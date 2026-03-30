@@ -11,6 +11,7 @@ type TherapistRow = {
   online: boolean | null;
   therapist_types: string[] | null;
   training_areas: string[] | null;
+  assessment_types: string[] | null;
   regions: string[] | null;
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
@@ -42,6 +43,7 @@ async function buildTherapistsResponse() {
       online,
       therapist_types,
       training_areas,
+      assessment_types,
       regions,
       cultural_prefs,
       arrangements,
@@ -88,6 +90,7 @@ async function buildTherapistsResponse() {
         online: t.online ?? false,
         therapist_types: t.therapist_types ?? [],
         training_areas: t.training_areas ?? [],
+        assessment_types: t.assessment_types ?? [],
         regions: t.regions ?? [],
         cultural_prefs: t.cultural_prefs ?? [],
         arrangements: t.arrangements ?? [],
@@ -137,6 +140,18 @@ export async function PATCH(request: Request) {
         { ok: false, error: "Missing therapist id" },
         { status: 400 }
       );
+    }
+
+    // עדכון שדות מלאים (עריכה)
+    if (body.fields) {
+      const allowed = ["full_name","email","phone","bio","gender","online","therapist_types","training_areas","assessment_types","regions","cultural_prefs","arrangements"];
+      const update: Record<string, unknown> = {};
+      for (const key of allowed) {
+        if (key in body.fields) update[key] = body.fields[key];
+      }
+      const { error } = await supabaseAdmin.from("therapists").update(update).eq("id", id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true, id });
     }
 
     if (!status || !["approved", "rejected", "pending"].includes(status)) {

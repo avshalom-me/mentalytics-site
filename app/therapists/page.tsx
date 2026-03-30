@@ -29,6 +29,49 @@ export default function TherapistsPage() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [regionFilter, setRegionFilter] = useState("");
 
+  // Update request modal
+  const [updateTarget, setUpdateTarget] = useState<PublicTherapist | null>(null);
+  const [updateName, setUpdateName] = useState("");
+  const [updateEmail, setUpdateEmail] = useState("");
+  const [updateMessage, setUpdateMessage] = useState("");
+  const [updateSending, setUpdateSending] = useState(false);
+  const [updateDone, setUpdateDone] = useState(false);
+  const [updateErr, setUpdateErr] = useState("");
+
+  function openUpdateRequest(t: PublicTherapist) {
+    setUpdateTarget(t);
+    setUpdateName("");
+    setUpdateEmail("");
+    setUpdateMessage("");
+    setUpdateDone(false);
+    setUpdateErr("");
+  }
+
+  async function sendUpdateRequest() {
+    if (!updateTarget) return;
+    setUpdateSending(true);
+    setUpdateErr("");
+    try {
+      const res = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: updateName || updateTarget.full_name,
+          email: updateEmail || "no-reply@mentalytics.co.il",
+          subject: `בקשת עדכון פרטים — ${updateTarget.full_name}`,
+          message: `מטפל/ת: ${updateTarget.full_name}\nמייל רשום: ${updateTarget.email}\n\nבקשת השינוי:\n${updateMessage}`,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "שגיאה בשליחה");
+      setUpdateDone(true);
+    } catch (err) {
+      setUpdateErr(err instanceof Error ? err.message : "שגיאה");
+    } finally {
+      setUpdateSending(false);
+    }
+  }
+
   useEffect(() => {
     let cancelled = false;
     async function loadTherapists() {
@@ -201,12 +244,102 @@ export default function TherapistsPage() {
                       )}
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-stone-100">
+                    <button
+                      onClick={() => openUpdateRequest(t)}
+                      className="text-xs text-stone-400 underline hover:text-stone-600"
+                    >
+                      מטפל/ת? בקש/י עדכון פרטים
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
           );
         })}
       </div>
+
+      {/* Update request modal */}
+      {updateTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl" dir="rtl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-stone-900">בקשת עדכון פרטים</h2>
+              <button
+                onClick={() => setUpdateTarget(null)}
+                className="text-2xl text-stone-400 hover:text-stone-700 leading-none"
+              >
+                ×
+              </button>
+            </div>
+
+            {updateDone ? (
+              <div className="py-6 text-center">
+                <div className="mb-2 text-3xl">✓</div>
+                <p className="font-semibold text-stone-800">הבקשה נשלחה בהצלחה!</p>
+                <p className="mt-1 text-sm text-stone-500">נחזור אליך בהקדם.</p>
+                <button
+                  onClick={() => setUpdateTarget(null)}
+                  className="mt-4 rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90"
+                >
+                  סגור
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm text-stone-600">
+                  שלח/י בקשה לעדכון הכרטיס של <strong>{updateTarget.full_name}</strong>.
+                </p>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-stone-700">שמך (אופציונלי)</label>
+                  <input
+                    value={updateName}
+                    onChange={(e) => setUpdateName(e.target.value)}
+                    placeholder={updateTarget.full_name}
+                    className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-stone-700">מייל ליצירת קשר (אופציונלי)</label>
+                  <input
+                    value={updateEmail}
+                    onChange={(e) => setUpdateEmail(e.target.value)}
+                    placeholder={updateTarget.email || "your@email.com"}
+                    className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-stone-700">מה ברצונך לעדכן?</label>
+                  <textarea
+                    value={updateMessage}
+                    onChange={(e) => setUpdateMessage(e.target.value)}
+                    rows={4}
+                    placeholder="לדוגמה: שם, טלפון, תחומי טיפול..."
+                    className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+                  />
+                </div>
+                {updateErr && <p className="text-sm text-red-600">{updateErr}</p>}
+                <div className="flex justify-end gap-3 pt-1">
+                  <button
+                    onClick={() => setUpdateTarget(null)}
+                    className="rounded-xl border border-stone-300 px-4 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                  >
+                    ביטול
+                  </button>
+                  <button
+                    onClick={sendUpdateRequest}
+                    disabled={updateSending || !updateMessage.trim()}
+                    className="rounded-xl bg-[#2e7d8c] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    {updateSending ? "שולח..." : "שלח בקשה"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </main>
   );
 }
