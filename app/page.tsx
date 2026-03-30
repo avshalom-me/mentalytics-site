@@ -277,9 +277,6 @@ export default function HomePage() {
                     </Link>
                   </div>
 
-                  <p className="mt-3 text-xs" style={{ color: "#A88B70" }}>
-                    ניתן לחבר כאן בהמשך וואטסאפ / מייל / טופס יצירת קשר.
-                  </p>
                 </div>
 
                 <div
