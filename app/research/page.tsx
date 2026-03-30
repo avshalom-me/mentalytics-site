@@ -1,370 +1,129 @@
-"use client";
+import Link from "next/link";
+import type { Metadata } from "next";
 
-import React, { useEffect, useMemo, useState } from "react";
-
-type SourceItem = {
-  id: string;
-  origin?: string;
-  raw?: string;
-  authors?: string[];
-  year?: number | string;
-  title?: string;
-  container?: string;
-  type?: "article" | "book" | "web" | string;
-  doi?: string;
-  url?: string;
-  abstract_url?: string;
-  full_text_url?: string;
-  tags?: string[];
-  annotation_he?: string;
-  verification_status?: "verified" | "corrected" | "unverified" | "error" | string;
-  verification_notes?: string;
+export const metadata: Metadata = {
+  title: "מאמרים ומידע שימושי",
+  description: "מידע מקצועי על סוגי טיפולים, בחירת מטפל, אבחונים, טיפול אונליין ועוד — בעברית, מותאם לישראל.",
 };
 
-const DATA_URL = "/assets/validated_sources.json"; // הקובץ שיושב ב: public/assets/validated_sources.json
+const TOPICS = [
+  {
+    href: "/research/therapist-types",
+    icon: "👨‍⚕️",
+    title: "סוגי המטפלים בישראל",
+    desc: "פסיכולוג קליני, עו\"ס קליני, מטפל בהבעה ויצירה — מה ההבדל ומי מתאים למה?",
+    color: "#FEF3EB",
+    border: "#F4C8A4",
+    tag: "#B06030",
+  },
+  {
+    href: "/research/assessments",
+    icon: "📋",
+    title: "סוגי אבחונים והערכות",
+    desc: "פסיכודידקטי, פסיכודיאגנוסטי, נוירופסיכולוגי — מתי כל אחד רלוונטי ומה מקבלים בסוף?",
+    color: "#EBF5F1",
+    border: "#A8D4C0",
+    tag: "#2A6B50",
+  },
+  {
+    href: "/research/online-therapy",
+    icon: "💻",
+    title: "טיפול אונליין — כן או לא?",
+    desc: "מחקרים, יתרונות, חסרונות, ומתי טיפול פנים מול פנים הכרחי.",
+    color: "#EDF2FC",
+    border: "#B4C8F0",
+    tag: "#1A4A8A",
+  },
+  {
+    href: "/research/choosing-therapist",
+    icon: "🤝",
+    title: "איך בוחרים מטפל?",
+    desc: "מה לשאול בשיחת היכרות, אילו פרמטרים חשובים, ומה המחקר אומר על ברית טיפולית.",
+    color: "#F5EEF8",
+    border: "#D4B4E8",
+    tag: "#6A3A8A",
+  },
+  {
+    href: "/research/therapy-types",
+    icon: "🧠",
+    title: "סוגי הטיפולים השונים",
+    desc: "CBT, דינאמי, EMDR, DBT, ACT ועוד — הסבר נגיש על כל גישה טיפולית ומה מתאים למי.",
+    color: "#FDF6EE",
+    border: "#F0D4A8",
+    tag: "#8B4A10",
+  },
+  {
+    href: "/research/faq",
+    icon: "❓",
+    title: "שאלות נפוצות",
+    desc: "כמה עולה טיפול, כמה זמן לוקח, האם קופות חולים מכסות — ותשובות לשאלות נוספות.",
+    color: "#F0F8F0",
+    border: "#B0D8B0",
+    tag: "#2A6A2A",
+  },
+];
 
-function safeText(v: unknown) {
-  return typeof v === "string" ? v : v == null ? "" : String(v);
-}
-
-function norm(v: unknown) {
-  return safeText(v).toLowerCase().trim();
-}
-
-function doiToUrl(doi?: string) {
-  const d = safeText(doi);
-  if (!d || d === "לא צוינו/unspecified") return "";
-  if (d.startsWith("http")) return d;
-  return `https://doi.org/${d}`;
-}
-
-function formatAuthors(authors?: string[]) {
-  if (!authors || authors.length === 0) return "לא צוינו/unspecified";
-  // בקובץ הנוכחי שמרתי "מחרוזת מחברים" בתא הראשון של המערך (כדי לא לשבור שמות)
-  return authors.join("; ");
-}
-
-function buildCitation(it: SourceItem) {
-  const authors = formatAuthors(it.authors);
-  const year = safeText(it.year) || "לא צוינו/unspecified";
-  const title = safeText(it.title) || "לא צוינו/unspecified";
-  const container = safeText(it.container) || "לא צוינו/unspecified";
-  return `${authors} (${year}). ${title}. ${container}`;
-}
-
-function bestLinks(it: SourceItem) {
-  const links: { label: string; url: string }[] = [];
-
-  const doiUrl = doiToUrl(it.doi);
-  if (doiUrl) links.push({ label: "DOI", url: doiUrl });
-
-  const abs = safeText(it.abstract_url);
-  if (abs && abs !== "לא צוינו/unspecified") links.push({ label: "תקציר/עמוד מקור", url: abs });
-
-  const full = safeText(it.full_text_url);
-  if (full && full !== "לא צוינו/unspecified") links.push({ label: "טקסט מלא/PMC", url: full });
-
-  const url = safeText(it.url);
-  if (url && url !== "לא צוינו/unspecified" && !doiUrl) links.push({ label: "Publisher/Source", url });
-
-  const title = safeText(it.title);
-  if (title) {
-    links.push({
-      label: "Google Scholar",
-      url: `https://scholar.google.com/scholar?q=${encodeURIComponent(title)}`,
-    });
-  }
-
-  return links;
-}
-
-export default function AcademicArticlesPage() {
-  const [data, setData] = useState<SourceItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState("");
-
-  const [q, setQ] = useState("");
-  const [tag, setTag] = useState("");
-  const [type, setType] = useState("");
-  const [sort, setSort] = useState<"year_desc" | "year_asc" | "title_asc">("year_desc");
-
-  useEffect(() => {
-    (async () => {
-      try {
-        setLoading(true);
-        setErr("");
-        const res = await fetch(DATA_URL, { cache: "no-store" });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json = await res.json();
-        if (!Array.isArray(json)) throw new Error("JSON is not an array");
-        setData(json);
-      } catch (e: any) {
-        setErr(e?.message || "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
-
-  const allTags = useMemo(() => {
-    const s = new Set<string>();
-    data.forEach((it) => (it.tags || []).forEach((t) => t && s.add(t)));
-    return Array.from(s).sort((a, b) => a.localeCompare(b, "he"));
-  }, [data]);
-
-  const filtered = useMemo(() => {
-    const query = norm(q);
-
-    const list = data.filter((it) => {
-      if (tag && !(it.tags || []).includes(tag)) return false;
-      if (type && safeText(it.type) !== type) return false;
-
-      if (!query) return true;
-      const hay = [
-        formatAuthors(it.authors),
-        it.title,
-        it.container,
-        it.year,
-        it.doi,
-        (it.tags || []).join(" "),
-      ]
-        .map(norm)
-        .join(" | ");
-
-      return hay.includes(query);
-    });
-
-    const sorted = [...list].sort((a, b) => {
-      const ya = Number(a.year || 0);
-      const yb = Number(b.year || 0);
-
-      if (sort === "year_asc") return ya - yb;
-      if (sort === "year_desc") return yb - ya;
-
-      const ta = safeText(a.title);
-      const tb = safeText(b.title);
-      return ta.localeCompare(tb, "he");
-    });
-
-    return sorted;
-  }, [data, q, tag, type, sort]);
-
-  const counts = useMemo(() => {
-    const c: Record<string, number> = {};
-    filtered.forEach((it) => {
-      const k = safeText(it.verification_status) || "unverified";
-      c[k] = (c[k] || 0) + 1;
-    });
-    return c;
-  }, [filtered]);
-
+export default function ResearchHubPage() {
   return (
-    <section dir="rtl" lang="he" style={{ maxWidth: 980, margin: "0 auto", padding: 16, fontFamily: "system-ui, Arial", lineHeight: 1.6 }}>
-      <h2 style={{ marginTop: 0 }}>המאמרים האקדמאיים</h2>
+    <main className="mx-auto max-w-4xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
-      <p style={{ fontSize: "1.05rem", margin: "0 0 14px" }}>
-        השאלונים וההתאמה בנויים על בסיס מחקר בן כשנתיים המבוסס על מאות מחקרים אקדמאיים. אנו מצרפים את המאמרים הללו ואת המקורות שלהם.
-      </p>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "1.4fr 0.9fr 0.8fr 0.8fr",
-          gap: 10,
-          alignItems: "end",
-          marginBottom: 14,
-        }}
-      >
-        <label>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginBottom: 6 }}>חיפוש</div>
-          <input
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            type="search"
-            placeholder="כותרת / מחבר / שנה / DOI / תג…"
-            style={{ width: "100%", padding: 10, border: "1px solid #d7d7d7", borderRadius: 10, fontSize: "0.95rem" }}
-          />
-        </label>
-
-        <label>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginBottom: 6 }}>תג רלוונטיות</div>
-          <select
-            value={tag}
-            onChange={(e) => setTag(e.target.value)}
-            style={{ width: "100%", padding: 10, border: "1px solid #d7d7d7", borderRadius: 10, fontSize: "0.95rem" }}
-          >
-            <option value="">הכל</option>
-            {allTags.map((t) => (
-              <option key={t} value={t}>
-                {t}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginBottom: 6 }}>סוג מקור</div>
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            style={{ width: "100%", padding: 10, border: "1px solid #d7d7d7", borderRadius: 10, fontSize: "0.95rem" }}
-          >
-            <option value="">הכל</option>
-            <option value="article">מאמר</option>
-            <option value="book">ספר מקצועי</option>
-            <option value="web">מקור רשמי/אתר</option>
-          </select>
-        </label>
-
-        <label>
-          <div style={{ fontSize: "0.85rem", opacity: 0.85, marginBottom: 6 }}>מיון</div>
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as any)}
-            style={{ width: "100%", padding: 10, border: "1px solid #d7d7d7", borderRadius: 10, fontSize: "0.95rem" }}
-          >
-            <option value="year_desc">שנה (חדש→ישן)</option>
-            <option value="year_asc">שנה (ישן→חדש)</option>
-            <option value="title_asc">כותרת (א→ת)</option>
-          </select>
-        </label>
+      {/* Header */}
+      <div className="mb-10 text-center">
+        <h1 className="text-3xl font-black text-stone-900 mb-3">מאמרים ומידע שימושי</h1>
+        <p className="text-stone-600 leading-7 max-w-xl mx-auto">
+          מידע מקצועי ונגיש על עולם הטיפול הנפשי — כדי שתוכלו להגיע מוכנים ולקבל החלטות מושכלות.
+        </p>
       </div>
 
-      <div aria-live="polite" style={{ margin: "10px 0 14px", fontSize: "0.95rem" }}>
-        {loading ? (
-          <div style={{ border: "1px solid #e6e6e6", borderRadius: 14, padding: 12, background: "#fff" }}>טוען מקורות…</div>
-        ) : err ? (
-          <div style={{ border: "1px solid #ffb4b4", borderRadius: 14, padding: 12, background: "#fff0f0" }}>
-            <strong>שגיאה בטעינת מקורות.</strong>
-            <div style={{ marginTop: 6 }}>
-              ודא שהקובץ נמצא בנתיב: <code>public/assets/validated_sources.json</code>
+      {/* Topic cards */}
+      <div className="grid gap-5 md:grid-cols-2">
+        {TOPICS.map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            className="group rounded-2xl p-6 transition hover:shadow-md hover:-translate-y-0.5"
+            style={{
+              background: t.color,
+              border: `1px solid ${t.border}`,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+              textDecoration: "none",
+            }}
+          >
+            <div className="text-4xl mb-3">{t.icon}</div>
+            <h2 className="text-lg font-extrabold text-stone-900 mb-2 group-hover:underline">{t.title}</h2>
+            <p className="text-sm leading-6 text-stone-700">{t.desc}</p>
+            <div
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1"
+              style={{ background: t.tag + "22", color: t.tag }}
+            >
+              קריאה ←
             </div>
-            <div style={{ marginTop: 6, opacity: 0.9 }}>פרטים: {err}</div>
-          </div>
-        ) : (
-          <div>
-            מוצגים <strong>{filtered.length}</strong> מקורות.&nbsp;
-            <span style={{ border: "1px solid #a7d7a7", background: "#effbea", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-              verified: {counts.verified || 0}
-            </span>{" "}
-            <span style={{ border: "1px solid #ffd38a", background: "#fff6e6", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-              corrected: {counts.corrected || 0}
-            </span>{" "}
-            <span style={{ border: "1px solid #d6d6d6", background: "#f7f7f7", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-              unverified: {counts.unverified || 0}
-            </span>
-          </div>
-        )}
+          </Link>
+        ))}
       </div>
 
-      {!loading && !err && (
-        <>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-            {filtered.map((it) => {
-              const badge = safeText(it.verification_status || "unverified");
-              const tagsTxt = (it.tags || []).length ? (it.tags || []).join(", ") : "לא צוינו/unspecified";
-              const links = bestLinks(it);
-
-              const badgeStyle: React.CSSProperties =
-                badge === "verified"
-                  ? { border: "1px solid #a7d7a7", background: "#effbea" }
-                  : badge === "corrected"
-                  ? { border: "1px solid #ffd38a", background: "#fff6e6" }
-                  : badge === "error"
-                  ? { border: "1px solid #ffb4b4", background: "#fff0f0" }
-                  : { border: "1px solid #d6d6d6", background: "#f7f7f7" };
-
-              return (
-                <article key={it.id} style={{ border: "1px solid #e6e6e6", borderRadius: 14, padding: "12px 14px", background: "#fff" }}>
-                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ ...badgeStyle, borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem", whiteSpace: "nowrap" }}>{badge}</span>
-                    <span style={{ border: "1px solid #ddd", background: "#f7f7f7", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-                      {safeText(it.type || "article")}
-                    </span>
-                    <span style={{ border: "1px solid #ddd", background: "#f7f7f7", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-                      {tagsTxt}
-                    </span>
-                    {it.origin ? (
-                      <span style={{ border: "1px solid #ddd", background: "#f7f7f7", borderRadius: 999, padding: "4px 8px", fontSize: "0.78rem" }}>
-                        מקור: {safeText(it.origin)}
-                      </span>
-                    ) : null}
-                  </div>
-
-                  <p style={{ margin: "0 0 6px" }}>{buildCitation(it)}</p>
-
-                  {it.annotation_he ? (
-                    <p style={{ fontSize: "0.92rem", opacity: 0.95, margin: "0 0 6px" }}>
-                      <strong>אנוטציה:</strong> {it.annotation_he}
-                    </p>
-                  ) : null}
-
-                  {it.verification_notes ? (
-                    <p style={{ fontSize: "0.92rem", opacity: 0.95, margin: "0 0 6px" }}>
-                      <strong>הערות אימות:</strong> {it.verification_notes}
-                    </p>
-                  ) : null}
-
-                  <div style={{ marginTop: 6, fontSize: "0.95rem" }}>
-                    {links.map((l) => (
-                      <a key={l.label} href={l.url} target="_blank" rel="noopener" style={{ marginLeft: 10, textDecoration: "none", borderBottom: "1px dotted #666" }}>
-                        {l.label}
-                      </a>
-                    ))}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-
-          <h3 style={{ marginTop: 18 }}>טבלת השוואה</h3>
-
-          <div style={{ overflow: "auto", border: "1px solid #e6e6e6", borderRadius: 12 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 780 }}>
-              <thead>
-                <tr>
-                  {["מחברים", "שנה", "סוג", "DOI/URL", "תג", "אימות"].map((h) => (
-                    <th key={h} style={{ position: "sticky", top: 0, background: "#fafafa", textAlign: "right", padding: 10, borderBottom: "1px solid #eee" }}>
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((it) => {
-                  const primary = doiToUrl(it.doi) || (safeText(it.url) !== "לא צוינו/unspecified" ? safeText(it.url) : "");
-                  return (
-                    <tr key={`row-${it.id}`}>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>{formatAuthors(it.authors)}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>{safeText(it.year) || "לא צוינו/unspecified"}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>{safeText(it.type) || "לא צוינו/unspecified"}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>
-                        {primary ? (
-                          <a href={primary} target="_blank" rel="noopener" style={{ textDecoration: "none", borderBottom: "1px dotted #666" }}>
-                            קישור
-                          </a>
-                        ) : (
-                          "לא צוינו/unspecified"
-                        )}
-                      </td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>{(it.tags || []).join(", ") || "לא צוינו/unspecified"}</td>
-                      <td style={{ padding: 10, borderBottom: "1px solid #eee", verticalAlign: "top" }}>{safeText(it.verification_status) || "unverified"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          <details style={{ marginTop: 14 }}>
-            <summary>הערות על סטטוס אימות</summary>
-            <p style={{ marginTop: 8 }}>
-              <strong>verified</strong> = יש DOI/קישור רשמי; <strong>corrected</strong> = תוקן מול מקור;{" "}
-              <strong>unverified</strong> = חסרים פרטים/אין DOI או קישור רשמי.
+      {/* Academic articles section */}
+      <div
+        className="mt-14 rounded-2xl p-6"
+        style={{ background: "#F7F5F2", border: "1px solid #E0D8D0" }}
+      >
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="font-extrabold text-stone-800 text-lg">📚 מאמרים אקדמאיים</h3>
+            <p className="text-sm text-stone-500 mt-1">
+              השאלונים מבוססים על מאות מחקרים — הנה המקורות המלאים.
             </p>
-          </details>
-        </>
-      )}
-    </section>
+          </div>
+          <Link
+            href="/research/academic"
+            className="inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-90"
+            style={{ background: "linear-gradient(135deg,#4A6FA5,#2C3E7A)" }}
+          >
+            לרשימת המאמרים ←
+          </Link>
+        </div>
+      </div>
+    </main>
   );
 }

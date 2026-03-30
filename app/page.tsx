@@ -1,5 +1,11 @@
 import Link from "next/link";
-import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, Shield } from "lucide-react";
+import type { Metadata } from "next";
+import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, Shield, User, GraduationCap } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "Mentalytics — הכוונה טיפולית חכמה",
+  description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול, סוג המטפל, והמטפל הנכון עבורכם — לילדים ולמבוגרים.",
+};
 
 const faqs = [
   {
@@ -21,6 +27,14 @@ const faqs = [
   {
     q: "איך מתחילים שאלון למבוגרים או לילדים/נוער?",
     a: "התחלת השאלונים נמצאת בכפתורים הקבועים בתפריט העליון (שאלון למבוגרים / שאלון לילדים-נוער).",
+  },
+  {
+    q: "למה להשתמש בחברה שלכם, האם לא עדיף לקבל המלצה מחבר/ה?",
+    a: "לעיתים אכן זה כיוון טוב לקבל המלצה מחבר. אולם לא תמיד מטפל שמתאים לחבר/ה מתאים גם לך. לפעמים בגלל הבדלים בסיבה שבאת לטיפול ולפעמים זה סוג הטיפול או האישיות המקצועית של המטפל.",
+  },
+  {
+    q: "מה עוד אני מקבל?",
+    a: "בחלק מהמקרים יינתנו כלים להפחתת הקשיים המדווחים או להתמודדות טובה יותר עם מה שצויין. המערכת גם יודעת להפנות לאבחון או הערכה לפי הצורך.",
   },
 ];
 
@@ -155,7 +169,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="mt-2 text-xl font-semibold" style={{ color: "#6B4226" }}>
-                  מערכת אבחון והכוונה טיפולית באמצעות שאלונים מודולריים
+                  מערכת בירור, הכוונה והתאמה טיפולית באמצעות שאלונים מודולריים אנונימיים
                 </p>
 
                 <div className="my-6 block md:hidden rounded-3xl overflow-hidden h-44"
@@ -207,12 +221,13 @@ export default function HomePage() {
                   <TrustBadge
                     icon={Heart}
                     color="#9B4F80"
-                    text="המערכת פותחה יחד עם פסיכולוגים ומטפלים קליניים — כדי שתקבלו כיוון אמיתי, לא רק מספרים."
+                    text='המערכת פותחה ע"י פסיכולוגים ומטפלים קליניים וכן חוקרים בתחומים שונים - כדי שתקבלו את הטיפול ואת המטפל/ת המתאים ביותר עבורכם'
                   />
                 </div>
 
                 <p className="mt-5 text-sm" style={{ color: "#8B6A50" }}>
-                  להתחלת שאלון: השתמשו בכפתורים שבתפריט העליון (מבוגרים / ילדים-נוער).
+                  לפירוט והסבר השתמשו בכפתורים בתפריט העליון: מבוגרים / ילדים-נוער.<br />
+                  להתחלת שאלון באופן מיידי יש ללחוץ על "שאלון למבוגרים" / "שאלון לילדים".
                 </p>
               </div>
 
@@ -322,6 +337,114 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* ADULTS QUESTIONNAIRE */}
+      <section id="adults" className="mt-14 fade-up">
+        <div
+          className="rounded-3xl p-8 md:p-10"
+          style={{
+            background: "linear-gradient(135deg,#FDF6EE 0%,#F5E8DC 60%,#E8F4F0 100%)",
+            border: "1px solid #E0D5C8",
+            boxShadow: "0 8px 32px rgba(120,80,50,.10)",
+          }}
+        >
+          <div className="mb-1 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
+            style={{ background: "#C96B5522", color: "#C96B55", border: "1px solid #C96B5544" }}>
+            <User size={12} />
+            מבוגרים
+          </div>
+
+          <h2 className="mt-4 text-2xl font-extrabold text-stone-900 leading-snug">
+            שאלון התאמת הטיפול עבור מבוגרים
+          </h2>
+
+          <div className="mt-5 space-y-4 leading-8 text-stone-700">
+            <p>
+              שאלון התאמת הטיפול עבור מבוגרים <strong>פותח במשך מספר שנים</strong>. הוא מבוסס על שילוב של עיבוד{" "}
+              <span className="font-bold" style={{ color: "#8B2E0A" }}>מאות מחקרים בתחום הפסיכולוגיה ומדעי המוח</span>,
+              על ניסיון קליני של מטפלים מובילים ועל עיבוד של בינה מלאכותית.
+            </p>
+            <p>
+              מטרת השאלון היא <strong>כפולה</strong>: להבין איזה{" "}
+              <span className="font-semibold" style={{ color: "#0F5468" }}>סוג טיפול</span> הכי
+              מתאים לצורך שלכם, וגם איזה{" "}
+              <span className="font-semibold" style={{ color: "#0F5468" }}>סגנון אישיות של מטפל/ת</span>{" "}
+              הכי מתאים לצרכים שלכם.
+            </p>
+            <p>
+              לאחר המענה על השאלון תיפתח לכם האפשרות לבחור מטפל המתאים ביותר עבורכם (ע"פ סוג הטיפול, אישיות מקצועית של המטפל, גיל, איזור מגורים, מגדר, העדפה תרבותית ועוד).
+            </p>
+          </div>
+
+          <div className="mt-7 flex items-center gap-4 flex-wrap">
+            <span className="text-base font-semibold text-stone-800">למעבר לשאלון לחצו כאן:</span>
+            <Link
+              href="/adults"
+              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
+              style={{ background: "linear-gradient(135deg,#C96B55,#A0402A)" }}
+            >
+              <User size={16} />
+              לשאלון למבוגרים ←
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* KIDS QUESTIONNAIRE */}
+      <section id="kids" className="mt-10 fade-up">
+        <div
+          className="rounded-3xl p-8 md:p-10"
+          style={{
+            background: "linear-gradient(135deg,#F0F7F2 0%,#DFF0E6 60%,#E8F4F0 100%)",
+            border: "1px solid #C8DDD0",
+            boxShadow: "0 8px 32px rgba(50,100,70,.10)",
+          }}
+        >
+          <div className="mb-1 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
+            style={{ background: "#6F8F7A22", color: "#4A7060", border: "1px solid #6F8F7A44" }}>
+            <GraduationCap size={12} />
+            ילדים ונוער
+          </div>
+
+          <h2 className="mt-4 text-2xl font-extrabold text-stone-900 leading-snug">
+            שאלון התאמת הטיפול עבור ילדים
+          </h2>
+
+          <div className="mt-5 space-y-4 leading-8 text-stone-700">
+            <p>
+              שאלון התאמת הטיפול עבור ילדים <strong>פותח במשך מספר שנים</strong>. הוא מבוסס על שילוב של עיבוד{" "}
+              <span className="font-bold" style={{ color: "#2A5C3A" }}>מאות מחקרים בתחום הפסיכולוגיה ומדעי המוח</span>,
+              על ניסיון קליני של מטפלים במספר תחומים: פסיכולוגיה, קלינאות תקשורת, לקויות למידה, ריפוי בעיסוק, פיזיותרפיה ועוד.
+            </p>
+            <p>
+              <strong>מטרות המענה על השאלון מרובות:</strong> להבין איזה{" "}
+              <span className="font-semibold" style={{ color: "#0F5468" }}>סוג טיפול/אבחון</span> הכי
+              מתאים לילדכם, לקבל כלים להתמודדות בבית או בכיתה, ולמצוא את המטפל/המאבחן המתאים ביותר.
+              בנוסף, הדו"ח שיינתן יסביר על אפשרויות המימון והבירוקרטיה הכרוכה.
+            </p>
+            <p>
+              לאחר המענה על השאלון יתקבל <strong>דו"ח אוטומטי</strong> שימליץ על אפשרויות הטיפול או האבחון הטובות ביותר.
+              כמו כן, ברוב המקרים יינתנו גם כלים להתמודדות עבור ההורים והצוות החינוכי.
+            </p>
+            <p>
+              בנוסף, ניתן יהיה לקבל התאמות מטפלים/מאבחנים ע"פ פרמטרים שונים כגון: התאמת הטיפול/אבחון לקושי הילד,{" "}
+              גיל, מגדר, מקום מגורים, שפה והעדפה תרבותית ועוד.
+            </p>
+          </div>
+
+          <div className="mt-7 flex items-center gap-4 flex-wrap">
+            <span className="text-base font-semibold text-stone-800">למעבר לשאלון לחצו כאן:</span>
+            <Link
+              href="/kids"
+              className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white transition hover:opacity-90 active:scale-95"
+              style={{ background: "linear-gradient(135deg,#6F8F7A,#4A7060)" }}
+            >
+              <GraduationCap size={16} />
+              לשאלון לילדים ←
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* FAQ */}
       <section className="mt-14">
         <h2 className="mb-6 text-2xl font-extrabold text-stone-900">שאלות ותשובות</h2>
@@ -338,8 +461,8 @@ export default function HomePage() {
               <summary className="flex list-none items-center justify-between font-bold text-stone-900">
                 <span>{item.q}</span>
                 <span
-                  className="rotate-plus mr-3 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-lg font-light"
-                  style={{ background: "#F4E8DC", color: "#8B2E0A" }}
+                  className="rotate-plus mr-3 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full leading-none"
+                  style={{ background: "#F4E8DC", color: "#8B2E0A", fontSize: "20px", fontWeight: 300 }}
                 >
                   +
                 </span>

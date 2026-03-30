@@ -1,5 +1,11 @@
 import Image from "next/image";
+import type { Metadata } from "next";
 import { Sparkles, ShieldCheck, Target, Users, Heart } from "lucide-react";
+
+export const metadata: Metadata = {
+  title: "אודות",
+  description: "הכירו את הצוות מאחורי Mentalytics — מערכת הכוונה טיפולית חכמה שפותחה על ידי פסיכולוגים קליניים.",
+};
 
 type TeamMember = {
   name: string;

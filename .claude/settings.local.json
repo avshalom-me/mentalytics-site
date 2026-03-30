@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude auth:*)",
+      "Bash(find /c/Users/avsha/Downloads /c/Users/avsha/Desktop /c/Users/avsha/Documents -name *שאלון* -o -name *questionnaire*)",
+      "Bash(find /c/Users/avsha -name *גרסה* -o -name *מבוגרים*)",
+      "Bash(find /c/Users/avsha -name *גרסה*)",
+      "Bash(find /c/Users/avsha -name *מבוגרים*)",
+      "Bash(find c:/projects/mentalytics-site -type f \\\\\\(-name *question* -o -name *form* -o -name *survey* \\\\\\))",
+      "Bash(find c:/projects/mentalytics-site -type d -name *data* -o -type d -name *questionnaire*)",
+      "Bash(find c:/projects/mentalytics-site -type f \\\\\\(-name *v7* -o -name *version* -o -name *original* -o -name *questionnaire* \\\\\\))",
+      "Bash(find c:/projects/mentalytics-site -type f \\\\\\(-name *.docx -o -name *.doc -o -name *.pdf -o -name *.txt \\\\\\))",
+      "Bash(grep -rn const.*= c:/projects/mentalytics-site/app --include=*.ts --include=*.tsx)",
+      "Bash(npx tsc:*)",
+      "Bash(grep -oP '✅.*?\\(?=\"\"\"\"|$\\)' \"/c/projects/mentalytics-site/app/kids/page.tsx\")",
+      "Bash(/tmp/check_match.txt:*)",
+      "Read(//tmp/**)"
+    ]
+  }
+}

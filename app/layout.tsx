@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
 import { Heebo } from "next/font/google";
-import { User, GraduationCap } from "lucide-react";
+import NavBar from "./components/NavBar";
+import AccessibilityWidget from "./components/AccessibilityWidget";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -11,61 +12,33 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: "Mentalytics",
-  description: "מערכת אבחון והכוונה טיפולית באמצעות שאלונים מודולריים",
+  title: { default: "Mentalytics", template: "%s | Mentalytics" },
+  description: "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+  openGraph: {
+    siteName: "Mentalytics",
+    locale: "he_IL",
+    type: "website",
+  },
 };
-
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href={href}>
-      {children}
-    </Link>
-  );
-}
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.className} min-h-screen bg-[#FAF7F2] text-stone-900`}>
-        <header className="sticky top-0 z-50 border-b border-[#E8E1D8] bg-white/80 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
-            <Link href="/" className="font-bold tracking-tight text-stone-900">
-              Mentalytics
-            </Link>
+        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none">
+          דלג לתוכן הראשי
+        </a>
+        <NavBar />
+        <AccessibilityWidget />
 
-            <nav className="flex items-center gap-4">
-              <NavLink href="/about">אודות</NavLink>
-              <NavLink href="/research">מאמרים</NavLink>
-              <NavLink href="/kids">ילדים</NavLink>
-              <NavLink href="/adults">מבוגרים</NavLink>
-              <NavLink href="/therapists">מטפלים</NavLink>
-
-              <div className="flex items-center gap-2">
-  <Link
-    href="/adults"
-    className="inline-flex items-center gap-2 rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40"
-  >
-    <User size={16} />
-    שאלון למבוגרים
-  </Link>
-
-  <Link
-    href="/kids"
-    className="inline-flex items-center gap-2 rounded-xl bg-[#6F8F7A] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#6F8F7A]/40"
-  >
-    <GraduationCap size={16} />
-    שאלון לילדים/נוער
-  </Link>
-</div>
-            </nav>
-          </div>
-        </header>
-
-        <div>{children}</div>
+        <div id="main-content">{children}</div>
 
         <footer className="mt-16 border-t border-[#E8E1D8] bg-white">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500">
-            © {new Date().getFullYear()} Mentalytics
+          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500 flex flex-wrap items-center gap-4">
+            <span>© {new Date().getFullYear()} Mentalytics</span>
+            <Link href="/privacy" className="hover:underline">מדיניות פרטיות</Link>
+            <Link href="/terms" className="hover:underline">תנאי שימוש</Link>
+            <Link href="/accessibility" className="hover:underline">הצהרת נגישות</Link>
           </div>
         </footer>
       </body>
