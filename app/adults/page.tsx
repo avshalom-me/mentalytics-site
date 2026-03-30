@@ -6,6 +6,7 @@ import type {
   ScoringResult,
   Recommendation,
 } from "@/app/lib/questionnaire-types";
+import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 
 // ── constants ────────────────────────────────────────────────────────────────
 const REGIONS = [
@@ -274,6 +275,7 @@ type Screen = string;
 
 type MatchPrefs = {
   region: string;
+  city: string;
   online: boolean;
   genderPref: string;
   culturalPrefs: string[];
@@ -285,7 +287,7 @@ export default function AdultsPage() {
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
-  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", online: false, genderPref: "", culturalPrefs: [] });
+  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -445,7 +447,8 @@ export default function AdultsPage() {
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
       const body: Record<string, unknown> = {
         treatmentTypes: [...new Set([selectedRec.treatment, selectedRec.treatmentLabel].filter(Boolean))],
-        region: matchPrefs.region || null,
+        city: matchPrefs.city || null,
+        region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs,
@@ -1635,11 +1638,21 @@ export default function AdultsPage() {
 
         <div className="mb-3">
           <label className="mb-1 block text-xs text-[#6b7280]">אזור גיאוגרפי</label>
-          <select value={matchPrefs.region} onChange={(e) => setMatchPrefs((p) => ({ ...p, region: e.target.value }))}
-            className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
-            <option value="">כל הארץ</option>
-            {REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+          <select value={matchPrefs.region} onChange={(e) => setMatchPrefs((p) => ({ ...p, region: e.target.value, city: "" }))}
+            className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none mb-2">
+            <option value="">בחר אזור</option>
+            {Object.keys(REGION_CITIES).map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
+          {matchPrefs.region && (
+            <>
+              <label className="mb-1 block text-xs text-[#6b7280]">עיר</label>
+              <select value={matchPrefs.city} onChange={(e) => setMatchPrefs((p) => ({ ...p, city: e.target.value }))}
+                className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
+                <option value="">כל הערים באזור</option>
+                {(REGION_CITIES[matchPrefs.region] ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </>
+          )}
         </div>
 
         <label className="mb-3 flex items-center gap-2 text-sm">

@@ -14,7 +14,8 @@
       "Bash(npx tsc:*)",
       "Bash(grep -oP '✅.*?\\(?=\"\"\"\"|$\\)' \"/c/projects/mentalytics-site/app/kids/page.tsx\")",
       "Bash(/tmp/check_match.txt:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(npm install:*)"
     ]
   }
 }

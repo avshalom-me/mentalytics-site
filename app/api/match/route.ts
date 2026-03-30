@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { citiesForRegion } from "@/app/lib/regions";
+import { CITY_TO_REGION } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -45,6 +45,7 @@ type NormalizedMatchInput = {
   therapistTypes: string[];
   culturalPreferences: string[];
   arrangements: string[];
+  city: string | null;
   region: string | null;
   genderPreference: string | null;
   onlineRequired: boolean;
@@ -215,6 +216,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   const styleP2 = Number.isInteger(body.styleP2) && body.styleP2 >= 1 && body.styleP2 <= 7 ? body.styleP2 : null;
   const styleP3 = Number.isInteger(body.styleP3) && body.styleP3 >= 1 && body.styleP3 <= 7 ? body.styleP3 : null;
   const ageGroups = mergeArrays(body.ageGroups, body.age_groups);
+  const city = firstNonEmptyString(body.city, body.city_name);
 
   return {
     treatmentTypes,
@@ -222,6 +224,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     therapistTypes,
     culturalPreferences,
     arrangements,
+    city,
     region,
     genderPreference,
     onlineRequired,
@@ -289,24 +292,35 @@ function scoreTherapist(
     }
   }
 
-  if (input.region || input.onlineRequired) {
+  if (input.city || input.region || input.onlineRequired) {
     possible += WEIGHTS.locationOnline;
 
-    const inRegion = input.region
-      ? citiesForRegion(input.region).some((city) =>
-          regions.includes(normalizeText(city))
-        )
-      : true;
+    const patientRegion = input.region ??
+      (input.city ? CITY_TO_REGION[input.city] ?? null : null);
 
-    // onlineRequired = "פתוח גם לאונליין" — מטפל אונליין נחשב התאמה גם אם לא באזור
+    // בדיקת התאמת עיר מדויקת
+    const inExactCity = input.city
+      ? regions.includes(normalizeText(input.city))
+      : false;
+
+    // בדיקת התאמת אזור (אותו אזור, עיר שונה)
+    const inSameRegion = patientRegion
+      ? regions.some((c) => CITY_TO_REGION[c] === patientRegion)
+      : false;
+
     const onlineMatch = input.onlineRequired && therapistOnline;
-    const locationOk = inRegion || onlineMatch;
 
-    if (locationOk) {
-      earned += WEIGHTS.locationOnline;
-      if (inRegion) reasons.push("התאמה באזור");
-      else if (onlineMatch) reasons.push("מציע טיפול אונליין");
+    if (inExactCity) {
+      earned += WEIGHTS.locationOnline; // התאמה מלאה — אותה עיר
+      reasons.push("התאמה מלאה באזור");
+    } else if (inSameRegion) {
+      earned += Math.round(WEIGHTS.locationOnline * 0.6); // 60% — אותו אזור
+      reasons.push("התאמה באזור");
+    } else if (onlineMatch) {
+      earned += Math.round(WEIGHTS.locationOnline * 0.4); // 40% — אונליין בלבד
+      reasons.push("מציע טיפול אונליין");
     }
+    // אזור שונה לגמרי = 0 נקודות
   }
 
   if (input.genderPreference) {

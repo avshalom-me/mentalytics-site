@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, Shield, User, GraduationCap } from "lucide-react";
+import ContactForm from "./components/ContactForm";
 
 export const metadata: Metadata = {
   title: "Mentalytics — הכוונה טיפולית חכמה",
@@ -495,14 +496,7 @@ export default function HomePage() {
           <p className="text-stone-700 leading-7">
             אנחנו כאן לענות על כל שאלה — לפני השאלון, אחריו, או אם סתם רוצים לדבר עם מישהו לפני שמתחילים.
           </p>
-          <p className="mt-2 text-sm text-stone-600">
-            כאן אפשר לשים בהמשך טופס יצירת קשר קצר / כפתור וואטסאפ / מייל.
-          </p>
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-semibold"
-            style={{ background: "#0F5468", color: "white" }}>
-            <Shield size={14} />
-            נגיב תוך 24 שעות 
-          </div>
+          <ContactForm />
         </div>
       </section>
 
