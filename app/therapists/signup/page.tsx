@@ -38,6 +38,7 @@ const TRAINING_AREAS = [
   "טיפול מיני",
   "טיפול COG-FUN לקשיי קשב וריכוז",
   "טיפול בטראומה",
+  "אבחון אוטיזם (ASD)",
 ] as const;
 
 const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
@@ -162,7 +163,7 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
           <h1 className="text-3xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>
             למה להירשם כמטפל?
           </h1>
-          <p className="mt-3 text-stone-600 leading-7 max-w-lg mx-auto">
+          <p className="mt-3 text-stone-800 leading-7 max-w-lg mx-auto">
             Mentalytics היא מערכת הפניה חכמה שמחברת בין מטופלים לאנשי טיפול —
             על בסיס התאמה אמיתית, לא רק רשימה.
           </p>
@@ -176,7 +177,7 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
               <div className="text-3xl flex-shrink-0 mt-0.5">{b.icon}</div>
               <div>
                 <p className="font-bold text-[#1a3a5c] mb-1">{b.title}</p>
-                <p className="text-sm leading-6 text-stone-600">{b.body}</p>
+                <p className="text-sm leading-6 text-stone-800">{b.body}</p>
               </div>
             </div>
           ))}
@@ -186,7 +187,7 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
         <div className="rounded-2xl p-5 mb-8 text-center"
           style={{ background: "linear-gradient(135deg,#EFF7F4,#E8F0F7)", border: "1px solid #C8DDD8" }}>
           <p className="font-bold text-[#1a3a5c] text-lg mb-1">ההרשמה חינמית*</p>
-          <p className="text-sm text-stone-500 mt-1">* לקידום הכרטיס שלך — <span className="underline cursor-pointer text-[#0F5468]">לחץ כאן</span> (יתווסף בהמשך)</p>
+          <p className="text-sm text-stone-700 mt-1">* לקידום הכרטיס שלך — <span className="underline cursor-pointer text-[#0F5468]">לחץ כאן</span> (יתווסף בהמשך)</p>
         </div>
 
         {/* CTA */}
@@ -198,7 +199,7 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
           >
             להרשמה ←
           </button>
-          <p className="mt-4 text-xs text-stone-500">
+          <p className="mt-4 text-xs text-stone-700">
             ההרשמה אורכת כ-5 דקות. הפרופיל יעלה לאחר בדיקה ואישור.
           </p>
         </div>
@@ -409,7 +410,7 @@ export default function TherapistSignupPage() {
           ← חזרה לאזור מטפלים
         </Link>
         <h1 className="mt-3 text-3xl font-bold">הרשמה למאגר מטפלים</h1>
-        <p className="mt-2 text-slate-600">
+        <p className="mt-2 text-slate-800">
           מלא/י את הפרטים. לאחר שליחה הפרופיל יישמר וימתין לאישור ידני לפני
           פרסום.
         </p>
@@ -493,7 +494,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">הכשרת מטפל <span className="text-red-500">*</span></h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לבחור כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לבחור כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {THERAPIST_TYPES.map((t) => (
@@ -515,7 +516,7 @@ export default function TherapistSignupPage() {
         </section>
         <section className="rounded-2xl border bg-white p-6">
   <h2 className="text-lg font-bold">כמה מילים עליי <span className="text-red-500">*</span></h2>
-  <p className="mt-1 text-sm text-slate-600">
+  <p className="mt-1 text-sm text-slate-800">
     2–3 משפטים קצרים על סגנון העבודה, ניסיון או תחומי התמחות.
   </p>
 
@@ -530,14 +531,14 @@ export default function TherapistSignupPage() {
     />
   </label>
 
-  <p className="mt-2 text-xs text-slate-500">
+  <p className="mt-2 text-xs text-slate-700">
     {form.bio.length}/500 תווים
   </p>
 </section>
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">תחומי הכשרה <span className="text-red-500">*</span></h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לבחור כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לבחור כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {TRAINING_AREAS.map((t) => (
@@ -569,7 +570,7 @@ export default function TherapistSignupPage() {
           {form.trainingAreas.includes("טיפול זוגי") && (
             <div className="mt-4 rounded-xl border bg-slate-50 p-4">
               <div className="text-sm font-semibold">סוג הטיפול הזוגי</div>
-              <p className="mt-1 text-xs text-slate-600">אפשר לבחור כמה.</p>
+              <p className="mt-1 text-xs text-slate-800">אפשר לבחור כמה.</p>
 
               <div className="mt-3 flex flex-wrap gap-4">
                 {COUPLES_MODALITIES.map((m) => (
@@ -594,7 +595,7 @@ export default function TherapistSignupPage() {
           {form.trainingAreas.includes("טיפול בהבעה ויצירה") && (
             <div className="mt-4 rounded-xl border bg-slate-50 p-4">
               <div className="text-sm font-semibold">סוג הטיפול בהבעה ויצירה</div>
-              <p className="mt-1 text-xs text-slate-600">אפשר לבחור כמה.</p>
+              <p className="mt-1 text-xs text-slate-800">אפשר לבחור כמה.</p>
 
               <div className="mt-3 flex flex-wrap gap-4">
                 {PLAY_THERAPY_MODALITIES.map((m) => (
@@ -619,7 +620,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">קבוצות גיל</h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לבחור כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לבחור כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {AGE_GROUPS.map((item) => (
@@ -642,7 +643,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">האם עורך/ת אבחונים?</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-800">
             אופציונלי. אם אינך עורך/ת אבחונים, אפשר להשאיר ריק.
           </p>
 
@@ -667,12 +668,12 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">סגנון עבודה טיפולי <span className="text-red-500">*</span></h2>
-          <p className="mt-1 text-sm text-slate-600">3 שאלות על הגישה הטיפולית שלך — ישמשו להתאמה אישיותית עם מטופלים</p>
+          <p className="mt-1 text-sm text-slate-800">3 שאלות על הגישה הטיפולית שלך — ישמשו להתאמה אישיותית עם מטופלים</p>
 
           {/* T1 */}
           <div className="mt-5">
             <p className="text-sm font-semibold text-slate-800">בעבודתי הטיפולית, אני נוטה לראות בהבנה מעמיקה של שורשי הקושי, העבר והדפוסים הלא-מודעים מרכיב מרכזי בשינוי הטיפולי.</p>
-            <p className="mt-1 text-xs text-slate-500">1 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק &nbsp;|&nbsp; 7 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד</p>
+            <p className="mt-1 text-xs text-slate-700">1 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק &nbsp;|&nbsp; 7 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד</p>
             <div className="mt-3 flex flex-wrap gap-4">
               {[1,2,3,4,5,6,7].map((num) => (
                 <label key={num} className="flex items-center gap-2 text-sm">
@@ -686,7 +687,7 @@ export default function TherapistSignupPage() {
           {/* T2 */}
           <div className="mt-5 border-t pt-5">
             <p className="text-sm font-semibold text-slate-800">בעבודתי הטיפולית, אני נוטה להציע למטופלים מסגרת ברורה, מטרות מוגדרות, כלים ומשימות בין פגישות.</p>
-            <p className="mt-1 text-xs text-slate-500">1 = בכלל לא מסכים/ה — אני עובד/ת יותר במרחב פתוח וגמיש &nbsp;|&nbsp; 7 = מסכים/ה מאוד — אני עובד/ת באופן מובנה, מכוון ופרקטי</p>
+            <p className="mt-1 text-xs text-slate-700">1 = בכלל לא מסכים/ה — אני עובד/ת יותר במרחב פתוח וגמיש &nbsp;|&nbsp; 7 = מסכים/ה מאוד — אני עובד/ת באופן מובנה, מכוון ופרקטי</p>
             <div className="mt-3 flex flex-wrap gap-4">
               {[1,2,3,4,5,6,7].map((num) => (
                 <label key={num} className="flex items-center gap-2 text-sm">
@@ -700,7 +701,7 @@ export default function TherapistSignupPage() {
           {/* T3 */}
           <div className="mt-5 border-t pt-5">
             <p className="text-sm font-semibold text-slate-800">בטיפול, הסגנון הטבעי שלי הוא להיות פעיל/ה, מכוון/ת ומעורב/ת מילולית, יותר מאשר שקט/ה, מכיל/ה ומתבונן/ת.</p>
-            <p className="mt-1 text-xs text-slate-500">1 = בכלל לא מסכים/ה — אני יותר מכיל/ה, שוהה ומתבונן/ת &nbsp;|&nbsp; 7 = מסכים/ה מאוד — אני יותר פעיל/ה, מכוון/ת ומעורב/ת</p>
+            <p className="mt-1 text-xs text-slate-700">1 = בכלל לא מסכים/ה — אני יותר מכיל/ה, שוהה ומתבונן/ת &nbsp;|&nbsp; 7 = מסכים/ה מאוד — אני יותר פעיל/ה, מכוון/ת ומעורב/ת</p>
             <div className="mt-3 flex flex-wrap gap-4">
               {[1,2,3,4,5,6,7].map((num) => (
                 <label key={num} className="flex items-center gap-2 text-sm">
@@ -714,7 +715,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">אזורי פעילות ואונליין <span className="text-red-500">*</span></h2>
-          <p className="mt-1 text-sm text-slate-600">יש לבחור אזור פעילות אחד לפחות, או לסמן שעובד/ת אונליין (אפשר גם שניהם).</p>
+          <p className="mt-1 text-sm text-slate-800">יש לבחור אזור פעילות אחד לפחות, או לסמן שעובד/ת אונליין (אפשר גם שניהם).</p>
 
           <div className="mt-4">
             <div className="text-sm font-semibold mb-2">האם עובד/ת גם אונליין?</div>
@@ -736,13 +737,13 @@ export default function TherapistSignupPage() {
           <div className={`mt-5 ${form.online === "כן" ? "opacity-60" : ""}`}>
             <div className="text-sm font-semibold mb-1">
               ערים / אזורים פיזיים
-              {form.online === "כן" && <span className="mr-2 text-xs font-normal text-slate-500">(אופציונלי — כבר סימנת אונליין)</span>}
+              {form.online === "כן" && <span className="mr-2 text-xs font-normal text-slate-700">(אופציונלי — כבר סימנת אונליין)</span>}
             </div>
-            <p className="text-xs text-slate-500 mb-3">אפשר לבחור עד 3 ערים.</p>
+            <p className="text-xs text-slate-700 mb-3">אפשר לבחור עד 3 ערים.</p>
             <div className="space-y-4">
               {Object.entries(REGION_CITIES).map(([region, cities]) => (
                 <div key={region}>
-                  <p className="mb-1 text-xs font-bold text-slate-500 uppercase tracking-wide">{region}</p>
+                  <p className="mb-1 text-xs font-bold text-slate-700 uppercase tracking-wide">{region}</p>
                   <div className="grid gap-1 sm:grid-cols-3">
                     {cities.map((city) => {
                       const checked = form.regions.includes(city);
@@ -772,7 +773,7 @@ export default function TherapistSignupPage() {
               ))}
             </div>
             {regionLimitReached && (
-              <p className="mt-3 text-xs text-slate-500">
+              <p className="mt-3 text-xs text-slate-700">
                 בחרת כבר 3 ערים. כדי לבחור עיר אחרת—בטל אחת.
               </p>
             )}
@@ -781,7 +782,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">התאמות תרבותיות</h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לבחור כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לבחור כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {CULTURAL_PREFS.map((item) => (
@@ -804,7 +805,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">שפות טיפול</h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לבחור כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לבחור כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {LANGUAGES.map((item) => (
@@ -862,12 +863,12 @@ export default function TherapistSignupPage() {
               inputMode="numeric"
             />
           </label>
-          <p className="mt-2 text-xs text-slate-500">אפשר להשאיר ריק בשלב זה.</p>
+          <p className="mt-2 text-xs text-slate-700">אפשר להשאיר ריק בשלב זה.</p>
         </section>
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">הסדרים</h2>
-          <p className="mt-1 text-sm text-slate-600">אפשר לסמן כמה.</p>
+          <p className="mt-1 text-sm text-slate-800">אפשר לסמן כמה.</p>
 
           <div className="mt-4 grid gap-2 sm:grid-cols-2">
             {ARRANGEMENTS.map((t) => (
@@ -890,7 +891,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">תמונת פרופיל (אופציונלי)</h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-800">
             תמונה מגדילה משמעותית את החשיפה וההיענות של מטופלים.
           </p>
 
@@ -923,7 +924,7 @@ export default function TherapistSignupPage() {
               נקה תמונה
             </button>
 
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-slate-700">
               {form.profilePhoto
                 ? `נבחרה: ${form.profilePhoto.name}`
                 : "לא נבחרה תמונה"}
@@ -933,7 +934,7 @@ export default function TherapistSignupPage() {
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">העלאת תעודות <span className="text-red-500">*</span></h2>
-          <p className="mt-1 text-sm text-slate-600">
+          <p className="mt-1 text-sm text-slate-800">
             חובה לצרף לפחות תעודה אחת. ניתן להעלות PDF/JPG/PNG. מומלץ עד 10MB לקובץ.
           </p>
 
@@ -967,7 +968,7 @@ export default function TherapistSignupPage() {
               נקה בחירה
             </button>
 
-            <span className="text-sm text-slate-500">
+            <span className="text-sm text-slate-700">
               {form.certificates.length > 0
                 ? `נבחרו ${form.certificates.length} קבצים`
                 : "לא נבחרו קבצים"}
@@ -975,7 +976,7 @@ export default function TherapistSignupPage() {
           </div>
 
           {form.certificates.length > 0 && (
-            <ul className="mt-4 list-disc pr-5 text-sm text-slate-600">
+            <ul className="mt-4 list-disc pr-5 text-sm text-slate-800">
               {form.certificates.map((f, index) => (
                 <li key={`${f.name}-${index}`}>{f.name}</li>
               ))}
@@ -997,7 +998,7 @@ export default function TherapistSignupPage() {
           </button>
 
           {isSubmitting && (
-  <span className="text-sm text-slate-500">
+  <span className="text-sm text-slate-700">
     הטופס נשלח כעת, נא להמתין...
   </span>
 )}
