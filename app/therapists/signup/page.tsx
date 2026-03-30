@@ -38,7 +38,6 @@ const TRAINING_AREAS = [
   "טיפול מיני",
   "טיפול COG-FUN לקשיי קשב וריכוז",
   "טיפול בטראומה",
-  "אבחון אוטיזם (ASD)",
 ] as const;
 
 const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
@@ -66,6 +65,7 @@ const ASSESSMENT_TYPES = [
   "אבחון תעסוקתי",
   "הערכה פסיכולוגית",
   "הערכת בשלות לגן",
+  "אבחון קשיי תקשורת ASD",
 ] as const;
 
 const CULTURAL_PREFS = [
