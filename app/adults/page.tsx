@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type {
   QuestionnaireAnswers,
   ScoringResult,
@@ -52,7 +52,7 @@ const PRODROME_ITEMS = [
   "יש לי תחושת 'דז'ה וו' תכופה",
   "אני מריח/ה טעמים שאחרים לא מרגישים",
   "שמעתי קולות/לחישות שאחרים לא שמעו",
-  "אני שומע/ת רגשות לא רגילים (דיפקות, נקישות)",
+  "אני שומע/ת דברים לא רגילים (נקישות או דפיקות)",
   "אני מרגיש/ה שלאחרים יש משהו נגדי",
   "אני מרגיש/ה שאיני שולט/ת במחשבותיי",
   "קולות רחוקים מסיחים את דעתי",
@@ -292,6 +292,16 @@ export default function AdultsPage() {
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
+  const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    // Admin bypass via localStorage
+    if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
+    fetch("/api/usage/check?type=adults")
+      .then(r => r.json())
+      .then(d => setUsageAllowed(d.allowed))
+      .catch(() => setUsageAllowed(true)); // on error — allow
+  }, []);
 
   // temp state (not in answers)
   const [localAge, setLocalAge] = useState<number>(0);
@@ -408,9 +418,17 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations, therapistStyleScore: json.therapistStyleScore });
+      if (localStorage.getItem("quiz_bypass") !== "1") {
+        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults" }) })
+          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+      }
       setScreen("results");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
+      if (localStorage.getItem("quiz_bypass") !== "1") {
+        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults" }) })
+          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+      }
       setScreen("results");
     } finally {
       setLoading(false);
@@ -451,6 +469,20 @@ export default function AdultsPage() {
       setLoading(false);
     }
   }
+
+  // ── USAGE LIMIT ────────────────────────────────────────────────────────────
+  if (usageAllowed === false) return (
+    <Layout>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6" dir="rtl">
+        <div className="text-5xl mb-4">🔒</div>
+        <h2 className="text-2xl font-black text-stone-900 mb-3">הגעת למגבלת השימוש החינמי</h2>
+        <p className="text-stone-600 leading-7 max-w-sm">
+          ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
+          בקרוב נפתח אפשרות לתשלום — עקבו אחרינו לעדכונים.
+        </p>
+      </div>
+    </Layout>
+  );
 
   // ── DISCLAIMER ─────────────────────────────────────────────────────────────
   if (screen === "disclaimer") return (
@@ -683,7 +715,7 @@ export default function AdultsPage() {
 
   if (screen === "e3-q") return (
     <Layout>
-      <Card badge="שאלון פרודרום" badgeColor="green">
+      <Card badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את ההצהרות המתאימות לך:</p>
         <CheckList items={PRODROME_ITEMS} checked={prodromeChecked}
           onChange={(i, v) => setProdromeChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />

@@ -235,9 +235,22 @@ export default function AdminTherapistsPage() {
     );
   }
 
+  const isBypassed = typeof window !== "undefined" && localStorage.getItem("quiz_bypass") === "1";
+
   return (
     <main className="mx-auto max-w-6xl p-6" dir="rtl">
-      <h1 className="mb-8 text-3xl font-bold text-right">ניהול מטפלים</h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold">ניהול מטפלים</h1>
+        <button
+          onClick={() => {
+            if (isBypassed) { localStorage.removeItem("quiz_bypass"); window.location.reload(); }
+            else { localStorage.setItem("quiz_bypass", "1"); window.location.reload(); }
+          }}
+          className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${isBypassed ? "bg-green-100 text-green-700 border-green-300" : "bg-stone-100 text-stone-600 border-stone-300"}`}
+        >
+          {isBypassed ? "✓ מצב אדמין פעיל (ללא הגבלת שאלון)" : "הפעל מצב אדמין"}
+        </button>
+      </div>
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 

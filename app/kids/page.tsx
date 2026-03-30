@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ALL_REGIONS } from "@/app/lib/regions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -3568,6 +3568,22 @@ function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
 export default function KidsPage() {
   const [step, setStep] = useState<string>("p-consent");
   const [A, setA]       = useState<Ans>({});
+  const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
+    fetch("/api/usage/check?type=kids")
+      .then(r => r.json())
+      .then(d => setUsageAllowed(d.allowed))
+      .catch(() => setUsageAllowed(true));
+  }, []);
+
+  useEffect(() => {
+    if (step === "p-result" && localStorage.getItem("quiz_bypass") !== "1") {
+      fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids" }) })
+        .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+    }
+  }, [step]);
 
   function goNext(newA: Ans = A) {
     setA(newA);
@@ -3579,6 +3595,19 @@ export default function KidsPage() {
 
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
   const pageProps = { A, setA, onNext: goNext, onBack: goBack };
+
+  if (usageAllowed === false && step !== "p-result") return (
+    <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+        <div className="text-5xl mb-4">🔒</div>
+        <h2 className="text-2xl font-black text-stone-900 mb-3">הגעת למגבלת השימוש החינמי</h2>
+        <p className="text-stone-600 leading-7 max-w-sm">
+          ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
+          בקרוב נפתח אפשרות לתשלום — עקבו אחרינו לעדכונים.
+        </p>
+      </div>
+    </main>
+  );
 
   return (
     <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
