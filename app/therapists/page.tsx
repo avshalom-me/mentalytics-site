@@ -153,11 +153,11 @@ export default function TherapistsPage() {
                 onClick={() => setOpenId(isOpen ? null : t.id)}
               >
                 {/* Photo — full width */}
-                <div className="relative h-44 w-full overflow-hidden bg-[#f5f0ea]">
+                <div className="relative h-44 w-full overflow-hidden bg-gray-100">
                   <img
                     src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
                     alt={t.full_name}
-                    className={`h-full w-full ${showImage ? "object-contain object-top" : "object-cover"}`}
+                    className="h-full w-full object-cover object-top"
                     onError={() => setBrokenImages((p) => ({ ...p, [t.id]: true }))}
                   />
                 </div>
