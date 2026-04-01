@@ -38,7 +38,6 @@ const TRAINING_AREAS = [
   "טיפול מיני",
   "טיפול COG-FUN לקשיי קשב וריכוז",
   "טיפול בטראומה",
-  "פסיכודרמה",
 ] as const;
 
 const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
@@ -49,6 +48,7 @@ const PLAY_THERAPY_MODALITIES = [
   "דרמה תרפיה",
   'טיפול בעזרת בע"ח',
   "טיפול במוזיקה",
+  "פסיכודרמה",
 ] as const;
 
 const AGE_GROUPS = [

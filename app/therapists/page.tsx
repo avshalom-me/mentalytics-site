@@ -140,6 +140,7 @@ export default function TherapistsPage() {
         {filtered.map((t) => {
           const isOpen = openId === t.id;
           const showImage = t.profile_photo_url && !brokenImages[t.id];
+          const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
 
           return (
             <div key={t.id}
@@ -148,27 +149,30 @@ export default function TherapistsPage() {
 
               {/* Always visible — header */}
               <button
-                className="w-full text-right p-4 hover:bg-stone-50 transition"
+                className="w-full text-right hover:bg-stone-50 transition"
                 onClick={() => setOpenId(isOpen ? null : t.id)}
               >
-                <div className="flex items-center gap-3">
-                  {/* Avatar */}
-                  <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-xl bg-gray-100 border border-[#E8E0D8]">
-                    <img
-                      src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                      alt={t.full_name}
-                      className="h-full w-full object-cover"
-                      onError={() => setBrokenImages((p) => ({ ...p, [t.id]: true }))}
-                    />
-                  </div>
+                {/* Photo — full width */}
+                <div className="relative h-40 w-full overflow-hidden bg-gray-100">
+                  <img
+                    src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                    alt={t.full_name}
+                    className="h-full w-full object-cover"
+                    onError={() => setBrokenImages((p) => ({ ...p, [t.id]: true }))}
+                  />
+                </div>
 
-                  {/* Name + tags */}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-extrabold text-stone-900 text-sm leading-tight">{t.full_name}</div>
+                {/* Name + bio snippet */}
+                <div className="flex items-start justify-between gap-2 p-4">
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="font-extrabold text-stone-900 text-base leading-tight">{t.full_name}</div>
                     {t.therapist_types.length > 0 && (
-                      <div className="mt-1 text-xs text-stone-500 truncate">{t.therapist_types[0]}</div>
+                      <div className="mt-0.5 text-xs text-stone-500">{t.therapist_types[0]}</div>
                     )}
-                    <div className="mt-1.5 flex flex-wrap gap-1">
+                    {bioSnippet && (
+                      <p className="mt-1.5 text-xs text-stone-600 leading-relaxed line-clamp-2">{bioSnippet}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1">
                       {t.online && (
                         <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700">🌐 אונליין</span>
                       )}
@@ -177,8 +181,7 @@ export default function TherapistsPage() {
                       )}
                     </div>
                   </div>
-
-                  <span className="text-stone-400 text-lg flex-shrink-0"
+                  <span className="text-stone-400 text-lg flex-shrink-0 mt-0.5"
                     style={{ transform: isOpen ? "rotate(45deg)" : "rotate(0deg)", transition: "transform 0.2s", display: "inline-block" }}>
                     +
                   </span>
@@ -191,7 +194,6 @@ export default function TherapistsPage() {
                   {t.bio && (
                     <p className="leading-6 text-stone-700">{t.bio}</p>
                   )}
-
                   {t.therapist_types.length > 0 && (
                     <div>
                       <span className="font-semibold text-stone-900">הכשרה: </span>
