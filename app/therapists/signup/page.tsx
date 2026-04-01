@@ -38,6 +38,7 @@ const TRAINING_AREAS = [
   "טיפול מיני",
   "טיפול COG-FUN לקשיי קשב וריכוז",
   "טיפול בטראומה",
+  "פסיכודרמה",
 ] as const;
 
 const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
