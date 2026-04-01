@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Heebo } from "next/font/google";
 import NavBar from "./components/NavBar";
 import AccessibilityWidget from "./components/AccessibilityWidget";
+import { Analytics } from "@vercel/analytics/next";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -32,6 +33,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <AccessibilityWidget />
 
         <div id="main-content">{children}</div>
+        <Analytics />
 
         <footer className="mt-16 border-t border-[#E8E1D8] bg-white">
           <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500 flex flex-wrap items-center gap-4">
