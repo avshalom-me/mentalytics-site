@@ -117,18 +117,21 @@ export default function TherapistDashboard() {
       setLoading(false);
     }
 
-    // Listen for auth state — fires after PKCE code exchange too
+    // Listen for auth changes (handles OAuth callback via implicit flow)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session) {
+      if (event === "SIGNED_IN" && session) {
         await loadProfile(session);
       } else if (event === "SIGNED_OUT") {
         window.location.href = "/therapists/login";
       } else if (event === "INITIAL_SESSION") {
-        // Implicit flow returns #access_token in hash; PKCE returns ?code in query
-        const hasToken = window.location.hash.includes("access_token");
-        const hasCode = new URLSearchParams(window.location.search).has("code");
-        if (!hasToken && !hasCode) {
-          window.location.href = "/therapists/login";
+        if (session) {
+          await loadProfile(session);
+        } else {
+          // Wait briefly for implicit flow to process hash token, then check again
+          setTimeout(async () => {
+            const { data: { session: s } } = await supabase.auth.getSession();
+            if (!s) window.location.href = "/therapists/login";
+          }, 500);
         }
       }
     });
