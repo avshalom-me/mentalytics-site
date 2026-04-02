@@ -87,11 +87,7 @@ export default function TherapistDashboard() {
   });
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      if (!session) {
-        window.location.href = "/therapists/login";
-        return;
-      }
+    async function loadProfile(session: { access_token: string; user: { email?: string } }) {
       setToken(session.access_token);
       setUserEmail(session.user.email ?? "");
 
@@ -119,7 +115,18 @@ export default function TherapistDashboard() {
         setIsNew(true);
       }
       setLoading(false);
+    }
+
+    // Listen for auth state — fires after PKCE code exchange too
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (session) {
+        await loadProfile(session);
+      } else if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+        window.location.href = "/therapists/login";
+      }
     });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   async function handleSave(e: React.FormEvent) {
