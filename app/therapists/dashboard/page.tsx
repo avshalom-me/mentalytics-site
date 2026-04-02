@@ -124,9 +124,10 @@ export default function TherapistDashboard() {
       } else if (event === "SIGNED_OUT") {
         window.location.href = "/therapists/login";
       } else if (event === "INITIAL_SESSION") {
-        // If there's a code in URL, OAuth is in progress — wait for SIGNED_IN
+        // Implicit flow returns #access_token in hash; PKCE returns ?code in query
+        const hasToken = window.location.hash.includes("access_token");
         const hasCode = new URLSearchParams(window.location.search).has("code");
-        if (!hasCode) {
+        if (!hasToken && !hasCode) {
           window.location.href = "/therapists/login";
         }
       }
