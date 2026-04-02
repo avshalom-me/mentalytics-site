@@ -121,8 +121,14 @@ export default function TherapistDashboard() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session) {
         await loadProfile(session);
-      } else if (event === "SIGNED_OUT" || event === "INITIAL_SESSION") {
+      } else if (event === "SIGNED_OUT") {
         window.location.href = "/therapists/login";
+      } else if (event === "INITIAL_SESSION") {
+        // If there's a code in URL, OAuth is in progress — wait for SIGNED_IN
+        const hasCode = new URLSearchParams(window.location.search).has("code");
+        if (!hasCode) {
+          window.location.href = "/therapists/login";
+        }
       }
     });
 
