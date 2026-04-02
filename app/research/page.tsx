@@ -6,6 +6,45 @@ export const metadata: Metadata = {
   description: "מידע מקצועי על סוגי טיפולים, בחירת מטפל, אבחונים, טיפול אונליין ועוד — בעברית, מותאם לישראל.",
 };
 
+const QUESTIONS = [
+  {
+    href: "/research/which-therapy",
+    icon: "🔍",
+    title: "איזה טיפול פסיכולוגי מתאים לי?",
+    desc: "מדריך מעשי לבחירת סוג הטיפול הנכון לפי הצורך, האישיות וסגנון החיים.",
+    color: "#FEF9EC",
+    border: "#F0D888",
+    tag: "#8A6000",
+  },
+  {
+    href: "/research/therapy-for-child",
+    icon: "👧",
+    title: "איך לבחור פסיכולוג לילד?",
+    desc: "מה חשוב לבדוק, מה לשאול, ואיך יודעים שמצאתם את האיש הנכון לילד שלכם.",
+    color: "#F0F8FF",
+    border: "#A8CCEA",
+    tag: "#1A5A8A",
+  },
+  {
+    href: "/research/cbt-vs-dynamic",
+    icon: "⚖️",
+    title: "הבדל בין CBT לטיפול דינמי",
+    desc: "שתי הגישות הנפוצות ביותר — מה ההבדל בפועל, ומי מתאים לאיזה מטופל?",
+    color: "#F5F0FA",
+    border: "#C8A8E8",
+    tag: "#6A2A9A",
+  },
+  {
+    href: "/research/adhd-adults",
+    icon: "🧩",
+    title: "אבחון ADHD למבוגרים",
+    desc: "מה כולל האבחון, איפה עושים אותו, כמה עולה, ומה עושים עם התוצאות.",
+    color: "#F0FBF5",
+    border: "#90D4A8",
+    tag: "#1A6A3A",
+  },
+];
+
 const TOPICS = [
   {
     href: "/research/therapist-types",
@@ -76,7 +115,42 @@ export default function ResearchHubPage() {
         </p>
       </div>
 
+      {/* Important questions */}
+      <div className="mb-4">
+        <h2 className="text-xl font-extrabold text-stone-800 mb-1">שאלות חשובות</h2>
+        <p className="text-sm text-stone-500">תשובות לשאלות שמטופלים שואלים הכי הרבה</p>
+      </div>
+      <div className="grid gap-5 md:grid-cols-2 mb-12">
+        {QUESTIONS.map((t) => (
+          <Link
+            key={t.href}
+            href={t.href}
+            className="group rounded-2xl p-6 transition hover:shadow-md hover:-translate-y-0.5"
+            style={{
+              background: t.color,
+              border: `1px solid ${t.border}`,
+              boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
+              textDecoration: "none",
+            }}
+          >
+            <div className="text-4xl mb-3">{t.icon}</div>
+            <h2 className="text-lg font-extrabold text-stone-900 mb-2 group-hover:underline">{t.title}</h2>
+            <p className="text-sm leading-6 text-stone-700">{t.desc}</p>
+            <div
+              className="mt-4 inline-flex items-center gap-1 text-xs font-semibold rounded-full px-3 py-1"
+              style={{ background: t.tag + "22", color: t.tag }}
+            >
+              קריאה ←
+            </div>
+          </Link>
+        ))}
+      </div>
+
       {/* Topic cards */}
+      <div className="mb-4">
+        <h2 className="text-xl font-extrabold text-stone-800 mb-1">מידע מקצועי</h2>
+        <p className="text-sm text-stone-500">על סוגי הטיפולים, המטפלים והאבחונים</p>
+      </div>
       <div className="grid gap-5 md:grid-cols-2">
         {TOPICS.map((t) => (
           <Link
