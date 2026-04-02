@@ -120,7 +120,7 @@ function toggleInArray(arr: string[], value: string) {
   return arr.includes(value) ? arr.filter((x) => x !== value) : [...arr, value];
 }
 
-function LandingScreen({ onStart }: { onStart: () => void }) {
+function LandingScreen() {
   const benefits = [
     {
       icon: "🎯",
@@ -193,13 +193,13 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
 
         {/* CTA */}
         <div className="text-center">
-          <button
-            onClick={onStart}
+          <a
+            href="/therapists/login"
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-90 active:scale-95 shadow-md"
             style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}
           >
-            להרשמה ←
-          </button>
+            להרשמה / כניסה ←
+          </a>
           <p className="mt-4 text-xs text-stone-700">
             ההרשמה אורכת כ-5 דקות. הפרופיל יעלה לאחר בדיקה ואישור.
           </p>
@@ -210,7 +210,7 @@ function LandingScreen({ onStart }: { onStart: () => void }) {
 }
 
 export default function TherapistSignupPage() {
-  const [showLanding, setShowLanding] = useState(true);
+  const [showLanding] = useState(true);
   const [form, setForm] = useState<FormState>({
     fullName: "",
     email: "",
@@ -399,7 +399,7 @@ export default function TherapistSignupPage() {
     }
   }
 
-  if (showLanding) return <LandingScreen onStart={() => setShowLanding(false)} />;
+  if (showLanding) return <LandingScreen />;
 
   return (
     <main className="mx-auto max-w-3xl px-6 py-12">
