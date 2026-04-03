@@ -124,12 +124,12 @@ function LandingScreen() {
   const benefits = [
     {
       icon: "🎯",
-      title: "הפניות מדויקות יותר",
+      title: "הפניות מדויקות יותר — פחות הפניות סרק",
       body: "המערכת מתאימה מטופלים לפי סוג הטיפול שאתה מציע, תחומי המומחיות שלך, והאופי המקצועי שלך — לא רק לפי מיקום.",
     },
     {
       icon: "🪪",
-      title: "כרטיס מטפל אישי",
+      title: "כרטיס מטפל אישי חינמי",
       body: 'פרופיל ייחודי שבו תוכל להציג את עצמך, את ה"אני מאמין" שלך, ואת הגישה הטיפולית שמאפיינת אותך.',
     },
     {
@@ -182,13 +182,6 @@ function LandingScreen() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* Price note */}
-        <div className="rounded-2xl p-5 mb-8 text-center"
-          style={{ background: "linear-gradient(135deg,#EFF7F4,#E8F0F7)", border: "1px solid #C8DDD8" }}>
-          <p className="font-bold text-[#1a3a5c] text-lg mb-1">ההרשמה חינמית*</p>
-          <p className="text-sm text-stone-700 mt-1">* לקידום הכרטיס שלך — <span className="underline cursor-pointer text-[#0F5468]">לחץ כאן</span> (יתווסף בהמשך)</p>
         </div>
 
         {/* CTA */}
