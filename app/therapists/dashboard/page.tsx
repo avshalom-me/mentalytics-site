@@ -117,22 +117,22 @@ export default function TherapistDashboard() {
       setLoading(false);
     }
 
-    // Listen for auth changes (handles OAuth callback via implicit flow)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === "SIGNED_IN" && session) {
+    async function init() {
+      // Session is stored in localStorage by /auth/callback after PKCE exchange
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
         await loadProfile(session);
-      } else if (event === "SIGNED_OUT") {
+      } else {
         window.location.href = "/therapists/login";
-      } else if (event === "INITIAL_SESSION") {
-        if (session) {
-          await loadProfile(session);
-        } else {
-          // Wait briefly for implicit flow to process hash token, then check again
-          setTimeout(async () => {
-            const { data: { session: s } } = await supabase.auth.getSession();
-            if (!s) window.location.href = "/therapists/login";
-          }, 500);
-        }
+      }
+    }
+
+    init();
+
+    // Listen only for sign-out
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") {
+        window.location.href = "/therapists/login";
       }
     });
 
