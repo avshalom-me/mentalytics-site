@@ -3545,6 +3545,13 @@ function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
       {/* Matching */}
       <KidsMatchSection A={A} />
 
+      {/* Disclaimer */}
+      <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-6 text-stone-500">
+        התוצאות מבוססות על תשובותיך לשאלון ומהוות הערכה כללית בלבד.<br />
+        אין לראות בתוצאות אלו אבחון, המלצה טיפולית מחייבת או תחליף לייעוץ מקצועי.<br />
+        מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
+      </div>
+
       {/* Actions */}
       <div className="mt-6 flex gap-3 justify-end print:hidden">
         <button

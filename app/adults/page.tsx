@@ -1625,7 +1625,12 @@ export default function AdultsPage() {
               );
             })}
           </div>
-          <p className="mt-5 text-center text-xs opacity-50">טיפול חכם</p>
+          <div className="mt-5 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs leading-6 text-white/70">
+            התוצאות מבוססות על תשובותיך לשאלון ומהוות הערכה כללית בלבד.<br />
+            אין לראות בתוצאות אלו אבחון, המלצה טיפולית מחייבת או תחליף לייעוץ מקצועי.<br />
+            מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
+          </div>
+          <p className="mt-3 text-center text-xs opacity-50">טיפול חכם</p>
         </div>
       </Layout>
     );
