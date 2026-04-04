@@ -1,4 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "טיפול אונליין — כן או לא?",
+  description: "כל מה שצריך לדעת על טיפול פסיכולוגי אונליין: יתרונות, חסרונות, למי זה מתאים ואיך בוחרים מטפל.",
+};
 
 export default function OnlineTherapyPage() {
   return (
