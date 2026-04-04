@@ -181,7 +181,7 @@ export default function HomePage() {
                 <p className="mt-5 leading-8 text-stone-700">
                   מחקרים רבים מראים כי הצלחת טיפול נפשי תלויה מאוד{" "}
                   <span className="font-bold" style={{ color: "#8B2E0A" }}>
-                    בהתאמת סוג הטיפול לקושי של המטופל/ת
+                    בהתאמת סוג הטיפול לצורך של המטופל/ת
                   </span>{" "}
                   ובהתאמת{" "}
                   <span className="font-bold" style={{ color: "#0F5468" }}>
