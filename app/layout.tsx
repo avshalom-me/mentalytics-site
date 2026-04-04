@@ -5,6 +5,7 @@ import { Heebo } from "next/font/google";
 import NavBar from "./components/NavBar";
 import AccessibilityWidget from "./components/AccessibilityWidget";
 import { Analytics } from "@vercel/analytics/next";
+import Script from "next/script";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -34,6 +35,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <div id="main-content">{children}</div>
         <Analytics />
+        <Script src="https://www.googletagmanager.com/gtag/js?id=G-V3QQRXSQ0T" strategy="afterInteractive" />
+        <Script id="google-analytics" strategy="afterInteractive">{`
+          window.dataLayer = window.dataLayer || [];
+          function gtag(){dataLayer.push(arguments);}
+          gtag('js', new Date());
+          gtag('config', 'G-V3QQRXSQ0T');
+        `}</Script>
 
         <footer className="mt-16 border-t border-[#E8E1D8] bg-white">
           <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500 flex flex-wrap items-center gap-4">
