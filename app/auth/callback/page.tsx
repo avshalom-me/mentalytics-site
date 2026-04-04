@@ -6,19 +6,31 @@ import { supabase } from "@/app/lib/supabaseClient";
 export default function AuthCallbackPage() {
   useEffect(() => {
     const code = new URLSearchParams(window.location.search).get("code");
-    console.log("auth/callback - code:", code ? "exists" : "MISSING", "| full search:", window.location.search, "| hash:", window.location.hash);
+    const hasHashToken = window.location.hash.includes("access_token");
+
     if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(({ data, error }) => {
-        console.log("exchangeCodeForSession - data:", data, "| error:", error);
+      // PKCE flow
+      supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
         if (error) {
-          console.error("Exchange failed:", error.message);
           window.location.href = "/therapists/login";
         } else {
           window.location.href = "/therapists/dashboard";
         }
       });
+    } else if (hasHashToken) {
+      // Implicit flow — Supabase processes hash automatically, just wait for session
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          window.location.href = "/therapists/dashboard";
+        } else {
+          // Give Supabase a moment to process the hash
+          setTimeout(async () => {
+            const { data: { session: s } } = await supabase.auth.getSession();
+            window.location.href = s ? "/therapists/dashboard" : "/therapists/login";
+          }, 1000);
+        }
+      });
     } else {
-      console.log("No code found, redirecting to login");
       window.location.href = "/therapists/login";
     }
   }, []);
