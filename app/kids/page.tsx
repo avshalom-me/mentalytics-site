@@ -3586,9 +3586,12 @@ export default function KidsPage() {
   }, []);
 
   useEffect(() => {
-    if (step === "p-result" && localStorage.getItem("quiz_bypass") !== "1") {
-      fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids" }) })
-        .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+    if (step === "p-result") {
+      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "kids" });
+      if (localStorage.getItem("quiz_bypass") !== "1") {
+        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids" }) })
+          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+      }
     }
   }, [step]);
 

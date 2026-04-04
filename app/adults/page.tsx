@@ -425,6 +425,7 @@ export default function AdultsPage() {
           .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
       setScreen("results");
+      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
       if (localStorage.getItem("quiz_bypass") !== "1") {
@@ -432,6 +433,7 @@ export default function AdultsPage() {
           .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
       setScreen("results");
+      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
     } finally {
       setLoading(false);
     }
@@ -1595,7 +1597,7 @@ export default function AdultsPage() {
               const notes = group.recs.find((r) => r.notes)?.notes;
               return (
                 <button key={group.treatment + (group.urgent ? "-urgent" : "")} type="button"
-                  onClick={() => { setSelectedRec(firstRec); setScreen("match-form"); }}
+                  onClick={() => { setSelectedRec(firstRec); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
                   className={`w-full rounded-xl p-4 text-right transition-all hover:scale-[1.01] ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30 hover:bg-red-900/40" : "border-r-4 border-[#8ecfdb] bg-white/10 hover:bg-white/20"}`}>
                   <div className={`mb-1 text-xs font-bold uppercase tracking-wide ${group.urgent ? "text-red-300" : "text-[#8ecfdb]"}`}>
                     {firstRec.domain} {group.urgent && "⚠️"}
