@@ -12,10 +12,10 @@ export async function POST(req: NextRequest) {
     }
 
     await resend.emails.send({
-      from: "Mentalytics <onboarding@resend.dev>",
+      from: "טיפול חכם <onboarding@resend.dev>",
       to: "avshalom84@gmail.com",
       replyTo: email,
-      subject: `פנייה חדשה מ-Mentalytics: ${subject || "ללא נושא"}`,
+      subject: `פנייה חדשה מ-טיפול חכם: ${subject || "ללא נושא"}`,
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #0F5468;">פנייה חדשה מהאתר</h2>

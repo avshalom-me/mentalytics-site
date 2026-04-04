@@ -1625,6 +1625,7 @@ export default function AdultsPage() {
               );
             })}
           </div>
+          <p className="mt-5 text-center text-xs opacity-50">טיפול חכם</p>
         </div>
       </Layout>
     );

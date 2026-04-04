@@ -4,14 +4,14 @@ import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, Shield, 
 import ContactForm from "./components/ContactForm";
 
 export const metadata: Metadata = {
-  title: "Mentalytics — הכוונה טיפולית חכמה",
+  title: "טיפול חכם — הכוונה טיפולית חכמה",
   description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול, סוג המטפל, והמטפל הנכון עבורכם — לילדים ולמבוגרים.",
 };
 
 const faqs = [
   {
-    q: "מה זה Mentalytics?",
-    a: "Mentalytics היא מערכת שאלונים מודולרית שמסייעת למקד את הקושי ולהציע כיוון טיפולי מתאים, על בסיס מחקר וניסיון קליני מצטבר.",
+    q: 'מה זה "טיפול חכם"?',
+    a: '"טיפול חכם" היא מערכת שאלונים מודולרית שמסייעת למקד את הקושי ולהציע כיוון טיפולי מתאים, על בסיס מחקר וניסיון קליני מצטבר.',
   },
   {
     q: "האם צריך להזין פרטים מזהים?",
@@ -166,7 +166,7 @@ export default function HomePage() {
                   className="text-5xl font-black tracking-tight"
                   style={{ color: "#2C1A10", letterSpacing: "-0.02em" }}
                 >
-                  Mentalytics
+                  טיפול חכם
                 </h1>
 
                 <p className="mt-2 text-xl font-semibold" style={{ color: "#6B4226" }}>

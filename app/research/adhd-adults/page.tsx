@@ -63,7 +63,7 @@ export default function AdhdAdultsPage() {
       <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8]">
         <h2 className="font-extrabold text-stone-900 text-xl mb-3">מחפשים מאבחן?</h2>
         <p className="text-sm leading-7 text-stone-700 mb-4">
-          במאגר המטפלים של Mentalytics תוכלו לסנן לפי "אבחון נוירו-פסיכולוגי" ולמצוא מאבחנים מוסמכים באזורכם.
+          במאגר המטפלים של טיפול חכם תוכלו לסנן לפי "אבחון נוירו-פסיכולוגי" ולמצוא מאבחנים מוסמכים באזורכם.
         </p>
         <Link href="/therapists"
           className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">

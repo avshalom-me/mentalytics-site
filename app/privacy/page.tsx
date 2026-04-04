@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "מדיניות פרטיות | Mentalytics",
+  title: "מדיניות פרטיות | טיפול חכם",
 };
 
 export default function PrivacyPage() {
@@ -16,7 +16,7 @@ export default function PrivacyPage() {
         <section>
           <h2 className="text-xl font-bold text-stone-900 mb-2">1. כללי</h2>
           <p>
-            Mentalytics ("השירות", "אנחנו") מפעילה אתר אינטרנט המאפשר לאנשים לקבל הכוונה טיפולית ולמטפלים להירשם ולהופיע במערכת ההתאמה. מדיניות זו מתארת אילו נתונים נאספים, כיצד הם נשמרים ואיך הם מוגנים.
+            טיפול חכם ("השירות", "אנחנו") מפעילה אתר אינטרנט המאפשר לאנשים לקבל הכוונה טיפולית ולמטפלים להירשם ולהופיע במערכת ההתאמה. מדיניות זו מתארת אילו נתונים נאספים, כיצד הם נשמרים ואיך הם מוגנים.
           </p>
         </section>
 

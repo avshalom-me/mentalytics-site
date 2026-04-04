@@ -9,7 +9,7 @@ export default function AccessibilityPage() {
         <section>
           <h2 className="text-xl font-bold text-stone-900 mb-2">כללי</h2>
           <p>
-            Mentalytics פועלת להנגשת אתר האינטרנט שלה לאנשים עם מוגבלות, בהתאם לתקן הישראלי{" "}
+            טיפול חכם פועלת להנגשת אתר האינטרנט שלה לאנשים עם מוגבלות, בהתאם לתקן הישראלי{" "}
             <strong>ת"י 5568</strong> (המבוסס על WCAG 2.1 ברמת AA) ובהתאם לתיקון 35 לחוק שוויון זכויות לאנשים עם מוגבלות.
           </p>
         </section>

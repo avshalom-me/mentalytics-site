@@ -13,10 +13,10 @@ const heebo = Heebo({
 });
 
 export const metadata: Metadata = {
-  title: { default: "Mentalytics", template: "%s | Mentalytics" },
+  title: { default: "טיפול חכם", template: "%s | טיפול חכם" },
   description: "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
   openGraph: {
-    siteName: "Mentalytics",
+    siteName: "טיפול חכם",
     locale: "he_IL",
     type: "website",
   },
@@ -37,7 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <footer className="mt-16 border-t border-[#E8E1D8] bg-white">
           <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500 flex flex-wrap items-center gap-4">
-            <span>© {new Date().getFullYear()} Mentalytics</span>
+            <span>© {new Date().getFullYear()} טיפול חכם</span>
             <Link href="/privacy" className="hover:underline">מדיניות פרטיות</Link>
             <Link href="/terms" className="hover:underline">תנאי שימוש</Link>
             <Link href="/accessibility" className="hover:underline">הצהרת נגישות</Link>

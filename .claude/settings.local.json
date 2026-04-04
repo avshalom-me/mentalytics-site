@@ -15,7 +15,10 @@
       "Bash(grep -oP '✅.*?\\(?=\"\"\"\"|$\\)' \"/c/projects/mentalytics-site/app/kids/page.tsx\")",
       "Bash(/tmp/check_match.txt:*)",
       "Read(//tmp/**)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)"
     ]
   }
 }

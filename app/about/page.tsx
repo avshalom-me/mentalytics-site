@@ -4,7 +4,7 @@ import { Sparkles, ShieldCheck, Target, Users, Heart } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "אודות",
-  description: "הכירו את הצוות מאחורי Mentalytics — מערכת הכוונה טיפולית חכמה שפותחה על ידי פסיכולוגים קליניים.",
+  description: "הכירו את הצוות מאחורי טיפול חכם — מערכת הכוונה טיפולית חכמה שפותחה על ידי פסיכולוגים קליניים.",
 };
 
 type TeamMember = {
@@ -85,7 +85,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
               style={{ background: "#F4A57422", color: "#B06030", border: "1px solid #F4A57455" }}>
               <Sparkles size={12} />
-              אודות Mentalytics
+              אודות טיפול חכם
             </div>
 
             <h1
@@ -97,7 +97,7 @@ export default function AboutPage() {
             </h1>
 
             <p className="mt-4 max-w-3xl leading-8 text-stone-700">
-              Mentalytics נולדה מתוך הבנה פשוטה: הרבה אנשים "מסתובבים" בין אפשרויות טיפול,
+              טיפול חכם נולדה מתוך הבנה פשוטה: הרבה אנשים "מסתובבים" בין אפשרויות טיפול,
               אבחונים ומסלולי זכאות — בלי מפת דרכים ברורה. אנחנו בונים מערכת שמסייעת למקד
               את הקושי, להציע כיוון טיפול מתאים, ולהנגיש מידע מסודר על צעדים אפשריים.
               כי לפעמים הצעד הכי קשה הוא פשוט לדעת מאיפה להתחיל — ואנחנו כאן בדיוק בשביל זה.
@@ -286,7 +286,7 @@ export default function AboutPage() {
             כי כל אחד מגיע לדרך שלו — בזמן שלו
           </h3>
           <p className="mt-3 max-w-xl mx-auto leading-7 text-stone-700">
-            Mentalytics לא כאן כדי להגיד לכם מה לעשות. אנחנו כאן כדי לעזור לכם להבין
+            טיפול חכם לא כאן כדי להגיד לכם מה לעשות. אנחנו כאן כדי לעזור לכם להבין
             קצת יותר — ולהרגיש קצת פחות לבד בתהליך.
           </p>
         </div>
