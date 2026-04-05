@@ -1633,6 +1633,12 @@ export default function AdultsPage() {
             מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
           </div>
           <p className="mt-3 text-center text-xs opacity-50">טיפול חכם</p>
+          <div className="mt-4 flex justify-center print:hidden">
+            <button onClick={() => window.print()}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+              💾 שמירה כ-PDF
+            </button>
+          </div>
         </div>
       </Layout>
     );
