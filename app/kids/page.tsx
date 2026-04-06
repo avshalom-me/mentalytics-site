@@ -1138,25 +1138,27 @@ function PageConsent({ onNext }: { onNext: () => void }) {
   const [agreed, setAgreed] = useState(false);
   return (
     <div>
-      <div className="inline-block bg-yellow-50 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full mb-3 border border-yellow-300">⚠️ הצהרה משפטית</div>
-      <h1 className="text-lg font-bold text-red-700 mb-4">הצהרה והבהרה משפטית</h1>
-      <div className="bg-yellow-50 border border-yellow-300 rounded-xl p-5 text-sm leading-loose text-gray-700 mb-4 space-y-3">
-        <p>שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח <strong>ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי</strong> מכל סוג שהוא.</p>
-        <p>המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
-        <p>המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות <strong>אינן מחייבות מבחינה קלינית</strong>, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+      <div className="mb-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-6 leading-relaxed text-amber-900">
+        <p className="mb-3 text-base font-bold">⚠️ הצהרה והבהרה משפטית</p>
+        <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
+        <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
+        <p className="mb-3 text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+        <p className="text-sm font-semibold">🚨 אם אתה/את נמצא/ת במצב של מצוקה נפשית חריפה או סכנה מיידית, פנה/י מיד לחדר מיון הקרוב, לקו החירום 101 (מד&quot;א) או לסיוע ראשוני 1201.</p>
       </div>
-      <label className="flex items-center gap-3 bg-green-50 border border-green-300 rounded-xl p-4 cursor-pointer mb-6">
+      <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
         <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
-          className="w-5 h-5 cursor-pointer accent-[#2c3e7a]" />
-        <span className="text-sm font-semibold text-green-800">קראתי והבנתי את ההצהרה לעיל ואני מסכים/ה להמשיך</span>
+          className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
+        <span>קראתי את ההצהרה לעיל, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
       </label>
-      <button
-        disabled={!agreed}
-        onClick={onNext}
-        className={`px-8 py-3 rounded-full font-bold text-sm transition-all ${agreed ? "bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white shadow-md hover:opacity-90" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}
-      >
-        אני מסכים/ה — המשך ←
-      </button>
+      <div className="mt-5">
+        <button
+          disabled={!agreed}
+          onClick={onNext}
+          className="w-full rounded-xl bg-[#1a3a5c] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
+        >
+          קראתי והסכמתי – נמשיך ▸
+        </button>
+      </div>
     </div>
   );
 }
