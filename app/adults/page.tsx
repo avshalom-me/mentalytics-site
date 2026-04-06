@@ -218,8 +218,8 @@ function Layout({ children }: { children: React.ReactNode }) {
     <main className="min-h-screen bg-[#f0ece4]" dir="rtl">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-5 text-center">
-          <img src="/logo.svg.png" alt="Mentalytics" className="mx-auto mb-3 h-16 w-auto" />
-          <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>לאן נפנה?</h1>
+          <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
+          <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
           <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – מבוגרים</p>
         </div>
         {children}
