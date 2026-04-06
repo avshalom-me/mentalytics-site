@@ -3646,9 +3646,19 @@ export default function KidsPage() {
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xl font-extrabold text-[#2c3e7a]">Mental<span className="text-[#4a9eca]">ytics</span></span>
-          {step !== "p-consent" && step !== "p-result" && (
-            <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">שאלון ילדים / מתבגרים</span>
+          {step === "p-consent" ? (
+            <div className="w-full text-center mb-1">
+              <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
+              <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
+              <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – ילדים ונוער</p>
+            </div>
+          ) : (
+            <>
+              <span className="text-xl font-extrabold text-[#1a3a5c]">טיפול חכם</span>
+              {step !== "p-result" && (
+                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">שאלון ילדים / מתבגרים</span>
+              )}
+            </>
           )}
         </div>
         {step !== "p-consent" && step !== "p-result" && (
