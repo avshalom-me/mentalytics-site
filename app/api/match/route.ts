@@ -31,7 +31,10 @@ type TherapistRow = {
   cultural_prefs: unknown;
   arrangements: unknown;
   bio: string | null;
+  phone: string | null;
+  email: string | null;
   profile_photo_path: string | null;
+  profile_photo_url: string | null;
   status: string | null;
   style_q1: number | null;
   style_q2: number | null;
@@ -454,26 +457,32 @@ export async function POST(req: NextRequest) {
     const top = scored.slice(0, input.limit);
 
     const ranked = await Promise.all(
-      top.map(async ({ therapist, result }) => ({
-        id: therapist.id,
-        full_name: therapist.full_name,
-        gender: therapist.gender,
-        online: therapist.online,
-        therapist_types: therapist.therapist_types,
-        training_areas: therapist.training_areas,
-        regions: therapist.regions,
-        cultural_prefs: therapist.cultural_prefs,
-        arrangements: therapist.arrangements,
-        bio: therapist.bio,
-        profile_photo_path: therapist.profile_photo_path,
-        profile_photo_url: await buildSignedPhotoUrl(therapist.profile_photo_path),
-        status: therapist.status,
-        match_score: result.score,
-        personality_score: result.personality_score,
-        combined_score: combinedScore(result.score, result.personality_score),
-        match_reasons: result.reasons,
-        debug_normalized: result.normalizedTherapist,
-      }))
+      top.map(async ({ therapist, result }) => {
+        // Use stored public URL first, fall back to signed URL from old path field
+        const photoUrl = therapist.profile_photo_url
+          || await buildSignedPhotoUrl(therapist.profile_photo_path);
+        return {
+          id: therapist.id,
+          full_name: therapist.full_name,
+          gender: therapist.gender,
+          online: therapist.online,
+          therapist_types: therapist.therapist_types,
+          training_areas: therapist.training_areas,
+          regions: therapist.regions,
+          cultural_prefs: therapist.cultural_prefs,
+          arrangements: therapist.arrangements,
+          bio: therapist.bio,
+          phone: therapist.phone,
+          email: therapist.email,
+          profile_photo_url: photoUrl,
+          status: therapist.status,
+          match_score: result.score,
+          personality_score: result.personality_score,
+          combined_score: combinedScore(result.score, result.personality_score),
+          match_reasons: result.reasons,
+          debug_normalized: result.normalizedTherapist,
+        };
+      })
     );
 
     return NextResponse.json({
