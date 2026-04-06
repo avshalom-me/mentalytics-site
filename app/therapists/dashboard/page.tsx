@@ -44,6 +44,8 @@ type Profile = {
   arrangements: string[];
   status: string;
   tier: string;
+  profile_photo_url?: string;
+  certificate_url?: string;
 };
 
 function CheckboxGroup({ label, options, selected, onChange }: {
@@ -77,6 +79,10 @@ export default function TherapistDashboard() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [saveErr, setSaveErr] = useState("");
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [certFile, setCertFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -139,12 +145,31 @@ export default function TherapistDashboard() {
     return () => subscription.unsubscribe();
   }, []);
 
+  async function uploadFile(file: File, type: "photo" | "certificate") {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("type", type);
+    await fetch("/api/therapist-upload", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      body: fd,
+    });
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     if (!token) return;
     setSaving(true);
     setSaveMsg("");
     setSaveErr("");
+
+    // Upload files if selected
+    if (photoFile || certFile) {
+      setUploading(true);
+      if (photoFile) await uploadFile(photoFile, "photo");
+      if (certFile) await uploadFile(certFile, "certificate");
+      setUploading(false);
+    }
 
     const res = await fetch("/api/therapist-profile", {
       method: "PATCH",
@@ -155,7 +180,8 @@ export default function TherapistDashboard() {
     if (json.ok) {
       setSaveMsg(json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.");
       setIsNew(false);
-      // Refresh profile
+      setPhotoFile(null);
+      setCertFile(null);
       const res2 = await fetch("/api/therapist-profile", { headers: { Authorization: `Bearer ${token}` } });
       const json2 = await res2.json();
       if (json2.therapist) setProfile(json2.therapist);
@@ -253,6 +279,33 @@ export default function TherapistDashboard() {
               rows={4} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="ספר/י על עצמך, הגישה הטיפולית שלך, ומה מייחד אותך..." />
           </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
+              {(photoPreview || profile?.profile_photo_url) && (
+                <img src={photoPreview || profile?.profile_photo_url || ""} alt="תמונה"
+                  className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
+              )}
+              <input type="file" accept="image/*"
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  setPhotoFile(f);
+                  if (f) setPhotoPreview(URL.createObjectURL(f));
+                }}
+                className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-stone-700">מסמך / תעודה מקצועית</label>
+              {profile?.certificate_url && !certFile && (
+                <a href={profile.certificate_url} target="_blank" rel="noopener noreferrer"
+                  className="mb-2 inline-block text-xs text-[#2e7d8c] underline">צפה במסמך הנוכחי</a>
+              )}
+              <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => setCertFile(e.target.files?.[0] ?? null)}
+                className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
+            </div>
+          </div>
         </div>
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
@@ -280,7 +333,7 @@ export default function TherapistDashboard() {
 
         <button type="submit" disabled={saving}
           className="w-full rounded-xl bg-[#2e7d8c] py-3 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50">
-          {saving ? "שומר..." : "שמור פרטים"}
+          {uploading ? "מעלה קבצים..." : saving ? "שומר..." : "שמור פרטים"}
         </button>
       </form>
     </main>
