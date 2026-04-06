@@ -21,6 +21,9 @@ const ASSESSMENT_TYPES = [
   "פסיכו-דידקטי","פסיכו-דיאגנוסטי","נוירו-פסיכולוגי","אבחון תעסוקתי",
   "הערכה פסיכולוגית","הערכת בשלות לגן","אבחון קשיי תקשורת ASD",
 ];
+const AGE_GROUPS = [
+  "גיל הרך", "ילדים", "נוער", "מבוגרים", "הגיל השלישי",
+];
 const CULTURAL_PREFS = [
   "היכרות עם העולם הדתי","היכרות עם העולם החרדי",'היכרות עם עולם הלהט"ב',
 ];
@@ -42,6 +45,7 @@ type Profile = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  age_groups: string[];
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -140,6 +144,7 @@ export default function TherapistDashboard() {
     therapist_types: [] as string[], training_areas: [] as string[],
     assessment_types: [] as string[], regions: [] as string[],
     cultural_prefs: [] as string[], arrangements: [] as string[],
+    age_groups: [] as string[],
     style_q1: null as number | null,
     style_q2: null as number | null,
     activity_level: null as number | null,
@@ -169,6 +174,7 @@ export default function TherapistDashboard() {
           regions: json.therapist.regions ?? [],
           cultural_prefs: json.therapist.cultural_prefs ?? [],
           arrangements: json.therapist.arrangements ?? [],
+          age_groups: json.therapist.age_groups ?? [],
           style_q1: json.therapist.style_q1 ?? null,
           style_q2: json.therapist.style_q2 ?? null,
           activity_level: json.therapist.activity_level ?? null,
@@ -346,6 +352,8 @@ export default function TherapistDashboard() {
             selected={form.training_areas} onChange={v => setForm({...form, training_areas: v})} />
           <CheckboxGroup label="סוגי אבחון" options={ASSESSMENT_TYPES}
             selected={form.assessment_types} onChange={v => setForm({...form, assessment_types: v})} />
+          <CheckboxGroup label="קבוצות גיל" options={AGE_GROUPS}
+            selected={form.age_groups} onChange={v => setForm({...form, age_groups: v})} />
         </div>
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
