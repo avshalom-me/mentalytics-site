@@ -27,8 +27,9 @@ export async function POST(req: NextRequest) {
   if (!file || !type) return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
 
   const ext = file.name.split(".").pop();
-  const path = `${type}s/${user.id}-${Date.now()}.${ext}`;
-  const bucket = type === "photo" ? "profile-photos" : "certificates";
+  const folder = type === "photo" ? "photos" : "certificates";
+  const path = `${folder}/${user.id}-${Date.now()}.${ext}`;
+  const bucket = "therapist-certificates";
 
   const arrayBuffer = await file.arrayBuffer();
   const { error: uploadError } = await supabaseAdmin.storage
@@ -41,7 +42,8 @@ export async function POST(req: NextRequest) {
 
   // Update the therapist record
   const field = type === "photo" ? "profile_photo_url" : "certificate_url";
-  await supabaseAdmin.from("therapists").update({ [field]: publicUrl }).eq("user_id", user.id);
+  const { error: dbError } = await supabaseAdmin.from("therapists").update({ [field]: publicUrl }).eq("user_id", user.id);
+  if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
 
   return NextResponse.json({ ok: true, url: publicUrl });
 }

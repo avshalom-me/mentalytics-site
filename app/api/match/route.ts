@@ -416,7 +416,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, bio, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, bio, phone, email, profile_photo_url, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       // זמנית: כדי שתוכל לבדוק גם מטפלים שעוד לא אושרו סופית
       .in("status", ["approved", "pending"]);

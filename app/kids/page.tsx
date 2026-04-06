@@ -3223,6 +3223,8 @@ type KidsMatchResult = {
   regions: unknown;
   arrangements: unknown;
   bio: string | null;
+  phone: string | null;
+  email: string | null;
   profile_photo_url: string | null;
   match_score: number;
   match_reasons: string[];
