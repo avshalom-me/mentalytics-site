@@ -38,12 +38,27 @@ export async function POST(req: NextRequest) {
 
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
 
-  const { data: { publicUrl } } = supabaseAdmin.storage.from(bucket).getPublicUrl(path);
+  if (type === "photo") {
+    // Store the path in profile_photo_path (same pattern as signup form)
+    const { error: dbError } = await supabaseAdmin
+      .from("therapists")
+      .update({ profile_photo_path: path })
+      .eq("user_id", user.id);
+    if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
+  } else {
+    // Find the therapist id, then insert into therapist_certificates table
+    const { data: therapist } = await supabaseAdmin
+      .from("therapists")
+      .select("id")
+      .eq("user_id", user.id)
+      .single();
+    if (!therapist) return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
 
-  // Update the therapist record
-  const field = type === "photo" ? "profile_photo_url" : "certificate_url";
-  const { error: dbError } = await supabaseAdmin.from("therapists").update({ [field]: publicUrl }).eq("user_id", user.id);
-  if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
+    const { error: dbError } = await supabaseAdmin
+      .from("therapist_certificates")
+      .insert({ therapist_id: therapist.id, file_path: path, file_name: file.name });
+    if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
+  }
 
-  return NextResponse.json({ ok: true, url: publicUrl });
+  return NextResponse.json({ ok: true, path });
 }

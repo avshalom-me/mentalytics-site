@@ -34,7 +34,6 @@ type TherapistRow = {
   phone: string | null;
   email: string | null;
   profile_photo_path: string | null;
-  profile_photo_url: string | null;
   status: string | null;
   style_q1: number | null;
   style_q2: number | null;
@@ -419,7 +418,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, bio, phone, email, profile_photo_url, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       // זמנית: כדי שתוכל לבדוק גם מטפלים שעוד לא אושרו סופית
       .in("status", ["approved", "pending"]);
@@ -459,8 +458,7 @@ export async function POST(req: NextRequest) {
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {
         // Use stored public URL first, fall back to signed URL from old path field
-        const photoUrl = therapist.profile_photo_url
-          || await buildSignedPhotoUrl(therapist.profile_photo_path);
+        const photoUrl = await buildSignedPhotoUrl(therapist.profile_photo_path);
         return {
           id: therapist.id,
           full_name: therapist.full_name,

@@ -47,8 +47,7 @@ type Profile = {
   activity_level: number | null;
   status: string;
   tier: string;
-  profile_photo_url?: string;
-  certificate_url?: string;
+  profile_photo_path?: string;
 };
 
 function CheckboxGroup({ label, options, selected, onChange }: {
@@ -392,8 +391,10 @@ export default function TherapistDashboard() {
               פרופילים עם תמונה מקבלים פניות רבות באופן משמעותי. מומלץ להוסיף תמונה.
             </div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל <span className="text-stone-400 font-normal">(רשות)</span></label>
-            {(photoPreview || profile?.profile_photo_url) && (
-              <img src={photoPreview || profile?.profile_photo_url || ""} alt="תמונה"
+            {(photoPreview || profile?.profile_photo_path) && (
+              <img
+                src={photoPreview || supabase.storage.from("therapist-certificates").getPublicUrl(profile!.profile_photo_path!).data.publicUrl}
+                alt="תמונה"
                 className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
             )}
             <input type="file" accept="image/*"
@@ -408,10 +409,6 @@ export default function TherapistDashboard() {
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תעודת רישיון / אישור מקצועי <span className="text-red-500">*</span></label>
             <p className="mb-2 text-xs text-stone-500">יש להוסיף תעודת רישיון מטפל או תעודה המוכיחה את המקצוע</p>
-            {profile?.certificate_url && !certFile && (
-              <a href={profile.certificate_url} target="_blank" rel="noopener noreferrer"
-                className="mb-2 inline-block text-xs text-[#2e7d8c] underline">צפה במסמך הנוכחי</a>
-            )}
             <input type="file" accept=".pdf,.jpg,.jpeg,.png"
               onChange={e => setCertFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
