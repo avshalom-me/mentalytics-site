@@ -252,7 +252,7 @@ export default function HomePage() {
                 >
                   <div className="flex items-center gap-2 font-extrabold text-stone-900">
                     <HelpCircle size={18} style={{ color: "#8B2E0A" }} />
-                    לאן לפנות?
+                    טיפול חכם
                   </div>
                   <p className="mt-2 text-sm leading-6 text-stone-700">
                     אם אתם לא בטוחים מאיפה להתחיל, או רוצים לשאול משהו לפני — אפשר לפנות כאן ונחזור אליכם בחום.
