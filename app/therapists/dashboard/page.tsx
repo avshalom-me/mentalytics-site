@@ -42,6 +42,9 @@ type Profile = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  style_q1: number | null;
+  style_q2: number | null;
+  activity_level: number | null;
   status: string;
   tier: string;
   profile_photo_url?: string;
@@ -70,6 +73,54 @@ function CheckboxGroup({ label, options, selected, onChange }: {
   );
 }
 
+function RegionCheckboxGroup({ selected, onChange }: {
+  selected: string[]; onChange: (v: string[]) => void;
+}) {
+  function toggle(city: string) {
+    onChange(selected.includes(city) ? selected.filter(x => x !== city) : [...selected, city]);
+  }
+  return (
+    <div className="mb-5">
+      <div className="mb-3 text-sm font-semibold text-stone-800">ערים / אזורים</div>
+      <div className="space-y-4">
+        {Object.entries(REGION_CITIES).map(([region, cities]) => (
+          <div key={region}>
+            <div className="mb-1.5 text-xs font-bold text-[#2e7d8c] uppercase tracking-wide">{region}</div>
+            <div className="flex flex-wrap gap-2">
+              {cities.map(city => (
+                <label key={city} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1 text-xs hover:bg-stone-50">
+                  <input type="checkbox" checked={selected.includes(city)} onChange={() => toggle(city)} />
+                  {city}
+                </label>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function StyleQuestion({ name, question, hint, value, onChange }: {
+  name: string; question: string; hint: string;
+  value: number | null; onChange: (v: number) => void;
+}) {
+  return (
+    <div className="mb-6">
+      <p className="text-sm font-semibold text-stone-800">{question}</p>
+      <p className="mt-1 text-xs text-stone-500">{hint}</p>
+      <div className="mt-3 flex flex-wrap gap-3">
+        {[1,2,3,4,5,6,7].map(num => (
+          <label key={num} className="flex items-center gap-1.5 text-sm cursor-pointer">
+            <input type="radio" name={name} checked={value === num} onChange={() => onChange(num)} />
+            {num}
+          </label>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function TherapistDashboard() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -90,6 +141,9 @@ export default function TherapistDashboard() {
     therapist_types: [] as string[], training_areas: [] as string[],
     assessment_types: [] as string[], regions: [] as string[],
     cultural_prefs: [] as string[], arrangements: [] as string[],
+    style_q1: null as number | null,
+    style_q2: null as number | null,
+    activity_level: null as number | null,
   });
 
   useEffect(() => {
@@ -116,6 +170,9 @@ export default function TherapistDashboard() {
           regions: json.therapist.regions ?? [],
           cultural_prefs: json.therapist.cultural_prefs ?? [],
           arrangements: json.therapist.arrangements ?? [],
+          style_q1: json.therapist.style_q1 ?? null,
+          style_q2: json.therapist.style_q2 ?? null,
+          activity_level: json.therapist.activity_level ?? null,
         });
       } else {
         setIsNew(true);
@@ -280,32 +337,6 @@ export default function TherapistDashboard() {
               placeholder="ספר/י על עצמך, הגישה הטיפולית שלך, ומה מייחד אותך..." />
           </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
-              {(photoPreview || profile?.profile_photo_url) && (
-                <img src={photoPreview || profile?.profile_photo_url || ""} alt="תמונה"
-                  className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
-              )}
-              <input type="file" accept="image/*"
-                onChange={e => {
-                  const f = e.target.files?.[0] ?? null;
-                  setPhotoFile(f);
-                  if (f) setPhotoPreview(URL.createObjectURL(f));
-                }}
-                className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">מסמך / תעודה מקצועית</label>
-              {profile?.certificate_url && !certFile && (
-                <a href={profile.certificate_url} target="_blank" rel="noopener noreferrer"
-                  className="mb-2 inline-block text-xs text-[#2e7d8c] underline">צפה במסמך הנוכחי</a>
-              )}
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png"
-                onChange={e => setCertFile(e.target.files?.[0] ?? null)}
-                className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
-            </div>
-          </div>
         </div>
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
@@ -320,12 +351,71 @@ export default function TherapistDashboard() {
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">אזור ופרטים נוספים</h2>
-          <CheckboxGroup label="ערים / אזורים" options={ALL_CITIES}
-            selected={form.regions} onChange={v => setForm({...form, regions: v})} />
+          <RegionCheckboxGroup selected={form.regions} onChange={v => setForm({...form, regions: v})} />
           <CheckboxGroup label="העדפות תרבותיות" options={CULTURAL_PREFS}
             selected={form.cultural_prefs} onChange={v => setForm({...form, cultural_prefs: v})} />
           <CheckboxGroup label="הסדרים" options={ARRANGEMENTS}
             selected={form.arrangements} onChange={v => setForm({...form, arrangements: v})} />
+        </div>
+
+        <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
+          <h2 className="text-lg font-extrabold text-stone-900 mb-1">סגנון טיפולי</h2>
+          <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית שלך — ישמשו להתאמה אישיותית עם מטופלים</p>
+          <StyleQuestion
+            name="style_q1"
+            question="בעבודתי הטיפולית, אני נוטה לראות בהבנה מעמיקה של שורשי הקושי, העבר והדפוסים הלא-מודעים מרכיב מרכזי בשינוי הטיפולי."
+            hint="1 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק | 7 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד"
+            value={form.style_q1}
+            onChange={v => setForm({...form, style_q1: v})}
+          />
+          <StyleQuestion
+            name="style_q2"
+            question="בעבודתי הטיפולית, אני נוטה להציע למטופלים מסגרת ברורה, מטרות מוגדרות, כלים ומשימות בין פגישות."
+            hint="1 = בכלל לא מסכים/ה — אני עובד/ת יותר במרחב פתוח וגמיש | 7 = מסכים/ה מאוד — אני עובד/ת באופן מובנה, מכוון ופרקטי"
+            value={form.style_q2}
+            onChange={v => setForm({...form, style_q2: v})}
+          />
+          <StyleQuestion
+            name="activity_level"
+            question="בטיפול, הסגנון הטבעי שלי הוא להיות פעיל/ה, מכוון/ת ומעורב/ת מילולית, יותר מאשר שקט/ה, מכיל/ה ומתבונן/ת."
+            hint="1 = בכלל לא מסכים/ה — אני יותר מכיל/ה, שוהה ומתבונן/ת | 7 = מסכים/ה מאוד — אני יותר פעיל/ה, מכוון/ת ומעורב/ת"
+            value={form.activity_level}
+            onChange={v => setForm({...form, activity_level: v})}
+          />
+        </div>
+
+        <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
+          <h2 className="text-lg font-extrabold text-stone-900 mb-5">תמונה ומסמכים</h2>
+
+          <div className="mb-5">
+            <div className="mb-2 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-xs text-amber-800">
+              פרופילים עם תמונה מקבלים פניות רבות באופן משמעותי. מומלץ להוסיף תמונה.
+            </div>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל <span className="text-stone-400 font-normal">(רשות)</span></label>
+            {(photoPreview || profile?.profile_photo_url) && (
+              <img src={photoPreview || profile?.profile_photo_url || ""} alt="תמונה"
+                className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
+            )}
+            <input type="file" accept="image/*"
+              onChange={e => {
+                const f = e.target.files?.[0] ?? null;
+                setPhotoFile(f);
+                if (f) setPhotoPreview(URL.createObjectURL(f));
+              }}
+              className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">תעודת רישיון / אישור מקצועי <span className="text-red-500">*</span></label>
+            <p className="mb-2 text-xs text-stone-500">יש להוסיף תעודת רישיון מטפל או תעודה המוכיחה את המקצוע</p>
+            {profile?.certificate_url && !certFile && (
+              <a href={profile.certificate_url} target="_blank" rel="noopener noreferrer"
+                className="mb-2 inline-block text-xs text-[#2e7d8c] underline">צפה במסמך הנוכחי</a>
+            )}
+            <input type="file" accept=".pdf,.jpg,.jpeg,.png"
+              onChange={e => setCertFile(e.target.files?.[0] ?? null)}
+              className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />
+          </div>
         </div>
 
         {saveMsg && <p className="text-sm text-emerald-600 font-semibold">{saveMsg}</p>}

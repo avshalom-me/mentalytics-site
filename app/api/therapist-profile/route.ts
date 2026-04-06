@@ -61,6 +61,7 @@ export async function PATCH(req: NextRequest) {
     "full_name", "phone", "bio", "gender", "online",
     "therapist_types", "training_areas", "assessment_types",
     "regions", "cultural_prefs", "arrangements",
+    "style_q1", "style_q2", "activity_level",
   ];
 
   const update: Record<string, unknown> = {};
