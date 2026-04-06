@@ -26,6 +26,7 @@ const CULTURAL_PREFS = [
   "היכרות עם העולם הדתי",
   "היכרות עם העולם החרדי",
   'היכרות עם עולם הלהט"ב',
+  "מטפל/ת עם ניסיון בגיל השלישי",
 ];
 const MOOD_ITEMS = [
   "תחושה מתמשכת של עצב או עצבנות",
@@ -453,7 +454,8 @@ export default function AdultsPage() {
         region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
-        culturalPreferences: matchPrefs.culturalPrefs,
+        culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
+        ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["הגיל השלישי"] : [],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
