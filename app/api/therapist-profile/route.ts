@@ -60,7 +60,7 @@ export async function PATCH(req: NextRequest) {
   const allowed = [
     "full_name", "phone", "bio", "gender", "online",
     "therapist_types", "training_areas", "assessment_types",
-    "regions", "cultural_prefs", "arrangements", "age_groups",
+    "regions", "cultural_prefs", "arrangements", "age_groups", "languages",
     "style_q1", "style_q2", "activity_level",
     "education", "experience",
   ];
