@@ -225,16 +225,6 @@ export default async function TherapistProfilePage({ params }: { params: Promise
 
       </div>
 
-      {/* CTA */}
-      <div className="mt-8 rounded-2xl p-6 bg-[#f0f8fa] border border-[#b0d8e0]">
-        <p className="text-sm leading-7 text-stone-700 mb-4">
-          רוצה לבדוק האם {name} מתאים/ה לצרכים שלך? מלא/י את שאלון ההתאמה וקבל/י המלצות אישיות.
-        </p>
-        <Link href="/adults"
-          className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
-          לשאלון ההתאמה ←
-        </Link>
-      </div>
     </main>
   );
 }
