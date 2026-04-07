@@ -101,6 +101,14 @@ const TYPES = [
     richContent: "criminology",
   },
   {
+    title: "יועץ/ת חינוכי/ת",
+    license: "משרד החינוך — תעודת יועץ חינוכי",
+    icon: "🏫",
+    desc: null,
+    suitable: "ילדים ונוער בגיל בית-ספר, קשיים רגשיים והתנהגותיים, הפניות לטיפול, ייעוץ להורים ומורים",
+    richContent: "counselor",
+  },
+  {
     title: "מאמן/ת מנטלי/ת / קואוצ'ר",
     license: "אין רגולציה ממשלתית",
     icon: "🎯",
@@ -362,6 +370,7 @@ export default function TherapistTypesPage() {
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במרכזי התפתחות הילד ובמסגרות מוכרות על ידי משרד הבריאות.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג התפתחותי מומחה".</span></li>
                       </ul>
+                      <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#FEF3EB] border border-[#F4C8A4] p-4">
@@ -388,6 +397,7 @@ export default function TherapistTypesPage() {
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות שיקומיים מוכרים על ידי משרד הבריאות (בתי חולים שיקומיים, מרכזי שיקום, מוסדות לטיפול באוכלוסיות מיוחדות).</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג שיקומי מומחה".</span></li>
                       </ul>
+                      <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#F0F8FF] border border-[#B4D4F0] p-4">
@@ -414,6 +424,7 @@ export default function TherapistTypesPage() {
                         <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
                         <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג תעסוקתי מומחה".</span></li>
                       </ul>
+                      <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#FDF6EE] border border-[#F0D4A8] p-4">
@@ -439,16 +450,43 @@ export default function TherapistTypesPage() {
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים בחצי משרה:</strong> לב ליבה של ההכשרה. מתבצעת לרוב במסגרת שפ"ח (שירות פסיכולוגי חינוכי) ברשויות המקומיות, המוכר על ידי משרד הבריאות כמוסד מאמן.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> רק לאחר מעבר בהצלחה מקבל הפסיכולוג את התואר "פסיכולוג חינוכי מומחה".</span></li>
                       </ul>
+                      <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
-                      <h3 className="font-bold text-[#4A2A8A] mb-2">המשך דרך</h3>
-                      <p>ישנם פסיכולוגים חינוכיים מומחים שממשיכים לקבלת רישיון כ<strong>"פסיכולוג חינוכי מדריך"</strong> — המוסמך להדריך מתמחים.</p>
+                      <h3 className="font-bold text-[#4A2A8A] mb-2">פסיכולוג חינוכי מומחה-מדריך</h3>
+                      <p>ישנם פסיכולוגים חינוכיים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג חינוכי מומחה-מדריך"</strong> — המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
                     </div>
 
                     <p>
                       פסיכולוג חינוכי לרוב מטפל בילדים ונוער. לעיתים, לאחר הכשרות נוספות, עובד גם עם מבוגרים או גיל הזהב.
                     </p>
+                  </div>
+                ) : t.richContent === "counselor" ? (
+                  <div className="text-sm leading-7 text-stone-700 space-y-4">
+                    <p>
+                      היועץ/ת החינוכי/ת עובד/ת במסגרת בית הספר ומהווה <strong>צומת מרכזית של הפניות טיפוליות</strong> — הדמות המקצועית הראשונה שילדים, הורים ומורים פונים אליה כאשר עולה קושי רגשי, חברתי או לימודי. תפקידו/ה מגשר בין הצרכים של התלמיד, המשפחה והמערכת החינוכית.
+                    </p>
+
+                    <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
+                      <h3 className="font-bold text-[#2A6B50] mb-3">תחומי עיסוק מרכזיים</h3>
+                      <ul className="space-y-2.5">
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>זיהוי והפניה:</strong> איתור תלמידים הזקוקים לסיוע והפניה לגורמי טיפול מתאימים — פסיכולוג חינוכי, מטפל, פסיכיאטר ילדים ועוד.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>ייעוץ פרטני לתלמיד:</strong> שיחות תמיכה, ליווי רגשי, סיוע במשברים והתמודדות עם קשיים חברתיים.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>עבודה עם הורים:</strong> ייעוץ ותמיכה, גישור בין הבית לבית הספר, סיוע בהתמודדות עם קשיי ילדים.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>עבודה עם צוות חינוכי:</strong> ייעוץ למורים, פיתוח תוכניות התערבות כיתתיות, טיפול באקלים כיתה.</span></li>
+                      </ul>
+                    </div>
+
+                    <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
+                      <h3 className="font-bold text-[#4A2A8A] mb-3">הכשרה נוספת — פסיכותרפיה</h3>
+                      <p>חלק מהיועצות והיועצים ממשיכים ללימודי <strong>פסיכותרפיה</strong> לאחר ההסמכה — הכשרה שנותנת להם כלים עמוקים ומקיפים יותר לטיפול רגשי ממוקד. הכשרה זו מחזקת את יכולת הטיפול בעיקר <strong>בילדים ובעבודת הורות</strong>, ומאפשרת לחלקם לפתוח מסגרת טיפולית פרטית לצד עבודתם בבית הספר.</p>
+                    </div>
+
+                    <div className="rounded-xl bg-[#FEF3EB] border border-[#F4C8A4] p-4">
+                      <h3 className="font-bold text-[#8B4A10] mb-2">מסלול ההכשרה</h3>
+                      <p>תואר ראשון בפסיכולוגיה, חינוך או תחום סמוך — ולאחריו תואר שני בייעוץ חינוכי (M.Ed. או M.A.) הכולל פרקטיקום בבית ספר. הסמכה ניתנת מטעם משרד החינוך.</p>
+                    </div>
                   </div>
                 ) : t.richContent === true ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
@@ -465,6 +503,12 @@ export default function TherapistTypesPage() {
                         <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
                         <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום ההתמחות — בחינה בעל פה מול ועדת בוחנים בכירה. רק לאחר המעבר הופך לפסיכולוג קליני מומחה.</span></li>
                       </ul>
+                      <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>.</p>
+                    </div>
+
+                    <div className="rounded-xl bg-[#F0F9F4] border border-[#A8D8BC] p-4">
+                      <h3 className="font-bold text-[#2A6B50] mb-2">פסיכולוג קליני מומחה-מדריך</h3>
+                      <p>ישנם פסיכולוגים קליניים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג קליני מומחה-מדריך"</strong> — המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#F0F8FF] border border-[#B4D4F0] p-4">
