@@ -110,7 +110,7 @@ export default async function TherapistProfilePage({ params }: { params: Promise
           <img
             src={photoUrl ?? avatarSrc}
             alt={name}
-            className="h-full w-full object-cover object-center"
+            className="h-full w-full object-cover object-top"
           />
         </div>
         <div className="p-6">
