@@ -62,6 +62,7 @@ export async function PATCH(req: NextRequest) {
     "therapist_types", "training_areas", "assessment_types",
     "regions", "cultural_prefs", "arrangements", "age_groups",
     "style_q1", "style_q2", "activity_level",
+    "education", "experience",
   ];
 
   const update: Record<string, unknown> = {};

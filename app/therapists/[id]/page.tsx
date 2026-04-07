@@ -23,6 +23,8 @@ type TherapistRow = {
   phone: string | null;
   email: string | null;
   profile_photo_path: string | null;
+  education: string | null;
+  experience: string | null;
 };
 
 async function getTherapist(id: string): Promise<{ therapist: TherapistRow; photoUrl: string | null } | null> {
@@ -32,7 +34,7 @@ async function getTherapist(id: string): Promise<{ therapist: TherapistRow; phot
       id, full_name, bio, gender, online,
       therapist_types, training_areas, assessment_types,
       regions, cultural_prefs, arrangements, languages, age_groups,
-      phone, email, profile_photo_path
+      phone, email, profile_photo_path, education, experience
     `)
     .eq("id", id)
     .eq("status", "approved")
@@ -131,6 +133,22 @@ export default async function TherapistProfilePage({ params }: { params: Promise
         <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8] mb-5">
           <h2 className="font-extrabold text-stone-900 text-base mb-3">כמה מילים עלי</h2>
           <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">{t.bio}</p>
+        </div>
+      )}
+
+      {/* Education */}
+      {t.education && (
+        <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8] mb-5">
+          <h2 className="font-extrabold text-stone-900 text-base mb-3">השכלה והכשרה</h2>
+          <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">{t.education}</p>
+        </div>
+      )}
+
+      {/* Experience */}
+      {t.experience && (
+        <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8] mb-5">
+          <h2 className="font-extrabold text-stone-900 text-base mb-3">ניסיון מקצועי</h2>
+          <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">{t.experience}</p>
         </div>
       )}
 

@@ -82,6 +82,8 @@ export async function POST(req: Request) {
     const priceRaw = String(fd.get("price") ?? "").trim();
     const price = priceRaw ? Number(priceRaw) : null;
     const bio = String(fd.get("bio") ?? "").trim();
+    const education = String(fd.get("education") ?? "").trim();
+    const experience = String(fd.get("experience") ?? "").trim();
 
     let therapistTypes: string[] = [];
     let trainingAreas: string[] = [];
@@ -164,6 +166,8 @@ export async function POST(req: Request) {
         online,
         price,
           bio: bio || null,
+        education: education || null,
+        experience: experience || null,
         therapist_types: therapistTypes,
         training_areas: trainingAreas,
         treatment_types: normalizedTreatmentTypes,

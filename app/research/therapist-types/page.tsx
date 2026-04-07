@@ -532,6 +532,16 @@ export default function TherapistTypesPage() {
       <div className="mt-10 rounded-2xl p-5 bg-amber-50 border border-amber-200 text-sm text-amber-900 leading-7">
         <strong>חשוב לדעת:</strong> כותרת כמו "מטפל/ת" או "יועץ/ת" אינה מוגנת בחוק. לפני שמתחילים טיפול, מומלץ לוודא שיש למטפל/ת רישיון ממשלתי מוכר.
       </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/research/assessments" className="text-[#2e7d8c] hover:underline">← סוגי אבחונים והערכות</Link></li>
+          <li><Link href="/research/cbt-vs-dynamic" className="text-[#2e7d8c] hover:underline">← הבדל בין CBT לטיפול דינמי</Link></li>
+        </ul>
+      </div>
     </main>
   );
 }

@@ -52,6 +52,8 @@ type Profile = {
   status: string;
   tier: string;
   profile_photo_path?: string;
+  education?: string;
+  experience?: string;
 };
 
 function CheckboxGroup({ label, options, selected, onChange }: {
@@ -148,6 +150,8 @@ export default function TherapistDashboard() {
     style_q1: null as number | null,
     style_q2: null as number | null,
     activity_level: null as number | null,
+    education: "",
+    experience: "",
   });
 
   useEffect(() => {
@@ -177,6 +181,8 @@ export default function TherapistDashboard() {
           age_groups: json.therapist.age_groups ?? [],
           style_q1: json.therapist.style_q1 ?? null,
           style_q2: json.therapist.style_q2 ?? null,
+          education: json.therapist.education ?? "",
+          experience: json.therapist.experience ?? "",
           activity_level: json.therapist.activity_level ?? null,
         });
       } else {
@@ -340,6 +346,20 @@ export default function TherapistDashboard() {
             <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})}
               rows={4} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="ספר/י על עצמך, הגישה הטיפולית שלך, ומה מייחד אותך..." />
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-semibold text-stone-700">השכלה והכשרה</label>
+            <textarea value={form.education} onChange={e => setForm({...form, education: e.target.value})}
+              rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+              placeholder="תארים, התמחויות, הכשרות רלוונטיות..." />
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-semibold text-stone-700">ניסיון מקצועי</label>
+            <textarea value={form.experience} onChange={e => setForm({...form, experience: e.target.value})}
+              rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+              placeholder="תפקידים, מסגרות עבודה, שנות ניסיון..." />
           </div>
 
         </div>

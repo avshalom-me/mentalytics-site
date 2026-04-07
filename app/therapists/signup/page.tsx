@@ -114,6 +114,8 @@ type FormState = {
   certificates: File[];
   profilePhoto: File | null;
   bio: string;
+  education: string;
+  experience: string;
   termsAccepted: boolean;
 };
 
@@ -229,6 +231,8 @@ export default function TherapistSignupPage() {
     certificates: [],
     profilePhoto: null,
     bio: "",
+    education: "",
+    experience: "",
     termsAccepted: false,
   });
 
@@ -327,6 +331,8 @@ export default function TherapistSignupPage() {
       fd.append("online", form.online);
       fd.append("price", form.price);
       fd.append("bio", form.bio);
+      fd.append("education", form.education);
+      fd.append("experience", form.experience);
 
       fd.append("therapistTypes", JSON.stringify(form.therapistTypes));
       const allTrainingAreas = [
@@ -534,6 +540,32 @@ export default function TherapistSignupPage() {
     {form.bio.length}/500 תווים
   </p>
 </section>
+
+        <section className="rounded-2xl border bg-white p-6">
+          <h2 className="text-lg font-bold">השכלה והכשרה</h2>
+          <p className="mt-1 text-sm text-slate-800">
+            תארים, התמחויות, הכשרות רלוונטיות.
+          </p>
+          <textarea
+            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            value={form.education}
+            onChange={(e) => setForm((p) => ({ ...p, education: e.target.value }))}
+            placeholder="לדוגמה: תואר שני בפסיכולוגיה קלינית, אוניברסיטת תל אביב. התמחות במרכז לבריאות הנפש."
+          />
+        </section>
+
+        <section className="rounded-2xl border bg-white p-6">
+          <h2 className="text-lg font-bold">ניסיון מקצועי</h2>
+          <p className="mt-1 text-sm text-slate-800">
+            תפקידים, מסגרות עבודה, שנות ניסיון.
+          </p>
+          <textarea
+            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            value={form.experience}
+            onChange={(e) => setForm((p) => ({ ...p, experience: e.target.value }))}
+            placeholder="לדוגמה: 8 שנות ניסיון בטיפול פרטי עם מבוגרים. לשעבר: פסיכולוגית בקופת חולים מכבי."
+          />
+        </section>
 
         <section className="rounded-2xl border bg-white p-6">
           <h2 className="text-lg font-bold">תחומי הכשרה <span className="text-red-500">*</span></h2>
