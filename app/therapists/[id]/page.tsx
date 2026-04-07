@@ -34,7 +34,7 @@ async function getTherapist(id: string): Promise<{ therapist: TherapistRow; phot
       id, full_name, bio, gender, online,
       therapist_types, training_areas, assessment_types,
       regions, cultural_prefs, arrangements, languages, age_groups,
-      phone, email, profile_photo_path, education, experience
+      phone, email, profile_photo_path
     `)
     .eq("id", id)
     .eq("status", "approved")
