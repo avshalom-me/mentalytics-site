@@ -106,11 +106,11 @@ export default async function TherapistProfilePage({ params }: { params: Promise
 
       {/* Photo + name header */}
       <div className="rounded-2xl overflow-hidden border border-[#E8E0D8] bg-white mb-6" style={{ boxShadow: "0 2px 12px rgba(100,60,30,.08)" }}>
-        <div className="h-64 w-full overflow-hidden bg-gray-100">
+        <div className="h-80 w-full overflow-hidden bg-gray-100">
           <img
             src={photoUrl ?? avatarSrc}
             alt={name}
-            className="h-full w-full object-cover object-top"
+            className="h-full w-full object-cover object-center"
           />
         </div>
         <div className="p-6">

@@ -103,11 +103,11 @@ export default function TherapistsPage() {
               style={{ boxShadow: "0 2px 10px rgba(100,60,30,.07)" }}>
 
               {/* Photo — full width */}
-              <div className="relative h-52 w-full overflow-hidden bg-gray-100">
+              <div className="relative h-72 w-full overflow-hidden bg-gray-100">
                 <img
                   src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
                   alt={t.full_name}
-                  className="h-full w-full object-cover object-top"
+                  className="h-full w-full object-cover object-center"
                   onError={() => setBrokenImages((p) => ({ ...p, [t.id]: true }))}
                 />
               </div>
