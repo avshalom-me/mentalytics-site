@@ -248,7 +248,11 @@ export default function TherapistsPage() {
                     </div>
                   )}
 
-                  <div className="pt-2 border-t border-stone-100">
+                  <div className="pt-2 border-t border-stone-100 flex items-center justify-between">
+                    <Link href={`/therapists/${t.id}`}
+                      className="text-xs font-semibold text-[#2e7d8c] hover:underline">
+                      דף פרופיל מלא ←
+                    </Link>
                     <button
                       onClick={() => openUpdateRequest(t)}
                       className="text-xs text-stone-400 underline hover:text-stone-600"
