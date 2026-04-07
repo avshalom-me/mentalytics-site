@@ -3,12 +3,24 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "טיפול אונליין — כן או לא?",
-  description: "כל מה שצריך לדעת על טיפול פסיכולוגי אונליין: יתרונות, חסרונות, למי זה מתאים ואיך בוחרים מטפל.",
+  description: "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "טיפול אונליין — כן או לא?",
+  "description": "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
+  "inLanguage": "he",
+  "author": { "@type": "Organization", "name": "טיפול חכם" },
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
+  "url": "https://www.tipolchacham.co.il/research/online-therapy",
 };
 
 export default function OnlineTherapyPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
@@ -78,6 +90,16 @@ export default function OnlineTherapyPage() {
           <li>• באיזה פלטפורמה נעבוד? (Zoom, Teams, פלטפורמה ייעודית?)</li>
           <li>• מה קורה אם יש בעיית טכנית באמצע פגישה?</li>
           <li>• האם ניתן לעבור לפגישה פיזית אם יתעורר הצורך?</li>
+        </ul>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
         </ul>
       </div>
     </main>

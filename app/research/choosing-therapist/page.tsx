@@ -1,4 +1,21 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "מה חשוב לבדוק כשבוחרים מטפל?",
+  description: "6 קריטריונים לבחירת מטפל נפשי — הכשרה, התמחות, כימיה, גישה טיפולית, לוגיסטיקה ועלות. ועוד שאלות לשאול בשיחת ההיכרות.",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "מה חשוב לבדוק כשבוחרים מטפל?",
+  "description": "6 קריטריונים לבחירת מטפל נפשי — הכשרה, התמחות, כימיה, גישה טיפולית, לוגיסטיקה ועלות.",
+  "inLanguage": "he",
+  "author": { "@type": "Organization", "name": "טיפול חכם" },
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
+  "url": "https://www.tipolchacham.co.il/research/choosing-therapist",
+};
 
 const CRITERIA = [
   {
@@ -46,6 +63,7 @@ const QUESTIONS = [
 export default function ChoosingTherapistPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
@@ -95,6 +113,16 @@ export default function ChoosingTherapistPage() {
 
       <div className="mt-6 rounded-2xl p-5 bg-emerald-50 border border-emerald-200 text-sm text-emerald-900 leading-7">
         <strong>חשוב:</strong> מותר לנסות מטפל אחר אם הפגישות הראשונות לא מרגישות נכונות. זה לא כישלון — זה חלק מהתהליך.
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/online-therapy" className="text-[#2e7d8c] hover:underline">← טיפול אונליין — כן או לא?</Link></li>
+          <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
+        </ul>
       </div>
     </main>
   );

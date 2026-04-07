@@ -1,4 +1,21 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "סוגי הטיפולים השונים — CBT, דינמי, DBT, EMDR ועוד",
+  description: "מדריך מקיף לסוגי הטיפולים הנפשיים — CBT, דינמי, DBT, EMDR, ACT ועוד. מה ההבדל, למי מתאים כל טיפול, וכמה זמן לוקח.",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "סוגי הטיפולים השונים",
+  "description": "מדריך מקיף לסוגי הטיפולים הנפשיים — CBT, דינמי, DBT, EMDR, ACT ועוד.",
+  "inLanguage": "he",
+  "author": { "@type": "Organization", "name": "טיפול חכם" },
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
+  "url": "https://www.tipolchacham.co.il/research/therapy-types",
+};
 
 const THERAPIES = [
   {
@@ -96,6 +113,7 @@ const THERAPIES = [
 export default function TherapyTypesPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
@@ -138,6 +156,16 @@ export default function TherapyTypesPage() {
 
       <div className="mt-10 rounded-2xl p-5 bg-amber-50 border border-amber-200 text-sm text-amber-900 leading-7">
         <strong>חשוב לזכור:</strong> אין גישה "הכי טובה" באופן אוניברסלי. ההתאמה בין הגישה לאדם, לקושי ולסגנון האישי — היא שקובעת.
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/cbt-vs-dynamic" className="text-[#2e7d8c] hover:underline">← הבדל בין CBT לטיפול דינמי</Link></li>
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+        </ul>
       </div>
     </main>
   );

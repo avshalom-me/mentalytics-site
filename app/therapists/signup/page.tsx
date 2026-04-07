@@ -114,6 +114,7 @@ type FormState = {
   certificates: File[];
   profilePhoto: File | null;
   bio: string;
+  termsAccepted: boolean;
 };
 
 function toggleInArray(arr: string[], value: string) {
@@ -228,6 +229,7 @@ export default function TherapistSignupPage() {
     certificates: [],
     profilePhoto: null,
     bio: "",
+    termsAccepted: false,
   });
 
   const [submitMsg, setSubmitMsg] = useState<string>("");
@@ -295,6 +297,9 @@ export default function TherapistSignupPage() {
     }
     if (form.certificates.length === 0) {
       e.push("נא לצרף לפחות תעודה אחת.");
+    }
+    if (!form.termsAccepted) {
+      e.push("נא לאשר את תנאי השימוש והצהרת הנאמנות.");
     }
     return e;
   }
@@ -977,6 +982,22 @@ export default function TherapistSignupPage() {
             </ul>
           )}
         </section>
+
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 mb-2">
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.termsAccepted}
+              onChange={(e) => setForm((p) => ({ ...p, termsAccepted: e.target.checked }))}
+              className="mt-1 h-4 w-4 flex-shrink-0 accent-indigo-600"
+            />
+            <span className="text-sm leading-6 text-stone-700">
+              אני מאשר/ת שאני בעל/ת רישיון מקצועי תקף, שהפרטים שמסרתי נכונים, ושאעמוד ב
+              <a href="/terms" target="_blank" className="text-indigo-600 hover:underline mx-1">תנאי השימוש</a>
+              של טיפול חכם.
+            </span>
+          </label>
+        </div>
 
         <div className="flex flex-wrap items-center gap-3">
           <button

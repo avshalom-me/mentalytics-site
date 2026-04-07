@@ -3,12 +3,24 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "איך לבחור פסיכולוג לילד?",
-  description: "מה חשוב לבדוק, מה לשאול, ואיך יודעים שמצאתם את האיש הנכון לילד שלכם.",
+  description: "מה חשוב לבדוק כשבוחרים מטפל לילד — הכשרה, גישה להורים, גיל הילד, ומה לשאול בשיחת ההיכרות.",
+};
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "איך לבחור פסיכולוג לילד?",
+  "description": "מה חשוב לבדוק כשבוחרים מטפל לילד — הכשרה, גישה להורים, גיל הילד, ומה לשאול בשיחת ההיכרות.",
+  "inLanguage": "he",
+  "author": { "@type": "Organization", "name": "טיפול חכם" },
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
+  "url": "https://www.tipolchacham.co.il/research/therapy-for-child",
 };
 
 export default function TherapyForChildPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
@@ -67,6 +79,16 @@ export default function TherapyForChildPage() {
           className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
           לשאלון לילדים ←
         </Link>
+      </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/assessments" className="text-[#2e7d8c] hover:underline">← סוגי אבחונים והערכות</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+        </ul>
       </div>
     </main>
   );

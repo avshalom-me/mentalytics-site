@@ -196,6 +196,16 @@ export default function AssessmentsPage() {
       <div className="mt-10 rounded-2xl p-5 bg-blue-50 border border-blue-200 text-sm text-blue-900 leading-7">
         <strong>טיפ:</strong> לפני שמשלמים עבור אבחון, כדאי לבדוק עם קופת החולים שלכם מה מכוסה — במיוחד עבור ילדים בגיל 6–18.
       </div>
+
+      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/adhd-adults" className="text-[#2e7d8c] hover:underline">← אבחון ADHD למבוגרים</Link></li>
+          <li><Link href="/research/therapy-for-child" className="text-[#2e7d8c] hover:underline">← איך לבחור פסיכולוג לילד?</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+        </ul>
+      </div>
     </main>
   );
 }

@@ -99,6 +99,16 @@ export default function FAQPage() {
           </div>
         ))}
       </div>
+
+      <div className="mt-10 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
+        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+        <ul className="space-y-2 text-sm">
+          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/research/online-therapy" className="text-[#2e7d8c] hover:underline">← טיפול אונליין — כן או לא?</Link></li>
+        </ul>
+      </div>
     </main>
   );
 }
