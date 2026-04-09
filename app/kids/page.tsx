@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ALL_REGIONS } from "@/app/lib/regions";
+import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 type Ans = Record<string, any>;
@@ -3242,6 +3242,7 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [arrangements, setArrangements] = useState<string[]>([]);
   const [cultural, setCultural]       = useState<string[]>([]);
   const [language, setLanguage]       = useState("עברית");
+  const [city, setCity]               = useState("");
   const [loading, setLoading]         = useState(false);
   const [results, setResults]         = useState<KidsMatchResult[]>([]);
   const [error, setError]             = useState("");
@@ -3265,7 +3266,8 @@ function KidsMatchSection({ A }: { A: Ans }) {
           treatmentTypes: treatments,
           ageGroups,
           genderPreference: gender || null,
-          region: (!online && region) ? region : null,
+          city: city || null,
+          region: city ? (CITY_TO_REGION[city] ?? region || null) : (region || null),
           onlineRequired: online,
           culturalPreferences: cultural,
           arrangements,
@@ -3315,20 +3317,31 @@ function KidsMatchSection({ A }: { A: Ans }) {
             </label>
           </div>
 
-          {/* Region */}
-          {!online && (
-            <div className="mb-4">
-              <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">אזור מגורים</label>
-              <select
-                value={region}
-                onChange={e => setRegion(e.target.value)}
-                className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm"
-              >
-                <option value="">-- בחר אזור --</option>
-                {ALL_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
-          )}
+          {/* Region + City */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">אזור מגורים</label>
+            <select
+              value={region}
+              onChange={e => { setRegion(e.target.value); setCity(""); }}
+              className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm mb-2"
+            >
+              <option value="">-- בחר אזור --</option>
+              {ALL_REGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+            </select>
+            {region && (
+              <>
+                <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">עיר</label>
+                <select
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm"
+                >
+                  <option value="">-- כל האזור --</option>
+                  {(REGION_CITIES[region] ?? []).map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </>
+            )}
+          </div>
 
           {/* Language */}
           <div className="mb-4">
