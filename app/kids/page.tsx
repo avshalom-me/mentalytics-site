@@ -3243,7 +3243,6 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [cultural, setCultural]       = useState<string[]>([]);
   const [language, setLanguage]       = useState("עברית");
   const [city, setCity]               = useState("");
-  const [therapistType, setTherapistType] = useState("");
   const [loading, setLoading]         = useState(false);
   const [results, setResults]         = useState<KidsMatchResult[]>([]);
   const [error, setError]             = useState("");
@@ -3272,7 +3271,6 @@ function KidsMatchSection({ A }: { A: Ans }) {
           onlineRequired: online,
           culturalPreferences: cultural,
           arrangements,
-          therapistTypes: therapistType ? [therapistType] : [],
           languages: [language || "עברית"],
           limit: 10,
         }),
@@ -3366,18 +3364,6 @@ function KidsMatchSection({ A }: { A: Ans }) {
                 </label>
               ))}
             </div>
-          </div>
-
-          {/* Therapist type */}
-          <div className="mb-4">
-            <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">סוג מטפל/ת מועדף</label>
-            <select value={therapistType} onChange={e => setTherapistType(e.target.value)}
-              className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
-              <option value="">ללא העדפה</option>
-              {["פסיכולוג קליני","פסיכולוג חינוכי","פסיכולוג שיקומי/רפואי","פסיכולוג התפתחותי",'עו"ס קליני',"יועצ/ת חינוכי","מטפל/ת בהבעה ויצירה"].map(t => (
-                <option key={t} value={t}>{t}</option>
-              ))}
-            </select>
           </div>
 
           {/* Arrangements */}
