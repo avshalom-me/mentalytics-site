@@ -303,6 +303,7 @@ type MatchPrefs = {
   city: string;
   online: boolean;
   genderPref: string;
+  therapistType: string;
   culturalPrefs: string[];
   language: string;
   arrangements: string[];
@@ -314,7 +315,7 @@ export default function AdultsPage() {
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
-  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
+  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", therapistType: "", culturalPrefs: [], language: "עברית", arrangements: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -475,7 +476,8 @@ export default function AdultsPage() {
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
       const body: Record<string, unknown> = {
-        treatmentTypes: [...new Set([selectedRec.treatment, selectedRec.treatmentLabel].filter(Boolean))],
+        treatmentTypes: selectedRec.treatment ? [selectedRec.treatment] : [],
+        therapistTypes: matchPrefs.therapistType ? [matchPrefs.therapistType] : [],
         city: matchPrefs.city || null,
         region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,
@@ -1712,6 +1714,17 @@ export default function AdultsPage() {
             <option value="">ללא העדפה</option>
             <option value="זכר">זכר</option>
             <option value="נקבה">נקבה</option>
+          </select>
+        </div>
+
+        <div className="mb-3">
+          <label className="mb-1 block text-xs text-[#6b7280]">סוג מטפל מועדף</label>
+          <select value={matchPrefs.therapistType} onChange={(e) => setMatchPrefs((p) => ({ ...p, therapistType: e.target.value }))}
+            className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
+            <option value="">ללא העדפה</option>
+            {["פסיכולוג קליני","פסיכולוג חינוכי","פסיכולוג שיקומי/רפואי","פסיכולוג התפתחותי","פסיכולוג תעסוקתי",'עו"ס קליני',"יועצ/ת חינוכי","מטפל/ת בהבעה ויצירה","קרימינולוג קליני"].map(t => (
+              <option key={t} value={t}>{t}</option>
+            ))}
           </select>
         </div>
 
