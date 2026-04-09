@@ -323,9 +323,9 @@ export default function HomePage() {
                 <h3 className="text-lg font-bold text-[#1a3a5c]">זיגמונד פרויד</h3>
                 <p className="text-xs text-[#6b7280]">זכר • אונליין</p>
                 <p className="mt-1 text-sm text-gray-700 line-clamp-2">
-                  פסיכולוג קליני ותיק עם למעלה מ-40 שנות ניסיון בטיפול דינמי ופסיכואנליטי. מתמחה בחרדה, דיכאון ודפוסי יחסים.
+                  פסיכיאטר ונוירולוג ותיק עם למעלה מ-40 שנות ניסיון בטיפול דינמי ופסיכואנליטי. מתמחה בחרדה, דיכאון ודפוסי יחסים.
                 </p>
-                <p className="mt-1 text-xs text-gray-500">📍 וינה, ברלין</p>
+                <p className="mt-1 text-xs text-gray-500">📍 יבנה</p>
                 <div className="mt-2 flex flex-wrap gap-1">
                   <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">התאמה בתחום המומחיות: טיפול דינמי</span>
                   <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">התאמה באזור</span>
