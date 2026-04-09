@@ -305,6 +305,7 @@ type MatchPrefs = {
   genderPref: string;
   culturalPrefs: string[];
   language: string;
+  arrangements: string[];
 };
 
 export default function AdultsPage() {
@@ -313,7 +314,7 @@ export default function AdultsPage() {
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
-  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית" });
+  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -480,6 +481,7 @@ export default function AdultsPage() {
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
+        arrangements: matchPrefs.arrangements,
         ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["מבוגרים", "הגיל השלישי"] : ["מבוגרים"],
         languages: matchPrefs.language ? [matchPrefs.language] : ["עברית"],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
@@ -1719,6 +1721,19 @@ export default function AdultsPage() {
             className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
             {["עברית","אנגלית","ערבית","רוסית","צרפתית","ספרדית","פורטוגזית","אמהרית"].map(l => <option key={l} value={l}>{l}</option>)}
           </select>
+        </div>
+
+        <div className="mb-3">
+          <p className="mb-1 text-xs text-[#6b7280]">מימון הטיפול (אפשר לסמן יותר מאחד)</p>
+          {["קופות החולים", "ביטוח לאומי", "משרד הביטחון", "ביטוחים פרטיים"].map((arr) => (
+            <label key={arr} className="mb-1 flex items-center gap-2 text-sm">
+              <input type="checkbox"
+                checked={matchPrefs.arrangements.includes(arr)}
+                onChange={(e) => setMatchPrefs((p) => ({ ...p, arrangements: e.target.checked ? [...p.arrangements, arr] : p.arrangements.filter((x) => x !== arr) }))}
+                className="accent-[#2e7d8c]" />
+              {arr}
+            </label>
+          ))}
         </div>
 
         <div className="mb-3">

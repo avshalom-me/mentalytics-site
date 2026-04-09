@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { CITY_TO_REGION } from "@/app/lib/regions";
+import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
@@ -313,29 +313,39 @@ function scoreTherapist(
     const patientRegion = input.region ??
       (input.city ? CITY_TO_REGION[input.city] ?? null : null);
 
-    // בדיקת התאמת עיר מדויקת
     const inExactCity = input.city
       ? regions.includes(normalizeText(input.city))
       : false;
 
-    // בדיקת התאמת אזור (אותו אזור, עיר שונה)
     const inSameRegion = patientRegion
-      ? regions.some((c) => CITY_TO_REGION[c] === patientRegion)
+      ? regions.some((c) => CITY_TO_REGION[c] === patientRegion || c === patientRegion)
+      : false;
+
+    const inAdjacentRegion = patientRegion
+      ? regions.some((c) => {
+          const cRegion = CITY_TO_REGION[c] ?? c;
+          return (REGION_NEIGHBORS[patientRegion] ?? []).includes(cRegion);
+        })
       : false;
 
     const onlineMatch = input.onlineRequired && therapistOnline;
 
     if (inExactCity) {
-      earned += WEIGHTS.locationOnline; // התאמה מלאה — אותה עיר
+      earned += WEIGHTS.locationOnline; // 100% — אותה עיר
       reasons.push("התאמה מלאה באזור");
     } else if (inSameRegion) {
       earned += Math.round(WEIGHTS.locationOnline * 0.6); // 60% — אותו אזור
       reasons.push("התאמה באזור");
+    } else if (inAdjacentRegion) {
+      earned += Math.round(WEIGHTS.locationOnline * 0.3); // 30% — אזור סמוך
+      reasons.push("מטפל/ת מאזור סמוך");
     } else if (onlineMatch) {
       earned += Math.round(WEIGHTS.locationOnline * 0.4); // 40% — אונליין בלבד
       reasons.push("מציע טיפול אונליין");
+    } else if (patientRegion && regions.length > 0) {
+      // Hard filter: therapist declared regions, none is nearby, no online → exclude
+      return null;
     }
-    // אזור שונה לגמרי = 0 נקודות
   }
 
   if (input.genderPreference) {
