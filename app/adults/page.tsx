@@ -480,7 +480,7 @@ export default function AdultsPage() {
         onlineRequired: matchPrefs.online,
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
-        ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["הגיל השלישי"] : [],
+        ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["מבוגרים", "הגיל השלישי"] : ["מבוגרים"],
         languages: matchPrefs.language ? [matchPrefs.language] : ["עברית"],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,

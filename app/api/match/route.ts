@@ -365,9 +365,14 @@ function scoreTherapist(
   }
 
   if (input.ageGroups.length > 0) {
-    possible += WEIGHTS.ageGroup;
     const therapistAgeGroups = parseArray(therapist.age_groups);
-    if (hasOverlap(therapistAgeGroups, input.ageGroups)) {
+    // Hard filter: if therapist declared specific age groups and there's no overlap → exclude
+    if (therapistAgeGroups.length > 0 && !hasOverlap(therapistAgeGroups, input.ageGroups)) {
+      return null;
+    }
+    // Soft score: reward match
+    possible += WEIGHTS.ageGroup;
+    if (therapistAgeGroups.length === 0 || hasOverlap(therapistAgeGroups, input.ageGroups)) {
       earned += WEIGHTS.ageGroup;
       reasons.push("התאמה בקבוצת גיל");
     }
