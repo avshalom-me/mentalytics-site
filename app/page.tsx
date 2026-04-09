@@ -294,48 +294,52 @@ export default function HomePage() {
       <section className="mt-14 fade-up fade-up-4" dir="rtl">
         <h2 className="mb-6 text-2xl font-extrabold text-stone-900">אז איך זה עובד?</h2>
 
-        {/* Steps — 3 columns */}
-        <div className="grid gap-4 sm:grid-cols-3 mb-8">
-          {[
-            { n: "1", title: "מלא/י את השאלון", body: "השאלון מסתעף בהתאם לתשובות — כל תשובה משפיעה על השאלה הבאה." },
-            { n: "2", title: "קבל/י מסמך פלט", body: "תקציר סוגי הטיפול המתאימים לך, ניתן לשמירה כ-PDF." },
-            { n: "3", title: "בחר/י מטפל מותאם", body: "לפי הטיפול שבחרת ופרמטרים נוספים תקבל/י רשימת ההתאמות הטובות ביותר." },
-          ].map(({ n, title, body }) => (
-            <div key={n} className="rounded-2xl border border-[#E8E0D8] bg-white p-4 flex gap-3" style={{ boxShadow: "0 2px 12px rgba(60,40,20,.07)" }}>
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1a3a5c] text-white text-xs font-bold">{n}</span>
-              <div>
-                <div className="font-bold text-stone-900 text-sm mb-1">{title}</div>
-                <div className="text-xs text-stone-500 leading-relaxed">{body}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        {/* Layout: steps right, card left. On mobile: card on top, steps below */}
+        <div className="flex flex-col-reverse sm:flex-row gap-6 items-start">
 
-        {/* Demo card — centered, compact */}
-        <p className="mb-4 text-sm text-stone-500 text-center">בסוף תקבל/י כרטיסי התאמה כאלה:</p>
-        <div className="mx-auto w-56 rounded-2xl border border-[#E8E0D8] bg-white overflow-hidden" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)" }}>
-          <div className="relative h-44 w-full overflow-hidden bg-stone-100">
-            <img src="/demo-freud.webp" alt="זיגמונד פרויד" className="h-full w-full object-cover object-top" />
-            <div className="absolute top-2 left-2 rounded-full bg-[#1a3a5c] px-2 py-0.5 text-xs font-bold text-white shadow">✦ 91%</div>
-          </div>
-          <div className="p-3" dir="rtl">
-            <div className="font-black text-stone-900 text-sm leading-tight">זיגמונד פרויד</div>
-            <div className="text-[#2e7d8c] text-xs font-semibold mt-0.5">פסיכולוג קליני · יבנה</div>
-            <div className="mt-2 space-y-1">
-              <div>
-                <div className="flex justify-between text-xs text-stone-500 mb-0.5"><span>התאמה מקצועית</span><span className="font-bold text-stone-700">88%</span></div>
-                <div className="h-1.5 w-full rounded-full bg-stone-100"><div className="h-1.5 rounded-full bg-[#2e7d8c]" style={{ width: "88%" }} /></div>
-              </div>
-              <div>
-                <div className="flex justify-between text-xs text-stone-500 mb-0.5"><span>התאמה אישיותית</span><span className="font-bold text-stone-700">96%</span></div>
-                <div className="h-1.5 w-full rounded-full bg-stone-100"><div className="h-1.5 rounded-full bg-amber-500" style={{ width: "96%" }} /></div>
-              </div>
+          {/* Demo card — left on desktop, top on mobile */}
+          <div className="w-full sm:w-48 shrink-0 rounded-2xl border border-[#E8E0D8] bg-white overflow-hidden self-center sm:self-start" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)" }}>
+            <div className="relative h-40 w-full overflow-hidden bg-stone-100">
+              <img src="/demo-freud.webp" alt="זיגמונד פרויד" className="h-full w-full object-cover object-top" />
+              <div className="absolute top-2 left-2 rounded-full bg-[#1a3a5c] px-2 py-0.5 text-xs font-bold text-white shadow">✦ 91%</div>
             </div>
-            <div className="mt-2 rounded-lg bg-stone-50 border border-stone-100 px-2.5 py-1.5 text-xs text-stone-500 space-y-0.5">
-              <div>✓ טיפול דינמי</div><div>✓ התאמת מגדר</div><div>✓ אונליין</div>
+            <div className="p-3" dir="rtl">
+              <div className="font-black text-stone-900 text-sm leading-tight">זיגמונד פרויד</div>
+              <div className="text-[#2e7d8c] text-xs font-semibold mt-0.5">פסיכולוג קליני · יבנה</div>
+              <div className="mt-2 space-y-1">
+                <div>
+                  <div className="flex justify-between text-xs text-stone-500 mb-0.5"><span>התאמה מקצועית</span><span className="font-bold text-stone-700">88%</span></div>
+                  <div className="h-1.5 w-full rounded-full bg-stone-100"><div className="h-1.5 rounded-full bg-[#2e7d8c]" style={{ width: "88%" }} /></div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-xs text-stone-500 mb-0.5"><span>התאמה אישיותית</span><span className="font-bold text-stone-700">96%</span></div>
+                  <div className="h-1.5 w-full rounded-full bg-stone-100"><div className="h-1.5 rounded-full bg-amber-500" style={{ width: "96%" }} /></div>
+                </div>
+              </div>
+              <div className="mt-2 rounded-lg bg-stone-50 border border-stone-100 px-2.5 py-1.5 text-xs text-stone-500 space-y-0.5">
+                <div>✓ טיפול דינמי</div><div>✓ התאמת מגדר</div><div>✓ אונליין</div>
+              </div>
+              <p className="mt-2 text-center text-xs text-stone-400 italic">* הדמיה בלבד</p>
             </div>
-            <p className="mt-2 text-center text-xs text-stone-400 italic">* הדמיה בלבד</p>
           </div>
+
+          {/* Steps — stacked vertically on the right */}
+          <ol className="flex-1 space-y-3">
+            {[
+              { n: "1", title: "מלא/י את השאלון", body: "השאלון מסתעף בהתאם לתשובות — כל תשובה משפיעה על השאלה הבאה." },
+              { n: "2", title: "קבל/י מסמך פלט", body: "תקציר סוגי הטיפול המתאימים לך, ניתן לשמירה כ-PDF." },
+              { n: "3", title: "בחר/י מטפל מותאם", body: "לפי הטיפול שבחרת ופרמטרים נוספים תקבל/י רשימת ההתאמות הטובות ביותר." },
+            ].map(({ n, title, body }) => (
+              <li key={n} className="rounded-2xl border border-[#E8E0D8] bg-white p-4 flex gap-3" style={{ boxShadow: "0 2px 12px rgba(60,40,20,.07)" }}>
+                <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1a3a5c] text-white text-xs font-bold">{n}</span>
+                <div>
+                  <div className="font-bold text-stone-900 text-sm mb-0.5">{title}</div>
+                  <div className="text-xs text-stone-500 leading-relaxed">{body}</div>
+                </div>
+              </li>
+            ))}
+          </ol>
+
         </div>
       </section>
 
