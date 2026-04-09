@@ -298,7 +298,7 @@ export default function HomePage() {
         <div className="rounded-2xl border border-[#E8E0D8] bg-white overflow-hidden max-w-sm mx-auto" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)" }}>
           {/* Photo */}
           <div className="relative h-64 w-full overflow-hidden bg-stone-100">
-            <img src="/demo-freud.jpg" alt="זיגמונד פרויד" className="h-full w-full object-cover object-top" />
+            <img src="/demo-freud.webp" alt="זיגמונד פרויד" className="h-full w-full object-cover object-top" />
             {/* Match badge */}
             <div className="absolute top-3 left-3 rounded-full bg-[#1a3a5c] px-3 py-1 text-xs font-bold text-white shadow">✦ התאמה כוללת: 91%</div>
           </div>
