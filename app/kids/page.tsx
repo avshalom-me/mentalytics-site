@@ -3267,7 +3267,7 @@ function KidsMatchSection({ A }: { A: Ans }) {
           ageGroups,
           genderPreference: gender || null,
           city: city || null,
-          region: city ? (CITY_TO_REGION[city] ?? region || null) : (region || null),
+          region: city ? (CITY_TO_REGION[city] ?? region ?? null) : (region || null),
           onlineRequired: online,
           culturalPreferences: cultural,
           arrangements,
