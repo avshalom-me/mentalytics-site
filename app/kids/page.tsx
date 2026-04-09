@@ -3229,6 +3229,8 @@ type KidsMatchResult = {
   email: string | null;
   profile_photo_url: string | null;
   match_score: number;
+  personality_score: number | null;
+  combined_score: number | null;
   match_reasons: string[];
 };
 
@@ -3242,7 +3244,6 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [language, setLanguage]       = useState("עברית");
   const [loading, setLoading]         = useState(false);
   const [results, setResults]         = useState<KidsMatchResult[]>([]);
-  const [expanded, setExpanded]       = useState<string | null>(null);
   const [error, setError]             = useState("");
   const [searched, setSearched]       = useState(false);
 
@@ -3400,61 +3401,48 @@ function KidsMatchSection({ A }: { A: Ans }) {
           ) : (
             <>
               <div className="text-sm font-bold text-[#1a3a5c] mb-3">נמצאו {results.length} מטפלים:</div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {results.map(t => {
-                  const isOpen = expanded === t.id;
-                  const score = t.match_score;
-                  const scoreColor = score >= 85 ? "bg-emerald-600" : score >= 70 ? "bg-teal-600" : score >= 55 ? "bg-amber-600" : "bg-gray-500";
-                  const trainingArr = toArr(t.training_areas);
-                  const regionsArr  = toArr(t.regions);
-                  const arrsArr     = toArr(t.arrangements);
+                  const regionsArr = toArr(t.regions);
+                  const combined = t.combined_score ?? t.match_score;
                   return (
-                    <div key={t.id} className="rounded-2xl border border-[#d0daf0] bg-white overflow-hidden shadow-sm">
-                      <div className="flex items-center gap-3 p-4 cursor-pointer" onClick={() => setExpanded(isOpen ? null : t.id)}>
-                        {t.profile_photo_url ? (
-                          <img src={t.profile_photo_url} alt={t.full_name ?? "תמונת פרופיל"} className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-                        ) : (
-                          <div className="w-12 h-12 rounded-full bg-[#dce8f8] flex items-center justify-center text-xl flex-shrink-0">
-                            {t.gender === "נקבה" ? "👩" : "👨"}
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-bold text-[#1a3a5c] text-sm">{t.full_name || "—"}</div>
-                          <div className="text-xs text-gray-500 mt-0.5 truncate">
-                            {toArr(t.therapist_types).join(", ")}
-                          </div>
-                        </div>
-                        <div className={`rounded-full px-3 py-1 text-xs font-bold text-white flex-shrink-0 ${scoreColor}`}>
-                          {score}%
-                        </div>
-                        <span className="text-gray-400 text-sm mr-1">{isOpen ? "▲" : "▼"}</span>
-                      </div>
-
-                      {isOpen && (
-                        <div className="px-4 pb-4 border-t border-[#e8eef8] pt-3 space-y-2 text-sm text-gray-700">
-                          {t.bio && <p className="leading-6">{t.bio}</p>}
-                          {trainingArr.length > 0 && (
-                            <div><span className="font-semibold">תחומי הכשרה: </span>{trainingArr.join(", ")}</div>
-                          )}
+                    <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg">
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                          alt={t.full_name ?? ""}
+                          className="h-16 w-16 flex-shrink-0 rounded-xl object-cover"
+                        />
+                        <div className="flex-1 text-right">
+                          <h3 className="text-lg font-bold text-[#1a3a5c]">{t.full_name || "ללא שם"}</h3>
+                          <p className="text-xs text-[#6b7280]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
+                          {t.bio && <p className="mt-1 text-sm text-gray-700 line-clamp-2">{t.bio}</p>}
                           {regionsArr.length > 0 && (
-                            <div>
-                              <span className="font-semibold">אזורי פעילות: </span>
-                              {regionsArr.join(", ")}
-                              {t.online ? " + אונליין" : ""}
-                            </div>
-                          )}
-                          {arrsArr.length > 0 && (
-                            <div><span className="font-semibold">הסדרים: </span>{arrsArr.join(", ")}</div>
+                            <p className="mt-1 text-xs text-gray-500">📍 {regionsArr.join(", ")}</p>
                           )}
                           {t.match_reasons?.length > 0 && (
-                            <div className="mt-2 pt-2 border-t border-gray-100">
-                              <div className="font-semibold text-[#1a3a5c] mb-1">סיבות להתאמה:</div>
-                              {t.match_reasons.map((r, i) => <div key={i} className="text-xs text-gray-500">• {r}</div>)}
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {t.match_reasons.map((r, i) => (
+                                <span key={i} className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">{r}</span>
+                              ))}
                             </div>
                           )}
+                          <div className="mt-2 flex flex-wrap gap-2 items-center">
+                            <div className={`inline-block rounded-full px-3 py-1 text-xs font-bold text-white ${
+                              combined >= 85 ? "bg-[#1a3a5c]" : combined >= 70 ? "bg-[#2a5a8c]" : combined >= 55 ? "bg-amber-700" : "bg-gray-500"
+                            }`}>✦ התאמה כוללת: {combined}%</div>
+                            <div className="inline-block rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c]">
+                              מקצועי: {t.match_score}%
+                            </div>
+                            {t.personality_score != null && (
+                              <div className={`inline-block rounded-full px-3 py-1 text-xs font-semibold text-white ${
+                                t.personality_score >= 85 ? "bg-emerald-600" : t.personality_score >= 70 ? "bg-teal-600" : t.personality_score >= 55 ? "bg-amber-600" : "bg-gray-500"
+                              }`}>אישיותי: {t.personality_score}%</div>
+                            )}
+                          </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {t.phone && (
-                              <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך "טיפול חכם"')}`}
+                              <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
                                 target="_blank" rel="noopener noreferrer"
                                 className="inline-flex items-center gap-1.5 rounded-xl bg-green-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-600">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -3464,14 +3452,21 @@ function KidsMatchSection({ A }: { A: Ans }) {
                               </a>
                             )}
                             {t.email && (
-                              <a href={`mailto:${t.email}?subject=פנייה דרך אתר טיפול חכם&body=${encodeURIComponent('שלום, הגעתי אלייך דרך "טיפול חכם"')}`}
+                              <a href={`mailto:${t.email}?subject=פנייה דרך אתר טיפול חכם&body=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
                                 className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
                                 ✉ מייל
                               </a>
                             )}
+                            {t.phone && (
+                              <a href={`tel:${t.phone}`}
+                                className="inline-flex items-center gap-1.5 rounded-xl bg-stone-700 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
+                                📞 התקשר/י
+                              </a>
+                            )}
                           </div>
+                          <a href={`/therapists/${t.id}`} className="mt-2 block text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</a>
                         </div>
-                      )}
+                      </div>
                     </div>
                   );
                 })}
