@@ -39,6 +39,7 @@ type TherapistRow = {
   style_q2: number | null;
   activity_level: number | null;
   age_groups: unknown;
+  languages: unknown;
 };
 
 type NormalizedMatchInput = {
@@ -56,6 +57,7 @@ type NormalizedMatchInput = {
   styleP2: number | null;
   styleP3: number | null;
   ageGroups: string[];
+  languages: string[];
 };
 
 const WEIGHTS = {
@@ -219,6 +221,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   const styleP3 = Number.isInteger(body.styleP3) && body.styleP3 >= 1 && body.styleP3 <= 7 ? body.styleP3 : null;
   const ageGroups = mergeArrays(body.ageGroups, body.age_groups);
   const city = firstNonEmptyString(body.city, body.city_name);
+  const languages = mergeArrays(body.languages);
 
   return {
     treatmentTypes,
@@ -235,6 +238,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     styleP2,
     styleP3,
     ageGroups,
+    languages,
   };
 }
 
@@ -265,6 +269,15 @@ function scoreTherapist(
   const arrangements = parseArray(therapist.arrangements);
   const therapistGender = normalizeText(therapist.gender);
   const therapistOnline = parseBoolean(therapist.online);
+  const therapistLanguages = parseArray(therapist.languages);
+
+  // Hard filter — language must match (fallback: if therapist has no languages, assume Hebrew)
+  if (input.languages.length > 0) {
+    const effectiveLangs = therapistLanguages.length > 0 ? therapistLanguages : ["עברית"];
+    if (!hasOverlap(effectiveLangs, input.languages)) {
+      return null;
+    }
+  }
 
   let earned = 0;
   let possible = 0;
@@ -421,7 +434,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       // זמנית: כדי שתוכל לבדוק גם מטפלים שעוד לא אושרו סופית
       .in("status", ["approved", "pending"]);
@@ -435,10 +448,13 @@ export async function POST(req: NextRequest) {
 
     const therapists = (data ?? []) as TherapistRow[];
 
-    const scored = therapists.map((therapist) => {
-      const result = scoreTherapist(therapist, input);
-      return { therapist, result };
-    });
+    const scored = therapists
+      .map((therapist) => {
+        const result = scoreTherapist(therapist, input);
+        if (result === null) return null;
+        return { therapist, result };
+      })
+      .filter((x): x is { therapist: TherapistRow; result: NonNullable<ReturnType<typeof scoreTherapist>> } => x !== null);
 
     const WEIGHT_PROFESSIONAL = 0.65;
     const WEIGHT_PERSONALITY  = 0.35;
@@ -460,7 +476,6 @@ export async function POST(req: NextRequest) {
 
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {
-        // Use stored public URL first, fall back to signed URL from old path field
         const photoUrl = await buildSignedPhotoUrl(therapist.profile_photo_path);
         return {
           id: therapist.id,

@@ -304,6 +304,7 @@ type MatchPrefs = {
   online: boolean;
   genderPref: string;
   culturalPrefs: string[];
+  language: string;
 };
 
 export default function AdultsPage() {
@@ -312,7 +313,7 @@ export default function AdultsPage() {
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
-  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [] });
+  const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית" });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -480,6 +481,7 @@ export default function AdultsPage() {
         genderPreference: matchPrefs.genderPref || null,
         culturalPreferences: matchPrefs.culturalPrefs.filter(p => p !== "מטפל/ת עם ניסיון בגיל השלישי"),
         ageGroups: matchPrefs.culturalPrefs.includes("מטפל/ת עם ניסיון בגיל השלישי") ? ["הגיל השלישי"] : [],
+        languages: matchPrefs.language ? [matchPrefs.language] : ["עברית"],
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
@@ -1708,6 +1710,14 @@ export default function AdultsPage() {
             <option value="">ללא העדפה</option>
             <option value="זכר">זכר</option>
             <option value="נקבה">נקבה</option>
+          </select>
+        </div>
+
+        <div className="mb-3">
+          <label className="mb-1 block text-xs text-[#6b7280]">שפת הטיפול</label>
+          <select value={matchPrefs.language} onChange={(e) => setMatchPrefs((p) => ({ ...p, language: e.target.value }))}
+            className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
+            {["עברית","אנגלית","ערבית","רוסית","צרפתית","ספרדית","פורטוגזית","אמהרית"].map(l => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
 

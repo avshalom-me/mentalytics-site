@@ -3239,6 +3239,7 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [gender, setGender]           = useState("");
   const [arrangements, setArrangements] = useState<string[]>([]);
   const [cultural, setCultural]       = useState<string[]>([]);
+  const [language, setLanguage]       = useState("עברית");
   const [loading, setLoading]         = useState(false);
   const [results, setResults]         = useState<KidsMatchResult[]>([]);
   const [expanded, setExpanded]       = useState<string | null>(null);
@@ -3267,6 +3268,7 @@ function KidsMatchSection({ A }: { A: Ans }) {
           onlineRequired: online,
           culturalPreferences: cultural,
           arrangements,
+          languages: [language || "עברית"],
           limit: 10,
         }),
       });
@@ -3326,6 +3328,15 @@ function KidsMatchSection({ A }: { A: Ans }) {
               </select>
             </div>
           )}
+
+          {/* Language */}
+          <div className="mb-4">
+            <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">שפת הטיפול</label>
+            <select value={language} onChange={e => setLanguage(e.target.value)}
+              className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
+              {["עברית","אנגלית","ערבית","רוסית","צרפתית","ספרדית","פורטוגזית","אמהרית"].map(l => <option key={l} value={l}>{l}</option>)}
+            </select>
+          </div>
 
           {/* Gender */}
           <div className="mb-4">
