@@ -17,6 +17,7 @@ type TherapistRow = {
   arrangements: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
+  manually_promoted: boolean | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -48,7 +49,8 @@ async function buildTherapistsResponse() {
       cultural_prefs,
       arrangements,
       profile_photo_path,
-      status
+      status,
+      manually_promoted
       `
     )
     .order("full_name", { ascending: true });
@@ -97,6 +99,7 @@ async function buildTherapistsResponse() {
         profile_photo_path: t.profile_photo_path ?? null,
         profile_photo_url,
         status: t.status ?? "",
+        manually_promoted: t.manually_promoted ?? false,
         created_at: null,
       };
     })
@@ -161,9 +164,14 @@ export async function PATCH(request: Request) {
       );
     }
 
+    // כשמקדמים ידנית → סימון; כשמורידים חזרה → ביטול הסימון
+    const extraFields: Record<string, unknown> = {};
+    if (status === "paying") extraFields.manually_promoted = true;
+    if (status === "approved") extraFields.manually_promoted = false;
+
     const { error } = await supabaseAdmin
       .from("therapists")
-      .update({ status })
+      .update({ status, ...extraFields })
       .eq("id", id);
 
     if (error) {

@@ -44,6 +44,7 @@ type AdminTherapist = {
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   status: string;
+  manually_promoted: boolean;
   created_at: string | null;
 };
 
@@ -317,12 +318,17 @@ export default function AdminTherapistsPage() {
                   {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
                 </button>
               )}
-              {therapist.status === "paying" && (
+              {therapist.status === "paying" && therapist.manually_promoted && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => updateStatus(therapist.id, "approved")}>
                   {isBusy ? "מעדכן..." : "הורד לחינמי"}
                 </button>
+              )}
+              {therapist.status === "paying" && !therapist.manually_promoted && (
+                <span className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-400 border border-stone-200">
+                  שילם — לא ניתן להוריד
+                </span>
               )}
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
