@@ -374,6 +374,33 @@ export default function TherapistDashboard() {
         </button>
       </div>
 
+      {/* Pricing banner — only for non-paying therapists */}
+      {profile && profile.status !== "paying" && (
+        <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
+          <div className="px-6 pt-6 pb-5">
+            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">הצטרפות למערכת ההתאמה</div>
+            <div className="flex items-end gap-3 mb-3">
+              <span className="text-4xl font-black text-white leading-none">₪120</span>
+              <span className="text-white/70 text-sm pb-1">כולל מע"מ · תשלום חד-פעמי</span>
+            </div>
+            <div className="h-px bg-white/20 mb-4" />
+            <div className="space-y-2.5">
+              <div className="flex items-start gap-2.5">
+                <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
+                <span className="text-white/90 text-sm leading-5">ניתן להזדכות על העלות מול חשבונית עסקית</span>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
+                <span className="text-white/90 text-sm leading-5">לא קיבלת הפנייה שהתממשה בתוך חודשיים? <strong className="text-white">החזר כספי מלא</strong></span>
+              </div>
+            </div>
+            <button disabled className="mt-5 w-full rounded-xl py-3 text-sm font-black text-[#0F5468] bg-white/20 border border-white/30 text-white/50 cursor-not-allowed">
+              הצטרפות ותשלום — בקרוב
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Plan comparison + status */}
       {profile && (
         <div className="mb-6 rounded-2xl overflow-hidden border border-[#E8E0D8]">
@@ -401,29 +428,24 @@ export default function TherapistDashboard() {
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> פרסום דף מידע אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
                 <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">כניסה למערכת ההתאמה</span></li>
+                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">דו"ח שבועי של פניות</span></li>
               </ul>
             </div>
 
             {/* Promoted */}
-            <div className={`p-5 ${profile.status === "paying" ? "bg-white" : ""}`}
+            <div className={`p-5 ${profile.status === "paying" ? "" : ""}`}
               style={profile.status === "paying" ? { background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" } : {}}>
               <div className="flex items-center gap-2 mb-3">
                 <span className="text-xs font-black rounded-full px-2.5 py-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>
-                {profile.status === "paying"
-                  ? <span className="text-xs text-[#0F5468] font-medium">← המסלול הנוכחי שלך</span>
-                  : <span className="text-xs text-stone-400 font-medium">בקרוב</span>}
+                {profile.status === "paying" && <span className="text-xs text-[#0F5468] font-medium">← המסלול הנוכחי שלך</span>}
               </div>
               <ul className="space-y-2 text-xs leading-5" style={{ color: profile.status === "paying" ? "#1a4a5c" : "#9ca3af" }}>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דף מידע אישי — כולל כל מה שבמסלול החינמי</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> כניסה למערכת ההתאמה — פניות לפי תחומי הטיפול והאישיות המקצועית שלך</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> התאמה לפי פרמטרים מגוונים: גיל, אזור, שפה, סגנון טיפולי, הסדרי ביטוח ועוד</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> הפניות המדויקות ביותר — מטופלים שמחפשים בדיוק את הגישה שלך</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דו"ח שבועי של כמות הלחיצות על הפרופיל שלך</li>
               </ul>
-              {profile.status !== "paying" && (
-                <button disabled className="mt-4 w-full rounded-xl py-2 text-xs font-bold text-stone-400 bg-stone-100 cursor-not-allowed">
-                  שדרג למקודם — בקרוב
-                </button>
-              )}
             </div>
           </div>
         </div>
