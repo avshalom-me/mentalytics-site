@@ -222,6 +222,7 @@ export default function TherapistDashboard() {
   const [certFile, setCertFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [showRefundNote, setShowRefundNote] = useState(false);
 
   // Form state
   const [form, setForm] = useState({
@@ -378,23 +379,31 @@ export default function TherapistDashboard() {
       {profile && profile.status !== "paying" && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
-            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">הצטרפות למערכת ההתאמה</div>
-            <div className="flex items-end gap-3 mb-3">
+            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">הצטרפות למערכת ההתאמה החכמה</div>
+            <div className="flex items-end gap-3 mb-1">
               <span className="text-4xl font-black text-white leading-none">₪120</span>
-              <span className="text-white/70 text-sm pb-1">כולל מע"מ · תשלום חד-פעמי</span>
+              <span className="text-white/70 text-sm pb-1">לחודש</span>
             </div>
+            <p className="text-white/60 text-xs mb-4">ניתן לבטל בכל עת</p>
             <div className="h-px bg-white/20 mb-4" />
-            <div className="space-y-2.5">
-              <div className="flex items-start gap-2.5">
-                <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
-                <span className="text-white/90 text-sm leading-5">ניתן להזדכות על העלות מול חשבונית עסקית</span>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
-                <span className="text-white/90 text-sm leading-5">לא קיבלת הפנייה שהתממשה בתוך חודשיים? <strong className="text-white">החזר כספי מלא</strong></span>
-              </div>
+            <div className="flex items-start gap-2.5">
+              <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
+              <span className="text-white/90 text-sm leading-5">
+                לא קיבלת מטופל/מאובחן שהגיע דרכינו תוך חודשיים? אפשרי לבקש החזר כספי מלא
+                <button
+                  onClick={() => setShowRefundNote(v => !v)}
+                  className="mr-1 text-yellow-300 font-black text-xs underline underline-offset-2 hover:text-yellow-200 transition-colors"
+                >
+                  *
+                </button>
+              </span>
             </div>
-            <button disabled className="mt-5 w-full rounded-xl py-3 text-sm font-black text-[#0F5468] bg-white/20 border border-white/30 text-white/50 cursor-not-allowed">
+            {showRefundNote && (
+              <div className="mt-3 rounded-xl bg-white/10 border border-white/20 px-4 py-3 text-xs text-white/80 leading-5">
+                * ההחזר הכספי מכסה את דמי המנוי של החודשיים בהם הייתם מנויים. ההחזר ניתן רק אם לא התקבלה אף הפנייה שהתממשה בשני החודשים העוקבים ממועד ההצטרפות.
+              </div>
+            )}
+            <button disabled className="mt-5 w-full rounded-xl py-3 text-sm font-black bg-white/20 border border-white/30 text-white/50 cursor-not-allowed">
               הצטרפות ותשלום — בקרוב
             </button>
           </div>
