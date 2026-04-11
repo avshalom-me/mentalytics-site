@@ -36,16 +36,12 @@ export async function GET(): Promise<NextResponse<AdminStatsResponse>> {
     return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
   }
 
-  // Fetch all-time clicks for all therapists
-  const { data: clicks, error: cErr } = await supabaseAdmin
+  // Fetch all-time clicks — gracefully handle missing table
+  const { data: clicks } = await supabaseAdmin
     .from("therapist_contact_clicks")
     .select("therapist_id, click_type");
 
-  if (cErr) {
-    return NextResponse.json({ ok: false, error: cErr.message }, { status: 500 });
-  }
-
-  // Aggregate clicks per therapist
+  // Aggregate clicks per therapist (clicks may be null if table doesn't exist yet)
   const clickMap: Record<string, { whatsapp: number; phone: number; email: number }> = {};
   for (const row of (clicks ?? []) as { therapist_id: string; click_type: string }[]) {
     if (!clickMap[row.therapist_id]) {
