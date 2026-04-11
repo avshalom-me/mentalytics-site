@@ -127,82 +127,122 @@ function toggleInArray(arr: string[], value: string) {
 }
 
 function LandingScreen() {
-  const benefits = [
-    {
-      icon: "🎯",
-      title: "הפניות מדויקות יותר — פחות הפניות סרק",
-      body: "המערכת מתאימה מטופלים לפי סוג הטיפול שאתה מציע, תחומי המומחיות שלך, והאופי המקצועי שלך — לא רק לפי מיקום.",
-    },
-    {
-      icon: "🪪",
-      title: "כרטיס מטפל אישי חינמי",
-      body: 'פרופיל ייחודי שבו תוכל להציג את עצמך, את ה"אני מאמין" שלך, ואת הגישה הטיפולית שמאפיינת אותך.',
-    },
-    {
-      icon: "🤝",
-      title: "התאמה אישיותית",
-      body: "מעבר להתמחות — המערכת בוחנת את הסגנון הטיפולי שלך ומתאימה אותו למטופלים שמחפשים בדיוק את הגישה שלך.",
-    },
-    {
-      icon: "📊",
-      title: "פרמטרים מגוונים",
-      body: "התאמה לפי גיל, אזור, שפה, העדפה תרבותית, הסדרי ביטוח ועוד — כדי שתגיעו בדיוק לקהל הנכון.",
-    },
-    {
-      icon: "🔒",
-      title: "שקיפות ובקרה",
-      body: "אתה שולט בפרטים שמוצגים, ויכול לעדכן את הפרופיל בכל עת. כל הגשה נסקרת לפני פרסום.",
-    },
-  ];
-
   return (
     <main className="min-h-screen bg-[#f0ece4]" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-      <div className="mx-auto max-w-2xl px-4 py-10">
+      <div className="mx-auto max-w-4xl px-4 py-10">
 
         {/* Header */}
-        <div className="mb-8 text-center">
+        <div className="mb-10 text-center">
           <img src="/logo.svg.png" alt="Mentalytics" className="mx-auto mb-4 h-16 w-auto" />
           <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase mb-4"
             style={{ background: "#0F546822", color: "#0F5468", border: "1px solid #0F546844" }}>
             למטפלים ומאבחנים
           </div>
           <h1 className="text-3xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>
-            למה להירשם כמטפל?
+            בחר/י את מסלול ההצטרפות שלך
           </h1>
-          <p className="mt-3 text-stone-800 leading-7 max-w-lg mx-auto">
-            טיפול חכם היא מערכת הפניה חכמה שמחברת בין מטופלים לאנשי טיפול —
-            על בסיס התאמה אמיתית, לא רק רשימה.
+          <p className="mt-3 text-stone-700 leading-7 max-w-lg mx-auto text-sm">
+            מנטליטיקס מחברת בין מטופלים לאנשי טיפול — בשתי רמות שירות.
           </p>
         </div>
 
-        {/* Benefits */}
-        <div className="space-y-4 mb-8">
-          {benefits.map((b, i) => (
-            <div key={i} className="flex gap-4 rounded-2xl bg-white p-5 shadow-sm"
-              style={{ border: "1px solid #E8E0D8" }}>
-              <div className="text-3xl flex-shrink-0 mt-0.5">{b.icon}</div>
-              <div>
-                <p className="font-bold text-[#1a3a5c] mb-1">{b.title}</p>
-                <p className="text-sm leading-6 text-stone-800">{b.body}</p>
-              </div>
+        {/* Plan cards */}
+        <div className="grid gap-6 md:grid-cols-2 mb-10">
+
+          {/* Free plan */}
+          <div className="rounded-2xl bg-white p-7 shadow-sm flex flex-col" style={{ border: "1px solid #E8E0D8" }}>
+            <div className="mb-4">
+              <span className="inline-block rounded-full px-3 py-1 text-xs font-bold mb-3"
+                style={{ background: "#E8F4F0", color: "#1a5c46" }}>
+                חינמי
+              </span>
+              <h2 className="text-xl font-black text-[#1a3a5c] mb-1">מסלול בסיסי</h2>
+              <p className="text-2xl font-black text-stone-800 mb-4">₪0 <span className="text-sm font-normal text-stone-500">/ תמיד</span></p>
             </div>
-          ))}
+            <ul className="space-y-3 flex-1 mb-6">
+              <li className="flex items-start gap-2 text-sm text-stone-700">
+                <span className="mt-0.5 text-green-600 font-bold flex-shrink-0">✓</span>
+                <span><strong>דף מידע אישי</strong> — פרסום פרופיל שלך עם תמונה, ביוגרפיה ותחומי התמחות</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-stone-700">
+                <span className="mt-0.5 text-green-600 font-bold flex-shrink-0">✓</span>
+                <span>נגיש לכל מי שמחפש מטפלים באתר</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-stone-700">
+                <span className="mt-0.5 text-green-600 font-bold flex-shrink-0">✓</span>
+                <span>שליטה מלאה בפרטים המוצגים</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-stone-400 line-through">
+                <span className="mt-0.5 flex-shrink-0">✗</span>
+                <span>כניסה למערכת ההתאמה</span>
+              </li>
+            </ul>
+            <a
+              href="/therapists/login"
+              className="block w-full text-center rounded-xl px-6 py-3 text-sm font-bold transition hover:opacity-90 active:scale-95"
+              style={{ background: "#E8E0D8", color: "#1a3a5c" }}
+            >
+              הרשמה חינמית ←
+            </a>
+          </div>
+
+          {/* Promoted plan */}
+          <div className="rounded-2xl p-7 shadow-lg flex flex-col relative"
+            style={{ background: "linear-gradient(160deg,#0F5468 0%,#1A7A96 100%)", border: "2px solid #0F5468" }}>
+            <div className="absolute -top-3 right-6">
+              <span className="rounded-full px-3 py-1 text-xs font-black shadow"
+                style={{ background: "#F5C842", color: "#1a3a0a" }}>
+                מומלץ
+              </span>
+            </div>
+            <div className="mb-4">
+              <span className="inline-block rounded-full px-3 py-1 text-xs font-bold mb-3"
+                style={{ background: "rgba(255,255,255,0.2)", color: "#ffffff" }}>
+                מקודם
+              </span>
+              <h2 className="text-xl font-black text-white mb-1">מסלול מתקדם</h2>
+              <p className="text-2xl font-black text-white mb-4">בקרוב <span className="text-sm font-normal opacity-70">/ מנוי חודשי</span></p>
+            </div>
+            <ul className="space-y-3 flex-1 mb-6">
+              <li className="flex items-start gap-2 text-sm text-white">
+                <span className="mt-0.5 text-yellow-300 font-bold flex-shrink-0">✓</span>
+                <span><strong>דף מידע אישי</strong> — כולל כל מה שבמסלול הבסיסי</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white">
+                <span className="mt-0.5 text-yellow-300 font-bold flex-shrink-0">✓</span>
+                <span><strong>כניסה למערכת ההתאמה</strong> — הפניות על בסיס תחומי הטיפול והאישיות המקצועית שלך</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white">
+                <span className="mt-0.5 text-yellow-300 font-bold flex-shrink-0">✓</span>
+                <span>התאמה לפי פרמטרים מגוונים: גיל, אזור, שפה, סגנון טיפולי, הסדרי ביטוח ועוד</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white">
+                <span className="mt-0.5 text-yellow-300 font-bold flex-shrink-0">✓</span>
+                <span>הפניות מדויקות — המטופלים שתקבל/י יתאימו לך ולגישה הטיפולית שלך</span>
+              </li>
+              <li className="flex items-start gap-2 text-sm text-white">
+                <span className="mt-0.5 text-yellow-300 font-bold flex-shrink-0">✓</span>
+                <span>ערך טיפולי גבוה יותר — מטופלים שבחרו אותך על בסיס התאמה אמיתית</span>
+              </li>
+            </ul>
+            <button
+              disabled
+              className="block w-full text-center rounded-xl px-6 py-3 text-sm font-bold cursor-not-allowed opacity-60"
+              style={{ background: "rgba(255,255,255,0.2)", color: "#ffffff", border: "1px solid rgba(255,255,255,0.4)" }}
+            >
+              הרשמה ותשלום — בקרוב
+            </button>
+            <p className="text-center text-xs mt-3 opacity-60 text-white">
+              הרשמה כבסיסי תאפשר שדרוג בהמשך
+            </p>
+          </div>
         </div>
 
-        {/* CTA */}
-        <div className="text-center">
-          <a
-            href="/therapists/login"
-            className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-90 active:scale-95 shadow-md"
-            style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}
-          >
-            להרשמה / כניסה ←
-          </a>
-          <p className="mt-4 text-xs text-stone-700">
-            ההרשמה אורכת כ-5 דקות. הפרופיל יעלה לאחר בדיקה ואישור.
-          </p>
-        </div>
+        {/* Sub note */}
+        <p className="text-center text-xs text-stone-500">
+          ההרשמה אורכת כ-5 דקות. הפרופיל יעלה לאחר בדיקה ואישור.
+        </p>
       </div>
     </main>
   );

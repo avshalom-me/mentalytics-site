@@ -154,7 +154,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: true, id });
     }
 
-    if (!status || !["approved", "rejected", "pending"].includes(status)) {
+    if (!status || !["approved", "rejected", "pending", "paying"].includes(status)) {
       return NextResponse.json(
         { ok: false, error: "Invalid status" },
         { status: 400 }

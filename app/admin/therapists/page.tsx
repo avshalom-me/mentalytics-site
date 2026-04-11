@@ -194,7 +194,7 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  async function updateStatus(id: string, status: "approved" | "rejected" | "pending") {
+  async function updateStatus(id: string, status: "approved" | "rejected" | "pending" | "paying") {
     try {
       setActionLoadingId(id);
       setError("");
@@ -253,12 +253,14 @@ export default function AdminTherapistsPage() {
           <div className="text-right">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-semibold">{therapist.full_name || "ללא שם"}</h2>
-              <span className={`rounded-full px-3 py-1 text-sm ${
+              <span className={`rounded-full px-3 py-1 text-sm font-medium ${
+                therapist.status === "paying" ? "bg-yellow-100 text-yellow-800 border border-yellow-400" :
                 therapist.status === "approved" ? "bg-green-100 text-green-800" :
                 therapist.status === "rejected" ? "bg-red-100 text-red-800" :
-                "bg-yellow-100 text-yellow-800"
+                "bg-gray-100 text-gray-700"
               }`}>
-                {therapist.status === "approved" ? "מאושר" :
+                {therapist.status === "paying" ? "★ מקודם" :
+                 therapist.status === "approved" ? "מאושר (חינמי)" :
                  therapist.status === "rejected" ? "נדחה" : "ממתין לאישור"}
               </span>
             </div>
@@ -300,11 +302,28 @@ export default function AdminTherapistsPage() {
                 onClick={() => openEdit(therapist)}>
                 ערוך
               </button>
-              <button type="button" disabled={isBusy}
-                className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-                onClick={() => updateStatus(therapist.id, "approved")}>
-                {isBusy ? "מעדכן..." : "אשר"}
-              </button>
+              {therapist.status !== "approved" && therapist.status !== "paying" && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                  onClick={() => updateStatus(therapist.id, "approved")}>
+                  {isBusy ? "מעדכן..." : "אשר (חינמי)"}
+                </button>
+              )}
+              {therapist.status === "approved" && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  style={{ background: "linear-gradient(135deg,#b8860b,#d4a017)" }}
+                  onClick={() => updateStatus(therapist.id, "paying")}>
+                  {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
+                </button>
+              )}
+              {therapist.status === "paying" && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                  onClick={() => updateStatus(therapist.id, "approved")}>
+                  {isBusy ? "מעדכן..." : "הורד לחינמי"}
+                </button>
+              )}
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                 onClick={() => updateStatus(therapist.id, "rejected")}>

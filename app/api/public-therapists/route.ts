@@ -42,7 +42,7 @@ export async function GET() {
       status
       `
     )
-    .eq("status", "approved")
+    .in("status", ["approved", "paying"])
     .order("full_name", { ascending: true });
 
   if (error) {

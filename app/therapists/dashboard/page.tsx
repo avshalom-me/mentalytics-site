@@ -130,6 +130,85 @@ function StyleQuestion({ name, question, hint, value, onChange }: {
   );
 }
 
+type StatsBucket = { whatsapp: number; phone: number; email: number; total: number };
+type StatsData = { week: StatsBucket; month: StatsBucket } | null;
+
+function ContactStats({ token }: { token: string }) {
+  const [stats, setStats] = useState<StatsData>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+  const [period, setPeriod] = useState<"week" | "month">("week");
+
+  useEffect(() => {
+    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.ok) setStats({ week: json.week, month: json.month }); })
+      .finally(() => setLoadingStats(false));
+  }, [token]);
+
+  const data = stats?.[period];
+  const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
+
+  return (
+    <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-extrabold text-stone-900">פניות מהפרופיל שלך</h2>
+        <div className="flex rounded-xl border border-stone-200 overflow-hidden text-xs font-semibold">
+          <button
+            onClick={() => setPeriod("week")}
+            className={`px-3 py-1.5 transition-colors ${period === "week" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+          >
+            שבוע
+          </button>
+          <button
+            onClick={() => setPeriod("month")}
+            className={`px-3 py-1.5 transition-colors ${period === "month" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+          >
+            חודש
+          </button>
+        </div>
+      </div>
+
+      {loadingStats ? (
+        <div className="text-sm text-stone-400 py-4 text-center">טוען נתונים...</div>
+      ) : !data ? (
+        <div className="text-sm text-stone-400 py-4 text-center">לא ניתן לטעון נתונים</div>
+      ) : (
+        <>
+          <p className="text-xs text-stone-500 mb-4">{periodLabel}</p>
+          {data.total === 0 ? (
+            <div className="text-sm text-stone-400 py-2 text-center">לא היו פניות בתקופה זו</div>
+          ) : (
+            <div className="grid grid-cols-3 gap-3">
+              {data.whatsapp > 0 && (
+                <div className="rounded-xl bg-green-50 border border-green-100 p-4 text-center">
+                  <div className="text-2xl font-black text-green-700">{data.whatsapp}</div>
+                  <div className="text-xs text-green-600 mt-1 font-semibold">💬 וואטסאפ</div>
+                </div>
+              )}
+              {data.phone > 0 && (
+                <div className="rounded-xl bg-stone-50 border border-stone-200 p-4 text-center">
+                  <div className="text-2xl font-black text-stone-700">{data.phone}</div>
+                  <div className="text-xs text-stone-500 mt-1 font-semibold">📞 שיחות</div>
+                </div>
+              )}
+              {data.email > 0 && (
+                <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center">
+                  <div className="text-2xl font-black text-blue-700">{data.email}</div>
+                  <div className="text-xs text-blue-500 mt-1 font-semibold">✉️ מייל</div>
+                </div>
+              )}
+            </div>
+          )}
+          <div className="mt-4 rounded-xl bg-[#f0ece4] px-4 py-3 flex items-center justify-between">
+            <span className="text-sm text-stone-600">סה"כ פניות</span>
+            <span className="text-xl font-black text-[#0F5468]">{data.total}</span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function TherapistDashboard() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -271,8 +350,12 @@ export default function TherapistDashboard() {
 
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
-  const statusLabel = profile?.status === "approved" ? { text: "מאושר ומופיע במאגר", color: "bg-green-100 text-green-800" }
-    : profile?.status === "rejected" ? { text: "נדחה", color: "bg-red-100 text-red-800" }
+  const statusLabel = profile?.status === "paying"
+    ? { text: "מקודם — מופיע בהתאמות", color: "bg-yellow-50 text-yellow-800 border border-yellow-300" }
+    : profile?.status === "approved"
+    ? { text: "מאושר — מופיע בדף המטפלים", color: "bg-green-100 text-green-800" }
+    : profile?.status === "rejected"
+    ? { text: "נדחה", color: "bg-red-100 text-red-800" }
     : { text: "ממתין לאישור", color: "bg-yellow-100 text-yellow-800" };
 
   return (
@@ -291,22 +374,63 @@ export default function TherapistDashboard() {
         </button>
       </div>
 
-      {/* Status banner */}
+      {/* Plan comparison + status */}
       {profile && (
-        <div className={`mb-6 flex items-center justify-between rounded-2xl px-5 py-4 ${statusLabel.color}`}>
-          <div>
-            <div className="font-bold text-sm">סטטוס: {statusLabel.text}</div>
-            {profile.tier === "paid" && (
-              <div className="text-xs mt-0.5 font-semibold">⭐ פרופיל מקודם</div>
+        <div className="mb-6 rounded-2xl overflow-hidden border border-[#E8E0D8]">
+
+          {/* Status bar */}
+          <div className={`px-5 py-3 flex items-center justify-between text-sm font-bold ${statusLabel.color}`}>
+            <span>סטטוס: {statusLabel.text}</span>
+            {(profile.status === "approved" || profile.status === "paying") && (
+              <span className={`text-xs font-black px-3 py-1 rounded-full ${profile.status === "paying" ? "bg-yellow-400 text-yellow-900" : "bg-white/60 text-stone-600"}`}>
+                {profile.status === "paying" ? "★ מקודם" : "חינמי"}
+              </span>
             )}
           </div>
-          {profile.status === "approved" && profile.tier === "free" && (
-            <button className="rounded-xl bg-white/80 border border-current px-3 py-1.5 text-xs font-bold opacity-60 cursor-not-allowed">
-              שדרג לקידום (בקרוב)
-            </button>
-          )}
+
+          {/* Plan cards */}
+          <div className="grid grid-cols-2 bg-white">
+
+            {/* Free */}
+            <div className={`p-5 border-l border-[#E8E0D8] ${profile.status !== "paying" ? "bg-white" : "bg-stone-50 opacity-70"}`}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-black rounded-full px-2.5 py-0.5 bg-green-100 text-green-800">חינמי</span>
+                {profile.status !== "paying" && <span className="text-xs text-stone-400 font-medium">← המסלול הנוכחי שלך</span>}
+              </div>
+              <ul className="space-y-2 text-xs text-stone-600 leading-5">
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> פרסום דף מידע אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
+                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">כניסה למערכת ההתאמה</span></li>
+              </ul>
+            </div>
+
+            {/* Promoted */}
+            <div className={`p-5 ${profile.status === "paying" ? "bg-white" : ""}`}
+              style={profile.status === "paying" ? { background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" } : {}}>
+              <div className="flex items-center gap-2 mb-3">
+                <span className="text-xs font-black rounded-full px-2.5 py-0.5 bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>
+                {profile.status === "paying"
+                  ? <span className="text-xs text-[#0F5468] font-medium">← המסלול הנוכחי שלך</span>
+                  : <span className="text-xs text-stone-400 font-medium">בקרוב</span>}
+              </div>
+              <ul className="space-y-2 text-xs leading-5" style={{ color: profile.status === "paying" ? "#1a4a5c" : "#9ca3af" }}>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דף מידע אישי — כולל כל מה שבמסלול החינמי</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> כניסה למערכת ההתאמה — פניות לפי תחומי הטיפול והאישיות המקצועית שלך</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> התאמה לפי פרמטרים מגוונים: גיל, אזור, שפה, סגנון טיפולי, הסדרי ביטוח ועוד</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> הפניות המדויקות ביותר — מטופלים שמחפשים בדיוק את הגישה שלך</li>
+              </ul>
+              {profile.status !== "paying" && (
+                <button disabled className="mt-4 w-full rounded-xl py-2 text-xs font-bold text-stone-400 bg-stone-100 cursor-not-allowed">
+                  שדרג למקודם — בקרוב
+                </button>
+              )}
+            </div>
+          </div>
         </div>
       )}
+
+      {/* Contact stats */}
+      {token && !isNew && <ContactStats token={token} />}
 
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-sm text-blue-800">

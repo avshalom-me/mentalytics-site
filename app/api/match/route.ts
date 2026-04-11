@@ -451,8 +451,7 @@ export async function POST(req: NextRequest) {
       .select(
         "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
-      // זמנית: כדי שתוכל לבדוק גם מטפלים שעוד לא אושרו סופית
-      .in("status", ["approved", "pending"]);
+      .eq("status", "paying");
 
     if (error) {
       return NextResponse.json(
@@ -480,8 +479,6 @@ export async function POST(req: NextRequest) {
     }
 
     scored.sort((a, b) => {
-      if (a.therapist.status === "approved" && b.therapist.status !== "approved") return -1;
-      if (a.therapist.status !== "approved" && b.therapist.status === "approved") return 1;
       const ca = combinedScore(a.result.score, a.result.personality_score);
       const cb = combinedScore(b.result.score, b.result.personality_score);
       return cb - ca;
