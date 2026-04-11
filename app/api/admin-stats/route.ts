@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
+
+export type Period = "week" | "month" | "all";
 
 export type TherapistStat = {
   id: string;
@@ -16,6 +18,7 @@ export type TherapistStat = {
 
 export type AdminStatsResponse = {
   ok: true;
+  period: Period;
   paying: TherapistStat[];
   free: TherapistStat[];
   generated_at: string;
@@ -24,7 +27,17 @@ export type AdminStatsResponse = {
   error: string;
 };
 
-export async function GET(): Promise<NextResponse<AdminStatsResponse>> {
+function periodToDate(period: Period): string | null {
+  if (period === "all") return null;
+  const ms = period === "week" ? 7 * 24 * 60 * 60 * 1000 : 30 * 24 * 60 * 60 * 1000;
+  return new Date(Date.now() - ms).toISOString();
+}
+
+export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResponse>> {
+  const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
+  const validPeriods: Period[] = ["week", "month", "all"];
+  const safePeriod: Period = validPeriods.includes(period) ? period : "all";
+
   // Fetch all active therapists
   const { data: therapists, error: tErr } = await supabaseAdmin
     .from("therapists")
@@ -36,12 +49,16 @@ export async function GET(): Promise<NextResponse<AdminStatsResponse>> {
     return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
   }
 
-  // Fetch all-time clicks — gracefully handle missing table
-  const { data: clicks } = await supabaseAdmin
+  // Fetch clicks, filtered by period if needed
+  const since = periodToDate(safePeriod);
+  let query = supabaseAdmin
     .from("therapist_contact_clicks")
     .select("therapist_id, click_type");
+  if (since) query = query.gte("clicked_at", since);
 
-  // Aggregate clicks per therapist (clicks may be null if table doesn't exist yet)
+  const { data: clicks } = await query;
+
+  // Aggregate
   const clickMap: Record<string, { whatsapp: number; phone: number; email: number }> = {};
   for (const row of (clicks ?? []) as { therapist_id: string; click_type: string }[]) {
     if (!clickMap[row.therapist_id]) {
@@ -70,6 +87,7 @@ export async function GET(): Promise<NextResponse<AdminStatsResponse>> {
 
   return NextResponse.json({
     ok: true,
+    period: safePeriod,
     paying: stats.filter((s) => s.status === "paying"),
     free: stats.filter((s) => s.status === "approved"),
     generated_at: new Date().toISOString(),
