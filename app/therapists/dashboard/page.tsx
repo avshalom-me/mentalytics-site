@@ -436,6 +436,7 @@ export default function TherapistDashboard() {
               <ul className="space-y-2 text-xs text-stone-600 leading-5">
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> פרסום דף מידע אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש מטפל לפי מיקום — אזור או עיר</li>
                 <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">כניסה למערכת ההתאמה</span></li>
                 <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">דו"ח שבועי של פניות</span></li>
               </ul>
