@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
+import type { TherapistStat } from "@/app/api/admin-stats/route";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -94,6 +95,60 @@ function CheckboxGroup({
   );
 }
 
+type StatsData = { paying: TherapistStat[]; free: TherapistStat[]; generated_at: string } | null;
+
+function StatsTable({ title, rows, accent }: { title: string; rows: TherapistStat[]; accent: string }) {
+  const totalWa = rows.reduce((s, r) => s + r.whatsapp, 0);
+  const totalPh = rows.reduce((s, r) => s + r.phone, 0);
+  const totalEm = rows.reduce((s, r) => s + r.email_clicks, 0);
+  const totalAll = rows.reduce((s, r) => s + r.total, 0);
+
+  return (
+    <div className="mb-10">
+      <h2 className="text-lg font-bold mb-3 pb-2 border-b" style={{ color: accent }}>{title} ({rows.length})</h2>
+      {rows.length === 0 ? (
+        <p className="text-sm text-gray-400 text-center py-4">אין מטפלים</p>
+      ) : (
+        <div className="overflow-x-auto rounded-xl border border-gray-200">
+          <table className="w-full text-sm text-right">
+            <thead className="bg-gray-50 text-xs font-bold text-gray-500 uppercase tracking-wide">
+              <tr>
+                <th className="px-4 py-3">שם</th>
+                <th className="px-4 py-3">מייל</th>
+                <th className="px-4 py-3 text-center">💬 וואטסאפ</th>
+                <th className="px-4 py-3 text-center">📞 טלפון</th>
+                <th className="px-4 py-3 text-center">✉️ מייל</th>
+                <th className="px-4 py-3 text-center font-black">סה"כ</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {rows.map((r) => (
+                <tr key={r.id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3 font-semibold text-gray-900">{r.full_name || "—"}</td>
+                  <td className="px-4 py-3 text-gray-500 text-xs">{r.email || "—"}</td>
+                  <td className="px-4 py-3 text-center">{r.whatsapp > 0 ? <span className="font-bold text-green-700">{r.whatsapp}</span> : <span className="text-gray-300">0</span>}</td>
+                  <td className="px-4 py-3 text-center">{r.phone > 0 ? <span className="font-bold text-gray-700">{r.phone}</span> : <span className="text-gray-300">0</span>}</td>
+                  <td className="px-4 py-3 text-center">{r.email_clicks > 0 ? <span className="font-bold text-blue-700">{r.email_clicks}</span> : <span className="text-gray-300">0</span>}</td>
+                  <td className="px-4 py-3 text-center"><span className={`font-black text-base ${r.total > 0 ? "text-gray-900" : "text-gray-300"}`}>{r.total}</span></td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="bg-gray-50 text-xs font-black text-gray-700 border-t border-gray-200">
+              <tr>
+                <td className="px-4 py-2" colSpan={2}>סה"כ</td>
+                <td className="px-4 py-2 text-center text-green-700">{totalWa}</td>
+                <td className="px-4 py-2 text-center text-gray-700">{totalPh}</td>
+                <td className="px-4 py-2 text-center text-blue-700">{totalEm}</td>
+                <td className="px-4 py-2 text-center text-gray-900 text-sm">{totalAll}</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminTherapistsPage() {
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,6 +156,8 @@ export default function AdminTherapistsPage() {
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const [approvedSearch, setApprovedSearch] = useState("");
+  const [stats, setStats] = useState<StatsData>(null);
+  const [statsLoading, setStatsLoading] = useState(true);
 
   // Edit modal state
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -128,7 +185,18 @@ export default function AdminTherapistsPage() {
       }
     }
 
+    async function loadStats() {
+      try {
+        const res = await fetch("/api/admin-stats", { cache: "no-store" });
+        const json = await res.json();
+        if (!cancelled && json.ok) setStats({ paying: json.paying, free: json.free, generated_at: json.generated_at });
+      } finally {
+        if (!cancelled) setStatsLoading(false);
+      }
+    }
+
     loadTherapists();
+    loadStats();
     return () => { cancelled = true; };
   }, []);
 
@@ -370,6 +438,28 @@ export default function AdminTherapistsPage() {
       </div>
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+
+      {/* ── טבלאות סטטיסטיקה ── */}
+      <section className="mb-12">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold border-b pb-2 flex-1">סטטיסטיקת לחיצות — כל הזמנים</h2>
+          {stats?.generated_at && (
+            <span className="text-xs text-gray-400 mr-4">
+              עודכן: {new Date(stats.generated_at).toLocaleTimeString("he-IL")}
+            </span>
+          )}
+        </div>
+        {statsLoading ? (
+          <p className="text-sm text-gray-400 py-4">טוען נתונים...</p>
+        ) : stats ? (
+          <>
+            <StatsTable title="★ מטפלים מקודמים" rows={stats.paying} accent="#0F5468" />
+            <StatsTable title="מטפלים חינמיים" rows={stats.free} accent="#4b7c6f" />
+          </>
+        ) : (
+          <p className="text-sm text-red-400">לא ניתן לטעון נתונים</p>
+        )}
+      </section>
 
       {/* ── ממתינים לאישור / נדחו ── */}
       <section className="mb-12">
