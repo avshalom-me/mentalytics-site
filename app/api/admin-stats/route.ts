@@ -76,7 +76,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
   const rows = (therapists ?? []) as { id: string; full_name: string | null; email: string | null; status: string }[];
 
   const stats: TherapistStat[] = rows.map((t) => {
-    const c = clickMap[t.id] ?? { whatsapp: 0, phone: 0, email: 0 };
+    const c = clickMap[t.id] ?? { whatsapp: 0, phone: 0, email: 0, match: 0, directory: 0 };
     return {
       id: t.id,
       full_name: t.full_name ?? "",
