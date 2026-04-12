@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Sparkles, ShieldCheck, Target, Users, Heart } from "lucide-react";
+import { Sparkles, ShieldCheck, Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "אודות",
@@ -88,90 +88,13 @@ export default function AboutPage() {
               אודות טיפול חכם
             </div>
 
-            <h1
-              className="mt-4 text-4xl font-black tracking-tight"
-              style={{ color: "#2C1A10", letterSpacing: "-0.02em" }}
-            >
-              הכוונה טיפולית/אבחונים וכלים לסיוע —{" "}
-              <span style={{ color: "#6B4226" }}>בצורה בהירה, רגישה ומעשית</span>
-            </h1>
-
-            <p className="mt-4 max-w-3xl leading-8 text-stone-700">
+            <p className="mt-6 max-w-3xl leading-8 text-stone-700 text-lg">
               טיפול חכם נולדה מתוך הבנה פשוטה: הרבה אנשים "מסתובבים" בין אפשרויות טיפול,
               אבחונים ומסלולי זכאות — בלי מפת דרכים ברורה. אנחנו בונים מערכת שמסייעת למקד
               את הקושי, להציע כיוון טיפול מתאים, ולהנגיש מידע מסודר על צעדים אפשריים.
               כי לפעמים הצעד הכי קשה הוא פשוט לדעת מאיפה להתחיל — ואנחנו כאן בדיוק בשביל זה.
             </p>
-
-            <div
-              className="mt-6 rounded-2xl px-4 py-3 text-sm text-stone-900"
-              style={{ background: "rgba(255,255,255,0.75)", border: "1px solid rgba(220,200,175,0.55)" }}
-            >
-              <div className="flex items-start gap-2">
-                <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
-                <p className="leading-7">
-                  <span className="font-semibold">השאלונים כתובים בשפה מכבדת, ומיועדים לתת הכוונה ראשונית ברורה.</span>{" "}
-                  השאלונים אינם מהווים אבחון מקצועי אלא רק פירוט הסימפטומים וההתאמה למטפל המתאים.
-                </p>
-              </div>
-            </div>
           </div>
-        </div>
-      </section>
-
-      {/* WHAT WE DO */}
-      <section className="mt-14 fade-up fade-up-2">
-        <div className="flex items-start gap-3 mb-6">
-          <div
-            className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "#F4E8DC", border: "1px solid #E8D5C0" }}
-          >
-            <Target size={18} style={{ color: "#8B2E0A" }} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-extrabold text-stone-900">מה אנחנו עושים בפועל</h2>
-            <p className="mt-1 text-stone-600">שילוב של מחקר, ניסיון קליני ומבנה שאלונים מודולרי.</p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            {
-              icon: "🔍",
-              title: "מיקוד הקושי",
-              body: "עוזרים להבין מה מרכזי כרגע ומה פחות — כדי לא ללכת לאיבוד בין אפשרויות.",
-              bg: "#FEF3EB",
-              border: "#F4C8A4",
-            },
-            {
-              icon: "🧭",
-              title: "כיוון טיפולי מתאים",
-              body: "התאמה בין סוג הקושי לבין כיווני טיפול מקובלים, עם הסבר קצר על הסיבה.",
-              bg: "#EBF5F1",
-              border: "#A8D4C0",
-            },
-            {
-              icon: "🤝",
-              title: "התאמה למטפל/ת",
-              body: "בשלב הבא: התאמת מטפל/ת לפי התמחות, סגנון עבודה, אזור, שפה וזמינות.",
-              bg: "#F0EBF8",
-              border: "#C4A8DC",
-            },
-          ].map((p, i) => (
-            <div
-              key={i}
-              className="rounded-2xl p-5"
-              style={{
-                background: p.bg,
-                border: `1px solid ${p.border}`,
-                boxShadow: "0 4px 16px rgba(100,60,30,.07)",
-              }}
-            >
-              <div className="mb-3 text-3xl">{p.icon}</div>
-              <div className="mb-2 font-bold text-stone-900">{p.title}</div>
-              <p className="text-sm leading-6 text-stone-700">{p.body}</p>
-            </div>
-          ))}
         </div>
       </section>
 
@@ -200,13 +123,33 @@ export default function AboutPage() {
         >
           <div className="grid gap-5 md:grid-cols-2">
             {[
-              { emoji: "💛", title: "חמימות ורגישות", body: "אנחנו יודעים שלפנות לעזרה זה לא קל. כל מילה בשאלונים נכתבה בתשומת לב, מבלי לשפוט." },
-              { emoji: "📚", title: "בסיס מחקרי", body: "כל שאלון מבוסס על ספרות מקצועית מוכרת וניסיון קליני מצטבר — לא על ניחושים." },
-              { emoji: "🔒", title: "פרטיות מלאה", body: "לא שומרים שמות, לא מייל, לא מעקב. המידע שלכם נשאר שלכם." },
-              { emoji: "🌱", title: "נקודת התחלה, לא תחליף", body: "אנחנו לא מחליפים טיפול מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובביטחון." },
+              {
+                emoji: "🧠",
+                title: "ניסיון קליני של אנשי טיפול",
+                body: "המערכת פותחה על ידי פסיכולוגים קליניים ואנשי טיפול עם שנים של ניסיון מצטבר בשטח — לא על ניחושים.",
+              },
+              {
+                emoji: "📚",
+                title: "בסיס מחקרי",
+                body: "כל שאלון מבוסס על ספרות מקצועית מוכרת וניסיון קליני מצטבר.",
+              },
+              {
+                emoji: "🔒",
+                title: "פרטיות מלאה",
+                body: "לא שומרים שמות, לא מייל, לא מעקב. המידע שלכם נשאר שלכם.",
+              },
+              {
+                emoji: "🌱",
+                title: "נקודת התחלה ואבחון, לא תחליף",
+                body: "אנחנו לא מחליפים טיפול מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובביטחון.",
+              },
             ].map((v, i) => (
-              <div key={i} className="flex items-start gap-3">
-                <span className="text-2xl mt-0.5">{v.emoji}</span>
+              <div
+                key={i}
+                className="flex items-start gap-4 rounded-2xl p-5"
+                style={{ background: "#FAFAF9", border: "1px solid #EAE0D5" }}
+              >
+                <span className="text-2xl mt-0.5 flex-shrink-0">{v.emoji}</span>
                 <div>
                   <div className="font-bold text-stone-900">{v.title}</div>
                   <p className="mt-1 text-sm leading-6 text-stone-700">{v.body}</p>
