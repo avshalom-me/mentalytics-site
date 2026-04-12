@@ -94,7 +94,7 @@ export default async function TherapistProfilePage({
   const type = t.therapist_types?.[0] ?? "";
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const waLink = t.phone
-    ? `https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}`
+    ? `https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`
     : null;
 
   const jsonLd = {
