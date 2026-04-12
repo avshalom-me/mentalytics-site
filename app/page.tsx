@@ -301,8 +301,8 @@ export default function HomePage() {
           <ol className="flex-1 space-y-3">
             {[
               { n: "1", title: "מלא/י את השאלון", body: "השאלון מסתעף בהתאם לתשובות — כל תשובה משפיעה על השאלה הבאה." },
-              { n: "2", title: "קבל/י מסמך פלט", body: "תקציר סוגי הטיפול המתאימים לך, ניתן לשמירה כ-PDF." },
-              { n: "3", title: "בחר/י מטפל מותאם", body: "לפי הטיפול שבחרת ופרמטרים נוספים תקבל/י רשימת ההתאמות הטובות ביותר." },
+              { n: "2", title: "קבל/י מסמך פלט", body: "תקציר סוגי הטיפול המתאימים לך, ניתן לשמירה כ-PDF. בנוסף תקבל/י כלים מיידיים שמתאימים לסוג הקושי המתואר." },
+              { n: "3", title: "בחר/י מטפל מותאם", body: "לפי הטיפול הכי מתאים שיצא בשאלון, ההתאמה לאישיות המקצועית של המטפל ופרמטרים נוספים — תקבל/י רשימת התאמות מדורגת." },
             ].map(({ n, title, body }) => (
               <li key={n} className="rounded-2xl border border-[#E8E0D8] bg-white p-4 flex gap-3" style={{ boxShadow: "0 2px 12px rgba(60,40,20,.07)" }}>
                 <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#1a3a5c] text-white text-xs font-bold">{n}</span>
