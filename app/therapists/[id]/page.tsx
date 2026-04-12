@@ -76,8 +76,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 }
 
 
-export default async function TherapistProfilePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function TherapistProfilePage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ from?: string }>;
+}) {
   const { id } = await params;
+  const { from } = await searchParams;
+  const source: "match" | "directory" = from === "match" ? "match" : "directory";
   const result = await getTherapist(id);
   if (!result) notFound();
 
@@ -153,6 +161,7 @@ export default async function TherapistProfilePage({ params }: { params: Promise
             waLink={waLink}
             phone={t.phone}
             email={t.email}
+            source={source}
           />
         </div>
       </div>

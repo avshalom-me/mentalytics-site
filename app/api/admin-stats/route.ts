@@ -14,6 +14,8 @@ export type TherapistStat = {
   phone: number;
   email_clicks: number;
   total: number;
+  match_clicks: number;
+  directory_clicks: number;
 };
 
 export type AdminStatsResponse = {
@@ -53,20 +55,22 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
   const since = periodToDate(safePeriod);
   let query = supabaseAdmin
     .from("therapist_contact_clicks")
-    .select("therapist_id, click_type");
+    .select("therapist_id, click_type, source");
   if (since) query = query.gte("clicked_at", since);
 
   const { data: clicks } = await query;
 
   // Aggregate
-  const clickMap: Record<string, { whatsapp: number; phone: number; email: number }> = {};
-  for (const row of (clicks ?? []) as { therapist_id: string; click_type: string }[]) {
+  const clickMap: Record<string, { whatsapp: number; phone: number; email: number; match: number; directory: number }> = {};
+  for (const row of (clicks ?? []) as { therapist_id: string; click_type: string; source: string }[]) {
     if (!clickMap[row.therapist_id]) {
-      clickMap[row.therapist_id] = { whatsapp: 0, phone: 0, email: 0 };
+      clickMap[row.therapist_id] = { whatsapp: 0, phone: 0, email: 0, match: 0, directory: 0 };
     }
     if (row.click_type === "whatsapp") clickMap[row.therapist_id].whatsapp++;
     else if (row.click_type === "phone") clickMap[row.therapist_id].phone++;
     else if (row.click_type === "email") clickMap[row.therapist_id].email++;
+    if (row.source === "match") clickMap[row.therapist_id].match++;
+    else clickMap[row.therapist_id].directory++;
   }
 
   const rows = (therapists ?? []) as { id: string; full_name: string | null; email: string | null; status: string }[];
@@ -82,6 +86,8 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
       phone: c.phone,
       email_clicks: c.email,
       total: c.whatsapp + c.phone + c.email,
+      match_clicks: c.match,
+      directory_clicks: c.directory,
     };
   });
 

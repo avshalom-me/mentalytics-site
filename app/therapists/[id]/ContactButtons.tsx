@@ -19,12 +19,11 @@ const phonesvg = (
   </svg>
 );
 
-function track(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
-  // fire-and-forget — don't block navigation
+function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", source: "match" | "directory") {
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType }),
+    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source }),
   }).catch(() => {});
 }
 
@@ -33,42 +32,36 @@ export default function ContactButtons({
   waLink,
   phone,
   email,
+  source = "directory",
 }: {
   therapistId: string;
   waLink: string | null;
   phone: string | null;
   email: string | null;
+  source?: "match" | "directory";
 }) {
   if (!waLink && !phone && !email) return null;
 
   return (
     <div className="mt-5 flex flex-wrap gap-3">
       {waLink && (
-        <a
-          href={waLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() => track(therapistId, "whatsapp")}
-          className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-600 transition-colors"
-        >
+        <a href={waLink} target="_blank" rel="noopener noreferrer"
+          onClick={() => track(therapistId, "whatsapp", source)}
+          className="inline-flex items-center gap-2 rounded-xl bg-green-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-green-600 transition-colors">
           {wasvg} וואטסאפ
         </a>
       )}
       {phone && (
-        <a
-          href={`tel:${phone}`}
-          onClick={() => track(therapistId, "phone")}
-          className="inline-flex items-center gap-2 rounded-xl bg-stone-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-stone-800 transition-colors"
-        >
+        <a href={`tel:${phone}`}
+          onClick={() => track(therapistId, "phone", source)}
+          className="inline-flex items-center gap-2 rounded-xl bg-stone-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-stone-800 transition-colors">
           {phonesvg} התקשר/י
         </a>
       )}
       {email && (
-        <a
-          href={`mailto:${email}`}
-          onClick={() => track(therapistId, "email")}
-          className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity"
-        >
+        <a href={`mailto:${email}`}
+          onClick={() => track(therapistId, "email", source)}
+          className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity">
           {emailsvg} מייל
         </a>
       )}
