@@ -16,6 +16,12 @@ export type TherapistStat = {
   total: number;
   match_clicks: number;
   directory_clicks: number;
+  match_whatsapp: number;
+  match_phone: number;
+  match_email: number;
+  directory_whatsapp: number;
+  directory_phone: number;
+  directory_email: number;
 };
 
 export type AdminStatsResponse = {
@@ -61,22 +67,49 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
   const { data: clicks } = await query;
 
   // Aggregate
-  const clickMap: Record<string, { whatsapp: number; phone: number; email: number; match: number; directory: number }> = {};
+  type ClickCounts = {
+    whatsapp: number; phone: number; email: number;
+    match: number; directory: number;
+    match_whatsapp: number; match_phone: number; match_email: number;
+    directory_whatsapp: number; directory_phone: number; directory_email: number;
+  };
+  const clickMap: Record<string, ClickCounts> = {};
   for (const row of (clicks ?? []) as { therapist_id: string; click_type: string; source: string }[]) {
     if (!clickMap[row.therapist_id]) {
-      clickMap[row.therapist_id] = { whatsapp: 0, phone: 0, email: 0, match: 0, directory: 0 };
+      clickMap[row.therapist_id] = {
+        whatsapp: 0, phone: 0, email: 0,
+        match: 0, directory: 0,
+        match_whatsapp: 0, match_phone: 0, match_email: 0,
+        directory_whatsapp: 0, directory_phone: 0, directory_email: 0,
+      };
     }
-    if (row.click_type === "whatsapp") clickMap[row.therapist_id].whatsapp++;
-    else if (row.click_type === "phone") clickMap[row.therapist_id].phone++;
-    else if (row.click_type === "email") clickMap[row.therapist_id].email++;
-    if (row.source === "match") clickMap[row.therapist_id].match++;
-    else clickMap[row.therapist_id].directory++;
+    const c = clickMap[row.therapist_id];
+    if (row.click_type === "whatsapp") c.whatsapp++;
+    else if (row.click_type === "phone") c.phone++;
+    else if (row.click_type === "email") c.email++;
+
+    if (row.source === "match") {
+      c.match++;
+      if (row.click_type === "whatsapp") c.match_whatsapp++;
+      else if (row.click_type === "phone") c.match_phone++;
+      else if (row.click_type === "email") c.match_email++;
+    } else {
+      c.directory++;
+      if (row.click_type === "whatsapp") c.directory_whatsapp++;
+      else if (row.click_type === "phone") c.directory_phone++;
+      else if (row.click_type === "email") c.directory_email++;
+    }
   }
 
   const rows = (therapists ?? []) as { id: string; full_name: string | null; email: string | null; status: string }[];
 
   const stats: TherapistStat[] = rows.map((t) => {
-    const c = clickMap[t.id] ?? { whatsapp: 0, phone: 0, email: 0, match: 0, directory: 0 };
+    const c = clickMap[t.id] ?? {
+      whatsapp: 0, phone: 0, email: 0,
+      match: 0, directory: 0,
+      match_whatsapp: 0, match_phone: 0, match_email: 0,
+      directory_whatsapp: 0, directory_phone: 0, directory_email: 0,
+    };
     return {
       id: t.id,
       full_name: t.full_name ?? "",
@@ -88,6 +121,12 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
       total: c.whatsapp + c.phone + c.email,
       match_clicks: c.match,
       directory_clicks: c.directory,
+      match_whatsapp: c.match_whatsapp,
+      match_phone: c.match_phone,
+      match_email: c.match_email,
+      directory_whatsapp: c.directory_whatsapp,
+      directory_phone: c.directory_phone,
+      directory_email: c.directory_email,
     };
   });
 

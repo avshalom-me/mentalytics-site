@@ -21,45 +21,62 @@ function StatsBadge({ value, color }: { value: number; color: string }) {
   return <span className={`font-bold text-sm ${color}`}>{value}</span>;
 }
 
-function StatsTable({ title, rows, badge }: { title: string; rows: TherapistStat[]; badge: React.ReactNode }) {
+type SourceMode = "match" | "directory";
+
+function StatsTable({
+  title, rows, badge, source,
+}: {
+  title: string;
+  rows: TherapistStat[];
+  badge: React.ReactNode;
+  source: SourceMode;
+}) {
   const [search, setSearch] = useState("");
 
+  const wa  = (r: TherapistStat) => source === "match" ? r.match_whatsapp    : r.directory_whatsapp;
+  const ph  = (r: TherapistStat) => source === "match" ? r.match_phone        : r.directory_phone;
+  const em  = (r: TherapistStat) => source === "match" ? r.match_email        : r.directory_email;
+  const tot = (r: TherapistStat) => source === "match" ? r.match_clicks       : r.directory_clicks;
+
+  // Only show therapists that have at least one click from this source
+  const relevant = rows.filter(r => tot(r) > 0);
+
   const filtered = search.trim()
-    ? rows.filter(r =>
+    ? relevant.filter(r =>
         r.full_name.toLowerCase().includes(search.toLowerCase()) ||
         r.email.toLowerCase().includes(search.toLowerCase())
       )
-    : rows;
+    : relevant;
 
-  const totalWa   = filtered.reduce((s, r) => s + r.whatsapp, 0);
-  const totalPh   = filtered.reduce((s, r) => s + r.phone, 0);
-  const totalEm   = filtered.reduce((s, r) => s + r.email_clicks, 0);
-  const totalAll  = filtered.reduce((s, r) => s + r.total, 0);
-  const totalMatch = filtered.reduce((s, r) => s + r.match_clicks, 0);
-  const totalDir  = filtered.reduce((s, r) => s + r.directory_clicks, 0);
+  const totalWa  = filtered.reduce((s, r) => s + wa(r), 0);
+  const totalPh  = filtered.reduce((s, r) => s + ph(r), 0);
+  const totalEm  = filtered.reduce((s, r) => s + em(r), 0);
+  const totalAll = filtered.reduce((s, r) => s + tot(r), 0);
 
   return (
-    <section className="mb-12">
+    <section className="mb-10">
       <div className="flex flex-wrap items-center gap-3 mb-4">
         <h2 className="text-xl font-black text-stone-900">{title}</h2>
         {badge}
         <span className="text-sm text-stone-400">
-          {search.trim() ? `${filtered.length} מתוך ${rows.length}` : `${rows.length} מטפלים`}
+          {search.trim() ? `${filtered.length} מתוך ${relevant.length}` : `${relevant.length} מטפלים`}
         </span>
-        <div className="mr-auto">
-          <input
-            type="text"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="חיפוש לפי שם או מייל..."
-            className="rounded-xl border border-stone-200 px-4 py-2 text-sm outline-none focus:border-[#0F5468] w-56"
-          />
-        </div>
+        {relevant.length > 0 && (
+          <div className="mr-auto">
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="חיפוש לפי שם או מייל..."
+              className="rounded-xl border border-stone-200 px-4 py-2 text-sm outline-none focus:border-[#0F5468] w-56"
+            />
+          </div>
+        )}
       </div>
 
-      {rows.length === 0 ? (
-        <div className="rounded-2xl border border-stone-200 bg-white px-6 py-10 text-center text-stone-400 text-sm">
-          אין מטפלים בקטגוריה זו
+      {relevant.length === 0 ? (
+        <div className="rounded-2xl border border-stone-200 bg-white px-6 py-8 text-center text-stone-400 text-sm">
+          אין לחיצות מקור זה עדיין
         </div>
       ) : filtered.length === 0 ? (
         <div className="rounded-2xl border border-stone-200 bg-white px-6 py-8 text-center text-stone-400 text-sm">
@@ -76,26 +93,20 @@ function StatsTable({ title, rows, badge }: { title: string; rows: TherapistStat
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">💬 וואטסאפ</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">📞 טלפון</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">✉️ מייל</th>
-                <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">🎯 התאמה</th>
-                <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">🔍 מאגר</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">סה&quot;כ</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((r, i) => (
-                <tr key={r.id} className={`border-b border-stone-100 hover:bg-stone-50 transition-colors ${r.total === 0 ? "opacity-40" : ""}`}>
+                <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
                   <td className="px-5 py-3.5 text-stone-400 text-xs">{i + 1}</td>
                   <td className="px-5 py-3.5 font-semibold text-stone-800">{r.full_name || "—"}</td>
                   <td className="px-5 py-3.5 text-stone-400 text-xs">{r.email || "—"}</td>
-                  <td className="px-5 py-3.5 text-center"><StatsBadge value={r.whatsapp} color="text-green-600" /></td>
-                  <td className="px-5 py-3.5 text-center"><StatsBadge value={r.phone} color="text-stone-700" /></td>
-                  <td className="px-5 py-3.5 text-center"><StatsBadge value={r.email_clicks} color="text-blue-600" /></td>
-                  <td className="px-5 py-3.5 text-center"><StatsBadge value={r.match_clicks} color="text-purple-600" /></td>
-                  <td className="px-5 py-3.5 text-center"><StatsBadge value={r.directory_clicks} color="text-orange-600" /></td>
+                  <td className="px-5 py-3.5 text-center"><StatsBadge value={wa(r)} color="text-green-600" /></td>
+                  <td className="px-5 py-3.5 text-center"><StatsBadge value={ph(r)} color="text-stone-700" /></td>
+                  <td className="px-5 py-3.5 text-center"><StatsBadge value={em(r)} color="text-blue-600" /></td>
                   <td className="px-5 py-3.5 text-center">
-                    {r.total > 0
-                      ? <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-stone-100 font-black text-stone-800 text-sm">{r.total}</span>
-                      : <span className="text-stone-200 text-sm">0</span>}
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-stone-100 font-black text-stone-800 text-sm">{tot(r)}</span>
                   </td>
                 </tr>
               ))}
@@ -110,8 +121,6 @@ function StatsTable({ title, rows, badge }: { title: string; rows: TherapistStat
                 <td className="px-5 py-3 text-center font-black text-green-600">{totalWa}</td>
                 <td className="px-5 py-3 text-center font-black text-stone-700">{totalPh}</td>
                 <td className="px-5 py-3 text-center font-black text-blue-600">{totalEm}</td>
-                <td className="px-5 py-3 text-center font-black text-purple-600">{totalMatch}</td>
-                <td className="px-5 py-3 text-center font-black text-orange-600">{totalDir}</td>
                 <td className="px-5 py-3 text-center">
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-stone-800 font-black text-white text-base">{totalAll}</span>
                 </td>
@@ -143,8 +152,9 @@ export default function AdminStatsPage() {
       .finally(() => setLoading(false));
   }, [period]);
 
-  const totalAll = data ? [...data.paying, ...data.free].reduce((s, r) => s + r.total, 0) : 0;
-  const periodLabel = PERIODS.find(p => p.value === period)?.label ?? "";
+  const totalAll = data
+    ? [...data.paying, ...data.free].reduce((s, r) => s + r.total, 0)
+    : 0;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -197,31 +207,49 @@ export default function AdminStatsPage() {
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700 mb-6">
           <p className="font-bold mb-1">שגיאה: {error}</p>
-          <p className="text-xs text-red-500">ייתכן שטבלת המעקב עדיין לא נוצרה ב-Supabase. הרץ את קובץ <code>supabase_migration_contact_clicks.sql</code>.</p>
+          <p className="text-xs text-red-500">ייתכן שטבלת המעקב עדיין לא נוצרה ב-Supabase.</p>
         </div>
       )}
 
       {!loading && data && (
         <>
+          {/* ── מערכת ההתאמות ── */}
+          <div className="mb-4 flex items-center gap-3">
+            <span className="text-lg font-black text-stone-800">🎯 לחיצות ממערכת ההתאמות</span>
+          </div>
+
           <StatsTable
             title="מטפלים מקודמים"
             rows={data.paying}
             badge={<span className="rounded-full px-2.5 py-0.5 text-xs font-black bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>}
+            source="match"
           />
           <StatsTable
             title="מטפלים חינמיים"
             rows={data.free}
             badge={<span className="rounded-full px-2.5 py-0.5 text-xs font-black bg-green-100 text-green-800">חינמי</span>}
+            source="match"
           />
 
-          <div className="rounded-2xl border border-stone-200 bg-stone-50 px-6 py-5 text-sm text-stone-600 leading-6">
-            <p className="font-bold text-stone-800 mb-1">🤖 חיבור סוכן AI</p>
-            <p>
-              הנתונים זמינים דרך{" "}
-              <code className="bg-stone-200 px-1.5 py-0.5 rounded text-xs">/api/admin-stats?period={period}</code>{" "}
-              כ-JSON מובנה עם פילוח לפי {periodLabel}. סוכן AI יוכל לקרוא לנקודה זו, לעבד את הנתונים ולשלוח מיילים מותאמים אישית לכל מטפל.
-            </p>
+          <div className="my-8 border-t-2 border-stone-200" />
+
+          {/* ── מאגר המטפלים הכללי ── */}
+          <div className="mb-4 flex items-center gap-3">
+            <span className="text-lg font-black text-stone-800">🔍 לחיצות ממאגר המטפלים הכללי</span>
           </div>
+
+          <StatsTable
+            title="מטפלים מקודמים"
+            rows={data.paying}
+            badge={<span className="rounded-full px-2.5 py-0.5 text-xs font-black bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>}
+            source="directory"
+          />
+          <StatsTable
+            title="מטפלים חינמיים"
+            rows={data.free}
+            badge={<span className="rounded-full px-2.5 py-0.5 text-xs font-black bg-green-100 text-green-800">חינמי</span>}
+            source="directory"
+          />
         </>
       )}
     </main>
