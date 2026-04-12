@@ -397,10 +397,8 @@ function scoreTherapist(
   const { styleP1, styleP2, styleP3 } = input;
   if (styleP1 != null && styleP2 != null && styleP3 != null &&
       t1Raw != null && t2 != null && t3 != null) {
-    // Q1 therapist scale is inverted vs patient (1=לא מסכים=הקלה, 7=מסכים=תובנה)
-    // Patient Q1: 1=תובנה, 7=הקלה → invert therapist: 8-t1Raw aligns scales
-    const t1 = 8 - t1Raw;
-    const davg = (Math.abs(styleP1 - t1) + Math.abs(styleP2 - t2) + Math.abs(styleP3 - t3)) / 3;
+    // All three Q scales aligned: 1=practical/immediate, 7=insight/deep/active
+    const davg = (Math.abs(styleP1 - t1Raw) + Math.abs(styleP2 - t2) + Math.abs(styleP3 - t3)) / 3;
     personality_score = Math.round(100 * (1 - davg / 6));
   }
 

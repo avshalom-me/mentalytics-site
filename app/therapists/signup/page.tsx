@@ -747,7 +747,7 @@ export default function TherapistSignupPage() {
           {/* T1 */}
           <div className="mt-5">
             <p className="text-sm font-semibold text-slate-800">בעבודתי הטיפולית, אני נוטה לראות בהבנה מעמיקה של שורשי הקושי, העבר והדפוסים הלא-מודעים מרכיב מרכזי בשינוי הטיפולי.</p>
-            <p className="mt-1 text-xs text-slate-700">1 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק &nbsp;|&nbsp; 7 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד</p>
+            <p className="mt-1 text-xs text-slate-700">1 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד &nbsp;|&nbsp; 7 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק</p>
             <div className="mt-3 flex flex-wrap gap-4">
               {[1,2,3,4,5,6,7].map((num) => (
                 <label key={num} className="flex items-center gap-2 text-sm">
