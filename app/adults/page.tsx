@@ -675,19 +675,9 @@ export default function AdultsPage() {
   if (screen === "e1") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה/ת <strong>מצב רוח ירוד, עצבות מתמשכת, או חוסר חשק</strong>?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה/ת <strong>מצב רוח ירוד, עצבות מתמשכת, חוסר חשק, או העדר הנאה ממושכים</strong>?</p>
         <p className="mb-3 rounded-lg bg-gray-50 p-2 text-xs text-[#6b7280]">כולל: עצב, עצבנות, אובדן עניין, שינויים במשקל/שינה, עייפות, קשיי ריכוז</p>
-        <YesNo onYes={() => { updE({ e1: true }); setScreen("e1-q"); }} onNo={() => { updE({ e1: false }); setScreen("e1b"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e1b") return (
-    <Layout>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם חווה/ת <strong>תחושה של חוסר חשק או העדר הנאה מתמשכים</strong>?</p>
-        <YesNo onYes={() => { updE({ e1b: true }); setScreen("e1-q"); }}
-          onNo={() => { updE({ e1b: false }); setScreen("e2"); }} />
+        <YesNo onYes={() => { updE({ e1: true }); setScreen("e1-q"); }} onNo={() => { updE({ e1: false }); setScreen("e2"); }} />
       </Card>
     </Layout>
   );
@@ -711,7 +701,7 @@ export default function AdultsPage() {
   if (screen === "e2") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
         <YesNo onYes={() => { updE({ maniaScreen1: true }); setScreen("e2-2"); }}
           onNo={() => { updE({ maniaScreen1: false }); setScreen("e3"); }} />
       </Card>
@@ -749,7 +739,7 @@ export default function AdultsPage() {
   if (screen === "e3") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם ראית/שמעת דברים שאחרים אמרו שאינם קיימים? או שיש לך אמונות/חשדות יוצאי דופן?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם ראית/שמעת דברים שאחרים אמרו שאינם קיימים? או שיש לך אמונות/חשדות יוצאי דופן?</p>
         <YesNo onYes={() => { updE({ e3: true }); setScreen("e3-q"); }}
           onNo={() => { updE({ e3: false }); setScreen("e4"); }} />
       </Card>
@@ -777,7 +767,7 @@ export default function AdultsPage() {
   if (screen === "e4") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">5. האם חווה/ת <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם חווה/ת <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
         <YesNo onYes={() => { updE({ e4: true }); setScreen("e4-chronic"); }}
           onNo={() => { updE({ e4: false }); setScreen("e5"); }} />
       </Card>
@@ -876,7 +866,7 @@ export default function AdultsPage() {
   if (screen === "e5") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">6. האם חש/ה <strong>הכרח לחשוב שוב ושוב מחשבות מסוימות, או לעשות שוב ושוב פעולות מסוימות</strong>?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">5. האם חש/ה <strong>הכרח לחשוב שוב ושוב מחשבות מסוימות, או לעשות שוב ושוב פעולות מסוימות</strong>?</p>
         <YesNo onYes={() => { updE({ e5: true }); setScreen("e5-q"); }}
           onNo={() => { updE({ e5: false }); setScreen("e6"); }} />
       </Card>
@@ -900,7 +890,7 @@ export default function AdultsPage() {
   if (screen === "e6") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם חווה/ת <strong>קשיים סביב אכילה</strong> (הגבלה קיצונית, אכילת יתר, הקאות, פחד ממזון)?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">6. האם חווה/ת <strong>קשיים סביב אכילה</strong> (הגבלה קיצונית, אכילת יתר, הקאות, פחד ממזון)?</p>
         <YesNo onYes={() => { updE({ e6: true }); setScreen("e6-q"); }}
           onNo={() => { updE({ e6: false }); setScreen("e7"); }} />
       </Card>
@@ -937,7 +927,7 @@ export default function AdultsPage() {
   if (screen === "e7") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם חווה/ת <strong>הפרעות שינה</strong> כגון נדודי שינה, שיתוק שינה, או נחירות חזקות?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם חווה/ת <strong>הפרעות שינה</strong> כגון נדודי שינה, שיתוק שינה, או נחירות חזקות?</p>
         <YesNo onYes={() => { updE({ e7: true }); setScreen("e7-q"); }}
           onNo={() => { updE({ e7: false }); setScreen("e8"); }} />
       </Card>
@@ -959,28 +949,18 @@ export default function AdultsPage() {
   if (screen === "e8") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
         <YesNo onYes={() => { updE({ e8: true }); setScreen("e8c"); }}
-          onNo={() => { updE({ e8: false }); setScreen("e8b"); }} />
+          onNo={() => { updE({ e8: false }); setScreen("e9"); }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "e8b") return (
-    <Layout>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">10. האם חווית אחד מהמצבים הבאים: <strong>אובדן זיכרון משמעותי, תחושת ניתוק מזהותך, אובדן תחושה בחלקי גוף, התקפים שנראים כאפילפטיים אך אינם</strong>?</p>
-        <YesNo onYes={() => { updE({ e8b: true }); setScreen("e9"); }}
-          onNo={() => { updE({ e8b: false }); setScreen("e9"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e8c") return (
+if (screen === "e8c") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם ישנם <strong>טיקים</strong> (תנועות או קולות בלתי רצוניים חוזרים)?</p>
-        <YesNo onYes={() => { updE({ tics: true }); setScreen("e8b"); }}
+        <YesNo onYes={() => { updE({ tics: true }); setScreen("e9"); }}
           onNo={() => { updE({ tics: false }); setScreen("e8d"); }} />
       </Card>
     </Layout>
@@ -990,8 +970,8 @@ export default function AdultsPage() {
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>צפצופים באוזניים</strong> (טנטון)?</p>
-        <YesNo onYes={() => { updE({ tinnitus: true }); setScreen("e8b"); }}
-          onNo={() => { updE({ tinnitus: false }); setScreen("e8b"); }} />
+        <YesNo onYes={() => { updE({ tinnitus: true }); setScreen("e9"); }}
+          onNo={() => { updE({ tinnitus: false }); setScreen("e9"); }} />
       </Card>
     </Layout>
   );
@@ -999,7 +979,7 @@ export default function AdultsPage() {
   if (screen === "e9") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">11. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
         <YesNo onYes={() => { updE({ e9: true }); setScreen("e9-q"); }}
           onNo={() => { updE({ e9: false }); setScreen("e10"); }} />
       </Card>
@@ -1046,7 +1026,7 @@ export default function AdultsPage() {
   if (screen === "e10") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">13. האם את/ה מרגיש/ה שקיימת <strong>חוסר יציבות עקבית</strong> או קושי מתמשך באופן שבו אתה חווה את עצמך, או מנהל/ת את הקשרים שלך עם אחרים?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">10. האם את/ה מרגיש/ה שקיימת <strong>חוסר יציבות עקבית</strong> או קושי מתמשך באופן שבו אתה חווה את עצמך, או מנהל/ת את הקשרים שלך עם אחרים?</p>
         <YesNo onYes={() => { updE({ e10: true }); setScreen("e10a"); }}
           onNo={() => { updE({ e10: false }); setScreen("therapist-style"); }} />
       </Card>
