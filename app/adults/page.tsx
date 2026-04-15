@@ -255,7 +255,7 @@ const ADULTS_SCREENS_ORDER = [
   "e10","e10a","e10b","e10c",
   "therapist-style",
   "f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
-  "r1","r1-rel","r1-scale","r2-q","r3","r3-partner",
+  "r-intake","r1","r1-scale","r2-q","r3","r3-partner",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -437,6 +437,8 @@ export default function AdultsPage() {
   const [execScores, setExecScores] = useState<number[]>(Array(6).fill(0));
   const [empAChecked, setEmpAChecked] = useState<boolean[]>([false, false, false, false, false]);
   const [empBChecked, setEmpBChecked] = useState<boolean[]>([false, false, false, false]);
+  const [inRelationship, setInRelationship] = useState(false);
+  const [hasChildren, setHasChildren] = useState(false);
   const [coupleScale, setCoupleScale] = useState(0);
   const [eftScores, setEftScores] = useState<number[]>(Array(7).fill(0));
   const [dynScores, setDynScores] = useState<number[]>(Array(7).fill(0));
@@ -475,7 +477,7 @@ export default function AdultsPage() {
   function firstScreenForDomain(d: string): Screen {
     if (d === "emotional") return "e1";
     if (d === "functional") return "f1";
-    if (d === "relationship") return "r1";
+    if (d === "relationship") return "r-intake";
     if (d === "addiction") return "a-types";
     return "scoring";
   }
@@ -1421,22 +1423,36 @@ if (screen === "e8c") return (
   // RELATIONSHIP DOMAIN
   // ═══════════════════════════════════════════════════════
 
-  if (screen === "r1") return (
+  if (screen === "r-intake") return (
     <Layout>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה/ת <strong>קשיים בתפקוד המיני</strong>?</p>
-        <YesNo onYes={() => { updR({ r1: true }); setScreen("r1-rel"); }}
-          onNo={() => { updR({ r1: false }); setScreen("r1-scale"); }} />
+        <p className="mb-4 font-semibold text-[#1a3a5c]">כדי להתאים את השאלות, ענה/י על השאלות הבאות:</p>
+        <div className="space-y-3">
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
+            <input type="checkbox" checked={inRelationship} onChange={(e) => setInRelationship(e.target.checked)} className="h-4 w-4 accent-[#2e7d8c]" />
+            <span>אני <strong>בזוגיות</strong> כרגע</span>
+          </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
+            <input type="checkbox" checked={hasChildren} onChange={(e) => setHasChildren(e.target.checked)} className="h-4 w-4 accent-[#2e7d8c]" />
+            <span>יש לי <strong>ילדים</strong></span>
+          </label>
+        </div>
+        <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
+          onNext={() => {
+            if (inRelationship) { setScreen("r1"); }
+            else if (hasChildren) { setScreen("r3"); }
+            else { nextDomain(); }
+          }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "r1-rel") return (
+  if (screen === "r1") return (
     <Layout>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם אתה/את <strong>בזוגיות כרגע</strong>?</p>
-        <YesNo onYes={() => { updR({ r1InRelationship: true }); setScreen("r1-scale"); }}
-          onNo={() => { updR({ r1InRelationship: false }); setScreen("r1-scale"); }} />
+        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה <strong>קשיים בתפקוד המיני</strong>?</p>
+        <YesNo onYes={() => { updR({ r1: true, r1InRelationship: true }); setScreen("r1-scale"); }}
+          onNo={() => { updR({ r1: false, r1InRelationship: true }); setScreen("r1-scale"); }} />
       </Card>
     </Layout>
   );
@@ -1444,26 +1460,16 @@ if (screen === "e8c") return (
   if (screen === "r1-scale") return (
     <Layout>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">2. עד כמה אתה/את חווה/ת קושי בזוגיות? (1=כלל לא, 7=קושי גדול מאוד)</p>
+        <p className="mb-3 font-semibold text-[#1a3a5c]">2. עד כמה את/ה חווה קושי בזוגיות? (1=כלל לא, 7=קושי גדול מאוד)</p>
         <ScaleRow label="" group="couple" values={[1,2,3,4,5,6,7]} value={coupleScale} onChange={setCoupleScale} />
-        {coupleScale >= 3 && (
-          <div className="mt-3">
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" checked={answers.relationship?.coupleInRelationship ?? false}
-                onChange={(e) => updR({ coupleInRelationship: e.target.checked })} className="accent-[#2e7d8c]" />
-              אני בזוגיות כרגע
-            </label>
-          </div>
-        )}
         <NavRow onBack={() => setScreen("r1")}
           onNext={() => {
-            updR({ coupleScale });
-            if (coupleScale >= 3 && answers.relationship?.coupleInRelationship) {
-              setScreen("r2-q");
-            } else {
-              setScreen("r3");
-            }
-          }} />
+            updR({ coupleScale, coupleInRelationship: true });
+            if (coupleScale >= 3) { setScreen("r2-q"); }
+            else if (hasChildren) { setScreen("r3"); }
+            else { nextDomain(); }
+          }}
+          nextDisabled={coupleScale === 0} />
       </Card>
     </Layout>
   );
@@ -1489,7 +1495,10 @@ if (screen === "e8c") return (
             onChange={(v) => setStructScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <NavRow onBack={() => setScreen("r1-scale")}
-          onNext={() => { updR({ eftScores, dynScores, structScores }); setScreen("r3"); }} />
+          onNext={() => {
+            updR({ eftScores, dynScores, structScores });
+            if (hasChildren) { setScreen("r3"); } else { nextDomain(); }
+          }} />
       </Card>
     </Layout>
   );
@@ -1497,7 +1506,7 @@ if (screen === "e8c") return (
   if (screen === "r3") return (
     <Layout>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>, או בעיות התנהגות / קשיים חברתיים של ילדיכם?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">{inRelationship ? "3." : "1."} האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>, או בעיות התנהגות / קשיים חברתיים של הילדים?</p>
         <YesNo onYes={() => { updR({ r3: true }); setScreen("r3-partner"); }}
           onNo={() => { updR({ r3: false }); nextDomain(); }} />
       </Card>
