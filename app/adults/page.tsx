@@ -401,10 +401,13 @@ export default function AdultsPage() {
 
   // temp state (not in answers)
   const [localAge, setLocalAge] = useState<number>(0);
+  const [ageTouched, setAgeTouched] = useState(false);
   const [visionAns, setVisionAns] = useState<boolean | null>(null);
   const [hearingAns, setHearingAns] = useState<boolean | null>(null);
   const [height, setHeight] = useState<number>(0);
+  const [heightTouched, setHeightTouched] = useState(false);
   const [weight, setWeight] = useState<number>(0);
+  const [weightTouched, setWeightTouched] = useState(false);
 
   // local form state (committed to answers on next)
   const [moodChecked, setMoodChecked] = useState<number[]>([]);
@@ -665,7 +668,9 @@ export default function AdultsPage() {
         <div className="mb-4 flex gap-4">
           <div className="flex-1">
             <label className="mb-1 block text-xs text-[#6b7280]">גיל</label>
-            <input type="number" min={18} max={120} value={localAge || ""} onChange={(e) => setLocalAge(Number(e.target.value))}
+            <input type="number" min={18} max={120} value={localAge || ""}
+              onChange={(e) => setLocalAge(Number(e.target.value))}
+              onBlur={() => setAgeTouched(true)}
               className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none" placeholder="למשל 35" />
           </div>
           <div className="flex-1">
@@ -678,7 +683,7 @@ export default function AdultsPage() {
             </select>
           </div>
         </div>
-        {localAge > 0 && localAge < 18 && (
+        {ageTouched && localAge > 0 && localAge < 18 && (
           <div className="mt-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-3 text-sm font-semibold text-amber-800">
             ⚠️ מתחת לגיל 18 יש לעבור לשאלון ילדים
           </div>
@@ -715,17 +720,21 @@ export default function AdultsPage() {
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-[#6b7280]">גובה (ס&quot;מ)</label>
-              <input type="number" min={100} max={250} value={height || ""} onChange={(e) => setHeight(Number(e.target.value))}
+              <input type="number" min={100} max={250} value={height || ""}
+                onChange={(e) => setHeight(Number(e.target.value))}
+                onBlur={() => setHeightTouched(true)}
                 className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none" placeholder="175" />
             </div>
             <div className="flex-1">
               <label className="mb-1 block text-xs text-[#6b7280]">משקל (ק&quot;ג)</label>
-              <input type="number" min={20} max={300} value={weight || ""} onChange={(e) => setWeight(Number(e.target.value))}
+              <input type="number" min={20} max={300} value={weight || ""}
+                onChange={(e) => setWeight(Number(e.target.value))}
+                onBlur={() => setWeightTouched(true)}
                 className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none" placeholder="70" />
             </div>
           </div>
           <div className="mt-2 min-h-[2.5rem]">
-            {height > 0 && weight > 0 && (() => { const bmi = weight / Math.pow(height / 100, 2); const ok = bmi >= 18.5 && bmi <= 24.9; return (
+            {heightTouched && weightTouched && height > 0 && weight > 0 && (() => { const bmi = weight / Math.pow(height / 100, 2); const ok = bmi >= 18.5 && bmi <= 24.9; return (
               <p className={`rounded-lg p-2 text-xs ${ok ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
                 BMI: {bmi.toFixed(1)} – {ok ? "תקין ✓" : "אינו תקין – הפנייה לרופא משפחה"}
               </p>
@@ -873,7 +882,7 @@ export default function AdultsPage() {
   if (screen === "e4") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם חווה/ת <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם חווה <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
         <YesNo onYes={() => { updE({ e4: true }); setScreen("e4-chronic"); }}
           onNo={() => { updE({ e4: false }); setScreen("e5"); }} />
       </Card>
@@ -1132,7 +1141,7 @@ if (screen === "e8c") return (
   if (screen === "e10") return (
     <Layout>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">10. האם את/ה מרגיש/ה שקיימת <strong>חוסר יציבות עקבית</strong> או קושי מתמשך באופן שבו אתה חווה את עצמך, או מנהל/ת את הקשרים שלך עם אחרים?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">10. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
         <YesNo onYes={() => { updE({ e10: true }); setScreen("e10a"); }}
           onNo={() => { updE({ e10: false }); setScreen("therapist-style"); }} />
       </Card>
