@@ -605,6 +605,7 @@ export default function AdultsPage() {
           },
           match_result: {
             match_score: t.match_score,
+            personality_score: t.personality_score ?? null,
             match_reasons: t.match_reasons ?? [],
           },
         }),

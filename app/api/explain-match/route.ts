@@ -38,6 +38,7 @@ const BodySchema = z.object({
 
   match_result: z.object({
     match_score: z.number(),
+    personality_score: z.number().nullable().optional(),
     match_reasons: z.array(z.string()),
     matched_fields: z.record(z.string(), z.unknown()).optional(),
   }),
@@ -103,6 +104,7 @@ function buildPrompt(body: Body): string {
     },
     match_result: {
       match_score: body.match_result.match_score,
+      personality_score: body.match_result.personality_score ?? null,
       match_reasons: body.match_result.match_reasons,
     },
   }, null, 2);
@@ -123,8 +125,9 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 
 המשימה שלך: כתוב פסקה אחת קצרה (2-4 משפטים) שמסבירה:
 1. מה בפרופיל המטפל מתאים לצרכים שעלו בשאלון — כולל תובנות שאינן כתובות ישירות ב-match_reasons (למשל: מה בביוגרפיה, סגנון הטיפול, או שיטת העבודה רלוונטי לצרכים שצוינו)
-2. מה פחות מתאים בדיוק (אם יש פער בין מה שהומלץ לבין מה שהמטפל מציע)
-3. למה בכל זאת זוהי ההתאמה הטובה ביותר שנמצאה
+2. אם personality_score קיים ואינו null — התייחס גם להתאמה האישיותית/סגנונית: ציון גבוה (מעל 70) פירושו שסגנון העבודה של המטפל תואם את ההעדפות שסומנו בשאלון; ציון נמוך (מתחת ל-50) פירושו פער בסגנון — ציין זאת בכנות
+3. מה פחות מתאים בדיוק (אם יש פער בין מה שהומלץ לבין מה שהמטפל מציע)
+4. למה בכל זאת זוהי ההתאמה הטובה ביותר שנמצאה
 
 כללים:
 - כתוב על המטפל בגוף שלישי בהתאם למגדר שסומן: אם gender הוא "זכר" — השתמש בלשון זכר ("הוא", "מתמחה", "עובד"); אם "נקבה" — לשון נקבה ("היא", "מתמחה", "עובדת"); אם לא ידוע — השתמש בניסוח מגדרי ניטרלי
