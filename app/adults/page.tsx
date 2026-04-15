@@ -381,6 +381,8 @@ export default function AdultsPage() {
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
+  const [explainData, setExplainData] = useState<Record<string, { title: string; short_explanation: string; bullet_reasons: string[]; tone_note: string } | null>>({});
+  const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
@@ -565,6 +567,51 @@ export default function AdultsPage() {
       setErr(e instanceof Error ? e.message : "שגיאה בחיפוש");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchExplanation(t: any) {
+    if (explainLoading[t.id] || explainData[t.id]) return;
+    setExplainLoading(prev => ({ ...prev, [t.id]: true }));
+    try {
+      const recommendedTreatments = scoring?.recommendations.map(r => r.treatment) ?? [];
+      const userSummary = {
+        age_group: answers.age ? `${answers.age}` : undefined,
+        region_preference: matchPrefs.city || matchPrefs.region || undefined,
+        online_preference: matchPrefs.online || undefined,
+        therapist_gender_preference: matchPrefs.genderPref || undefined,
+        main_needs: scoring?.recommendations.map(r => r.symptomText) ?? [],
+        recommended_treatment_types: recommendedTreatments,
+        cultural_preferences: matchPrefs.culturalPrefs.length ? matchPrefs.culturalPrefs : undefined,
+      };
+      const res = await fetch("/api/explain-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "adult",
+          user_summary: userSummary,
+          therapist: {
+            id: t.id,
+            full_name: t.full_name,
+            therapist_types: t.therapist_types ?? [],
+            training_areas: t.training_areas ?? [],
+            regions: t.regions ?? [],
+            online: t.online ?? false,
+            gender: t.gender ?? null,
+            bio: t.bio ?? null,
+          },
+          match_result: {
+            match_score: t.match_score,
+            match_reasons: t.match_reasons ?? [],
+          },
+        }),
+      });
+      const data = await res.json();
+      setExplainData(prev => ({ ...prev, [t.id]: data }));
+    } catch {
+      setExplainData(prev => ({ ...prev, [t.id]: null }));
+    } finally {
+      setExplainLoading(prev => ({ ...prev, [t.id]: false }));
     }
   }
 
@@ -1995,7 +2042,28 @@ if (screen === "e8c") return (
                       ✉ מייל
                     </a>
                   )}
+                  <button
+                    onClick={e => { e.stopPropagation(); fetchExplanation(t); }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-[#1a3a5c] hover:bg-[#f0f6ff]"
+                  >
+                    {explainLoading[t.id] ? "טוען..." : "✦ למה זה מתאים לי?"}
+                  </button>
                 </div>
+                {explainData[t.id] && (
+                  <div className="mt-3 rounded-xl bg-[#f0f8ff] border border-[#c0dff0] p-3 text-right" onClick={e => e.stopPropagation()}>
+                    <p className="text-xs font-bold text-[#1a3a5c] mb-1">{explainData[t.id]!.title}</p>
+                    <p className="text-xs text-gray-700 mb-2">{explainData[t.id]!.short_explanation}</p>
+                    <ul className="space-y-1 mb-2">
+                      {explainData[t.id]!.bullet_reasons.map((r, i) => (
+                        <li key={i} className="flex items-start gap-1.5 text-xs text-gray-700">
+                          <span className="text-[#2e7d8c] mt-0.5">•</span>
+                          <span>{r}</span>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
+                  </div>
+                )}
                 <p className="mt-2 text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</p>
               </div>
             </div>

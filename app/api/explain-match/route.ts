@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
+import OpenAI from "openai";
+
+// ── OpenAI client (server-side only) ─────────────────────────────────────────
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ── Input schema ──────────────────────────────────────────────────────────────
 
@@ -49,26 +53,14 @@ type ExplainResponse = {
   tone_note: string;
 };
 
-// ── Mock explanation builder ──────────────────────────────────────────────────
-// TODO: Replace this function with a real AI call (e.g. Claude Haiku via
-//       Anthropic API) when ready. The function signature and return type
-//       should remain the same so callers don't need to change.
-//
-// Future call site:
-//   const client = new Anthropic();
-//   const message = await client.messages.create({
-//     model: "claude-haiku-4-5-20251001",
-//     max_tokens: 300,
-//     messages: [{ role: "user", content: buildPrompt(body) }],
-//   });
-//   return parseAIResponse(message.content);
+// ── Mock / fallback explanation builder ──────────────────────────────────────
+// Used when OpenAI call fails or returns unparseable output.
 
 function buildShortExplanation(reasons: string[]): string {
   const joined = reasons.join(" ").toLowerCase();
-
   const hasTreatment = /טיפול|התמחות|מומחיות|גישה|שיטה/.test(joined);
-  const hasRegion    = /אזור|מיקום|עיר|אונליין|online|זמינות/.test(joined);
   const hasOnline    = /אונליין|online/.test(joined);
+  const hasRegion    = /אזור|מיקום|עיר|זמינות/.test(joined);
 
   const parts: string[] = ["בהתבסס על התשובות שסימנת בשאלון, נמצאה התאמה"];
 
@@ -91,23 +83,102 @@ function buildShortExplanation(reasons: string[]): string {
 
 function buildMockExplanation(body: Body): ExplainResponse {
   const { match_result } = body;
-
-  // title — fixed Hebrew string
-  const title = "למה המטפל הזה הוצע לך";
-
-  // bullet_reasons — max 4 items
   const bullet_reasons = match_result.match_reasons.slice(0, 4).length > 0
     ? match_result.match_reasons.slice(0, 4)
     : ["נמצאה התאמה כללית על בסיס תשובות השאלון."];
 
-  // short_explanation — context-aware based on match_reasons content
-  const short_explanation = buildShortExplanation(match_result.match_reasons);
+  return {
+    title: "למה המטפל הזה הוצע לך",
+    short_explanation: buildShortExplanation(match_result.match_reasons),
+    bullet_reasons,
+    tone_note: "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית.",
+  };
+}
 
-  // tone_note — fixed disclaimer
-  const tone_note =
-    "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית.";
+// ── OpenAI prompt builder ─────────────────────────────────────────────────────
 
-  return { title, short_explanation, bullet_reasons, tone_note };
+function buildPrompt(body: Body): string {
+  return JSON.stringify({
+    questionnaire_type: body.questionnaire_type,
+    user_summary: body.user_summary ?? {},
+    therapist: {
+      full_name: body.therapist.full_name,
+      therapist_types: body.therapist.therapist_types ?? [],
+      training_areas: body.therapist.training_areas ?? [],
+      regions: body.therapist.regions ?? [],
+      online: body.therapist.online ?? false,
+    },
+    match_result: {
+      match_score: body.match_result.match_score,
+      match_reasons: body.match_result.match_reasons,
+    },
+  }, null, 2);
+}
+
+// ── OpenAI call ───────────────────────────────────────────────────────────────
+
+async function callOpenAI(body: Body): Promise<ExplainResponse> {
+  // ── OpenAI API call ───────────────────────────────────────────────────────
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    max_tokens: 400,
+    temperature: 0.4,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content: `אתה עוזר שמסביר בעברית פשוטה וברורה מדוע מטפל מסוים הוצע למשתמש.
+כללים:
+- השתמש רק בנתונים שסופקו לך
+- אל תאבחן את המשתמש
+- אל תבטיח הצלחה
+- אל תכתוב "המטפל הטוב ביותר"
+- השתמש בניסוחים כמו "בהתבסס על התשובות שלך", "נמצאה התאמה"
+- החזר JSON בלבד במבנה הבא:
+{
+  "title": string,
+  "short_explanation": string,
+  "bullet_reasons": string[],
+  "tone_note": string
+}
+- title: תמיד "למה המטפל הזה הוצע לך"
+- short_explanation: משפט אחד עד שניים בעברית
+- bullet_reasons: 2 עד 4 נקודות קצרות בעברית
+- tone_note: תמיד "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית."`,
+      },
+      {
+        role: "user",
+        content: buildPrompt(body),
+      },
+    ],
+  });
+  // ── End OpenAI API call ───────────────────────────────────────────────────
+
+  const content = response.choices[0]?.message?.content ?? "";
+  const parsed = JSON.parse(content) as Partial<ExplainResponse>;
+
+  // Validate required fields exist
+  if (
+    typeof parsed.title !== "string" ||
+    typeof parsed.short_explanation !== "string" ||
+    !Array.isArray(parsed.bullet_reasons) ||
+    typeof parsed.tone_note !== "string"
+  ) {
+    throw new Error("OpenAI response missing required fields");
+  }
+
+  // Enforce bullet limit
+  const bullet_reasons = parsed.bullet_reasons.slice(0, 4);
+  if (bullet_reasons.length < 1) {
+    throw new Error("OpenAI returned empty bullet_reasons");
+  }
+
+  return {
+    title: parsed.title,
+    short_explanation: parsed.short_explanation,
+    bullet_reasons,
+    tone_note: parsed.tone_note,
+  };
 }
 
 // ── Route handler ─────────────────────────────────────────────────────────────
@@ -119,18 +190,27 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { ok: false, error: "Invalid request body", details: parsed.error.flatten() },
+        { error: "Invalid request body", details: parsed.error.flatten() },
         { status: 400 }
       );
     }
 
-    const explanation = buildMockExplanation(parsed.data);
+    const body = parsed.data;
 
-    return NextResponse.json(explanation, { status: 200 });
+    try {
+      // ── Try OpenAI first ──────────────────────────────────────────────────
+      const explanation = await callOpenAI(body);
+      return NextResponse.json(explanation, { status: 200 });
+    } catch (aiErr) {
+      // ── Fallback to mock if OpenAI fails ──────────────────────────────────
+      console.error("[explain-match] OpenAI call failed, using fallback:", aiErr);
+      const fallback = buildMockExplanation(body);
+      return NextResponse.json(fallback, { status: 200 });
+    }
   } catch (err) {
     console.error("[explain-match] Unexpected error:", err);
     return NextResponse.json(
-      { ok: false, error: "Internal server error" },
+      { error: "Internal server error" },
       { status: 500 }
     );
   }

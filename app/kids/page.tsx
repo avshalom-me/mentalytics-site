@@ -3255,9 +3255,52 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [results, setResults]         = useState<KidsMatchResult[]>([]);
   const [error, setError]             = useState("");
   const [searched, setSearched]       = useState(false);
+  const [explainData, setExplainData] = useState<Record<string, { title: string; short_explanation: string; bullet_reasons: string[]; tone_note: string } | null>>({});
+  const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
   const treatments = extractKidsTreatments(A);
   const ageGroups  = getKidsAgeGroups(A);
+
+  async function fetchExplanation(t: KidsMatchResult) {
+    if (explainLoading[t.id] || explainData[t.id]) return;
+    setExplainLoading(prev => ({ ...prev, [t.id]: true }));
+    try {
+      const res = await fetch("/api/explain-match", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "child",
+          user_summary: {
+            region_preference: city || region || undefined,
+            online_preference: online || undefined,
+            therapist_gender_preference: gender || undefined,
+            recommended_treatment_types: treatments,
+            cultural_preferences: cultural.length ? cultural : undefined,
+          },
+          therapist: {
+            id: t.id,
+            full_name: t.full_name ?? "",
+            therapist_types: t.therapist_types ?? [],
+            training_areas: t.training_areas ?? [],
+            regions: toArr(t.regions),
+            online: t.online ?? false,
+            gender: t.gender ?? null,
+            bio: t.bio ?? null,
+          },
+          match_result: {
+            match_score: t.match_score,
+            match_reasons: t.match_reasons ?? [],
+          },
+        }),
+      });
+      const data = await res.json();
+      setExplainData(prev => ({ ...prev, [t.id]: data }));
+    } catch {
+      setExplainData(prev => ({ ...prev, [t.id]: null }));
+    } finally {
+      setExplainLoading(prev => ({ ...prev, [t.id]: false }));
+    }
+  }
 
   function toggleArr(arr: string[], setArr: (v: string[]) => void, val: string) {
     setArr(arr.includes(val) ? arr.filter(x => x !== val) : [...arr, val]);
@@ -3488,7 +3531,28 @@ function KidsMatchSection({ A }: { A: Ans }) {
                                 📞 התקשר/י
                               </a>
                             )}
+                            <button
+                              onClick={() => fetchExplanation(t)}
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-[#1a3a5c] hover:bg-[#f0f6ff]"
+                            >
+                              {explainLoading[t.id] ? "טוען..." : "✦ למה זה מתאים לי?"}
+                            </button>
                           </div>
+                          {explainData[t.id] && (
+                            <div className="mt-3 rounded-xl bg-[#f0f8ff] border border-[#c0dff0] p-3 text-right">
+                              <p className="text-xs font-bold text-[#1a3a5c] mb-1">{explainData[t.id]!.title}</p>
+                              <p className="text-xs text-gray-700 mb-2">{explainData[t.id]!.short_explanation}</p>
+                              <ul className="space-y-1 mb-2">
+                                {explainData[t.id]!.bullet_reasons.map((r, i) => (
+                                  <li key={i} className="flex items-start gap-1.5 text-xs text-gray-700">
+                                    <span className="text-[#2e7d8c] mt-0.5">•</span>
+                                    <span>{r}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                              <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
+                            </div>
+                          )}
                           <a href={`/therapists/${t.id}`} className="mt-2 block text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</a>
                         </div>
                       </div>
