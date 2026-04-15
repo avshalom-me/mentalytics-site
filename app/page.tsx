@@ -39,52 +39,6 @@ const faqs = [
   },
 ];
 
-function IllustrationPeopleTalking() {
-  return (
-    <svg viewBox="0 0 320 220" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <ellipse cx="160" cy="150" rx="140" ry="70" fill="#F9E4D4" opacity="0.6"/>
-      <circle cx="90" cy="80" r="28" fill="#E8C5A8"/>
-      <ellipse cx="90" cy="155" rx="32" ry="45" fill="#C8956A"/>
-      <circle cx="83" cy="76" r="3" fill="#7C5038"/>
-      <circle cx="97" cy="76" r="3" fill="#7C5038"/>
-      <path d="M85 88 Q90 93 95 88" stroke="#7C5038" strokeWidth="2" strokeLinecap="round" fill="none"/>
-      <circle cx="230" cy="80" r="28" fill="#D4A896"/>
-      <ellipse cx="230" cy="155" rx="32" ry="45" fill="#A0726B"/>
-      <circle cx="223" cy="76" r="3" fill="#6B3F3F"/>
-      <circle cx="237" cy="76" r="3" fill="#6B3F3F"/>
-      <path d="M225 89 Q230 94 235 89" stroke="#6B3F3F" strokeWidth="2" strokeLinecap="round" fill="none"/>
-      <rect x="115" y="42" width="90" height="34" rx="12" fill="white" opacity="0.9"/>
-      <path d="M130 76 L122 84 L138 76" fill="white" opacity="0.9"/>
-      <circle cx="135" cy="59" r="5" fill="#D4948A" opacity="0.8"/>
-      <circle cx="160" cy="59" r="5" fill="#D4948A" opacity="0.8"/>
-      <circle cx="185" cy="59" r="5" fill="#D4948A" opacity="0.8"/>
-      <text x="55" y="35" fontSize="18" opacity="0.4">♡</text>
-      <text x="268" y="42" fontSize="14" opacity="0.3">♡</text>
-      <text x="150" y="205" fontSize="12" opacity="0.3">♡</text>
-    </svg>
-  );
-}
-
-function IllustrationMindfulness() {
-  return (
-    <svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg" className="w-full h-full">
-      <ellipse cx="140" cy="120" rx="120" ry="80" fill="#E8F4F0" opacity="0.7"/>
-      <circle cx="140" cy="70" r="30" fill="#E8C5A8"/>
-      <ellipse cx="140" cy="145" rx="40" ry="30" fill="#8EB8A8"/>
-      <ellipse cx="110" cy="165" rx="25" ry="12" fill="#8EB8A8" transform="rotate(-15 110 165)"/>
-      <ellipse cx="170" cy="165" rx="25" ry="12" fill="#8EB8A8" transform="rotate(15 170 165)"/>
-      <circle cx="133" cy="66" r="3" fill="#7C5038"/>
-      <circle cx="147" cy="66" r="3" fill="#7C5038"/>
-      <path d="M135 78 Q140 83 145 78" stroke="#7C5038" strokeWidth="2" strokeLinecap="round" fill="none"/>
-      <circle cx="140" cy="70" r="45" stroke="#A8D4C8" strokeWidth="1.5" strokeDasharray="4 6" opacity="0.6"/>
-      <circle cx="140" cy="70" r="62" stroke="#A8D4C8" strokeWidth="1" strokeDasharray="3 8" opacity="0.35"/>
-      <ellipse cx="58" cy="150" rx="18" ry="10" fill="#7EB8A0" transform="rotate(-30 58 150)" opacity="0.7"/>
-      <ellipse cx="222" cy="148" rx="18" ry="10" fill="#7EB8A0" transform="rotate(30 222 148)" opacity="0.7"/>
-      <ellipse cx="75" cy="170" rx="14" ry="8" fill="#9DC8B4" transform="rotate(-15 75 170)" opacity="0.5"/>
-      <ellipse cx="205" cy="170" rx="14" ry="8" fill="#9DC8B4" transform="rotate(15 205 170)" opacity="0.5"/>
-    </svg>
-  );
-}
 
 function TrustBadge({ icon: Icon, text, color }: { icon: any; text: string; color: string }) {
   return (
@@ -173,11 +127,6 @@ export default function HomePage() {
                   מערכת בירור, הכוונה והתאמה טיפולית באמצעות שאלונים מודולריים אנונימיים
                 </p>
 
-                <div className="my-6 block md:hidden rounded-3xl overflow-hidden h-44"
-                  style={{ background: "linear-gradient(135deg,#FEF0E4,#E8F5F0)" }}>
-                  <IllustrationPeopleTalking />
-                </div>
-
                 <p className="mt-5 leading-8 text-stone-700">
                   מחקרים רבים מראים כי הצלחת טיפול נפשי תלויה מאוד{" "}
                   <span className="font-bold" style={{ color: "#8B2E0A" }}>
@@ -235,13 +184,6 @@ export default function HomePage() {
               <div className="flex w-full flex-col gap-4 md:w-[300px] fade-up fade-up-3">
 
                 <div
-                  className="hidden md:block h-52 overflow-hidden rounded-3xl"
-                  style={{ background: "linear-gradient(145deg,#FEF0E4,#E8F5F0)" }}
-                >
-                  <IllustrationPeopleTalking />
-                </div>
-
-                <div
                   className="rounded-3xl p-5"
                   style={{
                     background: "rgba(255,255,255,0.82)",
@@ -278,12 +220,6 @@ export default function HomePage() {
 
                 </div>
 
-                <div
-                  className="hidden md:block h-44 overflow-hidden rounded-3xl"
-                  style={{ background: "linear-gradient(145deg,#E8F5F0,#EDE4F8)" }}
-                >
-                  <IllustrationMindfulness />
-                </div>
               </div>
             </div>
           </div>
