@@ -380,6 +380,7 @@ export default function AdultsPage() {
   const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
+  const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
@@ -532,7 +533,7 @@ export default function AdultsPage() {
   }
 
   async function doMatch() {
-    if (!selectedRec) return;
+    if (!selectedRec && !combinedTreatments) return;
     setLoading(true);
     setErr("");
     try {
@@ -540,7 +541,7 @@ export default function AdultsPage() {
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
       const body: Record<string, unknown> = {
-        treatmentTypes: selectedRec.treatment ? [selectedRec.treatment] : [],
+        treatmentTypes: combinedTreatments ?? (selectedRec?.treatment ? [selectedRec.treatment] : []),
         city: matchPrefs.city || null,
         region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,
@@ -1693,6 +1694,8 @@ if (screen === "e8c") return (
     });
 
     const multipleGroups = groups.filter((g) => !g.urgent).length > 1;
+    const emotionalGroups = groups.filter((g) => !g.urgent && g.recs[0]?.domain === "מורכבויות בתחום הרגשי/האישי");
+    const showCombined = emotionalGroups.length >= 2;
 
     return (
       <Layout>
@@ -1748,6 +1751,22 @@ if (screen === "e8c") return (
               );
             })}
           </div>
+          {showCombined && (
+            <button
+              type="button"
+              onClick={() => {
+                setCombinedTreatments(emotionalGroups.map(g => g.treatment));
+                setSelectedRec(null);
+                setScreen("match-form");
+                (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
+              }}
+              className="mt-3 w-full rounded-xl border-2 border-[#8ecfdb] bg-white/5 p-4 text-right transition-all hover:bg-white/15"
+            >
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">חיפוש מתקדם ✦</div>
+              <div className="font-semibold">חיפוש משולב — כל הצרכים הרגשיים</div>
+              <div className="mt-1 text-xs opacity-70">מציאת מטפל שמכסה את מירב הצרכים שעלו: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+            </button>
+          )}
           <div className="mt-5 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs leading-6 text-white/70">
             התוצאות מבוססות על תשובותיך לשאלון ומהוות הערכה כללית בלבד.<br />
             אין לראות בתוצאות אלו אבחון, המלצה טיפולית מחייבת או תחליף לייעוץ מקצועי.<br />
@@ -1768,8 +1787,17 @@ if (screen === "e8c") return (
   if (screen === "match-form") return (
     <Layout>
       <Card badge="חיפוש מטפל">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש מטפל עבור: <span className="text-[#2e7d8c]">{selectedRec?.treatmentLabel}</span></p>
-        <p className="mb-4 text-xs text-[#6b7280]">{selectedRec?.symptomText}</p>
+        {combinedTreatments ? (
+          <>
+            <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש משולב — <span className="text-[#2e7d8c]">כל הצרכים הרגשיים</span></p>
+            <p className="mb-4 text-xs text-[#6b7280]">מחפש מטפל שמכסה את מירב הטיפולים המומלצים: {combinedTreatments.join(", ")}</p>
+          </>
+        ) : (
+          <>
+            <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש מטפל עבור: <span className="text-[#2e7d8c]">{selectedRec?.treatmentLabel}</span></p>
+            <p className="mb-4 text-xs text-[#6b7280]">{selectedRec?.symptomText}</p>
+          </>
+        )}
 
         <div className="mb-3">
           <label className="mb-1 block text-xs text-[#6b7280]">אזור גיאוגרפי</label>
@@ -1841,7 +1869,7 @@ if (screen === "e8c") return (
 
         {err && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</p>}
 
-        <NavRow onBack={() => setScreen("results")}
+        <NavRow onBack={() => { setScreen("results"); setCombinedTreatments(null); }}
           onNext={doMatch}
           nextLabel={loading ? "מחפש..." : "חפש/י מטפל ▸"}
           nextDisabled={loading} />
@@ -1970,7 +1998,7 @@ if (screen === "e8c") return (
       )}
 
       <div className="mb-4">
-        <button type="button" onClick={() => setScreen("results")} className="text-sm text-[#2e7d8c] hover:underline">
+        <button type="button" onClick={() => { setScreen("results"); setCombinedTreatments(null); }} className="text-sm text-[#2e7d8c] hover:underline">
           ◂ חזרה לתוצאות
         </button>
       </div>
