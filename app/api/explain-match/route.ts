@@ -9,6 +9,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 const BodySchema = z.object({
   questionnaire_type: z.enum(["adult", "child"]),
+  search_mode: z.enum(["single", "combined"]).optional(),
 
   user_summary: z
     .object({
@@ -89,6 +90,7 @@ function buildMockExplanation(body: Body): ExplainResponse {
 function buildPrompt(body: Body): string {
   return JSON.stringify({
     questionnaire_type: body.questionnaire_type,
+    search_mode: body.search_mode ?? "single",
     user_summary: body.user_summary ?? {},
     therapist: {
       full_name: body.therapist.full_name,
@@ -129,6 +131,7 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 - אל תבטיח הצלחה
 - אל תכתוב "המטפל הטוב ביותר"
 - השתמש בניסוחים כמו "בהתבסס על תשובות השאלון", "נמצאה התאמה", "מבין המטפלים הזמינים"
+- אם search_mode הוא "combined" — הדגש במיוחד אילו מהצרכים המרובים המטפל מכסה ואילו פחות
 - אם אין פער משמעותי — אל תמציא אחד
 - החזר JSON בלבד במבנה הבא:
 {

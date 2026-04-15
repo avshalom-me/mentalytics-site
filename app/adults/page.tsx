@@ -591,6 +591,7 @@ export default function AdultsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           questionnaire_type: "adult",
+          search_mode: combinedTreatments ? "combined" : "single",
           user_summary: userSummary,
           therapist: {
             id: t.id,
