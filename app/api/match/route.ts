@@ -293,7 +293,9 @@ function scoreTherapist(
     possible += WEIGHTS.expertise;
     const matched = intersection(trainingAreas, expertiseNeed);
     if (matched.length > 0) {
-      earned += WEIGHTS.expertise;
+      // Proportional: reward covering more of the requested types
+      const coverage = matched.length / expertiseNeed.length;
+      earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
     }
   }

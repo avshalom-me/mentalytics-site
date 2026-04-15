@@ -381,6 +381,7 @@ export default function AdultsPage() {
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
+  const [combinedLabels, setCombinedLabels] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
@@ -1721,7 +1722,7 @@ if (screen === "e8c") return (
               const notes = group.recs.find((r) => r.notes)?.notes;
               return (
                 <button key={group.treatment + (group.urgent ? "-urgent" : "")} type="button"
-                  onClick={() => { setSelectedRec(firstRec); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
+                  onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
                   className={`w-full rounded-xl p-4 text-right transition-all hover:scale-[1.01] ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30 hover:bg-red-900/40" : "border-r-4 border-[#8ecfdb] bg-white/10 hover:bg-white/20"}`}>
                   <div className={`mb-1 text-xs font-bold uppercase tracking-wide ${group.urgent ? "text-red-300" : "text-[#8ecfdb]"}`}>
                     {firstRec.domain} {group.urgent && "⚠️"}
@@ -1756,6 +1757,7 @@ if (screen === "e8c") return (
               type="button"
               onClick={() => {
                 setCombinedTreatments(emotionalGroups.map(g => g.treatment));
+                setCombinedLabels(emotionalGroups.map(g => g.treatmentLabel));
                 setSelectedRec(null);
                 setScreen("match-form");
                 (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
@@ -1790,7 +1792,7 @@ if (screen === "e8c") return (
         {combinedTreatments ? (
           <>
             <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש משולב — <span className="text-[#2e7d8c]">כל הצרכים הרגשיים</span></p>
-            <p className="mb-4 text-xs text-[#6b7280]">מחפש מטפל שמכסה את מירב הטיפולים המומלצים: {combinedTreatments.join(", ")}</p>
+            <p className="mb-4 text-xs text-[#6b7280]">מחפש מטפל שמכסה את מירב הטיפולים המומלצים: {(combinedLabels ?? combinedTreatments).join(", ")}</p>
           </>
         ) : (
           <>
@@ -1869,7 +1871,7 @@ if (screen === "e8c") return (
 
         {err && <p className="mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</p>}
 
-        <NavRow onBack={() => { setScreen("results"); setCombinedTreatments(null); }}
+        <NavRow onBack={() => { setScreen("results"); setCombinedTreatments(null); setCombinedLabels(null); }}
           onNext={doMatch}
           nextLabel={loading ? "מחפש..." : "חפש/י מטפל ▸"}
           nextDisabled={loading} />
@@ -1998,7 +2000,7 @@ if (screen === "e8c") return (
       )}
 
       <div className="mb-4">
-        <button type="button" onClick={() => { setScreen("results"); setCombinedTreatments(null); }} className="text-sm text-[#2e7d8c] hover:underline">
+        <button type="button" onClick={() => { setScreen("results"); setCombinedTreatments(null); setCombinedLabels(null); }} className="text-sm text-[#2e7d8c] hover:underline">
           ◂ חזרה לתוצאות
         </button>
       </div>
