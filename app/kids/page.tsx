@@ -3693,9 +3693,24 @@ export default function KidsPage() {
           )}
         </div>
         {step !== "p-consent" && step !== "p-result" && (
-          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-l from-[#4a6fa5] to-[#2c3e7a] rounded-full transition-all duration-500"
-              style={{ width: `${progress}%` }} />
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="text-xs text-[#6b7280]">{progress}% הושלם</span>
+              {progress > 5 && (
+                <span className="text-xs font-semibold text-[#2e7d8c] animate-pulse">
+                  {progress <= 25 ? "יופי, ממשיכים! 💪"
+                    : progress <= 45 ? "באמצע הדרך, כל הכבוד!"
+                    : progress <= 65 ? "יותר ממחצית מאחוריך!"
+                    : progress <= 80 ? "כמעט שם, עוד קצת!"
+                    : progress <= 92 ? "עוד מעט סיימת! 🎉"
+                    : "שאלה אחרונה! 🏁"}
+                </span>
+              )}
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div className="h-2 rounded-full transition-all duration-500"
+                style={{ width: `${progress}%`, background: "linear-gradient(90deg, #2e7d8c, #1a3a5c)" }} />
+            </div>
           </div>
         )}
       </header>

@@ -246,20 +246,55 @@ function CheckList({
   );
 }
 
-function Layout({ children }: { children: React.ReactNode }) {
+// Ordered milestone screens — used for progress calculation
+const ADULTS_SCREENS_ORDER = [
+  "disclaimer","intake","domains",
+  "e1","e1-q","e2","e2-2","e2-q","e3","e3-q",
+  "e4","e4-chronic","e4-medical","e4-q","e4-social","e4-social-sev","e4-flight","e4-medanx","e4-stresspain",
+  "e5","e5-q","e6","e6-q","e7","e7-q","e8","e8c","e8d","e9","e9-q",
+  "e10","e10a","e10b","e10c",
+  "therapist-style",
+  "f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
+  "r1","r1-rel","r1-scale","r2-q","r3","r3-partner",
+  "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
+  "scoring",
+];
+
+function getAdultsProgress(screen: string): number {
+  const idx = ADULTS_SCREENS_ORDER.indexOf(screen);
+  if (idx < 0) return 0;
+  return Math.round((idx / (ADULTS_SCREENS_ORDER.length - 1)) * 100);
+}
+
+function getEncouragement(pct: number): string | null {
+  if (pct <= 5)  return null;
+  if (pct <= 25) return "יופי, ממשיכים! 💪";
+  if (pct <= 45) return "באמצע הדרך, כל הכבוד!";
+  if (pct <= 65) return "יותר ממחצית מאחוריך!";
+  if (pct <= 80) return "כמעט שם, עוד קצת!";
+  if (pct <= 92) return "עוד מעט סיימת! 🎉";
+  return "שאלה אחרונה! 🏁";
+}
+
+function ProgressBar({ pct }: { pct: number }) {
+  const msg = getEncouragement(pct);
   return (
-    <main className="min-h-screen bg-[#f0ece4]" dir="rtl">
-      <div className="mx-auto max-w-2xl px-4 py-8">
-        <div className="mb-5 text-center">
-          <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
-          <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
-          <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – מבוגרים</p>
-        </div>
-        {children}
+    <div className="mb-5">
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="text-xs text-[#6b7280]">{pct}% הושלם</span>
+        {msg && <span className="text-xs font-semibold text-[#2e7d8c] animate-pulse">{msg}</span>}
       </div>
-    </main>
+      <div className="h-2 w-full rounded-full bg-stone-200 overflow-hidden">
+        <div
+          className="h-2 rounded-full transition-all duration-500"
+          style={{ width: `${pct}%`, background: "linear-gradient(90deg, #2e7d8c, #1a3a5c)" }}
+        />
+      </div>
+    </div>
   );
 }
+
+// Layout is defined inside AdultsPage (below) to capture screen from closure
 
 function Card({ children, badge, badgeColor = "blue" }: { children: React.ReactNode; badge?: string; badgeColor?: "blue" | "green" | "teal" }) {
   const colors = { blue: "bg-[#1a3a5c]", green: "bg-[#2d7a4f]", teal: "bg-[#2e7d8c]" };
@@ -318,6 +353,26 @@ type MatchPrefs = {
 
 export default function AdultsPage() {
   const [screen, setScreen] = useState<Screen>("disclaimer");
+
+  // Progress bar — defined here to capture screen from closure
+  const NO_BAR = ["disclaimer","intake","domains","scoring","results","match-form","match-results"];
+  function Layout({ children }: { children: React.ReactNode }) {
+    const pct = getAdultsProgress(screen);
+    const showBar = pct > 0 && !NO_BAR.includes(screen);
+    return (
+      <main className="min-h-screen bg-[#f0ece4]" dir="rtl">
+        <div className="mx-auto max-w-2xl px-4 py-8">
+          <div className="mb-5 text-center">
+            <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
+            <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
+            <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – מבוגרים</p>
+          </div>
+          {showBar && <ProgressBar pct={pct} />}
+          {children}
+        </div>
+      </main>
+    );
+}
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
