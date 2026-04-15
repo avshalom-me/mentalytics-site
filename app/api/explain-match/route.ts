@@ -63,21 +63,45 @@ type ExplainResponse = {
 //   });
 //   return parseAIResponse(message.content);
 
+function buildShortExplanation(reasons: string[]): string {
+  const joined = reasons.join(" ").toLowerCase();
+
+  const hasTreatment = /טיפול|התמחות|מומחיות|גישה|שיטה/.test(joined);
+  const hasRegion    = /אזור|מיקום|עיר|אונליין|online|זמינות/.test(joined);
+  const hasOnline    = /אונליין|online/.test(joined);
+
+  const parts: string[] = ["בהתבסס על התשובות שסימנת בשאלון, נמצאה התאמה"];
+
+  if (hasTreatment && hasOnline) {
+    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל, כולל זמינות לטיפול אונליין.");
+  } else if (hasTreatment && hasRegion) {
+    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל ואזור הפעילות שלו.");
+  } else if (hasTreatment) {
+    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל.");
+  } else if (hasOnline) {
+    parts.push("בין הצרכים שעלו בשאלון לבין זמינות המטפל לטיפול אונליין.");
+  } else if (hasRegion) {
+    parts.push("בין הצרכים שעלו בשאלון לבין מיקום וזמינות המטפל.");
+  } else {
+    parts.push("בין הצרכים שעלו לבין תחומי העבודה והזמינות של המטפל.");
+  }
+
+  return parts.join(" ");
+}
+
 function buildMockExplanation(body: Body): ExplainResponse {
   const { match_result } = body;
 
   // title — fixed Hebrew string
   const title = "למה המטפל הזה הוצע לך";
 
-  // short_explanation — neutral fixed sentence
-  const short_explanation =
-    "בהתבסס על התשובות שסימנת בשאלון, נמצאה התאמה בין הצרכים שעלו לבין תחומי העבודה והזמינות של המטפל.";
-
-  // bullet_reasons — take top 4 from match_reasons, use all if fewer
-  const reasons = match_result.match_reasons.slice(0, 4);
-  const bullet_reasons = reasons.length > 0
-    ? reasons
+  // bullet_reasons — max 4 items
+  const bullet_reasons = match_result.match_reasons.slice(0, 4).length > 0
+    ? match_result.match_reasons.slice(0, 4)
     : ["נמצאה התאמה כללית על בסיס תשובות השאלון."];
+
+  // short_explanation — context-aware based on match_reasons content
+  const short_explanation = buildShortExplanation(match_result.match_reasons);
 
   // tone_note — fixed disclaimer
   const tone_note =
@@ -102,7 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     const explanation = buildMockExplanation(parsed.data);
 
-    return NextResponse.json({ ok: true, ...explanation }, { status: 200 });
+    return NextResponse.json(explanation, { status: 200 });
   } catch (err) {
     console.error("[explain-match] Unexpected error:", err);
     return NextResponse.json(
