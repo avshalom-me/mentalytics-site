@@ -97,6 +97,7 @@ function buildPrompt(body: Body): string {
       therapist_types: body.therapist.therapist_types ?? [],
       training_areas: body.therapist.training_areas ?? [],
       regions: body.therapist.regions ?? [],
+      gender: body.therapist.gender ?? null,
       online: body.therapist.online ?? false,
       bio: body.therapist.bio ?? null,
     },
@@ -126,11 +127,13 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 3. למה בכל זאת זוהי ההתאמה הטובה ביותר שנמצאה
 
 כללים:
+- כתוב על המטפל בגוף שלישי בהתאם למגדר שסומן: אם gender הוא "זכר" — השתמש בלשון זכר ("הוא", "מתמחה", "עובד"); אם "נקבה" — לשון נקבה ("היא", "מתמחה", "עובדת"); אם לא ידוע — השתמש בניסוח מגדרי ניטרלי
 - אל תחזור על ה-match_reasons מילה במילה — סנתז אותן
 - אל תאבחן את המשתמש
 - אל תבטיח הצלחה
 - אל תכתוב "המטפל הטוב ביותר"
 - השתמש בניסוחים כמו "בהתבסס על תשובות השאלון", "נמצאה התאמה", "מבין המטפלים הזמינים"
+- במקום "סוג הטיפול שציינת" כתוב תמיד "סוג הטיפול שנמצא כמתאים עבור הצרכים שלך"
 - אם search_mode הוא "combined" — הדגש במיוחד אילו מהצרכים המרובים המטפל מכסה ואילו פחות
 - אם אין פער משמעותי — אל תמציא אחד
 - החזר JSON בלבד במבנה הבא:
