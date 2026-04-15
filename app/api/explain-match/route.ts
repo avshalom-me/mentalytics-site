@@ -48,49 +48,38 @@ type Body = z.infer<typeof BodySchema>;
 
 type ExplainResponse = {
   title: string;
-  short_explanation: string;
-  bullet_reasons: string[];
+  explanation: string;
   tone_note: string;
 };
 
 // ── Mock / fallback explanation builder ──────────────────────────────────────
-// Used when OpenAI call fails or returns unparseable output.
-
-function buildShortExplanation(reasons: string[]): string {
-  const joined = reasons.join(" ").toLowerCase();
-  const hasTreatment = /טיפול|התמחות|מומחיות|גישה|שיטה/.test(joined);
-  const hasOnline    = /אונליין|online/.test(joined);
-  const hasRegion    = /אזור|מיקום|עיר|זמינות/.test(joined);
-
-  const parts: string[] = ["בהתבסס על התשובות שסימנת בשאלון, נמצאה התאמה"];
-
-  if (hasTreatment && hasOnline) {
-    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל, כולל זמינות לטיפול אונליין.");
-  } else if (hasTreatment && hasRegion) {
-    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל ואזור הפעילות שלו.");
-  } else if (hasTreatment) {
-    parts.push("בין סוג הטיפול המומלץ עבורך לבין תחומי העבודה של המטפל.");
-  } else if (hasOnline) {
-    parts.push("בין הצרכים שעלו בשאלון לבין זמינות המטפל לטיפול אונליין.");
-  } else if (hasRegion) {
-    parts.push("בין הצרכים שעלו בשאלון לבין מיקום וזמינות המטפל.");
-  } else {
-    parts.push("בין הצרכים שעלו לבין תחומי העבודה והזמינות של המטפל.");
-  }
-
-  return parts.join(" ");
-}
 
 function buildMockExplanation(body: Body): ExplainResponse {
-  const { match_result } = body;
-  const bullet_reasons = match_result.match_reasons.slice(0, 4).length > 0
-    ? match_result.match_reasons.slice(0, 4)
-    : ["נמצאה התאמה כללית על בסיס תשובות השאלון."];
+  const { match_result, user_summary, therapist } = body;
+  const reasons = match_result.match_reasons;
+
+  const treatments = user_summary?.recommended_treatment_types ?? [];
+  const therapistAreas = therapist.training_areas ?? [];
+  const matchedTreatments = treatments.filter(t => therapistAreas.includes(t));
+  const unmatchedTreatments = treatments.filter(t => !therapistAreas.includes(t));
+
+  let explanation = "בהתבסס על תשובות השאלון, ";
+
+  if (matchedTreatments.length > 0) {
+    explanation += `המטפל מתמחה ב${matchedTreatments.join(", ")} שמתאים לצרכים שעלו. `;
+  } else if (reasons.length > 0) {
+    explanation += `נמצאה התאמה על בסיס ${reasons[0]}. `;
+  }
+
+  if (unmatchedTreatments.length > 0) {
+    explanation += `חלק מהצרכים שעלו (${unmatchedTreatments.join(", ")}) אינם בדיוק בתחום ההתמחות, אך מבין המטפלים הזמינים זוהי ההתאמה הקרובה ביותר לפרופיל שלך.`;
+  } else {
+    explanation += "זוהי ההתאמה הטובה ביותר שנמצאה מבין המטפלים הזמינים.";
+  }
 
   return {
     title: "למה המטפל הזה הוצע לך",
-    short_explanation: buildShortExplanation(match_result.match_reasons),
-    bullet_reasons,
+    explanation,
     tone_note: "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית.",
   };
 }
@@ -107,6 +96,7 @@ function buildPrompt(body: Body): string {
       training_areas: body.therapist.training_areas ?? [],
       regions: body.therapist.regions ?? [],
       online: body.therapist.online ?? false,
+      bio: body.therapist.bio ?? null,
     },
     match_result: {
       match_score: body.match_result.match_score,
@@ -118,33 +108,34 @@ function buildPrompt(body: Body): string {
 // ── OpenAI call ───────────────────────────────────────────────────────────────
 
 async function callOpenAI(body: Body): Promise<ExplainResponse> {
-  // ── OpenAI API call ───────────────────────────────────────────────────────
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
-    max_tokens: 400,
-    temperature: 0.4,
+    max_tokens: 300,
+    temperature: 0.5,
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
-        content: `אתה עוזר שמסביר בעברית פשוטה וברורה מדוע מטפל מסוים הוצע למשתמש.
+        content: `אתה עוזר שמסביר בעברית פשוטה וכנה מדוע מטפל מסוים הוצע למשתמש.
+
+המשימה שלך: כתוב פסקה אחת קצרה (2-4 משפטים) שמסבירה:
+1. מה בפרופיל המטפל מתאים לצרכים שעלו בשאלון — כולל תובנות שאינן כתובות ישירות ב-match_reasons (למשל: מה בביוגרפיה, סגנון הטיפול, או שיטת העבודה רלוונטי לצרכים שצוינו)
+2. מה פחות מתאים בדיוק (אם יש פער בין מה שהומלץ לבין מה שהמטפל מציע)
+3. למה בכל זאת זוהי ההתאמה הטובה ביותר שנמצאה
+
 כללים:
-- השתמש רק בנתונים שסופקו לך
+- אל תחזור על ה-match_reasons מילה במילה — סנתז אותן
 - אל תאבחן את המשתמש
 - אל תבטיח הצלחה
 - אל תכתוב "המטפל הטוב ביותר"
-- השתמש בניסוחים כמו "בהתבסס על התשובות שלך", "נמצאה התאמה"
+- השתמש בניסוחים כמו "בהתבסס על תשובות השאלון", "נמצאה התאמה", "מבין המטפלים הזמינים"
+- אם אין פער משמעותי — אל תמציא אחד
 - החזר JSON בלבד במבנה הבא:
 {
-  "title": string,
-  "short_explanation": string,
-  "bullet_reasons": string[],
-  "tone_note": string
-}
-- title: תמיד "למה המטפל הזה הוצע לך"
-- short_explanation: משפט אחד עד שניים בעברית
-- bullet_reasons: 2 עד 4 נקודות קצרות בעברית
-- tone_note: תמיד "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית."`,
+  "title": "למה המטפל הזה הוצע לך",
+  "explanation": string,
+  "tone_note": "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית."
+}`,
       },
       {
         role: "user",
@@ -152,31 +143,21 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
       },
     ],
   });
-  // ── End OpenAI API call ───────────────────────────────────────────────────
 
   const content = response.choices[0]?.message?.content ?? "";
   const parsed = JSON.parse(content) as Partial<ExplainResponse>;
 
-  // Validate required fields exist
   if (
     typeof parsed.title !== "string" ||
-    typeof parsed.short_explanation !== "string" ||
-    !Array.isArray(parsed.bullet_reasons) ||
+    typeof parsed.explanation !== "string" ||
     typeof parsed.tone_note !== "string"
   ) {
     throw new Error("OpenAI response missing required fields");
   }
 
-  // Enforce bullet limit
-  const bullet_reasons = parsed.bullet_reasons.slice(0, 4);
-  if (bullet_reasons.length < 1) {
-    throw new Error("OpenAI returned empty bullet_reasons");
-  }
-
   return {
     title: parsed.title,
-    short_explanation: parsed.short_explanation,
-    bullet_reasons,
+    explanation: parsed.explanation,
     tone_note: parsed.tone_note,
   };
 }
@@ -198,11 +179,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const body = parsed.data;
 
     try {
-      // ── Try OpenAI first ──────────────────────────────────────────────────
       const explanation = await callOpenAI(body);
       return NextResponse.json(explanation, { status: 200 });
     } catch (aiErr) {
-      // ── Fallback to mock if OpenAI fails ──────────────────────────────────
       console.error("[explain-match] OpenAI call failed, using fallback:", aiErr);
       const fallback = buildMockExplanation(body);
       return NextResponse.json(fallback, { status: 200 });

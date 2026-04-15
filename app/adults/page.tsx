@@ -381,7 +381,7 @@ export default function AdultsPage() {
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const [explainData, setExplainData] = useState<Record<string, { title: string; short_explanation: string; bullet_reasons: string[]; tone_note: string } | null>>({});
+  const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
@@ -2052,15 +2052,7 @@ if (screen === "e8c") return (
                 {explainData[t.id] && (
                   <div className="mt-3 rounded-xl bg-[#f0f8ff] border border-[#c0dff0] p-3 text-right" onClick={e => e.stopPropagation()}>
                     <p className="text-xs font-bold text-[#1a3a5c] mb-1">{explainData[t.id]!.title}</p>
-                    <p className="text-xs text-gray-700 mb-2">{explainData[t.id]!.short_explanation}</p>
-                    <ul className="space-y-1 mb-2">
-                      {explainData[t.id]!.bullet_reasons.map((r, i) => (
-                        <li key={i} className="flex items-start gap-1.5 text-xs text-gray-700">
-                          <span className="text-[#2e7d8c] mt-0.5">•</span>
-                          <span>{r}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explainData[t.id]!.explanation}</p>
                     <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                   </div>
                 )}
