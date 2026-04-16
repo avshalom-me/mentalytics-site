@@ -3270,7 +3270,8 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
-  const treatments = extractKidsTreatments(A);
+  const rawTreatments = extractKidsTreatments(A);
+  const treatments = rawTreatments.length > 0 ? rawTreatments : ["טיפול דינאמי"];
   const ageGroups  = getKidsAgeGroups(A);
 
   async function fetchExplanation(t: KidsMatchResult) {
@@ -3630,9 +3631,10 @@ function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
           <Card>
             <div className="py-4">
               <p className="font-bold text-[#1a2a3a] text-base mb-2">לא נמצאו ממצאים משמעותיים בתחומים שנבדקו</p>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
+              <p className="text-sm text-[#2c3e7a] font-semibold">↓ ניתן לחפש מטפל/ת מתאים/ה למטה</p>
             </div>
           </Card>
         )}

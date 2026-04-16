@@ -1718,7 +1718,22 @@ if (screen === "e8c") return (
           <p className="mb-4 text-sm opacity-75">לחץ/י על אחד מהממצאים כדי לחפש מטפל מתאים</p>
           {err && <p className="mb-3 rounded-lg bg-red-800 p-3 text-sm">{err}</p>}
           {recs.length === 0 && (
-            <div className="rounded-xl bg-white/10 p-4 text-sm">לא נמצאו ממצאים מובהקים בשאלון. מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</div>
+            <div className="rounded-xl bg-white/10 p-4 text-sm space-y-3">
+              <p>לא נמצאו ממצאים מובהקים בשאלון. מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</p>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedRec({ id: "default", symptomText: "לא נמצאו ממצאים מובהקים", treatment: "טיפול דינאמי", treatmentLabel: "טיפול דינאמי", domain: "מורכבויות בתחום הרגשי/האישי", urgent: false });
+                  setCombinedTreatments(null);
+                  setScreen("match-form");
+                }}
+                className="w-full rounded-xl border-r-4 border-[#8ecfdb] bg-white/10 p-4 text-right transition-all hover:bg-white/20"
+              >
+                <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">מורכבויות בתחום הרגשי/האישי</div>
+                <div className="font-semibold">לא נמצאו ממצאים מובהקים — לחץ/י להפנייה למטפל</div>
+                <div className="mt-2 inline-block rounded-lg bg-white/20 px-3 py-1 text-xs font-bold">→ טיפול דינאמי</div>
+              </button>
+            </div>
           )}
           {multipleGroups && (
             <div className="mb-4 rounded-xl border border-yellow-400/40 bg-yellow-900/20 p-4 text-sm leading-relaxed text-yellow-100">
