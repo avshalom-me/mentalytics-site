@@ -411,6 +411,9 @@ export default function AdultsPage() {
   const [sleepChecked, setSleepChecked] = useState<number[]>([]);
   const [e6EatingChecked, setE6EatingChecked] = useState(false);
   const [e6SleepChecked, setE6SleepChecked] = useState(false);
+  const [eating1Checked, setEating1Checked] = useState<number[]>([]);
+  const [eating2Checked, setEating2Checked] = useState<number[]>([]);
+  const [eating3Checked, setEating3Checked] = useState<number[]>([]);
   const [traumaScores, setTraumaScores] = useState<number[]>(Array(10).fill(0));
   const [traumaSuicidal, setTraumaSuicidal] = useState(false);
   const [traumaType, setTraumaType] = useState("");
@@ -1038,22 +1041,28 @@ export default function AdultsPage() {
       <Card badge="שאלון אכילה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כמה מהדברים הבאים רלוונטיים (כל קבוצה בנפרד):</p>
         <p className="mb-2 text-sm font-bold text-[#2d7a4f]">א. הגבלת אכילה / אנורקסיה:</p>
-        <CheckList items={["סירוב לשמור על משקל גוף תקין","פחד עז מעלייה במשקל","עיוות בתפיסת הגוף"]} checked={(answers.emotional?.eating1Count ?? 0) > 0 ? [] : []}
-          onChange={(_i, v) => {
-            const current = answers.emotional?.eating1Count ?? 0;
-            updE({ eating1Count: v ? current + 1 : Math.max(0, current - 1) });
+        <CheckList items={["סירוב לשמור על משקל גוף תקין","פחד עז מעלייה במשקל","עיוות בתפיסת הגוף"]}
+          checked={eating1Checked}
+          onChange={(i, v) => {
+            const next = v ? [...eating1Checked, i] : eating1Checked.filter(x => x !== i);
+            setEating1Checked(next);
+            updE({ eating1Count: next.length });
           }} />
         <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ב. אכילת יתר / בולימיה:</p>
-        <CheckList items={["פרקי אכילת יתר מתמשכים","הקאות מכוונות / שימוש במשלשלים","פעילות גופנית כפייתית"]} checked={[]}
+        <CheckList items={["פרקי אכילת יתר מתמשכים","הקאות מכוונות / שימוש במשלשלים","פעילות גופנית כפייתית"]}
+          checked={eating2Checked}
           onChange={(i, v) => {
-            const current = answers.emotional?.eating2Count ?? 0;
-            updE({ eating2Count: v ? current + 1 : Math.max(0, current - 1), eating2Purge: i === 1 && v });
+            const next = v ? [...eating2Checked, i] : eating2Checked.filter(x => x !== i);
+            setEating2Checked(next);
+            updE({ eating2Count: next.length, eating2Purge: next.includes(1) });
           }} />
         <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ג. הימנעות מסוגי מזון (ARFID):</p>
-        <CheckList items={["הימנעות ממזון בשל מרקם/מראה","פחד מחנק/הקאה בעת אכילה","תזונה מוגבלת מאוד"]} checked={[]}
-          onChange={(_i, v) => {
-            const current = answers.emotional?.eating3Count ?? 0;
-            updE({ eating3Count: v ? current + 1 : Math.max(0, current - 1) });
+        <CheckList items={["הימנעות ממזון בשל מרקם/מראה","פחד מחנק/הקאה בעת אכילה","תזונה מוגבלת מאוד"]}
+          checked={eating3Checked}
+          onChange={(i, v) => {
+            const next = v ? [...eating3Checked, i] : eating3Checked.filter(x => x !== i);
+            setEating3Checked(next);
+            updE({ eating3Count: next.length });
           }} />
         <NavRow onBack={() => setScreen("e6")} onNext={() => setScreen(e6SleepChecked ? "e7-q" : "e8")} />
       </Card>
