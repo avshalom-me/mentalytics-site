@@ -264,13 +264,13 @@ function buildQ10StyleRef(A: Ans): string {
   const grp = gg(A);
   if (grp === "ga") return buildGaRef(A);
   if (grp === "bv") {
-    const m = A.q10_mot || A.aq_mot_bv || 0;
+    const m = A.soc_motiv_therapy || A.q10_mot || A.aq_mot_bv || 0;
     return m <= 2
       ? "✅ הפנייה: הדרכת הורים"
       : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
   }
   // zy
-  const v2 = A.q10_verbal || 0;
+  const v2 = A.soc_verbal || A.q10_verbal || 0;
   let txt = v2 <= 2
     ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
     : "✅ הפנייה: טיפול פסיכודינאמי";
@@ -1028,10 +1028,8 @@ function computeSocResults(A: Ans): Box[] {
       box("info","✅ יש לענות על שאלת המוטיבציה (בשאלון) לקביעת סוג הטיפול הרגשי המומלץ");
     }
   }
-  if (soc1 === "כן" && lsas >= 8) {
-    box("info","📌 בנוגע לחרדה החברתית שנמצאה:\nיש לעבד את ממצאי החרדה החברתית יחד עם שאלון החרדה (ראה ממצאי חרדה בדוח) ולהמשיך לפי שאלת המוטיבציה ויכולת תרגול הכלים בהתאם לכיתת הילד/ה.\n\nאפשרות נוספת: פנייה לעמותת רקפת המתמחה בטיפול בחרדה חברתית — rakefet-group.org.il");
-  }
-  if (hasSocIssue) {
+  // classroom tools — only for conflicts/communication, not for social anxiety
+  if (soc2 === "כן" || soc3 === "כן") {
     box("info","📌 כלים לעבודה בכיתה עם קשיים חברתיים:\n\n• אין לנהל שיח על מקרה מיד לאחר מריבה — יש להשהות לפחות שעתיים עד לרגיעה.\n• תחילת ואמצע השיח — שאלות פתוחות, לא שיפוטיות ולא ביקורתיות; הקשבה לסיבות ולהסברים של הילד/ה, גם אם נשמעים לא הגיוניים.\n• בסוף השיח — להתמקד בדרכים בהן יוכל להימנע מחיכוכים בפעם הבאה, ולשקף מה היו הטריגרים.\n• אין להתייאש — לאחר מספר התערבויות ניתן לראות שיפור.\n• אם ניתן, לחשוב יחד על רגעים בהם הוא מתחיל להתפרץ (עוד לפני שהתפרץ) ולבנות איתו דרך פעולה.\n• המורה אינו מערב רגשות שליליים בשיח (ייאוש, אכזבה, כעס) — מתמקד בהתנהגות, בהקשבה לצרכים ובהתבוננות לעתיד.\n• אין לנהל \"שיחות מוסר\" ארוכות ומייגעות.");
   }
   return boxes;
@@ -3010,7 +3008,8 @@ function needsSocTherapyMotiv(A: Ans): boolean {
 function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
   const soc3Early = A.soc3_early || "";
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
-  const showMotiv = needsSocTherapyMotiv(A);
+  const grp = gg(A);
+  const showSocDetails = A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && grp !== "ga";
   return (
     <div>
       <Card>
@@ -3139,13 +3138,36 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
           )}
         </div>
 
-        {/* therapy motivation */}
-        {showMotiv && (
+        {/* grade-aware therapy details for soc1 */}
+        {showSocDetails && grp === "bv" && (
           <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
             <p className="text-sm font-bold text-[#4a1a6a] mb-3">מה רמת המוטיבציה של הילד/ה לטיפול? [1–7]</p>
             <div className="flex gap-1.5 flex-wrap">
               {[1,2,3,4,5,6,7].map(n => (
                 <button key={n} className={sb(A.soc_motiv_therapy===n)} onClick={() => setA({...A, soc_motiv_therapy:n})}>{n}</button>
+              ))}
+            </div>
+          </div>
+        )}
+        {showSocDetails && grp === "zy" && (
+          <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
+            <p className="text-sm font-bold text-[#4a1a6a] mb-3">עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה? [1–5]</p>
+            <div className="flex gap-1.5 flex-wrap mb-4">
+              {[1,2,3,4,5].map(n => (
+                <button key={n} className={sb(A.soc_verbal===n)} onClick={() => setA({...A, soc_verbal:n})}>{n}</button>
+              ))}
+            </div>
+            <p className="text-sm text-gray-500 mb-2">תחומי עניין לטיפול (ניתן לבחור כמה):</p>
+            <div className="flex gap-2 flex-wrap">
+              {([
+                {key:"int_art",    label:"אומנות"},
+                {key:"int_music",  label:"מוזיקה"},
+                {key:"int_move",   label:"תנועה"},
+                {key:"int_drama",  label:"פסיכודרמה"},
+                {key:"int_biblio", label:"ביבליותרפיה"},
+                {key:"int_animal", label:'טיפול בבע"ח'},
+              ] as {key:string,label:string}[]).map(({key,label}) => (
+                <button key={key} className={cb(!!A[key])} onClick={() => setA({...A, [key]: !A[key]})}>{label}</button>
               ))}
             </div>
           </div>
