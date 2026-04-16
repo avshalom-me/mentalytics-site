@@ -1718,7 +1718,7 @@ if (screen === "e8c") return (
           <p className="mb-4 text-sm opacity-75">לחץ/י על אחד מהממצאים כדי לחפש מטפל מתאים</p>
           {err && <p className="mb-3 rounded-lg bg-red-800 p-3 text-sm">{err}</p>}
           {recs.length === 0 && (
-            <div className="rounded-xl bg-white/10 p-4 text-sm">לא נמצאו ממצאים מובהקים בשאלון. מומלץ הפנייה להערכה פסיכולוגית עבור המשך בירור.</div>
+            <div className="rounded-xl bg-white/10 p-4 text-sm">לא נמצאו ממצאים מובהקים בשאלון. מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</div>
           )}
           {multipleGroups && (
             <div className="mb-4 rounded-xl border border-yellow-400/40 bg-yellow-900/20 p-4 text-sm leading-relaxed text-yellow-100">

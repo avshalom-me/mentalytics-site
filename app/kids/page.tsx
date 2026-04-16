@@ -3628,11 +3628,10 @@ function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
       <div className="mt-4">
         {!hasAnyFindings && (
           <Card>
-            <div className="text-center py-8">
-              <div className="text-4xl mb-3">✅</div>
-              <p className="font-bold text-green-800 text-lg">לא נמצאו ממצאים משמעותיים</p>
-              <p className="text-sm text-gray-500 mt-2">
-                על בסיס הנתונים שהוזנו, לא עלו סימנים לקשיים המצריכים הפנייה.
+            <div className="py-4">
+              <p className="font-bold text-[#1a2a3a] text-base mb-2">לא נמצאו ממצאים משמעותיים בתחומים שנבדקו</p>
+              <p className="text-sm text-gray-600">
+                ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
             </div>
           </Card>
