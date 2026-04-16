@@ -124,7 +124,7 @@ export default function HomePage() {
                 </h1>
 
                 <p className="mt-2 text-xl font-semibold" style={{ color: "#6B4226" }}>
-                  מערכת בירור, הכוונה והתאמה טיפולית באמצעות שאלונים מודולריים אנונימיים
+                  מערכת בירור, הכוונה והתאמה טיפולית באמצעות שאלונים אנונימיים
                 </p>
 
                 <p className="mt-5 leading-8 text-stone-700">
@@ -248,41 +248,56 @@ export default function HomePage() {
                 </div>
               </li>
             ))}
+            <li className="rounded-2xl border border-[#E8E0D8] bg-white px-4 py-3 flex gap-3 items-center" style={{ boxShadow: "0 2px 12px rgba(60,40,20,.07)" }}>
+              <span className="text-sm text-stone-600">
+                השימוש בשאלונים חינמי{" "}
+                <details className="inline">
+                  <summary className="inline cursor-pointer list-none text-[#8B2E0A] font-bold hover:underline">*</summary>
+                  <span className="block mt-1 text-xs text-stone-500 leading-relaxed">בשימוש הוגן. מעל 3 שימושים ישנו תשלום סמלי של 30 ש״ח.</span>
+                </details>
+              </span>
+            </li>
           </ol>
 
           {/* Demo card — styled exactly like a real match card */}
-          <div className="w-full sm:w-72 shrink-0 rounded-2xl bg-white p-5 shadow-lg">
-            <div className="flex items-start gap-4" dir="rtl">
+          <div className="w-full sm:w-72 shrink-0 rounded-2xl bg-white p-4 shadow-lg">
+            <div className="flex items-start gap-3" dir="rtl">
               <img src="/demo-freud.webp" alt="זיגמונד פרויד"
-                className="h-16 w-16 flex-shrink-0 rounded-xl object-cover object-top" />
+                className="h-14 w-14 flex-shrink-0 rounded-xl object-cover object-top" />
               <div className="flex-1 text-right">
-                <h3 className="text-lg font-bold text-[#1a3a5c]">זיגמונד פרויד</h3>
-                <p className="text-xs text-[#6b7280]">זכר • אונליין</p>
-                <p className="mt-1 text-sm text-gray-700 line-clamp-2">
-                  פסיכיאטר ונוירולוג ותיק עם למעלה מ-40 שנות ניסיון בטיפול דינמי ופסיכואנליטי. מתמחה בחרדה, דיכאון ודפוסי יחסים.
+                <h3 className="text-base font-bold text-[#1a3a5c]">זיגמונד פרויד</h3>
+                <p className="text-xs text-[#6b7280]">זכר • אונליין • 📍 יבנה</p>
+                <p className="mt-1 text-xs text-gray-600 line-clamp-2">
+                  פסיכיאטר ונוירולוג עם למעלה מ-40 שנות ניסיון בטיפול דינמי. מתמחה בחרדה ודיכאון.
                 </p>
-                <p className="mt-1 text-xs text-gray-500">📍 יבנה</p>
-                <div className="mt-2 flex flex-wrap gap-1">
-                  <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">התאמה בתחום המומחיות: טיפול דינמי</span>
+                <div className="mt-1.5 flex flex-wrap gap-1">
+                  <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">טיפול דינמי</span>
                   <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">התאמה באזור</span>
-                  <span className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">התאמה בהעדפת מגדר</span>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2 items-center">
-                  <div className="inline-block rounded-full px-3 py-1 text-xs font-bold text-white bg-[#1a3a5c]">✦ התאמה כוללת: 91%</div>
-                  <div className="inline-block rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c]">מקצועי: 88%</div>
-                  <div className="inline-block rounded-full px-3 py-1 text-xs font-semibold text-white bg-emerald-600">אישיותי: 96%</div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5 items-center">
+                  <div className="rounded-full px-2.5 py-0.5 text-xs font-bold text-white bg-[#1a3a5c]">✦ 91%</div>
+                  <div className="rounded-full border border-[#1a3a5c] px-2.5 py-0.5 text-xs font-semibold text-[#1a3a5c]">מקצועי: 88%</div>
+                  <div className="rounded-full px-2.5 py-0.5 text-xs font-semibold text-white bg-emerald-600">אישיותי: 96%</div>
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-green-500 px-3 py-1.5 text-xs font-semibold text-white opacity-80 cursor-default">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                    וואטסאפ
-                  </span>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-semibold text-white opacity-80 cursor-default">✉ מייל</span>
-                </div>
-                <p className="mt-2 text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</p>
-                <p className="mt-1 text-xs text-stone-400 italic">* הדמיה בלבד</p>
               </div>
             </div>
+
+            {/* AI explanation demo */}
+            <div className="mt-3 rounded-xl bg-[#f0f7ff] border border-[#c7ddf5] p-3" dir="rtl">
+              <p className="text-xs font-bold text-[#1a3a5c] mb-1">✦ למה זה מתאים לי? <span className="font-normal text-[#6b7280]">(הסבר AI)</span></p>
+              <p className="text-xs text-[#374151] leading-relaxed">
+                בהתבסס על הממצאים שדווחו — חרדה חברתית ברמה בינונית וקושי ביחסים — פרויד מציע גישה פסיכודינאמית שמתאימה במיוחד לעבודה על דפוסים עמוקים. מיקומו ביבנה תואם את העדפת האזור שלך, והתאמת האישיות הגבוהה (96%) מצביעה על סגנון עבודה קרוב לצרכייך.
+              </p>
+            </div>
+
+            <div className="mt-2.5 flex flex-wrap gap-2" dir="rtl">
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-green-500 px-3 py-1.5 text-xs font-semibold text-white opacity-80 cursor-default">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                וואטסאפ
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-semibold text-white opacity-80 cursor-default">✉ מייל</span>
+            </div>
+            <p className="mt-1.5 text-xs text-stone-400 italic">* הדמיה בלבד</p>
           </div>
 
         </div>
