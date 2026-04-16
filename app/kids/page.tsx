@@ -430,8 +430,8 @@ function computeResults(A: Ans): Box[] {
 
   // Q7 — פרודרום (standalone)
   if (A.q7 === "כן" && (A.pq_tot || 0) >= 2) {
-    emoStandalones.push({ cls:"danger", txt:"🚨 נמצאו סימנים לקשיים סביב בוחן מציאות/שיפוט שאינם תקינים" });
-    emoStandalones.push({ cls:"info",   txt:"✅ הפנייה לרופא פסיכיאטר / פסיכולוג קליני להערכה" });
+    emoStandalones.push({ cls:"warn", txt:"📊 דווחו חוויות חושיות או קוגניטיביות החורגות מהרגיל — מומלץ להעריך" });
+    emoStandalones.push({ cls:"info", txt:"✅ הפנייה לפסיכולוג קליני או פסיכיאטר להערכה" });
   }
 
   // Q8 — הפרעות אכילה (standalone)
