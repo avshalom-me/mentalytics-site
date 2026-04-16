@@ -209,7 +209,7 @@ function updBQ(A: Ans, k: string, v: string): Ans {
 function updLSAS(A: Ans, k: string, v: number): Ans {
   const n = { ...A, [k]: v };
   let tot = 0;
-  for (let i = 1; i <= 24; i++) tot += (n[`lsas_a${i}`] || 0) + (n[`lsas_b${i}`] || 0);
+  for (let i = 1; i <= 8; i++) tot += (n[`lsas_a${i}`] || 0);
   n.lsas_tot = tot;
   return n;
 }
@@ -231,6 +231,61 @@ function updAddict(A: Ans, k: string, v: string, type: "s"|"g"|"b"): Ans {
   return n;
 }
 
+// ── Shared referral helpers ───────────────────────────────────────────────────
+function buildGaRef(A: Ans): string {
+  const consent = A.ga_consent || "";
+  const par     = A.ga_consent_parent || "";
+  const lvl     = A.a_emo || "";
+  if (consent === "לא") {
+    return par === "לא"
+      ? "✅ הפנייה: הדרכת הורים טיפולית"
+      : "✅ הפנייה: הדרכת הורים טיפולית\n✅ הפנייה: טיפול דיאדי";
+  }
+  if (consent === "כן") {
+    if (lvl === "הרבה מאוד") {
+      return "✅ הפנייה: טיפול פסיכודינאמי ע\"י פסיכולוג קליני/חינוכי/התפתחותי או עו\"ס קליני בשילוב הדרכת הורים";
+    }
+    const ints: string[] = [];
+    if (A.ga_int_art)    ints.push("אומנות");
+    if (A.ga_int_music)  ints.push("מוזיקה");
+    if (A.ga_int_move)   ints.push("תנועה");
+    if (A.ga_int_drama)  ints.push("דרמה");
+    if (A.ga_int_biblio) ints.push("ביבליותרפיה — סיפור");
+    if (A.ga_int_garden) ints.push("גינון");
+    if (A.ga_int_animal) ints.push("בע\"ח");
+    let txt = "✅ הפנייה: טיפול בהבעה ויצירה";
+    if (ints.length) txt += "\n📌 בעדיפות ל: " + ints.join(", ");
+    return txt;
+  }
+  return "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה";
+}
+
+// Same referral logic as Q10 (general emotional difficulties) — grade-based
+function buildQ10StyleRef(A: Ans): string {
+  const grp = gg(A);
+  if (grp === "ga") return buildGaRef(A);
+  if (grp === "bv") {
+    const m = A.q10_mot || A.aq_mot_bv || 0;
+    return m <= 2
+      ? "✅ הפנייה: הדרכת הורים"
+      : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
+  }
+  // zy
+  const v2 = A.q10_verbal || 0;
+  let txt = v2 <= 2
+    ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
+    : "✅ הפנייה: טיפול פסיכודינאמי";
+  const ints: string[] = [];
+  if (A.int_art)    ints.push("אומנות");
+  if (A.int_music)  ints.push("מוזיקה");
+  if (A.int_move)   ints.push("תנועה");
+  if (A.int_drama)  ints.push("פסיכודרמה");
+  if (A.int_biblio) ints.push("ביבליותרפיה");
+  if (A.int_animal) ints.push("טיפול בבע\"ח");
+  if (ints.length) txt += "\n📌 תחומי עניין: " + ints.join(", ");
+  return txt;
+}
+
 // ── Compute results ───────────────────────────────────────────────────────────
 function computeResults(A: Ans): Box[] {
   const grp = gg(A);
@@ -238,33 +293,7 @@ function computeResults(A: Ans): Box[] {
   const emoGroups: { symptoms: string[]; extraBoxes: Box[]; referral: string }[] = [];
   const emoStandalones: Box[] = [];
 
-  function getGaRef(): string {
-    const consent = A.ga_consent || "";
-    const par     = A.ga_consent_parent || "";
-    const lvl     = A.a_emo || "";
-    if (consent === "לא") {
-      return par === "לא"
-        ? "✅ הפנייה: הדרכת הורים טיפולית"
-        : "✅ הפנייה: הדרכת הורים טיפולית\n✅ הפנייה: טיפול דיאדי";
-    }
-    if (consent === "כן") {
-      if (lvl === "הרבה מאוד") {
-        return "✅ הפנייה: טיפול פסיכודינאמי ע\"י פסיכולוג קליני/חינוכי/התפתחותי או עו\"ס קליני בשילוב הדרכת הורים";
-      }
-      const ints: string[] = [];
-      if (A.ga_int_art)    ints.push("אומנות");
-      if (A.ga_int_music)  ints.push("מוזיקה");
-      if (A.ga_int_move)   ints.push("תנועה");
-      if (A.ga_int_drama)  ints.push("דרמה");
-      if (A.ga_int_biblio) ints.push("ביבליותרפיה — סיפור");
-      if (A.ga_int_garden) ints.push("גינון");
-      if (A.ga_int_animal) ints.push("בע\"ח");
-      let txt = "✅ הפנייה: טיפול בהבעה ויצירה";
-      if (ints.length) txt += "\n📌 בעדיפות ל: " + ints.join(", ");
-      return txt;
-    }
-    return "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה";
-  }
+  function getGaRef(): string { return buildGaRef(A); }
 
   function addToGroup(symptomTxt: string, referralTxt: string, extraBoxes: Box[]) {
     const existing = emoGroups.find(g => g.referral === referralTxt);
@@ -941,7 +970,8 @@ function computeSocResults(A: Ans): Box[] {
   const lsas = A.lsas_tot || 0;
   const soc1 = A.soc1 || "", soc2 = A.soc2 || "", soc3 = A.soc3 || "";
   const sev = A.soc2_sev || 0;
-  const hasSocIssue = soc1 === "כן" || soc2 === "כן" || soc3 === "כן";
+  // soc1 counts as an issue only if LSAS score reaches threshold (≥8)
+  const hasSocIssue = (soc1 === "כן" && lsas >= 8) || soc2 === "כן" || soc3 === "כן";
   if (hasSocIssue) box("purple","📊 נמצאו קשיים חברתיים");
   const emoBoxes = computeResults(A);
   const hasEmoTherapyRef = emoBoxes.some(b => b.txt.startsWith("✅") && b.txt.includes("טיפול"));
@@ -952,22 +982,16 @@ function computeSocResults(A: Ans): Box[] {
       if (!socTherapyRefs.includes(txt)) socTherapyRefs.push(txt);
     } else { socNonTherapyRefs.push(txt); }
   }
-  if (soc1 === "כן") {
-    if (lsas <= 50) {
-      addSocRef("הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
-    } else if (lsas <= 80) {
-      box("warn","📊 נמצאו סימפטומים קלים של לחצים בהיבט החברתי");
-      addSocRef("הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
-    } else if (lsas <= 100) {
-      box("warn","📊 נמצאו סימפטומים בינוניים של לחצים בהיבט החברתי");
-      addSocRef("הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
-    } else if (lsas <= 120) {
-      box("danger","📊 נמצאו סימפטומים משמעותיים של לחצים בהיבט החברתי");
-      addSocRef("הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
+  if (soc1 === "כן" && lsas >= 8) {
+    const ref = buildQ10StyleRef(A);
+    if (lsas <= 13) {
+      box("warn","📊 דווחו סימפטומים קלים של חרדה חברתית");
+    } else if (lsas <= 18) {
+      box("warn","📊 דווחו סימפטומים בינוניים של חרדה חברתית");
     } else {
-      box("danger","📊 נמצאו סימפטומים משמעותיים של לחצים בהיבט החברתי");
-      addSocRef("הפנייה לטיפול פסיכודינאמי בשילוב עבודה מערכתית (עדיפות לפסיכולוג חינוכי)");
+      box("danger","📊 דווחו סימפטומים משמעותיים של חרדה חברתית");
     }
+    box("info", ref);
   }
   if (soc2 === "כן") {
     if (sev >= 5) {
@@ -1005,7 +1029,7 @@ function computeSocResults(A: Ans): Box[] {
       box("info","✅ יש לענות על שאלת המוטיבציה (בשאלון) לקביעת סוג הטיפול הרגשי המומלץ");
     }
   }
-  if (soc1 === "כן" && lsas > 50) {
+  if (soc1 === "כן" && lsas >= 8) {
     box("info","📌 בנוגע לחרדה החברתית שנמצאה:\nיש לעבד את ממצאי החרדה החברתית יחד עם שאלון החרדה (ראה ממצאי חרדה בדוח) ולהמשיך לפי שאלת המוטיבציה ויכולת תרגול הכלים בהתאם לכיתת הילד/ה.\n\nאפשרות נוספת: פנייה לעמותת רקפת המתמחה בטיפול בחרדה חברתית — rakefet-group.org.il");
   }
   if (hasSocIssue) {
@@ -2965,31 +2989,17 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 }
 
 // ── p-soc ─────────────────────────────────────────────────────────────────────
+// Shortened social anxiety screen — 8 items, single scale 0–3
+// Items selected to cover key DSM-5 domains for childhood social anxiety
 const LSAS_ITEMS = [
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לדבר מול כל הכיתה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להרים יד בכיתה ולשאול שאלה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להזמין חבר/ה לבוא אליו/ה הביתה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר הוא/היא משתתף/ת בפעילויות בית-ספריות (טיולים, חוגים, הצגות)?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לדבר עם המורה בזמן השיעור?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר הוא/היא משחק/ת עם קבוצה של ילדים שאינם חברים קרובים?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להתחיל שיחה עם ילד/ה שהוא/היא לא מכיר/ה היטב?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר הוא/היא מתבקש/ת לענות על שאלה בכיתה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר הוא/היא מקבל/ת ביקורת מהמורה או ממבוגר אחר?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר הוא/היא משחק/ת עם חברים בזמן ההפסקה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לאכול ליד ילדים אחרים בקפיטריה/חדר האוכל?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להתקשר לחבר/ה בטלפון?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להיכנס לחדר מלא בילדים?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להצטרף לקבוצה של ילדים שכבר משחקים יחד?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה ללכת למסיבת יום הולדת שבה יש ילדים שהוא/היא לא מכיר/ה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לדבר עם מבוגרים שאינם בני משפחה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להחזיר מוצר למוכר בחנות?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לעמוד מול הכיתה ולקרוא משהו בקול רם?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לבקש עזרה מהמורה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לכתוב או לצייר בזמן שמישהו מסתכל עליו/ה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לשוחח עם מבוגר שהוא/היא לא מכיר/ה (כגון רופא, שכן חדש, הורה של חבר)?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לבצע משימה בזמן שילדים אחרים צופים בו/ה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה לפנות לחבר/ה לכיתה כדי לבקש עזרה?",
-  "עד כמה הילד/ה נראה/ית חרד/ה כאשר עליו/ה להשתתף בפעילות חברתית מחוץ לבית הספר (כגון חוג, תנועת נוער, פעילות בבית כנסת)?",
+  "לדבר מול כל הכיתה או לקרוא משהו בקול רם מול הכיתה",        // performance / public speaking
+  "להרים יד ולענות על שאלה בשיעור",                             // performance / classroom
+  "להתחיל שיחה עם ילד/ה שהוא/היא לא מכיר/ה היטב",              // peer initiation
+  "להצטרף לקבוצת ילדים שכבר משחקים יחד",                       // group entry
+  "להיכנס לחדר מלא ילדים שרובם לא מכירים אותו/ה",              // social exposure
+  "לקבל ביקורת מהמורה או לטעות מול ילדים אחרים",               // fear of negative evaluation
+  "לשוחח עם מבוגרים שאינם בני משפחה (כגון רופא, הורה של חבר/ה, שכן חדש)", // adult interaction
+  "להשתתף בפעילות חברתית מחוץ לבית הספר (כגון חוג, מסיבה, תנועת נוער)",   // broad social participation
 ];
 
 function needsSocTherapyMotiv(A: Ans): boolean {
@@ -3026,37 +3036,25 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
           </div>
           {A.soc1 === "כן" && (
             <div className="mt-4 bg-[#ede0f7] rounded-xl p-4 border border-[#9b59b6]">
-              <p className="text-xs text-[#6a3a8a] mb-4">לכל סעיף: דרג <strong>חרדה</strong> (0–3) ו<strong>הימנעות</strong> (0–3) בנפרד<br/>חרדה: 0=אין · 1=קלה · 2=בינונית · 3=חמורה<br/>הימנעות: 0=כלל לא · 1=לעיתים · 2=לעיתים קרובות · 3=כמעט תמיד</p>
+              <p className="text-xs text-[#6a3a8a] mb-1 font-semibold">דרג/י את עוצמת החרדה/מצוקה בכל מצב:</p>
+              <p className="text-xs text-[#6a3a8a] mb-4">0 = כלל לא · 1 = מעט · 2 = הרבה · 3 = מאוד</p>
               <div className="space-y-4">
                 {LSAS_ITEMS.map((item, i) => {
                   const n = i + 1;
                   return (
                     <div key={n} className="pb-3 border-b border-[#ddd6f3] last:border-0">
                       <p className="text-xs font-semibold text-[#2a1a4a] mb-2">{n}. {item}</p>
-                      <div className="flex gap-4 flex-wrap">
-                        <div>
-                          <p className="text-xs text-[#6a3a8a] font-bold mb-1">חרדה</p>
-                          <div className="flex gap-1">
-                            {[0,1,2,3].map(v => (
-                              <button key={v} className={so(A[`lsas_a${n}`]===v)} onClick={() => setA(updLSAS(A,`lsas_a${n}`,v))}>{v}</button>
-                            ))}
-                          </div>
-                        </div>
-                        <div>
-                          <p className="text-xs text-[#6a3a8a] font-bold mb-1">הימנעות</p>
-                          <div className="flex gap-1">
-                            {[0,1,2,3].map(v => (
-                              <button key={v} className={so(A[`lsas_b${n}`]===v)} onClick={() => setA(updLSAS(A,`lsas_b${n}`,v))}>{v}</button>
-                            ))}
-                          </div>
-                        </div>
+                      <div className="flex gap-2">
+                        {[0,1,2,3].map(v => (
+                          <button key={v} className={so(A[`lsas_a${n}`]===v)} onClick={() => setA(updLSAS(A,`lsas_a${n}`,v))}>{v}</button>
+                        ))}
                       </div>
                     </div>
                   );
                 })}
               </div>
               {(A.lsas_tot || 0) > 0 && (
-                <p className="text-xs text-[#6a3a8a] font-bold mt-3">ציון כולל: {A.lsas_tot || 0} / 144</p>
+                <p className="text-xs text-[#6a3a8a] font-bold mt-3">ציון כולל: {A.lsas_tot || 0} / 24</p>
               )}
             </div>
           )}
