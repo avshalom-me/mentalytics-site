@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, Shield, User, GraduationCap } from "lucide-react";
+import { HelpCircle, MessageCircle, Mail, Lock, Coins, Heart, Sparkles, User, GraduationCap } from "lucide-react";
 import ContactForm from "./components/ContactForm";
 
 export const metadata: Metadata = {
@@ -282,12 +282,11 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* AI explanation demo */}
-            <div className="mt-3 rounded-xl bg-[#f0f7ff] border border-[#c7ddf5] p-3" dir="rtl">
-              <p className="text-xs font-bold text-[#1a3a5c] mb-1">✦ למה זה מתאים לי? <span className="font-normal text-[#6b7280]">(הסבר AI)</span></p>
-              <p className="text-xs text-[#374151] leading-relaxed">
-                בהתבסס על הממצאים שדווחו — חרדה חברתית ברמה בינונית וקושי ביחסים — פרויד מציע גישה פסיכודינאמית שמתאימה במיוחד לעבודה על דפוסים עמוקים. מיקומו ביבנה תואם את העדפת האזור שלך, והתאמת האישיות הגבוהה (96%) מצביעה על סגנון עבודה קרוב לצרכייך.
-              </p>
+            {/* AI explanation demo — button only */}
+            <div className="mt-3" dir="rtl">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-[#c7ddf5] bg-[#f0f7ff] px-3 py-1.5 text-xs font-semibold text-[#1a3a5c] cursor-default opacity-80">
+                ✦ למה זה מתאים לי?
+              </span>
             </div>
 
             <div className="mt-2.5 flex flex-wrap gap-2" dir="rtl">
