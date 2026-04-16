@@ -243,7 +243,7 @@ const ADULTS_SCREENS_ORDER = [
   "disclaimer","intake","domains",
   "e1","e1-q","e2","e2-2","e2-q","e3","e3-q",
   "e4","e4-chronic","e4-medical","e4-q","e4-social","e4-social-sev","e4-flight","e4-medanx","e4-stresspain",
-  "e5","e5-q","e6","e6-q","e7","e7-q","e8","e8c","e8d","e9","e9-q",
+  "e5","e5-q","e6","e6-q","e7-q","e8","e8c","e8d","e9","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
   "f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
@@ -409,6 +409,8 @@ export default function AdultsPage() {
   const [socialSeverity, setSocialSeverity] = useState(0);
   const [ocd, setOcd] = useState<number[]>(Array(6).fill(0));
   const [sleepChecked, setSleepChecked] = useState<number[]>([]);
+  const [e6EatingChecked, setE6EatingChecked] = useState(false);
+  const [e6SleepChecked, setE6SleepChecked] = useState(false);
   const [traumaScores, setTraumaScores] = useState<number[]>(Array(10).fill(0));
   const [traumaSuicidal, setTraumaSuicidal] = useState(false);
   const [traumaType, setTraumaType] = useState("");
@@ -997,9 +999,36 @@ export default function AdultsPage() {
   if (screen === "e6") return (
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">6. האם חווה/ת <strong>קשיים סביב אכילה</strong> (הגבלה קיצונית, אכילת יתר, הקאות, פחד ממזון)?</p>
-        <YesNo onYes={() => { updE({ e6: true }); setScreen("e6-q"); }}
-          onNo={() => { updE({ e6: false }); setScreen("e7"); }} />
+        <p className="mb-3 font-semibold text-[#1a3a5c]">6. האם חווה/ת <strong>קשיים בנוגע למשקל, אכילה או שינה</strong>?</p>
+        <YesNo
+          onYes={() => updE({ e6: true, e7: true })}
+          onNo={() => { updE({ e6: false, e7: false }); setScreen("e8"); }}
+        />
+        {answers.emotional?.e6 === true && (
+          <div className="mt-4 space-y-3 border-t border-dashed border-[#c8dce0] pt-4">
+            <p className="text-sm font-semibold text-[#1a3a5c] mb-2">מה הרלוונטי לך? (ניתן לבחור שניים)</p>
+            {[
+              { key: "eating", label: "אכילה ומשקל", state: e6EatingChecked, setter: setE6EatingChecked },
+              { key: "sleep",  label: "בעיות שינה",  state: e6SleepChecked,  setter: setE6SleepChecked  },
+            ].map(({ key, label, state, setter }) => (
+              <label key={key} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-3 transition-all"
+                style={{ borderColor: state ? "#2e7d8c" : "#ddd6c8", background: state ? "#e0f4fa" : "white" }}>
+                <input type="checkbox" checked={state} onChange={e => setter(e.target.checked)}
+                  className="h-4 w-4 accent-[#2e7d8c]" />
+                <span className="text-sm font-medium text-[#1a3a5c]">{label}</span>
+              </label>
+            ))}
+            {(e6EatingChecked || e6SleepChecked) && (
+              <button onClick={() => {
+                if (e6EatingChecked) setScreen("e6-q");
+                else setScreen("e7-q");
+              }}
+                className="mt-2 rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1f5f6e]">
+                המשך ←
+              </button>
+            )}
+          </div>
+        )}
       </Card>
     </Layout>
   );
@@ -1026,17 +1055,7 @@ export default function AdultsPage() {
             const current = answers.emotional?.eating3Count ?? 0;
             updE({ eating3Count: v ? current + 1 : Math.max(0, current - 1) });
           }} />
-        <NavRow onBack={() => setScreen("e6")} onNext={() => setScreen("e7")} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e7") return (
-    <Layout screen={screen}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם חווה/ת <strong>הפרעות שינה</strong> כגון נדודי שינה, שיתוק שינה, או נחירות חזקות?</p>
-        <YesNo onYes={() => { updE({ e7: true }); setScreen("e7-q"); }}
-          onNo={() => { updE({ e7: false }); setScreen("e8"); }} />
+        <NavRow onBack={() => setScreen("e6")} onNext={() => setScreen(e6SleepChecked ? "e7-q" : "e8")} />
       </Card>
     </Layout>
   );
@@ -1047,7 +1066,7 @@ export default function AdultsPage() {
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
         <CheckList items={SLEEP_ITEMS} checked={sleepChecked}
           onChange={(i, v) => setSleepChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
-        <NavRow onBack={() => setScreen("e7")}
+        <NavRow onBack={() => setScreen(e6EatingChecked ? "e6-q" : "e6")}
           onNext={() => { updE({ sleepItems: SLEEP_ITEMS.map((_, i) => sleepChecked.includes(i)) }); setScreen("e8"); }} />
       </Card>
     </Layout>
@@ -1056,7 +1075,7 @@ export default function AdultsPage() {
   if (screen === "e8") return (
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
         <YesNo onYes={() => { updE({ e8: true }); setScreen("e8c"); }}
           onNo={() => { updE({ e8: false }); setScreen("e9"); }} />
       </Card>
@@ -1086,7 +1105,7 @@ if (screen === "e8c") return (
   if (screen === "e9") return (
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
         <YesNo onYes={() => { updE({ e9: true }); setScreen("e9-q"); }}
           onNo={() => { updE({ e9: false }); setScreen("e10"); }} />
       </Card>
@@ -1133,7 +1152,7 @@ if (screen === "e8c") return (
   if (screen === "e10") return (
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">10. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
         <YesNo onYes={() => { updE({ e10: true }); setScreen("e10a"); }}
           onNo={() => { updE({ e10: false }); setScreen("therapist-style"); }} />
       </Card>
