@@ -90,7 +90,7 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-aq")         return (A.q1 || 0) < 4;
   if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 14;
   if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 4;
-  if (pid === "p-q2-grade")   return (A.q2 || 0) < 4;
+  if (pid === "p-q2-grade")   return (A.q2 || 0) < 4 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
   if (pid === "p-mq")         return (A.q3 || 0) < 4;
   if (pid === "p-mq-sui")     return (A.mq_tot || 0) < 4;
   if (pid === "p-q4-types")   return A.q4 !== "כן";
@@ -119,7 +119,7 @@ function skipPage(pid: string, A: Ans): boolean {
     return anyPositive;
   }
   if (pid === "p-q10-par")   return A.q10 !== "כן";
-  if (pid === "p-q10-grade") return A.q10_par !== "כן";
+  if (pid === "p-q10-grade") return A.q10_par !== "כן" || (gg(A) === "bv" && ((A.aq_mot_bv || 0) > 0 || (A.q2_mot || 0) > 0));
 
   if (pid === "p-acad") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_aca || "");
 
@@ -264,7 +264,7 @@ function buildQ10StyleRef(A: Ans): string {
   const grp = gg(A);
   if (grp === "ga") return buildGaRef(A);
   if (grp === "bv") {
-    const m = A.soc_motiv_therapy || A.q10_mot || A.aq_mot_bv || 0;
+    const m = A.soc_motiv_therapy || A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
     return m <= 2
       ? "✅ הפנייה: הדרכת הורים"
       : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
@@ -365,7 +365,7 @@ function computeResults(A: Ans): Box[] {
     let ref = "";
     if (grp === "ga") ref = getGaRef();
     else if (grp === "bv") {
-      const m = A.q2_mot || 0;
+      const m = A.q2_mot || A.aq_mot_bv || 0;
       ref = m <= 1
         ? "✅ הפנייה: הדרכת הורים טיפולית"
         : "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
@@ -455,7 +455,7 @@ function computeResults(A: Ans): Box[] {
     if (grp === "ga") {
       ref = getGaRef();
     } else if (grp === "bv") {
-      const m = A.q10_mot || 0;
+      const m = A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
       ref = m <= 2 ? "✅ הפנייה: הדרכת הורים" : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
     } else {
       const v2 = A.q10_verbal || 0;
@@ -1084,7 +1084,7 @@ function StepHint({ children }: { children: React.ReactNode }) {
 function EqNum({ n }: { n: number }) {
   return <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#2c3e7a] text-white text-sm font-bold mb-3">{n}</div>;
 }
-function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = true }: {
+function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = false }: {
   onBack?: () => void; onNext?: () => void; backLabel?: string; nextLabel?: string; showBack?: boolean;
 }) {
   return (
@@ -1295,37 +1295,6 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
           <div className="text-xs text-gray-500 mb-4">BMI: <strong>{bmi.toFixed(1)}</strong> — {bmiLabel(bmi)}</div>
         )}
 
-        {/* ראייה ושמיעה */}
-        <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת ראייה?</p>
-          <div className="flex gap-2 mb-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.vision === v)} onClick={() => upd("vision", v)}>{v}</button>)}
-          </div>
-          {A.vision === "לא" && (
-            <div className="pr-4 border-r-2 border-blue-200 mt-2">
-              <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי ראייה?</p>
-              <div className="flex gap-2">
-                {["כן","לא"].map(v => <button key={v} className={ob(A.vis_sym === v)} onClick={() => upd("vis_sym", v)}>{v}</button>)}
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="mb-5">
-          <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת שמיעה?</p>
-          <div className="flex gap-2 mb-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.hearing === v)} onClick={() => upd("hearing", v)}>{v}</button>)}
-          </div>
-          {A.hearing === "לא" && (
-            <div className="pr-4 border-r-2 border-blue-200 mt-2">
-              <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי שמיעה?</p>
-              <div className="flex gap-2">
-                {["כן","לא"].map(v => <button key={v} className={ob(A.hear_sym === v)} onClick={() => upd("hear_sym", v)}>{v}</button>)}
-              </div>
-            </div>
-          )}
-        </div>
-
         {/* שינה ואכילה */}
         <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">😴 שינה ואכילה</div>
         <div className="mb-4">
@@ -1351,43 +1320,9 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
           )}
         </div>
         <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">האם יש קשיי אכילה?</p>
-          <div className="flex gap-2 mb-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.eating === v)} onClick={() => upd("eating", v)}>{v}</button>)}
-          </div>
-          {A.eating === "כן" && (
-            <div className="pr-4 border-r-2 border-blue-200 mt-2 space-y-3">
-              <div>
-                <p className="text-sm text-gray-500 mb-2">בררנות באוכל?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v => <button key={v} className={ob(A.eat_picky === v)} onClick={() => upd("eat_picky", v)}>{v}</button>)}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-2">אכילה מוגזמת/מועטת?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v => <button key={v} className={ob(A.eat_amount === v)} onClick={() => upd("eat_amount", v)}>{v}</button>)}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-2">תלונות על כאבי בטן?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v => <button key={v} className={ob(A.eat_belly === v)} onClick={() => upd("eat_belly", v)}>{v}</button>)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="mb-4">
           <p className="text-sm text-gray-500 mb-2">האם יש קשיי גמילה / התרוקנות?</p>
           <div className="flex gap-2">
             {["כן","לא"].map(v => <button key={v} className={ob(A.toilet === v)} onClick={() => upd("toilet", v)}>{v}</button>)}
-          </div>
-        </div>
-        <div className="mb-2">
-          <p className="text-sm text-gray-500 mb-2">האם הילד/ה עצמאי/ת בלבוש ורחצה?</p>
-          <div className="flex gap-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.indep === v)} onClick={() => upd("indep", v)}>{v}</button>)}
           </div>
         </div>
       </Card>
@@ -1697,7 +1632,7 @@ function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNe
         <StepQ>שאלות משלימות לגיל הצעיר</StepQ>
         <GaConsentBlock A={A} setA={setA} onDone={onNext} />
       </Card>
-      <NavRow onBack={onBack} showBack={true} />
+      <NavRow onBack={onBack} />
     </div>
   );
 }
@@ -2634,6 +2569,42 @@ function AcadAdhdBlock({ prefix, A, setA }: { prefix: string; A: Ans; setA: (a: 
   );
 }
 
+function VisionHearingBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
+  return (
+    <div className="mb-5">
+      <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
+      <div className="mb-4">
+        <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת ראייה?</p>
+        <div className="flex gap-2 mb-2">
+          {["כן","לא"].map(v => <button key={v} className={ob(A.vision === v)} onClick={() => setA({...A, vision:v})}>{v}</button>)}
+        </div>
+        {A.vision === "לא" && (
+          <div className="pr-4 border-r-2 border-blue-200 mt-2">
+            <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי ראייה?</p>
+            <div className="flex gap-2">
+              {["כן","לא"].map(v => <button key={v} className={ob(A.vis_sym === v)} onClick={() => setA({...A, vis_sym:v})}>{v}</button>)}
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="mb-2">
+        <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת שמיעה?</p>
+        <div className="flex gap-2 mb-2">
+          {["כן","לא"].map(v => <button key={v} className={ob(A.hearing === v)} onClick={() => setA({...A, hearing:v})}>{v}</button>)}
+        </div>
+        {A.hearing === "לא" && (
+          <div className="pr-4 border-r-2 border-blue-200 mt-2">
+            <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי שמיעה?</p>
+            <div className="flex gap-2">
+              {["כן","לא"].map(v => <button key={v} className={ob(A.hear_sym === v)} onClick={() => setA({...A, hear_sym:v})}>{v}</button>)}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function PageAcad({ A, setA, onNext, onBack }: PageProps) {
   const grp = acadGg(A);
 
@@ -2644,6 +2615,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
         <Card>
           <StepTag>📚 קשיים לימודיים</StepTag>
           <StepQ>שאלות לגבי התפקוד הלימודי בגן</StepQ>
+          <VisionHearingBlock A={A} setA={setA} />
           <GradeBlock title="🏫 גילאי גן">
             {[
               {k:"gan_q1", q:"1. האם הגננת דיווחה/מזהה קשיים בזיהוי אותיות ומספרים ביחס לבני גילו?", subKey:"gan_q1_speech", subQ:"האם עבר אבחון קלינאית תקשורת?"},
@@ -2695,6 +2667,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
         <Card>
           <StepTag>📚 קשיים לימודיים</StepTag>
           <StepQ>שאלות לגבי התפקוד הלימודי</StepQ>
+          <VisionHearingBlock A={A} setA={setA} />
           <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-3 mb-4 text-sm font-bold text-amber-900">
             💡 כדאי להתייעץ עם המחנכ/ת של הכיתה לפני המענה, או לענות יחד בטלפון.
           </div>
@@ -2813,6 +2786,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
         <Card>
           <StepTag>📚 קשיים לימודיים</StepTag>
           <StepQ>שאלות לגבי התפקוד הלימודי</StepQ>
+          <VisionHearingBlock A={A} setA={setA} />
           <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-3 mb-4 text-sm font-bold text-amber-900">
             💡 כדאי להתייעץ עם המחנכ/ת של הכיתה לפני המענה, או לענות יחד בטלפון.
           </div>
@@ -2912,6 +2886,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
       <Card>
         <StepTag>📚 קשיים לימודיים</StepTag>
         <StepQ>שאלות לגבי התפקוד הלימודי</StepQ>
+        <VisionHearingBlock A={A} setA={setA} />
         <div className="bg-amber-50 border-2 border-amber-400 rounded-xl p-3 mb-4 text-sm font-bold text-amber-900">
           💡 כדאי להתייעץ עם המחנכ/ת של הכיתה לפני המענה, או לענות יחד בטלפון.
         </div>
@@ -3009,6 +2984,8 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
   const soc3Early = A.soc3_early || "";
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
+  const motBvAlreadySet = (A.aq_mot_bv || 0) > 0 || (A.q2_mot || 0) > 0 || (A.q10_mot || 0) > 0;
+  const verbalZyAlreadySet = (A.q10_verbal || 0) > 0;
   const showSocDetails = A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && grp !== "ga";
   return (
     <div>
@@ -3139,7 +3116,7 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
         </div>
 
         {/* grade-aware therapy details for soc1 */}
-        {showSocDetails && grp === "bv" && (
+        {showSocDetails && grp === "bv" && !motBvAlreadySet && (
           <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
             <p className="text-sm font-bold text-[#4a1a6a] mb-3">מה רמת המוטיבציה של הילד/ה לטיפול? [1–7]</p>
             <div className="flex gap-1.5 flex-wrap">
@@ -3149,7 +3126,7 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
             </div>
           </div>
         )}
-        {showSocDetails && grp === "zy" && (
+        {showSocDetails && grp === "zy" && !verbalZyAlreadySet && (
           <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
             <p className="text-sm font-bold text-[#4a1a6a] mb-3">עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה? [1–5]</p>
             <div className="flex gap-1.5 flex-wrap mb-4">
