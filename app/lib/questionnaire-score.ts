@@ -130,7 +130,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
 
     // --- E3: Prodrome ---
     const prodromeCount = e.prodromeItems?.length ?? 0;
-    if (prodromeCount >= 6) {
+    if (prodromeCount >= 2) {
       if (e.prodromeSuicidal) {
         recs.push({
           id: uid("prodrome-suicidal"),

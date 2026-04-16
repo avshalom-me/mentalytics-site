@@ -22,7 +22,7 @@ export type QuestionnaireAnswers = {
     maniaItems?: number[];           // פריטים שסומנו (0-6)
     maniaDeath?: boolean;
     e3?: boolean;                    // פסיכוזה
-    prodromeItems?: number[];        // פריטים שסומנו (0-15)
+    prodromeItems?: number[];        // פריטים שסומנו (0-5)
     prodromeSuicidal?: boolean;
     e4?: boolean;                    // חרדה
     e4Chronic?: boolean;
