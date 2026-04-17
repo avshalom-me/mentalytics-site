@@ -42,6 +42,8 @@ const BodySchema = z.object({
     match_reasons: z.array(z.string()),
     matched_fields: z.record(z.string(), z.unknown()).optional(),
   }),
+
+  addiction_cbt_fallback: z.boolean().optional(),
 });
 
 type Body = z.infer<typeof BodySchema>;
@@ -107,6 +109,7 @@ function buildPrompt(body: Body): string {
       personality_score: body.match_result.personality_score ?? null,
       match_reasons: body.match_result.match_reasons,
     },
+    addiction_cbt_fallback: body.addiction_cbt_fallback ?? false,
   }, null, 2);
 }
 
@@ -139,6 +142,7 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 - תמיד התייחס למיקום/מרחק: אם regions של המטפל תואם את region_preference של המשתמש — ציין זאת כיתרון; אם יש פער — ציין אותו בכנות (למשל: "המטפל פועל באזור X בעוד שציינת עדיפות לאזור Y") ואם יש אפשרות אונליין — ציין אותה כפתרון
 - אל תחזור על ה-match_reasons מילה במילה — סנתז אותן
 - אל תציין הבדלים בין סוגי הרישיון/התואר של המטפל (כגון יועץ/ת חינוכי, פסיכולוג, עו"ס, מטפל בהבעה) — אין להעיר הערות בנושא זה
+- אם addiction_cbt_fallback הוא true — ציין בגוף ההסבר שלא נמצא מטפל המתמחה ספציפית בהתמכרויות באזור המבוקש או באזורים הסמוכים, ושטיפול CBT (קוגניטיבי-התנהגותי) הוא גישה יעילה ומומלצת גם לטיפול בהתמכרויות, ולכן המטפל/ת הזה/ה הוצע/ה כחלופה מתאימה
 - אל תאבחן את המשתמש
 - אל תבטיח הצלחה
 - אל תכתוב "המטפל הטוב ביותר"

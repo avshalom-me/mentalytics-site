@@ -369,6 +369,7 @@ export default function AdultsPage() {
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
+  const [addictionCbtFallback, setAddictionCbtFallback] = useState(false);
   const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
   const [combinedLabels, setCombinedLabels] = useState<string[] | null>(null);
@@ -564,6 +565,7 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setMatchResults(json.matches ?? []);
+      setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בחיפוש");
@@ -608,6 +610,7 @@ export default function AdultsPage() {
             personality_score: t.personality_score ?? null,
             match_reasons: t.match_reasons ?? [],
           },
+          addiction_cbt_fallback: addictionCbtFallback || undefined,
         }),
       });
       const data = await res.json();
@@ -1596,7 +1599,7 @@ if (screen === "e8c") return (
     return (
       <Layout screen={screen}>
         <Card badge="שאלון חומרים ממכרים">
-          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים (מעל 2 = סימן לקושי, מעל 8 = קושי משמעותי):</p>
+          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים:</p>
           <CheckList items={SUB_ITEMS} checked={substanceChecked}
             onChange={(i,v) => setSubstanceChecked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <NavRow onBack={() => setScreen("a-types")} onNext={() => { updA({ substanceCount: substanceChecked.length }); nextAddiction(); }} />
@@ -1636,7 +1639,7 @@ if (screen === "e8c") return (
   if (screen === "a-porn-q") return (
     <Layout screen={screen}>
       <Card badge="שאלון פורנוגרפיה">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=לא כלל, 7=מאוד)</p>
+        <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=כלל לא, 7=מאוד)</p>
         {PORN_ITEMS.map((item, i) => (
           <ScaleRow key={i} label={item} group={`porn-${i}`} values={[1,2,3,4,5,6,7]} value={pornScores[i]}
             onChange={(v) => setPornScores((p) => { const n = [...p]; n[i] = v; return n; })} />

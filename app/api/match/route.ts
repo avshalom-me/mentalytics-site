@@ -491,6 +491,12 @@ export async function POST(req: NextRequest) {
 
     const top = scored.slice(0, input.limit);
 
+    // Detect addiction fallback: user requested addiction treatment but no matched therapist specializes in it
+    const ADDICTION_LABEL = normalizeText("טיפול בהתמכרויות");
+    const addictionRequested = input.treatmentTypes.some(t => normalizeText(t) === ADDICTION_LABEL);
+    const addictionCbtFallback = addictionRequested &&
+      top.every(({ result }) => !result.normalizedTherapist.trainingAreas.some(a => normalizeText(a) === ADDICTION_LABEL));
+
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {
         const photoUrl = await buildSignedPhotoUrl(therapist.profile_photo_path);
@@ -524,6 +530,7 @@ export async function POST(req: NextRequest) {
       total_found: therapists.length,
       returned: ranked.length,
       matches: ranked,
+      addiction_cbt_fallback: addictionCbtFallback,
     });
   } catch (error: any) {
     return NextResponse.json(
