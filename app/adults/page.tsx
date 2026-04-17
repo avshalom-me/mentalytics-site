@@ -16,177 +16,6 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
   }).catch(() => {});
 }
 
-// ── constants ────────────────────────────────────────────────────────────────
-const REGIONS = [
-  "גוש דן",
-  "ירושלים והסביבה",
-  "דרום השרון",
-  "צפון השרון",
-  "השפלה והמרכז",
-  "חיפה והקריות",
-  "גליל וצפון",
-  "עמק יזרעאל ונצרת",
-  "דרום",
-  "נגב ואילת",
-  "יהודה ושומרון",
-];
-const CULTURAL_PREFS = [
-  "היכרות עם העולם הדתי",
-  "היכרות עם העולם החרדי",
-  'היכרות עם עולם הלהט"ב',
-  "מטפל/ת עם ניסיון בגיל השלישי",
-];
-const MOOD_ITEMS = [
-  "תחושה מתמשכת של עצב או עצבנות",
-  "אובדן עניין בפעילויות שנהנית מהן בעבר",
-  "שינויים משמעותיים במשקל או בתיאבון",
-  "בעיות שינה: נדודי שינה או שינה יתרה",
-  "חוסר מנוחה או איטיות בתנועה ובחשיבה",
-  "עייפות או חוסר אנרגיה",
-  "תחושות חוסר ערך או אשמה מופרזת",
-  "ירידה ביכולת החשיבה, ריכוז או חוסר החלטיות",
-  "מחשבות חוזרות על מוות", // i=8 suicidal
-  "בעבר חוויתי תקופה של מצב רוח מרומם/רוגזני קיצוני", // i=9 manic
-];
-const MANIA_ITEMS = [
-  "צורך מופחת בשינה",
-  "קצב דיבור מהיר או מחשבות 'טסות'",
-  "דחף מיני מוגבר",
-  "ערך עצמי גבוה באופן יוצא מגדר הרגיל",
-  "קושי להתרכז",
-  "פעולות המהוות סיכון (נהיגה פרועה, הימורים גדולים וכד')",
-];
-// Shortened prodromal screen — 6 core items covering auditory/visual hallucinations,
-// paranoia, reality testing, thought broadcasting, loss of thought control
-const PRODROME_ITEMS = [
-  "שמעתי קולות/לחישות שאחרים לא שמעו",
-  "ראיתי דברים שאנשים אחרים לא ראו",
-  "אני מרגיש/ה שלאחרים יש משהו נגדי",
-  "הייתי מבולבל/ת אם חוויה הייתה אמיתית או דמיונית",
-  "המחשבות שלי כל כך חזקות שאני כמעט שומע/ת אותן",
-  "אני מרגיש/ה שאיני שולט/ת במחשבותיי",
-];
-const GAD7_ITEMS = [
-  "דאגה מופרזת: קושי משמעותי לשלוט בדאגות לגבי מגוון רחב של נושאים (עבודה, בריאות, מטלות יומיומיות)",
-  'קשיי ריכוז: תחושה שהמוח "ננעל" או "מתרוקן", או מוסחות גבוהה עקב המחשבות הטורדניות',
-  "עצבנות: סף גירוי נמוך ותגובות מתוחות לסביבה",
-  'חוסר מנוחה: תחושה של "קוצים בישבן" או דריכות מתמדת',
-  "מתח שרירים: כאבים כרוניים בצוואר, בכתפיים או בלסת",
-  "קשיי שינה: קושי להירדם, יקיצות מרובות, או שינה לא מספקת",
-  'עוררות גופנית: תחושת דריכות/"על הקצה", אי-שקט. לעיתים גם דופק מהיר, הזעה, רעד, סחרחורת, קוצר נשימה או תחושות גופניות אחרות',
-  "הימנעות ממצבים, מקומות, אנשים או פעילויות שמעוררים את החרדה",
-  "פגיעה בתפקוד כתוצאה מהלחץ (כגון תפקוד חברתי, לימודי, תעסוקתי או משפחתי)",
-];
-const OCD_ITEMS = [
-  "בודק/ת שוב ושוב דברים ולא בטוח/ה אם נעשו",
-  "חושב/ת על דברים רעים ולא יכול/ה להפסיק",
-  "אוסף/ת דברים רבים עד כדי הפרעה לשגרה",
-  "שוטף/ת שוב ושוב ידיים",
-  "מתעצבן/ת אם הדברים לא בסדרם",
-  "צריך/ה לספור בזמן ביצוע פעולות",
-];
-const SLEEP_ITEMS = [
-  "קושי בהירדמות",
-  "קושי באיכות השינה (התעוררויות מרובות)",
-  "שינה מרובה או הירדמות מהרגע להרגע במהלך היום",
-  "הליכה מתוך שינה",
-  "ביעותי לילה או סיוטים",
-  "נזלת כרונית מרובה",
-];
-const TRAUMA_ITEMS = [
-  "מחשבות/תמונות מטרידות 'קופצות' לראשי",
-  "חלומות רעים/סיוטי לילה",
-  "תחושות בגוף בעת זיכרון האירוע",
-  "מנסה להתרחק מכל דבר שמזכיר את האירוע",
-  "ירידה בעניין לעשות דברים",
-  "אי יכולת להיזכר בחלק חשוב ממה שקרה",
-  "ביטוי רגשות חזקים (פחד, כעס, אשמה, בושה)",
-  "קופצניות/הבהלה בקלות",
-  "עושה דברים שיכולים לפגוע בי",
-  "זהירות מוגברת מסכנה",
-];
-const PERS_ITEMS = [
-  "אני נוטה לחשוד בזולת במידה שפוגעת ביחסים שלי",
-  "אני מעדיף/ה פנאי בגפי ועולם הפנטזיה הפנימי שלי",
-  "אנשים חושבים שהאמונות וההתנהגות שלי מוזרות",
-  "הביטחון העצמי שלי נמוך, אני רגיש/ה לביקורת",
-  "אני חווה תנודות קיצוניות במצב הרוח לאורך היום",
-  "אני נוטה לפעול באימפולסיביות באופן שפוגע בתפקודי",
-];
-const EXEC_ITEMS = [
-  "קשיי זיכרון עבודה: קושי לשמור ולעבד מידע זמני",
-  "אימפולסיביות: נטייה לפעול ללא מחשבה מוקדמת",
-  "קשיי גמישות מחשבתית: קושי להסתגל לשינויים",
-  "קשיי ניטור עצמי: חוסר מודעות לביצועים אישיים",
-  "קשיי ויסות רגשי: תגובות רגשיות מוגזמות",
-  "קשיי יזימה: קושי להתחיל משימות, דחיינות",
-];
-const LD_ITEMS = [
-  "מתקשה להבין הוראות כתובות או בעל-פה",
-  "מחפש/ת מילים מתאימות במהלך שיחה/כתיבה",
-  "מתקשה לעקוב אחר שיחות קבוצתיות",
-  "מתקשה לסכם/לפרש מידע שקראת/שמעת",
-  "מתקשה בפעולות חשבון בסיסיות / מושגים מתמטיים",
-];
-const EFT_ITEMS = [
-  "עד כמה את/ה חווה ריחוק, עוינות או ריבים תכופים בתוך הזוגיות?",
-  "עד כמה את/ה חווה בדידות או ייאוש בתוך הזוגיות?",
-  "עד כמה אחד מבני הזוג סובל מחרדה, דיכאון או טראומה המשפיעים על הקשר?",
-  "עד כמה את/ה חווה תחושת ניתוק, או תחושה שאתם 'תקועים' במעגל חוזר?",
-  "עד כמה קשה לך לבטא רגשות בתוך הקשר הזוגי?",
-  "עד כמה קשה לך לווסת את הרגשות שלך בתוך הקשר הזוגי?",
-  "עד כמה את/ה חווה חשש מנטישה, או נוטה להימנע מקרבה רגשית?",
-];
-const DYN_ITEMS = [
-  "עד כמה קיימים קשיים באינטימיות מינית בתוך הזוגיות?",
-  "עד כמה את/ה מעוניין/ת בתהליך טיפולי עמוק וארוך טווח?",
-  "עד כמה את/ה סקרן/ית לגבי העולם הפנימי שלך ושל בן/בת הזוג?",
-  "עד כמה טראומות עבר (שלך או של בן/בת הזוג) משפיעות על הקשר?",
-  "עד כמה קשיים נפשיים אישיים (שלך או של בן/בת הזוג) משפיעים על הזוגיות?",
-  "עד כמה אתם מגדירים את עצמכם כ'מחפשי תובנות' ולא רק פתרונות מעשיים?",
-  "עד כמה חשוב לך להבין לעומק את עצמך ואת בן/בת הזוג דרך הטיפול?",
-];
-const STRUCT_ITEMS = [
-  "עד כמה קיימים קונפליקטים על חלוקת תפקידים בבית ובזוגיות?",
-  "עד כמה הקשר עם משפחת המוצא (שלך או של בן/בת הזוג) יוצר חיכוך בזוגיות?",
-  "עד כמה את/ה חווה נתק ממשפחה או ממשאבי תמיכה חיצוניים?",
-  "עד כמה קיימים מאבקי כוח וסמכות בתוך היחסים הזוגיים?",
-  "עד כמה את/ה מחובר/ת לגישה פרקטית וממוקדת לשינוי (לעומת תהליך פנימי)?",
-  "עד כמה את/ה חווה כאב זוגי אינטנסיבי ביום-יום?",
-  "עד כמה קיים פער גדול באופי ובסגנון בין בני הזוג?",
-];
-const PORN_ITEMS = [
-  "הרגשתי שפורנוגרפיה היא חלק חשוב בחיי",
-  "השתמשתי בה לוויסות רגשות",
-  "הרגשתי שהיא גורמת בעיות בחיי המיניים",
-  "הרגשתי שעליי לצפות ביותר כדי לספק עצמי",
-  "ניסיתי ללא הצלחה להפחית",
-  "הרגשתי מתח כשנמנעתי",
-  "חשבתי כמה יהיה טוב לצפות",
-  "צפייה סייעה להיפטר מרגשות שליליים",
-  "צפייה מנעה ממני לממש פוטנציאל",
-  "הרגשתי שעליי לצפות ביותר לספק צרכיי",
-  "כשהתחייבתי להפסיק הצלחתי רק לתקופה קצרה",
-  "הפכתי לעצבני כשלא יכולתי לצפות",
-  "תכננתי באופן קבוע מתי לצפות",
-  "שחררתי מתח על ידי צפייה",
-  "הזנחתי פעילויות פנאי בגלל צפייה",
-  "צפיתי ב'קיצונית' יותר כי קודם פחות מספק",
-  "הצלחתי להתנגד לזמן קצר בלבד",
-  "התגעגעתי מאוד כשלא צפיתי",
-];
-const PHONE_ITEMS = [
-  "החסרתי משימות בגלל שימוש בסמארטפון",
-  "קשה לי להתרכז בגלל הסמארטפון",
-  "אני מרגיש/ה כאב בפרקי כף יד/צוואר",
-  "אינני מסוגל/ת להתמודד כשאין לי סמארטפון",
-  "אני מרגיש/ה חוסר מנוחה כשאיני מחזיק/ה אותו",
-  "אני חושב/ת עליו גם כשאיני משתמש/ת",
-  "לעולם לא אפסיק גם אם משפיע לרעה",
-  "בודק/ת אותו כדי לא להחמיץ שיחות/רשתות",
-  "משתמש/ת זמן ארוך יותר ממה שתכננתי",
-  "אנשים אומרים שאני משתמש/ת יותר מדי",
-];
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 function ScaleRow({
@@ -389,6 +218,17 @@ export default function AdultsPage() {
       .then(d => setUsageAllowed(d.allowed))
       .catch(() => setUsageAllowed(true)); // on error — allow
   }, []);
+
+  const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);
+  const [qItemsError, setQItemsError] = useState(false);
+  function fetchQItems() {
+    setQItemsError(false);
+    fetch("/api/questionnaire/adults/questions")
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setQItems)
+      .catch(() => setQItemsError(true));
+  }
+  useEffect(() => { fetchQItems(); }, []);
 
   // temp state (not in answers)
   const [localAge, setLocalAge] = useState<number>(0);
@@ -636,6 +476,26 @@ export default function AdultsPage() {
     </Layout>
   );
 
+  if (qItemsError) return (
+    <Layout screen={screen}>
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+        <div className="text-4xl mb-4">⚠️</div>
+        <h2 className="text-xl font-bold text-stone-900 mb-3">לא ניתן לטעון את השאלון</h2>
+        <p className="text-stone-500 mb-6 max-w-sm">בדוק את חיבור האינטרנט ונסה שוב.</p>
+        <button
+          onClick={fetchQItems}
+          className="px-6 py-3 bg-[#2c3e7a] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+        >נסה שוב</button>
+      </div>
+    </Layout>
+  );
+
+  if (!qItems) return (
+    <Layout screen={screen}>
+      <div className="flex justify-center py-20 text-[#6b7280]">טוען שאלון…</div>
+    </Layout>
+  );
+
   // ── DISCLAIMER ─────────────────────────────────────────────────────────────
   if (screen === "disclaimer") return (
     <Layout screen={screen}>
@@ -775,7 +635,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="שאלון מצב רוח" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">בשבועיים האחרונים, כמה מהתסמינים הבאים חווית? סמן/י את התסמינים המתאימים:</p>
-        <CheckList items={MOOD_ITEMS} checked={moodChecked}
+        <CheckList items={qItems.mood} checked={moodChecked}
           onChange={(i, v) => setMoodChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <NavRow onBack={() => setScreen("e1")}
           onNext={() => {
@@ -811,7 +671,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="שאלון מניה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את התסמינים הנוספים הרלוונטיים:</p>
-        <CheckList items={MANIA_ITEMS} checked={maniaChecked}
+        <CheckList items={qItems.mania} checked={maniaChecked}
           onChange={(i, v) => setManiaChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <div className="mt-3">
           <label className="flex items-center gap-2 text-sm">
@@ -839,7 +699,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את ההצהרות המתאימות לך:</p>
-        <CheckList items={PRODROME_ITEMS} checked={prodromeChecked}
+        <CheckList items={qItems.prodrome} checked={prodromeChecked}
           onChange={(i, v) => setProdromeChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <div className="mt-3">
           <label className="flex items-center gap-2 text-sm">
@@ -887,7 +747,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="שאלון חרדה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מפריע לך? (1=כלל לא, 3=לעיתים קרובות)</p>
-        {GAD7_ITEMS.map((item, i) => (
+        {qItems.gad7.map((item, i) => (
           <ScaleRow key={i} label={item} group={`gad-${i}`} values={[1, 2, 3]} value={gad7[i]}
             onChange={(v) => setGad7((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -966,7 +826,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=אף פעם, 3=תמיד)</p>
-        {OCD_ITEMS.map((item, i) => (
+        {qItems.ocd.map((item, i) => (
           <ScaleRow key={i} label={item} group={`ocd-${i}`} values={[1,2,3]} value={ocd[i]}
             onChange={(v) => setOcd((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1050,10 +910,10 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="שאלון שינה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
-        <CheckList items={SLEEP_ITEMS} checked={sleepChecked}
+        <CheckList items={qItems.sleep} checked={sleepChecked}
           onChange={(i, v) => setSleepChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <NavRow onBack={() => setScreen(e6EatingChecked ? "e6-q" : "e6")}
-          onNext={() => { updE({ sleepItems: SLEEP_ITEMS.map((_, i) => sleepChecked.includes(i)) }); setScreen("e8"); }} />
+          onNext={() => { updE({ sleepItems: qItems.sleep.map((_, i) => sleepChecked.includes(i)) }); setScreen("e8"); }} />
       </Card>
     </Layout>
   );
@@ -1119,7 +979,7 @@ if (screen === "e8c") return (
           ))}
         </div>
         <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' – ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
-        {TRAUMA_ITEMS.map((item, i) => (
+        {qItems.trauma.map((item, i) => (
           <ScaleRow key={i} label={item} group={`trauma-${i}`} values={[0,1,2,3,4]} value={traumaScores[i]}
             onChange={(v) => setTraumaScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1202,7 +1062,7 @@ if (screen === "e8c") return (
     <Layout screen={screen}>
       <Card badge="שאלון אישיות" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">דרג/י כל היגד מ-1 (כלל לא) עד 5 (מאוד):</p>
-        {PERS_ITEMS.map((item, i) => (
+        {qItems.pers.map((item, i) => (
           <ScaleRow key={i} label={item} group={`pers-${i}`} values={[1,2,3,4,5]} value={persScores[i]}
             onChange={(v) => setPersScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1343,7 +1203,7 @@ if (screen === "e8c") return (
     <Layout screen={screen}>
       <Card badge="שאלון קשיי למידה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=כלל לא, 3=תמיד)</p>
-        {LD_ITEMS.map((item, i) => (
+        {qItems.ld.map((item, i) => (
           <ScaleRow key={i} label={item} group={`ld-${i}`} values={[1,2,3]} value={ldScores[i]}
             onChange={(v) => setLdScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1367,7 +1227,7 @@ if (screen === "e8c") return (
     <Layout screen={screen}>
       <Card badge="שאלון תפקודים ניהוליים">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=כלל לא, 3=תמיד)</p>
-        {EXEC_ITEMS.map((item, i) => (
+        {qItems.exec.map((item, i) => (
           <ScaleRow key={i} label={item} group={`exec-${i}`} values={[1,2,3]} value={execScores[i]}
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1511,17 +1371,17 @@ if (screen === "e8c") return (
         <p className="mb-1 font-semibold text-[#1a3a5c]">דרג/י כל היגד מ-1 עד 7 עבור הזוגיות שלך:</p>
         <p className="mb-4 text-xs text-stone-500">1 = אין בכלל &nbsp;·&nbsp; 4 = במידה בינונית &nbsp;·&nbsp; 7 = הרבה מאוד</p>
         <p className="mb-2 text-sm font-bold text-[#2d7a4f]">EFT (ממוקד רגש):</p>
-        {EFT_ITEMS.map((item, i) => (
+        {qItems.eft.map((item, i) => (
           <ScaleRow key={i} label={item} group={`eft-${i}`} values={[1,2,3,4,5,6,7]} value={eftScores[i]}
             onChange={(v) => setEftScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <p className="mb-2 mt-2 text-sm font-bold text-[#2d7a4f]">דינאמי:</p>
-        {DYN_ITEMS.map((item, i) => (
+        {qItems.dyn.map((item, i) => (
           <ScaleRow key={i} label={item} group={`dyn-${i}`} values={[1,2,3,4,5,6,7]} value={dynScores[i]}
             onChange={(v) => setDynScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <p className="mb-2 mt-2 text-sm font-bold text-[#2d7a4f]">מבני:</p>
-        {STRUCT_ITEMS.map((item, i) => (
+        {qItems.struct.map((item, i) => (
           <ScaleRow key={i} label={item} group={`str-${i}`} values={[1,2,3,4,5,6,7]} value={structScores[i]}
             onChange={(v) => setStructScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1640,7 +1500,7 @@ if (screen === "e8c") return (
     <Layout screen={screen}>
       <Card badge="שאלון פורנוגרפיה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=כלל לא, 7=מאוד)</p>
-        {PORN_ITEMS.map((item, i) => (
+        {qItems.porn.map((item, i) => (
           <ScaleRow key={i} label={item} group={`porn-${i}`} values={[1,2,3,4,5,6,7]} value={pornScores[i]}
             onChange={(v) => setPornScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1706,7 +1566,7 @@ if (screen === "e8c") return (
     <Layout screen={screen}>
       <Card badge="שאלון טלפון סלולארי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=לא מסכים/ה, 6=מסכים/ה מאוד)</p>
-        {PHONE_ITEMS.map((item, i) => (
+        {qItems.phone.map((item, i) => (
           <ScaleRow key={i} label={item} group={`phone-${i}`} values={[1,2,3,4,5,6]} value={phoneScores[i]}
             onChange={(v) => setPhoneScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
@@ -1924,7 +1784,7 @@ if (screen === "e8c") return (
 
         <div className="mb-3">
           <p className="mb-1 text-xs text-[#6b7280]">העדפות תרבותיות</p>
-          {CULTURAL_PREFS.map((cp) => (
+          {qItems.culturalPrefs.map((cp) => (
             <label key={cp} className="mb-1 flex items-center gap-2 text-sm">
               <input type="checkbox"
                 checked={matchPrefs.culturalPrefs.includes(cp)}

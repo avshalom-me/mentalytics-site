@@ -15,6 +15,13 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
 type Ans = Record<string, any>;
 type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
 interface Box { cls: BoxCls; txt: string; isLowStress?: boolean; }
+interface KidsScoreResult {
+  emotional: Box[];
+  academic: Box[];
+  developmental: Box[];
+  behavioral: Box[];
+  social: Box[];
+}
 
 // ── Grade groups ─────────────────────────────────────────────────────────────
 const GA_GRADES = ["פעוט","גן3","גן-טרום","גן","א"];
@@ -230,810 +237,7 @@ function updAddict(A: Ans, k: string, v: string, type: "s"|"g"|"b"): Ans {
   return n;
 }
 
-// ── Shared referral helpers ───────────────────────────────────────────────────
-function buildGaRef(A: Ans): string {
-  const consent = A.ga_consent || "";
-  const par     = A.ga_consent_parent || "";
-  const lvl     = A.a_emo || "";
-  if (consent === "לא") {
-    return par === "לא"
-      ? "✅ הפנייה: הדרכת הורים טיפולית"
-      : "✅ הפנייה: הדרכת הורים טיפולית\n✅ הפנייה: טיפול דיאדי";
-  }
-  if (consent === "כן") {
-    if (lvl === "הרבה מאוד") {
-      return "✅ הפנייה: טיפול פסיכודינאמי ע\"י פסיכולוג קליני/חינוכי/התפתחותי או עו\"ס קליני בשילוב הדרכת הורים";
-    }
-    const ints: string[] = [];
-    if (A.ga_int_art)    ints.push("אומנות");
-    if (A.ga_int_music)  ints.push("מוזיקה");
-    if (A.ga_int_move)   ints.push("תנועה");
-    if (A.ga_int_drama)  ints.push("דרמה");
-    if (A.ga_int_biblio) ints.push("ביבליותרפיה — סיפור");
-    if (A.ga_int_garden) ints.push("גינון");
-    if (A.ga_int_animal) ints.push("בע\"ח");
-    let txt = "✅ הפנייה: טיפול בהבעה ויצירה";
-    if (ints.length) txt += "\n📌 בעדיפות ל: " + ints.join(", ");
-    return txt;
-  }
-  return "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה";
-}
 
-// Same referral logic as Q10 (general emotional difficulties) — grade-based
-function buildQ10StyleRef(A: Ans): string {
-  const grp = gg(A);
-  if (grp === "ga") return buildGaRef(A);
-  if (grp === "bv") {
-    const m = A.soc_motiv_therapy || A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
-    return m <= 2
-      ? "✅ הפנייה: הדרכת הורים"
-      : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
-  }
-  // zy
-  const v2 = A.soc_verbal || A.q10_verbal || 0;
-  let txt = v2 <= 2
-    ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
-    : "✅ הפנייה: טיפול פסיכודינאמי";
-  const ints: string[] = [];
-  if (A.int_art)    ints.push("אומנות");
-  if (A.int_music)  ints.push("מוזיקה");
-  if (A.int_move)   ints.push("תנועה");
-  if (A.int_drama)  ints.push("פסיכודרמה");
-  if (A.int_biblio) ints.push("ביבליותרפיה");
-  if (A.int_animal) ints.push("טיפול בבע\"ח");
-  if (ints.length) txt += "\n📌 תחומי עניין: " + ints.join(", ");
-  return txt;
-}
-
-// ── Compute results ───────────────────────────────────────────────────────────
-function computeResults(A: Ans): Box[] {
-  const grp = gg(A);
-  const boxes: Box[] = [];
-  const emoGroups: { symptoms: string[]; extraBoxes: Box[]; referral: string }[] = [];
-  const emoStandalones: Box[] = [];
-
-  function getGaRef(): string { return buildGaRef(A); }
-
-  function addToGroup(symptomTxt: string, referralTxt: string, extraBoxes: Box[]) {
-    const existing = emoGroups.find(g => g.referral === referralTxt);
-    if (existing) {
-      existing.symptoms.push(symptomTxt);
-      existing.extraBoxes.push(...extraBoxes);
-    } else {
-      emoGroups.push({ symptoms: [symptomTxt], extraBoxes, referral: referralTxt });
-    }
-  }
-
-  // Q1 — חרדה
-  if ((A.q1 || 0) >= 4) {
-    const aqTot = A.aq_tot || 0;
-    const extras: Box[] = [];
-    if (A.q1_pain === "כן") {
-      if (A.q1_med_clear === "לא")
-        extras.push({ cls:"warn", txt:"⚠️ דווח על כאבים כרוניים — יש לפנות לרופא משפחה לשלילת גורם רפואי לפני הטיפול" });
-      else if (!A.q1_med_clear)
-        extras.push({ cls:"warn", txt:"⚠️ דווח על כאבים כרוניים — מומלץ לשלול גורם רפואי לפני הטיפול" });
-    }
-    if (aqTot >= 14) {
-      let ref = "";
-      if (grp === "ga") {
-        ref = getGaRef();
-      } else if (grp === "bv") {
-        const m = A.aq_mot_bv || 0;
-        if (m === 1) ref = "✅ הפנייה: הדרכת הורים טיפולית";
-        else if (m === 2) ref = "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה";
-        else {
-          if (aqTot <= 20) {
-            const v = A.aq_verbal_bv || 0;
-            ref = v <= 2
-              ? "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה"
-              : "✅ הפנייה: טיפול CBT לטיפול בחרדה בשילוב הדרכת הורים";
-          } else {
-            const p = A.aq_prac_bv || 0;
-            ref = p <= 2
-              ? "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים"
-              : "✅ הפנייה: טיפול CBT לטיפול בחרדה בשילוב הדרכת הורים";
-          }
-        }
-      } else {
-        if (aqTot > 13) {
-          const m = A.aq_mot_zy || 0, p = A.aq_prac || 0;
-          ref = m === 1
-            ? "✅ הפנייה: הדרכת הורים טיפולית"
-            : p <= 2
-              ? "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים"
-              : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
-        }
-      }
-      addToGroup("📊 נמצאו סימנים לחרדה", ref, extras);
-    } else {
-      emoStandalones.push({ cls:"purple", txt:"📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true });
-      extras.forEach(e => emoStandalones.push(e));
-    }
-    emoStandalones.push({ cls:"info", txt:
-      "📌 כלים ופרקטיקות להפחתת מתח בילדים ונוער:\n\n" +
-      "🟢 קרקוע: לבקש מהילד/ה לומר 5 דברים שרואים מולם. 4 דברים שאפשר לגעת בהם. 3 דברים ששומעים. 2 דברים שאפשר להריח. 1 דבר שאפשר לטעום.\n\n" +
-      "🟢 נשימות: לדמיין ניפוח בועת סבון — נשימה עמוקה דרך האף, ונשיפה איטית מהפה (כדי לא לפוצץ את הבועה).\n\n" +
-      "🟢 שגרה: להפחית אי-ודאות. ליצור לוח יומי עם ציורים או סמלים של סדר היום. לסקור אותו בבוקר ובערב יחד עם הילד.\n\n" +
-      "🟢 פינת מרגוע: ליצור מקום רגוע להתמודדות עם מתח. לכלול: צעצועים להפגת מתחים, כדור לחיץ, חוברות צביעה ועוד. חשוב לשתף את הילד בבחירת התכנים.\n\n" +
-      "🟢 פעילות גופנית: הליכה, ריקוד, או משחק בחוץ — מסייע בהפחתת הורמון המתח (קורטיזול) ומשפר שינה וריכוז."
-    });
-  }
-
-  // Q2 — דימוי עצמי
-  if ((A.q2 || 0) >= 4) {
-    let ref = "";
-    if (grp === "ga") ref = getGaRef();
-    else if (grp === "bv") {
-      const m = A.q2_mot || A.aq_mot_bv || 0;
-      ref = m <= 1
-        ? "✅ הפנייה: הדרכת הורים טיפולית"
-        : "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
-    } else {
-      ref = "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
-    }
-    addToGroup("📊 נמצאו סימנים לדימוי עצמי נמוך", ref, []);
-  }
-
-  // Q3 — מצב רוח ירוד
-  if ((A.q3 || 0) >= 4 && (A.mq_tot || 0) >= 4) {
-    const extras: Box[] = [];
-    if (A.q3_sui === "כן")
-      extras.push({ cls:"danger", txt:"🚨 דווח על מחשבות אובדניות — נדרשת הערכת סיכון דחופה" });
-    let ref = grp === "ga" ? getGaRef() : "✅ הפנייה: טיפול פסיכודינאמי";
-    addToGroup("📊 נמצאו סימנים למצב רוח ירוד", ref, extras);
-  }
-
-  // Q4 — התמכרות
-  if (A.q4 === "כן") {
-    const s = A.add_s_tot || 0, g2 = A.add_g_tot || 0, b = A.add_b_tot || 0;
-    const addSyms: string[] = [];
-    if (s >= 3) addSyms.push("📊 נמצאו סימנים להתמכרות לחומרים");
-    if (g2 >= 4) addSyms.push("📊 נמצאו סימנים להתמכרות למשחקי מחשב");
-    if (b >= 4) { const sv = b >= 8 ? "חמורה" : b >= 6 ? "בינונית" : "קלה"; addSyms.push("📊 נמצאו סימנים להתמכרות להימורים — " + sv); }
-    if (A.ad_o) addSyms.push("📊 דווח על התמכרות אחרת — יש לפרט");
-    if (addSyms.length) {
-      const ctrl = A.q4_ctrl || 5;
-      let ref = grp === "ga"
-        ? "✅ הפנייה: הדרכת הורים טיפולית"
-        : grp === "bv"
-          ? (ctrl <= 1 ? "✅ הפנייה: הדרכת הורים" : "✅ הפנייה: טיפול CBT בהתמכרויות")
-          : "✅ הפנייה: טיפול CBT מומחה בהתמכרויות";
-      addToGroup(addSyms.join("\n"), ref, []);
-    }
-  }
-
-  // Q5 — OCD
-  if (A.q5 === "כן" && (A.oq_tot || 0) >= 10) {
-    const sv = (A.oq_tot || 0) >= 15 ? "משמעותיים" : "קלים-בינוניים";
-    const significant = (A.oq_tot || 0) >= 15;
-    let ref = grp === "ga"
-      ? getGaRef()
-      : significant
-        ? "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים + בשילוב צוות בית הספר במידת הצורך"
-        : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
-    addToGroup("📊 נמצאו סימנים " + sv + " להתנהגויות אובססיביות-קומפולסיביות", ref, []);
-  }
-
-  // Q6 — טראומה (standalone)
-  if (A.q6 === "כן" && (A.tq_tot || 0) >= 15) {
-    let txt = "📊 נמצאו סימנים לקשיי עיבוד לאחר אירוע טראומטי";
-    const clusters: string[] = [];
-    if ([A.tq1,A.tq2,A.tq3].some(x => (x||0) >= 2)) clusters.push("חודרנות");
-    if ([A.tq4,A.tq5].some(x => (x||0) >= 2))       clusters.push("הימנעות");
-    if ([A.tq6,A.tq7].some(x => (x||0) >= 2))       clusters.push("שינוי קוגניציה ומצב רוח");
-    if ([A.tq8,A.tq9,A.tq10].some(x => (x||0) >= 2)) clusters.push("עוררות ותגובתיות");
-    if (clusters.length) txt += "\nאשכולות: " + clusters.join(", ");
-    emoStandalones.push({ cls:"purple", txt });
-    emoStandalones.push({ cls:"info", txt:'✅ הפנייה לטיפול בטראומה (EMDR / CPT) ע"י פסיכולוג/עו"ס קליני' });
-  }
-
-  // Q7 — פרודרום (standalone)
-  if (A.q7 === "כן" && (A.pq_tot || 0) >= 2) {
-    emoStandalones.push({ cls:"warn", txt:"📊 דווחו חוויות חושיות או קוגניטיביות החורגות מהרגיל — מומלץ להעריך" });
-    emoStandalones.push({ cls:"info", txt:"✅ הפנייה לפסיכולוג קליני או פסיכיאטר להערכה" });
-  }
-
-  // Q8 — הפרעות אכילה (standalone)
-  if (A.q8 === "כן") {
-    const ano = A.eq_ano || 0, bul = A.eq_bul || 0;
-    if (ano >= 2 || bul >= 2) {
-      emoStandalones.push({ cls:"purple", txt:"📊 נמצאו קשיים בתחום האכילה" });
-      emoStandalones.push({ cls:"info",   txt:'✅ הפנייה לטיפול ע"פ מאפייני הילד + דיאטנית קלינית מומחית' });
-    }
-  }
-
-  // Q9 — ויסות/BPD
-  if (A.q9 === "כן" && (A.bq_tot || 0) >= 5) {
-    let ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
-    addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
-  }
-
-  // Q10 — קשיים כלליים
-  if (A.q10 === "כן" && A.q10_par === "כן") {
-    let ref = "";
-    if (grp === "ga") {
-      ref = getGaRef();
-    } else if (grp === "bv") {
-      const m = A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
-      ref = m <= 2 ? "✅ הפנייה: הדרכת הורים" : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
-    } else {
-      const v2 = A.q10_verbal || 0;
-      let txt = v2 <= 2
-        ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
-        : "✅ הפנייה: טיפול פסיכודינאמי";
-      const ints: string[] = [];
-      if (A.int_art)    ints.push("אומנות");
-      if (A.int_music)  ints.push("מוזיקה");
-      if (A.int_move)   ints.push("תנועה");
-      if (A.int_drama)  ints.push("פסיכודרמה");
-      if (A.int_biblio) ints.push("ביבליותרפיה");
-      if (A.int_animal) ints.push("טיפול בבע\"ח");
-      if (ints.length) txt += "\n📌 תחומי עניין: " + ints.join(", ");
-      ref = txt;
-    }
-    addToGroup("📊 נמצאו קשיים רגשיים כלליים", ref, []);
-  }
-
-  // ── BV merge: Q1+Q2+Q3 all positive → combined referral ──────────────────
-  if (grp === "bv") {
-    const q1p = (A.q1||0)>=4 && (A.aq_tot||0)>=14;
-    const q2p = (A.q2||0)>=4;
-    const q3p = (A.q3||0)>=4 && (A.mq_tot||0)>=4;
-    if (q1p && q2p && q3p) {
-      const combinedRef = "✅ הפנייה: טיפול פסיכודינאמי בשילוב CBT בשילוב הדרכת הורים";
-      const bvLabels = ["📊 נמצאו סימנים לחרדה","📊 נמצאו סימנים לדימוי עצמי נמוך","📊 נמצאו סימנים למצב רוח ירוד"];
-      const mergedExtras: Box[] = [];
-      const mergedSymptoms: string[] = [];
-      for (let i = emoGroups.length - 1; i >= 0; i--) {
-        const g = emoGroups[i];
-        if (g.symptoms.some(s => bvLabels.includes(s))) {
-          mergedSymptoms.unshift(...g.symptoms);
-          mergedExtras.unshift(...g.extraBoxes);
-          emoGroups.splice(i, 1);
-        }
-      }
-      if (mergedSymptoms.length)
-        emoGroups.unshift({ symptoms: mergedSymptoms, extraBoxes: mergedExtras, referral: combinedRef });
-    }
-  }
-
-  // ── Dedup by therapy base ─────────────────────────────────────────────────
-  function therapyBase(r: string): string {
-    return (r || "")
-      .replace(/^✅ הפנייה:\s*/, "").replace(/^✅ /, "")
-      .replace(/\s*בשילוב הדרכת הורים.*/, "")
-      .replace(/\s*\+\s*הדרכת הורים.*/, "")
-      .trim();
-  }
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (let i = 0; i < emoGroups.length && !changed; i++) {
-      for (let j = i + 1; j < emoGroups.length && !changed; j++) {
-        const bi = therapyBase(emoGroups[i].referral || "");
-        const bj = therapyBase(emoGroups[j].referral || "");
-        if (bi && bj && bi === bj) {
-          const ri = emoGroups[i].referral || "", rj = emoGroups[j].referral || "";
-          const strongerRef = ri.includes("הדרכת הורים") ? ri
-            : rj.includes("הדרכת הורים") ? rj
-            : ri.length >= rj.length ? ri : rj;
-          const merged = {
-            symptoms: [...emoGroups[i].symptoms, ...emoGroups[j].symptoms],
-            extraBoxes: [...emoGroups[i].extraBoxes, ...emoGroups[j].extraBoxes],
-            referral: strongerRef,
-          };
-          emoGroups.splice(j, 1);
-          emoGroups.splice(i, 1);
-          emoGroups.unshift(merged);
-          changed = true;
-        }
-      }
-    }
-  }
-
-  // ── Multiple-referral notice ──────────────────────────────────────────────
-  const allEmoRefs = new Set<string>();
-  emoGroups.forEach(g => { if (g.referral) allEmoRefs.add(g.referral); });
-  emoStandalones.forEach(s => { if (!s.isLowStress && s.txt?.startsWith("✅")) allEmoRefs.add(s.txt); });
-  if (allEmoRefs.size > 1)
-    boxes.push({ cls:"warn", txt:"⚠️ נמצאו מספר הפניות רגשיות. יש לבחור את ההפנייה הכי דחופה עבורכם." });
-
-  // ── Output emoGroups ──────────────────────────────────────────────────────
-  emoGroups.forEach(grp2 => {
-    grp2.extraBoxes.forEach(e => boxes.push(e));
-    boxes.push({ cls:"purple", txt: grp2.symptoms.join("\n") });
-    if (grp2.referral) boxes.push({ cls:"info", txt: grp2.referral });
-  });
-
-  // ── Low-stress standalone ─────────────────────────────────────────────────
-  const lowStress    = emoStandalones.filter(s => s.isLowStress);
-  const otherStands  = emoStandalones.filter(s => !s.isLowStress);
-  const hasAnyTherapy =
-    emoGroups.some(g => g.referral?.includes("טיפול")) ||
-    emoStandalones.some(s => s.txt?.startsWith("✅") && s.txt.includes("טיפול") && !s.isLowStress);
-  lowStress.forEach(s => boxes.push(s));
-  if (lowStress.length > 0 && !hasAnyTherapy && emoGroups.length === 0)
-    boxes.push({ cls:"info", txt:"✅ הפנייה: טיפול פסיכודינאמי" });
-  otherStands.forEach(s => boxes.push(s));
-
-  return boxes;
-}
-
-// ── Compute academic results ──────────────────────────────────────────────────
-function computeAcadResults(A: Ans): Box[] {
-  if (!["מעט","הרבה","הרבה מאוד"].includes(A.a_aca || "")) return [];
-  const ga = acadGg(A);
-  const boxes: Box[] = [];
-  function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
-
-  function emitADHD(inatt: number, hyper: number) {
-    const pi = inatt >= 3, ph = hyper >= 3;
-    const syms: string[] = [];
-    if (pi) syms.push("📊 ישנם סימנים לקשיי ריכוז וקשב");
-    if (ph) syms.push("📊 ישנם סימנים לקשיים בתחום ההיפראקטיביות/אימפולסיביות");
-    if (syms.length) box("purple", syms.join("\n"));
-    if (pi || ph) {
-      box("info", "✅ יש לפנות לנוירולוג/רופא ילדים המומחה בקשיי קשב");
-      if (pi) box("info", "✅ ישנם סימנים לקשיים בפונקציות הניהוליות — יש לפנות לטיפול/אימון מסוג Cog-Fun");
-    }
-    return pi || ph;
-  }
-
-  // ── גן ──────────────────────────────────────────────────────────────────────
-  if (ga === "gan") {
-    const yesCount = ["gan_q1","gan_q2","gan_q3","gan_q4","gan_q5"].filter(k => A[k] === "כן").length;
-    if (yesCount === 0) return boxes;
-    box("purple", "📚 נמצאו קשיים לימודיים — גן");
-    if (A.gan_q1 === "כן") {
-      if (A.gan_q1_speech === "כן") box("info","✅ קשיים בזיהוי אותיות/מספרים — יש לחזור לקלינאית תקשורת לטיפול נוסף\n✅ יש לפנות לפסיכולוג הגן לבחינת שעות שילוב");
-      else box("warn","⚠️ קשיים בזיהוי אותיות/מספרים — יש לבחון פנייה לקלינאית תקשורת + פסיכולוג הגן");
-      box("info","📌 כלים: אפליקציות לימוד קריאה, שירים, לוח מגנטי, ציור אותיות, פלסטלינה, ספירת חפצים");
-    }
-    if (A.gan_q2 === "כן") {
-      if (A.gan_q2_speech === "כן") box("info","✅ קשיים שפתיים — יש לחזור לקלינאית תקשורת לטיפול נוסף");
-      else box("warn","⚠️ קשיים בזכירת צורות/צבעים — יש לבחון פנייה לקלינאית תקשורת");
-    }
-    if (A.gan_q3 === "כן") box("info","📌 קשיי מודעות פונולוגית — כלים: שירים וחרוזים, \"צליל פותח של היום\", קלפי תמונות, משחקי חריזה");
-    if (A.gan_q4 === "כן") box("warn","⚠️ קשיים בביטוי עצמי ואוצר מילים — מומלץ להפנות לקלינאית תקשורת להערכה");
-    if (A.gan_q5 === "כן") {
-      if (A.gan_q5_ot === "כן") box("info","✅ קשיים מוטוריים — יש לחזור למרפאה בעיסוק לטיפול נוסף");
-      else { box("warn","⚠️ קשיים באחזקת עיפרון/ציור — יש לבחון פנייה לריפוי בעיסוק"); box("info","📌 כלים: טושים עבים, פלסטלינה, גזירה לפי קווים, השלחת חרוזים"); }
-    }
-    if (yesCount >= 4) box("danger","🚨 ניכרים סימפטומים משמעותיים בגן — יש לפנות להיוועצות עם הגננת ופסיכולוג הגן לגבי התאמת המסגרת");
-    else if (yesCount === 3) box("warn","⚠️ 3 קשיים לימודיים — מומלץ לבדוק צורך בוועדת זכאות של החינוך המיוחד");
-    return boxes;
-  }
-
-  // ── א-ג ─────────────────────────────────────────────────────────────────────
-  if (ga === "ag") {
-    const read  = A.ag_read  || "לא";
-    const write = A.ag_write === "כן";
-    const comp  = A.ag_comp  === "כן";
-    const math  = A.ag_math  || "לא";
-    const histYes = ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].filter(k => A[k] === "כן").length;
-    const inatt = ["ag_ad1","ag_ad2","ag_ad3","ag_ad4","ag_ad5","ag_ad6"].filter(k => A[k]).length;
-    const hyper = ["ag_ah1","ag_ah2","ag_ah3","ag_ah4","ag_ah5","ag_ah6"].filter(k => A[k]).length;
-    const adhdPos = inatt >= 3 || hyper >= 3;
-    if (read === "לא" && !write && !comp && math === "לא") return boxes;
-
-    const toolsChizuk = "📌 תוכנית חיזוקים — כלים לסיוע בלמידה בכיתה ובבית:\n1. משוב חיובי קבוע — שבחים פשוטים על הצלחה קטנה, עידוד להמשיך ולנסות, מיקוד במאמצים ולא רק בתוצאות.\n2. שילוב תרגילים להרפיה ומדיטציה קלה (נשימות עמוקות, הרפיית שרירים, דמיון מודרך) לפני פעילות לימודית מאתגרת.\n3. התאמת ההוראה לצרכים הייחודיים — בניית מטלות המאפשרות התקדמות בקצב אישי, עם הצלחות קטנות ומדורגות.\n4. למידה בקבוצות קטנות או בעזרת עמיתים.";
-    const toolsMath = "📌 כלים לחיזוק חשבון:\nא. שיפור הבנה בסיסית: פירוק משימות לשלבים, שימוש בדוגמאות מחיי היומיום, המחשה בשרטוטים ודיאגרמות.\nב. פיתוח אסטרטגיות: קוד צבעים בנוסחאות, למידה בקבוצות קטנות, הצגת בעיות בדרכים שונות.\nג. כלים טכנולוגיים:\n   • Math Land — משחק הרפתקאות עם תרגילי חשבון ברמות שונות (בתשלום)\n   • Pet Bingo — בינגו חוויתי עם תרגילי חיבור/חיסור/כפל/חילוק (חינמי)";
-
-    const syms: string[] = [];
-    const refs: string[] = [];
-    const tools: string[] = [];
-    function addSym(s: string) { if (!syms.includes(s)) syms.push(s); }
-    function addRef(r: string) { if (!refs.includes(r)) refs.push(r); }
-    function addTool(t: string) { if (!tools.includes(t)) tools.push(t); }
-
-    if (read !== "לא") {
-      addSym("נמצאו סימנים לקשיי קריאה");
-      if (A.ag_h6 === "כן") addRef("יש לפנות לקלינאית תקשורת (קושי/לקות בדיבור)");
-      if (histYes === 0) {
-        const motiv = A.ag_read_motiv;
-        if (motiv === "כן") { addRef("יש לבחון פנייה לקלינאית תקשורת"); }
-        else if (motiv === "לא") {
-          addRef("יש לבנות תוכנית חיזוקים"); addTool(toolsChizuk);
-          const mot = (A.ag_mot1||1)+(A.ag_mot2||1)+(A.ag_mot3||1);
-          if (mot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); }
-          else { if (!emitADHD(inatt, hyper)) addRef("הפנייה לאבחון פסיכודידקטי"); }
-        }
-      } else if (histYes >= 1 && histYes <= 2) {
-        const speech = A.ag_read_speech;
-        if (speech === "כן") {
-          const smotiv = A.ag_speech_motiv;
-          if (smotiv === "כן") { addRef("יש לבנות תוכנית חיזוקים — במידה ולא מקבל שעות שילוב יש לבחון פנייה לוועדת שילוב"); }
-          else if (smotiv === "לא") {
-            addRef("יש לבנות תוכנית חיזוקים — במידה ולא מקבל שעות שילוב יש לבחון פנייה לוועדת שילוב"); addTool(toolsChizuk);
-            const smot = (A.ag_smot1||1)+(A.ag_smot2||1)+(A.ag_smot3||1);
-            if (smot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); }
-            else { if (!emitADHD(inatt, hyper)) addRef("הפנייה לאבחון פסיכודידקטי"); }
-          }
-        } else if (speech === "לא") { addRef("יש לבחון פנייה לקלינאית תקשורת"); }
-      } else if (histYes >= 3) {
-        addRef("הפנייה לאבחון פסיכודידקטי"); addRef("יש לבחון פנייה לריפוי בעיסוק");
-      }
-      if (histYes >= 5) {
-        const mot = (A.ag_mot1||1)+(A.ag_mot2||1)+(A.ag_mot3||1);
-        if (mot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); addTool(toolsChizuk); }
-      }
-    }
-    if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      if (read !== "לא") addRef("נראה שיש שילוב של מספר קשיים — יש לפנות לאבחון פסיכו-דידקטי");
-      else { if (A.ag_write_ot === "כן") addRef("קשיי כתיבה — יש לחזור לבדיקה אצל מרפאה בעיסוק"); else addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק"); }
-    }
-    if (comp) {
-      addSym("נמצאו סימנים לקשיי הבנה בשיעור");
-      if (!(read !== "לא" || adhdPos)) addRef("הפנייה לאבחון פסיכודידקטי");
-    }
-    if (math !== "לא") {
-      addSym("נמצאו סימנים לקשיי חשבון");
-      if (math === "5%") { addRef("נמצאו קשיים בחשבון:\nא. יש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי — הפנייה לאבחון פסיכודידקטי."); addTool(toolsMath); }
-      else if (math === "10%") { addRef("נמצאו קשיים בחשבון:\nיש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי."); addTool(toolsMath); }
-      else if (math === "30%") { addRef("נמצאו קשיים בחשבון: יש לשקול מתן סיוע פרטני."); addTool(toolsMath); }
-    }
-    if (syms.length || refs.length || tools.length) {
-      box("purple", "📚 נמצאו קשיים לימודיים — כיתות א-ג");
-      if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
-      refs.forEach(r => box("info", "✅ " + r));
-      tools.forEach(t => box("info", t));
-    }
-    return boxes;
-  }
-
-  // ── ד-ו ─────────────────────────────────────────────────────────────────────
-  if (ga === "dv") {
-    const read    = A.dv_read === "כן";
-    const histYes = ["dv_h1","dv_h2","dv_h3","dv_h4","dv_h5"].filter(k => A[k] === "כן").length;
-    const write   = A.dv_write === "כן";
-    const comp    = A.dv_comp  === "כן";
-    const math    = A.dv_math  || "לא";
-    const adhdQ2yn = A.dv_adhd_yn === "כן";
-    const inattQ2 = ["dv_ad1","dv_ad2","dv_ad3","dv_ad4","dv_ad5","dv_ad6"].filter(k => A[k]).length;
-    const hyperQ2 = ["dv_ah1","dv_ah2","dv_ah3","dv_ah4","dv_ah5","dv_ah6"].filter(k => A[k]).length;
-    const inattR  = ["dv_read_ad1","dv_read_ad2","dv_read_ad3","dv_read_ad4","dv_read_ad5","dv_read_ad6"].filter(k => A[k]).length;
-    const hyperR  = ["dv_read_ah1","dv_read_ah2","dv_read_ah3","dv_read_ah4","dv_read_ah5","dv_read_ah6"].filter(k => A[k]).length;
-    const adhdPosQ2 = inattQ2 >= 3 || hyperQ2 >= 3;
-    const adhdAny   = adhdPosQ2 || inattR >= 3 || hyperR >= 3;
-    if (!read && !adhdQ2yn && !write && !comp && math === "לא") return boxes;
-
-    const toolsChizuk = "📌 תוכנית חיזוקים — כלים לסיוע בלמידה בכיתה ובבית:\n1. משוב חיובי קבוע — שבחים פשוטים על הצלחה קטנה, עידוד להמשיך ולנסות, מיקוד במאמצים ולא רק בתוצאות.\n2. שילוב תרגילים להרפיה ומדיטציה קלה (נשימות עמוקות, הרפיית שרירים, דמיון מודרך) לפני פעילות לימודית מאתגרת.\n3. התאמת ההוראה לצרכים הייחודיים — בניית מטלות המאפשרות התקדמות בקצב אישי, עם הצלחות קטנות ומדורגות.\n4. למידה בקבוצות קטנות או בעזרת עמיתים.";
-    const toolsMath = "📌 כלים לחיזוק חשבון (גיל היסודי הגדול):\nא. שיפור הבנה בסיסית: פירוק משימות לשלבים, שימוש בדוגמאות מחיי היומיום, המחשה בשרטוטים ודיאגרמות.\nב. פיתוח אסטרטגיות: קוד צבעים בנוסחאות, למידה בקבוצות קטנות, הצגת בעיות בדרכים שונות.\nג. כלים טכנולוגיים:\n   • Matific — פלטפורמה חינוכית מבוססת משחקים, פעילויות מתמטיות אינטראקטיביות בעברית.";
-
-    const syms: string[] = [];
-    const refs: string[] = [];
-    const tools: string[] = [];
-    function addSym(s: string) { if (!syms.includes(s)) syms.push(s); }
-    function addRef(r: string) { if (!refs.includes(r)) refs.push(r); }
-    function addTool(t: string) { if (!tools.includes(t)) tools.push(t); }
-
-    if (read) {
-      addSym("נמצאו סימנים לקשיי קריאה");
-      if (histYes === 0) {
-        const motiv = A.dv_read_motiv;
-        if (motiv === "כן") { addRef("יש לבחון פנייה לקלינאית תקשורת"); addRef("יש לבנות תוכנית חיזוקים"); addTool(toolsChizuk); }
-        else if (motiv === "לא") {
-          addRef("יש לבנות תוכנית חיזוקים"); addTool(toolsChizuk);
-          const mot = (A.dv_mot1||1)+(A.dv_mot2||1)+(A.dv_mot3||1);
-          if (mot > 5) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי");
-          else { if (!emitADHD(inattR, hyperR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
-        }
-      } else if (histYes >= 1 && histYes <= 2) {
-        const speech = A.dv_read_speech;
-        if (speech === "כן") {
-          const smotiv = A.dv_speech_motiv;
-          if (smotiv === "כן") addRef("יש לבנות תוכנית בית-ספרית — אם אין שיפור לאחר כחודשיים יש לפנות לאבחון פסיכודידקטי");
-          else if (smotiv === "לא") {
-            addRef("יש לבנות תוכנית בית-ספרית — אם אין שיפור לאחר כחודשיים יש לפנות לאבחון פסיכודידקטי"); addTool(toolsChizuk);
-            const smot = (A.dv_smot1||1)+(A.dv_smot2||1)+(A.dv_smot3||1);
-            if (smot > 5) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי");
-            else { if (!emitADHD(inattR, hyperR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
-          }
-        } else if (speech === "לא") addRef("יש לבחון פנייה לקלינאית תקשורת");
-      } else if (histYes >= 3) addRef("הפנייה לאבחון פסיכודידקטי");
-    }
-    if (adhdQ2yn) emitADHD(inattQ2, hyperQ2);
-    if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      if (A.dv_write_ot === "כן") addRef("קשיי כתיבה — יש לחזור לבדיקה אצל מרפאה בעיסוק");
-      else addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק");
-    }
-    if (comp) {
-      addSym("נמצאו סימנים לקשיי הבנה בשיעור");
-      if (!read && !adhdAny) addRef("הפנייה לאבחון פסיכודידקטי");
-    }
-    if (math !== "לא") {
-      addSym("נמצאו סימנים לקשיי חשבון");
-      const hasRA = read || adhdAny;
-      if (math === "5%") { addRef(hasRA ? "נמצאו קשיים משמעותיים בחשבון בשילוב קשיים נוספים:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי." : "נמצאו קשיים משמעותיים בחשבון:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי — הפנייה לאבחון פסיכודידקטי."); addTool(toolsMath); }
-      else if (math === "10%") { addRef("נמצאו קשיים בחשבון:\nיש לשקול סיוע פרטני דרך בית הספר או באופן פרטי."); addTool(toolsMath); }
-      else if (math === "30%") { addRef("נמצאו קשיים קלים בחשבון — יש לשקול סיוע פרטני."); addTool(toolsMath); }
-    }
-    if (syms.length || refs.length || tools.length) {
-      box("purple", "📚 נמצאו קשיים לימודיים — כיתות ד-ו");
-      if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
-      refs.forEach(r => box("info", "✅ " + r));
-      tools.forEach(t => box("info", t));
-    }
-    return boxes;
-  }
-
-  // ── ז-ח / ט-יב ──────────────────────────────────────────────────────────────
-  if (ga === "zh" || ga === "tyb") {
-    const p = ga, isTyb = ga === "tyb";
-    const verbal = A[p+"_verbal"] || "לא", math = A[p+"_math"] || "לא", eng = A[p+"_eng"] || "לא";
-    const adhdYn = A[p+"_adhd_yn"] === "כן";
-    const inatt = ["_ad1","_ad2","_ad3","_ad4","_ad5","_ad6"].filter(k => A[p+k]).length;
-    const hyper = ["_ah1","_ah2","_ah3","_ah4","_ah5","_ah6"].filter(k => A[p+k]).length;
-    const adhdPos = inatt >= 3 || hyper >= 3;
-    const write = A[p+"_write"] === "כן", comp = A[p+"_comp"] === "כן";
-    if (verbal === "לא" && math === "לא" && eng === "לא" && !adhdYn && !write && !comp) return boxes;
-
-    const verbalToolsMid = "📌 כלים לעבודה עם קשיים ברבי מלל (גילאי החטיבה):\n1. תוכנית התנהגותית של קריאת ספרים עם תגמול/טבלה.\n2. פירוק טקסטים לרכיבים קטנים — \"קריאה פעילה\": קריאת כל פסקה בנפרד וסיכומה במשפט.\n3. בניית \"תרשימי זרימה\" צבעוניים שמסבירים בקצרה על מה מדברת כל פסקה.\n4. קריאה תוך כדי רישום הנקודות העיקריות בכל פסקה.\n5. למידה בקבוצות — הכוונה ללמידה איטית תוך כדי שיח על התסכול שמתעורר.\n6. אסטרטגיית SQ3R — Survey ▸ Question ▸ Read ▸ Recite ▸ Review.\n⚠️ חשוב: לוקח זמן לראות תוצאות — לאחר מספר חודשים לרוב רואים שיפור.";
-    const verbalToolsHigh = "📌 כלים לעבודה עם קשיים ברבי מלל (גילאי התיכון):\n1. תוכנית התנהגותית של קריאת ספרים עם תגמול/טבלה.\n2. פירוק טקסטים לרכיבים קטנים — \"קריאה פעילה\".\n3. בניית \"תרשימי זרימה\" צבעוניים לפי פסקאות.\n4. שימוש בכלי AI לסיכום מאמרים ארוכים לבגרות.\n5. פיתוח \"הבנה אינפרנציאלית\": הסקת מידע שנרמז — קשרים סיבתיים, ניתוח עמדות, השוואה.\n6. שיטת Obsidian לארגון ידע — יצירת דפים וקישורים בין מושגים.\n⚠️ חשוב: לוקח זמן לראות תוצאות — לאחר מספר חודשים לרוב רואים שיפור.";
-    const mathToolsMid = "📌 כלים לעבודה עם קשיים במתמטיקה (גילאי החטיבה):\n1. עזרה פרטנית — שיעורים פרטיים, חלוקה בין זמן בית לזמן בית ספר.\n2. למידה בעזרת אפליקציות לימודיות וטכנולוגיה.\n3. חזרה לחיזוק יסודות המתמטיקה.\n4. שיח: האם מתעוררת חרדה כתוצאה מהקושי.\n5. קבוצות תרגול או תגבורים בבית הספר.";
-    const mathToolsHigh = "📌 כלים לעבודה עם קשיים במתמטיקה (גילאי התיכון):\nא. שיפור הבנה בסיסית: פירוק בעיות לשלבים, שימוש בדוגמאות מחיי היומיום, המחשה בשרטוטים.\nב. אסטרטגיות למידה: קוד צבעים בנוסחאות, למידה בקבוצות קטנות, הצגת בעיות בדרכים שונות.\nג. כלים טכנולוגיים: \"פשוט מתמטיקה\" — קורסים מקוונים בעברית מהטכניון.";
-    const engTools = "📌 כלים לעבודה עם קשיים באנגלית:\n1. תגבור פרטי ע\"י מורה לאנגלית — חלוקה בין זמן בית לזמן בית ספר.\n2. למידה בעזרת אפליקציות (Duolingo, Quizlet) ופלטפורמות דיגיטליות.\n3. למידה בהקשר — חשיפה לאנגלית דרך סרטים, שירים ומשחקים.\n4. חזרה לחיזוק יסודות: דקדוק, אוצר מילים ומבנה משפטים.\n5. קבוצות תרגול או תגבורים בבית הספר.";
-    const writeToolsMid = "📌 כלים לעבודה עם קשיי כתיבה (גילאי החטיבה):\nתרגול \"כתיבה מהירה\":\nשלב 1 — כתיבה חופשית (5 דקות): כתיבה ברצף על נושא חופשי. כללים: לא מרימים עט, לא מתקנים תוך כדי.\nשלב 2 — קריאה עצמית + סימון (3 דקות): סימון שגיאות כתיב, חזרות, משפטים לא ברורים.\nשלב 3 — \"טעויות חוזרות\": טבלת שיפור אישי — מה גיליתי? דוגמא מכתיבתי. איך לשפר?";
-    const writeToolsHigh = "📌 כלים לעבודה עם קשיי כתיבה (גילאי התיכון):\n1. מעבר מכתב-יד להקלדה בבחינות.\n2. מפות מושגים לפני כתיבה — ארגון רעיונות לפני ניסוח.\n3. דף עבודה \"לפני כתיבה\": מה אני טוען? אילו דוגמאות? למי אני כותב?";
-
-    const syms: string[] = [], refs: string[] = [], tools: string[] = [];
-    function addSym(s: string) { if (!syms.includes(s)) syms.push(s); }
-    function addRef(r: string) { if (!refs.includes(r)) refs.push(r); }
-    function addTool(t: string) { if (!tools.includes(t)) tools.push(t); }
-
-    const multiDomains = [verbal !== "לא", math !== "לא", adhdPos, comp].filter(Boolean).length;
-    if (multiDomains >= 3) addRef("הפנייה לאבחון פסיכודידקטי");
-
-    if (verbal !== "לא") {
-      addSym("נמצאו סימנים לקשיים ברבי מלל");
-      if (verbal === "20%" || verbal === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
-      addTool(isTyb ? verbalToolsHigh : verbalToolsMid);
-    }
-    if (math !== "לא") {
-      addSym("נמצאו סימנים לקשיים במתמטיקה");
-      if (math === "20%" || math === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
-      addTool(isTyb ? mathToolsHigh : mathToolsMid);
-    }
-    if (eng !== "לא") {
-      addSym("נמצאו סימנים לקשיים באנגלית");
-      if (eng === "20%" || eng === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
-      addTool(engTools);
-    }
-    if (adhdYn) emitADHD(inatt, hyper);
-    if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק");
-      addTool(isTyb ? writeToolsHigh : writeToolsMid);
-    }
-    if (comp) {
-      addSym("נמצאו סימנים לקשיי הבנה בשיעור");
-      const hasRel = verbal !== "לא" || adhdPos;
-      if (!hasRel) { addRef("קשיים בהבנה שאינם מוסברים ע\"י קשיי קשב או קריאה — יש לפנות לאבחון פסיכו-דידקטי"); if (isTyb) addRef("יש לשים לב לנתינת התאמות לבגרויות"); }
-      else if (isTyb) addRef("יש לשים לב לנתינת התאמות לבגרויות");
-    }
-    if (syms.length || refs.length || tools.length) {
-      box("purple", "📚 נמצאו קשיים לימודיים — כיתות " + (isTyb ? "ט-יב" : "ז-ח"));
-      if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
-      refs.forEach(r => box("info", "✅ " + r));
-      tools.forEach(t => box("info", t));
-    }
-    return boxes;
-  }
-
-  return boxes;
-}
-
-// ── Compute developmental results ────────────────────────────────────────────
-function computeDevResults(A: Ans): Box[] {
-  if (!["מעט","הרבה","הרבה מאוד"].includes(A.a_dev || "")) return [];
-  const boxes: Box[] = [];
-  function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
-  const age = parseInt(A._age) || 0;
-  const ageOk = devAgeOk(A);
-  const toiletShow = ageOk || A.toilet === "כן";
-
-  // ── גמילה ──────────────────────────────────────────────────────────────────
-  if (toiletShow && A.dev_toilet === "כן") {
-    const ttype = A.dev_toilet_type || "";
-    const past  = A.dev_toilet_past || "";
-    box("purple","📊 נמצאו קשיים בגמילה / התרוקנות");
-
-    if (ttype === "א") {
-      box("warn","⚠️ נמצאו סימפטומים של עצירות — יש לפנות לרופא הילדים או לפיזיותרפיה של רצפת אגן בילדים");
-      box("info","✅ הפנייה: רופא ילדים / פיזיותרפיסטית רצפת אגן ילדים (פרטי או דרך הקופה)\n\n📋 הערה — עצירות:\nנראה כי הילד מתמודד עם עצירות: קושי או כאבים במתן צואה, צואה קשה, התרוקנות בתדירות נמוכה.\n\nכלים לניסיון בבית:\n• שתיית מים מרובה — לפחות 35 מ\"ל לכל ק\"ג משקל גוף\n• ישיבה יזומה בשירותים כרבע שעה לאחר ארוחה\n• ישיבה עם שרפרף מתחת לכפות הרגליים כך שהברכיים גבוהות מהירך\n• תרגול נשימה בזמן הישיבה בשירותים\n\nאם אין שיפור תוך כשבועיים → פנייה לפיזיותרפיה רצפת אגן ילדים.");
-    } else if (ttype === "ב") {
-      const wetType = A.dev_wet_type || "";
-      box("warn","⚠️ נמצאו סימפטומים של הרטבת " + (wetType || "שתן") + " — יש לפנות לאורולוג ילדים או לפיזיותרפיה של רצפת אגן בילדים");
-      box("info","✅ הפנייה: אורולוג ילדים / פיזיותרפיסטית רצפת אגן ילדים (פרטי או דרך הקופה)\n\n📋 הערה — הרטבת יום/לילה:\nב-70–80% מהמקרים הגורם הראשוני הוא עצירות.\n\nכלים לניסיון בבית:\n• שתיית מים מרובה — לפחות 35 מ\"ל לכל ק\"ג משקל גוף\n• ישיבה יזומה בשירותים כרבע שעה לאחר ארוחה\n• ישיבה עם שרפרף מתחת לכפות הרגליים כך שהברכיים גבוהות מהירך\n• תרגול נשימה בזמן הישיבה בשירותים\n\nאם ההרטבה החלה בעקבות אירוע משברי → פנייה לפסיכולוג חינוכי/התפתחותי.\n\n⚠️ חשוב:\n• אין להפעיל לחץ גלוי או סמוי\n• אין להעניש או להעליב\n• אין להכריח את הילד לכבס את מצעיו ובגדיו");
-    } else if (ttype === "ג") {
-      box("warn","⚠️ נמצאו סימפטומים של בריחת צואה (אנקופרזיס) — יש לפנות לגסטרולוג ילדים או לפיזיותרפיה של רצפת אגן בילדים");
-      box("info","✅ הפנייה: גסטרולוג ילדים / פיזיותרפיסטית רצפת אגן ילדים (פרטי או דרך הקופה)\n\n📋 הערה — התלכלכות/הצטאות (אנקופרזיס):\nב-80–90% מהמקרים הגורם הראשוני הוא עצירות.\n\nכלים לניסיון בבית:\n• שתיית מים מרובה — לפחות 35 מ\"ל לכל ק\"ג משקל גוף\n• ישיבה יזומה בשירותים כרבע שעה לאחר ארוחה\n• ישיבה עם שרפרף מתחת לכפות הרגליים\n• תרגול נשימה בזמן הישיבה\n\n⚠️ חשוב:\n• חיזוקים חיוביים בלבד — חיזוקים שליליים עלולים להחמיר\n• אין להפעיל מתח, לחץ או חרדה\n• אם יש התלכלכות בגן/ביה\"ס → לערב פסיכולוג הגן");
-    } else if (ttype === "ד") {
-      box("warn","⚠️ נמצאו סימפטומים של בריחת שתן וצואה — יש לפנות לגסטרולוג ילדים או לפיזיותרפיה של רצפת אגן בילדים");
-      box("info","✅ הפנייה: גסטרולוג ילדים / פיזיותרפיסטית רצפת אגן ילדים (פרטי או דרך הקופה)\n\n📋 הערה — הרטבה + התלכלכות:\nב-70–90% מהמקרים הגורם הראשוני הוא עצירות.\n\nכלים לניסיון בבית:\n• שתיית מים מרובה — לפחות 35 מ\"ל לכל ק\"ג משקל גוף\n• ישיבה יזומה בשירותים כרבע שעה לאחר ארוחה\n• ישיבה עם שרפרף מתחת לכפות הרגליים\n\n⚠️ חשוב:\n• חיזוקים חיוביים בלבד\n• אין להפעיל לחץ, להעניש, להעליב\n• אם יש התלכלכות בגן/ביה\"ס → לערב פסיכולוג הגן");
-    }
-
-    if (past === "לא") {
-      box("info","📌 עשרת כללי הגמילה (לילדים שטרם גמולו):\n\nא. סימנים שאפשר להתחיל:\n   1. יבש/ה 1.5–2 שעות ברצף\n   2. מודעות לכך שעושה צרכים (נעמד בצד, מודיע \"יש לי\")\n   3. מבינ/ה הוראות פשוטות ויודע/ת לזהות איברי גוף\n   4. מביע/ה רצון לעצמאות (\"אני לבד!\")\n\nב. עדיף לא להתחיל בתקופות לחוצות (מעבר דירה, מעבר גן, מתח)\n\nג. עקביות ונחישות: אם מורידים בשעות הערות — להוריד לגמרי, לא לסירוגין\n\nד. התחלה: עדיף כשיש כמה ימים ברצף בבית (סוף שבוע / חגים)\n\nו. תזכורות: בימים הראשונים — להציע ללכת לשירותים כל 45 דקות\n\nז. ציוד נכון: סיר נוח / מקטין אסלה עם שרפרף, בגדים שקל להוריד, סטים להחלפה\n\nח. פספוסים — חלק בלתי נפרד מהלמידה:\n   \"אופס, ברח הפיפי. פיפי עושים בסיר/בשירותים\"\n   אל תכעסו, אל תענישו, אל תגרמו לבושה\n\nט. חיזוקים: שבחו מאמץ ומודעות — \"אמרת לי שיש פיפי — מצוין!\"\n   פרסים: קטנים, מיידיים, קצרי טווח (מדבקה/חותמת)\n\nי. גמילת לילה: מורכבת יותר וקשורה לפיזיולוגיה. מומלץ לגמול ביום קודם.");
-    } else if (past === "כן") {
-      if (age > 0 && age < 3) {
-        box("info","📌 המלצות לילדים עד גיל 3 (הייתה גמילה מלאה בעבר):\n\nחשוב: יש להימנע מהפעלת לחץ גלוי או סמוי.\n\nמה כן לעשות:\n• חשיפה לנושא הגמילה דרך ספרים\n• צפייה בבני גילו שמשתמשים בשירותים\n• ישיבה על סיר / אסלה לסיפור או משחק — ללא לחץ לתוצאה\n\nאם יש חרדת אסלה / התנגדות:\n→ פנייה לפיזיותרפיסטית רצפת אגן ילדים\n→ הדרכה על ידי פסיכולוג חינוכי/התפתחותי\n\nאם יש חוסר שליטה ובריחות:\n→ שלב ראשון: רופא ילדים לשלילת קושי פיזיולוגי\n→ שלב שני: פיזיותרפיה רצפת אגן ילדים");
-      } else {
-        box("info","📌 המלצות לילדים מעל גיל 3 (הייתה גמילה מלאה בעבר):\n\n→ שלב ראשון: רופא ילדים לשלילת קושי פיזיולוגי\n→ שלב שני: פיזיותרפיה רצפת אגן ילדים (פרטי או דרך הקופה)\n\nחשוב: יש להימנע מהפעלת לחץ גלוי או סמוי. אין להעניש או להעליב.");
-      }
-    }
-  }
-
-  // ── ויסות חושי ─────────────────────────────────────────────────────────────
-  if (ageOk && A.dev_sensory === "כן") {
-    const overTot  = (["so1","so2","so3","so4","so5","so6","so7","so8","so9","so10"]
-      .reduce((s,k) => s + (A[k] || 0), 0));
-    const underTot = (["su1","su2","su3","su4","su5","su6","su7","su8"]
-      .reduce((s,k) => s + (A[k] || 0), 0));
-    const hasOver  = overTot  > 0;
-    const hasUnder = underTot > 0;
-
-    if (!hasOver && !hasUnder) {
-      box("purple","📊 ישנם תסמינים כלליים לקשיי ויסות חושי");
-      box("warn","⚠️ יש לפנות לרופא המשפחה להמשך בדיקה");
-    } else {
-      if (hasOver) {
-        if (overTot >= 26) { /* תקין */ }
-        else if (overTot >= 24) {
-          box("purple","📊 נמצאו סימנים לרגישות יתר תחושתית (הבדל קל, ציון: " + overTot + ")");
-          box("warn","⚠️ ישנם תסמינים כלליים לקשיי ויסות חושי. יש לפנות לרופא המשפחה להמשך בדיקה");
-        } else {
-          box("purple","📊 חשד לרגישות יתר תחושתית (הבדל ברור, ציון: " + overTot + ")");
-          box("info","✅ הפנייה: טיפול ויסות חושי על ידי ריפוי בעיסוק");
-        }
-      }
-      if (hasUnder) {
-        if (underTot >= 19) { /* תקין */ }
-        else if (underTot >= 16) {
-          box("purple","📊 נמצאו סימנים לתת-תגובתיות תחושתית (הבדל קל, ציון: " + underTot + ")");
-          box("warn","⚠️ ישנם תסמינים כלליים לקשיי ויסות חושי. יש לפנות לרופא המשפחה להמשך בדיקה");
-        } else {
-          box("purple","📊 חשד לתת-תגובתיות תחושתית (הבדל ברור, ציון: " + underTot + ")");
-          box("info","✅ הפנייה: טיפול ויסות חושי על ידי ריפוי בעיסוק");
-        }
-      }
-    }
-  }
-
-  return boxes;
-}
-
-// ── Compute behavioral results ────────────────────────────────────────────────
-function computeBehResults(A: Ans): Box[] {
-  if (!["מעט","הרבה","הרבה מאוד"].includes(A.a_beh || "")) return [];
-  const ml = A.beh_max_level || 0;
-  if (ml <= 0) return [];
-  const boxes: Box[] = [];
-  function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
-  const finalPlan = gg(A) === "ga" ? "חיובי" : (A.beh_plan || "");
-  box("purple","📊 נמצאו קשיים התנהגותיים");
-  if (finalPlan === "חיובי") {
-    box("info","✅ הפנייה: תוכנית התנהגותית ממוקדת מרכיבים חיוביים");
-  } else if (finalPlan === "חיובי_שלילי") {
-    box("info","✅ הפנייה: תוכנית התנהגותית ממוקדת מרכיבים חיוביים ושליליים, בשיתוף המורים וההורים");
-  } else if (finalPlan === "חיובי_שלילי_פסיכולוגי") {
-    box("info","✅ הפנייה: תוכנית התנהגותית עם מרכיבים חיוביים ושליליים, בשיתוף המורים וההורים — יחד עם טיפול פסיכולוגי");
-  }
-  let planTxt = "📌 תוכנית התנהגותית מפורטת:\n\n";
-  planTxt += "🟢 תוכנית התנהגותית ממוקדת מרכיבים חיוביים\n";
-  planTxt += "נדרשת פגישה עם היועצת, המחנכ/ת ואפשרי גם פסיכולוג המסגרת. בפגישה זו יש לחשוב על הסיבות לקושי המוטיבציוני, ולבנות תוכנית התנהגותית.\n\n";
-  planTxt += "דוגמה לתוכנית התנהגותית ממוקדת תגובות חיוביות:\n";
-  planTxt += "א. יש לבחור 3 נושאים בהם רוצים לשפר את מצבו של הילד (לדוגמה: א. היעדרויות משיעורים. ב. חוסר השתתפות בשיעורים. ג. חיסורים).\n";
-  planTxt += "ב. תוכניות התנהגותיות לרוב עובדות. החיסרון שלהן הוא שפעמים רבות הן \"הולכות לאיבוד\" בשל חוסר מיקוד בנושא האחריות של המבוגרים בתוכנית. בשל כך על התוכנית ההתנהגותית להיות יעילה — יש לתת בכל יום נקודה על כל נושא, לסדר טבלה מסודרת במחברת של הילד, לכתוב תזכורות להורים לוודא שהם עוברים על הנקודות בסוף כל יום, להגדיר מראש ובכתב את הפרסים שהילד מקבל עבור כל סך נקודות.";
-  if (finalPlan === "חיובי_שלילי" || finalPlan === "חיובי_שלילי_פסיכולוגי") {
-    planTxt += "\n\n🟠 מרכיבים שליליים — תוספת לתוכנית\n";
-    planTxt += "בשל העובדה כי החומרה של בעיות ההתנהגות גבוהה, יש להוסיף גם תגובות שליליות בנוסף לתגובות החיוביות.\n\n";
-    planTxt += "כיצד מבצעים:\n";
-    planTxt += "• יש לערוך פגישה של המחנך/ת + ההורים + הילד, להחליט על 2 נושאים שהם \"קווים אדומים\" (כגון: חוצפה חמורה, או אלימות).\n";
-    planTxt += "• בכל מקרה שהוא עובר על הקו האדום — הילד/ה מקבל אזהרה.\n";
-    planTxt += "• בפעם השנייה באותו יום שהוא עובר על הקווים האדומים — הוא מקבל תגובה.\n";
-    planTxt += "• את התגובה הוא מבצע בבית וחוזר איתה למחרת (אלא אם כן הוא בוחר לעשות אותה בזמן ההפסקות).\n";
-    planTxt += "• ההורים צריכים לוודא שהילד מבצע את התגובה.\n";
-    planTxt += "• לשתף את הילד באפשרויות של התגובות השליליות ומה הוא היה מעדיף.\n";
-    planTxt += "• יש להפחית ככל הניתן בשיחות מוסר והסברים ארוכים, ולהתמקד בכך שגם החלק ה\"שלילי\" של התגובות הינו כתגובה למעשים שלו ולא לזהות שלו.";
-  }
-  if (finalPlan === "חיובי_שלילי_פסיכולוגי") {
-    planTxt += "\n\n🔴 טיפול פסיכולוגי — ע\"פ המאפיינים האישיים והגיל\n";
-    planTxt += "יש לפנות לטיפול פסיכודינאמי ע\"פ מאפייני הילד.";
-  }
-  planTxt += "\n\n📌 כלים לעבודה בכיתה עם ילדים בעלי חיכוכים והתנגדויות:\n";
-  planTxt += "• אין לנהל שיח על המקרה מיד לאחר מריבה — יש להשהות לפחות שעתיים עד לרגיעה.\n";
-  planTxt += "• תחילת ואמצע השיח צריך להיות בנוי בעיקר משאלות פתוחות, לא שיפוטיות ולא ביקורתיות — ניסיון להקשיב לסיבות ולהסברים של הילד.\n";
-  planTxt += "• בסוף השיח — להתמקד בדרכים בהן הוא יימנע מחיכוכים בפעם הבאה, ולשקף לו את הטריגרים.\n";
-  planTxt += "• אין להתייאש — לרוב בשיחות הראשונות יש תחושה שהילד לא מקבל את הניסיון לסייע, אך לאחר מספר התערבויות ניתן יהיה לראות שיפור.\n";
-  planTxt += "• חשוב מאוד שהמורה לא יערב רגשות שליליים בשיח (כמו ייאוש, אכזבה, כעס), אלא יתמקד התנהגותית במעשים ובהקשבה לצרכים.\n";
-  planTxt += "• אין לנהל \"שיחות מוסר\" ארוכות ומייגעות.\n\n";
-  planTxt += "📌 המלצות להורים:\n";
-  planTxt += "• לשמור על שגרה קבועה ועקבית — גבולות ברורים ועקביים מסייעים לילד להרגיש ביטחון.\n";
-  planTxt += "• להימנע מהסלמה מילולית בזמן כעס — לחכות לרגיעה לפני כל שיח.\n";
-  planTxt += "• לתת חיזוקים חיוביים גדולים על כל הצלחה קטנה — לשבח התנהגות ספציפית ולא את הילד כולו.\n";
-  planTxt += "• ליצור זמן איכות יומי עם הילד ללא מסכים ולא שיחות \"חינוכיות\".\n";
-  planTxt += "• לפנות ליועצת בית הספר לתיאום בין הבית לבית הספר.";
-  box("info", planTxt);
-  return boxes;
-}
-
-// ── Compute social results ────────────────────────────────────────────────────
-function computeSocResults(A: Ans): Box[] {
-  if (!["מעט","הרבה","הרבה מאוד"].includes(A.a_soc || "")) return [];
-  const boxes: Box[] = [];
-  function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
-  const lsas = A.lsas_tot || 0;
-  const soc1 = A.soc1 || "", soc2 = A.soc2 || "", soc3 = A.soc3 || "";
-  const sev = A.soc2_sev || 0;
-  // soc1 counts as an issue only if LSAS score reaches threshold (≥8)
-  const hasSocIssue = (soc1 === "כן" && lsas >= 8) || soc2 === "כן" || soc3 === "כן";
-  if (hasSocIssue) box("purple","📊 נמצאו קשיים חברתיים");
-  const emoBoxes = computeResults(A);
-  const hasEmoTherapyRef = emoBoxes.some(b => b.txt.startsWith("✅") && b.txt.includes("טיפול"));
-  const socTherapyRefs: string[] = [];
-  const socNonTherapyRefs: string[] = [];
-  function addSocRef(txt: string) {
-    if (txt.includes("טיפול פסיכודינאמי") || txt.includes("טיפול רגשי")) {
-      if (!socTherapyRefs.includes(txt)) socTherapyRefs.push(txt);
-    } else { socNonTherapyRefs.push(txt); }
-  }
-  if (soc1 === "כן" && lsas >= 8) {
-    const ref = buildQ10StyleRef(A);
-    if (lsas <= 13) {
-      box("warn","📊 דווחו סימפטומים קלים של חרדה חברתית");
-    } else if (lsas <= 18) {
-      box("warn","📊 דווחו סימפטומים בינוניים של חרדה חברתית");
-    } else {
-      box("danger","📊 דווחו סימפטומים משמעותיים של חרדה חברתית");
-    }
-    box("info", ref);
-  }
-  if (soc2 === "כן") {
-    if (sev >= 5) {
-      addSocRef('קשיים חברתיים גבוהים — הפנייה לקבוצה חברתית + כלים לעבודה בכיתה + טיפול פסיכודינאמי ע"פ מאפייני הילד');
-    } else if (sev >= 1) {
-      socNonTherapyRefs.push("קשיים חברתיים מתונים — הפנייה לקבוצה חברתית + כלים לעבודה בכיתה");
-    }
-  }
-  if (soc3 === "כן") {
-    const early3 = A.soc3_early || "";
-    const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
-    const hasExtra = A.comm_rep === "כן" || A.comm_rigid === "כן" || A.comm_interest === "כן" || A.comm_sens === "כן";
-    const allExtraNo = A.comm_rep === "לא" && A.comm_rigid === "לא" && A.comm_interest === "לא" && A.comm_sens === "לא";
-    if (allComm && hasExtra) {
-      box("danger","📊 ייתכנו תסמינים של קשיי תקשורת — יש לפנות ליועצת ופסיכולוג בית הספר לשם הערכה מקיפה");
-    } else if (allComm && allExtraNo) {
-      addSocRef("נמצאו קשיי תקשורת — הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
-    } else if (early3 === "לא") {
-      addSocRef("נמצאו סימני קושי בתקשורת — הפנייה לטיפול פסיכודינאמי בשילוב הדרכת הורים");
-    } else {
-      socNonTherapyRefs.push("נמצאו סימני קושי בתקשורת — מומלץ להיוועץ עם יועצת/פסיכולוג");
-    }
-  }
-  socNonTherapyRefs.forEach(r => box("info","✅ " + r));
-  if (socTherapyRefs.length > 0 && !hasEmoTherapyRef) {
-    const emoMotVal = (A.aq_mot_bv || 0) + (A.aq_mot_zy || 0);
-    const socMotVal = A.soc_motiv_therapy || 0;
-    const motVal = emoMotVal > 0 ? emoMotVal : socMotVal;
-    if (motVal >= 1) {
-      const refTxt = motVal <= 2
-        ? "יש להפנות לטיפול פסיכודינאמי + הדרכת הורים והתערבות במסגרת החינוכית"
-        : "יש להפנות לטיפול פסיכודינאמי משולב + CBT בשילוב הדרכת הורים והתערבות במסגרת החינוכית";
-      box("info","✅ " + refTxt);
-    } else {
-      box("info","✅ יש לענות על שאלת המוטיבציה (בשאלון) לקביעת סוג הטיפול הרגשי המומלץ");
-    }
-  }
-  // classroom tools — only for conflicts/communication, not for social anxiety
-  if (soc2 === "כן" || soc3 === "כן") {
-    box("info","📌 כלים לעבודה בכיתה עם קשיים חברתיים:\n\n• אין לנהל שיח על מקרה מיד לאחר מריבה — יש להשהות לפחות שעתיים עד לרגיעה.\n• תחילת ואמצע השיח — שאלות פתוחות, לא שיפוטיות ולא ביקורתיות; הקשבה לסיבות ולהסברים של הילד/ה, גם אם נשמעים לא הגיוניים.\n• בסוף השיח — להתמקד בדרכים בהן יוכל להימנע מחיכוכים בפעם הבאה, ולשקף מה היו הטריגרים.\n• אין להתייאש — לאחר מספר התערבויות ניתן לראות שיפור.\n• אם ניתן, לחשוב יחד על רגעים בהם הוא מתחיל להתפרץ (עוד לפני שהתפרץ) ולבנות איתו דרך פעולה.\n• המורה אינו מערב רגשות שליליים בשיח (ייאוש, אכזבה, כעס) — מתמקד בהתנהגות, בהקשבה לצרכים ובהתבוננות לעתיד.\n• אין לנהל \"שיחות מוסר\" ארוכות ומייגעות.");
-  }
-  return boxes;
-}
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
 const BTN_BASE  = "px-5 py-2 border-2 rounded-full font-medium text-sm transition-all cursor-pointer";
@@ -1493,26 +697,15 @@ function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-aq ─────────────────────────────────────────────────────────────────────
-const AQ_ITEMS = [
-  {key:"aq1",  label:"1. תחושת פחד עזה"},
-  {key:"aq2",  label:"2. קושי בנשימה / הרגשת חנק"},
-  {key:"aq3",  label:"3. זיעה יתירה"},
-  {key:"aq4",  label:"4. חוסר נוחות / כאבים בחזה"},
-  {key:"aq5",  label:"5. בחילה / צורך להקיא"},
-  {key:"aq6",  label:"6. סחרחורת או ניתוק"},
-  {key:"aq7",  label:"7. חשש מאובדן שליטה"},
-  {key:"aq8",  label:"8. מצוקה מופרזת בהיפרדות מהורים"},
-  {key:"aq9",  label:"9. התנגדות / קושי לצאת מהבית"},
-  {key:"aq10", label:"10. ביעותי לילה חוזרים"},
-];
-function PageAQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const aqItems = (items?.aq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
         <StepTag>🔍 שאלות משלימות</StepTag>
         <StepQ>10 סעיפים — 1 = כלל לא | 2 = לפעמים | 3 = לעיתים קרובות</StepQ>
         <SubCard>
-          {AQ_ITEMS.map(({key,label})=>(
+          {aqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -1722,18 +915,8 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-mq ─────────────────────────────────────────────────────────────────────
-const MQ_ITEMS = [
-  {key:"mq1", label:"1. תחושה מתמשכת של עצב או עצבנות"},
-  {key:"mq2", label:"2. אובדן עניין בפעילויות שנהנה בעבר"},
-  {key:"mq3", label:"3. שינויים משמעותיים במשקל/תיאבון"},
-  {key:"mq4", label:"4. בעיות שינה (נדודים או שינה יתרה)"},
-  {key:"mq5", label:"5. חוסר מנוחה או האטה פסיכומוטורית"},
-  {key:"mq6", label:"6. עייפות / חוסר אנרגיה"},
-  {key:"mq7", label:"7. תחושות חוסר ערך / אשמה מופרזת"},
-  {key:"mq8", label:"8. ירידה ביכולת חשיבה / ריכוז / החלטיות"},
-  {key:"mq9", label:"9. מחשבות חוזרות על מוות"},
-];
-function PageMQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const mqItems = (items?.mq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -1741,7 +924,7 @@ function PageMQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>שאלון מצב רוח — 9 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {MQ_ITEMS.map(({key,label})=>(
+          {mqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -1811,15 +994,8 @@ function PageQ4Types({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 }
 
 // ── p-q4-s ────────────────────────────────────────────────────────────────────
-const AS_ITEMS = [
-  {key:"as1", label:"1. שימוש בכמויות גדולות יותר מהמתוכנן"},
-  {key:"as2", label:"2. רצון / ניסיונות כושלים להפסיק"},
-  {key:"as3", label:"3. תשוקה עזה לחומר"},
-  {key:"as4", label:"4. כישלון בהתחייבויות בגלל השימוש"},
-  {key:"as5", label:"5. ויתור על פעילויות חברתיות"},
-  {key:"as6", label:"6. תסמיני גמילה בהפסקה"},
-];
-function PageQ4S({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const asItems = (items?.as ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -1827,7 +1003,7 @@ function PageQ4S({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
         <StepQ>שאלון חומרים — 6 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {AS_ITEMS.map(({key,label})=>(
+          {asItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -1845,16 +1021,8 @@ function PageQ4S({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 }
 
 // ── p-q4-g ────────────────────────────────────────────────────────────────────
-const AG_ITEMS = [
-  {key:"ag1", label:"1. עיסוק יתר במשחקים מחוץ לזמן המשחק"},
-  {key:"ag2", label:"2. עצבנות/חרדה/כעס כשאין גישה"},
-  {key:"ag3", label:"3. צורך לשחק זמן הולך וגדל"},
-  {key:"ag4", label:"4. ניסיונות כושלים לצמצם"},
-  {key:"ag5", label:"5. הזנחת לימודים/חברה"},
-  {key:"ag6", label:"6. שקרים על מידת המשחק"},
-  {key:"ag7", label:"7. שימוש במשחקים לבריחה מרגשות שליליים"},
-];
-function PageQ4G({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const agItems = (items?.ag ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -1862,7 +1030,7 @@ function PageQ4G({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
         <StepQ>שאלון משחקי מחשב — 7 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {AG_ITEMS.map(({key,label})=>(
+          {agItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -1880,16 +1048,8 @@ function PageQ4G({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 }
 
 // ── p-q4-b ────────────────────────────────────────────────────────────────────
-const AB_ITEMS = [
-  {key:"agl1", label:"1. עיסוק יתר בהימורים — מחשבות מתמשכות"},
-  {key:"agl2", label:"2. צורך להמר בסכומים גדלים"},
-  {key:"agl3", label:"3. ניסיונות כושלים להפסיק"},
-  {key:"agl4", label:"4. הימור לבריחה מרגשות שליליים"},
-  {key:"agl5", label:"5. שקרים על מידת ההימורים"},
-  {key:"agl6", label:"6. סיכון בקשרים/לימודים"},
-  {key:"agl7", label:"7. הסתמכות על אחרים לסיוע כלכלי"},
-];
-function PageQ4B({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const abItems = (items?.ab ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -1897,7 +1057,7 @@ function PageQ4B({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
         <StepQ>שאלון הימורים — 7 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {AB_ITEMS.map(({key,label})=>(
+          {abItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -1951,15 +1111,8 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-oq ─────────────────────────────────────────────────────────────────────
-const OQ_ITEMS = [
-  {key:"oq1", label:"1. בודק/ת שוב ושוב דברים ולא בטוח"},
-  {key:"oq2", label:"2. מחשבות רעות שלא ניתן להפסיק"},
-  {key:"oq3", label:"3. אוסף דברים רבים עד הפרעה לשגרה"},
-  {key:"oq4", label:"4. שוטף שוב ושוב ידיים / איבר"},
-  {key:"oq5", label:"5. מתעצבן אם דברים לא במקום הנכון"},
-  {key:"oq6", label:"6. צריך לספור בזמן ביצוע משימות"},
-];
-function PageOQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const oqItems = (items?.oq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -1967,7 +1120,7 @@ function PageOQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>שאלון — 6 סעיפים</StepQ>
         <StepHint>1 = אף פעם  |  2 = לפעמים  |  3 = תמיד</StepHint>
         <SubCard>
-          {OQ_ITEMS.map(({key,label})=>(
+          {oqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -2036,19 +1189,8 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-tq ─────────────────────────────────────────────────────────────────────
-const TQ_ITEMS = [
-  {key:"tq1",  label:"1. מחשבות/תמונות מטרידות \"קופצות\" לראשו"},
-  {key:"tq2",  label:"2. חלומות רעים / סיוטי לילה"},
-  {key:"tq3",  label:"3. תחושות בגוף כשנזכר (הזעה, דופק מהיר)"},
-  {key:"tq4",  label:"4. מנסה להתרחק מכל מה שמזכיר את האירוע"},
-  {key:"tq5",  label:"5. פחות עניין בפעילויות שנהג לעשות"},
-  {key:"tq6",  label:"6. לא מצליח להיזכר בחלקים חשובים"},
-  {key:"tq7",  label:"7. מבטא רגשות חזקים (פחד, כעס, אשמה)"},
-  {key:"tq8",  label:"8. קופצני / נבהל בקלות"},
-  {key:"tq9",  label:"9. עושה דברים שיכולים לפגוע בו"},
-  {key:"tq10", label:"10. מאוד זהיר / נשמר מפני סכנות"},
-];
-function PageTQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const tqItems = (items?.tq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -2057,7 +1199,7 @@ function PageTQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <p className="text-sm font-bold text-red-800 mb-1">ענו על השאלות הבאות בהתייחס לחודש האחרון:</p>
         <StepHint>0 = כלל לא  |  4 = כמעט תמיד (חודש אחרון)</StepHint>
         <SubCard>
-          {TQ_ITEMS.map(({key,label})=>(
+          {tqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -2093,15 +1235,8 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // Shortened prodromal questionnaire — 6 items (from PQ-16), yes/no
 // Covers core CAARMS/PACE domains: auditory & visual hallucinations, paranoia,
 // thought disorder, reality testing confusion, thought broadcasting
-const PQ_ITEMS = [
-  {key:"pq5",  label:"1. קרה לי ששמעתי קולות של אנשים, לחישות או דיבורים כאשר אנשים אחרים אמרו שהם לא שומעים כלום"},
-  {key:"pq16", label:"2. ראיתי דברים שאנשים אחרים לא יכולים לראות"},
-  {key:"pq7",  label:"3. אני מרגיש/ה לפעמים שלאחרים יש משהו נגדי"},
-  {key:"pq11", label:"4. קרה לי שהייתי מבולבל/ת או לא בטוח/ה האם משהו שחוויתי היה אמיתי או דמיוני"},
-  {key:"pq13", label:"5. המחשבות שלי כל כך חזקות לעיתים, שאני כמעט ושומע/ת אותן"},
-  {key:"pq8",  label:"6. לפעמים אני מרגיש/ה שאני לא שולט/ת על הרעיונות ועל המחשבות שלי"},
-];
-function PagePQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const pqItems = (items?.pq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -2110,7 +1245,7 @@ function PagePQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <p className="text-sm font-bold text-red-800 mb-1">יש למלא יחד עם הילד</p>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {PQ_ITEMS.map(({key,label})=>(
+          {pqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -2253,16 +1388,8 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-bq ─────────────────────────────────────────────────────────────────────
-const BQ_ITEMS = [
-  {key:"bq1", label:"1. מאמצים קיצוניים להימנע מנטישה"},
-  {key:"bq2", label:"2. חוסר ביטחון משמעותי בדימוי העצמי"},
-  {key:"bq3", label:"3. אימפולסיביות: סמים/נהיגה/אכילה/יחסי מין"},
-  {key:"bq4", label:"4. חוסר יציבות רגשית, שינויים חדים"},
-  {key:"bq5", label:"5. התפרצויות כעס לא פרופורציונליות"},
-  {key:"bq6", label:"6. רגעים של נתק / חשיבה פרנואידית בלחץ"},
-  {key:"bq7", label:"7. יחסים אינטנסיביים ובלתי יציבים"},
-];
-function PageBQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  const bqItems = (items?.bq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
@@ -2270,7 +1397,7 @@ function PageBQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>שאלון ויסות רגשות ויחסים בינאישיים — 7 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
-          {BQ_ITEMS.map(({key,label})=>(
+          {bqItems.map(({key,label})=>(
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
@@ -2469,31 +1596,11 @@ function PageDevToilet({ A, setA, onNext, onBack }: PageProps) {
 }
 
 // ── p-dev-sensory ─────────────────────────────────────────────────────────────
-const SENS_OVER_ITEMS = [
-  "מביע חוסר נוחות בזמן פעילות ניקיון וטיפוח (תספורת, גזיזת ציפורניים, רחצה)",
-  "מעדיף בגד ארוך כשחם או בגד קצר כשקר",
-  "מגיב בתוקפנות או בתגובה רגשית חזקה כשנוגעים בו",
-  "מתקשה לעמוד לאורך זמן בקרבת אנשים",
-  "נמנע מטעמים / ריחות של מאכלים הכלולים בתפריט שגרתי של ילדים",
-  "מגביל עצמו לטמפרטורה / מרקמים מסוימים של אוכל",
-  "פוחד משהייה בגבהים",
-  "נמנע מניתוק רגליים מהקרקע",
-  "אינו יכול לעבוד כשיש רעש רקע (מאוורר, מקרר)",
-  "מתקשה לסיים מטלות כשיש דיבורים ברקע",
-];
-const SENS_UNDER_ITEMS = [
-  "נהנה מרעשים חזקים / משמיע רעשים וקולות כדי לשמוע אותם",
-  "מחפש פעילות המערבת תנועה חזקה / חזרתית",
-  "נוגע יותר מהרגיל באנשים / חפצים",
-  "אינו שם לב כשגופו או פרצופו מלוכלכים",
-  "אינו שם לב כשבגד אינו מונח נכון על גופו",
-  "אינו מגיב כשמדברים אליו למרות ששמיעתו תקינה",
-  "בעל אחיזה חלשה, דברים נופלים לו מהידיים",
-  "נשען על מנת לתמוך בעצמו גם בזמן פעילות",
-];
 
-function PageDevSensory({ A, setA, onNext, onBack }: PageProps) {
+function PageDevSensory({ A, setA, onNext, onBack, items }: PageProps) {
   const showQs = A.dev_sensory === "כן";
+  const sensOverItems = (items?.sensOver ?? []) as string[];
+  const sensUnderItems = (items?.sensUnder ?? []) as string[];
   return (
     <div>
       <Card>
@@ -2506,7 +1613,7 @@ function PageDevSensory({ A, setA, onNext, onBack }: PageProps) {
           <>
             <GradeBlock title="א. שאלון רגישות יתר תחושתית">
               <div className="text-xs text-gray-500 mb-3">לכל שאלה: <strong>1 = תמיד</strong> | <strong>2 = לפעמים</strong> | <strong>3 = אף פעם</strong></div>
-              {SENS_OVER_ITEMS.map((label, i) => {
+              {sensOverItems.map((label, i) => {
                 const k = `so${i+1}`;
                 return (
                   <div key={k} className="mb-4">
@@ -2522,7 +1629,7 @@ function PageDevSensory({ A, setA, onNext, onBack }: PageProps) {
             </GradeBlock>
             <GradeBlock title="ב. שאלון תת-תגובתיות תחושתית">
               <div className="text-xs text-gray-500 mb-3">לכל שאלה: <strong>1 = תמיד</strong> | <strong>2 = לפעמים</strong> | <strong>3 = אף פעם</strong></div>
-              {SENS_UNDER_ITEMS.map((label, i) => {
+              {sensUnderItems.map((label, i) => {
                 const k = `su${i+1}`;
                 return (
                   <div key={k} className="mb-4">
@@ -2545,23 +1652,23 @@ function PageDevSensory({ A, setA, onNext, onBack }: PageProps) {
 }
 
 // ── p-acad ────────────────────────────────────────────────────────────────────
-type PageProps = { A: Ans; setA: (a: Ans) => void; onNext: (a?: Ans) => void; onBack: () => void };
+type PageProps = { A: Ans; setA: (a: Ans) => void; onNext: (a?: Ans) => void; onBack: () => void; items?: Record<string, any[]> | null };
 
-const ADHD_INATT = ["קושי בשמירה על ריכוז במשימות","קושי בארגון משימות","נטייה לאבד חפצים הנחוצים למשימה","הסחה קלה מרעשים/קולות","שכחה בביצוע משימות יומיומיות","קושי להקדיש תשומת לב לפרטים / טעויות מרובות"];
-const ADHD_HYPER = ["תנועות ידיים/רגליים מוגברות, קושי לשבת במקום","קושי להמתין לתורו","נטייה להפריע לאחרים","ריצה/טיפוס במצבים לא מתאימים","נטייה לענות לפני השלמת השאלה","קושי לשחק בשקט"];
 
-function AcadAdhdBlock({ prefix, A, setA }: { prefix: string; A: Ans; setA: (a: Ans) => void }) {
+function AcadAdhdBlock({ prefix, A, setA, items }: { prefix: string; A: Ans; setA: (a: Ans) => void; items?: Record<string, any[]> | null }) {
   function toggle(k: string) { setA({ ...A, [k]: !A[k] }); }
+  const adhdInatt = items?.adhdInatt ?? [];
+  const adhdHyper = items?.adhdHyper ?? [];
   return (
     <SubCard>
       <div className="text-sm font-bold text-amber-800 mb-2">📋 שאלון קשב (ADHD) — סמן את הסימנים הקיימים</div>
       <div className="text-xs font-semibold text-amber-700 mb-1">קשב:</div>
-      {ADHD_INATT.map((label, i) => {
+      {adhdInatt.map((label, i) => {
         const k = `${prefix}_ad${i+1}`;
         return <label key={k} className="flex items-center gap-2 text-sm text-gray-700 py-1 cursor-pointer"><input type="checkbox" checked={!!A[k]} onChange={() => toggle(k)} className="w-4 h-4" />{label}</label>;
       })}
       <div className="text-xs font-semibold text-amber-700 mt-3 mb-1">היפראקטיביות:</div>
-      {ADHD_HYPER.map((label, i) => {
+      {adhdHyper.map((label, i) => {
         const k = `${prefix}_ah${i+1}`;
         return <label key={k} className="flex items-center gap-2 text-sm text-gray-700 py-1 cursor-pointer"><input type="checkbox" checked={!!A[k]} onChange={() => toggle(k)} className="w-4 h-4" />{label}</label>;
       })}
@@ -2956,16 +2063,6 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 // ── p-soc ─────────────────────────────────────────────────────────────────────
 // Shortened social anxiety screen — 8 items, single scale 0–3
 // Items selected to cover key DSM-5 domains for childhood social anxiety
-const LSAS_ITEMS = [
-  "לדבר מול כל הכיתה או לקרוא משהו בקול רם מול הכיתה",        // performance / public speaking
-  "להרים יד ולענות על שאלה בשיעור",                             // performance / classroom
-  "להתחיל שיחה עם ילד/ה שהוא/היא לא מכיר/ה היטב",              // peer initiation
-  "להצטרף לקבוצת ילדים שכבר משחקים יחד",                       // group entry
-  "להיכנס לחדר מלא ילדים שרובם לא מכירים אותו/ה",              // social exposure
-  "לקבל ביקורת מהמורה או לטעות מול ילדים אחרים",               // fear of negative evaluation
-  "לשוחח עם מבוגרים שאינם בני משפחה (כגון רופא, הורה של חבר/ה, שכן חדש)", // adult interaction
-  "להשתתף בפעילות חברתית מחוץ לבית הספר (כגון חוג, מסיבה, תנועת נוער)",   // broad social participation
-];
 
 function needsSocTherapyMotiv(A: Ans): boolean {
   if ((A.aq_mot_bv || 0) > 0 || (A.aq_mot_zy || 0) > 0) return false;
@@ -2980,10 +2077,11 @@ function needsSocTherapyMotiv(A: Ans): boolean {
   return false;
 }
 
-function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
   const soc3Early = A.soc3_early || "";
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
+  const lsasItems = (items?.lsas ?? []) as string[];
   const motBvAlreadySet = (A.aq_mot_bv || 0) > 0 || (A.q2_mot || 0) > 0 || (A.q10_mot || 0) > 0;
   const verbalZyAlreadySet = (A.q10_verbal || 0) > 0;
   const showSocDetails = A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && grp !== "ga";
@@ -3007,7 +2105,7 @@ function PageSoc({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
               <p className="text-xs text-[#6a3a8a] mb-1 font-semibold">דרג/י את עוצמת החרדה/מצוקה בכל מצב:</p>
               <p className="text-xs text-[#6a3a8a] mb-4">0 = כלל לא · 1 = מעט · 2 = הרבה · 3 = מאוד</p>
               <div className="space-y-4">
-                {LSAS_ITEMS.map((item, i) => {
+                {lsasItems.map((item, i) => {
                   const n = i + 1;
                   return (
                     <div key={n} className="pb-3 border-b border-[#ddd6f3] last:border-0">
@@ -3184,13 +2282,13 @@ const KIDS_TREATMENT_MAP: { rx: RegExp; areas: string[] }[] = [
   { rx: /טיפול תעסוקתי/,               areas: ["טיפול תעסוקתי"] },
 ];
 
-function extractKidsTreatments(A: Ans): string[] {
+function extractKidsTreatments(score: KidsScoreResult): string[] {
   const allBoxes = [
-    ...computeResults(A),
-    ...computeAcadResults(A),
-    ...computeDevResults(A),
-    ...computeBehResults(A),
-    ...computeSocResults(A),
+    ...score.emotional,
+    ...score.academic,
+    ...score.developmental,
+    ...score.behavioral,
+    ...score.social,
   ];
   const found = new Set<string>();
   for (const box of allBoxes) {
@@ -3231,7 +2329,7 @@ type KidsMatchResult = {
   match_reasons: string[];
 };
 
-function KidsMatchSection({ A }: { A: Ans }) {
+function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null }) {
   const [open, setOpen]               = useState(false);
   const [region, setRegion]           = useState("");
   const [online, setOnline]           = useState(false);
@@ -3247,7 +2345,7 @@ function KidsMatchSection({ A }: { A: Ans }) {
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
-  const rawTreatments = extractKidsTreatments(A);
+  const rawTreatments = score ? extractKidsTreatments(score) : [];
   const treatments = rawTreatments.length > 0 ? rawTreatments : ["טיפול דינאמי"];
   const ageGroups  = getKidsAgeGroups(A);
 
@@ -3550,17 +2648,33 @@ function KidsMatchSection({ A }: { A: Ans }) {
   );
 }
 
-function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
-  const domains = [
-    { label: "🧠 תחום רגשי",       boxes: computeResults(A) },
-    { label: "📚 תחום לימודי",      boxes: computeAcadResults(A) },
-    { label: "🌱 תחום התפתחותי",    boxes: computeDevResults(A) },
-    { label: "⚡ תחום התנהגותי",    boxes: computeBehResults(A) },
-    { label: "🤝 תחום חברתי",       boxes: computeSocResults(A) },
-  ];
+function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void }) {
+  const domains: { label: string; boxes: Box[] }[] = score ? [
+    { label: "🧠 תחום רגשי",       boxes: score.emotional },
+    { label: "📚 תחום לימודי",      boxes: score.academic },
+    { label: "🌱 תחום התפתחותי",    boxes: score.developmental },
+    { label: "⚡ תחום התנהגותי",    boxes: score.behavioral },
+    { label: "🤝 תחום חברתי",       boxes: score.social },
+  ] : [];
 
   const hasAnyFindings = domains.some(d => d.boxes.length > 0);
   const bmiVal = A._bmi ? Number(A._bmi).toFixed(1) : null;
+
+  if (scoreError) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center px-6">
+      <div className="text-4xl mb-4">⚠️</div>
+      <p className="text-stone-700 font-semibold mb-2">שגיאה בחישוב התוצאות</p>
+      <p className="text-stone-500 text-sm mb-6">בדוק את חיבור האינטרנט ונסה שוב.</p>
+      <button
+        onClick={onRetryScore}
+        className="px-6 py-3 bg-[#2c3e7a] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+      >נסה שוב</button>
+    </div>
+  );
+
+  if (!score) return (
+    <div className="flex items-center justify-center py-20 text-gray-500 text-sm">מחשב תוצאות…</div>
+  );
 
   return (
     <div>
@@ -3642,7 +2756,7 @@ function PageResult({ A, onRestart }: { A: Ans; onRestart: () => void }) {
       </div>
 
       {/* Matching */}
-      <KidsMatchSection A={A} />
+      <KidsMatchSection A={A} score={score} />
 
       {/* Disclaimer */}
       <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-6 text-stone-500">
@@ -3675,6 +2789,20 @@ export default function KidsPage() {
   const [step, setStep] = useState<string>("p-consent");
   const [A, setA]       = useState<Ans>({});
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+  const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
+  const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
+  const [itemsError, setItemsError] = useState(false);
+  const [scoreError, setScoreError] = useState(false);
+
+  function fetchKidsItems() {
+    setItemsError(false);
+    fetch("/api/questionnaire/kids/questions")
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(setKidsItems)
+      .catch(() => setItemsError(true));
+  }
+
+  useEffect(() => { fetchKidsItems(); }, []);
 
   useEffect(() => {
     if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
@@ -3691,8 +2819,30 @@ export default function KidsPage() {
         fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids" }) })
           .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
+      fetchScore(A);
     }
   }, [step]);
+
+  function fetchScore(answers: Ans) {
+    setScoreError(false);
+    setKidsScore(null);
+    fetch("/api/questionnaire/kids/score", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(answers),
+    })
+      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
+      .then(d => {
+        if (d.ok) setKidsScore({
+          emotional: d.emotional,
+          academic: d.academic,
+          developmental: d.developmental,
+          behavioral: d.behavioral,
+          social: d.social,
+        }); else throw new Error();
+      })
+      .catch(() => setScoreError(true));
+  }
 
   function goNext(newA: Ans = A) {
     setA(newA);
@@ -3703,7 +2853,7 @@ export default function KidsPage() {
   }
 
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
-  const pageProps = { A, setA, onNext: goNext, onBack: goBack };
+  const pageProps = { A, setA, onNext: goNext, onBack: goBack, items: kidsItems };
 
   if (usageAllowed === false && step !== "p-result") return (
     <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
@@ -3714,6 +2864,20 @@ export default function KidsPage() {
           ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
           בקרוב נפתח אפשרות לתשלום — עקבו אחרינו לעדכונים.
         </p>
+      </div>
+    </main>
+  );
+
+  if (itemsError) return (
+    <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
+        <div className="text-4xl mb-4">⚠️</div>
+        <h2 className="text-xl font-bold text-stone-900 mb-3">לא ניתן לטעון את השאלון</h2>
+        <p className="text-stone-500 mb-6 max-w-sm">בדוק את חיבור האינטרנט ונסה שוב.</p>
+        <button
+          onClick={fetchKidsItems}
+          className="px-6 py-3 bg-[#2c3e7a] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+        >נסה שוב</button>
       </div>
     </main>
   );
@@ -3801,7 +2965,7 @@ export default function KidsPage() {
       {step === "p-beh"          && <PageBeh        {...pageProps} />}
       {step === "p-soc"          && <PageSoc        {...pageProps} />}
 
-      {step === "p-result" && <PageResult A={A} onRestart={()=>{ setA({}); setStep("p-consent"); }} />}
+      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); }} />}
     </main>
   );
 }
