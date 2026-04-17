@@ -246,7 +246,7 @@ const ADULTS_SCREENS_ORDER = [
   "e5","e5-q","e6","e6-q","e7-q","e8","e8c","e8d","e9","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
-  "f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
+  "f-vision","f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
   "r-intake","r1","r1-scale","r2-q","r3","r3-partner",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
@@ -471,7 +471,7 @@ export default function AdultsPage() {
 
   function firstScreenForDomain(d: string): Screen {
     if (d === "emotional") return "e1";
-    if (d === "functional") return "f1";
+    if (d === "functional") return "f-vision";
     if (d === "relationship") return "r-intake";
     if (d === "addiction") return "a-types";
     return "scoring";
@@ -687,32 +687,6 @@ export default function AdultsPage() {
         )}
 
         <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי ראייה?</p>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setVisionAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
-            <button type="button" onClick={() => setVisionAns(false)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
-          </div>
-          {visionAns === true && (
-            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת ראייה (תוצאה זו תיכלל בפלט הסופי)</p>
-          )}
-        </div>
-
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי שמיעה?</p>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setHearingAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
-            <button type="button" onClick={() => setHearingAns(false)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
-          </div>
-          {hearingAns === true && (
-            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת שמיעה (תוצאה זו תיכלל בפלט הסופי)</p>
-          )}
-        </div>
-
-        <div className="mt-4">
           <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל (לחישוב BMI)</p>
           <div className="flex gap-3">
             <div className="flex-1">
@@ -743,7 +717,7 @@ export default function AdultsPage() {
           const bmiAbnormal = (height > 0 && weight > 0)
             ? (weight / Math.pow(height / 100, 2)) < 18.5 || (weight / Math.pow(height / 100, 2)) > 24.9
             : undefined;
-          upd({ age: localAge, vision: visionAns ?? undefined, hearing: hearingAns ?? undefined, bmiAbnormal });
+          upd({ age: localAge, bmiAbnormal });
           setScreen("domains");
         }}
           nextDisabled={!localAge || localAge < 18 || !answers.gender} />
@@ -1264,6 +1238,42 @@ if (screen === "e8c") return (
   // ═══════════════════════════════════════════════════════
   // FUNCTIONAL DOMAIN
   // ═══════════════════════════════════════════════════════
+
+  if (screen === "f-vision") return (
+    <Layout screen={screen}>
+      <Card badge="תחום תפקודי">
+        <p className="mb-4 font-semibold text-[#1a3a5c]">לפני השאלות על תפקוד אקדמאי ותעסוקתי:</p>
+        <div className="mb-5">
+          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי ראייה?</p>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setVisionAns(true)}
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
+            <button type="button" onClick={() => setVisionAns(false)}
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
+          </div>
+          {visionAns === true && (
+            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת ראייה (תוצאה זו תיכלל בפלט הסופי)</p>
+          )}
+        </div>
+        <div className="mb-2">
+          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי שמיעה?</p>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => setHearingAns(true)}
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
+            <button type="button" onClick={() => setHearingAns(false)}
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
+          </div>
+          {hearingAns === true && (
+            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת שמיעה (תוצאה זו תיכלל בפלט הסופי)</p>
+          )}
+        </div>
+        <NavRow onNext={() => {
+          upd({ vision: visionAns ?? undefined, hearing: hearingAns ?? undefined });
+          setScreen("f1");
+        }} nextDisabled={visionAns === null || hearingAns === null} />
+      </Card>
+    </Layout>
+  );
 
   if (screen === "f1") return (
     <Layout screen={screen}>
