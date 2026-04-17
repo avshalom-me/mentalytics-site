@@ -349,8 +349,9 @@ function scoreTherapist(
     } else if (onlineMatch) {
       earned += Math.round(WEIGHTS.locationOnline * 0.4); // 40% — אונליין בלבד
       reasons.push("מציע טיפול אונליין");
-    } else if (patientRegion && regions.length > 0) {
-      // Hard filter: therapist declared regions, none is nearby, no online → exclude
+    } else if (patientRegion) {
+      // Hard filter: no geographic match and user didn't request online → exclude
+      // (applies whether or not therapist declared regions)
       return null;
     }
   }
