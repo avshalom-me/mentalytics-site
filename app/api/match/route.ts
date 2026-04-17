@@ -312,6 +312,11 @@ function scoreTherapist(
   if (input.city || input.region || input.onlineRequired) {
     possible += WEIGHTS.locationOnline;
 
+    // Hard filter: online-only request (no city/region) — exclude non-online therapists
+    if (input.onlineRequired && !input.city && !input.region && !therapistOnline) {
+      return null;
+    }
+
     const patientRegion = input.region ??
       (input.city ? CITY_TO_REGION[input.city] ?? null : null);
 
