@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Sparkles, ShieldCheck, Heart, Users } from "lucide-react";
+import { Sparkles, Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "אודות",
@@ -37,6 +37,15 @@ const team: TeamMember[] = [
     role: "חברת הצוות המקצועי המפתח",
     img: "/team/shilat.jpeg",
     bullets: ["מנהלת מרכז טיפולי לילדים ומבוגרים במשך כעשור", "פיזיותרפיסטית ילדים"],
+  },
+  {
+    name: "יוחאי ברוקנר",
+    role: "חבר הצוות המקצועי המפתח",
+    img: "/team/yochai.jpg",
+    bullets: [
+      "פסיכולוג בהתמחות חינוכית ותעסוקתית",
+      "בעל ניסיון בתחום היזמות החברתית",
+    ],
   },
 ];
 
