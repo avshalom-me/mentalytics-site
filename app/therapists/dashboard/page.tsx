@@ -131,21 +131,34 @@ function StyleQuestion({ name, question, hint, value, onChange }: {
 }
 
 type StatsBucket = { whatsapp: number; phone: number; email: number; total: number };
-type StatsData = { week: StatsBucket; month: StatsBucket } | null;
+type SourceBreakdown = { match: StatsBucket; directory: StatsBucket };
+type TrendMonth = { label: string; total: number; match: number; directory: number };
+type Comparison = { your_month: number; avg_month: number; therapist_count: number };
+type StatsResponse = {
+  week: StatsBucket;
+  month: StatsBucket;
+  week_by_source?: SourceBreakdown;
+  month_by_source?: SourceBreakdown;
+  trends?: TrendMonth[];
+  profile_views?: { week: number; month: number };
+  comparison?: Comparison;
+};
 
-function ContactStats({ token }: { token: string }) {
-  const [stats, setStats] = useState<StatsData>(null);
+function ContactStats({ token, isPaying }: { token: string; isPaying: boolean }) {
+  const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const [period, setPeriod] = useState<"week" | "month">("week");
 
   useEffect(() => {
     fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
       .then(r => r.json())
-      .then(json => { if (json.ok) setStats({ week: json.week, month: json.month }); })
+      .then(json => { if (json.ok) setStats(json); })
       .finally(() => setLoadingStats(false));
   }, [token]);
 
   const data = stats?.[period];
+  const sourceData = period === "week" ? stats?.week_by_source : stats?.month_by_source;
+  const views = stats?.profile_views;
   const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
 
   return (
@@ -203,6 +216,88 @@ function ContactStats({ token }: { token: string }) {
             <span className="text-sm text-stone-600">סה"כ פניות</span>
             <span className="text-xl font-black text-[#0F5468]">{data.total}</span>
           </div>
+
+          {/* ── Enhanced stats: paying only ── */}
+          {isPaying && sourceData && (
+            <div className="mt-5 pt-5 border-t border-[#E8E0D8]">
+              {/* Source breakdown */}
+              <h3 className="text-sm font-bold text-stone-800 mb-3">פירוט לפי מקור</h3>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center">
+                  <div className="text-lg font-black text-teal-700">{sourceData.match.total}</div>
+                  <div className="text-xs text-teal-600 font-semibold">🎯 ממערכת ההתאמה</div>
+                </div>
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-center">
+                  <div className="text-lg font-black text-stone-700">{sourceData.directory.total}</div>
+                  <div className="text-xs text-stone-500 font-semibold">🔍 ממאגר המטפלים</div>
+                </div>
+              </div>
+
+              {/* Profile views */}
+              {views && (views.week > 0 || views.month > 0) && (
+                <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 mb-4 flex items-center justify-between">
+                  <span className="text-sm text-purple-700 font-semibold">👁 צפיות בפרופיל</span>
+                  <span className="text-lg font-black text-purple-700">{period === "week" ? views.week : views.month}</span>
+                </div>
+              )}
+
+              {/* Comparison */}
+              {stats?.comparison && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-4">
+                  <h4 className="text-xs font-bold text-amber-800 mb-2">📊 השוואה לממוצע (30 ימים)</h4>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="text-center">
+                      <div className="text-lg font-black text-amber-800">{stats.comparison.your_month}</div>
+                      <div className="text-xs text-amber-600">הפניות שלך</div>
+                    </div>
+                    <div className="text-stone-300 text-lg">|</div>
+                    <div className="text-center">
+                      <div className="text-lg font-black text-amber-800">{stats.comparison.avg_month}</div>
+                      <div className="text-xs text-amber-600">ממוצע ({stats.comparison.therapist_count} מטפלים)</div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Monthly trends */}
+              {stats?.trends && stats.trends.length > 0 && (
+                <div>
+                  <h3 className="text-sm font-bold text-stone-800 mb-3">📈 מגמה חודשית</h3>
+                  <div className="space-y-2">
+                    {stats.trends.map(m => {
+                      const maxTotal = Math.max(...stats.trends!.map(t => t.total), 1);
+                      const barWidth = Math.round((m.total / maxTotal) * 100);
+                      const [y, mo] = m.label.split("-");
+                      const monthNames = ["", "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
+                      const label = `${monthNames[Number(mo)]} ${y}`;
+                      return (
+                        <div key={m.label} className="flex items-center gap-2">
+                          <span className="text-xs text-stone-500 w-20 text-left flex-shrink-0">{label}</span>
+                          <div className="flex-1 h-5 bg-stone-100 rounded-full overflow-hidden relative">
+                            {m.total > 0 && (
+                              <div className="h-full rounded-full flex overflow-hidden" style={{ width: `${barWidth}%` }}>
+                                {m.match > 0 && (
+                                  <div className="h-full bg-teal-500" style={{ width: `${(m.match / m.total) * 100}%` }} />
+                                )}
+                                {m.directory > 0 && (
+                                  <div className="h-full bg-stone-400" style={{ width: `${(m.directory / m.total) * 100}%` }} />
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          <span className="text-xs font-bold text-stone-700 w-6 text-right">{m.total}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex items-center gap-4 mt-2 text-xs text-stone-500">
+                    <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-teal-500" /> התאמה</span>
+                    <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-stone-400" /> מאגר</span>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>
@@ -462,7 +557,7 @@ export default function TherapistDashboard() {
       )}
 
       {/* Contact stats */}
-      {token && !isNew && <ContactStats token={token} />}
+      {token && !isNew && <ContactStats token={token} isPaying={profile?.status === "paying"} />}
 
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-sm text-blue-800">

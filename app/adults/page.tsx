@@ -1992,6 +1992,13 @@ if (screen === "e8c") return (
                       וואטסאפ
                     </a>
                   )}
+                  {t.phone && (
+                    <a href={`tel:${t.phone}`}
+                      onClick={() => trackClick(t.id, "phone")}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-stone-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700">
+                      📞 התקשרו
+                    </a>
+                  )}
                   {t.email && (
                     <a href={`mailto:${t.email}?subject=פנייה דרך אתר טיפול חכם&body=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
                       onClick={() => trackClick(t.id, "email")}

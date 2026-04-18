@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { genderTitle, genderTitles } from "@/app/lib/gender-text";
 import ContactButtons from "./ContactButtons";
+import TrackView from "./TrackView";
 
 const BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 const BASE_URL = "https://www.tipolchacham.co.il";
@@ -120,6 +121,7 @@ export default async function TherapistProfilePage({
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <TrackView therapistId={id} source={source} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
