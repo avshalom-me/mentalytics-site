@@ -38,21 +38,35 @@ export async function POST(req: NextRequest) {
 
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
 
+  // Find therapist by user_id, fallback to email
+  let { data: therapist } = await supabaseAdmin
+    .from("therapists")
+    .select("id")
+    .eq("user_id", user.id)
+    .single();
+
+  if (!therapist && user.email) {
+    const { data: byEmail } = await supabaseAdmin
+      .from("therapists")
+      .select("id")
+      .eq("email", user.email)
+      .single();
+    if (byEmail) {
+      // Link user_id for future requests
+      await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id);
+      therapist = byEmail;
+    }
+  }
+
+  if (!therapist) return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
+
   if (type === "photo") {
-    // Store the path in profile_photo_path (same pattern as signup form)
     const { error: dbError } = await supabaseAdmin
       .from("therapists")
       .update({ profile_photo_path: path })
-      .eq("user_id", user.id);
+      .eq("id", therapist.id);
     if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
   } else {
-    // Find the therapist id, then insert into therapist_certificates table
-    const { data: therapist } = await supabaseAdmin
-      .from("therapists")
-      .select("id")
-      .eq("user_id", user.id)
-      .single();
-    if (!therapist) return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
 
     const { error: dbError } = await supabaseAdmin
       .from("therapist_certificates")
