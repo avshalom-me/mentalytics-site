@@ -65,18 +65,6 @@ export default function TherapistLoginPage() {
           <p className="text-stone-600 text-sm mt-1">ניהול הפרופיל המקצועי שלך</p>
         </div>
 
-        {/* Plan comparison */}
-        <div className="mb-5 grid grid-cols-2 gap-3 text-sm">
-          <div className="rounded-2xl bg-white border border-[#E8E0D8] p-4">
-            <div className="text-xs font-bold text-green-700 mb-2">✓ חינמי</div>
-            <p className="text-xs text-stone-600 leading-5">פרסום דף מידע אישי — פרופיל שלך עם תמונה, ביוגרפיה ותחומי ההתמחות שלך.</p>
-          </div>
-          <div className="rounded-2xl border-2 p-4" style={{ background: "linear-gradient(160deg,#0F5468,#1A7A96)", borderColor: "#0F5468" }}>
-            <div className="text-xs font-bold text-yellow-300 mb-2">★ מקודם</div>
-            <p className="text-xs text-white/90 leading-5">כניסה למערכת ההתאמה — פניות מדויקות לפי תחומי הטיפול, הסגנון המקצועי שלך ופרמטרים מגוונים.</p>
-          </div>
-        </div>
-
         <div className="bg-white rounded-2xl shadow-sm border border-[#E8E0D8] p-8">
           {/* Google */}
           <button

@@ -71,7 +71,7 @@ export default function TherapistsPage() {
       {/* Header */}
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-3xl font-extrabold text-stone-900">המטפלים שלנו</h1>
-        <Link href="/therapists/signup"
+        <Link href="/therapists/login"
           className="rounded-xl bg-[#2e7d8c] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
           כניסת מטפלים / רישום ▸
         </Link>
