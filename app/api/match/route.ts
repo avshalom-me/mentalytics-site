@@ -530,7 +530,6 @@ export async function POST(req: NextRequest) {
           personality_score: result.personality_score,
           combined_score: combinedScore(result.score, result.personality_score),
           match_reasons: result.reasons,
-          debug_normalized: result.normalizedTherapist,
         };
       })
     );
