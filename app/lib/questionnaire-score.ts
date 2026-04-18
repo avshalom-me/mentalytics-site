@@ -621,7 +621,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           recs.push({
             id: uid("employment-assess"),
             symptomText: "מדווחים קשיים בתחום התעסוקתי.",
-            treatment: "טיפול תעסוקתי",
+            treatment: "אבחון תעסוקתי",
             treatmentLabel: "אבחון תעסוקתי",
             domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
             urgent: false,
@@ -651,7 +651,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           recs.push({
             id: uid("employment-assess"),
             symptomText: "מדווחים קשיים בתחום התעסוקתי.",
-            treatment: "טיפול תעסוקתי",
+            treatment: "אבחון תעסוקתי",
             treatmentLabel: "אבחון תעסוקתי",
             domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
             urgent: false,

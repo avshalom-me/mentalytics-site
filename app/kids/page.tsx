@@ -2280,6 +2280,7 @@ const KIDS_TREATMENT_MAP: { rx: RegExp; areas: string[] }[] = [
   { rx: /ריפוי בעיסוק/,                 areas: ["ריפוי בעיסוק"] },
   { rx: /קבוצה חברתית/,                areas: ["קבוצה חברתית"] },
   { rx: /טיפול תעסוקתי/,               areas: ["טיפול תעסוקתי"] },
+  { rx: /פסיכו.?דידקטי/,              areas: ["פסיכו-דידקטי"] },
 ];
 
 function extractKidsTreatments(score: KidsScoreResult): string[] {
