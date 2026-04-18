@@ -316,6 +316,7 @@ export default function TherapistDashboard() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showRefundNote, setShowRefundNote] = useState(false);
 
@@ -345,6 +346,7 @@ export default function TherapistDashboard() {
 
       if (json.therapist) {
         setProfile(json.therapist);
+        if (json.photoUrl) setProfilePhotoUrl(json.photoUrl);
         setForm({
           full_name: json.therapist.full_name ?? "",
           phone: json.therapist.phone ?? "",
@@ -430,9 +432,13 @@ export default function TherapistDashboard() {
       setIsNew(false);
       setPhotoFile(null);
       setCertFile(null);
+      setPhotoPreview(null);
       const res2 = await fetch("/api/therapist-profile", { headers: { Authorization: `Bearer ${token}` } });
       const json2 = await res2.json();
-      if (json2.therapist) setProfile(json2.therapist);
+      if (json2.therapist) {
+        setProfile(json2.therapist);
+        if (json2.photoUrl) setProfilePhotoUrl(json2.photoUrl);
+      }
     } else {
       setSaveErr(json.error ?? "שגיאה בשמירה");
     }
@@ -677,9 +683,9 @@ export default function TherapistDashboard() {
               פרופילים עם תמונה מקבלים פניות רבות באופן משמעותי. מומלץ להוסיף תמונה.
             </div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל <span className="text-stone-400 font-normal">(רשות)</span></label>
-            {(photoPreview || profile?.profile_photo_path) && (
+            {(photoPreview || profilePhotoUrl) && (
               <img
-                src={photoPreview || supabase.storage.from("therapist-certificates").getPublicUrl(profile!.profile_photo_path!).data.publicUrl}
+                src={photoPreview || profilePhotoUrl!}
                 alt="תמונה"
                 className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
             )}

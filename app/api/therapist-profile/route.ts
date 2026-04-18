@@ -47,7 +47,16 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, therapist: therapist ?? null, user_id: user.id, email: user.email });
+  // Generate signed photo URL if therapist has a profile photo
+  let photoUrl: string | null = null;
+  if (therapist?.profile_photo_path) {
+    const { data: signed } = await supabaseAdmin.storage
+      .from("therapist-certificates")
+      .createSignedUrl(therapist.profile_photo_path, 60 * 60 * 24);
+    if (signed?.signedUrl) photoUrl = signed.signedUrl;
+  }
+
+  return NextResponse.json({ ok: true, therapist: therapist ?? null, photoUrl, user_id: user.id, email: user.email });
 }
 
 // PATCH — update the therapist profile
