@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { genderTitle, genderTitles } from "@/app/lib/gender-text";
 import ContactButtons from "./ContactButtons";
 
 const BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
@@ -61,7 +62,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   const { therapist } = result;
   const name = therapist.full_name ?? "מטפל";
-  const type = therapist.therapist_types?.[0] ?? "מטפל נפשי";
+  const type = genderTitle(therapist.therapist_types?.[0] ?? "מטפל נפשי", therapist.gender);
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
 
   return {
@@ -91,7 +92,7 @@ export default async function TherapistProfilePage({
 
   const { therapist: t, photoUrl } = result;
   const name = t.full_name ?? "מטפל";
-  const type = t.therapist_types?.[0] ?? "";
+  const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const waLink = t.phone
     ? `https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`
@@ -192,7 +193,7 @@ export default async function TherapistProfilePage({
         {hasDetails && (
           <Accordion title="פרטים מקצועיים">
             <div className="space-y-3">
-              {t.therapist_types && t.therapist_types.length > 0 && <DetailRow label="הכשרה" value={t.therapist_types.join(", ")} />}
+              {t.therapist_types && t.therapist_types.length > 0 && <DetailRow label="הכשרה" value={genderTitles(t.therapist_types, t.gender).join(", ")} />}
               {t.training_areas && t.training_areas.length > 0 && <DetailRow label="תחומי טיפול" value={t.training_areas.join(", ")} />}
               {t.assessment_types && t.assessment_types.length > 0 && <DetailRow label="אבחונים" value={t.assessment_types.join(", ")} />}
               {t.age_groups && t.age_groups.length > 0 && <DetailRow label="גיל מטופלים" value={t.age_groups.join(", ")} />}

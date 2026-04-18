@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
+import { genderTitle } from "@/app/lib/gender-text";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -125,7 +126,7 @@ export default function TherapistsPage() {
                 <div className="px-4 pt-4 pb-3">
                   <div className="font-extrabold text-stone-900 text-base leading-tight">{t.full_name}</div>
                   {t.therapist_types.length > 0 && (
-                    <div className="mt-0.5 text-xs text-stone-500">{t.therapist_types[0]}</div>
+                    <div className="mt-0.5 text-xs text-stone-500">{genderTitle(t.therapist_types[0], t.gender)}</div>
                   )}
                   {bioSnippet && (
                     <p className="mt-1.5 text-xs text-stone-600 leading-relaxed line-clamp-2">{bioSnippet}</p>

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
@@ -389,16 +388,13 @@ function scoreTherapist(
 
   if (input.ageGroups.length > 0) {
     const therapistAgeGroups = parseArray(therapist.age_groups);
-    // Hard filter: if therapist declared specific age groups and there's no overlap → exclude
-    if (therapistAgeGroups.length > 0 && !hasOverlap(therapistAgeGroups, input.ageGroups)) {
+    // Hard filter: therapist must have declared matching age groups
+    if (therapistAgeGroups.length === 0 || !hasOverlap(therapistAgeGroups, input.ageGroups)) {
       return null;
     }
-    // Soft score: reward match
     possible += WEIGHTS.ageGroup;
-    if (therapistAgeGroups.length === 0 || hasOverlap(therapistAgeGroups, input.ageGroups)) {
-      earned += WEIGHTS.ageGroup;
-      reasons.push("התאמה בקבוצת גיל");
-    }
+    earned += WEIGHTS.ageGroup;
+    reasons.push("התאמה בקבוצת גיל");
   }
 
   const score =
@@ -438,26 +434,10 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl || !serviceRoleKey) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error:
-            "Missing env vars: NEXT_PUBLIC_SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY",
-        },
-        { status: 500 }
-      );
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
     const body = await req.json().catch(() => ({}));
     const input = normalizeInput(body);
 
-    const { data, error } = await supabase
+    const { data, error } = await supabaseAdmin
       .from("therapists")
       .select(
         "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
@@ -506,7 +486,7 @@ export async function POST(req: NextRequest) {
     const ADDICTION_LABEL = normalizeText("טיפול בהתמכרויות");
     const addictionRequested = input.treatmentTypes.some(t => normalizeText(t) === ADDICTION_LABEL);
     const addictionCbtFallback = addictionRequested &&
-      top.every(({ result }) => !result.normalizedTherapist.trainingAreas.some(a => normalizeText(a) === ADDICTION_LABEL));
+      scored.every(({ result }) => !result.normalizedTherapist.trainingAreas.some(a => normalizeText(a) === ADDICTION_LABEL));
 
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {

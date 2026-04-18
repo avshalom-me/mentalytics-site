@@ -7,6 +7,7 @@ import type {
   Recommendation,
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
+import { genderTitle } from "@/app/lib/gender-text";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -1868,7 +1869,7 @@ if (screen === "e8c") return (
                 <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">הכשרה</div>
                 <div className="flex flex-wrap gap-1">
                   {(Array.isArray(selectedTherapist.therapist_types) ? selectedTherapist.therapist_types : [selectedTherapist.therapist_types]).map((t: string, i: number) => (
-                    <span key={i} className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-800">{t}</span>
+                    <span key={i} className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-800">{genderTitle(t, selectedTherapist.gender)}</span>
                   ))}
                 </div>
               </div>
