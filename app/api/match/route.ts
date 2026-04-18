@@ -27,6 +27,7 @@ type TherapistRow = {
   therapist_types: unknown;
   training_areas: unknown;
   assessment_types: unknown;
+  couples_modalities: unknown;
   regions: unknown;
   cultural_prefs: unknown;
   arrangements: unknown;
@@ -260,9 +261,13 @@ function scoreTherapist(
   input: NormalizedMatchInput
 ) {
   const therapistTypes = parseArray(therapist.therapist_types);
+  const couplesModalities = parseArray(therapist.couples_modalities);
   const trainingAreas = uniqueStrings([
     ...parseArray(therapist.training_areas),
     ...parseArray(therapist.assessment_types),
+    // If therapist has any couples modality (EFT/דינאמי/מבני), synthesise "טיפול זוגי"
+    // so they match even if the parent entry is missing from training_areas
+    ...(couplesModalities.length > 0 ? ["טיפול זוגי"] : []),
   ]);
   const regions = parseArray(therapist.regions);
   const culturalPrefs = parseArray(therapist.cultural_prefs);
@@ -455,7 +460,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabase
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       .eq("status", "paying");
 
@@ -485,6 +490,11 @@ export async function POST(req: NextRequest) {
     }
 
     scored.sort((a, b) => {
+      const profDiff = b.result.score - a.result.score;
+      // Primary: professional score — expertise/location/etc.
+      // Personality can only affect ranking when professional scores are within 8 points
+      if (Math.abs(profDiff) > 8) return profDiff;
+      // Tiebreaker within close range: combined score (personality can tip)
       const ca = combinedScore(a.result.score, a.result.personality_score);
       const cb = combinedScore(b.result.score, b.result.personality_score);
       return cb - ca;
