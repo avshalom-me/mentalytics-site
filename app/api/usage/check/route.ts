@@ -16,46 +16,63 @@ function getIp(req: NextRequest): string {
   );
 }
 
-// GET /api/usage/check?type=adults  — check without incrementing
+function getMaxCount(rows: { count: number }[]): number {
+  if (rows.length === 0) return 0;
+  return Math.max(...rows.map((r) => r.count));
+}
+
+// GET /api/usage/check?type=adults&fp=HASH  — check without incrementing
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
   if (!type) return NextResponse.json({ error: "missing type" }, { status: 400 });
 
   const ip = getIp(req);
+  const fp = req.nextUrl.searchParams.get("fp");
+
+  const identifiers = [ip];
+  if (fp) identifiers.push(`fp:${fp}`);
+
   const { data } = await supabase
     .from("quiz_usage")
     .select("count")
-    .eq("ip", ip)
-    .eq("quiz_type", type)
-    .single();
+    .in("ip", identifiers)
+    .eq("quiz_type", type);
 
-  const count = data?.count ?? 0;
+  const count = getMaxCount(data ?? []);
   return NextResponse.json({ allowed: count < MAX_FREE, count });
 }
 
 // POST /api/usage/check  — increment and return new status
 export async function POST(req: NextRequest) {
-  const { type } = await req.json();
+  const { type, fp } = await req.json();
   if (!type) return NextResponse.json({ error: "missing type" }, { status: 400 });
 
   const ip = getIp(req);
 
+  const identifiers = [ip];
+  if (fp) identifiers.push(`fp:${fp}`);
+
   const { data: existing } = await supabase
     .from("quiz_usage")
-    .select("count")
-    .eq("ip", ip)
-    .eq("quiz_type", type)
-    .single();
+    .select("ip, count")
+    .in("ip", identifiers)
+    .eq("quiz_type", type);
 
-  if (existing && existing.count >= MAX_FREE) {
-    return NextResponse.json({ allowed: false, count: existing.count });
+  const maxCount = getMaxCount(existing ?? []);
+
+  if (maxCount >= MAX_FREE) {
+    return NextResponse.json({ allowed: false, count: maxCount });
   }
 
-  const newCount = (existing?.count ?? 0) + 1;
-  await supabase.from("quiz_usage").upsert(
-    { ip, quiz_type: type, count: newCount, updated_at: new Date().toISOString() },
-    { onConflict: "ip,quiz_type" }
-  );
+  const newCount = maxCount + 1;
+  const now = new Date().toISOString();
+
+  for (const id of identifiers) {
+    await supabase.from("quiz_usage").upsert(
+      { ip: id, quiz_type: type, count: newCount, updated_at: now },
+      { onConflict: "ip,quiz_type" }
+    );
+  }
 
   return NextResponse.json({ allowed: true, count: newCount });
 }

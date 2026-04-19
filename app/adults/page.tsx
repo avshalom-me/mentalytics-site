@@ -8,6 +8,7 @@ import type {
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
+import { getFingerprint } from "@/app/lib/fingerprint";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -217,12 +218,12 @@ export default function AdultsPage() {
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
 
   useEffect(() => {
-    // Admin bypass via localStorage
     if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
-    fetch("/api/usage/check?type=adults")
+    getFingerprint()
+      .then(fp => fetch(`/api/usage/check?type=adults&fp=${fp}`))
       .then(r => r.json())
       .then(d => setUsageAllowed(d.allowed))
-      .catch(() => setUsageAllowed(true)); // on error — allow
+      .catch(() => setUsageAllowed(true));
   }, []);
 
   const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);
@@ -362,16 +363,18 @@ export default function AdultsPage() {
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations, therapistStyleScore: json.therapistStyleScore });
       if (localStorage.getItem("quiz_bypass") !== "1") {
-        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults" }) })
-          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+        getFingerprint().then(fp =>
+          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults", fp }) })
+        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
       if (localStorage.getItem("quiz_bypass") !== "1") {
-        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults" }) })
-          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+        getFingerprint().then(fp =>
+          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults", fp }) })
+        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });

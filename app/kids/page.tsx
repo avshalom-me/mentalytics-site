@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
+import { getFingerprint } from "@/app/lib/fingerprint";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -2813,7 +2814,8 @@ export default function KidsPage() {
 
   useEffect(() => {
     if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
-    fetch("/api/usage/check?type=kids")
+    getFingerprint()
+      .then(fp => fetch(`/api/usage/check?type=kids&fp=${fp}`))
       .then(r => r.json())
       .then(d => setUsageAllowed(d.allowed))
       .catch(() => setUsageAllowed(true));
@@ -2823,8 +2825,9 @@ export default function KidsPage() {
     if (step === "p-result") {
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "kids" });
       if (localStorage.getItem("quiz_bypass") !== "1") {
-        fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids" }) })
-          .then(r => r.json()).then(d => setUsageAllowed(d.allowed));
+        getFingerprint().then(fp =>
+          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids", fp }) })
+        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
       }
       fetchScore(A);
     }
