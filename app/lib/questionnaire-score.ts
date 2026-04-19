@@ -65,11 +65,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
   }
 
-  // Compute therapist style score (average of Q1+Q2 as 1-7, for matching)
   const styleQ1 = answers.emotional?.therapistStyleQ1 ?? 0;
   const styleQ2 = answers.emotional?.therapistStyleQ2 ?? 0;
-  const therapistStyleScore =
-    styleQ1 > 0 || styleQ2 > 0 ? Math.round((styleQ1 + styleQ2) / 2) : null;
 
   const { treatment: emotTreatment, treatmentLabel: emotLabel, mixed } =
     resolveEmotionalTreatment(styleQ1, styleQ2);
@@ -883,6 +880,5 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
 
   return {
     recommendations: sorted,
-    therapistStyleScore,
   };
 }

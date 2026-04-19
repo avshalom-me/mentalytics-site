@@ -60,6 +60,7 @@ type NormalizedMatchInput = {
   languages: string[];
   couplesModality: string | null;
   needsSexualTherapy: boolean;
+  expressiveModalities: string[];
 };
 
 const WEIGHTS = {
@@ -72,6 +73,7 @@ const WEIGHTS = {
   ageGroup: 15,        // age_groups
   couplesBonus: 8,     // exact couples modality match (EFT/דינאמי/מבני)
   sexualBonus: 6,      // therapist also does sexual therapy when needed
+  expressiveBonus: 8,  // expressive therapy modality match (art/music/movement)
 };
 
 function normalizeText(value: unknown): string {
@@ -228,6 +230,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   const languages = mergeArrays(body.languages);
   const couplesModality = firstNonEmptyString(body.couplesModality, body.couples_modality);
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
+  const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
 
   return {
     treatmentTypes,
@@ -247,6 +250,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     languages,
     couplesModality,
     needsSexualTherapy,
+    expressiveModalities,
   };
 }
 
@@ -328,6 +332,20 @@ function scoreTherapist(
         therapistTypes.some((t) => normalizeText(t).includes("מיני"))) {
       earned += WEIGHTS.sexualBonus;
       reasons.push("המטפל/ת מתמחה גם בטיפול מיני");
+    }
+  }
+
+  // Bonus: expressive therapy modality match (e.g. child prefers art and therapist does art therapy)
+  if (input.expressiveModalities.length > 0) {
+    possible += WEIGHTS.expressiveBonus;
+    const matched = intersection(trainingAreas, input.expressiveModalities);
+    if (matched.length > 0) {
+      const coverage = matched.length / input.expressiveModalities.length;
+      earned += Math.round(WEIGHTS.expressiveBonus * coverage);
+      reasons.push(`התאמה בטיפול בהבעה ויצירה: ${matched.join(", ")}`);
+    } else if (trainingAreas.some((a) => normalizeText(a).includes("הבעה ויצירה"))) {
+      earned += Math.round(WEIGHTS.expressiveBonus * 0.4);
+      reasons.push("מטפל/ת בהבעה ויצירה (גישה אחרת)");
     }
   }
 

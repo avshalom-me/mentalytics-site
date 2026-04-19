@@ -361,7 +361,7 @@ export default function AdultsPage() {
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
-      setScoring({ recommendations: json.recommendations, therapistStyleScore: json.therapistStyleScore });
+      setScoring({ recommendations: json.recommendations });
       if (localStorage.getItem("quiz_bypass") !== "1") {
         getFingerprint().then(fp =>
           fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults", fp }) })
@@ -1945,6 +1945,11 @@ if (screen === "e8c") return (
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
       {(matchResults ?? []).length === 0 && (
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-[#6b7280] shadow">לא נמצאו מטפלים מתאימים. נסה/י לשנות את הפרמטרים.</div>
+      )}
+      {addictionCbtFallback && (matchResults ?? []).length > 0 && (
+        <div className="rounded-2xl bg-amber-50 border border-amber-200 p-4 text-sm text-amber-800" dir="rtl">
+          <strong>שימו לב:</strong> לא נמצאו מטפלים המתמחים ספציפית בהתמכרויות. המטפלים המוצגים מתאימים מבחינת פרמטרים אחרים. מומלץ לשקול גם פנייה למטפל/ת CBT (טיפול קוגניטיבי-התנהגותי), שהוכח כיעיל בטיפול בהתמכרויות.
+        </div>
       )}
       <div className="space-y-4">
         {(matchResults ?? []).map((t: any) => (

@@ -2302,6 +2302,30 @@ function extractKidsTreatments(score: KidsScoreResult): string[] {
   return Array.from(found);
 }
 
+const EXPRESSIVE_MODALITY_MAP: Record<string, string> = {
+  "אומנות": "טיפול באומנות",
+  "מוזיקה": "טיפול במוזיקה",
+  "תנועה": "טיפול בתנועה",
+  "דרמה": "דרמה תרפיה",
+  "פסיכודרמה": "פסיכודרמה",
+  'בע"ח': 'טיפול בעזרת בע"ח',
+};
+
+function extractExpressivePrefs(score: KidsScoreResult): string[] {
+  const allBoxes = [
+    ...score.emotional, ...score.academic, ...score.developmental,
+    ...score.behavioral, ...score.social,
+  ];
+  const found = new Set<string>();
+  for (const box of allBoxes) {
+    if (!box.txt.includes("📌")) continue;
+    for (const [keyword, modality] of Object.entries(EXPRESSIVE_MODALITY_MAP)) {
+      if (box.txt.includes(keyword)) found.add(modality);
+    }
+  }
+  return Array.from(found);
+}
+
 function getKidsAgeGroups(A: Ans): string[] {
   const grp = gg(A);
   if (grp === "ga") return ["גיל הרך", "ילדים"];
@@ -2350,6 +2374,7 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
   const rawTreatments = score ? extractKidsTreatments(score) : [];
   const treatments = rawTreatments.length > 0 ? rawTreatments : ["טיפול דינאמי"];
   const ageGroups  = getKidsAgeGroups(A);
+  const expressivePrefs = score ? extractExpressivePrefs(score) : [];
 
   async function fetchExplanation(t: KidsMatchResult) {
     if (explainLoading[t.id] || explainData[t.id]) return;
@@ -2413,6 +2438,7 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
           culturalPreferences: cultural,
           arrangements,
           languages: [language || "עברית"],
+          expressiveModalities: expressivePrefs.length > 0 ? expressivePrefs : undefined,
           limit: 10,
         }),
       });

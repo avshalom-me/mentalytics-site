@@ -122,5 +122,4 @@ export type Recommendation = {
 
 export type ScoringResult = {
   recommendations: Recommendation[];
-  therapistStyleScore: number | null;  // 1-7, עבור matching
 };

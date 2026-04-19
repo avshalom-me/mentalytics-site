@@ -6,9 +6,11 @@ import { REGION_CITIES } from "@/app/lib/regions";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   AGE_GROUPS, LANGUAGES, CULTURAL_PREFS, ARRANGEMENTS,
+  COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
 } from "@/app/lib/therapist-options";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
+const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
 type Profile = {
   id: string;
@@ -303,6 +305,7 @@ export default function TherapistDashboard() {
     assessment_types: [] as string[], regions: [] as string[],
     cultural_prefs: [] as string[], arrangements: [] as string[],
     age_groups: [] as string[], languages: [] as string[],
+    couples_modalities: [] as string[], play_therapy_modalities: [] as string[],
     style_q1: null as number | null,
     style_q2: null as number | null,
     activity_level: null as number | null,
@@ -330,7 +333,9 @@ export default function TherapistDashboard() {
           gender: json.therapist.gender ?? "",
           online: json.therapist.online ?? false,
           therapist_types: json.therapist.therapist_types ?? [],
-          training_areas: json.therapist.training_areas ?? [],
+          training_areas: (json.therapist.training_areas ?? []).filter((a: string) => !PLAY_MODALITIES_SET.has(a)),
+          couples_modalities: json.therapist.couples_modalities ?? [],
+          play_therapy_modalities: (json.therapist.training_areas ?? []).filter((a: string) => PLAY_MODALITIES_SET.has(a)),
           assessment_types: json.therapist.assessment_types ?? [],
           regions: json.therapist.regions ?? [],
           cultural_prefs: json.therapist.cultural_prefs ?? [],
@@ -414,10 +419,15 @@ export default function TherapistDashboard() {
       }
     }
 
+    const { play_therapy_modalities, ...rest } = form;
+    const patchBody = {
+      ...rest,
+      training_areas: [...form.training_areas, ...play_therapy_modalities],
+    };
     const res = await fetch("/api/therapist-profile", {
       method: "PATCH",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(form),
+      body: JSON.stringify(patchBody),
     });
     const json = await res.json();
     if (json.ok) {
@@ -624,7 +634,24 @@ export default function TherapistDashboard() {
           <CheckboxGroup label="סוג מטפל" options={THERAPIST_TYPES}
             selected={form.therapist_types} onChange={v => setForm({...form, therapist_types: v})} />
           <CheckboxGroup label="תחומי טיפול" options={TRAINING_AREAS}
-            selected={form.training_areas} onChange={v => setForm({...form, training_areas: v})} />
+            selected={form.training_areas} onChange={v => {
+              const hadCouples = form.training_areas.includes("טיפול זוגי");
+              const hasCouples = v.includes("טיפול זוגי");
+              const hadExpressive = form.training_areas.includes("טיפול בהבעה ויצירה");
+              const hasExpressive = v.includes("טיפול בהבעה ויצירה");
+              setForm({...form, training_areas: v,
+                couples_modalities: hadCouples && !hasCouples ? [] : form.couples_modalities,
+                play_therapy_modalities: hadExpressive && !hasExpressive ? [] : form.play_therapy_modalities,
+              });
+            }} />
+          {form.training_areas.includes("טיפול זוגי") && (
+            <CheckboxGroup label="גישה זוגית" options={COUPLES_MODALITIES}
+              selected={form.couples_modalities} onChange={v => setForm({...form, couples_modalities: v})} />
+          )}
+          {form.training_areas.includes("טיפול בהבעה ויצירה") && (
+            <CheckboxGroup label="סוג הטיפול בהבעה ויצירה" options={PLAY_THERAPY_MODALITIES}
+              selected={form.play_therapy_modalities} onChange={v => setForm({...form, play_therapy_modalities: v})} />
+          )}
           <CheckboxGroup label="סוגי אבחון" options={ASSESSMENT_TYPES}
             selected={form.assessment_types} onChange={v => setForm({...form, assessment_types: v})} />
           <CheckboxGroup label="קבוצות גיל" options={AGE_GROUPS}
