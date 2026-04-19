@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 
+export const revalidate = 3600;
+
 type TherapistRow = {
   id: string;
   full_name: string | null;
@@ -91,7 +93,7 @@ export async function GET() {
     { ok: true, therapists },
     {
       headers: {
-        "Cache-Control": "no-store",
+        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=600",
       },
     }
   );

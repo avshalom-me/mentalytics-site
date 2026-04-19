@@ -224,7 +224,6 @@ export async function POST(req: Request) {
             });
 
           if (photoErr) {
-            console.error("PROFILE PHOTO UPLOAD ERROR:", photoErr);
             uploadWarnings.push(`תמונת פרופיל: ${photoErr.message}`);
           } else {
             const { error: updatePhotoErr } = await supabase
@@ -233,7 +232,6 @@ export async function POST(req: Request) {
               .eq("id", therapist.id);
 
             if (updatePhotoErr) {
-              console.error("PROFILE PHOTO DB UPDATE ERROR:", updatePhotoErr);
               uploadWarnings.push(
                 `שמירת נתיב תמונת פרופיל: ${updatePhotoErr.message}`
               );
@@ -276,7 +274,6 @@ export async function POST(req: Request) {
         });
 
       if (upErr) {
-        console.error("CERTIFICATE UPLOAD ERROR:", file.name, upErr);
         uploadWarnings.push(`${file.name}: ${upErr.message}`);
         continue;
       }
@@ -292,7 +289,6 @@ export async function POST(req: Request) {
         });
 
       if (certInsertErr) {
-        console.error("CERTIFICATE DB INSERT ERROR:", file.name, certInsertErr);
         uploadWarnings.push(
           `${file.name}: נשמר ב-bucket אבל לא נרשם בטבלת התעודות`
         );
@@ -312,8 +308,6 @@ export async function POST(req: Request) {
       { status: 200 }
     );
   } catch (e: any) {
-    console.error("SIGNUP API ERROR:", e);
-
     return new Response(
       JSON.stringify({ ok: false, error: e?.message ?? String(e) }),
       { status: 500 }

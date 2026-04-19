@@ -55,12 +55,27 @@ function TrustBadge({ icon: Icon, text, color }: { icon: any; text: string; colo
 }
 
 export default function HomePage() {
+  const jsonLd = {
+    "@context": "https://schema.org",
+    "@type": ["MedicalBusiness", "HealthAndBeautyBusiness"],
+    name: "טיפול חכם",
+    url: "https://www.tipolchacham.co.il",
+    description:
+      "מערכת הכוונה טיפולית חכמה — התאמת מטפלים על בסיס שאלונים מבוססי מחקר",
+    areaServed: { "@type": "Country", name: "IL" },
+    serviceType: "Therapist Matching",
+  };
+
   return (
     <main
       className="mx-auto max-w-5xl px-5 pb-20"
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
 

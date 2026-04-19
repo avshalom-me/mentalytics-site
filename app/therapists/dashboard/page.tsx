@@ -371,15 +371,20 @@ export default function TherapistDashboard() {
     return () => subscription.unsubscribe();
   }, []);
 
-  async function uploadFile(file: File, type: "photo" | "certificate") {
+  async function uploadFile(file: File, type: "photo" | "certificate"): Promise<string | null> {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", type);
-    await fetch("/api/therapist-upload", {
+    const res = await fetch("/api/therapist-upload", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}` },
       body: fd,
     });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      return json.error ?? `שגיאה בהעלאת ${type === "photo" ? "תמונה" : "תעודה"} (${res.status})`;
+    }
+    return null;
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -392,9 +397,21 @@ export default function TherapistDashboard() {
     // Upload files if selected
     if (photoFile || certFile) {
       setUploading(true);
-      if (photoFile) await uploadFile(photoFile, "photo");
-      if (certFile) await uploadFile(certFile, "certificate");
+      const uploadErrors: string[] = [];
+      if (photoFile) {
+        const err = await uploadFile(photoFile, "photo");
+        if (err) uploadErrors.push(err);
+      }
+      if (certFile) {
+        const err = await uploadFile(certFile, "certificate");
+        if (err) uploadErrors.push(err);
+      }
       setUploading(false);
+      if (uploadErrors.length) {
+        setSaveErr(uploadErrors.join("; "));
+        setSaving(false);
+        return;
+      }
     }
 
     const res = await fetch("/api/therapist-profile", {
