@@ -667,6 +667,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     const r = answers.relationship;
 
     // --- R1: Sexual dysfunction ---
+    const hasSexualNeed = !!r.r1;
     if (r.r1) {
       if (r.r1InRelationship) {
         recs.push({
@@ -698,9 +699,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       const maxSum = Math.max(eftSum, dynSum, struSum);
 
       let approachLabel = "טיפול זוגי";
-      if (maxSum === eftSum) approachLabel = "EFT (טיפול ממוקד רגש)";
-      else if (maxSum === dynSum) approachLabel = "טיפול זוגי דינמי";
-      else approachLabel = "טיפול זוגי מבני";
+      let modality: string | undefined;
+      if (maxSum === eftSum) { approachLabel = "EFT (טיפול ממוקד רגש)"; modality = "EFT"; }
+      else if (maxSum === dynSum) { approachLabel = "טיפול זוגי דינמי"; modality = "דינאמי"; }
+      else { approachLabel = "טיפול זוגי מבני"; modality = "מבני"; }
 
       recs.push({
         id: uid("couple-therapy"),
@@ -709,6 +711,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         treatmentLabel: "טיפול זוגי",
         domain: "זוגיות ומשפחה",
         urgent: false,
+        couplesModality: modality,
+        needsSexualTherapy: hasSexualNeed,
       });
     }
 

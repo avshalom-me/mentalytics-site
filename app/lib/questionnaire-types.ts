@@ -116,6 +116,8 @@ export type Recommendation = {
   urgent: boolean;
   notes?: string;                   // הערות נוספות
   tools?: string;                   // כלים להתמודדות עצמית
+  couplesModality?: string;         // EFT / דינאמי / מבני
+  needsSexualTherapy?: boolean;     // שילוב טיפול מיני
 };
 
 export type ScoringResult = {

@@ -404,6 +404,8 @@ export default function AdultsPage() {
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
+        couplesModality: selectedRec?.couplesModality ?? undefined,
+        needsSexualTherapy: selectedRec?.needsSexualTherapy ?? false,
         limit: 10,
       };
       const res = await fetch("/api/match", {

@@ -58,6 +58,8 @@ type NormalizedMatchInput = {
   styleP3: number | null;
   ageGroups: string[];
   languages: string[];
+  couplesModality: string | null;
+  needsSexualTherapy: boolean;
 };
 
 const WEIGHTS = {
@@ -68,6 +70,8 @@ const WEIGHTS = {
   cultural: 5,         // cultural_prefs
   arrangements: 3,     // arrangements
   ageGroup: 15,        // age_groups
+  couplesBonus: 8,     // exact couples modality match (EFT/דינאמי/מבני)
+  sexualBonus: 6,      // therapist also does sexual therapy when needed
 };
 
 function normalizeText(value: unknown): string {
@@ -222,6 +226,8 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   const ageGroups = mergeArrays(body.ageGroups, body.age_groups);
   const city = firstNonEmptyString(body.city, body.city_name);
   const languages = mergeArrays(body.languages);
+  const couplesModality = firstNonEmptyString(body.couplesModality, body.couples_modality);
+  const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
 
   return {
     treatmentTypes,
@@ -239,6 +245,8 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     styleP3,
     ageGroups,
     languages,
+    couplesModality,
+    needsSexualTherapy,
   };
 }
 
@@ -301,6 +309,25 @@ function scoreTherapist(
       const coverage = matched.length / expertiseNeed.length;
       earned += Math.round(WEIGHTS.expertise * coverage);
       reasons.push(`התאמה בתחום המומחיות: ${matched.join(", ")}`);
+    }
+  }
+
+  // Bonus: exact couples modality match (e.g. patient needs EFT and therapist does EFT)
+  if (input.couplesModality) {
+    possible += WEIGHTS.couplesBonus;
+    if (couplesModalities.some((m) => normalizeText(m) === normalizeText(input.couplesModality!))) {
+      earned += WEIGHTS.couplesBonus;
+      reasons.push(`התאמה בגישה הזוגית: ${input.couplesModality}`);
+    }
+  }
+
+  // Bonus: therapist also handles sexual therapy when needed
+  if (input.needsSexualTherapy) {
+    possible += WEIGHTS.sexualBonus;
+    if (trainingAreas.some((a) => normalizeText(a).includes("מיני")) ||
+        therapistTypes.some((t) => normalizeText(t).includes("מיני"))) {
+      earned += WEIGHTS.sexualBonus;
+      reasons.push("המטפל/ת מתמחה גם בטיפול מיני");
     }
   }
 
