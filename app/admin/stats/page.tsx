@@ -33,13 +33,14 @@ function StatsTable({
 }) {
   const [search, setSearch] = useState("");
 
+  const pv  = (r: TherapistStat) => source === "match" ? r.match_views        : r.directory_views;
   const wa  = (r: TherapistStat) => source === "match" ? r.match_whatsapp    : r.directory_whatsapp;
   const ph  = (r: TherapistStat) => source === "match" ? r.match_phone        : r.directory_phone;
   const em  = (r: TherapistStat) => source === "match" ? r.match_email        : r.directory_email;
   const tot = (r: TherapistStat) => source === "match" ? r.match_clicks       : r.directory_clicks;
 
-  // Only show therapists that have at least one click from this source
-  const relevant = rows.filter(r => tot(r) > 0);
+  // Only show therapists that have at least one click or view from this source
+  const relevant = rows.filter(r => tot(r) > 0 || pv(r) > 0);
 
   const filtered = search.trim()
     ? relevant.filter(r =>
@@ -48,6 +49,7 @@ function StatsTable({
       )
     : relevant;
 
+  const totalPv  = filtered.reduce((s, r) => s + pv(r), 0);
   const totalWa  = filtered.reduce((s, r) => s + wa(r), 0);
   const totalPh  = filtered.reduce((s, r) => s + ph(r), 0);
   const totalEm  = filtered.reduce((s, r) => s + em(r), 0);
@@ -90,6 +92,7 @@ function StatsTable({
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs">#</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs">שם מטפל</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs">מייל</th>
+                <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">👁 צפיות</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">💬 וואטסאפ</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">📞 טלפון</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">✉️ מייל</th>
@@ -102,6 +105,7 @@ function StatsTable({
                   <td className="px-5 py-3.5 text-stone-400 text-xs">{i + 1}</td>
                   <td className="px-5 py-3.5 font-semibold text-stone-800">{r.full_name || "—"}</td>
                   <td className="px-5 py-3.5 text-stone-400 text-xs">{r.email || "—"}</td>
+                  <td className="px-5 py-3.5 text-center"><StatsBadge value={pv(r)} color="text-purple-600" /></td>
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={wa(r)} color="text-green-600" /></td>
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={ph(r)} color="text-stone-700" /></td>
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={em(r)} color="text-blue-600" /></td>
@@ -118,6 +122,7 @@ function StatsTable({
                     {search.trim() ? "סיכום תוצאות" : "סיכום"}
                   </span>
                 </td>
+                <td className="px-5 py-3 text-center font-black text-purple-600">{totalPv}</td>
                 <td className="px-5 py-3 text-center font-black text-green-600">{totalWa}</td>
                 <td className="px-5 py-3 text-center font-black text-stone-700">{totalPh}</td>
                 <td className="px-5 py-3 text-center font-black text-blue-600">{totalEm}</td>

@@ -120,6 +120,7 @@ type FormState = {
   education: string;
   experience: string;
   termsAccepted: boolean;
+  newsletterConsent: boolean;
 };
 
 function toggleInArray(arr: string[], value: string) {
@@ -154,6 +155,7 @@ export default function TherapistSignupPage() {
     education: "",
     experience: "",
     termsAccepted: false,
+    newsletterConsent: false,
   });
 
   const [submitMsg, setSubmitMsg] = useState<string>("");
@@ -272,6 +274,7 @@ export default function TherapistSignupPage() {
       fd.append("languages", JSON.stringify(form.languages));
       fd.append("acceptingNewClients", String(form.acceptingNewClients));
       fd.append("arrangements", JSON.stringify(form.arrangements));
+      fd.append("newsletterConsent", String(form.newsletterConsent));
 
       for (const f of form.certificates) {
         fd.append("certificates", f);
@@ -1007,7 +1010,7 @@ export default function TherapistSignupPage() {
           </div>
         </section>
 
-        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 mb-2">
+        <div className="rounded-2xl border border-stone-200 bg-stone-50 p-5 mb-2 space-y-4">
           <label className="flex items-start gap-3 cursor-pointer">
             <input
               type="checkbox"
@@ -1019,6 +1022,17 @@ export default function TherapistSignupPage() {
               אני מאשר/ת שאני בעל/ת רישיון מקצועי תקף, שהפרטים שמסרתי נכונים, ושאעמוד ב
               <a href="/terms" target="_blank" className="text-indigo-600 hover:underline mx-1">תנאי השימוש</a>
               של טיפול חכם.
+            </span>
+          </label>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={form.newsletterConsent}
+              onChange={(e) => setForm((p) => ({ ...p, newsletterConsent: e.target.checked }))}
+              className="mt-1 h-4 w-4 flex-shrink-0 accent-indigo-600"
+            />
+            <span className="text-sm leading-6 text-stone-500">
+              אני מעוניין/ת לקבל מידע אינפורמטיבי, מאמרים וחומרים מקצועיים מ&quot;טיפול חכם&quot;. ללא פרסום שאינו קשור לפלטפורמה. <span className="text-stone-400">(לא חובה)</span>
             </span>
           </label>
         </div>

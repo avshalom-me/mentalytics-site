@@ -99,6 +99,7 @@ export async function POST(req: Request) {
     let activityLevel: number | null = null;
     let styleQ1: number | null = null;
     let styleQ2: number | null = null;
+    let newsletterConsent = false;
 
     try {
       therapistTypes = parseJsonArray(fd.get("therapistTypes"));
@@ -112,6 +113,7 @@ export async function POST(req: Request) {
       languages = parseJsonArray(fd.get("languages"));
       arrangements = parseJsonArray(fd.get("arrangements"));
       acceptingNewClients = parseBoolean(fd.get("acceptingNewClients"), true);
+      newsletterConsent = parseBoolean(fd.get("newsletterConsent"), false);
       activityLevel = parseOptionalInt(fd.get("activityLevel"));
       styleQ1 = parseOptionalInt(fd.get("styleQ1"));
       styleQ2 = parseOptionalInt(fd.get("styleQ2"));
@@ -182,6 +184,7 @@ export async function POST(req: Request) {
         languages,
         arrangements,
         accepting_new_clients: acceptingNewClients,
+        newsletter_consent: newsletterConsent,
         status: "pending",
         public_visible: false,
       })

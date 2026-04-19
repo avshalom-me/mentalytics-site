@@ -22,6 +22,9 @@ export type TherapistStat = {
   directory_whatsapp: number;
   directory_phone: number;
   directory_email: number;
+  profile_views: number;
+  match_views: number;
+  directory_views: number;
 };
 
 export type AdminStatsResponse = {
@@ -65,6 +68,22 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
   if (since) query = query.gte("clicked_at", since);
 
   const { data: clicks } = await query;
+
+  // Fetch profile views
+  let viewsQuery = supabaseAdmin
+    .from("therapist_profile_views")
+    .select("therapist_id, source");
+  if (since) viewsQuery = viewsQuery.gte("viewed_at", since);
+  const { data: views } = await viewsQuery;
+
+  // Aggregate profile views
+  const viewsMap: Record<string, { total: number; match: number; directory: number }> = {};
+  for (const row of (views ?? []) as { therapist_id: string; source: string }[]) {
+    if (!viewsMap[row.therapist_id]) viewsMap[row.therapist_id] = { total: 0, match: 0, directory: 0 };
+    viewsMap[row.therapist_id].total++;
+    if (row.source === "match") viewsMap[row.therapist_id].match++;
+    else viewsMap[row.therapist_id].directory++;
+  }
 
   // Aggregate
   type ClickCounts = {
@@ -110,6 +129,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
       match_whatsapp: 0, match_phone: 0, match_email: 0,
       directory_whatsapp: 0, directory_phone: 0, directory_email: 0,
     };
+    const v = viewsMap[t.id] ?? { total: 0, match: 0, directory: 0 };
     return {
       id: t.id,
       full_name: t.full_name ?? "",
@@ -127,6 +147,9 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
       directory_whatsapp: c.directory_whatsapp,
       directory_phone: c.directory_phone,
       directory_email: c.directory_email,
+      profile_views: v.total,
+      match_views: v.match,
+      directory_views: v.directory,
     };
   });
 
