@@ -15,6 +15,7 @@ type TherapistRow = {
   regions: string[] | null;
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
+  age_groups: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
   manually_promoted: boolean | null;
@@ -48,6 +49,7 @@ async function buildTherapistsResponse() {
       regions,
       cultural_prefs,
       arrangements,
+      age_groups,
       profile_photo_path,
       status,
       manually_promoted
@@ -96,6 +98,7 @@ async function buildTherapistsResponse() {
         regions: t.regions ?? [],
         cultural_prefs: t.cultural_prefs ?? [],
         arrangements: t.arrangements ?? [],
+        age_groups: t.age_groups ?? [],
         profile_photo_path: t.profile_photo_path ?? null,
         profile_photo_url,
         status: t.status ?? "",

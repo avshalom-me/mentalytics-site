@@ -23,6 +23,9 @@ const ASSESSMENT_TYPES = [
 const CULTURAL_PREFS = [
   "היכרות עם העולם הדתי","היכרות עם העולם החרדי",'היכרות עם עולם הלהט"ב',
 ];
+const AGE_GROUPS = [
+  "גיל הרך", "ילדים", "נוער", "מבוגרים", "הגיל השלישי",
+];
 const ARRANGEMENTS = [
   "קופות החולים","משרד הביטחון","ביטוח לאומי","ביטוחים פרטיים",
 ];
@@ -41,6 +44,7 @@ type AdminTherapist = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  age_groups: string[];
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   status: string;
@@ -101,7 +105,13 @@ export default function AdminTherapistsPage() {
   const [error, setError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
-  const [approvedSearch, setApprovedSearch] = useState("");
+  const [filterName, setFilterName] = useState("");
+  const [filterGender, setFilterGender] = useState("");
+  const [filterTherapistType, setFilterTherapistType] = useState("");
+  const [filterTrainingArea, setFilterTrainingArea] = useState("");
+  const [filterCultural, setFilterCultural] = useState("");
+  const [filterAgeGroup, setFilterAgeGroup] = useState("");
+  const [showFilters, setShowFilters] = useState(false);
 
   // Edit modal state
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -221,11 +231,21 @@ export default function AdminTherapistsPage() {
   if (error) return <div className="p-6 text-center text-red-600">שגיאה: {error}</div>;
   if (therapists.length === 0) return <div className="p-6 text-center">לא נמצאו מטפלים.</div>;
 
-  const pending = therapists.filter((t) => t.status !== "approved");
-  const approved = therapists.filter((t) => t.status === "approved");
-  const filteredApproved = approved.filter((t) =>
-    t.full_name.toLowerCase().includes(approvedSearch.toLowerCase())
-  );
+  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup;
+
+  function matchesFilters(t: AdminTherapist) {
+    if (filterName && !t.full_name.toLowerCase().includes(filterName.toLowerCase())) return false;
+    if (filterGender && t.gender !== filterGender) return false;
+    if (filterTherapistType && !t.therapist_types.includes(filterTherapistType)) return false;
+    if (filterTrainingArea && !t.training_areas.includes(filterTrainingArea)) return false;
+    if (filterCultural && !t.cultural_prefs.includes(filterCultural)) return false;
+    if (filterAgeGroup && !t.age_groups.includes(filterAgeGroup)) return false;
+    return true;
+  }
+
+  const allFiltered = hasActiveFilter ? therapists.filter(matchesFilters) : null;
+  const pending = hasActiveFilter ? [] : therapists.filter((t) => t.status !== "approved" && t.status !== "paying");
+  const approved = (hasActiveFilter ? allFiltered! : therapists.filter((t) => t.status === "approved" || t.status === "paying"));
 
   function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
     const showImage = therapist.profile_photo_url && !brokenImages[therapist.id];
@@ -380,37 +400,99 @@ export default function AdminTherapistsPage() {
         </a>
       </div>
 
-      {/* ── ממתינים לאישור / נדחו ── */}
-      <section className="mb-12">
-        <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
-          ממתינים לאישור / נדחו ({pending.length})
-        </h2>
-        {pending.length === 0 ? (
-          <p className="text-center text-gray-500">אין מטפלים הממתינים לאישור.</p>
-        ) : (
-          <div className="space-y-6">
-            {pending.map((t) => <TherapistCard key={t.id} therapist={t} />)}
-          </div>
-        )}
-      </section>
+      {/* ── סינון וחיפוש ── */}
+      <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
+        <div className="flex items-center justify-between mb-3">
+          <button onClick={() => setShowFilters(!showFilters)} className="text-sm font-bold text-stone-700 hover:text-stone-900">
+            {showFilters ? "▾ סגור מסננים" : "▸ פתח מסננים"}
+          </button>
+          {hasActiveFilter && (
+            <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); }}
+              className="text-xs text-red-500 hover:underline">נקה הכל</button>
+          )}
+        </div>
 
-      {/* ── מאושרים ── */}
-      <section>
-        <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
-          מאושרים ({approved.length})
-        </h2>
         <input
           type="text"
-          value={approvedSearch}
-          onChange={(e) => setApprovedSearch(e.target.value)}
+          value={filterName}
+          onChange={(e) => setFilterName(e.target.value)}
           placeholder="חיפוש לפי שם..."
-          className="mb-5 w-full rounded-xl border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+          className="mb-3 w-full rounded-xl border px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
         />
-        {filteredApproved.length === 0 ? (
+
+        {showFilters && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">מגדר</label>
+              <select value={filterGender} onChange={(e) => setFilterGender(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                <option value="זכר">זכר</option>
+                <option value="נקבה">נקבה</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">סוג מטפל</label>
+              <select value={filterTherapistType} onChange={(e) => setFilterTherapistType(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                {THERAPIST_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">תחום טיפול</label>
+              <select value={filterTrainingArea} onChange={(e) => setFilterTrainingArea(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                {TRAINING_AREAS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">העדפות תרבותיות</label>
+              <select value={filterCultural} onChange={(e) => setFilterCultural(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                {CULTURAL_PREFS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">קבוצת גיל</label>
+              <select value={filterAgeGroup} onChange={(e) => setFilterAgeGroup(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                {AGE_GROUPS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── ממתינים לאישור / נדחו ── */}
+      {!hasActiveFilter && (
+        <section className="mb-12">
+          <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
+            ממתינים לאישור / נדחו ({pending.length})
+          </h2>
+          {pending.length === 0 ? (
+            <p className="text-center text-gray-500">אין מטפלים הממתינים לאישור.</p>
+          ) : (
+            <div className="space-y-6">
+              {pending.map((t) => <TherapistCard key={t.id} therapist={t} />)}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── מאושרים / תוצאות סינון ── */}
+      <section>
+        <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
+          {hasActiveFilter ? `תוצאות סינון (${approved.length})` : `מאושרים (${approved.length})`}
+        </h2>
+        {approved.length === 0 ? (
           <p className="text-center text-gray-500">לא נמצאו מטפלים.</p>
         ) : (
           <div className="space-y-6">
-            {filteredApproved.map((t) => <TherapistCard key={t.id} therapist={t} />)}
+            {approved.map((t) => <TherapistCard key={t.id} therapist={t} />)}
           </div>
         )}
       </section>
