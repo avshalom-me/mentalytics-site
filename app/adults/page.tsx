@@ -193,6 +193,11 @@ type MatchPrefs = {
 export default function AdultsPage() {
   const [screen, setScreen] = useState<Screen>("disclaimer");
 
+  useEffect(() => {
+    const pct = getAdultsProgress(screen);
+    (window as any).gtag?.("event", "quiz_step", { quiz_type: "adults", step: screen, progress: pct });
+  }, [screen]);
+
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
   const [scoring, setScoring] = useState<ScoringResult | null>(null);

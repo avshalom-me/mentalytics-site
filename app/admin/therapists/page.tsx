@@ -2,33 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
+import {
+  THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
+  CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
+} from "@/app/lib/therapist-options";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
-
-const THERAPIST_TYPES = [
-  "פסיכולוג קליני","פסיכולוג חינוכי","פסיכולוג שיקומי/רפואי","פסיכולוג התפתחותי",
-  "פסיכולוג תעסוקתי","יועצ/ת חינוכי",'עו"ס קליני',"מטפל/ת בהבעה ויצירה",
-  "מטפל מיני","קרימינולוג קליני","פיזיותרפיסט/ית",
-];
-const TRAINING_AREAS = [
-  "טיפול דינאמי","CBT","ACT","EMDR","DBT","הדרכת הורים","טיפול דיאדי",
-  "טיפול משפחתי","טיפול בהבעה ויצירה","ריפוי בעיסוק","טיפול תעסוקתי",
-  "קבוצה חברתית","טיפול זוגי","טיפול בהתמכרויות","טיפול מיני",
-  "טיפול COG-FUN לקשיי קשב וריכוז","טיפול בטראומה",
-];
-const ASSESSMENT_TYPES = [
-  "פסיכו-דידקטי","פסיכו-דיאגנוסטי","נוירו-פסיכולוגי","אבחון תעסוקתי",
-  "הערכה פסיכולוגית","הערכת בשלות לגן","אבחון קשיי תקשורת ASD",
-];
-const CULTURAL_PREFS = [
-  "היכרות עם העולם הדתי","היכרות עם העולם החרדי",'היכרות עם עולם הלהט"ב',
-];
-const AGE_GROUPS = [
-  "גיל הרך", "ילדים", "נוער", "מבוגרים", "הגיל השלישי",
-];
-const ARRANGEMENTS = [
-  "קופות החולים","משרד הביטחון","ביטוח לאומי","ביטוחים פרטיים",
-];
 
 type AdminTherapist = {
   id: string;
@@ -75,7 +54,7 @@ function CheckboxGroup({
   label, options, selected, onChange,
 }: {
   label: string;
-  options: string[];
+  options: readonly string[];
   selected: string[];
   onChange: (val: string[]) => void;
 }) {

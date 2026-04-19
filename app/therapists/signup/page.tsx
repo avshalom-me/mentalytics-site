@@ -6,92 +6,10 @@ import { REGION_CITIES } from "@/app/lib/regions";
 
 type Gender = "זכר" | "נקבה";
 
-const THERAPIST_TYPES = [
-  "פסיכולוג קליני",
-  "פסיכולוג חינוכי",
-  "פסיכולוג שיקומי/רפואי",
-  "פסיכולוג התפתחותי",
-  "פסיכולוג תעסוקתי",
-  "יועצ/ת חינוכי",
-  'עו"ס קליני',
-  "מטפל/ת בהבעה ויצירה",
-  "מטפל מיני",
-  "קרימינולוג קליני",
-  "פיזיותרפיסט/ית",
-] as const;
-
-const TRAINING_AREAS = [
-  "טיפול דינאמי",
-  "CBT",
-  "ACT",
-  "EMDR",
-  "DBT",
-  "הדרכת הורים",
-  "טיפול דיאדי",
-  "טיפול משפחתי",
-  "טיפול בהבעה ויצירה",
-  "ריפוי בעיסוק",
-  "טיפול תעסוקתי",
-  "קבוצה חברתית",
-  "טיפול זוגי",
-  "טיפול בהתמכרויות",
-  "טיפול מיני",
-  "טיפול COG-FUN לקשיי קשב וריכוז",
-  "טיפול בטראומה",
-] as const;
-
-const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
-
-const PLAY_THERAPY_MODALITIES = [
-  "טיפול באומנות",
-  "טיפול בתנועה",
-  "דרמה תרפיה",
-  'טיפול בעזרת בע"ח',
-  "טיפול במוזיקה",
-  "פסיכודרמה",
-] as const;
-
-const AGE_GROUPS = [
-  "גיל הרך",
-  "ילדים",
-  "נוער",
-  "מבוגרים",
-  "הגיל השלישי",
-] as const;
-
-const ASSESSMENT_TYPES = [
-  "פסיכו-דידקטי",
-  "פסיכו-דיאגנוסטי",
-  "נוירו-פסיכולוגי",
-  "אבחון תעסוקתי",
-  "הערכה פסיכולוגית",
-  "הערכת בשלות לגן",
-  "אבחון קשיי תקשורת ASD",
-] as const;
-
-const CULTURAL_PREFS = [
-  "היכרות עם העולם הדתי",
-  "היכרות עם העולם החרדי",
-  'היכרות עם עולם הלהט"ב',
-] as const;
-
-const LANGUAGES = [
-  "עברית",
-  "אנגלית",
-  "ערבית",
-  "רוסית",
-  "צרפתית",
-  "ספרדית",
-  "פורטוגזית",
-  "אמהרית",
-] as const;
-
-const ARRANGEMENTS = [
-  "קופות החולים",
-  "משרד הביטחון",
-  "ביטוח לאומי",
-  "ביטוחים פרטיים",
-] as const;
+import {
+  THERAPIST_TYPES, TRAINING_AREAS, COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
+  AGE_GROUPS, ASSESSMENT_TYPES, CULTURAL_PREFS, LANGUAGES, ARRANGEMENTS,
+} from "@/app/lib/therapist-options";
 
 type FormState = {
   fullName: string;

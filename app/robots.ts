@@ -5,7 +5,8 @@ export default function robots(): MetadataRoute.Robots {
     rules: {
       userAgent: "*",
       allow: "/",
+      disallow: ["/admin/", "/api/"],
     },
-    sitemap: "https://www.mentalytics.co.il/sitemap.xml",
+    sitemap: "https://www.tipolchacham.co.il/sitemap.xml",
   };
 }

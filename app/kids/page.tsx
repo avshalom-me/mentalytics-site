@@ -2790,6 +2790,12 @@ export default function KidsPage() {
   const [step, setStep] = useState<string>("p-consent");
   const [A, setA]       = useState<Ans>({});
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const idx = PAGES.indexOf(step as typeof PAGES[number]);
+    const pct = idx >= 0 ? Math.round(((idx + 1) / PAGES.length) * 100) : 0;
+    (window as any).gtag?.("event", "quiz_step", { quiz_type: "kids", step, progress: pct });
+  }, [step]);
   const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
   const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
   const [itemsError, setItemsError] = useState(false);
