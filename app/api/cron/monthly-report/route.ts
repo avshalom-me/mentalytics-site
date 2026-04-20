@@ -188,7 +188,7 @@ export async function GET(req: NextRequest) {
 
     try {
       await resend.emails.send({
-        from: "טיפול חכם <onboarding@resend.dev>",
+        from: "טיפול חכם <noreply@mentalytics.co.il>",
         to: t.email,
         subject: `הדו"ח החודשי שלך — טיפול חכם`,
         html,

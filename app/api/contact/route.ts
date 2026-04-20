@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     const safeMessage = escapeHtml(String(message));
 
     await resend.emails.send({
-      from: "טיפול חכם <onboarding@resend.dev>",
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
       to: "avshalom84@gmail.com",
       replyTo: email,
       subject: `פנייה חדשה מ-טיפול חכם: ${safeSubject || "ללא נושא"}`,
