@@ -16,10 +16,21 @@ const heebo = Heebo({
 export const metadata: Metadata = {
   title: { default: "טיפול חכם", template: "%s | טיפול חכם" },
   description: "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+  metadataBase: new URL("https://www.mentalytics.co.il"),
   openGraph: {
     siteName: "טיפול חכם",
     locale: "he_IL",
     type: "website",
+    url: "https://www.mentalytics.co.il",
+    title: "טיפול חכם — הכוונה טיפולית חכמה",
+    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם — לילדים ולמבוגרים.",
+    images: [{ url: "/logo.svg.png", width: 512, height: 512, alt: "טיפול חכם" }],
+  },
+  twitter: {
+    card: "summary",
+    title: "טיפול חכם — הכוונה טיפולית חכמה",
+    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+    images: ["/logo.svg.png"],
   },
 };
 

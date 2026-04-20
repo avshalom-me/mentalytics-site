@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import { Sparkles, Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "אודות",
-  description: "הכירו את הצוות מאחורי טיפול חכם — מערכת הכוונה טיפולית חכמה שפותחה על ידי פסיכולוגים קליניים.",
+  title: "אודות טיפול חכם",
+  description: "הכירו את הצוות מאחורי טיפול חכם — מערכת הכוונה טיפולית מבוססת מחקר שפותחה על ידי פסיכולוגים קליניים, לעזור לכם למצוא את המטפל הנכון.",
 };
 
 type TeamMember = {

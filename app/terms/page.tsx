@@ -2,7 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "תנאי שימוש | טיפול חכם",
+  title: "תנאי שימוש",
+  description: "תנאי השימוש של טיפול חכם — אחריות, זכויות, הגבלות שימוש והצהרות חשובות לגבי מערכת ההכוונה הטיפולית.",
 };
 
 export default function TermsPage() {

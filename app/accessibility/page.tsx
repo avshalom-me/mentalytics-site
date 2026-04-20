@@ -1,4 +1,10 @@
 import Link from "next/link";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "הצהרת נגישות",
+  description: "הצהרת הנגישות של טיפול חכם — התאמות נגישות לפי תקן ישראלי 5568 ו-WCAG 2.1 להנגשת השירות לכלל האוכלוסייה.",
+};
 
 export default function AccessibilityPage() {
   return (

@@ -2,8 +2,8 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "מאמרים ומידע שימושי",
-  description: "מידע מקצועי על סוגי טיפולים, בחירת מטפל, אבחונים, טיפול אונליין ועוד — בעברית, מותאם לישראל.",
+  title: "מאמרים ומידע על טיפול נפשי",
+  description: "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחון ADHD, טיפול אונליין ועוד — מותאם לישראל ולמערכת הבריאות הישראלית.",
 };
 
 const QUESTIONS = [
