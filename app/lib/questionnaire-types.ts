@@ -9,7 +9,7 @@ export type QuestionnaireAnswers = {
   bmiAbnormal?: boolean;
 
   // --- תחומים שנבחרו ---
-  domains: ("emotional" | "functional" | "relationship" | "addiction")[];
+  domains: ("emotional" | "functional" | "relationship" | "addiction" | "personal_development")[];
 
   // --- תחום רגשי ---
   emotional?: {

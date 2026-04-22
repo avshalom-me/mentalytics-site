@@ -866,12 +866,30 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
   }
 
+  // ===== PERSONAL DEVELOPMENT DOMAIN =====
+  // Only applies when personal_development is the sole selected domain.
+  // When combined with other domains, it's intentionally ignored.
+  if (
+    answers.domains.includes("personal_development") &&
+    answers.domains.length === 1
+  ) {
+    recs.push({
+      id: uid("personal-dev"),
+      symptomText: "צורך בהתפתחות אישית והבנה עצמית.",
+      treatment: "טיפול דינאמי",
+      treatmentLabel: "טיפול דינאמי",
+      domain: "התפתחות אישית",
+      urgent: false,
+    });
+  }
+
   // Urgent recommendations first, then by domain order
   const domainOrder = [
     "מורכבויות בתחום הרגשי/האישי",
     "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
     "זוגיות ומשפחה",
     "קשיי התמכרות",
+    "התפתחות אישית",
   ];
   const sorted = [...recs].sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;

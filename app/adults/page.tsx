@@ -310,8 +310,15 @@ export default function AdultsPage() {
     setAnswers((p) => ({ ...p, addiction: { ...p.addiction, types: p.addiction?.types ?? [], ...patch } }));
   }
 
+  // If personal_development is combined with any other domain, its flow is
+  // skipped — the other domains run as usual and scoring ignores it too.
+  function effectiveDomains(ds: QuestionnaireAnswers["domains"]): QuestionnaireAnswers["domains"] {
+    if (ds.length > 1) return ds.filter((d) => d !== "personal_development");
+    return ds;
+  }
+
   function startDomains() {
-    const domains = answers.domains;
+    const domains = effectiveDomains(answers.domains);
     if (domains.length === 0) return;
     setDomainIdx(0);
     setScreen(firstScreenForDomain(domains[0]));
@@ -322,11 +329,12 @@ export default function AdultsPage() {
     if (d === "functional") return "f-vision";
     if (d === "relationship") return "r-intake";
     if (d === "addiction") return "a-types";
+    if (d === "personal_development") return "therapist-style";
     return "scoring";
   }
 
   function nextDomain() {
-    const doms = answers.domains;
+    const doms = effectiveDomains(answers.domains);
     const next = domainIdx + 1;
     if (next >= doms.length) { goScoring(); return; }
     setDomainIdx(next);
@@ -622,6 +630,21 @@ export default function AdultsPage() {
               </button>
             );
           })}
+        </div>
+        <div className="mt-3">
+          {(() => {
+            const id = "personal_development" as const;
+            const sel = answers.domains.includes(id);
+            return (
+              <button key={id} type="button"
+                onClick={() => upd({ domains: sel ? answers.domains.filter((d) => d !== id) : [...answers.domains, id] })}
+                className={`w-full rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c] hover:bg-[#f0fafc]"}`}>
+                <div className="text-2xl">🌱</div>
+                <div className="mt-1 text-xs font-bold text-[#1a3a5c]">התפתחות אישית</div>
+                <div className="mt-0.5 text-xs text-[#6b7280]">אני לא מתמודד/ת עם קושי אלא מעוניין/ת בהבנה עצמית</div>
+              </button>
+            );
+          })()}
         </div>
         <NavRow onBack={() => setScreen("intake")} onNext={startDomains} nextDisabled={answers.domains.length === 0} />
       </Card>
@@ -1100,7 +1123,10 @@ if (screen === "e8c") return (
         <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד – מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
         <ScaleRow label="בבואי לפתור קושי רגשי, אני מעדיף/ה שהמטפל יספק לי תוכנית עבודה מוגדרת, כלים פרקטיים ומשימות לתרגול בין הפגישות." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מרחב פתוח וחופשי  |  7 = מסכים/ה מאוד – זקוק/ה למסגרת ברורה, כלים ומשימות" group="ts-q2" values={[1,2,3,4,5,6,7]} value={styleQ2} onChange={setStyleQ2} />
         <ScaleRow label="בטיפול רגשי, נוח לי יותר עם מטפל שמגיב באופן פעיל, שואל, מכוון, מסכם ומביע את עמדתו, מאשר עם מטפל שמכיל יותר, שוהה ומתבונן." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מטפל מכיל, שקט ומתבונן  |  7 = מסכים/ה מאוד – מעדיף/ה מטפל פעיל, מכוון ומעורב מילולית" group="ts-q3" values={[1,2,3,4,5,6,7]} value={styleQ3} onChange={setStyleQ3} />
-        <NavRow onBack={() => setScreen("e10")}
+        <NavRow onBack={() => {
+            const onlyPD = answers.domains.length === 1 && answers.domains[0] === "personal_development";
+            setScreen(onlyPD ? "domains" : "e10");
+          }}
           onNext={() => {
             updE({ therapistStyleQ1: styleQ1, therapistStyleQ2: styleQ2, therapistStyleQ3: styleQ3 });
             nextDomain();
