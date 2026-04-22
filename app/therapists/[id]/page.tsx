@@ -7,7 +7,7 @@ import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 
 const BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
-const BASE_URL = "https://www.tipolchacham.co.il";
+const BASE_URL = "https://www.mentalytics.co.il";
 
 type TherapistRow = {
   id: string;

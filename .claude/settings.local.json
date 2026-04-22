@@ -18,7 +18,27 @@
       "Bash(npm install:*)",
       "Bash(git add:*)",
       "Bash(git commit:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "mcp__237fe65c-b75a-45c5-aedd-b93d97eaf4b2__list_projects",
+      "mcp__d37772c2-ec8c-472f-9086-87dcfac441d7__list_projects",
+      "mcp__237fe65c-b75a-45c5-aedd-b93d97eaf4b2__get_advisors",
+      "mcp__d37772c2-ec8c-472f-9086-87dcfac441d7__list_teams",
+      "mcp__d37772c2-ec8c-472f-9086-87dcfac441d7__list_deployments",
+      "mcp__237fe65c-b75a-45c5-aedd-b93d97eaf4b2__execute_sql",
+      "mcp__237fe65c-b75a-45c5-aedd-b93d97eaf4b2__apply_migration",
+      "Bash(curl -s -X POST https://mentalytics.co.il/api/match -H \"Content-Type: application/json\" -d '{\"treatmentTypes\":[\"טיפול דינאמי\"],\"ageGroups\":[\"מבוגרים\"],\"languages\":[\"עברית\"],\"onlineRequired\":true,\"limit\":5}')",
+      "Bash(python -m json.tool)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/tmp/match_result.json'\\)\\); print\\('OK:', d.get\\('ok'\\)\\); print\\('Count:', len\\(d.get\\('therapists',[]\\)\\)\\); print\\('Error:', d.get\\('error','none'\\)\\)\")",
+      "Bash(curl -s -X POST https://mentalytics.co.il/api/match -H \"Content-Type: application/json\" -d '{\"treatmentTypes\":[\"טיפול דינאמי\"],\"ageGroups\":[\"מבוגרים\"],\"languages\":[\"עברית\"],\"onlineRequired\":true,\"limit\":5}' -o /tmp/match_result.json)",
+      "Bash(curl -sL -X POST https://www.mentalytics.co.il/api/match -H \"Content-Type: application/json\" -d '{\"treatmentTypes\":[\"טיפול דינאמי\"],\"ageGroups\":[\"מבוגרים\"],\"languages\":[\"עברית\"],\"onlineRequired\":true,\"limit\":5}' -o /tmp/match_result.json)",
+      "Bash(curl -sL -X POST https://www.mentalytics.co.il/api/match -H \"Content-Type: application/json\" -d '{\"treatmentTypes\":[\"טיפול דינאמי\"],\"ageGroups\":[\"מבוגרים\"],\"languages\":[\"עברית\"],\"onlineRequired\":false,\"limit\":5}' -o /tmp/match_result2.json)",
+      "Bash(python3 -c \"import json; d=json.load\\(open\\('/tmp/match_result2.json'\\)\\); print\\('ok:',d['ok']\\); print\\('total_found:',d['total_found']\\); print\\('returned:',d['returned']\\); [print\\(f\\\\\"- {m.get\\('full_name','?'\\)} score={m.get\\('professional_score','?'\\)} online={m.get\\('online_therapy'\\)}\\\\\"\\) for m in d.get\\('matches',[]\\)[:5]]\")",
+      "Bash(curl -sL -X POST https://www.mentalytics.co.il/api/match -H \"Content-Type: application/json; charset=utf-8\" --data-binary @/tmp/match_body.json -o /tmp/match_result3.json)",
+      "mcp__d37772c2-ec8c-472f-9086-87dcfac441d7__get_runtime_logs",
+      "Bash(node /c/projects/mentalytics-site/.claude/worktrees/awesome-heyrovsky-8e7b76/scripts/compress-existing-photos.mjs)",
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -)",
+      "Bash(node -e ' *)"
     ]
   }
 }

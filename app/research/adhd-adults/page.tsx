@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "מה כולל אבחון ADHD למבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/adhd-adults",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/adhd-adults",
 };
 
 export default function AdhdAdultsPage() {

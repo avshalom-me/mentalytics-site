@@ -59,7 +59,7 @@ export default function HomePage() {
     "@context": "https://schema.org",
     "@type": ["MedicalBusiness", "HealthAndBeautyBusiness"],
     name: "טיפול חכם",
-    url: "https://www.tipolchacham.co.il",
+    url: "https://www.mentalytics.co.il",
     description:
       "מערכת הכוונה טיפולית חכמה — התאמת מטפלים על בסיס שאלונים מבוססי מחקר",
     areaServed: { "@type": "Country", name: "IL" },

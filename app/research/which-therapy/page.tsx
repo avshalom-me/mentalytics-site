@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "איזה טיפול פסיכולוגי מתאים לי? — מדריך מבוסס מחקר | מנטאליטיקס",
+  title: "איזה טיפול פסיכולוגי מתאים לי? — מדריך מבוסס מחקר | טיפול חכם",
   description:
     "CBT, דינמי, DBT, ACT, EMDR, EFT — מה ההבדל ואיזה מתאים לך? מדריך מקיף מבוסס מחקרים עדכניים על בחירת טיפול פסיכולוגי והתאמה בין מטפל למטופל.",
   openGraph: {
@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     url: "https://www.mentalytics.co.il/research/which-therapy",
     type: "article",
     locale: "he_IL",
-    siteName: "מנטאליטיקס",
+    siteName: "טיפול חכם",
   },
 };
 
@@ -25,10 +25,10 @@ const jsonLd = {
   inLanguage: "he",
   datePublished: "2025-01-01",
   dateModified: "2026-04-22",
-  author: { "@type": "Organization", name: "מנטאליטיקס", url: "https://www.mentalytics.co.il" },
+  author: { "@type": "Organization", name: "טיפול חכם", url: "https://www.mentalytics.co.il" },
   publisher: {
     "@type": "Organization",
-    name: "מנטאליטיקס",
+    name: "טיפול חכם",
     url: "https://www.mentalytics.co.il",
     logo: { "@type": "ImageObject", url: "https://www.mentalytics.co.il/logo.png" },
   },
@@ -325,7 +325,7 @@ export default function WhichTherapyPage() {
       <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8] mb-10">
         <h2 className="font-extrabold text-stone-900 text-xl mb-3">רוצה עזרה בבחירה?</h2>
         <p className="text-sm leading-7 text-stone-700 mb-4">
-          השאלון של מנטאליטיקס מנתח את הצרכים שלך ומציע התאמה אישית — כולל סוג הטיפול המומלץ וסגנון המטפל
+          השאלון של טיפול חכם מנתח את הצרכים שלך ומציע התאמה אישית — כולל סוג הטיפול המומלץ וסגנון המטפל
           המתאים.
         </p>
         <Link

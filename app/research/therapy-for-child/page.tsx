@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "מה חשוב לבדוק כשבוחרים מטפל לילד — הכשרה, גישה להורים, גיל הילד, ומה לשאול בשיחת ההיכרות.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/therapy-for-child",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/therapy-for-child",
 };
 
 export default function TherapyForChildPage() {

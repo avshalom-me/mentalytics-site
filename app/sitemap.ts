@@ -1,7 +1,7 @@
 import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
-const BASE = "https://www.tipolchacham.co.il";
+const BASE = "https://www.mentalytics.co.il";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [

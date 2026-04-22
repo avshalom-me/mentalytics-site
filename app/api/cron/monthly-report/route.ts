@@ -108,7 +108,7 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
 
       <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
         <p>דו"ח זה נשלח אוטומטית למטפלים מקודמים ב&quot;טיפול חכם&quot;</p>
-        <a href="https://www.tipolchacham.co.il/therapists/dashboard" style="color: #0F5468;">כניסה ללוח הבקרה</a>
+        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468;">כניסה ללוח הבקרה</a>
       </div>
     </div>
   `;

@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/online-therapy",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/online-therapy",
 };
 
 export default function OnlineTherapyPage() {

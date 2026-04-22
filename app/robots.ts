@@ -7,6 +7,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: "/",
       disallow: ["/admin/", "/api/"],
     },
-    sitemap: "https://www.tipolchacham.co.il/sitemap.xml",
+    sitemap: "https://www.mentalytics.co.il/sitemap.xml",
   };
 }

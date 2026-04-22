@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "6 קריטריונים לבחירת מטפל נפשי — הכשרה, התמחות, כימיה, גישה טיפולית, לוגיסטיקה ועלות.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/choosing-therapist",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/choosing-therapist",
 };
 
 const CRITERIA = [

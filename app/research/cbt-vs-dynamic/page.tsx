@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "CBT מול טיפול דינמי — מה ההבדל בין הגישות ואיך יודעים מה מתאים לך?",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/cbt-vs-dynamic",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/cbt-vs-dynamic",
 };
 
 export default function CbtVsDynamicPage() {

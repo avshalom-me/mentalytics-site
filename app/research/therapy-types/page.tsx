@@ -13,8 +13,8 @@ const jsonLd = {
   "description": "מדריך מקיף לסוגי הטיפולים הנפשיים — CBT, דינמי, DBT, EMDR, ACT ועוד.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
-  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.tipolchacham.co.il" },
-  "url": "https://www.tipolchacham.co.il/research/therapy-types",
+  "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
+  "url": "https://www.mentalytics.co.il/research/therapy-types",
 };
 
 const THERAPIES = [
