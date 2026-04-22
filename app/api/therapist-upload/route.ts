@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
@@ -26,15 +28,40 @@ export async function POST(req: NextRequest) {
 
   if (!file || !type) return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
 
-  const ext = file.name.split(".").pop();
   const folder = type === "photo" ? "photos" : "certificates";
-  const path = `${folder}/${user.id}-${Date.now()}.${ext}`;
   const bucket = "therapist-certificates";
 
-  const arrayBuffer = await file.arrayBuffer();
+  let uploadBody: ArrayBuffer | Uint8Array;
+  let uploadContentType: string;
+  let uploadExt: string;
+
+  if (type === "photo") {
+    // Auto-compress profile photos: resize + convert to WebP.
+    // Therapists can upload any size — the server shrinks it to a reasonable
+    // thumbnail (~40-80KB) without touching the UX on their end.
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+    try {
+      uploadBody = await sharp(inputBuffer)
+        .rotate() // respect EXIF orientation
+        .resize(600, 600, { fit: "cover", position: "center" })
+        .webp({ quality: 80 })
+        .toBuffer();
+      uploadContentType = "image/webp";
+      uploadExt = "webp";
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
+    }
+  } else {
+    // Certificates: store as-is, they are legal documents.
+    uploadBody = await file.arrayBuffer();
+    uploadContentType = file.type;
+    uploadExt = file.name.split(".").pop() ?? "bin";
+  }
+
+  const path = `${folder}/${user.id}-${Date.now()}.${uploadExt}`;
   const { error: uploadError } = await supabaseAdmin.storage
     .from(bucket)
-    .upload(path, arrayBuffer, { contentType: file.type, upsert: true });
+    .upload(path, uploadBody, { contentType: uploadContentType, upsert: true });
 
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
 

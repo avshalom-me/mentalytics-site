@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
 
 export const runtime = "nodejs";
 
@@ -206,26 +207,37 @@ export async function POST(req: Request) {
     const profilePhoto = fd.get("profilePhoto") as File | null;
 
     if (profilePhoto && profilePhoto.size > 0) {
-      if (profilePhoto.size <= 5 * 1024 * 1024) {
-        const allowedImg = ["image/jpeg", "image/png"];
+      if (profilePhoto.size <= 10 * 1024 * 1024) {
+        const allowedImg = ["image/jpeg", "image/png", "image/webp"];
 
         if (!profilePhoto.type || allowedImg.includes(profilePhoto.type)) {
-          const ab = await profilePhoto.arrayBuffer();
-          const bytes = new Uint8Array(ab);
+          const inputBuffer = Buffer.from(await profilePhoto.arrayBuffer());
+          let compressed: Buffer;
+          try {
+            compressed = await sharp(inputBuffer)
+              .rotate()
+              .resize(600, 600, { fit: "cover", position: "center" })
+              .webp({ quality: 80 })
+              .toBuffer();
+          } catch {
+            uploadWarnings.push("תמונת פרופיל: קובץ תמונה לא תקין");
+            compressed = null as never;
+          }
 
-          const safeName = safeFileName(profilePhoto.name);
-          const photoPath = `${therapist.id}/profile-photo-${Date.now()}-${safeName}`;
+          const photoPath = `${therapist.id}/profile-photo-${Date.now()}.webp`;
 
-          const { error: photoErr } = await supabase.storage
-            .from("therapist-certificates")
-            .upload(photoPath, bytes, {
-              contentType: profilePhoto.type,
-              upsert: true,
-            });
+          const { error: photoErr } = compressed
+            ? await supabase.storage
+                .from("therapist-certificates")
+                .upload(photoPath, compressed, {
+                  contentType: "image/webp",
+                  upsert: true,
+                })
+            : { error: null };
 
           if (photoErr) {
             uploadWarnings.push(`תמונת פרופיל: ${photoErr.message}`);
-          } else {
+          } else if (compressed) {
             const { error: updatePhotoErr } = await supabase
               .from("therapists")
               .update({ profile_photo_path: photoPath })
@@ -241,7 +253,7 @@ export async function POST(req: Request) {
           uploadWarnings.push("תמונת פרופיל: סוג קובץ לא נתמך");
         }
       } else {
-        uploadWarnings.push("תמונת פרופיל: הקובץ גדול מ-5MB");
+        uploadWarnings.push("תמונת פרופיל: הקובץ גדול מ-10MB");
       }
     }
 
