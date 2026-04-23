@@ -85,7 +85,25 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!therapist) return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
+  // Brand-new therapist — no row yet. Create a stub so the upload has something
+  // to attach to. The full profile is saved via PATCH /api/therapist-profile
+  // right after this upload in the dashboard save flow.
+  if (!therapist) {
+    const { data: created, error: createErr } = await supabaseAdmin
+      .from("therapists")
+      .insert({
+        user_id: user.id,
+        email: user.email,
+        status: "pending",
+        tier: "free",
+      })
+      .select("id")
+      .single();
+    if (createErr || !created) {
+      return NextResponse.json({ ok: false, error: createErr?.message ?? "Could not create therapist record" }, { status: 500 });
+    }
+    therapist = created;
+  }
 
   if (type === "photo") {
     const { error: dbError } = await supabaseAdmin
