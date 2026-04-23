@@ -7,8 +7,6 @@ export interface BucketRow {
   key: string;
   label: string;
   views: number;
-  clicks: number;
-  ctr: number;
 }
 
 export interface EnrichedStatsData {

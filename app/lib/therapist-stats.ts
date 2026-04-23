@@ -24,8 +24,6 @@ export interface BucketRow {
   key: string;
   label: string;
   views: number;
-  clicks: number;
-  ctr: number; // 0-100
 }
 
 export interface EnrichedStats {
@@ -60,7 +58,6 @@ function groupByField<T extends string>(
   views: ViewRow[],
   field: keyof ViewRow,
   labels: Record<T, string>,
-  clicksCount: number,
 ): BucketRow[] {
   const counts = new Map<string, number>();
   for (const v of views) {
@@ -68,7 +65,6 @@ function groupByField<T extends string>(
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
-  const totalViews = views.length;
   const buckets: BucketRow[] = [];
   let otherViews = 0;
 
@@ -78,20 +74,11 @@ function groupByField<T extends string>(
       continue;
     }
     const label = labels[key as T] ?? key;
-    // CTR is approximated from aggregate clicks distributed proportionally
-    // to views. Accurate session-level CTR requires joining clicks by session_id,
-    // which we can't do reliably today (clicks table has no session_id yet).
-    const share = totalViews > 0 ? count / totalViews : 0;
-    const approxClicks = Math.round(clicksCount * share);
-    const ctr = count > 0 ? Math.round((approxClicks / count) * 1000) / 10 : 0;
-    buckets.push({ key, label, views: count, clicks: approxClicks, ctr });
+    buckets.push({ key, label, views: count });
   }
 
   if (otherViews >= K_ANON_MIN) {
-    const share = totalViews > 0 ? otherViews / totalViews : 0;
-    const approxClicks = Math.round(clicksCount * share);
-    const ctr = otherViews > 0 ? Math.round((approxClicks / otherViews) * 1000) / 10 : 0;
-    buckets.push({ key: "other", label: "אחר", views: otherViews, clicks: approxClicks, ctr });
+    buckets.push({ key: "other", label: "אחר", views: otherViews });
   }
 
   return buckets.sort((a, b) => b.views - a.views);
@@ -151,10 +138,10 @@ export async function computeEnrichedStats(
   }
 
   return {
-    by_region: groupByField<RegionCategory>(views, "viewer_region", REGION_LABELS, contacted),
-    by_issue: groupByField<IssueCategory>(views, "viewer_issue", ISSUE_LABELS, contacted),
-    by_age_band: groupByField<AgeBand>(views, "viewer_age_band", AGE_LABELS, contacted),
-    by_gender: groupByField<Gender>(views, "viewer_gender", GENDER_LABELS, contacted),
+    by_region: groupByField<RegionCategory>(views, "viewer_region", REGION_LABELS),
+    by_issue: groupByField<IssueCategory>(views, "viewer_issue", ISSUE_LABELS),
+    by_age_band: groupByField<AgeBand>(views, "viewer_age_band", AGE_LABELS),
+    by_gender: groupByField<Gender>(views, "viewer_gender", GENDER_LABELS),
     conversion: {
       total_views: totalViews,
       unique_sessions: uniqueSessions,

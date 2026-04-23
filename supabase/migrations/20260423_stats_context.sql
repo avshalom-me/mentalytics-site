@@ -7,6 +7,7 @@ BEGIN;
 -- ===== 1. Extend therapist_profile_views =====
 
 ALTER TABLE therapist_profile_views
+  ADD COLUMN IF NOT EXISTS source          text,
   ADD COLUMN IF NOT EXISTS viewer_region   text,
   ADD COLUMN IF NOT EXISTS viewer_issue    text,
   ADD COLUMN IF NOT EXISTS viewer_age_band text,
@@ -14,6 +15,7 @@ ALTER TABLE therapist_profile_views
   ADD COLUMN IF NOT EXISTS match_score     int,
   ADD COLUMN IF NOT EXISTS session_id      text;
 
+COMMENT ON COLUMN therapist_profile_views.source          IS 'Enum: match|directory';
 COMMENT ON COLUMN therapist_profile_views.viewer_region   IS 'Enum: center|sharon|jerusalem|haifa|north|south|online|other';
 COMMENT ON COLUMN therapist_profile_views.viewer_issue    IS 'Enum: emotional|relationship|addiction|functional|personal|sexual|parenting|child|other';
 COMMENT ON COLUMN therapist_profile_views.viewer_age_band IS 'Enum: child|18-30|31-45|46-60|60+';

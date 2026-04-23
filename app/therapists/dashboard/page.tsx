@@ -124,17 +124,8 @@ type StatsResponse = {
   enriched?: EnrichedStatsData;
 };
 
-function ContactStats({ token, isPaying }: { token: string; isPaying: boolean }) {
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [loadingStats, setLoadingStats] = useState(true);
+function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse | null; loadingStats: boolean; isPaying: boolean }) {
   const [period, setPeriod] = useState<"week" | "month">("week");
-
-  useEffect(() => {
-    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(json => { if (json.ok) setStats(json); })
-      .finally(() => setLoadingStats(false));
-  }, [token]);
 
   const data = stats?.[period];
   const sourceData = period === "week" ? stats?.week_by_source : stats?.month_by_source;
@@ -284,24 +275,6 @@ function ContactStats({ token, isPaying }: { token: string; isPaying: boolean })
   );
 }
 
-function EnrichedStatsWrapper({ token }: { token: string }) {
-  const [data, setData] = useState<EnrichedStatsData | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(json => { if (json.ok && json.enriched) setData(json.enriched); })
-      .finally(() => setLoading(false));
-  }, [token]);
-
-  if (loading) {
-    return <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6 text-sm text-stone-400 text-center">טוען ניתוח מעמיק...</div>;
-  }
-  if (!data) return null;
-  return <EnrichedStatsPanel data={data} />;
-}
-
 export default function TherapistDashboard() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -317,6 +290,17 @@ export default function TherapistDashboard() {
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showRefundNote, setShowRefundNote] = useState(false);
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [loadingStats, setLoadingStats] = useState(true);
+
+  useEffect(() => {
+    if (!token) return;
+    setLoadingStats(true);
+    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.ok) setStats(json); })
+      .finally(() => setLoadingStats(false));
+  }, [token]);
 
   // Form state
   const [form, setForm] = useState({
@@ -586,10 +570,10 @@ export default function TherapistDashboard() {
       )}
 
       {/* Contact stats */}
-      {token && !isNew && <ContactStats token={token} isPaying={profile?.status === "paying"} />}
+      {token && !isNew && <ContactStats stats={stats} loadingStats={loadingStats} isPaying={profile?.status === "paying"} />}
 
       {/* Enriched stats (paying only) */}
-      {token && !isNew && profile?.status === "paying" && <EnrichedStatsWrapper token={token} />}
+      {token && !isNew && profile?.status === "paying" && stats?.enriched && <EnrichedStatsPanel data={stats.enriched} />}
 
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-sm text-blue-800">

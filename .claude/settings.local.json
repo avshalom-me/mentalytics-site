@@ -39,7 +39,8 @@
       "Bash(python3 -c ' *)",
       "Bash(python3 -)",
       "Bash(node -e ' *)",
-      "WebFetch(domain:www.alhasapa.co.il)"
+      "WebFetch(domain:www.alhasapa.co.il)",
+      "Bash(echo \"EXIT=$?\")"
     ]
   }
 }
