@@ -8,6 +8,7 @@ import {
   AGE_GROUPS, LANGUAGES, CULTURAL_PREFS, ARRANGEMENTS,
   COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
 } from "@/app/lib/therapist-options";
+import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
@@ -120,6 +121,7 @@ type StatsResponse = {
   trends?: TrendMonth[];
   profile_views?: { week: number; month: number };
   comparison?: Comparison;
+  enriched?: EnrichedStatsData;
 };
 
 function ContactStats({ token, isPaying }: { token: string; isPaying: boolean }) {
@@ -280,6 +282,24 @@ function ContactStats({ token, isPaying }: { token: string; isPaying: boolean })
       )}
     </div>
   );
+}
+
+function EnrichedStatsWrapper({ token }: { token: string }) {
+  const [data, setData] = useState<EnrichedStatsData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(json => { if (json.ok && json.enriched) setData(json.enriched); })
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) {
+    return <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6 text-sm text-stone-400 text-center">טוען ניתוח מעמיק...</div>;
+  }
+  if (!data) return null;
+  return <EnrichedStatsPanel data={data} />;
 }
 
 export default function TherapistDashboard() {
@@ -567,6 +587,9 @@ export default function TherapistDashboard() {
 
       {/* Contact stats */}
       {token && !isNew && <ContactStats token={token} isPaying={profile?.status === "paying"} />}
+
+      {/* Enriched stats (paying only) */}
+      {token && !isNew && profile?.status === "paying" && <EnrichedStatsWrapper token={token} />}
 
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-sm text-blue-800">

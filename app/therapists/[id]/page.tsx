@@ -83,11 +83,18 @@ export default async function TherapistProfilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string }>;
+  searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string }>;
 }) {
   const { id } = await params;
-  const { from } = await searchParams;
-  const source: "match" | "directory" = from === "match" ? "match" : "directory";
+  const sp = await searchParams;
+  const source: "match" | "directory" = sp.from === "match" ? "match" : "directory";
+  const viewerContext = source === "match" ? {
+    region: sp.r,
+    issue: sp.i,
+    age_band: sp.a,
+    gender: sp.g,
+    match_score: sp.s ? Number(sp.s) : undefined,
+  } : undefined;
   const result = await getTherapist(id);
   if (!result) notFound();
 
@@ -121,7 +128,7 @@ export default async function TherapistProfilePage({
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <TrackView therapistId={id} source={source} />
+      <TrackView therapistId={id} source={source} context={viewerContext} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');

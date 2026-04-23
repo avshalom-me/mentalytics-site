@@ -2661,7 +2661,25 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
                               <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                             </div>
                           )}
-                          <a href={`/therapists/${t.id}`} className="mt-2 block text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</a>
+                          <a
+                            href={(() => {
+                              const params = new URLSearchParams({ from: "match" });
+                              if (t.match_score != null) params.set("s", String(t.match_score));
+                              params.set("i", "child");
+                              params.set("a", "child");
+                              const regionMap: Record<string, string> = {};
+                              if (region.includes("גוש דן") || region.includes("שפלה")) regionMap.r = "center";
+                              else if (region.includes("שרון")) regionMap.r = "sharon";
+                              else if (region.includes("ירושלים")) regionMap.r = "jerusalem";
+                              else if (region.includes("חיפה") || region.includes("קריות")) regionMap.r = "haifa";
+                              else if (region.includes("גליל") || region.includes("עמק")) regionMap.r = "north";
+                              else if (region.includes("דרום")) regionMap.r = "south";
+                              else if (online && !region) regionMap.r = "online";
+                              if (regionMap.r) params.set("r", regionMap.r);
+                              return `/therapists/${t.id}?${params.toString()}`;
+                            })()}
+                            className="mt-2 block text-xs text-[#2e7d8c] font-semibold"
+                          >לפרטים נוספים ◂</a>
                         </div>
                       </div>
                     </div>

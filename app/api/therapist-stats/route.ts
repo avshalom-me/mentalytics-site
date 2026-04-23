@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { computeEnrichedStats } from "@/app/lib/therapist-stats";
 
 export const dynamic = "force-dynamic";
 
@@ -138,6 +139,13 @@ export async function GET(req: NextRequest) {
       result.profile_views = { week: weekViews ?? 0, month: monthViews ?? 0 };
     } catch {
       result.profile_views = { week: 0, month: 0 };
+    }
+
+    // Enriched breakdown (by region / issue / age / gender + conversion)
+    try {
+      result.enriched = await computeEnrichedStats(info.id, monthAgo);
+    } catch {
+      // Non-critical — dashboard shows a placeholder if this is absent
     }
 
     // Comparison: average clicks for paying therapists

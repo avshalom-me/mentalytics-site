@@ -226,6 +226,66 @@ export default function AdultsPage() {
       .catch(() => setUsageAllowed(true));
   }, []);
 
+  // Track profile-modal views with anonymous context for promoted-therapist stats
+  useEffect(() => {
+    if (!selectedTherapist?.id) return;
+    const normalizeAgeBand = (a: number): string | null => {
+      if (!a || isNaN(a)) return null;
+      if (a < 18) return "child";
+      if (a <= 30) return "18-30";
+      if (a <= 45) return "31-45";
+      if (a <= 60) return "46-60";
+      return "60+";
+    };
+    const normalizeGenderKey = (g: string): string | null => {
+      if (g === "זכר" || g === "גבר") return "m";
+      if (g === "נקבה" || g === "אישה") return "f";
+      return g ? "other" : null;
+    };
+    const normalizeRegionKey = (r: string, online: boolean): string | null => {
+      if (online && !r) return "online";
+      if (!r) return null;
+      if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
+      if (r.includes("שרון")) return "sharon";
+      if (r.includes("ירושלים")) return "jerusalem";
+      if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
+      if (r.includes("גליל") || r.includes("עמק")) return "north";
+      if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
+      return "other";
+    };
+    const issueMap: Record<string, string> = {
+      emotional: "emotional",
+      functional: "functional",
+      family: "relationship",
+      sexual: "sexual",
+      addiction: "addiction",
+      personal: "personal",
+    };
+    const firstDomain = answers.domains?.[0];
+    let sessionId: string | null = null;
+    try {
+      sessionId = localStorage.getItem("mnt_session_id");
+      if (!sessionId) {
+        sessionId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+        localStorage.setItem("mnt_session_id", sessionId);
+      }
+    } catch {}
+    fetch("/api/track-view", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        therapist_id: selectedTherapist.id,
+        source: "match",
+        viewer_region: normalizeRegionKey(matchPrefs.region, matchPrefs.online),
+        viewer_issue: firstDomain ? issueMap[firstDomain] ?? null : null,
+        viewer_age_band: normalizeAgeBand(answers.age),
+        viewer_gender: normalizeGenderKey(answers.gender),
+        match_score: selectedTherapist.combined_score ?? selectedTherapist.match_score ?? null,
+        session_id: sessionId,
+      }),
+    }).catch(() => {});
+  }, [selectedTherapist?.id, answers.age, answers.gender, answers.domains, matchPrefs.region, matchPrefs.online]);
+
   const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);
   const [qItemsError, setQItemsError] = useState(false);
   function fetchQItems() {
