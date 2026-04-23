@@ -94,6 +94,7 @@ export async function POST(req: NextRequest) {
       .insert({
         user_id: user.id,
         email: user.email,
+        full_name: "",
         status: "pending",
         tier: "free",
       })

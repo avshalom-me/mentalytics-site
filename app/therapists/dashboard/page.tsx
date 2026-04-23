@@ -403,7 +403,27 @@ export default function TherapistDashboard() {
     setSaveMsg("");
     setSaveErr("");
 
-    // Upload files if selected
+    // Step 1: PATCH profile first — creates the therapist row with all required
+    // fields (full_name etc). Uploads run afterwards so they can attach to an
+    // existing row.
+    const { play_therapy_modalities, ...rest } = form;
+    const patchBody = {
+      ...rest,
+      training_areas: [...form.training_areas, ...play_therapy_modalities],
+    };
+    const res = await fetch("/api/therapist-profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify(patchBody),
+    });
+    const json = await res.json();
+    if (!json.ok) {
+      setSaveErr(json.error ?? "שגיאה בשמירה");
+      setSaving(false);
+      return;
+    }
+
+    // Step 2: upload files (now that the therapist row exists)
     if (photoFile || certFile) {
       setUploading(true);
       const uploadErrors: string[] = [];
@@ -423,31 +443,16 @@ export default function TherapistDashboard() {
       }
     }
 
-    const { play_therapy_modalities, ...rest } = form;
-    const patchBody = {
-      ...rest,
-      training_areas: [...form.training_areas, ...play_therapy_modalities],
-    };
-    const res = await fetch("/api/therapist-profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-      body: JSON.stringify(patchBody),
-    });
-    const json = await res.json();
-    if (json.ok) {
-      setSaveMsg(json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.");
-      setIsNew(false);
-      setPhotoFile(null);
-      setCertFile(null);
-      setPhotoPreview(null);
-      const res2 = await fetch("/api/therapist-profile", { headers: { Authorization: `Bearer ${token}` } });
-      const json2 = await res2.json();
-      if (json2.therapist) {
-        setProfile(json2.therapist);
-        if (json2.photoUrl) setProfilePhotoUrl(json2.photoUrl);
-      }
-    } else {
-      setSaveErr(json.error ?? "שגיאה בשמירה");
+    setSaveMsg(json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.");
+    setIsNew(false);
+    setPhotoFile(null);
+    setCertFile(null);
+    setPhotoPreview(null);
+    const res2 = await fetch("/api/therapist-profile", { headers: { Authorization: `Bearer ${token}` } });
+    const json2 = await res2.json();
+    if (json2.therapist) {
+      setProfile(json2.therapist);
+      if (json2.photoUrl) setProfilePhotoUrl(json2.photoUrl);
     }
     setSaving(false);
   }
