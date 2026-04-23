@@ -1,16 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
-import Image from "next/image";
 
-export default function TherapistLoginPage() {
-  const [mode, setMode] = useState<"login" | "register">("login");
+function TherapistLoginContent() {
+  const searchParams = useSearchParams();
+  const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
+  const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showRegisterHint, setShowRegisterHint] = useState(false);
   const [success, setSuccess] = useState("");
+
+  // Sync mode if query changes (e.g. user clicks a different entry point)
+  useEffect(() => {
+    const q = searchParams.get("mode");
+    if (q === "register" || q === "login") setMode(q);
+  }, [searchParams]);
 
   async function handleGoogleLogin() {
     setLoading(true);
@@ -34,7 +43,8 @@ export default function TherapistLoginPage() {
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) {
-        setError("מייל או סיסמא שגויים");
+        setError("המייל או הסיסמא שגויים");
+        setShowRegisterHint(true);
       } else {
         window.location.href = "/therapists/dashboard";
       }
@@ -60,9 +70,13 @@ export default function TherapistLoginPage() {
 
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <img src="/logo.svg.png" alt="Mentalytics" className="mx-auto mb-4 h-14 w-auto" />
-          <h1 className="text-2xl font-black text-[#1a3a5c]">כניסה למטפלים</h1>
-          <p className="text-stone-600 text-sm mt-1">ניהול הפרופיל המקצועי שלך</p>
+          <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-4 h-14 w-auto" />
+          <h1 className="text-2xl font-black text-[#1a3a5c]">
+            {mode === "register" ? "הרשמה למטפלים" : "כניסה למטפלים"}
+          </h1>
+          <p className="text-stone-600 text-sm mt-1">
+            {mode === "register" ? "יצירת חשבון חדש — ללא עלות" : "ניהול הפרופיל המקצועי שלך"}
+          </p>
         </div>
 
         <div className="bg-white rounded-2xl shadow-sm border border-[#E8E0D8] p-8">
@@ -116,7 +130,23 @@ export default function TherapistLoginPage() {
               />
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                <p className="text-sm text-red-700 font-semibold">{error}</p>
+                {showRegisterHint && mode === "login" && (
+                  <p className="text-sm text-red-700 mt-2">
+                    עדיין לא נרשמת למערכת?{" "}
+                    <button
+                      type="button"
+                      onClick={() => { setMode("register"); setError(""); setShowRegisterHint(false); }}
+                      className="font-bold underline hover:text-red-900"
+                    >
+                      לחצ/י כאן להרשמה
+                    </button>
+                  </p>
+                )}
+              </div>
+            )}
             {success && <p className="text-sm text-emerald-600">{success}</p>}
 
             <button
@@ -131,13 +161,13 @@ export default function TherapistLoginPage() {
           <p className="mt-4 text-center text-sm text-stone-500">
             {mode === "login" ? (
               <>אין לך חשבון?{" "}
-                <button onClick={() => setMode("register")} className="text-[#2e7d8c] font-semibold hover:underline">
+                <button type="button" onClick={() => { setMode("register"); setError(""); setShowRegisterHint(false); }} className="text-[#2e7d8c] font-semibold hover:underline">
                   הרשמה
                 </button>
               </>
             ) : (
               <>יש לך חשבון?{" "}
-                <button onClick={() => setMode("login")} className="text-[#2e7d8c] font-semibold hover:underline">
+                <button type="button" onClick={() => { setMode("login"); setError(""); setShowRegisterHint(false); }} className="text-[#2e7d8c] font-semibold hover:underline">
                   כניסה
                 </button>
               </>
@@ -146,5 +176,13 @@ export default function TherapistLoginPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function TherapistLoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#f0ece4]" />}>
+      <TherapistLoginContent />
+    </Suspense>
   );
 }

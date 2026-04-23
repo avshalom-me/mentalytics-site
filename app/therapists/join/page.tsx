@@ -48,7 +48,7 @@ export default function TherapistJoinPage() {
       {/* Login link for existing therapists */}
       <div className="pt-4 flex justify-end">
         <Link
-          href="/therapists/login"
+          href="/therapists/login?mode=login"
           className="text-sm text-stone-600 hover:text-[#0F5468] hover:underline"
         >
           כבר רשומ/ה? לכניסה למערכת ←
@@ -89,7 +89,7 @@ export default function TherapistJoinPage() {
 
           <div className="mt-8">
             <Link
-              href="/therapists/login"
+              href="/therapists/login?mode=register"
               className="inline-flex items-center gap-2 rounded-2xl px-7 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
               style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 8px 20px rgba(15,84,104,.25)" }}
             >
@@ -334,7 +334,7 @@ export default function TherapistJoinPage() {
             ההרשמה חינמית ולוקחת פחות מ-5 דקות.
           </p>
           <Link
-            href="/therapists/login"
+            href="/therapists/login?mode=register"
             className="inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#0F5468] transition hover:opacity-95 active:scale-95"
           >
             להרשמה
@@ -342,7 +342,7 @@ export default function TherapistJoinPage() {
           </Link>
           <p className="mt-4 text-sm text-white/80">
             כבר רשומ/ה?{" "}
-            <Link href="/therapists/login" className="underline hover:text-white">
+            <Link href="/therapists/login?mode=login" className="underline hover:text-white">
               לכניסה למערכת
             </Link>
           </p>

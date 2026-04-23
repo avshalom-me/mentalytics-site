@@ -71,7 +71,7 @@ export default function NavBar() {
           <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>המטפלים שלנו</Link>
           <div className="pt-3 mt-2 border-t border-[#EFE7DC] flex items-center gap-3 text-xs">
             <span className="text-stone-500">לאנשי מקצוע:</span>
-            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>כניסה/הרשמה</Link>
+            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/join" onClick={() => setOpen(false)}>כניסה/הרשמה</Link>
           </div>
         </nav>
       )}
