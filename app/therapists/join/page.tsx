@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, TrendingUp, Users, Brain } from "lucide-react";
+import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, TrendingUp, Users, Brain, BarChart3, MapPin, Activity, Lightbulb } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "הצטרפות מטפלים | טיפול חכם",
   description:
-    "פלטפורמת Mentalytics מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מדויקת. יותר פניות רלוונטיות, פחות בזבוז זמן. הצטרפות ללא עלות.",
+    'פלטפורמת "טיפול חכם" מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מדויקת. יותר פניות רלוונטיות, פחות בזבוז זמן. הצטרפות ללא עלות.',
 };
 
 const faqs = [
@@ -78,7 +78,7 @@ export default function TherapistJoinPage() {
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-stone-700 max-w-3xl">
-            פלטפורמת <strong>Mentalytics</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מדויקת — לא רק חיפוש גנרי.
+            פלטפורמת <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מדויקת — לא רק חיפוש גנרי.
           </p>
 
           <ul className="mt-6 space-y-2.5 text-stone-800">
@@ -206,6 +206,90 @@ export default function TherapistJoinPage() {
               במידה ולא תקבל פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם — תוכל לקבל את כל הכסף חזרה במהירות ובקלות.
             </p>
           </div>
+        </div>
+      </section>
+
+      {/* STATS DEEP-DIVE — marketing section for the enriched report */}
+      <section className="mt-14">
+        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
+          style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
+          <Sparkles size={12} />
+          בלעדי למסלול המקודם
+        </div>
+
+        <h2 className="text-2xl md:text-3xl font-extrabold text-stone-900 mb-3">
+          לראשונה — דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>מי בדיוק מחפש אותך</span>
+        </h2>
+        <p className="text-stone-700 leading-8 mb-8 max-w-3xl">
+          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה — תוך שמירה מוחלטת על אנונימיות המטופלים.
+        </p>
+
+        <div className="grid gap-4 md:grid-cols-2 mb-6">
+          {[
+            {
+              icon: BarChart3,
+              color: "#0F5468",
+              title: "כמה אנשים ראו אותך — באמת",
+              body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה.",
+            },
+            {
+              icon: MapPin,
+              color: "#1A7A96",
+              title: "מאיזו גיאוגרפיה מגיעים",
+              body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין — גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך.",
+            },
+            {
+              icon: Activity,
+              color: "#8B2E0A",
+              title: "עם איזה קשיים פונים",
+              body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אותך.",
+            },
+            {
+              icon: Users,
+              color: "#2A5C3A",
+              title: "גילאים ומגדר של הפונים",
+              body: 'התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון.',
+            },
+          ].map(({ icon: Icon, title, body, color }, i) => (
+            <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
+                <Icon size={22} style={{ color }} />
+              </div>
+              <div>
+                <h3 className="font-bold text-stone-900 mb-1">{title}</h3>
+                <p className="text-sm text-stone-600 leading-6">{body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* AI narrative teaser */}
+        <div className="rounded-2xl p-6 md:p-7" style={{ background: "linear-gradient(135deg,#FDF6EE,#F5E8DC)", border: "1px solid #E8DCC8" }}>
+          <div className="flex items-start gap-3">
+            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "#8B2E0A20" }}>
+              <Lightbulb size={22} style={{ color: "#8B2E0A" }} />
+            </div>
+            <div>
+              <h3 className="font-bold text-stone-900 mb-2">בקרוב: ניתוח AI אישי בעברית פשוטה</h3>
+              <p className="leading-7 text-stone-700 mb-3">
+                לא רק מספרים וגרפים. סוכן AI יקרא את הנתונים שלך מדי חודש, וייצור לך פסקה מעשית — מה בולט, מה השתנה, ואיפה הזדמנויות לחידוד.
+              </p>
+              <div className="rounded-xl bg-white/70 border border-[#E8DCC8] p-4">
+                <p className="text-sm text-stone-700 leading-7 italic">
+                  &quot;החודש רוב הפונים אליך (68%) הגיעו מהשרון וגוש דן, בגילאי 31-45, עם קשיים זוגיים. אחוז ההמרה שלך באוכלוסיה זו הוא 22% — מעל הממוצע. שקלי לחדד בביוגרפיה את הניסיון שלך בטיפול זוגי לבני 30+.&quot;
+                </p>
+                <p className="mt-2 text-xs text-stone-400">דוגמה — הניתוח האמיתי מותאם אישית לפי הנתונים שלך</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Privacy reassurance */}
+        <div className="mt-4 rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
+          <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-stone-700 leading-6">
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. קבוצה עם פחות מ-3 אנשים מוצגת כ&quot;אחר&quot; או מוסתרת. אין שום דרך לזהות מטופל ספציפי — גם לא על ידך.
+          </p>
         </div>
       </section>
 
