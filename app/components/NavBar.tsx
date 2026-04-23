@@ -20,7 +20,8 @@ export default function NavBar() {
           <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/research">מאמרים ומידע שימושי</Link>
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#kids">ילדים</a>
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#adults">מבוגרים</a>
-          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">מטפלים</Link>
+          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">המטפלים שלנו</Link>
+          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists/login">רישום/התחברות מטפלים</Link>
           <div className="flex items-center gap-2">
             <Link href="/adults" className="inline-flex items-center gap-2 rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40">
               <User size={16} />
@@ -60,7 +61,8 @@ export default function NavBar() {
           <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/research" onClick={() => setOpen(false)}>מאמרים ומידע שימושי</Link>
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#kids" onClick={() => setOpen(false)}>ילדים</a>
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#adults" onClick={() => setOpen(false)}>מבוגרים</a>
-          <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>מטפלים</Link>
+          <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>המטפלים שלנו</Link>
+          <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists/login" onClick={() => setOpen(false)}>רישום/התחברות מטפלים</Link>
         </nav>
       )}
     </header>
