@@ -13,9 +13,7 @@ export default function NavBar() {
       <div className="border-b border-[#EFE7DC] bg-[#FAF6F0]">
         <div className="mx-auto flex max-w-5xl items-center justify-end gap-4 px-6 py-1.5 text-xs">
           <span className="text-stone-500">לאנשי מקצוע:</span>
-          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">כניסה</Link>
-          <span className="text-stone-300">|</span>
-          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">הרשמה</Link>
+          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">כניסה/הרשמה</Link>
         </div>
       </div>
 
@@ -73,9 +71,7 @@ export default function NavBar() {
           <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>המטפלים שלנו</Link>
           <div className="pt-3 mt-2 border-t border-[#EFE7DC] flex items-center gap-3 text-xs">
             <span className="text-stone-500">לאנשי מקצוע:</span>
-            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>כניסה</Link>
-            <span className="text-stone-300">|</span>
-            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>הרשמה</Link>
+            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>כניסה/הרשמה</Link>
           </div>
         </nav>
       )}
