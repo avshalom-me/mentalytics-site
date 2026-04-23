@@ -38,7 +38,8 @@
       "Bash(node /c/projects/mentalytics-site/.claude/worktrees/awesome-heyrovsky-8e7b76/scripts/compress-existing-photos.mjs)",
       "Bash(python3 -c ' *)",
       "Bash(python3 -)",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "WebFetch(domain:www.alhasapa.co.il)"
     ]
   }
 }

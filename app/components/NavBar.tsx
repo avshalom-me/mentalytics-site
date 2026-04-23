@@ -13,7 +13,7 @@ export default function NavBar() {
       <div className="border-b border-[#EFE7DC] bg-[#FAF6F0]">
         <div className="mx-auto flex max-w-5xl items-center justify-end gap-4 px-6 py-1.5 text-xs">
           <span className="text-stone-500">לאנשי מקצוע:</span>
-          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">כניסה/הרשמה</Link>
+          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/join">כניסה/הרשמה</Link>
         </div>
       </div>
 
