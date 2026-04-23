@@ -116,7 +116,13 @@ export async function POST(req: NextRequest) {
 
     const { error: dbError } = await supabaseAdmin
       .from("therapist_certificates")
-      .insert({ therapist_id: therapist.id, file_path: path, file_name: file.name });
+      .insert({
+        therapist_id: therapist.id,
+        file_path: path,
+        original_name: file.name,
+        content_type: file.type,
+        size_bytes: file.size,
+      });
     if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
   }
 
