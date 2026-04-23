@@ -9,6 +9,16 @@ export default function NavBar() {
 
   return (
     <header className="sticky top-0 z-50 border-b border-[#E8E1D8] bg-white/80 backdrop-blur">
+      {/* Utility bar — for professionals */}
+      <div className="border-b border-[#EFE7DC] bg-[#FAF6F0]">
+        <div className="mx-auto flex max-w-5xl items-center justify-end gap-4 px-6 py-1.5 text-xs">
+          <span className="text-stone-500">לאנשי מקצוע:</span>
+          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">כניסה</Link>
+          <span className="text-stone-300">|</span>
+          <Link className="text-stone-600 hover:text-stone-900 hover:underline" href="/therapists/login">הרשמה</Link>
+        </div>
+      </div>
+
       <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
         <Link href="/" onClick={() => setOpen(false)}>
           <img src="/logo.svg.png" alt="Mentalytics" className="h-16 w-auto" />
@@ -21,7 +31,6 @@ export default function NavBar() {
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#kids">ילדים</a>
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#adults">מבוגרים</a>
           <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">המטפלים שלנו</Link>
-          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists/login">רישום/התחברות מטפלים</Link>
           <div className="flex items-center gap-2">
             <Link href="/adults" className="inline-flex items-center gap-2 rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40">
               <User size={16} />
@@ -62,7 +71,12 @@ export default function NavBar() {
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#kids" onClick={() => setOpen(false)}>ילדים</a>
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#adults" onClick={() => setOpen(false)}>מבוגרים</a>
           <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>המטפלים שלנו</Link>
-          <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists/login" onClick={() => setOpen(false)}>רישום/התחברות מטפלים</Link>
+          <div className="pt-3 mt-2 border-t border-[#EFE7DC] flex items-center gap-3 text-xs">
+            <span className="text-stone-500">לאנשי מקצוע:</span>
+            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>כניסה</Link>
+            <span className="text-stone-300">|</span>
+            <Link className="text-stone-600 hover:text-stone-900" href="/therapists/login" onClick={() => setOpen(false)}>הרשמה</Link>
+          </div>
         </nav>
       )}
     </header>
