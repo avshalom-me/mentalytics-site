@@ -371,14 +371,6 @@ export default function AdminTherapistsPage() {
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
-      {/* ── קישור לסטטיסטיקה ── */}
-      <div className="mb-8">
-        <a href="/admin/stats"
-          className="inline-flex items-center gap-2 rounded-xl border border-stone-200 bg-white px-5 py-3 text-sm font-semibold text-stone-700 hover:bg-stone-50 transition-colors shadow-sm">
-          📊 צפה בסטטיסטיקת לחיצות לפי מטפל
-        </a>
-      </div>
-
       {/* ── סינון וחיפוש ── */}
       <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">

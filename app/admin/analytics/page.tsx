@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, PieChart, Pie, Cell,
@@ -499,22 +498,11 @@ export default function AdminAnalyticsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       {/* Header */}
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-stone-900">אנליטיקס</h1>
-          <p className="text-xs text-stone-400 mt-1">דשבורד מרכזי — funnel, נשירה, סטטיסטיקות</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/admin/stats" className="text-sm text-[#2e7d8c] font-semibold hover:underline">
-            סטטיסטיקת לחיצות →
-          </Link>
-          <Link href="/admin/therapists" className="text-sm text-stone-500 underline hover:text-stone-700">
-            ← חזרה
-          </Link>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-black text-stone-900">אנליטיקס</h1>
+        <p className="text-xs text-stone-400 mt-1">דשבורד מרכזי — funnel, נשירה, סטטיסטיקות</p>
       </div>
 
       {/* Period + Tabs */}
