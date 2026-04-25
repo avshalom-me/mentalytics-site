@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { getOrCreateSessionId } from "@/app/lib/session";
 
 export interface ViewerContext {
   region?: string;
@@ -8,22 +9,6 @@ export interface ViewerContext {
   age_band?: string;
   gender?: string;
   match_score?: number;
-}
-
-function getOrCreateSessionId(): string {
-  if (typeof window === "undefined") return "";
-  const KEY = "mnt_session_id";
-  try {
-    let id = localStorage.getItem(KEY);
-    if (!id) {
-      // Not for identification — just for dedup. 16 hex chars is enough.
-      id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-      localStorage.setItem(KEY, id);
-    }
-    return id;
-  } catch {
-    return "";
-  }
 }
 
 export default function TrackView({

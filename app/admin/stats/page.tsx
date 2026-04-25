@@ -182,6 +182,9 @@ export default function AdminStatsPage() {
               <div className="text-xs text-stone-400 mt-0.5">לחיצות</div>
             </div>
           )}
+          <Link href="/admin/analytics" className="text-sm text-[#2e7d8c] font-semibold hover:underline">
+            אנליטיקס Funnel →
+          </Link>
           <Link href="/admin/therapists" className="text-sm text-stone-500 underline hover:text-stone-700">
             ← חזרה
           </Link>

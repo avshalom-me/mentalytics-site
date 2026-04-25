@@ -9,6 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -197,6 +198,7 @@ export default function AdultsPage() {
   useEffect(() => {
     const pct = getAdultsProgress(screen);
     (window as any).gtag?.("event", "quiz_step", { quiz_type: "adults", step: screen, progress: pct });
+    trackQuizStep("adults", screen, pct);
   }, [screen]);
 
   const [agreed, setAgreed] = useState(false);
@@ -441,6 +443,7 @@ export default function AdultsPage() {
       }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
+      trackQuizComplete("adults");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
       if (localStorage.getItem("quiz_bypass") !== "1") {
@@ -450,6 +453,7 @@ export default function AdultsPage() {
       }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
+      trackQuizComplete("adults");
     } finally {
       setLoading(false);
     }
