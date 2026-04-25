@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, TrendingUp, Users, Brain, BarChart3, MapPin, Activity, Lightbulb } from "lucide-react";
+import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "הצטרפות מטפלים | טיפול חכם",
@@ -246,27 +246,6 @@ export default function TherapistJoinPage() {
               </div>
             </div>
           ))}
-        </div>
-
-        {/* AI narrative teaser */}
-        <div className="rounded-2xl p-6 md:p-7" style={{ background: "linear-gradient(135deg,#FDF6EE,#F5E8DC)", border: "1px solid #E8DCC8" }}>
-          <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "#8B2E0A20" }}>
-              <Lightbulb size={22} style={{ color: "#8B2E0A" }} />
-            </div>
-            <div>
-              <h3 className="font-bold text-stone-900 mb-2">בקרוב: ניתוח AI אישי בעברית פשוטה</h3>
-              <p className="leading-7 text-stone-700 mb-3">
-                לא רק מספרים וגרפים. סוכן AI יקרא את הנתונים שלך מדי חודש, וייצור לך פסקה מעשית — מה בולט, מה השתנה, ואיפה הזדמנויות לחידוד.
-              </p>
-              <div className="rounded-xl bg-white/70 border border-[#E8DCC8] p-4">
-                <p className="text-sm text-stone-700 leading-7 italic">
-                  &quot;החודש רוב הפונים אליך (68%) הגיעו מהשרון וגוש דן, בגילאי 31-45, עם קשיים זוגיים. אחוז ההמרה שלך באוכלוסיה זו הוא 22% — מעל הממוצע. שקלי לחדד בביוגרפיה את הניסיון שלך בטיפול זוגי לבני 30+.&quot;
-                </p>
-                <p className="mt-2 text-xs text-stone-400">דוגמה — הניתוח האמיתי מותאם אישית לפי הנתונים שלך</p>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Privacy reassurance */}
