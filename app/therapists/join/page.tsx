@@ -153,11 +153,11 @@ export default function TherapistJoinPage() {
               </div>
               <h3 className="text-lg font-bold text-stone-900 mb-4">דף פרופיל אישי</h3>
               <ul className="space-y-2.5 text-sm text-stone-700 leading-6">
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> פרסום דף מידע אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש מטפל לפי מיקום — אזור או עיר</li>
-                <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> כניסה למערכת ההתאמה</li>
-                <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> דו"ח שבועי של פניות</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+                <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> מערכת ההתאמה החכמה</li>
+                <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> סטטיסטיקות וניתוח פרופיל הפונים</li>
               </ul>
             </div>
 
@@ -170,28 +170,13 @@ export default function TherapistJoinPage() {
                 <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>
                 <span className="text-xs text-[#0F5468]">מופיע בהתאמות</span>
               </div>
-              <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">מערכת ההתאמה + סטטיסטיקות</h3>
+              <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">התאמה חכמה + סטטיסטיקות מתקדמות</h3>
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "#1a4a5c" }}>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דף מידע אישי — כולל כל מה שבמסלול החינמי</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כניסה למערכת ההתאמה — פניות לפי תחומי הטיפול והאישיות המקצועית שלך</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> התאמה לפי פרמטרים מגוונים: גיל, אזור, שפה, סגנון טיפולי, הסדרי ביטוח ועוד</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הפניות המדויקות ביותר — מטופלים שמחפשים בדיוק את הגישה שלך</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו"ח שבועי של כמות הלחיצות על הפרופיל שלך</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-
-        {/* Bonus features for promoted */}
-        <div className="mt-6 rounded-2xl p-6" style={{ background: "#FDF6EE", border: "1px solid #E8DCC8" }}>
-          <div className="flex items-start gap-3 mb-3">
-            <TrendingUp size={22} style={{ color: "#8B2E0A" }} className="mt-1 flex-shrink-0" />
-            <div>
-              <h3 className="font-bold text-stone-900 mb-2">מה עוד מקבלים במסלול המקודם?</h3>
-              <ul className="space-y-2 text-sm text-stone-700 leading-6">
-                <li>• ניתוח חודשי של כמות הצפיות והלחיצות על הפרופיל שלך</li>
-                <li>• פרופילים של סוגי האנשים שפנו — אישיותית, גיאוגרפית, ולאיזה צורך הגיעו</li>
-                <li>• מידע חשוב על הצרכים הטיפוליים הנפוצים ביותר באזורך</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבמסלול החינמי</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מתאימים מופנים אליך לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו"ח צפיות, לחיצות ואחוזי המרה — כמה אנשים ראו, כמה פנו</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> פילוח הפונים אליך: מאיזה אזור, עם איזה קושי, באיזה גיל ומגדר</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר — לדעת איפה אתה עומד</li>
               </ul>
             </div>
           </div>

@@ -547,11 +547,11 @@ export default function TherapistDashboard() {
                 {profile.status !== "paying" && <span className="text-xs text-stone-400 font-medium">← המסלול הנוכחי שלך</span>}
               </div>
               <ul className="space-y-2 text-xs text-stone-600 leading-5">
-                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> פרסום דף מידע אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
-                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש מטפל לפי מיקום — אזור או עיר</li>
-                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">כניסה למערכת ההתאמה</span></li>
-                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">דו"ח שבועי של פניות</span></li>
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">מערכת ההתאמה החכמה</span></li>
+                <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">סטטיסטיקות וניתוח פרופיל הפונים</span></li>
               </ul>
             </div>
 
@@ -563,11 +563,11 @@ export default function TherapistDashboard() {
                 {profile.status === "paying" && <span className="text-xs text-[#0F5468] font-medium">← המסלול הנוכחי שלך</span>}
               </div>
               <ul className="space-y-2 text-xs leading-5" style={{ color: profile.status === "paying" ? "#1a4a5c" : "#9ca3af" }}>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דף מידע אישי — כולל כל מה שבמסלול החינמי</li>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> כניסה למערכת ההתאמה — פניות לפי תחומי הטיפול והאישיות המקצועית שלך</li>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> התאמה לפי פרמטרים מגוונים: גיל, אזור, שפה, סגנון טיפולי, הסדרי ביטוח ועוד</li>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> הפניות המדויקות ביותר — מטופלים שמחפשים בדיוק את הגישה שלך</li>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דו"ח שבועי של כמות הלחיצות על הפרופיל שלך</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> כל מה שבמסלול החינמי</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> מערכת התאמה חכמה — פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דו"ח צפיות, לחיצות ואחוזי המרה</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> פילוח הפונים: אזור, קושי, גיל ומגדר</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> השוואה לממוצע המטפלים באתר</li>
               </ul>
             </div>
           </div>
