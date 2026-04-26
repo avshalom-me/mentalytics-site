@@ -7,6 +7,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   AGE_GROUPS, LANGUAGES, CULTURAL_PREFS, ARRANGEMENTS,
   COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
+  COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 
@@ -310,6 +311,7 @@ export default function TherapistDashboard() {
     cultural_prefs: [] as string[], arrangements: [] as string[],
     age_groups: [] as string[], languages: [] as string[],
     couples_modalities: [] as string[], play_therapy_modalities: [] as string[],
+    cogfun_age_groups: [] as string[],
     style_q1: null as number | null,
     style_q2: null as number | null,
     activity_level: null as number | null,
@@ -340,6 +342,7 @@ export default function TherapistDashboard() {
           training_areas: (json.therapist.training_areas ?? []).filter((a: string) => !PLAY_MODALITIES_SET.has(a)),
           couples_modalities: json.therapist.couples_modalities ?? [],
           play_therapy_modalities: (json.therapist.training_areas ?? []).filter((a: string) => PLAY_MODALITIES_SET.has(a)),
+          cogfun_age_groups: json.therapist.cogfun_age_groups ?? [],
           assessment_types: json.therapist.assessment_types ?? [],
           regions: json.therapist.regions ?? [],
           cultural_prefs: json.therapist.cultural_prefs ?? [],
@@ -406,10 +409,11 @@ export default function TherapistDashboard() {
     // Step 1: PATCH profile first — creates the therapist row with all required
     // fields (full_name etc). Uploads run afterwards so they can attach to an
     // existing row.
-    const { play_therapy_modalities, ...rest } = form;
+    const { play_therapy_modalities, cogfun_age_groups, ...rest } = form;
     const patchBody = {
       ...rest,
       training_areas: [...form.training_areas, ...play_therapy_modalities],
+      cogfun_age_groups,
     };
     const res = await fetch("/api/therapist-profile", {
       method: "PATCH",
@@ -644,16 +648,27 @@ export default function TherapistDashboard() {
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">התמחות מקצועית</h2>
           <CheckboxGroup label="סוג מטפל" options={THERAPIST_TYPES}
-            selected={form.therapist_types} onChange={v => setForm({...form, therapist_types: v})} />
+            selected={form.therapist_types} onChange={v => {
+              const added = v.filter(t => !form.therapist_types.includes(t));
+              let nextTraining = form.training_areas;
+              for (const t of added) {
+                const auto = THERAPIST_TYPE_TO_TRAINING[t];
+                if (auto && !nextTraining.includes(auto)) nextTraining = [...nextTraining, auto];
+              }
+              setForm({...form, therapist_types: v, training_areas: nextTraining});
+            }} />
           <CheckboxGroup label="תחומי טיפול" options={TRAINING_AREAS}
             selected={form.training_areas} onChange={v => {
               const hadCouples = form.training_areas.includes("טיפול זוגי");
               const hasCouples = v.includes("טיפול זוגי");
               const hadExpressive = form.training_areas.includes("טיפול בהבעה ויצירה");
               const hasExpressive = v.includes("טיפול בהבעה ויצירה");
+              const hadCogfun = form.training_areas.includes("טיפול COG-FUN לקשיי קשב וריכוז");
+              const hasCogfun = v.includes("טיפול COG-FUN לקשיי קשב וריכוז");
               setForm({...form, training_areas: v,
                 couples_modalities: hadCouples && !hasCouples ? [] : form.couples_modalities,
                 play_therapy_modalities: hadExpressive && !hasExpressive ? [] : form.play_therapy_modalities,
+                cogfun_age_groups: hadCogfun && !hasCogfun ? [] : form.cogfun_age_groups,
               });
             }} />
           {form.training_areas.includes("טיפול זוגי") && (
@@ -663,6 +678,10 @@ export default function TherapistDashboard() {
           {form.training_areas.includes("טיפול בהבעה ויצירה") && (
             <CheckboxGroup label="סוג הטיפול בהבעה ויצירה" options={PLAY_THERAPY_MODALITIES}
               selected={form.play_therapy_modalities} onChange={v => setForm({...form, play_therapy_modalities: v})} />
+          )}
+          {form.training_areas.includes("טיפול COG-FUN לקשיי קשב וריכוז") && (
+            <CheckboxGroup label="טיפול COG-FUN — לאילו קבוצות גיל?" options={COGFUN_AGE_GROUPS}
+              selected={form.cogfun_age_groups} onChange={v => setForm({...form, cogfun_age_groups: v})} />
           )}
           <CheckboxGroup label="סוגי אבחון" options={ASSESSMENT_TYPES}
             selected={form.assessment_types} onChange={v => setForm({...form, assessment_types: v})} />

@@ -9,6 +9,7 @@ type Gender = "זכר" | "נקבה";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, COUPLES_MODALITIES, PLAY_THERAPY_MODALITIES,
   AGE_GROUPS, ASSESSMENT_TYPES, CULTURAL_PREFS, LANGUAGES, ARRANGEMENTS,
+  COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 
 type FormState = {
@@ -19,6 +20,7 @@ type FormState = {
   trainingAreas: string[];
   couplesModalities: string[];
   playTherapyModalities: string[];
+  cogfunAgeGroups: string[];
   ageGroups: string[];
   assessmentTypes: string[];
   styleQ1: number | null;
@@ -54,6 +56,7 @@ export default function TherapistSignupPage() {
     trainingAreas: [],
     couplesModalities: [],
     playTherapyModalities: [],
+    cogfunAgeGroups: [],
     ageGroups: [],
     assessmentTypes: [],
     styleQ1: null,
@@ -182,6 +185,7 @@ export default function TherapistSignupPage() {
       fd.append("trainingAreas", JSON.stringify(allTrainingAreas));
       fd.append("treatmentTypes", JSON.stringify(allTrainingAreas));
       fd.append("couplesModalities", JSON.stringify(form.couplesModalities));
+      fd.append("cogfunAgeGroups", JSON.stringify(form.cogfunAgeGroups));
       fd.append("ageGroups", JSON.stringify(form.ageGroups));
       fd.append("assessmentTypes", JSON.stringify(form.assessmentTypes));
       fd.append("styleQ1", String(form.styleQ1 ?? ""));
@@ -347,10 +351,16 @@ export default function TherapistSignupPage() {
                   type="checkbox"
                   checked={form.therapistTypes.includes(t)}
                   onChange={() =>
-                    setForm((p) => ({
-                      ...p,
-                      therapistTypes: toggleInArray(p.therapistTypes, t),
-                    }))
+                    setForm((p) => {
+                      const nextTypes = toggleInArray(p.therapistTypes, t);
+                      const adding = !p.therapistTypes.includes(t);
+                      const autoTraining = THERAPIST_TYPE_TO_TRAINING[t];
+                      let nextTraining = p.trainingAreas;
+                      if (autoTraining && adding && !nextTraining.includes(autoTraining)) {
+                        nextTraining = [...nextTraining, autoTraining];
+                      }
+                      return { ...p, therapistTypes: nextTypes, trainingAreas: nextTraining };
+                    })
                   }
                 />
                 <span>{t}</span>
@@ -423,11 +433,14 @@ export default function TherapistSignupPage() {
                       const couplesNowChecked = nextTrainingAreas.includes("טיפול זוגי");
                       const playWasChecked = p.trainingAreas.includes("טיפול בהבעה ויצירה");
                       const playNowChecked = nextTrainingAreas.includes("טיפול בהבעה ויצירה");
+                      const cogfunWasChecked = p.trainingAreas.includes("טיפול COG-FUN לקשיי קשב וריכוז");
+                      const cogfunNowChecked = nextTrainingAreas.includes("טיפול COG-FUN לקשיי קשב וריכוז");
                       return {
                         ...p,
                         trainingAreas: nextTrainingAreas,
                         couplesModalities: couplesWasChecked && !couplesNowChecked ? [] : p.couplesModalities,
                         playTherapyModalities: playWasChecked && !playNowChecked ? [] : p.playTherapyModalities,
+                        cogfunAgeGroups: cogfunWasChecked && !cogfunNowChecked ? [] : p.cogfunAgeGroups,
                       };
                     })
                   }
@@ -481,6 +494,31 @@ export default function TherapistSignupPage() {
                       }
                     />
                     {m}
+                  </label>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {form.trainingAreas.includes("טיפול COG-FUN לקשיי קשב וריכוז") && (
+            <div className="mt-4 rounded-xl border bg-slate-50 p-4">
+              <div className="text-sm font-semibold">טיפול COG-FUN — לאילו קבוצות גיל?</div>
+              <p className="mt-1 text-xs text-slate-800">אפשר לבחור כמה.</p>
+
+              <div className="mt-3 flex flex-wrap gap-4">
+                {COGFUN_AGE_GROUPS.map((g) => (
+                  <label key={g} className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.cogfunAgeGroups.includes(g)}
+                      onChange={() =>
+                        setForm((p) => ({
+                          ...p,
+                          cogfunAgeGroups: toggleInArray(p.cogfunAgeGroups, g),
+                        }))
+                      }
+                    />
+                    {g}
                   </label>
                 ))}
               </div>

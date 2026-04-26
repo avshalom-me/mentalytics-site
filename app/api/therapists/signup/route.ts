@@ -90,6 +90,7 @@ export async function POST(req: Request) {
     let trainingAreas: string[] = [];
     let treatmentTypes: string[] = [];
     let couplesModalities: string[] = [];
+    let cogfunAgeGroups: string[] = [];
     let ageGroups: string[] = [];
     let assessmentTypes: string[] = [];
     let regions: string[] = [];
@@ -107,6 +108,7 @@ export async function POST(req: Request) {
       trainingAreas = parseJsonArray(fd.get("trainingAreas"));
       treatmentTypes = parseJsonArray(fd.get("treatmentTypes"));
       couplesModalities = parseJsonArray(fd.get("couplesModalities"));
+      cogfunAgeGroups = parseJsonArray(fd.get("cogfunAgeGroups"));
       ageGroups = parseJsonArray(fd.get("ageGroups"));
       assessmentTypes = parseJsonArray(fd.get("assessmentTypes"));
       regions = parseJsonArray(fd.get("regions"));
@@ -175,6 +177,7 @@ export async function POST(req: Request) {
         training_areas: trainingAreas,
         treatment_types: normalizedTreatmentTypes,
         couples_modalities: couplesModalities,
+        cogfun_age_groups: cogfunAgeGroups,
         age_groups: ageGroups,
         assessment_types: assessmentTypes,
         activity_level: activityLevel,

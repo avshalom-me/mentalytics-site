@@ -10,6 +10,8 @@ export const THERAPIST_TYPES = [
   "מטפל מיני",
   "קרימינולוג קליני",
   "פיזיותרפיסט/ית",
+  "מרפא/ת בעיסוק",
+  "קלינאי/ת תקשורת",
 ] as const;
 
 export const TRAINING_AREAS = [
@@ -31,7 +33,15 @@ export const TRAINING_AREAS = [
   "טיפול COG-FUN לקשיי קשב וריכוז",
   "טיפול בטראומה",
   "פסיכואנליזה",
+  "קלינאות תקשורת",
 ] as const;
+
+export const COGFUN_AGE_GROUPS = ["ילדים", "בני נוער", "מבוגרים"] as const;
+
+export const THERAPIST_TYPE_TO_TRAINING: Record<string, string> = {
+  "מרפא/ת בעיסוק": "ריפוי בעיסוק",
+  "קלינאי/ת תקשורת": "קלינאות תקשורת",
+};
 
 export const COUPLES_MODALITIES = ["EFT", "דינאמי", "מבני"] as const;
 
