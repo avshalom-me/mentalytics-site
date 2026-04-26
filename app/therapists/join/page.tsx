@@ -87,17 +87,7 @@ export default function TherapistJoinPage() {
             <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאתה עובד איתם, ועל האישיות הטיפולית שלך</li>
           </ul>
 
-          <div className="mt-8">
-            <Link
-              href="/therapists/login?mode=register"
-              className="inline-flex items-center gap-2 rounded-2xl px-7 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
-              style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 8px 20px rgba(15,84,104,.25)" }}
-            >
-              הצטרף עכשיו ללא עלות
-              <ArrowLeft size={18} />
-            </Link>
-            <p className="mt-3 text-sm text-stone-600">ההרשמה חינמית. שדרוג למסלול מקודם — אופציונלי.</p>
-          </div>
+          <div className="mt-8" />
         </div>
       </section>
 
