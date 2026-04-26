@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Sparkles, ArrowLeft, ShieldCheck, Users, BarChart3, MapPin, Activity } from "lucide-react";
+import PromotedSignupButton from "./PromotedSignupButton";
 
 export const metadata: Metadata = {
   title: "בחירת מסלול הצטרפות | טיפול חכם",
@@ -133,14 +134,7 @@ export default function TherapistRegisterPage() {
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> פילוח הפונים: אזור, קושי, גיל ומגדר</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר</li>
               </ul>
-              <Link
-                href="/therapists/login?mode=register&plan=promoted"
-                className="mt-6 block w-full text-center rounded-xl px-6 py-3 text-sm font-bold text-white transition hover:opacity-95"
-                style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 12px rgba(15,84,104,.25)" }}
-              >
-                הרשמה + תשלום למסלול המקודם
-                <ArrowLeft size={16} className="inline mr-2" />
-              </Link>
+              <PromotedSignupButton />
             </div>
           </div>
         </div>
