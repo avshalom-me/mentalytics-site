@@ -18,16 +18,16 @@ const faqs = [
     a: "המערכת נבנתה במשך שנים, על בסיס שילוב של מחקרים בפסיכולוגיה ובהתאמות טיפול, וכן על בסיס ניסיון קליני של מספר מומחים ומטפלים מאסכולות שונות.",
   },
   {
-    q: "איפה אני מקבל את המידע הסטטיסטי על סוגי הפניות ומי מקבל אותו?",
+    q: "איפה אני מקבל/ת את המידע הסטטיסטי על סוגי הפניות ומי מקבל אותו?",
     a: 'רק מטפלים במסלול המקודם מקבלים את הסטטיסטיקות יחד עם ניתוח AI של הגורמים וסוגי הפניות. את הסטטיסטיקה והתיאורים אפשר לראות בפרופיל האישי.',
   },
   {
     q: "מה קורה אם לא אקבל פניות?",
-    a: "ללא סיכון — אם לא תקבל פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם, תוכל לקבל את כל הכסף חזרה במהירות ובקלות.",
+    a: "ללא סיכון — אם לא תקבל/י פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם, תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.",
   },
   {
     q: "כמה עולה המסלול החינמי?",
-    a: "ההרשמה והמסלול החינמי ללא עלות כלל. אתה מקבל דף פרופיל מקצועי שנגיש לכל מי שמחפש מטפלים באתר.",
+    a: "ההרשמה והמסלול החינמי ללא עלות כלל. את/ה מקבל/ת דף פרופיל מקצועי שנגיש לכל מי שמחפש מטפלים באתר.",
   },
 ];
 
@@ -84,7 +84,7 @@ export default function TherapistJoinPage() {
           <ul className="mt-6 space-y-2.5 text-stone-800">
             <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> יותר פניות רלוונטיות</li>
             <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> פחות בזבוז זמן</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאתה עובד איתם, ועל האישיות הטיפולית שלך</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאת/ה עובד/ת איתם, ועל האישיות הטיפולית שלך</li>
           </ul>
 
           <div className="mt-8" />
@@ -94,7 +94,7 @@ export default function TherapistJoinPage() {
       {/* PLANS TABLE — right after hero */}
       <section className="mt-10">
         <h2 className="text-2xl font-extrabold text-stone-900 mb-2">המסלולים</h2>
-        <p className="text-stone-600 mb-6">כל מטפל מתחיל במסלול החינמי. שדרוג למסלול מקודם — אופציונלי.</p>
+        <p className="text-stone-600 mb-6">כל מטפל/ת מתחיל/ה במסלול החינמי. שדרוג למסלול מקודם — אופציונלי.</p>
 
         <div className="rounded-2xl overflow-hidden border border-[#E8E0D8] bg-white shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-2">
@@ -134,9 +134,9 @@ export default function TherapistJoinPage() {
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו&quot;ח צפיות, לחיצות ואחוזי המרה — כמה אנשים ראו, כמה פנו</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> פילוח הפונים אליך: מאיזה אזור, עם איזה קושי, באיזה גיל ומגדר</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר — לדעת איפה אתה עומד</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר — לדעת איפה את/ה עומד/ת</li>
               </ul>
-              <p className="mt-4 text-xs text-[#0F5468]/70">* ללא סיכון — החזר כספי מלא אם לא תקבל פנייה בחודשיים הראשונים.</p>
+              <p className="mt-4 text-xs text-[#0F5468]/70">* ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים הראשונים.</p>
             </div>
           </div>
         </div>
@@ -148,7 +148,7 @@ export default function TherapistJoinPage() {
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
             style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 8px 20px rgba(15,84,104,.25)" }}
           >
-            הצטרף לאחד המסלולים
+            הצטרפ/י לאחד המסלולים
             <ArrowLeft size={18} />
           </Link>
         </div>
@@ -185,7 +185,7 @@ export default function TherapistJoinPage() {
             לאחר מכן — המטופלים מקבלים <strong>התאמה למטפלים שמתאימים בדיוק לפרופיל שלהם</strong>, כולל <strong>סוכן AI</strong> שמסביר להם את ההתאמה במפורט במידה ורוצים.
           </p>
           <p className="mt-3 leading-8 text-stone-800">
-            <strong>ואתה?</strong> מקבל פניות הרבה יותר מדויקות.
+            <strong>ואת/ה?</strong> מקבל/ת פניות הרבה יותר מדויקות.
           </p>
         </div>
       </section>
