@@ -27,6 +27,7 @@ type TherapistRow = {
   training_areas: unknown;
   assessment_types: unknown;
   couples_modalities: unknown;
+  cogfun_age_groups: unknown;
   regions: unknown;
   cultural_prefs: unknown;
   arrangements: unknown;
@@ -74,6 +75,7 @@ const WEIGHTS = {
   couplesBonus: 8,     // exact couples modality match (EFT/דינאמי/מבני)
   sexualBonus: 6,      // therapist also does sexual therapy when needed
   expressiveBonus: 8,  // expressive therapy modality match (art/music/movement)
+  cogfunBonus: 6,      // COG-FUN age group match (children/teens/adults)
 };
 
 function normalizeText(value: unknown): string {
@@ -349,6 +351,30 @@ function scoreTherapist(
     }
   }
 
+  // Bonus: COG-FUN age group match
+  const COGFUN_LABEL = normalizeText("טיפול cog-fun לקשיי קשב וריכוז");
+  const patientNeedsCogfun = expertiseNeed.some(t => normalizeText(t) === COGFUN_LABEL);
+  if (patientNeedsCogfun && trainingAreas.some(a => normalizeText(a) === COGFUN_LABEL)) {
+    const cogfunAges = parseArray(therapist.cogfun_age_groups);
+    if (cogfunAges.length > 0 && input.ageGroups.length > 0) {
+      possible += WEIGHTS.cogfunBonus;
+      const AGE_TO_COGFUN: Record<string, string> = {
+        "גיל הרך": "ילדים",
+        "ילדים": "ילדים",
+        "נוער": "בני נוער",
+        "מבוגרים": "מבוגרים",
+        "הגיל השלישי": "מבוגרים",
+      };
+      const neededCogfun = uniqueStrings(
+        input.ageGroups.map(ag => AGE_TO_COGFUN[ag] ?? ag)
+      );
+      if (hasOverlap(cogfunAges, neededCogfun)) {
+        earned += WEIGHTS.cogfunBonus;
+        reasons.push("התאמה ב-COG-FUN לקבוצת הגיל");
+      }
+    }
+  }
+
   if (input.therapistTypes.length > 0) {
     possible += WEIGHTS.therapistType;
     const matched = intersection(therapistTypes, input.therapistTypes);
@@ -485,7 +511,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       .eq("status", "paying");
 
