@@ -63,7 +63,7 @@ export async function GET() {
       if (t.profile_photo_path) {
         const { data: signedData, error: signedError } = await supabaseAdmin.storage
           .from(PROFILE_PHOTOS_BUCKET)
-          .createSignedUrl(t.profile_photo_path, 60 * 60);
+          .createSignedUrl(t.profile_photo_path, 60 * 60 * 24);
 
         if (!signedError && signedData?.signedUrl) {
           profile_photo_url = signedData.signedUrl;

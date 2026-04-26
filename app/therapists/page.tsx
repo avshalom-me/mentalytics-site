@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
@@ -41,8 +41,23 @@ function TherapistCard({
   setBrokenImages: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
   const impressionRef = useImpressionTrack(t.id);
+  const retryCount = useRef(0);
+  const imgRef = useRef<HTMLImageElement>(null);
   const showImage = t.profile_photo_url && !brokenImages[t.id];
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
+
+  const handleImageError = () => {
+    if (retryCount.current < 2 && imgRef.current && t.profile_photo_url) {
+      retryCount.current += 1;
+      setTimeout(() => {
+        if (imgRef.current) {
+          imgRef.current.src = t.profile_photo_url + "&retry=" + retryCount.current;
+        }
+      }, 1000 * retryCount.current);
+    } else {
+      setBrokenImages((p) => ({ ...p, [t.id]: true }));
+    }
+  };
 
   return (
     <div
@@ -53,10 +68,11 @@ function TherapistCard({
       <Link href={`/therapists/${t.id}`} className="block">
         <div className="relative h-72 w-full overflow-hidden bg-gray-100">
           <img
+            ref={imgRef}
             src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
             alt={t.full_name}
             className="h-full w-full object-cover object-center"
-            onError={() => setBrokenImages((p) => ({ ...p, [t.id]: true }))}
+            onError={handleImageError}
           />
         </div>
         <div className="px-4 pt-4 pb-3">

@@ -259,7 +259,7 @@ async function buildSignedPhotoUrl(path: string | null): Promise<string | null> 
   try {
     const { data, error } = await supabaseAdmin.storage
       .from("therapist-certificates")
-      .createSignedUrl(decodeURIComponent(path), 60 * 60);
+      .createSignedUrl(decodeURIComponent(path), 60 * 60 * 24);
     if (error || !data?.signedUrl) return null;
     return data.signedUrl;
   } catch {
