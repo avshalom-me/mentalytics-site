@@ -80,7 +80,7 @@ export default function TherapistRegisterPage() {
         <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
           <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
           <p className="text-sm text-stone-700 leading-6">
-            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. קבוצה עם פחות מ-3 אנשים מוצגת כ&quot;אחר&quot; או מוסתרת. אין שום דרך לזהות מטופל ספציפי — גם לא על ידך.
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי — לא על ידינו וגם לא על ידך.
           </p>
         </div>
       </section>
