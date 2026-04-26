@@ -141,6 +141,20 @@ export default function TherapistJoinPage() {
           </div>
         </div>
 
+        {/* Risk-free guarantee + tax note */}
+        <div className="mt-4 rounded-2xl p-5 flex items-start gap-3" style={{ background: "#F0F7F2", border: "1px solid #C8DDD0" }}>
+          <ShieldCheck size={22} style={{ color: "#2A5C3A" }} className="mt-0.5 flex-shrink-0" />
+          <div>
+            <p className="font-bold text-stone-900 mb-1">ללא סיכון — החזר כספי מלא</p>
+            <p className="text-sm text-stone-700 leading-6">
+              במידה ולא תקבל/י פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם — תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
+            </p>
+            <p className="text-sm text-stone-700 leading-6 mt-1">
+              ההוצאה מוכרת להזדכות במס הכנסה ומע&quot;מ.
+            </p>
+          </div>
+        </div>
+
         {/* CTA after table */}
         <div className="mt-6 text-center">
           <Link
@@ -215,36 +229,6 @@ export default function TherapistJoinPage() {
         </div>
       </section>
 
-      {/* FINAL CTA */}
-      <section className="mt-14">
-        <div
-          className="rounded-3xl p-8 md:p-10 text-center"
-          style={{
-            background: "linear-gradient(135deg,#0F5468 0%,#1A7A96 100%)",
-            boxShadow: "0 16px 40px rgba(15,84,104,.20)",
-          }}
-        >
-          <h2 className="text-2xl md:text-3xl font-black text-white mb-3">
-            מוכנ/ה להתחיל לקבל פניות רלוונטיות?
-          </h2>
-          <p className="text-white/90 text-lg mb-6 leading-8">
-            ההרשמה חינמית ולוקחת פחות מ-5 דקות.
-          </p>
-          <Link
-            href="/therapists/login?mode=register"
-            className="inline-flex items-center gap-2 rounded-2xl bg-white px-8 py-4 text-base font-bold text-[#0F5468] transition hover:opacity-95 active:scale-95"
-          >
-            להרשמה
-            <ArrowLeft size={18} />
-          </Link>
-          <p className="mt-4 text-sm text-white/80">
-            כבר רשומ/ה?{" "}
-            <Link href="/therapists/login?mode=login" className="underline hover:text-white">
-              לכניסה למערכת
-            </Link>
-          </p>
-        </div>
-      </section>
     </main>
   );
 }
