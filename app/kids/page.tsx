@@ -415,7 +415,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
       const hv = key === "_h" ? parseFloat(val)||0 : h;
       const wv = key === "_w" ? parseFloat(val)||0 : w;
       const b  = calcBMI(hv, wv);
-      if (b) next.bmi = b;
+      if (b) next._bmi = b;
     }
     setA(next);
   }
@@ -2705,7 +2705,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   ] : [];
 
   const hasAnyFindings = domains.some(d => d.boxes.length > 0);
-  const bmiVal = A._bmi ? Number(A._bmi).toFixed(1) : null;
+  const bmiNum = A._bmi ? Number(A._bmi) : null;
+  const bmiVal = bmiNum ? bmiNum.toFixed(1) : null;
+  const bmiAbnormal = bmiNum != null && (bmiNum < 18.5 || bmiNum > 24.9);
 
   if (scoreError) return (
     <div className="flex flex-col items-center justify-center py-20 text-center px-6">
@@ -2746,7 +2748,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
           {bmiVal && (
             <div className="flex justify-between">
               <span className="font-semibold">BMI:</span>
-              <span>{bmiVal}</span>
+              <span>{bmiVal} {bmiAbnormal && <span className="text-amber-700">(אינו תקין)</span>}</span>
             </div>
           )}
           <div className="pt-1 border-t border-gray-200">
@@ -2765,6 +2767,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
       {/* Findings */}
       <div className="mt-4">
+        {bmiAbnormal && (
+          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+            ⚕️ ה-BMI של הילד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.
+          </div>
+        )}
         {!hasAnyFindings && (
           <Card>
             <div className="py-4">

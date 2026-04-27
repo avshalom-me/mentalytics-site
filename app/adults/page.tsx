@@ -1758,6 +1758,11 @@ if (screen === "e8c") return (
               </button>
             </div>
           )}
+          {answers.bmiAbnormal && (
+            <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-900/20 p-4 text-sm leading-relaxed text-amber-100">
+              ⚕️ ה-BMI שדיווחת עליו אינו בטווח הרגיל. בנפרד מהטיפול הנפשי, מומלץ לפנות לרופא/ת המשפחה לבירור רפואי.
+            </div>
+          )}
           {multipleGroups && (
             <div className="mb-4 rounded-xl border border-yellow-400/40 bg-yellow-900/20 p-4 text-sm leading-relaxed text-yellow-100">
               📌 שים/י לב: נמצאו מספר סימנים עם הפניות שונות. המערכת סיננה את הפחות דחופות כך שבפניך מופיעות ההפניות העיקריות. יש לפנות ע"פ הקושי המשמעותי ביותר שאת/ה חווה.
@@ -1766,8 +1771,12 @@ if (screen === "e8c") return (
           <div className="space-y-3">
             {groups.map((group) => {
               const firstRec = group.recs[0];
-              const tools = group.recs.find((r) => r.tools)?.tools;
-              const notes = group.recs.find((r) => r.notes)?.notes;
+              const allNotes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[]));
+              const notes = allNotes.length ? allNotes.join("\n\n") : undefined;
+              const allTools = group.recs
+                .filter((r) => r.tools)
+                .map((r) => (group.recs.length > 1 ? `▸ ${r.symptomText}\n${r.tools}` : r.tools));
+              const tools = allTools.length ? allTools.join("\n\n――――――\n\n") : undefined;
               return (
                 <button key={group.treatment + (group.urgent ? "-urgent" : "")} type="button"
                   onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
