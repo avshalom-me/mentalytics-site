@@ -712,6 +712,18 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
   if (answers.domains.includes("relationship") && answers.relationship) {
     const r = answers.relationship;
 
+    // --- Single/divorced path ---
+    if (r.rSingle) {
+      recs.push({
+        id: uid("relationship-single"),
+        symptomText: "קיים עניין בעבודה על דפוסי קשר, עיבוד פרידה, או התמודדות עם קשיים ביצירת קשרים קרובים.",
+        treatment: "טיפול דינאמי",
+        treatmentLabel: "טיפול דינאמי",
+        domain: "זוגיות ומשפחה",
+        urgent: false,
+      });
+    }
+
     // --- R1: Sexual dysfunction ---
     const hasSexualNeed = !!r.r1;
     if (r.r1) {
@@ -736,35 +748,51 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       }
     }
 
-    // --- R1 / R2: Couple therapy ---
-    const coupleScore = r.coupleScale ?? 0;
-    if (coupleScore >= 3 && r.coupleInRelationship) {
-      const eftSum = sum(r.eftScores);
-      const dynSum = sum(r.dynScores);
-      const struSum = sum(r.structScores);
-      const maxSum = Math.max(eftSum, dynSum, struSum);
-
-      let approachLabel = "טיפול זוגי";
-      let modality: string | undefined;
-      if (maxSum === eftSum) { approachLabel = "EFT (טיפול ממוקד רגש)"; modality = "EFT"; }
-      else if (maxSum === dynSum) { approachLabel = "טיפול זוגי דינמי"; modality = "דינאמי"; }
-      else { approachLabel = "טיפול זוגי מבני"; modality = "מבני"; }
-
+    // --- Abuse screening (skip couple therapy if present) ---
+    if (r.rAbuse) {
       recs.push({
-        id: uid("couple-therapy"),
-        symptomText: `נמצא קושי בקשר הזוגי. מומלץ ${approachLabel}.`,
-        treatment: "טיפול זוגי",
-        treatmentLabel: "טיפול זוגי",
+        id: uid("relationship-abuse"),
+        symptomText: "דווחו חוויות של אלימות, הפחדות, או שליטה בקשר הזוגי.",
+        treatment: "טיפול דינאמי",
+        treatmentLabel: "טיפול פרטני",
         domain: "זוגיות ומשפחה",
         urgent: false,
-        couplesModality: modality,
-        needsSexualTherapy: hasSexualNeed,
+        notes: "חשוב: טיפול זוגי אינו מומלץ במצבים של אלימות בזוגיות. מומלץ לפנות לטיפול פרטני תחילה. לעזרה ותמיכה: מוקד 1202 (24/7, ללא עלות).",
       });
     }
 
-    // --- R3: Family therapy ---
-    if (r.r3) {
-      if (r.r3WithPartner) {
+    // --- R1 / R2: Couple therapy (רק אם אין אלימות) ---
+    if (!r.rAbuse) {
+      const coupleScore = r.coupleScale ?? 0;
+      if (coupleScore >= 4 && r.coupleInRelationship) {
+        const eftSum = sum(r.eftScores);
+        const dynSum = sum(r.dynScores);
+        const struSum = sum(r.structScores);
+        const maxSum = Math.max(eftSum, dynSum, struSum);
+
+        let approachLabel = "טיפול זוגי";
+        let modality: string | undefined;
+        if (maxSum > 0 && maxSum === eftSum) { approachLabel = "EFT (טיפול ממוקד רגש)"; modality = "EFT"; }
+        else if (maxSum > 0 && maxSum === dynSum) { approachLabel = "טיפול זוגי דינמי"; modality = "דינאמי"; }
+        else if (maxSum > 0) { approachLabel = "טיפול זוגי מבני"; modality = "מבני"; }
+
+        recs.push({
+          id: uid("couple-therapy"),
+          symptomText: `נמצא קושי בקשר הזוגי. מומלץ ${approachLabel}.`,
+          treatment: "טיפול זוגי",
+          treatmentLabel: "טיפול זוגי",
+          domain: "זוגיות ומשפחה",
+          urgent: false,
+          couplesModality: modality,
+          needsSexualTherapy: hasSexualNeed,
+        });
+      }
+    }
+
+    // --- R3: קונפליקטים משפחתיים ---
+    if (r.r3Conflict) {
+      const willing = r.r3AffectsAll && r.r3PartnerWilling;
+      if (willing) {
         recs.push({
           id: uid("family-therapy"),
           symptomText: "נמצא קושי בתא המשפחתי.",
@@ -782,6 +810,35 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           domain: "זוגיות ומשפחה",
           urgent: false,
         });
+      }
+    }
+
+    // --- R3: בעיות ילדים ---
+    if (r.r3ChildIssues) {
+      if (r.r3ChildType === "child") {
+        recs.push({
+          id: uid("child-therapy"),
+          symptomText: "מדווחים על קשיים רגשיים, התנהגותיים, או חברתיים אצל הילד/ים.",
+          treatment: "הדרכת הורים",
+          treatmentLabel: "טיפול ילדים",
+          domain: "זוגיות ומשפחה",
+          urgent: false,
+          notes: "מומלץ לפנות לפסיכולוג ילדים, עובד/ת סוציאלי/ת קלינית, או ייעוץ בית ספרי.",
+        });
+      } else if (r.r3ChildType === "family") {
+        const alreadyHasGuidance = recs.some(
+          (rec) => rec.domain === "זוגיות ומשפחה" && rec.treatment === "הדרכת הורים"
+        );
+        if (!alreadyHasGuidance) {
+          recs.push({
+            id: uid("family-guidance-child"),
+            symptomText: "נמצא קושי בדינמיקה המשפחתית בהקשר לילד/ים.",
+            treatment: "הדרכת הורים",
+            treatmentLabel: "הדרכת הורים",
+            domain: "זוגיות ומשפחה",
+            urgent: false,
+          });
+        }
       }
     }
   }

@@ -83,15 +83,20 @@ export type QuestionnaireAnswers = {
 
   // --- תחום זוגי/משפחתי ---
   relationship?: {
+    rSingle?: boolean;              // מחפש עזרה בדפוסי זוגיות/פרידה (לא בזוגיות כרגע)
     r1?: boolean;
     r1InRelationship?: boolean;
+    rAbuse?: boolean;               // אלימות/הפחדות/שליטה בקשר
     coupleScale?: number;            // 1-7
     coupleInRelationship?: boolean;
     eftScores?: number[];            // 7 פריטים, 1-7
     dynScores?: number[];            // 7 פריטים, 1-7
     structScores?: number[];         // 7 פריטים, 1-7
-    r3?: boolean;
-    r3WithPartner?: boolean;
+    r3Conflict?: boolean;           // קונפליקטים מתמשכים בתא המשפחתי
+    r3AffectsAll?: boolean;         // הבעיה משפיעה על כלל בני המשפחה
+    r3PartnerWilling?: boolean;     // כולם מוכנים לשתף פעולה
+    r3ChildIssues?: boolean;        // בעיות התנהגות/קשיים אצל הילדים
+    r3ChildType?: "child" | "family"; // בעיקר אצל הילד עצמו או בדינמיקה המשפחתית
   };
 
   // --- תחום התמכרויות ---

@@ -79,7 +79,7 @@ const ADULTS_SCREENS_ORDER = [
   "e10","e10a","e10b","e10c",
   "therapist-style",
   "f-vision","f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
-  "r-intake","r1","r1-scale","r2-q","r3","r3-partner",
+  "r-intake","r-single","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-affect","r3-willing","r3-child","r3-child-type",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -1447,10 +1447,20 @@ if (screen === "e8c") return (
         </div>
         <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
           onNext={() => {
-            if (inRelationship) { setScreen("r1"); }
-            else if (hasChildren) { setScreen("r3"); }
-            else { nextDomain(); }
+            if (inRelationship || hasChildren) { setScreen("r1"); }
+            else { setScreen("r-single"); }
           }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r-single") return (
+    <Layout screen={screen}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם את/ה מחפש/ת עזרה סביב <strong>דפוסים חוזרים בזוגיות</strong>, קושי ביצירת קשרים קרובים, או עיבוד פרידה / גירושין?</p>
+        <YesNo
+          onYes={() => { updR({ rSingle: true }); setScreen("r1"); }}
+          onNo={() => { updR({ rSingle: false }); nextDomain(); }} />
       </Card>
     </Layout>
   );
@@ -1458,9 +1468,34 @@ if (screen === "e8c") return (
   if (screen === "r1") return (
     <Layout screen={screen}>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה <strong>קשיים בתפקוד המיני</strong>?</p>
-        <YesNo onYes={() => { updR({ r1: true, r1InRelationship: true }); setScreen("r1-scale"); }}
-          onNo={() => { updR({ r1: false, r1InRelationship: true }); setScreen("r1-scale"); }} />
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קשיים בתפקוד המיני</strong>?</p>
+        <YesNo
+          onYes={() => {
+            updR({ r1: true, r1InRelationship: inRelationship });
+            if (inRelationship) { setScreen("r-abuse"); }
+            else if (hasChildren) { setScreen("r3-conflict"); }
+            else { nextDomain(); }
+          }}
+          onNo={() => {
+            updR({ r1: false, r1InRelationship: inRelationship });
+            if (inRelationship) { setScreen("r-abuse"); }
+            else if (hasChildren) { setScreen("r3-conflict"); }
+            else { nextDomain(); }
+          }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r-abuse") return (
+    <Layout screen={screen}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית/חווה <strong>אלימות, הפחדות, או שליטה</strong> מצד בן/בת הזוג?</p>
+        <YesNo
+          onYes={() => {
+            updR({ rAbuse: true });
+            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(); }
+          }}
+          onNo={() => { updR({ rAbuse: false }); setScreen("r1-scale"); }} />
       </Card>
     </Layout>
   );
@@ -1468,13 +1503,13 @@ if (screen === "e8c") return (
   if (screen === "r1-scale") return (
     <Layout screen={screen}>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">2. עד כמה את/ה חווה קושי בזוגיות? (1=כלל לא, 7=קושי גדול מאוד)</p>
+        <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה את/ה חווה קושי בזוגיות? (1=כלל לא, 7=קושי גדול מאוד)</p>
         <ScaleRow label="" group="couple" values={[1,2,3,4,5,6,7]} value={coupleScale} onChange={setCoupleScale} />
-        <NavRow onBack={() => setScreen("r1")}
+        <NavRow onBack={() => setScreen("r-abuse")}
           onNext={() => {
             updR({ coupleScale, coupleInRelationship: true });
-            if (coupleScale >= 3) { setScreen("r2-q"); }
-            else if (hasChildren) { setScreen("r3"); }
+            if (coupleScale >= 4) { setScreen("r2-q"); }
+            else if (hasChildren) { setScreen("r3-conflict"); }
             else { nextDomain(); }
           }}
           nextDisabled={coupleScale === 0} />
@@ -1505,28 +1540,73 @@ if (screen === "e8c") return (
         <NavRow onBack={() => setScreen("r1-scale")}
           onNext={() => {
             updR({ eftScores, dynScores, structScores });
-            if (hasChildren) { setScreen("r3"); } else { nextDomain(); }
-          }} />
+            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(); }
+          }}
+          nextDisabled={!eftScores.some(s => s > 0) || !dynScores.some(s => s > 0) || !structScores.some(s => s > 0)} />
       </Card>
     </Layout>
   );
 
-  if (screen === "r3") return (
+  if (screen === "r3-conflict") return (
     <Layout screen={screen}>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">{inRelationship ? "3." : "1."} האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>, או בעיות התנהגות / קשיים חברתיים של הילדים?</p>
-        <YesNo onYes={() => { updR({ r3: true }); setScreen("r3-partner"); }}
-          onNo={() => { updR({ r3: false }); nextDomain(); }} />
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>?</p>
+        <YesNo
+          onYes={() => { updR({ r3Conflict: true }); setScreen("r3-affect"); }}
+          onNo={() => { updR({ r3Conflict: false }); setScreen("r3-child"); }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "r3-partner") return (
+  if (screen === "r3-affect") return (
     <Layout screen={screen}>
       <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם הבעיה משפיעה על כלל בני המשפחה וכולם מוכנים לשתף פעולה עם טיפול?</p>
-        <YesNo onYes={() => { updR({ r3WithPartner: true }); nextDomain(); }}
-          onNo={() => { updR({ r3WithPartner: false }); nextDomain(); }} />
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם הקושי משפיע על <strong>כלל בני המשפחה</strong>?</p>
+        <YesNo
+          onYes={() => { updR({ r3AffectsAll: true }); setScreen("r3-willing"); }}
+          onNo={() => { updR({ r3AffectsAll: false }); setScreen("r3-child"); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r3-willing") return (
+    <Layout screen={screen}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>כולם מוכנים</strong> לשתף פעולה עם טיפול?</p>
+        <YesNo
+          onYes={() => { updR({ r3PartnerWilling: true }); setScreen("r3-child"); }}
+          onNo={() => { updR({ r3PartnerWilling: false }); setScreen("r3-child"); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r3-child") return (
+    <Layout screen={screen}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>בעיות התנהגות, קשיים חברתיים, או קשיים רגשיים</strong> אצל הילד/ים?</p>
+        <YesNo
+          onYes={() => { updR({ r3ChildIssues: true }); setScreen("r3-child-type"); }}
+          onNo={() => { updR({ r3ChildIssues: false }); nextDomain(); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r3-child-type") return (
+    <Layout screen={screen}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-3 font-semibold text-[#1a3a5c]">הקושי הוא בעיקר:</p>
+        <div className="flex flex-col gap-3">
+          <button type="button"
+            onClick={() => { updR({ r3ChildType: "child" }); nextDomain(); }}
+            className="rounded-xl bg-[#2d7a4f] px-4 py-3 text-right text-sm font-bold text-white hover:bg-[#1f5a38]">
+            אצל הילד עצמו (רגשי, התנהגותי, חברתי)
+          </button>
+          <button type="button"
+            onClick={() => { updR({ r3ChildType: "family" }); nextDomain(); }}
+            className="rounded-xl bg-[#1a3a5c] px-4 py-3 text-right text-sm font-bold text-white hover:bg-[#0f2540]">
+            בדינמיקה המשפחתית (יחסים בין בני המשפחה)
+          </button>
+        </div>
       </Card>
     </Layout>
   );
