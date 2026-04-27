@@ -417,10 +417,14 @@ function computeResults(A: Ans): KidsBox[] {
 function computeAcadResults(A: Ans): KidsBox[] {
   if (!["מעט", "הרבה", "הרבה מאוד"].includes(A.a_aca || "")) return [];
   const boxes = computeAcadResultsRaw(A);
+  const ga = acadGg(A);
   // Post-processing: no-findings message, cross-emotional, follow-up
   const hasFindings = boxes.some(b => b.txt?.startsWith("📚") || b.txt?.startsWith("📊") || b.txt?.startsWith("✅") || b.txt?.startsWith("⚠️") || b.txt?.startsWith("🚨"));
   if (!hasFindings) {
-    boxes.push({ cls: "info", txt: "✅ לא נמצאו סימנים מובהקים לקשיים לימודיים מובהקים. אם בכל זאת קיימת דאגה, מומלץ להיוועץ עם המחנכ/ת או יועצת בית הספר." });
+    const noFindingsTxt = ga === "gan"
+      ? "✅ לא נמצאו סימנים מובהקים לקשיים לימודיים מובהקים. אם בכל זאת קיימת דאגה, מומלץ להיוועץ עם הגננת ועם פסיכולוג הגן."
+      : "✅ לא נמצאו סימנים מובהקים לקשיים לימודיים מובהקים. אם בכל זאת קיימת דאגה, מומלץ להיוועץ עם המחנכ/ת או יועצת בית הספר.";
+    boxes.push({ cls: "info", txt: noFindingsTxt });
     return boxes;
   }
   // הצלבה עם החלק הרגשי — חרדה / דיכאון / קשב משפיעים על תפקוד לימודי
