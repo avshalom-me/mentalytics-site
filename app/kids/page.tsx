@@ -65,13 +65,13 @@ function devAgeOk(A: Ans): boolean {
 // ── Page order ───────────────────────────────────────────────────────────────
 const PAGES = [
   "p-consent","p-demo","p-areas",
-  "p-q1","p-aq","p-aq-grade","p-q1-ga",
+  "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q1-ga",
   "p-q2","p-q2-grade",
   "p-q3","p-mq","p-mq-sui",
   "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
   "p-q5","p-oq","p-oq-grade",
   "p-q6","p-tq",
-  "p-q7","p-pq",
+  "p-q7","p-q7b","p-pq",
   "p-q8","p-eq",
   "p-q9","p-bq",
   "p-q10","p-q10-par","p-q10-grade",
@@ -89,17 +89,18 @@ type PageId = (typeof PAGES)[number];
 function skipPage(pid: string, A: Ans): boolean {
   const emoOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "");
   const emoPages = [
-    "p-q1","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
+    "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
-    "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
+    "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-q7b","p-pq","p-q8","p-eq",
     "p-q9","p-bq","p-q10","p-q10-par","p-q10-grade",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
 
+  if (pid === "p-q1-pain")    return (A.q1 || 0) < 4;
   if (pid === "p-aq")         return (A.q1 || 0) < 4;
-  if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 14;
+  if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 16;
   if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 4;
-  if (pid === "p-q2-grade")   return (A.q2 || 0) < 4 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
+  if (pid === "p-q2-grade")   return (A.q2 || 0) < 5 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
   if (pid === "p-mq")         return (A.q3 || 0) < 4;
   if (pid === "p-mq-sui")     return (A.mq_tot || 0) < 4;
   if (pid === "p-q4-types")   return A.q4 !== "כן";
@@ -110,21 +111,23 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-oq")         return A.q5 !== "כן";
   if (pid === "p-oq-grade")   return (A.oq_tot || 0) < 10;
   if (pid === "p-tq")         return A.q6 !== "כן";
-  if (pid === "p-pq")         return A.q7 !== "כן";
+  if (pid === "p-q7b")        return false; // אחרי p-q7 תמיד שואלים גם על אמונות
+  if (pid === "p-pq")         return A.q7a !== "כן" && A.q7b !== "כן";
   if (pid === "p-eq")         return A.q8 !== "כן";
   if (pid === "p-bq")         return A.q9 !== "כן";
 
   if (pid === "p-q10") {
+    const pqThr = A.q7a === "כן" ? 1 : (A.q7b === "כן" ? 3 : Infinity);
     const anyPositive =
       (A.q1 || 0) >= 4 ||
-      (A.q2 || 0) >= 4 ||
+      (A.q2 || 0) >= 5 ||
       ((A.q3 || 0) >= 4 && (A.mq_tot || 0) >= 4) ||
       (A.q4 === "כן" && ((A.add_s_tot||0)>=3||(A.add_g_tot||0)>=4||(A.add_b_tot||0)>=4||A.ad_o)) ||
       (A.q5 === "כן" && (A.oq_tot || 0) >= 10) ||
-      (A.q6 === "כן" && (A.tq_tot || 0) >= 15) ||
-      (A.q7 === "כן" && (A.pq_tot || 0) >= 2) ||
+      (A.q6 === "כן" && (A.tq_tot || 0) >= 13) ||
+      ((A.pq_tot || 0) >= pqThr) ||
       (A.q8 === "כן" && ((A.eq_ano||0)>=2||(A.eq_bul||0)>=2)) ||
-      (A.q9 === "כן" && (A.bq_tot || 0) >= 5);
+      (A.q9 === "כן" && (A.bq_tot || 0) >= 4);
     return anyPositive;
   }
   if (pid === "p-q10-par")   return A.q10 !== "כן";
@@ -143,10 +146,10 @@ function skipPage(pid: string, A: Ans): boolean {
     if (gg(A) !== "ga") return true;
     if (A.ga_consent !== undefined) return true;
     const hasGaPositive =
-      (A.q1||0)>=4 || (A.q2||0)>=4 ||
+      (A.q1||0)>=4 || (A.q2||0)>=5 ||
       ((A.q3||0)>=4 && (A.mq_tot||0)>=4) ||
       (A.q5==="כן" && (A.oq_tot||0)>=10) ||
-      (A.q9==="כן" && (A.bq_tot||0)>=5) ||
+      (A.q9==="כן" && (A.bq_tot||0)>=4) ||
       (A.q10==="כן" && A.q10_par==="כן");
     return !hasGaPositive;
   }
@@ -671,25 +674,25 @@ function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
             <button key={n} className={sb(A.q1===n)} onClick={()=>pickScale(n)}>{n}</button>
           ))}
         </div>
+      </Card>
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+    </div>
+  );
+}
 
-        {(A.q1||0) >= 4 && (
-          <div className="mt-5 pt-4 border-t border-dashed border-[#d0dae8]">
-            <p className="text-sm text-gray-500 mb-2">האם הילד/ה סובל/ת מכאבים כרוניים (כאבי בטן/ראש)?</p>
-            <div className="flex gap-2 mb-3">
-              {["כן","לא"].map(v=>(
-                <button key={v} className={ob(A.q1_pain===v)} onClick={()=>setA({...A,q1_pain:v})}>{v}</button>
-              ))}
-            </div>
-            {A.q1_pain === "כן" && (
-              <div>
-                <p className="text-sm text-gray-500 mb-2">האם נשללו בעיות רפואיות?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v=>(
-                    <button key={v} className={ob(A.q1_med_clear===v)} onClick={()=>setA({...A,q1_med_clear:v})}>{v}</button>
-                  ))}
-                </div>
-              </div>
-            )}
+// ── p-q1-pain ────────────────────────────────────────────────────────────────
+function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+  return (
+    <div>
+      <Card>
+        <StepTag>שאלה משלימה — חרדה וגוף</StepTag>
+        <StepQ>האם הילד/ה סובל/ת מכאבים כרוניים?</StepQ>
+        <StepHint>למשל: כאבי בטן או כאבי ראש חוזרים</StepHint>
+        <YNRow val={A.q1_pain||""} onChange={v=>setA({...A,q1_pain:v})} />
+        {A.q1_pain === "כן" && (
+          <div className="mt-4 pt-4 border-t border-dashed border-[#d0dae8]">
+            <p className="text-sm font-semibold text-[#1a2a3a] mb-2">האם נשללו בעיות רפואיות כגורם לכאבים?</p>
+            <YNRow val={A.q1_med_clear||""} onChange={v=>setA({...A,q1_med_clear:v})} />
           </div>
         )}
       </Card>
@@ -1103,8 +1106,8 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
       <Card>
         <EqNum n={5}/>
         <StepTag>שאלה 5 מתוך 10 — רגשי</StepTag>
-        <StepQ>סימנים לסימפטומים טורדניים / מעשים כפייתיים</StepQ>
-        <StepHint>ברוב הימים, שבועיים רצופים לפחות</StepHint>
+        <StepQ>מחשבות חוזרות שקשה לילד/ה להפסיק, או טקסים שחוזרים על עצמם?</StepQ>
+        <StepHint>למשל: שטיפת ידיים מרובה, ספירה, צורך לסדר דברים בצורה מסוימת. ברוב הימים, שבועיים רצופים לפחות.</StepHint>
         <YNRow val={A.q5||""} onChange={v=>{ const nA={...A,q5:v}; setA(nA); onNext(nA); }} />
       </Card>
       <NavRow onBack={onBack} />
@@ -1219,14 +1222,29 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-q7 ─────────────────────────────────────────────────────────────────────
+// 7א — הזיות (חזותיות/שמיעתיות)
 function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
   return (
     <div>
       <Card>
         <EqNum n={7}/>
-        <StepTag>שאלה 7 מתוך 10 — רגשי</StepTag>
-        <StepQ>ראה/שמע דברים שאינם קיימים, או אמונות מוזרות / חשדות</StepQ>
-        <YNRow val={A.q7||""} onChange={v=>{ const nA={...A,q7:v}; setA(nA); onNext(nA); }} />
+        <StepTag>שאלה 7א מתוך 10 — רגשי</StepTag>
+        <StepQ>האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?</StepQ>
+        <YNRow val={A.q7a||""} onChange={v=>{ const nA={...A,q7a:v}; setA(nA); onNext(nA); }} />
+      </Card>
+      <NavRow onBack={onBack} />
+    </div>
+  );
+}
+
+// 7ב — אמונות יוצאות דופן / חשדות
+function PageQ7B({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+  return (
+    <div>
+      <Card>
+        <StepTag>שאלה 7ב מתוך 10 — רגשי</StepTag>
+        <StepQ>האם יש לילד/ה אמונות או חשדות יוצאי דופן שאחרים סביבו/ה לא חולקים?</StepQ>
+        <YNRow val={A.q7b||""} onChange={v=>{ const nA={...A,q7b:v}; setA(nA); onNext(nA); }} />
       </Card>
       <NavRow onBack={onBack} />
     </div>
@@ -1244,8 +1262,7 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
       <Card>
         <StepTag>שאלון</StepTag>
         <StepQ>שאלון — 6 סעיפים</StepQ>
-        <p className="text-sm font-bold text-red-800 mb-1">יש למלא יחד עם הילד</p>
-        <StepHint>כן / לא לכל סעיף</StepHint>
+        <StepHint>כן / לא לכל סעיף, על סמך מה שהבחנתם</StepHint>
         <SubCard>
           {pqItems.map(({key,label})=>(
             <div key={key}>
@@ -1271,8 +1288,8 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
       <Card>
         <EqNum n={8}/>
         <StepTag>שאלה 8 מתוך 10 — רגשי</StepTag>
-        <StepQ>קשיים בנוגע לאכילה</StepQ>
-        <StepHint>ירידה במשקל, השמנה, או הקאות רצוניות</StepHint>
+        <StepQ>דפוסי אכילה מדאיגים</StepQ>
+        <StepHint>הגבלה קיצונית, אכילה כפייתית, התנהגויות מפצות (הקאות, משלשלים, צום), או חרדה גדולה סביב משקל ואוכל</StepHint>
         <YNRow val={A.q8||""} onChange={v=>{ const nA={...A,q8:v}; setA(nA); onNext(nA); }} />
       </Card>
       <NavRow onBack={onBack} />
@@ -2998,6 +3015,7 @@ export default function KidsPage() {
       {step === "p-demo"      && <PageDemo    {...pageProps} />}
       {step === "p-areas"     && <PageAreas   {...pageProps} />}
       {step === "p-q1"        && <PageQ1      {...pageProps} />}
+      {step === "p-q1-pain"   && <PageQ1Pain  {...pageProps} />}
       {step === "p-aq"        && <PageAQ      {...pageProps} />}
       {step === "p-aq-grade"  && <PageAQGrade {...pageProps} />}
       {step === "p-q1-ga"     && <PageQ1GA    {...pageProps} />}
@@ -3018,6 +3036,7 @@ export default function KidsPage() {
       {step === "p-q6"          && <PageQ6       {...pageProps} />}
       {step === "p-tq"          && <PageTQ       {...pageProps} />}
       {step === "p-q7"          && <PageQ7       {...pageProps} />}
+      {step === "p-q7b"         && <PageQ7B      {...pageProps} />}
       {step === "p-pq"          && <PagePQ       {...pageProps} />}
       {step === "p-q8"          && <PageQ8       {...pageProps} />}
       {step === "p-eq"          && <PageEQ       {...pageProps} />}

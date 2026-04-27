@@ -120,6 +120,16 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q1 — חרדה
+  // חרדת היפרדות (פריטים aq8 + aq9) נבדקת בנפרד מהחרדה הכללית
+  const sepTot = (A.aq8 || 0) + (A.aq9 || 0);
+  if (sepTot >= 4) {
+    const sepRef = grp === "ga"
+      ? getGaRef()
+      : grp === "bv"
+        ? "✅ הפנייה: טיפול CBT ממוקד חרדת היפרדות בשילוב הדרכת הורים"
+        : "✅ הפנייה: טיפול CBT ממוקד חרדת היפרדות";
+    addToGroup("📊 נמצאו סימנים לחרדת היפרדות", sepRef, []);
+  }
   if ((A.q1 || 0) >= 4) {
     const aqTot = A.aq_tot || 0;
     const extras: KidsBox[] = [];
@@ -129,7 +139,7 @@ function computeResults(A: Ans): KidsBox[] {
       else if (!A.q1_med_clear)
         extras.push({ cls: "warn", txt: "⚠️ דווח על כאבים כרוניים — מומלץ לשלול גורם רפואי לפני הטיפול" });
     }
-    if (aqTot >= 14) {
+    if (aqTot >= 16) {
       let ref = "";
       if (grp === "ga") {
         ref = getGaRef();
@@ -176,7 +186,7 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q2 — דימוי עצמי
-  if ((A.q2 || 0) >= 4) {
+  if ((A.q2 || 0) >= 5) {
     let ref = "";
     if (grp === "ga") ref = getGaRef();
     else if (grp === "bv") {
@@ -191,12 +201,23 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q3 — מצב רוח ירוד
-  if ((A.q3 || 0) >= 4 && (A.mq_tot || 0) >= 4) {
-    const extras: KidsBox[] = [];
-    if (A.q3_sui === "כן")
-      extras.push({ cls: "danger", txt: "🚨 דווח על מחשבות אובדניות — נדרשת הערכת סיכון דחופה" });
-    const ref = grp === "ga" ? getGaRef() : "✅ הפנייה: טיפול פסיכודינאמי";
-    addToGroup("📊 נמצאו סימנים למצב רוח ירוד", ref, extras);
+  // אזהרת אובדנות מופיעה תמיד כשההורה ענה "כן", ללא קשר לציון מצב הרוח
+  const suicidalReported = A.q3_sui === "כן";
+  if (suicidalReported) {
+    emoStandalones.push({ cls: "danger", txt: "🚨 דווח על מחשבות אובדניות — נדרשת הערכת סיכון דחופה אצל פסיכיאטר ילדים" });
+  }
+  const mqTot = A.mq_tot || 0;
+  if ((A.q3 || 0) >= 4 && mqTot >= 4) {
+    const isSevere = mqTot >= 6;
+    const ref = grp === "ga"
+      ? getGaRef()
+      : isSevere
+        ? "✅ הפנייה: טיפול פסיכודינאמי במקביל לייעוץ אצל פסיכיאטר ילדים לבירור התאמה לטיפול תרופתי"
+        : "✅ הפנייה: טיפול פסיכודינאמי";
+    const symptomTxt = isSevere
+      ? "📊 נמצאו סימנים מובהקים של מצב רוח ירוד"
+      : "📊 נמצאו סימנים למצב רוח ירוד";
+    addToGroup(symptomTxt, ref, []);
   }
 
   // Q4 — התמכרות
@@ -205,7 +226,7 @@ function computeResults(A: Ans): KidsBox[] {
     const addSyms: string[] = [];
     if (s >= 3) addSyms.push("📊 נמצאו סימנים להתמכרות לחומרים");
     if (g2 >= 4) addSyms.push("📊 נמצאו סימנים להתמכרות למשחקי מחשב");
-    if (b >= 4) { const sv = b >= 8 ? "חמורה" : b >= 6 ? "בינונית" : "קלה"; addSyms.push("📊 נמצאו סימנים להתמכרות להימורים — " + sv); }
+    if (b >= 4) { const sv = b >= 7 ? "חמורה" : b >= 6 ? "בינונית" : "קלה"; addSyms.push("📊 נמצאו סימנים להתמכרות להימורים — " + sv); }
     if (A.ad_o) addSyms.push("📊 דווח על התמכרות אחרת — יש לפרט");
     if (addSyms.length) {
       const ctrl = A.q4_ctrl || 5;
@@ -231,7 +252,7 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q6 — טראומה
-  if (A.q6 === "כן" && (A.tq_tot || 0) >= 15) {
+  if (A.q6 === "כן" && (A.tq_tot || 0) >= 13) {
     let txt = "📊 נמצאו סימנים לקשיי עיבוד לאחר אירוע טראומטי";
     const clusters: string[] = [];
     if ([A.tq1, A.tq2, A.tq3].some(x => (x || 0) >= 2)) clusters.push("חודרנות");
@@ -244,7 +265,12 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q7 — פרודרום
-  if (A.q7 === "כן" && (A.pq_tot || 0) >= 2) {
+  // q7a = הזיות (חזותיות/שמיעתיות) → דגל אדום, סף נמוך (פריט אחד מספיק)
+  // q7b = אמונות יוצאות דופן בלבד → סף גבוה יותר (3 פריטים)
+  const q7Hall = A.q7a === "כן";
+  const q7Bel = A.q7b === "כן";
+  const pqThreshold = q7Hall ? 1 : (q7Bel ? 3 : Infinity);
+  if ((A.pq_tot || 0) >= pqThreshold) {
     emoStandalones.push({ cls: "warn", txt: "📊 דווחו חוויות חושיות או קוגניטיביות החורגות מהרגיל — מומלץ להעריך" });
     emoStandalones.push({ cls: "info", txt: "✅ הפנייה לפסיכולוג קליני או פסיכיאטר להערכה" });
   }
@@ -259,9 +285,17 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q9 — ויסות/BPD
-  if (A.q9 === "כן" && (A.bq_tot || 0) >= 5) {
-    const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
-    addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
+  // bq_tot >= 5 → קליני, הפניה ל-DBT
+  // bq_tot == 4 → גבולי, המלצה להערכה אצל פסיכולוג ילדים
+  if (A.q9 === "כן") {
+    const bqTot = A.bq_tot || 0;
+    if (bqTot >= 5) {
+      const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
+      addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
+    } else if (bqTot === 4) {
+      const ref = grp === "ga" ? getGaRef() : "✅ מומלץ להיוועץ עם פסיכולוג ילדים להערכה מעמיקה";
+      addToGroup("📊 נמצאו מאפיינים של קשיים בוויסות הרגשי וביחסים בין-אישיים", ref, []);
+    }
   }
 
   // Q10 — קשיים כלליים
@@ -353,6 +387,9 @@ function computeResults(A: Ans): KidsBox[] {
   emoStandalones.forEach(s => { if (!s.isLowStress && s.txt?.startsWith("✅")) allEmoRefs.add(s.txt); });
   if (allEmoRefs.size > 1)
     boxes.push({ cls: "warn", txt: "⚠️ נמצאו מספר הפניות רגשיות. יש לבחור את ההפנייה הכי דחופה עבורכם." });
+  // 3+ הפניות נפרדות → תמונה קלינית מורכבת, מומלץ ייעוץ אצל פסיכיאטר ילדים להערכה כוללת
+  if (allEmoRefs.size >= 3)
+    boxes.push({ cls: "info", txt: "📌 נמצאו 3 הפניות רגשיות או יותר — מומלץ במקביל לשקול ייעוץ אצל פסיכיאטר ילדים, להערכה כוללת ולסדר עדיפויות בין התחומים." });
 
   // Output emoGroups
   emoGroups.forEach(grp2 => {
