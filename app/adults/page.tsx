@@ -151,16 +151,11 @@ function Card({ children, badge, badgeColor = "blue" }: { children: React.ReactN
   );
 }
 
-function NavRow({ onBack, onNext, nextLabel = "המשך ▸", nextDisabled = false }: {
+function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ▸", nextDisabled = false }: {
   onBack?: () => void; onNext?: () => void; nextLabel?: string; nextDisabled?: boolean;
 }) {
   return (
-    <div className="mt-6 flex items-center justify-between gap-3">
-      {onBack ? (
-        <button type="button" onClick={onBack} className="rounded-xl border-2 border-[#1a3a5c] px-4 py-2 text-sm font-semibold text-[#1a3a5c] hover:bg-[#1a3a5c] hover:text-white">
-          ◂ חזרה
-        </button>
-      ) : <span />}
+    <div className="mt-6 flex items-center justify-end gap-3">
       {onNext && (
         <button type="button" onClick={onNext} disabled={nextDisabled} className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40 hover:bg-[#1f5f6e]">
           {nextLabel}
@@ -790,9 +785,26 @@ export default function AdultsPage() {
   if (screen === "e3") return (
     <Layout screen={screen}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם ראית/שמעת דברים שאחרים אמרו שאינם קיימים? או שיש לך אמונות/חשדות יוצאי דופן?</p>
-        <YesNo onYes={() => { updE({ e3: true }); setScreen("e3-q"); }}
-          onNo={() => { updE({ e3: false }); setScreen("e4"); }} />
+        <p className="mb-1 font-semibold text-[#1a3a5c]">3א. האם ראית או שמעת דברים שאחרים אמרו שאינם קיימים?</p>
+        <YesNo onYes={() => { updE({ e3a: true }); setScreen("e3b"); }}
+          onNo={() => { updE({ e3a: false }); setScreen("e3b"); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "e3b") return (
+    <Layout screen={screen}>
+      <Card badge="תחום רגשי" badgeColor="green">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">3ב. האם יש לך אמונות או חשדות יוצאי דופן שאחרים סביבך לא חולקים?</p>
+        <YesNo onYes={() => {
+            updE({ e3b: true, e3: true });
+            setScreen("e3-q");
+          }}
+          onNo={() => {
+            const e3a = answers.emotional?.e3a ?? false;
+            updE({ e3b: false, e3: e3a });
+            setScreen(e3a ? "e3-q" : "e4");
+          }} />
       </Card>
     </Layout>
   );
@@ -809,8 +821,7 @@ export default function AdultsPage() {
             קיימות מחשבות אובדניות
           </label>
         </div>
-        <NavRow onBack={() => setScreen("e3")}
-          onNext={() => { updE({ prodromeItems: prodromeChecked, prodromeSuicidal }); setScreen("e4"); }} />
+        <NavRow onNext={() => { updE({ prodromeItems: prodromeChecked, prodromeSuicidal }); setScreen("e4"); }} />
       </Card>
     </Layout>
   );
@@ -853,11 +864,10 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={item} group={`gad-${i}`} values={[1, 2, 3]} value={gad7[i]}
             onChange={(v) => setGad7((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        <NavRow onBack={() => setScreen("e4")}
+        <NavRow
           onNext={() => {
-            const total = gad7.reduce((a, b) => a + b, 0);
             updE({ gad7Scores: gad7 });
-            setScreen(total > 13 ? "e4-social" : "e4-flight");
+            setScreen("e4-social");
           }} />
       </Card>
     </Layout>
@@ -980,7 +990,7 @@ export default function AdultsPage() {
       <Card badge="שאלון אכילה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כמה מהדברים הבאים רלוונטיים (כל קבוצה בנפרד):</p>
         <p className="mb-2 text-sm font-bold text-[#2d7a4f]">א. הגבלת אכילה / אנורקסיה:</p>
-        <CheckList items={["סירוב לשמור על משקל גוף תקין","פחד עז מעלייה במשקל","עיוות בתפיסת הגוף"]}
+        <CheckList items={["אני מתאמץ/ת לשמור על משקל נמוך מהמומלץ לי","פחד עז מעלייה במשקל","עיוות בתפיסת הגוף"]}
           checked={eating1Checked}
           onChange={(i, v) => {
             const next = v ? [...eating1Checked, i] : eating1Checked.filter(x => x !== i);
@@ -1150,11 +1160,13 @@ if (screen === "e8c") return (
             </div>
           </div>
         ))}
-        <NavRow onBack={() => setScreen("e10a")}
+        <NavRow
           onNext={() => {
             updE({ disQAnswers: disQ });
+            // 1=כן, 2=לא לכל אחד מ-4 פריטים. סכום נמוך = הרבה "כן" = סימני אוטיזם.
+            // סכום <= 5 (3+ "כן") → ההפניה היא לאבחון תקשורת, מדלגים על שאלון אישיות.
             const total = disQ.reduce((a, b) => a + b, 0);
-            setScreen(total === 8 ? "therapist-style" : "e10c");
+            setScreen(total <= 5 ? "therapist-style" : "e10c");
           }} />
       </Card>
     </Layout>

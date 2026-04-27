@@ -21,7 +21,9 @@ export type QuestionnaireAnswers = {
     maniaScreen2?: boolean;
     maniaItems?: number[];           // פריטים שסומנו (0-6)
     maniaDeath?: boolean;
-    e3?: boolean;                    // פסיכוזה
+    e3?: boolean;                    // פסיכוזה (כן ל-e3a או e3b)
+    e3a?: boolean;                   // הזיות (חזותיות/שמיעתיות)
+    e3b?: boolean;                   // אמונות/חשדות יוצאי דופן
     prodromeItems?: number[];        // פריטים שסומנו (0-5)
     prodromeSuicidal?: boolean;
     e4?: boolean;                    // חרדה

@@ -77,21 +77,31 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
 
     // --- E1: Mood ---
     const moodCount = e.moodItems?.length ?? 0;
-    if (moodCount >= 4) {
-      if (e.moodSuicidal) {
-        recs.push({
-          id: uid("mood-suicidal"),
-          symptomText: "נמצאו סימנים של אובדנות.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
-          domain: "מורכבויות בתחום הרגשי/האישי",
-          urgent: true,
-          notes: "יש לפנות בהקדם לפסיכיאטר לשם הערכת סיכון.",
-        });
-      }
+    if (e.moodSuicidal) {
       recs.push({
-        id: uid("mood-low"),
-        symptomText: "נמצאו סימנים של מצב רוח ירוד.",
+        id: uid("mood-suicidal"),
+        symptomText: "נמצאו סימנים של אובדנות.",
+        treatment: emotTreatment,
+        treatmentLabel: emotLabel,
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: true,
+        notes: "יש לפנות בהקדם לפסיכיאטר לשם הערכת סיכון.",
+      });
+    }
+    if (moodCount >= 6) {
+      recs.push({
+        id: uid("mood-severe"),
+        symptomText: "נמצאו סימנים מובהקים של מצב רוח ירוד.",
+        treatment: emotTreatment,
+        treatmentLabel: emotLabel,
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "מומלץ לפנות במקביל לפסיכיאטר לבירור התאמה לטיפול תרופתי.",
+      });
+    } else if (moodCount >= 4) {
+      recs.push({
+        id: uid("mood-mild"),
+        symptomText: "נמצאו סימנים אפשריים של מצב רוח ירוד.",
         treatment: emotTreatment,
         treatmentLabel: emotLabel,
         domain: "מורכבויות בתחום הרגשי/האישי",
@@ -126,8 +136,11 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E3: Prodrome ---
+    // הזיות (e3a) = סימן חמור גם בעוצמה נמוכה → סף 1 פריט
+    // אמונות יוצאות דופן בלבד (e3b ללא e3a) = סף גבוה יותר → 3 פריטים
     const prodromeCount = e.prodromeItems?.length ?? 0;
-    if (prodromeCount >= 2) {
+    const prodromeThreshold = e.e3a ? 1 : (e.e3b ? 3 : Infinity);
+    if (prodromeCount >= prodromeThreshold) {
       if (e.prodromeSuicidal) {
         recs.push({
           id: uid("prodrome-suicidal"),
@@ -167,8 +180,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E4: Anxiety (GAD7) ---
+    // 9 פריטים × סקאלת 1-3 (טווח 9-27)
+    // > 15 = חרדה כללית מובהקת | > 12 = סימני מתח קלים
     const gad7Total = sum(e.gad7Scores);
-    if (gad7Total > 13) {
+    if (gad7Total > 15) {
       recs.push({
         id: uid("gad7-severe"),
         symptomText: "נמצאו סימנים של חרדה כללית.",
@@ -177,7 +192,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
-    } else if (gad7Total >= 3) {
+    } else if (gad7Total > 12) {
       recs.push({
         id: uid("gad7-mild"),
         symptomText: "נמצאו סימנים קלים של מתח.",
@@ -189,6 +204,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // Social anxiety
+    // המשתמש אישר חרדה חברתית - לפחות "low" תמיד יוקפץ, גם אם לא דורגה חומרה
     if (e.socialAnxiety) {
       const sev = e.socialSeverity ?? 0;
       if (sev >= 4) {
@@ -200,7 +216,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
-      } else if (sev >= 1) {
+      } else {
         recs.push({
           id: uid("social-anxiety-low"),
           symptomText: "נמצאו סימנים של חרדה חברתית.",
@@ -249,6 +265,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E5: OCD ---
+    // 6 פריטים × סקאלת 1-3 (טווח 6-18)
+    // > 13 = משמעותי | >= 10 = מתון
     const ocdTotal = sum(e.ocdScores);
     if (ocdTotal > 13) {
       recs.push({
@@ -260,7 +278,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         urgent: false,
         notes: 'בעדיפות על-ידי פסיכולוג או עו"ס קליני.',
       });
-    } else if (ocdTotal >= 8) {
+    } else if (ocdTotal >= 10) {
       recs.push({
         id: uid("ocd-mild"),
         symptomText: "נמצאו קשיים בתחום המחשבות האובססיביות.",
@@ -289,8 +307,13 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E7: Sleep ---
+    // פריטים 0-1 (קושי בהירדמות / איכות השינה) = הפרעות שינה קלות → טיפים
+    // פריטים 2-4 (שינה מרובה / סהרוריות / ביעותים) = פתולוגיים יותר → נוירולוג
+    // פריט 5 (נזלת כרונית) = הפניה לאף-אוזן-גרון
     const sleepItems = e.sleepItems ?? [];
-    if (sleepItems.slice(0, 5).some(Boolean)) {
+    const hasSleepNeuro = sleepItems[2] || sleepItems[3] || sleepItems[4];
+    const hasSleepMild = sleepItems[0] || sleepItems[1];
+    if (hasSleepNeuro) {
       recs.push({
         id: uid("sleep-neuro"),
         symptomText: "נמצאו סימנים להפרעת שינה.",
@@ -299,6 +322,31 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "התייעצות עם רופא המשפחה או נוירולוג.",
+      });
+    } else if (hasSleepMild) {
+      recs.push({
+        id: uid("sleep-mild"),
+        symptomText: "דווחו קשיי שינה קלים.",
+        treatment: emotTreatment,
+        treatmentLabel: emotLabel,
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "מומלץ לאמץ היגיינת שינה: שעות שינה קבועות, הימנעות מקפאין אחר הצהריים, צמצום מסכים שעה לפני השינה, וחשיפה לאור טבעי בבוקר.",
+        tools: [
+          "כלים בסיסיים לשיפור איכות השינה:",
+          "",
+          "1. שעות שינה קבועות – ללכת לישון ולהתעורר בערך באותה שעה כל יום, גם בסופי שבוע.",
+          "",
+          "2. שעת חוסך אור – להפסיק שימוש במסכים (טלפון, מחשב, טלוויזיה) שעה לפני השינה. אור כחול מדכא מלטונין.",
+          "",
+          "3. קפאין רק עד הצהריים – חצי חיים של קפאין הוא 5–6 שעות. קפה אחרי 14:00 עלול להפריע לאיכות השינה גם אם נרדמים.",
+          "",
+          "4. חדר שינה רק לשינה – לא לעבוד או לאכול במיטה. המוח לומד לקשר את המיטה עם פעילות במקום עם רוגע.",
+          "",
+          "5. אם לא נרדמים תוך 20 דקות – לקום, לעשות פעילות שקטה (קריאה לאור עמום) ולחזור למיטה רק כשעייפים.",
+          "",
+          "6. חשיפה לאור טבעי בבוקר – 15–30 דקות בשעה הראשונה לאחר ההתעוררות מסייעות לכוון את השעון הביולוגי.",
+        ].join("\n"),
       });
     }
     if (sleepItems[5]) {
@@ -382,8 +430,9 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     const persMainSum = sum(e.persMainScores);
     if (persMainSum >= 5) {
       const disTotal = sum(e.disQAnswers);
-      if (disTotal === 8) {
-        // All answered "2" → communication/autism assessment
+      // 1=כן, 2=לא × 4 פריטים: 4=כל "כן", 8=כל "לא".
+      // disTotal <= 5 (לפחות 3 "כן") → סימני אוטיזם נוכחים → אבחון תקשורת.
+      if (disTotal <= 5) {
         recs.push({
           id: uid("comm-diagnosis"),
           symptomText: "נמצאו סימנים לקשיים בתקשורת הבינאישית.",
