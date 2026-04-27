@@ -416,21 +416,59 @@ function computeResults(A: Ans): KidsBox[] {
 
 function computeAcadResults(A: Ans): KidsBox[] {
   if (!["מעט", "הרבה", "הרבה מאוד"].includes(A.a_aca || "")) return [];
+  const boxes = computeAcadResultsRaw(A);
+  // Post-processing: no-findings message, cross-emotional, follow-up
+  const hasFindings = boxes.some(b => b.txt?.startsWith("📚") || b.txt?.startsWith("📊") || b.txt?.startsWith("✅") || b.txt?.startsWith("⚠️") || b.txt?.startsWith("🚨"));
+  if (!hasFindings) {
+    boxes.push({ cls: "info", txt: "✅ לא נמצאו סימנים מובהקים לקשיים לימודיים מובהקים. אם בכל זאת קיימת דאגה, מומלץ להיוועץ עם המחנכ/ת או יועצת בית הספר." });
+    return boxes;
+  }
+  // הצלבה עם החלק הרגשי — חרדה / דיכאון / קשב משפיעים על תפקוד לימודי
+  const highAnxiety = (A.q1 || 0) >= 7;
+  const highMood = (A.q3 || 0) >= 5 && (A.mq_tot || 0) >= 4;
+  if (highAnxiety || highMood) {
+    boxes.push({ cls: "info", txt: "📌 חשוב לזכור: " + (highMood ? "דווחו סימני מצב רוח ירוד משמעותי" : "דווחה רמת חרדה גבוהה") + " — לעיתים קושי רגשי משפיע ישירות על התפקוד הלימודי. מומלץ לטפל קודם בקושי הרגשי, ולעקוב אם הקשיים הלימודיים נמשכים גם לאחר מכן." });
+  }
+  // מעקב ארוך-טווח
+  boxes.push({ cls: "info", txt: "📅 מומלץ לחזור על השאלון בעוד 3-6 חודשים, לבחון התקדמות לאחר יישום ההמלצות." });
+  return boxes;
+}
+
+function computeAcadResultsRaw(A: Ans): KidsBox[] {
   const ga = acadGg(A);
   const boxes: KidsBox[] = [];
   function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
 
-  function emitADHD(inatt: number, hyper: number): boolean {
-    const pi = inatt >= 3, ph = hyper >= 3;
+  // Vision/hearing — בדיקה לפני המשך הבירור הלימודי
+  if (A.vision === "לא" && A.vis_sym === "כן") {
+    box("warn", "⚠️ דווחו סימנים לקשיי ראייה ללא בדיקה — מומלץ לערוך בדיקת ראייה אצל אופטומטריסט/רופא עיניים לפני המשך הבירור הלימודי, כדי לשלול גורם ראייתי לקשיים.");
+  }
+  if (A.hearing === "לא" && A.hear_sym === "כן") {
+    box("warn", "⚠️ דווחו סימנים לקשיי שמיעה ללא בדיקה — מומלץ לערוך בדיקת שמיעה אצל קלינאית תקשורת או רופא אא\"ג לפני המשך הבירור הלימודי.");
+  }
+
+  let adhdEmitted = false;
+  // inatt items 2,3,5 (1-indexed) הם פונקציות ניהוליות (ארגון, איבוד חפצים, שכחה)
+  // efCount = כמה מהם סומנו
+  function emitADHD(inatt: number, hyper: number, efCount: number): boolean {
+    const pi = inatt >= 4, ph = hyper >= 4;
+    if (!(pi || ph)) return false;
+    if (adhdEmitted) return true;
+    adhdEmitted = true;
     const syms: string[] = [];
     if (pi) syms.push("📊 ישנם סימנים לקשיי ריכוז וקשב");
     if (ph) syms.push("📊 ישנם סימנים לקשיים בתחום ההיפראקטיביות/אימפולסיביות");
     if (syms.length) box("purple", syms.join("\n"));
-    if (pi || ph) {
-      box("info", "✅ יש לפנות לנוירולוג/רופא ילדים המומחה בקשיי קשב");
-      if (pi) box("info", "✅ ישנם סימנים לקשיים בפונקציות הניהוליות — יש לפנות לטיפול/אימון מסוג Cog-Fun");
+    box("info", "✅ יש לפנות לנוירולוג/רופא ילדים המומחה בקשיי קשב להמשך אבחון");
+    box("info", "📌 ניתן לפנות גם ליועצת בית הספר לתיאום עם הצוות החינוכי וליווי משפחתי");
+    if (pi && efCount >= 2) {
+      box("info", "✅ ישנם סימנים לקשיים בפונקציות הניהוליות (ארגון, שליפת חפצים, שכחה) — מתאים טיפול/אימון מסוג Cog-Fun");
     }
-    return pi || ph;
+    box("info", "📚 לקריאה נוספת: אנפ\"ר (איגוד נפגעי הפרעת קשב) — anpar.org.il");
+    return true;
+  }
+  function efCountFromPrefix(prefix: string): number {
+    return ["_ad2", "_ad3", "_ad5"].filter(k => A[prefix + k]).length;
   }
 
   // גן
@@ -454,7 +492,7 @@ function computeAcadResults(A: Ans): KidsBox[] {
       else { box("warn", "⚠️ קשיים באחזקת עיפרון/ציור — יש לבחון פנייה לריפוי בעיסוק"); box("info", "📌 כלים: טושים עבים, פלסטלינה, גזירה לפי קווים, השלחת חרוזים"); }
     }
     if (yesCount >= 4) box("danger", "🚨 ניכרים סימפטומים משמעותיים בגן — יש לפנות להיוועצות עם הגננת ופסיכולוג הגן לגבי התאמת המסגרת");
-    else if (yesCount === 3) box("warn", "⚠️ 3 קשיים לימודיים — מומלץ לבדוק צורך בוועדת זכאות של החינוך המיוחד");
+    else if (yesCount === 3) box("warn", "⚠️ 3 קשיים לימודיים — מומלץ להיוועץ עם פסיכולוג הגן ולבדוק זכאות לשעות שילוב במסגרת");
     return boxes;
   }
 
@@ -464,14 +502,19 @@ function computeAcadResults(A: Ans): KidsBox[] {
     const write = A.ag_write === "כן";
     const comp  = A.ag_comp  === "כן";
     const math  = A.ag_math  || "לא";
+    const adhdYn = A.ag_adhd_yn === "כן";
     const histYes = ["ag_h1", "ag_h2", "ag_h3", "ag_h4", "ag_h5", "ag_h6"].filter(k => A[k] === "כן").length;
     const inatt = ["ag_ad1", "ag_ad2", "ag_ad3", "ag_ad4", "ag_ad5", "ag_ad6"].filter(k => A[k]).length;
     const hyper = ["ag_ah1", "ag_ah2", "ag_ah3", "ag_ah4", "ag_ah5", "ag_ah6"].filter(k => A[k]).length;
-    const adhdPos = inatt >= 3 || hyper >= 3;
-    if (read === "לא" && !write && !comp && math === "לא") return boxes;
+    const efCount = efCountFromPrefix("ag");
+    const adhdPos = inatt >= 4 || hyper >= 4;
+    if (read === "לא" && !write && !comp && math === "לא" && !adhdYn) return boxes;
 
+    // עבור ילדים בא-ג (גילאי 6-9), ההפניה הרגשית היא לטיפול בהבעה ויצירה ולא לטיפול דינאמי בשיחות
+    const emotionalLearningRef = "נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול בהבעה ויצירה בשילוב הדרכת הורים";
     const toolsChizuk = "📌 תוכנית חיזוקים — כלים לסיוע בלמידה בכיתה ובבית:\n1. משוב חיובי קבוע — שבחים פשוטים על הצלחה קטנה, עידוד להמשיך ולנסות, מיקוד במאמצים ולא רק בתוצאות.\n2. שילוב תרגילים להרפיה ומדיטציה קלה (נשימות עמוקות, הרפיית שרירים, דמיון מודרך) לפני פעילות לימודית מאתגרת.\n3. התאמת ההוראה לצרכים הייחודיים — בניית מטלות המאפשרות התקדמות בקצב אישי, עם הצלחות קטנות ומדורגות.\n4. למידה בקבוצות קטנות או בעזרת עמיתים.";
     const toolsMath = "📌 כלים לחיזוק חשבון:\nא. שיפור הבנה בסיסית: פירוק משימות לשלבים, שימוש בדוגמאות מחיי היומיום, המחשה בשרטוטים ודיאגרמות.\nב. פיתוח אסטרטגיות: קוד צבעים בנוסחאות, למידה בקבוצות קטנות, הצגת בעיות בדרכים שונות.\nג. כלים טכנולוגיים:\n   • Math Land — משחק הרפתקאות עם תרגילי חשבון ברמות שונות (בתשלום)\n   • Pet Bingo — בינגו חוויתי עם תרגילי חיבור/חיסור/כפל/חילוק (חינמי)";
+    const psychodidacticNote = "(אבחון פסיכודידקטי מומלץ לרוב מכיתה ג' ומעלה, כשיש מספיק נתונים על תפקוד לימודי בסיסי)";
 
     const syms: string[] = [], refs: string[] = [], tools: string[] = [];
     function addSym(s: string) { if (!syms.includes(s)) syms.push(s); }
@@ -487,41 +530,39 @@ function computeAcadResults(A: Ans): KidsBox[] {
         else if (motiv === "לא") {
           addRef("יש לבנות תוכנית חיזוקים"); addTool(toolsChizuk);
           const mot = (A.ag_mot1 || 1) + (A.ag_mot2 || 1) + (A.ag_mot3 || 1);
-          if (mot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); }
-          else { if (!emitADHD(inatt, hyper)) addRef("הפנייה לאבחון פסיכודידקטי"); }
+          if (mot >= 7) { addRef(emotionalLearningRef); }
+          else { if (!emitADHD(inatt, hyper, efCount)) addRef("הפנייה לאבחון פסיכודידקטי " + psychodidacticNote); }
         }
-      } else if (histYes >= 1 && histYes <= 2) {
+      } else if (histYes >= 1 && histYes <= 3) {
         const speech = A.ag_read_speech;
         if (speech === "כן") {
           const smotiv = A.ag_speech_motiv;
-          if (smotiv === "כן") { addRef("יש לבנות תוכנית חיזוקים — במידה ולא מקבל שעות שילוב יש לבחון פנייה לוועדת שילוב"); }
+          if (smotiv === "כן") { addRef("יש לבנות תוכנית חיזוקים. כדאי לבדוק עם יועצת בית הספר זכאות לשעות שילוב במסגרת הכיתתית"); }
           else if (smotiv === "לא") {
-            addRef("יש לבנות תוכנית חיזוקים — במידה ולא מקבל שעות שילוב יש לבחון פנייה לוועדת שילוב"); addTool(toolsChizuk);
+            addRef("יש לבנות תוכנית חיזוקים. כדאי לבדוק עם יועצת בית הספר זכאות לשעות שילוב במסגרת הכיתתית"); addTool(toolsChizuk);
             const smot = (A.ag_smot1 || 1) + (A.ag_smot2 || 1) + (A.ag_smot3 || 1);
-            if (smot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); }
-            else { if (!emitADHD(inatt, hyper)) addRef("הפנייה לאבחון פסיכודידקטי"); }
+            if (smot >= 7) { addRef(emotionalLearningRef); }
+            else { if (!emitADHD(inatt, hyper, efCount)) addRef("הפנייה לאבחון פסיכודידקטי " + psychodidacticNote); }
           }
         } else if (speech === "לא") { addRef("יש לבחון פנייה לקלינאית תקשורת"); }
-      } else if (histYes >= 3) {
-        addRef("הפנייה לאבחון פסיכודידקטי"); addRef("יש לבחון פנייה לריפוי בעיסוק");
-      }
-      if (histYes >= 5) {
-        const mot = (A.ag_mot1 || 1) + (A.ag_mot2 || 1) + (A.ag_mot3 || 1);
-        if (mot > 5) { addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי"); addTool(toolsChizuk); }
+      } else if (histYes >= 4) {
+        addRef("הפנייה לאבחון פסיכודידקטי " + psychodidacticNote);
+        addRef("יש לבחון פנייה לריפוי בעיסוק");
       }
     }
+    if (adhdYn) emitADHD(inatt, hyper, efCount);
     if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      if (read !== "לא") addRef("נראה שיש שילוב של מספר קשיים — יש לפנות לאבחון פסיכו-דידקטי");
-      else { if (A.ag_write_ot === "כן") addRef("קשיי כתיבה — יש לחזור לבדיקה אצל מרפאה בעיסוק"); else addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק"); }
+      addSym("נמצאו סימנים לקשיי כתב יד");
+      if (read !== "לא") addRef("נראה שיש שילוב של מספר קשיים — יש לפנות לאבחון פסיכו-דידקטי " + psychodidacticNote);
+      else { if (A.ag_write_ot === "כן") addRef("קשיי כתב יד — יש לחזור לבדיקה אצל מרפאה בעיסוק"); else addRef("קשיי כתב יד — יש לבחון פנייה לריפוי בעיסוק"); }
     }
     if (comp) {
       addSym("נמצאו סימנים לקשיי הבנה בשיעור");
-      if (!(read !== "לא" || adhdPos)) addRef("הפנייה לאבחון פסיכודידקטי");
+      if (!(read !== "לא" || adhdPos)) addRef("הפנייה לאבחון פסיכודידקטי " + psychodidacticNote);
     }
     if (math !== "לא") {
       addSym("נמצאו סימנים לקשיי חשבון");
-      if (math === "5%") { addRef("נמצאו קשיים בחשבון:\nא. יש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי — הפנייה לאבחון פסיכודידקטי."); addTool(toolsMath); }
+      if (math === "5%") { addRef("נמצאו קשיים בחשבון:\nא. יש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי — הפנייה לאבחון פסיכודידקטי " + psychodidacticNote); addTool(toolsMath); }
       else if (math === "10%") { addRef("נמצאו קשיים בחשבון:\nיש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי."); addTool(toolsMath); }
       else if (math === "30%") { addRef("נמצאו קשיים בחשבון: יש לשקול מתן סיוע פרטני."); addTool(toolsMath); }
     }
@@ -530,6 +571,7 @@ function computeAcadResults(A: Ans): KidsBox[] {
       if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
       refs.forEach(r => box("info", "✅ " + r));
       tools.forEach(t => box("info", t));
+      box("info", "📌 ניתן להיוועץ גם עם יועצת בית הספר לתיאום בין הבית למסגרת החינוכית");
     }
     return boxes;
   }
@@ -546,8 +588,10 @@ function computeAcadResults(A: Ans): KidsBox[] {
     const hyperQ2 = ["dv_ah1", "dv_ah2", "dv_ah3", "dv_ah4", "dv_ah5", "dv_ah6"].filter(k => A[k]).length;
     const inattR  = ["dv_read_ad1", "dv_read_ad2", "dv_read_ad3", "dv_read_ad4", "dv_read_ad5", "dv_read_ad6"].filter(k => A[k]).length;
     const hyperR  = ["dv_read_ah1", "dv_read_ah2", "dv_read_ah3", "dv_read_ah4", "dv_read_ah5", "dv_read_ah6"].filter(k => A[k]).length;
-    const adhdPosQ2 = inattQ2 >= 3 || hyperQ2 >= 3;
-    const adhdAny   = adhdPosQ2 || inattR >= 3 || hyperR >= 3;
+    const efR = efCountFromPrefix("dv_read");
+    const efQ2 = efCountFromPrefix("dv");
+    const adhdPosQ2 = inattQ2 >= 4 || hyperQ2 >= 4;
+    const adhdAny   = adhdPosQ2 || inattR >= 4 || hyperR >= 4;
     if (!read && !adhdQ2yn && !write && !comp && math === "לא") return boxes;
 
     const toolsChizuk = "📌 תוכנית חיזוקים — כלים לסיוע בלמידה בכיתה ובבית:\n1. משוב חיובי קבוע — שבחים פשוטים על הצלחה קטנה, עידוד להמשיך ולנסות, מיקוד במאמצים ולא רק בתוצאות.\n2. שילוב תרגילים להרפיה ומדיטציה קלה (נשימות עמוקות, הרפיית שרירים, דמיון מודרך) לפני פעילות לימודית מאתגרת.\n3. התאמת ההוראה לצרכים הייחודיים — בניית מטלות המאפשרות התקדמות בקצב אישי, עם הצלחות קטנות ומדורגות.\n4. למידה בקבוצות קטנות או בעזרת עמיתים.";
@@ -566,10 +610,10 @@ function computeAcadResults(A: Ans): KidsBox[] {
         else if (motiv === "לא") {
           addRef("יש לבנות תוכנית חיזוקים"); addTool(toolsChizuk);
           const mot = (A.dv_mot1 || 1) + (A.dv_mot2 || 1) + (A.dv_mot3 || 1);
-          if (mot > 5) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי");
-          else { if (!emitADHD(inattR, hyperR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
+          if (mot >= 7) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי בשילוב הדרכת הורים");
+          else { if (!emitADHD(inattR, hyperR, efR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
         }
-      } else if (histYes >= 1 && histYes <= 2) {
+      } else if (histYes >= 1 && histYes <= 3) {
         const speech = A.dv_read_speech;
         if (speech === "כן") {
           const smotiv = A.dv_speech_motiv;
@@ -577,17 +621,17 @@ function computeAcadResults(A: Ans): KidsBox[] {
           else if (smotiv === "לא") {
             addRef("יש לבנות תוכנית בית-ספרית — אם אין שיפור לאחר כחודשיים יש לפנות לאבחון פסיכודידקטי"); addTool(toolsChizuk);
             const smot = (A.dv_smot1 || 1) + (A.dv_smot2 || 1) + (A.dv_smot3 || 1);
-            if (smot > 5) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי");
-            else { if (!emitADHD(inattR, hyperR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
+            if (smot >= 7) addRef("נמצאו קשיים רגשיים מול למידה — יש להפנות לטיפול פסיכודינאמי בשילוב הדרכת הורים");
+            else { if (!emitADHD(inattR, hyperR, efR)) addRef("הפנייה לאבחון פסיכודידקטי"); }
           }
         } else if (speech === "לא") addRef("יש לבחון פנייה לקלינאית תקשורת");
-      } else if (histYes >= 3) addRef("הפנייה לאבחון פסיכודידקטי");
+      } else if (histYes >= 4) addRef("הפנייה לאבחון פסיכודידקטי");
     }
-    if (adhdQ2yn) emitADHD(inattQ2, hyperQ2);
+    if (adhdQ2yn) emitADHD(inattQ2, hyperQ2, efQ2);
     if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      if (A.dv_write_ot === "כן") addRef("קשיי כתיבה — יש לחזור לבדיקה אצל מרפאה בעיסוק");
-      else addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק");
+      addSym("נמצאו סימנים לקשיי כתב יד");
+      if (A.dv_write_ot === "כן") addRef("קשיי כתב יד — יש לחזור לבדיקה אצל מרפאה בעיסוק");
+      else addRef("קשיי כתב יד — יש לבחון פנייה לריפוי בעיסוק");
     }
     if (comp) {
       addSym("נמצאו סימנים לקשיי הבנה בשיעור");
@@ -596,7 +640,7 @@ function computeAcadResults(A: Ans): KidsBox[] {
     if (math !== "לא") {
       addSym("נמצאו סימנים לקשיי חשבון");
       const hasRA = read || adhdAny;
-      if (math === "5%") { addRef(hasRA ? "נמצאו קשיים משמעותיים בחשבון בשילוב קשיים נוספים:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי." : "נמצאו קשיים משמעותיים בחשבון:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי — הפנייה לאבחון פסיכודידקטי."); addTool(toolsMath); }
+      if (math === "5%") { addRef(hasRA ? "נמצאו קשיים משמעותיים בחשבון בשילוב קשיים נוספים:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי." : "נמצאו קשיים משמעותיים בחשבון:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי."); addTool(toolsMath); }
       else if (math === "10%") { addRef("נמצאו קשיים בחשבון:\nיש לשקול סיוע פרטני דרך בית הספר או באופן פרטי."); addTool(toolsMath); }
       else if (math === "30%") { addRef("נמצאו קשיים קלים בחשבון — יש לשקול סיוע פרטני."); addTool(toolsMath); }
     }
@@ -605,6 +649,7 @@ function computeAcadResults(A: Ans): KidsBox[] {
       if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
       refs.forEach(r => box("info", "✅ " + r));
       tools.forEach(t => box("info", t));
+      box("info", "📌 ניתן להיוועץ גם עם יועצת בית הספר לתיאום בין הבית למסגרת החינוכית");
     }
     return boxes;
   }
@@ -616,7 +661,8 @@ function computeAcadResults(A: Ans): KidsBox[] {
     const adhdYn = A[p + "_adhd_yn"] === "כן";
     const inatt = ["_ad1", "_ad2", "_ad3", "_ad4", "_ad5", "_ad6"].filter(k => A[p + k]).length;
     const hyper = ["_ah1", "_ah2", "_ah3", "_ah4", "_ah5", "_ah6"].filter(k => A[p + k]).length;
-    const adhdPos = inatt >= 3 || hyper >= 3;
+    const efCountP = efCountFromPrefix(p);
+    const adhdPos = inatt >= 4 || hyper >= 4;
     const write = A[p + "_write"] === "כן", comp = A[p + "_comp"] === "כן";
     if (verbal === "לא" && math === "לא" && eng === "לא" && !adhdYn && !write && !comp) return boxes;
 
@@ -636,38 +682,45 @@ function computeAcadResults(A: Ans): KidsBox[] {
     const multiDomains = [verbal !== "לא", math !== "לא", adhdPos, comp].filter(Boolean).length;
     if (multiDomains >= 3) addRef("הפנייה לאבחון פסיכודידקטי");
 
+    // קשיים ברבי מלל בלבד הם סיבה לאבחון פסיכודידקטי, גם ב-5% וגם ב-20%+
     if (verbal !== "לא") {
       addSym("נמצאו סימנים לקשיים ברבי מלל");
-      if (verbal === "20%" || verbal === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
+      if (verbal === "5%" || verbal === "20%" || verbal === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
       addTool(isTyb ? verbalToolsHigh : verbalToolsMid);
     }
+    // קשיים במתמטיקה / אנגלית בלבד אינם מצריכים אבחון פסיכודידקטי כשלעצמם.
+    // אבחון מומלץ רק אם הם מלווים בקשיים ברבי מלל, בקשב, או ברגשי-לימודי.
+    const verbalPos = verbal !== "לא";
+    const mathSevere = math === "20%" || math === "מעל 20%";
+    const engSevere = eng === "20%" || eng === "מעל 20%";
     if (math !== "לא") {
       addSym("נמצאו סימנים לקשיים במתמטיקה");
-      if (math === "20%" || math === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
+      if (mathSevere && (verbalPos || adhdPos)) addRef("הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");
       addTool(isTyb ? mathToolsHigh : mathToolsMid);
     }
     if (eng !== "לא") {
       addSym("נמצאו סימנים לקשיים באנגלית");
-      if (eng === "20%" || eng === "מעל 20%") addRef("הפנייה לאבחון פסיכודידקטי");
+      if (engSevere && (verbalPos || adhdPos)) addRef("הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");
       addTool(engTools);
     }
-    if (adhdYn) emitADHD(inatt, hyper);
+    if (adhdYn) emitADHD(inatt, hyper, efCountP);
     if (write) {
-      addSym("נמצאו סימנים לקשיי כתיבה");
-      addRef("קשיי כתיבה — יש לבחון פנייה לריפוי בעיסוק");
+      addSym("נמצאו סימנים לקשיי כתב יד");
+      addRef("קשיי כתב יד — יש לבחון פנייה לריפוי בעיסוק");
       addTool(isTyb ? writeToolsHigh : writeToolsMid);
     }
     if (comp) {
       addSym("נמצאו סימנים לקשיי הבנה בשיעור");
       const hasRel = verbal !== "לא" || adhdPos;
-      if (!hasRel) { addRef("קשיים בהבנה שאינם מוסברים ע\"י קשיי קשב או קריאה — יש לפנות לאבחון פסיכו-דידקטי"); if (isTyb) addRef("יש לשים לב לנתינת התאמות לבגרויות"); }
-      else if (isTyb) addRef("יש לשים לב לנתינת התאמות לבגרויות");
+      if (!hasRel) { addRef("קשיים בהבנה שאינם מוסברים ע\"י קשיי קשב או קריאה — יש לפנות לאבחון פסיכו-דידקטי"); }
+      addRef("יש לשים לב להתאמות במבחנים — בכיתות ט'-יב' מדובר בהתאמות לבגרויות; בז'-ח' אפשר לבקש התאמות במבחנים פנימיים דרך יועצת בית הספר");
     }
     if (syms.length || refs.length || tools.length) {
       box("purple", "📚 נמצאו קשיים לימודיים — כיתות " + (isTyb ? "ט-יב" : "ז-ח"));
       if (syms.length) box("purple", syms.map(s => "📊 " + s).join("\n"));
       refs.forEach(r => box("info", "✅ " + r));
       tools.forEach(t => box("info", t));
+      box("info", "📌 ניתן להיוועץ גם עם יועצת בית הספר לתיאום בין הבית למסגרת החינוכית, ולבדוק זכאות לשעות שילוב");
     }
     return boxes;
   }

@@ -1809,13 +1809,14 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
               {showReadFlow && (
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
-                  <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף</div>
+                  <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתה הצעירה, ניתן לענות על פי התרשמותך הכוללת מהילד באותה תקופה.</div>
                   {[
                     {k:"ag_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},
-                    {k:"ag_h2",q:"ב. האם המורה דיווחה על קשיים בזיהוי אותיות ומספרים?"},
-                    {k:"ag_h3",q:"ג. האם הגננת דיווחה על קשיים בזכירת צורות וצבעים?"},
-                    {k:"ag_h4",q:"ד. האם הגננת דיווחה על קשיים בחריזה או זיהוי צליל פותח?"},
-                    {k:"ag_h5",q:"ה. האם הגננת דיווחה על קשיים בביטוי עצמי ואוצר מילים?"},
+                    {k:"ag_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},
+                    {k:"ag_h3",q:"ג. האם דווח על קשיים בזכירת צורות וצבעים בגן?"},
+                    {k:"ag_h4",q:"ד. האם דווח על קשיים בחריזה או זיהוי צליל פותח בגן?"},
+                    {k:"ag_h5",q:"ה. האם דווח על קשיים בביטוי עצמי ואוצר מילים בגן?"},
                     {k:"ag_h6",q:"ו. האם ישנו קושי או לקות בדיבור?"},
                   ].map(({k,q}) => (
                     <div key={k} className="mb-3">
@@ -1866,23 +1867,36 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
                 </SubCard>
               )}
             </div>
-            {/* שאלה 2: כתיבה */}
+            {/* שאלה 2: קשב (עצמאית) */}
             <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-800 mb-2">2. האם יש קושי בכתיבה? <span className="font-normal text-xs">(לא כולל שגיאות כתיב)</span></p>
+              <p className="text-sm font-semibold text-gray-800 mb-2">2. האם את/ה רואה סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
+              <YNRow val={A.ag_adhd_yn||""} onChange={v => setA({...A, ag_adhd_yn:v})} />
+              {A.ag_adhd_yn==="כן" && <AcadAdhdBlock prefix="ag" A={A} setA={setA} />}
+            </div>
+            {/* שאלה 3: כתב יד */}
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בכתב היד עצמו?</p>
+              <p className="text-xs text-gray-500 mb-2">למשל: אחיזת עיפרון, צורת אותיות, איטיות חריגה, לחץ רב על הדף. <strong>לא הכוונה לשגיאות כתיב.</strong></p>
               <YNRow val={A.ag_write||""} onChange={v => setA({...A, ag_write:v})} />
               {A.ag_write==="כן" && <SubCard><p className="text-sm font-semibold text-blue-900 mb-2">האם עבר אבחון/טיפול בריפוי בעיסוק?</p><YNRow val={A.ag_write_ot||""} onChange={v => setA({...A, ag_write_ot:v})} /></SubCard>}
             </div>
-            {/* שאלה 3: הבנה */}
+            {/* שאלה 4: הבנה */}
             <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בהבנה בע"פ בשיעור?</p>
+              <p className="text-sm font-semibold text-gray-800 mb-2">4. האם יש קושי בהבנה בע"פ בשיעור?</p>
               <YNRow val={A.ag_comp||""} onChange={v => setA({...A, ag_comp:v})} />
             </div>
-            {/* שאלה 4: חשבון */}
+            {/* שאלה 5: חשבון */}
             <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-800 mb-2">4. האם יש קושי בחשבון?</p>
+              <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
-                {["לא","5% הכי מתקשה בכיתה","10% הכי מתקשה בכיתה","30% הכי מתקשה בכיתה"].map(opt => (
-                  <button key={opt} className={ob(A.ag_math===opt)} onClick={() => setA({...A, ag_math:opt})}>{opt}</button>
+                {[
+                  ["לא","ללא קושי"],
+                  ["5% הכי מתקשה בכיתה","קושי חמור (5% הכי מתקשים)"],
+                  ["10% הכי מתקשה בכיתה","קושי משמעותי (10% הכי מתקשים)"],
+                  ["30% הכי מתקשה בכיתה","קושי קל-בינוני (30% הכי מתקשים)"],
+                ].map(([val, label]) => (
+                  <button key={val} className={ob(A.ag_math===val)} onClick={() => setA({...A, ag_math:val})}>{label}</button>
                 ))}
               </div>
             </div>
@@ -1924,8 +1938,9 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
               {showReadFlow && (
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
-                  <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף</div>
-                  {[{k:"dv_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},{k:"dv_h2",q:"ב. האם הגננת/המורה דיווחה על קשיים בזיהוי אותיות ומספרים?"},{k:"dv_h3",q:"ג. האם הגננת דיווחה על קשיים בזכירת צורות וצבעים?"},{k:"dv_h4",q:"ד. האם הגננת דיווחה על קשיים בחריזה או זיהוי צליל פותח?"},{k:"dv_h5",q:"ה. האם הגננת דיווחה על קשיים בביטוי עצמי ואוצר מילים?"}].map(({k,q}) => (
+                  <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתות הראשונות, ניתן לענות על פי התרשמותך הכוללת מהילד באותה תקופה.</div>
+                  {[{k:"dv_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},{k:"dv_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},{k:"dv_h3",q:"ג. האם דווח על קשיים בזכירת צורות וצבעים בגן?"},{k:"dv_h4",q:"ד. האם דווח על קשיים בחריזה או זיהוי צליל פותח בגן?"},{k:"dv_h5",q:"ה. האם דווח על קשיים בביטוי עצמי ואוצר מילים בגן?"}].map(({k,q}) => (
                     <div key={k} className="mb-3"><p className="text-sm text-gray-700 mb-1">{q}</p><YNRow val={A[k]||""} onChange={v => setA({...A,[k]:v})} /></div>
                   ))}
                   {showHist0 && (
@@ -1975,9 +1990,10 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
               <YNRow val={A.dv_adhd_yn||""} onChange={v => setA({...A, dv_adhd_yn:v})} />
               {A.dv_adhd_yn==="כן" && <AcadAdhdBlock prefix="dv" A={A} setA={setA} />}
             </div>
-            {/* שאלה 3: כתיבה */}
+            {/* שאלה 3: כתב יד */}
             <div className="mb-4">
-              <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בכתיבה?</p>
+              <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בכתב היד עצמו?</p>
+              <p className="text-xs text-gray-500 mb-2">למשל: אחיזת עיפרון, צורת אותיות, איטיות חריגה, לחץ רב על הדף. <strong>לא הכוונה לשגיאות כתיב.</strong></p>
               <YNRow val={A.dv_write||""} onChange={v => setA({...A, dv_write:v})} />
               {A.dv_write==="כן" && <SubCard><p className="text-sm font-semibold text-blue-900 mb-2">האם עבר אבחון/טיפול בריפוי בעיסוק?</p><YNRow val={A.dv_write_ot||""} onChange={v => setA({...A, dv_write_ot:v})} /></SubCard>}
             </div>
@@ -1989,9 +2005,15 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
-                {["לא","5% הכי נמוכים בכיתה","10% הכי נמוכים בכיתה","30% הכי נמוכים בכיתה"].map(opt => (
-                  <button key={opt} className={ob(A.dv_math===opt)} onClick={() => setA({...A, dv_math:opt})}>{opt}</button>
+                {[
+                  ["לא","ללא קושי"],
+                  ["5% הכי נמוכים בכיתה","קושי חמור (5% הכי מתקשים)"],
+                  ["10% הכי נמוכים בכיתה","קושי משמעותי (10% הכי מתקשים)"],
+                  ["30% הכי נמוכים בכיתה","קושי קל-בינוני (30% הכי מתקשים)"],
+                ].map(([val, label]) => (
+                  <button key={val} className={ob(A.dv_math===val)} onClick={() => setA({...A, dv_math:val})}>{label}</button>
                 ))}
               </div>
             </div>
@@ -2005,8 +2027,18 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
   // ── ז-ח / ט-יב ───────────────────────────────────────────────────────────────
   const p = grp;
   const gradeLabel = grp === "zh" ? "🎓 כיתות ז׳–ח׳" : "🏫 כיתות ט׳–י\"ב";
-  const pctOpts4 = ["לא","5%","20%","מעל 20%"];
-  const mathEngOpts = ["לא","10%","20%","מעל 20%"];
+  const verbalOpts: [string, string][] = [
+    ["לא","ללא קושי"],
+    ["5%","קושי חמור (5% הכי מתקשים)"],
+    ["20%","קושי משמעותי (20% הכי מתקשים)"],
+    ["מעל 20%","קושי קל-בינוני (מעל 20%)"],
+  ];
+  const mathEngOpts: [string, string][] = [
+    ["לא","ללא קושי"],
+    ["10%","קושי משמעותי (10% הכי מתקשים)"],
+    ["20%","קושי בינוני (20% הכי מתקשים)"],
+    ["מעל 20%","קושי קל (מעל 20%)"],
+  ];
   return (
     <div>
       <Card>
@@ -2018,16 +2050,16 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
         </div>
         <GradeBlock title={gradeLabel}>
           <div className="mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-2">1. רבי מלל — רמת ביצוע ביחס לכיתה</p>
-            <div className="flex gap-2 flex-wrap">{pctOpts4.map(opt => <button key={opt} className={ob(A[p+"_verbal"]===opt)} onClick={() => setA({...A, [p+"_verbal"]:opt})}>{opt === "לא" ? "ללא קושי" : opt}</button>)}</div>
+            <p className="text-sm font-semibold text-gray-800 mb-2">1. רבי מלל (קריאה והבנת הנקרא) — רמת ביצוע ביחס לכיתה</p>
+            <div className="flex gap-2 flex-wrap">{verbalOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_verbal"]===val)} onClick={() => setA({...A, [p+"_verbal"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">2. מתמטיקה — רמת ביצוע ביחס לכיתה</p>
-            <div className="flex gap-2 flex-wrap">{mathEngOpts.map(opt => <button key={opt} className={ob(A[p+"_math"]===opt)} onClick={() => setA({...A, [p+"_math"]:opt})}>{opt === "לא" ? "ללא קושי" : opt}</button>)}</div>
+            <div className="flex gap-2 flex-wrap">{mathEngOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_math"]===val)} onClick={() => setA({...A, [p+"_math"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">3. אנגלית — רמת ביצוע ביחס לכיתה</p>
-            <div className="flex gap-2 flex-wrap">{mathEngOpts.map(opt => <button key={opt} className={ob(A[p+"_eng"]===opt)} onClick={() => setA({...A, [p+"_eng"]:opt})}>{opt === "לא" ? "ללא קושי" : opt}</button>)}</div>
+            <div className="flex gap-2 flex-wrap">{mathEngOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_eng"]===val)} onClick={() => setA({...A, [p+"_eng"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">4. האם יש סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
@@ -2035,7 +2067,8 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
             {A[p+"_adhd_yn"]==="כן" && <AcadAdhdBlock prefix={p} A={A} setA={setA} />}
           </div>
           <div className="mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בכתיבה?</p>
+            <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בכתב היד עצמו?</p>
+            <p className="text-xs text-gray-500 mb-2">למשל: אחיזת עיפרון, צורת אותיות, איטיות חריגה. <strong>לא הכוונה לשגיאות כתיב.</strong></p>
             <YNRow val={A[p+"_write"]||""} onChange={v => setA({...A, [p+"_write"]:v})} />
           </div>
           <div className="mb-4">
