@@ -78,7 +78,7 @@ const ADULTS_SCREENS_ORDER = [
   "e5","e5-q","e6","e6-q","e7-q","e8","e8c","e8d","e9","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
-  "f-vision","f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b",
+  "f-vision","f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
   "r-intake","r-single","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-affect","r3-willing","r3-child","r3-child-type",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
@@ -1357,7 +1357,7 @@ if (screen === "e8c") return (
   if (screen === "f3") return (
     <Layout screen={screen}>
       <Card badge="תחום תפקודי">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם אינך בטוח/ה לגבי <strong>התחום התעסוקתי</strong> שלך, בהווה או בעתיד?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם יש לך <strong>קושי, אי-בהירות, או שחיקה</strong> בתחום התעסוקתי שלך?</p>
         <YesNo onYes={() => { updF({ f3: true }); setScreen("f3-type"); }}
           onNo={() => { updF({ f3: false }); nextDomain(); }} />
       </Card>
@@ -1369,17 +1369,18 @@ if (screen === "e8c") return (
       <Card badge="תחום תעסוקתי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">מה הסטאטוס הנוכחי?</p>
         <div className="flex flex-col gap-2">
-          {[
-            ["young","א. צעיר/ה בתחילת דרכי"],
-            ["career-change","ב. אדם בוגר בשאלות לגבי שינוי קריירה"],
-            ["disability","ג. בעל/ת מוגבלות"],
-            ["burnout","ד. מתמודד/ת עם שחיקה בעבודה, דכדוך, חוסר כיוון"],
-            ["other","ה. אחר"],
-          ].map(([v, l]) => (
+          {([
+            ["young", "צעיר/ה בתחילת דרכי", "טרם התחלתי לעבוד, לפני / במהלך לימודים"],
+            ["career-change", "אדם בוגר — שינוי קריירה", "כבר עובד/ת, מחפש/ת שינוי כיוון מקצועי"],
+            ["disability", "בעל/ת מוגבלות", ""],
+            ["burnout", "שחיקה בעבודה / דכדוך / חוסר כיוון", "עובד/ת, אך מרגיש/ה ירידה במוטיבציה או בשביעות רצון"],
+            ["other", "אחר", ""],
+          ] as [string, string, string][]).map(([v, l, sub]) => (
             <button key={v} type="button"
-              onClick={() => { updF({ employmentType: v }); setScreen(v === "disability" ? "f3-done" : v === "young" ? "f3-a" : "f3-b"); }}
+              onClick={() => { updF({ employmentType: v }); setScreen(v === "disability" ? "f3-disability" : v === "young" ? "f3-a" : "f3-b"); }}
               className="rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-3 text-right text-sm font-semibold hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
-              {l}
+              <div>{l}</div>
+              {sub && <div className="mt-0.5 text-xs font-normal text-stone-500">{sub}</div>}
             </button>
           ))}
         </div>
@@ -1388,17 +1389,13 @@ if (screen === "e8c") return (
     </Layout>
   );
 
-  if (screen === "f3-done") {
-    nextDomain(); return null;
-  }
-
   if (screen === "f3-a") return (
     <Layout screen={screen}>
       <Card badge="שאלון תעסוקתי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
         <CheckList items={[
           "האם חש/ה כי ישנו קושי רגשי שקשור לתחום שהיית רוצה לעסוק בו? (דימוי עצמי נמוך, לחצים ועוד)",
-          "האם אתה מחשיב את עצמך כאדם ורבאלי?",
+          "האם את/ה מחשיב/ה את עצמך כאדם ורבאלי?",
           "האם יש לך רצון לעסוק בתחומי הטיפול או החינוך?",
           "האם את/ה מעוניין/ת במידע אובייקטיבי ומבוסס מבחנים לגבי התאמה מקצועית?",
           "האם אתה מחפש כיוון לימודי או מקצועי?",
@@ -1417,12 +1414,23 @@ if (screen === "e8c") return (
         <CheckList items={[
           "האם חש/ה כי ישנו קושי רגשי שקשור לתחום העבודה שלך? (דימוי עצמי נמוך, לחצים ועוד)",
           "האם יש תחושה של שחיקה בעבודה, רצון לשינוי, אבל לא ברור מה הבעיה או מה הכיוון?",
-          "האם יש ענין לבחון כיוונים תעסוקתיים חדשים?",
+          "האם יש ענין לבחון כיוונים תעסוקתיים חדשים שלא חשבת עליהם, או שיש קושי להבין מה הכישורים הנוספים שיש לך?",
           "האם את/ה מעוניין/ת במידע אובייקטיבי ומבוסס מבחנים לגבי התאמה מקצועית?",
         ]} checked={empBChecked.map((v, i) => v ? i : -1).filter(i => i >= 0)}
           onChange={(i, v) => setEmpBChecked((p) => { const n = [...p]; n[i] = v; return n; })} />
         <NavRow onBack={() => setScreen("f3-type")}
           onNext={() => { updF({ empBItems: empBChecked }); nextDomain(); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "f3-disability") return (
+    <Layout screen={screen}>
+      <Card badge="תחום תעסוקתי">
+        <p className="mb-1 font-semibold text-[#1a3a5c]">האם כבר פנית לביטוח לאומי בנושא?</p>
+        <YesNo
+          onYes={() => { updF({ disabilityNl: true }); nextDomain(); }}
+          onNo={() => { updF({ disabilityNl: false }); nextDomain(); }} />
       </Card>
     </Layout>
   );

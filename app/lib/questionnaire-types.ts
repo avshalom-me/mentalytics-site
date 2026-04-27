@@ -79,6 +79,7 @@ export type QuestionnaireAnswers = {
     employmentType?: string;
     empAItems?: boolean[];           // 5 פריטים
     empBItems?: boolean[];           // 4 פריטים
+    disabilityNl?: boolean;          // כבר פנה/פנתה לביטוח לאומי
   };
 
   // --- תחום זוגי/משפחתי ---

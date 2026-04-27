@@ -635,6 +635,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (f.f3) {
       const empType = f.employmentType ?? "";
       if (empType === "disability") {
+        const nlApplied = f.disabilityNl ?? false;
         recs.push({
           id: uid("employment-dis"),
           symptomText: "מדווחים קשיים בתחום התעסוקתי.",
@@ -642,7 +643,9 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "טיפול תעסוקתי",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "יש לפנות לאבחון תעסוקתי ולבדוק מול ביטוח לאומי.",
+          notes: nlApplied
+            ? "יש לפנות לאבחון תעסוקתי. מכיוון שכבר פנית לביטוח לאומי, ניתן לבקש אבחון תעסוקתי דרכם."
+            : "יש לפנות לאבחון תעסוקתי ולבדוק זכאות מול ביטוח לאומי.",
         });
       } else if (empType === "young") {
         const a = f.empAItems ?? [false, false, false, false, false];
@@ -678,12 +681,13 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         // career-change, burnout, other → questionnaire B
         const b = f.empBItems ?? [false, false, false, false];
         // items 0,1 direct; 2,3 inverted
+        // סף הועלה ל-3 כדי שציון ברירת מחדל (2) יפול תחת אבחון ולא פסיכולוג
         const scoreB =
           (b[0] ? 1 : 0) +
           (b[1] ? 1 : 0) +
           (b[2] ? 0 : 1) +
           (b[3] ? 0 : 1);
-        if (scoreB >= 2) {
+        if (scoreB >= 3) {
           recs.push({
             id: uid("employment-psy"),
             symptomText: "מדווחים קשיים בתחום התעסוקתי.",
@@ -702,6 +706,17 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
             urgent: false,
             notes: "יש לפנות לאבחון תעסוקתי.",
+          });
+        }
+        if (empType === "burnout") {
+          recs.push({
+            id: uid("burnout-emotional"),
+            symptomText: "שחיקה מלווה לעיתים גם בקשיים רגשיים.",
+            treatment: "CBT",
+            treatmentLabel: "CBT",
+            domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
+            urgent: false,
+            notes: "מומלץ לבחון גם פנייה לטיפול רגשי תומך (CBT או טיפול דינאמי, בהתאם להעדפה).",
           });
         }
       }
