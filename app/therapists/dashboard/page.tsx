@@ -525,10 +525,10 @@ function TherapistDashboard() {
       {profile && profile.status !== "paying" && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
-            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">הצטרפות למערכת ההתאמה החכמה</div>
+            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">מבצע פתיחה — הצטרפות למערכת ההתאמה החכמה</div>
             <div className="flex items-end gap-3 mb-1">
               <span className="text-4xl font-black text-white leading-none">₪120</span>
-              <span className="text-white/70 text-sm pb-1">לחודש</span>
+              <span className="text-white/70 text-sm pb-1">+ מע&quot;מ / לחודש</span>
             </div>
             <p className="text-white/60 text-xs mb-4">ניתן לבטל בכל עת</p>
             <div className="h-px bg-white/20 mb-4" />

@@ -19,7 +19,7 @@ const faqs = [
   },
   {
     q: "כמה פעמים אפשר להשתמש בשאלון ומה העלות?",
-    a: "ניתן להשתמש 3 פעמים בשאלון. לאחר מכן תשלום סמלי של 30 שקלים. לרוב אין צורך ביותר מפעם או פעמיים.",
+    a: "ניתן להשתמש 3 פעמים בשאלון. לאחר מכן תשלום סמלי של 30 שקלים + מע\"מ. לרוב אין צורך ביותר מפעם או פעמיים.",
   },
   {
     q: "כמה זמן זה לוקח?",
@@ -180,7 +180,7 @@ export default function HomePage() {
                   <TrustBadge
                     icon={Coins}
                     color="#8B2E0A"
-                    text="ניתן להשתמש 3 פעמים בשאלון, לאחר מכן תשלום סמלי של 30 שקלים. לרוב אין צורך ביותר מפעם או פעמיים."
+                    text="ניתן להשתמש 3 פעמים בשאלון, לאחר מכן תשלום סמלי של 30 שקלים + מע&quot;מ. לרוב אין צורך ביותר מפעם או פעמיים."
                   />
                   <TrustBadge
                     icon={Heart}
@@ -268,7 +268,7 @@ export default function HomePage() {
                 השימוש בשאלונים חינמי{" "}
                 <details className="inline">
                   <summary className="inline cursor-pointer list-none text-[#8B2E0A] font-bold hover:underline">*</summary>
-                  <span className="block mt-1 text-xs text-stone-500 leading-relaxed">בשימוש הוגן. מעל 3 שימושים ישנו תשלום סמלי של 30 ש״ח.</span>
+                  <span className="block mt-1 text-xs text-stone-500 leading-relaxed">בשימוש הוגן. מעל 3 שימושים ישנו תשלום סמלי של 30 ש״ח + מע&quot;מ.</span>
                 </details>
               </span>
             </li>

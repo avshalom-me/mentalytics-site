@@ -1,28 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function verifySecret(req: NextRequest): boolean {
+  const expected = process.env.MORNING_WEBHOOK_SECRET;
+  if (!expected) return true;
+  const provided = req.nextUrl.searchParams.get("secret") || "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function POST(req: NextRequest) {
   try {
+    if (!verifySecret(req)) {
+      console.error("Morning webhook: invalid or missing secret");
+      return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    }
+
     const body = await req.json();
-    console.log("Morning webhook received:", JSON.stringify(body));
 
     let custom: Record<string, string> = {};
     try {
       custom = typeof body.custom === "string" ? JSON.parse(body.custom) : body.custom || {};
     } catch {
-      console.error("Failed to parse custom field:", body.custom);
+      console.error("Morning webhook: failed to parse custom field");
     }
 
     const paymentId = custom.paymentId;
     if (!paymentId) {
-      console.error("Webhook missing paymentId in custom field");
+      console.error("Morning webhook: missing paymentId in custom field");
       return NextResponse.json({ ok: true });
     }
+    console.log(`Morning webhook received for paymentId=${paymentId}, type=${custom.type || "unknown"}`);
 
     const { data: payment } = await supabase
       .from("payments")

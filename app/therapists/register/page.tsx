@@ -125,7 +125,7 @@ export default function TherapistRegisterPage() {
                 <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>
               </div>
               <h3 className="text-lg font-bold text-[#1a4a5c] mb-1">מסלול מקודם</h3>
-              <p className="text-2xl font-black text-[#0F5468] mb-1">מבצע היכרות — &#8362;120 <span className="text-sm font-normal text-[#0F5468]/70">/ לחודש</span></p>
+              <p className="text-2xl font-black text-[#0F5468] mb-1">מבצע פתיחה — &#8362;120 + מע&quot;מ <span className="text-sm font-normal text-[#0F5468]/70">/ לחודש</span></p>
               <p className="text-xs text-[#0F5468]/60 mb-4">* ללא סיכון — החזר כספי מלא אם לא תקבל פנייה בחודשיים הראשונים</p>
               <ul className="space-y-2.5 text-sm leading-6 flex-1" style={{ color: "#1a4a5c" }}>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבמסלול החינמי</li>

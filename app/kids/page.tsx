@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
+import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -2975,14 +2976,7 @@ export default function KidsPage() {
 
   if (usageAllowed === false && step !== "p-result") return (
     <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
-        <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-2xl font-black text-stone-900 mb-3">הגעת למגבלת השימוש החינמי</h2>
-        <p className="text-stone-600 leading-7 max-w-sm">
-          ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
-          בקרוב נפתח אפשרות לתשלום — עקבו אחרינו לעדכונים.
-        </p>
-      </div>
+      <QuizPaymentBlock quizType="kids" />
     </main>
   );
 

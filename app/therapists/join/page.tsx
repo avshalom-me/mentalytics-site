@@ -125,7 +125,7 @@ export default function TherapistJoinPage() {
                 <span className="text-xs text-[#0F5468]">מופיע בהתאמות</span>
               </div>
               <div className="mb-4 flex items-baseline gap-2">
-                <span className="text-lg font-black text-[#0F5468]">מבצע היכרות — &#8362;120 לחודש</span>
+                <span className="text-lg font-black text-[#0F5468]">מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</span>
                 <span className="text-xs text-[#0F5468]">*</span>
               </div>
               <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">התאמה חכמה + סטטיסטיקות מתקדמות</h3>

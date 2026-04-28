@@ -8,7 +8,7 @@ import { Suspense } from "react";
 function Inner() {
   const params = useSearchParams();
   const quizType = params.get("type") || "adults";
-  const quizPath = quizType === "kids" ? "/quiz/kids" : "/quiz/adults";
+  const quizPath = quizType === "kids" ? "/kids" : "/adults";
 
   return (
     <main

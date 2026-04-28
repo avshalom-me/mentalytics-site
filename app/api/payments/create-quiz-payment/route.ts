@@ -15,6 +15,19 @@ function getIp(req: NextRequest): string {
   );
 }
 
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { fp, quizType } = await req.json();
@@ -22,8 +35,18 @@ export async function POST(req: NextRequest) {
     if (!fp || !quizType) {
       return NextResponse.json({ error: "missing fp or quizType" }, { status: 400 });
     }
+    if (typeof fp !== "string" || fp.length > 200) {
+      return NextResponse.json({ error: "invalid fp" }, { status: 400 });
+    }
+    if (quizType !== "adults" && quizType !== "kids") {
+      return NextResponse.json({ error: "invalid quizType" }, { status: 400 });
+    }
 
     const ip = getIp(req);
+
+    if (!checkRateLimit(`${ip}:${fp}`)) {
+      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
 
     const { data: payment, error } = await supabase
       .from("payments")

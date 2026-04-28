@@ -10,6 +10,7 @@ import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
+import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -547,14 +548,7 @@ export default function AdultsPage() {
   // ── USAGE LIMIT ────────────────────────────────────────────────────────────
   if (usageAllowed === false) return (
     <Layout screen={screen}>
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6" dir="rtl">
-        <div className="text-5xl mb-4">🔒</div>
-        <h2 className="text-2xl font-black text-stone-900 mb-3">הגעת למגבלת השימוש החינמי</h2>
-        <p className="text-stone-600 leading-7 max-w-sm">
-          ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
-          בקרוב נפתח אפשרות לתשלום — עקבו אחרינו לעדכונים.
-        </p>
-      </div>
+      <QuizPaymentBlock quizType="adults" />
     </Layout>
   );
 

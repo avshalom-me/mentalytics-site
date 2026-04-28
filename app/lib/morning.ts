@@ -45,7 +45,9 @@ async function api(path: string, body: Record<string, unknown>) {
 }
 
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
-const NOTIFY_URL = `${BASE_URL}/api/webhooks/morning`;
+const NOTIFY_URL = process.env.MORNING_WEBHOOK_SECRET
+  ? `${BASE_URL}/api/webhooks/morning?secret=${encodeURIComponent(process.env.MORNING_WEBHOOK_SECRET)}`
+  : `${BASE_URL}/api/webhooks/morning`;
 
 export interface PaymentFormResult {
   errorCode: number;
