@@ -20,21 +20,21 @@ export default function BillingPolicyPage() {
       </Link>
 
       <h1 className="mt-6 text-3xl font-black text-stone-900 mb-2">תקנון רכישה — חיוב, ביטול והחזרים</h1>
-      <p className="text-sm text-stone-500 mb-10">טיפול חכם — מנטליטיקס בע&quot;מ | עודכן לאחרונה: אפריל 2026</p>
+      <p className="text-sm text-stone-500 mb-10">טיפול חכם — טיפול חכם — מנטליטיקס | עודכן לאחרונה: אפריל 2026</p>
 
       <div className="space-y-8 text-sm leading-7 text-stone-700">
 
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">1. כללי</h2>
-          <p>תקנון זה מהווה הסכם מחייב בין המשתמש/ת (להלן: &quot;המשתמש&quot;) לבין מנטליטיקס בע&quot;מ (להלן: &quot;החברה&quot;), המפעילה את פלטפורמת &quot;טיפול חכם&quot; בכתובת mentalytics.co.il (להלן: &quot;האתר&quot;).</p>
+          <p>תקנון זה מהווה הסכם מחייב בין המשתמש/ת (להלן: &quot;המשתמש&quot;) לבין טיפול חכם — מנטליטיקס (להלן: &quot;החברה&quot;), המפעילה את פלטפורמת &quot;טיפול חכם&quot; בכתובת mentalytics.co.il (להלן: &quot;האתר&quot;).</p>
           <p className="mt-2">השימוש באתר ורכישת שירותים בו מהווים הסכמה לתנאי תקנון זה. אם אינך מסכימ/ה לתנאים — אין לבצע רכישה.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">2. פרטי החברה</h2>
           <ul className="list-disc pr-6 mt-2 space-y-1">
-            <li>שם החברה: מנטליטיקס בע&quot;מ</li>
-            <li>שם מסחרי: טיפול חכם</li>
+            <li>שם החברה: טיפול חכם — מנטליטיקס</li>
+            <li>כתובת: אשכולית 28/3, פרדס חנה</li>
             <li>כתובת אתר: mentalytics.co.il</li>
             <li>מייל: <a href="mailto:tipool406@gmail.com" className="underline hover:text-[#0F5468]">tipool406@gmail.com</a></li>
             <li>טלפון: <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a></li>
