@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import { REGION_CITIES } from "@/app/lib/regions";
 import {
@@ -10,6 +11,7 @@ import {
   COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
+import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
@@ -276,7 +278,15 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   );
 }
 
-export default function TherapistDashboard() {
+export default function TherapistDashboardPage() {
+  return (
+    <Suspense>
+      <TherapistDashboard />
+    </Suspense>
+  );
+}
+
+function TherapistDashboard() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isNew, setIsNew] = useState(false);
@@ -293,6 +303,25 @@ export default function TherapistDashboard() {
   const [showRefundNote, setShowRefundNote] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
+  const searchParams = useSearchParams();
+
+  const triggerUpgrade = useCallback(async () => {
+    if (!token || !profile || profile.status === "paying") return;
+    try {
+      const res = await fetch("/api/payments/create-subscription", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (res.ok && data.url) window.location.href = data.url;
+    } catch { /* user can retry manually */ }
+  }, [token, profile]);
+
+  useEffect(() => {
+    if (searchParams.get("upgrade") === "promoted" && token && profile && profile.status !== "paying") {
+      triggerUpgrade();
+    }
+  }, [searchParams, token, profile, triggerUpgrade]);
 
   useEffect(() => {
     if (!token) return;
@@ -520,9 +549,9 @@ export default function TherapistDashboard() {
                 * ההחזר הכספי מכסה את דמי המנוי של החודשיים בהם הייתם מנויים. ההחזר ניתן רק אם לא התקבלה אף הפנייה שהתממשה בשני החודשים העוקבים ממועד ההצטרפות.
               </div>
             )}
-            <button disabled className="mt-5 w-full rounded-xl py-3 text-sm font-black bg-white/20 border border-white/30 text-white/50 cursor-not-allowed">
-              הצטרפות ותשלום — בקרוב
-            </button>
+            <div className="mt-5">
+              <UpgradeToPromotedButton />
+            </div>
           </div>
         </div>
       )}

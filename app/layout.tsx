@@ -54,12 +54,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('config', 'G-V3QQRXSQ0T');
         `}</Script>
 
-        <footer className="mt-16 border-t border-[#E8E1D8] bg-white">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500 flex flex-wrap items-center gap-4">
-            <span>© {new Date().getFullYear()} טיפול חכם</span>
-            <Link href="/privacy" className="hover:underline">מדיניות פרטיות</Link>
-            <Link href="/terms" className="hover:underline">תנאי שימוש</Link>
-            <Link href="/accessibility" className="hover:underline">הצהרת נגישות</Link>
+        <footer className="mt-16 border-t border-[#E8E1D8] bg-white" dir="rtl">
+          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500">
+            <div className="flex flex-wrap items-center gap-4 mb-3">
+              <span>© {new Date().getFullYear()} טיפול חכם — מנטליטיקס בע&quot;מ</span>
+              <Link href="/privacy" className="hover:underline">מדיניות פרטיות</Link>
+              <Link href="/terms" className="hover:underline">תנאי שימוש</Link>
+              <Link href="/billing-policy" className="hover:underline">תקנון רכישה</Link>
+              <Link href="/accessibility" className="hover:underline">הצהרת נגישות</Link>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 text-xs text-stone-400">
+              <span>טלפון: <a href="tel:0527906335" className="hover:underline">052-790-6335</a></span>
+              <span>מייל: <a href="mailto:tipool406@gmail.com" className="hover:underline">tipool406@gmail.com</a></span>
+            </div>
           </div>
         </footer>
       </body>

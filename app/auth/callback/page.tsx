@@ -5,7 +5,9 @@ import { supabase } from "@/app/lib/supabaseClient";
 
 export default function AuthCallbackPage() {
   useEffect(() => {
-    const code = new URLSearchParams(window.location.search).get("code");
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
+    const planParam = params.get("plan") === "promoted" ? "?upgrade=promoted" : "";
     const hasHashToken = window.location.hash.includes("access_token");
 
     if (code) {
@@ -14,14 +16,14 @@ export default function AuthCallbackPage() {
         if (error) {
           window.location.href = "/therapists/login";
         } else {
-          window.location.href = "/therapists/dashboard";
+          window.location.href = "/therapists/dashboard" + planParam;
         }
       });
     } else if (hasHashToken) {
       // Implicit flow — Supabase processes hash automatically, just wait for session
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
-          window.location.href = "/therapists/dashboard";
+          window.location.href = "/therapists/dashboard" + planParam;
         } else {
           // Give Supabase a moment to process the hash
           setTimeout(async () => {

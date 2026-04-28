@@ -21,6 +21,17 @@ function getMaxCount(rows: { count: number }[]): number {
   return Math.max(...rows.map((r) => r.count));
 }
 
+async function getPaidCredits(fp: string | null): Promise<number> {
+  if (!fp) return 0;
+  const { count } = await supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("payment_type", "quiz")
+    .eq("reference_id", `fp:${fp}`)
+    .eq("status", "completed");
+  return count ?? 0;
+}
+
 // GET /api/usage/check?type=adults&fp=HASH  — check without incrementing
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
@@ -39,7 +50,9 @@ export async function GET(req: NextRequest) {
     .eq("quiz_type", type);
 
   const count = getMaxCount(data ?? []);
-  return NextResponse.json({ allowed: count < MAX_FREE, count });
+  const paidCredits = await getPaidCredits(fp);
+  const limit = MAX_FREE + paidCredits;
+  return NextResponse.json({ allowed: count < limit, count, paymentRequired: count >= limit });
 }
 
 // POST /api/usage/check  — increment and return new status
@@ -60,8 +73,11 @@ export async function POST(req: NextRequest) {
 
   const maxCount = getMaxCount(existing ?? []);
 
-  if (maxCount >= MAX_FREE) {
-    return NextResponse.json({ allowed: false, count: maxCount });
+  const paidCredits = await getPaidCredits(fp);
+  const limit = MAX_FREE + paidCredits;
+
+  if (maxCount >= limit) {
+    return NextResponse.json({ allowed: false, count: maxCount, paymentRequired: true });
   }
 
   const newCount = maxCount + 1;

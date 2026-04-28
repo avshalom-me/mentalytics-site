@@ -7,6 +7,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 function TherapistLoginContent() {
   const searchParams = useSearchParams();
   const initialMode = searchParams.get("mode") === "register" ? "register" : "login";
+  const plan = searchParams.get("plan");
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,7 +28,7 @@ function TherapistLoginContent() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        redirectTo: `${window.location.origin}/auth/callback${plan === "promoted" ? "?plan=promoted" : ""}`,
       },
     });
     if (error) setError(error.message);
@@ -46,13 +47,15 @@ function TherapistLoginContent() {
         setError("המייל או הסיסמא שגויים");
         setShowRegisterHint(true);
       } else {
-        window.location.href = "/therapists/dashboard";
+        window.location.href = plan === "promoted"
+          ? "/therapists/dashboard?upgrade=promoted"
+          : "/therapists/dashboard";
       }
     } else {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/therapists/dashboard` },
+        options: { emailRedirectTo: `${window.location.origin}/therapists/dashboard${plan === "promoted" ? "?upgrade=promoted" : ""}` },
       });
       if (error) {
         setError(error.message);
