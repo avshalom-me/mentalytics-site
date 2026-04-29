@@ -50,6 +50,7 @@ export type QuestionnaireAnswers = {
     tinnitus?: boolean;
     e9?: boolean;                    // טראומה
     traumaType?: string;
+    traumaTypeOther?: string;        // תיאור חופשי כש-traumaType="other"
     traumaFreq?: string;
     traumaScores?: number[];         // 10 פריטים, 0-4
     traumaSuicidal?: boolean;

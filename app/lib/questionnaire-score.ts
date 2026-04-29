@@ -166,8 +166,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       }
     }
 
-    // --- E4: Chronic pain (psychological) ---
-    if (e.e4 && e.e4Chronic && e.e4Medical) {
+    // --- E4: Chronic pain ---
+    // e4Medical=true  → סיבות רפואיות נשללו → כאב כרוני נפשי → CBT
+    // e4Medical=false → סיבות רפואיות לא נשללו → תחילה הפניה לבירור רפואי
+    if (e.e4 && e.e4Chronic && e.e4Medical === true) {
       recs.push({
         id: uid("chronic-pain"),
         symptomText: "נמצאו כאבים כרוניים שמקורם נפשי.",
@@ -176,6 +178,17 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "עדיפות: פסיכולוג רפואי.",
+      });
+    }
+    if (e.e4 && e.e4Chronic && e.e4Medical === false) {
+      recs.push({
+        id: uid("chronic-pain-medical"),
+        symptomText: "דווחו כאבים פיזיים כרוניים שטרם נשללו כגורם רפואי.",
+        treatment: "CBT",
+        treatmentLabel: "בירור רפואי + CBT",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "מומלץ תחילה לפנות לרופא/ת המשפחה לבירור רפואי לשלילת מקור גופני לכאבים. במקביל, או לאחר השלילה הרפואית, ניתן לפנות לטיפול CBT (בעדיפות אצל פסיכולוג רפואי).",
       });
     }
 
@@ -276,7 +289,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         treatmentLabel: "CBT",
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
-        notes: 'בעדיפות על-ידי פסיכולוג או עו"ס קליני.',
+        notes: 'מומלץ לפנות למטפל/ת CBT עם הכשרה בטיפול ב-OCD (ERP).',
       });
     } else if (ocdTotal >= 10) {
       recs.push({
@@ -366,7 +379,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (e.e8 && !e.tics && !e.tinnitus) {
       addOrMergeCBT(EMO,
         "נמצאו תסמינים גופניים לא מוגדרים.",
-        "הפניה לטיפול CBT או היפנוזה. עדיפות על ידי פסיכולוג רפואי או פסיכולוג קליני."
+        "הפניה לטיפול CBT או היפנוזה. עדיפות על ידי פסיכולוג רפואי."
       );
     }
     if (e.e8b) {
@@ -404,26 +417,55 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (traumaTotal >= 15) {
       const traumaType = e.traumaType ?? "";
       const traumaFreq = e.traumaFreq ?? "single";
-      let traumaTreatment = "EMDR";
-      let traumaLabel = "EMDR";
+      const isRepeatedSexual = traumaType === "sexual" && (traumaFreq === "multiple" || traumaFreq === "ongoing");
+      const isOngoing = traumaFreq === "multiple" || traumaFreq === "ongoing";
 
-      if (
-        traumaType === "sexual" &&
-        (traumaFreq === "multiple" || traumaFreq === "ongoing")
-      ) {
-        traumaTreatment = "DBT";
-        traumaLabel = "DBT-PTSD / EMDR";
+      if (isRepeatedSexual) {
+        recs.push({
+          id: uid("trauma-dbt"),
+          symptomText: "נמצאו סימנים לקשיים סביב אירוע טראומטי מורכב/חוזר.",
+          treatment: "DBT",
+          treatmentLabel: "DBT-PTSD",
+          domain: "מורכבויות בתחום הרגשי/האישי",
+          urgent: false,
+        });
       }
-      // All other types → EMDR (optionally CBT for some, but EMDR is primary)
 
+      // EMDR – המלצה ראשית כמעט לכל סוגי הטראומה
       recs.push({
-        id: uid("trauma"),
-        symptomText: "נמצאו סימנים לקשיים סביב אירוע טראומטי.",
-        treatment: traumaTreatment,
-        treatmentLabel: traumaLabel,
+        id: uid("trauma-emdr"),
+        symptomText: isRepeatedSexual
+          ? "כחלופה / השלמה: ניתן לפנות גם לטיפול EMDR."
+          : "נמצאו סימנים לקשיים סביב אירוע טראומטי.",
+        treatment: "EMDR",
+        treatmentLabel: "EMDR",
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
+
+      // CPT – חלופה מבוססת-ראיות, מתאימה במיוחד לטראומה חד-פעמית או למי שמעדיף/ה גישה קוגניטיבית
+      recs.push({
+        id: uid("trauma-cpt"),
+        symptomText: "חלופה מבוססת-ראיות: טיפול CPT (Cognitive Processing Therapy).",
+        treatment: "CPT",
+        treatmentLabel: "CPT",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "CPT הוא טיפול קוגניטיבי ממוקד-טראומה, יעיל בעיקר עבור אירוע חד-פעמי או PTSD מוגדר.",
+      });
+
+      // טיפול דינאמי בטראומה – מתאים לטראומה מורכבת/מתמשכת או למי שמעדיף/ה גישה דינאמית
+      if (isOngoing || isRepeatedSexual || traumaType === "abuse" || traumaType === "loss") {
+        recs.push({
+          id: uid("trauma-dynamic"),
+          symptomText: "חלופה נוספת: טיפול דינאמי בטראומה.",
+          treatment: "טיפול דינאמי בטראומה",
+          treatmentLabel: "טיפול דינאמי בטראומה",
+          domain: "מורכבויות בתחום הרגשי/האישי",
+          urgent: false,
+          notes: "מתאים בעיקר לטראומה מורכבת, מתמשכת או הקשורה לאובדן ויחסים בינאישיים.",
+        });
+      }
     }
 
     // --- E10: Personality ---
@@ -480,7 +522,6 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             treatmentLabel: "טיפול דינאמי",
             domain: "מורכבויות בתחום הרגשי/האישי",
             urgent: false,
-            notes: 'עדיפות: פסיכולוג קליני או עו"ס קליני.',
           });
           found = true;
         }
@@ -508,7 +549,6 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             treatmentLabel: "טיפול דינאמי / קבוצתי",
             domain: "מורכבויות בתחום הרגשי/האישי",
             urgent: false,
-            notes: 'עדיפות: פסיכולוג קליני או עו"ס קליני.',
           });
           found = true;
         }
@@ -520,7 +560,6 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             treatmentLabel: "טיפול דינאמי",
             domain: "מורכבויות בתחום הרגשי/האישי",
             urgent: false,
-            notes: 'עדיפות: פסיכולוג קליני או עו"ס קליני.',
           });
         }
       }

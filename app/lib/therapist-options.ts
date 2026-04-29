@@ -19,6 +19,8 @@ export const TRAINING_AREAS = [
   "CBT",
   "ACT",
   "EMDR",
+  "CPT",
+  "טיפול דינאמי בטראומה",
   "DBT",
   "הדרכת הורים",
   "טיפול דיאדי",
