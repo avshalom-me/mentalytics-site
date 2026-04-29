@@ -132,9 +132,13 @@ export default function TherapistJoinPage() {
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "#1a4a5c" }}>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבמסלול החינמי</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו&quot;ח צפיות, לחיצות ואחוזי המרה — כמה אנשים ראו, כמה פנו</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> פילוח הפונים אליך: מאיזה אזור, עם איזה קושי, באיזה גיל ומגדר</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר — לדעת איפה את/ה עומד/ת</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> סוכן בינה מלאכותית אישי הכולל:
+                  <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "#1a4a5c" }}>
+                    <li>א. דו&quot;ח צפיות בפרופיל, אחוזי המרה של הצפיות להקלה על המספר ועוד</li>
+                    <li>ב. פילוח פונים פוטנציאליים באיזורך: איזה סוגי טיפולים מחפשים, איזה פרמטרים תרבותיים, מגדריים ודמוגרפיים הינם נפוצים</li>
+                    <li>ג. השוואות לממוצעים, גרפים ועוד מידע חשוב</li>
+                  </ul>
+                </li>
               </ul>
               <p className="mt-4 text-xs text-[#0F5468]/70">* ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים הראשונים.</p>
             </div>
