@@ -327,6 +327,7 @@ export default function AdultsPage() {
   const [traumaScores, setTraumaScores] = useState<number[]>(Array(10).fill(0));
   const [traumaSuicidal, setTraumaSuicidal] = useState(false);
   const [traumaType, setTraumaType] = useState("");
+  const [traumaTypeOther, setTraumaTypeOther] = useState("");
   const [traumaFreq, setTraumaFreq] = useState("single");
   const [persMain, setPersMain] = useState<number[]>([0, 0]);
   const [disQ, setDisQ] = useState<number[]>([0, 0, 0, 0]);
@@ -760,7 +761,7 @@ export default function AdultsPage() {
 
   if (screen === "e2-q") return (
     <Layout screen={screen}>
-      <Card badge="שאלון מניה" badgeColor="green">
+      <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את התסמינים הנוספים הרלוונטיים:</p>
         <CheckList items={qItems.mania} checked={maniaChecked}
           onChange={(i, v) => setManiaChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
@@ -983,7 +984,7 @@ export default function AdultsPage() {
     <Layout screen={screen}>
       <Card badge="שאלון אכילה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כמה מהדברים הבאים רלוונטיים (כל קבוצה בנפרד):</p>
-        <p className="mb-2 text-sm font-bold text-[#2d7a4f]">א. הגבלת אכילה / אנורקסיה:</p>
+        <p className="mb-2 text-sm font-bold text-[#2d7a4f]">א. הגבלה והקפדה על משקל:</p>
         <CheckList items={["אני מתאמץ/ת לשמור על משקל נמוך מהמומלץ לי","פחד עז מעלייה במשקל","עיוות בתפיסת הגוף"]}
           checked={eating1Checked}
           onChange={(i, v) => {
@@ -991,7 +992,7 @@ export default function AdultsPage() {
             setEating1Checked(next);
             updE({ eating1Count: next.length });
           }} />
-        <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ב. אכילת יתר / בולימיה:</p>
+        <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ב. אכילת יתר ופעולות פיצוי:</p>
         <CheckList items={["פרקי אכילת יתר מתמשכים","הקאות מכוונות / שימוש במשלשלים","פעילות גופנית כפייתית"]}
           checked={eating2Checked}
           onChange={(i, v) => {
@@ -999,7 +1000,7 @@ export default function AdultsPage() {
             setEating2Checked(next);
             updE({ eating2Count: next.length, eating2Purge: next.includes(1) });
           }} />
-        <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ג. הימנעות מסוגי מזון (ARFID):</p>
+        <p className="mb-2 mt-3 text-sm font-bold text-[#2d7a4f]">ג. הימנעות סלקטיבית ממזון:</p>
         <CheckList items={["הימנעות ממזון בשל מרקם/מראה","פחד מחנק/הקאה בעת אכילה","תזונה מוגבלת מאוד"]}
           checked={eating3Checked}
           onChange={(i, v) => {
@@ -1076,7 +1077,20 @@ if (screen === "e8c") return (
           <option value="terror">פיגוע או נפילת רקטה</option>
           <option value="combat">השתתפות/נוכחות בזירת לחימה</option>
           <option value="sexual">פגיעה מינית</option>
+          <option value="loss">אובדן/שכול של אדם קרוב</option>
+          <option value="medical">אירוע רפואי קשה (אבחנה, ניתוח, אשפוז)</option>
+          <option value="abuse">התעללות גופנית או רגשית</option>
+          <option value="other">אחר</option>
         </select>
+        {traumaType === "other" && (
+          <input
+            type="text"
+            value={traumaTypeOther}
+            onChange={(e) => setTraumaTypeOther(e.target.value)}
+            placeholder="פרט/י בקצרה את האירוע"
+            className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none"
+          />
+        )}
         <p className="mb-2 font-semibold text-[#1a3a5c]">תדירות:</p>
         <div className="mb-3 flex gap-2">
           {[["single","חד-פעמי"],["multiple","מספר פעמים"],["ongoing","מתמשך"]].map(([v, l]) => (
@@ -1096,7 +1110,7 @@ if (screen === "e8c") return (
           </label>
         </div>
         <NavRow onBack={() => setScreen("e9")}
-          onNext={() => { updE({ traumaScores, traumaSuicidal, traumaType, traumaFreq }); setScreen("e10"); }} />
+          onNext={() => { updE({ traumaScores, traumaSuicidal, traumaType, traumaTypeOther: traumaType === "other" ? traumaTypeOther : undefined, traumaFreq }); setScreen("e10"); }} />
       </Card>
     </Layout>
   );
