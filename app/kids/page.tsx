@@ -1149,7 +1149,7 @@ function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
   return (
     <div>
       <Card>
-        <StepTag>OCD — שאלות לפי כיתה</StepTag>
+        <StepTag>מחשבות והתנהגויות חוזרות — שאלות לפי כיתה</StepTag>
         <StepQ>שאלות משלימות</StepQ>
         {grp === "ga" && (
           <GradeBlock title="🏫 גן עד כיתה א׳">
@@ -1290,7 +1290,7 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <EqNum n={8}/>
         <StepTag>שאלה 8 מתוך 10 — רגשי</StepTag>
         <StepQ>דפוסי אכילה מדאיגים</StepQ>
-        <StepHint>הגבלה קיצונית, אכילה כפייתית, התנהגויות מפצות (הקאות, משלשלים, צום), או חרדה גדולה סביב משקל ואוכל</StepHint>
+        <StepHint>קשיים סביב אוכל, משקל או דימוי גוף</StepHint>
         <YNRow val={A.q8||""} onChange={v=>{ const nA={...A,q8:v}; setA(nA); onNext(nA); }} />
       </Card>
       <NavRow onBack={onBack} />
@@ -2324,7 +2324,8 @@ const KIDS_TREATMENT_MAP: { rx: RegExp; areas: string[] }[] = [
   { rx: /פסיכודינאמי|דינאמי/,           areas: ["טיפול דינאמי"] },
   { rx: /\bCBT\b/,                       areas: ["CBT"] },
   { rx: /EMDR/,                          areas: ["EMDR", "טיפול בטראומה"] },
-  { rx: /\bCPT\b/,                       areas: ["טיפול בטראומה"] },
+  { rx: /\bCPT\b/,                       areas: ["CPT", "טיפול בטראומה"] },
+  { rx: /טיפול דינאמי בטראומה/,         areas: ["טיפול דינאמי בטראומה", "טיפול בטראומה"] },
   { rx: /טיפול בטראומה/,                areas: ["טיפול בטראומה"] },
   { rx: /\bDBT\b/,                       areas: ["DBT"] },
   { rx: /התמכרויות/,                    areas: ["טיפול בהתמכרויות"] },
