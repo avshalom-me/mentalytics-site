@@ -261,7 +261,10 @@ function computeResults(A: Ans): KidsBox[] {
     if ([A.tq8, A.tq9, A.tq10].some(x => (x || 0) >= 2)) clusters.push("עוררות ותגובתיות");
     if (clusters.length) txt += "\nאשכולות: " + clusters.join(", ");
     emoStandalones.push({ cls: "purple", txt });
-    emoStandalones.push({ cls: "info", txt: "✅ הפנייה לטיפול בטראומה (EMDR / CPT) ע\"י פסיכולוג/עו\"ס קליני" });
+    // שלושה אופציות טיפול לטראומה — כל אחת ניתנת להתאמה למטפל בנפרד
+    emoStandalones.push({ cls: "info", txt: "✅ הפנייה לטיפול EMDR לעיבוד הטראומה" });
+    emoStandalones.push({ cls: "info", txt: "✅ חלופה: טיפול CPT (Cognitive Processing Therapy) — גישה קוגניטיבית מבוססת-ראיות" });
+    emoStandalones.push({ cls: "info", txt: "✅ חלופה נוספת: טיפול דינאמי בטראומה — מתאים בעיקר לטראומה מורכבת או הקשורה ליחסים קרובים" });
   }
 
   // Q7 — פרודרום
