@@ -1,8 +1,25 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from "recharts";
 
 type FilterEntry = { name: string; count: number };
+
+type TrendPoint = {
+  week_start: string;
+  pageViews: number;
+  profileViews: number;
+  contactClicks: number;
+  quizCompletions: number;
+};
+
+type ComparisonStats = {
+  current: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+  monthAvg: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+  quarterAvg: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+};
 
 type PatientData = {
   pageViews: number;
@@ -17,6 +34,8 @@ type PatientData = {
   clickTypeBreakdown: Record<string, number>;
   quizStarted: { adults: number; kids: number };
   quizCompleted: { adults: number; kids: number };
+  trend?: TrendPoint[];
+  comparison?: ComparisonStats;
 };
 
 type SilentTherapist = {
@@ -113,6 +132,78 @@ function MiniBars({ title, data, color = "#2e7d8c", limit = 6 }: { title: string
   );
 }
 
+function TrendChart({ trend }: { trend: TrendPoint[] }) {
+  if (!trend || trend.length === 0) return null;
+  const data = trend.map(t => ({ ...t, week: t.week_start.slice(5) }));
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <ResponsiveContainer width="100%" height={240}>
+        <LineChart data={data}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
+          <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#78716c" }} />
+          <YAxis tick={{ fontSize: 10, fill: "#78716c" }} />
+          <Tooltip contentStyle={{ fontFamily: "Heebo", fontSize: 12, direction: "rtl" }} />
+          <Legend wrapperStyle={{ fontSize: 11, fontFamily: "Heebo" }} />
+          <Line type="monotone" dataKey="pageViews" stroke="#3b82f6" name="כניסות" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="profileViews" stroke="#9333ea" name="צפיות" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="contactClicks" stroke="#22c55e" name="פניות" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="quizCompletions" stroke="#f59e0b" name="סיומי שאלון" strokeWidth={2} dot={false} />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
+function ComparisonCard({ label, current, monthAvg, quarterAvg, color }: {
+  label: string; current: number; monthAvg: number; quarterAvg: number; color: string;
+}) {
+  function pctOf(curr: number, base: number) {
+    if (base === 0) return curr === 0 ? "—" : "חדש";
+    const p = Math.round(((curr - base) / base) * 100);
+    return p > 0 ? `+${p}%` : `${p}%`;
+  }
+  function color4(curr: number, base: number) {
+    if (base === 0) return "text-stone-400";
+    const p = (curr - base) / base;
+    if (p >= 0.05) return "text-green-600";
+    if (p <= -0.05) return "text-red-600";
+    return "text-stone-400";
+  }
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="w-2 h-2 rounded-full" style={{ background: color }} />
+        <span className="text-xs font-bold text-stone-700">{label}</span>
+      </div>
+      <div className="text-2xl font-black text-stone-900 mb-2">{current.toLocaleString("he-IL")}</div>
+      <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+        <div className="rounded-lg bg-stone-50 px-2 py-1.5">
+          <div className="text-stone-400">חודשי</div>
+          <div className="font-bold text-stone-700">{monthAvg}</div>
+          <div className={`font-bold ${color4(current, monthAvg)}`}>{pctOf(current, monthAvg)}</div>
+        </div>
+        <div className="rounded-lg bg-stone-50 px-2 py-1.5">
+          <div className="text-stone-400">רבעוני</div>
+          <div className="font-bold text-stone-700">{quarterAvg}</div>
+          <div className={`font-bold ${color4(current, quarterAvg)}`}>{pctOf(current, quarterAvg)}</div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ComparisonCards({ comparison }: { comparison: ComparisonStats }) {
+  return (
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <ComparisonCard label="כניסות" current={comparison.current.pageViews} monthAvg={comparison.monthAvg.pageViews} quarterAvg={comparison.quarterAvg.pageViews} color="#3b82f6" />
+      <ComparisonCard label="צפיות בפרופיל" current={comparison.current.profileViews} monthAvg={comparison.monthAvg.profileViews} quarterAvg={comparison.quarterAvg.profileViews} color="#9333ea" />
+      <ComparisonCard label="פניות" current={comparison.current.contactClicks} monthAvg={comparison.monthAvg.contactClicks} quarterAvg={comparison.quarterAvg.contactClicks} color="#22c55e" />
+      <ComparisonCard label="סיומי שאלון" current={comparison.current.quizCompletions} monthAvg={comparison.monthAvg.quizCompletions} quarterAvg={comparison.quarterAvg.quizCompletions} color="#f59e0b" />
+    </div>
+  );
+}
+
 function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
   function concerns(t: SilentTherapist): string[] {
     const c: string[] = [];
@@ -187,6 +278,20 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
             <section>
               <h3 className="text-sm font-black text-[#0F5468] mb-2">סיכום</h3>
               <MarkdownText text={r.ai_summary} />
+            </section>
+          )}
+
+          {r.patient_data.comparison && (
+            <section>
+              <h3 className="text-sm font-black text-[#0F5468] mb-3">השבוע מול חודשי ורבעוני</h3>
+              <ComparisonCards comparison={r.patient_data.comparison} />
+            </section>
+          )}
+
+          {r.patient_data.trend && r.patient_data.trend.length > 1 && (
+            <section>
+              <h3 className="text-sm font-black text-[#0F5468] mb-3">מגמה — 13 שבועות אחרונים</h3>
+              <TrendChart trend={r.patient_data.trend} />
             </section>
           )}
 
