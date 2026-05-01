@@ -219,7 +219,10 @@ function buildIncompleteProfileEmailHtml(t: Therapist): string {
 }
 
 export async function GET(req: NextRequest) {
-  if (CRON_SECRET && req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+  if (!CRON_SECRET) {
+    return NextResponse.json({ ok: false, error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
+  }
+  if (req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
