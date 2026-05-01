@@ -118,6 +118,18 @@ async function aggregatePatientData(period: Period): Promise<PatientData> {
   };
 }
 
+type SilentTherapist = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  views: number;
+  clicks: number;
+  bio_length: number;
+  training_count: number;
+  region_count: number;
+  has_photo: boolean;
+};
+
 type TherapistData = {
   totalActive: number;
   paying: number;
@@ -128,21 +140,28 @@ type TherapistData = {
   byGender: { name: string; count: number }[];
   rareTrainingAreas: { name: string; count: number }[];
   newThisWeek: number;
+  silentPayingTherapists: SilentTherapist[];
+  invisiblePayingCount: number;
+  viewedNoClickPayingCount: number;
 };
 
 async function aggregateTherapistData(period: Period): Promise<TherapistData> {
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, status, therapist_types, training_areas, regions, gender, created_at")
+    .select("id, full_name, email, status, therapist_types, training_areas, regions, gender, bio, photo_url, created_at")
     .in("status", ["paying", "approved"]);
 
   const list = (therapists ?? []) as {
     id: string;
+    full_name: string | null;
+    email: string | null;
     status: string;
     therapist_types: string[] | null;
     training_areas: string[] | null;
     regions: string[] | null;
     gender: string | null;
+    bio: string | null;
+    photo_url: string | null;
     created_at: string;
   }[];
 
@@ -173,6 +192,52 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
 
   const sortedTraining = [...byTrainingArea].sort((a, b) => a.count - b.count);
 
+  // Per-therapist click + view counts for the week (paying only)
+  const payingList = list.filter(t => t.status === "paying");
+  const payingIds = payingList.map(t => t.id);
+
+  const [viewsRes, clicksRes] = await Promise.all([
+    supabaseAdmin
+      .from("therapist_profile_views")
+      .select("therapist_id")
+      .gte("viewed_at", period.since)
+      .lt("viewed_at", period.until)
+      .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("therapist_id")
+      .gte("clicked_at", period.since)
+      .lt("clicked_at", period.until)
+      .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
+  const viewsByT: Record<string, number> = {};
+  for (const v of (viewsRes.data ?? []) as { therapist_id: string }[]) {
+    viewsByT[v.therapist_id] = (viewsByT[v.therapist_id] ?? 0) + 1;
+  }
+  const clicksByT: Record<string, number> = {};
+  for (const c of (clicksRes.data ?? []) as { therapist_id: string }[]) {
+    clicksByT[c.therapist_id] = (clicksByT[c.therapist_id] ?? 0) + 1;
+  }
+
+  const silentPayingTherapists: SilentTherapist[] = payingList
+    .filter(t => (clicksByT[t.id] ?? 0) === 0)
+    .map(t => ({
+      id: t.id,
+      full_name: t.full_name ?? "—",
+      email: t.email,
+      views: viewsByT[t.id] ?? 0,
+      clicks: 0,
+      bio_length: (t.bio ?? "").length,
+      training_count: t.training_areas?.length ?? 0,
+      region_count: t.regions?.length ?? 0,
+      has_photo: Boolean(t.photo_url),
+    }))
+    .sort((a, b) => b.views - a.views);
+
+  const invisiblePayingCount = silentPayingTherapists.filter(t => t.views === 0).length;
+  const viewedNoClickPayingCount = silentPayingTherapists.filter(t => t.views > 0).length;
+
   return {
     totalActive: list.length,
     paying,
@@ -183,6 +248,9 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
     byGender: Object.entries(genderCounts).map(([name, count]) => ({ name, count })),
     rareTrainingAreas: sortedTraining.slice(0, 8),
     newThisWeek,
+    silentPayingTherapists,
+    invisiblePayingCount,
+    viewedNoClickPayingCount,
   };
 }
 
@@ -193,7 +261,7 @@ async function generateInsights(
   previous: { patient: PatientData; therapist: TherapistData },
   weekStart: string,
   weekEnd: string,
-): Promise<{ summary: string; recommendations: string }> {
+): Promise<{ summary: string; recommendations: string; silentTherapistsAdvice: string }> {
   const wow = {
     pageViews: diffPct(current.patient.pageViews, previous.patient.pageViews),
     profileViews: diffPct(current.patient.profileViews, previous.patient.profileViews),
@@ -245,15 +313,32 @@ ${JSON.stringify(current.therapist.byRegion, null, 2)}
 ### פילוח לפי מגדר:
 ${JSON.stringify(current.therapist.byGender, null, 2)}
 
+### מטפלים ממומנים שלא קיבלו אף פנייה השבוע (${current.therapist.silentPayingTherapists.length}):
+מתוכם ${current.therapist.invisiblePayingCount} בכלל לא נצפו (חוסר חשיפה), ${current.therapist.viewedNoClickPayingCount} נצפו אבל לא לחצו (חוסר המרה).
+${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => ({
+  שם: t.full_name,
+  צפיות: t.views,
+  אורך_ביו: t.bio_length,
+  תחומים: t.training_count,
+  אזורים: t.region_count,
+  תמונה: t.has_photo,
+})), null, 2)}
+
 ---
 
-אנא הפק שני חלקים נפרדים, בעברית פשוטה וברורה:
+אנא הפק שלושה חלקים נפרדים, בעברית פשוטה וברורה:
 
 **חלק 1 — סיכום השבוע (5-7 משפטים):**
 מצב כללי, מגמות בולטות מול השבוע הקודם, ושני-שלושה דברים שראויים לתשומת לב מיידית.
 
 **חלק 2 — המלצות פעולה ממוקדות (3-6 פעולות):**
 זהה גאפים בין ביקוש להיצע (אזורים/נושאים שמבוקשים אבל אין מספיק מטפלים, או להפך). תן המלצות קונקרטיות לפרסום ממוקד — מי הקהל (מטפלים או מטופלים), איזה אזור/תחום, ולמה. כל המלצה במשפט-שניים, עם הסבר מספרי קצר.
+
+**חלק 3 — מטפלים ממומנים בלי פניות:**
+התייחס ספציפית למטפלים שלא קיבלו אף פנייה השבוע. הפרד בין שתי קבוצות:
+- "לא נצפו בכלל" — בעיית חשיפה. הצע פעולות מוצריות (קידום במערכת ההתאמות, שיפור התאמת אזורים/תחומים בפרופיל, פרסום ממוקד באזור שלהם).
+- "נצפו אבל לא לחצו" — בעיית המרה. הצע פעולות שיפור פרופיל (ביו ארוך יותר, תמונה איכותית, הוספת תחומי הכשרה, ניסוח התמחות חד יותר).
+תן 3-5 פעולות קונקרטיות שאני יכול לבצע השבוע.
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
@@ -268,11 +353,14 @@ ${JSON.stringify(current.therapist.byGender, null, 2)}
 
   const text = completion.choices[0]?.message?.content ?? "";
 
-  const split = text.split(/\*\*חלק 2.*?\*\*/);
-  const summary = (split[0] ?? text).replace(/\*\*חלק 1.*?\*\*/, "").trim();
-  const recommendations = (split[1] ?? "").trim();
+  const part2Split = text.split(/\*\*חלק 2.*?\*\*/);
+  const summary = (part2Split[0] ?? text).replace(/\*\*חלק 1.*?\*\*/, "").trim();
+  const afterPart1 = part2Split[1] ?? "";
+  const part3Split = afterPart1.split(/\*\*חלק 3.*?\*\*/);
+  const recommendations = (part3Split[0] ?? "").trim();
+  const silentTherapistsAdvice = (part3Split[1] ?? "").trim();
 
-  return { summary, recommendations };
+  return { summary, recommendations, silentTherapistsAdvice };
 }
 
 // ── EMAIL ───────────────────────────────────────────────────────────
@@ -293,12 +381,50 @@ function mdToHtml(text: string): string {
     .replace(/$/, "</p>");
 }
 
+function buildSilentTherapistsTable(silent: SilentTherapist[]): string {
+  if (silent.length === 0) {
+    return `<p style="margin:8px 0;color:#22c55e;font-size:13px;">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת השבוע.</p>`;
+  }
+
+  const rows = silent.slice(0, 20).map(t => {
+    const concerns: string[] = [];
+    if (t.bio_length < 80) concerns.push("ביו קצר");
+    if (!t.has_photo) concerns.push("אין תמונה");
+    if (t.training_count <= 2) concerns.push("מעט תחומים");
+    if (t.region_count <= 1) concerns.push("מעט אזורים");
+    const flag = t.views === 0 ? "🔇 לא נצפה" : "👁️ נצפה — לא לחצו";
+    const flagColor = t.views === 0 ? "#dc2626" : "#d97706";
+    return `
+      <tr>
+        <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:13px;">${escapeHtml(t.full_name)}</td>
+        <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;color:${flagColor};font-size:11px;font-weight:bold;">${flag}</td>
+        <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${t.views}</td>
+        <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:11px;color:#888;">${concerns.length > 0 ? escapeHtml(concerns.join(" · ")) : "—"}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <table style="width:100%;border-collapse:collapse;margin:8px 0 16px;background:white;">
+      <thead>
+        <tr style="background:#f5f5f4;">
+          <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">מטפל</th>
+          <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">סטטוס</th>
+          <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפיות</th>
+          <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">דגלים בפרופיל</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+    ${silent.length > 20 ? `<p style="font-size:11px;color:#999;margin:0;">מציג 20 ראשונים מתוך ${silent.length}.</p>` : ""}
+  `;
+}
+
 function buildEmailHtml(
   weekStart: string,
   weekEnd: string,
   patient: PatientData,
   therapist: TherapistData,
-  insights: { summary: string; recommendations: string },
+  insights: { summary: string; recommendations: string; silentTherapistsAdvice: string },
 ): string {
   return `
     <div dir="rtl" style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#333;">
@@ -313,6 +439,16 @@ function buildEmailHtml(
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">המלצות פעולה</h2>
         ${mdToHtml(insights.recommendations)}
+
+        <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">
+          מטפלים ממומנים בלי פניות השבוע
+          <span style="font-size:13px;color:#888;font-weight:normal;">(${therapist.silentPayingTherapists.length})</span>
+        </h2>
+        <p style="font-size:12px;color:#666;margin:0 0 8px;">
+          🔇 ${therapist.invisiblePayingCount} לא נצפו בכלל · 👁️ ${therapist.viewedNoClickPayingCount} נצפו אבל לא יצרו קשר
+        </p>
+        ${buildSilentTherapistsTable(therapist.silentPayingTherapists)}
+        ${insights.silentTherapistsAdvice ? `<div style="background:white;padding:14px 16px;border-radius:8px;border:1px solid #e8e0d8;">${mdToHtml(insights.silentTherapistsAdvice)}</div>` : ""}
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מספרים מרכזיים</h2>
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
@@ -397,6 +533,7 @@ export async function GET(req: NextRequest) {
           therapist_data: therapist,
           ai_summary: insights.summary,
           ai_recommendations: insights.recommendations,
+          ai_silent_therapists_advice: insights.silentTherapistsAdvice,
           email_sent_to: REPORT_TO.join(", "),
           email_status: emailStatus,
         },

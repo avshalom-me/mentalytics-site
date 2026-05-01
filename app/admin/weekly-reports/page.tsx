@@ -19,6 +19,18 @@ type PatientData = {
   quizCompleted: { adults: number; kids: number };
 };
 
+type SilentTherapist = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  views: number;
+  clicks: number;
+  bio_length: number;
+  training_count: number;
+  region_count: number;
+  has_photo: boolean;
+};
+
 type TherapistData = {
   totalActive: number;
   paying: number;
@@ -29,6 +41,9 @@ type TherapistData = {
   byGender: FilterEntry[];
   rareTrainingAreas: FilterEntry[];
   newThisWeek: number;
+  silentPayingTherapists?: SilentTherapist[];
+  invisiblePayingCount?: number;
+  viewedNoClickPayingCount?: number;
 };
 
 type Report = {
@@ -39,6 +54,7 @@ type Report = {
   therapist_data: TherapistData;
   ai_summary: string | null;
   ai_recommendations: string | null;
+  ai_silent_therapists_advice: string | null;
   email_status: string | null;
   created_at: string;
 };
@@ -97,6 +113,52 @@ function MiniBars({ title, data, color = "#2e7d8c", limit = 6 }: { title: string
   );
 }
 
+function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
+  function concerns(t: SilentTherapist): string[] {
+    const c: string[] = [];
+    if (t.bio_length < 80) c.push("ביו קצר");
+    if (!t.has_photo) c.push("אין תמונה");
+    if (t.training_count <= 2) c.push("מעט תחומים");
+    if (t.region_count <= 1) c.push("מעט אזורים");
+    return c;
+  }
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white overflow-hidden">
+      <table className="w-full text-right text-sm">
+        <thead className="bg-stone-50 border-b border-stone-200 text-xs">
+          <tr>
+            <th className="px-3 py-2 font-semibold text-stone-500">מטפל</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">סטטוס</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפיות</th>
+            <th className="px-3 py-2 font-semibold text-stone-500">דגלים בפרופיל</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, 25).map(t => {
+            const flags = concerns(t);
+            const invisible = t.views === 0;
+            return (
+              <tr key={t.id} className="border-b border-stone-100">
+                <td className="px-3 py-2 font-semibold text-stone-800">{t.full_name}</td>
+                <td className="px-3 py-2 text-center">
+                  <span className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-bold ${invisible ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                    {invisible ? "🔇 לא נצפה" : "👁️ נצפה — לא לחצו"}
+                  </span>
+                </td>
+                <td className="px-3 py-2 text-center font-bold text-stone-700">{t.views}</td>
+                <td className="px-3 py-2 text-xs text-stone-500">{flags.length > 0 ? flags.join(" · ") : "—"}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      {rows.length > 25 && (
+        <p className="text-xs text-stone-400 px-3 py-2">מציג 25 ראשונים מתוך {rows.length}.</p>
+      )}
+    </div>
+  );
+}
+
 function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; onToggle: () => void }) {
   const week = `${r.week_start} – ${r.week_end}`;
   const sentOk = r.email_status === "sent";
@@ -132,6 +194,33 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
             <section>
               <h3 className="text-sm font-black text-[#0F5468] mb-2">המלצות פעולה</h3>
               <MarkdownText text={r.ai_recommendations} />
+            </section>
+          )}
+
+          {r.therapist_data.silentPayingTherapists && r.therapist_data.silentPayingTherapists.length > 0 && (
+            <section>
+              <h3 className="text-sm font-black text-[#0F5468] mb-2">
+                מטפלים ממומנים בלי פניות
+                <span className="mr-2 text-xs text-stone-400 font-normal">
+                  ({r.therapist_data.silentPayingTherapists.length})
+                </span>
+              </h3>
+              <p className="text-xs text-stone-500 mb-3">
+                🔇 {r.therapist_data.invisiblePayingCount ?? 0} לא נצפו · 👁️ {r.therapist_data.viewedNoClickPayingCount ?? 0} נצפו ולא לחצו
+              </p>
+              <SilentTherapistsTable rows={r.therapist_data.silentPayingTherapists} />
+              {r.ai_silent_therapists_advice && (
+                <div className="mt-3 rounded-xl border border-stone-200 bg-white p-4">
+                  <MarkdownText text={r.ai_silent_therapists_advice} />
+                </div>
+              )}
+            </section>
+          )}
+
+          {r.therapist_data.silentPayingTherapists && r.therapist_data.silentPayingTherapists.length === 0 && (
+            <section>
+              <h3 className="text-sm font-black text-[#0F5468] mb-2">מטפלים ממומנים בלי פניות</h3>
+              <p className="text-sm text-green-700">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת השבוע.</p>
             </section>
           )}
 
