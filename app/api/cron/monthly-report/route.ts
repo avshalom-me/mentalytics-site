@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { buildUnsubscribeUrl } from "@/app/lib/unsubscribe-token";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const CRON_SECRET = process.env.CRON_SECRET;
+const SITE_BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.mentalytics.co.il";
 
 type Therapist = {
   id: string;
@@ -123,7 +125,10 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
 
       <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
         <p>דו"ח זה נשלח אוטומטית למטפלים מקודמים ב&quot;טיפול חכם&quot;</p>
-        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468;">כניסה ללוח הבקרה</a>
+        <a href="${SITE_BASE_URL}/therapists/dashboard" style="color: #0F5468;">כניסה ללוח הבקרה</a>
+        <p style="margin-top:10px;font-size:11px;color:#bbb;">
+          <a href="${buildUnsubscribeUrl(SITE_BASE_URL, t.id)}" style="color:#999;text-decoration:underline;">הסרה מקבלת דוחות חודשיים</a>
+        </p>
       </div>
     </div>
   `;
@@ -173,7 +178,10 @@ function buildViewedOnlyEmailHtml(t: Therapist, views: number): string {
       </div>
 
       <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
-        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468; font-weight: bold;">לעריכת הפרופיל →</a>
+        <a href="${SITE_BASE_URL}/therapists/dashboard" style="color: #0F5468; font-weight: bold;">לעריכת הפרופיל →</a>
+        <p style="margin-top:10px;font-size:11px;color:#bbb;">
+          <a href="${buildUnsubscribeUrl(SITE_BASE_URL, t.id)}" style="color:#999;text-decoration:underline;">הסרה מקבלת דוחות חודשיים</a>
+        </p>
       </div>
     </div>
   `;
@@ -212,7 +220,10 @@ function buildIncompleteProfileEmailHtml(t: Therapist): string {
       </div>
 
       <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
-        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468; font-weight: bold;">להשלמת הפרופיל →</a>
+        <a href="${SITE_BASE_URL}/therapists/dashboard" style="color: #0F5468; font-weight: bold;">להשלמת הפרופיל →</a>
+        <p style="margin-top:10px;font-size:11px;color:#bbb;">
+          <a href="${buildUnsubscribeUrl(SITE_BASE_URL, t.id)}" style="color:#999;text-decoration:underline;">הסרה מקבלת דוחות חודשיים</a>
+        </p>
       </div>
     </div>
   `;
@@ -229,7 +240,8 @@ export async function GET(req: NextRequest) {
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
     .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status")
-    .eq("status", "paying");
+    .eq("status", "paying")
+    .eq("unsubscribed_from_stats", false);
 
   if (!therapists || therapists.length === 0) {
     return NextResponse.json({ ok: true, message: "No paying therapists", sent: 0 });
