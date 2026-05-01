@@ -370,6 +370,7 @@ type SilentTherapist = {
   training_count: number;
   region_count: number;
   has_photo: boolean;
+  days_promoted: number | null;
 };
 
 type TherapistData = {
@@ -392,7 +393,7 @@ type TherapistData = {
 async function aggregateTherapistData(period: Period): Promise<TherapistData> {
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, email, status, therapist_types, training_areas, regions, gender, bio, photo_url, created_at")
+    .select("id, full_name, email, status, therapist_types, training_areas, regions, gender, bio, photo_url, created_at, promoted_since")
     .in("status", ["paying", "approved"]);
 
   const list = (therapists ?? []) as {
@@ -407,6 +408,7 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
     bio: string | null;
     photo_url: string | null;
     created_at: string;
+    promoted_since: string | null;
   }[];
 
   const paying = list.filter(t => t.status === "paying").length;
@@ -464,6 +466,7 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
     clicksByT[c.therapist_id] = (clicksByT[c.therapist_id] ?? 0) + 1;
   }
 
+  const nowMs = Date.now();
   const silentPayingTherapists: SilentTherapist[] = payingList
     .filter(t => (clicksByT[t.id] ?? 0) === 0)
     .map(t => ({
@@ -476,8 +479,11 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
       training_count: t.training_areas?.length ?? 0,
       region_count: t.regions?.length ?? 0,
       has_photo: Boolean(t.photo_url),
+      days_promoted: t.promoted_since
+        ? Math.floor((nowMs - new Date(t.promoted_since).getTime()) / 86_400_000)
+        : null,
     }))
-    .sort((a, b) => b.views - a.views);
+    .sort((a, b) => (b.days_promoted ?? -1) - (a.days_promoted ?? -1));
 
   const invisiblePayingCount = silentPayingTherapists.filter(t => t.views === 0).length;
   const viewedNoClickPayingCount = silentPayingTherapists.filter(t => t.views > 0).length;
@@ -575,6 +581,7 @@ ${JSON.stringify(current.therapist.byGender, null, 2)}
 ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => ({
   שם: t.full_name,
   צפיות: t.views,
+  ימים_בקידום: t.days_promoted,
   אורך_ביו: t.bio_length,
   תחומים: t.training_count,
   אזורים: t.region_count,
@@ -595,6 +602,7 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
 התייחס ספציפית למטפלים שלא קיבלו אף פנייה ${N}. הפרד בין שתי קבוצות:
 - "לא נצפו בכלל" — בעיית חשיפה. הצע פעולות מוצריות (קידום במערכת ההתאמות, שיפור התאמת אזורים/תחומים בפרופיל, פרסום ממוקד באזור שלהם).
 - "נצפו אבל לא לחצו" — בעיית המרה. הצע פעולות שיפור פרופיל (ביו ארוך יותר, תמונה איכותית, הוספת תחומי הכשרה, ניסוח התמחות חד יותר).
+**חשוב במיוחד:** סמן את המטפלים שיותר מ-30 ימים בקידום ועדיין 0 פניות — אלה דורשים טיפול דחוף. אם יש כאלה ברשימה, הזכר אותם בשם ותן להם עדיפות.
 תן 3-5 פעולות קונקרטיות.
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
@@ -741,11 +749,19 @@ function buildSilentTherapistsTable(silent: SilentTherapist[], config: ReportCon
     if (t.region_count <= 1) concerns.push("מעט אזורים");
     const flag = t.views === 0 ? "🔇 לא נצפה" : "👁️ נצפה — לא לחצו";
     const flagColor = t.views === 0 ? "#dc2626" : "#d97706";
+    const daysHtml = t.days_promoted == null
+      ? "—"
+      : t.days_promoted >= 30
+        ? `<span style="color:#dc2626;font-weight:bold;">${t.days_promoted}</span>`
+        : t.days_promoted >= 14
+          ? `<span style="color:#d97706;font-weight:bold;">${t.days_promoted}</span>`
+          : `${t.days_promoted}`;
     return `
       <tr>
         <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:13px;">${escapeHtml(t.full_name)}</td>
         <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;color:${flagColor};font-size:11px;font-weight:bold;">${flag}</td>
         <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${t.views}</td>
+        <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:12px;">${daysHtml}</td>
         <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:11px;color:#888;">${concerns.length > 0 ? escapeHtml(concerns.join(" · ")) : "—"}</td>
       </tr>`;
   }).join("");
@@ -757,6 +773,7 @@ function buildSilentTherapistsTable(silent: SilentTherapist[], config: ReportCon
           <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">מטפל</th>
           <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">סטטוס</th>
           <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפיות</th>
+          <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">ימים בקידום</th>
           <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">דגלים בפרופיל</th>
         </tr>
       </thead>

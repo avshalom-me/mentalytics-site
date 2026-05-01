@@ -58,6 +58,7 @@ type SilentTherapist = {
   training_count: number;
   region_count: number;
   has_photo: boolean;
+  days_promoted: number | null;
 };
 
 type TherapistData = {
@@ -273,6 +274,7 @@ function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
             <th className="px-3 py-2 font-semibold text-stone-500">מטפל</th>
             <th className="px-3 py-2 font-semibold text-stone-500 text-center">סטטוס</th>
             <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפיות</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">ימים בקידום</th>
             <th className="px-3 py-2 font-semibold text-stone-500">דגלים בפרופיל</th>
           </tr>
         </thead>
@@ -280,6 +282,8 @@ function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
           {rows.slice(0, 25).map(t => {
             const flags = concerns(t);
             const invisible = t.views === 0;
+            const dp = t.days_promoted;
+            const dpCls = dp == null ? "text-stone-400" : dp >= 30 ? "text-red-600 font-bold" : dp >= 14 ? "text-amber-600 font-bold" : "text-stone-600";
             return (
               <tr key={t.id} className="border-b border-stone-100">
                 <td className="px-3 py-2 font-semibold text-stone-800">{t.full_name}</td>
@@ -289,6 +293,7 @@ function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
                   </span>
                 </td>
                 <td className="px-3 py-2 text-center font-bold text-stone-700">{t.views}</td>
+                <td className={`px-3 py-2 text-center ${dpCls}`}>{dp == null ? "—" : dp}</td>
                 <td className="px-3 py-2 text-xs text-stone-500">{flags.length > 0 ? flags.join(" · ") : "—"}</td>
               </tr>
             );

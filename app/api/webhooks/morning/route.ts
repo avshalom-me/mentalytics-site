@@ -101,7 +101,7 @@ async function handleSubscription(therapistId: string, custom: Record<string, st
 
   await supabase
     .from("therapists")
-    .update({ status: "paying", manually_promoted: false })
+    .update({ status: "paying", manually_promoted: false, promoted_since: new Date().toISOString() })
     .eq("id", therapistId);
 
   console.log(`Subscription activated for therapist ${therapistId}`);
