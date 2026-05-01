@@ -290,7 +290,7 @@ export default function WeeklyReportsPage() {
     setRunning(true);
     setRunMsg("");
     try {
-      const r = await fetch("/api/cron/weekly-report", { cache: "no-store" });
+      const r = await fetch("/api/admin-trigger-weekly-report", { method: "POST", cache: "no-store" });
       const json = await r.json();
       if (json.ok) {
         setRunMsg(`הופק דוח לשבוע ${json.week_start} (${json.emailStatus})`);
