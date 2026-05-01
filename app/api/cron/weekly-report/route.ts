@@ -393,7 +393,7 @@ type TherapistData = {
 async function aggregateTherapistData(period: Period): Promise<TherapistData> {
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, email, status, therapist_types, training_areas, regions, gender, bio, photo_url, created_at, promoted_since")
+    .select("id, full_name, email, status, therapist_types, training_areas, regions, gender, bio, profile_photo_path, created_at, promoted_since")
     .in("status", ["paying", "approved"]);
 
   const list = (therapists ?? []) as {
@@ -406,7 +406,7 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
     regions: string[] | null;
     gender: string | null;
     bio: string | null;
-    photo_url: string | null;
+    profile_photo_path: string | null;
     created_at: string;
     promoted_since: string | null;
   }[];
@@ -478,7 +478,7 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
       bio_length: (t.bio ?? "").length,
       training_count: t.training_areas?.length ?? 0,
       region_count: t.regions?.length ?? 0,
-      has_photo: Boolean(t.photo_url),
+      has_photo: Boolean(t.profile_photo_path),
       days_promoted: t.promoted_since
         ? Math.floor((nowMs - new Date(t.promoted_since).getTime()) / 86_400_000)
         : null,
