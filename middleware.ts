@@ -35,5 +35,7 @@ export const config = {
     "/api/admin-analytics/:path*",
     "/api/admin-weekly-reports/:path*",
     "/api/admin-trigger-weekly-report/:path*",
+    "/api/admin-monthly-reports/:path*",
+    "/api/admin-trigger-monthly-report/:path*",
   ],
 };

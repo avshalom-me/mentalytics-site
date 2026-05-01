@@ -15,14 +15,54 @@ const REPORT_TO = (process.env.WEEKLY_REPORT_TO ?? "avshalom84@gmail.com,tpool40
   .filter(Boolean);
 
 type Period = { since: string; until: string };
+export type ReportType = "weekly" | "monthly";
 
-function getWeekRange(weeksAgo = 0): Period {
+const REPORT_DAYS: Record<ReportType, number> = { weekly: 7, monthly: 30 };
+
+function getRange(periodsAgo: number, periodDays: number): Period {
   const now = Date.now();
-  const ms = 7 * 86_400_000;
-  const until = new Date(now - weeksAgo * ms).toISOString();
-  const since = new Date(now - (weeksAgo + 1) * ms).toISOString();
+  const ms = periodDays * 86_400_000;
+  const until = new Date(now - periodsAgo * ms).toISOString();
+  const since = new Date(now - (periodsAgo + 1) * ms).toISOString();
   return { since, until };
 }
+
+type ReportConfig = {
+  type: ReportType;
+  table: "weekly_reports" | "monthly_admin_reports";
+  startCol: "week_start" | "month_start";
+  endCol: "week_end" | "month_end";
+  periodLabel: string; // "שבועי" / "חודשי"
+  periodNoun: string;  // "השבוע" / "החודש"
+  prevLabel: string;   // "השבוע הקודם" / "החודש הקודם"
+  midAvgLabel: string; // "ממוצע חודשי" / "ממוצע 3-חודשי"
+  longAvgLabel: string; // "ממוצע רבעוני" / "ממוצע חצי שנתי"
+};
+
+const CONFIGS: Record<ReportType, ReportConfig> = {
+  weekly: {
+    type: "weekly",
+    table: "weekly_reports",
+    startCol: "week_start",
+    endCol: "week_end",
+    periodLabel: "שבועי",
+    periodNoun: "השבוע",
+    prevLabel: "השבוע הקודם",
+    midAvgLabel: "ממוצע 4-שבועי",
+    longAvgLabel: "ממוצע 12-שבועי",
+  },
+  monthly: {
+    type: "monthly",
+    table: "monthly_admin_reports",
+    startCol: "month_start",
+    endCol: "month_end",
+    periodLabel: "חודשי",
+    periodNoun: "החודש",
+    prevLabel: "החודש הקודם",
+    midAvgLabel: "ממוצע 3-חודשי",
+    longAvgLabel: "ממוצע 6-חודשי",
+  },
+};
 
 function topN<T extends { name: string; count: number }>(rows: T[], n: number): T[] {
   return [...rows].sort((a, b) => b.count - a.count).slice(0, n);
@@ -40,19 +80,22 @@ function avg(arr: number[]): number {
 
 // ── DATA AGGREGATORS ────────────────────────────────────────────────
 
-const TREND_WEEKS = 13;
+const WEEKLY_TREND_BUCKETS = 13;
+const WEEKLY_TREND_BUCKET_DAYS = 7;
+const MONTHLY_TREND_BUCKETS = 6;
+const MONTHLY_TREND_BUCKET_DAYS = 30;
 
 type TrendPoint = {
-  week_start: string;
+  week_start: string; // bucket start date (kept name for backwards compat with stored data)
   pageViews: number;
   profileViews: number;
   contactClicks: number;
   quizCompletions: number;
 };
 
-async function aggregate13WeekTrend(now: Date): Promise<TrendPoint[]> {
-  const weeksMs = TREND_WEEKS * 7 * 86_400_000;
-  const since = new Date(now.getTime() - weeksMs).toISOString();
+async function aggregateTrend(now: Date, bucketDays: number, numBuckets: number): Promise<TrendPoint[]> {
+  const totalMs = bucketDays * numBuckets * 86_400_000;
+  const since = new Date(now.getTime() - totalMs).toISOString();
   const until = now.toISOString();
 
   const [eventsRes, viewsRes, clicksRes] = await Promise.all([
@@ -74,13 +117,12 @@ async function aggregate13WeekTrend(now: Date): Promise<TrendPoint[]> {
       .lt("clicked_at", until),
   ]);
 
-  // Bucket index 0 = oldest, TREND_WEEKS - 1 = current week
   const buckets: TrendPoint[] = [];
-  for (let i = TREND_WEEKS - 1; i >= 0; i--) {
-    const weekEnd = new Date(now.getTime() - i * 7 * 86_400_000);
-    const weekStart = new Date(weekEnd.getTime() - 7 * 86_400_000);
+  for (let i = numBuckets - 1; i >= 0; i--) {
+    const bucketEnd = new Date(now.getTime() - i * bucketDays * 86_400_000);
+    const bucketStart = new Date(bucketEnd.getTime() - bucketDays * 86_400_000);
     buckets.push({
-      week_start: weekStart.toISOString().slice(0, 10),
+      week_start: bucketStart.toISOString().slice(0, 10),
       pageViews: 0,
       profileViews: 0,
       contactClicks: 0,
@@ -90,23 +132,24 @@ async function aggregate13WeekTrend(now: Date): Promise<TrendPoint[]> {
 
   function bucketIdx(dateStr: string): number {
     const d = new Date(dateStr).getTime();
-    const diffWeeks = Math.floor((now.getTime() - d) / (7 * 86_400_000));
-    return TREND_WEEKS - 1 - diffWeeks;
+    const diffDays = Math.floor((now.getTime() - d) / 86_400_000);
+    const periodsAgo = Math.floor(diffDays / bucketDays);
+    return numBuckets - 1 - periodsAgo;
   }
 
   for (const e of (eventsRes.data ?? []) as { event_type: string; created_at: string }[]) {
     const i = bucketIdx(e.created_at);
-    if (i < 0 || i >= TREND_WEEKS) continue;
+    if (i < 0 || i >= numBuckets) continue;
     if (e.event_type === "page_view") buckets[i].pageViews++;
     if (e.event_type === "quiz_complete") buckets[i].quizCompletions++;
   }
   for (const v of (viewsRes.data ?? []) as { viewed_at: string }[]) {
     const i = bucketIdx(v.viewed_at);
-    if (i >= 0 && i < TREND_WEEKS) buckets[i].profileViews++;
+    if (i >= 0 && i < numBuckets) buckets[i].profileViews++;
   }
   for (const c of (clicksRes.data ?? []) as { clicked_at: string }[]) {
     const i = bucketIdx(c.clicked_at);
-    if (i >= 0 && i < TREND_WEEKS) buckets[i].contactClicks++;
+    if (i >= 0 && i < numBuckets) buckets[i].contactClicks++;
   }
 
   return buckets;
@@ -232,6 +275,91 @@ async function aggregatePatientData(period: Period): Promise<PatientData> {
   };
 }
 
+type TherapistWeeklyTrend = {
+  id: string;
+  full_name: string;
+  weeklyClicks: number[];
+  currentWeek: number;
+  prior4WeekAvg: number;
+  changePct: number | null;
+  category: "grower" | "decliner" | "stalled" | "new" | "stable";
+};
+
+async function aggregateTherapistWeeklyTrends(now: Date): Promise<TherapistWeeklyTrend[]> {
+  const weeksMs = WEEKLY_TREND_BUCKETS * 7 * 86_400_000;
+  const since = new Date(now.getTime() - weeksMs).toISOString();
+  const until = now.toISOString();
+
+  const [therapistsRes, clicksRes] = await Promise.all([
+    supabaseAdmin
+      .from("therapists")
+      .select("id, full_name")
+      .eq("status", "paying"),
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("therapist_id, clicked_at")
+      .gte("clicked_at", since)
+      .lt("clicked_at", until),
+  ]);
+
+  const therapists = (therapistsRes.data ?? []) as { id: string; full_name: string | null }[];
+  const clicks = (clicksRes.data ?? []) as { therapist_id: string; clicked_at: string }[];
+
+  function bucketIdx(d: string): number {
+    const t = new Date(d).getTime();
+    const diffWeeks = Math.floor((now.getTime() - t) / (7 * 86_400_000));
+    return WEEKLY_TREND_BUCKETS - 1 - diffWeeks;
+  }
+
+  const byTherapist = new Map<string, number[]>();
+  for (const t of therapists) {
+    byTherapist.set(t.id, new Array(WEEKLY_TREND_BUCKETS).fill(0));
+  }
+  for (const c of clicks) {
+    const arr = byTherapist.get(c.therapist_id);
+    if (!arr) continue;
+    const i = bucketIdx(c.clicked_at);
+    if (i >= 0 && i < WEEKLY_TREND_BUCKETS) arr[i]++;
+  }
+
+  const trends: TherapistWeeklyTrend[] = [];
+  for (const t of therapists) {
+    const weekly = byTherapist.get(t.id) ?? new Array(WEEKLY_TREND_BUCKETS).fill(0);
+    const current = weekly[weekly.length - 1] ?? 0;
+    const prior4 = weekly.slice(-5, -1);
+    const prior4Avg = avg(prior4);
+
+    let category: TherapistWeeklyTrend["category"];
+    let changePct: number | null = null;
+
+    if (prior4Avg === 0 && current === 0) {
+      category = "stable";
+    } else if (prior4Avg === 0) {
+      category = "new";
+    } else if (current === 0) {
+      category = "stalled";
+      changePct = -100;
+    } else {
+      changePct = Math.round(((current - prior4Avg) / prior4Avg) * 100);
+      if (changePct >= 25) category = "grower";
+      else if (changePct <= -25) category = "decliner";
+      else category = "stable";
+    }
+
+    trends.push({
+      id: t.id,
+      full_name: t.full_name ?? "—",
+      weeklyClicks: weekly,
+      currentWeek: current,
+      prior4WeekAvg: Math.round(prior4Avg),
+      changePct,
+      category,
+    });
+  }
+
+  return trends;
+}
+
 type SilentTherapist = {
   id: string;
   full_name: string;
@@ -257,6 +385,8 @@ type TherapistData = {
   silentPayingTherapists: SilentTherapist[];
   invisiblePayingCount: number;
   viewedNoClickPayingCount: number;
+  growers?: TherapistWeeklyTrend[];
+  decliners?: TherapistWeeklyTrend[];
 };
 
 async function aggregateTherapistData(period: Period): Promise<TherapistData> {
@@ -373,8 +503,9 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
 async function generateInsights(
   current: { patient: PatientData; therapist: TherapistData },
   previous: { patient: PatientData; therapist: TherapistData },
-  weekStart: string,
-  weekEnd: string,
+  periodStart: string,
+  periodEnd: string,
+  config: ReportConfig,
 ): Promise<{ summary: string; recommendations: string; silentTherapistsAdvice: string }> {
   const wow = {
     pageViews: diffPct(current.patient.pageViews, previous.patient.pageViews),
@@ -384,20 +515,22 @@ async function generateInsights(
     quizCompletedKids: diffPct(current.patient.quizCompleted.kids, previous.patient.quizCompleted.kids),
   };
 
-  const prompt = `אתה אנליסט מוצר עבור "טיפול חכם" — פלטפורמה ישראלית לחיבור בין מטופלים למטפלים. אני מנהל המוצר וקיבלת את נתוני השבוע האחרון.
+  const N = config.periodNoun; // "השבוע" / "החודש"
 
-תקופה: ${weekStart} עד ${weekEnd}
+  const prompt = `אתה אנליסט מוצר עבור "טיפול חכם" — פלטפורמה ישראלית לחיבור בין מטופלים למטפלים. אני מנהל המוצר וקיבלת את הנתונים האחרונים (${config.periodLabel}).
 
-## נתוני השבוע (ביקוש מצד מטופלים פוטנציאליים)
-- כניסות לדירקטוריה: ${current.patient.pageViews} (שינוי מהשבוע הקודם: ${wow.pageViews}%)
+תקופה: ${periodStart} עד ${periodEnd}
+
+## נתוני ${N} (ביקוש מצד מטופלים פוטנציאליים)
+- כניסות לדירקטוריה: ${current.patient.pageViews} (שינוי מ${config.prevLabel}: ${wow.pageViews}%)
 - צפיות בפרופילים: ${current.patient.profileViews} (שינוי: ${wow.profileViews}%)
 - לחיצות יצירת קשר: ${current.patient.contactClicks} (שינוי: ${wow.contactClicks}%)
 - שאלון מבוגרים — סיומים: ${current.patient.quizCompleted.adults} (שינוי: ${wow.quizCompletedAdults}%)
 - שאלון ילדים — סיומים: ${current.patient.quizCompleted.kids} (שינוי: ${wow.quizCompletedKids}%)
 
-### השוואה לממוצעים ארוכי טווח (ממוצעים שבועיים, לא כולל השבוע הנוכחי):
+### השוואה לממוצעים ארוכי טווח (ממוצעים, לא כולל ${N} הנוכחי):
 ${current.patient.comparison ? `
-| מדד | השבוע | ממוצע חודשי (4w) | ממוצע רבעוני (12w) |
+| מדד | ${N} | ${config.midAvgLabel} | ${config.longAvgLabel} |
 | --- | --- | --- | --- |
 | כניסות | ${current.patient.comparison.current.pageViews} | ${current.patient.comparison.monthAvg.pageViews} | ${current.patient.comparison.quarterAvg.pageViews} |
 | צפיות בפרופיל | ${current.patient.comparison.current.profileViews} | ${current.patient.comparison.monthAvg.profileViews} | ${current.patient.comparison.quarterAvg.profileViews} |
@@ -437,7 +570,7 @@ ${JSON.stringify(current.therapist.byRegion, null, 2)}
 ### פילוח לפי מגדר:
 ${JSON.stringify(current.therapist.byGender, null, 2)}
 
-### מטפלים ממומנים שלא קיבלו אף פנייה השבוע (${current.therapist.silentPayingTherapists.length}):
+### מטפלים ממומנים שלא קיבלו אף פנייה ${N} (${current.therapist.silentPayingTherapists.length}):
 מתוכם ${current.therapist.invisiblePayingCount} בכלל לא נצפו (חוסר חשיפה), ${current.therapist.viewedNoClickPayingCount} נצפו אבל לא לחצו (חוסר המרה).
 ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => ({
   שם: t.full_name,
@@ -452,17 +585,17 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
 
 אנא הפק שלושה חלקים נפרדים, בעברית פשוטה וברורה:
 
-**חלק 1 — סיכום השבוע (5-7 משפטים):**
-מצב כללי, מגמות בולטות מול השבוע הקודם **וגם מול הממוצעים החודשי והרבעוני**, ושני-שלושה דברים שראויים לתשומת לב מיידית. אם השבוע חריג כלפי מעלה או מטה ביחס לרבעון, ציין זאת מפורשות.
+**חלק 1 — סיכום ${N} (5-7 משפטים):**
+מצב כללי, מגמות בולטות מול ${config.prevLabel} **וגם מול הממוצעים ארוכי הטווח**, ושני-שלושה דברים שראויים לתשומת לב מיידית. אם ${N} חריג כלפי מעלה או מטה ביחס לממוצע, ציין זאת מפורשות.
 
 **חלק 2 — המלצות פעולה ממוקדות (3-6 פעולות):**
 זהה גאפים בין ביקוש להיצע (אזורים/נושאים שמבוקשים אבל אין מספיק מטפלים, או להפך). תן המלצות קונקרטיות לפרסום ממוקד — מי הקהל (מטפלים או מטופלים), איזה אזור/תחום, ולמה. כל המלצה במשפט-שניים, עם הסבר מספרי קצר.
 
 **חלק 3 — מטפלים ממומנים בלי פניות:**
-התייחס ספציפית למטפלים שלא קיבלו אף פנייה השבוע. הפרד בין שתי קבוצות:
+התייחס ספציפית למטפלים שלא קיבלו אף פנייה ${N}. הפרד בין שתי קבוצות:
 - "לא נצפו בכלל" — בעיית חשיפה. הצע פעולות מוצריות (קידום במערכת ההתאמות, שיפור התאמת אזורים/תחומים בפרופיל, פרסום ממוקד באזור שלהם).
 - "נצפו אבל לא לחצו" — בעיית המרה. הצע פעולות שיפור פרופיל (ביו ארוך יותר, תמונה איכותית, הוספת תחומי הכשרה, ניסוח התמחות חד יותר).
-תן 3-5 פעולות קונקרטיות שאני יכול לבצע השבוע.
+תן 3-5 פעולות קונקרטיות.
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
@@ -515,7 +648,7 @@ function buildSparkline(values: number[], color: string): string {
   return `<table cellpadding="0" cellspacing="0" style="width:100%;height:42px;border-collapse:collapse;"><tr style="height:42px;">${bars}</tr></table>`;
 }
 
-function buildTrendSection(trend: TrendPoint[], comparison: ComparisonStats): string {
+function buildTrendSection(trend: TrendPoint[], comparison: ComparisonStats, config: ReportConfig): string {
   if (trend.length === 0) return "";
 
   const rows = [
@@ -543,26 +676,61 @@ function buildTrendSection(trend: TrendPoint[], comparison: ComparisonStats): st
     </tr>
   `).join("");
 
+  const trendLabel = config.type === "weekly" ? `${trend.length} שבועות אחרונים` : `${trend.length} חודשים אחרונים`;
+
   return `
     <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e8e0d8;border-radius:8px;overflow:hidden;">
       <thead>
         <tr style="background:#f5f5f4;">
           <th style="padding:8px;text-align:right;font-size:11px;color:#666;font-weight:bold;">מדד</th>
-          <th style="padding:8px;text-align:right;font-size:11px;color:#666;font-weight:bold;">${TREND_WEEKS} שבועות אחרונים</th>
-          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">השבוע</th>
-          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">חודשי*</th>
-          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">רבעוני*</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#666;font-weight:bold;">${trendLabel}</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">${config.periodNoun}</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">${config.midAvgLabel}*</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">${config.longAvgLabel}*</th>
         </tr>
       </thead>
       <tbody>${rowsHtml}</tbody>
     </table>
-    <p style="font-size:10px;color:#aaa;margin:6px 0 0;">* ממוצעים שבועיים בתקופה (ללא השבוע הנוכחי)</p>
+    <p style="font-size:10px;color:#aaa;margin:6px 0 0;">* ללא ${config.periodNoun} הנוכחי</p>
   `;
 }
 
-function buildSilentTherapistsTable(silent: SilentTherapist[]): string {
+function buildTherapistTrendTable(rows: TherapistWeeklyTrend[], direction: "up" | "down", config: ReportConfig): string {
+  if (rows.length === 0) {
+    const msg = direction === "up" ? `אין מטפלים בולטים בעלייה ${config.periodNoun}.` : `אין מטפלים בולטים בירידה ${config.periodNoun}.`;
+    return `<p style="font-size:12px;color:#888;margin:6px 0;">${msg}</p>`;
+  }
+  const arrow = direction === "up" ? "▲" : "▼";
+  const arrowColor = direction === "up" ? "#22c55e" : "#ef4444";
+
+  const tr = rows.map(r => {
+    const pct = r.changePct == null ? "חדש" : `${arrow} ${Math.abs(r.changePct)}%`;
+    return `
+      <tr>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;font-size:13px;">${escapeHtml(r.full_name)}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-size:13px;font-weight:bold;">${r.currentWeek}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;color:#666;">${r.prior4WeekAvg}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:center;font-size:12px;font-weight:bold;color:${arrowColor};">${pct}</td>
+      </tr>`;
+  }).join("");
+
+  return `
+    <table style="width:100%;border-collapse:collapse;background:white;">
+      <thead>
+        <tr style="background:#f5f5f4;">
+          <th style="padding:6px 10px;text-align:right;font-size:11px;color:#666;">מטפל</th>
+          <th style="padding:6px 10px;text-align:center;font-size:11px;color:#666;">${config.periodNoun}</th>
+          <th style="padding:6px 10px;text-align:center;font-size:11px;color:#666;">${config.midAvgLabel}</th>
+          <th style="padding:6px 10px;text-align:center;font-size:11px;color:#666;">שינוי</th>
+        </tr>
+      </thead>
+      <tbody>${tr}</tbody>
+    </table>`;
+}
+
+function buildSilentTherapistsTable(silent: SilentTherapist[], config: ReportConfig): string {
   if (silent.length === 0) {
-    return `<p style="margin:8px 0;color:#22c55e;font-size:13px;">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת השבוע.</p>`;
+    return `<p style="margin:8px 0;color:#22c55e;font-size:13px;">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת ${config.periodNoun}.</p>`;
   }
 
   const rows = silent.slice(0, 20).map(t => {
@@ -599,17 +767,22 @@ function buildSilentTherapistsTable(silent: SilentTherapist[]): string {
 }
 
 function buildEmailHtml(
-  weekStart: string,
-  weekEnd: string,
+  periodStart: string,
+  periodEnd: string,
   patient: PatientData,
   therapist: TherapistData,
   insights: { summary: string; recommendations: string; silentTherapistsAdvice: string },
+  config: ReportConfig,
 ): string {
+  const trendBucketLabel = config.type === "weekly" ? "שבועות" : "חודשים";
+  const dashboardLink = config.type === "weekly"
+    ? "https://www.mentalytics.co.il/admin/weekly-reports"
+    : "https://www.mentalytics.co.il/admin/monthly-reports";
   return `
     <div dir="rtl" style="font-family:Arial,sans-serif;max-width:680px;margin:0 auto;color:#333;">
       <div style="background:linear-gradient(135deg,#0F5468,#2e7d8c);padding:24px 32px;border-radius:12px 12px 0 0;">
-        <h1 style="color:white;margin:0;font-size:22px;">דוח שבועי — טיפול חכם</h1>
-        <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">${weekStart} עד ${weekEnd}</p>
+        <h1 style="color:white;margin:0;font-size:22px;">דוח ${config.periodLabel} — טיפול חכם</h1>
+        <p style="color:rgba(255,255,255,0.85);margin:6px 0 0;font-size:14px;">${periodStart} עד ${periodEnd}</p>
       </div>
 
       <div style="background:#f9f8f6;padding:24px 32px;border:1px solid #e8e0d8;border-top:0;">
@@ -617,21 +790,27 @@ function buildEmailHtml(
         ${mdToHtml(insights.summary)}
 
         ${patient.trend && patient.comparison ? `
-          <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מגמה ${TREND_WEEKS} שבועות והשוואה</h2>
-          ${buildTrendSection(patient.trend, patient.comparison)}
+          <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מגמה ${patient.trend.length} ${trendBucketLabel} והשוואה</h2>
+          ${buildTrendSection(patient.trend, patient.comparison, config)}
         ` : ""}
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">המלצות פעולה</h2>
         ${mdToHtml(insights.recommendations)}
 
+        <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מטפלים בעלייה (vs ${config.midAvgLabel})</h2>
+        ${buildTherapistTrendTable(therapist.growers ?? [], "up", config)}
+
+        <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מטפלים בירידה (vs ${config.midAvgLabel})</h2>
+        ${buildTherapistTrendTable(therapist.decliners ?? [], "down", config)}
+
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">
-          מטפלים ממומנים בלי פניות השבוע
+          מטפלים ממומנים בלי פניות ${config.periodNoun}
           <span style="font-size:13px;color:#888;font-weight:normal;">(${therapist.silentPayingTherapists.length})</span>
         </h2>
         <p style="font-size:12px;color:#666;margin:0 0 8px;">
           🔇 ${therapist.invisiblePayingCount} לא נצפו בכלל · 👁️ ${therapist.viewedNoClickPayingCount} נצפו אבל לא יצרו קשר
         </p>
-        ${buildSilentTherapistsTable(therapist.silentPayingTherapists)}
+        ${buildSilentTherapistsTable(therapist.silentPayingTherapists, config)}
         ${insights.silentTherapistsAdvice ? `<div style="background:white;padding:14px 16px;border-radius:8px;border:1px solid #e8e0d8;">${mdToHtml(insights.silentTherapistsAdvice)}</div>` : ""}
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מספרים מרכזיים</h2>
@@ -654,7 +833,7 @@ function buildEmailHtml(
       </div>
 
       <div style="padding:14px 32px;text-align:center;font-size:12px;color:#999;border:1px solid #e8e0d8;border-top:0;border-radius:0 0 12px 12px;">
-        <a href="https://www.mentalytics.co.il/admin/weekly-reports" style="color:#0F5468;">צפייה בכל הדוחות הקודמים</a>
+        <a href="${dashboardLink}" style="color:#0F5468;">צפייה בכל הדוחות הקודמים</a>
       </div>
     </div>
   `;
@@ -662,35 +841,51 @@ function buildEmailHtml(
 
 // ── MAIN ────────────────────────────────────────────────────────────
 
-export async function runWeeklyReport(): Promise<{
+export async function runReport(type: ReportType): Promise<{
   ok: boolean;
-  week_start?: string;
+  period_start?: string;
   emailStatus?: string;
   error?: string;
   status?: number;
 }> {
+  const config = CONFIGS[type];
+  const periodDays = REPORT_DAYS[type];
+  const trendBuckets = type === "weekly" ? WEEKLY_TREND_BUCKETS : MONTHLY_TREND_BUCKETS;
+  const trendBucketDays = type === "weekly" ? WEEKLY_TREND_BUCKET_DAYS : MONTHLY_TREND_BUCKET_DAYS;
+
   try {
-    const current = getWeekRange(0);
-    const previous = getWeekRange(1);
+    const current = getRange(0, periodDays);
+    const previous = getRange(1, periodDays);
     const now = new Date();
 
-    const [patient, therapist, prevPatient, prevTherapist, trend] = await Promise.all([
+    const [patient, therapist, prevPatient, prevTherapist, trend, therapistTrends] = await Promise.all([
       aggregatePatientData(current),
       aggregateTherapistData(current),
       aggregatePatientData(previous),
       aggregateTherapistData(previous),
-      aggregate13WeekTrend(now),
+      aggregateTrend(now, trendBucketDays, trendBuckets),
+      aggregateTherapistWeeklyTrends(now),
     ]);
 
     const comparison = computeComparison(trend);
     patient.trend = trend;
     patient.comparison = comparison;
 
+    therapist.growers = therapistTrends
+      .filter(t => t.category === "grower" || t.category === "new")
+      .sort((a, b) => (b.changePct ?? 9999) - (a.changePct ?? 9999))
+      .slice(0, 5);
+    therapist.decliners = therapistTrends
+      .filter(t => t.category === "decliner" || t.category === "stalled")
+      .sort((a, b) => (a.changePct ?? -9999) - (b.changePct ?? -9999))
+      .slice(0, 5);
+
     const insights = await generateInsights(
       { patient, therapist },
       { patient: prevPatient, therapist: prevTherapist },
       current.since.slice(0, 10),
       current.until.slice(0, 10),
+      config,
     );
 
     const html = buildEmailHtml(
@@ -699,6 +894,7 @@ export async function runWeeklyReport(): Promise<{
       patient,
       therapist,
       insights,
+      config,
     );
 
     let emailStatus = "sent";
@@ -706,7 +902,7 @@ export async function runWeeklyReport(): Promise<{
       await resend.emails.send({
         from: "טיפול חכם <noreply@mentalytics.co.il>",
         to: REPORT_TO,
-        subject: `דוח שבועי — ${current.since.slice(0, 10)} עד ${current.until.slice(0, 10)}`,
+        subject: `דוח ${config.periodLabel} — ${current.since.slice(0, 10)} עד ${current.until.slice(0, 10)}`,
         html,
       });
     } catch (e) {
@@ -714,11 +910,11 @@ export async function runWeeklyReport(): Promise<{
     }
 
     const { error: insertErr } = await supabaseAdmin
-      .from("weekly_reports")
+      .from(config.table)
       .upsert(
         {
-          week_start: current.since.slice(0, 10),
-          week_end: current.until.slice(0, 10),
+          [config.startCol]: current.since.slice(0, 10),
+          [config.endCol]: current.until.slice(0, 10),
           patient_data: patient,
           therapist_data: therapist,
           ai_summary: insights.summary,
@@ -727,18 +923,21 @@ export async function runWeeklyReport(): Promise<{
           email_sent_to: REPORT_TO.join(", "),
           email_status: emailStatus,
         },
-        { onConflict: "week_start" },
+        { onConflict: config.startCol },
       );
 
     if (insertErr) {
       return { ok: false, error: `DB save failed: ${insertErr.message}`, emailStatus, status: 500 };
     }
 
-    return { ok: true, week_start: current.since.slice(0, 10), emailStatus };
+    return { ok: true, period_start: current.since.slice(0, 10), emailStatus };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Unknown error", status: 500 };
   }
 }
+
+// Backwards-compat alias for the existing admin trigger.
+export const runWeeklyReport = () => runReport("weekly");
 
 export async function GET(req: NextRequest) {
   const isVercelCron = req.headers.get("user-agent")?.includes("vercel-cron");
@@ -746,7 +945,7 @@ export async function GET(req: NextRequest) {
   if (!isVercelCron && !hasSecret) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
-  const result = await runWeeklyReport();
+  const result = await runReport("weekly");
   const { status, ...body } = result;
   return NextResponse.json(body, { status: status ?? 200 });
 }

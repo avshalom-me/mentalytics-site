@@ -8,7 +8,7 @@ import {
 type FilterEntry = { name: string; count: number };
 
 type TrendPoint = {
-  week_start: string;
+  week_start: string; // bucket start date (kept name for backwards compat with weekly trend type)
   pageViews: number;
   profileViews: number;
   contactClicks: number;
@@ -79,8 +79,8 @@ type TherapistData = {
 
 type Report = {
   id: string;
-  week_start: string;
-  week_end: string;
+  month_start: string;
+  month_end: string;
   patient_data: PatientData;
   therapist_data: TherapistData;
   ai_summary: string | null;
@@ -146,13 +146,13 @@ function MiniBars({ title, data, color = "#2e7d8c", limit = 6 }: { title: string
 
 function TrendChart({ trend }: { trend: TrendPoint[] }) {
   if (!trend || trend.length === 0) return null;
-  const data = trend.map(t => ({ ...t, week: t.week_start.slice(5) }));
+  const data = trend.map(t => ({ ...t, label: t.week_start.slice(5) }));
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-4">
       <ResponsiveContainer width="100%" height={240}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
-          <XAxis dataKey="week" tick={{ fontSize: 10, fill: "#78716c" }} />
+          <XAxis dataKey="label" tick={{ fontSize: 10, fill: "#78716c" }} />
           <YAxis tick={{ fontSize: 10, fill: "#78716c" }} />
           <Tooltip contentStyle={{ fontFamily: "Heebo", fontSize: 12, direction: "rtl" }} />
           <Legend wrapperStyle={{ fontSize: 11, fontFamily: "Heebo" }} />
@@ -191,12 +191,12 @@ function ComparisonCard({ label, current, monthAvg, quarterAvg, color }: {
       <div className="text-2xl font-black text-stone-900 mb-2">{current.toLocaleString("he-IL")}</div>
       <div className="grid grid-cols-2 gap-1.5 text-[11px]">
         <div className="rounded-lg bg-stone-50 px-2 py-1.5">
-          <div className="text-stone-400">חודשי</div>
+          <div className="text-stone-400">3 חודשי</div>
           <div className="font-bold text-stone-700">{monthAvg}</div>
           <div className={`font-bold ${color4(current, monthAvg)}`}>{pctOf(current, monthAvg)}</div>
         </div>
         <div className="rounded-lg bg-stone-50 px-2 py-1.5">
-          <div className="text-stone-400">רבעוני</div>
+          <div className="text-stone-400">6 חודשי</div>
           <div className="font-bold text-stone-700">{quarterAvg}</div>
           <div className={`font-bold ${color4(current, quarterAvg)}`}>{pctOf(current, quarterAvg)}</div>
         </div>
@@ -218,7 +218,7 @@ function ComparisonCards({ comparison }: { comparison: ComparisonStats }) {
 
 function TherapistTrendList({ rows, direction }: { rows: TherapistWeeklyTrend[]; direction: "up" | "down" }) {
   if (rows.length === 0) {
-    return <p className="text-xs text-stone-400">{direction === "up" ? "אין מטפלים בולטים בעלייה השבוע." : "אין מטפלים בולטים בירידה השבוע."}</p>;
+    return <p className="text-xs text-stone-400">{direction === "up" ? "אין מטפלים בולטים בעלייה החודש." : "אין מטפלים בולטים בירידה החודש."}</p>;
   }
   const arrow = direction === "up" ? "▲" : "▼";
   const colorCls = direction === "up" ? "text-green-700 bg-green-50" : "text-red-700 bg-red-50";
@@ -229,8 +229,8 @@ function TherapistTrendList({ rows, direction }: { rows: TherapistWeeklyTrend[];
         <thead className="bg-stone-50 border-b border-stone-200 text-xs">
           <tr>
             <th className="px-3 py-2 font-semibold text-stone-500">מטפל</th>
-            <th className="px-3 py-2 font-semibold text-stone-500 text-center">השבוע</th>
-            <th className="px-3 py-2 font-semibold text-stone-500 text-center">ממוצע חודשי</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">החודש</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">ממוצע 4-שבועי</th>
             <th className="px-3 py-2 font-semibold text-stone-500 text-center">שינוי</th>
           </tr>
         </thead>
@@ -303,7 +303,7 @@ function SilentTherapistsTable({ rows }: { rows: SilentTherapist[] }) {
 }
 
 function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; onToggle: () => void }) {
-  const week = `${r.week_start} – ${r.week_end}`;
+  const period = `${r.month_start} – ${r.month_end}`;
   const sentOk = r.email_status === "sent";
 
   return (
@@ -314,7 +314,7 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
       >
         <div className="flex items-center gap-3">
           <span className="text-stone-400 text-xs">{expanded ? "▼" : "◀"}</span>
-          <span className="font-black text-stone-800">שבוע {week}</span>
+          <span className="font-black text-stone-800">חודש {period}</span>
           <span className="text-xs text-stone-400">
             {r.patient_data.contactClicks} פניות · {r.therapist_data.totalActive} מטפלים
           </span>
@@ -335,14 +335,14 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
 
           {r.patient_data.comparison && (
             <section>
-              <h3 className="text-sm font-black text-[#0F5468] mb-3">השבוע מול חודשי ורבעוני</h3>
+              <h3 className="text-sm font-black text-[#0F5468] mb-3">החודש מול ממוצעים ארוכי טווח</h3>
               <ComparisonCards comparison={r.patient_data.comparison} />
             </section>
           )}
 
           {r.patient_data.trend && r.patient_data.trend.length > 1 && (
             <section>
-              <h3 className="text-sm font-black text-[#0F5468] mb-3">מגמה — 13 שבועות אחרונים</h3>
+              <h3 className="text-sm font-black text-[#0F5468] mb-3">מגמה — {r.patient_data.trend.length} חודשים אחרונים</h3>
               <TrendChart trend={r.patient_data.trend} />
             </section>
           )}
@@ -370,7 +370,7 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
           {r.therapist_data.silentPayingTherapists && r.therapist_data.silentPayingTherapists.length > 0 && (
             <section>
               <h3 className="text-sm font-black text-[#0F5468] mb-2">
-                מטפלים ממומנים בלי פניות
+                מטפלים ממומנים בלי פניות החודש
                 <span className="mr-2 text-xs text-stone-400 font-normal">
                   ({r.therapist_data.silentPayingTherapists.length})
                 </span>
@@ -389,8 +389,8 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
 
           {r.therapist_data.silentPayingTherapists && r.therapist_data.silentPayingTherapists.length === 0 && (
             <section>
-              <h3 className="text-sm font-black text-[#0F5468] mb-2">מטפלים ממומנים בלי פניות</h3>
-              <p className="text-sm text-green-700">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת השבוע.</p>
+              <h3 className="text-sm font-black text-[#0F5468] mb-2">מטפלים ממומנים בלי פניות החודש</h3>
+              <p className="text-sm text-green-700">🎉 כל המטפלים הממומנים קיבלו לפחות פנייה אחת החודש.</p>
             </section>
           )}
 
@@ -434,7 +434,7 @@ function Stat({ label, value, highlight }: { label: string; value: number; highl
   );
 }
 
-export default function WeeklyReportsPage() {
+export default function MonthlyReportsPage() {
   const [reports, setReports] = useState<Report[] | null>(null);
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -443,7 +443,7 @@ export default function WeeklyReportsPage() {
 
   function load() {
     setError("");
-    fetch("/api/admin-weekly-reports", { cache: "no-store" })
+    fetch("/api/admin-monthly-reports", { cache: "no-store" })
       .then(r => r.json())
       .then(json => {
         if (json.ok) {
@@ -460,10 +460,10 @@ export default function WeeklyReportsPage() {
     setRunning(true);
     setRunMsg("");
     try {
-      const r = await fetch("/api/admin-trigger-weekly-report", { method: "POST", cache: "no-store" });
+      const r = await fetch("/api/admin-trigger-monthly-report", { method: "POST", cache: "no-store" });
       const json = await r.json();
       if (json.ok) {
-        setRunMsg(`הופק דוח לשבוע ${json.period_start} (${json.emailStatus})`);
+        setRunMsg(`הופק דוח לחודש ${json.period_start} (${json.emailStatus})`);
         load();
       } else {
         setRunMsg(`שגיאה: ${json.error}`);
@@ -479,8 +479,8 @@ export default function WeeklyReportsPage() {
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-black text-stone-900">דוחות שבועיים</h1>
-          <p className="text-xs text-stone-400 mt-1">סיכום אוטומטי של ביקוש מול היצע, רץ כל יום ראשון בבוקר.</p>
+          <h1 className="text-3xl font-black text-stone-900">דוחות חודשיים</h1>
+          <p className="text-xs text-stone-400 mt-1">סיכום אגרגטיבי של חודש שלם, רץ אוטומטית ב-1 בכל חודש בבוקר.</p>
         </div>
         <button
           onClick={runNow}
@@ -500,7 +500,7 @@ export default function WeeklyReportsPage() {
       {error && (
         <div className="rounded-2xl bg-red-50 border border-red-200 px-5 py-4 text-sm text-red-700 mb-6">
           <p className="font-bold mb-1">שגיאה: {error}</p>
-          <p className="text-xs text-red-500">ייתכן שטבלת weekly_reports עדיין לא נוצרה ב-Supabase.</p>
+          <p className="text-xs text-red-500">ייתכן שטבלת monthly_admin_reports עדיין לא נוצרה ב-Supabase.</p>
         </div>
       )}
 
@@ -508,8 +508,8 @@ export default function WeeklyReportsPage() {
 
       {reports && reports.length === 0 && (
         <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center">
-          <p className="text-stone-500 mb-4">עדיין אין דוחות שבועיים.</p>
-          <p className="text-xs text-stone-400">הדוח הראשון יתפרסם ביום ראשון הקרוב, או לחץ על &quot;הפק דוח עכשיו&quot;.</p>
+          <p className="text-stone-500 mb-4">עדיין אין דוחות חודשיים.</p>
+          <p className="text-xs text-stone-400">הדוח הראשון יתפרסם ב-1 לחודש הקרוב, או לחץ על &quot;הפק דוח עכשיו&quot;.</p>
         </div>
       )}
 
