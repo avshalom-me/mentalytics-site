@@ -33,7 +33,119 @@ function diffPct(curr: number, prev: number): number | null {
   return Math.round(((curr - prev) / prev) * 100);
 }
 
+function avg(arr: number[]): number {
+  if (arr.length === 0) return 0;
+  return Math.round(arr.reduce((s, v) => s + v, 0) / arr.length);
+}
+
 // ── DATA AGGREGATORS ────────────────────────────────────────────────
+
+const TREND_WEEKS = 13;
+
+type TrendPoint = {
+  week_start: string;
+  pageViews: number;
+  profileViews: number;
+  contactClicks: number;
+  quizCompletions: number;
+};
+
+async function aggregate13WeekTrend(now: Date): Promise<TrendPoint[]> {
+  const weeksMs = TREND_WEEKS * 7 * 86_400_000;
+  const since = new Date(now.getTime() - weeksMs).toISOString();
+  const until = now.toISOString();
+
+  const [eventsRes, viewsRes, clicksRes] = await Promise.all([
+    supabaseAdmin
+      .from("analytics_events")
+      .select("event_type, created_at")
+      .gte("created_at", since)
+      .lt("created_at", until)
+      .in("event_type", ["page_view", "quiz_complete"]),
+    supabaseAdmin
+      .from("therapist_profile_views")
+      .select("viewed_at")
+      .gte("viewed_at", since)
+      .lt("viewed_at", until),
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("clicked_at")
+      .gte("clicked_at", since)
+      .lt("clicked_at", until),
+  ]);
+
+  // Bucket index 0 = oldest, TREND_WEEKS - 1 = current week
+  const buckets: TrendPoint[] = [];
+  for (let i = TREND_WEEKS - 1; i >= 0; i--) {
+    const weekEnd = new Date(now.getTime() - i * 7 * 86_400_000);
+    const weekStart = new Date(weekEnd.getTime() - 7 * 86_400_000);
+    buckets.push({
+      week_start: weekStart.toISOString().slice(0, 10),
+      pageViews: 0,
+      profileViews: 0,
+      contactClicks: 0,
+      quizCompletions: 0,
+    });
+  }
+
+  function bucketIdx(dateStr: string): number {
+    const d = new Date(dateStr).getTime();
+    const diffWeeks = Math.floor((now.getTime() - d) / (7 * 86_400_000));
+    return TREND_WEEKS - 1 - diffWeeks;
+  }
+
+  for (const e of (eventsRes.data ?? []) as { event_type: string; created_at: string }[]) {
+    const i = bucketIdx(e.created_at);
+    if (i < 0 || i >= TREND_WEEKS) continue;
+    if (e.event_type === "page_view") buckets[i].pageViews++;
+    if (e.event_type === "quiz_complete") buckets[i].quizCompletions++;
+  }
+  for (const v of (viewsRes.data ?? []) as { viewed_at: string }[]) {
+    const i = bucketIdx(v.viewed_at);
+    if (i >= 0 && i < TREND_WEEKS) buckets[i].profileViews++;
+  }
+  for (const c of (clicksRes.data ?? []) as { clicked_at: string }[]) {
+    const i = bucketIdx(c.clicked_at);
+    if (i >= 0 && i < TREND_WEEKS) buckets[i].contactClicks++;
+  }
+
+  return buckets;
+}
+
+type ComparisonStats = {
+  current: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+  monthAvg: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+  quarterAvg: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
+};
+
+function computeComparison(trend: TrendPoint[]): ComparisonStats {
+  const current = trend[trend.length - 1] ?? { pageViews: 0, profileViews: 0, contactClicks: 0, quizCompletions: 0 };
+  // Prior 4 weeks (excluding current) — months avg
+  const monthSlice = trend.slice(-5, -1);
+  // Prior 12 weeks (excluding current) — quarter avg
+  const quarterSlice = trend.slice(0, -1);
+
+  return {
+    current: {
+      pageViews: current.pageViews,
+      profileViews: current.profileViews,
+      contactClicks: current.contactClicks,
+      quizCompletions: current.quizCompletions,
+    },
+    monthAvg: {
+      pageViews: avg(monthSlice.map(t => t.pageViews)),
+      profileViews: avg(monthSlice.map(t => t.profileViews)),
+      contactClicks: avg(monthSlice.map(t => t.contactClicks)),
+      quizCompletions: avg(monthSlice.map(t => t.quizCompletions)),
+    },
+    quarterAvg: {
+      pageViews: avg(quarterSlice.map(t => t.pageViews)),
+      profileViews: avg(quarterSlice.map(t => t.profileViews)),
+      contactClicks: avg(quarterSlice.map(t => t.contactClicks)),
+      quizCompletions: avg(quarterSlice.map(t => t.quizCompletions)),
+    },
+  };
+}
 
 type PatientData = {
   pageViews: number;
@@ -48,6 +160,8 @@ type PatientData = {
   clickTypeBreakdown: Record<string, number>;
   quizStarted: { adults: number; kids: number };
   quizCompleted: { adults: number; kids: number };
+  trend?: TrendPoint[];
+  comparison?: ComparisonStats;
 };
 
 async function aggregatePatientData(period: Period): Promise<PatientData> {
@@ -281,6 +395,16 @@ async function generateInsights(
 - שאלון מבוגרים — סיומים: ${current.patient.quizCompleted.adults} (שינוי: ${wow.quizCompletedAdults}%)
 - שאלון ילדים — סיומים: ${current.patient.quizCompleted.kids} (שינוי: ${wow.quizCompletedKids}%)
 
+### השוואה לממוצעים ארוכי טווח (ממוצעים שבועיים, לא כולל השבוע הנוכחי):
+${current.patient.comparison ? `
+| מדד | השבוע | ממוצע חודשי (4w) | ממוצע רבעוני (12w) |
+| --- | --- | --- | --- |
+| כניסות | ${current.patient.comparison.current.pageViews} | ${current.patient.comparison.monthAvg.pageViews} | ${current.patient.comparison.quarterAvg.pageViews} |
+| צפיות בפרופיל | ${current.patient.comparison.current.profileViews} | ${current.patient.comparison.monthAvg.profileViews} | ${current.patient.comparison.quarterAvg.profileViews} |
+| פניות | ${current.patient.comparison.current.contactClicks} | ${current.patient.comparison.monthAvg.contactClicks} | ${current.patient.comparison.quarterAvg.contactClicks} |
+| סיומי שאלון | ${current.patient.comparison.current.quizCompletions} | ${current.patient.comparison.monthAvg.quizCompletions} | ${current.patient.comparison.quarterAvg.quizCompletions} |
+` : "(אין מספיק היסטוריה)"}
+
 ### פילוח אזורים שמטופלים חיפשו (לפי צפיות בפרופילים):
 ${JSON.stringify(current.patient.byRegion, null, 2)}
 
@@ -329,7 +453,7 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
 אנא הפק שלושה חלקים נפרדים, בעברית פשוטה וברורה:
 
 **חלק 1 — סיכום השבוע (5-7 משפטים):**
-מצב כללי, מגמות בולטות מול השבוע הקודם, ושני-שלושה דברים שראויים לתשומת לב מיידית.
+מצב כללי, מגמות בולטות מול השבוע הקודם **וגם מול הממוצעים החודשי והרבעוני**, ושני-שלושה דברים שראויים לתשומת לב מיידית. אם השבוע חריג כלפי מעלה או מטה ביחס לרבעון, ציין זאת מפורשות.
 
 **חלק 2 — המלצות פעולה ממוקדות (3-6 פעולות):**
 זהה גאפים בין ביקוש להיצע (אזורים/נושאים שמבוקשים אבל אין מספיק מטפלים, או להפך). תן המלצות קונקרטיות לפרסום ממוקד — מי הקהל (מטפלים או מטופלים), איזה אזור/תחום, ולמה. כל המלצה במשפט-שניים, עם הסבר מספרי קצר.
@@ -379,6 +503,61 @@ function mdToHtml(text: string): string {
     .replace(/\n{2,}/g, '</p><p style="margin:10px 0;line-height:1.7;">')
     .replace(/^/, '<p style="margin:10px 0;line-height:1.7;">')
     .replace(/$/, "</p>");
+}
+
+function buildSparkline(values: number[], color: string): string {
+  if (values.length === 0) return "";
+  const max = Math.max(...values, 1);
+  const bars = values.map(v => {
+    const h = Math.max(Math.round((v / max) * 38), 2);
+    return `<td style="vertical-align:bottom;padding:0 1px;width:7%;"><div style="height:${h}px;background:${color};border-radius:1px 1px 0 0;" title="${v}"></div></td>`;
+  }).join("");
+  return `<table cellpadding="0" cellspacing="0" style="width:100%;height:42px;border-collapse:collapse;"><tr style="height:42px;">${bars}</tr></table>`;
+}
+
+function buildTrendSection(trend: TrendPoint[], comparison: ComparisonStats): string {
+  if (trend.length === 0) return "";
+
+  const rows = [
+    { label: "כניסות", color: "#3b82f6", values: trend.map(t => t.pageViews), curr: comparison.current.pageViews, m: comparison.monthAvg.pageViews, q: comparison.quarterAvg.pageViews },
+    { label: "צפיות בפרופיל", color: "#9333ea", values: trend.map(t => t.profileViews), curr: comparison.current.profileViews, m: comparison.monthAvg.profileViews, q: comparison.quarterAvg.profileViews },
+    { label: "פניות", color: "#22c55e", values: trend.map(t => t.contactClicks), curr: comparison.current.contactClicks, m: comparison.monthAvg.contactClicks, q: comparison.quarterAvg.contactClicks },
+    { label: "סיומי שאלון", color: "#f59e0b", values: trend.map(t => t.quizCompletions), curr: comparison.current.quizCompletions, m: comparison.monthAvg.quizCompletions, q: comparison.quarterAvg.quizCompletions },
+  ];
+
+  function arrow(curr: number, baseline: number): string {
+    if (baseline === 0) return curr === 0 ? "—" : "▲ חדש";
+    const pct = Math.round(((curr - baseline) / baseline) * 100);
+    if (pct >= 5) return `<span style="color:#22c55e;">▲ ${pct}%</span>`;
+    if (pct <= -5) return `<span style="color:#ef4444;">▼ ${pct}%</span>`;
+    return `<span style="color:#888;">≈ ${pct}%</span>`;
+  }
+
+  const rowsHtml = rows.map(r => `
+    <tr>
+      <td style="padding:10px 8px;border-bottom:1px solid #eee;font-size:13px;font-weight:bold;color:#333;width:24%;">${escapeHtml(r.label)}</td>
+      <td style="padding:6px 8px;border-bottom:1px solid #eee;width:36%;">${buildSparkline(r.values, r.color)}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #eee;text-align:center;font-size:13px;font-weight:bold;width:13%;">${r.curr}</td>
+      <td style="padding:10px 8px;border-bottom:1px solid #eee;text-align:center;font-size:11px;width:13%;">${r.m}<br/><span style="font-size:10px;">${arrow(r.curr, r.m)}</span></td>
+      <td style="padding:10px 8px;border-bottom:1px solid #eee;text-align:center;font-size:11px;width:14%;">${r.q}<br/><span style="font-size:10px;">${arrow(r.curr, r.q)}</span></td>
+    </tr>
+  `).join("");
+
+  return `
+    <table style="width:100%;border-collapse:collapse;background:white;border:1px solid #e8e0d8;border-radius:8px;overflow:hidden;">
+      <thead>
+        <tr style="background:#f5f5f4;">
+          <th style="padding:8px;text-align:right;font-size:11px;color:#666;font-weight:bold;">מדד</th>
+          <th style="padding:8px;text-align:right;font-size:11px;color:#666;font-weight:bold;">${TREND_WEEKS} שבועות אחרונים</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">השבוע</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">חודשי*</th>
+          <th style="padding:8px;text-align:center;font-size:11px;color:#666;font-weight:bold;">רבעוני*</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml}</tbody>
+    </table>
+    <p style="font-size:10px;color:#aaa;margin:6px 0 0;">* ממוצעים שבועיים בתקופה (ללא השבוע הנוכחי)</p>
+  `;
 }
 
 function buildSilentTherapistsTable(silent: SilentTherapist[]): string {
@@ -437,6 +616,11 @@ function buildEmailHtml(
         <h2 style="font-size:17px;color:#0F5468;margin:0 0 12px;">סיכום</h2>
         ${mdToHtml(insights.summary)}
 
+        ${patient.trend && patient.comparison ? `
+          <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מגמה ${TREND_WEEKS} שבועות והשוואה</h2>
+          ${buildTrendSection(patient.trend, patient.comparison)}
+        ` : ""}
+
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">המלצות פעולה</h2>
         ${mdToHtml(insights.recommendations)}
 
@@ -488,13 +672,19 @@ export async function runWeeklyReport(): Promise<{
   try {
     const current = getWeekRange(0);
     const previous = getWeekRange(1);
+    const now = new Date();
 
-    const [patient, therapist, prevPatient, prevTherapist] = await Promise.all([
+    const [patient, therapist, prevPatient, prevTherapist, trend] = await Promise.all([
       aggregatePatientData(current),
       aggregateTherapistData(current),
       aggregatePatientData(previous),
       aggregateTherapistData(previous),
+      aggregate13WeekTrend(now),
     ]);
+
+    const comparison = computeComparison(trend);
+    patient.trend = trend;
+    patient.comparison = comparison;
 
     const insights = await generateInsights(
       { patient, therapist },
