@@ -169,8 +169,14 @@ export async function PATCH(request: Request) {
 
     // כשמקדמים ידנית → סימון; כשמורידים חזרה → ביטול הסימון
     const extraFields: Record<string, unknown> = {};
-    if (status === "paying") extraFields.manually_promoted = true;
-    if (status === "approved") extraFields.manually_promoted = false;
+    if (status === "paying") {
+      extraFields.manually_promoted = true;
+      extraFields.promoted_since = new Date().toISOString();
+    }
+    if (status === "approved") {
+      extraFields.manually_promoted = false;
+      extraFields.promoted_since = null;
+    }
 
     const { error } = await supabaseAdmin
       .from("therapists")
