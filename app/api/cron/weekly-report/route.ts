@@ -285,9 +285,14 @@ type TherapistWeeklyTrend = {
   category: "grower" | "decliner" | "stalled" | "new" | "stable";
 };
 
-async function aggregateTherapistWeeklyTrends(now: Date): Promise<TherapistWeeklyTrend[]> {
-  const weeksMs = WEEKLY_TREND_BUCKETS * 7 * 86_400_000;
-  const since = new Date(now.getTime() - weeksMs).toISOString();
+async function aggregateTherapistTrends(
+  now: Date,
+  bucketDays: number,
+  numBuckets: number,
+  priorAvgBuckets: number,
+): Promise<TherapistWeeklyTrend[]> {
+  const totalMs = numBuckets * bucketDays * 86_400_000;
+  const since = new Date(now.getTime() - totalMs).toISOString();
   const until = now.toISOString();
 
   const [therapistsRes, clicksRes] = await Promise.all([
@@ -307,40 +312,41 @@ async function aggregateTherapistWeeklyTrends(now: Date): Promise<TherapistWeekl
 
   function bucketIdx(d: string): number {
     const t = new Date(d).getTime();
-    const diffWeeks = Math.floor((now.getTime() - t) / (7 * 86_400_000));
-    return WEEKLY_TREND_BUCKETS - 1 - diffWeeks;
+    const diffDays = Math.floor((now.getTime() - t) / 86_400_000);
+    const periodsAgo = Math.floor(diffDays / bucketDays);
+    return numBuckets - 1 - periodsAgo;
   }
 
   const byTherapist = new Map<string, number[]>();
   for (const t of therapists) {
-    byTherapist.set(t.id, new Array(WEEKLY_TREND_BUCKETS).fill(0));
+    byTherapist.set(t.id, new Array(numBuckets).fill(0));
   }
   for (const c of clicks) {
     const arr = byTherapist.get(c.therapist_id);
     if (!arr) continue;
     const i = bucketIdx(c.clicked_at);
-    if (i >= 0 && i < WEEKLY_TREND_BUCKETS) arr[i]++;
+    if (i >= 0 && i < numBuckets) arr[i]++;
   }
 
   const trends: TherapistWeeklyTrend[] = [];
   for (const t of therapists) {
-    const weekly = byTherapist.get(t.id) ?? new Array(WEEKLY_TREND_BUCKETS).fill(0);
-    const current = weekly[weekly.length - 1] ?? 0;
-    const prior4 = weekly.slice(-5, -1);
-    const prior4Avg = avg(prior4);
+    const series = byTherapist.get(t.id) ?? new Array(numBuckets).fill(0);
+    const current = series[series.length - 1] ?? 0;
+    const priorSlice = series.slice(-(priorAvgBuckets + 1), -1);
+    const priorAvg = avg(priorSlice);
 
     let category: TherapistWeeklyTrend["category"];
     let changePct: number | null = null;
 
-    if (prior4Avg === 0 && current === 0) {
+    if (priorAvg === 0 && current === 0) {
       category = "stable";
-    } else if (prior4Avg === 0) {
+    } else if (priorAvg === 0) {
       category = "new";
     } else if (current === 0) {
       category = "stalled";
       changePct = -100;
     } else {
-      changePct = Math.round(((current - prior4Avg) / prior4Avg) * 100);
+      changePct = Math.round(((current - priorAvg) / priorAvg) * 100);
       if (changePct >= 25) category = "grower";
       else if (changePct <= -25) category = "decliner";
       else category = "stable";
@@ -349,9 +355,9 @@ async function aggregateTherapistWeeklyTrends(now: Date): Promise<TherapistWeekl
     trends.push({
       id: t.id,
       full_name: t.full_name ?? "—",
-      weeklyClicks: weekly,
+      weeklyClicks: series,
       currentWeek: current,
-      prior4WeekAvg: Math.round(prior4Avg),
+      prior4WeekAvg: Math.round(priorAvg),
       changePct,
       category,
     });
@@ -875,13 +881,15 @@ export async function runReport(type: ReportType): Promise<{
     const previous = getRange(1, periodDays);
     const now = new Date();
 
+    const therapistTrendPriorBuckets = type === "weekly" ? 4 : 3;
+
     const [patient, therapist, prevPatient, prevTherapist, trend, therapistTrends] = await Promise.all([
       aggregatePatientData(current),
       aggregateTherapistData(current),
       aggregatePatientData(previous),
       aggregateTherapistData(previous),
       aggregateTrend(now, trendBucketDays, trendBuckets),
-      aggregateTherapistWeeklyTrends(now),
+      aggregateTherapistTrends(now, trendBucketDays, trendBuckets, therapistTrendPriorBuckets),
     ]);
 
     const comparison = computeComparison(trend);

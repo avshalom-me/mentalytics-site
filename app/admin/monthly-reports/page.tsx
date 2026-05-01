@@ -231,7 +231,7 @@ function TherapistTrendList({ rows, direction }: { rows: TherapistWeeklyTrend[];
           <tr>
             <th className="px-3 py-2 font-semibold text-stone-500">מטפל</th>
             <th className="px-3 py-2 font-semibold text-stone-500 text-center">החודש</th>
-            <th className="px-3 py-2 font-semibold text-stone-500 text-center">ממוצע 4-שבועי</th>
+            <th className="px-3 py-2 font-semibold text-stone-500 text-center">ממוצע 3-חודשי</th>
             <th className="px-3 py-2 font-semibold text-stone-500 text-center">שינוי</th>
           </tr>
         </thead>
