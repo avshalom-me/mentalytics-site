@@ -957,9 +957,10 @@ export async function runReport(type: ReportType): Promise<{
 export const runWeeklyReport = () => runReport("weekly");
 
 export async function GET(req: NextRequest) {
-  const isVercelCron = req.headers.get("user-agent")?.includes("vercel-cron");
-  const hasSecret = CRON_SECRET && req.headers.get("authorization") === `Bearer ${CRON_SECRET}`;
-  if (!isVercelCron && !hasSecret) {
+  if (!CRON_SECRET) {
+    return NextResponse.json({ ok: false, error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
+  }
+  if (req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const result = await runReport("weekly");
