@@ -14,7 +14,7 @@ type Therapist = {
   email: string | null;
   gender: string | null;
   bio: string | null;
-  photo_url: string | null;
+  profile_photo_path: string | null;
   therapist_types: string[] | null;
   training_areas: string[] | null;
   regions: string[] | null;
@@ -30,7 +30,7 @@ function categorize(t: Therapist, stats: { views: number; clicks: number }): Ema
   if (stats.views > 0) return "viewed_only";
   // 0 views, 0 clicks — only nudge if profile has clear gaps
   const bioShort = !t.bio || t.bio.length < SHORT_BIO_THRESHOLD;
-  const noPhoto = !t.photo_url;
+  const noPhoto = !t.profile_photo_path;
   if (bioShort || noPhoto) return "incomplete_profile";
   return "skip";
 }
@@ -136,7 +136,7 @@ function buildViewedOnlyEmailHtml(t: Therapist, views: number): string {
   if (!t.bio || t.bio.length < SHORT_BIO_THRESHOLD) {
     tips.push("הביוגרפיה שלך קצרה. מטופלים שראו את הפרופיל הססו לפנות — תיאור מפורט יותר על הגישה הטיפולית והניסיון שלך מגדיל משמעותית את הסיכוי לפנייה.");
   }
-  if (!t.photo_url) {
+  if (!t.profile_photo_path) {
     tips.push("אין לך תמונת פרופיל. תמונה מקצועית ומחייכת היא אחד הגורמים החזקים ביותר ליצירת אמון ראשוני.");
   }
   if ((t.training_areas?.length ?? 0) <= 2) {
@@ -183,7 +183,7 @@ function buildIncompleteProfileEmailHtml(t: Therapist): string {
   const name = escapeHtml(t.full_name ?? "מטפל/ת");
   const missing: string[] = [];
 
-  if (!t.photo_url) missing.push("תמונת פרופיל מקצועית");
+  if (!t.profile_photo_path) missing.push("תמונת פרופיל מקצועית");
   if (!t.bio || t.bio.length < SHORT_BIO_THRESHOLD) missing.push("ביוגרפיה מפורטת (150+ תווים על הגישה הטיפולית והניסיון שלך)");
 
   const missingHtml = missing.map(m => `<li style="margin-bottom: 10px;">${escapeHtml(m)}</li>`).join("");
@@ -225,7 +225,7 @@ export async function GET(req: NextRequest) {
 
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, email, gender, bio, photo_url, therapist_types, training_areas, regions, status")
+    .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status")
     .eq("status", "paying");
 
   if (!therapists || therapists.length === 0) {
