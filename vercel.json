@@ -11,6 +11,10 @@
     {
       "path": "/api/cron/weekly-report",
       "schedule": "0 6 * * 0"
+    },
+    {
+      "path": "/api/cron/monthly-admin-report",
+      "schedule": "30 6 1 * *"
     }
   ]
 }
