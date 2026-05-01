@@ -478,13 +478,13 @@ function buildEmailHtml(
 
 // ── MAIN ────────────────────────────────────────────────────────────
 
-export async function GET(req: NextRequest) {
-  const isVercelCron = req.headers.get("user-agent")?.includes("vercel-cron");
-  const hasSecret = CRON_SECRET && req.headers.get("authorization") === `Bearer ${CRON_SECRET}`;
-  if (!isVercelCron && !hasSecret) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  }
-
+export async function runWeeklyReport(): Promise<{
+  ok: boolean;
+  week_start?: string;
+  emailStatus?: string;
+  error?: string;
+  status?: number;
+}> {
   try {
     const current = getWeekRange(0);
     const previous = getWeekRange(1);
@@ -541,14 +541,22 @@ export async function GET(req: NextRequest) {
       );
 
     if (insertErr) {
-      return NextResponse.json({ ok: false, error: `DB save failed: ${insertErr.message}`, emailStatus }, { status: 500 });
+      return { ok: false, error: `DB save failed: ${insertErr.message}`, emailStatus, status: 500 };
     }
 
-    return NextResponse.json({ ok: true, week_start: current.since.slice(0, 10), emailStatus });
+    return { ok: true, week_start: current.since.slice(0, 10), emailStatus };
   } catch (err) {
-    return NextResponse.json(
-      { ok: false, error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 },
-    );
+    return { ok: false, error: err instanceof Error ? err.message : "Unknown error", status: 500 };
   }
+}
+
+export async function GET(req: NextRequest) {
+  const isVercelCron = req.headers.get("user-agent")?.includes("vercel-cron");
+  const hasSecret = CRON_SECRET && req.headers.get("authorization") === `Bearer ${CRON_SECRET}`;
+  if (!isVercelCron && !hasSecret) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  const result = await runWeeklyReport();
+  const { status, ...body } = result;
+  return NextResponse.json(body, { status: status ?? 200 });
 }
