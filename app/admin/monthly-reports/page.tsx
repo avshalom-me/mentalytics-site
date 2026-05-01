@@ -145,9 +145,17 @@ function MiniBars({ title, data, color = "#2e7d8c", limit = 6 }: { title: string
   );
 }
 
+const HEB_MONTHS_ABBR = ["", "ינו", "פבר", "מרץ", "אפר", "מאי", "יונ", "יול", "אוג", "ספט", "אוק", "נוב", "דצמ"];
+
+function formatHebrewBucketLabel(dateStr: string): string {
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr.slice(5);
+  return `${d.getDate()} ${HEB_MONTHS_ABBR[d.getMonth() + 1]}`;
+}
+
 function TrendChart({ trend }: { trend: TrendPoint[] }) {
   if (!trend || trend.length === 0) return null;
-  const data = trend.map(t => ({ ...t, label: t.week_start.slice(5) }));
+  const data = trend.map(t => ({ ...t, label: formatHebrewBucketLabel(t.week_start) }));
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-4">
       <ResponsiveContainer width="100%" height={240}>
