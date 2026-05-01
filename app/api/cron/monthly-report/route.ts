@@ -14,11 +14,26 @@ type Therapist = {
   email: string | null;
   gender: string | null;
   bio: string | null;
+  photo_url: string | null;
   therapist_types: string[] | null;
   training_areas: string[] | null;
   regions: string[] | null;
   status: string;
 };
+
+type EmailCategory = "engaged" | "viewed_only" | "incomplete_profile" | "skip";
+
+const SHORT_BIO_THRESHOLD = 80;
+
+function categorize(t: Therapist, stats: { views: number; clicks: number }): EmailCategory {
+  if (stats.clicks > 0) return "engaged";
+  if (stats.views > 0) return "viewed_only";
+  // 0 views, 0 clicks — only nudge if profile has clear gaps
+  const bioShort = !t.bio || t.bio.length < SHORT_BIO_THRESHOLD;
+  const noPhoto = !t.photo_url;
+  if (bioShort || noPhoto) return "incomplete_profile";
+  return "skip";
+}
 
 type ClickRow = { therapist_id: string; click_type: string; source: string };
 type ViewRow = { therapist_id: string; source: string };
@@ -114,6 +129,95 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
   `;
 }
 
+function buildViewedOnlyEmailHtml(t: Therapist, views: number): string {
+  const name = escapeHtml(t.full_name ?? "מטפל/ת");
+  const tips: string[] = [];
+
+  if (!t.bio || t.bio.length < SHORT_BIO_THRESHOLD) {
+    tips.push("הביוגרפיה שלך קצרה. מטופלים שראו את הפרופיל הססו לפנות — תיאור מפורט יותר על הגישה הטיפולית והניסיון שלך מגדיל משמעותית את הסיכוי לפנייה.");
+  }
+  if (!t.photo_url) {
+    tips.push("אין לך תמונת פרופיל. תמונה מקצועית ומחייכת היא אחד הגורמים החזקים ביותר ליצירת אמון ראשוני.");
+  }
+  if ((t.training_areas?.length ?? 0) <= 2) {
+    tips.push("הוספת תחומי הכשרה נוספים שאתה מתמחה בהם תעזור למטופלים לזהות שאתה מתאים לצרכים שלהם.");
+  }
+  tips.push("בדוק/י שמספר הטלפון והוואטסאפ בפרופיל מעודכנים — מטופלים שראו את הפרופיל ולא לחצו, ייתכן שהיססו בגלל פרטים לא ברורים.");
+
+  const tipsHtml = tips.map(tip => `<li style="margin-bottom: 10px;">${escapeHtml(tip)}</li>`).join("");
+
+  return `
+    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+      <div style="background: linear-gradient(135deg, #0F5468, #2e7d8c); padding: 24px 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 22px;">הזדמנות לשיפור הפרופיל שלך</h1>
+        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">טיפול חכם — ${name}</p>
+      </div>
+
+      <div style="background: #f9f8f6; padding: 24px 32px; border: 1px solid #e8e0d8; border-top: 0;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+          <strong>${views}</strong> מטופלים פוטנציאליים צפו בפרופיל שלך החודש, אבל אף אחד מהם לא לחץ על כפתור יצירת הקשר.
+        </p>
+        <p style="font-size: 14px; line-height: 1.7; color: #555; margin: 0 0 20px;">
+          זה אומר שהפרופיל שלך מופיע בתוצאות החיפוש — וזה שלב מצוין. עכשיו הקטנה האחרונה היא לגרום למטופל ללחוץ ולפנות. הנה כמה שינויים שעשויים להזיז את המחט:
+        </p>
+
+        <ul style="padding-right: 20px; font-size: 14px; line-height: 1.7; color: #444;">
+          ${tipsHtml}
+        </ul>
+
+        <div style="margin-top: 24px; padding: 14px 16px; background: #fff8e1; border-radius: 8px; border: 1px solid #f5d975;">
+          <p style="margin: 0; font-size: 13px; color: #6b4f00;">
+            💡 לפי המחקר שלנו, פרופילים עם ביו של 150+ תווים ותמונה מקצועית מקבלים פי 2-3 יותר פניות ממטופלים שצפו.
+          </p>
+        </div>
+      </div>
+
+      <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
+        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468; font-weight: bold;">לעריכת הפרופיל →</a>
+      </div>
+    </div>
+  `;
+}
+
+function buildIncompleteProfileEmailHtml(t: Therapist): string {
+  const name = escapeHtml(t.full_name ?? "מטפל/ת");
+  const missing: string[] = [];
+
+  if (!t.photo_url) missing.push("תמונת פרופיל מקצועית");
+  if (!t.bio || t.bio.length < SHORT_BIO_THRESHOLD) missing.push("ביוגרפיה מפורטת (150+ תווים על הגישה הטיפולית והניסיון שלך)");
+
+  const missingHtml = missing.map(m => `<li style="margin-bottom: 10px;">${escapeHtml(m)}</li>`).join("");
+
+  return `
+    <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+      <div style="background: linear-gradient(135deg, #0F5468, #2e7d8c); padding: 24px 32px; border-radius: 12px 12px 0 0;">
+        <h1 style="color: white; margin: 0; font-size: 22px;">הפרופיל שלך עדיין לא מוצג בעצמתו המלאה</h1>
+        <p style="color: rgba(255,255,255,0.85); margin: 6px 0 0; font-size: 14px;">טיפול חכם — ${name}</p>
+      </div>
+
+      <div style="background: #f9f8f6; padding: 24px 32px; border: 1px solid #e8e0d8; border-top: 0;">
+        <p style="font-size: 15px; line-height: 1.7; margin: 0 0 16px;">
+          הפרופיל שלך פעיל באתר, אבל יש בו פרטים חיוניים שחסרים — וזה משפיע על מספר ההצגות שלו במערכת ההתאמות ובדירקטוריה.
+        </p>
+        <p style="font-size: 14px; color: #555; margin: 0 0 12px;"><strong>מה חסר כרגע:</strong></p>
+        <ul style="padding-right: 20px; font-size: 14px; line-height: 1.7; color: #444;">
+          ${missingHtml}
+        </ul>
+
+        <div style="margin-top: 20px; padding: 14px 16px; background: #fff8e1; border-radius: 8px; border: 1px solid #f5d975;">
+          <p style="margin: 0; font-size: 13px; color: #6b4f00;">
+            💡 פרופילים מלאים מקבלים פי 3-5 יותר חשיפות מפרופילים חלקיים. ההשלמה לוקחת 5 דקות.
+          </p>
+        </div>
+      </div>
+
+      <div style="padding: 16px 32px; text-align: center; font-size: 12px; color: #999; border: 1px solid #e8e0d8; border-top: 0; border-radius: 0 0 12px 12px;">
+        <a href="https://www.mentalytics.co.il/therapists/dashboard" style="color: #0F5468; font-weight: bold;">להשלמת הפרופיל →</a>
+      </div>
+    </div>
+  `;
+}
+
 export async function GET(req: NextRequest) {
   if (CRON_SECRET && req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -121,7 +225,7 @@ export async function GET(req: NextRequest) {
 
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, email, gender, bio, therapist_types, training_areas, regions, status")
+    .select("id, full_name, email, gender, bio, photo_url, therapist_types, training_areas, regions, status")
     .eq("status", "paying");
 
   if (!therapists || therapists.length === 0) {
@@ -166,6 +270,8 @@ export async function GET(req: NextRequest) {
   const avgClicks = allTotals.length > 0 ? allTotals.reduce((a, b) => a + b, 0) / allTotals.length : 0;
 
   let sent = 0;
+  let skipped = 0;
+  const byCategory: Record<EmailCategory, number> = { engaged: 0, viewed_only: 0, incomplete_profile: 0, skip: 0 };
   const errors: string[] = [];
 
   for (const t of therapists as Therapist[]) {
@@ -183,14 +289,34 @@ export async function GET(req: NextRequest) {
       directoryClicks: c.directory,
     };
 
-    const tips = buildTips(t, stats, avgClicks);
-    const html = buildEmailHtml(t, stats, tips);
+    const category = categorize(t, stats);
+    byCategory[category]++;
+
+    if (category === "skip") {
+      skipped++;
+      continue;
+    }
+
+    let html: string;
+    let subject: string;
+
+    if (category === "engaged") {
+      const tips = buildTips(t, stats, avgClicks);
+      html = buildEmailHtml(t, stats, tips);
+      subject = `הדו"ח החודשי שלך — טיפול חכם`;
+    } else if (category === "viewed_only") {
+      html = buildViewedOnlyEmailHtml(t, stats.views);
+      subject = `${stats.views} מטופלים ראו את הפרופיל שלך — איך הופכים את זה לפנייה`;
+    } else {
+      html = buildIncompleteProfileEmailHtml(t);
+      subject = `הפרופיל שלך לא משדר במלוא הכוח — 5 דקות לתקן`;
+    }
 
     try {
       await resend.emails.send({
         from: "טיפול חכם <noreply@mentalytics.co.il>",
         to: t.email,
-        subject: `הדו"ח החודשי שלך — טיפול חכם`,
+        subject,
         html,
       });
       sent++;
@@ -199,5 +325,12 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, sent, total: therapists.length, errors: errors.length > 0 ? errors : undefined });
+  return NextResponse.json({
+    ok: true,
+    sent,
+    skipped,
+    total: therapists.length,
+    byCategory,
+    errors: errors.length > 0 ? errors : undefined,
+  });
 }
