@@ -110,6 +110,7 @@ export default function TherapistJoinPage() {
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+                <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> הופעה ראשונה בתוצאות החיפוש</li>
                 <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> מערכת ההתאמה החכמה</li>
                 <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> סטטיסטיקות וניתוח פרופיל הפונים</li>
               </ul>
@@ -131,6 +132,7 @@ export default function TherapistJoinPage() {
               <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">התאמה חכמה + סטטיסטיקות מתקדמות</h3>
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "#1a4a5c" }}>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבמסלול החינמי</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה ראשונה בתוצאות החיפוש של מטפלים</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> <span>🤖 סוכן בינה מלאכותית אישי הכולל:</span>
                   <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "#1a4a5c" }}>
