@@ -168,6 +168,7 @@ export default async function TherapistProfilePage({
           {/* Contact buttons */}
           <ContactButtons
             therapistId={id}
+            therapistName={t.full_name ?? ""}
             waLink={waLink}
             phone={t.phone}
             email={t.email}

@@ -39,7 +39,7 @@ export function useFilterTrack() {
 
 const impressedThisSession = new Set<string>();
 
-export function useImpressionTrack(therapistId: string) {
+export function useImpressionTrack(therapistId: string, position?: number) {
   const ref = useRef<HTMLDivElement>(null);
   const tracked = useRef(false);
 
@@ -52,7 +52,8 @@ export function useImpressionTrack(therapistId: string) {
         if (entry.isIntersecting && !tracked.current && !impressedThisSession.has(therapistId)) {
           tracked.current = true;
           impressedThisSession.add(therapistId);
-          sendTrack("profile_impression", { therapist_id: therapistId, source: "directory" });
+          const metadata = position != null ? { position } : undefined;
+          sendTrack("profile_impression", { therapist_id: therapistId, source: "directory", metadata });
           observer.disconnect();
         }
       },
@@ -61,7 +62,7 @@ export function useImpressionTrack(therapistId: string) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  }, [therapistId]);
+  }, [therapistId, position]);
 
   return ref;
 }

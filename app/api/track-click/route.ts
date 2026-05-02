@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
-const VALID_TYPES = ["whatsapp", "phone", "email"] as const;
+const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 const VALID_SOURCES = ["match", "directory"] as const;
 type ClickType = (typeof VALID_TYPES)[number];
 type Source = (typeof VALID_SOURCES)[number];
