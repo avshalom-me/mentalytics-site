@@ -146,6 +146,9 @@ export default function TherapistRegisterPage() {
             <p className="text-sm text-stone-700 leading-6">
               במידה ולא תקבל פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם — תוכל לקבל את כל הכסף חזרה במהירות ובקלות.
             </p>
+            <p className="text-sm text-stone-700 leading-6 mt-1">
+              ניתן לבטל את המנוי בכל עת.
+            </p>
           </div>
         </div>
       </section>

@@ -147,6 +147,9 @@ export default function TherapistJoinPage() {
               במידה ולא תקבל/י פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם — תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
             </p>
             <p className="text-sm text-stone-700 leading-6 mt-1">
+              ניתן לבטל את המנוי בכל עת.
+            </p>
+            <p className="text-sm text-stone-700 leading-6 mt-1">
               ההוצאה מוכרת להזדכות במס הכנסה ומע&quot;מ.
             </p>
           </div>

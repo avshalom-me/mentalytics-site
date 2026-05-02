@@ -426,7 +426,7 @@ export default function HomePage() {
           <div className="mb-1 inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
             style={{ background: "#6F8F7A22", color: "#4A7060", border: "1px solid #6F8F7A44" }}>
             <GraduationCap size={12} />
-            ילדים ונוער
+            שאלון להורים לילדים ונוער
           </div>
 
           <h2 className="mt-4 text-2xl font-extrabold text-stone-900 leading-snug">
