@@ -121,18 +121,9 @@ export default function TherapistJoinPage() {
               <div className="absolute top-4 left-4">
                 <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-400 text-yellow-900">★ מומלץ</span>
               </div>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300">★ מקודם</span>
-                <span className="text-xs text-[#0F5468]">מופיע בהתאמות</span>
-              </div>
-              <div className="mb-4 flex items-baseline gap-2">
-                <span className="text-lg font-black text-[#0F5468]">מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</span>
-                <span className="text-xs text-[#0F5468]">*</span>
-              </div>
               <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">התאמה חכמה + סטטיסטיקות מתקדמות</h3>
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "#1a4a5c" }}>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבמסלול החינמי</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה ראשונה בתוצאות החיפוש של מטפלים</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה ראשונה בתוצאות החיפוש</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> <span>🤖 סוכן בינה מלאכותית אישי הכולל:</span>
                   <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "#1a4a5c" }}>
@@ -142,7 +133,7 @@ export default function TherapistJoinPage() {
                   </ul>
                 </li>
               </ul>
-              <p className="mt-4 text-xs text-[#0F5468]/70">* ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים הראשונים.</p>
+              <p className="mt-4 text-xs text-[#0F5468]/70">* מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</p>
             </div>
           </div>
         </div>
