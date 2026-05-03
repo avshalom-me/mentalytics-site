@@ -36,7 +36,7 @@ export default function NavBar() {
             </Link>
             <Link href="/kids" className="inline-flex items-center gap-2 rounded-xl bg-[#6F8F7A] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#6F8F7A]/40">
               <GraduationCap size={16} />
-              שאלון לילדים/נוער
+              שאלון להורים לילדים ונוער
             </Link>
           </div>
         </nav>
