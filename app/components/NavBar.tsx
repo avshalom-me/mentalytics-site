@@ -49,7 +49,7 @@ export default function NavBar() {
           </Link>
           <Link href="/kids" className="inline-flex items-center gap-1 rounded-xl bg-[#6F8F7A] px-3 py-2 text-xs font-semibold text-white hover:opacity-95">
             <GraduationCap size={14} />
-            ילדים
+            להורים
           </Link>
           <button
             onClick={() => setOpen(!open)}
