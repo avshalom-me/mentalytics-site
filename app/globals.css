@@ -19,3 +19,45 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Print styles — apply across all pages so saved PDFs are clean and readable.
+   The kids/adults quiz reports are the main consumer (window.print() to PDF).  */
+@media print {
+  /* Drop interactive matching panels and other UI not relevant to a printed report */
+  .print\:hidden,
+  [data-print-hide="true"] {
+    display: none !important;
+  }
+  /* Force <details> open so users see all content in the printed PDF */
+  details {
+    page-break-inside: avoid;
+  }
+  details > summary {
+    display: none !important;
+  }
+  details > *:not(summary) {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  /* Avoid splitting recommendation cards across pages */
+  .rounded-2xl,
+  .rounded-xl {
+    page-break-inside: avoid;
+  }
+  /* Make sure background colors print (not all browsers honor this; user must enable "Background graphics") */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  /* Inline links: show URL after the text so a printed copy still has the address */
+  a[href^="http"]::after {
+    content: " (" attr(href) ")";
+    font-size: 0.85em;
+    color: #555;
+  }
+  /* Tighten body padding for print */
+  body {
+    background: white !important;
+  }
+}

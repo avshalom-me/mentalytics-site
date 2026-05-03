@@ -2740,6 +2740,33 @@ function uniq<T>(arr: T[]): T[] {
   return Array.from(new Set(arr));
 }
 
+// Detect bare or full URLs in free text and render them as clickable links.
+// Used for "anpar.org.il" style pointers inside tools/notes.
+function renderWithLinks(text: string): React.ReactNode[] {
+  const urlRx = /(?:https?:\/\/)?(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(?:\/[^\s]*)?/g;
+  const out: React.ReactNode[] = [];
+  let lastIdx = 0;
+  let m: RegExpExecArray | null;
+  while ((m = urlRx.exec(text)) !== null) {
+    if (m.index > lastIdx) out.push(text.slice(lastIdx, m.index));
+    const url = m[0].startsWith("http") ? m[0] : `https://${m[0]}`;
+    out.push(
+      <a
+        key={`u-${m.index}`}
+        href={url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-700 underline hover:text-blue-900"
+      >
+        {m[0]}
+      </a>
+    );
+    lastIdx = m.index + m[0].length;
+  }
+  if (lastIdx < text.length) out.push(text.slice(lastIdx));
+  return out;
+}
+
 function GroupCard({
   group,
   onSelect,
@@ -2812,7 +2839,7 @@ function GroupCard({
 
       {inlineNotes.length > 0 && (
         <div className="mt-2 text-xs text-gray-600 leading-relaxed whitespace-pre-line">
-          {inlineNotes.join("\n")}
+          {renderWithLinks(inlineNotes.join("\n"))}
         </div>
       )}
 
@@ -2846,7 +2873,7 @@ function GroupCard({
           <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
             {expandedNotes.map((n, i) => (
               <div key={`note-${i}`} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line border-r-2 border-gray-300 pr-2">
-                {n}
+                {renderWithLinks(n)}
               </div>
             ))}
             {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
@@ -2856,7 +2883,7 @@ function GroupCard({
                 )}
                 {tools.map((t, i) => (
                   <div key={i} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line">
-                    {t.replace(/^📌\s*/, "")}
+                    {renderWithLinks(t.replace(/^📌\s*/, ""))}
                   </div>
                 ))}
               </div>
@@ -3211,7 +3238,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
           <div className="mt-6 space-y-2">
             {allExternalNotes.map((n, i) => (
               <div key={i} className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 whitespace-pre-line">
-                {n}
+                {renderWithLinks(n)}
               </div>
             ))}
           </div>

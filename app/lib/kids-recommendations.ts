@@ -172,6 +172,18 @@ function emptyGroup(): PendingGroup {
   return { symptoms: [], symptomCls: "purple", refs: [], tools: [], urgent: false };
 }
 
+// Some referrals combine a treatment with an external auxiliary action via
+// "במקביל ל…" (e.g. "טיפול דינאמי במקביל לייעוץ אצל פסיכיאטר ילדים"). Split
+// such phrasings into two separate recommendations so the matching/non-matching
+// classification is correct and the user can act on each part independently.
+function splitParallelRefs(primary: string): string[] {
+  const parts = primary.split(/\s+במקביל\s+ל/);
+  if (parts.length === 1) return [primary];
+  const head = parts[0].trim();
+  const tail = parts.slice(1).map(p => "פנייה ל" + p.trim());
+  return [head, ...tail];
+}
+
 // Parse a referral box that may contain a primary line (✅ …) followed by
 // embedded notes (📌 בעדיפות ל…) on subsequent lines. Preserves blank lines
 // inside notes so paragraph breaks survive to the rendered output.
@@ -323,8 +335,19 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
     if (box.cls === "info" && txt.includes(REF_PREFIX)) {
       const refs = parseRefBox(txt);
       for (const r of refs) {
-        const cls = classifyReferral(r.primary);
-        pending.refs.push({ kind: cls.kind, key: cls.key, label: cls.label, text: r.primary, notes: r.notes });
+        const splits = splitParallelRefs(r.primary);
+        for (let i = 0; i < splits.length; i++) {
+          const text = splits[i];
+          const cls = classifyReferral(text);
+          // Notes only attach to the first ref (they describe the original referral context)
+          pending.refs.push({
+            kind: cls.kind,
+            key: cls.key,
+            label: cls.label,
+            text,
+            notes: i === 0 ? r.notes : undefined,
+          });
+        }
       }
       continue;
     }
