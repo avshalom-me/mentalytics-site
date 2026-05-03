@@ -29,7 +29,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const { data } = await supabaseAdmin
     .from("therapists")
     .select("id, updated_at")
-    .eq("status", "approved");
+    .in("status", ["approved", "paying"]);
 
   const therapistPages: MetadataRoute.Sitemap = (data ?? []).map((t) => ({
     url: `${BASE}/therapists/${t.id}`,
