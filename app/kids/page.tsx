@@ -2429,7 +2429,8 @@ function KidsMatchSection({ A, score, selection }: {
             region_preference: city || region || undefined,
             online_preference: online || undefined,
             therapist_gender_preference: gender || undefined,
-            recommended_treatment_types: treatments,
+            recommended_treatment_types: isAssessment ? [] : treatments,
+            recommended_assessment_types: isAssessment ? treatments : undefined,
             cultural_preferences: cultural.length ? cultural : undefined,
           },
           therapist: {
@@ -2775,13 +2776,16 @@ function GroupCard({
   // Color theme per kind
   const accent = group.urgent
     ? "border-red-400 bg-red-50"
-    : isAssessment
-      ? "border-purple-300 bg-purple-50"
-      : isExternal
-        ? "border-amber-300 bg-amber-50"
-        : "border-blue-200 bg-white";
+    : noAction
+      ? "border-gray-200 bg-gray-50"
+      : isAssessment
+        ? "border-purple-300 bg-purple-50"
+        : isExternal
+          ? "border-amber-300 bg-amber-50"
+          : "border-blue-200 bg-white";
 
   const labelTone = group.urgent ? "text-red-700"
+    : noAction ? "text-gray-500"
     : isAssessment ? "text-purple-700"
     : isExternal ? "text-amber-800"
     : "text-[#2e7d8c]";
@@ -2893,6 +2897,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     treatments: DomainGroup[];
     assessments: DomainGroup[];
     externals: DomainGroup[];
+    informational: DomainGroup[]; // symptoms with no actionable referral (low-stress etc.)
     standaloneWarnings: typeof domainResults[number]["result"]["standaloneWarnings"];
     externalNotes: string[];
   };
@@ -2906,6 +2911,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         treatments: groups.filter(g => g.kind === "treatment" && g.treatmentKey !== "_no_action"),
         assessments: groups.filter(g => g.kind === "assessment"),
         externals: groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
+        informational: groups.filter(g => g.treatmentKey === "_no_action"),
         standaloneWarnings: d.result.standaloneWarnings,
         externalNotes: d.result.externalNotes,
       };
@@ -2913,7 +2919,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   }, [domainResults]);
 
   const hasAnyFindings = byDomain.some(b =>
-    b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 || b.standaloneWarnings.length > 0
+    b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
   );
 
   // Active selection for the matching panel.
@@ -3075,6 +3081,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
             b.treatments.length > 0 ||
             b.assessments.length > 0 ||
             b.externals.length > 0 ||
+            b.informational.length > 0 ||
             b.standaloneWarnings.length > 0;
           if (!hasAny) return null;
 
@@ -3171,6 +3178,21 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2 pr-1">🩺 פניות נוספות</div>
                   <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה — יש לפנות אליהם בנפרד.</p>
                   {b.externals.map(g => (
+                    <GroupCard
+                      key={g.recs[0].id}
+                      group={g}
+                      onSelect={null}
+                      selected={false}
+                    />
+                  ))}
+                </div>
+              )}
+
+              {/* Informational symptoms (no actionable referral) */}
+              {b.informational.length > 0 && (
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 ? "mt-5" : ""}>
+                  <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 pr-1">📊 ממצאים נוספים</div>
+                  {b.informational.map(g => (
                     <GroupCard
                       key={g.recs[0].id}
                       group={g}

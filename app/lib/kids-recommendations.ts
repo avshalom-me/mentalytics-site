@@ -127,11 +127,15 @@ const TOOL_SYMPTOM_HINTS: { rx: RegExp; symptomHint: RegExp }[] = [
   { rx: /כלים? לעבודה עם קשיים ברבי מלל/, symptomHint: /רבי מלל|הבנת הנקרא|קריאה/ },
   { rx: /כלים? לעבודה עם קשיים באנגלית/, symptomHint: /אנגלית/ },
   { rx: /כלים? לעבודה עם קשיי כתיבה/, symptomHint: /כתב יד|כתיבה/ },
-  { rx: /תוכנית חיזוקים/, symptomHint: /קריאה/ },
-  { rx: /להפחתת מתח/, symptomHint: /חרד|מתח/ },
+  { rx: /תוכנית חיזוקים/, symptomHint: /קריאה|למידה/ },
+  { rx: /להפחתת מתח|הרפיה|נשימות/, symptomHint: /חרד|מתח|פחד/ },
   { rx: /קשיים חברתיים|חיכוכים והתנגדויות/, symptomHint: /חברת|התנהגות/ },
   { rx: /תוכנית התנהגותית/, symptomHint: /התנהגות/ },
   { rx: /גמילה|התרוקנות|עצירות|הרטבה|אנקופרזיס/, symptomHint: /גמילה|התרוקנות/ },
+  { rx: /אובססי|קומפולסי|OCD/i, symptomHint: /אובססי|קומפולסי/ },
+  { rx: /טראומה|EMDR/i, symptomHint: /טראומה|אירוע טראומטי/ },
+  { rx: /אכילה|דיאט/, symptomHint: /אכילה/ },
+  { rx: /ויסות|חוש/, symptomHint: /חוש|ויסות|רגישות/ },
 ];
 
 function findToolSymptom(toolText: string, symptoms: string[]): string | undefined {
@@ -169,15 +173,19 @@ function emptyGroup(): PendingGroup {
 }
 
 // Parse a referral box that may contain a primary line (✅ …) followed by
-// embedded notes (📌 בעדיפות ל…) on subsequent lines.
+// embedded notes (📌 בעדיפות ל…) on subsequent lines. Preserves blank lines
+// inside notes so paragraph breaks survive to the rendered output.
 function parseRefBox(text: string): { primary: string; notes?: string }[] {
-  const lines = text.split(/\n/).map(l => l.trim()).filter(Boolean);
+  const lines = text.split(/\n/);
   const out: { primary: string; notes?: string }[] = [];
   let currentNotes: string[] = [];
   let currentPrimary: string | null = null;
 
   function flush() {
     if (currentPrimary !== null) {
+      // Trim leading/trailing blank lines from notes; keep internal ones
+      while (currentNotes.length && !currentNotes[0].trim()) currentNotes.shift();
+      while (currentNotes.length && !currentNotes[currentNotes.length - 1].trim()) currentNotes.pop();
       out.push({
         primary: currentPrimary,
         notes: currentNotes.length ? currentNotes.join("\n") : undefined,
@@ -188,9 +196,10 @@ function parseRefBox(text: string): { primary: string; notes?: string }[] {
   }
 
   for (const line of lines) {
-    if (line.startsWith(REF_PREFIX)) {
+    const trimmed = line.trim();
+    if (trimmed.startsWith(REF_PREFIX)) {
       flush();
-      currentPrimary = stripPrefix(line, REF_PREFIX).replace(/^הפנייה[:\s]+/, "").trim();
+      currentPrimary = trimmed.slice(REF_PREFIX.length).trim().replace(/^הפנייה[:\s]+/, "").trim();
     } else if (currentPrimary !== null) {
       currentNotes.push(line);
     }
@@ -294,12 +303,16 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
 
     // Standalone urgent warning (no 📊) — danger or warn
     if ((box.cls === "danger" || box.cls === "warn") && (txt.startsWith(WARN_PREFIX) || txt.startsWith(URGENT_PREFIX))) {
-      // If there's a current pending group, attach as a warning rec inside it
-      // Otherwise standalone
-      if (pending.symptoms.length || pending.refs.length) {
-        // Treat as an extra ref attached to the current group
+      // 🚨 (URGENT_PREFIX) is ALWAYS standalone — flush any pending group first
+      // so the warning never gets glued to an unrelated treatment recommendation.
+      // ⚠️ (WARN_PREFIX) attaches to the current pending group if one exists
+      // (e.g. "⚠️ דווח על כאבים כרוניים" inside a current Q1 anxiety group).
+      if (txt.startsWith(URGENT_PREFIX)) {
+        flushPending();
+        standaloneWarnings.push({ text: txt, urgent: true });
+      } else if (pending.symptoms.length || pending.refs.length) {
         const cls = classifyReferral(txt);
-        pending.refs.push({ kind: cls.kind, key: cls.key, label: cls.label, text: stripPrefix(txt, txt.startsWith(URGENT_PREFIX) ? URGENT_PREFIX : WARN_PREFIX) });
+        pending.refs.push({ kind: cls.kind, key: cls.key, label: cls.label, text: stripPrefix(txt, WARN_PREFIX) });
       } else {
         standaloneWarnings.push({ text: txt, urgent: box.cls === "danger" });
       }
