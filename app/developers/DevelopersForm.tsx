@@ -49,9 +49,9 @@ export default function DevelopersForm() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.name.trim() || !form.email.trim() || !form.description.trim()) {
+    if (!form.name.trim() || !form.email.trim()) {
       setStatus("error");
-      setErrorMsg("יש למלא שם, מייל ותיאור הרעיון");
+      setErrorMsg("יש למלא שם ומייל");
       return;
     }
     setStatus("submitting");
@@ -151,9 +151,9 @@ export default function DevelopersForm() {
             onChange={(e) => update("role", e.target.value)}
             className={inputClass}
           >
-            <option value="">בחרו...</option>
+            <option value="" style={{ background: "#0F1729", color: "#9CA3AF" }}>בחרו...</option>
             {ROLES.map((r) => (
-              <option key={r} value={r}>{r}</option>
+              <option key={r} value={r} style={{ background: "#0F1729", color: "#FFFFFF" }}>{r}</option>
             ))}
           </select>
         </div>
@@ -165,19 +165,18 @@ export default function DevelopersForm() {
             onChange={(e) => update("stage", e.target.value)}
             className={inputClass}
           >
-            <option value="">בחרו...</option>
+            <option value="" style={{ background: "#0F1729", color: "#9CA3AF" }}>בחרו...</option>
             {STAGES.map((s) => (
-              <option key={s} value={s}>{s}</option>
+              <option key={s} value={s} style={{ background: "#0F1729", color: "#FFFFFF" }}>{s}</option>
             ))}
           </select>
         </div>
       </div>
 
       <div>
-        <label className={labelClass} htmlFor="dev-desc">תיאור הרעיון *</label>
+        <label className={labelClass} htmlFor="dev-desc">תיאור הרעיון (אופציונלי)</label>
         <textarea
           id="dev-desc"
-          required
           rows={6}
           value={form.description}
           onChange={(e) => update("description", e.target.value)}
@@ -207,7 +206,7 @@ export default function DevelopersForm() {
           ) : (
             <>
               <Send size={18} />
-              שלחו את הרעיון
+              שלח
             </>
           )}
         </span>
