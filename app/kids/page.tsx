@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
+import {
+  parseKidsBoxes,
+  type KidsRecommendationGroup,
+  type KidsDomainResult,
+} from "@/app/lib/kids-recommendations";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -2317,43 +2322,6 @@ const AREA_LABELS: Record<string, string> = {
 };
 
 // ── Kids matching helpers ─────────────────────────────────────────────────────
-const KIDS_TREATMENT_MAP: { rx: RegExp; areas: string[] }[] = [
-  { rx: /הדרכת הורים/,                  areas: ["הדרכת הורים"] },
-  { rx: /טיפול דיאדי/,                  areas: ["טיפול דיאדי"] },
-  { rx: /הבעה ויצירה/,                  areas: ["טיפול בהבעה ויצירה"] },
-  { rx: /פסיכודינאמי|דינאמי/,           areas: ["טיפול דינאמי"] },
-  { rx: /\bCBT\b/,                       areas: ["CBT"] },
-  { rx: /EMDR/,                          areas: ["EMDR", "טיפול בטראומה"] },
-  { rx: /\bCPT\b/,                       areas: ["CPT", "טיפול בטראומה"] },
-  { rx: /טיפול דינאמי בטראומה/,         areas: ["טיפול דינאמי בטראומה", "טיפול בטראומה"] },
-  { rx: /טיפול בטראומה/,                areas: ["טיפול בטראומה"] },
-  { rx: /\bDBT\b/,                       areas: ["DBT"] },
-  { rx: /התמכרויות/,                    areas: ["טיפול בהתמכרויות"] },
-  { rx: /COG[-\s]?FUN/i,               areas: ["טיפול COG-FUN לקשיי קשב וריכוז"] },
-  { rx: /ויסות חושי/,                   areas: ["ריפוי בעיסוק"] },
-  { rx: /ריפוי בעיסוק/,                 areas: ["ריפוי בעיסוק"] },
-  { rx: /קבוצה חברתית/,                areas: ["קבוצה חברתית"] },
-  { rx: /טיפול תעסוקתי/,               areas: ["טיפול תעסוקתי"] },
-  { rx: /פסיכו.?דידקטי/,              areas: ["פסיכו-דידקטי"] },
-];
-
-function extractKidsTreatments(score: KidsScoreResult): string[] {
-  const allBoxes = [
-    ...score.emotional,
-    ...score.academic,
-    ...score.developmental,
-    ...score.behavioral,
-    ...score.social,
-  ];
-  const found = new Set<string>();
-  for (const box of allBoxes) {
-    if (!box.txt.startsWith("✅")) continue;
-    for (const { rx, areas } of KIDS_TREATMENT_MAP) {
-      if (rx.test(box.txt)) areas.forEach(a => found.add(a));
-    }
-  }
-  return Array.from(found);
-}
 
 const EXPRESSIVE_MODALITY_MAP: Record<string, string> = {
   "אומנות": "טיפול באומנות",
@@ -2408,7 +2376,17 @@ type KidsMatchResult = {
   match_reasons: string[];
 };
 
-function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null }) {
+type MatchSelection = {
+  keys: string[];
+  labels: string[];
+  kind: "treatment" | "assessment";
+};
+
+function KidsMatchSection({ A, score, selection }: {
+  A: Ans;
+  score: KidsScoreResult | null;
+  selection: MatchSelection;
+}) {
   const [open, setOpen]               = useState(false);
   const [region, setRegion]           = useState("");
   const [online, setOnline]           = useState(false);
@@ -2424,8 +2402,17 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
-  const rawTreatments = score ? extractKidsTreatments(score) : [];
-  const treatments = rawTreatments.length > 0 ? rawTreatments : ["טיפול דינאמי"];
+  // Reset results when the selection changes (e.g. user clicked a different recommendation card)
+  useEffect(() => {
+    setResults([]);
+    setSearched(false);
+    setError("");
+  }, [selection.keys.join("|"), selection.kind]);
+
+  const treatments = selection.keys.length > 0 ? selection.keys : ["טיפול דינאמי"];
+  const treatmentLabels = selection.labels.length > 0 ? selection.labels : ["טיפול דינאמי"];
+  const isAssessment = selection.kind === "assessment";
+  const personLabel = isAssessment ? "מאבחן/ת" : "מטפל/ת";
   const ageGroups  = getKidsAgeGroups(A);
   const expressivePrefs = score ? extractExpressivePrefs(score) : [];
 
@@ -2482,7 +2469,8 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          treatmentTypes: treatments,
+          treatmentTypes: isAssessment ? [] : treatments,
+          diagnosisTypes: isAssessment ? treatments : [],
           ageGroups,
           genderPreference: gender || null,
           city: city || null,
@@ -2491,7 +2479,7 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
           culturalPreferences: cultural,
           arrangements,
           languages: [language || "עברית"],
-          expressiveModalities: expressivePrefs.length > 0 ? expressivePrefs : undefined,
+          expressiveModalities: isAssessment || expressivePrefs.length === 0 ? undefined : expressivePrefs,
           limit: 10,
         }),
       });
@@ -2517,16 +2505,16 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
         <button
           onClick={() => setOpen(true)}
           className="w-full py-4 rounded-2xl text-white font-bold text-base shadow-md transition hover:opacity-90 active:scale-95"
-          style={{ background: "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
+          style={{ background: isAssessment ? "linear-gradient(135deg,#5a3e7a,#7a4a9a)" : "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
         >
-          🔍 מציאת מטפל/ת מתאים/ה
+          {isAssessment ? "🔎" : "🔍"} מציאת {personLabel} מתאים/ה — {treatmentLabels.join(" + ")}
         </button>
       ) : (
-        <div className="rounded-2xl border border-[#c8d8f0] bg-[#f0f5ff] p-5">
-          <h3 className="font-bold text-[#1a3a5c] text-lg mb-1">מציאת מטפל/ת מתאים/ה</h3>
-          {treatments.length > 0 && (
+        <div className={`rounded-2xl border p-5 ${isAssessment ? "border-purple-200 bg-purple-50" : "border-[#c8d8f0] bg-[#f0f5ff]"}`}>
+          <h3 className="font-bold text-[#1a3a5c] text-lg mb-1">מציאת {personLabel} מתאים/ה</h3>
+          {treatmentLabels.length > 0 && (
             <p className="text-xs text-gray-500 mb-4">
-              על בסיס הממצאים: {treatments.join(", ")}
+              על בסיס הממצאים: {treatmentLabels.join(", ")}
             </p>
           )}
 
@@ -2616,9 +2604,9 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
             onClick={doMatch}
             disabled={loading}
             className="w-full py-3 rounded-xl text-white font-bold transition hover:opacity-90 disabled:opacity-50"
-            style={{ background: "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
+            style={{ background: isAssessment ? "linear-gradient(135deg,#5a3e7a,#7a4a9a)" : "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
           >
-            {loading ? "מחפש..." : "חיפוש מטפל/ת"}
+            {loading ? "מחפש..." : `חיפוש ${personLabel}`}
           </button>
 
           {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
@@ -2630,11 +2618,11 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
         <div className="mt-5">
           {results.length === 0 ? (
             <div className="text-center py-6 text-[#4a6fa5] text-sm bg-blue-50 rounded-2xl">
-              לא נמצאו מטפלים מתאימים לפי הפרמטרים שנבחרו.
+              לא נמצאו {isAssessment ? "מאבחנים" : "מטפלים"} מתאימים לפי הפרמטרים שנבחרו.
             </div>
           ) : (
             <>
-              <div className="text-sm font-bold text-[#1a3a5c] mb-3">נמצאו {results.length} מטפלים:</div>
+              <div className="text-sm font-bold text-[#1a3a5c] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
               <div className="space-y-4">
                 {results.map(t => {
                   const regionsArr = toArr(t.regions);
@@ -2747,16 +2735,252 @@ function KidsMatchSection({ A, score }: { A: Ans; score: KidsScoreResult | null 
   );
 }
 
-function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void }) {
-  const domains: { label: string; boxes: Box[] }[] = score ? [
-    { label: "🧠 תחום רגשי",       boxes: score.emotional },
-    { label: "📚 תחום לימודי",      boxes: score.academic },
-    { label: "🌱 תחום התפתחותי",    boxes: score.developmental },
-    { label: "⚡ תחום התנהגותי",    boxes: score.behavioral },
-    { label: "🤝 תחום חברתי",       boxes: score.social },
-  ] : [];
+function uniq<T>(arr: T[]): T[] {
+  return Array.from(new Set(arr));
+}
 
-  const hasAnyFindings = domains.some(d => d.boxes.length > 0);
+function GroupCard({
+  group,
+  onSelect,
+  selected,
+}: {
+  group: KidsRecommendationGroup & { domainLabel: string };
+  onSelect: (() => void) | null;
+  selected: boolean;
+}) {
+  const allSymptoms = uniq(group.recs.flatMap(r => r.symptoms));
+  const allTools = group.recs.flatMap(r => r.tools);
+  const allNotes = uniq(group.recs.map(r => r.notes).filter(Boolean) as string[]);
+
+  // Notes >200 chars move to the accordion so they don't overwhelm the card.
+  const NOTE_INLINE_LIMIT = 200;
+  const inlineNotes = allNotes.filter(n => n.length <= NOTE_INLINE_LIMIT);
+  const expandedNotes = allNotes.filter(n => n.length > NOTE_INLINE_LIMIT);
+
+  // Group tools by their source symptom (best-effort) so the user sees why each tool is recommended.
+  const toolsBySymptom = new Map<string, string[]>();
+  for (const t of allTools) {
+    const key = t.sourceSymptom || "כללי";
+    const list = toolsBySymptom.get(key) ?? [];
+    if (!list.includes(t.text)) list.push(t.text);
+    toolsBySymptom.set(key, list);
+  }
+
+  const hasExpandable = allTools.length > 0 || expandedNotes.length > 0;
+
+  const isAssessment = group.kind === "assessment";
+  const isExternal = group.kind === "external";
+  const noAction = group.treatmentKey === "_no_action";
+
+  // Color theme per kind
+  const accent = group.urgent
+    ? "border-red-400 bg-red-50"
+    : isAssessment
+      ? "border-purple-300 bg-purple-50"
+      : isExternal
+        ? "border-amber-300 bg-amber-50"
+        : "border-blue-200 bg-white";
+
+  const labelTone = group.urgent ? "text-red-700"
+    : isAssessment ? "text-purple-700"
+    : isExternal ? "text-amber-800"
+    : "text-[#2e7d8c]";
+
+  return (
+    <div className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[#1a3a5c]" : ""}`}>
+      <div className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${labelTone}`}>
+        {group.domainLabel}
+        {group.urgent && " ⚠️"}
+      </div>
+
+      {allSymptoms.length === 1 ? (
+        <p className="font-semibold text-[#1a2a3a] text-sm leading-relaxed">{allSymptoms[0]}</p>
+      ) : (
+        <ul className="space-y-1">
+          {allSymptoms.map(s => (
+            <li key={s} className="flex items-start gap-2 text-sm font-semibold text-[#1a2a3a] leading-relaxed">
+              <span className={`mt-1 ${labelTone}`}>•</span>
+              <span>{s}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {inlineNotes.length > 0 && (
+        <div className="mt-2 text-xs text-gray-600 leading-relaxed whitespace-pre-line">
+          {inlineNotes.join("\n")}
+        </div>
+      )}
+
+      {!noAction && (
+        <div className="mt-3">
+          {onSelect ? (
+            <button
+              type="button"
+              onClick={onSelect}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                isAssessment
+                  ? "bg-purple-700 text-white hover:bg-purple-800"
+                  : "bg-[#1a3a5c] text-white hover:bg-[#0f2845]"
+              }`}
+            >
+              {isAssessment ? "🔎 חיפוש מאבחן/ת" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel}
+            </button>
+          ) : (
+            <div className="inline-block rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">
+              → {group.treatmentLabel}
+            </div>
+          )}
+        </div>
+      )}
+
+      {hasExpandable && (
+        <details className="mt-3 group">
+          <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[#1a3a5c] select-none">
+            {allTools.length > 0 ? "🛠 כלים מעשיים והסבר מורחב — לחץ להרחיב" : "📋 הסבר מורחב — לחץ להרחיב"}
+          </summary>
+          <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
+            {expandedNotes.map((n, i) => (
+              <div key={`note-${i}`} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line border-r-2 border-gray-300 pr-2">
+                {n}
+              </div>
+            ))}
+            {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
+              <div key={symptom}>
+                {symptom !== "כללי" && allSymptoms.length > 1 && (
+                  <div className="text-xs font-bold text-[#1a3a5c] mb-1">▸ {symptom}</div>
+                )}
+                {tools.map((t, i) => (
+                  <div key={i} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line">
+                    {t.replace(/^📌\s*/, "")}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+    </div>
+  );
+}
+
+const DOMAIN_LABELS: Record<string, string> = {
+  emotional: "🧠 תחום רגשי",
+  academic: "📚 תחום לימודי",
+  developmental: "🌱 תחום התפתחותי",
+  behavioral: "⚡ תחום התנהגותי",
+  social: "🤝 תחום חברתי",
+};
+
+function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void }) {
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  const domainResults: { key: string; label: string; result: KidsDomainResult }[] = useMemo(() => {
+    if (!score) return [];
+    return [
+      { key: "emotional", label: DOMAIN_LABELS.emotional, result: parseKidsBoxes(score.emotional, "emotional") },
+      { key: "academic", label: DOMAIN_LABELS.academic, result: parseKidsBoxes(score.academic, "academic") },
+      { key: "developmental", label: DOMAIN_LABELS.developmental, result: parseKidsBoxes(score.developmental, "developmental") },
+      { key: "behavioral", label: DOMAIN_LABELS.behavioral, result: parseKidsBoxes(score.behavioral, "behavioral") },
+      { key: "social", label: DOMAIN_LABELS.social, result: parseKidsBoxes(score.social, "social") },
+    ];
+  }, [score]);
+
+  type DomainGroup = KidsRecommendationGroup & { domainLabel: string; domainKey: string };
+  type DomainBucket = {
+    key: string;
+    label: string;
+    treatments: DomainGroup[];
+    assessments: DomainGroup[];
+    externals: DomainGroup[];
+    standaloneWarnings: typeof domainResults[number]["result"]["standaloneWarnings"];
+    externalNotes: string[];
+  };
+
+  const byDomain: DomainBucket[] = useMemo(() => {
+    return domainResults.map(d => {
+      const groups = d.result.groups.map(g => ({ ...g, domainLabel: d.label, domainKey: d.key }));
+      return {
+        key: d.key,
+        label: d.label,
+        treatments: groups.filter(g => g.kind === "treatment" && g.treatmentKey !== "_no_action"),
+        assessments: groups.filter(g => g.kind === "assessment"),
+        externals: groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
+        standaloneWarnings: d.result.standaloneWarnings,
+        externalNotes: d.result.externalNotes,
+      };
+    });
+  }, [domainResults]);
+
+  const hasAnyFindings = byDomain.some(b =>
+    b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 || b.standaloneWarnings.length > 0
+  );
+
+  // Active selection for the matching panel.
+  //  selectedKey format:
+  //    "{domainKey}::{kind}::{treatmentKey}"      for individual group
+  //    "{domainKey}::__combined::{kind}"          for per-domain combined search
+  //    "_dynamic_fallback_"                       for the no-findings dynamic-therapist click
+  //  null  → matching panel hidden (no auto-fallback to טיפול דינאמי)
+  const activeSelection: MatchSelection | null = useMemo(() => {
+    if (!selectedKey) return null;
+    if (selectedKey === "_dynamic_fallback_") {
+      return { keys: ["טיפול דינאמי"], labels: ["טיפול דינאמי"], kind: "treatment" };
+    }
+    const combMatch = selectedKey.match(/^(.+)::__combined::(treatment|assessment)$/);
+    if (combMatch) {
+      const domainKey = combMatch[1];
+      const kindStr = combMatch[2] as "treatment" | "assessment";
+      const bucket = byDomain.find(b => b.key === domainKey);
+      if (!bucket) return null;
+      const groups = kindStr === "treatment" ? bucket.treatments : bucket.assessments;
+      const seen = new Set<string>();
+      const keys: string[] = [];
+      const labels: string[] = [];
+      for (const g of groups) {
+        if (seen.has(g.treatmentKey)) continue;
+        seen.add(g.treatmentKey);
+        keys.push(g.treatmentKey);
+        labels.push(g.treatmentLabel);
+      }
+      return { keys, labels, kind: kindStr };
+    }
+    const indMatch = selectedKey.match(/^(.+?)::(treatment|assessment|external)::(.+)$/);
+    if (indMatch) {
+      const [, domainKey, , treatmentKey] = indMatch;
+      const bucket = byDomain.find(b => b.key === domainKey);
+      if (!bucket) return null;
+      const all = [...bucket.treatments, ...bucket.assessments];
+      const group = all.find(g => g.treatmentKey === treatmentKey);
+      if (!group) return null;
+      const apiKind = group.kind === "assessment" ? "assessment" : "treatment";
+      return { keys: [group.treatmentKey], labels: [group.treatmentLabel], kind: apiKind };
+    }
+    return null;
+  }, [selectedKey, byDomain]);
+
+  function scrollToMatch() {
+    if (typeof window === "undefined") return;
+    setTimeout(() => {
+      document.getElementById("kids-match-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
+  function selectGroup(domainKey: string, g: KidsRecommendationGroup) {
+    setSelectedKey(`${domainKey}::${g.kind}::${g.treatmentKey}`);
+    scrollToMatch();
+  }
+
+  function selectCombined(domainKey: string, kind: "treatment" | "assessment") {
+    setSelectedKey(`${domainKey}::__combined::${kind}`);
+    scrollToMatch();
+  }
+
+  function selectDynamicFallback() {
+    setSelectedKey("_dynamic_fallback_");
+    scrollToMatch();
+  }
+
   const bmiNum = A._bmi ? Number(A._bmi) : null;
   const bmiVal = bmiNum ? bmiNum.toFixed(1) : null;
   const bmiAbnormal = bmiNum != null && (bmiNum < 18.5 || bmiNum > 24.9);
@@ -2776,6 +3000,8 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   if (!score) return (
     <div className="flex items-center justify-center py-20 text-gray-500 text-sm">מחשב תוצאות…</div>
   );
+
+  const allExternalNotes = uniq(byDomain.flatMap(b => b.externalNotes));
 
   return (
     <div>
@@ -2817,13 +3043,14 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         </div>
       </Card>
 
-      {/* Findings */}
+      {/* BMI banner */}
       <div className="mt-4">
         {bmiAbnormal && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+          <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
             ⚕️ ה-BMI של הילד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.
           </div>
         )}
+
         {!hasAnyFindings && (
           <Card>
             <div className="py-4">
@@ -2831,38 +3058,150 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
-              <p className="text-sm text-[#2c3e7a] font-semibold">↓ ניתן לחפש מטפל/ת מתאים/ה למטה</p>
+              <button
+                type="button"
+                onClick={selectDynamicFallback}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-3 py-2 text-xs font-bold text-white hover:bg-[#0f2845]"
+              >
+                🔍 חיפוש מטפל/ת לטיפול דינאמי
+              </button>
             </div>
           </Card>
         )}
 
-        {domains.map((domain, di) => {
-          if (domain.boxes.length === 0) return null;
-          const main  = domain.boxes.filter(b => !b.txt.startsWith("📌"));
-          const tools = domain.boxes.filter(b =>  b.txt.startsWith("📌"));
+        {/* Per-domain sections */}
+        {byDomain.map(b => {
+          const hasAny =
+            b.treatments.length > 0 ||
+            b.assessments.length > 0 ||
+            b.externals.length > 0 ||
+            b.standaloneWarnings.length > 0;
+          if (!hasAny) return null;
+
+          const domainTreatmentKeys = uniq(b.treatments.map(g => g.treatmentKey));
+          const domainAssessmentKeys = uniq(b.assessments.map(g => g.treatmentKey));
+          const showCombinedT = domainTreatmentKeys.length >= 2;
+          const showCombinedA = domainAssessmentKeys.length >= 2;
+          const combinedTLabels = uniq(b.treatments.map(g => g.treatmentLabel));
+          const combinedALabels = uniq(b.assessments.map(g => g.treatmentLabel));
+
           return (
-            <div key={di} className="mt-6">
+            <section key={b.key} className="mt-7">
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-px flex-1 bg-gray-200" />
                 <span className="text-sm font-bold text-[#1a3a5c] px-3 py-1 rounded-full bg-blue-50 border border-blue-100 whitespace-nowrap">
-                  {domain.label}
+                  {b.label}
                 </span>
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
-              {main.map((b, i) => <AlertBox key={i} cls={b.cls} txt={b.txt} />)}
-              {tools.length > 0 && (
-                <div className="mt-3">
-                  <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2 pr-1">כלים ופרקטיקות</div>
-                  {tools.map((b, i) => <AlertBox key={i} cls="info" txt={b.txt} />)}
+
+              {/* Standalone warnings for this domain (vision/hearing/suicidal/etc.) */}
+              {b.standaloneWarnings.map((w, i) => (
+                <div
+                  key={`w-${i}`}
+                  className={`mb-3 rounded-xl border p-4 text-sm leading-relaxed ${
+                    w.urgent
+                      ? "border-red-400 bg-red-50 text-red-900"
+                      : "border-amber-300 bg-amber-50 text-amber-900"
+                  }`}
+                >
+                  {w.text}
+                </div>
+              ))}
+
+              {/* Treatments */}
+              {b.treatments.length > 0 && (
+                <div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-[#2e7d8c] mb-2 pr-1">💙 טיפולים מומלצים</div>
+                  {b.treatments.map(g => (
+                    <GroupCard
+                      key={g.recs[0].id}
+                      group={g}
+                      onSelect={() => selectGroup(b.key, g)}
+                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                    />
+                  ))}
+                  {showCombinedT && (
+                    <button
+                      type="button"
+                      onClick={() => selectCombined(b.key, "treatment")}
+                      className={`mt-2 w-full rounded-2xl border-2 border-dashed border-[#1a3a5c] bg-blue-50/50 p-4 text-right transition hover:bg-blue-100 ${
+                        selectedKey === `${b.key}::__combined::treatment` ? "ring-2 ring-[#1a3a5c]" : ""
+                      }`}
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#1a3a5c] mb-1">חיפוש מתקדם ✦</div>
+                      <div className="font-semibold text-sm text-[#1a2a3a]">חיפוש משולב — מטפל/ת שמכסה את מירב הטיפולים בתחום זה</div>
+                      <div className="mt-1 text-xs text-gray-600">{combinedTLabels.join(" · ")}</div>
+                    </button>
+                  )}
                 </div>
               )}
-            </div>
+
+              {/* Assessments */}
+              {b.assessments.length > 0 && (
+                <div className={b.treatments.length > 0 ? "mt-5" : ""}>
+                  <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 pr-1">🔎 אבחונים מומלצים</div>
+                  {b.assessments.map(g => (
+                    <GroupCard
+                      key={g.recs[0].id}
+                      group={g}
+                      onSelect={() => selectGroup(b.key, g)}
+                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                    />
+                  ))}
+                  {showCombinedA && (
+                    <button
+                      type="button"
+                      onClick={() => selectCombined(b.key, "assessment")}
+                      className={`mt-2 w-full rounded-2xl border-2 border-dashed border-purple-700 bg-purple-50/50 p-4 text-right transition hover:bg-purple-100 ${
+                        selectedKey === `${b.key}::__combined::assessment` ? "ring-2 ring-purple-700" : ""
+                      }`}
+                    >
+                      <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-1">חיפוש מתקדם ✦</div>
+                      <div className="font-semibold text-sm text-[#1a2a3a]">חיפוש משולב — מאבחן/ת שמכסה את מירב האבחונים בתחום זה</div>
+                      <div className="mt-1 text-xs text-gray-600">{combinedALabels.join(" · ")}</div>
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Externals — no search button */}
+              {b.externals.length > 0 && (
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
+                  <div className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2 pr-1">🩺 פניות נוספות</div>
+                  <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה — יש לפנות אליהם בנפרד.</p>
+                  {b.externals.map(g => (
+                    <GroupCard
+                      key={g.recs[0].id}
+                      group={g}
+                      onSelect={null}
+                      selected={false}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
           );
         })}
+
+        {/* Cross-domain notes */}
+        {allExternalNotes.length > 0 && (
+          <div className="mt-6 space-y-2">
+            {allExternalNotes.map((n, i) => (
+              <div key={i} className="rounded-xl border border-gray-200 bg-gray-50 p-3 text-xs leading-relaxed text-gray-700 whitespace-pre-line">
+                {n}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Matching */}
-      <KidsMatchSection A={A} score={score} />
+      {/* Matching — visible only after a selection */}
+      <div id="kids-match-section">
+        {activeSelection && (
+          <KidsMatchSection A={A} score={score} selection={activeSelection} />
+        )}
+      </div>
 
       {/* Disclaimer */}
       <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-6 text-stone-500">
