@@ -29,6 +29,18 @@ export default function NavBar() {
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#kids">ילדים</a>
           <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#adults">מבוגרים</a>
           <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">המטפלים שלנו</Link>
+          <Link
+            className="text-sm font-semibold hover:underline"
+            href="/developers"
+            style={{
+              backgroundImage: "linear-gradient(120deg,#7C3AED,#DB2777,#06B6D4)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            בית למפתחים
+          </Link>
           <div className="flex items-center gap-2">
             <Link href="/adults" className="inline-flex items-center gap-2 rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40">
               <User size={16} />
@@ -69,6 +81,19 @@ export default function NavBar() {
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#kids" onClick={() => setOpen(false)}>ילדים</a>
           <a className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/#adults" onClick={() => setOpen(false)}>מבוגרים</a>
           <Link className="block text-sm text-stone-700 hover:text-stone-900 py-1" href="/therapists" onClick={() => setOpen(false)}>המטפלים שלנו</Link>
+          <Link
+            className="block text-sm font-semibold py-1"
+            href="/developers"
+            onClick={() => setOpen(false)}
+            style={{
+              backgroundImage: "linear-gradient(120deg,#7C3AED,#DB2777,#06B6D4)",
+              WebkitBackgroundClip: "text",
+              backgroundClip: "text",
+              color: "transparent",
+            }}
+          >
+            בית למפתחים
+          </Link>
           <div className="pt-3 mt-2 border-t border-[#EFE7DC] flex items-center gap-3 text-xs">
             <span className="text-stone-500">לאנשי מקצוע:</span>
             <Link className="text-stone-600 hover:text-stone-900" href="/therapists/join" onClick={() => setOpen(false)}>כניסה/הרשמה</Link>
