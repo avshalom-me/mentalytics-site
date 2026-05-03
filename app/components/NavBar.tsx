@@ -17,20 +17,20 @@ export default function NavBar() {
         </div>
       </div>
 
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
         <Link href="/" onClick={() => setOpen(false)}>
           <img src="/logo.svg.png" alt="Mentalytics" className="h-16 w-auto" />
         </Link>
 
         {/* Desktop nav */}
-        <nav aria-label="ניווט ראשי" className="hidden md:flex items-center gap-4">
-          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/about">אודות</Link>
-          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/research">מאמרים ומידע שימושי</Link>
-          <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#kids">ילדים</a>
-          <a className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#adults">מבוגרים</a>
-          <Link className="text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">המטפלים שלנו</Link>
+        <nav aria-label="ניווט ראשי" className="hidden md:flex items-center gap-3 lg:gap-4">
+          <Link className="whitespace-nowrap text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/about">אודות</Link>
+          <Link className="whitespace-nowrap text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/research">מאמרים ומידע שימושי</Link>
+          <a className="whitespace-nowrap text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#kids">ילדים</a>
+          <a className="whitespace-nowrap text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/#adults">מבוגרים</a>
+          <Link className="whitespace-nowrap text-sm text-stone-700 hover:text-stone-900 hover:underline" href="/therapists">המטפלים שלנו</Link>
           <Link
-            className="text-sm font-semibold hover:underline"
+            className="whitespace-nowrap text-sm font-semibold hover:underline"
             href="/developers"
             style={{
               backgroundImage: "linear-gradient(120deg,#7C3AED,#DB2777,#06B6D4)",
@@ -42,11 +42,11 @@ export default function NavBar() {
             בית למפתחים
           </Link>
           <div className="flex items-center gap-2">
-            <Link href="/adults" className="inline-flex items-center gap-2 rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40">
+            <Link href="/adults" className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#C96B55] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#C96B55]/40">
               <User size={16} />
               שאלון למבוגרים
             </Link>
-            <Link href="/kids" className="inline-flex items-center gap-2 rounded-xl bg-[#6F8F7A] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#6F8F7A]/40">
+            <Link href="/kids" className="inline-flex items-center gap-2 whitespace-nowrap rounded-xl bg-[#6F8F7A] px-3 py-2 text-sm font-semibold text-white hover:opacity-95 focus:outline-none focus:ring-2 focus:ring-[#6F8F7A]/40">
               <GraduationCap size={16} />
               שאלון להורים לילדים ונוער
             </Link>
