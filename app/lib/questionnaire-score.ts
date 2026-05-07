@@ -1180,6 +1180,26 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     "קשיי התמכרות",
     "התפתחות אישית",
   ];
+  // ===== BMI =====
+  // חריגה מהטווח התקין → המלצה לדיאטנ/ית קלינית (סינון קשיח דרך
+  // professionalType). הפנייה לרופא/ת המשפחה ממשיכה להופיע כבאנר טקסט בעמוד
+  // התוצאות (רופא משפחה אינו במאגר המטפלים).
+  if (answers.bmiAbnormal) {
+    const dietitianAlreadyRecommended = recs.some(r => r.professionalType === "דיאטנ/ית קליני/ת");
+    if (!dietitianAlreadyRecommended) {
+      recs.push({
+        id: uid("bmi-dietitian"),
+        symptomText: "ה-BMI שדיווחת עליו אינו בטווח התקין.",
+        treatment: "דיאטנ/ית קליני/ת",
+        treatmentLabel: "דיאטנ/ית קליני/ת",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "ליווי תזונתי על-ידי דיאטנ/ית קליני/ת. במקביל מומלץ גם בירור אצל רופא/ת המשפחה.",
+        professionalType: "דיאטנ/ית קליני/ת",
+      });
+    }
+  }
+
   const sorted = [...recs].sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
     return domainOrder.indexOf(a.domain) - domainOrder.indexOf(b.domain);
