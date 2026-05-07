@@ -568,11 +568,43 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   }
 
   const areas = [
-    { key:"a_emo", title:"בעיות רגשיות",        desc:"חרדות, לחצים, דימוי עצמי, מצב רוח, התמכרות" },
-    ...(showDev ? [{ key:"a_dev", title:"בעיות התפתחותיות", desc:"גמילה, הרטבה, מוטוריקה, ויסות חושי" }] : []),
-    { key:"a_aca", title:"בעיות לימודיות",       desc:"קריאה, כתיבה, ריכוז, לקויות למידה" },
-    { key:"a_beh", title:"בעיות התנהגותיות",     desc:"התנגדויות, הצקות, אלימות" },
-    { key:"a_soc", title:"בעיות חברתיות",        desc:"קושי בחברה, ביישנות, דחייה חברתית" },
+    {
+      key: "a_emo",
+      title: "בעיות רגשיות",
+      desc: "חרדות, לחצים, דימוי עצמי, מצב רוח, התמכרות",
+      detail:
+        "תחום שעוסק בעולם הפנימי של הילד/ה: חרדה, פחדים, דאגות חוזרות, קושי להירגע, מתח גופני; דימוי עצמי נמוך וביקורת עצמית; מצב רוח ירוד, חוסר עניין או הנאה, רגישות יתר וקושי בוויסות רגשי; מחשבות חודרניות או טקסים אובססיביים-קומפולסיביים; טראומה ואירועים מעוררי חרדה; וכן סוגי התמכרות (חומרים, מסכים, הימורים) ובעיות אכילה. אם בני הנוער או ילדכם מתמודדים עם תחושות פנימיות שמקשות עליהם בתפקוד היומיומי או בקשרים — סמנו כאן.",
+    },
+    ...(showDev
+      ? [{
+          key: "a_dev",
+          title: "בעיות התפתחותיות",
+          desc: "גמילה, הרטבה, מוטוריקה, ויסות חושי",
+          detail:
+            "תחום שעוסק באבני דרך התפתחותיות: גמילה מחיתולים (יום ולילה), הרטבה לאחר גיל הגמילה, עצירות או אנקופרזיס; מוטוריקה גסה (תיאום, שיווי משקל, חוסר בטחון בתנועה) ומוטוריקה עדינה (אחיזת עיפרון, גזירה, כתיבה, איכות ציור); ויסות חושי — תגובות מוגזמות לקולות, מגע, בדים, אורות, או דווקא חיפוש מוגבר של גירויים. בקשיים אלה מעורבים לעיתים רופא ילדים, מרפאה בעיסוק, פיזיותרפיסטית רצפת אגן או קלינאית תקשורת.",
+        }]
+      : []),
+    {
+      key: "a_aca",
+      title: "בעיות לימודיות",
+      desc: "קריאה, כתיבה, ריכוז, לקויות למידה",
+      detail:
+        "תחום שעוסק בתפקוד הלימודי: קשיי קשב וריכוז (חוסר ריכוז, היסחות, היפראקטיביות, אימפולסיביות); לקויות למידה בקריאה (דיסלקציה), בכתיבה (דיסגרפיה), בחשבון (דיסקלקוליה) או באנגלית; קשיים בהבנת הנקרא, ברבי מלל ובהפקת טקסט כתוב; קשיים ארגוניים בלמידה — תכנון זמן, הכנת שיעורי בית, הכנה למבחנים. בתחום זה עשויות להידרש פניות לאבחון פסיכו-דידקטי, נוירו-פסיכולוגי, קלינאית תקשורת או הוראה מתקנת.",
+    },
+    {
+      key: "a_beh",
+      title: "בעיות התנהגותיות",
+      desc: "התנגדויות, הצקות, אלימות",
+      detail:
+        'תחום שעוסק בהתנהגויות חיצוניות וביחסים עם סמכות: התקפי זעם, התנגדות עיקשת, ויכוחים ומשא ומתן בלתי-פוסק; הפרת חוקים בבית או במסגרת החינוכית; אלימות מילולית או פיזית, הצקות לאחים או לחברים; שקרים, גניבות, בריחה ממסגרת; קושי לשאת תסכול או לקבל "לא". התחום קשור לעיתים גם להדרכת הורים טיפולית, לתוכנית התנהגותית במסגרת ולעבודה משותפת עם בית הספר.',
+    },
+    {
+      key: "a_soc",
+      title: "בעיות חברתיות",
+      desc: "קושי בחברה, ביישנות, דחייה חברתית",
+      detail:
+        "תחום שעוסק בקשרים עם בני הגיל: קושי ליצור חברויות, להישאר בקבוצה ולשמור על קשרים לאורך זמן; ביישנות, הימנעות חברתית, חרדה חברתית ופחד מהערכה; דחייה, בריונות או חרם — בין אם בכיתה או ברשתות החברתיות; קשיים בקריאת רמזים חברתיים ובקבלת ביקורת. כאן רלוונטיים לעיתים קבוצות חברתיות, טיפול CBT לחרדה חברתית, וייעוץ עם יועצת בית הספר.",
+    },
   ];
 
   return (
@@ -580,13 +612,22 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
       <Card>
         <StepTag>שלב 2 מתוך 3</StepTag>
         <StepQ>תחומי הקושי העיקריים</StepQ>
-        <StepHint>דרג את רמת הקושי בכל תחום</StepHint>
+        <StepHint>דרג את רמת הקושי בכל תחום. ניתן ללחוץ על "הסבר מפורט" כדי לקרוא יותר על כל תחום.</StepHint>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {areas.map(({ key, title, desc }) => (
+          {areas.map(({ key, title, desc, detail }) => (
             <div key={key}
               className={`bg-[#f7f9fc] border-2 rounded-xl p-4 transition-all ${A[key] && A[key] !== "כלל לא" ? "border-[#2c3e7a]" : "border-[#e0e8f4]"}`}>
               <div className="text-sm font-bold text-[#1a2a3a] mb-1">{title}</div>
-              <div className="text-xs text-gray-400 mb-3 leading-relaxed">{desc}</div>
+              <div className="text-xs text-gray-400 mb-2 leading-relaxed">{desc}</div>
+              <details className="mb-3 area-details">
+                <summary className="text-xs font-semibold text-[#2c3e7a] cursor-pointer hover:underline list-none flex items-center gap-1 select-none">
+                  <span className="inline-block transition-transform area-plus text-base leading-none">+</span>
+                  הסבר מפורט
+                </summary>
+                <div className="mt-2 text-xs leading-6 text-gray-600 bg-white border border-[#e0e8f4] rounded-lg p-3">
+                  {detail}
+                </div>
+              </details>
               <div className="flex gap-1.5 flex-wrap">
                 {AREA_OPTS.map(opt => (
                   <button key={opt}
@@ -597,6 +638,10 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
             </div>
           ))}
         </div>
+        <style>{`
+          .area-details summary::-webkit-details-marker { display: none; }
+          .area-details[open] .area-plus { transform: rotate(45deg); }
+        `}</style>
       </Card>
       <NavRow onBack={onBack} onNext={() => onNext(A)} />
     </div>
@@ -1737,7 +1782,7 @@ function VisionHearingBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   );
 }
 
-function PageAcad({ A, setA, onNext, onBack }: PageProps) {
+function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
   const grp = acadGg(A);
 
   // ── גן ──────────────────────────────────────────────────────────────────────
@@ -1842,7 +1887,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
                           {[{k:"ag_mot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"ag_mot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"ag_mot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
                             <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                           ))}
-                          {showAgAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} />}
+                          {showAgAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
                         </div>
                       )}
                     </div>
@@ -1863,7 +1908,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
                               {[{k:"ag_smot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"ag_smot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"ag_smot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
                                 <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                               ))}
-                              {showSpeechAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} />}
+                              {showSpeechAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
                             </div>
                           )}
                         </div>
@@ -1877,7 +1922,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם את/ה רואה סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
               <YNRow val={A.ag_adhd_yn||""} onChange={v => setA({...A, ag_adhd_yn:v})} />
-              {A.ag_adhd_yn==="כן" && <AcadAdhdBlock prefix="ag" A={A} setA={setA} />}
+              {A.ag_adhd_yn==="כן" && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
             </div>
             {/* שאלה 3: כתב יד */}
             <div className="mb-4">
@@ -1960,7 +2005,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
                           {[{k:"dv_mot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"dv_mot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"dv_mot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
                             <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                           ))}
-                          {showDvReadAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} />}
+                          {showDvReadAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} items={items} />}
                         </div>
                       )}
                     </div>
@@ -1980,7 +2025,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
                               {[{k:"dv_smot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"dv_smot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"dv_smot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
                                 <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                               ))}
-                              {showDvSpeechAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} />}
+                              {showDvSpeechAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} items={items} />}
                             </div>
                           )}
                         </div>
@@ -1994,7 +2039,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם יש סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
               <YNRow val={A.dv_adhd_yn||""} onChange={v => setA({...A, dv_adhd_yn:v})} />
-              {A.dv_adhd_yn==="כן" && <AcadAdhdBlock prefix="dv" A={A} setA={setA} />}
+              {A.dv_adhd_yn==="כן" && <AcadAdhdBlock prefix="dv" A={A} setA={setA} items={items} />}
             </div>
             {/* שאלה 3: כתב יד */}
             <div className="mb-4">
@@ -2070,7 +2115,7 @@ function PageAcad({ A, setA, onNext, onBack }: PageProps) {
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">4. האם יש סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
             <YNRow val={A[p+"_adhd_yn"]||""} onChange={v => setA({...A, [p+"_adhd_yn"]:v})} />
-            {A[p+"_adhd_yn"]==="כן" && <AcadAdhdBlock prefix={p} A={A} setA={setA} />}
+            {A[p+"_adhd_yn"]==="כן" && <AcadAdhdBlock prefix={p} A={A} setA={setA} items={items} />}
           </div>
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בכתב היד עצמו?</p>
