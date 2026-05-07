@@ -6,7 +6,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const MAX_FREE = 3;
+const MAX_FREE = 6;
 
 function getIp(req: NextRequest): string {
   return (
