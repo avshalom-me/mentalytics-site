@@ -77,7 +77,7 @@ const PAGES = [
   "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
   "p-q5","p-oq","p-oq-grade",
   "p-q6","p-tq",
-  "p-q7","p-q7b","p-pq",
+  "p-q7","p-pq",
   "p-q8","p-eq",
   "p-q9","p-bq",
   "p-q10","p-q10-par","p-q10-grade",
@@ -97,7 +97,7 @@ function skipPage(pid: string, A: Ans): boolean {
   const emoPages = [
     "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
-    "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-q7b","p-pq","p-q8","p-eq",
+    "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
     "p-q9","p-bq","p-q10","p-q10-par","p-q10-grade",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
@@ -117,7 +117,6 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-oq")         return A.q5 !== "כן";
   if (pid === "p-oq-grade")   return (A.oq_tot || 0) < 10;
   if (pid === "p-tq")         return A.q6 !== "כן";
-  if (pid === "p-q7b")        return false; // אחרי p-q7 תמיד שואלים גם על אמונות
   if (pid === "p-pq")         return A.q7a !== "כן" && A.q7b !== "כן";
   if (pid === "p-eq")         return A.q8 !== "כן";
   if (pid === "p-bq")         return A.q9 !== "כן";
@@ -1273,31 +1272,33 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-q7 ─────────────────────────────────────────────────────────────────────
-// 7א — הזיות (חזותיות/שמיעתיות)
+// שאלה 7 — הזיות (7א) ואמונות יוצאות דופן / חשדות (7ב), על אותו מסך
 function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+  const canContinue = !!A.q7a && !!A.q7b;
+  function setKey(k: "q7a" | "q7b", v: string) {
+    const nA = { ...A, [k]: v };
+    setA(nA);
+  }
   return (
     <div>
       <Card>
         <EqNum n={7}/>
-        <StepTag>שאלה 7א מתוך 10 — רגשי</StepTag>
-        <StepQ>האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?</StepQ>
-        <YNRow val={A.q7a||""} onChange={v=>{ const nA={...A,q7a:v}; setA(nA); onNext(nA); }} />
+        <StepTag>שאלה 7 מתוך 10 — רגשי</StepTag>
+        <StepQ>חוויות פנימיות חריגות</StepQ>
+        <StepHint>שתי שאלות קצרות — נא לענות על שתיהן כדי להמשיך.</StepHint>
+        <div className="mb-5">
+          <p className="text-sm font-semibold text-gray-800 mb-2">א. האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?</p>
+          <YNRow val={A.q7a||""} onChange={v => setKey("q7a", v)} />
+        </div>
+        <div className="mb-2">
+          <p className="text-sm font-semibold text-gray-800 mb-2">ב. האם יש לילד/ה אמונות או חשדות יוצאי דופן שאחרים סביבו/ה לא חולקים?</p>
+          <YNRow val={A.q7b||""} onChange={v => setKey("q7b", v)} />
+        </div>
+        {!canContinue && (
+          <p className="text-xs text-amber-700 mt-3">יש לענות על שתי השאלות.</p>
+        )}
       </Card>
-      <NavRow onBack={onBack} />
-    </div>
-  );
-}
-
-// 7ב — אמונות יוצאות דופן / חשדות
-function PageQ7B({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
-  return (
-    <div>
-      <Card>
-        <StepTag>שאלה 7ב מתוך 10 — רגשי</StepTag>
-        <StepQ>האם יש לילד/ה אמונות או חשדות יוצאי דופן שאחרים סביבו/ה לא חולקים?</StepQ>
-        <YNRow val={A.q7b||""} onChange={v=>{ const nA={...A,q7b:v}; setA(nA); onNext(nA); }} />
-      </Card>
-      <NavRow onBack={onBack} />
+      <NavRow onBack={onBack} onNext={canContinue ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1383,7 +1384,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
               {[
                 {key:"ea5", label:"1. אפיזודות חוזרות של אכילה מוגזמת"},
                 {key:"ea6", label:"2. התנהגויות מפצות (הקאה, משלשלים, צום)"},
-                {key:"ea7", label:"3. אכילה מוגזמת לפחות פעם בשבוע / 3 חודשים"},
+                {key:"ea7", label:"3. אכילה מוגזמת לפחות פעם בשבוע במשך 3 חודשים"},
                 {key:"ea8", label:"4. הערכה עצמית תלויה במשקל/צורת גוף"},
               ].map(({key,label})=>(
                 <div key={key}>
@@ -1421,7 +1422,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
               {[
                 {key:"eb4", label:"1. אכילה מוגזמת חוזרת בפרק זמן קצר"},
                 {key:"eb5", label:"2. התנהגויות מפצות (הקאה, משלשלים)"},
-                {key:"eb6", label:"3. אכילה מוגזמת לפחות פעם בשבוע / 3 חודשים"},
+                {key:"eb6", label:"3. אכילה מוגזמת לפחות פעם בשבוע במשך 3 חודשים"},
                 {key:"eb7", label:"4. הערכה עצמית תלויה במשקל / צורת גוף"},
               ].map(({key,label})=>(
                 <div key={key}>
@@ -1939,7 +1940,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
@@ -2056,7 +2057,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
@@ -2100,6 +2101,13 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
           💡 כדאי להתייעץ עם המחנכ/ת של הכיתה לפני המענה, או לענות יחד בטלפון.
         </div>
         <GradeBlock title={gradeLabel}>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-900 leading-6">
+            <strong>איך לדרג כל מקצוע:</strong> דירוג ביחס לבני הכיתה.
+            <br />• <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת).
+            <br />• <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה).
+            <br />• <strong>20%</strong> = בקבוצה החלשה — לא הכי, אך מתקשה משמעותית.
+            <br />• <strong>מעל 20%</strong> = קושי קל-בינוני.
+          </div>
           <div className="mb-4">
             <p className="text-sm font-semibold text-gray-800 mb-2">1. רבי מלל (קריאה והבנת הנקרא) — רמת ביצוע ביחס לכיתה</p>
             <div className="flex gap-2 flex-wrap">{verbalOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_verbal"]===val)} onClick={() => setA({...A, [p+"_verbal"]:val})}>{label}</button>)}</div>
@@ -3497,7 +3505,6 @@ export default function KidsPage() {
       {step === "p-q6"          && <PageQ6       {...pageProps} />}
       {step === "p-tq"          && <PageTQ       {...pageProps} />}
       {step === "p-q7"          && <PageQ7       {...pageProps} />}
-      {step === "p-q7b"         && <PageQ7B      {...pageProps} />}
       {step === "p-pq"          && <PagePQ       {...pageProps} />}
       {step === "p-q8"          && <PageQ8       {...pageProps} />}
       {step === "p-eq"          && <PageEQ       {...pageProps} />}
