@@ -19,6 +19,9 @@ export default function TermsPage() {
           <p>
             ברוכים הבאים ל-טיפול חכם. השימוש באתר ובשירותים מהווה הסכמה לתנאי שימוש אלו. אם אינך מסכים לתנאים, אנא הימנע משימוש בשירות.
           </p>
+          <p className="mt-2">
+            השירות מיועד לבגירים (גיל 18 ומעלה) בלבד. שימוש באתר מהווה הצהרה כי המשתמש/ת הוא/היא מעל גיל 18.
+          </p>
         </section>
 
         <section>
@@ -99,10 +102,11 @@ export default function TermsPage() {
 
         <section>
           <h2 className="text-xl font-bold text-stone-900 mb-2">10. יצירת קשר</h2>
-          <p>
-            לשאלות ופניות:{" "}
-            <a href="mailto:info@mentalytics.co.il" className="text-[#0F5468] underline">info@mentalytics.co.il</a>
-          </p>
+          <p>לשאלות ופניות:</p>
+          <ul className="list-disc list-inside space-y-1 text-sm mt-2">
+            <li>מייל: <a href="mailto:tipool406@gmail.com" className="text-[#0F5468] underline">tipool406@gmail.com</a></li>
+            <li>טלפון: <a href="tel:0527906335" className="text-[#0F5468] underline">052-790-6335</a></li>
+          </ul>
         </section>
 
       </div>

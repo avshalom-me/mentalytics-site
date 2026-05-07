@@ -20,7 +20,7 @@ export default function BillingPolicyPage() {
       </Link>
 
       <h1 className="mt-6 text-3xl font-black text-stone-900 mb-2">תקנון רכישה — חיוב, ביטול והחזרים</h1>
-      <p className="text-sm text-stone-500 mb-10">טיפול חכם — טיפול חכם — מנטליטיקס | עודכן לאחרונה: אפריל 2026</p>
+      <p className="text-sm text-stone-500 mb-10">טיפול חכם — מנטליטיקס | עודכן לאחרונה: מאי 2026</p>
 
       <div className="space-y-8 text-sm leading-7 text-stone-700">
 
@@ -28,6 +28,7 @@ export default function BillingPolicyPage() {
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">1. כללי</h2>
           <p>תקנון זה מהווה הסכם מחייב בין המשתמש/ת (להלן: &quot;המשתמש&quot;) לבין טיפול חכם — מנטליטיקס (להלן: &quot;החברה&quot;), המפעילה את פלטפורמת &quot;טיפול חכם&quot; בכתובת mentalytics.co.il (להלן: &quot;האתר&quot;).</p>
           <p className="mt-2">השימוש באתר ורכישת שירותים בו מהווים הסכמה לתנאי תקנון זה. אם אינך מסכימ/ה לתנאים — אין לבצע רכישה.</p>
+          <p className="mt-2">השירות מיועד לבגירים (גיל 18 ומעלה) בלבד. רכישת שירותים באתר מהווה הצהרה כי המשתמש/ת הוא/היא מעל גיל 18.</p>
         </section>
 
         <section>
@@ -62,27 +63,36 @@ export default function BillingPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">5. מחירים ומע&quot;מ</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">5. אספקת השירות</h2>
+          <p>כלל השירותים הנרכשים באתר הם <strong>שירותים דיגיטליים</strong> הניתנים באופן מקוון בלבד. אין משלוח פיזי של מוצרים.</p>
+          <ul className="list-disc pr-6 mt-2 space-y-1">
+            <li><strong>מנוי מטפלים (מסלול מקודם):</strong> הגישה לשירות מופעלת מיד עם אישור התשלום. השירות כולל הופעה במערכת ההתאמה, סטטיסטיקות ודו&quot;חות — וזמין לשימוש מרגע ההפעלה.</li>
+            <li><strong>שאלון התאמה (מטופלים):</strong> הגישה לשאלון ניתנת מיד עם השלמת התשלום. השירות נצרך במלואו עם תחילת מילוי השאלון.</li>
+          </ul>
+        </section>
+
+        <section>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">6. מחירים ומע&quot;מ</h2>
           <p>כל המחירים המוצגים באתר אינם כוללים מע&quot;מ. מע&quot;מ ייתוסף בהתאם לשיעור המע&quot;מ החוקי בעת ביצוע הרכישה.</p>
           <p className="mt-2">החברה רשאית לעדכן מחירים מעת לעת. שינוי מחיר ייכנס לתוקף מתחילת תקופת החיוב הבאה ויילווה בהודעה מראש.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">6. חיוב חודשי (מנוי מטפלים)</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">7. חיוב חודשי (מנוי מטפלים)</h2>
           <p>השירות ניתן במסגרת מנוי חודשי מתחדש.</p>
           <p>החיוב מתבצע אחת לחודש באמצעות אמצעי התשלום שהוזן בעת ההרשמה.</p>
           <p className="mt-2">ההוצאה מוכרת להזדכות במס הכנסה ומע&quot;מ.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">7. ביטול מנוי</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">8. ביטול מנוי</h2>
           <p>ניתן לבטל את המנוי בכל עת.</p>
           <p>הביטול ייכנס לתוקף מתום תקופת החיוב הנוכחית. אם בוצע חיוב לחודש חדש — השירות ימשיך עד סוף אותו חודש, ולא יבוצע חיוב נוסף לאחר מכן.</p>
           <p className="mt-2">ביטול מנוי ניתן לבצע דרך פנייה למייל <a href="mailto:tipool406@gmail.com" className="underline hover:text-[#0F5468]">tipool406@gmail.com</a> או בטלפון <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a>.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">8. מדיניות החזרים</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">9. מדיניות החזרים</h2>
           <h3 className="font-bold text-stone-800 mt-3 mb-1">מנוי מטפלים:</h3>
           <p>מטפל/ת זכאי/ת לבקש החזר כספי עבור החודשיים הראשונים של השימוש במסלול המקודם, בכפוף לתנאים הבאים:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
@@ -100,7 +110,7 @@ export default function BillingPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">9. אופן הגשת בקשת החזר או ביטול</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">10. אופן הגשת בקשת החזר או ביטול</h2>
           <p>בקשות החזר או ביטול מנוי יש להגיש באחד מהאמצעים הבאים:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>מייל: <a href="mailto:tipool406@gmail.com" className="underline hover:text-[#0F5468]">tipool406@gmail.com</a></li>
@@ -110,13 +120,13 @@ export default function BillingPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">10. אבטחת מידע ותשלומים</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">11. אבטחת מידע ותשלומים</h2>
           <p>האתר משתמש בהצפנת SSL ומעבד תשלומים באמצעות חברת סליקה מורשית (Grow / Morning). החברה אינה שומרת ואינה חשופה לפרטי כרטיסי אשראי של משתמשים.</p>
           <p className="mt-2">למידע נוסף על הגנת המידע האישי — ראו את <Link href="/privacy" className="underline hover:text-[#0F5468]">מדיניות הפרטיות</Link>.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">11. שימוש הוגן והגנה מפני ניצול לרעה</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">12. שימוש הוגן והגנה מפני ניצול לרעה</h2>
           <p>במקרים של:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>ביטולים חוזרים ונשנים</li>
@@ -131,7 +141,7 @@ export default function BillingPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">12. מניעת הכחשות עסקה (Chargeback)</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">13. מניעת הכחשות עסקה (Chargeback)</h2>
           <p>המשתמש מתחייב לפנות תחילה לשירות הלקוחות של החברה בכל בקשה להחזר או בירור.</p>
           <div className="mt-3 rounded-xl bg-amber-50 border border-amber-200 px-4 py-3 text-amber-900">
             פתיחת הכחשת עסקה מול חברת האשראי ללא פנייה מוקדמת עשויה להיחשב כהפרת תנאי השימוש.
@@ -139,12 +149,12 @@ export default function BillingPolicyPage() {
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">13. שינויים בתקנון</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">14. שינויים בתקנון</h2>
           <p>החברה רשאית לעדכן תקנון זה מעת לעת. שינויים מהותיים יילוו בהודעה למשתמשים הרשומים. המשך השימוש בשירות לאחר עדכון התקנון מהווה הסכמה לתנאים המעודכנים.</p>
         </section>
 
         <section>
-          <h2 className="text-lg font-extrabold text-stone-900 mb-2">14. יצירת קשר</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-2">15. יצירת קשר</h2>
           <p>לכל שאלה, בקשה או בירור בנושא תשלומים, ביטולים והחזרים:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>מייל: <a href="mailto:tipool406@gmail.com" className="underline hover:text-[#0F5468]">tipool406@gmail.com</a></li>
