@@ -464,8 +464,10 @@ export default function AdultsPage() {
       const styleP1 = answers.emotional?.therapistStyleQ1 ?? 0;
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
+      const isProfessional = !!selectedRec?.professionalType;
       const body: Record<string, unknown> = {
-        treatmentTypes: combinedTreatments ?? (selectedRec?.treatment ? [selectedRec.treatment] : []),
+        treatmentTypes: isProfessional ? [] : (combinedTreatments ?? (selectedRec?.treatment ? [selectedRec.treatment] : [])),
+        requiredTherapistTypes: isProfessional ? [selectedRec!.professionalType!] : undefined,
         city: matchPrefs.city || null,
         region: matchPrefs.city ? CITY_TO_REGION[matchPrefs.city] || matchPrefs.region || null : matchPrefs.region || null,
         onlineRequired: matchPrefs.online,

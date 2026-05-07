@@ -12,6 +12,7 @@ export const THERAPIST_TYPES = [
   "פיזיותרפיסט/ית",
   "מרפא/ת בעיסוק",
   "קלינאי/ת תקשורת",
+  "דיאטנ/ית קליני/ת",
 ] as const;
 
 export const TRAINING_AREAS = [
@@ -37,6 +38,7 @@ export const TRAINING_AREAS = [
   "טיפול בטראומה",
   "פסיכואנליזה",
   "קלינאות תקשורת",
+  "טיפול בהפרעות אכילה",
 ] as const;
 
 export const COGFUN_AGE_GROUPS = ["ילדים", "בני נוער", "מבוגרים"] as const;

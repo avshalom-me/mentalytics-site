@@ -308,14 +308,24 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     const eating3 = e.eating3Count ?? 0;
     if (eating1 >= 2 || eating2 >= 2 || eating3 >= 2) {
       recs.push({
-        id: uid("eating"),
+        id: uid("eating-treatment"),
         symptomText: "נמצאו סימנים לקשיים סביב אכילה.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: "טיפול בהפרעות אכילה",
+        treatmentLabel: "טיפול בהפרעות אכילה",
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes:
-          'הפנייה למרכז לטיפול בהפרעות אכילה, הכולל מענה של פסיכולוג קליני/עו"ס קליני, של דיאטן ושל פסיכיאטר.',
+          'מומלץ לפנות למטפל/ת המתמחה בהפרעות אכילה, או למרכז ייעודי הכולל מענה של פסיכולוג קליני/עו"ס קליני, דיאטן ופסיכיאטר.',
+      });
+      recs.push({
+        id: uid("eating-dietitian"),
+        symptomText: "נמצאו סימנים לקשיים סביב אכילה.",
+        treatment: "דיאטנ/ית קליני/ת",
+        treatmentLabel: "דיאטנ/ית קליני/ת",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "ליווי תזונתי על-ידי דיאטנ/ית קליני/ת מומלץ במקביל לטיפול הנפשי.",
+        professionalType: "דיאטנ/ית קליני/ת",
       });
     }
 

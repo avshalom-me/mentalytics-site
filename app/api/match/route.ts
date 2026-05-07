@@ -47,6 +47,7 @@ type NormalizedMatchInput = {
   treatmentTypes: string[];
   diagnosisTypes: string[];
   therapistTypes: string[];
+  requiredTherapistTypes: string[]; // hard filter — only therapists of these types
   culturalPreferences: string[];
   arrangements: string[];
   city: string | null;
@@ -187,6 +188,11 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     body.providerTypes
   );
 
+  const requiredTherapistTypes = mergeArrays(
+    body.requiredTherapistTypes,
+    body.required_therapist_types
+  );
+
   const culturalPreferences = mergeArrays(
     body.culturalPreferences,
     body.cultural_preferences,
@@ -238,6 +244,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     treatmentTypes,
     diagnosisTypes,
     therapistTypes,
+    requiredTherapistTypes,
     culturalPreferences,
     arrangements,
     city,
@@ -293,6 +300,15 @@ function scoreTherapist(
   if (input.languages.length > 0) {
     const effectiveLangs = therapistLanguages.length > 0 ? therapistLanguages : ["עברית"];
     if (!hasOverlap(effectiveLangs, input.languages)) {
+      return null;
+    }
+  }
+
+  // Hard filter — required therapist type (e.g. dietitian-only search). Used
+  // when the recommendation is for a specialised professional type rather
+  // than a training area.
+  if (input.requiredTherapistTypes.length > 0) {
+    if (!hasOverlap(therapistTypes, input.requiredTherapistTypes)) {
       return null;
     }
   }
