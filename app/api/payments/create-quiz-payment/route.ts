@@ -30,7 +30,7 @@ function checkRateLimit(key: string): boolean {
 
 export async function POST(req: NextRequest) {
   try {
-    const { fp, quizType } = await req.json();
+    const { fp, quizType, firstName, lastName, phone, email } = await req.json();
 
     if (!fp || !quizType) {
       return NextResponse.json({ error: "missing fp or quizType" }, { status: 400 });
@@ -40,6 +40,21 @@ export async function POST(req: NextRequest) {
     }
     if (quizType !== "adults" && quizType !== "kids") {
       return NextResponse.json({ error: "invalid quizType" }, { status: 400 });
+    }
+
+    const cleanFirst = typeof firstName === "string" ? firstName.trim() : "";
+    const cleanLast = typeof lastName === "string" ? lastName.trim() : "";
+    const cleanPhone = typeof phone === "string" ? phone.trim() : "";
+    const cleanEmail = typeof email === "string" ? email.trim() : "";
+
+    if (!cleanFirst || !cleanLast || !cleanPhone || !cleanEmail) {
+      return NextResponse.json({ error: "missing customer details" }, { status: 400 });
+    }
+    if (cleanFirst.length > 80 || cleanLast.length > 80 || cleanPhone.length > 30 || cleanEmail.length > 200) {
+      return NextResponse.json({ error: "invalid customer details" }, { status: 400 });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return NextResponse.json({ error: "invalid email" }, { status: 400 });
     }
 
     const ip = getIp(req);
@@ -69,6 +84,9 @@ export async function POST(req: NextRequest) {
       ip,
       quizType,
       paymentId: payment.id,
+      customerName: `${cleanFirst} ${cleanLast}`,
+      customerEmail: cleanEmail,
+      customerPhone: cleanPhone,
     });
 
     if (result.errorCode !== 0 || !result.url) {

@@ -104,6 +104,9 @@ export async function createQuizPayment(opts: {
   ip: string;
   quizType: string;
   paymentId: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
 }): Promise<PaymentFormResult> {
   return api("/payments/form", {
     type: 320,
@@ -114,6 +117,12 @@ export async function createQuizPayment(opts: {
     maxPayments: 1,
     pluginId: process.env.MORNING_PLUGIN_ID,
     description: "שאלון התאמה לטיפול | טיפול חכם",
+    client: {
+      name: opts.customerName,
+      emails: [opts.customerEmail],
+      phone: opts.customerPhone,
+      add: true,
+    },
     income: [
       {
         catalogNum: "QUIZ-SINGLE",
