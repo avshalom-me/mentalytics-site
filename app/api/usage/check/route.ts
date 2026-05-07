@@ -8,12 +8,19 @@ const supabase = createClient(
 
 const MAX_FREE = 6;
 
+const FP_REGEX = /^[a-f0-9]{64}$/;
+
 function getIp(req: NextRequest): string {
   return (
     req.headers.get("x-forwarded-for")?.split(",")[0].trim() ??
     req.headers.get("x-real-ip") ??
     "unknown"
   );
+}
+
+function cleanFp(fp: unknown): string | null {
+  if (typeof fp !== "string") return null;
+  return FP_REGEX.test(fp) ? fp : null;
 }
 
 function getMaxCount(rows: { count: number }[]): number {
@@ -38,7 +45,7 @@ export async function GET(req: NextRequest) {
   if (!type) return NextResponse.json({ error: "missing type" }, { status: 400 });
 
   const ip = getIp(req);
-  const fp = req.nextUrl.searchParams.get("fp");
+  const fp = cleanFp(req.nextUrl.searchParams.get("fp"));
 
   const identifiers = [ip];
   if (fp) identifiers.push(`fp:${fp}`);
@@ -57,9 +64,11 @@ export async function GET(req: NextRequest) {
 
 // POST /api/usage/check  — increment and return new status
 export async function POST(req: NextRequest) {
-  const { type, fp } = await req.json();
+  const body = await req.json();
+  const type = body.type;
   if (!type) return NextResponse.json({ error: "missing type" }, { status: 400 });
 
+  const fp = cleanFp(body.fp);
   const ip = getIp(req);
 
   const identifiers = [ip];

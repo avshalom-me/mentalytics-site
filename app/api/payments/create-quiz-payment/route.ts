@@ -35,7 +35,9 @@ export async function POST(req: NextRequest) {
     if (!fp || !quizType) {
       return NextResponse.json({ error: "missing fp or quizType" }, { status: 400 });
     }
-    if (typeof fp !== "string" || fp.length > 200) {
+    // SHA-256 hex from getFingerprint() — strict format prevents arbitrary
+    // user-controlled strings polluting the DB or working around limits.
+    if (typeof fp !== "string" || !/^[a-f0-9]{64}$/.test(fp)) {
       return NextResponse.json({ error: "invalid fp" }, { status: 400 });
     }
     if (quizType !== "adults" && quizType !== "kids") {
