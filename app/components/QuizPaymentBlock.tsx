@@ -58,7 +58,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
       <div className="text-5xl mb-4">🔒</div>
       <h2 className="text-2xl font-black text-stone-900 mb-3 text-center">הגעת למגבלת השימוש החינמי</h2>
       <p className="text-stone-600 leading-7 max-w-sm mb-6 text-center">
-        ניתן למלא את השאלון עד 3 פעמים ללא תשלום.<br />
+        ניתן למלא את השאלון עד 6 פעמים ללא תשלום.<br />
         להמשך מילוי — תשלום חד־פעמי בסך ₪30 + מע&quot;מ.
       </p>
 
