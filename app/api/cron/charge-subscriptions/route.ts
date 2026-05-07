@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "crypto";
 import { chargeToken } from "@/app/lib/morning";
 
 const supabase = createClient(
@@ -7,9 +8,22 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+function verifyCron(req: NextRequest): boolean {
+  const expected = process.env.CRON_SECRET;
+  if (!expected) return false;
+  const header = req.headers.get("authorization") ?? "";
+  const provided = header.startsWith("Bearer ") ? header.slice(7) : "";
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+
 export async function GET(req: NextRequest) {
-  const authHeader = req.headers.get("authorization");
-  if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
+  if (!process.env.CRON_SECRET) {
+    return NextResponse.json({ error: "server misconfigured" }, { status: 503 });
+  }
+  if (!verifyCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 

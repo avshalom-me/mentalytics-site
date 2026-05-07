@@ -98,6 +98,6 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("create-quiz-payment error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
   }
 }

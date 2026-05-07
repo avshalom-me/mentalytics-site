@@ -44,6 +44,37 @@ async function api(path: string, body: Record<string, unknown>) {
   return res.json();
 }
 
+async function apiGet(path: string) {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Morning GET ${path} failed (${res.status}): ${text}`);
+  }
+
+  return res.json();
+}
+
+// Fetch a payment / document by id to verify it actually completed
+// at Morning, with the expected amount. Used by the webhook to defend
+// against forged callbacks even if the URL secret leaks.
+export interface MorningDocument {
+  id: string;
+  status?: number;
+  paymentsSum?: number;
+  amount?: number;
+  income?: { price: number }[];
+  [k: string]: unknown;
+}
+
+export async function fetchDocument(docId: string): Promise<MorningDocument> {
+  return apiGet(`/documents/${encodeURIComponent(docId)}`);
+}
+
 const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 const NOTIFY_URL = process.env.MORNING_WEBHOOK_SECRET
   ? `${BASE_URL}/api/webhooks/morning?secret=${encodeURIComponent(process.env.MORNING_WEBHOOK_SECRET)}`

@@ -57,11 +57,23 @@ export async function POST(req: NextRequest) {
       customerInfo = body || {};
     } catch {}
 
-    const clientName = customerInfo.firstName && customerInfo.lastName
-      ? `${customerInfo.firstName} ${customerInfo.lastName}`
+    const cleanFirst = typeof customerInfo.firstName === "string" ? customerInfo.firstName.trim() : "";
+    const cleanLast = typeof customerInfo.lastName === "string" ? customerInfo.lastName.trim() : "";
+    const cleanPhone = typeof customerInfo.phone === "string" ? customerInfo.phone.trim() : "";
+    const cleanEmail = typeof customerInfo.email === "string" ? customerInfo.email.trim() : "";
+
+    if (cleanFirst.length > 80 || cleanLast.length > 80 || cleanPhone.length > 30 || cleanEmail.length > 200) {
+      return NextResponse.json({ error: "invalid customer details" }, { status: 400 });
+    }
+    if (cleanEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      return NextResponse.json({ error: "invalid email" }, { status: 400 });
+    }
+
+    const clientName = cleanFirst && cleanLast
+      ? `${cleanFirst} ${cleanLast}`
       : therapist.full_name;
-    const clientEmail = customerInfo.email || therapist.email || user.email || "";
-    const clientPhone = customerInfo.phone || "";
+    const clientEmail = cleanEmail || therapist.email || user.email || "";
+    const clientPhone = cleanPhone;
 
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
@@ -96,6 +108,6 @@ export async function POST(req: NextRequest) {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("create-subscription error:", message);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json({ error: "internal error" }, { status: 500 });
   }
 }
