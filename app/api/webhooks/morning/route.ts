@@ -1,15 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
+import { fetchDocument } from "@/app/lib/morning";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
+// Morning document.status === 1 means "issued/paid" for type 320 (receipt).
+// Reference: https://www.greeninvoice.co.il/api-docs (status enum).
+const STATUS_ISSUED = 1;
+
 function verifySecret(req: NextRequest): boolean {
   const expected = process.env.MORNING_WEBHOOK_SECRET;
-  if (!expected) return true;
+  if (!expected) return false;
   const provided = req.nextUrl.searchParams.get("secret") || "";
   const a = Buffer.from(provided);
   const b = Buffer.from(expected);
@@ -19,6 +24,10 @@ function verifySecret(req: NextRequest): boolean {
 
 export async function POST(req: NextRequest) {
   try {
+    if (!process.env.MORNING_WEBHOOK_SECRET) {
+      console.error("Morning webhook: MORNING_WEBHOOK_SECRET not configured");
+      return NextResponse.json({ error: "server misconfigured" }, { status: 503 });
+    }
     if (!verifySecret(req)) {
       console.error("Morning webhook: invalid or missing secret");
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -40,30 +49,76 @@ export async function POST(req: NextRequest) {
     }
     console.log(`Morning webhook received for paymentId=${paymentId}, type=${custom.type || "unknown"}`);
 
-    const { data: payment } = await supabase
+    const documentId = body.id || body.documentId || "";
+    if (!documentId || typeof documentId !== "string") {
+      console.error(`Webhook: missing documentId for paymentId=${paymentId}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    // Look up our pending payment to know the expected amount.
+    const { data: pendingPayment } = await supabase
       .from("payments")
-      .select("id, payment_type, reference_id, status")
+      .select("id, payment_type, reference_id, status, amount")
       .eq("id", paymentId)
       .single();
 
-    if (!payment) {
-      console.error("Payment not found:", paymentId);
+    if (!pendingPayment) {
+      console.error(`Webhook: payment not found id=${paymentId}`);
       return NextResponse.json({ ok: true });
     }
 
-    if (payment.status === "completed") {
+    if (pendingPayment.status === "completed") {
+      // Idempotent — already processed.
       return NextResponse.json({ ok: true });
     }
 
-    const documentId = body.id || body.documentId || "";
+    // Verify the document with Morning's API directly. Without this, anyone
+    // who learns the URL secret could forge a webhook and activate accounts.
+    let doc;
+    try {
+      doc = await fetchDocument(documentId);
+    } catch (e) {
+      console.error(`Webhook: Morning fetchDocument failed for ${documentId}:`, e);
+      return NextResponse.json({ error: "verification failed" }, { status: 502 });
+    }
 
-    await supabase
+    if (doc.status !== STATUS_ISSUED) {
+      console.error(`Webhook: document ${documentId} status=${doc.status}, expected ${STATUS_ISSUED}`);
+      return NextResponse.json({ ok: true });
+    }
+
+    const docAmount = typeof doc.paymentsSum === "number"
+      ? doc.paymentsSum
+      : typeof doc.amount === "number"
+        ? doc.amount
+        : null;
+
+    if (docAmount === null || docAmount < pendingPayment.amount) {
+      console.error(
+        `Webhook: amount mismatch for ${documentId} — doc=${docAmount}, expected=${pendingPayment.amount}`
+      );
+      return NextResponse.json({ ok: true });
+    }
+
+    // Atomic claim: only one webhook can transition pending -> completed.
+    const { data: claimed, error: claimErr } = await supabase
       .from("payments")
-      .update({
-        status: "completed",
-        morning_document_id: documentId,
-      })
-      .eq("id", paymentId);
+      .update({ status: "completed", morning_document_id: documentId })
+      .eq("id", paymentId)
+      .eq("status", "pending")
+      .select("id, payment_type, reference_id");
+
+    if (claimErr) {
+      console.error("Webhook: failed to claim payment:", claimErr);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (!claimed || claimed.length === 0) {
+      // Already processed by a concurrent webhook — idempotent ack
+      return NextResponse.json({ ok: true });
+    }
+
+    const payment = claimed[0];
 
     if (
       payment.payment_type === "subscription" ||
@@ -108,29 +163,11 @@ async function handleSubscription(therapistId: string, custom: Record<string, st
 }
 
 async function handleQuizPayment(referenceId: string, custom: Record<string, string>) {
+  // The credit is granted via getPaidCredits() in /api/usage/check, which
+  // counts completed quiz payments on this fingerprint and adds them to the
+  // limit. We do NOT decrement quiz_usage here — doing so would grant 2 uses
+  // per payment (one from the decrement + one from the raised limit).
   const fp = custom.fingerprint || referenceId.replace("fp:", "");
-  const ip = custom.ip || "";
   const quizType = custom.quizType || "adults";
-
-  const identifiers = [`fp:${fp}`];
-  if (ip && ip !== "unknown") identifiers.push(ip);
-
-  for (const id of identifiers) {
-    const { data } = await supabase
-      .from("quiz_usage")
-      .select("count")
-      .eq("ip", id)
-      .eq("quiz_type", quizType)
-      .maybeSingle();
-
-    if (data) {
-      await supabase
-        .from("quiz_usage")
-        .update({ count: Math.max(data.count - 1, 0), updated_at: new Date().toISOString() })
-        .eq("ip", id)
-        .eq("quiz_type", quizType);
-    }
-  }
-
   console.log(`Quiz payment processed for ${fp}, quizType=${quizType}`);
 }
