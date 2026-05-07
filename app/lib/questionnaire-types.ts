@@ -119,7 +119,7 @@ export type QuestionnaireAnswers = {
 export type Recommendation = {
   id: string;
   symptomText: string;              // טקסט לתצוגה למשתמש
-  treatment: string;                // ערך מדויק מ-TRAINING_AREAS
+  treatment: string;                // ערך מדויק מ-TRAINING_AREAS, או — אם professionalType מוגדר — ערך מ-THERAPIST_TYPES
   treatmentLabel: string;           // שם לתצוגה על הכפתור
   domain: string;                   // לצורך קיבוץ בתצוגה
   urgent: boolean;
@@ -127,6 +127,7 @@ export type Recommendation = {
   tools?: string;                   // כלים להתמודדות עצמית
   couplesModality?: string;         // EFT / דינאמי / מבני
   needsSexualTherapy?: boolean;     // שילוב טיפול מיני
+  professionalType?: string;        // אם מוגדר — חיפוש קשיח לפי therapist_types (למשל דיאטנית קלינית)
 };
 
 export type ScoringResult = {

@@ -2432,7 +2432,7 @@ type KidsMatchResult = {
 type MatchSelection = {
   keys: string[];
   labels: string[];
-  kind: "treatment" | "assessment";
+  kind: "treatment" | "assessment" | "professional";
 };
 
 function KidsMatchSection({ A, score, selection }: {
@@ -2465,7 +2465,8 @@ function KidsMatchSection({ A, score, selection }: {
   const treatments = selection.keys.length > 0 ? selection.keys : ["טיפול דינאמי"];
   const treatmentLabels = selection.labels.length > 0 ? selection.labels : ["טיפול דינאמי"];
   const isAssessment = selection.kind === "assessment";
-  const personLabel = isAssessment ? "מאבחן/ת" : "מטפל/ת";
+  const isProfessional = selection.kind === "professional";
+  const personLabel = isAssessment ? "מאבחן/ת" : isProfessional ? "איש/ת מקצוע" : "מטפל/ת";
   const ageGroups  = getKidsAgeGroups(A);
   const expressivePrefs = score ? extractExpressivePrefs(score) : [];
 
@@ -2523,8 +2524,9 @@ function KidsMatchSection({ A, score, selection }: {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          treatmentTypes: isAssessment ? [] : treatments,
+          treatmentTypes: isAssessment || isProfessional ? [] : treatments,
           diagnosisTypes: isAssessment ? treatments : [],
+          requiredTherapistTypes: isProfessional ? treatments : undefined,
           ageGroups,
           genderPreference: gender || null,
           city: city || null,
@@ -2533,7 +2535,7 @@ function KidsMatchSection({ A, score, selection }: {
           culturalPreferences: cultural,
           arrangements,
           languages: [language || "עברית"],
-          expressiveModalities: isAssessment || expressivePrefs.length === 0 ? undefined : expressivePrefs,
+          expressiveModalities: isAssessment || isProfessional || expressivePrefs.length === 0 ? undefined : expressivePrefs,
           limit: 10,
         }),
       });
@@ -2851,6 +2853,7 @@ function GroupCard({
 
   const isAssessment = group.kind === "assessment";
   const isExternal = group.kind === "external";
+  const isProfessional = group.kind === "professional";
   const noAction = group.treatmentKey === "_no_action";
 
   // Color theme per kind
@@ -2860,13 +2863,16 @@ function GroupCard({
       ? "border-gray-200 bg-gray-50"
       : isAssessment
         ? "border-purple-300 bg-purple-50"
-        : isExternal
-          ? "border-amber-300 bg-amber-50"
-          : "border-blue-200 bg-white";
+        : isProfessional
+          ? "border-emerald-300 bg-emerald-50"
+          : isExternal
+            ? "border-amber-300 bg-amber-50"
+            : "border-blue-200 bg-white";
 
   const labelTone = group.urgent ? "text-red-700"
     : noAction ? "text-gray-500"
     : isAssessment ? "text-purple-700"
+    : isProfessional ? "text-emerald-700"
     : isExternal ? "text-amber-800"
     : "text-[#2e7d8c]";
 
@@ -2905,10 +2911,12 @@ function GroupCard({
               className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
                 isAssessment
                   ? "bg-purple-700 text-white hover:bg-purple-800"
-                  : "bg-[#1a3a5c] text-white hover:bg-[#0f2845]"
+                  : isProfessional
+                    ? "bg-emerald-700 text-white hover:bg-emerald-800"
+                    : "bg-[#1a3a5c] text-white hover:bg-[#0f2845]"
               }`}
             >
-              {isAssessment ? "🔎 חיפוש מאבחן/ת" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel}
+              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel}
             </button>
           ) : (
             <div className="inline-block rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">
@@ -2976,6 +2984,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     label: string;
     treatments: DomainGroup[];
     assessments: DomainGroup[];
+    professionals: DomainGroup[];
     externals: DomainGroup[];
     informational: DomainGroup[]; // symptoms with no actionable referral (low-stress etc.)
     standaloneWarnings: typeof domainResults[number]["result"]["standaloneWarnings"];
@@ -2990,6 +2999,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         label: d.label,
         treatments: groups.filter(g => g.kind === "treatment" && g.treatmentKey !== "_no_action"),
         assessments: groups.filter(g => g.kind === "assessment"),
+        professionals: groups.filter(g => g.kind === "professional"),
         externals: groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
         informational: groups.filter(g => g.treatmentKey === "_no_action"),
         standaloneWarnings: d.result.standaloneWarnings,
@@ -2999,7 +3009,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   }, [domainResults]);
 
   const hasAnyFindings = byDomain.some(b =>
-    b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
+    b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
   );
 
   // Active selection for the matching panel.
@@ -3031,15 +3041,18 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       }
       return { keys, labels, kind: kindStr };
     }
-    const indMatch = selectedKey.match(/^(.+?)::(treatment|assessment|external)::(.+)$/);
+    const indMatch = selectedKey.match(/^(.+?)::(treatment|assessment|external|professional)::(.+)$/);
     if (indMatch) {
       const [, domainKey, , treatmentKey] = indMatch;
       const bucket = byDomain.find(b => b.key === domainKey);
       if (!bucket) return null;
-      const all = [...bucket.treatments, ...bucket.assessments];
+      const all = [...bucket.treatments, ...bucket.assessments, ...bucket.professionals];
       const group = all.find(g => g.treatmentKey === treatmentKey);
       if (!group) return null;
-      const apiKind = group.kind === "assessment" ? "assessment" : "treatment";
+      const apiKind: MatchSelection["kind"] =
+        group.kind === "assessment" ? "assessment" :
+        group.kind === "professional" ? "professional" :
+        "treatment";
       return { keys: [group.treatmentKey], labels: [group.treatmentLabel], kind: apiKind };
     }
     return null;
@@ -3160,6 +3173,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
           const hasAny =
             b.treatments.length > 0 ||
             b.assessments.length > 0 ||
+            b.professionals.length > 0 ||
             b.externals.length > 0 ||
             b.informational.length > 0 ||
             b.standaloneWarnings.length > 0;
@@ -3252,9 +3266,24 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                 </div>
               )}
 
+              {/* Professionals — hard-filtered search by therapist type */}
+              {b.professionals.length > 0 && (
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
+                  <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
+                  {b.professionals.map(g => (
+                    <GroupCard
+                      key={g.recs[0].id}
+                      group={g}
+                      onSelect={() => selectGroup(b.key, g)}
+                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                    />
+                  ))}
+                </div>
+              )}
+
               {/* Externals — no search button */}
               {b.externals.length > 0 && (
-                <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2 pr-1">🩺 פניות נוספות</div>
                   <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה — יש לפנות אליהם בנפרד.</p>
                   {b.externals.map(g => (

@@ -297,7 +297,8 @@ function computeResults(A: Ans): KidsBox[] {
     const ano = A.eq_ano || 0, bul = A.eq_bul || 0;
     if (ano >= 2 || bul >= 2) {
       emoStandalones.push({ cls: "purple", txt: "📊 נמצאו קשיים בתחום האכילה" });
-      emoStandalones.push({ cls: "info",   txt: "✅ הפנייה לטיפול ע\"פ מאפייני הילד + דיאטנית קלינית מומחית" });
+      emoStandalones.push({ cls: "info",   txt: "✅ הפנייה: טיפול בהפרעות אכילה" });
+      emoStandalones.push({ cls: "info",   txt: "✅ הפנייה: דיאטנית קלינית" });
     }
   }
 

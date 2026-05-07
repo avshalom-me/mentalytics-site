@@ -13,7 +13,7 @@
 export type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
 export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; }
 
-export type RecKind = "treatment" | "assessment" | "external";
+export type RecKind = "treatment" | "assessment" | "external" | "professional";
 
 export interface KidsRecommendation {
   id: string;
@@ -87,6 +87,14 @@ const TREATMENT_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /פיזיותרפיסטית רצפת אגן|פיזיותרפיה.*רצפת אגן/, key: "פיזיותרפיה רצפת אגן", label: "פיזיותרפיה רצפת אגן ילדים" },
   { rx: /טיפול בהתמכר/, key: "טיפול בהתמכרויות", label: "טיפול בהתמכרויות" },
   { rx: /טיפול תעסוקתי/, key: "טיפול תעסוקתי", label: "טיפול תעסוקתי" },
+  { rx: /טיפול בהפרעות אכילה/, key: "טיפול בהפרעות אכילה", label: "טיפול בהפרעות אכילה" },
+];
+
+// Professional types — clinicians whose primary identifier is the professional
+// type (matched against `therapist_types`), not a training area. These get a
+// hard-filter search button that returns ONLY therapists of this type.
+const PROFESSIONAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
+  { rx: /דיאטנית קלינית|דיאטנ\/?ית קליני\/?ת/, key: "דיאטנ/ית קליני/ת", label: "דיאטנ/ית קליני/ת" },
 ];
 
 // External referrals — clinicians/doctors not in our DB (no search button)
@@ -98,7 +106,6 @@ const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /גסטרולוג ילדים/, key: "גסטרולוג ילדים", label: "פנייה לגסטרולוג ילדים" },
   { rx: /רופא משפחה|רופא.ת המשפחה|רופא הילדים/, key: "רופא משפחה", label: "פנייה לרופא המשפחה / ילדים" },
   { rx: /פסיכיאטר ילדים|פסיכיאטר/, key: "פסיכיאטר ילדים", label: "פנייה לפסיכיאטר ילדים" },
-  { rx: /דיאטנית קלינית/, key: "דיאטנית קלינית", label: "פנייה לדיאטנית קלינית" },
   { rx: /יועצת בית הספר|יועצת.*ופסיכולוג/, key: "יועצת בית ספר", label: "התייעצות עם יועצת בית הספר" },
   { rx: /פסיכולוג הגן|פסיכולוג בית הספר/, key: "פסיכולוג מסגרת", label: "פנייה לפסיכולוג המסגרת" },
   { rx: /פסיכולוג חינוכי|פסיכולוג התפתחותי/, key: "פסיכולוג חינוכי", label: "פנייה לפסיכולוג חינוכי / התפתחותי" },
@@ -113,6 +120,9 @@ const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
 // Heuristic: classify a referral text into kind + key + label
 function classifyReferral(text: string): { kind: RecKind; key: string; label: string } {
   for (const p of ASSESSMENT_PATTERNS) if (p.rx.test(text)) return { kind: "assessment", key: p.key, label: p.label };
+  // Professional-type patterns must run before TREATMENT_PATTERNS in case of
+  // overlapping wording (e.g. "טיפול ע"י דיאטנית").
+  for (const p of PROFESSIONAL_PATTERNS) if (p.rx.test(text)) return { kind: "professional", key: p.key, label: p.label };
   for (const p of TREATMENT_PATTERNS) if (p.rx.test(text)) return { kind: "treatment", key: p.key, label: p.label };
   for (const p of EXTERNAL_PATTERNS) if (p.rx.test(text)) return { kind: "external", key: p.key, label: p.label };
   // Fallback: short summary of the text
@@ -397,6 +407,8 @@ export interface KidsAggregatedRecommendations {
   treatmentLabels: string[];
   assessmentKeys: string[];
   assessmentLabels: string[];
+  professionalKeys: string[];
+  professionalLabels: string[];
 }
 
 export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRecommendations {
@@ -404,6 +416,8 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
   const treatmentLabels = new Map<string, string>();
   const assessmentKeys = new Set<string>();
   const assessmentLabels = new Map<string, string>();
+  const professionalKeys = new Set<string>();
+  const professionalLabels = new Map<string, string>();
 
   for (const d of domains) {
     for (const g of d.groups) {
@@ -413,6 +427,9 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
       } else if (g.kind === "assessment") {
         assessmentKeys.add(g.treatmentKey);
         assessmentLabels.set(g.treatmentKey, g.treatmentLabel);
+      } else if (g.kind === "professional") {
+        professionalKeys.add(g.treatmentKey);
+        professionalLabels.set(g.treatmentKey, g.treatmentLabel);
       }
     }
   }
@@ -421,5 +438,7 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
     treatmentLabels: Array.from(treatmentKeys).map(k => treatmentLabels.get(k) || k),
     assessmentKeys: Array.from(assessmentKeys),
     assessmentLabels: Array.from(assessmentKeys).map(k => assessmentLabels.get(k) || k),
+    professionalKeys: Array.from(professionalKeys),
+    professionalLabels: Array.from(professionalKeys).map(k => professionalLabels.get(k) || k),
   };
 }
