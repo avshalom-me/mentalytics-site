@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, Suspense } from "react";
+import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import { REGION_CITIES } from "@/app/lib/regions";
@@ -305,23 +305,11 @@ function TherapistDashboard() {
   const [loadingStats, setLoadingStats] = useState(true);
   const searchParams = useSearchParams();
 
-  const triggerUpgrade = useCallback(async () => {
-    if (!token || !profile || profile.status === "paying") return;
-    try {
-      const res = await fetch("/api/payments/create-subscription", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (res.ok && data.url) window.location.href = data.url;
-    } catch { /* user can retry manually */ }
-  }, [token, profile]);
-
   useEffect(() => {
     if (searchParams.get("upgrade") === "promoted" && token && profile && profile.status !== "paying") {
-      triggerUpgrade();
+      window.location.href = "/therapists/checkout";
     }
-  }, [searchParams, token, profile, triggerUpgrade]);
+  }, [searchParams, token, profile]);
 
   useEffect(() => {
     if (!token) return;

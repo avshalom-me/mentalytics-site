@@ -51,6 +51,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "active subscription exists" }, { status: 400 });
     }
 
+    let customerInfo: { firstName?: string; lastName?: string; phone?: string; email?: string } = {};
+    try {
+      const body = await req.json();
+      customerInfo = body || {};
+    } catch {}
+
+    const clientName = customerInfo.firstName && customerInfo.lastName
+      ? `${customerInfo.firstName} ${customerInfo.lastName}`
+      : therapist.full_name;
+    const clientEmail = customerInfo.email || therapist.email || user.email || "";
+    const clientPhone = customerInfo.phone || "";
+
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
       .insert({
@@ -58,7 +70,7 @@ export async function POST(req: NextRequest) {
         reference_id: therapist.id,
         amount: 120,
         status: "pending",
-        metadata: { therapist_name: therapist.full_name, email: therapist.email },
+        metadata: { therapist_name: clientName, email: clientEmail, phone: clientPhone },
       })
       .select("id")
       .single();
@@ -69,8 +81,9 @@ export async function POST(req: NextRequest) {
 
     const result = await createSubscriptionPayment({
       therapistId: therapist.id,
-      therapistName: therapist.full_name,
-      therapistEmail: therapist.email || user.email || "",
+      therapistName: clientName,
+      therapistEmail: clientEmail,
+      therapistPhone: clientPhone,
       paymentId: payment.id,
     });
 

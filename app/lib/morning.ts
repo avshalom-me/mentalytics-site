@@ -58,8 +58,16 @@ export async function createSubscriptionPayment(opts: {
   therapistId: string;
   therapistName: string;
   therapistEmail: string;
+  therapistPhone?: string;
   paymentId: string;
 }): Promise<PaymentFormResult> {
+  const client: Record<string, unknown> = {
+    name: opts.therapistName,
+    emails: [opts.therapistEmail],
+    add: true,
+  };
+  if (opts.therapistPhone) client.phone = opts.therapistPhone;
+
   return api("/payments/form", {
     type: 320,
     lang: "he",
@@ -69,11 +77,7 @@ export async function createSubscriptionPayment(opts: {
     maxPayments: 1,
     pluginId: process.env.MORNING_PLUGIN_ID,
     description: "מנוי חודשי — מסלול מקודם | טיפול חכם",
-    client: {
-      name: opts.therapistName,
-      emails: [opts.therapistEmail],
-      add: true,
-    },
+    client,
     income: [
       {
         catalogNum: "PROMOTED-MONTHLY",
