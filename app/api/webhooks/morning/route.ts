@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
-import { fetchDocument } from "@/app/lib/morning";
+import { fetchDocument, searchTokens } from "@/app/lib/morning";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -33,18 +33,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
+    // Morning fires multiple webhook event types (document/created,
+    // payment/received). Some carry a JSON body with our `custom` field,
+    // others don't. Treat unparseable / non-payment events as no-ops
+    // rather than errors — only the document event matters to us.
+    let body: Record<string, unknown>;
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ ok: true });
+    }
 
     let custom: Record<string, string> = {};
     try {
-      custom = typeof body.custom === "string" ? JSON.parse(body.custom) : body.custom || {};
+      custom = typeof body.custom === "string" ? JSON.parse(body.custom) : (body.custom as Record<string, string>) || {};
     } catch {
-      console.error("Morning webhook: failed to parse custom field");
+      // ignore — fall through and the missing-paymentId check below skips this event
     }
 
     const paymentId = custom.paymentId;
     if (!paymentId) {
-      console.error("Morning webhook: missing paymentId in custom field");
+      // Expected for payment/received events without a custom field
       return NextResponse.json({ ok: true });
     }
     console.log(`Morning webhook received for paymentId=${paymentId}, type=${custom.type || "unknown"}`);
@@ -141,6 +150,21 @@ async function handleSubscription(therapistId: string, custom: Record<string, st
   const periodEnd = new Date(now);
   periodEnd.setMonth(periodEnd.getMonth() + 1);
 
+  // Look up the token Morning created when the customer paid via the form
+  // (addToken:true + externalKey:paymentId on /payments/form). Without this
+  // ID we can't auto-charge for renewals.
+  let tokenId: string | null = null;
+  if (custom.paymentId) {
+    try {
+      const result = await searchTokens(custom.paymentId);
+      const items = (result as { items?: { id: string }[] }).items;
+      if (items && items.length > 0) tokenId = items[0].id;
+      else console.error(`Subscription ${therapistId}: no token found for externalKey=${custom.paymentId}`);
+    } catch (e) {
+      console.error(`Subscription ${therapistId}: searchTokens failed:`, e);
+    }
+  }
+
   await supabase
     .from("subscriptions")
     .upsert(
@@ -149,6 +173,7 @@ async function handleSubscription(therapistId: string, custom: Record<string, st
         status: "active",
         current_period_start: now.toISOString(),
         current_period_end: periodEnd.toISOString(),
+        morning_token_id: tokenId,
         updated_at: now.toISOString(),
       },
       { onConflict: "therapist_id" }
@@ -159,7 +184,7 @@ async function handleSubscription(therapistId: string, custom: Record<string, st
     .update({ status: "paying", manually_promoted: false, promoted_since: new Date().toISOString() })
     .eq("id", therapistId);
 
-  console.log(`Subscription activated for therapist ${therapistId}`);
+  console.log(`Subscription activated for therapist ${therapistId}, token=${tokenId ?? "MISSING"}`);
 }
 
 async function handleQuizPayment(referenceId: string, custom: Record<string, string>) {
