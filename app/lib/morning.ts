@@ -116,6 +116,8 @@ export async function createSubscriptionPayment(opts: {
     pluginId: process.env.MORNING_PLUGIN_ID,
     description: "מנוי חודשי — מסלול מקודם | טיפול חכם",
     client,
+    addToken: true,
+    externalKey: opts.paymentId,
     income: [
       {
         catalogNum: "PROMOTED-MONTHLY",
