@@ -1,6 +1,13 @@
 const API_BASE =
   process.env.MORNING_API_BASE || "https://api.greeninvoice.co.il/api/v1";
 
+// Israeli VAT (raised from 17% to 18% on 2025-01-01).
+const VAT_RATE = 0.18;
+const QUIZ_BASE_PRICE = 30;
+const SUBSCRIPTION_BASE_PRICE = 120;
+const QUIZ_TOTAL = +(QUIZ_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
+const SUBSCRIPTION_TOTAL = +(SUBSCRIPTION_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
+
 let cached: { token: string; exp: number } | null = null;
 
 async function getToken(): Promise<string> {
@@ -103,8 +110,8 @@ export async function createSubscriptionPayment(opts: {
     type: 320,
     lang: "he",
     currency: "ILS",
-    vatType: 0,
-    amount: 120,
+    vatType: 2,
+    amount: SUBSCRIPTION_TOTAL,
     maxPayments: 1,
     pluginId: process.env.MORNING_PLUGIN_ID,
     description: "מנוי חודשי — מסלול מקודם | טיפול חכם",
@@ -114,7 +121,7 @@ export async function createSubscriptionPayment(opts: {
         catalogNum: "PROMOTED-MONTHLY",
         description: "מנוי מטפל חודשי — מסלול מקודם",
         quantity: 1,
-        price: 120,
+        price: SUBSCRIPTION_BASE_PRICE,
         currency: "ILS",
         vatType: 0,
       },
@@ -143,8 +150,8 @@ export async function createQuizPayment(opts: {
     type: 320,
     lang: "he",
     currency: "ILS",
-    vatType: 0,
-    amount: 30,
+    vatType: 2,
+    amount: QUIZ_TOTAL,
     maxPayments: 1,
     pluginId: process.env.MORNING_PLUGIN_ID,
     description: "שאלון התאמה לטיפול | טיפול חכם",
@@ -159,7 +166,7 @@ export async function createQuizPayment(opts: {
         catalogNum: "QUIZ-SINGLE",
         description: "שימוש בשאלון התאמה לטיפול",
         quantity: 1,
-        price: 30,
+        price: QUIZ_BASE_PRICE,
         currency: "ILS",
         vatType: 0,
       },
@@ -190,8 +197,8 @@ export async function chargeToken(
     type: 320,
     lang: "he",
     currency: "ILS",
-    vatType: 0,
-    amount: 120,
+    vatType: 2,
+    amount: SUBSCRIPTION_TOTAL,
     maxPayments: 1,
     description: "מנוי חודשי — מסלול מקודם | טיפול חכם",
     client: {
@@ -203,7 +210,7 @@ export async function chargeToken(
         catalogNum: "PROMOTED-MONTHLY",
         description: "מנוי מטפל חודשי — מסלול מקודם",
         quantity: 1,
-        price: 120,
+        price: SUBSCRIPTION_BASE_PRICE,
         currency: "ILS",
         vatType: 0,
       },
