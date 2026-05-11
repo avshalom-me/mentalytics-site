@@ -55,7 +55,7 @@ export default function BillingPolicyPage() {
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">4. תהליך הרכישה</h2>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>הרכישה מתבצעת באתר באמצעות טופס תשלום מאובטח.</li>
-            <li>התשלום מעובד על ידי חברת Grow באמצעות פלטפורמת Morning (חשבונית ירוקה).</li>
+            <li>התשלום מעובד על ידי חברת סליקה מורשית (Sumit / UPay).</li>
             <li>החברה אינה שומרת פרטי כרטיס אשראי — כל מידע פיננסי מוחזק באופן מאובטח על ידי חברת הסליקה בלבד.</li>
             <li>עם השלמת התשלום תופק חשבונית מס / קבלה אוטומטית ותישלח למייל הרשום.</li>
             <li>לפני ביצוע רכישה, המשתמש נדרש לאשר את תקנון הרכישה באמצעות סימון ✓.</li>
@@ -121,7 +121,7 @@ export default function BillingPolicyPage() {
 
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">11. אבטחת מידע ותשלומים</h2>
-          <p>האתר משתמש בהצפנת SSL ומעבד תשלומים באמצעות חברת סליקה מורשית (Grow / Morning). החברה אינה שומרת ואינה חשופה לפרטי כרטיסי אשראי של משתמשים.</p>
+          <p>האתר משתמש בהצפנת SSL ומעבד תשלומים באמצעות חברת סליקה מורשית (Sumit / UPay). החברה אינה שומרת ואינה חשופה לפרטי כרטיסי אשראי של משתמשים.</p>
           <p className="mt-2">למידע נוסף על הגנת המידע האישי — ראו את <Link href="/privacy" className="underline hover:text-[#0F5468]">מדיניות הפרטיות</Link>.</p>
         </section>
 

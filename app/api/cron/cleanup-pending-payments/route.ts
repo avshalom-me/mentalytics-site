@@ -21,9 +21,9 @@ function verifyCron(req: NextRequest): boolean {
 }
 
 // Marks payments stuck in 'pending' for more than STALE_HOURS as 'failed'.
-// A payment is 'pending' once we've created the Morning form URL — but the
-// user may have closed the tab before paying, never returned, etc. Without
-// cleanup, these accumulate forever.
+// A payment is 'pending' once we've inserted the row and called Sumit —
+// but the user may have closed the tab before paying, never returned, etc.
+// Without cleanup, these accumulate forever.
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "server misconfigured" }, { status: 503 });
