@@ -5,29 +5,92 @@ import Link from "next/link";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getFingerprint } from "@/app/lib/fingerprint";
 
+const SUMIT_TOKENIZE_URL = "https://api.sumit.co.il/creditguy/vault/tokenizesingleuse/";
+
+interface SumitConfig {
+  companyId: number;
+  publicKey: string;
+}
+
+interface SumitTokenizeResponse {
+  Status: number;
+  UserErrorMessage: string | null;
+  TechnicalErrorDetails: string | null;
+  Data: { SingleUseToken?: string } | null;
+}
+
+function formatCardNumber(raw: string): string {
+  const digits = raw.replace(/\D/g, "").slice(0, 19);
+  return digits.replace(/(.{4})/g, "$1 ").trim();
+}
+
 export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "kids" }) {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
+
+  const [cardNumber, setCardNumber] = useState("");
+  const [expMonth, setExpMonth] = useState("");
+  const [expYear, setExpYear] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [citizenId, setCitizenId] = useState("");
+
   const [agreed, setAgreed] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const cardDigits = cardNumber.replace(/\s/g, "");
   const canSubmit =
     firstName.trim() &&
     lastName.trim() &&
     phone.trim() &&
     email.trim() &&
+    cardDigits.length >= 13 &&
+    expMonth.length === 2 &&
+    expYear.length === 4 &&
+    cvv.length >= 3 &&
+    citizenId.length >= 5 &&
     agreed;
 
   async function handlePay(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit) return;
+    if (!canSubmit || loading) return;
     setLoading(true);
     setError("");
     try {
       const fp = await getFingerprint();
+
+      const cfgRes = await fetch("/api/payments/sumit-config");
+      if (!cfgRes.ok) {
+        setError("שגיאה בטעינת מערכת התשלום. נסו שוב.");
+        setLoading(false);
+        return;
+      }
+      const cfg: SumitConfig = await cfgRes.json();
+
+      const tokRes = await fetch(SUMIT_TOKENIZE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          Credentials: { CompanyID: cfg.companyId, APIPublicKey: cfg.publicKey },
+          CardNumber: cardDigits,
+          ExpirationMonth: parseInt(expMonth, 10),
+          ExpirationYear: parseInt(expYear, 10),
+          CVV: cvv,
+          CitizenID: citizenId,
+        }),
+      });
+      const tok = (await tokRes.json()) as SumitTokenizeResponse;
+      if (tok.Status !== 0 || !tok.Data?.SingleUseToken) {
+        setError(
+          tok.UserErrorMessage ||
+            "פרטי הכרטיס לא תקינים. בדקו את המספר, התוקף וה-CVV ונסו שוב."
+        );
+        setLoading(false);
+        return;
+      }
+
       const res = await fetch("/api/payments/create-quiz-payment", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -38,15 +101,20 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
           lastName: lastName.trim(),
           phone: phone.trim(),
           email: email.trim(),
+          singleUseToken: tok.Data.SingleUseToken,
         }),
       });
       const data = await res.json();
-      if (!res.ok || !data.url) {
-        setError("שגיאה ביצירת התשלום. ניתן לנסות שוב בעוד מספר רגעים.");
+      if (!res.ok || !data.success) {
+        setError(
+          data.error === "payment provider error"
+            ? "החיוב נדחה ע\"י חברת האשראי. בדקו פרטים או נסו כרטיס אחר."
+            : "שגיאה בעיבוד התשלום. נסו שוב בעוד מספר רגעים."
+        );
         setLoading(false);
         return;
       }
-      window.location.href = data.url;
+      window.location.href = `/quiz/payment-success?type=${quizType}`;
     } catch {
       setError("שגיאה בלתי צפויה. נסו שוב.");
       setLoading(false);
@@ -116,21 +184,93 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
           />
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-stone-700 mb-1">מדינה</label>
-          <input
-            type="text"
-            value="ישראל"
-            disabled
-            className="w-full rounded-lg border border-stone-200 bg-stone-50 px-3 py-2.5 text-sm text-stone-500"
-          />
-        </div>
-
         <div className="rounded-xl p-3 flex items-start gap-2.5" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
           <ShieldCheck size={16} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
           <p className="text-[11px] leading-5 text-stone-700">
             הפרטים משמשים אך ורק להפקת חשבונית כנדרש בחוק ואינם נשמרים אצלנו במערכת. <strong>תוכן השאלון והתוצאות נשארים אנונימיים</strong> ואינם מקושרים לפרטים אלה.
           </p>
+        </div>
+
+        <hr className="border-stone-200" />
+
+        <h3 className="text-base font-bold text-stone-900">פרטי תשלום</h3>
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-700 mb-1">מספר כרטיס *</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="cc-number"
+            required
+            value={cardNumber}
+            onChange={e => setCardNumber(formatCardNumber(e.target.value))}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[#0F5468] focus:ring-1 focus:ring-[#0F5468] outline-none"
+            dir="ltr"
+            placeholder="1234 5678 9012 3456"
+          />
+        </div>
+
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1">חודש *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-exp-month"
+              required
+              maxLength={2}
+              value={expMonth}
+              onChange={e => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[#0F5468] focus:ring-1 focus:ring-[#0F5468] outline-none"
+              dir="ltr"
+              placeholder="MM"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1">שנה *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-exp-year"
+              required
+              maxLength={4}
+              value={expYear}
+              onChange={e => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[#0F5468] focus:ring-1 focus:ring-[#0F5468] outline-none"
+              dir="ltr"
+              placeholder="YYYY"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-stone-700 mb-1">CVV *</label>
+            <input
+              type="text"
+              inputMode="numeric"
+              autoComplete="cc-csc"
+              required
+              maxLength={4}
+              value={cvv}
+              onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[#0F5468] focus:ring-1 focus:ring-[#0F5468] outline-none"
+              dir="ltr"
+              placeholder="123"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-stone-700 mb-1">ת&quot;ז בעל/ת הכרטיס *</label>
+          <input
+            type="text"
+            inputMode="numeric"
+            required
+            maxLength={9}
+            value={citizenId}
+            onChange={e => setCitizenId(e.target.value.replace(/\D/g, "").slice(0, 9))}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[#0F5468] focus:ring-1 focus:ring-[#0F5468] outline-none"
+            dir="ltr"
+            placeholder="123456789"
+          />
         </div>
 
         <hr className="border-stone-200" />
@@ -163,14 +303,14 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
           {loading ? (
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
-            "מעבר לתשלום מאובטח — ₪30 + מע\"מ"
+            "חיוב מאובטח — ₪35.40"
           )}
         </button>
 
         {error && <p className="text-xs text-red-600 text-center">{error}</p>}
 
         <p className="text-[11px] leading-5 text-stone-500 text-center">
-          התשלום מאובטח ומבוצע דרך חברת הסליקה Grow / Morning. פרטי כרטיס האשראי אינם נשמרים באתר שלנו.
+          התשלום מאובטח ומבוצע דרך חברת הסליקה Sumit. פרטי כרטיס האשראי נשלחים ישירות אליהם דרך חיבור מוצפן ואינם נשמרים באתר שלנו.
         </p>
       </form>
     </div>
