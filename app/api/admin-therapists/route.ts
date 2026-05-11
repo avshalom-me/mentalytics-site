@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
+import { cancelSubscription } from "@/app/lib/sumit";
 
 type TherapistRow = {
   id: string;
@@ -173,9 +174,59 @@ export async function PATCH(request: Request) {
       extraFields.manually_promoted = true;
       extraFields.promoted_since = new Date().toISOString();
     }
-    if (status === "approved") {
+    if (status === "approved" || status === "rejected") {
       extraFields.manually_promoted = false;
       extraFields.promoted_since = null;
+
+      // If this therapist has an active subscription at Sumit (real paying
+      // customer, not a manually-promoted free account), cancelling them
+      // locally is not enough — Sumit would keep charging their card every
+      // month while their status here is "approved". Cancel at Sumit first
+      // and mark the row 'cancelled' locally. If the Sumit call fails we
+      // surface a 502 with a clear message so the admin can resolve the
+      // mismatch manually in Sumit's UI before the status flips locally.
+      const { data: activeSub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id, morning_token_id")
+        .eq("therapist_id", id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (activeSub && activeSub.morning_token_id) {
+        try {
+          await cancelSubscription({
+            recurringItemId: parseInt(activeSub.morning_token_id, 10),
+            customerExternalId: id,
+          });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "unknown error";
+          console.error(`Admin demote: Sumit cancel failed for therapist ${id}:`, message);
+          return NextResponse.json(
+            {
+              ok: false,
+              error:
+                "ביטול הוראת הקבע ב-Sumit נכשל. בטלו ידנית ב-Sumit UI לפני שינוי הסטטוס.",
+            },
+            { status: 502 }
+          );
+        }
+
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", activeSub.id);
+      } else if (activeSub) {
+        // Subscription row exists but no recurring id — orphan from before
+        // we captured the id. Mark cancelled locally; admin should also
+        // verify no leftover at Sumit.
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", activeSub.id);
+        console.warn(
+          `Admin demote: subscription ${activeSub.id} for therapist ${id} had no morning_token_id; cancelled locally only.`
+        );
+      }
     }
 
     const { error } = await supabaseAdmin

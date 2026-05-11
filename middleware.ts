@@ -1,17 +1,45 @@
 import { NextRequest, NextResponse } from "next/server";
+import { timingSafeEqual } from "crypto";
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
 
+// Constant-time equality so a network observer can't extract the secret
+// character-by-character via response-time analysis.
+function safeEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a);
+  const bBuf = Buffer.from(b);
+  // Length comparison itself is fine to leak; we only need to hide the
+  // per-byte comparison. timingSafeEqual requires equal-length buffers.
+  if (aBuf.length !== bBuf.length) return false;
+  return timingSafeEqual(aBuf, bBuf);
+}
+
 function isAuthorized(request: NextRequest): boolean {
+  if (!ADMIN_PASSWORD) return false;
+
   const authHeader = request.headers.get("authorization");
   if (!authHeader || !authHeader.startsWith("Basic ")) return false;
 
   const base64 = authHeader.slice(6);
-  const decoded = Buffer.from(base64, "base64").toString("utf-8");
-  const [username, password] = decoded.split(":");
+  let decoded: string;
+  try {
+    decoded = Buffer.from(base64, "base64").toString("utf-8");
+  } catch {
+    return false;
+  }
 
-  return username === ADMIN_USERNAME && password === ADMIN_PASSWORD && ADMIN_PASSWORD !== "";
+  // Split on first colon only — password may contain colons.
+  const sep = decoded.indexOf(":");
+  if (sep < 0) return false;
+  const username = decoded.slice(0, sep);
+  const password = decoded.slice(sep + 1);
+
+  // Evaluate both checks regardless of the first result so the response
+  // time doesn't reveal which one failed.
+  const userOk = safeEqual(username, ADMIN_USERNAME);
+  const passOk = safeEqual(password, ADMIN_PASSWORD);
+  return userOk && passOk;
 }
 
 export function middleware(request: NextRequest) {

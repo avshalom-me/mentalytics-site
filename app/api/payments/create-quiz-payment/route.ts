@@ -28,6 +28,13 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
+// Strip everything that isn't a letter (Hebrew or Latin), space, hyphen,
+// apostrophe or dot — defends against control chars and any XSS surface in
+// downstream document renderers.
+function sanitizeName(raw: string): string {
+  return raw.replace(/[^\p{L}\s'.\-]/gu, "").trim().slice(0, 80);
+}
+
 // One-off quiz payment via Sumit. The browser has already tokenized the card
 // against the Vault API and passes us SingleUseToken — we just charge it.
 // Sumit auto-issues the receipt and emails it to the customer.
@@ -53,8 +60,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "invalid quizType" }, { status: 400 });
     }
 
-    const cleanFirst = typeof firstName === "string" ? firstName.trim() : "";
-    const cleanLast = typeof lastName === "string" ? lastName.trim() : "";
+    const cleanFirst = sanitizeName(typeof firstName === "string" ? firstName : "");
+    const cleanLast = sanitizeName(typeof lastName === "string" ? lastName : "");
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
     const cleanEmail = typeof email === "string" ? email.trim() : "";
     const cleanToken = typeof singleUseToken === "string" ? singleUseToken.trim() : "";
@@ -62,7 +69,7 @@ export async function POST(req: NextRequest) {
     if (!cleanFirst || !cleanLast || !cleanPhone || !cleanEmail || !cleanToken) {
       return NextResponse.json({ error: "missing fields" }, { status: 400 });
     }
-    if (cleanFirst.length > 80 || cleanLast.length > 80 || cleanPhone.length > 30 || cleanEmail.length > 200) {
+    if (cleanPhone.length > 30 || cleanEmail.length > 200) {
       return NextResponse.json({ error: "invalid customer details" }, { status: 400 });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -72,6 +79,21 @@ export async function POST(req: NextRequest) {
     const ip = getIp(req);
     if (!checkRateLimit(`${ip}:${fp}`)) {
       return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
+
+    // Race-condition guard: refuse a second submission while a payment for
+    // the same fingerprint is still pending (probably a double-click).
+    const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+    const { data: pending } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("payment_type", "quiz")
+      .eq("reference_id", `fp:${fp}`)
+      .eq("status", "pending")
+      .gte("created_at", sixtySecondsAgo)
+      .maybeSingle();
+    if (pending) {
+      return NextResponse.json({ error: "payment in progress" }, { status: 409 });
     }
 
     const { data: payment, error } = await supabase

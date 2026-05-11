@@ -7,16 +7,29 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-// Flow:
-// 1. Frontend collects customer details + tokenizes the card directly with
-//    Sumit's Vault API (using the public key), producing a SingleUseToken.
-// 2. Frontend POSTs everything here with Authorization: Bearer <supabase jwt>.
-// 3. We validate, ensure no active subscription exists, then call Sumit's
-//    /billing/recurring/charge which charges the token AND creates the
-//    standing order in one shot. Sumit handles future monthly charges on
-//    their servers.
-// 4. On success we mark the therapist paying and store Sumit's customer id
-//    + recurring item id for later cancel/status-sync calls.
+// Best-effort rate limit. In-memory, so cold starts reset it — that's a
+// known limitation (F4). Pairs with the in-DB pending-payment check below
+// to make double-charging hard even when this cache is empty.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(key: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(key);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(key, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 3) return false;
+  entry.count++;
+  return true;
+}
+
+// Names go on the customer record and the invoice. Strip everything that
+// isn't a letter (Hebrew or Latin), space, hyphen, apostrophe, or dot.
+// Defends against accidental control chars and any latent XSS surface in
+// downstream renderers (e.g. PDF generators upstream at Sumit).
+function sanitizeName(raw: string): string {
+  return raw.replace(/[^\p{L}\s'.\-]/gu, "").trim().slice(0, 80);
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -51,6 +64,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "already subscribed" }, { status: 400 });
     }
 
+    if (!checkRateLimit(therapist.id)) {
+      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
+
     const existing = await supabase
       .from("subscriptions")
       .select("id, status")
@@ -60,6 +77,24 @@ export async function POST(req: NextRequest) {
 
     if (existing.data) {
       return NextResponse.json({ error: "active subscription exists" }, { status: 400 });
+    }
+
+    // Race-condition guard: if there is already a pending payment for this
+    // therapist created in the last 60 seconds, the user probably double-
+    // submitted. Refuse the second attempt instead of opening a parallel
+    // charge against Sumit.
+    const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
+    const { data: pending } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("payment_type", "subscription")
+      .eq("reference_id", therapist.id)
+      .eq("status", "pending")
+      .gte("created_at", sixtySecondsAgo)
+      .maybeSingle();
+
+    if (pending) {
+      return NextResponse.json({ error: "payment in progress" }, { status: 409 });
     }
 
     let body: {
@@ -75,8 +110,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "invalid body" }, { status: 400 });
     }
 
-    const cleanFirst = typeof body.firstName === "string" ? body.firstName.trim() : "";
-    const cleanLast = typeof body.lastName === "string" ? body.lastName.trim() : "";
+    const cleanFirst = sanitizeName(typeof body.firstName === "string" ? body.firstName : "");
+    const cleanLast = sanitizeName(typeof body.lastName === "string" ? body.lastName : "");
     const cleanPhone = typeof body.phone === "string" ? body.phone.trim() : "";
     const cleanEmail = typeof body.email === "string" ? body.email.trim() : "";
     const singleUseToken =
@@ -85,12 +120,7 @@ export async function POST(req: NextRequest) {
     if (!cleanFirst || !cleanLast || !cleanPhone || !cleanEmail || !singleUseToken) {
       return NextResponse.json({ error: "missing fields" }, { status: 400 });
     }
-    if (
-      cleanFirst.length > 80 ||
-      cleanLast.length > 80 ||
-      cleanPhone.length > 30 ||
-      cleanEmail.length > 200
-    ) {
+    if (cleanPhone.length > 30 || cleanEmail.length > 200) {
       return NextResponse.json({ error: "invalid customer details" }, { status: 400 });
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
@@ -136,12 +166,10 @@ export async function POST(req: NextRequest) {
     const periodEnd = new Date(now);
     periodEnd.setMonth(periodEnd.getMonth() + 1);
 
-    // Sumit returns the customer + recurring item ids; store the recurring
-    // id in morning_token_id (column name kept for now to avoid a migration)
-    // so we can call /billing/recurring/cancel later without re-searching.
+    // Sumit's recurring-item id is stored in subscriptions.morning_token_id
+    // (legacy column name retained to avoid a rename migration).
     const sumitRecurringId = (result.RecurringItemID ?? null) as number | null;
     const sumitDocumentId = (result.DocumentID ?? null) as number | null;
-    const sumitCustomerId = (result.CustomerID ?? null) as number | null;
 
     await supabase
       .from("subscriptions")
@@ -174,9 +202,8 @@ export async function POST(req: NextRequest) {
       })
       .eq("id", payment.id);
 
-    console.log(
-      `Subscription created for therapist ${therapist.id} | sumitCustomer=${sumitCustomerId} | recurring=${sumitRecurringId} | doc=${sumitDocumentId}`
-    );
+    // Single audit line, no sensitive ids beyond our own payment row.
+    console.log(`Subscription completed: payment=${payment.id}`);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
