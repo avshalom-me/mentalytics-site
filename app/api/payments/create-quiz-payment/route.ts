@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createQuizPayment } from "@/app/lib/morning";
+import { chargeQuizPayment, QUIZ_BASE_PRICE } from "@/app/lib/sumit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -28,15 +28,24 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
+// One-off quiz payment via Sumit. The browser has already tokenized the card
+// against the Vault API and passes us SingleUseToken — we just charge it.
+// Sumit auto-issues the receipt and emails it to the customer.
 export async function POST(req: NextRequest) {
   try {
-    const { fp, quizType, firstName, lastName, phone, email } = await req.json();
+    const {
+      fp,
+      quizType,
+      firstName,
+      lastName,
+      phone,
+      email,
+      singleUseToken,
+    } = await req.json();
 
     if (!fp || !quizType) {
       return NextResponse.json({ error: "missing fp or quizType" }, { status: 400 });
     }
-    // SHA-256 hex from getFingerprint() — strict format prevents arbitrary
-    // user-controlled strings polluting the DB or working around limits.
     if (typeof fp !== "string" || !/^[a-f0-9]{64}$/.test(fp)) {
       return NextResponse.json({ error: "invalid fp" }, { status: 400 });
     }
@@ -48,9 +57,10 @@ export async function POST(req: NextRequest) {
     const cleanLast = typeof lastName === "string" ? lastName.trim() : "";
     const cleanPhone = typeof phone === "string" ? phone.trim() : "";
     const cleanEmail = typeof email === "string" ? email.trim() : "";
+    const cleanToken = typeof singleUseToken === "string" ? singleUseToken.trim() : "";
 
-    if (!cleanFirst || !cleanLast || !cleanPhone || !cleanEmail) {
-      return NextResponse.json({ error: "missing customer details" }, { status: 400 });
+    if (!cleanFirst || !cleanLast || !cleanPhone || !cleanEmail || !cleanToken) {
+      return NextResponse.json({ error: "missing fields" }, { status: 400 });
     }
     if (cleanFirst.length > 80 || cleanLast.length > 80 || cleanPhone.length > 30 || cleanEmail.length > 200) {
       return NextResponse.json({ error: "invalid customer details" }, { status: 400 });
@@ -60,7 +70,6 @@ export async function POST(req: NextRequest) {
     }
 
     const ip = getIp(req);
-
     if (!checkRateLimit(`${ip}:${fp}`)) {
       return NextResponse.json({ error: "too many requests" }, { status: 429 });
     }
@@ -70,7 +79,7 @@ export async function POST(req: NextRequest) {
       .insert({
         payment_type: "quiz",
         reference_id: `fp:${fp}`,
-        amount: 30,
+        amount: QUIZ_BASE_PRICE,
         status: "pending",
         metadata: { ip, quizType, fingerprint: fp },
       })
@@ -81,22 +90,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "failed to create payment record" }, { status: 500 });
     }
 
-    const result = await createQuizPayment({
-      fingerprint: fp,
-      ip,
-      quizType,
-      paymentId: payment.id,
-      customerName: `${cleanFirst} ${cleanLast}`,
-      customerEmail: cleanEmail,
-      customerPhone: cleanPhone,
-    });
-
-    if (result.errorCode !== 0 || !result.url) {
+    let result;
+    try {
+      result = await chargeQuizPayment({
+        fingerprint: fp,
+        singleUseToken: cleanToken,
+        customerName: `${cleanFirst} ${cleanLast}`,
+        customerEmail: cleanEmail,
+        customerPhone: cleanPhone,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "unknown error";
+      console.error("Sumit chargeQuizPayment failed:", message);
       await supabase.from("payments").update({ status: "failed" }).eq("id", payment.id);
       return NextResponse.json({ error: "payment provider error" }, { status: 502 });
     }
 
-    return NextResponse.json({ url: result.url, paymentId: payment.id });
+    const sumitDocumentId = (result.DocumentID ?? null) as number | null;
+
+    await supabase
+      .from("payments")
+      .update({
+        status: "completed",
+        morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
+      })
+      .eq("id", payment.id);
+
+    return NextResponse.json({ success: true, paymentId: payment.id });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("create-quiz-payment error:", message);
