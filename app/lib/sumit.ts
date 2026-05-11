@@ -149,6 +149,12 @@ export async function createSubscription(opts: {
       },
     ],
     VATIncluded: false,
+    // Email the customer the receipt automatically on each charge — Sumit
+    // does NOT do this by default for /billing/recurring/charge (unlike
+    // /billing/payments/charge which has SendDocumentByEmail). For recurring
+    // the correct flag is UpdateCustomerByEmail + the attach toggle.
+    UpdateCustomerByEmail: true,
+    UpdateCustomerByEmail_AttachDocument: true,
     SendCopyToOrganization: true,
     PreventStandingOrder: false, // explicit: create the standing order
   });
