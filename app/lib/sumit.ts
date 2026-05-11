@@ -35,9 +35,10 @@ function credentials() {
 }
 
 // Sumit wraps every response in {Status, UserErrorMessage, TechnicalErrorDetails, Data}.
-// Status is typically "Success" on the happy path; anything else is an error.
+// Status is numeric: 0 = success, anything else is an error code. The Swagger
+// "Example Value" shows "Success (0)" as a label, but the wire format is just 0.
 interface SumitEnvelope<T> {
-  Status: string;
+  Status: number;
   UserErrorMessage: string | null;
   TechnicalErrorDetails: string | null;
   Data: T;
@@ -56,8 +57,8 @@ async function api<T>(path: string, body: Record<string, unknown>): Promise<T> {
   }
 
   const env = (await res.json()) as SumitEnvelope<T>;
-  if (typeof env.Status === "string" && !env.Status.startsWith("Success")) {
-    const msg = env.UserErrorMessage || env.TechnicalErrorDetails || env.Status;
+  if (env.Status !== 0) {
+    const msg = env.UserErrorMessage || env.TechnicalErrorDetails || `status=${env.Status}`;
     throw new Error(`Sumit ${path} business error: ${msg}`);
   }
   return env.Data;
@@ -175,7 +176,8 @@ export async function listRecurringForCustomer(opts: {
   externalIdentifier: string;
   includeInactive?: boolean;
 }): Promise<RecurringItem[]> {
-  const data = await api<{ Items?: RecurringItem[] } | RecurringItem[]>(
+  // Sumit wraps the list as { RecurringItems: [...] } inside the envelope's Data.
+  const data = await api<{ RecurringItems?: RecurringItem[] }>(
     "/billing/recurring/listforcustomer/",
     {
       Customer: {
@@ -185,6 +187,5 @@ export async function listRecurringForCustomer(opts: {
       IncludeInactive: opts.includeInactive ?? false,
     }
   );
-  if (Array.isArray(data)) return data;
-  return data.Items ?? [];
+  return data.RecurringItems ?? [];
 }
