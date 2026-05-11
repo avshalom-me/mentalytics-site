@@ -124,7 +124,7 @@ export async function createSubscription(opts: {
   therapistPhone?: string;
   singleUseToken: string;
 }): Promise<SubscriptionChargeResult> {
-  return api<SubscriptionChargeResult>("/billing/recurring/charge/", {
+  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
     Customer: {
       ExternalIdentifier: opts.therapistId,
       SearchMode: 0,
@@ -158,23 +158,59 @@ export async function createSubscription(opts: {
     SendCopyToOrganization: true,
     PreventStandingOrder: false, // explicit: create the standing order
   });
+
+  // /billing/recurring/charge returns the document + customer but does not
+  // surface the new RecurringItem ID in any reliable field name (verified
+  // via live testing — DocumentID was 1895650732, no RecurringItemID was
+  // populated in the Data envelope). Look it up by ExternalIdentifier so
+  // we can store it for later cancel/sync calls.
+  if (!charge.RecurringItemID) {
+    try {
+      const items = await listRecurringForCustomer({
+        externalIdentifier: opts.therapistId,
+        includeInactive: false,
+      });
+      // Most recent active item is the one we just created.
+      const newest = items
+        .filter((i) => i.Status === 0)
+        .sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+      if (newest) charge.RecurringItemID = newest.ID;
+    } catch (e) {
+      console.error("createSubscription: failed to resolve RecurringItemID:", e);
+    }
+  }
+
+  return charge;
 }
 
 // ---------- Cancel a standing order ----------
-
-export async function cancelSubscription(recurringItemId: number): Promise<void> {
+//
+// Sumit's /billing/recurring/cancel takes the recurring item id plus the
+// customer's Sumit-internal id (not ExternalIdentifier — that returns
+// "Customer item not found"). The Customer.ID can be obtained from the
+// /accounting/customers/create response or by looking up the standing
+// order via listRecurringForCustomer first.
+export async function cancelSubscription(opts: {
+  recurringItemId: number;
+  customerExternalId: string;
+}): Promise<void> {
   await api("/billing/recurring/cancel/", {
-    ID: recurringItemId,
+    Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+    ID: opts.recurringItemId,
   });
 }
 
 // ---------- Status sync (daily cron polls this) ----------
 
+// Status enum from live API responses: 0 = active, non-zero = cancelled/
+// suspended/expired (Sumit's docs don't enumerate the exact codes).
 export interface RecurringItem {
   ID: number;
-  Status: string; // "Active", "Cancelled", "Suspended", ...
-  NextChargeDate?: string;
-  LastChargeStatus?: string;
+  Status: number;
+  Date_NextBilling?: string;
+  Date_PreviousBilling?: string;
+  Date_Last?: string;
+  UnitPrice?: number;
   [k: string]: unknown;
 }
 
