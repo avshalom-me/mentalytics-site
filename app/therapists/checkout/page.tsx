@@ -6,8 +6,10 @@ import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 
 // Sumit's Vault API: card data goes from the browser directly to Sumit, never
-// through our server. PCI scope is effectively SAQ-A.
-const SUMIT_TOKENIZE_URL = "https://api.sumit.co.il/creditguy/vault/tokenizesingleuse/";
+// through our server. PCI scope is effectively SAQ-A. The "json" variant of
+// the endpoint accepts JSON bodies (the plain one expects jQuery-style
+// form-encoded data via their JS SDK).
+const SUMIT_TOKENIZE_URL = "https://api.sumit.co.il/creditguy/vault/tokenizesingleusejson/";
 
 interface SumitConfig {
   companyId: number;

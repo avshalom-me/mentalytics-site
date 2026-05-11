@@ -5,7 +5,9 @@ import Link from "next/link";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getFingerprint } from "@/app/lib/fingerprint";
 
-const SUMIT_TOKENIZE_URL = "https://api.sumit.co.il/creditguy/vault/tokenizesingleuse/";
+// The "json" variant accepts JSON bodies; the plain endpoint expects
+// jQuery-style form-encoded data (used by Sumit's official JS SDK).
+const SUMIT_TOKENIZE_URL = "https://api.sumit.co.il/creditguy/vault/tokenizesingleusejson/";
 
 interface SumitConfig {
   companyId: number;
