@@ -15,10 +15,15 @@ function escapeHtml(str: string): string {
 }
 
 // Reasons a therapist's promoted-tier access ends:
-//   - 'admin_demote'  — admin manually demoted them
-//   - 'trial_expired' — time-limited promotion reached its expiry date
-//   - 'payment_failed'— Sumit cancelled the standing order after retries
-export type PromotionEndedReason = "admin_demote" | "trial_expired" | "payment_failed";
+//   - 'admin_demote'         — admin demoted a free (manual/trial) promotion
+//   - 'customer_cancellation'— paying customer asked us to cancel their sub
+//   - 'trial_expired'        — time-limited promotion reached its expiry
+//   - 'payment_failed'       — Sumit cancelled the standing order after retries
+export type PromotionEndedReason =
+  | "admin_demote"
+  | "customer_cancellation"
+  | "trial_expired"
+  | "payment_failed";
 
 // Source of a new gift promotion (admin granted, no money changed hands):
 //   - 'manual' — no expiry, runs until admin demotes
@@ -31,6 +36,13 @@ const REASON_TEXTS: Record<PromotionEndedReason, { subject: string; body: string
     body:
       "ההטבה של הקידום החינמי שניתנה לך הסתיימה." +
       ' כדי להמשיך להופיע כמטפל/ת מקודם/ת באתר, ניתן להירשם למסלול בתשלום של ₪120 + מע"מ לחודש.',
+  },
+  customer_cancellation: {
+    subject: "המנוי שלך באתר טיפול חכם בוטל",
+    body:
+      "המנוי החודשי שלך באתר טיפול חכם בוטל בעקבות בקשתך." +
+      " הוראת הקבע אצל Sumit הופסקה ולא ייגבו ממך תשלומים נוספים." +
+      " תודה שהיית חלק מהמערכת — אם בעתיד תרצה/י לחזור, ניתן להירשם מחדש מהאתר.",
   },
   trial_expired: {
     subject: "תקופת הניסיון שלך באתר טיפול חכם הסתיימה",
@@ -109,11 +121,15 @@ export async function sendPromotionEndedEmail(opts: {
 
 // Sent when an admin grants a free promoted-tier gift (manual or trial).
 // promotedUntilIso = null → indefinite manual gift; otherwise it's a trial.
+// wasPreviouslyPaying = true → therapist was previously on a Sumit
+// subscription that we just cancelled; mention this so they don't think
+// the missing charge is a bug.
 export async function sendPromotionGrantedEmail(opts: {
   to: string;
   name: string;
   source: PromotionGrantedSource;
   promotedUntilIso: string | null;
+  wasPreviouslyPaying?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendPromotionGrantedEmail: RESEND_API_KEY not configured, skipping");
@@ -123,7 +139,14 @@ export async function sendPromotionGrantedEmail(opts: {
   const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
   const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
 
-  const subject = "🎁 קיבלת קידום מתנה באתר טיפול חכם!";
+  const subject = opts.wasPreviouslyPaying
+    ? "המנוי שלך הוסב למסלול הטבה ללא עלות 🎁"
+    : "🎁 קיבלת קידום מתנה באתר טיפול חכם!";
+
+  const openingLine = opts.wasPreviouslyPaying
+    ? `המנוי בתשלום שלך באתר טיפול חכם הוסב <strong>למסלול הטבה ללא עלות</strong>. הוראת הקבע אצל Sumit בוטלה ולא ייגבו ממך תשלומים נוספים.`
+    : `קיבלת <strong>קידום מתנה</strong> למסלול המקודם באתר טיפול חכם, ללא תשלום מצדך.`;
+
   const durationLine =
     opts.source === "manual" || !opts.promotedUntilIso
       ? "ההטבה אינה מוגבלת בזמן ותימשך עד הודעה חדשה."
@@ -134,9 +157,7 @@ export async function sendPromotionGrantedEmail(opts: {
   <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">מזל טוב ${safeName} 🎉</h1>
-      <p style="margin:0 0 12px;">
-        קיבלת <strong>קידום מתנה</strong> למסלול המקודם באתר טיפול חכם, ללא תשלום מצדך.
-      </p>
+      <p style="margin:0 0 12px;">${openingLine}</p>
       <p style="margin:0 0 20px;">${escapeHtml(durationLine)}</p>
 
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:0 0 22px;">

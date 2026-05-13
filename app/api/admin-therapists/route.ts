@@ -204,8 +204,9 @@ export async function PATCH(request: Request) {
     }
 
     const extraFields: Record<string, unknown> = {};
-    let emailReason: "admin_demote" | null = null;
+    let endedEmailReason: "admin_demote" | "customer_cancellation" | null = null;
     let sendGrantedEmail = false;
+    let convertedFromPaying = false;
 
     if (status === "paying") {
       // Admin is promoting (or re-promoting). If the therapist is *already*
@@ -257,12 +258,12 @@ export async function PATCH(request: Request) {
       extraFields.promoted_since = new Date().toISOString();
       extraFields.promoted_until = promotedUntilIso;
 
-      // Only send the gift email if the therapist wasn't already on a
-      // paid promoted tier (that case is a freebie on top — they already
-      // knew they had access; the demote-the-Sumit-sub already fired
-      // above without notification).
-      if (before.status !== "paying") {
-        sendGrantedEmail = true;
+      // Always notify of the gift. If the therapist was previously paying,
+      // the email also explains that their Sumit subscription was cancelled
+      // — otherwise they'd see no charge next month and wonder.
+      sendGrantedEmail = true;
+      if (before.status === "paying" && before.promotion_source === "paid") {
+        convertedFromPaying = true;
       }
     }
 
@@ -316,11 +317,14 @@ export async function PATCH(request: Request) {
       }
 
       // If the therapist was on any promoted tier before (paid/manual/
-      // trial), notify them by email that their access has ended. Skip if
-      // they were never promoted in the first place (e.g. moving pending →
-      // approved, which is a normal first-time approval).
+      // trial), notify them by email that their access has ended. The
+      // wording differs based on whether they were a paying customer
+      // (customer_cancellation) or a free gift (admin_demote). Skip if
+      // they were never promoted in the first place (pending → approved
+      // is a normal first-time approval and doesn't need a notification).
       if (before.status === "paying") {
-        emailReason = "admin_demote";
+        endedEmailReason =
+          before.promotion_source === "paid" ? "customer_cancellation" : "admin_demote";
       }
     }
 
@@ -338,11 +342,11 @@ export async function PATCH(request: Request) {
 
     // Fire the email AFTER the DB commit so the customer never gets a
     // "your promotion ended" message that turned out not to be true.
-    if (emailReason && before.email) {
+    if (endedEmailReason && before.email) {
       await sendPromotionEndedEmail({
         to: before.email,
         name: before.full_name ?? "",
-        reason: emailReason,
+        reason: endedEmailReason,
       });
     }
     if (sendGrantedEmail && before.email) {
@@ -351,6 +355,7 @@ export async function PATCH(request: Request) {
         name: before.full_name ?? "",
         source: promotedUntilIso ? "trial" : "manual",
         promotedUntilIso,
+        wasPreviouslyPaying: convertedFromPaying,
       });
     }
 
