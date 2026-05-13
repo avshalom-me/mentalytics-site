@@ -28,6 +28,8 @@ type AdminTherapist = {
   profile_photo_url: string | null;
   status: string;
   manually_promoted: boolean;
+  promotion_source: string | null;
+  promoted_until: string | null;
   created_at: string | null;
 };
 
@@ -205,8 +207,27 @@ export default function AdminTherapistsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to update therapist status");
+
+      // Mirror server-side field updates locally so the buttons re-render
+      // correctly without a hard refresh. promotion_source / promoted_until
+      // are derived the same way the server does (paying + expiry = trial,
+      // paying + no expiry = manual, anything else = cleared).
+      const derived = status === "paying"
+        ? {
+            manually_promoted: true,
+            promotion_source: promotedUntil ? "trial" : "manual",
+            promoted_until: promotedUntil ?? null,
+          }
+        : {
+            manually_promoted: false,
+            promotion_source: null,
+            promoted_until: null,
+          };
+
       setTherapists((prev) =>
-        prev.map((therapist) => therapist.id === id ? { ...therapist, status } : therapist)
+        prev.map((therapist) =>
+          therapist.id === id ? { ...therapist, status, ...derived } : therapist
+        )
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -279,16 +300,33 @@ export default function AdminTherapistsPage() {
           <div className="text-right">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-2xl font-semibold">{therapist.full_name || "ללא שם"}</h2>
-              <span className={`rounded-full px-3 py-1 text-sm font-medium ${
-                therapist.status === "paying" ? "bg-yellow-100 text-yellow-800 border border-yellow-400" :
-                therapist.status === "approved" ? "bg-green-100 text-green-800" :
-                therapist.status === "rejected" ? "bg-red-100 text-red-800" :
-                "bg-gray-100 text-gray-700"
-              }`}>
-                {therapist.status === "paying" ? "★ מקודם" :
-                 therapist.status === "approved" ? "מאושר (חינמי)" :
-                 therapist.status === "rejected" ? "נדחה" : "ממתין לאישור"}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-3 py-1 text-sm font-medium ${
+                  therapist.status === "paying" ? "bg-yellow-100 text-yellow-800 border border-yellow-400" :
+                  therapist.status === "approved" ? "bg-green-100 text-green-800" :
+                  therapist.status === "rejected" ? "bg-red-100 text-red-800" :
+                  "bg-gray-100 text-gray-700"
+                }`}>
+                  {therapist.status === "paying" ? "★ מקודם" :
+                   therapist.status === "approved" ? "מאושר (חינמי)" :
+                   therapist.status === "rejected" ? "נדחה" : "ממתין לאישור"}
+                </span>
+                {therapist.status === "paying" && therapist.promotion_source === "paid" && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 border border-blue-300">
+                    💳 משלם דרך Sumit
+                  </span>
+                )}
+                {therapist.status === "paying" && therapist.promotion_source === "manual" && (
+                  <span className="rounded-full bg-purple-100 px-3 py-1 text-xs font-semibold text-purple-800 border border-purple-300">
+                    🎁 מתנה (ללא תפוגה)
+                  </span>
+                )}
+                {therapist.status === "paying" && therapist.promotion_source === "trial" && therapist.promoted_until && (
+                  <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 border border-orange-300">
+                    ⏰ ניסיון עד {new Date(therapist.promoted_until).toLocaleDateString("he-IL")}
+                  </span>
+                )}
+              </div>
             </div>
 
             {therapist.bio && (
@@ -343,16 +381,26 @@ export default function AdminTherapistsPage() {
                   {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
                 </button>
               )}
-              {therapist.status === "paying" && therapist.manually_promoted && (
+              {therapist.status === "paying" && (therapist.promotion_source === "manual" || therapist.promotion_source === "trial") && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => updateStatus(therapist.id, "approved")}>
                   {isBusy ? "מעדכן..." : "הורד לחינמי"}
                 </button>
               )}
-              {therapist.status === "paying" && !therapist.manually_promoted && (
-                <span className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-400 border border-stone-200">
-                  שילם — לא ניתן להוריד
+              {therapist.status === "paying" && therapist.promotion_source === "paid" && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                  onClick={() => {
+                    if (window.confirm("המטפל משלם דרך Sumit. הורדה תבטל את הוראת הקבע ותשלח לו מייל. להמשיך?"))
+                      updateStatus(therapist.id, "approved");
+                  }}>
+                  {isBusy ? "מעדכן..." : "בטל מנוי + הורד"}
+                </button>
+              )}
+              {therapist.status === "paying" && !therapist.promotion_source && (
+                <span className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-400 border border-stone-200" title="מצב לא עקבי — נסה רענון">
+                  ⚠ מצב לא עקבי
                 </span>
               )}
               <button type="button" disabled={isBusy}

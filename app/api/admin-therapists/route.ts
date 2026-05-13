@@ -22,6 +22,8 @@ type TherapistRow = {
   profile_photo_path: string | null;
   status: string | null;
   manually_promoted: boolean | null;
+  promotion_source: string | null;
+  promoted_until: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -55,7 +57,9 @@ async function buildTherapistsResponse() {
       age_groups,
       profile_photo_path,
       status,
-      manually_promoted
+      manually_promoted,
+      promotion_source,
+      promoted_until
       `
     )
     .order("full_name", { ascending: true });
@@ -106,6 +110,8 @@ async function buildTherapistsResponse() {
         profile_photo_url,
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,
+        promotion_source: t.promotion_source ?? null,
+        promoted_until: t.promoted_until ?? null,
         created_at: null,
       };
     })
