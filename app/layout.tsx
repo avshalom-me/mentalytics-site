@@ -66,7 +66,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             <div className="flex flex-wrap items-center gap-4 text-xs text-stone-400">
               <span>אשכולית 28/3, פרדס חנה</span>
               <span>טלפון: <a href="tel:0527906335" className="hover:underline">052-790-6335</a></span>
-              <span>מייל: <a href="mailto:tipool406@gmail.com" className="hover:underline">tipool406@gmail.com</a></span>
+              <span>מייל: <a href="mailto:tpool406@gmail.com" className="hover:underline">tpool406@gmail.com</a></span>
             </div>
           </div>
         </footer>

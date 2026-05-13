@@ -67,7 +67,7 @@ export default function DevelopersForm() {
       setStatus("success");
     } catch (err: any) {
       setStatus("error");
-      setErrorMsg(err?.message || "שגיאה בשליחה. נסו שוב או פנו ב-tipool406@gmail.com");
+      setErrorMsg(err?.message || "שגיאה בשליחה. נסו שוב או פנו ב-tpool406@gmail.com");
     }
   }
 
