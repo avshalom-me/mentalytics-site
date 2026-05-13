@@ -172,8 +172,25 @@ Admin clicks "Demote to approved" in /admin/therapists
 | עמודה | טיפוס | משמעות |
 |--------|------|--------|
 | `status` | text | `'pending'` → `'approved'` → `'paying'` (או `'rejected'`) |
-| `manually_promoted` | boolean | true = אדמין שדרג חינם. false = משלם אמיתי דרך Sumit |
-| `promoted_since` | timestamptz | מתי הופך paying |
+| `promotion_source` | text NULL | מקור הקידום: `'paid'` (Sumit), `'manual'` (אדמין ידני), `'trial'` (ידני עם תפוגה), `NULL` (לא מקודם) |
+| `promoted_since` | timestamptz NULL | מתי הופך paying |
+| `promoted_until` | timestamptz NULL | תאריך תפוגה לקידום זמני (`trial` / `manual`). NULL = אינסופי |
+| `manually_promoted` | boolean | **legacy** — מסונכרן אך לא בשימוש בקוד החדש. יוסר ב-migration עתידי |
+
+### `therapist_audit_log` (חדש מ-2026-05-13)
+| עמודה | תיאור |
+|--------|--------|
+| `id` | uuid PK |
+| `therapist_id` | uuid FK |
+| `actor_type` | `'admin'` / `'self'` / `'sumit'` / `'cron'` / `'system'` |
+| `actor_id` | text NULL |
+| `action` | text — לדוגמה `'status_change:approved->paying'` |
+| `before_state` | jsonb |
+| `after_state` | jsonb |
+| `reason` | text NULL |
+| `created_at` | timestamptz |
+
+נכתב לכל שינוי סטטוס/קידום. שימושי למעקב אחרי "מי שינה מתי ולמה" ולתשובה ללקוח שמטעין שינוי בטעות.
 
 ### `quiz_usage` (הגבלת שאלונים)
 | עמודה | תיאור |
@@ -227,7 +244,7 @@ Admin clicks "Demote to approved" in /admin/therapists
 | Path | Schedule | מטרה |
 |------|----------|------|
 | `/api/cron/cleanup-pending-payments` | `15 6 * * *` | מסמן payments תקועים יותר מ-24 שעות כ-`'failed'` |
-| `/api/cron/sumit-status-sync` | `30 6 * * *` | מסנכרן סטטוס subscriptions מ-Sumit ל-DB |
+| `/api/cron/sumit-status-sync` | `0 * * * *` (כל שעה) | מסנכרן סטטוס subscriptions מ-Sumit ל-DB **+** מוריד trials שפג תוקפם **+** שולח מייל ללקוח |
 | `/api/cron/weekly-report` | `0 6 * * 0` | דוח שבועי לאדמין (לא קשור לתשלומים) |
 | `/api/cron/monthly-admin-report` | `30 6 1 * *` | דוח חודשי (לא קשור לתשלומים) |
 
@@ -258,15 +275,20 @@ UPDATE payments SET status = 'refunded' WHERE id = '<payment-uuid>';
 ```
 (לא חובה לפיצ'רים שלנו, אבל טוב לתחקיר עתידי.)
 
-### לקדם מטפל חינם (manually_promoted)
-1. אדמין → `/admin/therapists` → סטטוס ל-`paying`
-2. הקוד מסמן `manually_promoted=true` אוטומטית
+### לקדם מטפל חינם (manual / trial)
+1. אדמין → `/admin/therapists` → לחץ "★ שדרג למקודם"
+2. **תיפתח חלונית prompt** עם שאלה על תאריך תפוגה:
+   - **השאר ריק** → קידום ידני ללא תפוגה (`promotion_source='manual'`)
+   - **הזן תאריך עתידי** (YYYY-MM-DD) → trial עם תפוגה (`promotion_source='trial'`, `promoted_until=date`). הקרון השעתי יוריד אוטומטית בתאריך הזה ויישלח למטפל מייל
 3. **אין חיוב בפועל** — לא דרך Sumit, לא דרך DB
+4. **אם המטפל היה משלם** — הקוד מבטל אוטומטית ב-Sumit ועובר לקידום הידני
 
 ### להוריד מטפל ידני חזרה
 1. אדמין → סטטוס ל-`approved`
-2. הקוד יבדוק אם יש subscription פעיל ב-Sumit (לרוב לא יהיה אצל manually_promoted)
-3. סוף סיפור
+2. הקוד יבדוק אם יש subscription פעיל ב-Sumit (לרוב לא יהיה אצל manual/trial)
+3. אם כן (היה משלם אמיתי) — Sumit cancel + DB update
+4. **המטפל יקבל מייל אוטומטי** ("ההטבה שלך הסתיימה / החיוב נכשל / קידום הסתיים")
+5. שורת audit log נוצרת
 
 ---
 
