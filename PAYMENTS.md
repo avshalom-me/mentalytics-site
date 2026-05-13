@@ -244,7 +244,7 @@ Admin clicks "Demote to approved" in /admin/therapists
 | Path | Schedule | מטרה |
 |------|----------|------|
 | `/api/cron/cleanup-pending-payments` | `15 6 * * *` | מסמן payments תקועים יותר מ-24 שעות כ-`'failed'` |
-| `/api/cron/sumit-status-sync` | `0 * * * *` (כל שעה) | מסנכרן סטטוס subscriptions מ-Sumit ל-DB **+** מוריד trials שפג תוקפם **+** שולח מייל ללקוח |
+| `/api/cron/sumit-status-sync` | `45 6 * * *` (יומי) | מסנכרן סטטוס subscriptions מ-Sumit ל-DB **+** מוריד trials שפג תוקפם **+** שולח מייל ללקוח. תדירות יומית בגלל מגבלת Vercel Hobby — לשדרג ל-Pro כדי לעבור ל-hourly |
 | `/api/cron/weekly-report` | `0 6 * * 0` | דוח שבועי לאדמין (לא קשור לתשלומים) |
 | `/api/cron/monthly-admin-report` | `30 6 1 * *` | דוח חודשי (לא קשור לתשלומים) |
 

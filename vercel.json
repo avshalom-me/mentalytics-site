@@ -6,7 +6,7 @@
     },
     {
       "path": "/api/cron/sumit-status-sync",
-      "schedule": "0 * * * *"
+      "schedule": "45 6 * * *"
     },
     {
       "path": "/api/cron/weekly-report",
