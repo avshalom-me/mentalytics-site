@@ -95,6 +95,7 @@ export default function AdminTherapistsPage() {
   // Edit modal state
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
 
@@ -214,25 +215,19 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  // Opens a date prompt before promoting. Empty/cancel = indefinite manual
-  // promotion. Any future date = time-limited trial that the daily cron
-  // will auto-expire (and email the therapist).
-  async function promoteWithOptionalExpiry(id: string) {
-    const input = window.prompt(
-      "תאריך סיום הקידום (YYYY-MM-DD), או השאר/י ריק לקידום ידני ללא תפוגה:",
-      ""
-    );
-    if (input === null) return; // user cancelled
-    const trimmed = input.trim();
-    if (!trimmed) {
+  // Promotes the therapist with the chosen expiry. monthsAhead=null means
+  // an indefinite manual promotion (no expiry, won't be auto-demoted).
+  // Anything > 0 creates a time-limited trial that the daily cron will
+  // auto-expire on the resulting date (and email the therapist).
+  async function confirmPromote(id: string, monthsAhead: number | null) {
+    setPromotingId(null);
+    if (monthsAhead === null) {
       await updateStatus(id, "paying");
       return;
     }
-    const d = new Date(trimmed);
-    if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
-      setError("תאריך לא תקין — חייב להיות תאריך עתידי בפורמט YYYY-MM-DD");
-      return;
-    }
+    const d = new Date();
+    if (monthsAhead === 12) d.setFullYear(d.getFullYear() + 1);
+    else d.setMonth(d.getMonth() + monthsAhead);
     await updateStatus(id, "paying", d.toISOString());
   }
 
@@ -344,7 +339,7 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg,#b8860b,#d4a017)" }}
-                  onClick={() => promoteWithOptionalExpiry(therapist.id)}>
+                  onClick={() => setPromotingId(therapist.id)}>
                   {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
                 </button>
               )}
@@ -629,6 +624,69 @@ export default function AdminTherapistsPage() {
                 {editSaving ? "שומר..." : "שמור שינויים"}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {promotingId && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          dir="rtl"
+          onClick={() => setPromotingId(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-1 text-lg font-bold text-stone-900">שדרוג למסלול המקודם</h3>
+            <p className="mb-5 text-sm text-stone-600">
+              לכמה זמן להעניק את ההטבה? בסיום התקופה הקידום ייפסק אוטומטית והמטפל יקבל מייל.
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => confirmPromote(promotingId, null)}
+                className="rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50"
+              >
+                לתמיד
+                <div className="mt-0.5 text-[11px] font-normal text-stone-500">ללא תאריך תפוגה</div>
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmPromote(promotingId, 1)}
+                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+              >
+                חודש
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmPromote(promotingId, 2)}
+                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+              >
+                חודשיים
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmPromote(promotingId, 6)}
+                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+              >
+                חצי שנה
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmPromote(promotingId, 12)}
+                className="col-span-2 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
+              >
+                שנה
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPromotingId(null)}
+              className="mt-4 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100"
+            >
+              ביטול
+            </button>
           </div>
         </div>
       )}
