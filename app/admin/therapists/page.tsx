@@ -185,14 +185,22 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  async function updateStatus(id: string, status: "approved" | "rejected" | "pending" | "paying") {
+  async function updateStatus(
+    id: string,
+    status: "approved" | "rejected" | "pending" | "paying",
+    promotedUntil?: string | null
+  ) {
     try {
       setActionLoadingId(id);
       setError("");
       const res = await fetch("/api/admin-therapists", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
+        body: JSON.stringify({
+          id,
+          status,
+          ...(promotedUntil ? { promoted_until: promotedUntil } : {}),
+        }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to update therapist status");
@@ -204,6 +212,28 @@ export default function AdminTherapistsPage() {
     } finally {
       setActionLoadingId(null);
     }
+  }
+
+  // Opens a date prompt before promoting. Empty/cancel = indefinite manual
+  // promotion. Any future date = time-limited trial that the daily cron
+  // will auto-expire (and email the therapist).
+  async function promoteWithOptionalExpiry(id: string) {
+    const input = window.prompt(
+      "תאריך סיום הקידום (YYYY-MM-DD), או השאר/י ריק לקידום ידני ללא תפוגה:",
+      ""
+    );
+    if (input === null) return; // user cancelled
+    const trimmed = input.trim();
+    if (!trimmed) {
+      await updateStatus(id, "paying");
+      return;
+    }
+    const d = new Date(trimmed);
+    if (isNaN(d.getTime()) || d.getTime() <= Date.now()) {
+      setError("תאריך לא תקין — חייב להיות תאריך עתידי בפורמט YYYY-MM-DD");
+      return;
+    }
+    await updateStatus(id, "paying", d.toISOString());
   }
 
   if (loading) return <div className="p-6 text-center">טוען מטפלים...</div>;
@@ -314,7 +344,7 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg,#b8860b,#d4a017)" }}
-                  onClick={() => updateStatus(therapist.id, "paying")}>
+                  onClick={() => promoteWithOptionalExpiry(therapist.id)}>
                   {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
                 </button>
               )}

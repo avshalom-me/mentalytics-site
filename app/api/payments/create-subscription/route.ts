@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSubscription, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import { writeAudit } from "@/app/lib/audit";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -189,8 +190,10 @@ export async function POST(req: NextRequest) {
       .from("therapists")
       .update({
         status: "paying",
-        manually_promoted: false,
+        manually_promoted: false, // legacy column, kept in sync
+        promotion_source: "paid",
         promoted_since: now.toISOString(),
+        promoted_until: null, // paid subscriptions don't auto-expire
       })
       .eq("id", therapist.id);
 
@@ -201,6 +204,15 @@ export async function POST(req: NextRequest) {
         morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
       })
       .eq("id", payment.id);
+
+    await writeAudit(supabase, {
+      therapistId: therapist.id,
+      actorType: "self",
+      action: `status_change:${therapist.status ?? "null"}->paying`,
+      before: { status: therapist.status, promotion_source: null },
+      after: { status: "paying", promotion_source: "paid" },
+      reason: "subscription_created",
+    });
 
     // Single audit line, no sensitive ids beyond our own payment row.
     console.log(`Subscription completed: payment=${payment.id}`);

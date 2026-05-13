@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { cancelSubscription } from "@/app/lib/sumit";
+import { writeAudit } from "@/app/lib/audit";
+import { sendPromotionEndedEmail } from "@/app/lib/therapist-emails";
 
 type TherapistRow = {
   id: string;
@@ -168,23 +170,96 @@ export async function PATCH(request: Request) {
       );
     }
 
-    // כשמקדמים ידנית → סימון; כשמורידים חזרה → ביטול הסימון
-    const extraFields: Record<string, unknown> = {};
-    if (status === "paying") {
-      extraFields.manually_promoted = true;
-      extraFields.promoted_since = new Date().toISOString();
+    // Snapshot current state for the audit log and for downstream logic
+    // (we need to know whether they were already paying, etc.).
+    const { data: before } = await supabaseAdmin
+      .from("therapists")
+      .select("status, manually_promoted, promotion_source, promoted_since, promoted_until, email, full_name")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (!before) {
+      return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
     }
+
+    // Optional expiry date for trial promotions. Admin can pass null/omit
+    // for an indefinite manual promotion, or a future date for a trial.
+    const promotedUntilRaw = body?.promoted_until;
+    let promotedUntilIso: string | null = null;
+    if (promotedUntilRaw) {
+      const d = new Date(promotedUntilRaw);
+      if (isNaN(d.getTime()) || d.getTime() < Date.now()) {
+        return NextResponse.json(
+          { ok: false, error: "promoted_until must be a future date" },
+          { status: 400 }
+        );
+      }
+      promotedUntilIso = d.toISOString();
+    }
+
+    const extraFields: Record<string, unknown> = {};
+    let emailReason: "admin_demote" | null = null;
+
+    if (status === "paying") {
+      // Admin is promoting (or re-promoting). If the therapist is *already*
+      // a real paying customer at Sumit, the admin is effectively giving
+      // them a freebie on top — cancel the standing order so we don't keep
+      // charging the card while showing them as a "manual" promotion. This
+      // closes the silent double-bill in scenario #2 of the audit.
+      const { data: activeSub } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id, morning_token_id")
+        .eq("therapist_id", id)
+        .eq("status", "active")
+        .maybeSingle();
+
+      if (activeSub && activeSub.morning_token_id) {
+        try {
+          await cancelSubscription({
+            recurringItemId: parseInt(activeSub.morning_token_id, 10),
+            customerExternalId: id,
+          });
+        } catch (err: unknown) {
+          const message = err instanceof Error ? err.message : "unknown error";
+          console.error(`Admin promote-over-paying: Sumit cancel failed for ${id}:`, message);
+          return NextResponse.json(
+            {
+              ok: false,
+              error:
+                "המטפל כבר משלם — ביטול הוראת הקבע ב-Sumit נכשל. בטלו ידנית ב-Sumit לפני קידום ידני.",
+            },
+            { status: 502 }
+          );
+        }
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", activeSub.id);
+      } else if (activeSub) {
+        await supabaseAdmin
+          .from("subscriptions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", activeSub.id);
+        console.warn(
+          `Admin promote: subscription ${activeSub.id} for therapist ${id} had no morning_token_id; cancelled locally only.`
+        );
+      }
+
+      extraFields.manually_promoted = true; // legacy column, kept in sync
+      extraFields.promotion_source = promotedUntilIso ? "trial" : "manual";
+      extraFields.promoted_since = new Date().toISOString();
+      extraFields.promoted_until = promotedUntilIso;
+    }
+
     if (status === "approved" || status === "rejected") {
       extraFields.manually_promoted = false;
+      extraFields.promotion_source = null;
       extraFields.promoted_since = null;
+      extraFields.promoted_until = null;
 
-      // If this therapist has an active subscription at Sumit (real paying
-      // customer, not a manually-promoted free account), cancelling them
-      // locally is not enough — Sumit would keep charging their card every
-      // month while their status here is "approved". Cancel at Sumit first
-      // and mark the row 'cancelled' locally. If the Sumit call fails we
-      // surface a 502 with a clear message so the admin can resolve the
-      // mismatch manually in Sumit's UI before the status flips locally.
+      // If the therapist had an active subscription, cancel it at Sumit
+      // before flipping local status. Failure must be reported (chargeback
+      // risk: customer keeps getting charged while shown as "approved").
       const { data: activeSub } = await supabaseAdmin
         .from("subscriptions")
         .select("id, morning_token_id")
@@ -216,9 +291,6 @@ export async function PATCH(request: Request) {
           .update({ status: "cancelled", updated_at: new Date().toISOString() })
           .eq("id", activeSub.id);
       } else if (activeSub) {
-        // Subscription row exists but no recurring id — orphan from before
-        // we captured the id. Mark cancelled locally; admin should also
-        // verify no leftover at Sumit.
         await supabaseAdmin
           .from("subscriptions")
           .update({ status: "cancelled", updated_at: new Date().toISOString() })
@@ -226,6 +298,14 @@ export async function PATCH(request: Request) {
         console.warn(
           `Admin demote: subscription ${activeSub.id} for therapist ${id} had no morning_token_id; cancelled locally only.`
         );
+      }
+
+      // If the therapist was on any promoted tier before (paid/manual/
+      // trial), notify them by email that their access has ended. Skip if
+      // they were never promoted in the first place (e.g. moving pending →
+      // approved, which is a normal first-time approval).
+      if (before.status === "paying") {
+        emailReason = "admin_demote";
       }
     }
 
@@ -240,6 +320,33 @@ export async function PATCH(request: Request) {
         { status: 500 }
       );
     }
+
+    // Fire the email AFTER the DB commit so the customer never gets a
+    // "your promotion ended" message that turned out not to be true.
+    if (emailReason && before.email) {
+      await sendPromotionEndedEmail({
+        to: before.email,
+        name: before.full_name ?? "",
+        reason: emailReason,
+      });
+    }
+
+    await writeAudit(supabaseAdmin, {
+      therapistId: id,
+      actorType: "admin",
+      action: `status_change:${before.status ?? "null"}->${status}`,
+      before: {
+        status: before.status,
+        promotion_source: before.promotion_source,
+        promoted_until: before.promoted_until,
+      },
+      after: {
+        status,
+        promotion_source: extraFields.promotion_source ?? null,
+        promoted_until: extraFields.promoted_until ?? null,
+      },
+      reason: body?.reason ?? null,
+    });
 
     return NextResponse.json({ ok: true, id, status });
   } catch {
