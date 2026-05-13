@@ -20,6 +20,11 @@ function escapeHtml(str: string): string {
 //   - 'payment_failed'— Sumit cancelled the standing order after retries
 export type PromotionEndedReason = "admin_demote" | "trial_expired" | "payment_failed";
 
+// Source of a new gift promotion (admin granted, no money changed hands):
+//   - 'manual' — no expiry, runs until admin demotes
+//   - 'trial'  — time-limited, expires at promoted_until
+export type PromotionGrantedSource = "manual" | "trial";
+
 const REASON_TEXTS: Record<PromotionEndedReason, { subject: string; body: string }> = {
   admin_demote: {
     subject: "ההטבה שלך באתר טיפול חכם הסתיימה",
@@ -98,6 +103,86 @@ export async function sendPromotionEndedEmail(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
     console.error("sendPromotionEndedEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// Sent when an admin grants a free promoted-tier gift (manual or trial).
+// promotedUntilIso = null → indefinite manual gift; otherwise it's a trial.
+export async function sendPromotionGrantedEmail(opts: {
+  to: string;
+  name: string;
+  source: PromotionGrantedSource;
+  promotedUntilIso: string | null;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendPromotionGrantedEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+
+  const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
+  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+
+  const subject = "🎁 קיבלת קידום מתנה באתר טיפול חכם!";
+  const durationLine =
+    opts.source === "manual" || !opts.promotedUntilIso
+      ? "ההטבה אינה מוגבלת בזמן ותימשך עד הודעה חדשה."
+      : `ההטבה תקפה עד ${new Date(opts.promotedUntilIso).toLocaleDateString("he-IL")}. לקראת סיום התקופה תקבל/י תזכורת.`;
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">מזל טוב ${safeName} 🎉</h1>
+      <p style="margin:0 0 12px;">
+        קיבלת <strong>קידום מתנה</strong> למסלול המקודם באתר טיפול חכם, ללא תשלום מצדך.
+      </p>
+      <p style="margin:0 0 20px;">${escapeHtml(durationLine)}</p>
+
+      <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:0 0 22px;">
+        <p style="margin:0 0 8px;font-weight:bold;color:#0F5468;">המסלול המקודם כולל:</p>
+        <ul style="margin:0;padding-right:18px;font-size:14px;">
+          <li>חשיפה מועדפת בתוצאות החיפוש</li>
+          <li>מערכת התאמה חכמה — פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+          <li>דו"ח צפיות, לחיצות ואחוזי המרה</li>
+          <li>פילוח הפונים: אזור, קושי, גיל ומגדר</li>
+          <li>השוואה לממוצע המטפלים באתר</li>
+        </ul>
+      </div>
+
+      <p style="margin:0 0 16px;">לצפייה בפרטים מלאים ובסטטיסטיקות שלך:</p>
+      <p style="margin:0 0 16px;">
+        <a href="${dashboardUrl}"
+           style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
+          לדשבורד שלי
+        </a>
+      </p>
+
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">
+        לכל שאלה: tpool406@gmail.com | 052-790-6335<br/>
+        בהצלחה,<br/>
+        טיפול חכם — Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM,
+      to: opts.to,
+      subject,
+      html,
+    });
+    if (error) {
+      console.error("sendPromotionGrantedEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendPromotionGrantedEmail: throw:", msg);
     return { ok: false, error: msg };
   }
 }

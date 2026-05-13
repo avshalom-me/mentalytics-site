@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { cancelSubscription } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
-import { sendPromotionEndedEmail } from "@/app/lib/therapist-emails";
+import { sendPromotionEndedEmail, sendPromotionGrantedEmail } from "@/app/lib/therapist-emails";
 
 type TherapistRow = {
   id: string;
@@ -205,6 +205,7 @@ export async function PATCH(request: Request) {
 
     const extraFields: Record<string, unknown> = {};
     let emailReason: "admin_demote" | null = null;
+    let sendGrantedEmail = false;
 
     if (status === "paying") {
       // Admin is promoting (or re-promoting). If the therapist is *already*
@@ -255,6 +256,14 @@ export async function PATCH(request: Request) {
       extraFields.promotion_source = promotedUntilIso ? "trial" : "manual";
       extraFields.promoted_since = new Date().toISOString();
       extraFields.promoted_until = promotedUntilIso;
+
+      // Only send the gift email if the therapist wasn't already on a
+      // paid promoted tier (that case is a freebie on top — they already
+      // knew they had access; the demote-the-Sumit-sub already fired
+      // above without notification).
+      if (before.status !== "paying") {
+        sendGrantedEmail = true;
+      }
     }
 
     if (status === "approved" || status === "rejected") {
@@ -334,6 +343,14 @@ export async function PATCH(request: Request) {
         to: before.email,
         name: before.full_name ?? "",
         reason: emailReason,
+      });
+    }
+    if (sendGrantedEmail && before.email) {
+      await sendPromotionGrantedEmail({
+        to: before.email,
+        name: before.full_name ?? "",
+        source: promotedUntilIso ? "trial" : "manual",
+        promotedUntilIso,
       });
     }
 
