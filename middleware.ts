@@ -1,18 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
-import { timingSafeEqual } from "crypto";
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
 
-// Constant-time equality so a network observer can't extract the secret
-// character-by-character via response-time analysis.
+// Constant-time string equality, written in pure JS because Next.js
+// middleware runs in the Edge Runtime, where Node's `crypto.timingSafeEqual`
+// is not available. XORing every byte and OR-accumulating the result
+// means the loop always touches the same number of characters regardless
+// of where the first mismatch sits.
 function safeEqual(a: string, b: string): boolean {
-  const aBuf = Buffer.from(a);
-  const bBuf = Buffer.from(b);
-  // Length comparison itself is fine to leak; we only need to hide the
-  // per-byte comparison. timingSafeEqual requires equal-length buffers.
-  if (aBuf.length !== bBuf.length) return false;
-  return timingSafeEqual(aBuf, bBuf);
+  // Length comparison itself is fine to leak; what we hide is the
+  // per-byte mismatch position once lengths match.
+  if (a.length !== b.length) return false;
+  let mismatch = 0;
+  for (let i = 0; i < a.length; i++) {
+    mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return mismatch === 0;
 }
 
 function isAuthorized(request: NextRequest): boolean {
@@ -24,19 +28,19 @@ function isAuthorized(request: NextRequest): boolean {
   const base64 = authHeader.slice(6);
   let decoded: string;
   try {
-    decoded = Buffer.from(base64, "base64").toString("utf-8");
+    decoded = atob(base64);
   } catch {
     return false;
   }
 
-  // Split on first colon only — password may contain colons.
+  // Split on first colon only — passwords may contain colons.
   const sep = decoded.indexOf(":");
   if (sep < 0) return false;
   const username = decoded.slice(0, sep);
   const password = decoded.slice(sep + 1);
 
-  // Evaluate both checks regardless of the first result so the response
-  // time doesn't reveal which one failed.
+  // Evaluate both checks regardless of the first result so response time
+  // doesn't reveal which one failed.
   const userOk = safeEqual(username, ADMIN_USERNAME);
   const passOk = safeEqual(password, ADMIN_PASSWORD);
   return userOk && passOk;
