@@ -39,6 +39,7 @@ export const TRAINING_AREAS = [
   "פסיכואנליזה",
   "קלינאות תקשורת",
   "טיפול בהפרעות אכילה",
+  "טיפול באנקופרזיס",
 ] as const;
 
 export const COGFUN_AGE_GROUPS = ["ילדים", "בני נוער", "מבוגרים"] as const;

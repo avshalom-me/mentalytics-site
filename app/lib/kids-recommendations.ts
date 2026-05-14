@@ -88,6 +88,7 @@ const TREATMENT_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /טיפול בהתמכר/, key: "טיפול בהתמכרויות", label: "טיפול בהתמכרויות" },
   { rx: /טיפול תעסוקתי/, key: "טיפול תעסוקתי", label: "טיפול תעסוקתי" },
   { rx: /טיפול בהפרעות אכילה/, key: "טיפול בהפרעות אכילה", label: "טיפול בהפרעות אכילה" },
+  { rx: /טיפול באנקופרזיס/, key: "טיפול באנקופרזיס", label: "טיפול באנקופרזיס" },
 ];
 
 // Professional types — clinicians whose primary identifier is the professional
