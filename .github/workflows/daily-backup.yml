@@ -1,0 +1,78 @@
+name: Daily Backup
+
+on:
+  schedule:
+    # 03:00 UTC = 05:00 / 06:00 Israel (depending on DST)
+    - cron: '0 3 * * *'
+  workflow_dispatch: # allows manual run from the Actions tab
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client 17
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y curl ca-certificates gnupg lsb-release
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          sudo sh -c 'echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client-17
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install @supabase/supabase-js
+        run: npm install --no-save @supabase/supabase-js@^2.98.0
+
+      - name: Prepare backup directory
+        run: mkdir -p backup
+
+      - name: Dump database
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          pg_dump --no-owner --no-privileges --format=plain --file=backup/database.sql "$SUPABASE_DB_URL"
+          echo "Database dump size: $(du -h backup/database.sql | cut -f1)"
+
+      - name: Backup storage buckets
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node scripts/backup-storage.js
+
+      - name: Write metadata
+        run: |
+          {
+            echo "Backup created: $(date -u +'%Y-%m-%d %H:%M:%S UTC')"
+            echo "Commit: ${{ github.sha }}"
+            echo "Workflow run: ${{ github.run_id }}"
+          } > backup/METADATA.txt
+
+      - name: Archive and encrypt
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          tar -czf "backup-${DATE}.tar.gz" backup/
+          gpg --batch --yes --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 "backup-${DATE}.tar.gz"
+          rm "backup-${DATE}.tar.gz"
+          echo "Encrypted archive size: $(du -h backup-${DATE}.tar.gz.gpg | cut -f1)"
+
+      - name: Upload backup as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mentalytics-backup-${{ github.run_id }}
+          path: backup-*.tar.gz.gpg
+          retention-days: 90
+          compression-level: 0
