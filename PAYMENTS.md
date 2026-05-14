@@ -204,6 +204,18 @@ Admin clicks "Demote to approved" in /admin/therapists
 ### Migrations
 היסטוריה של schema changes נמצאת ב-`supabase_migration_payments.sql` ו-`supabase/migrations/20260507_payments_security.sql`. **לא לערוך אותם** — רק להוסיף חדשים.
 
+### ⚠ GRANT explicit לטבלאות חדשות (מ-30/10/2026)
+Supabase משנה את ההתנהגות: טבלאות חדשות לא נחשפות אוטומטית ל-Data API (supabase-js). כל migration חדשה שיוצרת טבלה חייבת לכלול:
+```sql
+CREATE TABLE my_new_table (...);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.my_new_table TO service_role;
+-- + GRANT SELECT TO authenticated/anon אם רוצים גישה מ-frontend
+ALTER TABLE my_new_table ENABLE ROW LEVEL SECURITY;
+-- + CREATE POLICY ... לפי הצורך
+```
+טבלאות קיימות (לפני 30/10/2026) שומרות את ה-grants הנוכחיים שלהן ולא מושפעות.
+אם תשכח: PostgREST מחזיר שגיאת `42501` עם בדיוק ה-GRANT statement שצריך להריץ.
+
 ---
 
 ## 6. Environment Variables
