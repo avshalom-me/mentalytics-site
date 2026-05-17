@@ -124,21 +124,48 @@ export async function GET(req: NextRequest) {
     result.month_by_source = sumBySource(monthRows);
     result.trends = buildMonthlyTrends(rows);
 
-    // Profile views (if table exists)
+    // Profile views split:
+    //   profile_entries = source IN ('match', 'directory') — actual entries into the full profile page
+    //   match_impressions = source = 'match_card'        — card impressions in the match-results list
+    // Aggregated to two rows so the dashboard can show them side by side.
     try {
-      const { count: weekViews } = await supabaseAdmin
-        .from("therapist_profile_views")
-        .select("*", { count: "exact", head: true })
-        .eq("therapist_id", info.id)
-        .gte("viewed_at", weekAgo.toISOString());
-      const { count: monthViews } = await supabaseAdmin
-        .from("therapist_profile_views")
-        .select("*", { count: "exact", head: true })
-        .eq("therapist_id", info.id)
-        .gte("viewed_at", monthAgo.toISOString());
-      result.profile_views = { week: weekViews ?? 0, month: monthViews ?? 0 };
+      const [weekEntries, monthEntries, weekImpressions, monthImpressions] = await Promise.all([
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .in("source", ["match", "directory"])
+          .gte("viewed_at", weekAgo.toISOString()),
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .in("source", ["match", "directory"])
+          .gte("viewed_at", monthAgo.toISOString()),
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .eq("source", "match_card")
+          .gte("viewed_at", weekAgo.toISOString()),
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .eq("source", "match_card")
+          .gte("viewed_at", monthAgo.toISOString()),
+      ]);
+      result.profile_views = {
+        week: weekEntries.count ?? 0,
+        month: monthEntries.count ?? 0,
+      };
+      result.match_impressions = {
+        week: weekImpressions.count ?? 0,
+        month: monthImpressions.count ?? 0,
+      };
     } catch {
       result.profile_views = { week: 0, month: 0 };
+      result.match_impressions = { week: 0, month: 0 };
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)

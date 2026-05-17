@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
@@ -11,12 +11,29 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 
-function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
-  fetch("/api/track-click", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source: "match" }),
-  }).catch(() => {});
+function getOrCreateSessionId(): string | null {
+  try {
+    let id = localStorage.getItem("mnt_session_id");
+    if (!id) {
+      id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+      localStorage.setItem("mnt_session_id", id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+function normalizeKidsRegionKey(r: string, online: boolean): string | null {
+  if (online && !r) return "online";
+  if (!r) return null;
+  if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
+  if (r.includes("שרון")) return "sharon";
+  if (r.includes("ירושלים")) return "jerusalem";
+  if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
+  if (r.includes("גליל") || r.includes("עמק")) return "north";
+  if (r.includes("דרום")) return "south";
+  return null;
 }
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -102,12 +119,12 @@ function skipPage(pid: string, A: Ans): boolean {
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
 
-  if (pid === "p-q1-pain")    return (A.q1 || 0) < 4;
-  if (pid === "p-aq")         return (A.q1 || 0) < 4;
+  if (pid === "p-q1-pain")    return (A.q1 || 0) < 3;
+  if (pid === "p-aq")         return (A.q1 || 0) < 3;
   if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 16;
-  if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 4;
-  if (pid === "p-q2-grade")   return (A.q2 || 0) < 5 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
-  if (pid === "p-mq")         return (A.q3 || 0) < 4;
+  if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 3;
+  if (pid === "p-q2-grade")   return (A.q2 || 0) < 3 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
+  if (pid === "p-mq")         return (A.q3 || 0) < 3;
   if (pid === "p-mq-sui")     return (A.mq_tot || 0) < 4;
   if (pid === "p-q4-types")   return A.q4 !== "כן";
   if (pid === "p-q4-s")       return !A.ad_s;
@@ -124,9 +141,9 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-q10") {
     const pqThr = A.q7a === "כן" ? 1 : (A.q7b === "כן" ? 3 : Infinity);
     const anyPositive =
-      (A.q1 || 0) >= 4 ||
-      (A.q2 || 0) >= 5 ||
-      ((A.q3 || 0) >= 4 && (A.mq_tot || 0) >= 4) ||
+      (A.q1 || 0) >= 3 ||
+      (A.q2 || 0) >= 3 ||
+      ((A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4) ||
       (A.q4 === "כן" && ((A.add_s_tot||0)>=3||(A.add_g_tot||0)>=4||(A.add_b_tot||0)>=4||A.ad_o)) ||
       (A.q5 === "כן" && (A.oq_tot || 0) >= 10) ||
       (A.q6 === "כן" && (A.tq_tot || 0) >= 13) ||
@@ -151,8 +168,8 @@ function skipPage(pid: string, A: Ans): boolean {
     if (gg(A) !== "ga") return true;
     if (A.ga_consent !== undefined) return true;
     const hasGaPositive =
-      (A.q1||0)>=4 || (A.q2||0)>=5 ||
-      ((A.q3||0)>=4 && (A.mq_tot||0)>=4) ||
+      (A.q1||0)>=3 || (A.q2||0)>=3 ||
+      ((A.q3||0)>=3 && (A.mq_tot||0)>=4) ||
       (A.q5==="כן" && (A.oq_tot||0)>=10) ||
       (A.q9==="כן" && (A.bq_tot||0)>=4) ||
       (A.q10==="כן" && A.q10_par==="כן");
@@ -717,10 +734,10 @@ function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <EqNum n={1}/>
         <StepTag>שאלה 1 מתוך 10 — רגשי</StepTag>
         <StepQ>ילדך חש דאגות/לחצים מתמשכים</StepQ>
-        <StepHint>1 = כלל לא  |  10 = בעוצמה גבוהה מאוד</StepHint>
+        <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5 flex-wrap">
-          {[1,2,3,4,5,6,7,8,9,10].map(n=>(
+        <div className="flex gap-1.5">
+          {[1,2,3,4,5].map(n=>(
             <button key={n} className={sb(A.q1===n)} onClick={()=>pickScale(n)}>{n}</button>
           ))}
         </div>
@@ -893,10 +910,10 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <EqNum n={2}/>
         <StepTag>שאלה 2 מתוך 10 — רגשי</StepTag>
         <StepQ>הילד/ה חש/ה כי "אינו/ה שווה" או אינו/ה מוערך/ת</StepQ>
-        <StepHint>1 = כלל לא  |  10 = בעוצמה גבוהה מאוד</StepHint>
+        <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5 flex-wrap">
-          {[1,2,3,4,5,6,7,8,9,10].map(n=>(
+        <div className="flex gap-1.5">
+          {[1,2,3,4,5].map(n=>(
             <button key={n} className={sb(A.q2===n)} onClick={()=>{ const nA={...A,q2:n}; setA(nA); onNext(nA); }}>{n}</button>
           ))}
         </div>
@@ -956,10 +973,10 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <EqNum n={3}/>
         <StepTag>שאלה 3 מתוך 10 — רגשי</StepTag>
         <StepQ>מצב רוח ירוד או עצוב</StepQ>
-        <StepHint>1 = כלל לא  |  10 = בעוצמה גבוהה מאוד</StepHint>
+        <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5 flex-wrap">
-          {[1,2,3,4,5,6,7,8,9,10].map(n=>(
+        <div className="flex gap-1.5">
+          {[1,2,3,4,5].map(n=>(
             <button key={n} className={sb(A.q3===n)} onClick={()=>{ const nA={...A,q3:n}; setA(nA); onNext(nA); }}>{n}</button>
           ))}
         </div>
@@ -2455,12 +2472,88 @@ function KidsMatchSection({ A, score, selection }: {
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
-  // Reset results when the selection changes (e.g. user clicked a different recommendation card)
+  const selectionKey = selection.keys.join("|") + "::" + selection.kind;
+
+  // Reset results when the selection changes (e.g. user clicked a different recommendation card),
+  // but skip the reset when we are restoring saved state for the same selection on mount.
+  const didRestoreRef = useRef(false);
   useEffect(() => {
+    if (didRestoreRef.current) {
+      didRestoreRef.current = false;
+      return;
+    }
     setResults([]);
     setSearched(false);
     setError("");
-  }, [selection.keys.join("|"), selection.kind]);
+  }, [selectionKey]);
+
+  // Restore the active match block when navigating back from a therapist profile,
+  // but only for the recommendation card that originally produced the results.
+  useEffect(() => {
+    try {
+      const referrer = document.referrer || "";
+      const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
+      if (!cameFromProfile) return;
+      const raw = sessionStorage.getItem("kids_match_block_v1");
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.ts !== "number") return;
+      if (Date.now() - saved.ts > 60 * 60_000) return;
+      if (saved.selectionKey !== selectionKey) return;
+      didRestoreRef.current = true;
+      if (typeof saved.region === "string") setRegion(saved.region);
+      if (typeof saved.online === "boolean") setOnline(saved.online);
+      if (typeof saved.gender === "string") setGender(saved.gender);
+      if (Array.isArray(saved.arrangements)) setArrangements(saved.arrangements);
+      if (Array.isArray(saved.cultural)) setCultural(saved.cultural);
+      if (typeof saved.language === "string") setLanguage(saved.language);
+      if (typeof saved.city === "string") setCity(saved.city);
+      if (Array.isArray(saved.results)) setResults(saved.results);
+      if (saved.searched) setSearched(true);
+      setOpen(false);
+    } catch {}
+  }, [selectionKey]);
+
+  // Persist the current match block (form + results) so the user lands back here
+  // after browser-back from a therapist profile.
+  useEffect(() => {
+    if (!searched || results.length === 0) return;
+    try {
+      sessionStorage.setItem("kids_match_block_v1", JSON.stringify({
+        ts: Date.now(),
+        selectionKey,
+        region, online, gender, arrangements, cultural, language, city,
+        results, searched: true,
+      }));
+    } catch {}
+  }, [searched, results, selectionKey, region, online, gender, arrangements, cultural, language, city]);
+
+  // Track impressions for every card shown in the match-results list (source="match_card").
+  // The profile page fires its own track-view with source="match" on entry, so the user gets
+  // counted both as a card-impression and as a profile-entry.
+  useEffect(() => {
+    if (!results || results.length === 0) return;
+    const sessionId = getOrCreateSessionId();
+    const viewer = {
+      viewer_region: normalizeKidsRegionKey(region, online),
+      viewer_issue: "child",
+      viewer_age_band: "child",
+      viewer_gender: null,
+      session_id: sessionId,
+    };
+    for (const t of results) {
+      fetch("/api/track-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          therapist_id: t.id,
+          source: "match_card",
+          match_score: t.combined_score ?? t.match_score ?? null,
+          ...viewer,
+        }),
+      }).catch(() => {});
+    }
+  }, [results, region, online]);
 
   const treatments = selection.keys.length > 0 ? selection.keys : ["טיפול דינאמי"];
   const treatmentLabels = selection.labels.length > 0 ? selection.labels : ["טיפול דינאמי"];
@@ -2683,6 +2776,16 @@ function KidsMatchSection({ A, score, selection }: {
                 {results.map(t => {
                   const regionsArr = toArr(t.regions);
                   const combined = t.combined_score ?? t.match_score;
+                  const profileHref = (() => {
+                    const params = new URLSearchParams({ from: "match" });
+                    const score = t.combined_score ?? t.match_score;
+                    if (typeof score === "number") params.set("s", String(score));
+                    params.set("i", "child");
+                    params.set("a", "child");
+                    const r = normalizeKidsRegionKey(region, online);
+                    if (r) params.set("r", r);
+                    return `/therapists/${t.id}?${params.toString()}`;
+                  })();
                   return (
                     <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg">
                       <div className="flex items-start gap-4">
@@ -2698,13 +2801,6 @@ function KidsMatchSection({ A, score, selection }: {
                           {regionsArr.length > 0 && (
                             <p className="mt-1 text-xs text-gray-500">📍 {regionsArr.join(", ")}</p>
                           )}
-                          {t.match_reasons?.length > 0 && (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {t.match_reasons.map((r, i) => (
-                                <span key={i} className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">{r}</span>
-                              ))}
-                            </div>
-                          )}
                           <div className="mt-2 flex flex-wrap gap-2 items-center">
                             <div className={`inline-block rounded-full px-3 py-1 text-xs font-bold text-white ${
                               combined >= 85 ? "bg-[#1a3a5c]" : combined >= 70 ? "bg-[#2a5a8c]" : combined >= 55 ? "bg-amber-700" : "bg-gray-500"
@@ -2718,65 +2814,28 @@ function KidsMatchSection({ A, score, selection }: {
                               }`}>אישיותי: {t.personality_score}%</div>
                             )}
                           </div>
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {t.phone && (
-                              <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
-                                target="_blank" rel="noopener noreferrer"
-                                onClick={() => trackClick(t.id, "whatsapp")}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-green-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-600">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                                </svg>
-                                וואטסאפ
-                              </a>
-                            )}
-                            {t.email && (
-                              <a href={`mailto:${t.email}?subject=פנייה דרך אתר טיפול חכם&body=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
-                                onClick={() => trackClick(t.id, "email")}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
-                                ✉ מייל
-                              </a>
-                            )}
-                            {t.phone && (
-                              <a href={`tel:${t.phone}`}
-                                onClick={() => trackClick(t.id, "phone")}
-                                className="inline-flex items-center gap-1.5 rounded-xl bg-stone-700 px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
-                                📞 התקשר/י
-                              </a>
-                            )}
+                          <div className="mt-4 flex flex-wrap items-center gap-2">
+                            <a
+                              href={profileHref}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#2a5a8c] transition-colors"
+                            >
+                              פרופיל מלא ←
+                            </a>
                             <button
                               onClick={() => fetchExplanation(t)}
-                              className="inline-flex items-center gap-1.5 rounded-xl border border-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-[#1a3a5c] hover:bg-[#f0f6ff]"
+                              disabled={explainLoading[t.id]}
+                              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
                             >
-                              {explainLoading[t.id] ? "טוען..." : "✦ למה זה מתאים לי?"}
+                              {explainLoading[t.id] ? "טוען..." : "✦ ניתוח AI אישי"}
                             </button>
                           </div>
                           {explainData[t.id] && (
-                            <div className="mt-3 rounded-xl bg-[#f0f8ff] border border-[#c0dff0] p-3 text-right">
-                              <p className="text-xs font-bold text-[#1a3a5c] mb-1">{explainData[t.id]!.title}</p>
+                            <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
+                              <p className="text-xs font-bold text-violet-900 mb-1">✦ {explainData[t.id]!.title}</p>
                               <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explainData[t.id]!.explanation}</p>
                               <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                             </div>
                           )}
-                          <a
-                            href={(() => {
-                              const params = new URLSearchParams({ from: "match" });
-                              if (t.match_score != null) params.set("s", String(t.match_score));
-                              params.set("i", "child");
-                              params.set("a", "child");
-                              const regionMap: Record<string, string> = {};
-                              if (region.includes("גוש דן") || region.includes("שפלה")) regionMap.r = "center";
-                              else if (region.includes("שרון")) regionMap.r = "sharon";
-                              else if (region.includes("ירושלים")) regionMap.r = "jerusalem";
-                              else if (region.includes("חיפה") || region.includes("קריות")) regionMap.r = "haifa";
-                              else if (region.includes("גליל") || region.includes("עמק")) regionMap.r = "north";
-                              else if (region.includes("דרום")) regionMap.r = "south";
-                              else if (online && !region) regionMap.r = "online";
-                              if (regionMap.r) params.set("r", regionMap.r);
-                              return `/therapists/${t.id}?${params.toString()}`;
-                            })()}
-                            className="mt-2 block text-xs text-[#2e7d8c] font-semibold"
-                          >לפרטים נוספים ◂</a>
                         </div>
                       </div>
                     </div>
@@ -3399,6 +3458,37 @@ export default function KidsPage() {
       .then(d => setUsageAllowed(d.allowed))
       .catch(() => setUsageAllowed(true));
   }, []);
+
+  // Restore the kids questionnaire state when the user navigates back from a therapist profile.
+  // Gated on referrer so a fresh /kids visit always starts at the consent step.
+  useEffect(() => {
+    try {
+      const referrer = document.referrer || "";
+      const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
+      if (!cameFromProfile) return;
+      const raw = sessionStorage.getItem("kids_state_v1");
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.ts !== "number") return;
+      if (Date.now() - saved.ts > 60 * 60_000) return;
+      if (saved.A) setA(saved.A);
+      if (saved.step) setStep(saved.step);
+      if (saved.kidsScore) setKidsScore(saved.kidsScore);
+    } catch {}
+  }, []);
+
+  // Persist state so back-navigation from a profile page restores the results screen.
+  useEffect(() => {
+    if (step !== "p-result") return;
+    try {
+      sessionStorage.setItem("kids_state_v1", JSON.stringify({
+        ts: Date.now(),
+        step,
+        A,
+        kidsScore,
+      }));
+    } catch {}
+  }, [step, A, kidsScore]);
 
   useEffect(() => {
     if (step === "p-result") {

@@ -7,17 +7,58 @@ import type {
   Recommendation,
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
-import { genderTitle } from "@/app/lib/gender-text";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
-function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
-  fetch("/api/track-click", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source: "match" }),
-  }).catch(() => {});
+// Anonymous viewer context derived from the questionnaire — used for impression
+// tracking and to seed match-attribution params on the profile-page link.
+function normalizeAgeBand(a: number): string | null {
+  if (!a || isNaN(a)) return null;
+  if (a < 18) return "child";
+  if (a <= 30) return "18-30";
+  if (a <= 45) return "31-45";
+  if (a <= 60) return "46-60";
+  return "60+";
+}
+function normalizeGenderKey(g: string): string | null {
+  if (g === "זכר" || g === "גבר") return "m";
+  if (g === "נקבה" || g === "אישה") return "f";
+  return g ? "other" : null;
+}
+function normalizeRegionKey(r: string, online: boolean): string | null {
+  if (online && !r) return "online";
+  if (!r) return null;
+  if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
+  if (r.includes("שרון")) return "sharon";
+  if (r.includes("ירושלים")) return "jerusalem";
+  if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
+  if (r.includes("גליל") || r.includes("עמק")) return "north";
+  if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
+  return "other";
+}
+// Maps internal questionnaire-domain keys to the analytics-issue taxonomy
+// in `app/lib/stats-categories.ts`. Keys must match the union in
+// `QuestionnaireAnswers["domains"]`.
+const DOMAIN_ISSUE_MAP: Record<string, string> = {
+  emotional: "emotional",
+  functional: "functional",
+  relationship: "relationship",
+  addiction: "addiction",
+  personal_development: "personal",
+};
+
+function getOrCreateSessionId(): string | null {
+  try {
+    let id = localStorage.getItem("mnt_session_id");
+    if (!id) {
+      id = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
+      localStorage.setItem("mnt_session_id", id);
+    }
+    return id;
+  } catch {
+    return null;
+  }
 }
 
 
@@ -85,10 +126,36 @@ const ADULTS_SCREENS_ORDER = [
   "scoring",
 ];
 
-function getAdultsProgress(screen: string): number {
-  const idx = ADULTS_SCREENS_ORDER.indexOf(screen);
+// Always-visited spine of the questionnaire, regardless of which domains were selected.
+const ADULTS_CORE_SCREENS = ["disclaimer", "intake", "domains", "therapist-style", "scoring"];
+
+// Map of which domain each screen belongs to. Screens not listed are core.
+function screenDomain(s: string): string | null {
+  if (s.startsWith("e")) return "emotional";
+  if (s.startsWith("f") || s === "f-vision") return "functional";
+  if (s.startsWith("r")) return "relationship";
+  if (s.startsWith("a")) return "addiction";
+  return null;
+}
+
+// Filter the full ordered list down to the screens the user can plausibly visit
+// based on which domains they selected. Used to give a more honest progress reading
+// than dividing by the static 80-screen total.
+function getReachableScreens(domains: string[]): string[] {
+  if (!domains || domains.length === 0) return ADULTS_SCREENS_ORDER;
+  return ADULTS_SCREENS_ORDER.filter(s => {
+    if (ADULTS_CORE_SCREENS.includes(s)) return true;
+    const d = screenDomain(s);
+    return d !== null && domains.includes(d);
+  });
+}
+
+function getAdultsProgress(screen: string, domains: string[] = []): number {
+  const reachable = getReachableScreens(domains);
+  const idx = reachable.indexOf(screen);
   if (idx < 0) return 0;
-  return Math.round((idx / (ADULTS_SCREENS_ORDER.length - 1)) * 100);
+  if (reachable.length <= 1) return 0;
+  return Math.round((idx / (reachable.length - 1)) * 100);
 }
 
 function getEncouragement(pct: number): string | null {
@@ -120,8 +187,8 @@ function ProgressBar({ pct }: { pct: number }) {
 }
 
 const NO_BAR = ["disclaimer","intake","domains","scoring","results","match-form","match-results"];
-function Layout({ screen, children }: { screen: string; children: React.ReactNode }) {
-  const pct = getAdultsProgress(screen);
+function Layout({ screen, domains, children }: { screen: string; domains?: string[]; children: React.ReactNode }) {
+  const pct = getAdultsProgress(screen, domains ?? []);
   const showBar = pct > 0 && !NO_BAR.includes(screen);
   return (
     <main className="min-h-screen bg-[#f0ece4]" dir="rtl">
@@ -190,21 +257,20 @@ type MatchPrefs = {
 
 export default function AdultsPage() {
   const [screen, setScreen] = useState<Screen>("disclaimer");
-
-  useEffect(() => {
-    const pct = getAdultsProgress(screen);
-    (window as any).gtag?.("event", "quiz_step", { quiz_type: "adults", step: screen, progress: pct });
-    trackQuizStep("adults", screen, pct);
-  }, [screen]);
-
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
+
+  useEffect(() => {
+    const pct = getAdultsProgress(screen, answers.domains);
+    (window as any).gtag?.("event", "quiz_step", { quiz_type: "adults", step: screen, progress: pct });
+    trackQuizStep("adults", screen, pct);
+  }, [screen, answers.domains]);
+
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
   const [matchResults, setMatchResults] = useState<any[] | null>(null);
   const [addictionCbtFallback, setAddictionCbtFallback] = useState(false);
-  const [selectedTherapist, setSelectedTherapist] = useState<any | null>(null);
   const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
   const [combinedLabels, setCombinedLabels] = useState<string[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -228,65 +294,94 @@ export default function AdultsPage() {
       .catch(() => setUsageAllowed(true));
   }, []);
 
-  // Track profile-modal views with anonymous context for promoted-therapist stats
+  // Restore match-results state when the user navigates back from a therapist profile.
+  // Gated on referrer so a fresh /adults visit always starts at the disclaimer.
   useEffect(() => {
-    if (!selectedTherapist?.id) return;
-    const normalizeAgeBand = (a: number): string | null => {
-      if (!a || isNaN(a)) return null;
-      if (a < 18) return "child";
-      if (a <= 30) return "18-30";
-      if (a <= 45) return "31-45";
-      if (a <= 60) return "46-60";
-      return "60+";
-    };
-    const normalizeGenderKey = (g: string): string | null => {
-      if (g === "זכר" || g === "גבר") return "m";
-      if (g === "נקבה" || g === "אישה") return "f";
-      return g ? "other" : null;
-    };
-    const normalizeRegionKey = (r: string, online: boolean): string | null => {
-      if (online && !r) return "online";
-      if (!r) return null;
-      if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
-      if (r.includes("שרון")) return "sharon";
-      if (r.includes("ירושלים")) return "jerusalem";
-      if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
-      if (r.includes("גליל") || r.includes("עמק")) return "north";
-      if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
-      return "other";
-    };
-    const issueMap: Record<string, string> = {
-      emotional: "emotional",
-      functional: "functional",
-      family: "relationship",
-      sexual: "sexual",
-      addiction: "addiction",
-      personal: "personal",
-    };
-    const firstDomain = answers.domains?.[0];
-    let sessionId: string | null = null;
     try {
-      sessionId = localStorage.getItem("mnt_session_id");
-      if (!sessionId) {
-        sessionId = crypto.randomUUID().replace(/-/g, "").slice(0, 16);
-        localStorage.setItem("mnt_session_id", sessionId);
-      }
+      const referrer = document.referrer || "";
+      const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
+      if (!cameFromProfile) return;
+      const raw = sessionStorage.getItem("adults_match_state_v1");
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.ts !== "number") return;
+      if (Date.now() - saved.ts > 60 * 60_000) return;
+      if (saved.answers) setAnswers(saved.answers);
+      if (saved.scoring) setScoring(saved.scoring);
+      if (saved.selectedRec) setSelectedRec(saved.selectedRec);
+      if (saved.matchPrefs) setMatchPrefs(saved.matchPrefs);
+      if (saved.combinedTreatments) setCombinedTreatments(saved.combinedTreatments);
+      if (saved.combinedLabels) setCombinedLabels(saved.combinedLabels);
+      if (typeof saved.addictionCbtFallback === "boolean") setAddictionCbtFallback(saved.addictionCbtFallback);
+      if (Array.isArray(saved.matchResults)) setMatchResults(saved.matchResults);
+      if (saved.screen) setScreen(saved.screen);
+      setAgreed(true);
     } catch {}
-    fetch("/api/track-view", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        therapist_id: selectedTherapist.id,
-        source: "match",
-        viewer_region: normalizeRegionKey(matchPrefs.region, matchPrefs.online),
-        viewer_issue: firstDomain ? issueMap[firstDomain] ?? null : null,
-        viewer_age_band: normalizeAgeBand(answers.age),
-        viewer_gender: normalizeGenderKey(answers.gender),
-        match_score: selectedTherapist.combined_score ?? selectedTherapist.match_score ?? null,
-        session_id: sessionId,
-      }),
-    }).catch(() => {});
-  }, [selectedTherapist?.id, answers.age, answers.gender, answers.domains, matchPrefs.region, matchPrefs.online]);
+  }, []);
+
+  // Track impressions for every card shown in the match-results list (source="match_card").
+  // The profile page fires its own track-view with source="match" on entry, so the user gets
+  // counted both as a card-impression and as a profile-entry.
+  useEffect(() => {
+    if (!matchResults || matchResults.length === 0) return;
+    const sessionId = getOrCreateSessionId();
+    const firstDomain = answers.domains?.[0];
+    const viewer = {
+      viewer_region: normalizeRegionKey(matchPrefs.region, matchPrefs.online),
+      viewer_issue: firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] ?? null : null,
+      viewer_age_band: normalizeAgeBand(answers.age),
+      viewer_gender: normalizeGenderKey(answers.gender),
+      session_id: sessionId,
+    };
+    for (const t of matchResults) {
+      fetch("/api/track-view", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          therapist_id: t.id,
+          source: "match_card",
+          match_score: t.combined_score ?? t.match_score ?? null,
+          ...viewer,
+        }),
+      }).catch(() => {});
+    }
+  }, [matchResults, answers.age, answers.gender, answers.domains, matchPrefs.region, matchPrefs.online]);
+
+  // Persist match-results state so back-navigation from the profile page restores the list.
+  useEffect(() => {
+    if (screen !== "match-results" || !matchResults) return;
+    try {
+      sessionStorage.setItem("adults_match_state_v1", JSON.stringify({
+        ts: Date.now(),
+        screen,
+        matchResults,
+        selectedRec,
+        matchPrefs,
+        combinedTreatments,
+        combinedLabels,
+        addictionCbtFallback,
+        scoring,
+        answers,
+      }));
+    } catch {}
+  }, [screen, matchResults, selectedRec, matchPrefs, combinedTreatments, combinedLabels, addictionCbtFallback, scoring, answers]);
+
+  // Build the profile-page link for a given therapist with match-attribution params.
+  function profileHrefForMatch(t: any): string {
+    const params = new URLSearchParams({ from: "match" });
+    const score = t.combined_score ?? t.match_score;
+    if (typeof score === "number") params.set("s", String(score));
+    const firstDomain = answers.domains?.[0];
+    const issue = firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] : null;
+    if (issue) params.set("i", issue);
+    const age = normalizeAgeBand(answers.age);
+    if (age) params.set("a", age);
+    const gender = normalizeGenderKey(answers.gender);
+    if (gender) params.set("g", gender);
+    const region = normalizeRegionKey(matchPrefs.region, matchPrefs.online);
+    if (region) params.set("r", region);
+    return `/therapists/${t.id}?${params.toString()}`;
+  }
 
   const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);
   const [qItemsError, setQItemsError] = useState(false);
@@ -550,13 +645,13 @@ export default function AdultsPage() {
 
   // ── USAGE LIMIT ────────────────────────────────────────────────────────────
   if (usageAllowed === false) return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <QuizPaymentBlock quizType="adults" />
     </Layout>
   );
 
   if (qItemsError) return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
         <div className="text-4xl mb-4">⚠️</div>
         <h2 className="text-xl font-bold text-stone-900 mb-3">לא ניתן לטעון את השאלון</h2>
@@ -570,14 +665,14 @@ export default function AdultsPage() {
   );
 
   if (!qItems) return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <div className="flex justify-center py-20 text-[#6b7280]">טוען שאלון…</div>
     </Layout>
   );
 
   // ── DISCLAIMER ─────────────────────────────────────────────────────────────
   if (screen === "disclaimer") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card>
         <div className="mb-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-6 leading-relaxed text-amber-900">
           <p className="mb-3 text-base font-bold">⚠️ הצהרה והבהרה משפטית</p>
@@ -601,7 +696,7 @@ export default function AdultsPage() {
 
   // ── INTAKE ─────────────────────────────────────────────────────────────────
   if (screen === "intake") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="פרטים ראשוניים">
         <p className="mb-4 font-semibold text-[#1a3a5c]">נתחיל עם כמה שאלות כלליות</p>
         <div className="mb-4 flex gap-4">
@@ -669,10 +764,10 @@ export default function AdultsPage() {
 
   // ── DOMAINS ─────────────────────────────────────────────────────────────────
   if (screen === "domains") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחומי קושי">
         <p className="mb-4 font-semibold text-[#1a3a5c]">בחר/י את התחומים בהם חווה/ת קושי (ניתן לסמן יותר מאחד)</p>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {([
             ["emotional","🧠","מורכבויות בתחום הרגשי/האישי","חרדות, מצב רוח, טראומה, שינה, אכילה"],
             ["functional","📚","סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים","קשיי למידה, ריכוז, כיוון מקצועי"],
@@ -716,7 +811,7 @@ export default function AdultsPage() {
   // ═══════════════════════════════════════════════════════
 
   if (screen === "e1") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווה/ת <strong>מצב רוח ירוד, עצבות מתמשכת, חוסר חשק, או העדר הנאה ממושכים</strong>?</p>
         <p className="mb-3 rounded-lg bg-gray-50 p-2 text-xs text-[#6b7280]">כולל: עצב, עצבנות, אובדן עניין, שינויים במשקל/שינה, עייפות, קשיי ריכוז</p>
@@ -726,7 +821,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e1-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון מצב רוח" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">בשבועיים האחרונים, כמה מהתסמינים הבאים חווית? סמן/י את התסמינים המתאימים:</p>
         <CheckList items={qItems.mood} checked={moodChecked}
@@ -742,7 +837,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e2") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
         <YesNo onYes={() => { updE({ maniaScreen1: true }); setScreen("e2-2"); }}
@@ -752,7 +847,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e2-2") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית גם <strong>פרץ אנרגיה יוצא דופן</strong> בתקופה זו?</p>
         <YesNo onYes={() => { updE({ maniaScreen2: true }); setScreen("e2-q"); }}
@@ -762,7 +857,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e2-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את התסמינים הנוספים הרלוונטיים:</p>
         <CheckList items={qItems.mania} checked={maniaChecked}
@@ -780,7 +875,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e3") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">3א. האם ראית או שמעת דברים שאחרים אמרו שאינם קיימים?</p>
         <YesNo onYes={() => { updE({ e3a: true }); setScreen("e3b"); }}
@@ -790,7 +885,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e3b") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">3ב. האם יש לך אמונות או חשדות יוצאי דופן שאחרים סביבך לא חולקים?</p>
         <YesNo onYes={() => {
@@ -807,7 +902,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e3-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את ההצהרות המתאימות לך:</p>
         <CheckList items={qItems.prodrome} checked={prodromeChecked}
@@ -824,7 +919,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם חווה <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
         <YesNo onYes={() => { updE({ e4: true }); setScreen("e4-chronic"); }}
@@ -834,7 +929,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-chronic") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם ישנם <strong>כאבים כרוניים</strong> כגון כאבי בטן או כאבי ראש?</p>
         <YesNo onYes={() => { updE({ e4Chronic: true }); setScreen("e4-medical"); }}
@@ -844,7 +939,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-medical") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>נשללו בעיות רפואיות</strong> כגורם לכאבים?</p>
         <YesNo onYes={() => { updE({ e4Medical: true }); setScreen("e4-q"); }}
@@ -854,7 +949,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון חרדה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מפריע לך? (1=כלל לא, 3=לעיתים קרובות)</p>
         {qItems.gad7.map((item, i) => (
@@ -871,7 +966,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-social") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חרדה חברתית" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">האם יש לך <strong>חרדה חברתית</strong>? (חשש מהערכה שלילית, הימנעות ממצבים חברתיים)</p>
         <YesNo onYes={() => { updE({ socialAnxiety: true }); setScreen("e4-social-sev"); }}
@@ -881,7 +976,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-social-sev") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חרדה חברתית" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה החרדה החברתית פוגעת בתפקוד שלך? (1=כלל לא, 7=מאוד)</p>
         <ScaleRow label="" group="social-sev" values={[1,2,3,4,5,6,7]} value={socialSeverity} onChange={setSocialSeverity} />
@@ -892,7 +987,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-flight") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חרדה – שאלות נוספות" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם החרדה מתעוררת בהקשר של <strong>טיסות</strong>?</p>
         <YesNo onYes={() => { updE({ flightAnxiety: true }); setScreen("e4-medanx"); }}
@@ -902,7 +997,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-medanx") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חרדה – שאלות נוספות" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם החרדה קשורה ל<strong>טיפול רפואי, חשיפה למחטים, או חשש מתמיד ממחלות</strong>?</p>
         <YesNo onYes={() => { updE({ medicalAnxiety: true }); setScreen("e4-stresspain"); }}
@@ -912,7 +1007,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e4-stresspain") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חרדה – שאלות נוספות" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם בתקופות של מתח ישנם תסמינים של <strong>כאבים פיסיים כגון כאבי ראש או סחרחורות</strong>?</p>
         <YesNo onYes={() => { updE({ stressPain: true }); setScreen("e5"); }}
@@ -922,7 +1017,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e5") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">5. האם חש/ה <strong>הכרח לחשוב שוב ושוב מחשבות מסוימות, או לעשות שוב ושוב פעולות מסוימות</strong>?</p>
         <YesNo onYes={() => { updE({ e5: true }); setScreen("e5-q"); }}
@@ -932,7 +1027,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e5-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=אף פעם, 3=תמיד)</p>
         {qItems.ocd.map((item, i) => (
@@ -946,7 +1041,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e6") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">6. האם חווה/ת <strong>קשיים בנוגע למשקל, אכילה או שינה</strong>?</p>
         <YesNo
@@ -983,7 +1078,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e6-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון אכילה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כמה מהדברים הבאים רלוונטיים (כל קבוצה בנפרד):</p>
         <p className="mb-2 text-sm font-bold text-[#2d7a4f]">א. הגבלה והקפדה על משקל:</p>
@@ -1016,7 +1111,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e7-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון שינה" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
         <CheckList items={qItems.sleep} checked={sleepChecked}
@@ -1028,7 +1123,7 @@ export default function AdultsPage() {
   );
 
   if (screen === "e8") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
         <YesNo onYes={() => { updE({ e8: true }); setScreen("e8c"); }}
@@ -1038,7 +1133,7 @@ export default function AdultsPage() {
   );
 
 if (screen === "e8c") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם ישנם <strong>טיקים</strong> (תנועות או קולות בלתי רצוניים חוזרים)?</p>
         <YesNo onYes={() => { updE({ tics: true }); setScreen("e9"); }}
@@ -1048,7 +1143,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e8d") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>צפצופים באוזניים</strong> (טנטון)?</p>
         <YesNo onYes={() => { updE({ tinnitus: true }); setScreen("e9"); }}
@@ -1058,7 +1153,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e9") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
         <YesNo onYes={() => { updE({ e9: true }); setScreen("e9-q"); }}
@@ -1068,7 +1163,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e9-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון טראומה" badgeColor="green">
         <p className="mb-2 font-semibold text-[#1a3a5c]">סוג האירוע:</p>
         <select value={traumaType} onChange={(e) => setTraumaType(e.target.value)}
@@ -1118,7 +1213,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e10") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
         <YesNo onYes={() => { updE({ e10: true }); setScreen("e10a"); }}
@@ -1128,7 +1223,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e10a") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון אישיות" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">דרג/י כל שאלה מ-1 (כלל לא) עד 5 (מאוד):</p>
         {[
@@ -1149,7 +1244,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e10b") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון אישיות" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">ענה/י על כל שאלה: 1=כן, 2=לא</p>
         {[
@@ -1183,7 +1278,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "e10c") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון אישיות" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">דרג/י כל היגד מ-1 (כלל לא) עד 5 (מאוד):</p>
         {qItems.pers.map((item, i) => (
@@ -1207,7 +1302,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "therapist-style") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="סגנון טיפול מועדף" badgeColor="teal">
         <p className="mb-3 font-semibold text-[#1a3a5c]">שלוש שאלות על סגנון הטיפול המועדף עליך:</p>
         <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד – מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
@@ -1230,7 +1325,7 @@ if (screen === "e8c") return (
   // ═══════════════════════════════════════════════════════
 
   if (screen === "f-vision") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תפקודי">
         <p className="mb-4 font-semibold text-[#1a3a5c]">לפני השאלות על תפקוד אקדמאי ותעסוקתי:</p>
         <div className="mb-5">
@@ -1266,7 +1361,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f1") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווית <strong>קשיים משמעותיים ומתמשכים בלמידה</strong> או בביצוע מטלות אקדמיות (כגון קריאה, כתיבה, או חשבון)?</p>
         <YesNo onYes={() => { updF({ f1: true }); setScreen("f1-subs"); }}
@@ -1276,7 +1371,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f1-subs") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תפקודי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">האם הקושי נובע מחוסר ריכוז, או שהמשימה עצמה קשה גם כשמתרכזים? (ניתן לסמן שניים)</p>
         <div className="flex flex-col gap-3">
@@ -1299,7 +1394,7 @@ if (screen === "e8c") return (
     const ADHD1 = ["שמירה על ריכוז במשימות או פעילויות","ארגון משימות או פעילויות","נטייה לאבד חפצים הנחוצים לביצוע משימה","הסחה בקלות מרעשים/קולות","שכחה בביצוע משימות יומיומיות","קושי להקדיש תשומת לב לפרטים / טעויות מרובות בעבודה"];
     const ADHD2 = ["תחושת חוסר מנוחה או קוצר רוח","קושי לשבת במקום לאורך זמן ו/או תנועות ידיים ורגליים מוגברות","קושי להירגע ולהשתחרר כשיש לך זמן לעצמך","קושי להמתין לתורך","נטייה להפריע לאחרים או להתפרץ לדבריהם","נטייה לענות על שאלות לפני השלמתן"];
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <Card badge="שאלון ADHD">
           <p className="mb-1 text-xs text-[#6b7280]">סמן/י את הרלוונטי (3 מתוך 6 בכל בלוק = סף)</p>
           <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א – חוסר קשב:</p>
@@ -1317,7 +1412,7 @@ if (screen === "e8c") return (
   }
 
   if (screen === "f1-ld") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון קשיי למידה">
         <p className="mb-2 font-semibold text-[#1a3a5c]">האם בילדותך היה קושי ברכישת הקריאה?</p>
         <YesNo onYes={() => { updF({ ldReading: true }); setScreen("f1-ld-q"); }}
@@ -1327,7 +1422,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f1-ld-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון קשיי למידה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=כלל לא, 3=תמיד)</p>
         {qItems.ld.map((item, i) => (
@@ -1341,7 +1436,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f2") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם יש לך <strong>קשיי התארגנות</strong> (תכנון, ניהול זמן, ניהול משימות)?</p>
         <YesNo onYes={() => { updF({ f2: true }); setScreen("f2-q"); }}
@@ -1351,7 +1446,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f2-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון תפקודים ניהוליים">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=כלל לא, 3=תמיד)</p>
         {qItems.exec.map((item, i) => (
@@ -1365,7 +1460,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f3") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם יש לך <strong>קושי, אי-בהירות, או שחיקה</strong> בתחום התעסוקתי שלך?</p>
         <YesNo onYes={() => { updF({ f3: true }); setScreen("f3-type"); }}
@@ -1375,7 +1470,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f3-type") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תעסוקתי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">מה הסטאטוס הנוכחי?</p>
         <div className="flex flex-col gap-2">
@@ -1400,7 +1495,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f3-a") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון תעסוקתי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
         <CheckList items={[
@@ -1418,7 +1513,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f3-b") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון תעסוקתי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לך:</p>
         <CheckList items={[
@@ -1435,7 +1530,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "f3-disability") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום תעסוקתי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם כבר פנית לביטוח לאומי בנושא?</p>
         <YesNo
@@ -1450,7 +1545,7 @@ if (screen === "e8c") return (
   // ═══════════════════════════════════════════════════════
 
   if (screen === "r-intake") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-4 font-semibold text-[#1a3a5c]">כדי להתאים את השאלות, ענה/י על השאלות הבאות:</p>
         <div className="space-y-3">
@@ -1473,7 +1568,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r-single") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם את/ה מחפש/ת עזרה סביב <strong>דפוסים חוזרים בזוגיות</strong>, קושי ביצירת קשרים קרובים, או עיבוד פרידה / גירושין?</p>
         <YesNo
@@ -1484,7 +1579,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r1") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קשיים בתפקוד המיני</strong>?</p>
         <YesNo
@@ -1505,7 +1600,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r-abuse") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית/חווה <strong>אלימות, הפחדות, או שליטה</strong> מצד בן/בת הזוג?</p>
         <YesNo
@@ -1519,7 +1614,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r1-scale") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה את/ה חווה קושי בזוגיות? (1=כלל לא, 7=קושי גדול מאוד)</p>
         <ScaleRow label="" group="couple" values={[1,2,3,4,5,6,7]} value={coupleScale} onChange={setCoupleScale} />
@@ -1536,7 +1631,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r2-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון טיפול זוגי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">דרג/י כל היגד מ-1 עד 7 עבור הזוגיות שלך:</p>
         <p className="mb-4 text-xs text-stone-500">1 = אין בכלל &nbsp;·&nbsp; 4 = במידה בינונית &nbsp;·&nbsp; 7 = הרבה מאוד</p>
@@ -1566,7 +1661,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r3-conflict") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>?</p>
         <YesNo
@@ -1577,7 +1672,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r3-affect") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם הקושי משפיע על <strong>כלל בני המשפחה</strong>?</p>
         <YesNo
@@ -1588,7 +1683,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r3-willing") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>כולם מוכנים</strong> לשתף פעולה עם טיפול?</p>
         <YesNo
@@ -1599,7 +1694,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r3-child") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>בעיות התנהגות, קשיים חברתיים, או קשיים רגשיים</strong> אצל הילד/ים?</p>
         <YesNo
@@ -1610,7 +1705,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "r3-child-type") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="זוגיות ומשפחה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">הקושי הוא בעיקר:</p>
         <div className="flex flex-col gap-3">
@@ -1634,7 +1729,7 @@ if (screen === "e8c") return (
   // ═══════════════════════════════════════════════════════
 
   if (screen === "a-types") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="קשיי התמכרות">
         <p className="mb-3 font-semibold text-[#1a3a5c]">בחר/י את סוגי ההתמכרות הרלוונטיים:</p>
         <div className="flex flex-col gap-2">
@@ -1684,7 +1779,7 @@ if (screen === "e8c") return (
       "תסמיני גמילה: הופעת תסמינים פיזיים או נפשיים כאשר מפסיקים את השימוש או מצמצמים אותו.",
     ];
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <Card badge="שאלון חומרים ממכרים">
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים:</p>
           <CheckList items={SUB_ITEMS} checked={substanceChecked}
@@ -1708,7 +1803,7 @@ if (screen === "e8c") return (
       "סיכון בקשרים או הזדמנויות בשל המשחק: סיכון של קשרים חשובים או הזדמנויות חינוכיות או מקצועיות בשל משחקים.",
     ];
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <Card badge="שאלון התמכרות למשחקים">
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים:</p>
           <CheckList items={GAME_ITEMS} checked={gamingChecked}
@@ -1720,7 +1815,7 @@ if (screen === "e8c") return (
   }
 
   if (screen === "a-porn-type") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="קשיי התמכרות">
         <p className="mb-3 font-semibold text-[#1a3a5c]">מה הקושי הספציפי?</p>
         <div className="flex gap-3">
@@ -1734,7 +1829,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "a-porn-q") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון פורנוגרפיה">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=כלל לא, 7=מאוד)</p>
         {qItems.porn.map((item, i) => (
@@ -1759,7 +1854,7 @@ if (screen === "e8c") return (
       "האם הייתה מעורבות בהתנהגות מינית שעלולה להיות לא חוקית, פוגענית, מסכנת או מערבת אדם שאינו יכול להסכים באופן חופשי ובוגר?",
     ];
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <Card badge="שאלון קשיים בשליטה בהתנהגות מינית">
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לכל היגד שמתאר אותך:</p>
           <CheckList items={SAST_ITEMS} checked={sastChecked}
@@ -1783,7 +1878,7 @@ if (screen === "e8c") return (
       "הסתמכות על אחרים לסיוע כלכלי – פנייה לאנשים אחרים כדי להשיג כסף ולחלץ את עצמך ממצב כלכלי שנגרם כתוצאה מההימורים.",
     ];
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <Card badge="שאלון הימורים">
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לכל היגד שמתאר אותך:</p>
           <CheckList items={GAMBLE_ITEMS} checked={gamblingChecked}
@@ -1795,7 +1890,7 @@ if (screen === "e8c") return (
   }
 
   if (screen === "a-phone") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="שאלון טלפון סלולארי">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל היגד מתאר אותך? (1=לא מסכים/ה, 6=מסכים/ה מאוד)</p>
         {qItems.phone.map((item, i) => (
@@ -1812,7 +1907,7 @@ if (screen === "e8c") return (
   // ═══════════════════════════════════════════════════════
 
   if (screen === "scoring") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card>
         <div className="py-8 text-center">
           <div className="mb-3 text-4xl">⏳</div>
@@ -1842,7 +1937,7 @@ if (screen === "e8c") return (
     const showCombined = emotionalGroups.length >= 2;
 
     return (
-      <Layout screen={screen}>
+      <Layout screen={screen} domains={answers.domains}>
         <div className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
           <div className="mb-4 flex justify-center">
             <img src="/logo.svg.png" alt="Mentalytics" className="h-14 w-auto" />
@@ -1954,7 +2049,7 @@ if (screen === "e8c") return (
   }
 
   if (screen === "match-form") return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card badge="חיפוש מטפל">
         {combinedTreatments ? (
           <>
@@ -2047,125 +2142,7 @@ if (screen === "e8c") return (
   );
 
   if (screen === "match-results") return (
-    <Layout screen={screen}>
-      {/* ── Modal פרופיל מלא ── */}
-      {selectedTherapist && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          onClick={() => setSelectedTherapist(null)}
-        >
-          <div
-            className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl text-right"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <button
-              onClick={() => setSelectedTherapist(null)}
-              className="absolute left-4 top-4 text-gray-400 hover:text-gray-700 text-xl font-bold"
-            >✕</button>
-
-            {/* תמונה + שם */}
-            <div className="flex items-center gap-4 mb-4">
-              <img
-                src={selectedTherapist.profile_photo_url || (selectedTherapist.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                alt={selectedTherapist.full_name ?? ""}
-                className="h-20 w-20 flex-shrink-0 rounded-xl object-cover"
-              />
-              <div>
-                <h2 className="text-xl font-bold text-[#1a3a5c]">{selectedTherapist.full_name || "ללא שם"}</h2>
-                <p className="text-sm text-gray-500 mt-0.5">{selectedTherapist.gender} • {selectedTherapist.online ? "🌐 אונליין" : "📍 פנים אל פנים"}</p>
-              </div>
-            </div>
-
-            {/* ציונים */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              <div className={`rounded-full px-3 py-1 text-xs font-bold text-white ${
-                (selectedTherapist.combined_score ?? selectedTherapist.match_score) >= 85 ? "bg-[#1a3a5c]" :
-                (selectedTherapist.combined_score ?? selectedTherapist.match_score) >= 70 ? "bg-[#2a5a8c]" :
-                (selectedTherapist.combined_score ?? selectedTherapist.match_score) >= 55 ? "bg-amber-700" : "bg-gray-500"
-              }`}>✦ התאמה כוללת: {selectedTherapist.combined_score ?? selectedTherapist.match_score}%</div>
-              <div className="rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c]">
-                מקצועי: {selectedTherapist.match_score}%
-              </div>
-              {selectedTherapist.personality_score != null && (
-                <div className={`rounded-full px-3 py-1 text-xs font-semibold text-white ${
-                  selectedTherapist.personality_score >= 85 ? "bg-emerald-600" :
-                  selectedTherapist.personality_score >= 70 ? "bg-teal-600" :
-                  selectedTherapist.personality_score >= 55 ? "bg-amber-600" : "bg-gray-500"
-                }`}>אישיותי: {selectedTherapist.personality_score}%</div>
-              )}
-            </div>
-
-            {/* ביו */}
-            {selectedTherapist.bio && (
-              <div className="mb-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">כמה מילים עלי</div>
-                <p className="text-sm text-gray-700 leading-6">{selectedTherapist.bio}</p>
-              </div>
-            )}
-
-            {/* סוגי מטפל */}
-            {selectedTherapist.therapist_types?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">הכשרה</div>
-                <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(selectedTherapist.therapist_types) ? selectedTherapist.therapist_types : [selectedTherapist.therapist_types]).map((t: string, i: number) => (
-                    <span key={i} className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-800">{genderTitle(t, selectedTherapist.gender)}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* תחומי הכשרה */}
-            {selectedTherapist.training_areas?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">תחומי טיפול</div>
-                <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(selectedTherapist.training_areas) ? selectedTherapist.training_areas : [selectedTherapist.training_areas]).map((t: string, i: number) => (
-                    <span key={i} className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs text-teal-800">{t}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* אזורים */}
-            {selectedTherapist.regions?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">אזורי פעילות</div>
-                <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(selectedTherapist.regions) ? selectedTherapist.regions : [selectedTherapist.regions]).map((r: string, i: number) => (
-                    <span key={i} className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-700">📍 {r}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* הסדרים */}
-            {selectedTherapist.arrangements?.length > 0 && (
-              <div className="mb-4">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">הסדרים</div>
-                <div className="flex flex-wrap gap-1">
-                  {(Array.isArray(selectedTherapist.arrangements) ? selectedTherapist.arrangements : [selectedTherapist.arrangements]).map((a: string, i: number) => (
-                    <span key={i} className="rounded-full bg-purple-50 border border-purple-200 px-2 py-0.5 text-xs text-purple-800">{a}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* סיבות התאמה */}
-            {selectedTherapist.match_reasons?.length > 0 && (
-              <div className="mb-2">
-                <div className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-1">סיבות ההתאמה</div>
-                <div className="flex flex-wrap gap-1">
-                  {selectedTherapist.match_reasons.map((r: string, i: number) => (
-                    <span key={i} className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">{r}</span>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
+    <Layout screen={screen} domains={answers.domains}>
       <div className="mb-4">
         <button type="button" onClick={() => { setScreen("results"); setCombinedTreatments(null); setCombinedLabels(null); }} className="text-sm text-[#2e7d8c] hover:underline">
           ◂ חזרה לתוצאות
@@ -2183,7 +2160,7 @@ if (screen === "e8c") return (
       )}
       <div className="space-y-4">
         {(matchResults ?? []).map((t: any) => (
-          <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setSelectedTherapist(t)}>
+          <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg">
             <div className="flex items-start gap-4">
               <img
                 src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
@@ -2196,13 +2173,6 @@ if (screen === "e8c") return (
                 {t.bio && <p className="mt-1 text-sm text-gray-700 line-clamp-2">{t.bio}</p>}
                 {t.regions?.length > 0 && (
                   <p className="mt-1 text-xs text-gray-500">📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}</p>
-                )}
-                {t.match_reasons?.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {t.match_reasons.map((r: string, i: number) => (
-                      <span key={i} className="rounded-full bg-[#e0f4fa] px-2 py-0.5 text-xs text-[#2e7d8c]">{r}</span>
-                    ))}
-                  </div>
                 )}
                 <div className="mt-2 flex flex-wrap gap-2 items-center">
                   <div className={`inline-block rounded-full px-3 py-1 text-xs font-bold text-white ${
@@ -2225,47 +2195,28 @@ if (screen === "e8c") return (
                     </div>
                   )}
                 </div>
-                <div className="mt-3 flex flex-wrap gap-2" onClick={e => e.stopPropagation()}>
-                  {t.phone && (
-                    <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
-                      target="_blank" rel="noopener noreferrer"
-                      onClick={() => trackClick(t.id, "whatsapp")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-green-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-green-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                      </svg>
-                      וואטסאפ
-                    </a>
-                  )}
-                  {t.phone && (
-                    <a href={`tel:${t.phone}`}
-                      onClick={() => trackClick(t.id, "phone")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-stone-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-stone-700">
-                      📞 התקשרו
-                    </a>
-                  )}
-                  {t.email && (
-                    <a href={`mailto:${t.email}?subject=פנייה דרך אתר טיפול חכם&body=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
-                      onClick={() => trackClick(t.id, "email")}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90">
-                      ✉ מייל
-                    </a>
-                  )}
-                  <button
-                    onClick={e => { e.stopPropagation(); fetchExplanation(t); }}
-                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#1a3a5c] px-3 py-1.5 text-xs font-semibold text-[#1a3a5c] hover:bg-[#f0f6ff]"
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <a
+                    href={profileHrefForMatch(t)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#2a5a8c] transition-colors"
                   >
-                    {explainLoading[t.id] ? "טוען..." : "✦ למה זה מתאים לי?"}
+                    פרופיל מלא ←
+                  </a>
+                  <button
+                    onClick={() => fetchExplanation(t)}
+                    disabled={explainLoading[t.id]}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
+                  >
+                    {explainLoading[t.id] ? "טוען..." : "✦ ניתוח AI אישי"}
                   </button>
                 </div>
                 {explainData[t.id] && (
-                  <div className="mt-3 rounded-xl bg-[#f0f8ff] border border-[#c0dff0] p-3 text-right" onClick={e => e.stopPropagation()}>
-                    <p className="text-xs font-bold text-[#1a3a5c] mb-1">{explainData[t.id]!.title}</p>
+                  <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
+                    <p className="text-xs font-bold text-violet-900 mb-1">✦ {explainData[t.id]!.title}</p>
                     <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explainData[t.id]!.explanation}</p>
                     <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                   </div>
                 )}
-                <p className="mt-2 text-xs text-[#2e7d8c] font-semibold">לפרטים נוספים ◂</p>
               </div>
             </div>
           </div>
@@ -2275,7 +2226,7 @@ if (screen === "e8c") return (
   );
 
   return (
-    <Layout screen={screen}>
+    <Layout screen={screen} domains={answers.domains}>
       <Card>
         <div className="py-8 text-center">
           <p className="text-[#6b7280]">טוען...</p>

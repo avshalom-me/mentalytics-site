@@ -130,7 +130,7 @@ function computeResults(A: Ans): KidsBox[] {
         : "✅ הפנייה: טיפול CBT ממוקד חרדת היפרדות";
     addToGroup("📊 נמצאו סימנים לחרדת היפרדות", sepRef, []);
   }
-  if ((A.q1 || 0) >= 4) {
+  if ((A.q1 || 0) >= 3) {
     const aqTot = A.aq_tot || 0;
     const extras: KidsBox[] = [];
     if (A.q1_pain === "כן") {
@@ -200,7 +200,7 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q2 — דימוי עצמי
-  if ((A.q2 || 0) >= 5) {
+  if ((A.q2 || 0) >= 3) {
     let ref = "";
     if (grp === "ga") ref = getGaRef();
     else if (grp === "bv") {
@@ -221,7 +221,7 @@ function computeResults(A: Ans): KidsBox[] {
     emoStandalones.push({ cls: "danger", txt: "🚨 דווח על מחשבות אובדניות — נדרשת הערכת סיכון דחופה אצל פסיכיאטר ילדים" });
   }
   const mqTot = A.mq_tot || 0;
-  if ((A.q3 || 0) >= 4 && mqTot >= 4) {
+  if ((A.q3 || 0) >= 3 && mqTot >= 4) {
     const isSevere = mqTot >= 6;
     const ref = grp === "ga"
       ? getGaRef()
@@ -354,9 +354,9 @@ function computeResults(A: Ans): KidsBox[] {
 
   // BV merge: Q1+Q2+Q3 all positive → combined referral
   if (grp === "bv") {
-    const q1p = (A.q1 || 0) >= 4 && (A.aq_tot || 0) >= 14;
-    const q2p = (A.q2 || 0) >= 4;
-    const q3p = (A.q3 || 0) >= 4 && (A.mq_tot || 0) >= 4;
+    const q1p = (A.q1 || 0) >= 3 && (A.aq_tot || 0) >= 14;
+    const q2p = (A.q2 || 0) >= 3;
+    const q3p = (A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4;
     if (q1p && q2p && q3p) {
       const combinedRef = "✅ הפנייה: טיפול פסיכודינאמי בשילוב CBT בשילוב הדרכת הורים";
       const bvLabels = ["📊 נמצאו סימנים לחרדה", "📊 נמצאו סימנים לדימוי עצמי נמוך", "📊 נמצאו סימנים למצב רוח ירוד"];
@@ -893,8 +893,8 @@ function computeAcadResults(A: Ans): KidsBox[] {
     return boxes;
   }
   // הצלבה עם החלק הרגשי — חרדה / דיכאון משפיעים על תפקוד לימודי
-  const highAnxiety = (A.q1 || 0) >= 7;
-  const highMood = (A.q3 || 0) >= 5 && (A.mq_tot || 0) >= 4;
+  const highAnxiety = (A.q1 || 0) >= 4;
+  const highMood = (A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4;
   if (highAnxiety || highMood) {
     boxes.push({
       cls: "info",

@@ -123,6 +123,7 @@ type StatsResponse = {
   month_by_source?: SourceBreakdown;
   trends?: TrendMonth[];
   profile_views?: { week: number; month: number };
+  match_impressions?: { week: number; month: number };
   comparison?: Comparison;
   enriched?: EnrichedStatsData;
 };
@@ -133,7 +134,11 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   const data = stats?.[period];
   const sourceData = period === "week" ? stats?.week_by_source : stats?.month_by_source;
   const views = stats?.profile_views;
+  const impressions = stats?.match_impressions;
   const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
+  const viewsValue = views ? (period === "week" ? views.week : views.month) : 0;
+  const impressionsValue = impressions ? (period === "week" ? impressions.week : impressions.month) : 0;
+  const conversionPct = impressionsValue > 0 ? Math.round((viewsValue / impressionsValue) * 100) : null;
 
   return (
     <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
@@ -207,11 +212,27 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
                 </div>
               </div>
 
-              {/* Profile views */}
-              {views && (views.week > 0 || views.month > 0) && (
-                <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 mb-4 flex items-center justify-between">
-                  <span className="text-sm text-purple-700 font-semibold">👁 צפיות בפרופיל</span>
-                  <span className="text-lg font-black text-purple-700">{period === "week" ? views.week : views.month}</span>
+              {/* Funnel: impressions → profile entries → conversion */}
+              {(impressionsValue > 0 || viewsValue > 0) && (
+                <div className="mb-4">
+                  <h3 className="text-sm font-bold text-stone-800 mb-3">חשיפה ועניין</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-2">
+                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
+                      <div className="text-lg font-black text-indigo-700">{impressionsValue}</div>
+                      <div className="text-xs text-indigo-600 font-semibold mt-1">✨ הופעות במאטצ'ינג</div>
+                      <div className="text-[10px] text-indigo-500 mt-0.5">פעמים שהופעת ברשימת ההמלצות</div>
+                    </div>
+                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
+                      <div className="text-lg font-black text-purple-700">{viewsValue}</div>
+                      <div className="text-xs text-purple-600 font-semibold mt-1">👁 כניסות לפרופיל</div>
+                      <div className="text-[10px] text-purple-500 mt-0.5">לחיצות שהובילו לעמוד שלך</div>
+                    </div>
+                  </div>
+                  {conversionPct !== null && (
+                    <div className="text-xs text-stone-500 text-center">
+                      יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מהמופיעים נכנסו לפרופיל
+                    </div>
+                  )}
                 </div>
               )}
 

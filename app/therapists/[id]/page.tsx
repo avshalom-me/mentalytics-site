@@ -118,13 +118,14 @@ export default async function TherapistProfilePage({
 
   const hasDetails =
     (t.therapist_types?.length ?? 0) > 0 ||
-    (t.training_areas?.length ?? 0) > 0 ||
     (t.assessment_types?.length ?? 0) > 0 ||
-    (t.age_groups?.length ?? 0) > 0 ||
     (t.regions?.length ?? 0) > 0 ||
     (t.languages?.length ?? 0) > 0 ||
     (t.cultural_prefs?.length ?? 0) > 0 ||
     (t.arrangements?.length ?? 0) > 0;
+  const hasSpecialties =
+    (t.training_areas?.length ?? 0) > 0 ||
+    (t.age_groups?.length ?? 0) > 0;
 
   return (
     <main className="mx-auto max-w-2xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -177,6 +178,32 @@ export default async function TherapistProfilePage({
         </div>
       </div>
 
+      {/* Specialties — surfaced above the fold */}
+      {hasSpecialties && (
+        <div className="mb-8 px-1 space-y-4">
+          {t.training_areas && t.training_areas.length > 0 && (
+            <div>
+              <h2 className="text-sm font-bold text-stone-500 mb-2">תחומי טיפול</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {t.training_areas.map((area, i) => (
+                  <span key={i} className="rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-medium text-teal-800">{area}</span>
+                ))}
+              </div>
+            </div>
+          )}
+          {t.age_groups && t.age_groups.length > 0 && (
+            <div>
+              <h2 className="text-sm font-bold text-stone-500 mb-2">גיל מטופלים</h2>
+              <div className="flex flex-wrap gap-1.5">
+                {t.age_groups.map((g, i) => (
+                  <span key={i} className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-medium text-indigo-800">{g}</span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Bio — open, large and prominent */}
       {t.bio && (
         <div className="mb-8 px-1">
@@ -204,9 +231,7 @@ export default async function TherapistProfilePage({
           <Accordion title="פרטים מקצועיים">
             <div className="space-y-3">
               {t.therapist_types && t.therapist_types.length > 0 && <DetailRow label="הכשרה" value={genderTitles(t.therapist_types, t.gender).join(", ")} />}
-              {t.training_areas && t.training_areas.length > 0 && <DetailRow label="תחומי טיפול" value={t.training_areas.join(", ")} />}
               {t.assessment_types && t.assessment_types.length > 0 && <DetailRow label="אבחונים" value={t.assessment_types.join(", ")} />}
-              {t.age_groups && t.age_groups.length > 0 && <DetailRow label="גיל מטופלים" value={t.age_groups.join(", ")} />}
               {t.regions && t.regions.length > 0 && <DetailRow label="אזורי פעילות" value={t.regions.join(", ")} />}
               {t.languages && t.languages.length > 0 && <DetailRow label="שפות טיפול" value={t.languages.join(", ")} />}
               {t.cultural_prefs && t.cultural_prefs.length > 0 && <DetailRow label="העדפות תרבותיות" value={t.cultural_prefs.join(", ")} />}

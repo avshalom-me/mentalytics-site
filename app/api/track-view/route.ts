@@ -7,7 +7,10 @@ import {
   isValidGender,
 } from "@/app/lib/stats-categories";
 
-const VALID_SOURCES = ["match", "directory"] as const;
+// "match_card"   = impression in the match-results list
+// "match"        = entry into the full profile page coming from match results
+// "directory"    = entry into the full profile page from the directory
+const VALID_SOURCES = ["match", "match_card", "directory"] as const;
 type Source = (typeof VALID_SOURCES)[number];
 
 // Simple in-memory rate limiter: max 60 views per IP per minute
@@ -50,12 +53,13 @@ export async function POST(req: NextRequest) {
     const safeIssue = isValidIssue(viewer_issue) ? viewer_issue : null;
     const safeAgeBand = isValidAgeBand(viewer_age_band) ? viewer_age_band : null;
     const safeGender = isValidGender(viewer_gender) ? viewer_gender : null;
-    const safeScore = safeSource === "match" ? clampScore(match_score) : null;
+    const safeScore = safeSource === "directory" ? null : clampScore(match_score);
     const safeSessionId = typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128
       ? session_id
       : null;
 
-    // Dedup: skip insert if same (therapist_id, session_id) viewed in last 30 minutes
+    // Dedup: skip insert if same (therapist_id, session_id, source) viewed in last 30 minutes.
+    // Including source lets us count both a match-card view and a full-profile entry separately.
     if (safeSessionId) {
       const thirtyMinAgo = new Date(Date.now() - 30 * 60_000).toISOString();
       const { data: recent } = await supabaseAdmin
@@ -63,6 +67,7 @@ export async function POST(req: NextRequest) {
         .select("id")
         .eq("therapist_id", therapist_id)
         .eq("session_id", safeSessionId)
+        .eq("source", safeSource)
         .gte("viewed_at", thirtyMinAgo)
         .limit(1)
         .maybeSingle();
