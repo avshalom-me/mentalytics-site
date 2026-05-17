@@ -3240,8 +3240,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
           const domainTreatmentKeys = uniq(b.treatments.map(g => g.treatmentKey));
           const domainAssessmentKeys = uniq(b.assessments.map(g => g.treatmentKey));
-          const showCombinedT = domainTreatmentKeys.length >= 2;
-          const showCombinedA = domainAssessmentKeys.length >= 2;
+          // Combined search is reserved for the emotional domain only — combining e.g. an
+          // academic-LD treatment with a behavioral one doesn't map to a real-world practitioner.
+          const showCombinedT = b.key === "emotional" && domainTreatmentKeys.length >= 2;
+          const showCombinedA = b.key === "emotional" && domainAssessmentKeys.length >= 2;
           const combinedTLabels = uniq(b.treatments.map(g => g.treatmentLabel));
           const combinedALabels = uniq(b.assessments.map(g => g.treatmentLabel));
 

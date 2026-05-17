@@ -9,6 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
+import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
 // Anonymous viewer context derived from the questionnaire — used for impression
@@ -115,13 +116,13 @@ function CheckList({
 // Ordered milestone screens — used for progress calculation
 const ADULTS_SCREENS_ORDER = [
   "disclaimer","intake","domains",
-  "e1","e1-q","e2","e2-2","e2-q","e3","e3-q",
-  "e4","e4-chronic","e4-medical","e4-q","e4-social","e4-social-sev","e4-flight","e4-medanx","e4-stresspain",
-  "e5","e5-q","e6","e6-q","e7-q","e8","e8c","e8d","e9","e9-q",
+  "e1","e1-q","e2","e2-q","e3","e3-q",
+  "e4","e4-contexts","e4-q","e4-social","e4-social-sev",
+  "e5","e5-q","e6","e6-q","e7-q","e8c","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
-  "f-vision","f1","f1-subs","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
-  "r-intake","r-single","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-affect","r3-willing","r3-child","r3-child-type",
+  "f-vision","f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
+  "r-intake","r-single","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-child","r3-child-type",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -233,11 +234,37 @@ function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ▸", nextDisab
   );
 }
 
-function YesNo({ onYes, onNo }: { onYes: () => void; onNo: () => void }) {
+function YesNo({ onYes, onNo, value }: { onYes: () => void; onNo: () => void; value?: boolean }) {
+  // When `value` is provided, render in stateful mode (button reflects the
+  // current selection) — used in screens where the user can change their answer
+  // before pressing Continue. When omitted, falls back to the original
+  // immediate-action behaviour.
+  const yesSelected = value === true;
+  const noSelected = value === false;
   return (
     <div className="mt-4 flex gap-3">
-      <button type="button" onClick={onYes} className="flex-1 rounded-xl bg-[#2d7a4f] py-3 text-sm font-bold text-white hover:bg-[#1f5a38]">כן</button>
-      <button type="button" onClick={onNo} className="flex-1 rounded-xl bg-[#1a3a5c] py-3 text-sm font-bold text-white hover:bg-[#0f2540]">לא</button>
+      <button
+        type="button"
+        onClick={onYes}
+        className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${
+          yesSelected
+            ? "bg-[#2d7a4f] text-white ring-2 ring-[#2d7a4f] ring-offset-2"
+            : value === undefined
+            ? "bg-[#2d7a4f] text-white hover:bg-[#1f5a38]"
+            : "border-2 border-[#2d7a4f] bg-white text-[#2d7a4f] hover:bg-[#e8f4ec]"
+        }`}
+      >כן</button>
+      <button
+        type="button"
+        onClick={onNo}
+        className={`flex-1 rounded-xl py-3 text-sm font-bold transition-all ${
+          noSelected
+            ? "bg-[#1a3a5c] text-white ring-2 ring-[#1a3a5c] ring-offset-2"
+            : value === undefined
+            ? "bg-[#1a3a5c] text-white hover:bg-[#0f2540]"
+            : "border-2 border-[#1a3a5c] bg-white text-[#1a3a5c] hover:bg-[#eaf0f6]"
+        }`}
+      >לא</button>
     </div>
   );
 }
@@ -836,25 +863,44 @@ export default function AdultsPage() {
     </Layout>
   );
 
-  if (screen === "e2") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
-        <YesNo onYes={() => { updE({ maniaScreen1: true }); setScreen("e2-2"); }}
-          onNo={() => { updE({ maniaScreen1: false }); setScreen("e3"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e2-2") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית גם <strong>פרץ אנרגיה יוצא דופן</strong> בתקופה זו?</p>
-        <YesNo onYes={() => { updE({ maniaScreen2: true }); setScreen("e2-q"); }}
-          onNo={() => { updE({ maniaScreen2: false }); setScreen("e3"); }} />
-      </Card>
-    </Layout>
-  );
+  // Mania screening — DSM-5 requires BOTH elevated mood AND increased energy.
+  // We ask both in one screen with progressive reveal: the second question only
+  // shows once the first is answered. The maniaScreen1 / maniaScreen2 booleans
+  // are stored separately so downstream scoring sees the same shape as before.
+  if (screen === "e2") {
+    const m1 = answers.emotional?.maniaScreen1;
+    const m2 = answers.emotional?.maniaScreen2;
+    const canContinue = m1 !== undefined && (m1 === false || m2 !== undefined);
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="תחום רגשי" badgeColor="green">
+          <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
+          <YesNo
+            onYes={() => updE({ maniaScreen1: true })}
+            onNo={() => updE({ maniaScreen1: false, maniaScreen2: false })}
+            value={m1}
+          />
+          {m1 === true && (
+            <div className="mt-5 pt-4 border-t border-dashed border-[#c8dce0]">
+              <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית גם <strong>פרץ אנרגיה יוצא דופן</strong> בתקופה זו?</p>
+              <YesNo
+                onYes={() => updE({ maniaScreen2: true })}
+                onNo={() => updE({ maniaScreen2: false })}
+                value={m2}
+              />
+            </div>
+          )}
+          <NavRow
+            onNext={() => {
+              if (m1 && m2) setScreen("e2-q");
+              else setScreen("e3");
+            }}
+            nextDisabled={!canContinue}
+          />
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "e2-q") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -868,38 +914,76 @@ export default function AdultsPage() {
             מחשבות על מוות
           </label>
         </div>
-        <NavRow onBack={() => setScreen("e2-2")}
+        <NavRow onBack={() => setScreen("e2")}
           onNext={() => { updE({ maniaItems: maniaChecked, maniaDeath }); setScreen("e3"); }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "e3") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3א. האם ראית או שמעת דברים שאחרים אמרו שאינם קיימים?</p>
-        <YesNo onYes={() => { updE({ e3a: true }); setScreen("e3b"); }}
-          onNo={() => { updE({ e3a: false }); setScreen("e3b"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e3b") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">3ב. האם יש לך אמונות או חשדות יוצאי דופן שאחרים סביבך לא חולקים?</p>
-        <YesNo onYes={() => {
-            updE({ e3b: true, e3: true });
-            setScreen("e3-q");
-          }}
-          onNo={() => {
-            const e3a = answers.emotional?.e3a ?? false;
-            updE({ e3b: false, e3: e3a });
-            setScreen(e3a ? "e3-q" : "e4");
-          }} />
-      </Card>
-    </Layout>
-  );
+  // Merged screening for 3א + 3ב + 7 — three uncommon, often-stigmatising "do
+  // any of these apply?" gates that previously took 3 sequential YesNo screens.
+  // Most users will leave everything unchecked and skip; positives still trigger
+  // the same follow-up branches (prodrome questionnaire for 3א/3ב, tics+tinnitus
+  // for 7) so no clinical info is lost.
+  if (screen === "e3") {
+    const e3a = answers.emotional?.e3a ?? false;
+    const e3b = answers.emotional?.e3b ?? false;
+    const e8 = answers.emotional?.e8 ?? false;
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="תחום רגשי" badgeColor="green">
+          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי (או דלג/י אם אין):</p>
+          <ul className="flex flex-col gap-2">
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e3a}
+                  onChange={(e) => updE({ e3a: e.target.checked, e3: e.target.checked || e3b })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                ראיתי או שמעתי דברים שאחרים אמרו שאינם קיימים
+              </label>
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e3b}
+                  onChange={(e) => updE({ e3b: e.target.checked, e3: e3a || e.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                יש לי אמונות או חשדות יוצאי דופן שאחרים סביבי לא חולקים
+              </label>
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e8}
+                  onChange={(e) => updE({ e8: e.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                יש לי תסמינים גופניים שגורמים מצוקה, ומקורם אינו רפואי ואינו חרדה
+              </label>
+            </li>
+          </ul>
+          <NavRow
+            onNext={() => {
+              const cur = answers.emotional ?? {};
+              const ce3a = cur.e3a ?? false;
+              const ce3b = cur.e3b ?? false;
+              // The tics/tinnitus follow-up for the somatic checkbox runs at the
+              // original e8 position (after the sleep/eating sub-questionnaires),
+              // not here — so continue linearly even when e8 was checked.
+              if (ce3a || ce3b) setScreen("e3-q");
+              else setScreen("e4");
+            }}
+          />
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "e3-q") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -913,7 +997,12 @@ export default function AdultsPage() {
             קיימות מחשבות אובדניות
           </label>
         </div>
-        <NavRow onNext={() => { updE({ prodromeItems: prodromeChecked, prodromeSuicidal }); setScreen("e4"); }} />
+        <NavRow onNext={() => {
+          updE({ prodromeItems: prodromeChecked, prodromeSuicidal });
+          // Tics/tinnitus follow-up runs at the original e8 position (after
+          // eating/sleep). Don't branch on e8 here.
+          setScreen("e4");
+        }} />
       </Card>
     </Layout>
   );
@@ -922,31 +1011,89 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
         <p className="mb-1 font-semibold text-[#1a3a5c]">4. האם חווה <strong>דאגות מתמשכות, חרדה, או פחד ממצבים מסוימים</strong>?</p>
-        <YesNo onYes={() => { updE({ e4: true }); setScreen("e4-chronic"); }}
+        <YesNo onYes={() => { updE({ e4: true }); setScreen("e4-contexts"); }}
           onNo={() => { updE({ e4: false }); setScreen("e5"); }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "e4-chronic") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם ישנם <strong>כאבים כרוניים</strong> כגון כאבי בטן או כאבי ראש?</p>
-        <YesNo onYes={() => { updE({ e4Chronic: true }); setScreen("e4-medical"); }}
-          onNo={() => { updE({ e4Chronic: false }); setScreen("e4-q"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e4-medical") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>נשללו בעיות רפואיות</strong> כגורם לכאבים?</p>
-        <YesNo onYes={() => { updE({ e4Medical: true }); setScreen("e4-q"); }}
-          onNo={() => { updE({ e4Medical: false }); setScreen("e4-q"); }} />
-      </Card>
-    </Layout>
-  );
+  // Merged anxiety-contexts screen replaces five separate YesNo screens:
+  // e4-chronic, e4-medical, e4-flight, e4-medanx, e4-stresspain.
+  // Each checkbox writes to the same underlying field the original screen did,
+  // so the scoring logic in questionnaire-score.ts is unchanged.
+  if (screen === "e4-contexts") {
+    const e = answers.emotional ?? {};
+    const chronic = e.e4Chronic ?? false;
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="תחום רגשי" badgeColor="green">
+          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י הקשרים שבהם החרדה באה לידי ביטוי (או דלג/י אם לא רלוונטי):</p>
+          <ul className="flex flex-col gap-2">
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={chronic}
+                  onChange={(ev) => updE({ e4Chronic: ev.target.checked, e4Medical: ev.target.checked ? e.e4Medical : undefined })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                כאבים כרוניים (כאבי בטן, כאבי ראש שחוזרים)
+              </label>
+              {chronic && (
+                <div className="mt-2 mr-7 rounded-lg bg-amber-50 border border-amber-200 p-3">
+                  <p className="mb-2 text-xs font-semibold text-amber-900">האם נשללו בעיות רפואיות כגורם לכאבים?</p>
+                  <div className="flex gap-2">
+                    <button type="button" onClick={() => updE({ e4Medical: true })}
+                      className={`flex-1 rounded-lg border-2 py-1.5 text-xs font-bold transition-all ${e.e4Medical === true ? "border-amber-700 bg-amber-700 text-white" : "border-amber-300 bg-white text-amber-900 hover:border-amber-700"}`}>כן</button>
+                    <button type="button" onClick={() => updE({ e4Medical: false })}
+                      className={`flex-1 rounded-lg border-2 py-1.5 text-xs font-bold transition-all ${e.e4Medical === false ? "border-amber-700 bg-amber-700 text-white" : "border-amber-300 bg-white text-amber-900 hover:border-amber-700"}`}>לא</button>
+                  </div>
+                </div>
+              )}
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e.flightAnxiety ?? false}
+                  onChange={(ev) => updE({ flightAnxiety: ev.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                חרדה בהקשר של טיסות
+              </label>
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e.medicalAnxiety ?? false}
+                  onChange={(ev) => updE({ medicalAnxiety: ev.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                חרדה רפואית (חשש ממחטים, מבדיקות, או חשש מתמיד ממחלות)
+              </label>
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={e.stressPain ?? false}
+                  onChange={(ev) => updE({ stressPain: ev.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                תסמינים גופניים בעת מתח (כאבי ראש, סחרחורות)
+              </label>
+            </li>
+          </ul>
+          <NavRow
+            onBack={() => setScreen("e4")}
+            onNext={() => setScreen("e4-q")}
+            nextDisabled={chronic && e.e4Medical === undefined}
+          />
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "e4-q") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -970,7 +1117,7 @@ export default function AdultsPage() {
       <Card badge="חרדה חברתית" badgeColor="green">
         <p className="mb-3 font-semibold text-[#1a3a5c]">האם יש לך <strong>חרדה חברתית</strong>? (חשש מהערכה שלילית, הימנעות ממצבים חברתיים)</p>
         <YesNo onYes={() => { updE({ socialAnxiety: true }); setScreen("e4-social-sev"); }}
-          onNo={() => { updE({ socialAnxiety: false }); setScreen("e4-flight"); }} />
+          onNo={() => { updE({ socialAnxiety: false }); setScreen("e5"); }} />
       </Card>
     </Layout>
   );
@@ -981,40 +1128,11 @@ export default function AdultsPage() {
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה החרדה החברתית פוגעת בתפקוד שלך? (1=כלל לא, 7=מאוד)</p>
         <ScaleRow label="" group="social-sev" values={[1,2,3,4,5,6,7]} value={socialSeverity} onChange={setSocialSeverity} />
         <NavRow onBack={() => setScreen("e4-social")}
-          onNext={() => { updE({ socialSeverity }); setScreen("e4-flight"); }} />
+          onNext={() => { updE({ socialSeverity }); setScreen("e5"); }} />
       </Card>
     </Layout>
   );
-
-  if (screen === "e4-flight") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="חרדה – שאלות נוספות" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם החרדה מתעוררת בהקשר של <strong>טיסות</strong>?</p>
-        <YesNo onYes={() => { updE({ flightAnxiety: true }); setScreen("e4-medanx"); }}
-          onNo={() => { updE({ flightAnxiety: false }); setScreen("e4-medanx"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e4-medanx") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="חרדה – שאלות נוספות" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם החרדה קשורה ל<strong>טיפול רפואי, חשיפה למחטים, או חשש מתמיד ממחלות</strong>?</p>
-        <YesNo onYes={() => { updE({ medicalAnxiety: true }); setScreen("e4-stresspain"); }}
-          onNo={() => { updE({ medicalAnxiety: false }); setScreen("e4-stresspain"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e4-stresspain") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="חרדה – שאלות נוספות" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם בתקופות של מתח ישנם תסמינים של <strong>כאבים פיסיים כגון כאבי ראש או סחרחורות</strong>?</p>
-        <YesNo onYes={() => { updE({ stressPain: true }); setScreen("e5"); }}
-          onNo={() => { updE({ stressPain: false }); setScreen("e5"); }} />
-      </Card>
-    </Layout>
-  );
+  // e4-flight, e4-medanx, e4-stresspain merged into "e4-contexts" above.
 
   if (screen === "e5") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -1040,39 +1158,37 @@ export default function AdultsPage() {
     </Layout>
   );
 
+  // Eating/sleep — gate removed. We show the two checkboxes directly; the
+  // underlying e6 / e7 booleans are populated based on what was checked, so the
+  // downstream sub-questionnaires (e6-q for eating, e7-q for sleep) still receive
+  // the same triggers. Neither checked → skip straight to e8.
   if (screen === "e6") return (
     <Layout screen={screen} domains={answers.domains}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">6. האם חווה/ת <strong>קשיים בנוגע למשקל, אכילה או שינה</strong>?</p>
-        <YesNo
-          onYes={() => updE({ e6: true, e7: true })}
-          onNo={() => { updE({ e6: false, e7: false }); setScreen("e8"); }}
+        <p className="mb-3 font-semibold text-[#1a3a5c]">6. האם חווה/ת קשיים באחד מהבאים? (סמן/י את הרלוונטי או דלג/י)</p>
+        <div className="space-y-3">
+          {[
+            { key: "eating", label: "אכילה ומשקל", state: e6EatingChecked, setter: setE6EatingChecked },
+            { key: "sleep",  label: "בעיות שינה",  state: e6SleepChecked,  setter: setE6SleepChecked  },
+          ].map(({ key, label, state, setter }) => (
+            <label key={key} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-3 transition-all"
+              style={{ borderColor: state ? "#2e7d8c" : "#ddd6c8", background: state ? "#e0f4fa" : "white" }}>
+              <input type="checkbox" checked={state} onChange={e => setter(e.target.checked)}
+                className="h-4 w-4 accent-[#2e7d8c]" />
+              <span className="text-sm font-medium text-[#1a3a5c]">{label}</span>
+            </label>
+          ))}
+        </div>
+        <NavRow
+          onNext={() => {
+            const hasEating = e6EatingChecked;
+            const hasSleep = e6SleepChecked;
+            updE({ e6: hasEating, e7: hasSleep });
+            if (hasEating) setScreen("e6-q");
+            else if (hasSleep) setScreen("e7-q");
+            else setScreen(answers.emotional?.e8 ? "e8c" : "e9-q");
+          }}
         />
-        {answers.emotional?.e6 === true && (
-          <div className="mt-4 space-y-3 border-t border-dashed border-[#c8dce0] pt-4">
-            <p className="text-sm font-semibold text-[#1a3a5c] mb-2">מה הרלוונטי לך? (ניתן לבחור שניים)</p>
-            {[
-              { key: "eating", label: "אכילה ומשקל", state: e6EatingChecked, setter: setE6EatingChecked },
-              { key: "sleep",  label: "בעיות שינה",  state: e6SleepChecked,  setter: setE6SleepChecked  },
-            ].map(({ key, label, state, setter }) => (
-              <label key={key} className="flex items-center gap-3 cursor-pointer rounded-xl border-2 px-4 py-3 transition-all"
-                style={{ borderColor: state ? "#2e7d8c" : "#ddd6c8", background: state ? "#e0f4fa" : "white" }}>
-                <input type="checkbox" checked={state} onChange={e => setter(e.target.checked)}
-                  className="h-4 w-4 accent-[#2e7d8c]" />
-                <span className="text-sm font-medium text-[#1a3a5c]">{label}</span>
-              </label>
-            ))}
-            {(e6EatingChecked || e6SleepChecked) && (
-              <button onClick={() => {
-                if (e6EatingChecked) setScreen("e6-q");
-                else setScreen("e7-q");
-              }}
-                className="mt-2 rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1f5f6e]">
-                המשך ←
-              </button>
-            )}
-          </div>
-        )}
       </Card>
     </Layout>
   );
@@ -1105,7 +1221,7 @@ export default function AdultsPage() {
             setEating3Checked(next);
             updE({ eating3Count: next.length });
           }} />
-        <NavRow onBack={() => setScreen("e6")} onNext={() => setScreen(e6SleepChecked ? "e7-q" : "e8")} />
+        <NavRow onBack={() => setScreen("e6")} onNext={() => setScreen(e6SleepChecked ? "e7-q" : (answers.emotional?.e8 ? "e8c" : "e9-q"))} />
       </Card>
     </Layout>
   );
@@ -1117,100 +1233,143 @@ export default function AdultsPage() {
         <CheckList items={qItems.sleep} checked={sleepChecked}
           onChange={(i, v) => setSleepChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <NavRow onBack={() => setScreen(e6EatingChecked ? "e6-q" : "e6")}
-          onNext={() => { updE({ sleepItems: qItems.sleep.map((_, i) => sleepChecked.includes(i)) }); setScreen("e8"); }} />
+          onNext={() => {
+            updE({ sleepItems: qItems.sleep.map((_, i) => sleepChecked.includes(i)) });
+            setScreen(answers.emotional?.e8 ? "e8c" : "e9-q");
+          }} />
       </Card>
     </Layout>
   );
 
-  if (screen === "e8") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם ישנם <strong>תסמינים גופניים שגורמים מצוקה</strong> ומקורם אינו רפואי ואינו חרדה?</p>
-        <YesNo onYes={() => { updE({ e8: true }); setScreen("e8c"); }}
-          onNo={() => { updE({ e8: false }); setScreen("e9"); }} />
-      </Card>
-    </Layout>
-  );
+  // The standalone "e8" somatic question was merged into the psychosis/somatic
+  // super-question at e3. The tics+tinnitus follow-up below runs at the same
+  // sequence position the standalone screen used to occupy, but only when the
+  // somatic checkbox was actually marked on the merged screen.
+  if (screen === "e8c") {
+    const e = answers.emotional ?? {};
+    const tics = e.tics ?? false;
+    const tinnitus = e.tinnitus ?? false;
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="תחום רגשי" badgeColor="green">
+          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי לגבי התסמינים הגופניים (או דלג/י):</p>
+          <ul className="flex flex-col gap-2">
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={tics}
+                  onChange={(ev) => updE({ tics: ev.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                טיקים (תנועות או קולות בלתי רצוניים חוזרים)
+              </label>
+            </li>
+            <li>
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+                <input
+                  type="checkbox"
+                  checked={tinnitus}
+                  onChange={(ev) => updE({ tinnitus: ev.target.checked })}
+                  className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+                />
+                צפצופים באוזניים (טנטון)
+              </label>
+            </li>
+          </ul>
+          <NavRow onNext={() => setScreen("e9-q")} />
+        </Card>
+      </Layout>
+    );
+  }
 
-if (screen === "e8c") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם ישנם <strong>טיקים</strong> (תנועות או קולות בלתי רצוניים חוזרים)?</p>
-        <YesNo onYes={() => { updE({ tics: true }); setScreen("e9"); }}
-          onNo={() => { updE({ tics: false }); setScreen("e8d"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e8d") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>צפצופים באוזניים</strong> (טנטון)?</p>
-        <YesNo onYes={() => { updE({ tinnitus: true }); setScreen("e9"); }}
-          onNo={() => { updE({ tinnitus: false }); setScreen("e9"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e9") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">8. האם חווית בעבר <strong>אירוע טראומטי</strong> כגון: תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד'?</p>
-        <YesNo onYes={() => { updE({ e9: true }); setScreen("e9-q"); }}
-          onNo={() => { updE({ e9: false }); setScreen("e10"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "e9-q") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="שאלון טראומה" badgeColor="green">
-        <p className="mb-2 font-semibold text-[#1a3a5c]">סוג האירוע:</p>
-        <select value={traumaType} onChange={(e) => setTraumaType(e.target.value)}
-          className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
-          <option value="">בחר/י</option>
-          <option value="accident">תאונת דרכים</option>
-          <option value="disaster">אסון טבע</option>
-          <option value="terror">פיגוע או נפילת רקטה</option>
-          <option value="combat">השתתפות/נוכחות בזירת לחימה</option>
-          <option value="sexual">פגיעה מינית</option>
-          <option value="loss">אובדן/שכול של אדם קרוב</option>
-          <option value="medical">אירוע רפואי קשה (אבחנה, ניתוח, אשפוז)</option>
-          <option value="abuse">התעללות גופנית או רגשית</option>
-          <option value="other">אחר</option>
-        </select>
-        {traumaType === "other" && (
-          <input
-            type="text"
-            value={traumaTypeOther}
-            onChange={(e) => setTraumaTypeOther(e.target.value)}
-            placeholder="פרט/י בקצרה את האירוע"
-            className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none"
+  // Trauma gate (e9) was merged into e9-q: instead of a standalone yes/no
+  // followed by the full PCL-5 form, we surface a single "no trauma" option in
+  // the same screen so users who don't need the questionnaire skip in one tap.
+  if (screen === "e9-q") {
+    const noTrauma = traumaType === "__none__";
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="8. אירוע טראומטי" badgeColor="green">
+          <p className="mb-3 font-semibold text-[#1a3a5c]">האם חווית בעבר <strong>אירוע טראומטי</strong>? (תאונת דרכים, פיגוע, רעידת אדמה, פגיעה מינית, לחימה וכד')</p>
+          <div className="mb-3">
+            <button
+              type="button"
+              onClick={() => setTraumaType("__none__")}
+              className={`w-full rounded-xl border-2 px-4 py-3 text-right text-sm font-semibold transition-all ${noTrauma ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white text-[#1a3a5c] hover:border-[#1a3a5c]"}`}
+            >
+              לא חוויתי אירוע טראומטי — דלג/י
+            </button>
+          </div>
+          <p className="mb-2 text-xs text-[#6b7280]">או — בחר/י סוג אירוע למילוי השאלון:</p>
+          <select value={noTrauma ? "" : traumaType} onChange={(e) => setTraumaType(e.target.value)}
+            className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
+            <option value="">בחר/י סוג אירוע</option>
+            <option value="accident">תאונת דרכים</option>
+            <option value="disaster">אסון טבע</option>
+            <option value="terror">פיגוע או נפילת רקטה</option>
+            <option value="combat">השתתפות/נוכחות בזירת לחימה</option>
+            <option value="sexual">פגיעה מינית</option>
+            <option value="loss">אובדן/שכול של אדם קרוב</option>
+            <option value="medical">אירוע רפואי קשה (אבחנה, ניתוח, אשפוז)</option>
+            <option value="abuse">התעללות גופנית או רגשית</option>
+            <option value="other">אחר</option>
+          </select>
+          {!noTrauma && traumaType === "other" && (
+            <input
+              type="text"
+              value={traumaTypeOther}
+              onChange={(e) => setTraumaTypeOther(e.target.value)}
+              placeholder="פרט/י בקצרה את האירוע"
+              className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none"
+            />
+          )}
+          {!noTrauma && traumaType && (
+            <>
+              <p className="mb-2 font-semibold text-[#1a3a5c]">תדירות:</p>
+              <div className="mb-3 flex gap-2">
+                {[["single","חד-פעמי"],["multiple","מספר פעמים"],["ongoing","מתמשך"]].map(([v, l]) => (
+                  <button key={v} type="button" onClick={() => setTraumaFreq(v)}
+                    className={`flex-1 rounded-lg border-2 py-2 text-xs font-semibold ${traumaFreq === v ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white"}`}>{l}</button>
+                ))}
+              </div>
+              <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' – ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
+              {qItems.trauma.map((item, i) => (
+                <ScaleRow key={i} label={item} group={`trauma-${i}`} values={[0,1,2,3,4]} value={traumaScores[i]}
+                  onChange={(v) => setTraumaScores((p) => { const n = [...p]; n[i] = v; return n; })} />
+              ))}
+              <div className="mt-2">
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={traumaSuicidal} onChange={(e) => setTraumaSuicidal(e.target.checked)} className="accent-[#2e7d8c]" />
+                  קיימות מחשבות אובדניות בהקשר הטראומה
+                </label>
+              </div>
+            </>
+          )}
+          <NavRow
+            onNext={() => {
+              if (noTrauma) {
+                updE({ e9: false });
+                setScreen("e10");
+                return;
+              }
+              if (!traumaType) return;
+              updE({
+                e9: true,
+                traumaScores,
+                traumaSuicidal,
+                traumaType,
+                traumaTypeOther: traumaType === "other" ? traumaTypeOther : undefined,
+                traumaFreq,
+              });
+              setScreen("e10");
+            }}
+            nextDisabled={!noTrauma && !traumaType}
           />
-        )}
-        <p className="mb-2 font-semibold text-[#1a3a5c]">תדירות:</p>
-        <div className="mb-3 flex gap-2">
-          {[["single","חד-פעמי"],["multiple","מספר פעמים"],["ongoing","מתמשך"]].map(([v, l]) => (
-            <button key={v} type="button" onClick={() => setTraumaFreq(v)}
-              className={`flex-1 rounded-lg border-2 py-2 text-xs font-semibold ${traumaFreq === v ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white"}`}>{l}</button>
-          ))}
-        </div>
-        <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' – ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
-        {qItems.trauma.map((item, i) => (
-          <ScaleRow key={i} label={item} group={`trauma-${i}`} values={[0,1,2,3,4]} value={traumaScores[i]}
-            onChange={(v) => setTraumaScores((p) => { const n = [...p]; n[i] = v; return n; })} />
-        ))}
-        <div className="mt-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={traumaSuicidal} onChange={(e) => setTraumaSuicidal(e.target.checked)} className="accent-[#2e7d8c]" />
-            קיימות מחשבות אובדניות בהקשר הטראומה
-          </label>
-        </div>
-        <NavRow onBack={() => setScreen("e9")}
-          onNext={() => { updE({ traumaScores, traumaSuicidal, traumaType, traumaTypeOther: traumaType === "other" ? traumaTypeOther : undefined, traumaFreq }); setScreen("e10"); }} />
-      </Card>
-    </Layout>
-  );
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "e10") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -1360,35 +1519,45 @@ if (screen === "e8c") return (
     </Layout>
   );
 
-  if (screen === "f1") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום תפקודי">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">1. האם חווית <strong>קשיים משמעותיים ומתמשכים בלמידה</strong> או בביצוע מטלות אקדמיות (כגון קריאה, כתיבה, או חשבון)?</p>
-        <YesNo onYes={() => { updF({ f1: true }); setScreen("f1-subs"); }}
-          onNo={() => { updF({ f1: false }); setScreen("f2"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "f1-subs") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="תחום תפקודי">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">האם הקושי נובע מחוסר ריכוז, או שהמשימה עצמה קשה גם כשמתרכזים? (ניתן לסמן שניים)</p>
-        <div className="flex flex-col gap-3">
-          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm hover:border-[#2e7d8c]">
-            <input type="checkbox" checked={answers.functional?.f1Attention ?? false} onChange={(e) => updF({ f1Attention: e.target.checked })} className="h-4 w-4 accent-[#2e7d8c]" />
-            ריכוז – חוסר ריכוז / קושי להתמיד במשימה (ADHD)
-          </label>
-          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm hover:border-[#2e7d8c]">
-            <input type="checkbox" checked={answers.functional?.f1Processing ?? false} onChange={(e) => updF({ f1Processing: e.target.checked })} className="h-4 w-4 accent-[#2e7d8c]" />
-            קושי בהבנה – המשימה קשה להבנה ולעיבוד גם עם ריכוז מלא
-          </label>
-        </div>
-        <NavRow onBack={() => setScreen("f1")}
-          onNext={() => setScreen(answers.functional?.f1Attention ? "f1-adhd" : (answers.functional?.f1Processing ? "f1-ld" : "f2"))} />
-      </Card>
-    </Layout>
-  );
+  // f1 gate + sub-type picker merged into one screen. Selecting either checkbox
+  // implicitly sets f1=true; unchecking both means no learning difficulties and
+  // skips straight to f2.
+  if (screen === "f1") {
+    const att = answers.functional?.f1Attention ?? false;
+    const proc = answers.functional?.f1Processing ?? false;
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="תחום תפקודי">
+          <p className="mb-3 font-semibold text-[#1a3a5c]">1. האם חווית <strong>קשיים משמעותיים ומתמשכים בלמידה</strong>? סמן/י את סוג הקושי (ניתן לסמן שניים, או לדלג):</p>
+          <div className="flex flex-col gap-3">
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+              <input type="checkbox" checked={att}
+                onChange={(e) => updF({ f1Attention: e.target.checked, f1: e.target.checked || proc })}
+                className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
+              קושי בריכוז — חוסר ריכוז / קושי להתמיד במשימה (ADHD)
+            </label>
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+              <input type="checkbox" checked={proc}
+                onChange={(e) => updF({ f1Processing: e.target.checked, f1: e.target.checked || att })}
+                className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
+              קושי בהבנה ועיבוד — המשימה קשה להבנה גם עם ריכוז מלא (לקויות למידה)
+            </label>
+          </div>
+          <NavRow
+            onNext={() => {
+              const cur = answers.functional ?? {};
+              const a = cur.f1Attention ?? false;
+              const p = cur.f1Processing ?? false;
+              updF({ f1: a || p });
+              if (a) setScreen("f1-adhd");
+              else if (p) setScreen("f1-ld");
+              else setScreen("f2");
+            }}
+          />
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "f1-adhd") {
     const ADHD1 = ["שמירה על ריכוז במשימות או פעילויות","ארגון משימות או פעילויות","נטייה לאבד חפצים הנחוצים לביצוע משימה","הסחה בקלות מרעשים/קולות","שכחה בביצוע משימות יומיומיות","קושי להקדיש תשומת לב לפרטים / טעויות מרובות בעבודה"];
@@ -1401,7 +1570,7 @@ if (screen === "e8c") return (
           <CheckList items={ADHD1} checked={adhd1Checked} onChange={(i,v) => setAdhd1Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב – היפראקטיביות:</p>
           <CheckList items={ADHD2} checked={adhd2Checked} onChange={(i,v) => setAdhd2Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <NavRow onBack={() => setScreen("f1-subs")}
+          <NavRow onBack={() => setScreen("f1")}
             onNext={() => {
               updF({ adhd1Count: adhd1Checked.length, adhd2Count: adhd2Checked.length });
               setScreen(answers.functional?.f1Processing ? "f1-ld" : "f2");
@@ -1660,38 +1829,56 @@ if (screen === "e8c") return (
     </Layout>
   );
 
-  if (screen === "r3-conflict") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>?</p>
-        <YesNo
-          onYes={() => { updR({ r3Conflict: true }); setScreen("r3-affect"); }}
-          onNo={() => { updR({ r3Conflict: false }); setScreen("r3-child"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "r3-affect") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם הקושי משפיע על <strong>כלל בני המשפחה</strong>?</p>
-        <YesNo
-          onYes={() => { updR({ r3AffectsAll: true }); setScreen("r3-willing"); }}
-          onNo={() => { updR({ r3AffectsAll: false }); setScreen("r3-child"); }} />
-      </Card>
-    </Layout>
-  );
-
-  if (screen === "r3-willing") return (
-    <Layout screen={screen} domains={answers.domains}>
-      <Card badge="זוגיות ומשפחה">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>כולם מוכנים</strong> לשתף פעולה עם טיפול?</p>
-        <YesNo
-          onYes={() => { updR({ r3PartnerWilling: true }); setScreen("r3-child"); }}
-          onNo={() => { updR({ r3PartnerWilling: false }); setScreen("r3-child"); }} />
-      </Card>
-    </Layout>
-  );
+  // Family-conflict triplet merged into a single progressive-disclosure screen.
+  // The follow-ups (r3AffectsAll, r3PartnerWilling) only reveal when the
+  // preceding answer keeps them relevant, preserving the original branching
+  // logic in questionnaire-score.ts.
+  if (screen === "r3-conflict") {
+    const r = answers.relationship ?? {};
+    const conflict = r.r3Conflict;
+    const affects = r.r3AffectsAll;
+    const willing = r.r3PartnerWilling;
+    const fullyAnswered =
+      conflict === false ||
+      (conflict === true && affects === false) ||
+      (conflict === true && affects === true && willing !== undefined);
+    return (
+      <Layout screen={screen} domains={answers.domains}>
+        <Card badge="זוגיות ומשפחה">
+          <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קונפליקטים מתמשכים בתא המשפחתי</strong>?</p>
+          <YesNo
+            value={conflict}
+            onYes={() => updR({ r3Conflict: true })}
+            onNo={() => updR({ r3Conflict: false, r3AffectsAll: undefined, r3PartnerWilling: undefined })}
+          />
+          {conflict === true && (
+            <div className="mt-5 pt-4 border-t border-dashed border-[#c8dce0]">
+              <p className="mb-1 font-semibold text-[#1a3a5c]">האם הקושי משפיע על <strong>כלל בני המשפחה</strong>?</p>
+              <YesNo
+                value={affects}
+                onYes={() => updR({ r3AffectsAll: true })}
+                onNo={() => updR({ r3AffectsAll: false, r3PartnerWilling: undefined })}
+              />
+            </div>
+          )}
+          {conflict === true && affects === true && (
+            <div className="mt-5 pt-4 border-t border-dashed border-[#c8dce0]">
+              <p className="mb-1 font-semibold text-[#1a3a5c]">האם <strong>כולם מוכנים</strong> לשתף פעולה עם טיפול?</p>
+              <YesNo
+                value={willing}
+                onYes={() => updR({ r3PartnerWilling: true })}
+                onNo={() => updR({ r3PartnerWilling: false })}
+              />
+            </div>
+          )}
+          <NavRow
+            onNext={() => setScreen("r3-child")}
+            nextDisabled={!fullyAnswered}
+          />
+        </Card>
+      </Layout>
+    );
+  }
 
   if (screen === "r3-child") return (
     <Layout screen={screen} domains={answers.domains}>
@@ -1933,12 +2120,20 @@ if (screen === "e8c") return (
     });
 
     const multipleGroups = groups.filter((g) => !g.urgent).length > 1;
-    const emotionalGroups = groups.filter((g) => !g.urgent && g.recs[0]?.domain === "מורכבויות בתחום הרגשי/האישי");
+    // Combined search is reserved for the emotional domain only — combining a CBT therapist
+    // with e.g. an addiction or couples treatment doesn't map to a real-world practitioner.
+    // Professional-type referrals (psychiatrist, dietitian, OT, speech, physio) are also
+    // excluded because they're strict-match specialties that can't be merged with talk therapy.
+    const emotionalGroups = groups.filter((g) =>
+      !g.urgent
+      && g.recs[0]?.domain === "מורכבויות בתחום הרגשי/האישי"
+      && !g.recs[0]?.professionalType
+    );
     const showCombined = emotionalGroups.length >= 2;
 
     return (
       <Layout screen={screen} domains={answers.domains}>
-        <div className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
+        <div id="adults-results-card" className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
           <div className="mb-4 flex justify-center">
             <img src="/logo.svg.png" alt="Mentalytics" className="h-14 w-auto" />
           </div>
@@ -2038,8 +2233,9 @@ if (screen === "e8c") return (
           </div>
           <p className="mt-3 text-center text-xs opacity-50">טיפול חכם</p>
           <div className="mt-4 flex justify-center print:hidden">
-            <button onClick={() => window.print()}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10">
+            <button onClick={() => downloadResultsPDF("adults-results-card", "תוצאות-השאלון")}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
+              id="adults-download-pdf-btn">
               💾 שמירה כ-PDF
             </button>
           </div>
