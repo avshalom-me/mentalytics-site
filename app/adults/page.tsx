@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import type {
   QuestionnaireAnswers,
   ScoringResult,
@@ -189,6 +189,75 @@ function ProgressBar({ pct }: { pct: number }) {
   );
 }
 
+// Compact "tabs" header rendered above match-form / match-results so the user
+// can switch between their recommendations (or jump back to the full list) at
+// any point in the matching flow — without losing context.
+function RecommendationsStrip({
+  groups,
+  combinableGroups,
+  activeTreatment,
+  isCombinedActive,
+  onSelectGroup,
+  onSelectCombined,
+  onBack,
+}: {
+  groups: Array<{ treatment: string; treatmentLabel: string; urgent: boolean }>;
+  combinableGroups: Array<{ treatment: string; treatmentLabel: string }>;
+  activeTreatment: string | null;
+  isCombinedActive: boolean;
+  onSelectGroup: (treatment: string) => void;
+  onSelectCombined: () => void;
+  onBack: () => void;
+}) {
+  if (groups.length === 0) return null;
+  return (
+    <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+      <button
+        type="button"
+        onClick={onBack}
+        className="inline-flex items-center gap-1 text-xs font-semibold text-[#2e7d8c] hover:underline mb-2"
+      >
+        ◂ חזרה לכל ההמלצות
+      </button>
+      <p className="mb-2 text-[10px] uppercase tracking-wider font-bold text-stone-400">המעבר בין ההמלצות שלך</p>
+      <div className="flex flex-wrap gap-2">
+        {combinableGroups.length >= 2 && (
+          <button
+            type="button"
+            onClick={onSelectCombined}
+            className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${
+              isCombinedActive
+                ? "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 text-white shadow-sm"
+                : "border border-violet-400 bg-violet-50 text-violet-800 hover:bg-violet-100"
+            }`}
+          >
+            ✦ חיפוש משולב
+          </button>
+        )}
+        {groups.map((g) => {
+          const isActive = !isCombinedActive && activeTreatment === g.treatment;
+          return (
+            <button
+              key={g.treatment + (g.urgent ? "-urgent" : "")}
+              type="button"
+              onClick={() => onSelectGroup(g.treatment)}
+              className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                isActive
+                  ? "bg-[#1a3a5c] text-white shadow-sm"
+                  : g.urgent
+                    ? "border border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
+                    : "border border-stone-300 bg-white text-stone-700 hover:border-[#1a3a5c] hover:text-[#1a3a5c]"
+              }`}
+            >
+              {g.urgent && "⚠️ "}{g.treatmentLabel}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const NO_BAR = ["disclaimer","intake","domains","scoring","results","match-form","match-results"];
 function Layout({ screen, domains, children }: { screen: string; domains?: string[]; children: React.ReactNode }) {
   const pct = getAdultsProgress(screen, domains ?? []);
@@ -312,6 +381,34 @@ export default function AdultsPage() {
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+
+  // Build the recommendation groups once and share between the results screen,
+  // the match-form/match-results strip, and any other consumer. Same grouping
+  // logic as the inline version that used to live inside `if (screen === "results")`.
+  type RecGroup = { treatment: string; treatmentLabel: string; recs: Recommendation[]; urgent: boolean };
+  const recommendationGroups = useMemo<RecGroup[]>(() => {
+    const recs = scoring?.recommendations ?? [];
+    const groups: RecGroup[] = [];
+    for (const rec of recs) {
+      if (rec.urgent) {
+        groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: true });
+        continue;
+      }
+      const existing = groups.find(g => !g.urgent && g.treatment === rec.treatment);
+      if (existing) existing.recs.push(rec);
+      else groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: false });
+    }
+    return groups;
+  }, [scoring]);
+
+  // Only emotional, non-urgent, non-professional groups can be combined into one search.
+  const combinableEmotionalGroups = useMemo(() => {
+    return recommendationGroups.filter(g =>
+      !g.urgent
+      && g.recs[0]?.domain === "מורכבויות בתחום הרגשי/האישי"
+      && !g.recs[0]?.professionalType
+    );
+  }, [recommendationGroups]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -2173,29 +2270,9 @@ export default function AdultsPage() {
 
   if (screen === "results") {
     const recs = scoring?.recommendations ?? [];
-
-    // קבץ לפי treatment — דחוף תמיד נשאר לבד
-    const groups: { treatment: string; treatmentLabel: string; recs: typeof recs; urgent: boolean }[] = [];
-    recs.forEach((rec) => {
-      if (rec.urgent) {
-        groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: true });
-        return;
-      }
-      const existing = groups.find((g) => !g.urgent && g.treatment === rec.treatment);
-      if (existing) existing.recs.push(rec);
-      else groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: false });
-    });
-
+    const groups = recommendationGroups;
     const multipleGroups = groups.filter((g) => !g.urgent).length > 1;
-    // Combined search is reserved for the emotional domain only — combining a CBT therapist
-    // with e.g. an addiction or couples treatment doesn't map to a real-world practitioner.
-    // Professional-type referrals (psychiatrist, dietitian, OT, speech, physio) are also
-    // excluded because they're strict-match specialties that can't be merged with talk therapy.
-    const emotionalGroups = groups.filter((g) =>
-      !g.urgent
-      && g.recs[0]?.domain === "מורכבויות בתחום הרגשי/האישי"
-      && !g.recs[0]?.professionalType
-    );
+    const emotionalGroups = combinableEmotionalGroups;
     const showCombined = emotionalGroups.length >= 2;
 
     return (
@@ -2352,6 +2429,31 @@ export default function AdultsPage() {
 
   if (screen === "match-form") return (
     <Layout screen={screen} domains={answers.domains}>
+      <RecommendationsStrip
+        groups={recommendationGroups}
+        combinableGroups={combinableEmotionalGroups}
+        activeTreatment={selectedRec?.treatment ?? null}
+        isCombinedActive={!!combinedTreatments}
+        onSelectGroup={(treatment) => {
+          const g = recommendationGroups.find(r => r.treatment === treatment);
+          if (!g) return;
+          setSelectedRec(g.recs[0]);
+          setCombinedTreatments(null);
+          setCombinedLabels(null);
+          setMatchResults(null);
+        }}
+        onSelectCombined={() => {
+          setCombinedTreatments(combinableEmotionalGroups.map(g => g.treatment));
+          setCombinedLabels(combinableEmotionalGroups.map(g => g.treatmentLabel));
+          setSelectedRec(null);
+          setMatchResults(null);
+        }}
+        onBack={() => {
+          setScreen("results");
+          setCombinedTreatments(null);
+          setCombinedLabels(null);
+        }}
+      />
       <Card badge="חיפוש מטפל">
         {combinedTreatments ? (
           <>
@@ -2445,12 +2547,34 @@ export default function AdultsPage() {
 
   if (screen === "match-results") return (
     <Layout screen={screen} domains={answers.domains}>
-      <div className="mb-4">
-        <button type="button" onClick={() => { setScreen("results"); setCombinedTreatments(null); setCombinedLabels(null); }} className="text-sm text-[#2e7d8c] hover:underline">
-          ◂ חזרה לתוצאות
-        </button>
-      </div>
-      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים – {selectedRec?.treatmentLabel}</h2>
+      <RecommendationsStrip
+        groups={recommendationGroups}
+        combinableGroups={combinableEmotionalGroups}
+        activeTreatment={selectedRec?.treatment ?? null}
+        isCombinedActive={!!combinedTreatments}
+        onSelectGroup={(treatment) => {
+          const g = recommendationGroups.find(r => r.treatment === treatment);
+          if (!g) return;
+          setSelectedRec(g.recs[0]);
+          setCombinedTreatments(null);
+          setCombinedLabels(null);
+          setMatchResults(null);
+          setScreen("match-form");
+        }}
+        onSelectCombined={() => {
+          setCombinedTreatments(combinableEmotionalGroups.map(g => g.treatment));
+          setCombinedLabels(combinableEmotionalGroups.map(g => g.treatmentLabel));
+          setSelectedRec(null);
+          setMatchResults(null);
+          setScreen("match-form");
+        }}
+        onBack={() => {
+          setScreen("results");
+          setCombinedTreatments(null);
+          setCombinedLabels(null);
+        }}
+      />
+      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים – {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
       {(matchResults ?? []).length === 0 && (
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-[#6b7280] shadow">לא נמצאו מטפלים מתאימים. נסה/י לשנות את הפרמטרים.</div>

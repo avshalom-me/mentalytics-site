@@ -2652,6 +2652,19 @@ function KidsMatchSection({ A, score, selection }: {
 
   return (
     <div className="mt-8">
+      {/* "Back to recommendations" — visible whenever the match section is shown
+          (form or results), so the user never feels locked into one referral.
+          Smooth-scrolls back to the start of the recommendation cards above. */}
+      <button
+        type="button"
+        onClick={() => {
+          if (typeof window === "undefined") return;
+          document.getElementById("kids-recommendations-top")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }}
+        className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:border-[#1a3a5c] hover:text-[#1a3a5c] shadow-sm"
+      >
+        ↑ חזרה לכל ההמלצות
+      </button>
       {!open ? (
         <button
           onClick={() => setOpen(true)}
@@ -3343,6 +3356,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
             </div>
           </Card>
         )}
+
+        {/* Anchor target for the "back to recommendations" button in the match section. */}
+        <div id="kids-recommendations-top" className="scroll-mt-4" />
 
         {/* Per-domain sections */}
         {byDomain.map(b => {
