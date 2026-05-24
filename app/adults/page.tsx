@@ -2509,7 +2509,7 @@ export default function AdultsPage() {
                     disabled={explainLoading[t.id]}
                     className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
                   >
-                    {explainLoading[t.id] ? "טוען..." : "✦ ניתוח AI אישי"}
+                    {explainLoading[t.id] ? "טוען..." : "✦ ניתוח אישי"}
                   </button>
                 </div>
                 {explainData[t.id] && (

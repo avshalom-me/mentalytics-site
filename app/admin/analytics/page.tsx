@@ -47,7 +47,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "funnel", label: "Funnel דירקטוריה" },
   { value: "quiz", label: "נשירה מהשאלון" },
   { value: "stats", label: "סטטיסטיקות" },
-  { value: "explain", label: "✦ הסברי AI" },
+  { value: "explain", label: "✦ ניתוחים אישיים" },
 ];
 
 const COLORS = ["#2e7d8c", "#1a3a5c", "#f59e0b", "#22c55e", "#9333ea", "#ef4444", "#6366f1", "#ec4899"];
@@ -489,7 +489,7 @@ function ExplainTab({ data }: { data: AnalyticsData }) {
     <>
       <div className="mb-4">
         <h2 className="text-lg font-black text-stone-800">קליקים על &quot;✦ למה הוצע לי?&quot;</h2>
-        <p className="text-xs text-stone-400">משתמשים לוחצים על כפתור ההסבר ב-AI בכרטיס המלצה</p>
+        <p className="text-xs text-stone-400">משתמשים לוחצים על כפתור הניתוח האישי בכרטיס המלצה</p>
       </div>
 
       {/* Totals */}
