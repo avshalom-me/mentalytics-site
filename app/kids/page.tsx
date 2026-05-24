@@ -10,6 +10,8 @@ import {
   type KidsRecommendationGroup,
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
+import { buildKidsFacts } from "@/app/lib/explain-facts";
+import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 
 function getOrCreateSessionId(): string | null {
   try {
@@ -2885,10 +2887,18 @@ function GroupCard({
   group,
   onSelect,
   selected,
+  onExplain,
+  explanation,
+  explanationLoading,
 }: {
   group: KidsRecommendationGroup & { domainLabel: string };
   onSelect: (() => void) | null;
   selected: boolean;
+  // AI explanation hooks — when onExplain is omitted, the explain button is hidden
+  // (used for "informational" and "external" cards that don't have an actionable treatment).
+  onExplain?: () => void;
+  explanation?: { title: string; explanation: string; evidence_note: string } | null;
+  explanationLoading?: boolean;
 }) {
   const allSymptoms = uniq(group.recs.flatMap(r => r.symptoms));
   const allTools = group.recs.flatMap(r => r.tools);
@@ -2962,7 +2972,7 @@ function GroupCard({
       )}
 
       {!noAction && (
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           {onSelect ? (
             <button
               type="button"
@@ -2982,6 +2992,48 @@ function GroupCard({
               → {group.treatmentLabel}
             </div>
           )}
+          {onExplain && (
+            <button
+              type="button"
+              onClick={onExplain}
+              disabled={explanationLoading}
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
+            >
+              {explanationLoading ? "טוען..." : "✦ למה הוצע לי?"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {explanation && (
+        <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
+          <p className="text-xs font-bold text-violet-900 mb-1">✦ {explanation.title}</p>
+          <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explanation.explanation}</p>
+          <p className="text-[10px] text-gray-400 mb-3">{explanation.evidence_note}</p>
+          {(() => {
+            const href = getTreatmentArticleHref(group.treatmentKey);
+            const article = getTreatmentArticle(group.treatmentKey);
+            if (href) {
+              return (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-violet-700 hover:text-violet-900 hover:underline"
+                >
+                  📖 קרא עוד על {group.treatmentLabel} ←
+                </a>
+              );
+            }
+            if (article.status === "pending") {
+              return (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
+                  📖 מאמר בהכנה
+                </span>
+              );
+            }
+            return null;
+          })()}
         </div>
       )}
 
@@ -3025,6 +3077,52 @@ const DOMAIN_LABELS: Record<string, string> = {
 
 function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Per-recommendation AI explanation state. Keyed on `${domainKey}::${treatmentKey}`
+  // so two cards for the same treatment in different domains don't collide.
+  const [recExplain, setRecExplain] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
+  const [recExplainLoading, setRecExplainLoading] = useState<Record<string, boolean>>({});
+
+  async function fetchRecExplain(
+    domainKey: string,
+    domainLabel: string,
+    g: KidsRecommendationGroup,
+  ) {
+    const key = `${domainKey}::${g.treatmentKey}`;
+    if (recExplainLoading[key] || recExplain[key]) return;
+    setRecExplainLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const symptoms = g.recs.flatMap(r => r.symptoms).filter(Boolean);
+      const facts = buildKidsFacts(A, domainLabel);
+      const factsWithSymptoms = {
+        ...facts,
+        summary: [
+          ...(symptoms.length ? [`ממצאי השאלון: ${symptoms.slice(0, 3).join("; ")}`] : []),
+          ...(facts.summary ?? []),
+        ],
+      };
+      const res = await fetch("/api/explain-recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "child",
+          recommendation: {
+            treatment: g.treatmentKey,
+            treatment_label: g.treatmentLabel,
+            domain: domainLabel,
+            urgent: g.urgent,
+            symptom_text: symptoms[0],
+          },
+          user_facts: factsWithSymptoms,
+        }),
+      });
+      const data = await res.json();
+      setRecExplain(prev => ({ ...prev, [key]: data }));
+    } catch {
+      setRecExplain(prev => ({ ...prev, [key]: null }));
+    } finally {
+      setRecExplainLoading(prev => ({ ...prev, [key]: false }));
+    }
+  }
 
   const domainResults: { key: string; label: string; result: KidsDomainResult }[] = useMemo(() => {
     if (!score) return [];
@@ -3275,14 +3373,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.treatments.length > 0 && (
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wider text-[#2e7d8c] mb-2 pr-1">💙 טיפולים מומלצים</div>
-                  {b.treatments.map(g => (
-                    <GroupCard
-                      key={g.recs[0].id}
-                      group={g}
-                      onSelect={() => selectGroup(b.key, g)}
-                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
-                    />
-                  ))}
+                  {b.treatments.map(g => {
+                    const explainKey = `${b.key}::${g.treatmentKey}`;
+                    return (
+                      <GroupCard
+                        key={g.recs[0].id}
+                        group={g}
+                        onSelect={() => selectGroup(b.key, g)}
+                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        explanation={recExplain[explainKey]}
+                        explanationLoading={recExplainLoading[explainKey]}
+                      />
+                    );
+                  })}
                   {showCombinedT && (
                     <button
                       type="button"
@@ -3303,14 +3407,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.assessments.length > 0 && (
                 <div className={b.treatments.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 pr-1">🔎 אבחונים מומלצים</div>
-                  {b.assessments.map(g => (
-                    <GroupCard
-                      key={g.recs[0].id}
-                      group={g}
-                      onSelect={() => selectGroup(b.key, g)}
-                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
-                    />
-                  ))}
+                  {b.assessments.map(g => {
+                    const explainKey = `${b.key}::${g.treatmentKey}`;
+                    return (
+                      <GroupCard
+                        key={g.recs[0].id}
+                        group={g}
+                        onSelect={() => selectGroup(b.key, g)}
+                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        explanation={recExplain[explainKey]}
+                        explanationLoading={recExplainLoading[explainKey]}
+                      />
+                    );
+                  })}
                   {showCombinedA && (
                     <button
                       type="button"
@@ -3331,14 +3441,20 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.professionals.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
-                  {b.professionals.map(g => (
-                    <GroupCard
-                      key={g.recs[0].id}
-                      group={g}
-                      onSelect={() => selectGroup(b.key, g)}
-                      selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
-                    />
-                  ))}
+                  {b.professionals.map(g => {
+                    const explainKey = `${b.key}::${g.treatmentKey}`;
+                    return (
+                      <GroupCard
+                        key={g.recs[0].id}
+                        group={g}
+                        onSelect={() => selectGroup(b.key, g)}
+                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        explanation={recExplain[explainKey]}
+                        explanationLoading={recExplainLoading[explainKey]}
+                      />
+                    );
+                  })}
                 </div>
               )}
 

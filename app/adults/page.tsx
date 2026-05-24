@@ -10,6 +10,8 @@ import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
+import { buildAdultFacts } from "@/app/lib/explain-facts";
+import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
 // Anonymous viewer context derived from the questionnaire — used for impression
@@ -303,6 +305,9 @@ export default function AdultsPage() {
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
+  // Per-recommendation AI explanation ("למה הוצע לי?") — keyed on treatment string.
+  const [recExplainData, setRecExplainData] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
+  const [recExplainLoading, setRecExplainLoading] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
@@ -667,6 +672,47 @@ export default function AdultsPage() {
       setExplainData(prev => ({ ...prev, [t.id]: null }));
     } finally {
       setExplainLoading(prev => ({ ...prev, [t.id]: false }));
+    }
+  }
+
+  // Fetch a per-recommendation explanation ("why was X recommended to me?").
+  // Keyed on group.treatment + urgent flag so two cards for the same treatment
+  // (one urgent, one not) get separate entries.
+  async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ symptomText: string; domain: string }> }) {
+    const key = group.treatment + (group.urgent ? "-urgent" : "");
+    if (recExplainLoading[key] || recExplainData[key]) return;
+    setRecExplainLoading(prev => ({ ...prev, [key]: true }));
+    try {
+      const domain = group.recs[0]?.domain ?? "";
+      const symptoms = group.recs.map(r => r.symptomText).filter(Boolean);
+      const facts = buildAdultFacts(answers, domain);
+      // Prepend symptom texts to the summary so the model has them even if
+      // buildAdultFacts didn't surface a matching field.
+      const factsWithSymptoms = {
+        ...facts,
+        summary: [...(symptoms.length ? [`ממצאי השאלון: ${symptoms.join("; ")}`] : []), ...(facts.summary ?? [])],
+      };
+      const res = await fetch("/api/explain-recommendation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "adult",
+          recommendation: {
+            treatment: group.treatment,
+            treatment_label: group.treatmentLabel,
+            domain,
+            urgent: group.urgent,
+            symptom_text: symptoms[0],
+          },
+          user_facts: factsWithSymptoms,
+        }),
+      });
+      const data = await res.json();
+      setRecExplainData(prev => ({ ...prev, [key]: data }));
+    } catch {
+      setRecExplainData(prev => ({ ...prev, [key]: null }));
+    } finally {
+      setRecExplainLoading(prev => ({ ...prev, [key]: false }));
     }
   }
 
@@ -2177,10 +2223,14 @@ export default function AdultsPage() {
                 .filter((r) => r.tools)
                 .map((r) => (group.recs.length > 1 ? `▸ ${r.symptomText}\n${r.tools}` : r.tools));
               const tools = allTools.length ? allTools.join("\n\n――――――\n\n") : undefined;
+              const key = group.treatment + (group.urgent ? "-urgent" : "");
+              const aiData = recExplainData[key];
+              const aiLoading = recExplainLoading[key];
+              const article = getTreatmentArticle(group.treatment);
+              const articleHref = getTreatmentArticleHref(group.treatment);
               return (
-                <button key={group.treatment + (group.urgent ? "-urgent" : "")} type="button"
-                  onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
-                  className={`w-full rounded-xl p-4 text-right transition-all hover:scale-[1.01] ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30 hover:bg-red-900/40" : "border-r-4 border-[#8ecfdb] bg-white/10 hover:bg-white/20"}`}>
+                <div key={key}
+                  className={`rounded-xl p-4 text-right transition-all ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30" : "border-r-4 border-[#8ecfdb] bg-white/10"}`}>
                   <div className={`mb-1 text-xs font-bold uppercase tracking-wide ${group.urgent ? "text-red-300" : "text-[#8ecfdb]"}`}>
                     {firstRec.domain} {group.urgent && "⚠️"}
                   </div>
@@ -2202,10 +2252,45 @@ export default function AdultsPage() {
                       <div className="whitespace-pre-wrap text-xs leading-relaxed text-amber-100">{tools}</div>
                     </div>
                   )}
-                  <div className="mt-2 inline-block rounded-lg bg-white/20 px-3 py-1 text-xs font-bold">
-                    → {group.treatmentLabel}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
+                      className="rounded-lg bg-white/25 hover:bg-white/35 px-3 py-1.5 text-xs font-bold transition-colors"
+                    >
+                      → {group.treatmentLabel}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fetchRecommendationExplanation(group)}
+                      disabled={aiLoading}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
+                    >
+                      {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
+                    </button>
                   </div>
-                </button>
+                  {aiData && (
+                    <div className="mt-3 rounded-xl border border-violet-300/60 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 p-3 text-right">
+                      <p className="text-xs font-bold text-violet-100 mb-1">✦ {aiData.title}</p>
+                      <p className="text-xs text-white/90 mb-2 leading-relaxed">{aiData.explanation}</p>
+                      <p className="text-[10px] text-white/50 mb-3">{aiData.evidence_note}</p>
+                      {articleHref ? (
+                        <a
+                          href={articleHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:text-cyan-100 hover:underline"
+                        >
+                          📖 קרא עוד על {group.treatmentLabel} ←
+                        </a>
+                      ) : article.status === "pending" && (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-white/40">
+                          📖 מאמר בהכנה
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>

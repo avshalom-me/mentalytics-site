@@ -17,10 +17,13 @@ const jsonLd = {
   "url": "https://www.mentalytics.co.il/research/therapy-types",
 };
 
+// `anchor` is used by deep-links from the matching results screen
+// (see app/lib/treatment-articles.ts). Keep the slugs stable.
 const THERAPIES = [
   {
     name: "טיפול דינאמי / פסיכואנליטי",
     short: "דינאמי",
+    anchor: "dynamic",
     icon: "🌊",
     color: "#EDF2FC", border: "#B4C8F0",
     focus: "חקירת הדפוסים הלא-מודעים, חוויות ילדות והשפעתן על ההווה",
@@ -31,6 +34,7 @@ const THERAPIES = [
   {
     name: "CBT — טיפול קוגניטיבי-התנהגותי",
     short: "CBT",
+    anchor: "cbt",
     icon: "🔄",
     color: "#EBF5F1", border: "#A8D4C0",
     focus: "זיהוי ושינוי דפוסי חשיבה שליליים והתנהגויות בעייתיות",
@@ -41,6 +45,7 @@ const THERAPIES = [
   {
     name: "DBT — טיפול דיאלקטי-התנהגותי",
     short: "DBT",
+    anchor: "dbt",
     icon: "⚖️",
     color: "#F5EEF8", border: "#D4B4E8",
     focus: "ויסות רגשי, סבילות למצוקה, מיינדפולנס ויחסים בינאישיים",
@@ -51,6 +56,7 @@ const THERAPIES = [
   {
     name: "EMDR — עיבוד תנועות עיניים",
     short: "EMDR",
+    anchor: "emdr",
     icon: "👁️",
     color: "#FEF3EB", border: "#F4C8A4",
     focus: "עיבוד זיכרונות טראומטיים דרך גירוי דו-צדדי",
@@ -61,6 +67,7 @@ const THERAPIES = [
   {
     name: "ACT — טיפול בקבלה ומחויבות",
     short: "ACT",
+    anchor: "act",
     icon: "🧭",
     color: "#F0F8F0", border: "#B0D8B0",
     focus: "קבלת רגשות קשים מבלי להיאבק בהם, ופעולה לפי ערכים אישיים",
@@ -71,6 +78,7 @@ const THERAPIES = [
   {
     name: "טיפול משפחתי וזוגי",
     short: "משפחתי/זוגי",
+    anchor: "family-couples",
     icon: "👨‍👩‍👧",
     color: "#FDF6EE", border: "#F0D4A8",
     focus: "דינמיקות משפחתיות, תקשורת זוגית, קונפליקטים",
@@ -81,6 +89,7 @@ const THERAPIES = [
   {
     name: "הדרכת הורים",
     short: "הדרכת הורים",
+    anchor: "parent-guidance",
     icon: "👶",
     color: "#EBF5F1", border: "#A8D4C0",
     focus: "כלים להורות, תגובה לקשיים של הילד, חיזוק הקשר",
@@ -91,6 +100,7 @@ const THERAPIES = [
   {
     name: "טיפול בהבעה ויצירה",
     short: "הבעה ויצירה",
+    anchor: "expressive",
     icon: "🎨",
     color: "#F5EEF8", border: "#D4B4E8",
     focus: "ביטוי רגשי דרך אמנות, מוזיקה, תנועה, דרמה",
@@ -101,6 +111,7 @@ const THERAPIES = [
   {
     name: "טיפול COG-FUN",
     short: "COG-FUN",
+    anchor: "cog-fun",
     icon: "⚙️",
     color: "#EDF2FC", border: "#B4C8F0",
     focus: "פיתוח תפקודים ניהוליים ומיומנויות יומיומיות",
@@ -125,7 +136,12 @@ export default function TherapyTypesPage() {
 
       <div className="space-y-4">
         {THERAPIES.map((t, i) => (
-          <div key={i} className="rounded-2xl p-5 border" style={{ background: t.color, borderColor: t.border, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}>
+          <div
+            key={i}
+            id={t.anchor}
+            className="rounded-2xl p-5 border scroll-mt-20"
+            style={{ background: t.color, borderColor: t.border, boxShadow: "0 2px 8px rgba(0,0,0,0.04)" }}
+          >
             <div className="flex items-center gap-3 mb-3">
               <span className="text-3xl">{t.icon}</span>
               <div>
