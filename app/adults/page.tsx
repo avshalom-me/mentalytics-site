@@ -677,17 +677,38 @@ export default function AdultsPage() {
 
   // Fetch a per-recommendation explanation ("why was X recommended to me?").
   // Keyed on group.treatment + urgent flag so two cards for the same treatment
-  // (one urgent, one not) get separate entries.
+  // (one urgent, one not) get separate entries. Also fires an analytics event
+  // (fire-and-forget) so admin can see who clicks and on what.
   async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ symptomText: string; domain: string }> }) {
     const key = group.treatment + (group.urgent ? "-urgent" : "");
     if (recExplainLoading[key] || recExplainData[key]) return;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
+    const domain = group.recs[0]?.domain ?? "";
+    const firstDomain = answers.domains?.[0];
+
+    // Fire-and-forget analytics event — captures who clicks and on what.
     try {
-      const domain = group.recs[0]?.domain ?? "";
+      fetch("/api/track-explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "adult",
+          treatment_key: group.treatment,
+          treatment_label: group.treatmentLabel,
+          domain,
+          urgent: group.urgent,
+          session_id: getOrCreateSessionId(),
+          viewer_region: normalizeRegionKey(matchPrefs.region, matchPrefs.online),
+          viewer_issue: firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] ?? undefined : undefined,
+          viewer_age_band: normalizeAgeBand(answers.age),
+          viewer_gender: normalizeGenderKey(answers.gender),
+        }),
+      }).catch(() => {});
+    } catch {}
+
+    try {
       const symptoms = group.recs.map(r => r.symptomText).filter(Boolean);
       const facts = buildAdultFacts(answers, domain);
-      // Prepend symptom texts to the summary so the model has them even if
-      // buildAdultFacts didn't surface a matching field.
       const factsWithSymptoms = {
         ...facts,
         summary: [...(symptoms.length ? [`ממצאי השאלון: ${symptoms.join("; ")}`] : []), ...(facts.summary ?? [])],
@@ -2271,8 +2292,8 @@ export default function AdultsPage() {
                   </div>
                   {aiData && (
                     <div className="mt-3 rounded-xl border border-violet-300/60 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 p-3 text-right">
-                      <p className="text-xs font-bold text-violet-100 mb-1">✦ {aiData.title}</p>
-                      <p className="text-xs text-white/90 mb-2 leading-relaxed">{aiData.explanation}</p>
+                      <p className="text-xs font-bold text-violet-100 mb-2">✦ {aiData.title}</p>
+                      <p className="text-xs text-white/90 mb-2 leading-relaxed whitespace-pre-line">{aiData.explanation}</p>
                       <p className="text-[10px] text-white/50 mb-3">{aiData.evidence_note}</p>
                       {articleHref ? (
                         <a

@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 type Period = "week" | "month" | "all";
-type Tab = "funnel" | "quiz" | "stats";
+type Tab = "funnel" | "quiz" | "stats" | "explain";
 
 type Funnel = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
 type FilterEntry = { name: string; count: number };
@@ -15,6 +15,15 @@ type TrendEntry = { week: string; page_view: number; profile_impression: number;
 type CTRRow = { id: string; full_name: string; status: string; impressions: number; profile_views: number; clicks: number; ctr: number };
 type QuizStepRow = { step: string; count: number };
 type QuizFunnel = { steps: QuizStepRow[]; started: number; completed: number };
+type ExplainAnalytics = {
+  total: number;
+  byQuestionnaireType: FilterEntry[];
+  byTreatment: FilterEntry[];
+  byAgeBand: FilterEntry[];
+  byGender: FilterEntry[];
+  byRegion: FilterEntry[];
+  byDomain: FilterEntry[];
+};
 
 type AnalyticsData = {
   funnel: Funnel;
@@ -24,6 +33,7 @@ type AnalyticsData = {
   quizDropout: { adults: QuizFunnel; kids: QuizFunnel };
   demographics: { byRegion: FilterEntry[]; byIssue: FilterEntry[]; byAgeBand: FilterEntry[]; byGender: FilterEntry[] };
   clickTypeBreakdown: Record<string, number>;
+  explainAnalytics: ExplainAnalytics;
   generated_at: string;
 };
 
@@ -37,6 +47,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "funnel", label: "Funnel דירקטוריה" },
   { value: "quiz", label: "נשירה מהשאלון" },
   { value: "stats", label: "סטטיסטיקות" },
+  { value: "explain", label: "✦ הסברי AI" },
 ];
 
 const COLORS = ["#2e7d8c", "#1a3a5c", "#f59e0b", "#22c55e", "#9333ea", "#ef4444", "#6366f1", "#ec4899"];
@@ -436,6 +447,95 @@ function ClickBreakdown({ breakdown }: { breakdown: Record<string, number> }) {
   );
 }
 
+// ── TAB 4: AI Explain Analytics ─────────────────────────────────────
+
+function ExplainTab({ data }: { data: AnalyticsData }) {
+  const ex = data.explainAnalytics;
+  // Friendly relabeling for chart names (Hebrew labels for taxonomy keys)
+  const labelize = (entries: FilterEntry[], map: Record<string, string>) =>
+    entries.map(e => ({ name: map[e.name] ?? e.name, count: e.count }));
+
+  const questionnaireLabels: Record<string, string> = { adult: "מבוגרים", child: "ילדים" };
+  const ageBandLabels: Record<string, string> = {
+    child: "ילדים/נוער",
+    "18-30": "18-30",
+    "31-45": "31-45",
+    "46-60": "46-60",
+    "60+": "60+",
+  };
+  const genderLabels: Record<string, string> = { m: "גברים", f: "נשים", other: "אחר" };
+  const regionLabels: Record<string, string> = {
+    center: "מרכז",
+    sharon: "שרון",
+    jerusalem: "ירושלים",
+    haifa: "חיפה",
+    north: "צפון",
+    south: "דרום",
+    online: "אונליין",
+    other: "אחר",
+  };
+
+  if (ex.total === 0) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
+        <div className="text-4xl mb-2">✦</div>
+        <p className="text-sm font-bold text-stone-800 mb-1">עדיין אין קליקים על &quot;למה הוצע לי?&quot;</p>
+        <p className="text-xs text-stone-500">הנתונים יתחילו להופיע ברגע שמשתמשים יתחילו להשתמש בפיצ&apos;ר.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4">
+        <h2 className="text-lg font-black text-stone-800">קליקים על &quot;✦ למה הוצע לי?&quot;</h2>
+        <p className="text-xs text-stone-400">משתמשים לוחצים על כפתור ההסבר ב-AI בכרטיס המלצה</p>
+      </div>
+
+      {/* Totals */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
+        <div className="rounded-2xl border border-violet-200 bg-violet-50 p-4 text-center">
+          <div className="text-3xl font-black text-violet-800">{ex.total.toLocaleString("he-IL")}</div>
+          <div className="text-xs font-semibold text-violet-700 mt-1">סה&quot;כ קליקים</div>
+        </div>
+        {ex.byQuestionnaireType.map(q => (
+          <div key={q.name} className="rounded-2xl border border-stone-200 bg-white p-4 text-center">
+            <div className="text-3xl font-black text-stone-800">{q.count.toLocaleString("he-IL")}</div>
+            <div className="text-xs font-semibold text-stone-600 mt-1">
+              {questionnaireLabels[q.name] ?? q.name} — {pct(q.count, ex.total)}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Top treatments */}
+      <div className="mb-6">
+        <HorizontalBars
+          title="טיפולים שהכי הסקרנו לגביהם"
+          data={ex.byTreatment}
+          color="#9333ea"
+        />
+      </div>
+
+      {/* Demographics — who clicks */}
+      <div className="mb-4">
+        <h3 className="text-sm font-black text-stone-800">מי לוחץ? פילוח דמוגרפי</h3>
+        <p className="text-xs text-stone-400">נתונים אנונימיים — מבוסס על תשובות השאלון בלבד</p>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-4">
+        <DonutChart title="לפי קבוצת גיל" data={labelize(ex.byAgeBand, ageBandLabels)} />
+        <DonutChart title="לפי מגדר" data={labelize(ex.byGender, genderLabels)} />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        <HorizontalBars title="לפי אזור" data={labelize(ex.byRegion, regionLabels)} color="#2e7d8c" />
+        <HorizontalBars title="לפי תחום" data={ex.byDomain} color="#1a3a5c" />
+      </div>
+    </>
+  );
+}
+
 function StatsTab({ data }: { data: AnalyticsData }) {
   return (
     <>
@@ -486,6 +586,15 @@ export default function AdminAnalyticsPage() {
             quizDropout: json.quizDropout,
             demographics: json.demographics,
             clickTypeBreakdown: json.clickTypeBreakdown,
+            explainAnalytics: json.explainAnalytics ?? {
+              total: 0,
+              byQuestionnaireType: [],
+              byTreatment: [],
+              byAgeBand: [],
+              byGender: [],
+              byRegion: [],
+              byDomain: [],
+            },
             generated_at: json.generated_at,
           });
         } else {
@@ -543,6 +652,7 @@ export default function AdminAnalyticsPage() {
           {tab === "funnel" && <FunnelTab data={data} />}
           {tab === "quiz" && <QuizTab data={data} />}
           {tab === "stats" && <StatsTab data={data} />}
+          {tab === "explain" && <ExplainTab data={data} />}
 
           {data.generated_at && (
             <p className="text-xs text-stone-400 mt-6 text-left">

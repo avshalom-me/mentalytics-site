@@ -159,6 +159,48 @@ export async function GET(req: NextRequest) {
       clickTypeBreakdown[c.click_type] = (clickTypeBreakdown[c.click_type] ?? 0) + 1;
     }
 
+    // --- Recommendation-explain clicks ("✦ למה הוצע לי?") ---
+    // We persist this event into analytics_events with rich metadata, so
+    // aggregation here is pure jsonb extraction.
+    type ExplainEvent = {
+      event_type: string;
+      metadata: {
+        questionnaire_type?: string;
+        treatment_key?: string;
+        treatment_label?: string;
+        domain?: string | null;
+        urgent?: boolean;
+        viewer_age_band?: string | null;
+        viewer_gender?: string | null;
+        viewer_region?: string | null;
+      } | null;
+      created_at: string;
+    };
+    const explainEvents = events.filter(e => e.event_type === "recommendation_explain_click") as unknown as ExplainEvent[];
+
+    function rankByMetadata(field: keyof NonNullable<ExplainEvent["metadata"]>) {
+      const counts: Record<string, number> = {};
+      for (const e of explainEvents) {
+        const val = e.metadata?.[field];
+        if (val == null) continue;
+        const key = String(val);
+        counts[key] = (counts[key] ?? 0) + 1;
+      }
+      return Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+    }
+
+    const explainAnalytics = {
+      total: explainEvents.length,
+      byQuestionnaireType: rankByMetadata("questionnaire_type"),
+      byTreatment: rankByMetadata("treatment_label").slice(0, 15),
+      byAgeBand: rankByMetadata("viewer_age_band"),
+      byGender: rankByMetadata("viewer_gender"),
+      byRegion: rankByMetadata("viewer_region"),
+      byDomain: rankByMetadata("domain"),
+    };
+
     // --- Impressions vs Clicks per therapist ---
     const therapistMap = new Map(therapists.map(t => [t.id, t]));
 
@@ -214,6 +256,7 @@ export async function GET(req: NextRequest) {
       quizDropout: { adults: adultsQuiz, kids: kidsQuiz },
       demographics,
       clickTypeBreakdown,
+      explainAnalytics,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

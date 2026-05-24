@@ -3007,8 +3007,8 @@ function GroupCard({
 
       {explanation && (
         <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
-          <p className="text-xs font-bold text-violet-900 mb-1">✦ {explanation.title}</p>
-          <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explanation.explanation}</p>
+          <p className="text-xs font-bold text-violet-900 mb-2">✦ {explanation.title}</p>
+          <p className="text-xs text-gray-700 mb-2 leading-relaxed whitespace-pre-line">{explanation.explanation}</p>
           <p className="text-[10px] text-gray-400 mb-3">{explanation.evidence_note}</p>
           {(() => {
             const href = getTreatmentArticleHref(group.treatmentKey);
@@ -3090,6 +3090,25 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     const key = `${domainKey}::${g.treatmentKey}`;
     if (recExplainLoading[key] || recExplain[key]) return;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
+
+    // Fire-and-forget analytics event — admin sees who clicks and on what.
+    try {
+      fetch("/api/track-explain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionnaire_type: "child",
+          treatment_key: g.treatmentKey,
+          treatment_label: g.treatmentLabel,
+          domain: domainLabel,
+          urgent: g.urgent,
+          session_id: getOrCreateSessionId(),
+          viewer_issue: "child",
+          viewer_age_band: "child",
+        }),
+      }).catch(() => {});
+    } catch {}
+
     try {
       const symptoms = g.recs.flatMap(r => r.symptoms).filter(Boolean);
       const facts = buildKidsFacts(A, domainLabel);
