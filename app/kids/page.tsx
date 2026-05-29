@@ -2832,7 +2832,7 @@ function KidsMatchSection({ A, score, selection }: {
                           <div className="mt-4 flex flex-wrap items-center gap-2">
                             <a
                               href={profileHref}
-                              className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#2a5a8c] transition-colors"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--teal-dark)] transition-colors"
                             >
                               פרופיל מלא ←
                             </a>

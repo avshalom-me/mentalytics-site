@@ -914,7 +914,7 @@ export default function AdultsPage() {
         )}
 
         <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל (לחישוב BMI)</p>
+          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל <span className="font-normal text-[#6b7280]">(לחישוב BMI — אופציונלי)</span></p>
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-[#6b7280]">גובה (ס&quot;מ)</label>
@@ -1040,7 +1040,7 @@ export default function AdultsPage() {
           <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם בשבועות האחרונים חווית <strong>מצב רוח מרומם או רוגזני באופן קיצוני</strong>?</p>
           <YesNo
             onYes={() => updE({ maniaScreen1: true })}
-            onNo={() => updE({ maniaScreen1: false, maniaScreen2: false })}
+            onNo={() => { updE({ maniaScreen1: false, maniaScreen2: false }); setScreen("e3"); }}
             value={m1}
           />
           {m1 === true && (
@@ -1131,6 +1131,13 @@ export default function AdultsPage() {
               </label>
             </li>
           </ul>
+          <button
+            type="button"
+            onClick={() => { updE({ e3a: false, e3b: false, e8: false, e3: false }); setScreen("e4"); }}
+            className="mt-3 w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
+          >
+            לא — אף אחד מהמשפטים אינו מתאר אותי (דלג/י)
+          </button>
           <NavRow
             onNext={() => {
               const cur = answers.emotional ?? {};
@@ -1342,6 +1349,18 @@ export default function AdultsPage() {
             </label>
           ))}
         </div>
+        <button
+          type="button"
+          onClick={() => {
+            setE6EatingChecked(false);
+            setE6SleepChecked(false);
+            updE({ e6: false, e7: false });
+            setScreen(answers.emotional?.e8 ? "e8c" : "e9-q");
+          }}
+          className="mt-3 w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
+        >
+          לא — איני חווה אף אחד מהקשיים האלה (דלג/י)
+        </button>
         <NavRow
           onNext={() => {
             const hasEating = e6EatingChecked;
@@ -1458,7 +1477,7 @@ export default function AdultsPage() {
           <div className="mb-3">
             <button
               type="button"
-              onClick={() => setTraumaType("__none__")}
+              onClick={() => { setTraumaType("__none__"); updE({ e9: false }); setScreen("e10"); }}
               className={`w-full rounded-xl border-2 px-4 py-3 text-right text-sm font-semibold transition-all ${noTrauma ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white text-[#1a3a5c] hover:border-[#1a3a5c]"}`}
             >
               לא חוויתי אירוע טראומטי — דלג/י
@@ -2623,7 +2642,7 @@ export default function AdultsPage() {
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <a
                     href={profileHrefForMatch(t)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#2a5a8c] transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--teal-dark)] transition-colors"
                   >
                     פרופיל מלא ←
                   </a>
