@@ -30,7 +30,7 @@ function Inner() {
       <Link
         href={quizPath}
         className="inline-block rounded-xl px-8 py-3 text-sm font-bold text-white transition hover:opacity-95"
-        style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}
+        style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}
       >
         המשך לשאלון
       </Link>

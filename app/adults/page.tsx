@@ -81,8 +81,8 @@ function ScaleRow({
             onClick={() => onChange(v)}
             className={`h-10 w-10 rounded-lg border-2 text-sm font-bold transition-all ${
               value === v
-                ? "border-[#2e7d8c] bg-[#2e7d8c] text-white"
-                : "border-[#ddd6c8] bg-white text-[#1c1c2e] hover:border-[#2e7d8c]"
+                ? "border-[var(--teal)] bg-[var(--teal)] text-white"
+                : "border-[var(--line)] bg-white text-[var(--text)] hover:border-[var(--teal)]"
             }`}
           >
             {v}
@@ -100,12 +100,12 @@ function CheckList({
     <ul className="flex flex-col gap-2">
       {items.map((item, i) => (
         <li key={i}>
-          <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+          <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]">
             <input
               type="checkbox"
               checked={checked.includes(i)}
               onChange={(e) => onChange(i, e.target.checked)}
-              className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]"
+              className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[var(--teal)]"
             />
             {item}
           </label>
@@ -177,12 +177,12 @@ function ProgressBar({ pct }: { pct: number }) {
     <div className="mb-5">
       <div className="flex items-center justify-between mb-1.5">
         <span className="text-xs text-[#6b7280]">{pct}% הושלם</span>
-        {msg && <span className="text-xs font-semibold text-[#2e7d8c] animate-pulse">{msg}</span>}
+        {msg && <span className="text-xs font-semibold animate-pulse" style={{ color: "var(--teal)" }}>{msg}</span>}
       </div>
       <div className="h-2 w-full rounded-full bg-stone-200 overflow-hidden">
         <div
           className="h-2 rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: "linear-gradient(90deg, #2e7d8c, #1a3a5c)" }}
+          style={{ width: `${pct}%`, background: "linear-gradient(90deg, var(--teal), var(--teal-dark))" }}
         />
       </div>
     </div>
@@ -263,12 +263,11 @@ function Layout({ screen, domains, children }: { screen: string; domains?: strin
   const pct = getAdultsProgress(screen, domains ?? []);
   const showBar = pct > 0 && !NO_BAR.includes(screen);
   return (
-    <main className="min-h-screen bg-[#f0ece4]" dir="rtl">
+    <main className="min-h-screen" style={{ background: "var(--surface)" }} dir="rtl">
       <div className="mx-auto max-w-2xl px-4 py-8">
         <div className="mb-5 text-center">
-          <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
-          <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
-          <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – מבוגרים</p>
+          <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
+          <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – מבוגרים</p>
         </div>
         {showBar && <ProgressBar pct={pct} />}
         {children}
@@ -278,7 +277,7 @@ function Layout({ screen, domains, children }: { screen: string; domains?: strin
 }
 
 function Card({ children, badge, badgeColor = "blue" }: { children: React.ReactNode; badge?: string; badgeColor?: "blue" | "green" | "teal" }) {
-  const colors = { blue: "bg-[#1a3a5c]", green: "bg-[#2d7a4f]", teal: "bg-[#2e7d8c]" };
+  const colors = { blue: "bg-[var(--teal-dark)]", green: "bg-emerald-700", teal: "bg-[var(--teal)]" };
   return (
     <div className="animate-fadeIn rounded-2xl bg-white p-6 shadow-lg">
       {badge && (
@@ -297,7 +296,7 @@ function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ▸", nextDisab
   return (
     <div className="mt-6 flex items-center justify-end gap-3">
       {onNext && (
-        <button type="button" onClick={onNext} disabled={nextDisabled} className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white disabled:opacity-40 hover:bg-[#1f5f6e]">
+        <button type="button" onClick={onNext} disabled={nextDisabled} style={{ background: "var(--teal)", borderRadius: "50px", padding: "8px 20px", fontSize: "14px", fontWeight: 700, color: "white", border: "none", cursor: "pointer", transition: "background .2s" }} className="disabled:opacity-40 hover:bg-[var(--teal-dark)]">
           {nextLabel}
         </button>
       )}
@@ -873,7 +872,7 @@ export default function AdultsPage() {
           <p className="text-sm font-semibold">🚨 אם אתה/את נמצא/ת במצב של מצוקה נפשית חריפה או סכנה מיידית, פנה/י מיד לחדר מיון הקרוב, לקו החירום 101 (מד&quot;א) או לסיוע ראשוני 1201.</p>
         </div>
         <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
-          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
+          <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[var(--teal)]" />
           <span>קראתי את ההצהרה לעיל, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
         </label>
         <div className="mt-5">
@@ -969,7 +968,7 @@ export default function AdultsPage() {
             return (
               <button key={id} type="button"
                 onClick={() => upd({ domains: sel ? answers.domains.filter((d) => d !== id) : [...answers.domains, id as any] })}
-                className={`rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c] hover:bg-[#f0fafc]"}`}>
+                className={`rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]"}`}>
                 <div className="text-2xl">{icon}</div>
                 <div className="mt-1 text-xs font-bold text-[#1a3a5c]">{title}</div>
                 <div className="mt-0.5 text-xs text-[#6b7280]">{desc}</div>
@@ -984,7 +983,7 @@ export default function AdultsPage() {
             return (
               <button key={id} type="button"
                 onClick={() => upd({ domains: sel ? answers.domains.filter((d) => d !== id) : [...answers.domains, id] })}
-                className={`w-full rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c] hover:bg-[#f0fafc]"}`}>
+                className={`w-full rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]"}`}>
                 <div className="text-2xl">🌱</div>
                 <div className="mt-1 text-xs font-bold text-[#1a3a5c]">התפתחות אישית</div>
                 <div className="mt-0.5 text-xs text-[#6b7280]">אני לא מתמודד/ת עם קושי אלא מעוניין/ת בהבנה עצמית</div>
@@ -1074,7 +1073,7 @@ export default function AdultsPage() {
           onChange={(i, v) => setManiaChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <div className="mt-3">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={maniaDeath} onChange={(e) => setManiaDeath(e.target.checked)} className="accent-[#2e7d8c]" />
+            <input type="checkbox" checked={maniaDeath} onChange={(e) => setManiaDeath(e.target.checked)} className="accent-[var(--teal)]" />
             מחשבות על מוות
           </label>
         </div>
@@ -1157,7 +1156,7 @@ export default function AdultsPage() {
           onChange={(i, v) => setProdromeChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
         <div className="mt-3">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={prodromeSuicidal} onChange={(e) => setProdromeSuicidal(e.target.checked)} className="accent-[#2e7d8c]" />
+            <input type="checkbox" checked={prodromeSuicidal} onChange={(e) => setProdromeSuicidal(e.target.checked)} className="accent-[var(--teal)]" />
             קיימות מחשבות אובדניות
           </label>
         </div>
@@ -1581,7 +1580,7 @@ export default function AdultsPage() {
             <div className="flex gap-2">
               {[1, 2].map((v) => (
                 <button key={v} type="button" onClick={() => setDisQ((p) => { const n = [...p]; n[i] = v; return n; })}
-                  className={`flex-1 rounded-lg border-2 py-2 text-sm font-bold ${disQ[i] === v ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white"}`}>
+                  className={`flex-1 rounded-lg border-2 py-2 text-sm font-bold ${disQ[i] === v ? "border-[var(--teal)] bg-[var(--teal)] text-white" : "border-[#ddd6c8] bg-white"}`}>
                   {v === 1 ? "כן" : "לא"}
                 </button>
               ))}
@@ -1610,11 +1609,11 @@ export default function AdultsPage() {
         ))}
         <div className="mt-2 flex flex-col gap-2">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={persQ7} onChange={(e) => setPersQ7(e.target.checked)} className="accent-[#2e7d8c]" />
+            <input type="checkbox" checked={persQ7} onChange={(e) => setPersQ7(e.target.checked)} className="accent-[var(--teal)]" />
             יש לי תחושה של "ריק פנימי" או חוסר בתחושת זהות יציבה
           </label>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={persQ8} onChange={(e) => setPersQ8(e.target.checked)} className="accent-[#2e7d8c]" />
+            <input type="checkbox" checked={persQ8} onChange={(e) => setPersQ8(e.target.checked)} className="accent-[var(--teal)]" />
             הסביבה הקרובה אומרת שיש לי תגובות רגשיות קיצוניות ומהירות
           </label>
         </div>
@@ -1655,7 +1654,7 @@ export default function AdultsPage() {
           <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי ראייה?</p>
           <div className="flex gap-3">
             <button type="button" onClick={() => setVisionAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === true ? "border-[var(--teal)] bg-[var(--teal)] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
             <button type="button" onClick={() => setVisionAns(false)}
               className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
           </div>
@@ -1667,7 +1666,7 @@ export default function AdultsPage() {
           <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי שמיעה?</p>
           <div className="flex gap-3">
             <button type="button" onClick={() => setHearingAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === true ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
+              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === true ? "border-[var(--teal)] bg-[var(--teal)] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
             <button type="button" onClick={() => setHearingAns(false)}
               className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
           </div>
@@ -1816,7 +1815,7 @@ export default function AdultsPage() {
           ] as [string, string, string][]).map(([v, l, sub]) => (
             <button key={v} type="button"
               onClick={() => { updF({ employmentType: v }); setScreen(v === "disability" ? "f3-disability" : v === "young" ? "f3-a" : "f3-b"); }}
-              className="rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-3 text-right text-sm font-semibold hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
+              className="rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-3 text-right text-sm font-semibold hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]">
               <div>{l}</div>
               {sub && <div className="mt-0.5 text-xs font-normal text-stone-500">{sub}</div>}
             </button>
@@ -1883,11 +1882,11 @@ export default function AdultsPage() {
         <p className="mb-4 font-semibold text-[#1a3a5c]">כדי להתאים את השאלות, ענה/י על השאלות הבאות:</p>
         <div className="space-y-3">
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
-            <input type="checkbox" checked={inRelationship} onChange={(e) => setInRelationship(e.target.checked)} className="h-4 w-4 accent-[#2e7d8c]" />
+            <input type="checkbox" checked={inRelationship} onChange={(e) => setInRelationship(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
             <span>אני <strong>בזוגיות</strong> כרגע</span>
           </label>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
-            <input type="checkbox" checked={hasChildren} onChange={(e) => setHasChildren(e.target.checked)} className="h-4 w-4 accent-[#2e7d8c]" />
+            <input type="checkbox" checked={hasChildren} onChange={(e) => setHasChildren(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
             <span>יש לי <strong>ילדים</strong></span>
           </label>
         </div>
@@ -2097,7 +2096,7 @@ export default function AdultsPage() {
               <label key={id} className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 text-sm transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>
                 <input type="checkbox" checked={sel}
                   onChange={(e) => updA({ types: e.target.checked ? [...types, id] : types.filter((t) => t !== id) })}
-                  className="h-4 w-4 accent-[#2e7d8c]" />
+                  className="h-4 w-4 accent-[var(--teal)]" />
                 {label}
               </label>
             );
@@ -2487,7 +2486,7 @@ export default function AdultsPage() {
         </div>
 
         <label className="mb-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={matchPrefs.online} onChange={(e) => setMatchPrefs((p) => ({ ...p, online: e.target.checked }))} className="accent-[#2e7d8c]" />
+          <input type="checkbox" checked={matchPrefs.online} onChange={(e) => setMatchPrefs((p) => ({ ...p, online: e.target.checked }))} className="accent-[var(--teal)]" />
           פתוח/ה גם לטיפול אונליין
         </label>
 
@@ -2516,7 +2515,7 @@ export default function AdultsPage() {
               <input type="checkbox"
                 checked={matchPrefs.arrangements.includes(arr)}
                 onChange={(e) => setMatchPrefs((p) => ({ ...p, arrangements: e.target.checked ? [...p.arrangements, arr] : p.arrangements.filter((x) => x !== arr) }))}
-                className="accent-[#2e7d8c]" />
+                className="accent-[var(--teal)]" />
               {arr}
             </label>
           ))}
@@ -2529,7 +2528,7 @@ export default function AdultsPage() {
               <input type="checkbox"
                 checked={matchPrefs.culturalPrefs.includes(cp)}
                 onChange={(e) => setMatchPrefs((p) => ({ ...p, culturalPrefs: e.target.checked ? [...p.culturalPrefs, cp] : p.culturalPrefs.filter((x) => x !== cp) }))}
-                className="accent-[#2e7d8c]" />
+                className="accent-[var(--teal)]" />
               {cp}
             </label>
           ))}

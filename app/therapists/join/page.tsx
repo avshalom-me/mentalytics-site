@@ -49,7 +49,7 @@ export default function TherapistJoinPage() {
       <div className="pt-4 flex justify-end">
         <Link
           href="/therapists/login?mode=login"
-          className="text-sm text-stone-600 hover:text-[#0F5468] hover:underline"
+          className="text-sm text-stone-600 hover:text-[#3D8C8A] hover:underline"
         >
           כבר רשומ/ה? לכניסה למערכת ←
         </Link>
@@ -66,7 +66,7 @@ export default function TherapistJoinPage() {
           }}
         >
           <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase mb-5"
-            style={{ background: "#0F546822", color: "#0F5468", border: "1px solid #0F546844" }}>
+            style={{ background: "var(--teal-pale)", color: "var(--teal-dark)", border: "1px solid var(--teal-mid)" }}>
             <Sparkles size={12} />
             לאנשי מקצוע בתחום הטיפול
           </div>
@@ -74,7 +74,7 @@ export default function TherapistJoinPage() {
           <h1 className="text-3xl md:text-4xl font-black leading-tight text-stone-900">
             הגיע הזמן שמטופלים ימצאו אותך — לפי התאמה אמיתית,
             <br className="hidden md:inline" />
-            <span style={{ color: "#0F5468" }}> לא לפי מזל.</span>
+            <span style={{ color: "var(--teal)" }}> לא לפי מזל.</span>
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-stone-700 max-w-3xl">
@@ -82,9 +82,9 @@ export default function TherapistJoinPage() {
           </p>
 
           <ul className="mt-6 space-y-2.5 text-stone-800">
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> יותר פניות רלוונטיות</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> פחות בזבוז זמן</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאת/ה עובד/ת איתם, ועל האישיות הטיפולית שלך</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> יותר פניות רלוונטיות</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> פחות בזבוז זמן</li>
+            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאת/ה עובד/ת איתם, ועל האישיות הטיפולית שלך</li>
           </ul>
 
           <div className="mt-8" />
@@ -121,19 +121,19 @@ export default function TherapistJoinPage() {
               <div className="absolute top-4 left-4">
                 <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-400 text-yellow-900">★ מומלץ</span>
               </div>
-              <h3 className="text-lg font-bold text-[#1a4a5c] mb-4">התאמה חכמה + סטטיסטיקות מתקדמות</h3>
-              <ul className="space-y-2.5 text-sm leading-6" style={{ color: "#1a4a5c" }}>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה ראשונה בתוצאות החיפוש</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> <span>🤖 סוכן בינה מלאכותית אישי הכולל:</span>
-                  <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "#1a4a5c" }}>
+              <h3 className="text-lg font-bold mb-4" style={{ color: "var(--teal-dark)" }}>התאמה חכמה + סטטיסטיקות מתקדמות</h3>
+              <ul className="space-y-2.5 text-sm leading-6" style={{ color: "var(--teal-dark)" }}>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה ראשונה בתוצאות החיפוש</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> <span>🤖 סוכן בינה מלאכותית אישי הכולל:</span>
+                  <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "var(--teal-dark)" }}>
                     <li>א. דו&quot;ח צפיות בפרופיל, אחוזי המרה של הצפיות להקשה על המספר ועוד</li>
                     <li>ב. פילוח פונים פוטנציאליים באיזורך: איזה סוגי טיפולים מחפשים, איזה פרמטרים תרבותיים, מגדריים ודמוגרפיים הינם נפוצים</li>
                     <li>ג. השוואות לממוצעים, גרפים ועוד מידע חשוב</li>
                   </ul>
                 </li>
               </ul>
-              <p className="mt-4 text-xs text-[#0F5468]/70">* מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</p>
+              <p className="mt-4 text-xs opacity-70" style={{ color: "var(--teal-dark)" }}>* מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</p>
             </div>
           </div>
         </div>
@@ -160,7 +160,7 @@ export default function TherapistJoinPage() {
           <Link
             href="/therapists/register"
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
-            style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 8px 20px rgba(15,84,104,.25)" }}
+            style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))", boxShadow: "0 8px 20px rgba(45,100,98,.25)" }}
           >
             הצטרפ/י לאחד המסלולים
             <ArrowLeft size={18} />
@@ -183,8 +183,8 @@ export default function TherapistJoinPage() {
             { icon: ShieldCheck, title: "מאפיינים דמוגרפיים", body: "מגורים, גיל, שפה והעדפות תרבותיות." },
           ].map(({ icon: Icon, title, body }, i) => (
             <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "#0F546815" }}>
-                <Icon size={20} style={{ color: "#0F5468" }} />
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--teal-pale)" }}>
+                <Icon size={20} style={{ color: "var(--teal)" }} />
               </div>
               <div>
                 <h3 className="font-bold text-stone-900 mb-1">{title}</h3>
@@ -218,7 +218,7 @@ export default function TherapistJoinPage() {
                 <span>{item.q}</span>
                 <span
                   className="rotate-plus mr-3 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full leading-none"
-                  style={{ background: "#E6F4F7", color: "#0F5468", fontSize: "20px", fontWeight: 300 }}
+                  style={{ background: "var(--teal-pale)", color: "var(--teal-dark)", fontSize: "20px", fontWeight: 300 }}
                 >
                   +
                 </span>

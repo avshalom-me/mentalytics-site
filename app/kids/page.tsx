@@ -270,17 +270,17 @@ function updAddict(A: Ans, k: string, v: string, type: "s"|"g"|"b"): Ans {
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
 const BTN_BASE  = "px-5 py-2 border-2 rounded-full font-medium text-sm transition-all cursor-pointer";
-const BTN_SEL   = "bg-[#2c3e7a] text-white border-[#2c3e7a]";
-const BTN_DEF   = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[#4a6fa5]";
+const BTN_SEL   = "bg-[var(--teal)] text-white border-[var(--teal)]";
+const BTN_DEF   = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 const SB_BASE   = "min-w-[40px] h-10 border-2 rounded-lg font-semibold text-sm transition-all cursor-pointer flex-1";
-const SB_SEL    = "bg-[#2c3e7a] text-white border-[#2c3e7a]";
-const SB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[#4a6fa5]";
+const SB_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
+const SB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 const SO_BASE   = "px-3 py-1.5 border-2 rounded-2xl text-xs font-medium transition-all cursor-pointer";
-const SO_SEL    = "bg-[#2c3e7a] text-white border-[#2c3e7a]";
-const SO_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[#4a6fa5]";
+const SO_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
+const SO_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 const CB_BASE   = "px-4 py-2 border-2 rounded-full text-sm font-medium transition-all cursor-pointer";
-const CB_SEL    = "bg-[#2c3e7a] text-white border-[#2c3e7a]";
-const CB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[#4a6fa5]";
+const CB_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
+const CB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 
 function ob(selected: boolean) { return `${BTN_BASE} ${selected ? BTN_SEL : BTN_DEF}`; }
 function sb(selected: boolean) { return `${SB_BASE} ${selected ? SB_SEL : SB_DEF}`; }
@@ -315,7 +315,7 @@ function StepHint({ children }: { children: React.ReactNode }) {
   return <p className="text-sm text-gray-400 mb-5 leading-relaxed">{children}</p>;
 }
 function EqNum({ n }: { n: number }) {
-  return <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[#2c3e7a] text-white text-sm font-bold mb-3">{n}</div>;
+  return <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--teal)] text-white text-sm font-bold mb-3">{n}</div>;
 }
 function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = false }: {
   onBack?: () => void; onNext?: () => void; backLabel?: string; nextLabel?: string; showBack?: boolean;
@@ -323,7 +323,7 @@ function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המ�
   return (
     <div className="flex gap-3 mt-7 flex-wrap">
       {showBack && onBack && (
-        <button onClick={onBack} className="px-6 py-3 border-2 border-[#2c3e7a] text-[#2c3e7a] rounded-full font-semibold text-sm hover:bg-blue-50 transition-all">{backLabel}</button>
+        <button onClick={onBack} className="px-6 py-3 border-2 border-[var(--teal)] text-[var(--teal)] rounded-full font-semibold text-sm hover:bg-blue-50 transition-all">{backLabel}</button>
       )}
       {onNext && (
         <button onClick={onNext} className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90 transition-all">{nextLabel}</button>
@@ -332,7 +332,7 @@ function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המ�
   );
 }
 function SubCard({ children }: { children: React.ReactNode }) {
-  return <div className="bg-[#f7f9fc] rounded-xl p-5 mt-2 border border-[#e0e8f4] space-y-4">{children}</div>;
+  return <div className="bg-[var(--surface)] rounded-xl p-5 mt-2 border border-[var(--line)] space-y-4">{children}</div>;
 }
 function GradeBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -367,8 +367,8 @@ function Scale04Row({ val, onChange }: { val: number; onChange: (v: number) => v
 function YNRow({ val, onChange }: { val: string; onChange: (v: string) => void }) {
   return (
     <div className="flex gap-3 mt-1">
-      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="כן" ? "bg-[#2c3e7a] text-white border-[#2c3e7a]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[#4a6fa5]"}`} onClick={() => onChange("כן")}>כן</button>
-      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="לא" ? "bg-[#2c3e7a] text-white border-[#2c3e7a]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[#4a6fa5]"}`} onClick={() => onChange("לא")}>לא</button>
+      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="כן" ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`} onClick={() => onChange("כן")}>כן</button>
+      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="לא" ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`} onClick={() => onChange("לא")}>לא</button>
     </div>
   );
 }
@@ -416,7 +416,7 @@ function PageConsent({ onNext }: { onNext: () => void }) {
         <button
           disabled={!agreed}
           onClick={onNext}
-          className="w-full rounded-xl bg-[#1a3a5c] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
+          className="w-full rounded-xl bg-[var(--teal-dark)] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
         >
           קראתי והסכמתי – נמשיך ▸
         </button>
@@ -461,7 +461,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
         <StepHint>שדות עם <span className="text-red-500">*</span> הם חובה</StepHint>
 
         {/* פרטים בסיסיים */}
-        <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">🧒 פרטים בסיסיים</div>
+        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">🧒 פרטים בסיסיים</div>
         <div className="flex gap-4 flex-wrap mb-4">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-gray-500">גיל <span className="text-red-500">*</span></label>
@@ -509,7 +509,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
         </div>
 
         {/* גובה ומשקל */}
-        <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">📏 גובה ומשקל (אופציונלי)</div>
+        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">📏 גובה ומשקל (אופציונלי)</div>
         <div className="flex gap-4 flex-wrap mb-2">
           <div className="flex flex-col gap-1">
             <label className="text-xs font-semibold text-gray-500">גובה (ס"מ)</label>
@@ -529,7 +529,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
         )}
 
         {/* שינה ואכילה */}
-        <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">😴 שינה ואכילה</div>
+        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">😴 שינה ואכילה</div>
         <div className="mb-4">
           <p className="text-sm text-gray-500 mb-2">האם יש קשיי שינה?</p>
           <div className="flex gap-2 mb-2">
@@ -634,22 +634,22 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {areas.map(({ key, title, desc, detail }) => (
             <div key={key}
-              className={`bg-[#f7f9fc] border-2 rounded-xl p-4 transition-all ${A[key] && A[key] !== "כלל לא" ? "border-[#2c3e7a]" : "border-[#e0e8f4]"}`}>
+              className={`bg-[var(--surface)] border-2 rounded-xl p-4 transition-all ${A[key] && A[key] !== "כלל לא" ? "border-[var(--teal)]" : "border-[var(--line)]"}`}>
               <div className="text-sm font-bold text-[#1a2a3a] mb-1">{title}</div>
               <div className="text-xs text-gray-400 mb-2 leading-relaxed">{desc}</div>
               <details className="mb-3 area-details">
-                <summary className="text-xs font-semibold text-[#2c3e7a] cursor-pointer hover:underline list-none flex items-center gap-1 select-none">
+                <summary className="text-xs font-semibold text-[var(--teal)] cursor-pointer hover:underline list-none flex items-center gap-1 select-none">
                   <span className="inline-block transition-transform area-plus text-base leading-none">+</span>
                   הסבר מפורט
                 </summary>
-                <div className="mt-2 text-xs leading-6 text-gray-600 bg-white border border-[#e0e8f4] rounded-lg p-3">
+                <div className="mt-2 text-xs leading-6 text-gray-600 bg-white border border-[var(--line)] rounded-lg p-3">
                   {detail}
                 </div>
               </details>
               <div className="flex gap-1.5 flex-wrap">
                 {AREA_OPTS.map(opt => (
                   <button key={opt}
-                    className={`px-2.5 py-1 border-[1.5px] rounded-2xl text-xs font-medium transition-all cursor-pointer ${A[key] === opt ? "bg-[#2c3e7a] text-white border-[#2c3e7a]" : "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[#4a6fa5]"}`}
+                    className={`px-2.5 py-1 border-[1.5px] rounded-2xl text-xs font-medium transition-all cursor-pointer ${A[key] === opt ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]"}`}
                     onClick={() => selArea(key, opt)}>{opt}</button>
                 ))}
               </div>
@@ -688,9 +688,9 @@ function GaConsentBlock({ A, setA, onDone }: {
     <div>
       <p className="text-base font-bold text-[#1a2a3a] mb-3">האם הילד מסכים לטיפול?</p>
       <div className="flex gap-3 mb-4">
-        <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="כן"?"bg-[#2c3e7a] text-white border-[#2c3e7a]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[#4a6fa5]"}`}
+        <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="כן"?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
           onClick={() => { const n=pick("ga_consent","כן"); if(veryHigh) onDone(n); }}>כן</button>
-        <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="לא"?"bg-[#2c3e7a] text-white border-[#2c3e7a]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[#4a6fa5]"}`}
+        <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="לא"?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
           onClick={() => pick("ga_consent","לא")}>לא</button>
       </div>
 
@@ -699,7 +699,7 @@ function GaConsentBlock({ A, setA, onDone }: {
           <p className="text-sm font-semibold text-[#1a2a3a] mb-3">האם הילד יסכים לטיפול יחד עם אחד ההורים?</p>
           <div className="flex gap-3">
             {["כן","לא"].map(v=>(
-              <button key={v} className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent_parent===v?"bg-[#2c3e7a] text-white border-[#2c3e7a]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[#4a6fa5]"}`}
+              <button key={v} className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent_parent===v?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
                 onClick={() => { const n={...A,ga_consent_parent:v}; setA(n); onDone(n); }}>{v}</button>
             ))}
           </div>
@@ -1769,7 +1769,7 @@ function AcadAdhdBlock({ prefix, A, setA, items }: { prefix: string; A: Ans; set
 function VisionHearingBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   return (
     <div className="mb-5">
-      <div className="text-xs font-bold text-[#2c3e7a] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
+      <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
       <div className="mb-4">
         <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת ראייה?</p>
         <div className="flex gap-2 mb-2">
@@ -2675,7 +2675,7 @@ function KidsMatchSection({ A, score, selection }: {
         </button>
       ) : (
         <div className={`rounded-2xl border p-5 ${isAssessment ? "border-purple-200 bg-purple-50" : "border-[#c8d8f0] bg-[#f0f5ff]"}`}>
-          <h3 className="font-bold text-[#1a3a5c] text-lg mb-1">מציאת {personLabel} מתאים/ה</h3>
+          <h3 className="font-bold text-[var(--teal-dark)] text-lg mb-1">מציאת {personLabel} מתאים/ה</h3>
           {treatmentLabels.length > 0 && (
             <p className="text-xs text-gray-500 mb-4">
               על בסיס הממצאים: {treatmentLabels.join(", ")}
@@ -2786,7 +2786,7 @@ function KidsMatchSection({ A, score, selection }: {
             </div>
           ) : (
             <>
-              <div className="text-sm font-bold text-[#1a3a5c] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
+              <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
               <div className="space-y-4">
                 {results.map(t => {
                   const regionsArr = toArr(t.regions);
@@ -2810,7 +2810,7 @@ function KidsMatchSection({ A, score, selection }: {
                           className="h-16 w-16 flex-shrink-0 rounded-xl object-cover"
                         />
                         <div className="flex-1 text-right">
-                          <h3 className="text-lg font-bold text-[#1a3a5c]">{t.full_name || "ללא שם"}</h3>
+                          <h3 className="text-lg font-bold text-[var(--teal-dark)]">{t.full_name || "ללא שם"}</h3>
                           <p className="text-xs text-[#6b7280]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
                           {t.bio && <p className="mt-1 text-sm text-gray-700 line-clamp-2">{t.bio}</p>}
                           {regionsArr.length > 0 && (
@@ -2818,9 +2818,9 @@ function KidsMatchSection({ A, score, selection }: {
                           )}
                           <div className="mt-2 flex flex-wrap gap-2 items-center">
                             <div className={`inline-block rounded-full px-3 py-1 text-xs font-bold text-white ${
-                              combined >= 85 ? "bg-[#1a3a5c]" : combined >= 70 ? "bg-[#2a5a8c]" : combined >= 55 ? "bg-amber-700" : "bg-gray-500"
+                              combined >= 85 ? "bg-[var(--teal-dark)]" : combined >= 70 ? "bg-[#2a5a8c]" : combined >= 55 ? "bg-amber-700" : "bg-gray-500"
                             }`}>✦ התאמה כוללת: {combined}%</div>
-                            <div className="inline-block rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c]">
+                            <div className="inline-block rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
                               מקצועי: {t.match_score}%
                             </div>
                             {t.personality_score != null && (
@@ -2956,7 +2956,7 @@ function GroupCard({
     : isAssessment ? "text-purple-700"
     : isProfessional ? "text-emerald-700"
     : isExternal ? "text-amber-800"
-    : "text-[#2e7d8c]";
+    : "text-[var(--teal)]";
 
   return (
     <div className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[#1a3a5c]" : ""}`}>
@@ -2995,7 +2995,7 @@ function GroupCard({
                   ? "bg-purple-700 text-white hover:bg-purple-800"
                   : isProfessional
                     ? "bg-emerald-700 text-white hover:bg-emerald-800"
-                    : "bg-[#1a3a5c] text-white hover:bg-[#0f2845]"
+                    : "bg-[var(--teal-dark)] text-white hover:bg-[var(--teal-dark)]"
               }`}
             >
               {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel}
@@ -3052,7 +3052,7 @@ function GroupCard({
 
       {hasExpandable && (
         <details className="mt-3 group">
-          <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[#1a3a5c] select-none">
+          <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[var(--teal-dark)] select-none">
             {allTools.length > 0 ? "🛠 כלים מעשיים והסבר מורחב — לחץ להרחיב" : "📋 הסבר מורחב — לחץ להרחיב"}
           </summary>
           <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
@@ -3064,7 +3064,7 @@ function GroupCard({
             {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
               <div key={symptom}>
                 {symptom !== "כללי" && allSymptoms.length > 1 && (
-                  <div className="text-xs font-bold text-[#1a3a5c] mb-1">▸ {symptom}</div>
+                  <div className="text-xs font-bold text-[var(--teal-dark)] mb-1">▸ {symptom}</div>
                 )}
                 {tools.map((t, i) => (
                   <div key={i} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line">
@@ -3280,7 +3280,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       <p className="text-stone-500 text-sm mb-6">בדוק את חיבור האינטרנט ונסה שוב.</p>
       <button
         onClick={onRetryScore}
-        className="px-6 py-3 bg-[#2c3e7a] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+        className="px-6 py-3 bg-[var(--teal)] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
       >נסה שוב</button>
     </div>
   );
@@ -3349,7 +3349,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               <button
                 type="button"
                 onClick={selectDynamicFallback}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-[#1a3a5c] px-3 py-2 text-xs font-bold text-white hover:bg-[#0f2845]"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal-dark)]"
               >
                 🔍 חיפוש מטפל/ת לטיפול דינאמי
               </button>
@@ -3384,7 +3384,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
             <section key={b.key} className="mt-7">
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-sm font-bold text-[#1a3a5c] px-3 py-1 rounded-full bg-blue-50 border border-blue-100 whitespace-nowrap">
+                <span className="text-sm font-bold text-[var(--teal-dark)] px-3 py-1 rounded-full bg-blue-50 border border-blue-100 whitespace-nowrap">
                   {b.label}
                 </span>
                 <div className="h-px flex-1 bg-gray-200" />
@@ -3430,7 +3430,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                         selectedKey === `${b.key}::__combined::treatment` ? "ring-2 ring-[#1a3a5c]" : ""
                       }`}
                     >
-                      <div className="text-xs font-bold uppercase tracking-wider text-[#1a3a5c] mb-1">חיפוש מתקדם ✦</div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)] mb-1">חיפוש מתקדם ✦</div>
                       <div className="font-semibold text-sm text-[#1a2a3a]">חיפוש משולב — מטפל/ת שמכסה את מירב הטיפולים בתחום זה</div>
                       <div className="mt-1 text-xs text-gray-600">{combinedTLabels.join(" · ")}</div>
                     </button>
@@ -3557,7 +3557,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       <div className="mt-6 flex gap-3 justify-end print:hidden">
         <button
           onClick={() => window.print()}
-          className="px-5 py-2 rounded-xl border-2 border-[#2c3e7a] text-[#2c3e7a] text-sm font-semibold hover:bg-[#2c3e7a] hover:text-white transition-all"
+          className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all"
         >
           💾 שמירה כ-PDF
         </button>
@@ -3689,41 +3689,40 @@ export default function KidsPage() {
   const pageProps = { A, setA, onNext: goNext, onBack: goBack, items: kidsItems };
 
   if (usageAllowed === false && step !== "p-result") return (
-    <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
+    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       <QuizPaymentBlock quizType="kids" />
     </main>
   );
 
   if (itemsError) return (
-    <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
+    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
         <div className="text-4xl mb-4">⚠️</div>
-        <h2 className="text-xl font-bold text-stone-900 mb-3">לא ניתן לטעון את השאלון</h2>
-        <p className="text-stone-500 mb-6 max-w-sm">בדוק את חיבור האינטרנט ונסה שוב.</p>
+        <h2 className="text-xl font-bold mb-3" style={{ color: "var(--text)" }}>לא ניתן לטעון את השאלון</h2>
+        <p className="mb-6 max-w-sm" style={{ color: "var(--muted)" }}>בדוק את חיבור האינטרנט ונסה שוב.</p>
         <button
           onClick={fetchKidsItems}
-          className="px-6 py-3 bg-[#2c3e7a] text-white rounded-full font-semibold text-sm hover:opacity-90 transition-all"
+          style={{ background: "var(--teal)", borderRadius: "50px", padding: "12px 24px", color: "white", fontWeight: 700, border: "none", cursor: "pointer" }}
         >נסה שוב</button>
       </div>
     </main>
   );
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8 pb-20" dir="rtl">
+    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
           {step === "p-consent" ? (
             <div className="w-full text-center mb-1">
-              <img src="/logo.svg.png" alt="טיפול חכם" className="mx-auto mb-3 h-16 w-auto" />
-              <h1 className="text-2xl font-black text-[#1a3a5c]" style={{ fontFamily: "serif" }}>טיפול חכם</h1>
-              <p className="text-sm text-[#6b7280]">שאלון הפניה לטיפול – ילדים ונוער</p>
+              <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
+              <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – ילדים ונוער</p>
             </div>
           ) : (
             <>
-              <span className="text-xl font-extrabold text-[#1a3a5c]">טיפול חכם</span>
+              <span className="text-xl font-extrabold" style={{ color: "var(--teal)" }}>טיפול חכם</span>
               {step !== "p-result" && (
-                <span className="text-xs text-gray-400 bg-gray-100 px-3 py-1 rounded-full">שאלון ילדים / מתבגרים</span>
+                <span className="text-xs px-3 py-1 rounded-full" style={{ color: "var(--muted)", background: "var(--surface-2)" }}>שאלון ילדים / מתבגרים</span>
               )}
             </>
           )}
@@ -3733,7 +3732,7 @@ export default function KidsPage() {
             <div className="flex items-center justify-between mb-1.5">
               <span className="text-xs text-[#6b7280]">{progress}% הושלם</span>
               {progress > 5 && (
-                <span className="text-xs font-semibold text-[#2e7d8c] animate-pulse">
+                <span className="text-xs font-semibold text-[var(--teal)] animate-pulse">
                   {progress <= 25 ? "יופי, ממשיכים! 💪"
                     : progress <= 45 ? "באמצע הדרך, כל הכבוד!"
                     : progress <= 65 ? "יותר ממחצית מאחוריך!"

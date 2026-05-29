@@ -68,8 +68,8 @@ function TherapistCard({
   return (
     <div
       ref={impressionRef}
-      className="rounded-2xl border border-[#E8E0D8] bg-white overflow-hidden"
-      style={{ boxShadow: "0 2px 10px rgba(100,60,30,.07)" }}
+      className="rounded-2xl bg-white overflow-hidden"
+      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)" }}
     >
       <Link href={`/therapists/${t.id}`} className="block">
         <div className="relative h-72 w-full overflow-hidden bg-gray-100">
@@ -93,10 +93,10 @@ function TherapistCard({
           )}
           <div className="mt-2 flex flex-wrap gap-1">
             {t.online && (
-              <span className="rounded-full bg-blue-50 border border-blue-200 px-2 py-0.5 text-xs text-blue-700">🌐 אונליין</span>
+              <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
             )}
             {t.regions[0] && (
-              <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-xs text-stone-600">📍 {t.regions[0]}</span>
+              <span className="rounded-full px-2 py-0.5 text-xs" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--muted)" }}>📍 {t.regions[0]}</span>
             )}
           </div>
         </div>
@@ -122,12 +122,12 @@ function TherapistCard({
         <button
           type="button"
           onClick={() => setMessageOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-xl bg-[#2e7d8c] px-3 py-1.5 text-xs font-bold text-white hover:opacity-90"
+          className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold text-white hover:opacity-90" style={{ background: "var(--teal)" }}
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           הודעה
         </button>
-        <Link href={`/therapists/${t.id}`} className="mr-auto text-xs font-semibold text-[#2e7d8c] hover:underline">
+        <Link href={`/therapists/${t.id}`} className="mr-auto text-xs font-semibold hover:underline" style={{ color: "var(--teal)" }}>
           פרופיל מלא ←
         </Link>
       </div>
@@ -186,20 +186,32 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 pb-20" dir="rtl">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-3xl font-extrabold text-stone-900">המטפלים שלנו</h1>
-        <Link href="/therapists/join"
-          className="rounded-xl bg-[#2e7d8c] px-4 py-2 text-sm font-semibold text-white hover:opacity-90">
-          לאנשי מקצוע ▸
-        </Link>
+      {/* Header */}
+      <div className="mb-8">
+        <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>
+          המטפלים שלנו
+        </p>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
+            מצאו את המטפל המתאים לכם
+          </h1>
+          <Link href="/therapists/join" style={{
+            background: "var(--teal)", color: "white", borderRadius: "50px",
+            padding: "9px 22px", fontSize: "14px", fontWeight: 700, transition: "background .2s",
+          }} className="hover:bg-[var(--teal-dark)] whitespace-nowrap">
+            לאנשי מקצוע ▸
+          </Link>
+        </div>
       </div>
 
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <label className="text-sm font-semibold text-stone-700">סינון:</label>
+      {/* Filters */}
+      <div className="mb-7 flex flex-wrap items-center gap-3 p-4 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)" }}>סינון לפי:</span>
         <select
           value={regionFilter}
           onChange={(e) => handleRegionChange(e.target.value)}
-          className="rounded-xl border border-[#E0D5C8] bg-white px-3 py-2 text-sm text-stone-800 focus:border-[#2e7d8c] focus:outline-none"
+          className="rounded-xl bg-white px-3 py-2 text-sm focus:outline-none"
+          style={{ border: "1px solid var(--line)", color: "var(--text)" }}
         >
           <option value="">כל האזורים</option>
           {ALL_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
@@ -208,7 +220,8 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
           value={cityFilter}
           onChange={(e) => handleCityChange(e.target.value)}
           disabled={availableCities.length === 0}
-          className="rounded-xl border border-[#E0D5C8] bg-white px-3 py-2 text-sm text-stone-800 focus:border-[#2e7d8c] focus:outline-none disabled:opacity-50"
+          className="rounded-xl bg-white px-3 py-2 text-sm focus:outline-none disabled:opacity-50"
+          style={{ border: "1px solid var(--line)", color: "var(--text)" }}
         >
           <option value="">כל הערים</option>
           {availableCities.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -216,7 +229,7 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
         {(regionFilter || cityFilter) && (
           <button
             onClick={() => { setRegionFilter(""); setCityFilter(""); }}
-            className="text-xs text-stone-500 underline hover:text-stone-700"
+            style={{ fontSize: "12px", color: "var(--muted)", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}
           >
             נקה
           </button>

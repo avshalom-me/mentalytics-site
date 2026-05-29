@@ -9,7 +9,7 @@ import Script from "next/script";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "700", "800", "900"],
   display: "swap",
 });
 
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="he" dir="rtl">
-      <body className={`${heebo.className} min-h-screen bg-[#FAF7F2] text-stone-900`}>
+      <body className={`${heebo.className} min-h-screen`}>
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none">
           דלג לתוכן הראשי
         </a>
@@ -54,17 +54,26 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('config', 'G-V3QQRXSQ0T');
         `}</Script>
 
-        <footer className="mt-16 border-t border-[#E8E1D8] bg-white" dir="rtl">
-          <div className="mx-auto max-w-5xl px-6 py-8 text-sm text-stone-500">
-            <div className="flex flex-wrap items-center gap-4 mb-3">
-              <span>© {new Date().getFullYear()} טיפול חכם — מנטליטיקס</span>
-              <Link href="/privacy" className="hover:underline">מדיניות פרטיות</Link>
-              <Link href="/terms" className="hover:underline">תנאי שימוש</Link>
-              <Link href="/billing-policy" className="hover:underline">תקנון רכישה</Link>
-              <Link href="/accessibility" className="hover:underline">הצהרת נגישות</Link>
-            </div>
-            <div className="flex flex-wrap items-center gap-4 text-xs text-stone-400">
-              <span>מייל: <a href="mailto:tpool406@gmail.com" className="hover:underline">tpool406@gmail.com</a></span>
+        <footer style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
+          <div className="mx-auto max-w-5xl px-6 py-8">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם — Mentalytics</span>
+              <ul className="flex flex-wrap gap-5 list-none">
+                {[
+                  { href: "/privacy", label: "מדיניות פרטיות" },
+                  { href: "/terms", label: "תנאי שימוש" },
+                  { href: "/billing-policy", label: "תקנון רכישה" },
+                  { href: "/accessibility", label: "הצהרת נגישות" },
+                ].map(({ href, label }) => (
+                  <li key={href}>
+                    <Link href={href} style={{ fontSize: "12.5px", color: "var(--faint)", transition: "color .18s" }}
+                      className="hover:text-[var(--teal)]">{label}</Link>
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontSize: "12px", color: "var(--faint)" }} className="flex flex-wrap gap-4">
+                <a href="mailto:tpool406@gmail.com" className="hover:text-[var(--teal)]">tpool406@gmail.com</a>
+              </div>
             </div>
           </div>
         </footer>

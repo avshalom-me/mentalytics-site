@@ -253,7 +253,7 @@ export default function TherapistSignupPage() {
       <div className="mb-6">
         <Link
           href="/therapists"
-          className="text-sm text-indigo-700 hover:underline"
+          className="text-sm hover:underline" style={{ color: "var(--teal-dark)" }}
         >
           ← חזרה לאזור מטפלים
         </Link>
@@ -288,7 +288,7 @@ export default function TherapistSignupPage() {
           <label className="mt-4 block text-sm font-semibold">
             שם מלא <span className="text-red-500">*</span>
             <input
-              className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+              className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#C2DFDE]"
               value={form.fullName}
               onChange={(e) =>
                 setForm((p) => ({ ...p, fullName: e.target.value }))
@@ -302,7 +302,7 @@ export default function TherapistSignupPage() {
               כתובת מייל <span className="text-red-500">*</span>
               <input
                 type="email"
-                className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+                className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#C2DFDE]"
                 value={form.email}
                 onChange={(e) => setForm((p) => ({ ...p, email: e.target.value }))}
                 placeholder="example@gmail.com"
@@ -313,7 +313,7 @@ export default function TherapistSignupPage() {
               טלפון סלולארי <span className="text-red-500">*</span>
               <input
                 type="tel"
-                className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+                className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#C2DFDE]"
                 value={form.phone}
                 onChange={(e) => setForm((p) => ({ ...p, phone: e.target.value }))}
                 placeholder="0501234567"
@@ -377,7 +377,7 @@ export default function TherapistSignupPage() {
   <label className="mt-4 block text-sm font-semibold">
     תיאור קצר
     <textarea
-      className="mt-2 min-h-[120px] w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+      className="mt-2 min-h-[120px] w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#C2DFDE]"
       value={form.bio}
       onChange={(e) => setForm((p) => ({ ...p, bio: e.target.value }))}
       maxLength={500}
@@ -396,7 +396,7 @@ export default function TherapistSignupPage() {
             תארים, התמחויות, הכשרות רלוונטיות.
           </p>
           <textarea
-            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#C2DFDE]"
             value={form.education}
             onChange={(e) => setForm((p) => ({ ...p, education: e.target.value }))}
             placeholder="לדוגמה: תואר שני בפסיכולוגיה קלינית, אוניברסיטת תל אביב. התמחות במרכז לבריאות הנפש."
@@ -409,7 +409,7 @@ export default function TherapistSignupPage() {
             תפקידים, מסגרות עבודה, שנות ניסיון.
           </p>
           <textarea
-            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            className="mt-4 min-h-[100px] w-full rounded-xl border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#C2DFDE]"
             value={form.experience}
             onChange={(e) => setForm((p) => ({ ...p, experience: e.target.value }))}
             placeholder="לדוגמה: 8 שנות ניסיון בטיפול פרטי עם מבוגרים. לשעבר: פסיכולוגית בקופת חולים מכבי."
@@ -764,7 +764,7 @@ export default function TherapistSignupPage() {
           <label className="mt-4 block text-sm font-semibold">
             מחיר לפגישה (ש״ח)
             <input
-              className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-200"
+              className="mt-2 w-full rounded-xl border px-3 py-2 outline-none focus:ring-2 focus:ring-[#C2DFDE]"
               value={form.price}
               onChange={(e) => setForm((p) => ({ ...p, price: e.target.value }))}
               placeholder="לדוגמה: 450"
@@ -819,7 +819,8 @@ export default function TherapistSignupPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <label
               htmlFor="profilePhoto"
-              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="inline-flex cursor-pointer items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: "var(--teal)" }}
             >
               בחר תמונה
             </label>
@@ -863,7 +864,8 @@ export default function TherapistSignupPage() {
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <label
               htmlFor="certificates"
-              className="inline-flex cursor-pointer items-center justify-center rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white hover:bg-indigo-700"
+              className="inline-flex cursor-pointer items-center justify-center rounded-xl px-4 py-2 text-sm font-semibold text-white"
+            style={{ background: "var(--teal)" }}
             >
               בחר קבצים
             </label>
@@ -893,18 +895,18 @@ export default function TherapistSignupPage() {
         </section>
 
         {/* ── בחירת מסלול ── */}
-        <section className="rounded-2xl border border-[#E8E0D8] bg-[#faf8f5] p-6 mb-6">
-          <h2 className="text-lg font-extrabold text-[#1a3a5c] mb-2">בחר/י את מסלול ההצטרפות שלך</h2>
+        <section className="rounded-2xl p-6 mb-6" style={{ border: "1px solid var(--line)", background: "var(--surface)" }}>
+          <h2 className="text-lg font-extrabold mb-2" style={{ color: "var(--text)" }}>בחר/י את מסלול ההצטרפות שלך</h2>
           <p className="text-sm text-stone-600 mb-5">מנטליטיקס מחברת בין מטופלים לאנשי טיפול — בשתי רמות שירות.</p>
 
           <div className="grid gap-4 md:grid-cols-2">
             {/* Free plan */}
-            <div className="rounded-2xl bg-white p-5 flex flex-col" style={{ border: "1px solid #E8E0D8" }}>
+            <div className="rounded-2xl bg-white p-5 flex flex-col" style={{ border: "1px solid var(--line)" }}>
               <span className="inline-block self-start rounded-full px-3 py-1 text-xs font-bold mb-3"
                 style={{ background: "#E8F4F0", color: "#1a5c46" }}>
                 חינמי
               </span>
-              <h3 className="text-base font-black text-[#1a3a5c] mb-1">מסלול בסיסי</h3>
+              <h3 className="text-base font-black mb-1" style={{ color: "var(--text)" }}>מסלול בסיסי</h3>
               <p className="text-xl font-black text-stone-800 mb-3">&#8362;0 <span className="text-sm font-normal text-stone-500">/ תמיד</span></p>
               <ul className="space-y-2 flex-1 text-sm text-stone-700">
                 <li className="flex items-start gap-2">
@@ -928,7 +930,7 @@ export default function TherapistSignupPage() {
 
             {/* Promoted plan */}
             <div className="rounded-2xl p-5 flex flex-col relative"
-              style={{ background: "linear-gradient(160deg,#0F5468 0%,#1A7A96 100%)", border: "2px solid #0F5468" }}>
+              style={{ background: "linear-gradient(160deg,var(--teal-dark) 0%,var(--teal) 100%)", border: "2px solid var(--teal-dark)" }}>
               <div className="absolute -top-3 right-4">
                 <span className="rounded-full px-3 py-1 text-xs font-black shadow"
                   style={{ background: "#F5C842", color: "#1a3a0a" }}>
@@ -972,11 +974,11 @@ export default function TherapistSignupPage() {
               type="checkbox"
               checked={form.termsAccepted}
               onChange={(e) => setForm((p) => ({ ...p, termsAccepted: e.target.checked }))}
-              className="mt-1 h-4 w-4 flex-shrink-0 accent-indigo-600"
+              className="mt-1 h-4 w-4 flex-shrink-0 accent-[#3D8C8A]"
             />
             <span className="text-sm leading-6 text-stone-700">
               אני מאשר/ת שאני בעל/ת רישיון מקצועי תקף, שהפרטים שמסרתי נכונים, ושאעמוד ב
-              <a href="/terms" target="_blank" className="text-indigo-600 hover:underline mx-1">תנאי השימוש</a>
+              <a href="/terms" target="_blank" className="hover:underline mx-1" style={{ color: "var(--teal)" }}>תנאי השימוש</a>
               של טיפול חכם.
             </span>
           </label>
@@ -985,7 +987,7 @@ export default function TherapistSignupPage() {
               type="checkbox"
               checked={form.newsletterConsent}
               onChange={(e) => setForm((p) => ({ ...p, newsletterConsent: e.target.checked }))}
-              className="mt-1 h-4 w-4 flex-shrink-0 accent-indigo-600"
+              className="mt-1 h-4 w-4 flex-shrink-0 accent-[#3D8C8A]"
             />
             <span className="text-sm leading-6 text-stone-500">
               אני מעוניין/ת לקבל מידע אינפורמטיבי, מאמרים וחומרים מקצועיים מ&quot;טיפול חכם&quot;. ללא פרסום שאינו קשור לפלטפורמה. <span className="text-stone-400">(לא חובה)</span>
@@ -998,10 +1000,9 @@ export default function TherapistSignupPage() {
             type="submit"
             disabled={isSubmitting}
             className={`rounded-xl px-5 py-3 font-semibold text-white ${
-              isSubmitting
-                ? "cursor-not-allowed bg-slate-400"
-                : "bg-indigo-600 hover:bg-indigo-700"
+              isSubmitting ? "cursor-not-allowed bg-slate-400" : ""
             }`}
+            style={isSubmitting ? {} : { background: "var(--teal)" }}
           >
             {isSubmitting ? "שולח..." : "שליחת טופס"}
           </button>

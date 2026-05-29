@@ -13,7 +13,7 @@ export default function NotFound() {
         <Link
           href="/"
           className="inline-flex items-center gap-2 rounded-2xl px-6 py-3 text-sm font-bold text-white"
-          style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}
+          style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}
         >
           חזרה לדף הבית
         </Link>

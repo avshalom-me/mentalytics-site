@@ -1,63 +1,61 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --teal:      #3D8C8A;
+  --teal-dark: #2A6462;
+  --teal-pale: #EAF4F3;
+  --teal-mid:  #C2DFDE;
+  --gold:      #D49018;
+  --gold-dark: #A87010;
+  --gold-pale: #FDF6E3;
+  --pink:      #F0A8AC;
+  --text:      #131F1E;
+  --text-2:    #3E5250;
+  --muted:     #6B807E;
+  --faint:     #A2B5B4;
+  --bg:        #FFFFFF;
+  --surface:   #F7FAF9;
+  --surface-2: #EFF5F5;
+  --line:      #DDE9E8;
+  --radius:    18px;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Force light mode always — site is not designed for dark mode */
+html { scroll-behavior: smooth; }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Heebo', sans-serif;
+  overflow-x: hidden;
+  line-height: 1.6;
 }
 
-/* Print styles — apply across all pages so saved PDFs are clean and readable.
-   The kids/adults quiz reports are the main consumer (window.print() to PDF).  */
+a { text-decoration: none; color: inherit; }
+
+/* Print styles — quiz PDF export */
 @media print {
-  /* Drop interactive matching panels and other UI not relevant to a printed report */
   .print\:hidden,
-  [data-print-hide="true"] {
-    display: none !important;
-  }
-  /* Force <details> open so users see all content in the printed PDF */
-  details {
-    page-break-inside: avoid;
-  }
-  details > summary {
-    display: none !important;
-  }
+  [data-print-hide="true"] { display: none !important; }
+
+  details { page-break-inside: avoid; }
+  details > summary { display: none !important; }
   details > *:not(summary) {
     display: block !important;
     height: auto !important;
     overflow: visible !important;
   }
-  /* Avoid splitting recommendation cards across pages */
-  .rounded-2xl,
-  .rounded-xl {
-    page-break-inside: avoid;
-  }
-  /* Make sure background colors print (not all browsers honor this; user must enable "Background graphics") */
+  .rounded-2xl, .rounded-xl { page-break-inside: avoid; }
+
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  /* Inline links: show URL after the text so a printed copy still has the address */
+
   a[href^="http"]::after {
     content: " (" attr(href) ")";
     font-size: 0.85em;
     color: #555;
   }
-  /* Tighten body padding for print */
-  body {
-    background: white !important;
-  }
+
+  body { background: white !important; }
 }

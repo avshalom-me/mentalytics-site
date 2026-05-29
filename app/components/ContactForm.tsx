@@ -94,7 +94,7 @@ export default function ContactForm() {
         type="submit"
         disabled={status === "sending"}
         className="w-full rounded-xl py-2.5 text-sm font-bold text-white transition hover:opacity-90 disabled:opacity-60"
-        style={{ background: "#0F5468" }}
+        style={{ background: "var(--teal)", borderRadius: "50px" }}
       >
         {status === "sending" ? "שולח..." : "שלח פנייה ▸"}
       </button>

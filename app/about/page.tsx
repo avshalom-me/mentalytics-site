@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { Sparkles, Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
-  title: "אודות טיפול חכם",
+  title: "מי אנחנו",
   description: "הכירו את הצוות מאחורי טיפול חכם — מערכת הכוונה טיפולית מבוססת מחקר שפותחה על ידי פסיכולוגים קליניים, לעזור לכם למצוא את המטפל הנכון.",
 };
 
@@ -75,8 +75,61 @@ export default function AboutPage() {
         .blob-2 { animation-duration: 9s; animation-delay: 1.5s; }
       `}</style>
 
-      {/* HERO */}
+      {/* STORY */}
       <section className="pt-10 fade-up fade-up-1">
+        <div style={{
+          position: "relative",
+          borderRadius: "28px",
+          overflow: "hidden",
+          background: "linear-gradient(160deg, #FDFAF6 0%, #F4F9F7 100%)",
+          border: "1px solid var(--line)",
+          padding: "52px 56px",
+        }}>
+          {/* Decorative quote mark */}
+          <div aria-hidden="true" style={{
+            position: "absolute",
+            top: "-12px",
+            right: "24px",
+            fontSize: "200px",
+            lineHeight: 1,
+            fontFamily: "Georgia, serif",
+            color: "var(--teal)",
+            opacity: 0.07,
+            userSelect: "none",
+            pointerEvents: "none",
+            fontWeight: 900,
+          }}>״</div>
+
+          {/* Eyebrow */}
+          <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".2em", marginBottom: "28px" }}>
+            הסיפור שלנו
+          </p>
+
+          {/* Opening hook */}
+          <p style={{ fontSize: "20px", fontWeight: 800, color: "var(--text)", lineHeight: 1.8, marginBottom: "22px", maxWidth: "68ch" }}>
+            הסיפור שלנו התחיל בערב אחד, כשקבוצה של פסיכולוגים וחוקרים ישבה סביב שולחן ושאלה שאלה פשוטה:{" "}
+            <span style={{ color: "var(--teal)" }}>למה כל כך מורכב למצוא מטפל/ת?</span>
+          </p>
+
+          {/* Body */}
+          <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text-2)", maxWidth: "68ch", marginBottom: "28px" }}>
+            כולנו הכרנו מטפלים מצוינים וגם הפנינו אליהם, אבל שוב ושוב ראינו שלא תמיד נוצרת התאמה טובה. לפעמים סוג הטיפול לא היה המדויק ביותר עבור האדם שפנה, ולפעמים פשוט לא נוצר החיבור האנושי והאישי שכל כך חשוב להצלחת התהליך. פעמים רבות המטופל בכלל לא ידע מה הוא מחפש.
+          </p>
+
+          {/* Founding moment — gold side border */}
+          <div style={{ borderInlineStart: "4px solid var(--gold)", paddingInlineStart: "22px" }}>
+            <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch" }}>
+              משם התחיל רעיון קטן, שהלך וגדל: האם אפשר להפוך את בחירת המטפל למקצועית יותר?
+            </p>
+            <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch", marginTop: "12px" }}>
+              כך נולדה <strong style={{ color: "var(--teal)" }}>"טיפול חכם"</strong> — מערכת הנשענת על ידע מחקרי וקליני, ומסייעת להתאים בין מטפלים למטופלים לא רק לפי זמינות או המלצה מקרית, אלא לפי הצרכים, הבנת הקשיים, ההעדפות וסוג הטיפול המתאים ביותר לכל אדם.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {/* HERO */}
+      <section className="mt-10 fade-up fade-up-2">
         <div
           className="relative overflow-hidden rounded-[36px]"
           style={{
@@ -94,7 +147,7 @@ export default function AboutPage() {
             <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
               style={{ background: "#F4A57422", color: "#B06030", border: "1px solid #F4A57455" }}>
               <Sparkles size={12} />
-              אודות טיפול חכם
+              מי אנחנו
             </div>
 
             <p className="mt-6 max-w-3xl leading-8 text-stone-700 text-lg">
@@ -176,7 +229,7 @@ export default function AboutPage() {
             className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
             style={{ background: "#EBF0F5", border: "1px solid #A8C0D4" }}
           >
-            <Users size={18} style={{ color: "#0F5468" }} />
+            <Users size={18} style={{ color: "var(--teal)" }} />
           </div>
           <div>
             <h2 className="text-2xl font-extrabold text-stone-900">הצוות המקצועי המפתח</h2>
@@ -196,7 +249,7 @@ export default function AboutPage() {
             >
               <div className="flex items-center gap-4">
                 <div className="relative h-16 w-16 overflow-hidden rounded-2xl flex-shrink-0"
-                  style={{ border: "2px solid #EAE0D5", background: "#FAF7F2" }}>
+                  style={{ border: "2px solid var(--line)", background: "var(--surface)" }}>
                   <Image src={m.img} alt={m.name} fill className="object-cover" />
                 </div>
                 <div>
@@ -212,7 +265,7 @@ export default function AboutPage() {
                   <li key={i} className="flex items-start gap-2 text-sm leading-6 text-stone-700">
                     <span
                       className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                      style={{ background: "#C96B55" }}
+                      style={{ background: "var(--teal)" }}
                     />
                     <span>{b}</span>
                   </li>
