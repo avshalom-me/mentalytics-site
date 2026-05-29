@@ -144,7 +144,7 @@ export default function HomePage() {
             fontSize: "1.12rem", color: "var(--text-2)", fontWeight: 400,
             lineHeight: 1.8, maxWidth: "46ch", margin: "0 auto 38px",
           }} className="fade fade-3">
-            שאלון אנונימי שמוביל להמלצה מדויקת על סוג הטיפול ועל המטפל שמתאים לכם — למבוגרים ולילדים.
+            שאלון שמוביל להמלצה מדויקת על <strong style={{ color: "var(--teal)", fontWeight: 700 }}>סוג הטיפול</strong> ועל <strong style={{ color: "var(--gold)", fontWeight: 700 }}>סוג המטפל</strong> שמתאים לכם.
           </p>
 
           {/* CTAs */}
