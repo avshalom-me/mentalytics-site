@@ -23,7 +23,7 @@ const API_BASE = process.env.SUMIT_API_BASE || "https://api.sumit.co.il";
 // Sumit to add VAT on top of UnitPrice and report it cleanly on the invoice.
 const VAT_RATE = 0.18;
 export const QUIZ_BASE_PRICE = 30;
-export const SUBSCRIPTION_BASE_PRICE = 120;
+export const SUBSCRIPTION_BASE_PRICE = 140;
 export const QUIZ_TOTAL = +(QUIZ_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
 export const SUBSCRIPTION_TOTAL = +(SUBSCRIPTION_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
 

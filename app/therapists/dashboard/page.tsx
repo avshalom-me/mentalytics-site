@@ -536,7 +536,7 @@ function TherapistDashboard() {
           <div className="px-6 pt-6 pb-5">
             <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">מבצע פתיחה — הצטרפות למערכת ההתאמה החכמה</div>
             <div className="flex items-end gap-3 mb-1">
-              <span className="text-4xl font-black text-white leading-none">₪120</span>
+              <span className="text-4xl font-black text-white leading-none">₪140</span>
               <span className="text-white/70 text-sm pb-1">+ מע&quot;מ / לחודש</span>
             </div>
             <p className="text-white/60 text-xs mb-4">ניתן לבטל בכל עת</p>

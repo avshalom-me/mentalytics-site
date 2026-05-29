@@ -207,7 +207,7 @@ function CheckoutForm() {
       <div className="mt-4 rounded-xl border border-[#E8E0D8] bg-white p-4">
         <div className="flex justify-between items-center">
           <span className="font-bold text-stone-800">מנוי חודשי — מסלול מקודם</span>
-          <span className="font-black text-[#0F5468]">&#8362;120 + מע&quot;מ</span>
+          <span className="font-black text-[#0F5468]">&#8362;140 + מע&quot;מ</span>
         </div>
         <p className="text-xs text-stone-500 mt-1">חיוב חודשי מתחדש. ניתן לבטל בכל עת.</p>
       </div>
@@ -368,7 +368,7 @@ function CheckoutForm() {
             >
               תקנון הרכישה
             </Link>{" "}
-            ואת החיוב החודשי המתחדש של ₪120 + מע&quot;מ עד לביטול.
+            ואת החיוב החודשי המתחדש של ₪140 + מע&quot;מ עד לביטול.
           </span>
         </label>
 
@@ -385,7 +385,7 @@ function CheckoutForm() {
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
             <>
-              חיוב מאובטח — ₪141.60
+              חיוב מאובטח — ₪165.20
               <ArrowLeft size={16} className="inline mr-2" />
             </>
           )}

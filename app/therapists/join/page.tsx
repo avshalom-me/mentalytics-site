@@ -133,7 +133,7 @@ export default function TherapistJoinPage() {
                   </ul>
                 </li>
               </ul>
-              <p className="mt-4 text-xs opacity-70" style={{ color: "var(--teal-dark)" }}>* מבצע פתיחה — &#8362;120 + מע&quot;מ / לחודש</p>
+              <p className="mt-4 text-xs opacity-70" style={{ color: "var(--teal-dark)" }}>* מבצע פתיחה — &#8362;140 + מע&quot;מ / לחודש</p>
             </div>
           </div>
         </div>

@@ -54,7 +54,7 @@ export function UpgradeToPromotedButton() {
         className="block w-full text-center rounded-xl px-6 py-3 text-sm font-bold text-white transition hover:opacity-95"
         style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 12px rgba(15,84,104,.25)" }}
       >
-        שדרוג למסלול המקודם — ₪120 + מע&quot;מ / חודש
+        שדרוג למסלול המקודם — ₪140 + מע&quot;מ / חודש
         <ArrowLeft size={16} className="inline mr-2" />
       </Link>
     </div>
