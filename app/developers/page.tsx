@@ -20,7 +20,6 @@ export const metadata: Metadata = {
   },
 };
 
-
 const BENEFITS = [
   "ליווי באפיון, מיקוד ודיוק קהל היעד.",
   "בחינת אפשרויות לפיילוט, מחקר ושיפור מתמשך.",
@@ -30,185 +29,296 @@ const BENEFITS = [
 
 export default function DevelopersPage() {
   return (
-    <main dir="rtl" className="dev-root relative min-h-screen overflow-hidden text-stone-100">
-      {/* Page-specific styles */}
+    <main dir="rtl" className="dev-root relative min-h-screen overflow-hidden">
       <style>{`
         .dev-root {
-          background:
-            radial-gradient(1200px 600px at 20% -10%, rgba(167,139,250,.18), transparent 60%),
-            radial-gradient(900px 500px at 90% 10%, rgba(244,114,182,.15), transparent 60%),
-            radial-gradient(1000px 700px at 50% 110%, rgba(34,211,238,.12), transparent 60%),
-            #07091B;
+          background: #ffffff;
           font-family: 'Heebo', sans-serif;
+          color: var(--text);
         }
+
+        /* Subtle dot grid */
         .dev-grid-bg {
-          background-image:
-            linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-            linear-gradient(to right, rgba(255,255,255,0.04) 1px, transparent 1px);
-          background-size: 56px 56px;
-          mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 40%, transparent 100%);
-          -webkit-mask-image: radial-gradient(ellipse 90% 70% at 50% 30%, black 40%, transparent 100%);
+          background-image: radial-gradient(circle, rgba(61,140,138,.22) 1px, transparent 1px);
+          background-size: 30px 30px;
+          mask-image: radial-gradient(ellipse 85% 55% at 50% 10%, black 20%, transparent 100%);
+          -webkit-mask-image: radial-gradient(ellipse 85% 55% at 50% 10%, black 20%, transparent 100%);
         }
+
+        /* Teal → Gold gradient text */
         .dev-gradient-text {
-          background: linear-gradient(120deg,#A78BFA 0%,#F472B6 45%,#22D3EE 100%);
+          background: linear-gradient(110deg, #2A6462 0%, #3D8C8A 40%, #D49018 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
         }
         .dev-gradient-text-warm {
-          background: linear-gradient(120deg,#FCA66B 0%,#F472B6 50%,#A78BFA 100%);
+          background: linear-gradient(110deg, #D49018 0%, #3D8C8A 100%);
           -webkit-background-clip: text;
           background-clip: text;
           color: transparent;
         }
+
+        /* Light glass cards with 3D depth shadow */
         .dev-glass-card {
-          position: relative;
-          background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.025));
-          border: 1px solid rgba(255,255,255,0.08);
+          background: #ffffff;
+          border: 1px solid var(--line);
           border-radius: 20px;
-          backdrop-filter: blur(14px);
-          -webkit-backdrop-filter: blur(14px);
-          box-shadow: 0 8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06);
+          box-shadow:
+            0 4px 0 var(--teal-mid),
+            0 10px 36px rgba(61,140,138,.09);
+          transition: transform 0.35s ease, box-shadow 0.35s ease;
         }
-        .dev-glass-card::before {
-          content: "";
-          position: absolute; inset: 0;
-          padding: 1px;
-          border-radius: inherit;
-          background: linear-gradient(135deg, rgba(167,139,250,.5), rgba(244,114,182,.35), rgba(34,211,238,.5));
-          -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
-          -webkit-mask-composite: xor;
-                  mask-composite: exclude;
-          opacity: .35;
+        .dev-glass-card:hover {
+          transform: perspective(900px) translateY(-5px) rotateX(1.2deg);
+          box-shadow:
+            0 8px 0 var(--teal-mid),
+            0 20px 50px rgba(61,140,138,.15);
+        }
+
+        /* Hero glass card variant */
+        .dev-hero-card {
+          background: linear-gradient(155deg, #fdfaf7 0%, #eaf4f3 60%, #fdf6e3 100%);
+          border: 1px solid var(--teal-mid);
+          border-radius: 28px;
+          box-shadow:
+            0 6px 0 var(--teal-mid),
+            0 20px 60px rgba(61,140,138,.12);
+          position: relative;
+          overflow: hidden;
+        }
+
+        /* Perspective grid floor */
+        .dev-perspective-grid {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          height: 170px;
+          background-image:
+            linear-gradient(rgba(61,140,138,.22) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(61,140,138,.22) 1px, transparent 1px);
+          background-size: 38px 38px;
+          transform: perspective(320px) rotateX(60deg);
+          transform-origin: bottom;
+          mask-image: linear-gradient(to top, rgba(0,0,0,.35) 0%, transparent 100%);
+          -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,.35) 0%, transparent 100%);
           pointer-events: none;
+          z-index: 0;
         }
+
+        /* Spinning ring decoration */
+        @keyframes spinSlow { to { transform: rotate(360deg); } }
+        .dev-ring {
+          background: conic-gradient(from 90deg, #3D8C8A, #D49018, #F0A8AC, #3D8C8A);
+          animation: spinSlow 18s linear infinite;
+          filter: blur(1px);
+        }
+
+        /* CTA button: dark teal → gold */
         .dev-cta-btn {
-          background: linear-gradient(120deg,#5B3FE3 0%,#C13ABF 50%,#0EA5E9 100%);
+          background: linear-gradient(120deg, #2A6462 0%, #3D8C8A 45%, #D49018 100%);
           background-size: 200% 200%;
           animation: ctaShift 6s ease-in-out infinite;
-          box-shadow: 0 10px 40px rgba(193,58,191,.45), 0 4px 16px rgba(91,63,227,.4);
+          box-shadow: 0 6px 28px rgba(61,140,138,.45), 0 2px 8px rgba(212,144,24,.3);
+          border-radius: 50px;
+          transition: filter 0.25s ease, transform 0.25s ease;
         }
-        .dev-cta-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .dev-cta-btn:hover { filter: brightness(1.08); transform: translateY(-2px); }
         @keyframes ctaShift {
           0%,100% { background-position: 0% 50%; }
-          50%     { background-position: 100% 50%; }
+          50%      { background-position: 100% 50%; }
         }
+
+        /* Blobs */
         @keyframes floatBlob {
           0%,100% { transform: translateY(0) scale(1); }
-          50%     { transform: translateY(-22px) scale(1.06); }
+          50%      { transform: translateY(-20px) scale(1.05); }
         }
+        .dev-blob   { animation: floatBlob 9s ease-in-out infinite; }
+        .dev-blob-2 { animation-duration: 12s; animation-delay: 2s; }
+        .dev-blob-3 { animation-duration: 14s; animation-delay: 4.5s; }
+
+        /* Animations */
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(22px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes spinSlow { to { transform: rotate(360deg); } }
-        @keyframes pulseDot {
-          0%,100% { opacity: .35; transform: scale(1); }
-          50%     { opacity: .85; transform: scale(1.25); }
-        }
-        .dev-blob { animation: floatBlob 9s ease-in-out infinite; }
-        .dev-blob-2 { animation-duration: 11s; animation-delay: 2s; }
-        .dev-blob-3 { animation-duration: 13s; animation-delay: 4s; }
-        .fade-up { animation: fadeUp .7s ease both; }
+        .fade-up   { animation: fadeUp .7s ease both; }
         .fade-up-2 { animation-delay: .1s; }
         .fade-up-3 { animation-delay: .2s; }
         .fade-up-4 { animation-delay: .3s; }
+
+        /* Icon chip */
         .dev-icon-chip {
-          background: linear-gradient(135deg, rgba(167,139,250,.18), rgba(244,114,182,.12));
-          border: 1px solid rgba(167,139,250,.3);
-          box-shadow: 0 0 24px rgba(167,139,250,.15) inset;
+          background: var(--teal-pale);
+          border: 1px solid var(--teal-mid);
         }
+
+        /* Bullet */
         .dev-bullet {
-          background: linear-gradient(135deg,#A78BFA,#F472B6,#22D3EE);
-          box-shadow: 0 0 14px rgba(244,114,182,.5);
+          background: linear-gradient(135deg, #3D8C8A, #D49018);
+          box-shadow: 0 0 10px rgba(61,140,138,.5);
+        }
+
+        /* Pulsing dot */
+        @keyframes pulseDot {
+          0%,100% { opacity: .4; transform: scale(1); }
+          50%      { opacity: 1;  transform: scale(1.35); }
         }
         .dev-pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
-        .dev-ring {
-          background: conic-gradient(from 90deg, #A78BFA, #F472B6, #22D3EE, #A78BFA);
-          animation: spinSlow 16s linear infinite;
-          filter: blur(1px);
+
+        /* 3D floating cards scene — desktop only */
+        .dev-3d-scene { display: none; position: relative; width: 190px; height: 155px; flex-shrink: 0; }
+        @media (min-width: 768px) { .dev-3d-scene { display: block; } }
+
+        /* Secondary button */
+        .dev-sec-btn {
+          border-radius: 50px;
+          border: 1.5px solid var(--teal-mid);
+          padding: 10px 22px;
+          font-size: 14px;
+          font-weight: 600;
+          color: var(--teal);
+          background: transparent;
+          transition: background 0.25s ease, color 0.25s ease;
+          display: inline-flex;
+          align-items: center;
+          gap: 8px;
+          text-decoration: none;
         }
+        .dev-sec-btn:hover { background: var(--teal-pale); }
       `}</style>
 
-      {/* Animated background grid + blobs */}
-      <div className="dev-grid-bg pointer-events-none absolute inset-0 -z-0" aria-hidden />
-      <div
-        className="dev-blob pointer-events-none absolute -top-32 -right-24 h-[28rem] w-[28rem] rounded-full opacity-50 -z-0"
-        style={{ background: "radial-gradient(circle, #6D28D9, transparent 70%)" }}
-        aria-hidden
-      />
-      <div
-        className="dev-blob dev-blob-2 pointer-events-none absolute top-[40%] -left-40 h-[26rem] w-[26rem] rounded-full opacity-40 -z-0"
-        style={{ background: "radial-gradient(circle, #DB2777, transparent 70%)" }}
-        aria-hidden
-      />
-      <div
-        className="dev-blob dev-blob-3 pointer-events-none absolute -bottom-32 right-1/4 h-[24rem] w-[24rem] rounded-full opacity-40 -z-0"
-        style={{ background: "radial-gradient(circle, #06B6D4, transparent 70%)" }}
-        aria-hidden
-      />
+      {/* Background elements */}
+      <div className="dev-grid-bg pointer-events-none absolute inset-0" style={{ zIndex: 0 }} aria-hidden />
+      <div className="dev-blob pointer-events-none absolute -top-40 -right-32 h-[30rem] w-[30rem] rounded-full"
+        style={{ background: "radial-gradient(circle, #3D8C8A, transparent 70%)", opacity: .12, zIndex: 0 }} aria-hidden />
+      <div className="dev-blob dev-blob-2 pointer-events-none absolute top-[45%] -left-44 h-[26rem] w-[26rem] rounded-full"
+        style={{ background: "radial-gradient(circle, #D49018, transparent 70%)", opacity: .1, zIndex: 0 }} aria-hidden />
+      <div className="dev-blob dev-blob-3 pointer-events-none absolute -bottom-40 right-1/4 h-[22rem] w-[22rem] rounded-full"
+        style={{ background: "radial-gradient(circle, #F0A8AC, transparent 70%)", opacity: .18, zIndex: 0 }} aria-hidden />
 
-      <div className="relative z-10 mx-auto max-w-5xl px-5 pb-24">
-        {/* HERO */}
+      <div className="relative mx-auto max-w-5xl px-5 pb-24" style={{ zIndex: 1 }}>
+
+        {/* ── HERO ── */}
         <section className="pt-12 fade-up">
-          <div className="dev-glass-card relative overflow-hidden p-8 md:p-14">
-            {/* Decorative spinning ring */}
-            <div className="pointer-events-none absolute -left-24 -top-24 h-64 w-64 rounded-full opacity-30 dev-ring" aria-hidden />
+          <div className="dev-hero-card">
 
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase backdrop-blur"
-              style={{ color: "#C4B5FD" }}>
-              <Sparkles size={12} />
-              חדש בטיפול חכם
-              <span className="dev-pulse-dot ml-1 inline-block h-1.5 w-1.5 rounded-full"
-                style={{ background: "#22D3EE" }} />
-            </div>
+            {/* Spinning ring */}
+            <div className="pointer-events-none absolute -left-20 -top-20 h-56 w-56 rounded-full dev-ring"
+              style={{ opacity: .18 }} aria-hidden />
 
-            <h1 className="mt-6 text-4xl md:text-6xl font-black leading-tight tracking-tight">
-              <span className="dev-gradient-text">בית למפתחים</span>
-              <br />
-              <span className="text-white">בתחום בריאות הנפש והלמידה</span>
-            </h1>
+            {/* Perspective grid floor */}
+            <div className="dev-perspective-grid" aria-hidden />
 
-            <div className="mt-3 text-sm md:text-base font-semibold text-stone-400">
-              מבית <span className="dev-gradient-text-warm">טיפול חכם</span>
-            </div>
+            <div className="relative p-8 md:p-14 flex items-center gap-12" style={{ zIndex: 1 }}>
 
-            <p className="mt-6 max-w-3xl text-lg leading-8 text-stone-200">
-              יש לכם רעיון לאפליקציה או תוכנה שיכולים לעזור לאנשים? טיפול חכם מזמינה מטפלים ויזמים להצטרף לבית מקצועי חדש לפיתוח כלים דיגיטליים בתחום בריאות הנפש, הטיפול, ההורות והלמידה.
-            </p>
+              {/* Text */}
+              <div style={{ flex: 1 }}>
+                {/* Badge */}
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: "8px",
+                  fontSize: "11px", fontWeight: 700, color: "var(--teal)",
+                  textTransform: "uppercase", letterSpacing: ".16em",
+                  background: "var(--teal-pale)", padding: "6px 14px", borderRadius: "50px",
+                  border: "1px solid var(--teal-mid)", marginBottom: "24px",
+                }}>
+                  <Sparkles size={11} />
+                  חדש בטיפול חכם
+                  <span className="dev-pulse-dot inline-block h-1.5 w-1.5 rounded-full" style={{ background: "var(--gold)" }} />
+                </div>
 
-            <p className="mt-5 max-w-3xl text-base leading-8 text-stone-300">
-              אנחנו מאמינים שהעתיד של בריאות הנפש והלמידה לא נמצא רק בחדר הטיפולים, אלא גם בכלים חכמים שיכולים ללוות אנשים בין פגישות,
-              להנגיש ידע מקצועי, לתמוך בתרגול רגשי, לסייע בזיהוי צרכים, לחזק תהליכי למידה ולעזור לאנשי מקצוע לתת מענה מדויק, נגיש ויעיל יותר.
-            </p>
+                <h1 style={{
+                  fontSize: "clamp(2.2rem, 4.5vw, 3.8rem)", fontWeight: 900,
+                  lineHeight: 1.1, letterSpacing: "-.025em", marginBottom: "8px",
+                }}>
+                  <span className="dev-gradient-text">בית למפתחים</span>
+                  <br />
+                  <span style={{ color: "var(--text)" }}>בתחום בריאות הנפש והלמידה</span>
+                </h1>
 
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#contact"
-                className="dev-cta-btn group relative inline-flex items-center gap-2 overflow-hidden rounded-xl px-6 py-3 text-sm font-bold text-white"
-              >
-                <Zap size={16} />
-                בואו ניצור שיתוף פעולה
-              </a>
-              <a
-                href="#how"
-                className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/5 px-6 py-3 text-sm font-semibold text-stone-200 backdrop-blur transition hover:bg-white/10"
-              >
-                איך זה עובד
-              </a>
+                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--muted)", marginBottom: "20px" }}>
+                  מבית{" "}
+                  <span style={{ color: "var(--gold-dark)", fontWeight: 700 }}>טיפול חכם</span>
+                </div>
+
+                <p style={{ fontSize: "17px", lineHeight: 1.9, color: "var(--text-2)", maxWidth: "58ch", marginBottom: "14px" }}>
+                  יש לכם רעיון לאפליקציה או תוכנה שיכולים לעזור לאנשים? טיפול חכם מזמינה מטפלים ויזמים להצטרף לבית מקצועי חדש לפיתוח כלים דיגיטליים בתחום בריאות הנפש, הטיפול, ההורות והלמידה.
+                </p>
+
+                <p style={{ fontSize: "15px", lineHeight: 1.9, color: "var(--muted)", maxWidth: "58ch", marginBottom: "32px" }}>
+                  אנחנו מאמינים שהעתיד של בריאות הנפש והלמידה לא נמצא רק בחדר הטיפולים, אלא גם בכלים חכמים שיכולים ללוות אנשים בין פגישות, להנגיש ידע מקצועי ולסייע בזיהוי צרכים.
+                </p>
+
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                  <a href="#contact" className="dev-cta-btn"
+                    style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "12px 24px", fontSize: "14px", fontWeight: 700, color: "white", textDecoration: "none" }}>
+                    <Zap size={16} />
+                    בואו ניצור שיתוף פעולה
+                  </a>
+                  <a href="#how" className="dev-sec-btn">
+                    איך זה עובד
+                  </a>
+                </div>
+              </div>
+
+              {/* 3D floating cards — desktop decoration */}
+              <div className="dev-3d-scene" aria-hidden>
+                {/* Card — back layer */}
+                <div style={{
+                  position: "absolute",
+                  width: "158px", height: "100px",
+                  background: "var(--gold-pale)",
+                  borderRadius: "14px",
+                  border: "1px solid #EDD090",
+                  transform: "perspective(600px) rotateY(22deg) rotateX(-7deg) translate(-28px, -22px)",
+                  boxShadow: "0 14px 36px rgba(212,144,24,.2)",
+                  opacity: 0.75,
+                }} />
+                {/* Card — mid layer */}
+                <div style={{
+                  position: "absolute",
+                  width: "158px", height: "100px",
+                  background: "var(--teal-pale)",
+                  borderRadius: "14px",
+                  border: "1px solid var(--teal-mid)",
+                  transform: "perspective(600px) rotateY(22deg) rotateX(-7deg) translate(-12px, -9px)",
+                  boxShadow: "0 14px 36px rgba(61,140,138,.18)",
+                  opacity: 0.88,
+                }} />
+                {/* Card — front layer with fake UI */}
+                <div style={{
+                  position: "absolute",
+                  width: "158px", height: "100px",
+                  background: "white",
+                  borderRadius: "14px",
+                  border: "1px solid var(--line)",
+                  transform: "perspective(600px) rotateY(22deg) rotateX(-7deg)",
+                  boxShadow: "0 18px 44px rgba(61,140,138,.22)",
+                  padding: "14px 16px",
+                }}>
+                  <div style={{ width: "55%", height: "8px", background: "var(--teal)", borderRadius: "4px", marginBottom: "8px", opacity: .75 }} />
+                  <div style={{ width: "80%", height: "6px", background: "var(--line)", borderRadius: "4px", marginBottom: "6px" }} />
+                  <div style={{ width: "40%", height: "6px", background: "var(--line)", borderRadius: "4px", marginBottom: "14px" }} />
+                  <div style={{ display: "flex", gap: "6px" }}>
+                    <div style={{ width: "50px", height: "22px", background: "var(--teal)", borderRadius: "6px", opacity: .85 }} />
+                    <div style={{ width: "38px", height: "22px", background: "var(--gold-pale)", border: "1px solid #EDD090", borderRadius: "6px" }} />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* RESEARCH + WHAT WE OFFER (merged) */}
+        {/* ── RESEARCH + OFFER ── */}
         <section id="how" className="mt-16 fade-up fade-up-2">
           <SectionHeader
             icon={FlaskConical}
-            iconBg="linear-gradient(135deg,#F472B6,#FB923C)"
+            iconBg="linear-gradient(135deg, #3D8C8A, #D49018)"
             title="מחקר, פיילוטים ולמידה"
             kicker="מרעיון להוכחה"
           />
-
           <div className="mt-6 grid gap-4">
             <ProseCard>
               אם פיתחתם כלי, אפליקציה, שאלון או פתרון שמסייע לאנשים — נשמח להכיר. הפלטפורמה של טיפול חכם נבנית כמערכת חכמה להתאמת פתרונות בתחום הנפש והלמידה, וכלים דיגיטליים יוכלו להשתלב כחלק ממערך ההמלצות לצד טיפול, אבחון ואנשי מקצוע.
@@ -219,15 +329,14 @@ export default function DevelopersPage() {
           </div>
         </section>
 
-        {/* WHAT TO BUILD */}
-        <section className="mt-16 fade-up fade-up-4">
+        {/* ── WHAT TO BUILD ── */}
+        <section className="mt-16 fade-up fade-up-3">
           <SectionHeader
             icon={Cpu}
-            iconBg="linear-gradient(135deg,#06B6D4,#A78BFA)"
+            iconBg="linear-gradient(135deg, #2A6462, #3D8C8A)"
             title="מה אפשר לפתח יחד?"
             kicker="מגוון רחב של כלים"
           />
-
           <div className="mt-6">
             <ProseCard>
               אפליקציות לתרגול רגשי, כלים לוויסות חרדה, מערכות לניהול טיפול, שאלונים דיגיטליים, כלים להורים, תוכנות למעקב בין פגישות,
@@ -237,52 +346,63 @@ export default function DevelopersPage() {
           </div>
         </section>
 
-        {/* BENEFITS */}
-        <section className="mt-16 fade-up fade-up-4">
+        {/* ── BENEFITS ── */}
+        <section className="mt-16 fade-up fade-up-3">
           <SectionHeader
             icon={Rocket}
-            iconBg="linear-gradient(135deg,#F472B6,#A78BFA)"
+            iconBg="linear-gradient(135deg, #D49018, #F0A8AC)"
             title="למה להצטרף אלינו?"
             kicker="מה אנחנו נביא לשולחן"
           />
-
           <ul className="mt-6 grid gap-3 md:grid-cols-2">
             {BENEFITS.map((b, i) => (
-              <li key={i} className="dev-glass-card flex items-start gap-3 p-4">
-                <span className="dev-bullet mt-2 h-2 w-2 flex-shrink-0 rounded-full" />
-                <span className="text-[15px] leading-7 text-stone-200">{b}</span>
+              <li key={i} className="dev-glass-card flex items-start gap-3 p-5">
+                <span className="dev-bullet mt-2 h-2.5 w-2.5 flex-shrink-0 rounded-full" />
+                <span style={{ fontSize: "15px", lineHeight: "1.8", color: "var(--text-2)" }}>{b}</span>
               </li>
             ))}
           </ul>
         </section>
 
-        {/* CONTACT FORM */}
+        {/* ── CONTACT ── */}
         <section id="contact" className="mt-20 fade-up fade-up-4">
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold tracking-widest uppercase backdrop-blur"
-              style={{ color: "#FCA66B" }}>
+          <div style={{
+            background: "linear-gradient(145deg, var(--teal-pale) 0%, #ffffff 50%, var(--gold-pale) 100%)",
+            borderRadius: "28px",
+            padding: "52px 40px",
+            textAlign: "center",
+            border: "1px solid var(--teal-mid)",
+            boxShadow: "0 6px 0 var(--teal-mid), 0 20px 60px rgba(61,140,138,.1)",
+            marginBottom: "32px",
+          }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: "8px",
+              fontSize: "11px", fontWeight: 700, color: "var(--gold-dark)",
+              textTransform: "uppercase", letterSpacing: ".16em",
+              background: "var(--gold-pale)", padding: "6px 14px", borderRadius: "50px",
+              border: "1px solid #EDD090", marginBottom: "20px",
+            }}>
               <HeartHandshake size={12} />
               יש לכם רעיון? נשמח לשמוע
             </div>
-            <h2 className="mt-5 text-3xl md:text-4xl font-black leading-tight">
-              <span className="dev-gradient-text-warm">בואו נבנה יחד</span>
-              <span className="text-white"> את הדור הבא</span>
+
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", fontWeight: 900, lineHeight: 1.15, letterSpacing: "-.02em", marginBottom: "16px" }}>
+              <span className="dev-gradient-text">בואו נבנה יחד</span>
+              <span style={{ color: "var(--text)" }}> את הדור הבא</span>
             </h2>
-            <p className="mx-auto mt-4 max-w-2xl text-stone-300 leading-7">
-              אם יש לכם אפליקציה קיימת, תוכנה בפיתוח, שאלון מקצועי, רעיון ראשוני או צורך מהשטח שאתם רוצים להפוך לכלי דיגיטלי —
-              זה המקום להתחיל.
+
+            <p style={{ maxWidth: "52ch", margin: "0 auto 12px", lineHeight: 1.8, color: "var(--text-2)", fontSize: "16px" }}>
+              אם יש לכם אפליקציה קיימת, תוכנה בפיתוח, שאלון מקצועי, רעיון ראשוני או צורך מהשטח שאתם רוצים להפוך לכלי דיגיטלי — זה המקום להתחיל.
             </p>
-            <p className="mx-auto mt-3 max-w-2xl text-stone-300 leading-7">
+            <p style={{ maxWidth: "52ch", margin: "0 auto 20px", lineHeight: 1.8, color: "var(--muted)", fontSize: "15px" }}>
               בואו לקחת חלק בבניית הדור הבא של הכלים הדיגיטליים בתחום בריאות הנפש, הטיפול, ההורות והלמידה.
             </p>
-            <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-7 dev-gradient-text">
-              השאירו פרטים ונבחן יחד כיצד ניתן לשלב, לפתח או לקדם את הרעיון שלכם במסגרת טיפול חכם — מהשלב הראשוני ועד למוצר דיגיטלי שלם.
+            <p style={{ maxWidth: "52ch", margin: "0 auto", lineHeight: 1.8, fontSize: "15px", fontWeight: 600 }} className="dev-gradient-text">
+              השאירו פרטים ונבחן יחד כיצד ניתן לשלב, לפתח או לקדם את הרעיון שלכם.
             </p>
           </div>
 
-          <div className="mt-8">
-            <DevelopersForm />
-          </div>
+          <DevelopersForm />
         </section>
       </div>
     </main>
@@ -304,17 +424,17 @@ function SectionHeader({
     <div className="flex items-start gap-3">
       <div
         className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-2xl"
-        style={{ background: iconBg, boxShadow: "0 8px 28px rgba(167,139,250,.35)" }}
+        style={{ background: iconBg, boxShadow: "0 6px 24px rgba(61,140,138,.3)" }}
       >
         <Icon size={20} color="white" />
       </div>
       <div>
         {kicker && (
-          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "#C4B5FD" }}>
+          <div className="text-xs font-semibold uppercase tracking-widest" style={{ color: "var(--teal)" }}>
             {kicker}
           </div>
         )}
-        <h2 className="text-2xl md:text-3xl font-extrabold text-white">{title}</h2>
+        <h2 className="text-2xl md:text-3xl font-extrabold" style={{ color: "var(--text)" }}>{title}</h2>
       </div>
     </div>
   );
@@ -322,8 +442,8 @@ function SectionHeader({
 
 function ProseCard({ children }: { children: React.ReactNode }) {
   return (
-    <div className="dev-glass-card p-5 md:p-6">
-      <p className="text-[15px] md:text-base leading-8 text-stone-200">{children}</p>
+    <div className="dev-glass-card p-5 md:p-6" style={{ borderInlineStart: "4px solid var(--teal)" }}>
+      <p className="text-[15px] md:text-base leading-8" style={{ color: "var(--text-2)" }}>{children}</p>
     </div>
   );
 }
