@@ -1,6 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Sparkles, Heart, Users } from "lucide-react";
+import { Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "מי אנחנו",
@@ -128,35 +128,75 @@ export default function AboutPage() {
         </div>
       </section>
 
-      {/* HERO */}
+      {/* DISCLAIMER */}
       <section className="mt-10 fade-up fade-up-2">
-        <div
-          className="relative overflow-hidden rounded-[36px]"
-          style={{
-            background: "linear-gradient(135deg, #FDF6EE 0%, #F5E8DC 40%, #E8F4F0 100%)",
-            boxShadow: "0 24px 60px rgba(120,80,50,.12), 0 4px 16px rgba(120,80,50,.07)",
-            border: "1px solid rgba(220,200,180,.5)",
-          }}
-        >
-          <div className="blob pointer-events-none absolute -left-20 -top-20 h-72 w-72 rounded-full opacity-30"
-            style={{ background: "radial-gradient(circle, #F4A574, transparent 70%)" }} />
-          <div className="blob blob-2 pointer-events-none absolute -right-24 bottom-0 h-80 w-80 rounded-full opacity-20"
-            style={{ background: "radial-gradient(circle, #7EC8A4, transparent 70%)" }} />
+        <div style={{
+          borderRadius: "20px",
+          padding: "24px 32px",
+          background: "var(--teal-pale)",
+          border: "1px solid var(--teal-mid)",
+          display: "flex",
+          alignItems: "center",
+          gap: "16px",
+        }}>
+          <span style={{ fontSize: "22px", flexShrink: 0 }}>💡</span>
+          <p style={{ fontSize: "16px", fontWeight: 600, color: "var(--teal-dark)", lineHeight: 1.7, margin: 0 }}>
+            אנחנו לא מחליפים טיפול או אבחון מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובמקצועיות
+          </p>
+        </div>
+      </section>
 
-          <div className="relative p-8 md:p-12">
-            <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase"
-              style={{ background: "#F4A57422", color: "#B06030", border: "1px solid #F4A57455" }}>
-              <Sparkles size={12} />
-              מי אנחנו
-            </div>
-
-            <p className="mt-6 max-w-3xl leading-8 text-stone-700 text-lg">
-              טיפול חכם נולדה מתוך הבנה פשוטה: הרבה אנשים "מסתובבים" בין אפשרויות טיפול,
-              אבחונים ומסלולי זכאות — בלי מפת דרכים ברורה. אנחנו בונים מערכת שמסייעת למקד
-              את הקושי, להציע כיוון טיפול מתאים, ולהנגיש מידע מסודר על צעדים אפשריים.
-              כי לפעמים הצעד הכי קשה הוא פשוט לדעת מאיפה להתחיל — ואנחנו כאן בדיוק בשביל זה.
-            </p>
+      {/* TEAM */}
+      <section className="mt-14 fade-up fade-up-3">
+        <div className="flex items-start gap-3 mb-6">
+          <div
+            className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: "#EBF0F5", border: "1px solid #A8C0D4" }}
+          >
+            <Users size={18} style={{ color: "var(--teal)" }} />
           </div>
+          <div>
+            <h2 className="text-2xl font-extrabold text-stone-900">הצוות המקצועי המפתח</h2>
+            <p className="mt-1 text-stone-600">אנשי מקצוע מהתחום הקליני והאבחוני שמובילים את הפיתוח המקצועי.</p>
+          </div>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {team.map((m) => (
+            <div
+              key={m.name}
+              className="rounded-2xl bg-white p-5"
+              style={{
+                border: "1px solid #EAE0D5",
+                boxShadow: "0 4px 16px rgba(100,60,30,.07)",
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="relative h-16 w-16 overflow-hidden rounded-2xl flex-shrink-0"
+                  style={{ border: "2px solid var(--line)", background: "var(--surface)" }}>
+                  <Image src={m.img} alt={m.name} fill className="object-cover" />
+                </div>
+                <div>
+                  <div className="text-base font-extrabold text-stone-900">{m.name}</div>
+                  <div className="mt-0.5 text-xs font-semibold" style={{ color: "#8B6A50" }}>
+                    {m.role}
+                  </div>
+                </div>
+              </div>
+
+              <ul className="mt-4 space-y-2">
+                {m.bullets.map((b, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm leading-6 text-stone-700">
+                    <span
+                      className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
+                      style={{ background: "var(--teal)" }}
+                    />
+                    <span>{b}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -219,81 +259,6 @@ export default function AboutPage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* TEAM */}
-      <section className="mt-14 fade-up fade-up-3">
-        <div className="flex items-start gap-3 mb-6">
-          <div
-            className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "#EBF0F5", border: "1px solid #A8C0D4" }}
-          >
-            <Users size={18} style={{ color: "var(--teal)" }} />
-          </div>
-          <div>
-            <h2 className="text-2xl font-extrabold text-stone-900">הצוות המקצועי המפתח</h2>
-            <p className="mt-1 text-stone-600">אנשי מקצוע מהתחום הקליני והאבחוני שמובילים את הפיתוח המקצועי.</p>
-          </div>
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-3">
-          {team.map((m) => (
-            <div
-              key={m.name}
-              className="rounded-2xl bg-white p-5"
-              style={{
-                border: "1px solid #EAE0D5",
-                boxShadow: "0 4px 16px rgba(100,60,30,.07)",
-              }}
-            >
-              <div className="flex items-center gap-4">
-                <div className="relative h-16 w-16 overflow-hidden rounded-2xl flex-shrink-0"
-                  style={{ border: "2px solid var(--line)", background: "var(--surface)" }}>
-                  <Image src={m.img} alt={m.name} fill className="object-cover" />
-                </div>
-                <div>
-                  <div className="text-base font-extrabold text-stone-900">{m.name}</div>
-                  <div className="mt-0.5 text-xs font-semibold" style={{ color: "#8B6A50" }}>
-                    {m.role}
-                  </div>
-                </div>
-              </div>
-
-              <ul className="mt-4 space-y-2">
-                {m.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm leading-6 text-stone-700">
-                    <span
-                      className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                      style={{ background: "var(--teal)" }}
-                    />
-                    <span>{b}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* CLOSING */}
-      <section className="mt-14 fade-up fade-up-3">
-        <div
-          className="rounded-3xl p-8 text-center"
-          style={{
-            background: "linear-gradient(135deg,#FDF6EE,#E8F4F0)",
-            border: "1px solid #E0D5C8",
-            boxShadow: "0 8px 28px rgba(100,60,30,.08)",
-          }}
-        >
-          <div className="text-3xl mb-3">🌿</div>
-          <h3 className="text-xl font-extrabold text-stone-900">
-            כי כל אחד מגיע לדרך שלו — בזמן שלו
-          </h3>
-          <p className="mt-3 max-w-xl mx-auto leading-7 text-stone-700">
-            טיפול חכם לא כאן כדי להגיד לכם מה לעשות. אנחנו כאן כדי לעזור לכם להבין
-            קצת יותר — ולהרגיש קצת פחות לבד בתהליך.
-          </p>
         </div>
       </section>
 
