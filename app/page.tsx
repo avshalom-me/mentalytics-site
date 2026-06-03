@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import ContactForm from "./components/ContactForm";
+import TooltipAsterisk from "./components/TooltipAsterisk";
 
 export const metadata: Metadata = {
   title: "טיפול חכם — מתאימים את החיבור הנכון",
@@ -38,7 +39,7 @@ const steps = [
   {
     n: "1",
     title: "מלאו את השאלון",
-    body: "שאלון אדפטיבי שמסתעף לפי תשובותיכם — מצאו והבינו מה הקושי. כל תשובה מדייקת את הכיוון הבא.",
+    body: "שאלון שמסתעף לפי תשובותיכם — מצאו והבינו מה הקושי. כל תשובה מדייקת את הכיוון הבא.",
     active: true,
   },
   {
@@ -182,34 +183,43 @@ export default function HomePage() {
 
           {/* Trust badges */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", fontSize: "13px", color: "var(--muted)", justifyContent: "center" }} className="fade fade-5">
-            {["🔒 אנונימי לחלוטין", "🆓 חינמי", "⏱ כמה דקות", "📄 דו\"ח אישי לשמירה"].map(t => (
-              <span key={t} style={{ display: "flex", alignItems: "center", gap: "5px" }}>{t}</span>
-            ))}
+            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>🔒 שאלון אנונימי</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>🆓 חינמי<TooltipAsterisk /></span>
+            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>⏱ כמה דקות</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>📄 דו"ח אישי לשמירה</span>
           </div>
         </div>
       </section>
 
       {/* ─── STATS STRIP ─── */}
-      <div style={{
+      <style>{`
+        @media (max-width: 640px) {
+          .stats-strip { padding: 20px 12px !important; }
+          .stat-item { padding: 0 10px !important; }
+          .stat-number { font-size: 1.35rem !important; }
+          .stat-label { font-size: 11px !important; white-space: normal !important; text-align: center; }
+        }
+      `}</style>
+      <div className="stats-strip" style={{
         background: "var(--surface)",
         borderTop: "1px solid var(--line)", borderBottom: "1px solid var(--line)",
         padding: "24px 56px",
         display: "flex", alignItems: "center", justifyContent: "center",
-        gap: 0, flexWrap: "wrap",
+        gap: 0, flexWrap: "nowrap",
       }}>
         {[
           { n: "20+", l: "סוגי טיפולים נפשיים" },
           { n: "100%", l: "אנונימי לחלוטין" },
           { n: "מאות", l: "מחקרים כבסיס" },
-          { n: "6", l: "שימושים חינמיים" },
         ].map(({ n, l }, i, arr) => (
-          <div key={n} style={{
+          <div key={n} className="stat-item" style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
             padding: "0 44px",
             borderInlineEnd: i < arr.length - 1 ? "1px solid var(--line)" : "none",
+            flex: "1 1 0", minWidth: 0,
           }}>
-            <span style={{ fontSize: "2rem", fontWeight: 900, color: "var(--teal)", lineHeight: 1 }}>{n}</span>
-            <span style={{ fontSize: "13px", color: "var(--muted)", whiteSpace: "nowrap" }}>{l}</span>
+            <span className="stat-number" style={{ fontSize: "2rem", fontWeight: 900, color: "var(--teal)", lineHeight: 1 }}>{n}</span>
+            <span className="stat-label" style={{ fontSize: "13px", color: "var(--muted)", whiteSpace: "nowrap" }}>{l}</span>
           </div>
         ))}
       </div>
