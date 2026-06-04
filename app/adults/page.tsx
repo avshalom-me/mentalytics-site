@@ -2492,7 +2492,7 @@ export default function AdultsPage() {
             מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
           </div>
           <p className="mt-3 text-center text-xs opacity-50">טיפול חכם</p>
-          <div className="mt-4 flex justify-center print:hidden">
+          <div className="mt-4 flex justify-center print:hidden" data-html2canvas-ignore="true">
             <button onClick={() => downloadResultsPDF("adults-results-card", "תוצאות-השאלון")}
               className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
               id="adults-download-pdf-btn">

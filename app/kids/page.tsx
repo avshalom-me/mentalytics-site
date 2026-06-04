@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import {
@@ -3302,7 +3303,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   const allExternalNotes = uniq(byDomain.flatMap(b => b.externalNotes));
 
   return (
-    <div>
+    <div id="kids-results-card">
       {/* Demographics card */}
       <Card>
         <StepTag>סיכום שאלון</StepTag>
@@ -3571,8 +3572,8 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         )}
       </div>
 
-      {/* Matching — visible only after a selection */}
-      <div id="kids-match-section">
+      {/* Matching — visible only after a selection. Excluded from the PDF capture. */}
+      <div id="kids-match-section" data-html2canvas-ignore="true">
         {activeSelection && (
           <KidsMatchSection A={A} score={score} selection={activeSelection} />
         )}
@@ -3586,10 +3587,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       </div>
 
       {/* Actions */}
-      <div className="mt-6 flex gap-3 justify-end print:hidden">
+      <div className="mt-6 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
         <button
-          onClick={() => window.print()}
-          className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all"
+          onClick={() => downloadResultsPDF("kids-results-card", "תוצאות-השאלון-ילדים", "#ffffff")}
+          data-pdf-trigger="kids-results-card"
+          className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all disabled:opacity-60"
         >
           💾 שמירה כ-PDF
         </button>

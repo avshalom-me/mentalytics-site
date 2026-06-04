@@ -4,7 +4,11 @@
 //
 // Dynamic imports keep the ~200KB of html2canvas + jspdf out of the main bundle.
 
-export async function downloadResultsPDF(elementId: string, baseFilename: string): Promise<void> {
+export async function downloadResultsPDF(
+  elementId: string,
+  baseFilename: string,
+  backgroundColor: string = "#1a3a5c",
+): Promise<void> {
   const el = document.getElementById(elementId);
   if (!el) return;
 
@@ -28,7 +32,7 @@ export async function downloadResultsPDF(elementId: string, baseFilename: string
     // and forced a window.print() fallback.
     const canvas = await html2canvas(el, {
       scale: 2,
-      backgroundColor: "#1a3a5c",
+      backgroundColor,
       useCORS: true,
       logging: false,
     });
