@@ -19,7 +19,8 @@ export default function NavBar() {
     <header style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--line)" }}>
       {/* Topbar */}
       <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)", padding: "8px 24px", fontSize: "13px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "6px" }}>
-        <span>לאנשי מקצוע:</span>
+        <span>כניסה למטפלים</span>
+        <span style={{ color: "var(--faint)" }}>›</span>
         <Link href="/therapists/join" style={{ color: "var(--teal)", fontWeight: 600, transition: "opacity .15s" }} className="hover:opacity-75">כניסה / הרשמה</Link>
       </div>
 

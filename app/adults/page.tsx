@@ -864,14 +864,16 @@ export default function AdultsPage() {
   if (screen === "disclaimer") return (
     <Layout screen={screen} domains={answers.domains}>
       <Card>
-        <div className="mb-6 rounded-xl border-2 border-amber-300 bg-amber-50 p-6 leading-relaxed text-amber-900">
-          <p className="mb-3 text-base font-bold">⚠️ הצהרה והבהרה משפטית</p>
+        <div className="mb-4 rounded-xl p-4 text-sm font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
+          🔒 מילוי השאלון אנונימי לחלוטין — לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
+        </div>
+        <div className="mb-6 rounded-xl p-6 leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
+          <p className="mb-3 text-sm font-bold" style={{ color: "var(--text)" }}>📋 הצהרה והבהרה</p>
           <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
           <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
-          <p className="mb-3 text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
-          <p className="text-sm font-semibold">🚨 אם אתה/את נמצא/ת במצב של מצוקה נפשית חריפה או סכנה מיידית, פנה/י מיד לחדר מיון הקרוב, לקו החירום 101 (מד&quot;א) או לסיוע ראשוני 1201.</p>
+          <p className="text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
         </div>
-        <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 hover:bg-amber-100">
+        <label className="flex cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
           <input type="checkbox" checked={agreed} onChange={(e) => setAgreed(e.target.checked)} className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[var(--teal)]" />
           <span>קראתי את ההצהרה לעיל, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
         </label>
@@ -2299,7 +2301,7 @@ export default function AdultsPage() {
           <div className="mb-4 flex justify-center">
             <img src="/logo.svg.png" alt="Mentalytics" className="h-14 w-auto" />
           </div>
-          <h2 className="mb-1 text-2xl font-black" style={{ fontFamily: "serif" }}>תוצאות השאלון</h2>
+          <h2 className="mb-1 text-2xl font-black" style={{ fontFamily: "'Heebo', sans-serif" }}>תוצאות השאלון</h2>
           <p className="mb-4 text-sm opacity-75">לחץ/י על אחד מהממצאים כדי לחפש מטפל מתאים</p>
           {err && <p className="mb-3 rounded-lg bg-red-800 p-3 text-sm">{err}</p>}
           {recs.length === 0 && (
