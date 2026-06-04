@@ -27,30 +27,41 @@ export async function downloadResultsPDF(
     ]);
     const jsPDF = jsPDFMod.jsPDF;
 
-    // Capture at 2x for crisp output. html2canvas-pro is used (not html2canvas)
+    // Expand any collapsed <details> first: html2canvas paints their hidden
+    // content in place without reserving layout height, so a closed <details>
+    // bleeds over the elements below it. Opening them lays the content out in
+    // normal flow (and includes the tools in the saved report). Restored after.
+    const detailsEls = Array.from(el.querySelectorAll("details"));
+    const prevOpen = detailsEls.map((d) => d.open);
+    detailsEls.forEach((d) => { d.open = true; });
+
+    // Capture at 3x for crisp text. html2canvas-pro is used (not html2canvas)
     // because it supports Tailwind v4 oklch() colors — the original threw on them
     // and forced a window.print() fallback.
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      backgroundColor,
-      useCORS: true,
-      logging: false,
-    });
+    let canvas: HTMLCanvasElement;
+    try {
+      canvas = await html2canvas(el, {
+        scale: 3,
+        backgroundColor,
+        useCORS: true,
+        logging: false,
+      });
+    } finally {
+      detailsEls.forEach((d, i) => { d.open = prevOpen[i]; });
+    }
 
-    const imgWidthPx = canvas.width;
-    const imgHeightPx = canvas.height;
-
-    // Build a PDF page that matches the captured aspect ratio (single page,
-    // sized to the image so nothing gets clipped or rescaled).
+    // Lay the capture onto an A4-width page (proportional height) so the file
+    // opens at a sensible size instead of a giant pixel-sized page.
+    const pageWidthMm = 210; // A4 width
+    const pageHeightMm = (canvas.height / canvas.width) * pageWidthMm;
     const pdf = new jsPDF({
-      orientation: imgHeightPx > imgWidthPx ? "portrait" : "landscape",
-      unit: "px",
-      format: [imgWidthPx, imgHeightPx],
-      hotfixes: ["px_scaling"],
+      orientation: "portrait",
+      unit: "mm",
+      format: [pageWidthMm, pageHeightMm],
     });
 
-    const imgData = canvas.toDataURL("image/jpeg", 0.92);
-    pdf.addImage(imgData, "JPEG", 0, 0, imgWidthPx, imgHeightPx);
+    const imgData = canvas.toDataURL("image/jpeg", 0.95);
+    pdf.addImage(imgData, "JPEG", 0, 0, pageWidthMm, pageHeightMm);
 
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);

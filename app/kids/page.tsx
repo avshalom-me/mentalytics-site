@@ -3304,6 +3304,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
   return (
     <div id="kids-results-card">
+      {/* Logo — included in the captured PDF report */}
+      <div className="mb-4 flex justify-center">
+        <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
+      </div>
       {/* Demographics card */}
       <Card>
         <StepTag>סיכום שאלון</StepTag>
