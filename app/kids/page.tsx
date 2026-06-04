@@ -2933,8 +2933,6 @@ function GroupCard({
     toolsBySymptom.set(key, list);
   }
 
-  const hasExpandable = allTools.length > 0 || expandedNotes.length > 0;
-
   const isAssessment = group.kind === "assessment";
   const isExternal = group.kind === "external";
   const isProfessional = group.kind === "professional";
@@ -2951,7 +2949,7 @@ function GroupCard({
           ? "border-emerald-300 bg-emerald-50"
           : isExternal
             ? "border-amber-300 bg-amber-50"
-            : "border-blue-200 bg-white";
+            : "border-[var(--teal-mid)] bg-white";
 
   const labelTone = group.urgent ? "text-red-700"
     : noAction ? "text-gray-500"
@@ -2961,7 +2959,7 @@ function GroupCard({
     : "text-[var(--teal)]";
 
   return (
-    <div className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[#1a3a5c]" : ""}`}>
+    <div className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[var(--teal)]" : ""}`}>
       <div className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${labelTone}`}>
         {group.domainLabel}
         {group.urgent && " ⚠️"}
@@ -2992,15 +2990,15 @@ function GroupCard({
             <button
               type="button"
               onClick={onSelect}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
                 isAssessment
-                  ? "bg-purple-700 text-white hover:bg-purple-800"
+                  ? "bg-purple-700"
                   : isProfessional
-                    ? "bg-emerald-700 text-white hover:bg-emerald-800"
-                    : "bg-[var(--teal-dark)] text-white hover:bg-[var(--teal-dark)]"
+                    ? "bg-emerald-700"
+                    : "bg-[var(--teal-dark)]"
               }`}
             >
-              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel}
+              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel} ←
             </button>
           ) : (
             <div className="inline-block rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">
@@ -3052,27 +3050,37 @@ function GroupCard({
         </div>
       )}
 
-      {hasExpandable && (
-        <details className="mt-3 group">
-          <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[var(--teal-dark)] select-none">
-            {allTools.length > 0 ? "🛠 כלים מעשיים והסבר מורחב — לחץ להרחיב" : "📋 הסבר מורחב — לחץ להרחיב"}
+      {allTools.length > 0 && (
+        <details className="mt-3" open={group.urgent}>
+          <summary className="cursor-pointer select-none list-none rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100">
+            🛠 {allTools.length} כלים מעשיים להתמודדות — אפשר להתחיל כבר עכשיו »
           </summary>
-          <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
-            {expandedNotes.map((n, i) => (
-              <div key={`note-${i}`} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line border-r-2 border-gray-300 pr-2">
-                {renderWithLinks(n)}
-              </div>
-            ))}
+          <div className="mt-2 space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
             {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
               <div key={symptom}>
                 {symptom !== "כללי" && allSymptoms.length > 1 && (
-                  <div className="text-xs font-bold text-[var(--teal-dark)] mb-1">▸ {symptom}</div>
+                  <div className="text-xs font-bold text-amber-800 mb-1">▸ {symptom}</div>
                 )}
                 {tools.map((t, i) => (
                   <div key={i} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line">
                     {renderWithLinks(t.replace(/^📌\s*/, ""))}
                   </div>
                 ))}
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
+      {expandedNotes.length > 0 && (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[var(--teal-dark)] select-none">
+            📋 הסבר מורחב — לחץ להרחיב
+          </summary>
+          <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
+            {expandedNotes.map((n, i) => (
+              <div key={`note-${i}`} className="text-xs leading-relaxed text-gray-700 whitespace-pre-line border-r-2 border-gray-300 pr-2">
+                {renderWithLinks(n)}
               </div>
             ))}
           </div>
@@ -3333,6 +3341,27 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         </div>
       </Card>
 
+      {/* "What now?" orientation strip */}
+      {hasAnyFindings && (
+        <div className="mt-4 rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+          <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)]">מה עכשיו?</p>
+          <div className="flex flex-col gap-2.5 text-sm text-[#2a3a4a]">
+            <div className="flex items-start gap-2.5">
+              <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">1</span>
+              <span>עברו על דוח הממצאים, מסודר לפי תחומים</span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">2</span>
+              <span>בכל ממצא — פתחו את <span className="font-semibold text-amber-700">🛠 הכלים המעשיים</span> שאפשר להתחיל ליישם כבר עכשיו</span>
+            </div>
+            <div className="flex items-start gap-2.5">
+              <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
+              <span>כשמוכנים — לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן"</span> בממצא הרלוונטי ביותר עבורכם</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* BMI banner */}
       <div className="mt-4">
         {bmiAbnormal && (
@@ -3386,7 +3415,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
             <section key={b.key} className="mt-7">
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-px flex-1 bg-gray-200" />
-                <span className="text-sm font-bold text-[var(--teal-dark)] px-3 py-1 rounded-full bg-blue-50 border border-blue-100 whitespace-nowrap">
+                <span className="text-sm font-bold text-[var(--teal-dark)] px-3 py-1 rounded-full bg-[var(--teal-pale)] border border-[var(--teal-mid)] whitespace-nowrap">
                   {b.label}
                 </span>
                 <div className="h-px flex-1 bg-gray-200" />
@@ -3428,13 +3457,14 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "treatment")}
-                      className={`mt-2 w-full rounded-2xl border-2 border-dashed border-[#1a3a5c] bg-blue-50/50 p-4 text-right transition hover:bg-blue-100 ${
-                        selectedKey === `${b.key}::__combined::treatment` ? "ring-2 ring-[#1a3a5c]" : ""
+                      className={`mt-2 w-full rounded-2xl p-4 text-right transition hover:opacity-95 ${
+                        selectedKey === `${b.key}::__combined::treatment` ? "ring-2 ring-offset-2 ring-[var(--teal-dark)]" : ""
                       }`}
+                      style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
                     >
-                      <div className="text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)] mb-1">חיפוש מתקדם ✦</div>
-                      <div className="font-semibold text-sm text-[#1a2a3a]">חיפוש משולב — מטפל/ת שמכסה את מירב הטיפולים בתחום זה</div>
-                      <div className="mt-1 text-xs text-gray-600">{combinedTLabels.join(" · ")}</div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-[#C2DFDE] mb-1">חיפוש מתקדם ✦</div>
+                      <div className="font-bold text-sm text-white">חפש/י מטפל/ת שמשלב כמה גישות ←</div>
+                      <div className="mt-1 text-xs text-white/75">{combinedTLabels.join(" · ")}</div>
                     </button>
                   )}
                 </div>
@@ -3462,13 +3492,13 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "assessment")}
-                      className={`mt-2 w-full rounded-2xl border-2 border-dashed border-purple-700 bg-purple-50/50 p-4 text-right transition hover:bg-purple-100 ${
-                        selectedKey === `${b.key}::__combined::assessment` ? "ring-2 ring-purple-700" : ""
+                      className={`mt-2 w-full rounded-2xl bg-purple-700 p-4 text-right transition hover:bg-purple-800 ${
+                        selectedKey === `${b.key}::__combined::assessment` ? "ring-2 ring-offset-2 ring-purple-700" : ""
                       }`}
                     >
-                      <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-1">חיפוש מתקדם ✦</div>
-                      <div className="font-semibold text-sm text-[#1a2a3a]">חיפוש משולב — מאבחן/ת שמכסה את מירב האבחונים בתחום זה</div>
-                      <div className="mt-1 text-xs text-gray-600">{combinedALabels.join(" · ")}</div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-purple-200 mb-1">חיפוש מתקדם ✦</div>
+                      <div className="font-bold text-sm text-white">חפש/י מאבחן/ת שמשלב כמה אבחונים ←</div>
+                      <div className="mt-1 text-xs text-white/75">{combinedALabels.join(" · ")}</div>
                     </button>
                   )}
                 </div>
@@ -3746,7 +3776,7 @@ export default function KidsPage() {
             </div>
             <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
               <div className="h-2 rounded-full transition-all duration-500"
-                style={{ width: `${progress}%`, background: "linear-gradient(90deg, #2e7d8c, #1a3a5c)" }} />
+                style={{ width: `${progress}%`, background: "linear-gradient(90deg, var(--teal), var(--teal-dark))" }} />
             </div>
           </div>
         )}

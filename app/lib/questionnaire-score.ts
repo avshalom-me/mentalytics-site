@@ -199,7 +199,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (gad7Total > 15) {
       recs.push({
         id: uid("gad7-severe"),
-        symptomText: "נמצאו סימנים של חרדה כללית.",
+        symptomText: "נמצאו קשיים בניהול חרדה ומתח.",
         treatment: emotTreatment,
         treatmentLabel: emotLabel,
         domain: "מורכבויות בתחום הרגשי/האישי",
@@ -223,7 +223,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       if (sev >= 4) {
         recs.push({
           id: uid("social-anxiety-high"),
-          symptomText: "נמצאו סימנים של חרדה חברתית בעוצמה גבוהה.",
+          symptomText: "נמצאו קשיים בתחום החרדה החברתית — בעוצמה גבוהה.",
           treatment: emotTreatment,
           treatmentLabel: emotLabel,
           domain: "מורכבויות בתחום הרגשי/האישי",
@@ -232,7 +232,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       } else {
         recs.push({
           id: uid("social-anxiety-low"),
-          symptomText: "נמצאו סימנים של חרדה חברתית.",
+          symptomText: "נמצאו קשיים בתחום החרדה החברתית.",
           treatment: emotTreatment,
           treatmentLabel: emotLabel,
           domain: "מורכבויות בתחום הרגשי/האישי",
@@ -244,7 +244,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (e.flightAnxiety) {
       recs.push({
         id: uid("anxiety-flight"),
-        symptomText: "נמצאו סימנים של חרדת טיסות.",
+        symptomText: "נמצאו קשיי חרדה בהקשר טיסות.",
         treatment: "CBT",
         treatmentLabel: "CBT",
         domain: "מורכבויות בתחום הרגשי/האישי",
@@ -256,7 +256,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (e.medicalAnxiety) {
       recs.push({
         id: uid("anxiety-medical"),
-        symptomText: "נמצאו סימנים של חרדה רפואית.",
+        symptomText: "נמצאו קשיי חרדה בהקשר רפואי.",
         treatment: "CBT",
         treatmentLabel: "CBT",
         domain: "מורכבויות בתחום הרגשי/האישי",

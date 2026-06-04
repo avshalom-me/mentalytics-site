@@ -106,6 +106,10 @@ function computeResults(A: Ans): KidsBox[] {
   const boxes: KidsBox[] = [];
   const emoGroups: { symptoms: string[]; extraBoxes: KidsBox[]; referral: string }[] = [];
   const emoStandalones: KidsBox[] = [];
+  // General medical cautions (e.g. chronic-pain → rule out a physical cause).
+  // These are NOT tied to any single symptom/treatment card — they're emitted up
+  // front as standalone domain warnings so they never glue to an unrelated finding.
+  const medicalCautions: KidsBox[] = [];
 
   function getGaRef(): string { return buildGaRef(A); }
 
@@ -132,12 +136,14 @@ function computeResults(A: Ans): KidsBox[] {
   }
   if ((A.q1 || 0) >= 3) {
     const aqTot = A.aq_tot || 0;
-    const extras: KidsBox[] = [];
+    // Chronic-pain caution is a general medical note, not a per-symptom referral.
+    // Route it to medicalCautions (emitted as a standalone) so it never attaches
+    // to a specific finding card (e.g. wrongly to separation anxiety).
     if (A.q1_pain === "כן") {
       if (A.q1_med_clear === "לא")
-        extras.push({ cls: "warn", txt: "⚠️ דווח על כאבים כרוניים — יש לפנות לרופא משפחה לשלילת גורם רפואי לפני הטיפול" });
+        medicalCautions.push({ cls: "warn", txt: "⚠️ דווח על כאבים כרוניים — יש לפנות לרופא משפחה לשלילת גורם רפואי לפני הטיפול" });
       else if (!A.q1_med_clear)
-        extras.push({ cls: "warn", txt: "⚠️ דווח על כאבים כרוניים — מומלץ לשלול גורם רפואי לפני הטיפול" });
+        medicalCautions.push({ cls: "warn", txt: "⚠️ דווח על כאבים כרוניים — מומלץ לשלול גורם רפואי לפני הטיפול" });
     }
     if (aqTot >= 16) {
       let ref = "";
@@ -170,10 +176,9 @@ function computeResults(A: Ans): KidsBox[] {
               : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
         }
       }
-      addToGroup("📊 נמצאו סימנים לחרדה", ref, extras);
+      addToGroup("📊 נמצאו סימנים לחרדה", ref, []);
     } else {
       emoStandalones.push({ cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true });
-      extras.forEach(e => emoStandalones.push(e));
     }
     if (grp === "zy") {
       emoStandalones.push({ cls: "info", txt:
@@ -314,15 +319,12 @@ function computeResults(A: Ans): KidsBox[] {
 
   // Q9 — ויסות/BPD
   // bq_tot >= 5 → קליני, הפניה ל-DBT
-  // bq_tot == 4 → גבולי, המלצה להערכה אצל פסיכולוג ילדים
+  // bq_tot == 4 (גבולי/סאב-קליני) — אין הפנייה: לא קיים "פסיכולוג ילדים" כסוג מטפל במערכת.
   if (A.q9 === "כן") {
     const bqTot = A.bq_tot || 0;
     if (bqTot >= 5) {
       const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
       addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
-    } else if (bqTot === 4) {
-      const ref = grp === "ga" ? getGaRef() : "✅ מומלץ להיוועץ עם פסיכולוג ילדים להערכה מעמיקה";
-      addToGroup("📊 נמצאו מאפיינים של קשיים בוויסות הרגשי וביחסים בין-אישיים", ref, []);
     }
   }
 
@@ -408,6 +410,10 @@ function computeResults(A: Ans): KidsBox[] {
       }
     }
   }
+
+  // Emit general medical cautions up front, while no symptom group is open, so
+  // the parser renders them as standalone domain warnings (never glued to a card).
+  medicalCautions.forEach(c => boxes.push(c));
 
   // Multiple-referral notice
   const allEmoRefs = new Set<string>();

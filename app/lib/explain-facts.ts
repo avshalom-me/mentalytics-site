@@ -80,13 +80,13 @@ export function buildAdultFacts(
     if (e.socialAnxiety) {
       facts.summary!.push(
         e.socialSeverity
-          ? `חרדה חברתית בעוצמה ${e.socialSeverity} מתוך 7`
-          : "דווחה חרדה חברתית",
+          ? `קשיים בתחום החרדה החברתית — עוצמה ${e.socialSeverity} מתוך 7`
+          : "דווחו קשיים בתחום החרדה החברתית",
       );
     }
     if (e.e4Chronic) facts.flags!.push("כאבים כרוניים");
-    if (e.flightAnxiety) facts.flags!.push("חרדה בהקשר טיסות");
-    if (e.medicalAnxiety) facts.flags!.push("חרדה רפואית");
+    if (e.flightAnxiety) facts.flags!.push("קשיי חרדה בהקשר טיסות");
+    if (e.medicalAnxiety) facts.flags!.push("קשיי חרדה בהקשר רפואי");
     if (e.stressPain) facts.flags!.push("תסמינים גופניים בעת מתח");
     if (e.ocdScores && e.ocdScores.length > 0) {
       const total = e.ocdScores.reduce((a, b) => a + b, 0);

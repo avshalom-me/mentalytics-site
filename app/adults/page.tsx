@@ -2302,7 +2302,25 @@ export default function AdultsPage() {
             <img src="/logo.svg.png" alt="Mentalytics" className="h-14 w-auto" />
           </div>
           <h2 className="mb-1 text-2xl font-black" style={{ fontFamily: "'Heebo', sans-serif" }}>תוצאות השאלון</h2>
-          <p className="mb-4 text-sm opacity-75">לחץ/י על אחד מהממצאים כדי לחפש מטפל מתאים</p>
+          {recs.length > 0 && (
+            <div className="mb-5 rounded-xl bg-white/10 p-4">
+              <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">מה עכשיו?</p>
+              <div className="flex flex-col gap-2 text-sm text-white/90">
+                <div className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">1</span>
+                  <span>קרא/י את הממצאים למטה</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">2</span>
+                  <span>לחץ/י על "מצא/י לי מטפל" בממצא הרלוונטי ביותר עבורך</span>
+                </div>
+                <div className="flex items-start gap-2.5">
+                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">3</span>
+                  <span>לחלופין — חפש/י מטפל שמשלב כמה גישות בכפתור שבתחתית</span>
+                </div>
+              </div>
+            </div>
+          )}
           {err && <p className="mb-3 rounded-lg bg-red-800 p-3 text-sm">{err}</p>}
           {recs.length === 0 && (
             <div className="rounded-xl bg-white/10 p-4 text-sm space-y-3">
@@ -2374,9 +2392,9 @@ export default function AdultsPage() {
                     <button
                       type="button"
                       onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
-                      className="rounded-lg bg-white/25 hover:bg-white/35 px-3 py-1.5 text-xs font-bold transition-colors"
+                      className="rounded-lg bg-[#3D8C8A] hover:bg-[#2A6462] px-4 py-2 text-sm font-bold transition-colors"
                     >
-                      → {group.treatmentLabel}
+                      מצא/י לי מטפל — {group.treatmentLabel} ←
                     </button>
                     <button
                       type="button"
@@ -2422,11 +2440,12 @@ export default function AdultsPage() {
                 setScreen("match-form");
                 (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
               }}
-              className="mt-3 w-full rounded-xl border-2 border-[#8ecfdb] bg-white/5 p-4 text-right transition-all hover:bg-white/15"
+              className="mt-4 w-full rounded-xl p-4 text-right transition-all"
+              style={{ background: "linear-gradient(120deg,#2A6462,#3D8C8A)", border: "1px solid #5AADAB" }}
             >
-              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">חיפוש מתקדם ✦</div>
-              <div className="font-semibold">חיפוש משולב — כל הצרכים הרגשיים</div>
-              <div className="mt-1 text-xs opacity-70">מציאת מטפל שמכסה את מירב הצרכים שעלו: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#C2DFDE]">חיפוש מתקדם ✦</div>
+              <div className="font-bold text-white">חפש/י מטפל שמשלב כמה גישות ←</div>
+              <div className="mt-1 text-xs text-white/70">מציאת מטפל שמכסה את מירב הצרכים שעלו: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
             </button>
           )}
           <div className="mt-5 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs leading-6 text-white/70">
