@@ -54,7 +54,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('config', 'G-V3QQRXSQ0T');
         `}</Script>
 
-        <footer style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
+        <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
           <div className="mx-auto max-w-5xl px-6 py-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם — Mentalytics</span>

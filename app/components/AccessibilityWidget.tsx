@@ -97,7 +97,7 @@ export default function AccessibilityWidget() {
         onClick={() => setOpen(o => !o)}
         aria-label="פתח תפריט נגישות"
         aria-expanded={open}
-        className="fixed bottom-24 left-0 z-50 w-12 h-12 flex items-center justify-center shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
+        className="print:hidden fixed bottom-24 left-0 z-50 w-12 h-12 flex items-center justify-center shadow-lg transition-transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-600"
         style={{ background: "#1565c0", borderRadius: "0 8px 8px 0" }}
       >
         {/* Standard wheelchair accessibility icon */}
@@ -117,7 +117,7 @@ export default function AccessibilityWidget() {
           role="dialog"
           aria-label="אפשרויות נגישות"
           dir="rtl"
-          className="fixed bottom-12 left-14 z-50 rounded-xl shadow-2xl border border-gray-200 overflow-hidden"
+          className="print:hidden fixed bottom-12 left-14 z-50 rounded-xl shadow-2xl border border-gray-200 overflow-hidden"
           style={{ background: "#fff", minWidth: "200px", fontFamily: "Heebo, Arial, sans-serif" }}
         >
           {/* Header */}
