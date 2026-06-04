@@ -2422,7 +2422,7 @@ export default function AdultsPage() {
       <Layout screen={screen} domains={answers.domains}>
         <div id="adults-results-card" className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
           <div className="mb-4 flex justify-center">
-            <img src="/logo.svg.png" alt="Mentalytics" className="h-14 w-auto" />
+            <img src="/logo-on-dark-512.png" alt="Mentalytics" className="h-14 w-auto" />
           </div>
           <h2 className="mb-1 text-2xl font-black" style={{ fontFamily: "'Heebo', sans-serif" }}>תוצאות השאלון</h2>
           {recs.length > 0 && (
