@@ -18,13 +18,14 @@ export async function downloadResultsPDF(elementId: string, baseFilename: string
 
   try {
     const [{ default: html2canvas }, jsPDFMod] = await Promise.all([
-      import("html2canvas"),
+      import("html2canvas-pro"),
       import("jspdf"),
     ]);
     const jsPDF = jsPDFMod.jsPDF;
 
-    // Capture at 2x for crisp output; oklch() colors confuse html2canvas, so we
-    // rely on the inline-cloned styles in the captured DOM.
+    // Capture at 2x for crisp output. html2canvas-pro is used (not html2canvas)
+    // because it supports Tailwind v4 oklch() colors — the original threw on them
+    // and forced a window.print() fallback.
     const canvas = await html2canvas(el, {
       scale: 2,
       backgroundColor: "#1a3a5c",
