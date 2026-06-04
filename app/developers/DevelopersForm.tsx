@@ -32,13 +32,7 @@ const STAGES = [
 
 export default function DevelopersForm() {
   const [form, setForm] = useState<FormState>({
-    name: "",
-    email: "",
-    phone: "",
-    role: "",
-    stage: "",
-    description: "",
-    link: "",
+    name: "", email: "", phone: "", role: "", stage: "", description: "", link: "",
   });
   const [status, setStatus] = useState<"idle" | "submitting" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState<string>("");
@@ -73,148 +67,193 @@ export default function DevelopersForm() {
 
   if (status === "success") {
     return (
-      <div className="dev-glass-card text-center p-10">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl"
-          style={{ background: "linear-gradient(135deg,#10B981,#22D3EE)", boxShadow: "0 8px 32px rgba(34,211,238,.4)" }}>
+      <div style={{
+        background: "linear-gradient(135deg, var(--teal-pale), var(--gold-pale))",
+        border: "1px solid var(--teal-mid)",
+        borderRadius: "24px",
+        padding: "56px 40px",
+        textAlign: "center",
+        boxShadow: "0 4px 0 var(--teal-mid), 0 12px 40px rgba(61,140,138,.1)",
+      }}>
+        <div style={{
+          margin: "0 auto 20px",
+          width: "64px", height: "64px",
+          borderRadius: "20px",
+          background: "linear-gradient(135deg, #3D8C8A, #2A6462)",
+          boxShadow: "0 8px 28px rgba(61,140,138,.4)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
           <CheckCircle2 size={32} color="white" />
         </div>
-        <h3 className="text-2xl font-extrabold dev-gradient-text">תודה! קיבלנו את הפנייה</h3>
-        <p className="mt-3 text-stone-300 leading-7">
+        <h3 style={{ fontSize: "1.6rem", fontWeight: 900, color: "var(--teal-dark)", marginBottom: "12px" }}>
+          תודה! קיבלנו את הפנייה
+        </h3>
+        <p style={{ color: "var(--text-2)", lineHeight: 1.8, maxWidth: "44ch", margin: "0 auto" }}>
           אנחנו נחזור אליכם בקרוב כדי להבין יחד את הרעיון, את השלב שבו הוא נמצא, ואיך אפשר לקדם אותו.
         </p>
       </div>
     );
   }
 
-  const inputClass =
-    "w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder:text-stone-500 backdrop-blur transition focus:border-[#A78BFA] focus:bg-white/10 focus:outline-none focus:ring-2 focus:ring-[#A78BFA]/40";
-
-  const labelClass = "mb-1.5 block text-sm font-semibold text-stone-200";
-
   return (
-    <form onSubmit={onSubmit} className="dev-glass-card p-6 md:p-8 space-y-5">
-      <div className="grid gap-5 md:grid-cols-2">
-        <div>
-          <label className={labelClass} htmlFor="dev-name">שם מלא *</label>
-          <input
-            id="dev-name"
-            type="text"
-            required
-            value={form.name}
-            onChange={(e) => update("name", e.target.value)}
-            className={inputClass}
-            placeholder="ישראל ישראלי"
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="dev-email">מייל *</label>
-          <input
-            id="dev-email"
-            type="email"
-            required
-            value={form.email}
-            onChange={(e) => update("email", e.target.value)}
-            className={inputClass}
-            placeholder="you@example.com"
-            dir="ltr"
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="dev-phone">טלפון</label>
-          <input
-            id="dev-phone"
-            type="tel"
-            value={form.phone}
-            onChange={(e) => update("phone", e.target.value)}
-            className={inputClass}
-            placeholder="050-0000000"
-            dir="ltr"
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="dev-link">קישור / אתר (אופציונלי)</label>
-          <input
-            id="dev-link"
-            type="url"
-            value={form.link}
-            onChange={(e) => update("link", e.target.value)}
-            className={inputClass}
-            placeholder="https://..."
-            dir="ltr"
-          />
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="dev-role">תפקיד / רקע</label>
-          <select
-            id="dev-role"
-            value={form.role}
-            onChange={(e) => update("role", e.target.value)}
-            className={inputClass}
-          >
-            <option value="" style={{ background: "#0F1729", color: "#9CA3AF" }}>בחרו...</option>
-            {ROLES.map((r) => (
-              <option key={r} value={r} style={{ background: "#0F1729", color: "#FFFFFF" }}>{r}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={labelClass} htmlFor="dev-stage">שלב הרעיון</label>
-          <select
-            id="dev-stage"
-            value={form.stage}
-            onChange={(e) => update("stage", e.target.value)}
-            className={inputClass}
-          >
-            <option value="" style={{ background: "#0F1729", color: "#9CA3AF" }}>בחרו...</option>
-            {STAGES.map((s) => (
-              <option key={s} value={s} style={{ background: "#0F1729", color: "#FFFFFF" }}>{s}</option>
-            ))}
-          </select>
-        </div>
-      </div>
+    <>
+      <style>{`
+        .dev-input {
+          width: 100%;
+          border-radius: 12px;
+          border: 1.5px solid var(--line);
+          background: white;
+          padding: 12px 16px;
+          font-size: 15px;
+          font-family: 'Heebo', sans-serif;
+          color: var(--text);
+          transition: border-color 0.2s ease, box-shadow 0.2s ease;
+          outline: none;
+        }
+        .dev-input::placeholder { color: var(--faint); }
+        .dev-input:focus {
+          border-color: var(--teal);
+          box-shadow: 0 0 0 3px rgba(61,140,138,.14);
+        }
+        .dev-input option { background: white; color: var(--text); }
+      `}</style>
 
-      <div>
-        <label className={labelClass} htmlFor="dev-desc">תיאור הרעיון (אופציונלי)</label>
-        <textarea
-          id="dev-desc"
-          rows={6}
-          value={form.description}
-          onChange={(e) => update("description", e.target.value)}
-          className={inputClass}
-          placeholder="ספרו על הרעיון: מה הוא פותר, למי הוא מיועד, מה השלב הנוכחי, ומה תרצו ליצור איתנו..."
-        />
-      </div>
+      <form onSubmit={onSubmit} style={{
+        background: "linear-gradient(155deg, var(--teal-pale) 0%, #ffffff 55%, var(--gold-pale) 100%)",
+        border: "1.5px solid var(--teal-mid)",
+        borderRadius: "24px",
+        boxShadow: "0 4px 0 var(--teal-mid), 0 16px 48px rgba(61,140,138,.1)",
+        overflow: "hidden",
+      }}>
 
-      {status === "error" && (
-        <div className="flex items-start gap-2 rounded-xl border border-red-400/30 bg-red-500/10 p-3 text-sm text-red-200">
-          <AlertCircle size={18} className="flex-shrink-0 mt-0.5" />
-          <span>{errorMsg}</span>
+        {/* Colorful header strip */}
+        <div style={{
+          background: "linear-gradient(120deg, #2A6462 0%, #3D8C8A 50%, #D49018 100%)",
+          padding: "20px 32px",
+          display: "flex", alignItems: "center", gap: "12px",
+        }}>
+          <Send size={18} color="white" style={{ opacity: .85 }} />
+          <span style={{ color: "white", fontWeight: 700, fontSize: "15px", letterSpacing: ".02em" }}>
+            ספרו לנו על הרעיון
+          </span>
         </div>
-      )}
 
-      <button
-        type="submit"
-        disabled={status === "submitting"}
-        className="dev-cta-btn group relative w-full overflow-hidden rounded-xl px-6 py-4 text-base font-bold text-white transition disabled:opacity-60"
-      >
-        <span className="relative z-10 inline-flex items-center justify-center gap-2">
-          {status === "submitting" ? (
-            <>
-              <Loader2 size={18} className="animate-spin" />
-              שולח...
-            </>
-          ) : (
-            <>
-              <Send size={18} />
-              שלח
-            </>
+        {/* Fields */}
+        <div style={{ padding: "28px 32px 32px", display: "flex", flexDirection: "column", gap: "20px" }}>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "16px" }}>
+            <div>
+              <label htmlFor="dev-name" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                שם מלא *
+              </label>
+              <input id="dev-name" type="text" required value={form.name}
+                onChange={(e) => update("name", e.target.value)}
+                className="dev-input" placeholder="ישראל ישראלי" />
+            </div>
+            <div>
+              <label htmlFor="dev-email" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                מייל *
+              </label>
+              <input id="dev-email" type="email" required value={form.email}
+                onChange={(e) => update("email", e.target.value)}
+                className="dev-input" placeholder="you@example.com" dir="ltr" />
+            </div>
+            <div>
+              <label htmlFor="dev-phone" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                טלפון
+              </label>
+              <input id="dev-phone" type="tel" value={form.phone}
+                onChange={(e) => update("phone", e.target.value)}
+                className="dev-input" placeholder="050-0000000" dir="ltr" />
+            </div>
+            <div>
+              <label htmlFor="dev-link" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                קישור / אתר (אופציונלי)
+              </label>
+              <input id="dev-link" type="url" value={form.link}
+                onChange={(e) => update("link", e.target.value)}
+                className="dev-input" placeholder="https://..." dir="ltr" />
+            </div>
+            <div>
+              <label htmlFor="dev-role" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                תפקיד / רקע
+              </label>
+              <select id="dev-role" value={form.role}
+                onChange={(e) => update("role", e.target.value)}
+                className="dev-input">
+                <option value="">בחרו...</option>
+                {ROLES.map((r) => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="dev-stage" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+                שלב הרעיון
+              </label>
+              <select id="dev-stage" value={form.stage}
+                onChange={(e) => update("stage", e.target.value)}
+                className="dev-input">
+                <option value="">בחרו...</option>
+                {STAGES.map((s) => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label htmlFor="dev-desc" style={{ display: "block", marginBottom: "6px", fontSize: "13px", fontWeight: 700, color: "var(--text-2)" }}>
+              תיאור הרעיון (אופציונלי)
+            </label>
+            <textarea id="dev-desc" rows={5} value={form.description}
+              onChange={(e) => update("description", e.target.value)}
+              className="dev-input"
+              style={{ resize: "vertical" }}
+              placeholder="ספרו על הרעיון: מה הוא פותר, למי הוא מיועד, מה השלב הנוכחי, ומה תרצו ליצור איתנו..." />
+          </div>
+
+          {status === "error" && (
+            <div style={{
+              display: "flex", alignItems: "flex-start", gap: "8px",
+              borderRadius: "12px", border: "1px solid #FCA5A5",
+              background: "#FEF2F2", padding: "12px 16px",
+              fontSize: "14px", color: "#B91C1C",
+            }}>
+              <AlertCircle size={16} style={{ flexShrink: 0, marginTop: "2px" }} />
+              <span>{errorMsg}</span>
+            </div>
           )}
-        </span>
-      </button>
 
-      <p className="text-center text-xs text-stone-400">
-        הפרטים יישלחו ישירות לצוות טיפול חכם. אנחנו לא משתפים את הרעיון שלכם עם אף גורם חיצוני.
-      </p>
-    </form>
+          <button
+            type="submit"
+            disabled={status === "submitting"}
+            style={{
+              width: "100%",
+              background: "linear-gradient(120deg, #2A6462 0%, #3D8C8A 45%, #D49018 100%)",
+              backgroundSize: "200% 200%",
+              borderRadius: "50px",
+              padding: "14px 24px",
+              fontSize: "16px",
+              fontWeight: 700,
+              color: "white",
+              border: "none",
+              cursor: status === "submitting" ? "not-allowed" : "pointer",
+              opacity: status === "submitting" ? 0.65 : 1,
+              boxShadow: "0 6px 28px rgba(61,140,138,.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+              fontFamily: "'Heebo', sans-serif",
+              transition: "filter 0.25s ease, transform 0.25s ease",
+            }}
+          >
+            {status === "submitting" ? (
+              <><Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />שולח...</>
+            ) : (
+              <><Send size={18} />שלח</>
+            )}
+          </button>
+
+          <p style={{ textAlign: "center", fontSize: "12px", color: "var(--muted)" }}>
+            הפרטים יישלחו ישירות לצוות טיפול חכם. אנחנו לא משתפים את הרעיון שלכם עם אף גורם חיצוני.
+          </p>
+        </div>
+      </form>
+    </>
   );
 }
