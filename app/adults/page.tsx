@@ -231,7 +231,7 @@ function RecommendationsStrip({
                 : "border border-violet-400 bg-violet-50 text-violet-800 hover:bg-violet-100"
             }`}
           >
-            ✦ חיפוש משולב
+            ✦ חיפוש משולב (רגשי)
           </button>
         )}
         {groups.map((g) => {
@@ -2295,6 +2295,129 @@ export default function AdultsPage() {
     const emotionalGroups = combinableEmotionalGroups;
     const showCombined = emotionalGroups.length >= 2;
 
+    // Group the result cards into rubric sections so each domain is visually
+    // separate. The combined-search button lives ONLY inside the emotional
+    // section, making it explicit it never mixes couples/addiction findings.
+    const EMOTIONAL_DOMAIN = "מורכבויות בתחום הרגשי/האישי";
+    const DOMAIN_SECTIONS: { key: string; label: string }[] = [
+      { key: EMOTIONAL_DOMAIN, label: "🧠 התחום הרגשי" },
+      { key: "זוגיות ומשפחה", label: "💑 זוגיות ומשפחה" },
+      { key: "קשיי התמכרות", label: "🧩 התמכרויות" },
+      { key: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים", label: "📚 תחום תפקודי / תעסוקתי / אקדמי" },
+      { key: "התפתחות אישית", label: "🌱 התפתחות אישית" },
+    ];
+    const sections: { key: string; label: string; groups: RecGroup[] }[] = [];
+    const seenDomains = new Set<string>();
+    for (const d of DOMAIN_SECTIONS) {
+      const gs = groups.filter((g) => (g.recs[0]?.domain ?? "") === d.key);
+      if (gs.length) { sections.push({ ...d, groups: gs }); seenDomains.add(d.key); }
+    }
+    // Append any domains not in the known list so nothing is ever dropped.
+    for (const g of groups) {
+      const dom = g.recs[0]?.domain ?? "אחר";
+      if (seenDomains.has(dom)) continue;
+      seenDomains.add(dom);
+      sections.push({ key: dom, label: dom, groups: groups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom) });
+    }
+
+    const renderGroupCard = (group: RecGroup) => {
+      const firstRec = group.recs[0];
+      const allNotes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[]));
+      const notes = allNotes.length ? allNotes.join("\n\n") : undefined;
+      const allTools = group.recs
+        .filter((r) => r.tools)
+        .map((r) => (group.recs.length > 1 ? `▸ ${r.symptomText}\n${r.tools}` : r.tools));
+      const tools = allTools.length ? allTools.join("\n\n――――――\n\n") : undefined;
+      const key = group.treatment + (group.urgent ? "-urgent" : "");
+      const aiData = recExplainData[key];
+      const aiLoading = recExplainLoading[key];
+      const article = getTreatmentArticle(group.treatment);
+      const articleHref = getTreatmentArticleHref(group.treatment);
+      return (
+        <div key={key}
+          className={`rounded-xl p-4 text-right transition-all ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30" : "border-r-4 border-[#8ecfdb] bg-white/10"}`}>
+          {group.urgent && (
+            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-red-300">⚠️ דחוף</div>
+          )}
+          {group.recs.length === 1 ? (
+            <div className="font-semibold">{firstRec.symptomText}</div>
+          ) : (
+            <ul className="mb-1 space-y-1">
+              {group.recs.map((r) => (
+                <li key={r.id} className="flex items-start gap-2 font-semibold">
+                  <span className="mt-1 text-[#8ecfdb]">•</span>{r.symptomText}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes && <div className="mt-1 text-xs opacity-75">{notes}</div>}
+          {tools && (
+            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-900/20 p-3 text-right">
+              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-300">🛠 כלים להתמודדות</div>
+              <div className="whitespace-pre-wrap text-xs leading-relaxed text-amber-100">{tools}</div>
+            </div>
+          )}
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
+              className="rounded-lg bg-[#3D8C8A] hover:bg-[#2A6462] px-4 py-2 text-sm font-bold transition-colors"
+            >
+              מצא/י לי מטפל — {group.treatmentLabel} ←
+            </button>
+            <button
+              type="button"
+              onClick={() => fetchRecommendationExplanation(group)}
+              disabled={aiLoading}
+              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
+            >
+              {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
+            </button>
+          </div>
+          {aiData && (
+            <div className="mt-3 rounded-xl border border-violet-300/60 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 p-3 text-right">
+              <p className="text-xs font-bold text-violet-100 mb-2">✦ {aiData.title}</p>
+              <p className="text-xs text-white/90 mb-2 leading-relaxed whitespace-pre-line">{aiData.explanation}</p>
+              <p className="text-[10px] text-white/50 mb-3">{aiData.evidence_note}</p>
+              {articleHref ? (
+                <a
+                  href={articleHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:text-cyan-100 hover:underline"
+                >
+                  📖 קרא עוד על {group.treatmentLabel} ←
+                </a>
+              ) : article.status === "pending" && (
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-white/40">
+                  📖 מאמר בהכנה
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    };
+
+    const renderCombinedButton = () => (
+      <button
+        type="button"
+        onClick={() => {
+          setCombinedTreatments(emotionalGroups.map(g => g.treatment));
+          setCombinedLabels(emotionalGroups.map(g => g.treatmentLabel));
+          setSelectedRec(null);
+          setScreen("match-form");
+          (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
+        }}
+        className="mt-3 w-full rounded-xl p-4 text-right transition-all"
+        style={{ background: "linear-gradient(120deg,#2A6462,#3D8C8A)", border: "1px solid #5AADAB" }}
+      >
+        <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#C2DFDE]">חיפוש מתקדם ✦</div>
+        <div className="font-bold text-white">חפש/י מטפל שמשלב את הגישות הרגשיות ←</div>
+        <div className="mt-1 text-xs text-white/70">החיפוש המשולב מתייחס לתחום הרגשי בלבד — טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+      </button>
+    );
+
     return (
       <Layout screen={screen} domains={answers.domains}>
         <div id="adults-results-card" className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
@@ -2350,104 +2473,19 @@ export default function AdultsPage() {
               📌 שים/י לב: נמצאו מספר סימנים עם הפניות שונות. המערכת סיננה את הפחות דחופות כך שבפניך מופיעות ההפניות העיקריות. יש לפנות ע"פ הקושי המשמעותי ביותר שאת/ה חווה.
             </div>
           )}
-          <div className="space-y-3">
-            {groups.map((group) => {
-              const firstRec = group.recs[0];
-              const allNotes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[]));
-              const notes = allNotes.length ? allNotes.join("\n\n") : undefined;
-              const allTools = group.recs
-                .filter((r) => r.tools)
-                .map((r) => (group.recs.length > 1 ? `▸ ${r.symptomText}\n${r.tools}` : r.tools));
-              const tools = allTools.length ? allTools.join("\n\n――――――\n\n") : undefined;
-              const key = group.treatment + (group.urgent ? "-urgent" : "");
-              const aiData = recExplainData[key];
-              const aiLoading = recExplainLoading[key];
-              const article = getTreatmentArticle(group.treatment);
-              const articleHref = getTreatmentArticleHref(group.treatment);
-              return (
-                <div key={key}
-                  className={`rounded-xl p-4 text-right transition-all ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30" : "border-r-4 border-[#8ecfdb] bg-white/10"}`}>
-                  <div className={`mb-1 text-xs font-bold uppercase tracking-wide ${group.urgent ? "text-red-300" : "text-[#8ecfdb]"}`}>
-                    {firstRec.domain} {group.urgent && "⚠️"}
-                  </div>
-                  {group.recs.length === 1 ? (
-                    <div className="font-semibold">{firstRec.symptomText}</div>
-                  ) : (
-                    <ul className="mb-1 space-y-1">
-                      {group.recs.map((r) => (
-                        <li key={r.id} className="flex items-start gap-2 font-semibold">
-                          <span className="mt-1 text-[#8ecfdb]">•</span>{r.symptomText}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {notes && <div className="mt-1 text-xs opacity-75">{notes}</div>}
-                  {tools && (
-                    <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-900/20 p-3 text-right">
-                      <div className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-300">🛠 כלים להתמודדות</div>
-                      <div className="whitespace-pre-wrap text-xs leading-relaxed text-amber-100">{tools}</div>
-                    </div>
-                  )}
-                  <div className="mt-3 flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
-                      className="rounded-lg bg-[#3D8C8A] hover:bg-[#2A6462] px-4 py-2 text-sm font-bold transition-colors"
-                    >
-                      מצא/י לי מטפל — {group.treatmentLabel} ←
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => fetchRecommendationExplanation(group)}
-                      disabled={aiLoading}
-                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
-                    >
-                      {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
-                    </button>
-                  </div>
-                  {aiData && (
-                    <div className="mt-3 rounded-xl border border-violet-300/60 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 p-3 text-right">
-                      <p className="text-xs font-bold text-violet-100 mb-2">✦ {aiData.title}</p>
-                      <p className="text-xs text-white/90 mb-2 leading-relaxed whitespace-pre-line">{aiData.explanation}</p>
-                      <p className="text-[10px] text-white/50 mb-3">{aiData.evidence_note}</p>
-                      {articleHref ? (
-                        <a
-                          href={articleHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:text-cyan-100 hover:underline"
-                        >
-                          📖 קרא עוד על {group.treatmentLabel} ←
-                        </a>
-                      ) : article.status === "pending" && (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-white/40">
-                          📖 מאמר בהכנה
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-          {showCombined && (
-            <button
-              type="button"
-              onClick={() => {
-                setCombinedTreatments(emotionalGroups.map(g => g.treatment));
-                setCombinedLabels(emotionalGroups.map(g => g.treatmentLabel));
-                setSelectedRec(null);
-                setScreen("match-form");
-                (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
-              }}
-              className="mt-4 w-full rounded-xl p-4 text-right transition-all"
-              style={{ background: "linear-gradient(120deg,#2A6462,#3D8C8A)", border: "1px solid #5AADAB" }}
-            >
-              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#C2DFDE]">חיפוש מתקדם ✦</div>
-              <div className="font-bold text-white">חפש/י מטפל שמשלב כמה גישות ←</div>
-              <div className="mt-1 text-xs text-white/70">מציאת מטפל שמכסה את מירב הצרכים שעלו: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
-            </button>
-          )}
+          {sections.map((section) => (
+            <div key={section.key} className="mt-5">
+              <div className="mb-2 flex items-center gap-2">
+                <div className="h-px flex-1 bg-white/15" />
+                <span className="whitespace-nowrap text-sm font-bold text-[#8ecfdb]">{section.label}</span>
+                <div className="h-px flex-1 bg-white/15" />
+              </div>
+              <div className="space-y-3">
+                {section.groups.map((group) => renderGroupCard(group))}
+              </div>
+              {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
+            </div>
+          ))}
           <div className="mt-5 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs leading-6 text-white/70">
             התוצאות מבוססות על תשובותיך לשאלון ומהוות הערכה כללית בלבד.<br />
             אין לראות בתוצאות אלו אבחון, המלצה טיפולית מחייבת או תחליף לייעוץ מקצועי.<br />
