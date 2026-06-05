@@ -142,39 +142,49 @@ export default async function TherapistProfilePage({
       <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה לכל המטפלים</Link>
 
       {/* Hero card — photo + identity + contact */}
-      <div className="rounded-3xl overflow-hidden bg-white mb-8" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)", border: "1px solid #E8E0D8" }}>
+      <div className="rounded-3xl bg-white mb-8 p-5 sm:p-6" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)", border: "1px solid #E8E0D8" }}>
+        <div className="flex flex-col sm:flex-row gap-5 items-start">
 
-        {/* Photo */}
-        <div className="h-80 w-full overflow-hidden bg-stone-100">
-          <img src={photoUrl ?? avatarSrc} alt={name} className="h-full w-full object-cover object-center" />
-        </div>
-
-        {/* Identity + contact */}
-        <div className="p-6">
-          <h1 className="text-3xl font-black text-stone-900 leading-tight">{name}</h1>
-          {type && <p className="text-[#2e7d8c] font-semibold text-base mt-1">{type}</p>}
-
-          <div className="mt-3 flex flex-wrap gap-2">
-            {t.online && (
-              <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">🌐 טיפול אונליין</span>
-            )}
-            {t.regions && t.regions.length > 0 && (
-              <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">📍 {t.regions.slice(0, 2).join(", ")}</span>
-            )}
-            {t.languages && t.languages.length > 0 && (
-              <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">🗣 {t.languages.join(", ")}</span>
-            )}
+          {/* Photo — portrait, no forced crop */}
+          <div className="w-full sm:w-44 flex-shrink-0">
+            <div className="rounded-2xl overflow-hidden bg-stone-100 w-full sm:aspect-[3/4]" style={{ maxHeight: "260px" }}>
+              <img
+                src={photoUrl ?? avatarSrc}
+                alt={name}
+                className="w-full h-full object-cover object-top"
+                style={{ display: "block", maxHeight: "260px" }}
+              />
+            </div>
           </div>
 
-          {/* Contact buttons */}
-          <ContactButtons
-            therapistId={id}
-            therapistName={t.full_name ?? ""}
-            waLink={waLink}
-            phone={t.phone}
-            email={t.email}
-            source={source}
-          />
+          {/* Identity + contact */}
+          <div className="flex-1 min-w-0">
+            <h1 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight">{name}</h1>
+            {type && <p className="text-[#2e7d8c] font-semibold text-base mt-1">{type}</p>}
+
+            <div className="mt-3 flex flex-wrap gap-2">
+              {t.online && (
+                <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">🌐 טיפול אונליין</span>
+              )}
+              {t.regions && t.regions.length > 0 && (
+                <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">📍 {t.regions.slice(0, 2).join(", ")}</span>
+              )}
+              {t.languages && t.languages.length > 0 && (
+                <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">🗣 {t.languages.join(", ")}</span>
+              )}
+            </div>
+
+            {/* Contact buttons */}
+            <ContactButtons
+              therapistId={id}
+              therapistName={t.full_name ?? ""}
+              waLink={waLink}
+              phone={t.phone}
+              email={t.email}
+              source={source}
+            />
+          </div>
+
         </div>
       </div>
 
