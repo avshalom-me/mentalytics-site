@@ -93,13 +93,6 @@ export default function ContactButtons({
             {phonesvg} התקשר/י
           </a>
         )}
-        {email && (
-          <a href={`mailto:${email}`}
-            onClick={() => track(therapistId, "email", source)}
-            className="inline-flex items-center gap-2 rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 transition-opacity">
-            {emailsvg} מייל
-          </a>
-        )}
         <button
           type="button"
           onClick={() => setMessageOpen(true)}
