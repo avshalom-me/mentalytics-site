@@ -33,6 +33,10 @@ export async function GET(req: NextRequest) {
       })(),
     ]);
 
+    if (therapistsRes.error) throw therapistsRes.error;
+    if (viewsRes.error) throw viewsRes.error;
+    if (clicksRes.error) throw clicksRes.error;
+
     const sd = computeSupplyDemand(
       therapistsRes.data ?? [],
       viewsRes.data ?? [],

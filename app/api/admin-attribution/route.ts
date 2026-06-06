@@ -53,6 +53,10 @@ export async function GET(req: NextRequest) {
       })(),
     ]);
 
+    if (eventsRes.error) throw eventsRes.error;
+    if (viewsRes.error) throw viewsRes.error;
+    if (clicksRes.error) throw clicksRes.error;
+
     const events = (eventsRes.data ?? []) as { event_type: string; channel: string | null }[];
     const views = (viewsRes.data ?? []) as { channel: string | null }[];
     const clicks = (clicksRes.data ?? []) as { channel: string | null; utm_campaign: string | null; click_type: string }[];

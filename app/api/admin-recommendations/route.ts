@@ -7,6 +7,9 @@ export const dynamic = "force-dynamic";
 
 const ACTIVE_STATUSES = ["pending", "accepted"];
 const VALID_TARGET_STATUSES = ["accepted", "dismissed", "done", "pending"];
+// How long a resolved (dismissed/done) recommendation is suppressed from being
+// regenerated, so a just-dismissed item doesn't immediately reappear on refresh.
+const RECENT_RESOLVED_DAYS = 14;
 
 type Rec = {
   id: string;
@@ -59,15 +62,31 @@ export async function POST() {
       supabaseAdmin.from("therapist_profile_views").select("therapist_id, viewer_region"),
       supabaseAdmin.from("therapist_contact_clicks").select("therapist_id"),
     ]);
+    if (tRes.error) throw tRes.error;
+    if (vRes.error) throw vRes.error;
+    if (cRes.error) throw cRes.error;
 
     const sd = computeSupplyDemand(tRes.data ?? [], vRes.data ?? [], cRes.data ?? []);
     const computed = buildRecommendations(sd);
 
-    const { data: existing } = await supabaseAdmin
-      .from("marketing_recommendations")
-      .select("type, target_key")
-      .in("status", ACTIVE_STATUSES);
-    const seen = new Set((existing ?? []).map((r) => `${r.type}|${r.target_key}`));
+    // Dedup so "refresh" doesn't recreate a recommendation that is still active
+    // (pending/accepted) OR was resolved (dismissed/done) within the suppression
+    // window — otherwise a just-dismissed item would immediately reappear. After
+    // the window it can resurface if the underlying condition still holds.
+    const recentCutoff = new Date(Date.now() - RECENT_RESOLVED_DAYS * 86_400_000).toISOString();
+    const [activeRes, recentRes] = await Promise.all([
+      supabaseAdmin.from("marketing_recommendations").select("type, target_key").in("status", ACTIVE_STATUSES),
+      supabaseAdmin
+        .from("marketing_recommendations")
+        .select("type, target_key")
+        .in("status", ["dismissed", "done"])
+        .gte("resolved_at", recentCutoff),
+    ]);
+    if (activeRes.error) throw activeRes.error;
+    if (recentRes.error) throw recentRes.error;
+    const seen = new Set(
+      [...(activeRes.data ?? []), ...(recentRes.data ?? [])].map((r) => `${r.type}|${r.target_key}`),
+    );
 
     const toInsert = computed.filter((r) => !seen.has(`${r.type}|${r.target_key}`));
     if (toInsert.length) {
