@@ -126,7 +126,7 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-aq")         return (A.q1 || 0) < 3;
   if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 16;
   if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 3;
-  if (pid === "p-q2-grade")   return (A.q2 || 0) < 3 || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
+  if (pid === "p-q2-grade")   return (A.q2 || 0) < 3 || gg(A) === "zy" || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
   if (pid === "p-mq")         return (A.q3 || 0) < 3;
   if (pid === "p-mq-sui")     return (A.mq_tot || 0) < 4;
   if (pid === "p-q4-types")   return A.q4 !== "כן";
@@ -959,11 +959,6 @@ function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
           </GradeBlock>
         )}
 
-        {grp === "zy" && (
-          <GradeBlock title='🎓 כיתות ז׳–י"ב'>
-            <p className="text-sm text-gray-500">הממצאים יוצגו בדוח הסופי. ניתן להמשיך.</p>
-          </GradeBlock>
-        )}
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
     </div>
@@ -1487,7 +1482,7 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>שאלון ויסות רגשות ויחסים בינאישיים</StepTag>
-        <StepQ>שאלון ויסות רגשות ויחסים בינאישיים — 7 סעיפים</StepQ>
+        <StepQ>שאלון ויסות רגשות ויחסים בינאישיים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
           {bqItems.map(({key,label})=>(
@@ -2899,6 +2894,12 @@ function renderWithLinks(text: string): React.ReactNode[] {
   return out;
 }
 
+function hasSameSymptoms(a: KidsRecommendationGroup, b: KidsRecommendationGroup): boolean {
+  const aS = [...new Set(a.recs.flatMap(r => r.symptoms))].sort();
+  const bS = [...new Set(b.recs.flatMap(r => r.symptoms))].sort();
+  return aS.length === bS.length && aS.every((s, i) => s === bS[i]);
+}
+
 function GroupCard({
   group,
   onSelect,
@@ -2906,6 +2907,8 @@ function GroupCard({
   onExplain,
   explanation,
   explanationLoading,
+  siblings,
+  onSelectSiblings,
 }: {
   group: KidsRecommendationGroup & { domainLabel: string };
   onSelect: (() => void) | null;
@@ -2915,6 +2918,8 @@ function GroupCard({
   onExplain?: () => void;
   explanation?: { title: string; explanation: string; evidence_note: string } | null;
   explanationLoading?: boolean;
+  siblings?: (KidsRecommendationGroup & { domainLabel: string })[];
+  onSelectSiblings?: (() => void)[];
 }) {
   const allSymptoms = uniq(group.recs.flatMap(r => r.symptoms));
   const allTools = group.recs.flatMap(r => r.tools);
@@ -3006,6 +3011,24 @@ function GroupCard({
               → {group.treatmentLabel}
             </div>
           )}
+          {(siblings ?? []).map((s, i) => {
+            const cb = onSelectSiblings?.[i];
+            if (!cb) return null;
+            const sAssessment = s.kind === "assessment";
+            const sProfessional = s.kind === "professional";
+            return (
+              <button
+                key={s.treatmentKey}
+                type="button"
+                onClick={cb}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
+                  sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : "bg-[var(--teal-dark)]"
+                }`}
+              >
+                {sAssessment ? "🔎 חיפוש מאבחן/ת" : sProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {s.treatmentLabel} ←
+              </button>
+            );
+          })}
           {onExplain && (
             <button
               type="button"
@@ -3444,17 +3467,24 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.treatments.length > 0 && (
                 <div>
                   <div className="text-xs font-bold uppercase tracking-wider text-[#2e7d8c] mb-2 pr-1">💙 טיפולים מומלצים</div>
-                  {b.treatments.map(g => {
+                  {b.treatments.map((g, idx) => {
+                    if (b.treatments.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
+                    const siblings = b.treatments.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
                         key={g.recs[0].id}
                         group={g}
                         onSelect={() => selectGroup(b.key, g)}
-                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        selected={
+                          selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
+                          siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
+                        }
                         onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
+                        siblings={siblings.length > 0 ? siblings : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
@@ -3479,17 +3509,24 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.assessments.length > 0 && (
                 <div className={b.treatments.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 pr-1">🔎 אבחונים מומלצים</div>
-                  {b.assessments.map(g => {
+                  {b.assessments.map((g, idx) => {
+                    if (b.assessments.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
+                    const siblings = b.assessments.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
                         key={g.recs[0].id}
                         group={g}
                         onSelect={() => selectGroup(b.key, g)}
-                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        selected={
+                          selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
+                          siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
+                        }
                         onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
+                        siblings={siblings.length > 0 ? siblings : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
@@ -3513,17 +3550,24 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {b.professionals.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
-                  {b.professionals.map(g => {
+                  {b.professionals.map((g, idx) => {
+                    if (b.professionals.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
+                    const siblings = b.professionals.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
                         key={g.recs[0].id}
                         group={g}
                         onSelect={() => selectGroup(b.key, g)}
-                        selected={selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}`}
+                        selected={
+                          selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
+                          siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
+                        }
                         onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
+                        siblings={siblings.length > 0 ? siblings : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
