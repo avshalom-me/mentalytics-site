@@ -22,7 +22,7 @@ const TOPICS = [
   { href: "/research/faq",              icon: "❓", title: "שאלות נפוצות",                       desc: "כמה עולה טיפול, כמה זמן לוקח, האם קופות חולים מכסות — ותשובות לשאלות נוספות.", img: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&h=260&fit=crop&auto=format&q=75" },
 ];
 
-function ArticleCard({ href, icon, title, desc, img, imgPosition = "center" }: { href: string; icon: string; title: string; desc: string; img: string; imgPosition?: string }) {
+function ArticleCard({ href, title, desc, img, imgPosition = "center" }: { href: string; title: string; desc: string; img: string; imgPosition?: string }) {
   return (
     <Link href={href} className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", overflow: "hidden" }}>
@@ -41,11 +41,6 @@ function ArticleCard({ href, icon, title, desc, img, imgPosition = "center" }: {
 
       {/* Content */}
       <div style={{ padding: "20px 22px 22px" }}>
-        <div style={{
-          width: "40px", height: "40px", borderRadius: "10px",
-          background: "var(--teal-pale)", display: "flex", alignItems: "center",
-          justifyContent: "center", fontSize: "19px", marginBottom: "12px",
-        }}>{icon}</div>
         <h2 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
           className="group-hover:underline">{title}</h2>
         <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{desc}</p>
@@ -101,7 +96,7 @@ export default function ResearchHubPage() {
       }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
-            <h3 style={{ fontWeight: 800, color: "var(--text)", fontSize: "16px" }}>📚 מאמרים אקדמאיים</h3>
+            <h3 style={{ fontWeight: 800, color: "var(--text)", fontSize: "16px" }}>מאמרים אקדמאיים</h3>
             <p style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px" }}>
               השאלונים מבוססים על מאות מחקרים — הנה המקורות המלאים.
             </p>
