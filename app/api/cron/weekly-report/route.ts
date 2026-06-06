@@ -6,11 +6,15 @@ import { computeAttribution, type AttributionResult } from "@/app/lib/attributio
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+export const maxDuration = 300; // reasoning models need more headroom (Vercel caps to plan max)
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 const CRON_SECRET = process.env.CRON_SECRET;
+// The reports run a few times a month (not per-user), so we can afford the
+// strongest reasoning model here. Isolated via env from the per-user agents.
+const REPORT_LLM_MODEL = process.env.REPORT_LLM_MODEL ?? "gpt-5.5";
+const REPORT_LLM_EFFORT = process.env.REPORT_LLM_EFFORT ?? "high";
 const REPORT_TO = (process.env.WEEKLY_REPORT_TO ?? "avshalom84@gmail.com,tpool406@gmail.com")
   .split(",")
   .map(s => s.trim())
@@ -652,16 +656,15 @@ ${channelLines}
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
-  const completion = await openai.chat.completions.create({
-    model: "gpt-4o",
-    messages: [
-      { role: "system", content: "אתה אנליסט מוצר ישראלי ענייני. אתה כותב עברית טבעית, ממוקדת מספרים וללא מליצות." },
-      { role: "user", content: prompt },
-    ],
-    temperature: 0.4,
+  // Reasoning models work best via the Responses API and reject `temperature`.
+  const SYSTEM = "אתה אנליסט מוצר ישראלי ענייני. אתה כותב עברית טבעית, ממוקדת מספרים וללא מליצות.";
+  const response = await openai.responses.create({
+    model: REPORT_LLM_MODEL,
+    reasoning: { effort: REPORT_LLM_EFFORT as "minimal" | "low" | "medium" | "high" },
+    input: `${SYSTEM}\n\n${prompt}`,
   });
 
-  const text = completion.choices[0]?.message?.content ?? "";
+  const text = response.output_text ?? "";
 
   const part2Split = text.split(/\*\*חלק 2.*?\*\*/);
   const summary = (part2Split[0] ?? text).replace(/\*\*חלק 1.*?\*\*/, "").trim();
