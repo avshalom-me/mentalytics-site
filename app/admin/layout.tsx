@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/admin/analytics",  label: "אנליטיקס", icon: "📈" },
   { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
   { href: "/admin/supply-demand", label: "היצע/ביקוש", icon: "⚖️" },
+  { href: "/admin/recommendations", label: "המלצות", icon: "💡" },
   { href: "/admin/weekly-reports", label: "דוח שבועי", icon: "📬" },
   { href: "/admin/monthly-reports", label: "דוח חודשי", icon: "🗓️" },
 ];
