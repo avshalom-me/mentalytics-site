@@ -30,6 +30,9 @@ function AdminNav() {
                 <Link
                   key={item.href}
                   href={item.href}
+                  // Inline color overrides the global `a { color: inherit }` rule
+                  // (unlayered CSS beats Tailwind's layered text utilities).
+                  style={{ color: isActive ? "#ffffff" : "#78716c" }}
                   className={`flex items-center gap-1.5 px-4 py-2 text-sm font-semibold transition-colors ${
                     isActive
                       ? "bg-stone-800 text-white"
