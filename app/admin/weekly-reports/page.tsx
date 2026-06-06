@@ -4,8 +4,23 @@ import { useEffect, useState } from "react";
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
+import { CHANNEL_LABELS } from "@/app/lib/attribution";
 
 type FilterEntry = { name: string; count: number };
+
+type ChannelFunnel = {
+  channel: string;
+  pageViews: number;
+  impressions: number;
+  profileViews: number;
+  contactClicks: number;
+  viewToClick: number;
+  impressionToClick: number;
+};
+type MarketingData = {
+  channels?: ChannelFunnel[];
+  topCampaigns?: { campaign: string; contactClicks: number }[];
+};
 
 type TrendPoint = {
   week_start: string;
@@ -87,9 +102,52 @@ type Report = {
   ai_summary: string | null;
   ai_recommendations: string | null;
   ai_silent_therapists_advice: string | null;
+  marketing_data?: MarketingData;
+  ai_marketing?: string | null;
   email_status: string | null;
   created_at: string;
 };
+
+function MarketingSection({ marketing, advice }: { marketing?: MarketingData; advice?: string | null }) {
+  const channels = marketing?.channels ?? [];
+  if (channels.length === 0 && !advice) return null;
+  return (
+    <section>
+      <h3 className="text-sm font-black text-[#0F5468] mb-3">ערוצי שיווק — מאיפה הגיעו המבקרים</h3>
+      {channels.length > 0 && (
+        <div className="rounded-xl border border-stone-200 bg-white overflow-hidden mb-3">
+          <table className="w-full text-right text-sm">
+            <thead className="bg-stone-50 border-b border-stone-200 text-xs">
+              <tr>
+                <th className="px-3 py-2 font-semibold text-stone-500">ערוץ</th>
+                <th className="px-3 py-2 font-semibold text-stone-500 text-center">כניסות</th>
+                <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפיות</th>
+                <th className="px-3 py-2 font-semibold text-stone-500 text-center">פניות</th>
+                <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפייה→פנייה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {channels.map(c => (
+                <tr key={c.channel} className="border-b border-stone-100">
+                  <td className="px-3 py-2 font-semibold text-stone-800">{CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}</td>
+                  <td className="px-3 py-2 text-center text-stone-600">{c.pageViews}</td>
+                  <td className="px-3 py-2 text-center text-stone-600">{c.profileViews}</td>
+                  <td className="px-3 py-2 text-center font-bold text-stone-800">{c.contactClicks}</td>
+                  <td className="px-3 py-2 text-center text-stone-600">{c.profileViews > 0 ? `${c.viewToClick}%` : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {advice && (
+        <div className="rounded-xl border border-stone-200 bg-white p-4">
+          <MarkdownText text={advice} />
+        </div>
+      )}
+    </section>
+  );
+}
 
 function formatTextWithBold(text: string): React.ReactNode {
   const parts = text.split(/(\*\*.+?\*\*)/g);
@@ -366,6 +424,8 @@ function ReportCard({ r, expanded, onToggle }: { r: Report; expanded: boolean; o
               <MarkdownText text={r.ai_recommendations} />
             </section>
           )}
+
+          <MarketingSection marketing={r.marketing_data} advice={r.ai_marketing} />
 
           {(r.therapist_data.growers || r.therapist_data.decliners) && (
             <section className="grid md:grid-cols-2 gap-4">

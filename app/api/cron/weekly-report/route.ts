@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import OpenAI from "openai";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { computeAttribution, type AttributionResult } from "@/app/lib/attribution-report";
+import { CHANNEL_LABELS } from "@/app/lib/attribution";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -510,15 +512,39 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
   };
 }
 
+// ── MARKETING (attribution by channel) ──────────────────────────────
+
+async function aggregateMarketingData(period: Period): Promise<AttributionResult> {
+  const [eventsRes, viewsRes, clicksRes] = await Promise.all([
+    supabaseAdmin
+      .from("analytics_events")
+      .select("event_type, channel")
+      .in("event_type", ["page_view", "profile_impression"])
+      .gte("created_at", period.since)
+      .lt("created_at", period.until),
+    supabaseAdmin
+      .from("therapist_profile_views")
+      .select("channel")
+      .gte("viewed_at", period.since)
+      .lt("viewed_at", period.until),
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("channel, utm_campaign")
+      .gte("clicked_at", period.since)
+      .lt("clicked_at", period.until),
+  ]);
+  return computeAttribution(eventsRes.data ?? [], viewsRes.data ?? [], clicksRes.data ?? []);
+}
+
 // ── LLM SYNTHESIS ───────────────────────────────────────────────────
 
 async function generateInsights(
-  current: { patient: PatientData; therapist: TherapistData },
+  current: { patient: PatientData; therapist: TherapistData; marketing: AttributionResult },
   previous: { patient: PatientData; therapist: TherapistData },
   periodStart: string,
   periodEnd: string,
   config: ReportConfig,
-): Promise<{ summary: string; recommendations: string; silentTherapistsAdvice: string }> {
+): Promise<{ summary: string; recommendations: string; silentTherapistsAdvice: string; marketingAdvice: string }> {
   const wow = {
     pageViews: diffPct(current.patient.pageViews, previous.patient.pageViews),
     profileViews: diffPct(current.patient.profileViews, previous.patient.profileViews),
@@ -528,6 +554,12 @@ async function generateInsights(
   };
 
   const N = config.periodNoun; // "השבוע" / "החודש"
+
+  const mk = current.marketing;
+  const channelLines = mk.channels.length
+    ? mk.channels.map(c => `- ${CHANNEL_LABELS[c.channel] ?? c.channel}: ${c.pageViews} כניסות, ${c.profileViews} צפיות, ${c.contactClicks} פניות, המרה צפייה→פנייה ${c.viewToClick}%`).join("\n")
+    : "(אין עדיין נתוני מקור לתקופה זו)";
+  const campaignLines = mk.topCampaigns.length ? JSON.stringify(mk.topCampaigns) : "(אין קמפיינים מתויגים ב-UTM)";
 
   const prompt = `אתה אנליסט מוצר עבור "טיפול חכם" — פלטפורמה ישראלית לחיבור בין מטופלים למטפלים. אני מנהל המוצר וקיבלת את הנתונים האחרונים (${config.periodLabel}).
 
@@ -594,9 +626,13 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
   תמונה: t.has_photo,
 })), null, 2)}
 
+## ערוצי שיווק — מאיפה הגיעו המבקרים (attribution)
+${channelLines}
+קמפיינים מובילים (לפי פניות): ${campaignLines}
+
 ---
 
-אנא הפק שלושה חלקים נפרדים, בעברית פשוטה וברורה:
+אנא הפק ארבעה חלקים נפרדים, בעברית פשוטה וברורה:
 
 **חלק 1 — סיכום ${N} (5-7 משפטים):**
 מצב כללי, מגמות בולטות מול ${config.prevLabel} **וגם מול הממוצעים ארוכי הטווח**, ושני-שלושה דברים שראויים לתשומת לב מיידית. אם ${N} חריג כלפי מעלה או מטה ביחס לממוצע, ציין זאת מפורשות.
@@ -610,6 +646,9 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
 - "נצפו אבל לא לחצו" — בעיית המרה. הצע פעולות שיפור פרופיל (ביו ארוך יותר, תמונה איכותית, הוספת תחומי הכשרה, ניסוח התמחות חד יותר).
 **חשוב במיוחד:** סמן את המטפלים שיותר מ-30 ימים בקידום ועדיין 0 פניות — אלה דורשים טיפול דחוף. אם יש כאלה ברשימה, הזכר אותם בשם ותן להם עדיפות.
 תן 3-5 פעולות קונקרטיות.
+
+**חלק 4 — ערוצי שיווק:**
+נתח מאילו ערוצים מגיעים הלידים ואיזה ערוץ ממיר טוב יותר (צפייה→פנייה). אם רוב התנועה "ישיר"/"אורגני" כי עדיין אין פרסום בתשלום — ציין זאת מפורשות, והמלץ על מה לשים דגש כשמתחילים לפרסם בתשלום (איזה ערוץ/אזור, ומול איזה benchmark של המרה אורגנית). 2-4 נקודות.
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
@@ -629,9 +668,11 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
   const afterPart1 = part2Split[1] ?? "";
   const part3Split = afterPart1.split(/\*\*חלק 3.*?\*\*/);
   const recommendations = (part3Split[0] ?? "").trim();
-  const silentTherapistsAdvice = (part3Split[1] ?? "").trim();
+  const part4Split = (part3Split[1] ?? "").split(/\*\*חלק 4.*?\*\*/);
+  const silentTherapistsAdvice = (part4Split[0] ?? "").trim();
+  const marketingAdvice = (part4Split[1] ?? "").trim();
 
-  return { summary, recommendations, silentTherapistsAdvice };
+  return { summary, recommendations, silentTherapistsAdvice, marketingAdvice };
 }
 
 // ── EMAIL ───────────────────────────────────────────────────────────
@@ -789,12 +830,40 @@ function buildSilentTherapistsTable(silent: SilentTherapist[], config: ReportCon
   `;
 }
 
+function buildMarketingSection(marketing: AttributionResult, advice: string): string {
+  if (marketing.channels.length === 0 && !advice) {
+    return `<p style="font-size:13px;color:#888;margin:8px 0;">אין עדיין נתוני מקור לתקופה זו (פרסום בתשלום עוד לא רץ).</p>`;
+  }
+  const rows = marketing.channels.map(c => `
+    <tr>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:13px;">${escapeHtml(CHANNEL_LABELS[c.channel] ?? c.channel)}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${c.pageViews}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${c.profileViews}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;font-weight:bold;">${c.contactClicks}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:12px;">${c.profileViews > 0 ? c.viewToClick + "%" : "—"}</td>
+    </tr>`).join("");
+  const table = marketing.channels.length ? `
+    <table style="width:100%;border-collapse:collapse;margin:8px 0;background:white;">
+      <thead><tr style="background:#f5f5f4;">
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">ערוץ</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">כניסות</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפיות</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">פניות</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפייה→פנייה</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>` : "";
+  const adviceHtml = advice ? `<div style="background:white;padding:14px 16px;border-radius:8px;border:1px solid #e8e0d8;margin-top:8px;">${mdToHtml(advice)}</div>` : "";
+  return table + adviceHtml;
+}
+
 function buildEmailHtml(
   periodStart: string,
   periodEnd: string,
   patient: PatientData,
   therapist: TherapistData,
-  insights: { summary: string; recommendations: string; silentTherapistsAdvice: string },
+  marketing: AttributionResult,
+  insights: { summary: string; recommendations: string; silentTherapistsAdvice: string; marketingAdvice: string },
   config: ReportConfig,
 ): string {
   const trendBucketLabel = config.type === "weekly" ? "שבועות" : "חודשים";
@@ -819,6 +888,9 @@ function buildEmailHtml(
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">המלצות פעולה</h2>
         ${mdToHtml(insights.recommendations)}
+
+        <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">ערוצי שיווק — מאיפה הגיעו המבקרים</h2>
+        ${buildMarketingSection(marketing, insights.marketingAdvice)}
 
         <h2 style="font-size:17px;color:#0F5468;margin:24px 0 12px;">מטפלים בעלייה (vs ${config.midAvgLabel})</h2>
         ${buildTherapistTrendTable(therapist.growers ?? [], "up", config)}
@@ -883,13 +955,14 @@ export async function runReport(type: ReportType): Promise<{
 
     const therapistTrendPriorBuckets = type === "weekly" ? 4 : 3;
 
-    const [patient, therapist, prevPatient, prevTherapist, trend, therapistTrends] = await Promise.all([
+    const [patient, therapist, prevPatient, prevTherapist, trend, therapistTrends, marketing] = await Promise.all([
       aggregatePatientData(current),
       aggregateTherapistData(current),
       aggregatePatientData(previous),
       aggregateTherapistData(previous),
       aggregateTrend(now, trendBucketDays, trendBuckets),
       aggregateTherapistTrends(now, trendBucketDays, trendBuckets, therapistTrendPriorBuckets),
+      aggregateMarketingData(current),
     ]);
 
     const comparison = computeComparison(trend);
@@ -906,7 +979,7 @@ export async function runReport(type: ReportType): Promise<{
       .slice(0, 5);
 
     const insights = await generateInsights(
-      { patient, therapist },
+      { patient, therapist, marketing },
       { patient: prevPatient, therapist: prevTherapist },
       current.since.slice(0, 10),
       current.until.slice(0, 10),
@@ -918,6 +991,7 @@ export async function runReport(type: ReportType): Promise<{
       current.until.slice(0, 10),
       patient,
       therapist,
+      marketing,
       insights,
       config,
     );
@@ -942,9 +1016,11 @@ export async function runReport(type: ReportType): Promise<{
           [config.endCol]: current.until.slice(0, 10),
           patient_data: patient,
           therapist_data: therapist,
+          marketing_data: marketing,
           ai_summary: insights.summary,
           ai_recommendations: insights.recommendations,
           ai_silent_therapists_advice: insights.silentTherapistsAdvice,
+          ai_marketing: insights.marketingAdvice,
           email_sent_to: REPORT_TO.join(", "),
           email_status: emailStatus,
         },
