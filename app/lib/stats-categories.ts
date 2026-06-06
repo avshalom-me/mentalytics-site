@@ -4,6 +4,8 @@
  * but API validation uses these constants.
  */
 
+import { CITY_TO_REGION } from "./regions";
+
 export const ISSUE_CATEGORIES = [
   "emotional",       // רגשי — דיכאון/חרדה/טראומה/דימוי עצמי
   "relationship",    // זוגיות/משפחה
@@ -133,4 +135,34 @@ export function isValidAgeBand(x: unknown): x is AgeBand {
 }
 export function isValidGender(x: unknown): x is Gender {
   return typeof x === "string" && (GENDERS as readonly string[]).includes(x);
+}
+
+/** Map an app region name (from regions.ts) to a stats region bucket. */
+const APP_REGION_TO_BUCKET: Record<string, RegionCategory> = {
+  "גוש דן": "center",
+  "השפלה והמרכז": "center",
+  "ירושלים והסביבה": "jerusalem",
+  "יהודה ושומרון": "jerusalem",
+  "דרום השרון": "sharon",
+  "צפון השרון": "sharon",
+  "חיפה והקריות": "haifa",
+  "גליל וצפון": "north",
+  "עמק יזרעאל ונצרת": "north",
+  "דרום": "south",
+  "נגב ואילת": "south",
+};
+
+/**
+ * Map a therapist `regions` entry — which may be a city name, an app region
+ * name, or already a stats bucket — to a stats region bucket.
+ * Used to put therapist supply on the same axis as patient demand (viewer_region).
+ */
+export function therapistAreaToBucket(raw: string | null | undefined): RegionCategory | null {
+  if (!raw) return null;
+  const s = raw.trim();
+  if (APP_REGION_TO_BUCKET[s]) return APP_REGION_TO_BUCKET[s];           // app region name
+  const region = CITY_TO_REGION[s];                                       // city → app region
+  if (region && APP_REGION_TO_BUCKET[region]) return APP_REGION_TO_BUCKET[region];
+  if ((REGION_CATEGORIES as readonly string[]).includes(s)) return s as RegionCategory; // already a bucket
+  return normalizeRegion(s);                                              // loose fallback
 }
