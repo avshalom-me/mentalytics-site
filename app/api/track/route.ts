@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { sanitizeAttribution } from "@/app/lib/attribution";
 
 const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete"] as const;
 type EventType = (typeof VALID_EVENTS)[number];
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       therapist_id: safeTherapistId,
       session_id: safeSessionId,
       metadata: safeMetadata,
+      ...sanitizeAttribution(body),
     });
 
     return NextResponse.json({ ok: true });

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { sanitizeAttribution } from "@/app/lib/attribution";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -109,7 +110,7 @@ export async function POST(req: NextRequest) {
 
     await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type: "site_message", source: safeSource });
+      .insert({ therapist_id, click_type: "site_message", source: safeSource, ...sanitizeAttribution(body) });
 
     return NextResponse.json({ ok: true });
   } catch (e) {

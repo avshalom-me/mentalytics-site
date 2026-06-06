@@ -2,15 +2,17 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { getOrCreateSessionId } from "./session";
+import { getAttribution } from "./attribution";
 
 type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   const session_id = getOrCreateSessionId();
+  const attribution = getAttribution() ?? {};
   fetch("/api/track", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ event_type, session_id, ...extra }),
+    body: JSON.stringify({ event_type, session_id, ...attribution, ...extra }),
   }).catch(() => {});
 }
 

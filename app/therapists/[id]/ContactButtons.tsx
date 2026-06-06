@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import SiteMessageModal from "../SiteMessageModal";
+import { getAttribution } from "@/app/lib/attribution";
 
 const wasvg = (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
@@ -23,10 +24,11 @@ const phonesvg = (
 );
 
 function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", source: "match" | "directory") {
+  const attribution = getAttribution() ?? {};
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source }),
+    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source, ...attribution }),
   }).catch(() => {});
 }
 

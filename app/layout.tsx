@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Heebo } from "next/font/google";
 import NavBar from "./components/NavBar";
 import AccessibilityWidget from "./components/AccessibilityWidget";
+import AttributionTracker from "./components/AttributionTracker";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 
@@ -41,6 +42,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none">
           דלג לתוכן הראשי
         </a>
+        <AttributionTracker />
         <NavBar />
         <AccessibilityWidget />
 

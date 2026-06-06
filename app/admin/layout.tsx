@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/admin/therapists", label: "מטפלים", icon: "👥" },
   { href: "/admin/stats",      label: "לחיצות", icon: "📊" },
   { href: "/admin/analytics",  label: "אנליטיקס", icon: "📈" },
+  { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
   { href: "/admin/weekly-reports", label: "דוח שבועי", icon: "📬" },
   { href: "/admin/monthly-reports", label: "דוח חודשי", icon: "🗓️" },
 ];

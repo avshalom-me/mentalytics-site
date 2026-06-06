@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { getAttribution } from "@/app/lib/attribution";
 
 type Props = {
   therapistId: string;
@@ -58,6 +59,7 @@ export default function SiteMessageModal({
           sender_contact: contact,
           message,
           source,
+          ...(getAttribution() ?? {}),
         }),
       });
       const json = await res.json();

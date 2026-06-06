@@ -6,6 +6,7 @@ import {
   isValidAgeBand,
   isValidGender,
 } from "@/app/lib/stats-categories";
+import { sanitizeAttribution } from "@/app/lib/attribution";
 
 // "match_card"   = impression in the match-results list
 // "match"        = entry into the full profile page coming from match results
@@ -87,6 +88,7 @@ export async function POST(req: NextRequest) {
         viewer_gender: safeGender,
         match_score: safeScore,
         session_id: safeSessionId,
+        ...sanitizeAttribution(body),
       });
 
     return NextResponse.json({ ok: true });

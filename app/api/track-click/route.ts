@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { sanitizeAttribution } from "@/app/lib/attribution";
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 const VALID_SOURCES = ["match", "directory"] as const;
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
 
     const { error } = await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type, source: safeSource });
+      .insert({ therapist_id, click_type, source: safeSource, ...sanitizeAttribution(body) });
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

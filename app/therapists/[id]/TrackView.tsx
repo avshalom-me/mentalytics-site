@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { getAttribution } from "@/app/lib/attribution";
 
 export interface ViewerContext {
   region?: string;
@@ -22,6 +23,7 @@ export default function TrackView({
 }) {
   useEffect(() => {
     const session_id = getOrCreateSessionId();
+    const attribution = getAttribution() ?? {};
     fetch("/api/track-view", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -34,6 +36,7 @@ export default function TrackView({
         viewer_gender: context?.gender ?? null,
         match_score: context?.match_score ?? null,
         session_id,
+        ...attribution,
       }),
     }).catch(() => {});
   }, [therapistId, source, context]);
