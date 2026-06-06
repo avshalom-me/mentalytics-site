@@ -2333,63 +2333,59 @@ export default function AdultsPage() {
       const aiLoading = recExplainLoading[key];
       const article = getTreatmentArticle(group.treatment);
       const articleHref = getTreatmentArticleHref(group.treatment);
+      const accent = group.urgent ? "border-red-300 bg-red-50" : "border-[var(--teal-mid)] bg-white";
       return (
-        <div key={key}
-          className={`rounded-xl p-4 text-right transition-all ${group.urgent ? "border-r-4 border-red-400 bg-red-900/30" : "border-r-4 border-[#8ecfdb] bg-white/10"}`}>
+        <div key={key} className={`rounded-2xl border p-5 mb-3 ${accent}`}>
           {group.urgent && (
-            <div className="mb-1 text-xs font-bold uppercase tracking-wide text-red-300">⚠️ דחוף</div>
+            <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-red-700">⚠️ דחוף</div>
           )}
           {group.recs.length === 1 ? (
-            <div className="font-semibold">{firstRec.symptomText}</div>
+            <p className="font-semibold text-[#1a2a3a] text-sm leading-relaxed">{firstRec.symptomText}</p>
           ) : (
-            <ul className="mb-1 space-y-1">
+            <ul className="space-y-1">
               {group.recs.map((r) => (
-                <li key={r.id} className="flex items-start gap-2 font-semibold">
-                  <span className="mt-1 text-[#8ecfdb]">•</span>{r.symptomText}
+                <li key={r.id} className="flex items-start gap-2 text-sm font-semibold text-[#1a2a3a] leading-relaxed">
+                  <span className="mt-1 text-[var(--teal)]">•</span>{r.symptomText}
                 </li>
               ))}
             </ul>
           )}
-          {notes && <div className="mt-1 text-xs opacity-75">{notes}</div>}
+          {notes && <div className="mt-2 text-xs text-gray-500 leading-relaxed">{notes}</div>}
           {tools && (
-            <div className="mt-3 rounded-xl border border-amber-400/40 bg-amber-900/20 p-3 text-right">
-              <div className="mb-1 text-xs font-bold uppercase tracking-wide text-amber-300">🛠 כלים להתמודדות</div>
-              <div className="whitespace-pre-wrap text-xs leading-relaxed text-amber-100">{tools}</div>
+            <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-amber-700">🛠 כלים להתמודדות</div>
+              <div className="whitespace-pre-wrap text-xs leading-relaxed text-amber-900">{tools}</div>
             </div>
           )}
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
-              className="rounded-lg bg-[#3D8C8A] hover:bg-[#2A6462] px-4 py-2 text-sm font-bold transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
             >
-              מצא/י לי מטפל — {group.treatmentLabel} ←
+              🔍 מצא/י לי מטפל — {group.treatmentLabel} ←
             </button>
             <button
               type="button"
               onClick={() => fetchRecommendationExplanation(group)}
               disabled={aiLoading}
-              className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
+              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
             >
               {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
             </button>
           </div>
           {aiData && (
-            <div className="mt-3 rounded-xl border border-violet-300/60 bg-gradient-to-br from-violet-900/40 to-fuchsia-900/30 p-3 text-right">
-              <p className="text-xs font-bold text-violet-100 mb-2">✦ {aiData.title}</p>
-              <p className="text-xs text-white/90 mb-2 leading-relaxed whitespace-pre-line">{aiData.explanation}</p>
-              <p className="text-[10px] text-white/50 mb-3">{aiData.evidence_note}</p>
+            <div className="mt-3 rounded-xl border border-purple-200 bg-purple-50 p-3">
+              <p className="text-xs font-bold text-purple-800 mb-2">✦ {aiData.title}</p>
+              <p className="text-xs text-purple-900 mb-2 leading-relaxed whitespace-pre-line">{aiData.explanation}</p>
+              <p className="text-[10px] text-purple-500 mb-3">{aiData.evidence_note}</p>
               {articleHref ? (
-                <a
-                  href={articleHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-cyan-200 hover:text-cyan-100 hover:underline"
-                >
+                <a href={articleHref} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--teal-dark)] hover:underline">
                   📖 קרא עוד על {group.treatmentLabel} ←
                 </a>
               ) : article.status === "pending" && (
-                <span className="inline-flex items-center gap-1 text-xs font-medium text-white/40">
+                <span className="inline-flex items-center gap-1 text-xs font-medium text-gray-400">
                   📖 מאמר בהכנה
                 </span>
               )}
@@ -2409,45 +2405,65 @@ export default function AdultsPage() {
           setScreen("match-form");
           (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
         }}
-        className="mt-3 w-full rounded-xl p-4 text-right transition-all"
-        style={{ background: "linear-gradient(120deg,#2A6462,#3D8C8A)", border: "1px solid #5AADAB" }}
+        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
       >
-        <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#C2DFDE]">חיפוש מתקדם ✦</div>
-        <div className="font-bold text-white">חפש/י מטפל שמשלב את הגישות הרגשיות ←</div>
-        <div className="mt-1 text-xs text-white/70">החיפוש המשולב מתייחס לתחום הרגשי בלבד — טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
+        <div className="font-bold text-sm text-white">חפש/י מטפל שמשלב את הגישות הרגשיות ←</div>
+        <div className="mt-1 text-xs text-white/75">החיפוש המשולב מתייחס לתחום הרגשי בלבד — טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
       </button>
     );
 
     return (
       <Layout screen={screen} domains={answers.domains}>
-        <div id="adults-results-card" className="rounded-2xl bg-[#1a3a5c] p-6 text-white">
+        <div id="adults-results-card">
+          {/* Logo */}
           <div className="mb-4 flex justify-center">
-            <img src="/logo-on-dark-512.png" alt="Mentalytics" className="h-14 w-auto" />
+            <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
-          <h2 className="mb-1 text-2xl font-black" style={{ fontFamily: "'Heebo', sans-serif" }}>תוצאות השאלון</h2>
-          {recs.length > 0 && (
-            <div className="mb-5 rounded-xl bg-white/10 p-4">
-              <p className="mb-2.5 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">מה עכשיו?</p>
-              <div className="flex flex-col gap-2 text-sm text-white/90">
-                <div className="flex items-start gap-2.5">
-                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">1</span>
-                  <span>קרא/י את הממצאים למטה</span>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">2</span>
-                  <span>לחץ/י על "מצא/י לי מטפל" בממצא הרלוונטי ביותר עבורך</span>
-                </div>
-                <div className="flex items-start gap-2.5">
-                  <span className="flex-shrink-0 rounded-full bg-[#8ecfdb]/25 px-2 py-0.5 text-xs font-bold text-[#8ecfdb]">3</span>
-                  <span>לחלופין — חפש/י מטפל שמשלב כמה גישות בכפתור שבתחתית</span>
+
+          {/* Header + "what now?" */}
+          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6 mb-4">
+            <h2 className="text-xl font-bold text-[#1a2a3a] mb-4">דוח ממצאים</h2>
+            {recs.length > 0 && (
+              <div className="rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+                <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)]">מה עכשיו?</p>
+                <div className="flex flex-col gap-2.5 text-sm text-[#2a3a4a]">
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">1</span>
+                    <span>קרא/י את הממצאים למטה</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">2</span>
+                    <span>לחץ/י על "מצא/י לי מטפל" בממצא הרלוונטי ביותר עבורך</span>
+                  </div>
+                  <div className="flex items-start gap-2.5">
+                    <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
+                    <span>לחלופין — חפש/י מטפל שמשלב כמה גישות בכפתור שבתחתית</span>
+                  </div>
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* Alerts */}
+          {err && <p className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">{err}</p>}
+          {answers.bmiAbnormal && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+              ⚕️ ה-BMI שדיווחת עליו אינו בטווח הרגיל. בנפרד מהטיפול הנפשי, מומלץ לפנות לרופא/ת המשפחה לבירור רפואי.
             </div>
           )}
-          {err && <p className="mb-3 rounded-lg bg-red-800 p-3 text-sm">{err}</p>}
+          {multipleGroups && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
+              📌 שים/י לב: נמצאו מספר סימנים עם הפניות שונות. המערכת סיננה את הפחות דחופות כך שבפניך מופיעות ההפניות העיקריות. יש לפנות ע"פ הקושי המשמעותי ביותר שאת/ה חווה.
+            </div>
+          )}
+
+          {/* No results */}
           {recs.length === 0 && (
-            <div className="rounded-xl bg-white/10 p-4 text-sm space-y-3">
-              <p>לא נמצאו ממצאים מובהקים בשאלון. מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</p>
+            <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4 space-y-3">
+              <p className="font-bold text-[#1a2a3a]">לא נמצאו ממצאים מובהקים בשאלון.</p>
+              <p className="text-sm text-gray-600">מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</p>
               <button
                 type="button"
                 onClick={() => {
@@ -2455,47 +2471,45 @@ export default function AdultsPage() {
                   setCombinedTreatments(null);
                   setScreen("match-form");
                 }}
-                className="w-full rounded-xl border-r-4 border-[#8ecfdb] bg-white/10 p-4 text-right transition-all hover:bg-white/20"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal)] transition-colors"
               >
-                <div className="mb-1 text-xs font-bold uppercase tracking-wide text-[#8ecfdb]">מורכבויות בתחום הרגשי/האישי</div>
-                <div className="font-semibold">לא נמצאו ממצאים מובהקים — לחץ/י להפנייה למטפל</div>
-                <div className="mt-2 inline-block rounded-lg bg-white/20 px-3 py-1 text-xs font-bold">→ טיפול דינאמי</div>
+                🔍 חיפוש מטפל/ת לטיפול דינאמי
               </button>
             </div>
           )}
-          {answers.bmiAbnormal && (
-            <div className="mb-4 rounded-xl border border-amber-400/50 bg-amber-900/20 p-4 text-sm leading-relaxed text-amber-100">
-              ⚕️ ה-BMI שדיווחת עליו אינו בטווח הרגיל. בנפרד מהטיפול הנפשי, מומלץ לפנות לרופא/ת המשפחה לבירור רפואי.
-            </div>
-          )}
-          {multipleGroups && (
-            <div className="mb-4 rounded-xl border border-yellow-400/40 bg-yellow-900/20 p-4 text-sm leading-relaxed text-yellow-100">
-              📌 שים/י לב: נמצאו מספר סימנים עם הפניות שונות. המערכת סיננה את הפחות דחופות כך שבפניך מופיעות ההפניות העיקריות. יש לפנות ע"פ הקושי המשמעותי ביותר שאת/ה חווה.
-            </div>
-          )}
+
+          {/* Domain sections */}
           {sections.map((section) => (
-            <div key={section.key} className="mt-5">
-              <div className="mb-2 flex items-center gap-2">
-                <div className="h-px flex-1 bg-white/15" />
-                <span className="whitespace-nowrap text-sm font-bold text-[#8ecfdb]">{section.label}</span>
-                <div className="h-px flex-1 bg-white/15" />
+            <section key={section.key} className="mt-5">
+              <div className="flex items-center gap-2 mb-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-sm font-bold text-[var(--teal-dark)] px-3 py-1 rounded-full bg-[var(--teal-pale)] border border-[var(--teal-mid)] whitespace-nowrap">
+                  {section.label}
+                </span>
+                <div className="h-px flex-1 bg-gray-200" />
               </div>
               <div className="space-y-3">
                 {section.groups.map((group) => renderGroupCard(group))}
               </div>
               {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
-            </div>
+            </section>
           ))}
-          <div className="mt-5 rounded-xl border border-white/20 bg-white/10 px-4 py-3 text-xs leading-6 text-white/70">
+
+          {/* Disclaimer */}
+          <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-6 text-stone-500">
             התוצאות מבוססות על תשובותיך לשאלון ומהוות הערכה כללית בלבד.<br />
             אין לראות בתוצאות אלו אבחון, המלצה טיפולית מחייבת או תחליף לייעוץ מקצועי.<br />
             מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
           </div>
-          <p className="mt-3 text-center text-xs opacity-50">טיפול חכם</p>
-          <div className="mt-4 flex justify-center print:hidden" data-html2canvas-ignore="true">
-            <button onClick={() => downloadResultsPDF("adults-results-card", "תוצאות-השאלון")}
-              className="inline-flex items-center gap-2 rounded-xl border border-white/40 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 disabled:opacity-60"
-              id="adults-download-pdf-btn">
+          <p className="mt-3 text-center text-xs text-gray-400">טיפול חכם</p>
+
+          {/* Actions */}
+          <div className="mt-4 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
+            <button
+              onClick={() => downloadResultsPDF("adults-results-card", "תוצאות-השאלון", "#ffffff")}
+              id="adults-download-pdf-btn"
+              className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all disabled:opacity-60"
+            >
               💾 שמירה כ-PDF
             </button>
           </div>

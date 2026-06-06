@@ -2946,15 +2946,15 @@ function GroupCard({
 
   // Color theme per kind
   const accent = group.urgent
-    ? "border-red-400 bg-red-50"
+    ? "border-red-300 bg-red-50"
     : noAction
       ? "border-gray-200 bg-gray-50"
       : isAssessment
-        ? "border-purple-300 bg-purple-50"
+        ? "border-purple-200 bg-purple-50/70"
         : isProfessional
-          ? "border-emerald-300 bg-emerald-50"
+          ? "border-emerald-200 bg-emerald-50/70"
           : isExternal
-            ? "border-amber-300 bg-amber-50"
+            ? "border-amber-200 bg-amber-50/70"
             : "border-[var(--teal-mid)] bg-white";
 
   const labelTone = group.urgent ? "text-red-700"
@@ -3466,7 +3466,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {/* Treatments */}
               {b.treatments.length > 0 && (
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-[#2e7d8c] mb-2 pr-1">💙 טיפולים מומלצים</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[var(--teal)] mb-2 pr-1">💙 טיפולים מומלצים</div>
                   {b.treatments.map((g, idx) => {
                     if (b.treatments.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
@@ -3508,7 +3508,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {/* Assessments */}
               {b.assessments.length > 0 && (
                 <div className={b.treatments.length > 0 ? "mt-5" : ""}>
-                  <div className="text-xs font-bold uppercase tracking-wider text-purple-700 mb-2 pr-1">🔎 אבחונים מומלצים</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-purple-600 mb-2 pr-1">🔎 אבחונים מומלצים</div>
                   {b.assessments.map((g, idx) => {
                     if (b.assessments.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
@@ -3549,7 +3549,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
               {/* Professionals — hard-filtered search by therapist type */}
               {b.professionals.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
-                  <div className="text-xs font-bold uppercase tracking-wider text-emerald-700 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
                   {b.professionals.map((g, idx) => {
                     if (b.professionals.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
                     const explainKey = `${b.key}::${g.treatmentKey}`;
