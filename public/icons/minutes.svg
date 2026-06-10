@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 30 30">
+  <!-- Generator: Adobe Illustrator 29.7.1, SVG Export Plug-In . SVG Version: 2.1.1 Build 8)  -->
+  <defs>
+    <style>
+      .st0 {
+        fill: none;
+        stroke: #3a3a3a;
+        stroke-miterlimit: 10;
+        stroke-width: .58px;
+      }
+
+      .st1 {
+        fill: #477c79;
+      }
+
+      .st2 {
+        fill: #e7a323;
+      }
+    </style>
+  </defs>
+  <circle class="st2" cx="7.1" cy="6.15" r=".92"/>
+  <circle class="st2" cx="24.06" cy="6.15" r=".92"/>
+  <circle class="st2" cx="24.06" cy="23.06" r=".92"/>
+  <circle class="st2" cx="7.1" cy="23.06" r=".92"/>
+  <circle class="st1" cx="15.54" cy="14.62" r="8.43"/>
+  <path id="path3453" class="st0" d="M24.12,25.93H7.05c-1.53,0-2.77-1.24-2.77-2.77V6.09c0-1.53,1.24-2.77,2.77-2.77h17.07c1.53,0,2.77,1.24,2.77,2.77v17.07c0,1.53-1.24,2.77-2.77,2.77Z"/>
+  <path id="path3457" class="st0" d="M24.06,14.62c0-4.68-3.8-8.48-8.48-8.48s-8.48,3.8-8.48,8.48,3.8,8.48,8.48,8.48,8.48-3.8,8.48-8.48Z"/>
+  <path id="path3461" class="st0" d="M7.1,6.85c.37,0,.72-.32.7-.7-.02-.38-.31-.7-.7-.7-.37,0-.72.32-.7.7.02.38.31.7.7.7"/>
+  <path id="path3465" class="st0" d="M24.06,6.85c.37,0,.72-.32.7-.7-.02-.38-.31-.7-.7-.7-.37,0-.72.32-.7.7.02.38.31.7.7.7"/>
+  <path id="path3469" class="st0" d="M7.1,23.81c.37,0,.72-.32.7-.7-.02-.38-.31-.7-.7-.7-.37,0-.72.32-.7.7.02.38.31.7.7.7"/>
+  <path id="path3473" class="st0" d="M24.06,23.81c.37,0,.72-.32.7-.7-.02-.38-.31-.7-.7-.7-.37,0-.72.32-.7.7.02.38.31.7.7.7"/>
+  <path id="path3477" class="st0" d="M15.58,8.97v5.65l2.83,2.83"/>
+</svg>

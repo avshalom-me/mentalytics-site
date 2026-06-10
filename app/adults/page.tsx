@@ -961,17 +961,17 @@ export default function AdultsPage() {
         <p className="mb-4 font-semibold text-[#1a3a5c]">בחר/י את התחומים בהם חווה/ת קושי (ניתן לסמן יותר מאחד)</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {([
-            ["emotional","🧠","מורכבויות בתחום הרגשי/האישי","חרדות, מצב רוח, טראומה, שינה, אכילה"],
-            ["functional","📚","סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים","קשיי למידה, ריכוז, כיוון מקצועי"],
-            ["relationship","💑","זוגיות ומשפחה","קשיים זוגיים, הורות, מיניות"],
-            ["addiction","🔄","קשיי התמכרות","אלכוהול, סמים, מסכים, הימורים"],
+            ["emotional","/icons/emotional.svg","מורכבויות בתחום הרגשי/האישי","חרדות, מצב רוח, טראומה, שינה, אכילה"],
+            ["functional","/icons/functional.svg","סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים","קשיי למידה, ריכוז, כיוון מקצועי"],
+            ["relationship","/icons/relationship.png","זוגיות ומשפחה","קשיים זוגיים, הורות, מיניות"],
+            ["addiction","/icons/addiction.svg","קשיי התמכרות","אלכוהול, סמים, מסכים, הימורים"],
           ] as const).map(([id, icon, title, desc]) => {
             const sel = answers.domains.includes(id as any);
             return (
               <button key={id} type="button"
                 onClick={() => upd({ domains: sel ? answers.domains.filter((d) => d !== id) : [...answers.domains, id as any] })}
                 className={`rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]"}`}>
-                <div className="text-2xl">{icon}</div>
+                <img src={icon} alt="" width={34} height={34} style={{ display: "block" }} />
                 <div className="mt-1 text-xs font-bold text-[#1a3a5c]">{title}</div>
                 <div className="mt-0.5 text-xs text-[#6b7280]">{desc}</div>
               </button>
@@ -986,8 +986,7 @@ export default function AdultsPage() {
               <button key={id} type="button"
                 onClick={() => upd({ domains: sel ? answers.domains.filter((d) => d !== id) : [...answers.domains, id] })}
                 className={`w-full rounded-xl border-2 p-4 text-right transition-all ${sel ? "border-[#2e7d8c] bg-[#e0f4fa]" : "border-[#ddd6c8] bg-white hover:border-[var(--teal)] hover:bg-[var(--teal-pale)]"}`}>
-                <div className="text-2xl">🌱</div>
-                <div className="mt-1 text-xs font-bold text-[#1a3a5c]">התפתחות אישית</div>
+                <img src="/icons/personal-development.svg" alt="" width={34} height={34} style={{ display: "block" }} />
                 <div className="mt-0.5 text-xs text-[#6b7280]">אני לא מתמודד/ת עם קושי אלא מעוניין/ת בהבנה עצמית</div>
               </button>
             );

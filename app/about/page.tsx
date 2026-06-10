@@ -1,6 +1,5 @@
 import Image from "next/image";
 import type { Metadata } from "next";
-import { Heart, Users } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "מי אנחנו",
@@ -139,7 +138,7 @@ export default function AboutPage() {
           alignItems: "center",
           gap: "16px",
         }}>
-          <span style={{ fontSize: "22px", flexShrink: 0 }}>💡</span>
+          <img src="/icons/lightbulb.svg" alt="" width={28} height={28} style={{ flexShrink: 0, display: "block" }} />
           <p style={{ fontSize: "16px", fontWeight: 600, color: "var(--teal-dark)", lineHeight: 1.7, margin: 0 }}>
             אנחנו לא מחליפים טיפול או אבחון מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובמקצועיות
           </p>
@@ -151,9 +150,9 @@ export default function AboutPage() {
         <div className="flex items-start gap-3 mb-6">
           <div
             className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "#EBF0F5", border: "1px solid #A8C0D4" }}
+            style={{ background: "var(--surface)", border: "1px solid var(--line)" }}
           >
-            <Users size={18} style={{ color: "var(--teal)" }} />
+            <img src="/icons/team.svg" alt="" width={24} height={24} style={{ display: "block" }} />
           </div>
           <div>
             <h2 className="text-2xl font-extrabold text-stone-900">הצוות המקצועי המפתח</h2>
@@ -205,9 +204,9 @@ export default function AboutPage() {
         <div className="flex items-start gap-3 mb-6">
           <div
             className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "#EBF5F1", border: "1px solid #A8D4C0" }}
+            style={{ background: "var(--surface)", border: "1px solid var(--line)" }}
           >
-            <Heart size={18} style={{ color: "#2E7A5C" }} />
+            <img src="/icons/values.svg" alt="" width={24} height={24} style={{ display: "block" }} />
           </div>
           <div>
             <h2 className="text-2xl font-extrabold text-stone-900">מה מנחה אותנו</h2>
@@ -226,22 +225,22 @@ export default function AboutPage() {
           <div className="grid gap-5 md:grid-cols-2">
             {[
               {
-                emoji: "🧠",
+                icon: "/icons/clinical-experience.svg",
                 title: "ניסיון קליני של אנשי טיפול",
                 body: "המערכת פותחה על ידי פסיכולוגים קליניים ואנשי טיפול עם שנים של ניסיון מצטבר בשטח.",
               },
               {
-                emoji: "📚",
+                icon: "/icons/research.svg",
                 title: "בסיס מחקרי",
                 body: "כל שאלון מבוסס על ספרות מקצועית מוכרת וניסיון קליני מצטבר.",
               },
               {
-                emoji: "🔒",
+                icon: "/icons/privacy.svg",
                 title: "פרטיות מלאה",
                 body: "לא שומרים שמות, לא מייל, לא מעקב. המידע שלכם נשאר שלכם.",
               },
               {
-                emoji: "🌱",
+                icon: "/icons/starting-point.svg",
                 title: "נקודת התחלה ואבחון, לא תחליף",
                 body: "אנחנו לא מחליפים טיפול מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובביטחון.",
               },
@@ -251,7 +250,7 @@ export default function AboutPage() {
                 className="flex items-start gap-4 rounded-2xl p-5"
                 style={{ background: "#FAFAF9", border: "1px solid #EAE0D5" }}
               >
-                <span className="text-2xl mt-0.5 flex-shrink-0">{v.emoji}</span>
+                <img src={v.icon} alt="" width={32} height={32} className="mt-0.5 flex-shrink-0" style={{ display: "block" }} />
                 <div>
                   <div className="font-bold text-stone-900">{v.title}</div>
                   <p className="mt-1 text-sm leading-6 text-stone-700">{v.body}</p>

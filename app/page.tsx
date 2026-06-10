@@ -156,6 +156,7 @@ export default function HomePage() {
               padding: "14px 34px", background: "var(--teal)", color: "white",
               border: "none", transition: "all .22s", cursor: "pointer",
             }} className="hover:bg-[var(--teal-dark)] hover:-translate-y-0.5">
+              <img src="/icons/btn-adults.svg" alt="" width={22} height={22} style={{ display: "block" }} />
               התאמה למבוגרים ←
             </Link>
             <Link href="/kids" style={{
@@ -164,6 +165,7 @@ export default function HomePage() {
               padding: "14px 34px", background: "var(--gold)", color: "white",
               border: "none", transition: "all .22s", cursor: "pointer",
             }} className="hover:bg-[var(--gold-dark)] hover:-translate-y-0.5">
+              <img src="/icons/btn-kids.svg" alt="" width={22} height={22} style={{ display: "block" }} />
               התאמה לילדים ←
             </Link>
           </div>
@@ -183,10 +185,10 @@ export default function HomePage() {
 
           {/* Trust badges */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", fontSize: "13px", color: "var(--muted)", justifyContent: "center" }} className="fade fade-5">
-            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>🔒 שאלון אנונימי</span>
-            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>🆓 חינמי<TooltipAsterisk /></span>
-            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>⏱ כמה דקות</span>
-            <span style={{ display: "flex", alignItems: "center", gap: "5px" }}>📄 דו"ח אישי לשמירה</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/anonymous.svg" alt="" width={20} height={20} style={{ display: "block" }} /> שאלון אנונימי</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/free.svg" alt="" width={20} height={20} style={{ display: "block" }} /> חינמי<TooltipAsterisk /></span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/minutes.svg" alt="" width={20} height={20} style={{ display: "block" }} /> כמה דקות</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/report.svg" alt="" width={20} height={20} style={{ display: "block" }} /> דו"ח אישי לשמירה</span>
           </div>
         </div>
       </section>
@@ -332,6 +334,7 @@ export default function HomePage() {
             padding: "14px 34px", background: "var(--teal)", color: "white",
             transition: "all .22s",
           }} className="hover:bg-[var(--teal-dark)]">
+            <img src="/icons/btn-adults.svg" alt="" width={22} height={22} style={{ display: "block" }} />
             התאמה למבוגרים ←
           </Link>
         </div>
@@ -375,6 +378,7 @@ export default function HomePage() {
             padding: "14px 34px", background: "var(--gold)", color: "white",
             transition: "all .22s",
           }} className="hover:bg-[var(--gold-dark)]">
+            <img src="/icons/btn-kids.svg" alt="" width={22} height={22} style={{ display: "block" }} />
             התאמה לילדים ←
           </Link>
         </div>
