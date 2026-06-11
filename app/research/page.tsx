@@ -20,6 +20,7 @@ const TOPICS = [
   { href: "/research/choosing-therapist",icon: "🤝", title: "איך בוחרים מטפל?",                  desc: "מה לשאול בשיחת היכרות, אילו פרמטרים חשובים, ומה המחקר אומר על ברית טיפולית.", img: "https://images.unsplash.com/photo-1776886099265-6366478b341b?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/therapy-types",    icon: "🧠", title: "סוגי הטיפולים השונים",               desc: "CBT, דינאמי, EMDR, DBT, ACT ועוד — הסבר נגיש על כל גישה טיפולית ומה מתאים למי.", img: "https://images.unsplash.com/photo-1637245048732-adf1a547835e?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/faq",              icon: "❓", title: "שאלות נפוצות",                       desc: "כמה עולה טיפול, כמה זמן לוקח, האם קופות חולים מכסות — ותשובות לשאלות נוספות.", img: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&h=260&fit=crop&auto=format&q=75" },
+  { href: "/research/child-emotional-developmental", icon: "🧒", title: "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה", desc: "כיצד קשיים פיזיולוגיים — עצירות תפקודית, עיבוד חושי, עיכוב שפתי ואתגרים מוטוריים — מקבלים ביטוי כקושי רגשי לכאורה.", img: "https://images.unsplash.com/photo-1576765608622-067973a79f53?w=600&h=260&fit=crop&auto=format&q=75" },
 ];
 
 function ArticleCard({ href, title, desc, img, imgPosition = "center" }: { href: string; title: string; desc: string; img: string; imgPosition?: string }) {
