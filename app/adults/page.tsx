@@ -290,7 +290,7 @@ function Card({ children, badge, badgeColor = "blue" }: { children: React.ReactN
   );
 }
 
-function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ▸", nextDisabled = false }: {
+function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ←", nextDisabled = false }: {
   onBack?: () => void; onNext?: () => void; nextLabel?: string; nextDisabled?: boolean;
 }) {
   return (
@@ -568,6 +568,7 @@ export default function AdultsPage() {
   const [empBChecked, setEmpBChecked] = useState<boolean[]>([false, false, false, false]);
   const [inRelationship, setInRelationship] = useState(false);
   const [hasChildren, setHasChildren] = useState(false);
+  const [noRelationship, setNoRelationship] = useState(false);
   const [coupleScale, setCoupleScale] = useState(0);
   const [eftScores, setEftScores] = useState<number[]>(Array(7).fill(0));
   const [dynScores, setDynScores] = useState<number[]>(Array(7).fill(0));
@@ -879,7 +880,7 @@ export default function AdultsPage() {
         </label>
         <div className="mt-5">
           <button type="button" disabled={!agreed} onClick={() => setScreen("intake")} className="w-full rounded-xl bg-[#1a3a5c] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]">
-            קראתי והסכמתי – נמשיך ▸
+            קראתי והסכמתי – נמשיך ←
           </button>
         </div>
       </Card>
@@ -1902,17 +1903,23 @@ export default function AdultsPage() {
         <p className="mb-4 font-semibold text-[#1a3a5c]">כדי להתאים את השאלות, ענה/י על השאלות הבאות:</p>
         <div className="space-y-3">
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
-            <input type="checkbox" checked={inRelationship} onChange={(e) => setInRelationship(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
+            <input type="checkbox" checked={inRelationship} onChange={(e) => { setInRelationship(e.target.checked); if (e.target.checked) setNoRelationship(false); }} className="h-4 w-4 accent-[var(--teal)]" />
             <span>אני <strong>בזוגיות</strong> כרגע</span>
           </label>
           <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
             <input type="checkbox" checked={hasChildren} onChange={(e) => setHasChildren(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
             <span>יש לי <strong>ילדים</strong></span>
           </label>
+          <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm transition-all hover:border-[#2e7d8c]">
+            <input type="checkbox" checked={noRelationship} onChange={(e) => { setNoRelationship(e.target.checked); if (e.target.checked) setInRelationship(false); }} className="h-4 w-4 accent-[var(--teal)]" />
+            <span><strong>ללא זוגיות</strong> כרגע</span>
+          </label>
         </div>
         <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
           onNext={() => {
-            if (inRelationship || hasChildren) { setScreen("r1"); }
+            // "ללא זוגיות כרגע" מתנהג כמו דילוג על שאלות הזוגיות — עובר למסלול היחיד/ה (r-single)
+            if (noRelationship && !hasChildren) { setScreen("r-single"); }
+            else if (inRelationship || hasChildren) { setScreen("r1"); }
             else { setScreen("r-single"); }
           }} />
       </Card>
@@ -2629,7 +2636,7 @@ export default function AdultsPage() {
 
         <NavRow onBack={() => { setScreen("results"); setCombinedTreatments(null); setCombinedLabels(null); }}
           onNext={doMatch}
-          nextLabel={loading ? "מחפש..." : "חפש/י מטפל ▸"}
+          nextLabel={loading ? "מחפש..." : "חפש/י מטפל ←"}
           nextDisabled={loading} />
       </Card>
     </Layout>

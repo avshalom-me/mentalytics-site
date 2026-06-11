@@ -74,6 +74,50 @@ async function buildTherapistsResponse() {
 
   const rows = (data ?? []) as TherapistRow[];
 
+  // Fetch all certificate documents for these therapists and generate signed
+  // URLs so the admin can review them before approving/rejecting.
+  type CertItem = {
+    id: string;
+    original_name: string;
+    content_type: string;
+    signed_url: string | null;
+  };
+  const certsByTherapist: Record<string, CertItem[]> = {};
+  const therapistIds = rows.map((r) => r.id);
+
+  if (therapistIds.length > 0) {
+    const { data: certData } = await supabaseAdmin
+      .from("therapist_certificates")
+      .select("id, therapist_id, file_path, original_name, content_type, created_at")
+      .in("therapist_id", therapistIds)
+      .order("created_at", { ascending: true });
+
+    await Promise.all(
+      ((certData ?? []) as Array<{
+        id: string;
+        therapist_id: string;
+        file_path: string;
+        original_name: string | null;
+        content_type: string | null;
+      }>).map(async (c) => {
+        let signed_url: string | null = null;
+        const { data: signedData, error: signedError } =
+          await supabaseAdmin.storage
+            .from(PROFILE_PHOTOS_BUCKET)
+            .createSignedUrl(normalizeStoragePath(c.file_path), 60 * 60);
+        if (!signedError && signedData?.signedUrl) {
+          signed_url = signedData.signedUrl;
+        }
+        (certsByTherapist[c.therapist_id] ||= []).push({
+          id: c.id,
+          original_name: c.original_name ?? "תעודה",
+          content_type: c.content_type ?? "",
+          signed_url,
+        });
+      })
+    );
+  }
+
   const therapists = await Promise.all(
     rows.map(async (t) => {
       let profile_photo_url: string | null = null;
@@ -108,6 +152,7 @@ async function buildTherapistsResponse() {
         age_groups: t.age_groups ?? [],
         profile_photo_path: t.profile_photo_path ?? null,
         profile_photo_url,
+        certificates: certsByTherapist[t.id] ?? [],
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,
         promotion_source: t.promotion_source ?? null,

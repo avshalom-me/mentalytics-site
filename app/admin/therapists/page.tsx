@@ -26,6 +26,12 @@ type AdminTherapist = {
   age_groups: string[];
   profile_photo_path: string | null;
   profile_photo_url: string | null;
+  certificates: Array<{
+    id: string;
+    original_name: string;
+    content_type: string;
+    signed_url: string | null;
+  }>;
   status: string;
   manually_promoted: boolean;
   promotion_source: string | null;
@@ -358,6 +364,36 @@ export default function AdminTherapistsPage() {
                 <span className="font-medium">הסדרים:</span>{" "}
                 {therapist.arrangements.length > 0 ? therapist.arrangements.join(", ") : "—"}
               </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="mb-2 text-sm font-medium text-gray-800">
+                תעודות שהוגשו ({therapist.certificates.length}):
+              </div>
+              {therapist.certificates.length === 0 ? (
+                <div className="text-sm text-gray-400">לא הועלו תעודות</div>
+              ) : (
+                <ul className="flex flex-wrap gap-2">
+                  {therapist.certificates.map((c) => (
+                    <li key={c.id}>
+                      {c.signed_url ? (
+                        <a
+                          href={c.signed_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#2e7d8c] bg-white px-3 py-1.5 text-xs font-medium text-[#2e7d8c] hover:bg-[#2e7d8c] hover:text-white transition-colors"
+                        >
+                          📄 {c.original_name}
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-400">
+                          📄 {c.original_name} (קישור לא זמין)
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">

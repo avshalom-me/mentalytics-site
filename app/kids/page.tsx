@@ -421,7 +421,7 @@ function PageConsent({ onNext }: { onNext: () => void }) {
           onClick={onNext}
           className="w-full rounded-xl bg-[var(--teal-dark)] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
         >
-          קראתי והסכמתי – נמשיך ▸
+          קראתי והסכמתי – נמשיך ←
         </button>
       </div>
     </div>
