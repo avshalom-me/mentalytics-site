@@ -74,7 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 ))}
               </ul>
               <div style={{ fontSize: "12px", color: "var(--faint)" }} className="flex flex-wrap gap-4">
-                <a href="mailto:tpool406@gmail.com" className="hover:text-[var(--teal)]">tpool406@gmail.com</a>
+                <a href="mailto:admin@getmentalytics.com" className="hover:text-[var(--teal)]">admin@getmentalytics.com</a>
               </div>
             </div>
           </div>

@@ -15,7 +15,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 // strongest reasoning model here. Isolated via env from the per-user agents.
 const REPORT_LLM_MODEL = process.env.REPORT_LLM_MODEL ?? "gpt-5.5";
 const REPORT_LLM_EFFORT = process.env.REPORT_LLM_EFFORT ?? "high";
-const REPORT_TO = (process.env.WEEKLY_REPORT_TO ?? "avshalom84@gmail.com,tpool406@gmail.com")
+const REPORT_TO = (process.env.WEEKLY_REPORT_TO ?? "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com")
   .split(",")
   .map(s => s.trim())
   .filter(Boolean);

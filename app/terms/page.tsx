@@ -104,7 +104,7 @@ export default function TermsPage() {
           <h2 className="text-xl font-bold text-stone-900 mb-2">10. יצירת קשר</h2>
           <p>לשאלות ופניות:</p>
           <ul className="list-disc list-inside space-y-1 text-sm mt-2">
-            <li>מייל: <a href="mailto:tpool406@gmail.com" className="text-[#0F5468] underline">tpool406@gmail.com</a></li>
+            <li>מייל: <a href="mailto:admin@getmentalytics.com" className="text-[#0F5468] underline">admin@getmentalytics.com</a></li>
             <li>טלפון: <a href="tel:0527906335" className="text-[#0F5468] underline">052-790-6335</a></li>
           </ul>
         </section>

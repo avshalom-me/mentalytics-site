@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     await resend.emails.send({
       from: "טיפול חכם <noreply@mentalytics.co.il>",
-      to: "avshalom84@gmail.com",
+      to: "admin@getmentalytics.com",
       replyTo: email,
       subject: `פנייה חדשה מ-טיפול חכם: ${safeSubject || "ללא נושא"}`,
       html: `

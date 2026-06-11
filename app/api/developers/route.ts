@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     await resend.emails.send({
       from: "טיפול חכם — בית למפתחים <noreply@mentalytics.co.il>",
-      to: "avshalom84@gmail.com",
+      to: "admin@getmentalytics.com",
       replyTo: email,
       subject: `פנייה חדשה לבית למפתחים: ${safe.name}`,
       html: `

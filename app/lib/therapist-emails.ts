@@ -93,7 +93,7 @@ export async function sendPromotionEndedEmail(opts: {
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: tpool406@gmail.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>
@@ -181,7 +181,7 @@ export async function sendPromotionGrantedEmail(opts: {
 
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: tpool406@gmail.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
         בהצלחה,<br/>
         טיפול חכם — Mentalytics
       </p>

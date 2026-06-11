@@ -64,7 +64,7 @@ export default function PrivacyPage() {
           <h2 className="text-xl font-bold text-stone-900 mb-2">6. זכויות המשתמש</h2>
           <p>
             מטפל רשום רשאי בכל עת לבקש עיון, תיקון או מחיקה של הנתונים שלו. לפניות:{" "}
-            <a href="mailto:privacy@mentalytics.co.il" className="text-[#0F5468] underline">privacy@mentalytics.co.il</a>
+            <a href="mailto:admin@getmentalytics.com" className="text-[#0F5468] underline">admin@getmentalytics.com</a>
           </p>
         </section>
 

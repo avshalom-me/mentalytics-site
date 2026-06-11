@@ -46,8 +46,8 @@ export default function AccessibilityPage() {
           <h2 className="text-xl font-bold text-stone-900 mb-2">פניות בנושא נגישות</h2>
           <p>
             נתקלתם בבעיית נגישות? נשמח לשמוע. ניתן לפנות אלינו בדוא"ל:{" "}
-            <a href="mailto:accessibility@mentalytics.co.il" className="text-[#0F5468] underline">
-              accessibility@mentalytics.co.il
+            <a href="mailto:admin@getmentalytics.com" className="text-[#0F5468] underline">
+              admin@getmentalytics.com
             </a>
           </p>
           <p className="mt-2 text-sm text-stone-500">
