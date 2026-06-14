@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import { REGION_CITIES } from "@/app/lib/regions";
@@ -40,6 +41,7 @@ type Profile = {
   profile_photo_path?: string;
   education?: string;
   experience?: string;
+  rejection_reason?: string | null;
 };
 
 function CheckboxGroup({ label, options, selected, onChange }: {
@@ -530,6 +532,21 @@ function TherapistDashboard() {
         </button>
       </div>
 
+      {/* Rejection notice — reason + how to re-submit */}
+      {profile?.status === "rejected" && (
+        <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4">
+          <h2 className="text-sm font-extrabold text-red-800 mb-1">הפרופיל לא אושר</h2>
+          {profile.rejection_reason ? (
+            <p className="text-sm text-red-700 leading-6">סיבה: {profile.rejection_reason}</p>
+          ) : (
+            <p className="text-sm text-red-700 leading-6">הפרופיל לא אושר במתכונתו הנוכחית.</p>
+          )}
+          <p className="text-sm text-red-700 leading-6 mt-1">
+            עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; — הפרופיל יישלח שוב לאישור.
+          </p>
+        </div>
+      )}
+
       {/* Pricing banner — only for non-paying therapists */}
       {profile && profile.status !== "paying" && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
@@ -613,6 +630,22 @@ function TherapistDashboard() {
               </ul>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Write-an-article CTA — for any approved therapist (free or paying) */}
+      {profile && (profile.status === "approved" || profile.status === "paying") && (
+        <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <h2 className="text-base font-extrabold text-stone-900">כתבו מאמר — קבלו יותר פניות</h2>
+            <p className="text-sm text-stone-500 mt-0.5 leading-6">
+              מידע מקצועי קצר עוזר למטופלים להכיר אתכם. כל מאמר מאושר מתפרסם במאגר המאמרים עם שמכם וקישור לפרופיל.
+            </p>
+          </div>
+          <Link href="/therapists/articles"
+            className="rounded-xl bg-[#D49018] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90 whitespace-nowrap">
+            לכתיבת מאמר
+          </Link>
         </div>
       )}
 

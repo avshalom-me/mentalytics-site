@@ -1,0 +1,139 @@
+import OpenAI from "openai";
+
+// Hybrid profile-quality feedback for therapists.
+//   1. Rule-based detection finds concrete, certain gaps (no photo, short bio…).
+//   2. gpt-4o-mini rephrases them into warm, personal Hebrew prose.
+//   3. If the AI call is unavailable or fails, we fall back to the rule text.
+// Used by the welcome / onboarding emails (and reusable elsewhere).
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+export type ProfileForFeedback = {
+  full_name?: string | null;
+  bio?: string | null;
+  profile_photo_path?: string | null;
+  training_areas?: string[] | null;
+  therapist_types?: string[] | null;
+  regions?: string[] | null;
+  education?: string | null;
+  experience?: string | null;
+  languages?: string[] | null;
+};
+
+const BIO_MIN = 80;
+
+function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+// Concrete, rule-based gaps. Each entry is a short Hebrew phrase describing
+// what's missing and why it matters — used both as the AI's input and as the
+// no-AI fallback text. Order is by impact (photo and bio first).
+export function detectProfileGaps(t: ProfileForFeedback): string[] {
+  const gaps: string[] = [];
+
+  if (!t.profile_photo_path) {
+    gaps.push("אין תמונת פרופיל — תמונה מקצועית היא מהגורמים החזקים ביותר לאמון ולפנייה ראשונית.");
+  }
+  if (!t.bio || t.bio.trim().length < BIO_MIN) {
+    gaps.push("הביוגרפיה קצרה או חסרה — תיאור אישי של הגישה הטיפולית שלך מגדיל משמעותית את מספר הפניות.");
+  }
+  if ((t.training_areas?.length ?? 0) <= 2) {
+    gaps.push("מעט תחומי טיפול מסומנים — הוספת תחומים שאת/ה מתמחה בהם תרחיב את החשיפה במערכת ההתאמה ובמאגר.");
+  }
+  if (!t.education || t.education.trim().length < 10) {
+    gaps.push("חסרים פרטי השכלה והכשרה — מטופלים בודקים רקע מקצועי לפני שהם פונים.");
+  }
+  if (!t.experience || t.experience.trim().length < 10) {
+    gaps.push("חסר תיאור ניסיון מקצועי — שנות ניסיון ומסגרות עבודה מחזקות אמון.");
+  }
+  if ((t.regions?.length ?? 0) === 0) {
+    gaps.push("לא סומנו אזורי פעילות — בלי אזור קשה למטופלים למצוא אותך בחיפוש לפי מיקום.");
+  }
+
+  return gaps;
+}
+
+async function aiPhrase(
+  name: string,
+  gaps: string[],
+): Promise<{ intro: string; bullets: string[] } | null> {
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o-mini",
+    temperature: 0.6,
+    max_tokens: 450,
+    response_format: { type: "json_object" },
+    messages: [
+      {
+        role: "system",
+        content:
+          "אתה עוזר אדיב לפלטפורמה ישראלית להתאמת מטפלים נפשיים. כתוב בעברית חמה, מקצועית, מעודדת ולא מתנשאת. החזר JSON בלבד.",
+      },
+      {
+        role: "user",
+        content:
+          `מטפל/ת בשם "${name || "ללא שם"}" השלים/ה פרופיל באתר. אלה הפערים שזוהו בפרופיל:\n` +
+          gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") +
+          `\n\nכתוב/כתבי משוב קצר, אישי ומעודד. החזר/החזירי JSON במבנה: ` +
+          `{"intro": "משפט פתיחה אחד חם ומעודד", "bullets": ["המלצה קצרה 1", "המלצה קצרה 2"]}. ` +
+          `כל המלצה עד 22 מילים, ממוקדת ופרקטית. אל תמציא/י פערים שלא מופיעים ברשימה.`,
+      },
+    ],
+  });
+
+  const raw = response.choices[0]?.message?.content;
+  if (!raw) return null;
+  const parsed = JSON.parse(raw) as { intro?: unknown; bullets?: unknown };
+  if (typeof parsed.intro !== "string" || !Array.isArray(parsed.bullets)) return null;
+  const bullets = parsed.bullets
+    .filter((b): b is string => typeof b === "string" && b.trim().length > 0)
+    .slice(0, 6);
+  if (bullets.length === 0) return null;
+  return { intro: parsed.intro, bullets };
+}
+
+// Returns an RTL, inline-styled HTML snippet with personalized suggestions, or
+// null if the profile has no notable gaps (so the caller can omit the block).
+export async function buildProfileFeedbackHtml(t: ProfileForFeedback): Promise<string | null> {
+  const gaps = detectProfileGaps(t);
+  if (gaps.length === 0) return null;
+
+  const name = (t.full_name || "").trim();
+  let intro = "";
+  let bullets: string[] = gaps;
+
+  if (process.env.OPENAI_API_KEY) {
+    try {
+      const result = await aiPhrase(name, gaps);
+      if (result) {
+        intro = result.intro;
+        bullets = result.bullets;
+      }
+    } catch (err) {
+      console.error(
+        "buildProfileFeedbackHtml: AI phrasing failed, using rule fallback:",
+        err instanceof Error ? err.message : err,
+      );
+    }
+  }
+
+  if (!intro) {
+    intro = "כדי שהפרופיל שלך יקבל יותר פניות, שמנו לב לכמה דברים שכדאי להשלים:";
+  }
+
+  const items = bullets
+    .map((b) => `<li style="margin-bottom:8px;">${escapeHtml(b)}</li>`)
+    .join("");
+
+  return `
+    <div style="background:#FDF6E3;border:1px solid #F0E2BE;border-radius:10px;padding:16px 20px;margin:0 0 22px;">
+      <p style="margin:0 0 10px;font-weight:bold;color:#A87010;">איך להפיק יותר מהפרופיל שלך</p>
+      <p style="margin:0 0 10px;font-size:14px;color:#3E5250;">${escapeHtml(intro)}</p>
+      <ul style="margin:0;padding-inline-start:18px;font-size:14px;color:#3E5250;line-height:1.6;">${items}</ul>
+    </div>`;
+}

@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { cancelSubscription } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
-import { sendPromotionEndedEmail, sendPromotionGrantedEmail } from "@/app/lib/therapist-emails";
+import {
+  sendPromotionEndedEmail,
+  sendPromotionGrantedEmail,
+  sendTherapistWelcomeEmail,
+  sendTherapistRejectedEmail,
+} from "@/app/lib/therapist-emails";
 
 type TherapistRow = {
   id: string;
@@ -225,7 +230,9 @@ export async function PATCH(request: Request) {
     // (we need to know whether they were already paying, etc.).
     const { data: before } = await supabaseAdmin
       .from("therapists")
-      .select("status, manually_promoted, promotion_source, promoted_since, promoted_until, email, full_name")
+      .select(
+        "status, manually_promoted, promotion_source, promoted_since, promoted_until, email, full_name, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages"
+      )
       .eq("id", id)
       .maybeSingle();
 
@@ -252,6 +259,9 @@ export async function PATCH(request: Request) {
     let endedEmailReason: "admin_demote" | "customer_cancellation" | null = null;
     let sendGrantedEmail = false;
     let convertedFromPaying = false;
+    let sendFreeWelcome = false;
+    let sendRejectedEmail = false;
+    const rejectionReason = typeof body?.reason === "string" ? body.reason.trim() : "";
 
     if (status === "paying") {
       // Admin is promoting (or re-promoting). If the therapist is *already*
@@ -317,6 +327,23 @@ export async function PATCH(request: Request) {
       extraFields.promotion_source = null;
       extraFields.promoted_since = null;
       extraFields.promoted_until = null;
+
+      // First-time approval (pending → approved): send the free onboarding
+      // email with profile feedback + an invitation to write an article. Only
+      // on the pending→approved transition, so re-approvals don't re-send it.
+      if (status === "approved" && before.status === "pending") {
+        sendFreeWelcome = true;
+      }
+
+      // Store/clear the rejection reason. On rejection (e.g. an unreadable
+      // certificate) notify the therapist so they can fix and re-submit —
+      // except for paying→rejected, which already gets a cancellation email.
+      if (status === "rejected") {
+        extraFields.rejection_reason = rejectionReason || null;
+        if (before.status !== "paying") sendRejectedEmail = true;
+      } else {
+        extraFields.rejection_reason = null;
+      }
 
       // If the therapist had an active subscription, cancel it at Sumit
       // before flipping local status. Failure must be reported (chargeback
@@ -401,6 +428,20 @@ export async function PATCH(request: Request) {
         source: promotedUntilIso ? "trial" : "manual",
         promotedUntilIso,
         wasPreviouslyPaying: convertedFromPaying,
+      });
+    }
+    if (sendFreeWelcome && before.email) {
+      await sendTherapistWelcomeEmail({
+        to: before.email,
+        tier: "free",
+        therapist: before,
+      });
+    }
+    if (sendRejectedEmail && before.email) {
+      await sendTherapistRejectedEmail({
+        to: before.email,
+        name: before.full_name ?? "",
+        reason: rejectionReason || undefined,
       });
     }
 

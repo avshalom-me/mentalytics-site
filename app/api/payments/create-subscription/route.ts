@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSubscription, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
+import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -53,7 +54,9 @@ export async function POST(req: NextRequest) {
 
     const { data: therapist } = await supabase
       .from("therapists")
-      .select("id, full_name, email, status")
+      .select(
+        "id, full_name, email, status, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages"
+      )
       .eq("user_id", user.id)
       .single();
 
@@ -216,6 +219,20 @@ export async function POST(req: NextRequest) {
 
     // Single audit line, no sensitive ids beyond our own payment row.
     console.log(`Subscription completed: payment=${payment.id}`);
+
+    // Welcome email (confirmation + profile feedback + article invite).
+    // Best-effort — a mail failure must never fail a completed payment.
+    try {
+      const welcomeTo = therapist.email || clientEmail;
+      if (welcomeTo) {
+        await sendTherapistWelcomeEmail({ to: welcomeTo, tier: "paid", therapist });
+      }
+    } catch (mailErr) {
+      console.error(
+        "create-subscription: welcome email failed:",
+        mailErr instanceof Error ? mailErr.message : mailErr
+      );
+    }
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {

@@ -197,7 +197,8 @@ export default function AdminTherapistsPage() {
   async function updateStatus(
     id: string,
     status: "approved" | "rejected" | "pending" | "paying",
-    promotedUntil?: string | null
+    promotedUntil?: string | null,
+    reason?: string
   ) {
     try {
       setActionLoadingId(id);
@@ -209,6 +210,7 @@ export default function AdminTherapistsPage() {
           id,
           status,
           ...(promotedUntil ? { promoted_until: promotedUntil } : {}),
+          ...(reason ? { reason } : {}),
         }),
       });
       const json = await res.json();
@@ -441,7 +443,14 @@ export default function AdminTherapistsPage() {
               )}
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-                onClick={() => updateStatus(therapist.id, "rejected")}>
+                onClick={() => {
+                  const reason = window.prompt(
+                    "סיבת הדחייה (תישלח למטפל/ת. למשל: התעודה אינה קריאה — נא להעלות תעודת רישיון ברורה):",
+                    ""
+                  );
+                  if (reason === null) return;
+                  updateStatus(therapist.id, "rejected", null, reason);
+                }}>
                 {isBusy ? "מעדכן..." : "דחה"}
               </button>
               <button type="button" disabled={isBusy}

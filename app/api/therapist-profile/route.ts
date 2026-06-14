@@ -98,7 +98,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ ok: true, id: data.id, created: true });
   }
 
-  // Update existing — keep status as pending if already pending, otherwise set to pending for review
+  // A rejected therapist who edits is re-submitting for review — send it back
+  // to pending and clear the previous rejection reason. Approved/paying
+  // profiles keep their status when edited.
+  if (existing.status === "rejected") {
+    update.status = "pending";
+    update.rejection_reason = null;
+  }
+
   const { error } = await supabaseAdmin
     .from("therapists")
     .update(update)

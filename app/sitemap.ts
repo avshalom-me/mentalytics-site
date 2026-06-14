@@ -39,5 +39,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: t.updated_at ? new Date(t.updated_at) : undefined,
   }));
 
-  return [...staticPages, ...therapistPages];
+  const { data: articles } = await supabaseAdmin
+    .from("therapist_articles")
+    .select("slug, updated_at")
+    .eq("status", "approved");
+
+  const articlePages: MetadataRoute.Sitemap = (articles ?? []).map((a) => ({
+    url: `${BASE}/research/community/${a.slug}`,
+    priority: 0.6,
+    changeFrequency: "monthly" as const,
+    lastModified: a.updated_at ? new Date(a.updated_at) : undefined,
+  }));
+
+  return [...staticPages, ...therapistPages, ...articlePages];
 }

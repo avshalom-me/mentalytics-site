@@ -1,10 +1,35 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const metadata: Metadata = {
   title: "מאמרים ומידע על טיפול נפשי",
   description: "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחון ADHD, טיפול אונליין ועוד — מותאם לישראל ולמערכת הבריאות הישראלית.",
 };
+
+// Refresh the hub periodically so newly-approved community articles appear.
+export const revalidate = 300;
+
+type CommunityItem = { slug: string; title: string; summary: string; topic: string | null; author: string };
+
+async function getCommunityArticles(): Promise<CommunityItem[]> {
+  const { data } = await supabaseAdmin
+    .from("therapist_articles")
+    .select("slug, title, summary, topic, therapists(full_name)")
+    .eq("status", "approved")
+    .order("approved_at", { ascending: false })
+    .limit(40);
+  return (data ?? []).map((r) => {
+    const t = Array.isArray(r.therapists) ? r.therapists[0] : r.therapists;
+    return {
+      slug: r.slug,
+      title: r.title,
+      summary: r.summary,
+      topic: r.topic,
+      author: t?.full_name ?? "מטפל/ת",
+    };
+  });
+}
 
 const QUESTIONS = [
   { href: "/research/which-therapy",    icon: "🔍", title: "איזה טיפול פסיכולוגי מתאים לי?",    desc: "מדריך מעשי לבחירת סוג הטיפול הנכון לפי הצורך, האישיות וסגנון החיים.",   img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&h=260&fit=crop&auto=format&q=75" },
@@ -57,7 +82,23 @@ function ArticleCard({ href, title, desc, img, imgPosition = "center" }: { href:
   );
 }
 
-export default function ResearchHubPage() {
+function CommunityCard({ slug, title, summary, topic, author }: CommunityItem) {
+  return (
+    <Link href={`/research/community/${slug}`} className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
+      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", padding: "20px 22px" }}>
+      {topic && (
+        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".06em", marginBottom: "8px" }}>{topic}</div>
+      )}
+      <h3 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
+        className="group-hover:underline">{title}</h3>
+      {summary && <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{summary}</p>}
+      <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--faint)" }}>מאת {author}</div>
+    </Link>
+  );
+}
+
+export default async function ResearchHubPage() {
+  const community = await getCommunityArticles();
   return (
     <main className="mx-auto max-w-4xl px-5 py-14 pb-20" dir="rtl">
 
@@ -91,6 +132,19 @@ export default function ResearchHubPage() {
       <div className="grid gap-4 md:grid-cols-2 mb-12">
         {QUESTIONS.map((t) => <ArticleCard key={t.href} {...t} />)}
       </div>
+
+      {/* Community articles — written by site therapists */}
+      {community.length > 0 && (
+        <>
+          <div className="mb-5">
+            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text)", marginBottom: "4px" }}>מאמרים מאת מטפלי האתר</h2>
+            <p style={{ fontSize: "13px", color: "var(--muted)" }}>מידע, תובנות וכלים מאת המטפלים הרשומים בטיפול חכם</p>
+          </div>
+          <div className="grid gap-4 md:grid-cols-2 mb-12">
+            {community.map((c) => <CommunityCard key={c.slug} {...c} />)}
+          </div>
+        </>
+      )}
 
       {/* Academic articles */}
       <div style={{

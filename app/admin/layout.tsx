@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { href: "/admin/recommendations", label: "המלצות", icon: "💡" },
   { href: "/admin/weekly-reports", label: "דוח שבועי", icon: "📬" },
   { href: "/admin/monthly-reports", label: "דוח חודשי", icon: "🗓️" },
+  { href: "/admin/articles", label: "מאמרים", icon: "📝" },
 ];
 
 function AdminNav() {

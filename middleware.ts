@@ -72,5 +72,6 @@ export const config = {
     "/api/admin-trigger-weekly-report/:path*",
     "/api/admin-monthly-reports/:path*",
     "/api/admin-trigger-monthly-report/:path*",
+    "/api/admin-articles/:path*",
   ],
 };
