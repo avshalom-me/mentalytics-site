@@ -147,6 +147,12 @@ export default function HomePage() {
           }} className="fade fade-3">
             שאלון שמוביל להמלצה מדויקת על <strong style={{ color: "var(--teal)", fontWeight: 700 }}>סוג הטיפול</strong> ועל <strong style={{ color: "var(--gold)", fontWeight: 700 }}>סוג המטפל</strong> שמתאים לכם.
           </p>
+          <p style={{
+            fontSize: "1.25rem", color: "var(--teal-dark)", fontWeight: 700,
+            margin: "-22px auto 38px",
+          }} className="fade fade-3">
+            בואו נמצא לכם את המטפל/ת המתאימ/ה
+          </p>
 
           {/* CTAs */}
           <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", justifyContent: "center", marginBottom: "24px" }} className="fade fade-4">
