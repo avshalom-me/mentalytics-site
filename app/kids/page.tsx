@@ -516,7 +516,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
         <div className="mb-5">
           <label className="text-xs font-semibold text-gray-500 block mb-2">מין <span className="text-red-500">*</span></label>
           <div className="flex gap-2 flex-wrap">
-            {["זכר","נקבה","אחר"].map(g => (
+            {["זכר","נקבה"].map(g => (
               <button key={g} className={ob(A.gender === g)} onClick={() => upd("gender", g)}>{g}</button>
             ))}
           </div>
