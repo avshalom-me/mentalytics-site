@@ -317,10 +317,16 @@ function computeResults(A: Ans): KidsBox[] {
     emoStandalones.push({ cls: "info",   txt: "✅ הפנייה: רופא משפחה / רופא ילדים לבירור רפואי" });
   }
 
-  // Q9 — ויסות/BPD
-  // bq_tot >= 5 → קליני, הפניה ל-DBT
-  // bq_tot == 4 (גבולי/סאב-קליני) — אין הפנייה: לא קיים "פסיכולוג ילדים" כסוג מטפל במערכת.
-  if (A.q9 === "כן") {
+  // Q9 — ויסות/BPD (ז׳–יב׳ ו-גן–א׳) או קשב (ב׳–ו׳)
+  // ב׳–ו׳: שאלת חוסר-היציבות/אימפולסיביות מנותבת לשאלון קשב (ADHD) במקום BQ —
+  // בגיל זה אימפולסיביות וקושי ויסות נוטים להיות ADHD ולא BPD. הפלט מוצג כאן
+  // (תוצאות רגשיות). אם יש גם קושי לימודי — השאלון נאסף פעם אחת בלבד והחלק
+  // הלימודי מדלג עליו (ראו makeAdhdEmitter עם {source:"q9"}).
+  // ga/zy: BQ כרגיל — bq_tot>=5 קליני (DBT / הפניית גיל-רך);
+  // bq_tot==4 (סאב-קליני) ללא הפנייה (לא קיים "פסיכולוג ילדים" כסוג מטפל).
+  if (A.q9 === "כן" && grp === "bv") {
+    buildAdhdBoxes(A, "q9").forEach(b => emoStandalones.push(b));
+  } else if (A.q9 === "כן") {
     const bqTot = A.bq_tot || 0;
     if (bqTot >= 5) {
       const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
@@ -596,35 +602,59 @@ interface AdhdEmitter {
   isPositive: (prefix: string) => boolean;
 }
 
-function makeAdhdEmitter(A: Ans, boxes: KidsBox[]): AdhdEmitter {
-  let emitted = false;
-  // inatt items 2,3,5 (1-indexed) הם פונקציות ניהוליות (ארגון, איבוד חפצים, שכחה)
-  function count(prefix: string) {
-    const inatt = ["_ad1", "_ad2", "_ad3", "_ad4", "_ad5", "_ad6"].filter(k => A[prefix + k]).length;
-    const hyper = ["_ah1", "_ah2", "_ah3", "_ah4", "_ah5", "_ah6"].filter(k => A[prefix + k]).length;
-    const efCount = ["_ad2", "_ad3", "_ad5"].filter(k => A[prefix + k]).length;
-    return { inatt, hyper, efCount };
+// Pure ADHD scoring — single source of truth for the threshold and the output
+// boxes, reused by the academic flow and by the Q9 (emotional) re-route for
+// grades ב׳–ו׳. inatt items 2,3,5 (1-indexed) are executive functions
+// (organisation, losing items, forgetfulness).
+function adhdCount(A: Ans, prefix: string) {
+  const inatt = ["_ad1", "_ad2", "_ad3", "_ad4", "_ad5", "_ad6"].filter(k => A[prefix + k]).length;
+  const hyper = ["_ah1", "_ah2", "_ah3", "_ah4", "_ah5", "_ah6"].filter(k => A[prefix + k]).length;
+  const efCount = ["_ad2", "_ad3", "_ad5"].filter(k => A[prefix + k]).length;
+  return { inatt, hyper, efCount };
+}
+function adhdPositive(A: Ans, prefix: string): boolean {
+  const c = adhdCount(A, prefix);
+  return c.inatt >= 4 || c.hyper >= 4;
+}
+function buildAdhdBoxes(A: Ans, prefix: string): KidsBox[] {
+  const { inatt, hyper, efCount } = adhdCount(A, prefix);
+  const pi = inatt >= 4, ph = hyper >= 4;
+  if (!(pi || ph)) return [];
+  const out: KidsBox[] = [];
+  const syms: string[] = [];
+  if (pi) syms.push("📊 ישנם סימנים לקשיי ריכוז וקשב");
+  if (ph) syms.push("📊 ישנם סימנים לקשיים בתחום ההיפראקטיביות/אימפולסיביות");
+  if (syms.length) out.push({ cls: "purple", txt: syms.join("\n") });
+  out.push({ cls: "info", txt: "✅ יש לפנות לנוירולוג/רופא ילדים המומחה בקשיי קשב להמשך אבחון" });
+  out.push({ cls: "info", txt: "📌 ניתן לפנות גם ליועצת בית הספר לתיאום עם הצוות החינוכי וליווי משפחתי" });
+  if (pi && efCount >= 2) {
+    out.push({ cls: "info", txt: "✅ ישנם סימנים לקשיים בפונקציות הניהוליות (ארגון, שליפת חפצים, שכחה) — מתאים טיפול/אימון מסוג Cog-Fun" });
   }
+  out.push({ cls: "info", txt: "📚 לקריאה נוספת: אנפ\"ר (איגוד נפגעי הפרעת קשב) — anpar.org.il" });
+  return out;
+}
+
+// When the Q9 (emotional) re-route owns the ADHD questionnaire (ב׳–ו׳), the
+// academic emitter is built with { source:"q9", suppress:true }: the reading
+// flow still reads the real ADHD positivity (from the q9_* answers) so its
+// referral decisions stay correct, but the academic side does NOT re-emit the
+// box — it is shown once, under the emotional results.
+function makeAdhdEmitter(
+  A: Ans,
+  boxes: KidsBox[],
+  opts?: { source?: string; suppress?: boolean },
+): AdhdEmitter {
+  let emitted = false;
+  const eff = (prefix: string) => opts?.source ?? prefix;
   function isPositive(prefix: string): boolean {
-    const c = count(prefix);
-    return c.inatt >= 4 || c.hyper >= 4;
+    return adhdPositive(A, eff(prefix));
   }
   function emit(prefix: string): boolean {
-    const { inatt, hyper, efCount } = count(prefix);
-    const pi = inatt >= 4, ph = hyper >= 4;
-    if (!(pi || ph)) return false;
+    if (!adhdPositive(A, eff(prefix))) return false;
+    if (opts?.suppress) return true; // owned by the emotional (Q9) path
     if (emitted) return true;
     emitted = true;
-    const syms: string[] = [];
-    if (pi) syms.push("📊 ישנם סימנים לקשיי ריכוז וקשב");
-    if (ph) syms.push("📊 ישנם סימנים לקשיים בתחום ההיפראקטיביות/אימפולסיביות");
-    if (syms.length) boxes.push({ cls: "purple", txt: syms.join("\n") });
-    boxes.push({ cls: "info", txt: "✅ יש לפנות לנוירולוג/רופא ילדים המומחה בקשיי קשב להמשך אבחון" });
-    boxes.push({ cls: "info", txt: "📌 ניתן לפנות גם ליועצת בית הספר לתיאום עם הצוות החינוכי וליווי משפחתי" });
-    if (pi && efCount >= 2) {
-      boxes.push({ cls: "info", txt: "✅ ישנם סימנים לקשיים בפונקציות הניהוליות (ארגון, שליפת חפצים, שכחה) — מתאים טיפול/אימון מסוג Cog-Fun" });
-    }
-    boxes.push({ cls: "info", txt: "📚 לקריאה נוספת: אנפ\"ר (איגוד נפגעי הפרעת קשב) — anpar.org.il" });
+    buildAdhdBoxes(A, eff(prefix)).forEach(b => boxes.push(b));
     return true;
   }
   return { emit, isPositive };
@@ -917,7 +947,12 @@ function computeAcadResultsRaw(A: Ans): KidsBox[] {
   const ga = acadGg(A);
   const boxes: KidsBox[] = [];
   emitVisionHearing(A, boxes);
-  const adhd = makeAdhdEmitter(A, boxes);
+  // ב׳–ו׳ עם q9=כן אספו את שאלון הקשב כבר ב-Q9 (תחת הרגשי). כאן הקורא עדיין
+  // מתחשב בחיוביות (להחלטות זרימת הקריאה) אך אינו פולט שוב את הקופסה.
+  const q9Adhd = A.q9 === "כן" && gg(A) === "bv";
+  const adhd = q9Adhd
+    ? makeAdhdEmitter(A, boxes, { source: "q9", suppress: true })
+    : makeAdhdEmitter(A, boxes);
   if (ga === "gan")           computeGanAcad(A, boxes);
   else if (ga === "ag")       computeAGAcad(A, boxes, adhd);
   else if (ga === "dv")       computeDVAcad(A, boxes, adhd);

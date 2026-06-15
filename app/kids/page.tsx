@@ -88,6 +88,15 @@ function devAgeOk(A: Ans): boolean {
   return (age > 0 && age < 7) || gg(A) === "ga";
 }
 
+// Q9 (regulation/impulsivity) for grades ב׳–ו׳ is re-routed to the ADHD
+// questionnaire (prefix "q9") instead of BQ. Kept in sync with kids-score.server.ts.
+function q9AdhdActive(A: Ans): boolean { return A.q9 === "כן" && gg(A) === "bv"; }
+function q9AdhdPositive(A: Ans): boolean {
+  const inatt = ["q9_ad1","q9_ad2","q9_ad3","q9_ad4","q9_ad5","q9_ad6"].filter(k => A[k]).length;
+  const hyper = ["q9_ah1","q9_ah2","q9_ah3","q9_ah4","q9_ah5","q9_ah6"].filter(k => A[k]).length;
+  return inatt >= 4 || hyper >= 4;
+}
+
 // ── Page order ───────────────────────────────────────────────────────────────
 const PAGES = [
   "p-consent","p-demo","p-areas",
@@ -99,7 +108,7 @@ const PAGES = [
   "p-q6","p-tq",
   "p-q7","p-pq",
   "p-q8","p-eq",
-  "p-q9","p-bq",
+  "p-q9","p-bq","p-q9-adhd",
   "p-q10","p-q10-par","p-q10-grade",
   "p-ga-traits",
   "p-acad",
@@ -118,7 +127,7 @@ function skipPage(pid: string, A: Ans): boolean {
     "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
     "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
-    "p-q9","p-bq","p-q10","p-q10-par","p-q10-grade",
+    "p-q9","p-bq","p-q9-adhd","p-q10","p-q10-par","p-q10-grade",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
 
@@ -139,7 +148,8 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-tq")         return A.q6 !== "כן";
   if (pid === "p-pq")         return A.q7a !== "כן" && A.q7b !== "כן";
   if (pid === "p-eq")         return A.q8 !== "כן";
-  if (pid === "p-bq")         return A.q9 !== "כן";
+  if (pid === "p-bq")         return A.q9 !== "כן" || gg(A) === "bv";
+  if (pid === "p-q9-adhd")    return !q9AdhdActive(A);
 
   if (pid === "p-q10") {
     const pqThr = A.q7a === "כן" ? 1 : (A.q7b === "כן" ? 3 : Infinity);
@@ -152,7 +162,8 @@ function skipPage(pid: string, A: Ans): boolean {
       (A.q6 === "כן" && (A.tq_tot || 0) >= 13) ||
       ((A.pq_tot || 0) >= pqThr) ||
       (A.q8 === "כן" && ((A.eq_ano||0)>=2||(A.eq_bul||0)>=2)) ||
-      (A.q9 === "כן" && (A.bq_tot || 0) >= 4);
+      (A.q9 === "כן" && (A.bq_tot || 0) >= 4) ||
+      (q9AdhdActive(A) && q9AdhdPositive(A));
     return anyPositive;
   }
   if (pid === "p-q10-par")   return A.q10 !== "כן";
@@ -1502,6 +1513,21 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
   );
 }
 
+// ── p-q9-adhd — Q9 re-route to the ADHD questionnaire for grades ב׳–ו׳ ────────
+function PageQ9Adhd({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+  return (
+    <div>
+      <Card>
+        <StepTag>שאלה 9 — קשב וריכוז</StepTag>
+        <StepQ>שאלון קשב (ADHD)</StepQ>
+        <StepHint>בגיל זה, קושי בוויסות ובאימפולסיביות נבדק דרך שאלון הקשב</StepHint>
+        <AcadAdhdBlock prefix="q9" A={A} setA={setA} items={items} />
+      </Card>
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+    </div>
+  );
+}
+
 // ── p-q10 ────────────────────────────────────────────────────────────────────
 function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
   return (
@@ -1851,11 +1877,11 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const showHist12 = showReadFlow && histYes >= 1 && histYes <= 2 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
     const showMotivRg = showHist0 && A.ag_read_motiv === "לא";
     const agMotTot = (A.ag_mot1||1)+(A.ag_mot2||1)+(A.ag_mot3||1);
-    const showAgAdhd = showMotivRg && agMotTot <= 5;
+    const showAgAdhd = showMotivRg && agMotTot <= 5 && !q9AdhdActive(A);
     const speechMotiv = A.ag_speech_motiv || "";
     const speechMotivNo = showHist12 && A.ag_read_speech === "כן" && speechMotiv === "לא";
     const smotTot = (A.ag_smot1||1)+(A.ag_smot2||1)+(A.ag_smot3||1);
-    const showSpeechAdhd = speechMotivNo && smotTot <= 5;
+    const showSpeechAdhd = speechMotivNo && smotTot <= 5 && !q9AdhdActive(A);
 
     return (
       <div>
@@ -1936,12 +1962,14 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
                 </SubCard>
               )}
             </div>
-            {/* שאלה 2: קשב (עצמאית) */}
+            {/* שאלה 2: קשב (עצמאית) — מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
+            {!q9AdhdActive(A) && (
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם את/ה רואה סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
               <YNRow val={A.ag_adhd_yn||""} onChange={v => setA({...A, ag_adhd_yn:v})} />
               {A.ag_adhd_yn==="כן" && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
             </div>
+            )}
             {/* שאלה 3: כתב יד */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בכתב היד עצמו?</p>
@@ -1985,10 +2013,10 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const showHist12 = histAllAnswered && histYes >= 1 && histYes <= 2;
     const showMotivRg = showHist0 && A.dv_read_motiv === "לא";
     const dvMotTot = (A.dv_mot1||1)+(A.dv_mot2||1)+(A.dv_mot3||1);
-    const showDvReadAdhd = showMotivRg && dvMotTot <= 5;
+    const showDvReadAdhd = showMotivRg && dvMotTot <= 5 && !q9AdhdActive(A);
     const smotivNo = showHist12 && A.dv_read_speech === "כן" && A.dv_speech_motiv === "לא";
     const dvSmotTot = (A.dv_smot1||1)+(A.dv_smot2||1)+(A.dv_smot3||1);
-    const showDvSpeechAdhd = smotivNo && dvSmotTot <= 5;
+    const showDvSpeechAdhd = smotivNo && dvSmotTot <= 5 && !q9AdhdActive(A);
 
     return (
       <div>
@@ -2053,12 +2081,14 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
                 </SubCard>
               )}
             </div>
-            {/* שאלה 2: קשב עצמאי */}
+            {/* שאלה 2: קשב עצמאי — מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
+            {!q9AdhdActive(A) && (
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם יש סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
               <YNRow val={A.dv_adhd_yn||""} onChange={v => setA({...A, dv_adhd_yn:v})} />
               {A.dv_adhd_yn==="כן" && <AcadAdhdBlock prefix="dv" A={A} setA={setA} items={items} />}
             </div>
+            )}
             {/* שאלה 3: כתב יד */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">3. האם יש קושי בכתב היד עצמו?</p>
@@ -3863,6 +3893,7 @@ export default function KidsPage() {
       {step === "p-eq"          && <PageEQ       {...pageProps} />}
       {step === "p-q9"          && <PageQ9       {...pageProps} />}
       {step === "p-bq"          && <PageBQ       {...pageProps} />}
+      {step === "p-q9-adhd"     && <PageQ9Adhd   {...pageProps} />}
       {step === "p-q10"         && <PageQ10      {...pageProps} />}
       {step === "p-q10-par"     && <PageQ10Par   {...pageProps} />}
       {step === "p-q10-grade"   && <PageQ10Grade {...pageProps} />}
