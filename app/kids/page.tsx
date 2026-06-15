@@ -3696,6 +3696,14 @@ export default function KidsPage() {
     (window as any).gtag?.("event", "quiz_step", { quiz_type: "kids", step, progress: pct });
     trackQuizStep("kids", step, pct);
   }, [step]);
+
+  // Reset scroll to the top on every step change. Without this, advancing from a
+  // scrolled-down (tall) page on mobile leaves the next page scrolled to the
+  // bottom, with the question off-screen. behavior:"instant" overrides the
+  // global scroll-behavior:smooth so there's no visible scroll animation.
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  }, [step]);
   const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
   const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
   const [itemsError, setItemsError] = useState(false);
