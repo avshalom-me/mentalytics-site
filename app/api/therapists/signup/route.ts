@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
+import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
 
 export const runtime = "nodejs";
 
@@ -206,6 +207,34 @@ export async function POST(req: Request) {
     }
 
     const uploadWarnings: string[] = [];
+
+    // ── Newsletter consent: append-only audit record. Amendment 40 to the
+    // Communications Law puts the burden of proof of consent on us, so we log
+    // WHO/WHEN/WHAT-wording/FROM-WHERE. Non-blocking: a logging failure must not
+    // fail the registration (the boolean still marks list membership). ──
+    if (newsletterConsent) {
+      const consentIp =
+        req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+        req.headers.get("x-real-ip") ||
+        null;
+      const consentUa = req.headers.get("user-agent") || null;
+
+      const { error: consentErr } = await supabase.from("consent_events").insert({
+        therapist_id: therapist.id,
+        email,
+        consent_type: "newsletter",
+        action: "granted",
+        consent_text: NEWSLETTER_CONSENT_TEXT,
+        consent_version: NEWSLETTER_CONSENT_VERSION,
+        source: "therapist_signup_form",
+        ip: consentIp,
+        user_agent: consentUa,
+      });
+
+      if (consentErr) {
+        uploadWarnings.push(`רישום הסכמת דיוור נכשל: ${consentErr.message}`);
+      }
+    }
 
     const profilePhoto = fd.get("profilePhoto") as File | null;
 

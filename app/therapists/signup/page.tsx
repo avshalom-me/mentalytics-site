@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { REGION_CITIES } from "@/app/lib/regions";
+import { NEWSLETTER_CONSENT_TEXT } from "@/app/lib/consent";
 
 type Gender = "זכר" | "נקבה";
 
@@ -990,7 +991,7 @@ export default function TherapistSignupPage() {
               className="mt-1 h-4 w-4 flex-shrink-0 accent-[#3D8C8A]"
             />
             <span className="text-sm leading-6 text-stone-500">
-              אני מעוניין/ת לקבל מידע אינפורמטיבי, מאמרים וחומרים מקצועיים מ&quot;טיפול חכם&quot;. ללא פרסום שאינו קשור לפלטפורמה. <span className="text-stone-400">(לא חובה)</span>
+              {NEWSLETTER_CONSENT_TEXT} <span className="text-stone-400">(לא חובה)</span>
             </span>
           </label>
         </div>

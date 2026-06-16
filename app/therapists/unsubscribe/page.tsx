@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-type SearchParams = { id?: string; token?: string; done?: string };
+type SearchParams = { id?: string; token?: string; done?: string; type?: string };
 
 async function getTherapistName(id: string): Promise<string | null> {
   const { data } = await supabaseAdmin
@@ -24,6 +24,7 @@ export default async function UnsubscribePage({
   const id = params.id;
   const token = params.token;
   const done = params.done === "1";
+  const isNewsletter = params.type === "newsletter";
 
   return (
     <main
@@ -35,25 +36,29 @@ export default async function UnsubscribePage({
 
       <div className="max-w-md w-full rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
         {done ? (
-          <DoneView />
+          <DoneView isNewsletter={isNewsletter} />
         ) : (
-          <ConfirmView id={id} token={token} />
+          <ConfirmView id={id} token={token} isNewsletter={isNewsletter} />
         )}
       </div>
     </main>
   );
 }
 
-function DoneView() {
+function DoneView({ isNewsletter }: { isNewsletter: boolean }) {
   return (
     <>
       <div className="mb-4 text-3xl">✓</div>
-      <h1 className="text-2xl font-black text-stone-900 mb-3">הסרת בהצלחה</h1>
+      <h1 className="text-2xl font-black text-stone-900 mb-3">הוסרת בהצלחה</h1>
       <p className="text-sm text-stone-600 leading-7 mb-4">
-        לא תקבל יותר את הדוח החודשי על הביצועים של הפרופיל שלך.
+        {isNewsletter
+          ? "לא תקבל/י יותר מאיתנו מאמרים, עדכונים ותכנים מקצועיים."
+          : "לא תקבל יותר את הדוח החודשי על הביצועים של הפרופיל שלך."}
       </p>
       <p className="text-xs text-stone-500 leading-6">
-        אם תרצה לחזור לקבל את הדוחות, היכנס ללוח הבקרה שלך ועדכן את ההעדפה.
+        {isNewsletter
+          ? "אם זו טעות, אפשר לכתוב לנו ונשמח להחזיר אותך לרשימה."
+          : "אם תרצה לחזור לקבל את הדוחות, היכנס ללוח הבקרה שלך ועדכן את ההעדפה."}
       </p>
       <Link
         href="/therapists/dashboard"
@@ -65,7 +70,15 @@ function DoneView() {
   );
 }
 
-async function ConfirmView({ id, token }: { id?: string; token?: string }) {
+async function ConfirmView({
+  id,
+  token,
+  isNewsletter,
+}: {
+  id?: string;
+  token?: string;
+  isNewsletter: boolean;
+}) {
   if (!id || !token) {
     return (
       <>
@@ -75,7 +88,7 @@ async function ConfirmView({ id, token }: { id?: string; token?: string }) {
     );
   }
 
-  const valid = verifyUnsubscribeToken(id, token);
+  const valid = verifyUnsubscribeToken(id, token, isNewsletter ? "newsletter" : "");
   if (!valid) {
     return (
       <>
@@ -91,23 +104,27 @@ async function ConfirmView({ id, token }: { id?: string; token?: string }) {
 
   return (
     <>
-      <h1 className="text-2xl font-black text-stone-900 mb-3">הסרה מהדוח החודשי</h1>
+      <h1 className="text-2xl font-black text-stone-900 mb-3">
+        {isNewsletter ? "הסרה מרשימת הדיוור" : "הסרה מהדוח החודשי"}
+      </h1>
       <p className="text-sm text-stone-600 leading-7 mb-2">
         {name ? `שלום ${name},` : "שלום,"}
       </p>
       <p className="text-sm text-stone-600 leading-7 mb-5">
-        ברגע שתאשר/י, נפסיק לשלוח אליך את הדוח החודשי על הביצועים של הפרופיל שלך.
-        בכל רגע תוכל/י לחזור ולהפעיל את הדוחות מתוך לוח הבקרה.
+        {isNewsletter
+          ? 'ברגע שתאשר/י, נפסיק לשלוח אליך מאמרים, עדכונים ותכנים מקצועיים מ"טיפול חכם".'
+          : "ברגע שתאשר/י, נפסיק לשלוח אליך את הדוח החודשי על הביצועים של הפרופיל שלך. בכל רגע תוכל/י לחזור ולהפעיל את הדוחות מתוך לוח הבקרה."}
       </p>
 
       <form method="POST" action="/api/therapists/unsubscribe" className="space-y-3">
         <input type="hidden" name="id" value={id} />
         <input type="hidden" name="token" value={token} />
+        {isNewsletter && <input type="hidden" name="type" value="newsletter" />}
         <button
           type="submit"
           className="w-full rounded-xl bg-stone-800 text-white text-sm font-bold py-3 hover:bg-stone-700 transition-colors"
         >
-          אישור — הסר אותי מהדוח החודשי
+          {isNewsletter ? "אישור — הסר אותי מרשימת הדיוור" : "אישור — הסר אותי מהדוח החודשי"}
         </button>
       </form>
 

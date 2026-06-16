@@ -3,22 +3,36 @@ import crypto from "crypto";
 
 const SECRET = process.env.CRON_SECRET ?? "";
 
-export function generateUnsubscribeToken(therapistId: string): string {
+// `purpose` scopes the token so a stats-report unsubscribe link can't be used to
+// remove someone from the newsletter and vice-versa. Empty purpose ("") keeps
+// the LEGACY payload (`unsubscribe:<id>`) so stats links already in the wild
+// stay valid. Newsletter links use purpose "newsletter".
+function tokenPayload(therapistId: string, purpose: string): string {
+  return purpose
+    ? `unsubscribe:${purpose}:${therapistId}`
+    : `unsubscribe:${therapistId}`;
+}
+
+export function generateUnsubscribeToken(therapistId: string, purpose = ""): string {
   if (!SECRET) {
     throw new Error("CRON_SECRET not set; cannot generate unsubscribe token");
   }
   return crypto
     .createHmac("sha256", SECRET)
-    .update(`unsubscribe:${therapistId}`)
+    .update(tokenPayload(therapistId, purpose))
     .digest("hex")
     .slice(0, 32);
 }
 
-export function verifyUnsubscribeToken(therapistId: string, token: string): boolean {
+export function verifyUnsubscribeToken(
+  therapistId: string,
+  token: string,
+  purpose = "",
+): boolean {
   if (!SECRET || !token || !therapistId) return false;
   let expected: string;
   try {
-    expected = generateUnsubscribeToken(therapistId);
+    expected = generateUnsubscribeToken(therapistId, purpose);
   } catch {
     return false;
   }
@@ -26,7 +40,15 @@ export function verifyUnsubscribeToken(therapistId: string, token: string): bool
   return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(token));
 }
 
-export function buildUnsubscribeUrl(baseUrl: string, therapistId: string): string {
-  const token = generateUnsubscribeToken(therapistId);
-  return `${baseUrl}/therapists/unsubscribe?id=${therapistId}&token=${token}`;
+// Builds the unsubscribe link to embed in an email. For the newsletter pass
+// purpose "newsletter"; the resulting link carries &type=newsletter so the
+// unsubscribe page/route know which list to remove the recipient from.
+export function buildUnsubscribeUrl(
+  baseUrl: string,
+  therapistId: string,
+  purpose = "",
+): string {
+  const token = generateUnsubscribeToken(therapistId, purpose);
+  const url = `${baseUrl}/therapists/unsubscribe?id=${therapistId}&token=${token}`;
+  return purpose ? `${url}&type=${purpose}` : url;
 }
