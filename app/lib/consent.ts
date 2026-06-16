@@ -5,7 +5,7 @@
 // the therapist saw. If you change the wording, bump NEWSLETTER_CONSENT_VERSION
 // — old records keep their original text + version, new ones get the new pair.
 
-export const NEWSLETTER_CONSENT_VERSION = "v1-2026-06";
+export const NEWSLETTER_CONSENT_VERSION = "v2-2026-06";
 
 export const NEWSLETTER_CONSENT_TEXT =
-  'אני מעוניין/ת לקבל מידע אינפורמטיבי, מאמרים וחומרים מקצועיים מ"טיפול חכם". ללא פרסום שאינו קשור לפלטפורמה.';
+  'אני מאשר/ת קבלת דיוור מ"טיפול חכם" בדוא"ל — מאמרים, עדכונים, מבצעים ותכנים שיווקיים. ניתן להסיר בכל עת.';
