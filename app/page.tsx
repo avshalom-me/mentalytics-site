@@ -40,18 +40,26 @@ const steps = [
     n: "1",
     title: "מלאו את השאלון",
     body: "שאלון שמסתעף לפי תשובותיכם — מצאו והבינו מה הקושי. כל תשובה מדייקת את הכיוון הבא.",
-    active: true,
+    numBg: "var(--teal)",
+    numColor: "white",
+    numBorder: "var(--teal)",
   },
   {
     n: "2",
     title: "קבלו מסמך פלט",
     body: "תקציר סוגי הטיפול המתאימים לכם. בנוסף — כלים מיידיים להתמודדות.",
     tag: "📄 ניתן לשמירה כ-PDF",
+    numBg: "var(--gold)",
+    numColor: "white",
+    numBorder: "var(--gold)",
   },
   {
     n: "3",
     title: "בחרו מטפל מותאם",
     body: "רשימת מטפלים מדורגת לפי סוג הטיפול, האישיות, הגיאוגרפיה והעדפות נוספות. מעבד בינה מלאכותית יסביר לכם במפורט באיזה אופן כל סוג טיפול וכל מטפל/ת מתאים לכם.",
+    numBg: "var(--teal-dark)",
+    numColor: "white",
+    numBorder: "var(--teal-dark)",
   },
 ];
 
@@ -262,7 +270,7 @@ export default function HomePage() {
               }
               @media (max-width: 640px) { .steps-grid-wrap::before { display: none; } }
             `}</style>
-            {steps.map(({ n, title, body, active, tag }) => (
+            {steps.map(({ n, title, body, numBg, numColor, numBorder, tag }) => (
               <div key={n} className="step-card" style={{
                 background: "white",
                 borderRadius: "var(--radius)",
@@ -275,10 +283,10 @@ export default function HomePage() {
                   width: "52px", height: "52px", borderRadius: "50%",
                   display: "flex", alignItems: "center", justifyContent: "center",
                   fontSize: "20px", fontWeight: 900,
-                  background: active ? "var(--teal)" : "var(--surface-2)",
-                  color: active ? "white" : "var(--teal)",
+                  background: numBg,
+                  color: numColor,
                   marginBottom: "20px",
-                  border: active ? "2px solid var(--teal)" : "2px solid var(--teal-mid)",
+                  border: `2px solid ${numBorder}`,
                 }}>{n}</div>
                 <h3 style={{ fontSize: "17px", fontWeight: 800, color: "var(--text)", marginBottom: "9px" }}>{title}</h3>
                 <p style={{ fontSize: "14.5px", color: "var(--muted)", lineHeight: 1.75 }}>{body}</p>

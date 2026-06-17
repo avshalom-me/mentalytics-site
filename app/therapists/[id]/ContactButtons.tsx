@@ -91,7 +91,7 @@ export default function ContactButtons({
         {phone && (
           <a href={`tel:${phone}`}
             onClick={() => track(therapistId, "phone", source)}
-            className="inline-flex items-center gap-2 rounded-xl bg-stone-700 px-5 py-2.5 text-sm font-bold text-white hover:bg-stone-800 transition-colors">
+            className="inline-flex items-center gap-2 rounded-xl bg-stone-100 px-5 py-2.5 text-sm font-bold text-stone-700 hover:bg-stone-200 transition-colors">
             {phonesvg} התקשר/י
           </a>
         )}
