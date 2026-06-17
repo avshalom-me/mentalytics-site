@@ -267,7 +267,7 @@ export async function PATCH(request: Request) {
 
         if (!target) {
           result.notFound++;
-          result.details.push(`הוראת קבע ${recurringId}: לא נמצאה ב-Sumit (ייתכן מזהה מ-Morning הישן).`);
+          result.details.push(`הוראת קבע ${recurringId}: לא נמצאה ב-Sumit תחת המטפל הזה — ייתכן שאינה מקושרת לחשבון או שזהו מזהה ישן שאינו פעיל.`);
           continue;
         }
         if (target.Status !== 0) {
