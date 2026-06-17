@@ -260,7 +260,9 @@ ALTER TABLE my_new_table ENABLE ROW LEVEL SECURITY;
 | `/api/cron/weekly-report` | `0 6 * * 0` | דוח שבועי לאדמין (לא קשור לתשלומים) |
 | `/api/cron/monthly-admin-report` | `30 6 1 * *` | דוח חודשי (לא קשור לתשלומים) |
 
-הקרון הישן `charge-subscriptions` (שחייב חודשית בעצמו) **הוסר** — Sumit מטפלת בזה. אם תוסיף קרון חדש: Vercel hobby tier מוגבל ל-2 cron schedules; כרגע יש 4, יתכן שעוברים את הגבול והם רצים בסבב או בעיכוב.
+הקרון הישן `charge-subscriptions` (שחייב חודשית בעצמו) **הוסר** — Sumit מטפלת בזה.
+
+**עדכון (17/6/26):** כל 4 ה-crons רשומים, מופעלים ורצים ב-Hobby — Vercel מריץ אותם בחלון גמיש של עד שעה מהזמן המתוכנן (UTC). אומת ידנית ש-`sumit-status-sync` רץ בהצלחה (HTTP 200, ללא שגיאות). החשש הישן על "מגבלת 2 cron schedules ב-Hobby" כבר לא רלוונטי — כל המשימות רצות.
 
 ---
 
