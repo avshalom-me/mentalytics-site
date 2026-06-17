@@ -190,6 +190,7 @@ export function buildKidsFacts(
     scores: {},
     flags: [],
     age_band: kidsAgeBand(A._grade as string | undefined),
+    gender: genderText(A.gender as string | undefined),
   };
 
   const isEmotional = domainLabel.includes("רגשי");

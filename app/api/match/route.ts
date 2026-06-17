@@ -313,6 +313,15 @@ function scoreTherapist(
     }
   }
 
+  // Hard filter — assessment referral: therapist must offer the requested
+  // diagnosis/assessment type. Without this, therapists with strong location /
+  // age-group scores could appear even though they don't do assessments at all.
+  if (input.diagnosisTypes.length > 0) {
+    if (!hasOverlap(trainingAreas, input.diagnosisTypes)) {
+      return null;
+    }
+  }
+
   let earned = 0;
   let possible = 0;
   const reasons: string[] = [];
