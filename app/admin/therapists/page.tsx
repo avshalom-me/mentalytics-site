@@ -36,6 +36,7 @@ type AdminTherapist = {
   manually_promoted: boolean;
   promotion_source: string | null;
   promoted_until: string | null;
+  admin_approved: boolean;
   created_at: string | null;
 };
 
@@ -227,11 +228,13 @@ export default function AdminTherapistsPage() {
             manually_promoted: true,
             promotion_source: promotedUntil ? "trial" : "manual",
             promoted_until: promotedUntil ?? null,
+            admin_approved: true,
           }
         : {
             manually_promoted: false,
             promotion_source: null,
             promoted_until: null,
+            admin_approved: status === "approved",
           };
 
       setTherapists((prev) =>
@@ -286,6 +289,27 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // Approve a paid-but-unapproved therapist for public listing (sets
+  // admin_approved=true server-side without changing their paying tier).
+  async function approveListing(id: string) {
+    try {
+      setActionLoadingId(id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "approve_listing" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "אישור נכשל");
+      setTherapists((prev) => prev.map((t) => (t.id === id ? { ...t, admin_approved: true } : t)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   // Promotes the therapist with the chosen expiry. monthsAhead=null means
   // an indefinite manual promotion (no expiry, won't be auto-demoted).
   // Anything > 0 creates a time-limited trial that the daily cron will
@@ -318,9 +342,10 @@ export default function AdminTherapistsPage() {
     return true;
   }
 
+  const isListed = (t: AdminTherapist) => t.admin_approved && (t.status === "approved" || t.status === "paying");
   const allFiltered = hasActiveFilter ? therapists.filter(matchesFilters) : null;
-  const pending = hasActiveFilter ? [] : therapists.filter((t) => t.status !== "approved" && t.status !== "paying");
-  const approved = (hasActiveFilter ? allFiltered! : therapists.filter((t) => t.status === "approved" || t.status === "paying"));
+  const pending = hasActiveFilter ? [] : therapists.filter((t) => !isListed(t));
+  const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
 
   function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
     const showImage = therapist.profile_photo_url && !brokenImages[therapist.id];
@@ -352,12 +377,14 @@ export default function AdminTherapistsPage() {
               <h2 className="text-2xl font-semibold">{therapist.full_name || "ללא שם"}</h2>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-3 py-1 text-sm font-medium ${
+                  therapist.status === "paying" && !therapist.admin_approved ? "bg-orange-100 text-orange-800 border border-orange-400" :
                   therapist.status === "paying" ? "bg-yellow-100 text-yellow-800 border border-yellow-400" :
                   therapist.status === "approved" ? "bg-green-100 text-green-800" :
                   therapist.status === "rejected" ? "bg-red-100 text-red-800" :
                   "bg-gray-100 text-gray-700"
                 }`}>
-                  {therapist.status === "paying" ? "★ מקודם" :
+                  {therapist.status === "paying" && !therapist.admin_approved ? "💳 שילם — ממתין לאישור" :
+                   therapist.status === "paying" ? "★ מקודם" :
                    therapist.status === "approved" ? "מאושר (חינמי)" :
                    therapist.status === "rejected" ? "נדחה" : "ממתין לאישור"}
                 </span>
@@ -446,6 +473,13 @@ export default function AdminTherapistsPage() {
                 onClick={() => openEdit(therapist)}>
                 ערוך
               </button>
+              {therapist.status === "paying" && !therapist.admin_approved && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  onClick={() => approveListing(therapist.id)}>
+                  {isBusy ? "מאשר..." : "✓ אשר להצגה"}
+                </button>
+              )}
               {therapist.status !== "approved" && therapist.status !== "paying" && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"

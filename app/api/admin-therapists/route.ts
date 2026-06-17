@@ -29,6 +29,7 @@ type TherapistRow = {
   manually_promoted: boolean | null;
   promotion_source: string | null;
   promoted_until: string | null;
+  admin_approved: boolean | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -64,7 +65,8 @@ async function buildTherapistsResponse() {
       status,
       manually_promoted,
       promotion_source,
-      promoted_until
+      promoted_until,
+      admin_approved
       `
     )
     .order("full_name", { ascending: true });
@@ -162,6 +164,7 @@ async function buildTherapistsResponse() {
         manually_promoted: t.manually_promoted ?? false,
         promotion_source: t.promotion_source ?? null,
         promoted_until: t.promoted_until ?? null,
+        admin_approved: t.admin_approved ?? false,
         created_at: null,
       };
     })
@@ -205,6 +208,30 @@ export async function PATCH(request: Request) {
         { ok: false, error: "Missing therapist id" },
         { status: 400 }
       );
+    }
+
+    // Approve a paid-but-unapproved therapist for public listing — flips
+    // admin_approved on WITHOUT changing their paying status. This is how a
+    // therapist who paid during signup becomes visible: only after the admin
+    // has vetted them. (Pending/free therapists are approved via the normal
+    // status='approved' path, which also sets admin_approved.)
+    if (body.action === "approve_listing") {
+      const { error } = await supabaseAdmin
+        .from("therapists")
+        .update({ admin_approved: true })
+        .eq("id", id);
+      if (error) {
+        return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      }
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "approve_listing",
+        before: { admin_approved: false },
+        after: { admin_approved: true },
+        reason: "admin approved therapist for public listing",
+      });
+      return NextResponse.json({ ok: true, id, admin_approved: true });
     }
 
     // ── On-demand Sumit reconciliation ──────────────────────────────────────
@@ -519,6 +546,12 @@ export async function PATCH(request: Request) {
           before.promotion_source === "paid" ? "customer_cancellation" : "admin_demote";
       }
     }
+
+    // Vetting flag: approving/promoting marks the therapist admin-approved
+    // (allowed in the public list + matching); rejecting / returning-to-pending
+    // clears it. Separate from the paying tier so a paid therapist stays hidden
+    // until vetted.
+    extraFields.admin_approved = status === "approved" || status === "paying";
 
     const { error } = await supabaseAdmin
       .from("therapists")

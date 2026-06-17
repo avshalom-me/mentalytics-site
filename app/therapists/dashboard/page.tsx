@@ -37,6 +37,7 @@ type Profile = {
   style_q2: number | null;
   activity_level: number | null;
   status: string;
+  admin_approved?: boolean;
   tier: string;
   profile_photo_path?: string;
   education?: string;
@@ -508,7 +509,9 @@ function TherapistDashboard() {
 
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
-  const statusLabel = profile?.status === "paying"
+  const statusLabel = profile?.status === "paying" && !profile?.admin_approved
+    ? { text: "שולם — ממתין לאישור מנהל (טרם מופיע בהתאמות)", color: "bg-orange-50 text-orange-800 border border-orange-300" }
+    : profile?.status === "paying"
     ? { text: "מקודם — מופיע בהתאמות", color: "bg-yellow-50 text-yellow-800 border border-yellow-300" }
     : profile?.status === "approved"
     ? { text: "מאושר — מופיע בדף המטפלים", color: "bg-green-100 text-green-800" }
@@ -543,6 +546,16 @@ function TherapistDashboard() {
           )}
           <p className="text-sm text-red-700 leading-6 mt-1">
             עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; — הפרופיל יישלח שוב לאישור.
+          </p>
+        </div>
+      )}
+
+      {/* Paid but awaiting admin approval — not yet shown in matching */}
+      {profile && profile.status === "paying" && !profile.admin_approved && (
+        <div className="mb-6 rounded-2xl bg-orange-50 border border-orange-200 px-5 py-4">
+          <h2 className="text-sm font-extrabold text-orange-800 mb-1">התשלום התקבל — הפרופיל ממתין לאישור</h2>
+          <p className="text-sm text-orange-700 leading-6">
+            תודה! קיבלנו את התשלום. הפרופיל שלך יופיע בהתאמות לפונים רק לאחר שמנהל יאשר את התעודות שלך. נעדכן אותך במייל כשהפרופיל יאושר.
           </p>
         </div>
       )}
@@ -589,7 +602,7 @@ function TherapistDashboard() {
           {/* Status bar */}
           <div className={`px-5 py-3 flex items-center justify-between text-sm font-bold ${statusLabel.color}`}>
             <span>סטטוס: {statusLabel.text}</span>
-            {(profile.status === "approved" || profile.status === "paying") && (
+            {((profile.status === "approved" || profile.status === "paying") && profile.admin_approved) && (
               <span className={`text-xs font-black px-3 py-1 rounded-full ${profile.status === "paying" ? "bg-yellow-400 text-yellow-900" : "bg-white/60 text-stone-600"}`}>
                 {profile.status === "paying" ? "★ מקודם" : "חינמי"}
               </span>

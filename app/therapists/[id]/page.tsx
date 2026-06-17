@@ -41,6 +41,7 @@ async function getTherapist(id: string): Promise<{ therapist: TherapistRow; phot
     `)
     .eq("id", id)
     .in("status", ["approved", "paying"])
+    .eq("admin_approved", true)
     .single();
 
   if (error || !data) return null;

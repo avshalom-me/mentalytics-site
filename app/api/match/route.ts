@@ -538,7 +538,8 @@ export async function POST(req: NextRequest) {
       .select(
         "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
-      .eq("status", "paying");
+      .eq("status", "paying")
+      .eq("admin_approved", true);
 
     if (error) {
       return NextResponse.json(
