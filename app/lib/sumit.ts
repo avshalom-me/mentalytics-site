@@ -185,44 +185,19 @@ export async function createSubscription(opts: {
 
 // ---------- Cancel a standing order ----------
 //
-// Sumit's /billing/recurring/cancel takes the recurring item id plus the
-// customer's Sumit-internal id (not ExternalIdentifier — that returns
-// "Customer item not found"). The Customer.ID can be obtained from the
-// /accounting/customers/create response or by looking up the standing
-// order via listRecurringForCustomer first.
+// Sumit's /billing/recurring/cancel takes the customer (resolved by
+// ExternalIdentifier) plus the recurring-order id in the
+// `RecurringCustomerItemID` field. Passing the id in a generic `ID` field
+// returns "Customer item not found" — that was the long-standing F1 bug.
+// Verified live against a real standing order on 2026-06-17.
 export async function cancelSubscription(opts: {
   recurringItemId: number;
   customerExternalId: string;
 }): Promise<void> {
-  // Attempt the cancel by ExternalIdentifier (Sumit resolves the customer).
-  let firstError: unknown = null;
-  try {
-    await api("/billing/recurring/cancel/", {
-      Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
-      ID: opts.recurringItemId,
-    });
-  } catch (e) {
-    firstError = e;
-    // Fallback: some Sumit accounts reject ExternalIdentifier-only cancels
-    // with "Customer item not found". Resolve the customer's internal Sumit
-    // ID from the recurring item itself and retry by ID.
-    const items = await listRecurringForCustomer({
-      externalIdentifier: opts.customerExternalId,
-      includeInactive: true,
-    });
-    const item = items.find((i) => Number(i.ID) === opts.recurringItemId);
-    const internalCustomerId =
-      (item?.CustomerID as number | undefined) ??
-      ((item?.Customer as { ID?: number } | undefined)?.ID);
-    if (internalCustomerId) {
-      await api("/billing/recurring/cancel/", {
-        Customer: { ID: internalCustomerId },
-        ID: opts.recurringItemId,
-      });
-    } else {
-      throw firstError;
-    }
-  }
+  await api("/billing/recurring/cancel/", {
+    Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+    RecurringCustomerItemID: opts.recurringItemId,
+  });
 
   // VERIFY the cancel actually took effect at Sumit. This is the crux of the
   // fix: previously a request that returned without throwing — or a cancel
