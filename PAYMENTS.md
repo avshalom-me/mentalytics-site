@@ -11,7 +11,7 @@
 | סוג | מחיר בסיס | מנגנון | קוד רלוונטי |
 |-----|-----------|---------|--------------|
 | שאלון מטופלים | ₪30 + 18% מע"מ = ₪35.40 | חד-פעמי, אחרי 6 שאלונים חינמיים | `chargeQuizPayment` |
-| מנוי מטפלים | ₪120 + 18% מע"מ = ₪141.60 | חודשי מתחדש (הוראת קבע) | `createSubscription` |
+| מנוי מטפלים | ₪140 + 18% מע"מ = ₪165.20 | חודשי מתחדש (הוראת קבע) | `createSubscription` |
 
 **מאז 2026-05-11:** המערכת עברה מ-Morning+Grow ל-Sumit. הסיבה: Morning לא תומכים ב-API לחיוב מחזורי merchant-initiated. כל זכר ל-Morning נמחק מהקוד (חוץ משמות עמודות `morning_token_id` ו-`morning_document_id` שנשמרו כדי לחסוך migration).
 
@@ -308,12 +308,12 @@ UPDATE payments SET status = 'refunded' WHERE id = '<payment-uuid>';
 
 ## 9. בדיקות
 
-### בדיקה ידנית של חיוב חדש (₪141.60 לכיס שלך)
+### בדיקה ידנית של חיוב חדש (₪165.20 לכיס שלך)
 
 1. הורד את עצמך זמנית: `UPDATE therapists SET status='approved', manually_promoted=false WHERE id=<your-id>`
 2. דפדפן incognito → התחבר כמטפל → דשבורד → "שדרוג למסלול המקודם"
 3. ב-checkout: מלא פרטים אישיים + פרטי כרטיס אמיתי
-4. לחץ "חיוב מאובטח — ₪141.60"
+4. לחץ "חיוב מאובטח — ₪165.20"
 5. וודא:
    - הפנייה ל-`/therapists/payment/success`
    - DB: `payments.status='completed'`, `subscriptions.status='active'`, `morning_token_id` לא null
@@ -372,10 +372,10 @@ Sumit לא דוחפים webhooks לאירועי תשלום ישירות. הם כ
 
 | | תיאור | חומרה |
 |---|--------|--------|
-| F1 | `cancelSubscription` API — סכימה לא אומתה חיים (החזיר "Customer item not found" בבדיקה). הקוד הקיים הוא ההשערה הסבירה לפי Swagger. | 🟠 |
+| F1 | ✅ **נפתר (17/6/26):** `cancelSubscription` עושה fallback ל-`Customer.ID` הפנימי כש-ExternalIdentifier נכשל, ומאמת שהביטול תפס (commit c2bb5c4). | ✅ |
 | F2 | כפתור ביטול עצמי למטפל בדשבורד שלו. כיום ביטול דרך מייל/טלפון לחברה. | 🟡 |
-| F3 | מטפל manually_promoted לא יכול לעבור לתשלום אמיתי (`create-subscription` חוסם כל `status='paying'` בלי לבדוק `manually_promoted`). | 🟡 |
-| F4 | אין הודעות מייל אוטומטיות על שינויי סטטוס (Resend מותקן, רק לא משתמשים בו פה). | 🟡 |
+| F3 | מטפל manually_promoted לא יכול לעבור לתשלום אמיתי (`create-subscription` חוסם כל `status='paying'` בלי לבדוק `manually_promoted`). זו התנהגות מכוונת (לא לתקן — מטפל מקודם לא אמור לשלם). | 🟢 |
+| F4 | ✅ **נפתר (17/6/26):** מיילים אוטומטיים פעילים — קידום/הורדה/ברוכים-הבאים/דחייה + התראת אדמין על הוראת קבע יתומה. | ✅ |
 | F5 | Rate limit `new Map()` לא עמיד ב-cold start של Vercel serverless. לעבור ל-Vercel KV / Supabase counter בעתיד. | 🟡 |
 | F6 | סיסמת אדמין `naomi2026` חלשה. לעבור ל-Supabase Auth עם role בעתיד. | 🟠 |
 | F7 | שמות עמודות `morning_token_id` ו-`morning_document_id` שורדים מהאינטגרציה הישנה. אפשר לבצע migration לשמות עם `sumit_*` בעתיד. | 🟡 |
