@@ -1,0 +1,385 @@
+<!doctype html>
+<html dir="rtl" lang="he">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>מפת שאלון הילדים — טיפול חכם</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --teal:#3D8C8A; --teal-dark:#2A6462; --teal-pale:#EAF4F3;
+    --gold:#D49018; --gold-dark:#A87010; --gold-pale:#FDF6E3;
+    --text:#131F1E; --text-2:#3E5250; --muted:#6B807E;
+    --bg:#FFFFFF; --surface:#F7FAF9; --line:#DDE9E8;
+    --ok-bg:#E1F5EE; --ok-tx:#085041;
+    --warn-bg:#FAEEDA; --warn-tx:#633806;
+    --dg-bg:#FCEBEB; --dg-tx:#791F1F;
+    --low-bg:#F1EFE8; --low-tx:#444441;
+    --info-bg:#E6F1FB; --info-tx:#0C447C;
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Heebo',Arial,sans-serif;background:var(--surface);color:var(--text);margin:0;line-height:1.6;}
+  .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 80px;}
+  header h1{font-size:clamp(1.6rem,3.5vw,2.3rem);font-weight:900;margin:0 0 6px;color:var(--text);}
+  header p{color:var(--text-2);margin:0 0 4px;font-size:15px;}
+  .meta{font-size:12px;color:var(--muted);}
+  .toolbar{position:sticky;top:0;z-index:10;background:var(--surface);padding:14px 0;margin:18px 0 8px;border-bottom:1px solid var(--line);display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  #search{flex:1;min-width:200px;padding:9px 14px;border:1px solid var(--line);border-radius:50px;font-family:inherit;font-size:14px;outline:none;background:var(--bg);}
+  #search:focus{border-color:var(--teal);}
+  .btn{border:1px solid var(--line);background:var(--bg);color:var(--text-2);border-radius:50px;padding:8px 16px;font-family:inherit;font-size:13px;font-weight:500;cursor:pointer;}
+  .btn:hover{background:var(--teal-pale);border-color:var(--teal);}
+  .legend{display:flex;gap:8px;flex-wrap:wrap;font-size:12px;margin:6px 0 18px;}
+  .chip{display:inline-flex;align-items:center;gap:5px;padding:3px 11px;border-radius:50px;font-weight:500;}
+  .chip.ok{background:var(--ok-bg);color:var(--ok-tx)} .chip.warn{background:var(--warn-bg);color:var(--warn-tx)}
+  .chip.dg{background:var(--dg-bg);color:var(--dg-tx)} .chip.low{background:var(--low-bg);color:var(--low-tx)}
+  .chip.info{background:var(--info-bg);color:var(--info-tx)}
+  .sec{background:var(--bg);border:1px solid var(--line);border-radius:16px;margin-bottom:16px;overflow:hidden;}
+  .sec-hd{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;user-select:none;}
+  .sec-hd:hover{background:var(--surface);}
+  .sec-num{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;flex:none;font-size:14px;}
+  .sec-hd h2{font-size:19px;font-weight:800;margin:0;flex:1;}
+  .sec-gate{font-size:12px;color:var(--muted);font-weight:500;background:var(--surface);padding:3px 10px;border-radius:50px;border:1px solid var(--line);}
+  .caret{transition:transform .25s;color:var(--muted);font-size:13px;}
+  .sec.collapsed .caret{transform:rotate(-90deg);}
+  .sec.collapsed .sec-bd{display:none;}
+  .sec-note{padding:0 20px 4px;color:var(--text-2);font-size:13px;}
+  .sec-bd{padding:6px 20px 18px;}
+  .blk{border:1px solid var(--line);border-radius:13px;padding:14px 16px;margin:10px 0;background:var(--bg);}
+  .blk-hd{display:flex;align-items:flex-start;gap:9px;margin-bottom:4px;}
+  .blk-num{min-width:22px;height:22px;border-radius:50%;background:var(--teal-pale);color:var(--teal-dark);display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex:none;margin-top:1px;}
+  .blk-name{font-weight:800;font-size:15px;color:var(--text);}
+  .blk-gate{font-size:13px;color:var(--text-2);margin:1px 0 8px 0;}
+  .subq{display:inline-block;font-size:12px;font-weight:600;background:var(--surface);border:1px solid var(--line);color:var(--text-2);padding:2px 10px;border-radius:7px;margin-bottom:8px;}
+  .items{margin:4px 0 10px;padding:0;list-style:none;display:flex;flex-wrap:wrap;gap:5px;}
+  .items li{font-size:12px;color:var(--text-2);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:2px 9px;}
+  .items li b{color:var(--teal-dark);font-weight:700;}
+  .rules{margin:6px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:5px;}
+  .rule{display:flex;gap:9px;align-items:baseline;font-size:13px;flex-wrap:wrap;}
+  .thr{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px;background:var(--low-bg);color:var(--low-tx);padding:1px 8px;border-radius:5px;white-space:nowrap;}
+  .arrow{color:var(--muted);}
+  .out{padding:2px 10px;border-radius:6px;font-size:12.5px;font-weight:500;}
+  .out.ok{background:var(--ok-bg);color:var(--ok-tx)} .out.warn{background:var(--warn-bg);color:var(--warn-tx)}
+  .out.dg{background:var(--dg-bg);color:var(--dg-tx)} .out.low{background:var(--low-bg);color:var(--low-tx)}
+  .out.info{background:var(--info-bg);color:var(--info-tx)}
+  .grades{margin-top:9px;border-top:1px dashed var(--line);padding-top:8px;}
+  .grades-h{font-size:11px;font-weight:700;color:var(--muted);margin-bottom:5px;}
+  .grow{display:flex;gap:8px;align-items:baseline;font-size:12.5px;margin-bottom:4px;}
+  .gtag{flex:none;min-width:64px;font-weight:700;color:var(--teal-dark);background:var(--teal-pale);border-radius:5px;padding:1px 8px;font-size:11.5px;text-align:center;}
+  .gtxt{color:var(--text-2);}
+  .xrules{background:var(--gold-pale);border:1px solid #F0E2BE;border-radius:13px;padding:14px 18px;margin-top:14px;}
+  .xrules h3{margin:0 0 8px;font-size:14px;color:var(--gold-dark);font-weight:800;}
+  .xrules li{font-size:12.5px;color:var(--text-2);margin-bottom:5px;line-height:1.7;}
+  .nohit{display:none;text-align:center;color:var(--muted);padding:30px;font-size:14px;}
+  mark{background:#fde68a;color:inherit;border-radius:3px;padding:0 2px;}
+  @media print{.toolbar{display:none}.sec.collapsed .sec-bd{display:block}.sec-hd{cursor:default}body{background:#fff}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>מפת שאלון הילדים — לוגיקת ההסתעפות והפלטים</h1>
+    <p>5 תחומים. בכל תחום: שאלת שער → תת-שאלון מפושט → סף → פלט (הפנייה). סוג ההפנייה משתנה לפי קבוצת הגיל.</p>
+    <p class="meta">מסמך עזר פנימי שנגזר מלוגיקת הקוד (kids-score.server.ts). עודכן 2026-06-15. ניתן ללחוץ על כותרת תחום לכיווץ/הרחבה, לחפש, ולהדפיס ל-PDF.</p>
+  </header>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="חיפוש בשאלות, תת-שאלונים, ספים…" oninput="onSearch(this.value)">
+    <button class="btn" onclick="toggleAll(true)">הרחב הכל</button>
+    <button class="btn" onclick="toggleAll(false)">כווץ הכל</button>
+    <button class="btn" onclick="window.print()">הדפסה / PDF</button>
+  </div>
+
+  <div class="legend">
+    <span class="chip ok">הפנייה לטיפול</span>
+    <span class="chip warn">בירור / הערכה</span>
+    <span class="chip dg">דחוף / דגל אדום</span>
+    <span class="chip low">תת-סף / ללא הפנייה</span>
+    <span class="chip info">מידע / כלים</span>
+  </div>
+
+  <div id="root"></div>
+  <div class="nohit" id="nohit">לא נמצאו תוצאות לחיפוש.</div>
+</div>
+
+<script>
+const SECTIONS = [
+  {
+    id:"emo", title:"רגשי", color:"#3D8C8A", gate:'תנאי כניסה: «בעיות רגשיות» a_emo ≥ "מעט"',
+    note:"10 שאלות שער — כל אחת מסך שמעליו נפתח תת-שאלון מעמיק; רק מעל הסף יוצאת הפנייה.",
+    blocks:[
+      {num:1,name:"חרדה",gate:'שער: «ילדך חש דאגות/לחצים מתמשכים» (סולם, פותח אם ≥3)',
+       subq:"שאלון חרדה (AQ) · 10 פריטים",
+       items:["פחד עז","קושי בנשימה/חנק","זיעה יתירה","אי-נוחות בחזה","בחילה","סחרחורת/ניתוק","חשש מאובדן שליטה","מצוקה בהיפרדות","קושי לצאת מהבית","ביעותי לילה"],
+       rules:[
+         {thr:"aq_tot ≥ 16",out:"הפנייה לטיפול בחרדה (סוג לפי גיל)",sev:"ok"},
+         {thr:"aq_tot < 16",out:"מתח ברמה נמוכה + כלים",sev:"low"},
+         {thr:"aq8+aq9 ≥ 4",out:"חרדת היפרדות — CBT ממוקד",sev:"ok"},
+         {thr:"כאבים כרוניים = כן",out:"שלילת גורם רפואי אצל רופא",sev:"warn"},
+       ]},
+      {num:2,name:"דימוי עצמי",gate:'שער: «אינו/ה שווה / אינו/ה מוערך/ת» (≥3)',
+       subq:"ללא תת-שאלון · שאלות לוואי לפי כיתה",items:[],
+       rules:[{thr:"q2 ≥ 3",out:"הפנייה: פסיכודינמי / הדרכת הורים (לפי גיל)",sev:"ok"}]},
+      {num:3,name:"מצב רוח",gate:'שער: «מצב רוח ירוד או עצוב» (≥3)',
+       subq:"שאלון מצב רוח (MQ) · 9 פריטים",
+       items:["עצב מתמשך","אובדן עניין","שינוי משקל/תיאבון","בעיות שינה","האטה מוטורית-מחשבתית","עייפות","חוסר ערך/אשמה","ירידה בריכוז","מחשבות על מוות"],
+       rules:[
+         {thr:"q3≥3 ו-mq_tot ≥ 4",out:"הפנייה: פסיכודינמי",sev:"ok"},
+         {thr:"mq_tot ≥ 6",out:"+ ייעוץ פסיכיאטרי (מצב חמור)",sev:"ok"},
+         {thr:"q3_sui = כן",out:"🚩 אובדנות — הערכת סיכון דחופה (תמיד, ללא תלות בציון)",sev:"dg"},
+       ]},
+      {num:4,name:"התמכרות",gate:'שער: «סימנים להתמכרות לחומרים/התנהגויות» (כן) → בחירת סוג',
+       subq:"חומרים (AS·6) · גיימינג (AG·7) · הימורים (AB·7)",
+       items:["חומרים: שימוש מעבר למתוכנן · ניסיון כושל להפסיק · תשוקה · כשל בהתחייבויות · ויתור חברתי · גמילה","גיימינג: עיסוק יתר · עצבנות בלי גישה · זמן גדל · כשל בצמצום · הזנחה · שקרים · בריחה","הימורים: עיסוק · סכומים גדלים · כשל בהפסקה · בריחה · שקרים · סיכון · הסתמכות כלכלית"],
+       rules:[
+         {thr:"AS ≥ 3",out:"CBT בהתמכרויות (חומרים)",sev:"ok"},
+         {thr:"AG ≥ 4",out:"CBT בהתמכרויות (גיימינג)",sev:"ok"},
+         {thr:"AB ≥ 4",out:"CBT בהתמכרויות (הימורים: 4 קל · 6 בינוני · 7 חמור)",sev:"ok"},
+       ]},
+      {num:5,name:"OCD",gate:'שער: «מחשבות/טקסים חוזרים שקשה להפסיק» (כן)',
+       subq:"שאלון OCD (OQ) · 6 פריטים",
+       items:["בדיקות חוזרות","מחשבות רעות שקשה לעצור","אגירה","שטיפה חוזרת","צורך בסדר","ספירה"],
+       rules:[
+         {thr:"oq_tot ≥ 10",out:"CBT",sev:"ok"},
+         {thr:"oq_tot ≥ 15",out:"CBT + צוות בית-הספר (משמעותי)",sev:"ok"},
+         {thr:"oq_tot < 10",out:"ללא הפנייה",sev:"low"},
+       ]},
+      {num:6,name:"טראומה",gate:'שער: «חווה אירוע טראומטי» (כן)',
+       subq:"שאלון טראומה (TQ) · 10 פריטים",
+       items:["מחשבות/תמונות חודרניות","סיוטים","תגובה גופנית בהיזכרות","הימנעות","ירידה בעניין","קושי להיזכר","רגשות חזקים","קפיצנות/בהלה","התנהגות מסכנת","דריכות יתר"],
+       rules:[
+         {thr:"tq_tot ≥ 13",out:"EMDR / CPT / טיפול דינמי בטראומה",sev:"ok"},
+         {thr:"tq_tot < 13",out:"ללא הפנייה",sev:"low"},
+         {thr:"אשכולות (פריט≥2)",out:"חודרנות · הימנעות · קוגניציה/מצב רוח · עוררות",sev:"info"},
+       ]},
+      {num:7,name:"פרודרום / פסיכוזה",gate:'שער כפול: 7א «ראה/שמע דברים שאינם קיימים» · 7ב «אמונות/חשדות חריגים»',
+       subq:"שאלון PQ · 6 פריטים",
+       items:["שמיעת קולות","ראיית דברים","תחושת איום מאחרים","בלבול מציאות/דמיון","מחשבות חזקות עד שמיעה","חוסר שליטה במחשבות"],
+       rules:[
+         {thr:"7א=כן → pq ≥ 1",out:"🚩 הפנייה להערכה (פסיכולוג קליני/פסיכיאטר) — סף רגיש",sev:"dg"},
+         {thr:"7ב=כן → pq ≥ 3",out:"הפנייה להערכה",sev:"warn"},
+       ]},
+      {num:8,name:"הפרעות אכילה",gate:'שער: «דפוסי אכילה מדאיגים» (כן)',
+       subq:"פריטים לפי גיל: <12 EA (הגבלה·4 + זלילה·4) · 12+ EB (הגבלה·3 + זלילה·4)",
+       items:["הגבלה: ירידה במשקל · סירוב/הגבלה · אכילה טקסית · עיכוב צמיחה / פחד מעלייה · תפיסת גוף מעוותת","זלילה: התקפי זלילה · התנהגויות מפצות · ≥פעם בשבוע 3 חודשים · הערכה תלוית-משקל"],
+       rules:[
+         {thr:"eq_ano ≥ 2 או eq_bul ≥ 2",out:"טיפול בהפרעות אכילה + דיאטנית קלינית",sev:"ok"},
+         {thr:"BMI < 18.5 או > 24.9",out:"דיאטנית + רופא (סקר ראשוני בלבד)",sev:"warn"},
+       ]},
+      {num:9,name:"ויסות / BPD",gate:'שער: «חוסר יציבות ביחסים, ויסות רגשי, אימפולסיביות» (כן) — מתפצל לפי גיל',
+       subq:"ז׳–יב׳ + גן–א׳: שאלון ויסות BQ·7 · ב׳–ו׳: שאלון קשב (ADHD) במקום BQ",
+       items:["BQ·7: מאמץ להימנע מנטישה · חוסר ביטחון · אימפולסיביות מסכנת · חוסר יציבות רגשית · התפרצויות כעס · נתק/פרנויה · יחסים לא יציבים","ADHD (ב׳–ו׳): נאסף פעם אחת — אם יש גם קושי לימודי, החלק הלימודי מדלג עליו"],
+       rules:[
+         {thr:"ב׳–ו׳ → ADHD",out:"קשב ≥4 או היפר ≥4 → אבחון קשב (הפלט תחת הרגשי)",sev:"ok"},
+         {thr:"ז׳–יב׳: bq_tot ≥ 5",out:"הפנייה ל-DBT",sev:"ok"},
+         {thr:"גן–א׳: bq_tot ≥ 5",out:"הפניית גיל-רך (מסך הסכמה)",sev:"ok"},
+         {thr:"bq_tot = 4",out:"תת-קליני — ללא הפנייה",sev:"low"},
+       ]},
+      {num:10,name:"קשיים כלליים",gate:'מופיע רק אם אף תחום אחר לא יצא חיובי · שער: «קשיים אחרים» → «קשור לקשר עם הורה?»',
+       subq:"שאלות לוואי לפי כיתה",items:[],
+       rules:[{thr:"q10=כן ו-q10_par=כן",out:"הפנייה לפי מאפייני הילד (פסיכודינמי / הדרכת הורים)",sev:"ok"}]},
+    ],
+    xrules:[
+      "<b>קבוצות הגיל בחלק הרגשי</b>: גן–א׳ (ga) · ב׳–ו׳ (bv) · ז׳–יב׳ (zy). הסינון (שאלות השער ותתי-השאלונים) זהה בכל הגילאים — מה שמשתנה הוא שאלות הלוואי ו<u>סוג ההפנייה</u> (ראו «הפנייה לפי קבוצת גיל» בכל תחום).",
+      "⚠️ <b>שים לב — כיתה א׳</b>: בחלק הרגשי כיתה א׳ משויכת לקבוצת הגיל הרך (גן–א׳), <u>לא</u> ל-ב׳–ו׳. כלומר ההסתעפות אינה «גן ומטה / א–ו / ז–יב» אלא «גן–א / ב–ו / ז–יב». אם הכוונה הייתה ש-א׳ תהיה עם א–ו — זו נקודה לבדיקה.",
+      "<b>גיל הרך (גן–א׳)</b>: מסך הסכמה/הורים מנתב לתרפיה בהבעה ויצירה / טיפול דיאדי / הדרכת הורים.",
+      "<b>מיזוג ב׳–ו׳</b>: חרדה + דימוי עצמי + מצב רוח חיוביים יחד → הפנייה משולבת אחת (פסיכודינמי + CBT + הדרכת הורים).",
+      "<b>ריבוי הפניות</b>: 2+ → «בחרו את הדחופה»; 3+ → לשקול ייעוץ פסיכיאטר ילדים להערכה כוללת.",
+      "<b>דגלים אדומים תמיד עולים</b>: אובדנות (q3_sui) והזיות (7א, סף פריט יחיד).",
+      "מפת הגיל של החלק הרגשי (גן–א / ב–ו / ז–יב) שונה מזו של החלק הלימודי (גן / א–ג / ד–ו / ז–ח / ט–יב).",
+    ],
+  },
+  {
+    id:"aca", title:"לימודי", color:"#185FA5", gate:'תנאי כניסה: «קשיים לימודיים» a_aca ≥ "מעט"',
+    note:"מסך מקדים לראייה/שמיעה + זיהוי קשב (ADHD) משותף, ואז סקר לפי קבוצת גיל לימודית.",
+    blocks:[
+      {num:0,name:"מקדים — ראייה / שמיעה",gate:"לפני המשך הבירור הלימודי",subq:"",items:[],
+       rules:[
+         {thr:"דווח קושי ראייה ללא בדיקה",out:"בדיקת ראייה (אופטומטריסט)",sev:"warn"},
+         {thr:"דווח קושי שמיעה ללא בדיקה",out:"בדיקת שמיעה (קלינאית/אא״ג)",sev:"warn"},
+       ]},
+      {num:0,name:"קשב וריכוז (ADHD) — משותף לכל הגילאים",gate:"",
+       subq:"חוסר קשב · 6 פריטים | היפראקטיביות/אימפולסיביות · 6 פריטים",
+       items:["קשב: ריכוז · ארגון · איבוד חפצים · הסחה · שכחה · תשומת לב לפרטים","היפר: חוסר שקט · קושי להמתין · הפרעה לאחרים · ריצה/טיפוס · מענה פזיז · קושי לשחק בשקט"],
+       rules:[
+         {thr:"חוסר קשב ≥ 4 או היפר ≥ 4",out:"אבחון אצל נוירולוג/רופא ילדים מומחה קשב",sev:"ok"},
+         {thr:"קשב חיובי + ≥2 פונקציות ניהוליות",out:"טיפול/אימון Cog-Fun",sev:"ok"},
+       ]},
+      {num:1,name:"גן (gan)",gate:"5 שאלות סקר (כן/לא)",subq:"",
+       items:["זיהוי אותיות/מספרים","זכירת צורות/צבעים","מודעות פונולוגית","אוצר מילים/ביטוי עצמי","מוטוריקה/אחיזת עיפרון"],
+       rules:[
+         {thr:"כל קושי",out:"קלינאית תקשורת / ריפוי בעיסוק / פסיכולוג הגן + כלים",sev:"ok"},
+         {thr:"3 קשיים",out:"היוועצות פסיכולוג הגן + בדיקת שעות שילוב",sev:"warn"},
+         {thr:"4+ קשיים",out:"🚩 ממצא משמעותי — התאמת המסגרת",sev:"dg"},
+       ]},
+      {num:2,name:"כיתות א׳–ג׳ (ag) / ד׳–ו׳ (dv)",gate:"סקר: קריאה · כתיבה · הבנה · חשבון",
+       subq:"קריאה + היסטוריית רקע (6 פריטים) + מוטיבציה · חשבון (5%/10%/30%)",
+       items:["קריאה","כתב יד","הבנה בשיעור","חשבון","שאלות מוטיבציה רגשית-לימודית (×3)"],
+       rules:[
+         {thr:"קריאה · 0 רקע · מוטיבציה",out:"קלינאית תקשורת / תוכנית חיזוקים",sev:"ok"},
+         {thr:"emoMot ≥ 7",out:"קושי רגשי מול למידה → טיפול רגשי",sev:"ok"},
+         {thr:"קריאה · 1–3 רקע",out:"שפה → תוכנית בית-ספרית / שילוב",sev:"ok"},
+         {thr:"קריאה · 4+ רקע",out:"אבחון פסיכודידקטי (+ ריפוי בעיסוק)",sev:"ok"},
+         {thr:"חשבון 5%",out:"סיוע פרטני → ואם אין שיפור: פסיכודידקטי",sev:"ok"},
+       ]},
+      {num:3,name:"כיתות ז׳–ח׳ (zh) / ט׳–יב׳ (tyb)",gate:"סקר: רבי-מלל · מתמטיקה · אנגלית · כתיבה · הבנה",
+       subq:"דירוג אחוזון: 5% / 20% / מעל 20%",items:[],
+       rules:[
+         {thr:"קושי ברבי-מלל",out:"אבחון פסיכודידקטי",sev:"ok"},
+         {thr:"מתמטיקה/אנגלית בלבד",out:"כלים + תגבור (ללא פסיכודידקטי כשלעצמו)",sev:"low"},
+         {thr:"3+ תחומים יחד",out:"אבחון פסיכודידקטי לבירור כולל",sev:"ok"},
+         {thr:"הבנה ללא קשב/קריאה",out:"אבחון פסיכודידקטי + התאמות בבחינות",sev:"ok"},
+       ]},
+    ],
+    xrules:[
+      "<b>הצלבה עם הרגשי</b>: חרדה גבוהה (q1≥4) או מצב רוח ירוד → «טפלו קודם בקושי הרגשי ועקבו אם הלימודי נמשך».",
+      "אם אין ממצאים → הודעת «לא נמצאו קשיים מובהקים» + היוועצות עם הגננת/מחנכת/יועצת.",
+      "המלצה קבועה: לחזור על השאלון בעוד 3–6 חודשים לבחינת התקדמות.",
+      "שים לב: מפת קבוצות הגיל הלימודית (gan/ag/dv/zh/tyb) שונה מזו של החלק הרגשי (ga/bv/zy).",
+    ],
+  },
+  {
+    id:"dev", title:"התפתחותי", color:"#534AB7", gate:'תנאי כניסה: «קשיים התפתחותיים» a_dev ≥ "מעט" · בעיקר גיל < 7 / גן',
+    note:"שני צירים: גמילה/התרוקנות, וויסות חושי. רוב הפלטים — הפנייה רפואית/פרא-רפואית.",
+    blocks:[
+      {num:1,name:"גמילה / התרוקנות",gate:'שער: «קשיים בגמילה» (כן) → סוג + האם הייתה גמילה בעבר',
+       subq:"סוגים: א עצירות · ב הרטבה · ג אנקופרזיס · ד שילוב",items:[],
+       rules:[
+         {thr:"א — עצירות",out:"רופא ילדים / פיזיותרפיה רצפת אגן + כלים בבית",sev:"warn"},
+         {thr:"ב — הרטבה",out:"אורולוג ילדים / פיזיו רצפת אגן (70–80% מקור בעצירות)",sev:"warn"},
+         {thr:"ג / ד — אנקופרזיס",out:"גסטרו ילדים / פיזיו + טיפול בהדרכת הורים",sev:"warn"},
+         {thr:"עבר גמילה? לא",out:"«עשרת כללי הגמילה» (מדריך הורים)",sev:"info"},
+       ]},
+      {num:2,name:"ויסות חושי",gate:'שער: «קשיי ויסות חושי» (כן) · שים לב — ציון נמוך = יותר קושי',
+       subq:"רגישות-יתר · 10 פריטים | תת-תגובתיות · 8 פריטים",
+       items:["רגישות-יתר: רגישות למגע/רעש/אור · נמנע ממרקמים/טעמים · קושי בקרבת אנשים · מופרע מרעש רקע","תת-תגובתיות: מחפש תנועה/רעש חזק · לא שם לב ללכלוך/בגד · אחיזה חלשה · נשען להישען"],
+       rules:[
+         {thr:"רגישות-יתר ≥ 26",out:"תקין",sev:"low"},
+         {thr:"רגישות-יתר 24–25",out:"הבדל קל → רופא משפחה",sev:"warn"},
+         {thr:"רגישות-יתר < 24",out:"הבדל ברור → ריפוי בעיסוק (ויסות חושי)",sev:"ok"},
+         {thr:"תת-תגובתיות ≥ 19",out:"תקין",sev:"low"},
+         {thr:"תת-תגובתיות 16–18",out:"הבדל קל → רופא משפחה",sev:"warn"},
+         {thr:"תת-תגובתיות < 16",out:"הבדל ברור → ריפוי בעיסוק",sev:"ok"},
+       ]},
+    ],
+    xrules:["אזהרות רפואיות (גמילה, BMI, ראייה/שמיעה) מוצגות תמיד כקופסאות עצמאיות, כדי לא «להידבק» לממצא רגשי לא קשור."],
+  },
+  {
+    id:"beh", title:"התנהגותי", color:"#D85A30", gate:'תנאי כניסה: «קשיים התנהגותיים» a_beh ≥ "מעט"',
+    note:"3 שאלות בדירוג לא/מעט/הרבה. הפלט נקבע לפי רמת הקושי הגבוהה ביותר שסומנה (היררכיה: אלימות > חוצפה > הפרעות).",
+    blocks:[
+      {num:1,name:"שלוש שאלות התנהגות",gate:"כל שאלה: לא / מעט / הרבה",subq:"",
+       items:["1. חוסר השתתפות / הפרעות בשיעור (מעט→1 · הרבה→2)","2. חוצפה כלפי צוות (מעט→3 · הרבה→4)","3. אלימות פיזית/מילולית (מעט→5 · הרבה→6)"],
+       rules:[
+         {thr:"רמה מקס׳ ≤ 3",out:"תוכנית התנהגותית — מרכיבים חיוביים",sev:"ok"},
+         {thr:"רמה מקס׳ 4–5",out:"תוכנית — חיוביים + שליליים (מורים + הורים)",sev:"ok"},
+         {thr:"רמה מקס׳ = 6",out:"חיוביים + שליליים + טיפול פסיכולוגי",sev:"ok"},
+         {thr:"גיל רך (גן–א׳)",out:"תמיד תוכנית חיובית בלבד",sev:"low"},
+       ]},
+    ],
+    xrules:["הפלט כולל מדריך תוכנית התנהגותית מפורט להורים ולמורים (טבלת נקודות, קווים אדומים, כלים לשיח בכיתה)."],
+  },
+  {
+    id:"soc", title:"חברתי", color:"#993556", gate:'תנאי כניסה: «קשיים חברתיים» a_soc ≥ "מעט"',
+    note:"שלושה צירים נפרדים: חרדה חברתית (LSAS), חיכוכים/מריבות, וקשיי תקשורת (סקר לאיתור סימני אוטיזם).",
+    blocks:[
+      {num:1,name:"חרדה חברתית / ביישנות (soc1)",gate:'שער: «ביישנות/חרדה חברתית» (כן)',
+       subq:"שאלון LSAS מקוצר · 8 פריטים · סולם 0–3",
+       items:["דיבור/קריאה מול הכיתה","הרמת יד ומענה","פתיחת שיחה עם לא-מוכר","הצטרפות לקבוצה","כניסה לחדר מלא","קבלת ביקורת/טעות","שיחה עם מבוגרים זרים","פעילות חברתית מחוץ לביה״ס"],
+       rules:[
+         {thr:"lsas_tot ≥ 8 · ≤ 13",out:"חרדה חברתית קלה → הפנייה (לפי גיל)",sev:"warn"},
+         {thr:"lsas_tot ≤ 18",out:"בינונית → הפנייה",sev:"warn"},
+         {thr:"lsas_tot > 18",out:"משמעותית → הפנייה",sev:"dg"},
+       ]},
+      {num:2,name:"חיכוכים / מריבות (soc2)",gate:'שער: «חיכוכים/מריבות» (כן) → חומרה 1–6',
+       subq:"",items:[],
+       rules:[
+         {thr:"חומרה 1–4",out:"קבוצה חברתית + כלים לכיתה",sev:"ok"},
+         {thr:"חומרה ≥ 5",out:"קבוצה + כלים + טיפול פסיכודינמי",sev:"ok"},
+       ]},
+      {num:3,name:"קשיי תקשורת (soc3)",gate:'שער: «קשיי תקשורת» (כן) → 3 שאלות ליבה + מאפיינים נוספים + הופעה מוקדמת',
+       subq:"ליבה (×3) · נוספים: חזרתיות · נוקשות · תחומי עניין · חושי",items:[],
+       rules:[
+         {thr:"3 ליבה + מאפיין נוסף",out:"🚩 הערכת תקשורת/אוטיזם (יועצת + פסיכולוג ביה״ס)",sev:"dg"},
+         {thr:"3 ליבה · ללא נוסף",out:"פסיכודינמי + הדרכת הורים",sev:"ok"},
+         {thr:"הופעה מוקדמת = לא",out:"פסיכודינמי + הדרכת הורים",sev:"ok"},
+       ]},
+    ],
+    xrules:[
+      "סוג הטיפול הרגשי נקבע לפי שאלת מוטיבציה (כמו בחלק הרגשי): נמוכה → פסיכודינמי + הדרכת הורים; גבוהה → + CBT.",
+      "אם כבר יש הפניית-טיפול מהחלק הרגשי — לא מוסיפים הפנייה רגשית כפולה.",
+    ],
+  },
+];
+
+const EMO_GRADES = {
+  "חרדה":[["גן–א","מסך הסכמה → הבעה ויצירה / טיפול דיאדי / הדרכת הורים (עוצמה «הרבה מאוד» → פסיכודינמי)"],["ב–ו","לפי מוטיבציה ומילוליות → הדרכת הורים · הבעה ויצירה · CBT בחרדה · פסיכודינמי (כולם + הדרכת הורים)"],["ז–יב","לפי מוטיבציה ופרקטיות → הדרכת הורים · פסיכודינמי · CBT בחרדה (+ הדרכת הורים)"]],
+  "דימוי עצמי":[["גן–א","מסך הסכמה (הבעה ויצירה / דיאדי / הדרכת הורים)"],["ב–ו","מוטיבציה נמוכה → הדרכת הורים · אחרת → פסיכודינמי + הדרכת הורים"],["ז–יב","פסיכודינמי + הדרכת הורים"]],
+  "מצב רוח":[["גן–א","מסך הסכמה"],["ב–ו / ז–יב","פסיכודינמי (mq_tot ≥ 6 → + ייעוץ פסיכיאטרי)"]],
+  "התמכרות":[["גן–א","הדרכת הורים טיפולית"],["ב–ו","שליטה נמוכה → הדרכת הורים · אחרת → CBT בהתמכרויות"],["ז–יב","CBT מומחה בהתמכרויות"]],
+  "OCD":[["גן–א","מסך הסכמה"],["ב–ו / ז–יב","CBT (+ הדרכת הורים; ≥15 → + צוות ביה״ס)"]],
+  "טראומה":[["כל הגילאים","זהה — EMDR / CPT / טיפול דינמי בטראומה"]],
+  "פרודרום / פסיכוזה":[["כל הגילאים","זהה — הפנייה להערכה (פסיכולוג קליני / פסיכיאטר)"]],
+  "הפרעות אכילה":[["כל הגילאים","זהה — טיפול בהפרעות אכילה + דיאטנית"]],
+  "ויסות / BPD":[["גן–א","BQ → הפניית גיל-רך (מסך הסכמה)"],["ב–ו","מנותב לשאלון קשב (ADHD) — לא BQ; הפלט תחת הרגשי"],["ז–יב","BQ → הפנייה ל-DBT"]],
+  "קשיים כלליים":[["גן–א","מסך הסכמה"],["ב–ו","מוטיבציה ≤ 2 → הדרכת הורים · אחרת → לפי מאפייני הילד"],["ז–יב","מילוליות ≤ 2 → פסיכודינמי + הדרכת הורים · אחרת → פסיכודינמי"]],
+};
+
+const root = document.getElementById("root");
+function sevClass(s){return s||"info";}
+function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
+
+function render(){
+  root.innerHTML = SECTIONS.map((sec,si)=>{
+    const blocks = sec.blocks.map(b=>{
+      const items = b.items.length ? '<ul class="items">'+b.items.map(it=>'<li>'+esc(it)+'</li>').join('')+'</ul>' : '';
+      const subq = b.subq ? '<div class="subq">'+esc(b.subq)+'</div>' : '';
+      const rules = '<ul class="rules">'+b.rules.map(r=>
+        '<li class="rule"><span class="thr">'+esc(r.thr)+'</span><span class="arrow">←</span><span class="out '+sevClass(r.sev)+'">'+esc(r.out)+'</span></li>'
+      ).join('')+'</ul>';
+      const numChip = b.num>0 ? '<span class="blk-num">'+b.num+'</span>' : '';
+      const gr = (sec.id==="emo" && EMO_GRADES[b.name]) ?
+        '<div class="grades"><div class="grades-h">הפנייה לפי קבוצת גיל</div>'+
+        EMO_GRADES[b.name].map(g=>'<div class="grow"><span class="gtag">'+esc(g[0])+'</span><span class="gtxt">'+esc(g[1])+'</span></div>').join('')+'</div>' : '';
+      return '<div class="blk"><div class="blk-hd">'+numChip+'<span class="blk-name">'+esc(b.name)+'</span></div>'+
+        (b.gate?'<div class="blk-gate">'+esc(b.gate)+'</div>':'')+subq+items+rules+gr+'</div>';
+    }).join('');
+    const xr = sec.xrules && sec.xrules.length ? '<div class="xrules"><h3>כללים והערות חוצי-תחום</h3><ul>'+sec.xrules.map(x=>'<li>'+x+'</li>').join('')+'</ul></div>' : '';
+    return '<div class="sec" data-i="'+si+'"><div class="sec-hd" onclick="toggleSec('+si+')">'+
+      '<span class="sec-num" style="background:'+sec.color+'">'+(si+1)+'</span>'+
+      '<h2>'+esc(sec.title)+'</h2><span class="sec-gate">'+esc(sec.gate)+'</span><span class="caret">▼</span></div>'+
+      '<div class="sec-note">'+esc(sec.note)+'</div><div class="sec-bd">'+blocks+xr+'</div></div>';
+  }).join('');
+}
+function toggleSec(i){document.querySelector('.sec[data-i="'+i+'"]').classList.toggle('collapsed');}
+function toggleAll(open){document.querySelectorAll('.sec').forEach(s=>s.classList.toggle('collapsed',!open));}
+
+let searchTimer=null;
+function onSearch(q){
+  clearTimeout(searchTimer);
+  searchTimer=setTimeout(()=>doSearch(q.trim()),120);
+}
+function doSearch(q){
+  render();
+  const nohit=document.getElementById('nohit');
+  if(!q){nohit.style.display='none';return;}
+  const ql=q.toLowerCase();
+  const rx=new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi');
+  let anyHit=false;
+  document.querySelectorAll('.sec').forEach(sec=>{
+    let secHit=false;
+    sec.querySelectorAll('.blk').forEach(blk=>{
+      if(blk.textContent.toLowerCase().includes(ql)){
+        blk.innerHTML=blk.innerHTML.replace(/(>)([^<]+)(<)/g,(m,a,t,b)=>a+t.replace(rx,'<mark>$1</mark>')+b);
+        secHit=true;
+      } else { blk.style.display='none'; }
+    });
+    if(secHit){sec.classList.remove('collapsed');anyHit=true;}
+    else{sec.style.display='none';}
+  });
+  nohit.style.display=anyHit?'none':'block';
+}
+render();
+</script>
+</body>
+</html>
