@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
-import { cancelSubscription } from "@/app/lib/sumit";
+import { cancelSubscription, listRecurringForCustomer, type RecurringItem } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import {
   sendPromotionEndedEmail,
@@ -205,6 +205,126 @@ export async function PATCH(request: Request) {
         { ok: false, error: "Missing therapist id" },
         { status: 400 }
       );
+    }
+
+    // ── On-demand Sumit reconciliation ──────────────────────────────────────
+    // Closes the gap where a standing order is still ACTIVE at Sumit but the
+    // local subscription is already 'cancelled' — the status-change cancel
+    // paths only look at status='active' subs, so they can never reach it.
+    // Here we check EVERY subscription that carries a Sumit recurring id
+    // (regardless of local status) and cancel any that are still live, so an
+    // admin isn't blind to a charge that keeps running. The daily cron does
+    // the same sweep automatically; this is the immediate, per-therapist
+    // version with a verified cancel.
+    if (body.action === "reconcile_sumit") {
+      const { data: subs } = await supabaseAdmin
+        .from("subscriptions")
+        .select("id, status, morning_token_id")
+        .eq("therapist_id", id)
+        .not("morning_token_id", "is", null);
+
+      const result = {
+        checked: 0,
+        cancelled: 0,
+        alreadyInactive: 0,
+        notFound: 0,
+        failed: 0,
+        unlinkedActive: 0,
+        details: [] as string[],
+      };
+
+      if (!subs || subs.length === 0) {
+        // No local subs with a token — but there could still be an orphaned
+        // standing order at Sumit with no local record. Surface it.
+        try {
+          const items = await listRecurringForCustomer({ externalIdentifier: id, includeInactive: true });
+          for (const item of items) {
+            if (item.Status === 0) {
+              result.unlinkedActive++;
+              result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
+            }
+          }
+        } catch (err) {
+          const message = err instanceof Error ? err.message : "unknown error";
+          return NextResponse.json({ ok: false, error: `בדיקה מול Sumit נכשלה: ${message}` }, { status: 502 });
+        }
+        return NextResponse.json({ ok: true, reconcile: result });
+      }
+
+      // One Sumit lookup for the whole customer, then match each local sub.
+      let items: RecurringItem[] = [];
+      try {
+        items = await listRecurringForCustomer({ externalIdentifier: id, includeInactive: true });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : "unknown error";
+        return NextResponse.json({ ok: false, error: `בדיקה מול Sumit נכשלה: ${message}` }, { status: 502 });
+      }
+
+      for (const sub of subs) {
+        const recurringId = sub.morning_token_id as string;
+        result.checked++;
+        const target = items.find((i) => String(i.ID) === recurringId);
+
+        if (!target) {
+          result.notFound++;
+          result.details.push(`הוראת קבע ${recurringId}: לא נמצאה ב-Sumit (ייתכן מזהה מ-Morning הישן).`);
+          continue;
+        }
+        if (target.Status !== 0) {
+          result.alreadyInactive++;
+          result.details.push(`הוראת קבע ${recurringId}: כבר לא פעילה ב-Sumit.`);
+          if (sub.status === "active") {
+            await supabaseAdmin
+              .from("subscriptions")
+              .update({ status: "cancelled", updated_at: new Date().toISOString() })
+              .eq("id", sub.id);
+          }
+          continue;
+        }
+
+        // Active at Sumit → cancel for real (cancelSubscription re-reads and
+        // throws if the cancel didn't take effect).
+        try {
+          await cancelSubscription({ recurringItemId: parseInt(recurringId, 10), customerExternalId: id });
+          result.cancelled++;
+          result.details.push(`הוראת קבע ${recurringId}: בוטלה עכשיו ב-Sumit ✓`);
+          await supabaseAdmin
+            .from("subscriptions")
+            .update({ status: "cancelled", updated_at: new Date().toISOString() })
+            .eq("id", sub.id);
+          await writeAudit(supabaseAdmin, {
+            therapistId: id,
+            actorType: "admin",
+            action: "sumit_reconcile_cancelled",
+            before: { sumit_recurring: recurringId, sumit_status: "active", local_status: sub.status },
+            after: { sumit_status: "cancelled", local_status: "cancelled" },
+            reason: "admin_on_demand_reconcile",
+          });
+        } catch (cancelErr) {
+          result.failed++;
+          const message = cancelErr instanceof Error ? cancelErr.message : "unknown error";
+          result.details.push(`הוראת קבע ${recurringId}: ביטול נכשל — ${message}`);
+          await writeAudit(supabaseAdmin, {
+            therapistId: id,
+            actorType: "admin",
+            action: "sumit_reconcile_failed",
+            before: { sumit_recurring: recurringId, sumit_status: "active", local_status: sub.status },
+            after: null,
+            reason: `cancel_failed: ${message}`,
+          });
+        }
+      }
+
+      // Surface any ACTIVE Sumit order not linked to a local sub (true orphan).
+      const localTokens = new Set(subs.map((s) => String(s.morning_token_id)));
+      for (const item of items) {
+        if (item.Status === 0 && !localTokens.has(String(item.ID))) {
+          result.unlinkedActive++;
+          result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
+        }
+      }
+
+      return NextResponse.json({ ok: true, reconcile: result });
     }
 
     // עדכון שדות מלאים (עריכה)

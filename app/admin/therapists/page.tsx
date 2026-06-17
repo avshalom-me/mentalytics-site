@@ -91,6 +91,8 @@ export default function AdminTherapistsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  const [reconcilingId, setReconcilingId] = useState<string | null>(null);
+  const [reconcileResults, setReconcileResults] = useState<Record<string, string>>({});
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const [filterName, setFilterName] = useState("");
   const [filterGender, setFilterGender] = useState("");
@@ -241,6 +243,46 @@ export default function AdminTherapistsPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  // On-demand check of this therapist's standing orders at Sumit. Cancels any
+  // that are still live there (e.g. an order marked 'cancelled' locally but
+  // still charging — the billing leak), so the admin isn't blind to it.
+  async function reconcileSumit(id: string) {
+    if (!window.confirm("בדיקה מול Sumit: כל הוראת קבע שעדיין פעילה אצל המטפל תבוטל. להמשיך?")) return;
+    try {
+      setReconcilingId(id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "reconcile_sumit" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "בדיקת Sumit נכשלה");
+      const r = json.reconcile;
+      const summary =
+        r.checked === 0 && !r.unlinkedActive
+          ? "אין הוראות קבע עם מזהה Sumit לבדיקה."
+          : [
+              r.cancelled ? `בוטלו עכשיו: ${r.cancelled}` : null,
+              r.alreadyInactive ? `כבר לא פעילות: ${r.alreadyInactive}` : null,
+              r.notFound ? `לא נמצאו ב-Sumit: ${r.notFound}` : null,
+              r.failed ? `נכשלו: ${r.failed}` : null,
+              r.unlinkedActive ? `פעילות לא מקושרות: ${r.unlinkedActive}` : null,
+            ]
+              .filter(Boolean)
+              .join(" · ") || "אין הוראת קבע פעילה.";
+      const msg = [summary, ...(r.details ?? [])].join("\n");
+      setReconcileResults((prev) => ({ ...prev, [id]: msg }));
+    } catch (err) {
+      setReconcileResults((prev) => ({
+        ...prev,
+        [id]: err instanceof Error ? err.message : "שגיאה",
+      }));
+    } finally {
+      setReconcilingId(null);
     }
   }
 
@@ -458,12 +500,22 @@ export default function AdminTherapistsPage() {
                 onClick={() => updateStatus(therapist.id, "pending")}>
                 {isBusy ? "מעדכן..." : "החזר להמתנה"}
               </button>
+              <button type="button" disabled={reconcilingId === therapist.id}
+                className="rounded-xl border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
+                onClick={() => reconcileSumit(therapist.id)}>
+                {reconcilingId === therapist.id ? "בודק ב-Sumit..." : "בדוק/בטל הוראת קבע ב-Sumit"}
+              </button>
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-black px-4 py-2 text-sm text-white disabled:opacity-50"
                 onClick={() => deleteTherapist(therapist.id)}>
                 {isBusy ? "מוחק..." : "מחק"}
               </button>
             </div>
+            {reconcileResults[therapist.id] && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 whitespace-pre-line">
+                {reconcileResults[therapist.id]}
+              </div>
+            )}
           </div>
         </div>
       </div>
