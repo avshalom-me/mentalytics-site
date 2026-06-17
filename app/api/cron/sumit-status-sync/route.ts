@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
-import { listRecurringForCustomer } from "@/app/lib/sumit";
+import { Resend } from "resend";
+import { listRecurringForCustomer, cancelSubscription } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 
@@ -9,6 +10,41 @@ const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+
+const resend = new Resend(process.env.RESEND_API_KEY);
+const ALERT_TO = (
+  process.env.WEEKLY_REPORT_TO ??
+  "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
+
+// Loud admin alert for a standing order that is still charging at Sumit but
+// should not be — and that we failed to auto-cancel. Best-effort: an email
+// failure must never abort the sync.
+async function alertAdminOrphan(
+  therapistId: string,
+  recurringItemId: string,
+  detail: string
+): Promise<void> {
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: "⚠️ הוראת קבע פעילה ב-Sumit שאמורה להיות מבוטלת",
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>הסנכרון היומי זיהה הוראת קבע ש<strong>פעילה ב-Sumit וממשיכה לחייב</strong>, אך מסומנת כמבוטלת במערכת — והביטול האוטומטי נכשל.</p>
+        <p><strong>מטפל (therapist_id):</strong> ${therapistId}<br/>
+        <strong>מזהה הוראת קבע ב-Sumit:</strong> ${recurringItemId}<br/>
+        <strong>פרטי הכשל:</strong> ${detail}</p>
+        <p>יש לבטל ידנית ב-Sumit: סליקת אשראי → הוראות קבע → חפש לפי המזהה → ביטול.</p>
+      </div>`,
+    });
+  } catch (e) {
+    console.error("alertAdminOrphan: failed to send admin email:", e);
+  }
+}
 
 function verifyCron(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;
@@ -47,6 +83,9 @@ export async function GET(req: NextRequest) {
   let errors = 0;
   let stillActive = 0;
   let trialsExpired = 0;
+  let orphansFound = 0;
+  let orphansCancelled = 0;
+  let orphanAlerts = 0;
 
   // -------- (1) Sumit subscription state for paid therapists --------
   const { data: paidTherapists } = await supabase
@@ -174,11 +213,81 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -------- (3) Orphaned standing orders (billing-leak guard) --------
+  // A standing order can stay ACTIVE at Sumit while we believe it's cancelled
+  // locally — e.g. a cancel that failed at Sumit but was recorded locally, or
+  // a promote-over-paying that only updated the DB. Passes (1) and (2) only
+  // look at therapists who are *currently* paid-active, so they can never
+  // catch this class — the leak charges the card every month, invisibly.
+  // Here we sweep every locally-cancelled subscription that still carries a
+  // Sumit recurring id, verify it against Sumit, and if it's still active we
+  // cancel it for real (bringing Sumit in line with the recorded intent) and
+  // alert the admin if that cancel fails.
+  const { data: cancelledSubs } = await supabase
+    .from("subscriptions")
+    .select("id, therapist_id, morning_token_id")
+    .eq("status", "cancelled")
+    .not("morning_token_id", "is", null);
+
+  for (const sub of cancelledSubs ?? []) {
+    const recurringId = sub.morning_token_id as string | null;
+    if (!recurringId) continue;
+    try {
+      const items = await listRecurringForCustomer({
+        externalIdentifier: sub.therapist_id,
+        includeInactive: true,
+      });
+      const target = items.find((i) => String(i.ID) === recurringId);
+      // Genuinely inactive at Sumit (or gone) — local and remote agree, fine.
+      if (!target || target.Status !== 0) continue;
+
+      // Active at Sumit but cancelled locally → billing leak. Reconcile.
+      orphansFound++;
+      try {
+        await cancelSubscription({
+          recurringItemId: parseInt(recurringId, 10),
+          customerExternalId: sub.therapist_id,
+        });
+        orphansCancelled++;
+        await writeAudit(supabase, {
+          therapistId: sub.therapist_id,
+          actorType: "sumit",
+          action: "sumit_orphan_cancelled",
+          before: { sumit_recurring: recurringId, sumit_status: "active", local_status: "cancelled" },
+          after: { sumit_status: "cancelled" },
+          reason: "orphaned_active_standing_order_reconciled",
+        });
+      } catch (cancelErr) {
+        orphanAlerts++;
+        const message = cancelErr instanceof Error ? cancelErr.message : "unknown error";
+        console.error(
+          `Orphan standing order ${recurringId} for therapist ${sub.therapist_id}: auto-cancel failed:`,
+          message
+        );
+        await writeAudit(supabase, {
+          therapistId: sub.therapist_id,
+          actorType: "sumit",
+          action: "sumit_orphan_detected",
+          before: { sumit_recurring: recurringId, sumit_status: "active", local_status: "cancelled" },
+          after: null,
+          reason: `auto_cancel_failed: ${message}`,
+        });
+        await alertAdminOrphan(sub.therapist_id, recurringId, message);
+      }
+    } catch (err) {
+      errors++;
+      console.error(`Orphan sweep failed for therapist ${sub.therapist_id}:`, err);
+    }
+  }
+
   return NextResponse.json({
     checked,
     stillActive,
     demoted,
     trialsExpired,
+    orphansFound,
+    orphansCancelled,
+    orphanAlerts,
     errors,
   });
 }

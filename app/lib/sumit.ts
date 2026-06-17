@@ -194,10 +194,55 @@ export async function cancelSubscription(opts: {
   recurringItemId: number;
   customerExternalId: string;
 }): Promise<void> {
-  await api("/billing/recurring/cancel/", {
-    Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
-    ID: opts.recurringItemId,
+  // Attempt the cancel by ExternalIdentifier (Sumit resolves the customer).
+  let firstError: unknown = null;
+  try {
+    await api("/billing/recurring/cancel/", {
+      Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+      ID: opts.recurringItemId,
+    });
+  } catch (e) {
+    firstError = e;
+    // Fallback: some Sumit accounts reject ExternalIdentifier-only cancels
+    // with "Customer item not found". Resolve the customer's internal Sumit
+    // ID from the recurring item itself and retry by ID.
+    const items = await listRecurringForCustomer({
+      externalIdentifier: opts.customerExternalId,
+      includeInactive: true,
+    });
+    const item = items.find((i) => Number(i.ID) === opts.recurringItemId);
+    const internalCustomerId =
+      (item?.CustomerID as number | undefined) ??
+      ((item?.Customer as { ID?: number } | undefined)?.ID);
+    if (internalCustomerId) {
+      await api("/billing/recurring/cancel/", {
+        Customer: { ID: internalCustomerId },
+        ID: opts.recurringItemId,
+      });
+    } else {
+      throw firstError;
+    }
+  }
+
+  // VERIFY the cancel actually took effect at Sumit. This is the crux of the
+  // fix: previously a request that returned without throwing — or a cancel
+  // that silently didn't apply — could leave the standing order ACTIVE at
+  // Sumit while the caller recorded it as cancelled locally, charging the
+  // customer every month with nothing left to catch it. We re-read the item
+  // and throw if it's still active, so a "successful" cancel always means the
+  // card will genuinely stop being charged.
+  const after = await listRecurringForCustomer({
+    externalIdentifier: opts.customerExternalId,
+    includeInactive: true,
   });
+  const stillActive = after.find(
+    (i) => Number(i.ID) === opts.recurringItemId && i.Status === 0
+  );
+  if (stillActive) {
+    throw new Error(
+      `Sumit cancel did not take effect: recurring item ${opts.recurringItemId} is still active`
+    );
+  }
 }
 
 // ---------- Status sync (daily cron polls this) ----------
@@ -207,6 +252,7 @@ export async function cancelSubscription(opts: {
 export interface RecurringItem {
   ID: number;
   Status: number;
+  CustomerID?: number;
   Date_NextBilling?: string;
   Date_PreviousBilling?: string;
   Date_Last?: string;
