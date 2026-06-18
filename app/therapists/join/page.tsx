@@ -72,13 +72,15 @@ export default function TherapistJoinPage() {
           </div>
 
           <h1 className="text-3xl md:text-4xl font-black leading-tight text-stone-900">
-            הגיע הזמן שמטופלים ימצאו אותך — לפי התאמה אמיתית,
-            <br className="hidden md:inline" />
-            <span style={{ color: "var(--teal)" }}> לא לפי מזל.</span>
+            הגיע הזמן שמטופלים ימצאו אותך,{" "}
+            <span style={{ color: "var(--teal)" }}>לפי התאמה אמיתית.</span>
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-stone-700 max-w-3xl">
-            פלטפורמת <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מדויקת — לא רק חיפוש גנרי.
+            <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית.
+          </p>
+          <p className="mt-3 text-base leading-8 text-stone-700 max-w-3xl">
+            יותר פניות רלוונטיות ופחות בזבוז זמן וחוסר נוחות. התאמה שמבוססת על ההכשרה, הכלים והאישיות הטיפולית שלך.
           </p>
 
           <ul className="mt-6 space-y-2.5 text-stone-800">
@@ -94,7 +96,6 @@ export default function TherapistJoinPage() {
       {/* PLANS TABLE — right after hero */}
       <section className="mt-10">
         <h2 className="text-2xl font-extrabold text-stone-900 mb-2">המסלולים</h2>
-        <p className="text-stone-600 mb-6">כל מטפל/ת מתחיל/ה במסלול החינמי. שדרוג למסלול מקודם — אופציונלי.</p>
 
         <div className="rounded-2xl overflow-hidden border border-[#E8E0D8] bg-white shadow-sm">
           <div className="grid grid-cols-1 md:grid-cols-2">

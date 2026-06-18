@@ -265,10 +265,12 @@ function Layout({ screen, domains, children }: { screen: string; domains?: strin
   return (
     <main className="min-h-screen" style={{ background: "var(--surface)" }} dir="rtl">
       <div className="mx-auto max-w-2xl px-4 py-8">
-        <div className="mb-5 text-center">
-          <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-          <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – מבוגרים</p>
-        </div>
+        {screen !== "results" && (
+          <div className="mb-5 text-center">
+            <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
+            <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – מבוגרים</p>
+          </div>
+        )}
         {showBar && <ProgressBar pct={pct} />}
         {children}
       </div>
@@ -2428,9 +2430,34 @@ export default function AdultsPage() {
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
 
-          {/* Header + "what now?" */}
-          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-6 mb-4">
+          {/* Summary + demographics + "what now?" */}
+          <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4">
+            <p className="text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)] mb-2">סיכום שאלון</p>
             <h2 className="text-xl font-bold text-[#1a2a3a] mb-4">דוח ממצאים</h2>
+            <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm space-y-1.5 text-[#2a3a4a]">
+              <div className="flex justify-between">
+                <span className="font-semibold">גיל:</span>
+                <span>{answers.age || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="font-semibold">מגדר:</span>
+                <span>{answers.gender || "—"}</span>
+              </div>
+              <div className="pt-1 border-t border-gray-200">
+                <div className="font-semibold mb-1">תחומי קושי שסומנו:</div>
+                {answers.domains.map(d => (
+                  <div key={d} className="flex justify-between">
+                    <span>{({
+                      emotional: "מורכבויות בתחום הרגשי/האישי",
+                      functional: "תחומים תפקודיים / תעסוקתיים / אקדמאיים",
+                      relationship: "זוגיות ומשפחה",
+                      addiction: "קשיי התמכרות",
+                      personal_development: "התפתחות אישית",
+                    } as Record<string, string>)[d] ?? d}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
             {recs.length > 0 && (
               <div className="rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
                 <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)]">מה עכשיו?</p>
