@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
+import GaConversion from "@/app/components/GaConversion";
 
 export const metadata: Metadata = { title: "התשלום התקבל | טיפול חכם" };
 
@@ -12,6 +13,13 @@ export default function PaymentSuccessPage() {
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
+
+      {/* GA4 conversion: therapist activated the promoted subscription (₪140/mo, ex-VAT). */}
+      <GaConversion
+        event="therapist_subscription"
+        dedupeKey="ga_therapist_subscription"
+        params={{ value: 140, currency: "ILS" }}
+      />
 
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 size={40} className="text-green-600" />

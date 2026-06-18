@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { REGION_CITIES } from "@/app/lib/regions";
 import { NEWSLETTER_CONSENT_TEXT } from "@/app/lib/consent";
+import { gaEvent } from "@/app/lib/gtag";
 
 type Gender = "זכר" | "נקבה";
 
@@ -229,6 +230,9 @@ export default function TherapistSignupPage() {
       const warnings = Array.isArray(data.uploadWarnings)
         ? data.uploadWarnings
         : [];
+
+      // GA4 conversion: a therapist successfully submitted the join form (lead).
+      gaEvent("therapist_signup");
 
       setErrors([]);
       setSubmitMsg(

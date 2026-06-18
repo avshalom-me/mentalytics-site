@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { getOrCreateSessionId } from "./session";
 import { getAttribution } from "./attribution";
+import { gaEvent } from "./gtag";
 
 type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete";
 
@@ -22,6 +23,7 @@ export function trackQuizStep(quizType: "adults" | "kids", step: string, progres
 
 export function trackQuizComplete(quizType: "adults" | "kids") {
   sendTrack("quiz_complete", { metadata: { quiz_type: quizType } });
+  gaEvent("quiz_complete", { quiz_type: quizType });
 }
 
 export function usePageView(page: string, source?: string) {

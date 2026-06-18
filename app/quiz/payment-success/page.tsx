@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
 import { Suspense } from "react";
+import GaConversion from "@/app/components/GaConversion";
 
 function Inner() {
   const params = useSearchParams();
@@ -17,6 +18,13 @@ function Inner() {
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
+
+      {/* GA4 conversion: patient paid for quiz access (₪30, ex-VAT). */}
+      <GaConversion
+        event="patient_payment"
+        dedupeKey="ga_patient_payment"
+        params={{ value: 30, currency: "ILS", quiz_type: quizType }}
+      />
 
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 size={40} className="text-green-600" />
