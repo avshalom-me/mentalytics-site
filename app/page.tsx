@@ -197,6 +197,10 @@ export default function HomePage() {
             מבוסס מחקר וניסיון קליני
           </div>
 
+          <p className="fade fade-3" style={{ fontSize: "13px", color: "var(--muted)", textAlign: "center", margin: "4px 0 0" }}>
+            כל המטפלים הינם בעלי רישיון ועוברים תהליך אימות המוודאים שהם בעלי הכלים המתאימים
+          </p>
+
           {/* Trust badges */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", fontSize: "13px", color: "var(--muted)", justifyContent: "center" }} className="fade fade-5">
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/anonymous.svg" alt="" width={20} height={20} style={{ display: "block" }} /> שאלון אנונימי</span>
