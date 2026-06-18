@@ -33,6 +33,10 @@ const faqs = [
     q: "מה עוד אני מקבל?",
     a: "בחלק מהמקרים יינתנו כלים להפחתת הקשיים המדווחים. המערכת גם יודעת להפנות לאבחון או הערכה לפי הצורך.",
   },
+  {
+    q: "האם המטפלים המופיעים באתר מוסמכים?",
+    a: "כל המטפלים עוברים תהליך אימות המוודאים שהם בעלי הכלים וההכשרה המתאימה.",
+  },
 ];
 
 const steps = [
@@ -197,16 +201,13 @@ export default function HomePage() {
             מבוסס מחקר וניסיון קליני
           </div>
 
-          <p className="fade fade-3" style={{ fontSize: "13px", color: "var(--muted)", textAlign: "center", margin: "4px 0 0" }}>
-            כל המטפלים הינם בעלי רישיון ועוברים תהליך אימות המוודאים שהם בעלי הכלים המתאימים
-          </p>
-
           {/* Trust badges */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: "20px", fontSize: "13px", color: "var(--muted)", justifyContent: "center" }} className="fade fade-5">
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/anonymous.svg" alt="" width={20} height={20} style={{ display: "block" }} /> שאלון אנונימי</span>
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/free.svg" alt="" width={20} height={20} style={{ display: "block" }} /> חינמי<TooltipAsterisk /></span>
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/minutes.svg" alt="" width={20} height={20} style={{ display: "block" }} /> כמה דקות</span>
             <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/report.svg" alt="" width={20} height={20} style={{ display: "block" }} /> דו"ח אישי לשמירה</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}><img src="/icons/team.svg" alt="" width={20} height={20} style={{ display: "block" }} /> מטפלים מורשים בלבד</span>
           </div>
         </div>
       </section>
