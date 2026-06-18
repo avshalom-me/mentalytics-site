@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { chargeQuizPayment, QUIZ_BASE_PRICE } from "@/app/lib/sumit";
+import { sanitizeClickIds } from "@/app/lib/attribution";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -40,15 +41,8 @@ function sanitizeName(raw: string): string {
 // Sumit auto-issues the receipt and emails it to the customer.
 export async function POST(req: NextRequest) {
   try {
-    const {
-      fp,
-      quizType,
-      firstName,
-      lastName,
-      phone,
-      email,
-      singleUseToken,
-    } = await req.json();
+    const body = await req.json();
+    const { fp, quizType, firstName, lastName, phone, email, singleUseToken } = body;
 
     if (!fp || !quizType) {
       return NextResponse.json({ error: "missing fp or quizType" }, { status: 400 });
@@ -96,6 +90,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "payment in progress" }, { status: 409 });
     }
 
+    // Raw ad click ids captured at landing — persisted so a completed payment
+    // can be uploaded to Google Ads / Meta with exact click attribution.
+    const clickIds = sanitizeClickIds(body);
+
     const { data: payment, error } = await supabase
       .from("payments")
       .insert({
@@ -104,6 +102,10 @@ export async function POST(req: NextRequest) {
         amount: QUIZ_BASE_PRICE,
         status: "pending",
         metadata: { ip, quizType, fingerprint: fp },
+        gclid: clickIds.gclid,
+        gbraid: clickIds.gbraid,
+        wbraid: clickIds.wbraid,
+        fbclid: clickIds.fbclid,
       })
       .select("id")
       .single();

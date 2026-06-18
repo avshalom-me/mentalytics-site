@@ -31,6 +31,34 @@ export type Attribution = {
 const STORAGE_KEY = "mnt_attribution";
 const UTM_MAX = 120;
 
+// Raw ad-platform click ids are stored separately from the normalized
+// attribution: they are only needed at conversion time (to upload the
+// conversion back to Google Ads / Meta with exact click attribution), so they
+// are kept out of the per-event tracking payload.
+const STORAGE_KEY_CLICKS = "mnt_click_ids";
+const CLICK_ID_MAX = 512;
+
+export type ClickIds = {
+  gclid: string | null; // Google Ads — standard web click id
+  gbraid: string | null; // Google Ads — web-to-app (iOS)
+  wbraid: string | null; // Google Ads — app-to-web (iOS)
+  fbclid: string | null; // Meta — click id (for future Meta CAPI)
+};
+
+function readClickIdsFromParams(params: URLSearchParams): ClickIds {
+  const cap = (v: string | null) => (v && v.length > 0 ? v.slice(0, CLICK_ID_MAX) : null);
+  return {
+    gclid: cap(params.get("gclid")),
+    gbraid: cap(params.get("gbraid")),
+    wbraid: cap(params.get("wbraid")),
+    fbclid: cap(params.get("fbclid")),
+  };
+}
+
+function hasAnyClickId(c: ClickIds): boolean {
+  return Boolean(c.gclid || c.gbraid || c.wbraid || c.fbclid);
+}
+
 export function isValidChannel(x: unknown): x is Channel {
   return typeof x === "string" && (CHANNELS as readonly string[]).includes(x);
 }
@@ -106,6 +134,15 @@ export function captureAttribution(): void {
     if (existing && !hasCampaignSignal) return; // keep the prior touch
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(buildAttribution(params, referrer)));
+
+    // Persist the raw ad click ids (last-touch) so a later conversion can be
+    // uploaded to the ad platform with exact click attribution. Only overwrite
+    // when this landing actually carries click ids — a utm-only or organic
+    // landing must not wipe a gclid captured on an earlier paid visit.
+    const clicks = readClickIdsFromParams(params);
+    if (hasAnyClickId(clicks)) {
+      localStorage.setItem(STORAGE_KEY_CLICKS, JSON.stringify(clicks));
+    }
   } catch {
     /* localStorage blocked — attribution stays unknown */
   }
@@ -148,6 +185,60 @@ export function sanitizeAttribution(body: unknown): {
     utm_source: cap(b.utm_source),
     utm_medium: cap(b.utm_medium),
     utm_campaign: cap(b.utm_campaign),
+  };
+}
+
+function parseClickIds(raw: string): ClickIds | null {
+  try {
+    const p = JSON.parse(raw) as Partial<ClickIds>;
+    const cap = (v: unknown) =>
+      typeof v === "string" && v.length > 0 ? v.slice(0, CLICK_ID_MAX) : null;
+    const c: ClickIds = {
+      gclid: cap(p.gclid),
+      gbraid: cap(p.gbraid),
+      wbraid: cap(p.wbraid),
+      fbclid: cap(p.fbclid),
+    };
+    return hasAnyClickId(c) ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Read the raw ad click ids captured at landing. Attach to the request body of
+ * a conversion (payment) so the server can store them on the payment row.
+ * Returns null when this visitor carries no click id (organic / direct).
+ */
+export function getClickIds(): ClickIds | null {
+  if (typeof window === "undefined") return null;
+  try {
+    let raw = localStorage.getItem(STORAGE_KEY_CLICKS);
+    if (!raw) {
+      // This page might itself be the click landing (single-page convert).
+      captureAttribution();
+      raw = localStorage.getItem(STORAGE_KEY_CLICKS);
+    }
+    return raw ? parseClickIds(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Validate + clamp click ids arriving in an API request body (server-side). */
+export function sanitizeClickIds(body: unknown): ClickIds {
+  const b = (body ?? {}) as Record<string, unknown>;
+  // Click ids are opaque url-safe tokens — accept only [A-Za-z0-9._-].
+  const clean = (v: unknown): string | null => {
+    if (typeof v !== "string") return null;
+    const t = v.trim().slice(0, CLICK_ID_MAX);
+    return t.length > 0 && /^[A-Za-z0-9._-]+$/.test(t) ? t : null;
+  };
+  return {
+    gclid: clean(b.gclid),
+    gbraid: clean(b.gbraid),
+    wbraid: clean(b.wbraid),
+    fbclid: clean(b.fbclid),
   };
 }
 

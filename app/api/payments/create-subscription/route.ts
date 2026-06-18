@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createSubscription, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
+import { sanitizeClickIds } from "@/app/lib/attribution";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -107,6 +108,10 @@ export async function POST(req: NextRequest) {
       lastName?: string;
       phone?: string;
       email?: string;
+      gclid?: string;
+      gbraid?: string;
+      wbraid?: string;
+      fbclid?: string;
     };
     try {
       body = await req.json();
@@ -134,6 +139,10 @@ export async function POST(req: NextRequest) {
     const clientName = `${cleanFirst} ${cleanLast}`;
     const clientEmail = cleanEmail || therapist.email || user.email || "";
 
+    // Raw ad click ids captured at landing — persisted so a completed payment
+    // can be uploaded to Google Ads / Meta with exact click attribution.
+    const clickIds = sanitizeClickIds(body);
+
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
       .insert({
@@ -142,6 +151,10 @@ export async function POST(req: NextRequest) {
         amount: SUBSCRIPTION_BASE_PRICE,
         status: "pending",
         metadata: { therapist_name: clientName, email: clientEmail, phone: cleanPhone },
+        gclid: clickIds.gclid,
+        gbraid: clickIds.gbraid,
+        wbraid: clickIds.wbraid,
+        fbclid: clickIds.fbclid,
       })
       .select("id")
       .single();

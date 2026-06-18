@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { getClickIds } from "@/app/lib/attribution";
 
 // The "json" variant accepts JSON bodies; the plain endpoint expects
 // jQuery-style form-encoded data (used by Sumit's official JS SDK).
@@ -104,6 +105,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
           phone: phone.trim(),
           email: email.trim(),
           singleUseToken: tok.Data.SingleUseToken,
+          ...(getClickIds() ?? {}),
         }),
       });
       const data = await res.json();

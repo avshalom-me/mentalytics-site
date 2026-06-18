@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
+import { getClickIds } from "@/app/lib/attribution";
 
 // Sumit's Vault API: card data goes from the browser directly to Sumit, never
 // through our server. PCI scope is effectively SAQ-A. The "json" variant of
@@ -162,6 +163,7 @@ function CheckoutForm() {
           phone: phone.trim(),
           email: email.trim(),
           singleUseToken,
+          ...(getClickIds() ?? {}),
         }),
       });
 
