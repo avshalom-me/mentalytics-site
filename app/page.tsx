@@ -39,7 +39,15 @@ const faqs = [
   },
 ];
 
-const steps = [
+const steps: {
+  n: string;
+  title: string;
+  body: string;
+  numBg: string;
+  numColor: string;
+  numBorder: string;
+  tag?: string;
+}[] = [
   {
     n: "1",
     title: "מלאו את השאלון",
