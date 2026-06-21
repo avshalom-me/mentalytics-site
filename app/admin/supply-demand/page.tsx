@@ -29,6 +29,8 @@ type Data = {
   therapistLeads: TherapistLead[];
   onlineTherapistCount: number;
   payingTherapistCount: number;
+  paidTherapistCount: number;
+  giftedTherapistCount: number;
   starvingCount: number;
   demandNoRegion: number;
   totals: { demand: number };
@@ -101,7 +103,9 @@ export default function SupplyDemandPage() {
           <>
             {/* Top cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-              <Card value={data.payingTherapistCount} label="מטפלים משלמים" cls="bg-teal-50 border-teal-200 text-teal-800" />
+              <Card value={data.payingTherapistCount} label="מטפלים פעילים"
+                sub={`${data.paidTherapistCount} משלמים · ${data.giftedTherapistCount} מקודמים`}
+                cls="bg-teal-50 border-teal-200 text-teal-800" />
               <Card value={data.onlineTherapistCount} label="מתוכם אונליין (גמישים)" cls="bg-sky-50 border-sky-200 text-sky-800" />
               <Card value={data.totals.demand} label="ביקוש (צפיות עם אזור)" cls="bg-amber-50 border-amber-200 text-amber-800" />
               <Card
@@ -150,9 +154,9 @@ export default function SupplyDemandPage() {
 
             {/* Per-therapist leads */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6 overflow-x-auto">
-              <h2 className="text-base font-black text-stone-800 mb-1">פניות לכל מטפל משלם</h2>
+              <h2 className="text-base font-black text-stone-800 mb-1">פניות לכל מטפל פעיל</h2>
               <p className="text-xs text-stone-400 mb-4">
-                היעד: כל מטפל משלם מקבל לפחות פנייה אחת. מטפלים עם 0 פניות מסומנים — הם בסיכון נטישה.
+                היעד: כל מטפל פעיל מקבל לפחות פנייה אחת. מטפלים עם 0 פניות מסומנים — הם בסיכון נטישה.
               </p>
               <table className="w-full text-sm">
                 <thead>
@@ -191,10 +195,11 @@ export default function SupplyDemandPage() {
   );
 }
 
-function Card({ value, label, cls }: { value: number; label: string; cls: string }) {
+function Card({ value, label, sub, cls }: { value: number; label: string; sub?: string; cls: string }) {
   return (
     <div className={`rounded-2xl border p-4 text-center ${cls}`}>
       <div className="text-3xl font-black">{value.toLocaleString("he-IL")}</div>
+      {sub && <div className="text-[11px] font-semibold mt-0.5 opacity-70">{sub}</div>}
       <div className="text-xs font-semibold mt-1">{label}</div>
     </div>
   );

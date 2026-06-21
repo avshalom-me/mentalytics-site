@@ -26,7 +26,8 @@ type ExplainAnalytics = {
 };
 type TherapistBreakdowns = {
   total: number;
-  paying: number;
+  paid: number;
+  gifted: number;
   free: number;
   withPhoto: number;
   acceptingNew: number;
@@ -593,7 +594,7 @@ function StatCard({ label, value, sub, color }: { label: string; value: string |
 }
 
 function TherapistsTab({ data }: { data: TherapistBreakdowns }) {
-  const { total, paying, free, withPhoto, acceptingNew, onlineCount } = data;
+  const { total, paid, gifted, free, withPhoto, acceptingNew, onlineCount } = data;
 
   if (total === 0) {
     return (
@@ -614,7 +615,7 @@ function TherapistsTab({ data }: { data: TherapistBreakdowns }) {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <StatCard label="מטפלים פעילים" value={total}
-          sub={`${paying} משלמים · ${free} חינמיים`}
+          sub={`${paid} משלמים · ${gifted} מקודמים · ${free} חינמיים`}
           color="bg-blue-50 border-blue-200 text-blue-800" />
         <StatCard label="מקבלים פניות חדשות" value={acceptingNew} sub={pct(acceptingNew, total)}
           color="bg-green-50 border-green-200 text-green-800" />
@@ -681,7 +682,7 @@ export default function AdminAnalyticsPage() {
               byDomain: [],
             },
             therapistBreakdowns: json.therapistBreakdowns ?? {
-              total: 0, paying: 0, free: 0, withPhoto: 0, acceptingNew: 0, onlineCount: 0,
+              total: 0, paid: 0, gifted: 0, free: 0, withPhoto: 0, acceptingNew: 0, onlineCount: 0,
               byType: [], byTraining: [], byAgeGroup: [], byRegion: [],
               byArrangement: [], byGender: [], byLanguage: [], byCulturalPref: [],
             },

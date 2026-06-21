@@ -20,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [therapistsRes, viewsRes, clicksRes] = await Promise.all([
-      supabaseAdmin.from("therapists").select("id, full_name, regions, online").eq("status", "paying"),
+      supabaseAdmin.from("therapists").select("id, full_name, regions, online, promotion_source").eq("status", "paying"),
       (() => {
         let q = supabaseAdmin.from("therapist_profile_views").select("therapist_id, viewer_region");
         if (since) q = q.gte("viewed_at", since);
@@ -43,10 +43,18 @@ export async function GET(req: NextRequest) {
       clicksRes.data ?? [],
     );
 
+    // status='paying' bundles real payers with comped/promoted therapists.
+    // Split by revenue so "paying" isn't overstated ('paid' = charged via Sumit).
+    const payingRows = (therapistsRes.data ?? []) as { promotion_source: string | null }[];
+    const paidTherapistCount = payingRows.filter(t => t.promotion_source === "paid").length;
+    const giftedTherapistCount = payingRows.filter(t => t.promotion_source !== "paid").length;
+
     return NextResponse.json({
       ok: true,
       period: safePeriod,
       ...sd,
+      paidTherapistCount,
+      giftedTherapistCount,
       totals: { demand: sd.totalDemand },
       generated_at: new Date().toISOString(),
     });

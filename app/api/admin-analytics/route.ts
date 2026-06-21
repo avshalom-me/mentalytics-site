@@ -16,6 +16,7 @@ type TherapistRow = {
   full_name: string | null;
   status: string;
   admin_approved: boolean | null;
+  promotion_source: string | null;
   gender: string | null;
   online: boolean | null;
   therapist_types: string[] | null;
@@ -66,7 +67,7 @@ export async function GET(req: NextRequest) {
       supabaseAdmin
         .from("therapists")
         .select(
-          "id, full_name, status, admin_approved, gender, online, therapist_types, training_areas, age_groups, regions, arrangements, languages, cultural_prefs, profile_photo_path, accepting_new_clients"
+          "id, full_name, status, admin_approved, promotion_source, gender, online, therapist_types, training_areas, age_groups, regions, arrangements, languages, cultural_prefs, profile_photo_path, accepting_new_clients"
         )
         .in("status", ["paying", "approved"]),
     ]);
@@ -288,7 +289,11 @@ export async function GET(req: NextRequest) {
 
     const therapistBreakdowns = {
       total: listed.length,
-      paying: listed.filter(t => t.status === "paying").length,
+      // status='paying' covers both real payers and comped/promoted therapists;
+      // promotion_source distinguishes them. 'paid' = charged via Sumit;
+      // 'manual'/'trial'/null = gifted promotion (no revenue).
+      paid: listed.filter(t => t.status === "paying" && t.promotion_source === "paid").length,
+      gifted: listed.filter(t => t.status === "paying" && t.promotion_source !== "paid").length,
       free: listed.filter(t => t.status === "approved").length,
       withPhoto: listed.filter(t => t.profile_photo_path).length,
       acceptingNew: listed.filter(t => t.accepting_new_clients).length,
