@@ -76,20 +76,37 @@ const steps: {
 ];
 
 
+const BASE_URL = "https://www.mentalytics.co.il";
+
 export default function HomePage() {
-  const jsonLd = {
+  const businessJsonLd = {
     "@context": "https://schema.org",
     "@type": ["MedicalBusiness", "HealthAndBeautyBusiness"],
     name: "טיפול חכם",
-    url: "https://www.mentalytics.co.il",
+    url: BASE_URL,
     description: "מערכת הכוונה טיפולית חכמה — התאמת מטפלים על בסיס שאלונים מבוססי מחקר",
     areaServed: { "@type": "Country", name: "IL" },
     serviceType: "Therapist Matching",
   };
 
+  // WebSite entity schema — helps Google resolve the site entity (name +
+  // language) and sitelinks eligibility. The Sitelinks Searchbox SearchAction
+  // from the original draft was intentionally dropped: /therapists has no ?q=
+  // search endpoint to honor it, and Google retired that feature in 2024.
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "טיפול חכם",
+    url: BASE_URL,
+    description:
+      "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+    inLanguage: "he",
+  };
+
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
 
       <style>{`
         @keyframes fadeIn {
