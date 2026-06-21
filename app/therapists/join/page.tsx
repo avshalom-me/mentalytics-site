@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain } from "lucide-react";
+import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
 
 export const metadata: Metadata = {
   title: "הצטרפות מטפלים | טיפול חכם",
@@ -93,6 +93,45 @@ export default function TherapistJoinPage() {
         </div>
       </section>
 
+      {/* STATS DEEP-DIVE — exclusive to promoted (merged from /register) */}
+      <section className="mt-12">
+        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
+          style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
+          <Sparkles size={12} />
+          בלעדי למסלול המקודם
+        </div>
+        <h2 className="text-2xl md:text-3xl font-extrabold text-stone-900 mb-3">
+          דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>איזה סוגי מטופלים מחפשים אותך — ואיזה מדלגים עליך</span>
+        </h2>
+        <p className="text-stone-700 leading-8 mb-8 max-w-3xl">
+          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה — תוך שמירה מוחלטת על אנונימיות המטופלים.
+        </p>
+        <div className="grid gap-4 md:grid-cols-2 mb-6">
+          {[
+            { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אותך — באמת", body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה." },
+            { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין — גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך." },
+            { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אותך." },
+            { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון." },
+          ].map(({ icon: Icon, title, body, color }, i) => (
+            <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
+                <Icon size={22} style={{ color }} />
+              </div>
+              <div>
+                <h3 className="font-bold text-stone-900 mb-1">{title}</h3>
+                <p className="text-sm text-stone-600 leading-6">{body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
+          <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-stone-700 leading-6">
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי — לא על ידינו וגם לא על ידך.
+          </p>
+        </div>
+      </section>
+
       {/* PLANS TABLE — right after hero */}
       <section className="mt-10">
         <h2 className="text-2xl font-extrabold text-stone-900 mb-2">המסלולים</h2>
@@ -159,7 +198,7 @@ export default function TherapistJoinPage() {
         {/* CTA after table */}
         <div className="mt-6 text-center">
           <Link
-            href="/therapists/register"
+            href="/therapists/login?mode=register"
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
             style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))", boxShadow: "0 8px 20px rgba(45,100,98,.25)" }}
           >

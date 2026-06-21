@@ -325,6 +325,7 @@ function TherapistDashboard() {
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showRefundNote, setShowRefundNote] = useState(false);
+  const [showPlanChoice, setShowPlanChoice] = useState(false);
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loadingStats, setLoadingStats] = useState(true);
   const searchParams = useSearchParams();
@@ -490,6 +491,8 @@ function TherapistDashboard() {
 
     setSaveMsg(json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.");
     setIsNew(false);
+    // First-time registration: let the therapist pick a plan before finishing.
+    if (json.created) setShowPlanChoice(true);
     setPhotoFile(null);
     setCertFile(null);
     setPhotoPreview(null);
@@ -508,6 +511,60 @@ function TherapistDashboard() {
   }
 
   if (loading) return <div className="p-10 text-center">טוען...</div>;
+
+  // ── Plan choice — shown right after the first profile submission ──
+  if (showPlanChoice) {
+    return (
+      <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
+
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 rounded-full bg-green-100 text-green-800 px-4 py-1.5 text-sm font-bold mb-4">
+            ✓ הפרופיל נשלח
+          </div>
+          <h1 className="text-2xl font-black text-stone-900 mb-2">נותר רק לבחור מסלול</h1>
+          <p className="text-stone-600 leading-7">הפרופיל שלך נשמר וממתין לאישור. בחר/י איך תופיע/י באתר — תמיד אפשר לשנות מאוחר יותר מלוח הבקרה.</p>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          {/* Free */}
+          <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6 flex flex-col">
+            <span className="text-xs font-black rounded-full px-2.5 py-1 bg-green-100 text-green-800 self-start mb-3">חינמי</span>
+            <h2 className="text-lg font-bold text-stone-900 mb-1">מסלול חינמי</h2>
+            <p className="text-2xl font-black text-stone-800 mb-4">₪0 <span className="text-sm font-normal text-stone-500">/ לתמיד</span></p>
+            <ul className="space-y-2 text-sm text-stone-700 leading-6 flex-1">
+              <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי נגיש לכל מי שמחפש מטפלים</li>
+              <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+              <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> מערכת ההתאמה החכמה וסטטיסטיקות</li>
+            </ul>
+            <button onClick={() => setShowPlanChoice(false)}
+              className="mt-6 w-full rounded-xl border-2 border-stone-300 bg-white px-6 py-3 text-sm font-bold text-stone-700 hover:bg-stone-50 hover:border-stone-400">
+              פרסום במסלול החינמי
+            </button>
+          </div>
+
+          {/* Promoted */}
+          <div className="rounded-2xl border-2 border-[#1A7A96] p-6 flex flex-col relative" style={{ background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" }}>
+            <span className="absolute top-4 left-4 text-xs font-black rounded-full px-2.5 py-1 bg-yellow-400 text-yellow-900">★ מומלץ</span>
+            <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300 self-start mb-3">★ מקודם</span>
+            <h2 className="text-lg font-bold text-[#1a4a5c] mb-1">מסלול מקודם</h2>
+            <p className="text-xl font-black text-[#0F5468] mb-1">מבצע פתיחה — ₪140 + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span></p>
+            <p className="text-xs text-[#0F5468]/70 mb-4">ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים</p>
+            <ul className="space-y-2 text-sm leading-6 flex-1" style={{ color: "#1a4a5c" }}>
+              <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבחינמי + הופעה במערכת ההתאמה החכמה</li>
+              <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו&quot;ח צפיות, פילוח פונים ואחוזי המרה</li>
+              <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> השוואה לממוצע המטפלים באתר</li>
+            </ul>
+            <button onClick={() => { window.location.href = "/therapists/checkout"; }}
+              className="mt-6 w-full rounded-xl px-6 py-3 text-sm font-bold text-white hover:opacity-95"
+              style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}>
+              הצטרפות למסלול המקודם
+            </button>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   const statusLabel = profile?.status === "paying" && !profile?.admin_approved
     ? { text: "שולם — ממתין לאישור מנהל (טרם מופיע בהתאמות)", color: "bg-orange-50 text-orange-800 border border-orange-300" }
