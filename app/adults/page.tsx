@@ -606,17 +606,21 @@ export default function AdultsPage() {
   function upd(patch: Partial<QuestionnaireAnswers>) {
     setAnswers((p) => ({ ...p, ...patch }));
   }
-  function updE(patch: Partial<NonNullable<QuestionnaireAnswers["emotional"]>>) {
+  function updE(patch: Partial<NonNullable<QuestionnaireAnswers["emotional"]>>): QuestionnaireAnswers {
     setAnswers((p) => ({ ...p, emotional: { ...p.emotional, ...patch } }));
+    return { ...answers, emotional: { ...answers.emotional, ...patch } };
   }
-  function updF(patch: Partial<NonNullable<QuestionnaireAnswers["functional"]>>) {
+  function updF(patch: Partial<NonNullable<QuestionnaireAnswers["functional"]>>): QuestionnaireAnswers {
     setAnswers((p) => ({ ...p, functional: { ...p.functional, ...patch } }));
+    return { ...answers, functional: { ...answers.functional, ...patch } };
   }
-  function updR(patch: Partial<NonNullable<QuestionnaireAnswers["relationship"]>>) {
+  function updR(patch: Partial<NonNullable<QuestionnaireAnswers["relationship"]>>): QuestionnaireAnswers {
     setAnswers((p) => ({ ...p, relationship: { ...p.relationship, ...patch } }));
+    return { ...answers, relationship: { ...answers.relationship, ...patch } };
   }
-  function updA(patch: Partial<NonNullable<QuestionnaireAnswers["addiction"]>>) {
+  function updA(patch: Partial<NonNullable<QuestionnaireAnswers["addiction"]>>): QuestionnaireAnswers {
     setAnswers((p) => ({ ...p, addiction: { ...p.addiction, types: p.addiction?.types ?? [], ...patch } }));
+    return { ...answers, addiction: { ...answers.addiction, types: answers.addiction?.types ?? [], ...patch } };
   }
 
   // If personal_development is combined with any other domain, its flow is
@@ -642,18 +646,18 @@ export default function AdultsPage() {
     return "scoring";
   }
 
-  function nextDomain() {
+  function nextDomain(ao?: QuestionnaireAnswers) {
     const doms = effectiveDomains(answers.domains);
     const next = domainIdx + 1;
-    if (next >= doms.length) { goScoring(); return; }
+    if (next >= doms.length) { goScoring(ao); return; }
     setDomainIdx(next);
     setScreen(firstScreenForDomain(doms[next]));
   }
 
-  function nextAddiction() {
+  function nextAddiction(ao?: QuestionnaireAnswers) {
     const types = answers.addiction?.types ?? [];
     const next = addictionIdx + 1;
-    if (next >= types.length) { nextDomain(); return; }
+    if (next >= types.length) { nextDomain(ao); return; }
     setAddictionIdx(next);
     setScreen(addictionScreen(types[next]));
   }
@@ -666,7 +670,7 @@ export default function AdultsPage() {
     return "a-phone";
   }
 
-  async function goScoring() {
+  async function goScoring(ao?: QuestionnaireAnswers) {
     setScreen("scoring");
     setLoading(true);
     setErr("");
@@ -674,7 +678,7 @@ export default function AdultsPage() {
       const res = await fetch("/api/questionnaire/adults/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(answers),
+        body: JSON.stringify(ao ?? answers),
       });
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
@@ -1688,8 +1692,7 @@ export default function AdultsPage() {
             setScreen(onlyPD ? "domains" : "e10");
           }}
           onNext={() => {
-            updE({ therapistStyleQ1: styleQ1, therapistStyleQ2: styleQ2, therapistStyleQ3: styleQ3 });
-            nextDomain();
+            nextDomain(updE({ therapistStyleQ1: styleQ1, therapistStyleQ2: styleQ2, therapistStyleQ3: styleQ3 }));
           }} />
       </Card>
     </Layout>
@@ -1849,7 +1852,7 @@ export default function AdultsPage() {
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">3. האם יש לך <strong>קושי, אי-בהירות, או שחיקה</strong> בתחום התעסוקתי שלך?</p>
         <YesNo onYes={() => { updF({ f3: true }); setScreen("f3-type"); }}
-          onNo={() => { updF({ f3: false }); nextDomain(); }} />
+          onNo={() => { nextDomain(updF({ f3: false })); }} />
       </Card>
     </Layout>
   );
@@ -1892,7 +1895,7 @@ export default function AdultsPage() {
         ]} checked={empAChecked.map((v, i) => v ? i : -1).filter(i => i >= 0)}
           onChange={(i, v) => setEmpAChecked((p) => { const n = [...p]; n[i] = v; return n; })} />
         <NavRow onBack={() => setScreen("f3-type")}
-          onNext={() => { updF({ empAItems: empAChecked }); nextDomain(); }} />
+          onNext={() => { nextDomain(updF({ empAItems: empAChecked })); }} />
       </Card>
     </Layout>
   );
@@ -1909,7 +1912,7 @@ export default function AdultsPage() {
         ]} checked={empBChecked.map((v, i) => v ? i : -1).filter(i => i >= 0)}
           onChange={(i, v) => setEmpBChecked((p) => { const n = [...p]; n[i] = v; return n; })} />
         <NavRow onBack={() => setScreen("f3-type")}
-          onNext={() => { updF({ empBItems: empBChecked }); nextDomain(); }} />
+          onNext={() => { nextDomain(updF({ empBItems: empBChecked })); }} />
       </Card>
     </Layout>
   );
@@ -1919,8 +1922,8 @@ export default function AdultsPage() {
       <Card badge="תחום תעסוקתי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם כבר פנית לביטוח לאומי בנושא?</p>
         <YesNo
-          onYes={() => { updF({ disabilityNl: true }); nextDomain(); }}
-          onNo={() => { updF({ disabilityNl: false }); nextDomain(); }} />
+          onYes={() => { nextDomain(updF({ disabilityNl: true })); }}
+          onNo={() => { nextDomain(updF({ disabilityNl: false })); }} />
       </Card>
     </Layout>
   );
@@ -2003,16 +2006,16 @@ export default function AdultsPage() {
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>קשיים בתפקוד המיני</strong>?</p>
         <YesNo
           onYes={() => {
-            updR({ r1: true, r1InRelationship: inRelationship });
+            const a = updR({ r1: true, r1InRelationship: inRelationship });
             if (inRelationship) { setScreen("r-abuse"); }
             else if (hasChildren) { setScreen("r3-conflict"); }
-            else { nextDomain(); }
+            else { nextDomain(a); }
           }}
           onNo={() => {
-            updR({ r1: false, r1InRelationship: inRelationship });
+            const a = updR({ r1: false, r1InRelationship: inRelationship });
             if (inRelationship) { setScreen("r-abuse"); }
             else if (hasChildren) { setScreen("r3-conflict"); }
-            else { nextDomain(); }
+            else { nextDomain(a); }
           }} />
       </Card>
     </Layout>
@@ -2221,7 +2224,7 @@ export default function AdultsPage() {
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים:</p>
           <CheckList items={SUB_ITEMS} checked={substanceChecked}
             onChange={(i,v) => setSubstanceChecked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <NavRow onBack={() => setScreen("a-types")} onNext={() => { updA({ substanceCount: substanceChecked.length }); nextAddiction(); }} />
+          <NavRow onBack={() => setScreen("a-types")} onNext={() => { nextAddiction(updA({ substanceCount: substanceChecked.length })); }} />
         </Card>
       </Layout>
     );
@@ -2245,7 +2248,7 @@ export default function AdultsPage() {
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לתסמינים הרלוונטיים:</p>
           <CheckList items={GAME_ITEMS} checked={gamingChecked}
             onChange={(i,v) => setGamingChecked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <NavRow onBack={() => setScreen("a-types")} onNext={() => { updA({ gamingCount: gamingChecked.length }); nextAddiction(); }} />
+          <NavRow onBack={() => setScreen("a-types")} onNext={() => { nextAddiction(updA({ gamingCount: gamingChecked.length })); }} />
         </Card>
       </Layout>
     );
@@ -2273,7 +2276,7 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={item} group={`porn-${i}`} values={[1,2,3,4,5,6,7]} value={pornScores[i]}
             onChange={(v) => setPornScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        <NavRow onBack={() => setScreen("a-porn-type")} onNext={() => { updA({ pornScores }); nextAddiction(); }} />
+        <NavRow onBack={() => setScreen("a-porn-type")} onNext={() => { nextAddiction(updA({ pornScores })); }} />
       </Card>
     </Layout>
   );
@@ -2296,7 +2299,7 @@ export default function AdultsPage() {
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לכל היגד שמתאר אותך:</p>
           <CheckList items={SAST_ITEMS} checked={sastChecked}
             onChange={(i,v) => setSastChecked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <NavRow onBack={() => setScreen("a-porn-type")} onNext={() => { updA({ sastCount: sastChecked.length }); nextAddiction(); }} />
+          <NavRow onBack={() => setScreen("a-porn-type")} onNext={() => { nextAddiction(updA({ sastCount: sastChecked.length })); }} />
         </Card>
       </Layout>
     );
@@ -2320,7 +2323,7 @@ export default function AdultsPage() {
           <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י כן לכל היגד שמתאר אותך:</p>
           <CheckList items={GAMBLE_ITEMS} checked={gamblingChecked}
             onChange={(i,v) => setGamblingChecked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <NavRow onBack={() => setScreen("a-types")} onNext={() => { updA({ gamblingYes: gamblingChecked.length }); nextAddiction(); }} />
+          <NavRow onBack={() => setScreen("a-types")} onNext={() => { nextAddiction(updA({ gamblingYes: gamblingChecked.length })); }} />
         </Card>
       </Layout>
     );
@@ -2334,7 +2337,7 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={item} group={`phone-${i}`} values={[1,2,3,4,5,6]} value={phoneScores[i]}
             onChange={(v) => setPhoneScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        <NavRow onBack={() => setScreen("a-types")} onNext={() => { updA({ phoneScores }); nextAddiction(); }} />
+        <NavRow onBack={() => setScreen("a-types")} onNext={() => { nextAddiction(updA({ phoneScores })); }} />
       </Card>
     </Layout>
   );
