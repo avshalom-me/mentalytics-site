@@ -7,7 +7,7 @@ import {
 } from "recharts";
 
 type Period = "week" | "month" | "all";
-type Tab = "funnel" | "quiz" | "stats" | "explain";
+type Tab = "funnel" | "quiz" | "stats" | "explain" | "therapists";
 
 type Funnel = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
 type FilterEntry = { name: string; count: number };
@@ -24,6 +24,22 @@ type ExplainAnalytics = {
   byRegion: FilterEntry[];
   byDomain: FilterEntry[];
 };
+type TherapistBreakdowns = {
+  total: number;
+  paying: number;
+  free: number;
+  withPhoto: number;
+  acceptingNew: number;
+  onlineCount: number;
+  byType: FilterEntry[];
+  byTraining: FilterEntry[];
+  byAgeGroup: FilterEntry[];
+  byRegion: FilterEntry[];
+  byArrangement: FilterEntry[];
+  byGender: FilterEntry[];
+  byLanguage: FilterEntry[];
+  byCulturalPref: FilterEntry[];
+};
 
 type AnalyticsData = {
   funnel: Funnel;
@@ -34,6 +50,7 @@ type AnalyticsData = {
   demographics: { byRegion: FilterEntry[]; byIssue: FilterEntry[]; byAgeBand: FilterEntry[]; byGender: FilterEntry[] };
   clickTypeBreakdown: Record<string, number>;
   explainAnalytics: ExplainAnalytics;
+  therapistBreakdowns: TherapistBreakdowns;
   generated_at: string;
 };
 
@@ -47,6 +64,7 @@ const TABS: { value: Tab; label: string }[] = [
   { value: "funnel", label: "Funnel דירקטוריה" },
   { value: "quiz", label: "נשירה מהשאלון" },
   { value: "stats", label: "סטטיסטיקות" },
+  { value: "therapists", label: "פרופיל מטפלים" },
   { value: "explain", label: "✦ ניתוחים אישיים" },
 ];
 
@@ -562,6 +580,73 @@ function StatsTab({ data }: { data: AnalyticsData }) {
   );
 }
 
+// ── TAB 5: Therapist profile breakdowns ────────────────────────────
+
+function StatCard({ label, value, sub, color }: { label: string; value: string | number; sub?: string; color: string }) {
+  return (
+    <div className={`rounded-2xl border p-4 text-center ${color}`}>
+      <div className="text-3xl font-black">{value}</div>
+      {sub && <div className="text-xs font-semibold mt-0.5 opacity-70">{sub}</div>}
+      <div className="text-xs font-semibold mt-1">{label}</div>
+    </div>
+  );
+}
+
+function TherapistsTab({ data }: { data: TherapistBreakdowns }) {
+  const { total, paying, free, withPhoto, acceptingNew, onlineCount } = data;
+
+  if (total === 0) {
+    return (
+      <div className="rounded-2xl border border-stone-200 bg-white p-8 text-center">
+        <div className="text-4xl mb-2">🧑‍⚕️</div>
+        <p className="text-sm font-bold text-stone-800 mb-1">אין עדיין מטפלים פעילים מוצגים</p>
+        <p className="text-xs text-stone-500">הפילוח יופיע ברגע שיהיו מטפלים מאושרים במערכת ההתאמות.</p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="mb-4">
+        <h2 className="text-lg font-black text-stone-800">פרופיל המטפלים הפעילים</h2>
+        <p className="text-xs text-stone-400">פילוח לפי שדות הפרופיל — מטפלים מוצגים בהתאמות (משלמים + חינמיים מאושרים)</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <StatCard label="מטפלים פעילים" value={total}
+          sub={`${paying} משלמים · ${free} חינמיים`}
+          color="bg-blue-50 border-blue-200 text-blue-800" />
+        <StatCard label="מקבלים פניות חדשות" value={acceptingNew} sub={pct(acceptingNew, total)}
+          color="bg-green-50 border-green-200 text-green-800" />
+        <StatCard label="מטפלים אונליין" value={onlineCount} sub={pct(onlineCount, total)}
+          color="bg-purple-50 border-purple-200 text-purple-800" />
+        <StatCard label="עם תמונת פרופיל" value={withPhoto} sub={pct(withPhoto, total)}
+          color="bg-amber-50 border-amber-200 text-amber-800" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-6">
+        <HorizontalBars title="סוג מטפל" data={data.byType} color="#1a3a5c" />
+        <HorizontalBars title="שיטות טיפול" data={data.byTraining} color="#2e7d8c" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-6">
+        <HorizontalBars title="קבוצות גיל שמטפלים בהן" data={data.byAgeGroup} color="#7c3aed" />
+        <HorizontalBars title="אזורי פעילות" data={data.byRegion} color="#0f766e" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-6">
+        <DonutChart title="מגדר" data={data.byGender} />
+        <HorizontalBars title="הסדרי תשלום" data={data.byArrangement} color="#b45309" />
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 mb-6">
+        <HorizontalBars title="שפות" data={data.byLanguage} color="#0369a1" />
+        <HorizontalBars title="העדפות תרבותיות" data={data.byCulturalPref} color="#9f1239" />
+      </div>
+    </>
+  );
+}
+
 // ── Main ────────────────────────────────────────────────────────────
 
 export default function AdminAnalyticsPage() {
@@ -595,6 +680,11 @@ export default function AdminAnalyticsPage() {
               byRegion: [],
               byDomain: [],
             },
+            therapistBreakdowns: json.therapistBreakdowns ?? {
+              total: 0, paying: 0, free: 0, withPhoto: 0, acceptingNew: 0, onlineCount: 0,
+              byType: [], byTraining: [], byAgeGroup: [], byRegion: [],
+              byArrangement: [], byGender: [], byLanguage: [], byCulturalPref: [],
+            },
             generated_at: json.generated_at,
           });
         } else {
@@ -611,7 +701,7 @@ export default function AdminAnalyticsPage() {
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-3xl font-black text-stone-900">אנליטיקס</h1>
-        <p className="text-xs text-stone-400 mt-1">דשבורד מרכזי — funnel, נשירה, סטטיסטיקות</p>
+        <p className="text-xs text-stone-400 mt-1">דשבורד מרכזי — funnel, נשירה, סטטיסטיקות, פרופיל מטפלים</p>
       </div>
 
       {/* Period + Tabs */}
@@ -652,6 +742,7 @@ export default function AdminAnalyticsPage() {
           {tab === "funnel" && <FunnelTab data={data} />}
           {tab === "quiz" && <QuizTab data={data} />}
           {tab === "stats" && <StatsTab data={data} />}
+          {tab === "therapists" && <TherapistsTab data={data.therapistBreakdowns} />}
           {tab === "explain" && <ExplainTab data={data} />}
 
           {data.generated_at && (

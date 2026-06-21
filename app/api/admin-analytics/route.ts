@@ -11,6 +11,24 @@ function periodToDate(period: Period): string | null {
   return new Date(Date.now() - ms).toISOString();
 }
 
+type TherapistRow = {
+  id: string;
+  full_name: string | null;
+  status: string;
+  admin_approved: boolean | null;
+  gender: string | null;
+  online: boolean | null;
+  therapist_types: string[] | null;
+  training_areas: string[] | null;
+  age_groups: string[] | null;
+  regions: string[] | null;
+  arrangements: string[] | null;
+  languages: string[] | null;
+  cultural_prefs: string[] | null;
+  profile_photo_path: string | null;
+  accepting_new_clients: boolean | null;
+};
+
 export async function GET(req: NextRequest) {
   const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
   const validPeriods: Period[] = ["week", "month", "all"];
@@ -44,17 +62,19 @@ export async function GET(req: NextRequest) {
         if (since) q = q.gte("clicked_at", since);
         return q;
       })(),
-      // therapist names for the impressions table
+      // therapists for the impressions table + profile breakdowns (one fetch)
       supabaseAdmin
         .from("therapists")
-        .select("id, full_name, status")
+        .select(
+          "id, full_name, status, admin_approved, gender, online, therapist_types, training_areas, age_groups, regions, arrangements, languages, cultural_prefs, profile_photo_path, accepting_new_clients"
+        )
         .in("status", ["paying", "approved"]),
     ]);
 
     const events = (eventsRes.data ?? []) as { event_type: string; therapist_id: string | null; metadata: Record<string, string>; created_at: string }[];
     const views = (viewsRes.data ?? []) as { therapist_id: string; viewed_at: string }[];
     const clicks = (clicksRes.data ?? []) as { therapist_id: string; click_type: string; clicked_at: string }[];
-    const therapists = (therapistsRes.data ?? []) as { id: string; full_name: string | null; status: string }[];
+    const therapists = (therapistsRes.data ?? []) as TherapistRow[];
 
     // --- Funnel ---
     const pageViews = events.filter(e => e.event_type === "page_view").length;
@@ -246,6 +266,43 @@ export async function GET(req: NextRequest) {
       .filter(r => r.impressions > 0 || r.clicks > 0 || r.profile_views > 0)
       .sort((a, b) => b.impressions - a.impressions);
 
+    // --- Listed-therapist profile breakdowns ---
+    // Over therapists visible in matching (admin_approved), split paying vs
+    // free. Reuses the therapists query above — no extra DB round-trip.
+    const listed = therapists.filter(t => t.admin_approved);
+
+    function countTherapistField(field: keyof TherapistRow) {
+      const counts: Record<string, number> = {};
+      for (const t of listed) {
+        const val = t[field];
+        if (Array.isArray(val)) {
+          for (const v of val) if (v) counts[v] = (counts[v] ?? 0) + 1;
+        } else if (typeof val === "string" && val) {
+          counts[val] = (counts[val] ?? 0) + 1;
+        }
+      }
+      return Object.entries(counts)
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count);
+    }
+
+    const therapistBreakdowns = {
+      total: listed.length,
+      paying: listed.filter(t => t.status === "paying").length,
+      free: listed.filter(t => t.status === "approved").length,
+      withPhoto: listed.filter(t => t.profile_photo_path).length,
+      acceptingNew: listed.filter(t => t.accepting_new_clients).length,
+      onlineCount: listed.filter(t => t.online).length,
+      byType: countTherapistField("therapist_types"),
+      byTraining: countTherapistField("training_areas"),
+      byAgeGroup: countTherapistField("age_groups"),
+      byRegion: countTherapistField("regions"),
+      byArrangement: countTherapistField("arrangements"),
+      byGender: countTherapistField("gender"),
+      byLanguage: countTherapistField("languages"),
+      byCulturalPref: countTherapistField("cultural_prefs"),
+    };
+
     return NextResponse.json({
       ok: true,
       period: safePeriod,
@@ -257,6 +314,7 @@ export async function GET(req: NextRequest) {
       demographics,
       clickTypeBreakdown,
       explainAnalytics,
+      therapistBreakdowns,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {
