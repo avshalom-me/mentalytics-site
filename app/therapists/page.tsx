@@ -6,7 +6,6 @@ export const revalidate = 60;
 type TherapistRow = {
   id: string;
   full_name: string | null;
-  email: string | null;
   phone: string | null;
   bio: string | null;
   gender: string | null;
@@ -97,7 +96,6 @@ async function loadTherapists(): Promise<PublicTherapist[]> {
       return {
         id: t.id,
         full_name: t.full_name ?? "",
-        email: t.email ?? "",
         phone: t.phone ?? "",
         bio: t.bio ?? "",
         gender: t.gender ?? "",

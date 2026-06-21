@@ -18,7 +18,6 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
 export type PublicTherapist = {
   id: string;
   full_name: string;
-  email: string;
   phone: string;
   bio: string;
   gender: string;

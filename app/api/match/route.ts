@@ -33,7 +33,6 @@ type TherapistRow = {
   arrangements: unknown;
   bio: string | null;
   phone: string | null;
-  email: string | null;
   profile_photo_path: string | null;
   status: string | null;
   style_q1: number | null;
