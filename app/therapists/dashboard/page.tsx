@@ -331,7 +331,7 @@ function TherapistDashboard() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (searchParams.get("upgrade") === "promoted" && token && profile && profile.status !== "paying") {
+    if (searchParams.get("upgrade") === "promoted" && token && profile && profile.status !== "paying" && !showPlanChoice) {
       window.location.href = "/therapists/checkout";
     }
   }, [searchParams, token, profile]);

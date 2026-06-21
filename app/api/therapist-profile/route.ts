@@ -35,7 +35,8 @@ export async function GET(req: NextRequest) {
       .from("therapists")
       .select("*")
       .eq("email", user.email)
-      .single();
+      .is("user_id", null)
+      .maybeSingle();
 
     if (byEmail) {
       // Link the existing therapist to this user

@@ -28,7 +28,8 @@ async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status:
       .from("therapists")
       .select("id, status")
       .eq("email", user.email)
-      .single();
+      .is("user_id", null)
+      .maybeSingle();
     return byEmail ? { id: byEmail.id, status: byEmail.status } : null;
   }
 

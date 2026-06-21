@@ -188,47 +188,80 @@ export async function POST(req: NextRequest) {
     const sumitRecurringId = (result.RecurringItemID ?? null) as number | null;
     const sumitDocumentId = (result.DocumentID ?? null) as number | null;
 
-    await supabase
-      .from("subscriptions")
-      .upsert(
-        {
-          therapist_id: therapist.id,
-          status: "active",
-          current_period_start: now.toISOString(),
-          current_period_end: periodEnd.toISOString(),
-          morning_token_id: sumitRecurringId ? String(sumitRecurringId) : null,
-          updated_at: now.toISOString(),
-        },
-        { onConflict: "therapist_id" }
+    // No recurring id means the standing order cannot be cancelled
+    // programmatically later (cancelSubscription needs it). Log loudly with the
+    // Sumit document id so an admin can locate/stop it at Sumit if needed — the
+    // orphan-sweep cron keys off morning_token_id and can't catch this case.
+    if (!sumitRecurringId) {
+      console.error(
+        `WARNING create-subscription: no Sumit RecurringItemID for therapist=${therapist.id} ` +
+          `(morning_token_id=null, uncancellable programmatically). sumitDocumentId=${sumitDocumentId}.`
       );
+    }
 
-    await supabase
-      .from("therapists")
-      .update({
-        status: "paying",
-        manually_promoted: false, // legacy column, kept in sync
-        promotion_source: "paid",
-        promoted_since: now.toISOString(),
-        promoted_until: null, // paid subscriptions don't auto-expire
-      })
-      .eq("id", therapist.id);
+    // The card is now charged and a standing order exists at Sumit. From here a
+    // DB failure must NOT surface as a retryable 500 — that would let the user
+    // re-submit and get charged a second time. On failure we log everything
+    // needed to reconcile and acknowledge the payment; the daily
+    // sumit-status-sync / admin reconcile repairs the local state.
+    try {
+      await supabase
+        .from("subscriptions")
+        .upsert(
+          {
+            therapist_id: therapist.id,
+            status: "active",
+            current_period_start: now.toISOString(),
+            current_period_end: periodEnd.toISOString(),
+            morning_token_id: sumitRecurringId ? String(sumitRecurringId) : null,
+            updated_at: now.toISOString(),
+          },
+          { onConflict: "therapist_id" }
+        )
+        .throwOnError();
 
-    await supabase
-      .from("payments")
-      .update({
-        status: "completed",
-        morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
-      })
-      .eq("id", payment.id);
+      await supabase
+        .from("therapists")
+        .update({
+          status: "paying",
+          manually_promoted: false, // legacy column, kept in sync
+          promotion_source: "paid",
+          promoted_since: now.toISOString(),
+          promoted_until: null, // paid subscriptions don't auto-expire
+        })
+        .eq("id", therapist.id)
+        .throwOnError();
 
-    await writeAudit(supabase, {
-      therapistId: therapist.id,
-      actorType: "self",
-      action: `status_change:${therapist.status ?? "null"}->paying`,
-      before: { status: therapist.status, promotion_source: null },
-      after: { status: "paying", promotion_source: "paid" },
-      reason: "subscription_created",
-    });
+      await supabase
+        .from("payments")
+        .update({
+          status: "completed",
+          morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
+        })
+        .eq("id", payment.id)
+        .throwOnError();
+
+      await writeAudit(supabase, {
+        therapistId: therapist.id,
+        actorType: "self",
+        action: `status_change:${therapist.status ?? "null"}->paying`,
+        before: { status: therapist.status, promotion_source: null },
+        after: { status: "paying", promotion_source: "paid" },
+        reason: "subscription_created",
+      });
+    } catch (dbErr: unknown) {
+      const msg = dbErr instanceof Error ? dbErr.message : "unknown";
+      console.error(
+        `CRITICAL create-subscription: charged at Sumit but local DB write failed — ` +
+          `payment=${payment.id} therapist=${therapist.id} sumitRecurringId=${sumitRecurringId} ` +
+          `sumitDocumentId=${sumitDocumentId} err=${msg}`
+      );
+      // Acknowledge the payment instead of returning a retryable error.
+      return NextResponse.json(
+        { success: true, pending: true, message: "התשלום התקבל; הפעלת המנוי תושלם בקרוב. אם יש בעיה ניצור איתך קשר." },
+        { status: 200 }
+      );
+    }
 
     // Single audit line, no sensitive ids beyond our own payment row.
     console.log(`Subscription completed: payment=${payment.id}`);

@@ -536,7 +536,7 @@ export async function POST(req: NextRequest) {
     const { data, error } = await supabaseAdmin
       .from("therapists")
       .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, email, profile_photo_path, status, style_q1, style_q2, activity_level"
+        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level"
       )
       .eq("status", "paying")
       .eq("admin_approved", true);
@@ -600,7 +600,6 @@ export async function POST(req: NextRequest) {
           arrangements: therapist.arrangements,
           bio: therapist.bio,
           phone: therapist.phone,
-          email: therapist.email,
           profile_photo_url: photoUrl,
           status: therapist.status,
           match_score: result.score,

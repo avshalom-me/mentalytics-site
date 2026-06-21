@@ -52,10 +52,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
     }
   } else {
-    // Certificates: store as-is, they are legal documents.
+    // Certificates: license/diploma docs. Validate type + size (mirrors the
+    // signup route) — never trust a client-supplied content-type/extension blindly.
+    const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
+    const ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png"];
+    if (file.size > 10 * 1024 * 1024) {
+      return NextResponse.json({ ok: false, error: "הקובץ גדול מ-10MB" }, { status: 400 });
+    }
+    const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+    if ((file.type && !ALLOWED_TYPES.includes(file.type)) || !ALLOWED_EXT.includes(ext)) {
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
+    }
     uploadBody = await file.arrayBuffer();
-    uploadContentType = file.type;
-    uploadExt = file.name.split(".").pop() ?? "bin";
+    uploadContentType = file.type || "application/octet-stream";
+    uploadExt = ext;
   }
 
   const path = `${folder}/${user.id}-${Date.now()}.${uploadExt}`;
@@ -73,11 +83,14 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!therapist && user.email) {
+    // Only auto-claim an UNLINKED row by email (user_id IS NULL); never re-bind
+    // a row already owned by another user.
     const { data: byEmail } = await supabaseAdmin
       .from("therapists")
       .select("id")
       .eq("email", user.email)
-      .single();
+      .is("user_id", null)
+      .maybeSingle();
     if (byEmail) {
       // Link user_id for future requests
       await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id);

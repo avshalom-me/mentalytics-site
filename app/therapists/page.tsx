@@ -33,7 +33,6 @@ async function loadTherapists(): Promise<PublicTherapist[]> {
       `
       id,
       full_name,
-      email,
       phone,
       bio,
       gender,
@@ -49,6 +48,7 @@ async function loadTherapists(): Promise<PublicTherapist[]> {
       `
     )
     .in("status", ["approved", "paying"])
+    .eq("admin_approved", true)
     .order("full_name", { ascending: true });
 
   if (error || !data) return [];

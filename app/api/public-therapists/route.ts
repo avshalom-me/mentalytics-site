@@ -30,7 +30,6 @@ export async function GET() {
       `
       id,
       full_name,
-      email,
       phone,
       bio,
       gender,
@@ -45,6 +44,7 @@ export async function GET() {
       `
     )
     .in("status", ["approved", "paying"])
+    .eq("admin_approved", true)
     .order("full_name", { ascending: true });
 
   if (error) {

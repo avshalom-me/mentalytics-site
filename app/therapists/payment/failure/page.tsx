@@ -24,7 +24,7 @@ export default function PaymentFailurePage() {
 
       <div className="flex flex-col gap-3 items-center">
         <Link
-          href="/therapists/register"
+          href="/therapists/checkout"
           className="inline-block rounded-xl px-8 py-3 text-sm font-bold text-white transition hover:opacity-95"
           style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)" }}
         >
