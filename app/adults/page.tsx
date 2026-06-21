@@ -124,7 +124,7 @@ const ADULTS_SCREENS_ORDER = [
   "e10","e10a","e10b","e10c",
   "therapist-style",
   "f-vision","f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
-  "r-intake","r-single","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-child","r3-child-type",
+  "r-intake","r-single","r-single-no-detail","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-child","r3-child-type",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -372,6 +372,8 @@ export default function AdultsPage() {
   const [addictionCbtFallback, setAddictionCbtFallback] = useState(false);
   const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
   const [combinedLabels, setCombinedLabels] = useState<string[] | null>(null);
+  const [combinedCouplesModality, setCombinedCouplesModality] = useState<string | undefined>(undefined);
+  const [combinedNeedsSexualTherapy, setCombinedNeedsSexualTherapy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
@@ -411,6 +413,18 @@ export default function AdultsPage() {
     );
   }, [recommendationGroups]);
 
+  // Relationship groups eligible for combined search — excludes parenting/child referrals
+  // which target a different professional type and don't make sense to bundle with couple/sexual therapy.
+  const NON_COMBINABLE_RELATIONSHIP = new Set(["הדרכת הורים", "טיפול ילדים"]);
+  const combinableRelationshipGroups = useMemo(() => {
+    return recommendationGroups.filter(g =>
+      !g.urgent
+      && g.recs[0]?.domain === "זוגיות ומשפחה"
+      && !g.recs[0]?.professionalType
+      && !NON_COMBINABLE_RELATIONSHIP.has(g.treatment)
+    );
+  }, [recommendationGroups]);
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     if (params.get("staff") === "6454a9b616f5") {
@@ -442,6 +456,8 @@ export default function AdultsPage() {
       if (saved.matchPrefs) setMatchPrefs(saved.matchPrefs);
       if (saved.combinedTreatments) setCombinedTreatments(saved.combinedTreatments);
       if (saved.combinedLabels) setCombinedLabels(saved.combinedLabels);
+      if (saved.combinedCouplesModality) setCombinedCouplesModality(saved.combinedCouplesModality);
+      if (typeof saved.combinedNeedsSexualTherapy === "boolean") setCombinedNeedsSexualTherapy(saved.combinedNeedsSexualTherapy);
       if (typeof saved.addictionCbtFallback === "boolean") setAddictionCbtFallback(saved.addictionCbtFallback);
       if (Array.isArray(saved.matchResults)) setMatchResults(saved.matchResults);
       if (saved.screen) setScreen(saved.screen);
@@ -489,12 +505,14 @@ export default function AdultsPage() {
         matchPrefs,
         combinedTreatments,
         combinedLabels,
+        combinedCouplesModality,
+        combinedNeedsSexualTherapy,
         addictionCbtFallback,
         scoring,
         answers,
       }));
     } catch {}
-  }, [screen, matchResults, selectedRec, matchPrefs, combinedTreatments, combinedLabels, addictionCbtFallback, scoring, answers]);
+  }, [screen, matchResults, selectedRec, matchPrefs, combinedTreatments, combinedLabels, combinedCouplesModality, combinedNeedsSexualTherapy, addictionCbtFallback, scoring, answers]);
 
   // Build the profile-page link for a given therapist with match-attribution params.
   function profileHrefForMatch(t: any): string {
@@ -572,6 +590,8 @@ export default function AdultsPage() {
   const [hasChildren, setHasChildren] = useState(false);
   const [noRelationship, setNoRelationship] = useState(false);
   const [coupleScale, setCoupleScale] = useState(0);
+  const [rSingleCBTScale, setRSingleCBTScale] = useState(0);
+  const [rSingleDynScale, setRSingleDynScale] = useState(0);
   const [eftScores, setEftScores] = useState<number[]>(Array(7).fill(0));
   const [dynScores, setDynScores] = useState<number[]>(Array(7).fill(0));
   const [structScores, setStructScores] = useState<number[]>(Array(7).fill(0));
@@ -705,8 +725,8 @@ export default function AdultsPage() {
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
-        couplesModality: selectedRec?.couplesModality ?? undefined,
-        needsSexualTherapy: selectedRec?.needsSexualTherapy ?? false,
+        couplesModality: selectedRec?.couplesModality ?? (!selectedRec && combinedTreatments ? combinedCouplesModality : undefined),
+        needsSexualTherapy: selectedRec?.needsSexualTherapy ?? (!selectedRec && combinedTreatments ? combinedNeedsSexualTherapy : false),
         limit: 10,
       };
       const res = await fetch("/api/match", {
@@ -778,7 +798,7 @@ export default function AdultsPage() {
   // Keyed on group.treatment + urgent flag so two cards for the same treatment
   // (one urgent, one not) get separate entries. Also fires an analytics event
   // (fire-and-forget) so admin can see who clicks and on what.
-  async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ symptomText: string; domain: string }> }) {
+  async function fetchRecommendationExplanation(group: { treatment: string; treatmentLabel: string; urgent: boolean; recs: Array<{ symptomText: string; domain: string; couplesModality?: string }> }) {
     const key = group.treatment + (group.urgent ? "-urgent" : "");
     if (recExplainLoading[key] || recExplainData[key]) return;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
@@ -812,6 +832,15 @@ export default function AdultsPage() {
         ...facts,
         summary: [...(symptoms.length ? [`ממצאי השאלון: ${symptoms.join("; ")}`] : []), ...(facts.summary ?? [])],
       };
+      const coupleModality = group.recs[0]?.couplesModality;
+      const COUPLE_MODALITY_WHY: Record<string, string> = {
+        EFT: "EFT (Emotionally Focused Therapy) מתמקד בזיהוי דפוסי תגובה שליליים חוזרים בזוגיות, גישה לרגשות עמוקים שמניעים אותם, ובניית קשר רגשי בטוח ואינטימי יותר בין בני הזוג.",
+        "דינאמי": "טיפול זוגי דינאמי בוחן כיצד ההיסטוריה האישית של כל אחד מבני הזוג — דפוסים לא-מודעים, קונפליקטים פנימיים וחוויות עבר — משפיעים על הדינמיקה הזוגית, ומסייע בהפחתת דפוסים בעייתיים חוזרים.",
+        "מבני": "טיפול זוגי מבני מתמקד בשיפור דפוסי התקשורת, חלוקת התפקידים, הגבולות ומבנה הכוח בזוגיות ובמשפחה — עם דגש על שינוי מעשי באינטראקציות היומיומיות.",
+      };
+      const treatmentRationale = coupleModality && COUPLE_MODALITY_WHY[coupleModality]
+        ? { why: COUPLE_MODALITY_WHY[coupleModality] }
+        : undefined;
       const res = await fetch("/api/explain-recommendation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -825,6 +854,7 @@ export default function AdultsPage() {
             symptom_text: symptoms[0],
           },
           user_facts: factsWithSymptoms,
+          ...(treatmentRationale ? { treatment_rationale: treatmentRationale } : {}),
         }),
       });
       const data = await res.json();
@@ -1934,7 +1964,35 @@ export default function AdultsPage() {
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם את/ה מחפש/ת עזרה סביב <strong>דפוסים חוזרים בזוגיות</strong>, קושי ביצירת קשרים קרובים, או עיבוד פרידה / גירושין?</p>
         <YesNo
           onYes={() => { updR({ rSingle: true }); setScreen("r1"); }}
-          onNo={() => { updR({ rSingle: false }); nextDomain(); }} />
+          onNo={() => { updR({ rSingle: false }); setScreen("r-single-no-detail"); }} />
+      </Card>
+    </Layout>
+  );
+
+  if (screen === "r-single-no-detail") return (
+    <Layout screen={screen} domains={answers.domains}>
+      <Card badge="זוגיות ומשפחה">
+        <p className="mb-3 font-semibold text-[#1a3a5c]">כמה כל אחד מהדברים הבאים מעניין אותך? (1=כלל לא, 5=מאוד)</p>
+        <ScaleRow
+          label="עזרה ממוקדת והדרכתית שנועדה לסייע להשגת זוגיות"
+          values={[1, 2, 3, 4, 5]}
+          value={rSingleCBTScale}
+          onChange={setRSingleCBTScale}
+        />
+        <ScaleRow
+          label="טיפול מעמיק שנועד להבין מכשולים ומורכבויות הנוגעות לתחום הזוגי"
+          values={[1, 2, 3, 4, 5]}
+          value={rSingleDynScale}
+          onChange={setRSingleDynScale}
+        />
+        <NavRow
+          onBack={() => setScreen("r-single")}
+          onNext={() => {
+            updR({ rSingleCBTScale, rSingleDynScale });
+            setScreen("r1");
+          }}
+          nextDisabled={rSingleCBTScale === 0 || rSingleDynScale === 0}
+        />
       </Card>
     </Layout>
   );
@@ -2302,11 +2360,14 @@ export default function AdultsPage() {
     const multipleGroups = groups.filter((g) => !g.urgent).length > 1;
     const emotionalGroups = combinableEmotionalGroups;
     const showCombined = emotionalGroups.length >= 2;
+    const relationshipGroups = combinableRelationshipGroups;
+    const showRelationshipCombined = relationshipGroups.length >= 2;
 
     // Group the result cards into rubric sections so each domain is visually
-    // separate. The combined-search button lives ONLY inside the emotional
-    // section, making it explicit it never mixes couples/addiction findings.
+    // separate. The combined-search buttons live inside their respective domain
+    // section only and never mix domains.
     const EMOTIONAL_DOMAIN = "מורכבויות בתחום הרגשי/האישי";
+    const RELATIONSHIP_DOMAIN = "זוגיות ומשפחה";
     const DOMAIN_SECTIONS: { key: string; label: string }[] = [
       { key: EMOTIONAL_DOMAIN, label: "🧠 התחום הרגשי" },
       { key: "זוגיות ומשפחה", label: "💑 זוגיות ומשפחה" },
@@ -2409,6 +2470,8 @@ export default function AdultsPage() {
         onClick={() => {
           setCombinedTreatments(emotionalGroups.map(g => g.treatment));
           setCombinedLabels(emotionalGroups.map(g => g.treatmentLabel));
+          setCombinedCouplesModality(undefined);
+          setCombinedNeedsSexualTherapy(false);
           setSelectedRec(null);
           setScreen("match-form");
           (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
@@ -2419,6 +2482,29 @@ export default function AdultsPage() {
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
         <div className="font-bold text-sm text-white">חפש/י מטפל שמשלב את הגישות הרגשיות ←</div>
         <div className="mt-1 text-xs text-white/75">החיפוש המשולב מתייחס לתחום הרגשי בלבד — טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+      </button>
+    );
+
+    const renderCombinedRelationshipButton = () => (
+      <button
+        type="button"
+        onClick={() => {
+          const modality = relationshipGroups.find(g => g.recs[0]?.couplesModality)?.recs[0]?.couplesModality;
+          const needsSexual = relationshipGroups.some(g => g.recs.some(r => r.treatment === "טיפול מיני"));
+          setCombinedTreatments(relationshipGroups.map(g => g.treatment));
+          setCombinedLabels(relationshipGroups.map(g => g.treatmentLabel));
+          setCombinedCouplesModality(modality);
+          setCombinedNeedsSexualTherapy(needsSexual);
+          setSelectedRec(null);
+          setScreen("match-form");
+          (window as any).gtag?.("event", "matching_click", { treatment: "combined_relationship" });
+        }}
+        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        style={{ background: "linear-gradient(120deg, var(--gold-dark), var(--gold))", border: "1px solid #C8961A" }}
+      >
+        <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#FDF6E3]">חיפוש מתקדם ✦</div>
+        <div className="font-bold text-sm text-white">חפש/י מטפל שמשלב תחומים בטיפול הזוגי ←</div>
+        <div className="mt-1 text-xs text-white/75">כולל: {relationshipGroups.map(g => g.treatmentLabel).join(", ")}</div>
       </button>
     );
 
@@ -2525,6 +2611,7 @@ export default function AdultsPage() {
                 {section.groups.map((group) => renderGroupCard(group))}
               </div>
               {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
+              {section.key === RELATIONSHIP_DOMAIN && showRelationshipCombined && renderCombinedRelationshipButton()}
             </section>
           ))}
 

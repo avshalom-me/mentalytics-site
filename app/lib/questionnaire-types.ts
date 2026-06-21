@@ -99,6 +99,8 @@ export type QuestionnaireAnswers = {
     r3PartnerWilling?: boolean;     // כולם מוכנים לשתף פעולה
     r3ChildIssues?: boolean;        // בעיות התנהגות/קשיים אצל הילדים
     r3ChildType?: "child" | "family"; // בעיקר אצל הילד עצמו או בדינמיקה המשפחתית
+    rSingleCBTScale?: number;       // 1-5: עניין בעזרה ממוקדת להשגת זוגיות
+    rSingleDynScale?: number;       // 1-5: עניין בטיפול מעמיק להבנת מכשולים
   };
 
   // --- תחום התמכרויות ---

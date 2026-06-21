@@ -131,11 +131,31 @@ export function buildAdultFacts(
   }
 
   if (isRelationship) {
+    if (r.rSingle) facts.summary!.push("מחפש/ת עזרה עם דפוסי זוגיות, קושי ביצירת קשרים קרובים, או עיבוד פרידה/גירושין");
+    if (r.rSingleCBTScale !== undefined && r.rSingleDynScale !== undefined) {
+      if (r.rSingleCBTScale > r.rSingleDynScale) {
+        facts.summary!.push("מעוניין/ת בעזרה ממוקדת ומכוונת-מטרה לעולם הזוגי");
+      } else {
+        facts.summary!.push("מעוניין/ת בטיפול מעמיק להבנת מכשולים ומורכבויות בתחום הזוגי");
+      }
+    }
     if (r.r1) facts.summary!.push("דווחו קשיים בתפקוד המיני");
     if (r.rAbuse) facts.flags!.push("דווחה אלימות / שליטה בקשר זוגי");
     if (r.coupleScale) {
       facts.scores!.couple_difficulty = r.coupleScale;
       facts.summary!.push(`קושי בזוגיות: ${r.coupleScale} מתוך 7`);
+    }
+    if (r.eftScores && r.dynScores && r.structScores) {
+      const eftSum = r.eftScores.reduce((a, b) => a + b, 0);
+      const dynSum = r.dynScores.reduce((a, b) => a + b, 0);
+      const struSum = r.structScores.reduce((a, b) => a + b, 0);
+      const maxSum = Math.max(eftSum, dynSum, struSum);
+      if (maxSum > 0) {
+        const modality = maxSum === eftSum ? "EFT (טיפול ממוקד רגש)"
+          : maxSum === dynSum ? "טיפול זוגי דינאמי"
+          : "טיפול זוגי מבני";
+        facts.summary!.push(`גישה זוגית שנמצאה מתאימה: ${modality}`);
+      }
     }
     if (r.r3Conflict) facts.summary!.push("דווחו קונפליקטים מתמשכים בתא המשפחתי");
     if (r.r3ChildIssues) facts.summary!.push("דווחו קשיים אצל הילדים");

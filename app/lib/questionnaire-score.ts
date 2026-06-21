@@ -804,6 +804,20 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         domain: "זוגיות ומשפחה",
         urgent: false,
       });
+    } else if (r.rSingleCBTScale !== undefined && r.rSingleDynScale !== undefined) {
+      // לא מחפש עזרה עם דפוסים/פרידה, אך ביקש סיוע בתחום הזוגי —
+      // CBT אם ציון ממוקד > ציון מעמיק; דינאמי אחרת (כולל שוויון)
+      const useCBT = r.rSingleCBTScale > r.rSingleDynScale;
+      recs.push({
+        id: uid("relationship-solo-goal"),
+        symptomText: useCBT
+          ? "קיים עניין בעזרה ממוקדת ומכוונת-מטרה בתחום הזוגיות."
+          : "קיים עניין בטיפול מעמיק להבנת מכשולים ומורכבויות בתחום הזוגי.",
+        treatment: useCBT ? "CBT" : "טיפול דינאמי",
+        treatmentLabel: useCBT ? "CBT" : "טיפול דינאמי",
+        domain: "זוגיות ומשפחה",
+        urgent: false,
+      });
     }
 
     // --- R1: Sexual dysfunction ---
@@ -862,7 +876,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           id: uid("couple-therapy"),
           symptomText: `נמצא קושי בקשר הזוגי. מומלץ ${approachLabel}.`,
           treatment: "טיפול זוגי",
-          treatmentLabel: "טיפול זוגי",
+          treatmentLabel: approachLabel,
           domain: "זוגיות ומשפחה",
           urgent: false,
           couplesModality: modality,
