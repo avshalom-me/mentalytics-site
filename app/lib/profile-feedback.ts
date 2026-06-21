@@ -59,42 +59,38 @@ export function detectProfileGaps(t: ProfileForFeedback): string[] {
   return gaps;
 }
 
-async function aiPhrase(
-  name: string,
-  gaps: string[],
-): Promise<{ intro: string; bullets: string[] } | null> {
+async function aiPhrase(gaps: string[]): Promise<string[] | null> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     temperature: 0.6,
-    max_tokens: 450,
+    max_tokens: 400,
     response_format: { type: "json_object" },
     messages: [
       {
         role: "system",
         content:
-          "אתה עוזר אדיב לפלטפורמה ישראלית להתאמת מטפלים נפשיים. כתוב בעברית חמה, מקצועית, מעודדת ולא מתנשאת. החזר JSON בלבד.",
+          "אתה עוזר אדיב לפלטפורמה ישראלית להתאמת מטפלים נפשיים. כתוב בעברית מקצועית, ברורה ופרקטית. החזר JSON בלבד.",
       },
       {
         role: "user",
         content:
-          `מטפל/ת בשם "${name || "ללא שם"}" השלים/ה פרופיל באתר. אלה הפערים שזוהו בפרופיל:\n` +
+          `אלה הפערים שזוהו בפרופיל של מטפל/ת באתר:\n` +
           gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") +
-          `\n\nכתוב/כתבי משוב קצר, אישי ומעודד. החזר/החזירי JSON במבנה: ` +
-          `{"intro": "משפט פתיחה אחד חם ומעודד", "bullets": ["המלצה קצרה 1", "המלצה קצרה 2"]}. ` +
-          `כל המלצה עד 22 מילים, ממוקדת ופרקטית. אל תמציא/י פערים שלא מופיעים ברשימה.`,
+          `\n\nנסח/י אותם כהמלצות קצרות ופרקטיות. החזר/החזירי JSON במבנה: ` +
+          `{"bullets": ["המלצה קצרה 1", "המלצה קצרה 2"]}. ` +
+          `כל המלצה עד 22 מילים, ממוקדת ופרקטית. אל תמציא/י פערים שלא מופיעים ברשימה, ואל תוסיף/י משפטי מחמאה או עידוד אישיים.`,
       },
     ],
   });
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) return null;
-  const parsed = JSON.parse(raw) as { intro?: unknown; bullets?: unknown };
-  if (typeof parsed.intro !== "string" || !Array.isArray(parsed.bullets)) return null;
+  const parsed = JSON.parse(raw) as { bullets?: unknown };
+  if (!Array.isArray(parsed.bullets)) return null;
   const bullets = parsed.bullets
     .filter((b): b is string => typeof b === "string" && b.trim().length > 0)
     .slice(0, 6);
-  if (bullets.length === 0) return null;
-  return { intro: parsed.intro, bullets };
+  return bullets.length > 0 ? bullets : null;
 }
 
 // Returns an RTL, inline-styled HTML snippet with personalized suggestions, or
@@ -103,16 +99,13 @@ export async function buildProfileFeedbackHtml(t: ProfileForFeedback): Promise<s
   const gaps = detectProfileGaps(t);
   if (gaps.length === 0) return null;
 
-  const name = (t.full_name || "").trim();
-  let intro = "";
   let bullets: string[] = gaps;
 
   if (process.env.OPENAI_API_KEY) {
     try {
-      const result = await aiPhrase(name, gaps);
+      const result = await aiPhrase(gaps);
       if (result) {
-        intro = result.intro;
-        bullets = result.bullets;
+        bullets = result;
       }
     } catch (err) {
       console.error(
@@ -122,9 +115,9 @@ export async function buildProfileFeedbackHtml(t: ProfileForFeedback): Promise<s
     }
   }
 
-  if (!intro) {
-    intro = "כדי שהפרופיל שלך יקבל יותר פניות, שמנו לב לכמה דברים שכדאי להשלים:";
-  }
+  // Neutral, practical lead-in only — no personal "I'm proud of your progress /
+  // I believe in you" style messaging (removed per product decision).
+  const intro = "כדי שהפרופיל שלך יקבל יותר פניות, שמנו לב לכמה דברים שכדאי להשלים:";
 
   const items = bullets
     .map((b) => `<li style="margin-bottom:8px;">${escapeHtml(b)}</li>`)
