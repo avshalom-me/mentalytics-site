@@ -10,7 +10,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const MAX_FREE = 6;
+export const MAX_FREE = 5;
 
 const FP_REGEX = /^[a-f0-9]{64}$/;
 

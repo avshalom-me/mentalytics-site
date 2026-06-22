@@ -47,7 +47,7 @@ export default function TooltipAsterisk() {
           boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
           pointerEvents: "none",
         }}>
-          בשימוש הוגן. עד 6 שימושים לכל שאלון
+          בשימוש הוגן. עד 5 שימושים לכל שאלון
         </span>
       )}
     </span>
