@@ -118,7 +118,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
         setLoading(false);
         return;
       }
-      window.location.href = `/quiz/payment-success?type=${quizType}`;
+      window.location.href = `/quiz/payment-success?type=${quizType}&pid=${data.paymentId ?? ""}`;
     } catch {
       setError("שגיאה בלתי צפויה. נסו שוב.");
       setLoading(false);

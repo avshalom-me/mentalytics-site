@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
       );
       // Acknowledge the payment instead of returning a retryable error.
       return NextResponse.json(
-        { success: true, pending: true, message: "התשלום התקבל; הפעלת המנוי תושלם בקרוב. אם יש בעיה ניצור איתך קשר." },
+        { success: true, pending: true, paymentId: payment.id, message: "התשלום התקבל; הפעלת המנוי תושלם בקרוב. אם יש בעיה ניצור איתך קשר." },
         { status: 200 }
       );
     }
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ success: true, paymentId: payment.id });
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "unknown error";
     console.error("create-subscription error:", message);

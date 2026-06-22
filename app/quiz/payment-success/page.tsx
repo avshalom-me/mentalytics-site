@@ -1,15 +1,22 @@
-"use client";
-
-import { useSearchParams } from "next/navigation";
 import Link from "next/link";
+import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
-import { Suspense } from "react";
 import GaConversion from "@/app/components/GaConversion";
+import { isCompletedPayment } from "@/app/lib/verify-payment";
 
-function Inner() {
-  const params = useSearchParams();
-  const quizType = params.get("type") || "adults";
+export const metadata: Metadata = { title: "התשלום התקבל | טיפול חכם" };
+
+export default async function QuizPaymentSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ type?: string; pid?: string }>;
+}) {
+  const sp = await searchParams;
+  const quizType = sp.type === "kids" ? "kids" : "adults";
   const quizPath = quizType === "kids" ? "/kids" : "/adults";
+  // Only fire the ₪30 GA4 conversion for a real, completed quiz payment — a
+  // direct / bookmarked / refreshed visit must not fake one.
+  const verified = await isCompletedPayment(sp.pid, "quiz");
 
   return (
     <main
@@ -19,12 +26,13 @@ function Inner() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
 
-      {/* GA4 conversion: patient paid for quiz access (₪30, ex-VAT). */}
-      <GaConversion
-        event="patient_payment"
-        dedupeKey="ga_patient_payment"
-        params={{ value: 30, currency: "ILS", quiz_type: quizType }}
-      />
+      {verified && (
+        <GaConversion
+          event="patient_payment"
+          dedupeKey={`ga_patient_payment_${sp.pid}`}
+          params={{ value: 30, currency: "ILS", quiz_type: quizType, transaction_id: sp.pid }}
+        />
+      )}
 
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 size={40} className="text-green-600" />
@@ -43,13 +51,5 @@ function Inner() {
         המשך לשאלון
       </Link>
     </main>
-  );
-}
-
-export default function QuizPaymentSuccessPage() {
-  return (
-    <Suspense>
-      <Inner />
-    </Suspense>
   );
 }

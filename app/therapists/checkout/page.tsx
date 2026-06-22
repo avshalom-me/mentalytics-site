@@ -180,7 +180,7 @@ function CheckoutForm() {
         return;
       }
 
-      window.location.href = "/therapists/payment/success";
+      window.location.href = `/therapists/payment/success?pid=${data.paymentId ?? ""}`;
     } catch {
       setError("שגיאה בלתי צפויה. בדוק/י את החיבור לאינטרנט ונסה/י שוב.");
       setLoading(false);

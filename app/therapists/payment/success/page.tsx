@@ -2,10 +2,20 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { CheckCircle2 } from "lucide-react";
 import GaConversion from "@/app/components/GaConversion";
+import { isCompletedPayment } from "@/app/lib/verify-payment";
 
 export const metadata: Metadata = { title: "התשלום התקבל | טיפול חכם" };
 
-export default function PaymentSuccessPage() {
+export default async function PaymentSuccessPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ pid?: string }>;
+}) {
+  const { pid } = await searchParams;
+  // Only fire the ₪140 GA4 conversion for a real, completed subscription
+  // payment — a direct / bookmarked / refreshed visit must not fake one.
+  const verified = await isCompletedPayment(pid, "subscription");
+
   return (
     <main
       className="mx-auto max-w-lg px-5 py-20 text-center"
@@ -14,12 +24,13 @@ export default function PaymentSuccessPage() {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
 
-      {/* GA4 conversion: therapist activated the promoted subscription (₪140/mo, ex-VAT). */}
-      <GaConversion
-        event="therapist_subscription"
-        dedupeKey="ga_therapist_subscription"
-        params={{ value: 140, currency: "ILS" }}
-      />
+      {verified && (
+        <GaConversion
+          event="therapist_subscription"
+          dedupeKey={`ga_therapist_subscription_${pid}`}
+          params={{ value: 140, currency: "ILS", transaction_id: pid }}
+        />
+      )}
 
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100">
         <CheckCircle2 size={40} className="text-green-600" />
