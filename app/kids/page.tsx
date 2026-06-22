@@ -3689,6 +3689,7 @@ export default function KidsPage() {
   const [step, setStep] = useState<string>("p-consent");
   const [A, setA]       = useState<Ans>({});
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+  const [paymentRequired, setPaymentRequired] = useState(false);
 
   useEffect(() => {
     const idx = PAGES.indexOf(step as typeof PAGES[number]);
@@ -3721,10 +3722,10 @@ export default function KidsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("staff") === "6454a9b616f5") {
-      localStorage.setItem("quiz_bypass", "1");
-    }
-    if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
+    // Staff bypass token — validated server-side; not shipped in the bundle.
+    const staffParam = params.get("staff");
+    if (staffParam) localStorage.setItem("staff_token", staffParam);
+    if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
       .then(fp => fetch(`/api/usage/check?type=kids&fp=${fp}`))
       .then(r => r.json())
@@ -3767,34 +3768,36 @@ export default function KidsPage() {
     if (step === "p-result") {
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "kids" });
       trackQuizComplete("kids");
-      if (localStorage.getItem("quiz_bypass") !== "1") {
-        getFingerprint().then(fp =>
-          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "kids", fp }) })
-        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
-      }
       fetchScore(A);
     }
   }, [step]);
 
-  function fetchScore(answers: Ans) {
+  // Scoring consumes one free-tier credit server-side and refuses (402) once
+  // the limit is reached, so the result itself is gated — not just the UI.
+  async function fetchScore(answers: Ans) {
     setScoreError(false);
     setKidsScore(null);
-    fetch("/api/questionnaire/kids/score", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(answers),
-    })
-      .then(r => { if (!r.ok) throw new Error(); return r.json(); })
-      .then(d => {
-        if (d.ok) setKidsScore({
-          emotional: d.emotional,
-          academic: d.academic,
-          developmental: d.developmental,
-          behavioral: d.behavioral,
-          social: d.social,
-        }); else throw new Error();
-      })
-      .catch(() => setScoreError(true));
+    const fp = await getFingerprint().catch(() => null);
+    const staffToken = localStorage.getItem("staff_token") || undefined;
+    try {
+      const r = await fetch("/api/questionnaire/kids/score", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...answers, _fp: fp, _staffToken: staffToken }),
+      });
+      if (r.status === 402) { setPaymentRequired(true); return; }
+      if (!r.ok) throw new Error();
+      const d = await r.json();
+      if (d.ok) setKidsScore({
+        emotional: d.emotional,
+        academic: d.academic,
+        developmental: d.developmental,
+        behavioral: d.behavioral,
+        social: d.social,
+      }); else throw new Error();
+    } catch {
+      setScoreError(true);
+    }
   }
 
   function goNext(newA: Ans = A) {
@@ -3808,7 +3811,9 @@ export default function KidsPage() {
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
   const pageProps = { A, setA, onNext: goNext, onBack: goBack, items: kidsItems };
 
-  if (usageAllowed === false && step !== "p-result") return (
+  // paymentRequired is set when the server refused to score (limit reached) —
+  // blocks the result too, unlike the pre-quiz usageAllowed gate below.
+  if (paymentRequired || (usageAllowed === false && step !== "p-result")) return (
     <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       <QuizPaymentBlock quizType="kids" />
     </main>

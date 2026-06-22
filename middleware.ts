@@ -46,7 +46,20 @@ function isAuthorized(request: NextRequest): boolean {
   return userOk && passOk;
 }
 
+// What counts as an admin surface. Done in code (not the matcher) because
+// path-to-regexp can't reliably match a hyphenated prefix within a segment
+// like `/api/admin-*`. A plain string prefix check is unambiguous and fails
+// safe: every current AND future `/admin/*` page or `/api/admin-*` route is
+// guarded by default, with no per-route matcher line to forget.
+function needsAuth(pathname: string): boolean {
+  return pathname.startsWith("/admin") || pathname.startsWith("/api/admin-");
+}
+
 export function middleware(request: NextRequest) {
+  if (!needsAuth(request.nextUrl.pathname)) {
+    return NextResponse.next();
+  }
+
   if (!isAuthorized(request)) {
     return new NextResponse("Unauthorized", {
       status: 401,
@@ -60,18 +73,6 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: [
-    "/admin/:path*",
-    "/api/admin-therapists/:path*",
-    "/api/admin-stats/:path*",
-    "/api/admin-analytics/:path*",
-    "/api/admin-attribution/:path*",
-    "/api/admin-supply-demand/:path*",
-    "/api/admin-recommendations/:path*",
-    "/api/admin-weekly-reports/:path*",
-    "/api/admin-trigger-weekly-report/:path*",
-    "/api/admin-monthly-reports/:path*",
-    "/api/admin-trigger-monthly-report/:path*",
-    "/api/admin-articles/:path*",
-  ],
+  // Broad matcher; the actual admin gate is the needsAuth() prefix check above.
+  matcher: ["/admin/:path*", "/api/:path*"],
 };

@@ -84,23 +84,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "active subscription exists" }, { status: 400 });
     }
 
-    // Race-condition guard: if there is already a pending payment for this
-    // therapist created in the last 60 seconds, the user probably double-
-    // submitted. Refuse the second attempt instead of opening a parallel
-    // charge against Sumit.
+    // Expire any stale pending row for this therapist (a crashed/abandoned
+    // attempt) so it doesn't permanently block new submissions via the
+    // payments_pending_unique index. A genuine concurrent double-submit leaves
+    // a *fresh* pending row, which the index below rejects atomically.
     const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
-    const { data: pending } = await supabase
+    await supabase
       .from("payments")
-      .select("id")
+      .update({ status: "failed" })
       .eq("payment_type", "subscription")
       .eq("reference_id", therapist.id)
       .eq("status", "pending")
-      .gte("created_at", sixtySecondsAgo)
-      .maybeSingle();
-
-    if (pending) {
-      return NextResponse.json({ error: "payment in progress" }, { status: 409 });
-    }
+      .lt("created_at", sixtySecondsAgo);
 
     let body: {
       singleUseToken?: string;
@@ -160,6 +155,11 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (paymentErr || !payment) {
+      // 23505 = unique violation on payments_pending_unique: a concurrent
+      // submission for this therapist is already mid-charge (double-click).
+      if (paymentErr?.code === "23505") {
+        return NextResponse.json({ error: "payment in progress" }, { status: 409 });
+      }
       return NextResponse.json({ error: "failed to create payment record" }, { status: 500 });
     }
 

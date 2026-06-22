@@ -556,7 +556,7 @@ export default function AdminTherapistsPage() {
     );
   }
 
-  const isBypassed = typeof window !== "undefined" && localStorage.getItem("quiz_bypass") === "1";
+  const isBypassed = typeof window !== "undefined" && !!localStorage.getItem("staff_token");
 
   return (
     <main className="mx-auto max-w-6xl p-6" dir="rtl">
@@ -564,8 +564,13 @@ export default function AdminTherapistsPage() {
         <h1 className="text-3xl font-bold">ניהול מטפלים</h1>
         <button
           onClick={() => {
-            if (isBypassed) { localStorage.removeItem("quiz_bypass"); window.location.reload(); }
-            else { localStorage.setItem("quiz_bypass", "1"); window.location.reload(); }
+            // Stores the STAFF_BYPASS_TOKEN locally; it's sent to the score
+            // routes, which validate it server-side and skip the free limit.
+            if (isBypassed) { localStorage.removeItem("staff_token"); window.location.reload(); }
+            else {
+              const token = window.prompt("הזן את טוקן ה-staff (STAFF_BYPASS_TOKEN):");
+              if (token) { localStorage.setItem("staff_token", token); window.location.reload(); }
+            }
           }}
           className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${isBypassed ? "bg-green-100 text-green-700 border-green-300" : "bg-stone-100 text-stone-600 border-stone-300"}`}
         >

@@ -75,20 +75,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "too many requests" }, { status: 429 });
     }
 
-    // Race-condition guard: refuse a second submission while a payment for
-    // the same fingerprint is still pending (probably a double-click).
+    // Expire any stale pending row for this fingerprint (a crashed/abandoned
+    // attempt) so it doesn't permanently block new submissions via the
+    // payments_pending_unique index. A genuine concurrent double-click leaves a
+    // *fresh* pending row, which the index below rejects atomically.
     const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
-    const { data: pending } = await supabase
+    await supabase
       .from("payments")
-      .select("id")
+      .update({ status: "failed" })
       .eq("payment_type", "quiz")
       .eq("reference_id", `fp:${fp}`)
       .eq("status", "pending")
-      .gte("created_at", sixtySecondsAgo)
-      .maybeSingle();
-    if (pending) {
-      return NextResponse.json({ error: "payment in progress" }, { status: 409 });
-    }
+      .lt("created_at", sixtySecondsAgo);
 
     // Raw ad click ids captured at landing — persisted so a completed payment
     // can be uploaded to Google Ads / Meta with exact click attribution.
@@ -111,6 +109,11 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error || !payment) {
+      // 23505 = unique violation on payments_pending_unique: a concurrent
+      // submission for this fingerprint is already mid-charge (double-click).
+      if (error?.code === "23505") {
+        return NextResponse.json({ error: "payment in progress" }, { status: 409 });
+      }
       return NextResponse.json({ error: "failed to create payment record" }, { status: 500 });
     }
 

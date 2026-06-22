@@ -427,10 +427,12 @@ export default function AdultsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("staff") === "6454a9b616f5") {
-      localStorage.setItem("quiz_bypass", "1");
-    }
-    if (localStorage.getItem("quiz_bypass") === "1") { setUsageAllowed(true); return; }
+    // Staff bypass: the token from ?staff= is persisted and later sent to the
+    // server, which validates it against STAFF_BYPASS_TOKEN. No token literal
+    // is shipped in this bundle; this flag only controls the UI optimistically.
+    const staffParam = params.get("staff");
+    if (staffParam) localStorage.setItem("staff_token", staffParam);
+    if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
       .then(fp => fetch(`/api/usage/check?type=adults&fp=${fp}`))
       .then(r => r.json())
@@ -674,30 +676,24 @@ export default function AdultsPage() {
     setScreen("scoring");
     setLoading(true);
     setErr("");
+    const fp = await getFingerprint().catch(() => null);
+    const staffToken = localStorage.getItem("staff_token") || undefined;
     try {
       const res = await fetch("/api/questionnaire/adults/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ao ?? answers),
+        body: JSON.stringify({ ...(ao ?? answers), _fp: fp, _staffToken: staffToken }),
       });
+      // Server enforced the free limit and refused to score — show the paywall.
+      if (res.status === 402) { setUsageAllowed(false); return; }
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations });
-      if (localStorage.getItem("quiz_bypass") !== "1") {
-        getFingerprint().then(fp =>
-          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults", fp }) })
-        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
-      }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
       trackQuizComplete("adults");
     } catch (e) {
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
-      if (localStorage.getItem("quiz_bypass") !== "1") {
-        getFingerprint().then(fp =>
-          fetch("/api/usage/check", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ type: "adults", fp }) })
-        ).then(r => r.json()).then(d => setUsageAllowed(d.allowed));
-      }
       setScreen("results");
       (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
       trackQuizComplete("adults");
