@@ -37,6 +37,7 @@ const CHANNEL_COLOR: Record<string, string> = {
   google_paid: "bg-blue-50 border-blue-200 text-blue-800",
   google_organic: "bg-sky-50 border-sky-200 text-sky-800",
   meta_paid: "bg-indigo-50 border-indigo-200 text-indigo-800",
+  meta_organic: "bg-violet-50 border-violet-200 text-violet-800",
   whatsapp: "bg-green-50 border-green-200 text-green-800",
   direct: "bg-stone-50 border-stone-200 text-stone-700",
   referral: "bg-amber-50 border-amber-200 text-amber-800",
@@ -197,6 +198,7 @@ function SourceMix({ channels }: { channels: ChannelRow[] }) {
           const w = (c.contactClicks / total) * 100;
           const bar: Record<string, string> = {
             google_paid: "bg-blue-500", google_organic: "bg-sky-400", meta_paid: "bg-indigo-500",
+            meta_organic: "bg-violet-400",
             whatsapp: "bg-green-500", direct: "bg-stone-400", referral: "bg-amber-500",
             other: "bg-stone-300", unknown: "bg-stone-200",
           };
