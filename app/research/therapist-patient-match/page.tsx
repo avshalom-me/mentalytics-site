@@ -98,7 +98,7 @@ export default function TherapistPatientMatchPage() {
           מידע מקצועי · התאמה טיפולית
         </p>
         <h1 style={{ fontSize: "clamp(1.7rem,4vw,2.3rem)", fontWeight: 900, color: "var(--text)", lineHeight: 1.3, letterSpacing: "-.02em", marginBottom: "16px" }}>
-          {`"זכו – שכינה ביניהם": על הקושי בהתאמה הטיפולית והאישיותית בין מטפל למטופל`}
+          {`"זכו – שכינה ביניהם": על הקושי בהתאמה טיפולית ואישיותית בין מטפל ומטופל`}
         </h1>
         <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8 }}>
           {`מהי התאמה "טובה" בין מטפל למטופל, ולמה דווקא הסוגיה החשובה הזו נחקרה כל כך מעט? סקירה של מה שהמחקר כן מלמד אותנו — בין גישת ההשלמה לגישת הדמיון.`}

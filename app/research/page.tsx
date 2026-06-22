@@ -40,7 +40,7 @@ const QUESTIONS = [
 ];
 
 const TOPICS = [
-  { href: "/research/therapist-patient-match", icon: "🔗", title: "הקושי בהתאמה בין מטפל למטופל", desc: "מה המחקר אומר על התאמה אישיותית בין מטפל למטופל — גישת ההשלמה מול גישת הדמיון, ולמה זה כל כך משפיע על הצלחת הטיפול.", img: "https://images.unsplash.com/photo-1604881991720-f91add269bed?w=600&h=260&fit=crop&auto=format&q=75" },
+  { href: "/research/therapist-patient-match", icon: "🔗", title: '"זכו – שכינה ביניהם": על הקושי בהתאמה טיפולית ואישיותית בין מטפל ומטופל', desc: "מה המחקר אומר על התאמה אישיותית בין מטפל למטופל — גישת ההשלמה מול גישת הדמיון, ולמה זה כל כך משפיע על הצלחת הטיפול.", img: "https://images.unsplash.com/photo-1604881991720-f91add269bed?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/therapist-types",  icon: "👨‍⚕️", title: "סוגי המטפלים בישראל",              desc: 'פסיכולוג קליני, עו"ס קליני, מטפל בהבעה ויצירה — מה ההבדל ומי מתאים למה?', img: "https://images.unsplash.com/photo-1758273241078-8eec353836be?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/assessments",      icon: "📋", title: "סוגי אבחונים והערכות",              desc: "פסיכודידקטי, פסיכודיאגנוסטי, נוירופסיכולוגי — מתי כל אחד רלוונטי ומה מקבלים בסוף?", img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/psychodiagnostic", icon: "🔬", title: "אבחון פסיכודיאגנוסטי",              desc: "לראות את התמונה המלאה: מהו האבחון המעמיק ביותר שיש, מה הוא כולל ומתי הוא חיוני.", img: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=260&fit=crop&auto=format&q=75" },
