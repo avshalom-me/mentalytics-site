@@ -72,50 +72,35 @@ export default function TherapistJoinPage() {
           </div>
 
           <h1 className="text-3xl md:text-4xl font-black leading-tight text-stone-900">
-            הגיע הזמן שמטופלים ימצאו אותך,{" "}
-            <span style={{ color: "var(--teal)" }}>לפי התאמה אמיתית.</span>
+            הגיע הזמן שמטופלים ימצאו אותך{" "}
+            <span style={{ color: "var(--teal)" }}>לפי התאמה מקצועית.</span>
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-stone-700 max-w-3xl">
             <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית.
           </p>
-          <p className="mt-3 text-base leading-8 text-stone-700 max-w-3xl">
-            יותר פניות רלוונטיות ופחות בזבוז זמן וחוסר נוחות. התאמה שמבוססת על ההכשרה, הכלים והאישיות הטיפולית שלך.
-          </p>
 
-          <ul className="mt-6 space-y-2.5 text-stone-800">
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> יותר פניות רלוונטיות</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> פחות בזבוז זמן</li>
-            <li className="flex items-start gap-2"><CheckCircle2 size={20} style={{ color: "var(--teal)" }} className="mt-0.5 flex-shrink-0" /> התאמה שמבוססת על ההכשרה והכלים שאת/ה עובד/ת איתם, ועל האישיות הטיפולית שלך</li>
-          </ul>
-
-          <div className="mt-8" />
+          <div className="mt-6" />
         </div>
       </section>
 
-      {/* STATS DEEP-DIVE — exclusive to promoted (merged from /register) */}
-      <section className="mt-12">
-        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
-          style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
-          <Sparkles size={12} />
-          בלעדי למסלול המקודם
-        </div>
-        <h2 className="text-2xl md:text-3xl font-extrabold text-stone-900 mb-3">
-          דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>איזה סוגי מטופלים מחפשים אותך — ואיזה מדלגים עליך</span>
-        </h2>
-        <p className="text-stone-700 leading-8 mb-8 max-w-3xl">
-          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה — תוך שמירה מוחלטת על אנונימיות המטופלים.
+      {/* HOW IT WORKS — right after hero */}
+      <section className="mt-14">
+        <h2 className="text-2xl font-extrabold text-stone-900 mb-3">איך זה עובד?</h2>
+        <p className="text-stone-700 leading-8 mb-6 max-w-3xl">
+          מטופלים פוטנציאליים עוברים שאלון חכם ומודולרי שמנתח את:
         </p>
+
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {[
-            { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אותך — באמת", body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה." },
-            { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין — גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך." },
-            { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אותך." },
-            { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון." },
-          ].map(({ icon: Icon, title, body, color }, i) => (
+            { icon: Brain, title: "סוג הקושי", body: "רגשי, חברתי, זוגי, משפחתי, התנהגותי ועוד." },
+            { icon: Sparkles, title: "התאמה מחקרית", body: "סוג/י הטיפול המתאימים ביותר מחקרית לסוג הקושי המדווח." },
+            { icon: Users, title: "העדפות אישיות", body: "סגנון טיפולי, אישיות המטפל ואופי הקשר המקצועי." },
+            { icon: ShieldCheck, title: "מאפיינים דמוגרפיים", body: "מגורים, גיל, שפה והעדפות תרבותיות." },
+          ].map(({ icon: Icon, title, body }, i) => (
             <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
-              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
-                <Icon size={22} style={{ color }} />
+              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--teal-pale)" }}>
+                <Icon size={20} style={{ color: "var(--teal)" }} />
               </div>
               <div>
                 <h3 className="font-bold text-stone-900 mb-1">{title}</h3>
@@ -124,15 +109,18 @@ export default function TherapistJoinPage() {
             </div>
           ))}
         </div>
-        <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
-          <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-stone-700 leading-6">
-            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי — לא על ידינו וגם לא על ידך.
+
+        <div className="rounded-2xl p-6" style={{ background: "#FDF6EE", border: "1px solid #E8DCC8" }}>
+          <p className="leading-8 text-stone-800">
+            לאחר מכן — המטופלים מקבלים <strong>התאמה למטפלים שמתאימים בדיוק לפרופיל שלהם</strong>, כולל <strong>סוכן AI</strong> שמסביר להם את ההתאמה במפורט במידה ורוצים.
+          </p>
+          <p className="mt-3 leading-8 text-stone-800">
+            <strong>ואת/ה?</strong> מקבל/ת פניות הרבה יותר מדויקות.
           </p>
         </div>
       </section>
 
-      {/* PLANS TABLE — right after hero */}
+      {/* PLANS TABLE */}
       <section className="mt-10">
         <h2 className="text-2xl font-extrabold text-stone-900 mb-2">המסלולים</h2>
 
@@ -158,9 +146,6 @@ export default function TherapistJoinPage() {
 
             {/* Promoted */}
             <div className="p-6 relative" style={{ background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" }}>
-              <div className="absolute top-4 left-4">
-                <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-400 text-yellow-900">★ מומלץ</span>
-              </div>
               <h3 className="text-lg font-bold mb-4" style={{ color: "var(--teal-dark)" }}>התאמה חכמה + סטטיסטיקות מתקדמות</h3>
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "var(--teal-dark)" }}>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה ראשונה בתוצאות החיפוש</li>
@@ -208,23 +193,29 @@ export default function TherapistJoinPage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS */}
-      <section className="mt-14">
-        <h2 className="text-2xl font-extrabold text-stone-900 mb-3">איך זה עובד?</h2>
-        <p className="text-stone-700 leading-8 mb-6 max-w-3xl">
-          מטופלים פוטנציאליים עוברים שאלון חכם ומודולרי שמנתח את:
+      {/* STATS DEEP-DIVE — exclusive to promoted */}
+      <section className="mt-12">
+        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
+          style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
+          <Sparkles size={12} />
+          בלעדי למסלול המקודם
+        </div>
+        <h2 className="text-2xl md:text-3xl font-extrabold text-stone-900 mb-3">
+          דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>איזה סוגי מטופלים מחפשים אותך — ואיזה מדלגים עליך</span>
+        </h2>
+        <p className="text-stone-700 leading-8 mb-8 max-w-3xl">
+          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה — תוך שמירה מוחלטת על אנונימיות המטופלים.
         </p>
-
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {[
-            { icon: Brain, title: "סוג הקושי", body: "רגשי, חברתי, זוגי, משפחתי, התנהגותי ועוד." },
-            { icon: Sparkles, title: "התאמה מחקרית", body: "סוג/י הטיפול המתאימים ביותר מחקרית לסוג הקושי המדווח." },
-            { icon: Users, title: "העדפות אישיות", body: "סגנון טיפולי, אישיות המטפל ואופי הקשר המקצועי." },
-            { icon: ShieldCheck, title: "מאפיינים דמוגרפיים", body: "מגורים, גיל, שפה והעדפות תרבותיות." },
-          ].map(({ icon: Icon, title, body }, i) => (
+            { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אותך — באמת", body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה." },
+            { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין — גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך." },
+            { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אותך." },
+            { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון." },
+          ].map(({ icon: Icon, title, body, color }, i) => (
             <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
-              <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--teal-pale)" }}>
-                <Icon size={20} style={{ color: "var(--teal)" }} />
+              <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
+                <Icon size={22} style={{ color }} />
               </div>
               <div>
                 <h3 className="font-bold text-stone-900 mb-1">{title}</h3>
@@ -233,13 +224,10 @@ export default function TherapistJoinPage() {
             </div>
           ))}
         </div>
-
-        <div className="rounded-2xl p-6" style={{ background: "#FDF6EE", border: "1px solid #E8DCC8" }}>
-          <p className="leading-8 text-stone-800">
-            לאחר מכן — המטופלים מקבלים <strong>התאמה למטפלים שמתאימים בדיוק לפרופיל שלהם</strong>, כולל <strong>סוכן AI</strong> שמסביר להם את ההתאמה במפורט במידה ורוצים.
-          </p>
-          <p className="mt-3 leading-8 text-stone-800">
-            <strong>ואת/ה?</strong> מקבל/ת פניות הרבה יותר מדויקות.
+        <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
+          <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-stone-700 leading-6">
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי — לא על ידינו וגם לא על ידך.
           </p>
         </div>
       </section>
