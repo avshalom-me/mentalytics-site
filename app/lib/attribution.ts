@@ -94,7 +94,7 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // Explicit UTM tagging — trust the medium to separate paid from organic.
   if (src) {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
-    if (isGoogleSource(src)) return med === "organic" ? "google_organic" : "google_paid";
+    if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
     if (PAID_MEDIUMS.has(med)) return "other"; // tagged paid, unknown source
     return "other";
@@ -133,9 +133,13 @@ export function captureAttribution(): void {
   try {
     const params = new URLSearchParams(window.location.search);
     const referrer = typeof document !== "undefined" ? document.referrer : "";
+    // Bare fbclid is deliberately NOT a "meaningful" touch: Meta appends it to
+    // organic clicks, so an organic Meta re-visit must not overwrite a prior
+    // paid touch (or its click-ids). A real tagged Meta campaign still carries
+    // utm_source and is captured normally.
     const hasCampaignSignal =
       params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
-      params.has("fbclid") || params.has("utm_source");
+      params.has("utm_source");
 
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing && !hasCampaignSignal) return; // keep the prior touch
