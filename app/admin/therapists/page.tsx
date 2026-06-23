@@ -6,6 +6,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
 } from "@/app/lib/therapist-options";
+import { missingProfileFields } from "@/app/lib/profile-completeness";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -109,6 +110,7 @@ export default function AdminTherapistsPage() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [bulkSending, setBulkSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -332,6 +334,32 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // Bulk: emails every incomplete (non-rejected) therapist their own missing
+  // list in one click. The button + count live in the page header.
+  async function requestCompletionBulk() {
+    if (!window.confirm(`לשלוח מייל "בקשת השלמה" לכל ${incompleteCount} הפרופילים החסרים? לכל מטפל/ת תישלח הרשימה האישית של מה שחסר לו.`)) return;
+    try {
+      setBulkSending(true);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "request_completion_bulk" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      window.alert(
+        `נשלחו ${json.sent} בקשות השלמה.` +
+          (json.failed ? ` ${json.failed} נכשלו.` : "") +
+          (json.skipped_no_email ? ` ${json.skipped_no_email} ללא מייל דולגו.` : "")
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setBulkSending(false);
+    }
+  }
+
   // Promotes the therapist with the chosen expiry. monthsAhead=null means
   // an indefinite manual promotion (no expiry, won't be auto-demoted).
   // Anything > 0 creates a time-limited trial that the daily cron will
@@ -549,7 +577,7 @@ export default function AdminTherapistsPage() {
                   ⚠ מצב לא עקבי
                 </span>
               )}
-              {(therapist.certificates.length === 0 || therapist.full_name.trim().split(/\s+/).filter(Boolean).length < 2) && (
+              {missingProfileFields(therapist, therapist.certificates.length > 0).length > 0 && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
                   onClick={() => requestCompletion(therapist.id)}>
@@ -597,6 +625,10 @@ export default function AdminTherapistsPage() {
 
   const isBypassed = typeof window !== "undefined" && !!localStorage.getItem("staff_token");
 
+  const incompleteCount = therapists.filter(
+    (t) => t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0
+  ).length;
+
   return (
     <main className="mx-auto max-w-6xl p-6" dir="rtl">
       <div className="flex items-center justify-between mb-8">
@@ -618,6 +650,18 @@ export default function AdminTherapistsPage() {
       </div>
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+
+      {incompleteCount > 0 && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4">
+          <div className="text-sm text-amber-900">
+            <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳).
+          </div>
+          <button type="button" disabled={bulkSending} onClick={requestCompletionBulk}
+            className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+            {bulkSending ? "שולח..." : "✉️ שלח לכולם בקשת השלמה"}
+          </button>
+        </div>
+      )}
 
       {/* ── סינון וחיפוש ── */}
       <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
