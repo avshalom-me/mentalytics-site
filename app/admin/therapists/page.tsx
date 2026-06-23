@@ -110,7 +110,6 @@ export default function AdminTherapistsPage() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
-  const [bulkSending, setBulkSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -331,32 +330,6 @@ export default function AdminTherapistsPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setActionLoadingId(null);
-    }
-  }
-
-  // Bulk: emails every incomplete (non-rejected) therapist their own missing
-  // list in one click. The button + count live in the page header.
-  async function requestCompletionBulk() {
-    if (!window.confirm(`לשלוח מייל "בקשת השלמה" לכל ${incompleteCount} הפרופילים החסרים? לכל מטפל/ת תישלח הרשימה האישית של מה שחסר לו.`)) return;
-    try {
-      setBulkSending(true);
-      setError("");
-      const res = await fetch("/api/admin-therapists", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "request_completion_bulk" }),
-      });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
-      window.alert(
-        `נשלחו ${json.sent} בקשות השלמה.` +
-          (json.failed ? ` ${json.failed} נכשלו.` : "") +
-          (json.skipped_no_email ? ` ${json.skipped_no_email} ללא מייל דולגו.` : "")
-      );
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
-    } finally {
-      setBulkSending(false);
     }
   }
 
@@ -652,14 +625,8 @@ export default function AdminTherapistsPage() {
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
 
       {incompleteCount > 0 && (
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4">
-          <div className="text-sm text-amber-900">
-            <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳).
-          </div>
-          <button type="button" disabled={bulkSending} onClick={requestCompletionBulk}
-            className="rounded-xl bg-amber-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
-            {bulkSending ? "שולח..." : "✉️ שלח לכולם בקשת השלמה"}
-          </button>
+        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-900">
+          <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳). עבור/עברי עליהם אחד-אחד — בכל פרופיל חסר יופיע כפתור <span className="font-semibold">&quot;✉️ בקש השלמה&quot;</span> לשליחה ידנית, רק באישורך.
         </div>
       )}
 

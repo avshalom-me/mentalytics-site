@@ -273,58 +273,6 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: true, id, missing });
     }
 
-    // Bulk "request completion" — one admin click emails EVERY non-rejected
-    // therapist who has an email and at least one missing profile field
-    // (last name / certificate / photo / geography / type / treatment areas),
-    // each with their own personalized missing list.
-    if (body.action === "request_completion_bulk") {
-      const { data: rows } = await supabaseAdmin
-        .from("therapists")
-        .select("id, full_name, email, profile_photo_path, regions, therapist_types, training_areas")
-        .neq("status", "rejected");
-      const list = (rows ?? []) as Array<{
-        id: string;
-        full_name: string | null;
-        email: string | null;
-        profile_photo_path: string | null;
-        regions: string[] | null;
-        therapist_types: string[] | null;
-        training_areas: string[] | null;
-      }>;
-
-      const ids = list.map((r) => r.id);
-      const certSet = new Set<string>();
-      if (ids.length > 0) {
-        const { data: certs } = await supabaseAdmin
-          .from("therapist_certificates")
-          .select("therapist_id")
-          .in("therapist_id", ids);
-        for (const c of (certs ?? []) as { therapist_id: string }[]) certSet.add(c.therapist_id);
-      }
-
-      const incomplete = list
-        .map((t) => ({ t, missing: missingProfileFields(t, certSet.has(t.id)) }))
-        .filter((x) => x.missing.length > 0);
-      const mailable = incomplete.filter((x) => x.t.email);
-
-      const results = await Promise.allSettled(
-        mailable.map((x) =>
-          sendTherapistCompletionRequestEmail({
-            to: x.t.email as string,
-            name: x.t.full_name ?? "",
-            missing: x.missing,
-          })
-        )
-      );
-      const sent = results.filter((r) => r.status === "fulfilled" && r.value.ok).length;
-      const failed = mailable.length - sent;
-      const skipped_no_email = incomplete.length - mailable.length;
-      console.log(
-        `request_completion_bulk: sent=${sent} failed=${failed} no_email=${skipped_no_email} incomplete=${incomplete.length}`
-      );
-      return NextResponse.json({ ok: true, sent, failed, skipped_no_email, incomplete: incomplete.length });
-    }
-
     // ── On-demand Sumit reconciliation ──────────────────────────────────────
     // Closes the gap where a standing order is still ACTIVE at Sumit but the
     // local subscription is already 'cancelled' — the status-change cancel
