@@ -310,6 +310,28 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // Emails the therapist a "please complete your profile" nudge listing what's
+  // missing (last name / certificate). Does not change their status.
+  async function requestCompletion(id: string) {
+    if (!window.confirm("לשלוח למטפל/ת מייל עם בקשה להשלים את הפרטים החסרים (שם משפחה / תעודה)?")) return;
+    try {
+      setActionLoadingId(id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, action: "request_completion" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      window.alert(`נשלחה בקשת השלמה במייל${json.missing?.length ? ` (חסר: ${json.missing.join(", ")})` : ""}.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   // Promotes the therapist with the chosen expiry. monthsAhead=null means
   // an indefinite manual promotion (no expiry, won't be auto-demoted).
   // Anything > 0 creates a time-limited trial that the daily cron will
@@ -401,6 +423,16 @@ export default function AdminTherapistsPage() {
                 {therapist.status === "paying" && therapist.promotion_source === "trial" && therapist.promoted_until && (
                   <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 border border-orange-300">
                     ⏰ ניסיון עד {new Date(therapist.promoted_until).toLocaleDateString("he-IL")}
+                  </span>
+                )}
+                {therapist.certificates.length === 0 && (
+                  <span className="rounded-full bg-red-100 px-3 py-1 text-xs font-semibold text-red-800 border border-red-300">
+                    ⚠️ חסרה תעודה
+                  </span>
+                )}
+                {therapist.full_name.trim().split(/\s+/).filter(Boolean).length < 2 && (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300">
+                    ⚠️ חסר שם משפחה
                   </span>
                 )}
               </div>
@@ -516,6 +548,13 @@ export default function AdminTherapistsPage() {
                 <span className="rounded-xl bg-stone-100 px-4 py-2 text-sm text-stone-400 border border-stone-200" title="מצב לא עקבי — נסה רענון">
                   ⚠ מצב לא עקבי
                 </span>
+              )}
+              {(therapist.certificates.length === 0 || therapist.full_name.trim().split(/\s+/).filter(Boolean).length < 2) && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
+                  onClick={() => requestCompletion(therapist.id)}>
+                  {isBusy ? "שולח..." : "✉️ בקש השלמה"}
+                </button>
               )}
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"

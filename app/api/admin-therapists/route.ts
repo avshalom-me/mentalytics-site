@@ -7,6 +7,7 @@ import {
   sendPromotionGrantedEmail,
   sendTherapistWelcomeEmail,
   sendTherapistRejectedEmail,
+  sendTherapistCompletionRequestEmail,
 } from "@/app/lib/therapist-emails";
 
 type TherapistRow = {
@@ -232,6 +233,47 @@ export async function PATCH(request: Request) {
         reason: "admin approved therapist for public listing",
       });
       return NextResponse.json({ ok: true, id, admin_approved: true });
+    }
+
+    // Admin-triggered "request completion" — emails the therapist the exact
+    // missing items (last name / certificate) and links to the dashboard,
+    // WITHOUT changing their status. A soft alternative to rejection for a
+    // merely-incomplete submission.
+    if (body.action === "request_completion") {
+      const { data: t } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, email")
+        .eq("id", id)
+        .single();
+      if (!t || !t.email) {
+        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      }
+      const { count: certCount } = await supabaseAdmin
+        .from("therapist_certificates")
+        .select("id", { count: "exact", head: true })
+        .eq("therapist_id", id);
+      const missing: string[] = [];
+      if (!t.full_name || t.full_name.trim().split(/\s+/).filter(Boolean).length < 2) {
+        missing.push("שם משפחה");
+      }
+      if (!certCount) missing.push("תעודת רישיון / אישור מקצועי");
+      const sent = await sendTherapistCompletionRequestEmail({
+        to: t.email,
+        name: t.full_name ?? "",
+        missing,
+      });
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "request_completion",
+        before: {},
+        after: { missing },
+        reason: "admin requested profile completion",
+      });
+      if (!sent.ok) {
+        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
+      }
+      return NextResponse.json({ ok: true, id, missing });
     }
 
     // ── On-demand Sumit reconciliation ──────────────────────────────────────
