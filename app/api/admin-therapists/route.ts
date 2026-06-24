@@ -32,6 +32,7 @@ type TherapistRow = {
   promotion_source: string | null;
   promoted_until: string | null;
   admin_approved: boolean | null;
+  created_at: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -68,7 +69,8 @@ async function buildTherapistsResponse() {
       manually_promoted,
       promotion_source,
       promoted_until,
-      admin_approved
+      admin_approved,
+      created_at
       `
     )
     .order("full_name", { ascending: true });
@@ -127,6 +129,60 @@ async function buildTherapistsResponse() {
     );
   }
 
+  // ── Per-therapist 30-day engagement + subscription health (batched) ──
+  // Profile entries (match/directory views) and contact clicks over the last
+  // 30 days, plus the subscription's billing state. One query each, counted
+  // in memory — fine at the current scale (admin-only, low frequency).
+  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const viewsByTherapist: Record<string, number> = {};
+  const contactsByTherapist: Record<string, number> = {};
+  const subByTherapist: Record<
+    string,
+    { status: string; current_period_end: string | null; promo_reverts_at: string | null }
+  > = {};
+
+  if (therapistIds.length > 0) {
+    const [viewsRes, clicksRes, subsRes] = await Promise.all([
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id")
+        .in("therapist_id", therapistIds)
+        .in("source", ["match", "directory"])
+        .gte("viewed_at", monthAgoIso),
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id")
+        .in("therapist_id", therapistIds)
+        .gte("clicked_at", monthAgoIso),
+      supabaseAdmin
+        .from("subscriptions")
+        .select("therapist_id, status, current_period_end, promo_reverts_at")
+        .in("therapist_id", therapistIds),
+    ]);
+    for (const v of (viewsRes.data ?? []) as Array<{ therapist_id: string }>) {
+      viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
+    }
+    for (const c of (clicksRes.data ?? []) as Array<{ therapist_id: string }>) {
+      contactsByTherapist[c.therapist_id] = (contactsByTherapist[c.therapist_id] ?? 0) + 1;
+    }
+    for (const s of (subsRes.data ?? []) as Array<{
+      therapist_id: string;
+      status: string;
+      current_period_end: string | null;
+      promo_reverts_at: string | null;
+    }>) {
+      // Prefer the active subscription when a therapist has more than one row.
+      const prev = subByTherapist[s.therapist_id];
+      if (!prev || s.status === "active") {
+        subByTherapist[s.therapist_id] = {
+          status: s.status,
+          current_period_end: s.current_period_end,
+          promo_reverts_at: s.promo_reverts_at,
+        };
+      }
+    }
+  }
+
   const therapists = await Promise.all(
     rows.map(async (t) => {
       let profile_photo_url: string | null = null;
@@ -167,7 +223,11 @@ async function buildTherapistsResponse() {
         promotion_source: t.promotion_source ?? null,
         promoted_until: t.promoted_until ?? null,
         admin_approved: t.admin_approved ?? false,
-        created_at: null,
+        created_at: t.created_at ?? null,
+        views_30d: viewsByTherapist[t.id] ?? 0,
+        contacts_30d: contactsByTherapist[t.id] ?? 0,
+        subscription: subByTherapist[t.id] ?? null,
+        missing: missingProfileFields(t, (certsByTherapist[t.id]?.length ?? 0) > 0),
       };
     })
   );

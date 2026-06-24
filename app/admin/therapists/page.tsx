@@ -39,6 +39,10 @@ type AdminTherapist = {
   promoted_until: string | null;
   admin_approved: boolean;
   created_at: string | null;
+  views_30d: number;
+  contacts_30d: number;
+  subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
+  missing: string[];
 };
 
 type EditForm = {
@@ -444,12 +448,43 @@ export default function AdminTherapistsPage() {
                     ⚠️ חסרה תעודה
                   </span>
                 )}
-                {therapist.full_name.trim().split(/\s+/).filter(Boolean).length < 2 && (
+                {therapist.missing.length > 0 && (
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300">
-                    ⚠️ חסר שם משפחה
+                    ⚠️ פרופיל לא שלם: {therapist.missing.join(", ")}
                   </span>
                 )}
               </div>
+            </div>
+
+            {/* Engagement (30d) + account/billing health */}
+            <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
+              <span className="font-semibold text-stone-500">📊 30 ימים אחרונים:</span>
+              <span><b className="text-stone-900">{therapist.views_30d}</b> כניסות לפרופיל</span>
+              <span><b className="text-stone-900">{therapist.contacts_30d}</b> פניות</span>
+              <span>
+                המרה:{" "}
+                <b className="text-stone-900">
+                  {therapist.views_30d > 0 ? Math.round((therapist.contacts_30d / therapist.views_30d) * 100) : 0}%
+                </b>
+              </span>
+              {therapist.created_at && (
+                <span className="text-stone-500">
+                  · נרשם/ה לפני {Math.max(0, Math.floor((Date.now() - new Date(therapist.created_at).getTime()) / 86400000))} ימים
+                </span>
+              )}
+              {therapist.status === "paying" && therapist.subscription?.current_period_end && (
+                <span className="text-stone-500">
+                  · חיוב הבא: {new Date(therapist.subscription.current_period_end).toLocaleDateString("he-IL")}
+                  {therapist.subscription.status && therapist.subscription.status !== "active" && (
+                    <span className="text-red-600 font-semibold"> ({therapist.subscription.status})</span>
+                  )}
+                </span>
+              )}
+              {therapist.subscription?.promo_reverts_at && (
+                <span className="text-amber-700 font-semibold">
+                  · מבצע — חוזר ל-₪140 ב-{new Date(therapist.subscription.promo_reverts_at).toLocaleDateString("he-IL")}
+                </span>
+              )}
             </div>
 
             {therapist.bio && (

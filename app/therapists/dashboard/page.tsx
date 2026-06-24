@@ -321,6 +321,30 @@ function TherapistDashboard() {
     ? { text: "נדחה", color: "bg-red-100 text-red-800" }
     : { text: "ממתין לאישור", color: "bg-yellow-100 text-yellow-800" };
 
+  // "What to improve" — prioritized, actionable suggestions tied to profile
+  // completeness and (for promoted therapists) the funnel. Empty = looks good.
+  const improvements: { icon: string; text: string }[] = [];
+  if (profile) {
+    if (!profile.profile_photo_path)
+      improvements.push({ icon: "🖼️", text: "הוסף/י תמונת פרופיל — פרופילים עם תמונה מקבלים פניות רבות יותר באופן משמעותי." });
+    if (!profile.bio || profile.bio.trim().length < 80)
+      improvements.push({ icon: "✍️", text: "הרחב/י את הביוגרפיה (2–3 משפטים על הגישה, הניסיון והייחוד שלך) — מגביר אמון והקלקות." });
+    if ((!profile.regions || profile.regions.length === 0) && !profile.online)
+      improvements.push({ icon: "📍", text: "הוסף/י אזורי טיפול או סמן/י עבודה אונליין — בלי זה קשה למטופלים למצוא אותך." });
+    if (!profile.education || !profile.education.trim())
+      improvements.push({ icon: "🎓", text: "הוסף/י פרטי השכלה והכשרה — מחזק את האמינות המקצועית." });
+
+    if (profile.status === "paying") {
+      const imp = stats?.match_impressions?.month ?? 0;
+      const views = stats?.profile_views?.month ?? 0;
+      const contacts = stats?.month?.total ?? 0;
+      if (imp >= 20 && views / imp < 0.15)
+        improvements.push({ icon: "👁️", text: "הופעת הרבה בתוצאות ההתאמה אך מעט נכנסו לפרופיל — תמונה וכותרת ביו חזקה מגדילות את אחוז ההקלקה." });
+      if (views >= 15 && contacts === 0)
+        improvements.push({ icon: "💬", text: "אנשים נכנסו לפרופיל אך עדיין לא פנו — ביו ברור, הסדרים שקופים ומחיר עוזרים להפוך צפייה לפנייה." });
+    }
+  }
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
@@ -492,6 +516,33 @@ function TherapistDashboard() {
 
       {/* Enriched stats (paying only) */}
       {token && !isNew && profile?.status === "paying" && stats?.enriched && <EnrichedStatsPanel data={stats.enriched} />}
+
+      {/* What to improve */}
+      {!isNew && profile && (
+        <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-5">
+          <h2 className="text-base font-extrabold text-stone-900 mb-3">💡 מה כדאי לשפר</h2>
+          {improvements.length === 0 ? (
+            <p className="text-sm text-stone-600 leading-6">
+              הפרופיל שלך נראה מצוין — כל הפרטים המרכזיים מולאו. המשך/י כך! 🎉
+            </p>
+          ) : (
+            <>
+              <ul className="space-y-2.5">
+                {improvements.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm text-stone-700 leading-6">
+                    <span className="flex-shrink-0">{s.icon}</span>
+                    <span>{s.text}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link href="/therapists/dashboard/edit"
+                className="mt-4 inline-block rounded-xl bg-[#2e7d8c] px-5 py-2.5 text-sm font-bold text-white hover:opacity-90">
+                לעריכת הפרופיל
+              </Link>
+            </>
+          )}
+        </div>
+      )}
 
       {/* New user: prompt to complete profile */}
       {isNew && (
