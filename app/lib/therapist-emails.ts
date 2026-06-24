@@ -11,6 +11,13 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 const FROM = "טיפול חכם <noreply@mentalytics.co.il>";
+const ADMIN_RECIPIENTS = (
+  process.env.WEEKLY_REPORT_TO ??
+  "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com"
+)
+  .split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 function escapeHtml(str: string): string {
   return str
@@ -48,8 +55,9 @@ const REASON_TEXTS: Record<PromotionEndedReason, { subject: string; body: string
     subject: "המנוי שלך באתר טיפול חכם בוטל",
     body:
       "המנוי החודשי שלך באתר טיפול חכם בוטל בעקבות בקשתך." +
-      " הוראת הקבע אצל Sumit הופסקה ולא ייגבו ממך תשלומים נוספים." +
-      " תודה שהיית חלק מהמערכת — אם בעתיד תרצה/י לחזור, ניתן להירשם מחדש מהאתר.",
+      " הוראת הקבע הופסקה ולא ייגבו ממך תשלומים נוספים." +
+      " אנחנו מצטערים לראות אותך עוזב/ת, ותודה שהיית חלק מטיפול חכם 🙏" +
+      " כל שאלה, הערה או תלונה — אנחנו כאן וזה חשוב לנו. ואם בעתיד תרצה/י לחזור, ניתן להירשם מחדש מהאתר בכל עת.",
   },
   trial_expired: {
     subject: "תקופת הניסיון שלך באתר טיפול חכם הסתיימה",
@@ -80,6 +88,17 @@ export async function sendPromotionEndedEmail(opts: {
   const safeBody = escapeHtml(body);
   const checkoutUrl = `${SITE_URL}/therapists/checkout`;
   const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const feedbackUrl = `${SITE_URL}/therapists/feedback?email=${encodeURIComponent(opts.to)}&name=${encodeURIComponent(opts.name || "")}`;
+
+  // For a deliberate cancellation, invite quick exit feedback (reasons + free
+  // text) via a short on-site form. Not shown for payment-failure / gift-end.
+  const feedbackHtml =
+    opts.reason === "customer_cancellation"
+      ? `<p style="margin:0 0 12px;">אם יש דקה — נשמח מאוד לדעת מה גרם לך לעזוב, זה עוזר לנו להשתפר:</p>
+      <p style="margin:0 0 24px;">
+        <a href="${feedbackUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">שיתוף הסיבה לביטול</a>
+      </p>`
+      : "";
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
@@ -87,6 +106,7 @@ export async function sendPromotionEndedEmail(opts: {
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">${safeBody}</p>
+      ${feedbackHtml}
       <p style="margin:0 0 24px;">לתחילת מסלול בתשלום:</p>
       <p style="margin:0 0 16px;">
         <a href="${checkoutUrl}"
@@ -122,6 +142,64 @@ export async function sendPromotionEndedEmail(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
     console.error("sendPromotionEndedEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// Internal: a therapist's exit feedback after they cancel (reasons + free
+// text), submitted from the on-site /therapists/feedback form. Goes to the
+// admin team, not to the therapist.
+export async function sendCancellationFeedbackEmail(opts: {
+  name?: string;
+  email?: string;
+  reasons: string[];
+  message?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendCancellationFeedbackEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  const safeName = escapeHtml(opts.name?.trim() || "—");
+  const safeEmail = escapeHtml(opts.email?.trim() || "—");
+  const reasonsHtml =
+    opts.reasons.length > 0
+      ? `<ul style="margin:0 0 12px;padding-inline-start:18px;">${opts.reasons
+          .map((r) => `<li>${escapeHtml(r)}</li>`)
+          .join("")}</ul>`
+      : `<p style="margin:0 0 12px;color:#888;">לא נבחרו סיבות.</p>`;
+  const messageHtml = opts.message?.trim()
+    ? `<p style="margin:0 0 6px;font-weight:bold;">הערות חופשיות:</p><p style="margin:0 0 12px;white-space:pre-line;">${escapeHtml(opts.message.trim())}</p>`
+    : "";
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      <h1 style="color:#0F5468;font-size:18px;margin:0 0 16px;">משוב ביטול ממטפל/ת</h1>
+      <p style="margin:0 0 6px;"><strong>שם:</strong> ${safeName}</p>
+      <p style="margin:0 0 16px;"><strong>מייל:</strong> ${safeEmail}</p>
+      <p style="margin:0 0 6px;font-weight:bold;">סיבות שנבחרו:</p>
+      ${reasonsHtml}
+      ${messageHtml}
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM,
+      to: ADMIN_RECIPIENTS,
+      subject: `משוב ביטול ממטפל/ת — ${opts.name?.trim() || opts.email?.trim() || "ללא שם"}`,
+      html,
+    });
+    if (error) {
+      console.error("sendCancellationFeedbackEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendCancellationFeedbackEmail: throw:", msg);
     return { ok: false, error: msg };
   }
 }
