@@ -68,19 +68,29 @@ export default function TherapistArticlesPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) return;
     setSaving(true);
     setMsg("");
     setErr("");
 
+    // Fresh token at submit — the one captured at load may have expired during
+    // a long edit (Supabase JWTs last ~1h), which would surface as "Unauthorized".
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setErr("פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש.");
+      setSaving(false);
+      return;
+    }
+    setToken(accessToken);
+
     const res = await fetch("/api/therapists/articles", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify({ title, topic, summary, body }),
     });
     const json = await res.json();
     if (!json.ok) {
-      setErr(json.error ?? "שגיאה בשליחה");
+      setErr(json.error === "Unauthorized" ? "פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש." : (json.error ?? "שגיאה בשליחה"));
       setSaving(false);
       return;
     }
@@ -89,7 +99,7 @@ export default function TherapistArticlesPage() {
     setTopic("");
     setSummary("");
     setBody("");
-    await refresh(token);
+    await refresh(accessToken);
     setSaving(false);
   }
 
