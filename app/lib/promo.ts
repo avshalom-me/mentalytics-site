@@ -1,0 +1,37 @@
+// Promoted-plan pricing + the early-bird promotion.
+//
+// This module is intentionally free of secrets / server-only code so it can be
+// imported from client components, API routes, and cron jobs alike — one source
+// of truth for the prices and the promo window.
+//
+// Early-bird promo: therapists who subscribe on or before 2026-07-01 (end of
+// day, Israel time) pay SUBSCRIPTION_PROMO_PRICE for the first
+// SUBSCRIPTION_PROMO_MONTHS billing cycles. After that the standing order
+// reverts automatically to SUBSCRIPTION_REGULAR_PRICE — handled server-side by
+// the daily Sumit sync cron, which calls /billing/recurring/update.
+
+const VAT_RATE = 0.18;
+
+export const SUBSCRIPTION_REGULAR_PRICE = 140;
+export const SUBSCRIPTION_PROMO_PRICE = 90;
+export const SUBSCRIPTION_PROMO_MONTHS = 3;
+
+export const SUBSCRIPTION_REGULAR_TOTAL = +(SUBSCRIPTION_REGULAR_PRICE * (1 + VAT_RATE)).toFixed(2); // 165.20
+export const SUBSCRIPTION_PROMO_TOTAL = +(SUBSCRIPTION_PROMO_PRICE * (1 + VAT_RATE)).toFixed(2); // 106.20
+
+// 2026-07-01 23:59:59 Israel (UTC+3 in July) → 20:59:59Z.
+export const PROMO_SIGNUP_DEADLINE_ISO = "2026-07-01T20:59:59.999Z";
+
+export function isPromoActive(at: Date = new Date()): boolean {
+  return at.getTime() <= Date.parse(PROMO_SIGNUP_DEADLINE_ISO);
+}
+
+// When a promo subscription should revert to the regular price: a few days
+// before the 4th monthly charge (i.e. after 3 charges at the promo price),
+// giving the daily cron a safe window to apply the update before Sumit bills.
+export function promoRevertDate(signupAt: Date = new Date()): Date {
+  const d = new Date(signupAt);
+  d.setMonth(d.getMonth() + SUBSCRIPTION_PROMO_MONTHS);
+  d.setDate(d.getDate() - 3);
+  return d;
+}

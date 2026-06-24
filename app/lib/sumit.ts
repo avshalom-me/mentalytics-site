@@ -17,13 +17,17 @@
 //   https://app.sumit.co.il/help/developers/swagger/index.html
 //   https://help.sumit.co.il/he/articles/5833033 (charging with API)
 
+import { SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+
 const API_BASE = process.env.SUMIT_API_BASE || "https://api.sumit.co.il";
 
 // Israeli VAT, 18% since 2025-01-01. VATIncluded=false on charge bodies tells
 // Sumit to add VAT on top of UnitPrice and report it cleanly on the invoice.
 const VAT_RATE = 0.18;
 export const QUIZ_BASE_PRICE = 30;
-export const SUBSCRIPTION_BASE_PRICE = 140;
+// Regular monthly price. Single source of truth lives in app/lib/promo.ts so
+// client/server/cron never diverge.
+export const SUBSCRIPTION_BASE_PRICE = SUBSCRIPTION_REGULAR_PRICE;
 export const QUIZ_TOTAL = +(QUIZ_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
 export const SUBSCRIPTION_TOTAL = +(SUBSCRIPTION_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
 
@@ -123,6 +127,10 @@ export async function createSubscription(opts: {
   therapistEmail: string;
   therapistPhone?: string;
   singleUseToken: string;
+  // Per-subscription price. Defaults to the regular price; the early-bird
+  // promo passes the discounted price here and the daily cron later updates
+  // the standing order back to SUBSCRIPTION_BASE_PRICE.
+  unitPrice?: number;
 }): Promise<SubscriptionChargeResult> {
   const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
     Customer: {
@@ -141,7 +149,7 @@ export async function createSubscription(opts: {
           Duration_Months: 1,
         },
         Quantity: 1,
-        UnitPrice: SUBSCRIPTION_BASE_PRICE,
+        UnitPrice: opts.unitPrice ?? SUBSCRIPTION_BASE_PRICE,
         // Recurrence is how many times Sumit will charge after the first.
         // 999 = effectively "until cancelled". We control cancellation via
         // the cancelSubscription endpoint below.
@@ -216,6 +224,42 @@ export async function cancelSubscription(opts: {
   if (stillActive) {
     throw new Error(
       `Sumit cancel did not take effect: recurring item ${opts.recurringItemId} is still active`
+    );
+  }
+}
+
+// ---------- Update the price of an existing standing order ----------
+//
+// Sumit endpoint POST /billing/recurring/update/ — identifies the order by
+// RecurringCustomerItemID (same field as cancel) and sets a new UnitPrice.
+// Used to auto-revert the early-bird promo (₪90 → ₪140) after 3 cycles
+// without touching the customer's saved card. We re-read the item afterwards
+// and throw unless the new price actually applied — money-critical, so a
+// "success" here must mean the next charge will be at the new amount.
+export async function updateRecurringPrice(opts: {
+  recurringItemId: number;
+  customerExternalId: string;
+  unitPrice: number;
+}): Promise<void> {
+  await api("/billing/recurring/update/", {
+    Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+    RecurringCustomerItemID: opts.recurringItemId,
+    UnitPrice: opts.unitPrice,
+  });
+
+  const after = await listRecurringForCustomer({
+    externalIdentifier: opts.customerExternalId,
+    includeInactive: true,
+  });
+  const item = after.find((i) => Number(i.ID) === opts.recurringItemId);
+  if (!item || item.Status !== 0) {
+    throw new Error(
+      `Sumit update did not take effect: recurring item ${opts.recurringItemId} not active after update`
+    );
+  }
+  if (typeof item.UnitPrice === "number" && Math.round(item.UnitPrice) !== Math.round(opts.unitPrice)) {
+    throw new Error(
+      `Sumit update price mismatch: item ${opts.recurringItemId} is ${item.UnitPrice}, expected ${opts.unitPrice}`
     );
   }
 }

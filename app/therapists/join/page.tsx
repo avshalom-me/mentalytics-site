@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
+import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 
 export const metadata: Metadata = {
   title: "הצטרפות מטפלים | טיפול חכם",
@@ -32,6 +33,7 @@ const faqs = [
 ];
 
 export default function TherapistJoinPage() {
+  const promo = isPromoActive();
   return (
     <main
       className="mx-auto max-w-5xl px-5 pb-20"
@@ -158,7 +160,13 @@ export default function TherapistJoinPage() {
                   </ul>
                 </li>
               </ul>
-              <p className="mt-4 text-xs opacity-70" style={{ color: "var(--teal-dark)" }}>* מבצע פתיחה — &#8362;140 + מע&quot;מ / לחודש</p>
+              {promo ? (
+                <p className="mt-4 text-xs opacity-80" style={{ color: "var(--teal-dark)" }}>
+                  <strong>מבצע פתיחה:</strong> &#8362;{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ לחודש ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן &#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ / לחודש
+                </p>
+              ) : (
+                <p className="mt-4 text-xs opacity-70" style={{ color: "var(--teal-dark)" }}>* &#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ / לחודש</p>
+              )}
             </div>
           </div>
         </div>

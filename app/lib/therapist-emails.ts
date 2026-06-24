@@ -418,7 +418,7 @@ export async function sendTherapistRejectedEmail(opts: {
   }
 
   const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
-  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const editUrl = `${SITE_URL}/therapists/dashboard/edit`;
   const subject = "עדכון לגבי הרשמתך לטיפול חכם";
 
   const reasonBlock = opts.reason
@@ -434,10 +434,11 @@ export async function sendTherapistRejectedEmail(opts: {
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">תודה שנרשמת לטיפול חכם. לאחר בדיקת הפרטים, הפרופיל שלך עדיין לא אושר לפרסום.</p>
       ${reasonBlock}
-      <p style="margin:0 0 16px;">קל לתקן: היכנס/י ללוח הבקרה, עדכן/י את הפרטים הנדרשים והעלה/י תעודת רישיון או אישור מקצועי ברורים וקריאים. לאחר השמירה, הפרופיל יישלח שוב לבדיקה אוטומטית.</p>
+      <p style="margin:0 0 16px;">קל לתקן: היכנס/י לעריכת הפרופיל, עדכן/י את הפרטים הנדרשים והעלה/י תעודת רישיון או אישור מקצועי ברורים וקריאים. לאחר השמירה, הפרופיל יישלח שוב לבדיקה אוטומטית.</p>
       <p style="margin:0 0 16px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעדכון הפרטים</a>
+        <a href="${editUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
       </p>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
@@ -475,7 +476,7 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   }
 
   const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
-  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const editUrl = `${SITE_URL}/therapists/dashboard/edit`;
   const subject = "נשאר צעד קטן להשלמת הפרופיל שלך בטיפול חכם";
 
   const safeMessage = escapeHtml(
@@ -488,10 +489,11 @@ export async function sendTherapistCompletionRequestEmail(opts: {
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <div style="white-space:pre-line;margin:0 0 18px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
-      <p style="margin:0 0 16px;">היכנס/י ללוח הבקרה, השלם/י את הפרטים, ולאחר השמירה הפרופיל יישלח אוטומטית לבדיקה.</p>
+      <p style="margin:0 0 16px;">היכנס/י לעריכת הפרופיל, השלם/י את הפרטים, ולאחר השמירה הפרופיל יישלח אוטומטית לבדיקה.</p>
       <p style="margin:0 0 16px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">להשלמת הפרופיל</a>
+        <a href="${editUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
       </p>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>

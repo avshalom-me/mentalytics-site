@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createSubscription, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, promoRevertDate } from "@/app/lib/promo";
 import { writeAudit } from "@/app/lib/audit";
 import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
 import { sanitizeClickIds } from "@/app/lib/attribution";
@@ -138,12 +139,19 @@ export async function POST(req: NextRequest) {
     // can be uploaded to Google Ads / Meta with exact click attribution.
     const clickIds = sanitizeClickIds(body);
 
+    // Early-bird promo: discounted price for the first cycles for therapists
+    // who subscribe before the deadline. The standing order is created at this
+    // price; the daily cron reverts it to the regular price after the promo
+    // window (see promoRevertDate + sumit-status-sync).
+    const promoActive = isPromoActive();
+    const unitPrice = promoActive ? SUBSCRIPTION_PROMO_PRICE : SUBSCRIPTION_BASE_PRICE;
+
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
       .insert({
         payment_type: "subscription",
         reference_id: therapist.id,
-        amount: SUBSCRIPTION_BASE_PRICE,
+        amount: unitPrice,
         status: "pending",
         metadata: { therapist_name: clientName, email: clientEmail, phone: cleanPhone },
         gclid: clickIds.gclid,
@@ -171,6 +179,7 @@ export async function POST(req: NextRequest) {
         therapistEmail: clientEmail,
         therapistPhone: cleanPhone,
         singleUseToken,
+        unitPrice,
       });
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "unknown error";
@@ -211,9 +220,13 @@ export async function POST(req: NextRequest) {
           {
             therapist_id: therapist.id,
             status: "active",
+            amount: unitPrice,
             current_period_start: now.toISOString(),
             current_period_end: periodEnd.toISOString(),
             morning_token_id: sumitRecurringId ? String(sumitRecurringId) : null,
+            // When to auto-revert the promo price to the regular price. null for
+            // non-promo subscriptions (they're already at the regular price).
+            promo_reverts_at: promoActive ? promoRevertDate(now).toISOString() : null,
             updated_at: now.toISOString(),
           },
           { onConflict: "therapist_id" }

@@ -5,6 +5,14 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { getClickIds } from "@/app/lib/attribution";
+import {
+  isPromoActive,
+  SUBSCRIPTION_PROMO_PRICE,
+  SUBSCRIPTION_PROMO_TOTAL,
+  SUBSCRIPTION_PROMO_MONTHS,
+  SUBSCRIPTION_REGULAR_PRICE,
+  SUBSCRIPTION_REGULAR_TOTAL,
+} from "@/app/lib/promo";
 
 // Sumit's Vault API: card data goes from the browser directly to Sumit, never
 // through our server. PCI scope is effectively SAQ-A. The "json" variant of
@@ -33,6 +41,7 @@ function formatCardNumber(raw: string): string {
 function CheckoutForm() {
   const searchParams = useSearchParams();
   const isNewSignup = searchParams.get("mode") === "register";
+  const promo = isPromoActive();
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -209,9 +218,28 @@ function CheckoutForm() {
       <div className="mt-4 rounded-xl border border-[#E8E0D8] bg-white p-4">
         <div className="flex justify-between items-center">
           <span className="font-bold text-stone-800">מנוי חודשי — מסלול מקודם</span>
-          <span className="font-black text-[#0F5468]">&#8362;140 + מע&quot;מ</span>
+          {promo ? (
+            <span className="text-left">
+              <span className="font-black text-[#0F5468]">&#8362;{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ</span>
+              <span className="block text-[11px] font-normal text-stone-400 line-through">&#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ</span>
+            </span>
+          ) : (
+            <span className="font-black text-[#0F5468]">&#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ</span>
+          )}
         </div>
-        <p className="text-xs text-stone-500 mt-1">חיוב חודשי מתחדש. ניתן לבטל בכל עת.</p>
+        {promo ? (
+          <div className="mt-2 rounded-lg bg-[#FDF6EE] border border-[#E8DCC8] px-3 py-2">
+            <p className="text-xs font-bold text-[#8B5A0A]">מבצע פתיחה 🎉</p>
+            <p className="text-xs text-stone-600 mt-0.5 leading-5">
+              ₪{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ לחודש ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן ₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ לחודש. ניתן לבטל בכל עת.
+            </p>
+          </div>
+        ) : (
+          <p className="text-xs text-stone-500 mt-1">חיוב חודשי מתחדש. ניתן לבטל בכל עת.</p>
+        )}
+        <p className="text-xs text-stone-600 mt-2 leading-5">
+          <strong>ללא סיכון:</strong> בכל מקרה ניתן לקבל החזר כספי מלא אחרי חודשיים אם לא נקלטה אף פנייה והמנוי לא הצדיק את עצמו.
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -370,7 +398,9 @@ function CheckoutForm() {
             >
               תקנון הרכישה
             </Link>{" "}
-            ואת החיוב החודשי המתחדש של ₪140 + מע&quot;מ עד לביטול.
+            {promo
+              ? `ואת החיוב החודשי המתחדש — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים ולאחר מכן ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ — עד לביטול.`
+              : `ואת החיוב החודשי המתחדש של ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ עד לביטול.`}
           </span>
         </label>
 
@@ -387,7 +417,7 @@ function CheckoutForm() {
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
             <>
-              חיוב מאובטח — ₪165.20
+              חיוב מאובטח — ₪{promo ? SUBSCRIPTION_PROMO_TOTAL : SUBSCRIPTION_REGULAR_TOTAL}
               <ArrowLeft size={16} className="inline mr-2" />
             </>
           )}

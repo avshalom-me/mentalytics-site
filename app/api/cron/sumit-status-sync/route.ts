@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { Resend } from "resend";
-import { listRecurringForCustomer, cancelSubscription } from "@/app/lib/sumit";
+import { listRecurringForCustomer, cancelSubscription, updateRecurringPrice, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 
@@ -86,6 +86,7 @@ export async function GET(req: NextRequest) {
   let orphansFound = 0;
   let orphansCancelled = 0;
   let orphanAlerts = 0;
+  let promosReverted = 0;
 
   // -------- (1) Sumit subscription state for paid therapists --------
   const { data: paidTherapists } = await supabase
@@ -280,6 +281,60 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -------- (4) Early-bird promo price reverts --------
+  // Subscriptions created at the promo price carry a promo_reverts_at date
+  // (set a few days before the 4th charge). Once that date passes, update the
+  // standing order's UnitPrice back to the regular price at Sumit so the next
+  // charge is full price, then clear the flag. updateRecurringPrice verifies
+  // the change took effect; on failure we leave promo_reverts_at set so the
+  // next run retries (the therapist stays at the promo price meanwhile — a
+  // safe direction to fail).
+  const { data: promoSubs } = await supabase
+    .from("subscriptions")
+    .select("id, therapist_id, morning_token_id, promo_reverts_at")
+    .eq("status", "active")
+    .not("promo_reverts_at", "is", null)
+    .lte("promo_reverts_at", nowIso);
+
+  for (const sub of promoSubs ?? []) {
+    const recurringId = sub.morning_token_id as string | null;
+    if (!recurringId) {
+      // No Sumit recurring id → can't update the price programmatically.
+      errors++;
+      console.error(
+        `Promo revert: therapist ${sub.therapist_id} has promo_reverts_at but no morning_token_id; cannot update price at Sumit.`
+      );
+      continue;
+    }
+    try {
+      await updateRecurringPrice({
+        recurringItemId: parseInt(recurringId, 10),
+        customerExternalId: sub.therapist_id,
+        unitPrice: SUBSCRIPTION_BASE_PRICE,
+      });
+      await supabase
+        .from("subscriptions")
+        .update({
+          amount: SUBSCRIPTION_BASE_PRICE,
+          promo_reverts_at: null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", sub.id);
+      await writeAudit(supabase, {
+        therapistId: sub.therapist_id,
+        actorType: "cron",
+        action: "promo_price_reverted",
+        before: { promo_reverts_at: sub.promo_reverts_at },
+        after: { amount: SUBSCRIPTION_BASE_PRICE },
+        reason: "early_bird_promo_ended",
+      });
+      promosReverted++;
+    } catch (err) {
+      errors++;
+      console.error(`Promo revert failed for therapist ${sub.therapist_id}:`, err);
+    }
+  }
+
   return NextResponse.json({
     checked,
     stillActive,
@@ -288,6 +343,7 @@ export async function GET(req: NextRequest) {
     orphansFound,
     orphansCancelled,
     orphanAlerts,
+    promosReverted,
     errors,
   });
 }
