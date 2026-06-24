@@ -2834,6 +2834,16 @@ export default function AdultsPage() {
                       אישיותי: {t.personality_score}%
                     </div>
                   )}
+                  {(() => {
+                    const pref = selectedRec?.couplesModality ?? combinedCouplesModality;
+                    const tMods = Array.isArray(t.couples_modalities) ? t.couples_modalities : [];
+                    const matchesPref = pref && tMods.some((m: string) => String(m).trim().toLowerCase() === String(pref).trim().toLowerCase());
+                    return matchesPref ? (
+                      <div className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
+                        ✓ עובד/ת בגישת {pref} שהותאמה לך
+                      </div>
+                    ) : null;
+                  })()}
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <a

@@ -866,15 +866,18 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         const struSum = sum(r.structScores);
         const maxSum = Math.max(eftSum, dynSum, struSum);
 
-        let approachLabel = "טיפול זוגי";
         let modality: string | undefined;
-        if (maxSum > 0 && maxSum === eftSum) { approachLabel = "EFT (טיפול ממוקד רגש)"; modality = "EFT"; }
-        else if (maxSum > 0 && maxSum === dynSum) { approachLabel = "טיפול זוגי דינמי"; modality = "דינאמי"; }
-        else if (maxSum > 0) { approachLabel = "טיפול זוגי מבני"; modality = "מבני"; }
+        let modalityName: string | undefined; // text that follows "בהעדפה ל"
+        if (maxSum > 0 && maxSum === eftSum) { modality = "EFT"; modalityName = "גישת EFT הממוקדת ברגש"; }
+        else if (maxSum > 0 && maxSum === dynSum) { modality = "דינאמי"; modalityName = "גישה דינמית"; }
+        else if (maxSum > 0) { modality = "מבני"; modalityName = "גישה מבנית"; }
+
+        // Soft preference: couples therapy, with a preferred approach when one stands out.
+        const approachLabel = modalityName ? `טיפול זוגי (בהעדפה ל${modalityName})` : "טיפול זוגי";
 
         recs.push({
           id: uid("couple-therapy"),
-          symptomText: `נמצא קושי בקשר הזוגי. מומלץ ${approachLabel}.`,
+          symptomText: `נמצא קושי בקשר הזוגי. מומלץ טיפול זוגי${modalityName ? `, בהעדפה ל${modalityName}` : ""}.`,
           treatment: "טיפול זוגי",
           treatmentLabel: approachLabel,
           domain: "זוגיות ומשפחה",
