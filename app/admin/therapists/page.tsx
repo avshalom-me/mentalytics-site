@@ -108,6 +108,7 @@ export default function AdminTherapistsPage() {
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
+  const [giftMonths, setGiftMonths] = useState(1);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [completionFor, setCompletionFor] = useState<AdminTherapist | null>(null);
@@ -205,7 +206,8 @@ export default function AdminTherapistsPage() {
     id: string,
     status: "approved" | "rejected" | "pending" | "paying",
     promotedUntil?: string | null,
-    reason?: string
+    reason?: string,
+    giftMonthsCount?: number | null
   ) {
     try {
       setActionLoadingId(id);
@@ -217,6 +219,7 @@ export default function AdminTherapistsPage() {
           id,
           status,
           ...(promotedUntil ? { promoted_until: promotedUntil } : {}),
+          ...(giftMonthsCount ? { gift_months: giftMonthsCount } : {}),
           ...(reason ? { reason } : {}),
         }),
       });
@@ -356,7 +359,7 @@ export default function AdminTherapistsPage() {
     const d = new Date();
     if (monthsAhead === 12) d.setFullYear(d.getFullYear() + 1);
     else d.setMonth(d.getMonth() + monthsAhead);
-    await updateStatus(id, "paying", d.toISOString());
+    await updateStatus(id, "paying", d.toISOString(), undefined, monthsAhead);
   }
 
   if (loading) return <div className="p-6 text-center">טוען מטפלים...</div>;
@@ -534,7 +537,7 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                   style={{ background: "linear-gradient(135deg,#b8860b,#d4a017)" }}
-                  onClick={() => setPromotingId(therapist.id)}>
+                  onClick={() => { setGiftMonths(1); setPromotingId(therapist.id); }}>
                   {isBusy ? "מעדכן..." : "★ שדרג למקודם"}
                 </button>
               )}
@@ -886,48 +889,51 @@ export default function AdminTherapistsPage() {
             <p className="mb-5 text-sm text-stone-600">
               לכמה זמן להעניק את ההטבה? בסיום התקופה הקידום ייפסק אוטומטית והמטפל יקבל מייל.
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => confirmPromote(promotingId, null)}
-                className="rounded-xl border border-stone-300 bg-white px-4 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50"
-              >
-                לתמיד
-                <div className="mt-0.5 text-[11px] font-normal text-stone-500">ללא תאריך תפוגה</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmPromote(promotingId, 1)}
-                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-              >
-                חודש
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmPromote(promotingId, 2)}
-                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-              >
-                חודשיים
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmPromote(promotingId, 6)}
-                className="rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-              >
-                חצי שנה
-              </button>
-              <button
-                type="button"
-                onClick={() => confirmPromote(promotingId, 12)}
-                className="col-span-2 rounded-xl border border-indigo-300 bg-indigo-50 px-4 py-3 text-sm font-semibold text-indigo-800 hover:bg-indigo-100"
-              >
-                שנה
-              </button>
+
+            {/* Choose any number of gift months, 1–12 */}
+            <label className="mb-2 block text-sm font-semibold text-stone-800">
+              מספר חודשי קידום במתנה
+            </label>
+            <div className="grid grid-cols-6 gap-2">
+              {Array.from({ length: 12 }, (_, k) => k + 1).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setGiftMonths(m)}
+                  className={`rounded-xl border px-0 py-3 text-sm font-bold transition ${
+                    giftMonths === m
+                      ? "border-indigo-600 bg-indigo-600 text-white"
+                      : "border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
             </div>
+            <p className="mt-2 text-xs text-stone-500">
+              נבחרו <span className="font-bold text-stone-700">{giftMonths}</span> {giftMonths === 1 ? "חודש" : "חודשים"} של קידום במתנה.
+            </p>
+
+            <button
+              type="button"
+              onClick={() => confirmPromote(promotingId, giftMonths)}
+              className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700"
+            >
+              העניק/י {giftMonths} {giftMonths === 1 ? "חודש" : "חודשים"} קידום במתנה
+            </button>
+
+            <button
+              type="button"
+              onClick={() => confirmPromote(promotingId, null)}
+              className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+            >
+              קידום לתמיד (ללא תאריך תפוגה)
+            </button>
+
             <button
               type="button"
               onClick={() => setPromotingId(null)}
-              className="mt-4 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100"
+              className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100"
             >
               ביטול
             </button>

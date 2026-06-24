@@ -131,6 +131,7 @@ export async function sendPromotionGrantedEmail(opts: {
   source: PromotionGrantedSource;
   promotedUntilIso: string | null;
   wasPreviouslyPaying?: boolean;
+  giftMonths?: number | null;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendPromotionGrantedEmail: RESEND_API_KEY not configured, skipping");
@@ -148,9 +149,17 @@ export async function sendPromotionGrantedEmail(opts: {
     ? `המנוי בתשלום שלך באתר טיפול חכם הוסב <strong>למסלול הטבה ללא עלות</strong>. הוראת הקבע אצל Sumit בוטלה ולא ייגבו ממך תשלומים נוספים.`
     : `קיבלת <strong>קידום מתנה</strong> למסלול המקודם באתר טיפול חכם, ללא תשלום מצדך.`;
 
+  const monthsText = opts.giftMonths
+    ? opts.giftMonths === 1
+      ? "חודש קידום אחד במתנה"
+      : `${opts.giftMonths} חודשי קידום במתנה`
+    : null;
+
   const durationLine =
     opts.source === "manual" || !opts.promotedUntilIso
       ? "ההטבה אינה מוגבלת בזמן ותימשך עד הודעה חדשה."
+      : monthsText
+      ? `קיבלת ${monthsText}. ההטבה תקפה עד ${new Date(opts.promotedUntilIso).toLocaleDateString("he-IL")}, ולקראת סיום התקופה תקבל/י תזכורת.`
       : `ההטבה תקפה עד ${new Date(opts.promotedUntilIso).toLocaleDateString("he-IL")}. לקראת סיום התקופה תקבל/י תזכורת.`;
 
   const html = `<!doctype html>

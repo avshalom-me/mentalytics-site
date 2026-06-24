@@ -620,12 +620,14 @@ export async function PATCH(request: Request) {
       });
     }
     if (sendGrantedEmail && before.email) {
+      const giftMonths = Number.isInteger(body?.gift_months) ? Number(body.gift_months) : null;
       await sendPromotionGrantedEmail({
         to: before.email,
         name: before.full_name ?? "",
         source: promotedUntilIso ? "trial" : "manual",
         promotedUntilIso,
         wasPreviouslyPaying: convertedFromPaying,
+        giftMonths,
       });
     }
     if (sendFreeWelcome && before.email) {
