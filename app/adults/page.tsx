@@ -751,6 +751,8 @@ export default function AdultsPage() {
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const recommendedTreatments = scoring?.recommendations.map(r => r.treatment) ?? [];
+      // The couples modality this search was run for (EFT / דינאמי / מבני), if any.
+      const couplesModality = selectedRec?.couplesModality ?? (combinedTreatments ? combinedCouplesModality : undefined);
       const userSummary = {
         age_group: answers.age ? `${answers.age}` : undefined,
         region_preference: matchPrefs.city || matchPrefs.region || undefined,
@@ -758,6 +760,7 @@ export default function AdultsPage() {
         therapist_gender_preference: matchPrefs.genderPref || undefined,
         main_needs: scoring?.recommendations.map(r => r.symptomText) ?? [],
         recommended_treatment_types: recommendedTreatments,
+        couples_modality: couplesModality,
         cultural_preferences: matchPrefs.culturalPrefs.length ? matchPrefs.culturalPrefs : undefined,
       };
       const res = await fetch("/api/explain-match", {
@@ -772,6 +775,7 @@ export default function AdultsPage() {
             full_name: t.full_name,
             therapist_types: t.therapist_types ?? [],
             training_areas: t.training_areas ?? [],
+            couples_modalities: t.couples_modalities ?? [],
             regions: t.regions ?? [],
             online: t.online ?? false,
             gender: t.gender ?? null,

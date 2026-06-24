@@ -72,7 +72,7 @@ const WEIGHTS = {
   cultural: 5,         // cultural_prefs
   arrangements: 3,     // arrangements
   ageGroup: 15,        // age_groups
-  couplesBonus: 8,     // exact couples modality match (EFT/דינאמי/מבני)
+  couplesBonus: 15,    // exact couples modality match (EFT/דינאמי/מבני) — soft preference, not a filter
   sexualBonus: 6,      // therapist also does sexual therapy when needed
   expressiveBonus: 8,  // expressive therapy modality match (art/music/movement)
   cogfunBonus: 6,      // COG-FUN age group match (children/teens/adults)
@@ -594,6 +594,7 @@ export async function POST(req: NextRequest) {
           online: therapist.online,
           therapist_types: therapist.therapist_types,
           training_areas: therapist.training_areas,
+          couples_modalities: therapist.couples_modalities,
           regions: therapist.regions,
           cultural_prefs: therapist.cultural_prefs,
           arrangements: therapist.arrangements,

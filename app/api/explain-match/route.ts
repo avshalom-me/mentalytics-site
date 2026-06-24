@@ -19,6 +19,7 @@ const BodySchema = z.object({
       therapist_gender_preference: z.string().nullable().optional(),
       main_needs: z.array(z.string()).optional(),
       recommended_treatment_types: z.array(z.string()).optional(),
+      couples_modality: z.string().nullable().optional(),
       recommended_assessment_types: z.array(z.string()).optional(),
       recommended_therapist_types: z.array(z.string()).optional(),
       cultural_preferences: z.array(z.string()).optional(),
@@ -30,6 +31,7 @@ const BodySchema = z.object({
     full_name: z.string(),
     therapist_types: z.array(z.string()).optional(),
     training_areas: z.array(z.string()).optional(),
+    couples_modalities: z.array(z.string()).optional(),
     regions: z.array(z.string()).optional(),
     online: z.boolean().optional(),
     gender: z.string().nullable().optional(),
@@ -111,6 +113,7 @@ function buildPrompt(body: Body): string {
       full_name: body.therapist.full_name,
       therapist_types: body.therapist.therapist_types ?? [],
       training_areas: body.therapist.training_areas ?? [],
+      couples_modalities: body.therapist.couples_modalities ?? [],
       regions: body.therapist.regions ?? [],
       gender: body.therapist.gender ?? null,
       online: body.therapist.online ?? false,
@@ -147,6 +150,13 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 
 אחרת — מדובר בהפניה לטיפול. במקרה זה:
 - התמקד בהתאמה הטיפולית: גישה, הכשרה, ניסיון עם הצרכים שעלו
+
+**טיפול זוגי — סוג הגישה:**
+אם user_summary.couples_modality קיים (EFT / דינאמי / מבני) — זהו סוג הטיפול הזוגי שהומלץ למטופל לפי תשובותיו:
+- EFT = טיפול ממוקד-רגש (זיהוי דפוסי תגובה רגשיים וחיזוק הקשר הרגשי הבטוח בין בני הזוג)
+- דינאמי = בחינת השפעת ההיסטוריה האישית והדפוסים הלא-מודעים על הדינמיקה הזוגית
+- מבני = שיפור דפוסי תקשורת, גבולות, תפקידים ומבנה הכוח בזוגיות
+אם therapist.couples_modalities כולל את אותו סוג — הסבר בקצרה ובחום למה הגישה הזו מתאימה לצרכים שעלו אצל המטופל. אם המטפל/ת עובד/ת בגישה זוגית אחרת בלבד — ציין בעדינות שהוא/היא מתמחה בטיפול זוגי בגישה אחרת, שגם היא יכולה להתאים, ושכדאי לבדוק זאת מולו/ה — בלי לפסול.
 
 **המשימה:** כתוב פסקה אחת קצרה (2-4 משפטים) שמסבירה:
 1. מה בפרופיל איש/ת המקצוע מתאים לצרכים שעלו בשאלון — כולל תובנות שאינן כתובות ישירות ב-match_reasons
