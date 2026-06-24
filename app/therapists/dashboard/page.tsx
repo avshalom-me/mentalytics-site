@@ -173,23 +173,11 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
           {/* ── Enhanced stats: paying only ── */}
           {isPaying && sourceData && (
             <div className="mt-5 pt-5 border-t border-[#E8E0D8]">
-              {/* Source breakdown */}
-              <h3 className="text-sm font-bold text-stone-800 mb-3">פירוט לפי מקור</h3>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center">
-                  <div className="text-lg font-black text-teal-700">{sourceData.match.total}</div>
-                  <div className="text-xs text-teal-600 font-semibold">🎯 ממערכת ההתאמה</div>
-                </div>
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-center">
-                  <div className="text-lg font-black text-stone-700">{sourceData.directory.total}</div>
-                  <div className="text-xs text-stone-500 font-semibold">🔍 ממאגר המטפלים</div>
-                </div>
-              </div>
-
-              {/* Funnel: impressions → profile entries → conversion */}
+              {/* Funnel steps 1+2: exposure → profile entries */}
               {(impressionsValue > 0 || viewsValue > 0) && (
-                <div className="mb-4">
-                  <h3 className="text-sm font-bold text-stone-800 mb-3">חשיפה ועניין</h3>
+                <div className="mb-5">
+                  <h3 className="text-sm font-bold text-stone-800 mb-1">חשיפה ועניין</h3>
+                  <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל — לפני שלב יצירת הקשר</p>
                   <div className="grid grid-cols-2 gap-3 mb-2">
                     <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
                       <div className="text-lg font-black text-indigo-700">{impressionsValue}</div>
@@ -207,6 +195,25 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
                       יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מהמופיעים נכנסו לפרופיל
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* Funnel step 3: contacts by source */}
+              <h3 className="text-sm font-bold text-stone-800 mb-1">פניות לפי מקור</h3>
+              <p className="text-[11px] text-stone-500 mb-3">אנשים שלחצו ליצירת קשר (וואטסאפ / טלפון / מייל)</p>
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center">
+                  <div className="text-lg font-black text-teal-700">{sourceData.match.total}</div>
+                  <div className="text-xs text-teal-600 font-semibold">🎯 ממערכת ההתאמה</div>
+                </div>
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-center">
+                  <div className="text-lg font-black text-stone-700">{sourceData.directory.total}</div>
+                  <div className="text-xs text-stone-500 font-semibold">🔍 ממאגר המטפלים</div>
+                </div>
+              </div>
+              {sourceData.match.total + sourceData.directory.total === 0 && viewsValue > 0 && (
+                <div className="rounded-xl bg-[#f0ece4] px-4 py-3 mb-4 text-center text-xs text-stone-600">
+                  עדיין אין פניות — אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
                 </div>
               )}
 
