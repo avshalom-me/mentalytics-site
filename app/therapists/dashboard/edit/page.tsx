@@ -142,13 +142,13 @@ export default function TherapistProfileEditPage() {
     init();
   }, []);
 
-  async function uploadFile(file: File, type: "photo" | "certificate"): Promise<string | null> {
+  async function uploadFile(file: File, type: "photo" | "certificate", accessToken: string): Promise<string | null> {
     const fd = new FormData();
     fd.append("file", file);
     fd.append("type", type);
     const res = await fetch("/api/therapist-upload", {
       method: "POST",
-      headers: { Authorization: `Bearer ${token}` },
+      headers: { Authorization: `Bearer ${accessToken}` },
       body: fd,
     });
     if (!res.ok) {
@@ -160,10 +160,22 @@ export default function TherapistProfileEditPage() {
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!token) return;
     setSaving(true);
     setSaveMsg("");
     setSaveErr("");
+
+    // Fetch a FRESH token at submit time. The token captured at page load can
+    // expire while a therapist fills the (long) form — Supabase JWTs last ~1h —
+    // which previously surfaced as a raw "Unauthorized" on save. getSession()
+    // returns the auto-refreshed token held by the client.
+    const { data: { session } } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
+    if (!accessToken) {
+      setSaveErr("פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש, והפרטים יישמרו.");
+      setSaving(false);
+      return;
+    }
+    setToken(accessToken);
 
     const { play_therapy_modalities, cogfun_age_groups, ...rest } = form;
     const patchBody = {
@@ -173,12 +185,12 @@ export default function TherapistProfileEditPage() {
     };
     const res = await fetch("/api/therapist-profile", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
       body: JSON.stringify(patchBody),
     });
     const json = await res.json();
     if (!json.ok) {
-      setSaveErr(json.error ?? "שגיאה בשמירה");
+      setSaveErr(json.error === "Unauthorized" ? "פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש." : (json.error ?? "שגיאה בשמירה"));
       setSaving(false);
       return;
     }
@@ -187,11 +199,11 @@ export default function TherapistProfileEditPage() {
       setUploading(true);
       const uploadErrors: string[] = [];
       if (photoFile) {
-        const err = await uploadFile(photoFile, "photo");
+        const err = await uploadFile(photoFile, "photo", accessToken);
         if (err) uploadErrors.push(err);
       }
       if (certFile) {
-        const err = await uploadFile(certFile, "certificate");
+        const err = await uploadFile(certFile, "certificate", accessToken);
         if (err) uploadErrors.push(err);
       }
       setUploading(false);
