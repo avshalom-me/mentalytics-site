@@ -26,3 +26,14 @@ export function missingProfileFields(t: ProfileLike, hasCertificate: boolean): s
   if (!t.training_areas || t.training_areas.length === 0) missing.push("תחומי טיפול");
   return missing;
 }
+
+/** A ready-to-edit draft for the admin's completion request, listing the
+ *  detected gaps. It is only a starting point — the admin edits or replaces it
+ *  before sending, so the wording is the admin's, not the system's. */
+export function defaultCompletionMessage(missing: string[]): string {
+  if (missing.length === 0) {
+    return "נשמח שתשלים/י את הפרטים החסרים בפרופיל כדי שנוכל לאשר ולהציג אותו במערכת ההתאמה.";
+  }
+  const bullets = missing.map((m) => `• ${m}`).join("\n");
+  return `כדי שנוכל לאשר את הפרופיל ולהציג אותו במערכת ההתאמה, חסרים עוד הפרטים הבאים:\n${bullets}`;
+}

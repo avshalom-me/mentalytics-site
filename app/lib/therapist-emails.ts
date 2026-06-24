@@ -458,7 +458,7 @@ export async function sendTherapistRejectedEmail(opts: {
 export async function sendTherapistCompletionRequestEmail(opts: {
   to: string;
   name: string;
-  missing: string[];
+  message: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendTherapistCompletionRequestEmail: RESEND_API_KEY not configured, skipping");
@@ -469,17 +469,16 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
   const subject = "נשאר צעד קטן להשלמת הפרופיל שלך בטיפול חכם";
 
-  const items = (opts.missing.length ? opts.missing : ["השלמת הפרטים החסרים"])
-    .map((m) => `<li style="margin:4px 0;">${escapeHtml(m)}</li>`)
-    .join("");
+  const safeMessage = escapeHtml(
+    opts.message || "נשמח שתשלים/י את הפרטים החסרים בפרופיל כדי שנוכל לאשר ולהציג אותו."
+  );
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
   <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
     <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
-      <p style="margin:0 0 16px;">תודה שנרשמת לטיפול חכם! כדי שנוכל לאשר את הפרופיל ולהציג אותו במערכת ההתאמה, נשאר רק להשלים:</p>
-      <ul style="margin:0 0 18px;padding-inline-start:22px;font-size:14px;color:#0F5468;">${items}</ul>
+      <div style="white-space:pre-line;margin:0 0 18px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
       <p style="margin:0 0 16px;">היכנס/י ללוח הבקרה, השלם/י את הפרטים, ולאחר השמירה הפרופיל יישלח אוטומטית לבדיקה.</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">להשלמת הפרופיל</a>

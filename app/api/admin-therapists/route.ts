@@ -9,7 +9,7 @@ import {
   sendTherapistRejectedEmail,
   sendTherapistCompletionRequestEmail,
 } from "@/app/lib/therapist-emails";
-import { missingProfileFields } from "@/app/lib/profile-completeness";
+import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 
 type TherapistRow = {
   id: string;
@@ -254,10 +254,16 @@ export async function PATCH(request: Request) {
         .select("id", { count: "exact", head: true })
         .eq("therapist_id", id);
       const missing = missingProfileFields(t, !!certCount);
+      // The admin writes the message; fall back to a generated draft only if
+      // none was provided (e.g. an older client).
+      const message =
+        typeof body.message === "string" && body.message.trim()
+          ? body.message.trim().slice(0, 4000)
+          : defaultCompletionMessage(missing);
       const sent = await sendTherapistCompletionRequestEmail({
         to: t.email,
         name: t.full_name ?? "",
-        missing,
+        message,
       });
       await writeAudit(supabaseAdmin, {
         therapistId: id,

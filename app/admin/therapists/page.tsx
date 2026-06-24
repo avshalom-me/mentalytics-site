@@ -6,7 +6,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
 } from "@/app/lib/therapist-options";
-import { missingProfileFields } from "@/app/lib/profile-completeness";
+import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -110,6 +110,9 @@ export default function AdminTherapistsPage() {
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [completionFor, setCompletionFor] = useState<AdminTherapist | null>(null);
+  const [completionText, setCompletionText] = useState("");
+  const [completionSending, setCompletionSending] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -311,25 +314,32 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  // Emails the therapist a "please complete your profile" nudge listing what's
-  // missing (last name / certificate). Does not change their status.
-  async function requestCompletion(id: string) {
-    if (!window.confirm("לשלוח למטפל/ת מייל עם בקשה להשלים את הפרטים החסרים (שם משפחה / תעודה)?")) return;
+  // Opens the completion-request composer for a therapist, pre-filling an
+  // editable draft from the detected gaps. The admin writes/edits the actual
+  // message before it is sent — the wording is the admin's, not the system's.
+  function openCompletion(t: AdminTherapist) {
+    setCompletionFor(t);
+    setCompletionText(defaultCompletionMessage(missingProfileFields(t, t.certificates.length > 0)));
+  }
+
+  async function sendCompletion() {
+    if (!completionFor || !completionText.trim()) return;
     try {
-      setActionLoadingId(id);
+      setCompletionSending(true);
       setError("");
       const res = await fetch("/api/admin-therapists", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, action: "request_completion" }),
+        body: JSON.stringify({ id: completionFor.id, action: "request_completion", message: completionText }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
-      window.alert(`נשלחה בקשת השלמה במייל${json.missing?.length ? ` (חסר: ${json.missing.join(", ")})` : ""}.`);
+      setCompletionFor(null);
+      window.alert("בקשת ההשלמה נשלחה למטפל/ת.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
-      setActionLoadingId(null);
+      setCompletionSending(false);
     }
   }
 
@@ -553,8 +563,8 @@ export default function AdminTherapistsPage() {
               {missingProfileFields(therapist, therapist.certificates.length > 0).length > 0 && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
-                  onClick={() => requestCompletion(therapist.id)}>
-                  {isBusy ? "שולח..." : "✉️ בקש השלמה"}
+                  onClick={() => openCompletion(therapist)}>
+                  ✉️ בקש השלמה
                 </button>
               )}
               <button type="button" disabled={isBusy}
@@ -921,6 +931,36 @@ export default function AdminTherapistsPage() {
             >
               ביטול
             </button>
+          </div>
+        </div>
+      )}
+
+      {completionFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+          onClick={() => setCompletionFor(null)}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">בקשת השלמה — {completionFor.full_name || "מטפל/ת"}</h3>
+            <p className="mb-3 text-sm text-stone-600">
+              כתוב/כתבי את ההודעה שתישלח למייל של המטפל/ת. מולאה טיוטה לפי מה שחסר — אפשר לערוך, להוסיף או למחוק לגמרי ולכתוב משלך.
+            </p>
+            <textarea
+              value={completionText}
+              onChange={(e) => setCompletionText(e.target.value)}
+              rows={7}
+              dir="rtl"
+              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="מה תרצה/י לבקש מהמטפל/ת?"
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setCompletionFor(null)}
+                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50">
+                ביטול
+              </button>
+              <button type="button" onClick={sendCompletion} disabled={completionSending || !completionText.trim()}
+                className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {completionSending ? "שולח..." : "✉️ שלח למטפל/ת"}
+              </button>
+            </div>
           </div>
         </div>
       )}
