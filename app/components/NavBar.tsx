@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { User, GraduationCap, Menu, X } from "lucide-react";
+import { User, GraduationCap, Menu, X, LogIn } from "lucide-react";
 
 const navLinks = [
   { href: "/about", label: "מי אנחנו" },
@@ -18,10 +18,21 @@ export default function NavBar() {
   return (
     <header className="print:hidden" style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", borderBottom: "1px solid var(--line)" }}>
       {/* Topbar */}
-      <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)", padding: "8px 24px", fontSize: "13px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "6px" }}>
-        <span>כניסה למטפלים</span>
-        <span style={{ color: "var(--faint)" }}>›</span>
-        <Link href="/therapists/join" style={{ color: "var(--teal)", fontWeight: 600, transition: "opacity .15s" }} className="hover:opacity-75">כניסה / הרשמה</Link>
+      <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)", padding: "7px 24px", fontSize: "13px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "8px" }}>
+        <span>את/ה מטפל/ת?</span>
+        <Link
+          href="/therapists/join"
+          style={{
+            display: "inline-flex", alignItems: "center", gap: "5px",
+            color: "var(--teal-dark)", fontWeight: 700,
+            border: "1px solid var(--teal-mid)", background: "var(--teal-pale)",
+            borderRadius: "50px", padding: "3px 12px", transition: "all .15s",
+          }}
+          className="hover:bg-[var(--teal-mid)]"
+        >
+          <LogIn size={13} />
+          כניסה / הרשמה למטפלים
+        </Link>
       </div>
 
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
@@ -51,6 +62,12 @@ export default function NavBar() {
 
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-2">
+          <Link href="/therapists/join"
+            style={{ background: "white", color: "var(--teal-dark)", border: "1.5px solid var(--teal)", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "6px 15px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            className="hover:bg-[var(--teal-pale)]">
+            <LogIn size={14} />
+            כניסה למטפלים
+          </Link>
           <Link href="/kids"
             style={{ background: "var(--gold)", color: "white", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "7px 16px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--gold-dark)]">
@@ -96,6 +113,11 @@ export default function NavBar() {
           <Link href="/developers" onClick={() => setOpen(false)}
             style={{ display: "block", fontSize: "14px", fontWeight: 600, padding: "6px 0", backgroundImage: "linear-gradient(120deg,#7C3AED,#DB2777,#06B6D4)", WebkitBackgroundClip: "text", backgroundClip: "text", color: "transparent" }}>
             בית למפתחים בתחומי הטיפול
+          </Link>
+          <Link href="/therapists/join" onClick={() => setOpen(false)}
+            style={{ marginTop: "6px", display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "14px", fontWeight: 700, color: "var(--teal-dark)", border: "1.5px solid var(--teal)", background: "var(--teal-pale)", borderRadius: "50px", padding: "8px 16px" }}>
+            <LogIn size={15} />
+            כניסה / הרשמה למטפלים
           </Link>
         </nav>
       )}

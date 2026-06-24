@@ -4,7 +4,6 @@ import { useEffect, useState, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
-import { REGION_CITIES } from "@/app/lib/regions";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   AGE_GROUPS, LANGUAGES, CULTURAL_PREFS, ARRANGEMENTS,
@@ -13,8 +12,8 @@ import {
 } from "@/app/lib/therapist-options";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
+import RegionCityPicker from "@/app/components/RegionCityPicker";
 
-const ALL_CITIES = Object.values(REGION_CITIES).flat();
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
 type Profile = {
@@ -61,34 +60,6 @@ function CheckboxGroup({ label, options, selected, onChange }: {
             <input type="checkbox" checked={selected.includes(opt)} onChange={() => toggle(opt)} />
             {opt}
           </label>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RegionCheckboxGroup({ selected, onChange }: {
-  selected: string[]; onChange: (v: string[]) => void;
-}) {
-  function toggle(city: string) {
-    onChange(selected.includes(city) ? selected.filter(x => x !== city) : [...selected, city]);
-  }
-  return (
-    <div className="mb-5">
-      <div className="mb-3 text-sm font-semibold text-stone-800">ערים / אזורים</div>
-      <div className="space-y-4">
-        {Object.entries(REGION_CITIES).map(([region, cities]) => (
-          <div key={region}>
-            <div className="mb-1.5 text-xs font-bold text-[#2e7d8c] uppercase tracking-wide">{region}</div>
-            <div className="flex flex-wrap gap-2">
-              {cities.map(city => (
-                <label key={city} className="flex cursor-pointer items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 py-1 text-xs hover:bg-stone-50">
-                  <input type="checkbox" checked={selected.includes(city)} onChange={() => toggle(city)} />
-                  {city}
-                </label>
-              ))}
-            </div>
-          </div>
         ))}
       </div>
     </div>
@@ -545,7 +516,6 @@ function TherapistDashboard() {
 
           {/* Promoted */}
           <div className="rounded-2xl border-2 border-[#1A7A96] p-6 flex flex-col relative" style={{ background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" }}>
-            <span className="absolute top-4 left-4 text-xs font-black rounded-full px-2.5 py-1 bg-yellow-400 text-yellow-900">★ מומלץ</span>
             <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300 self-start mb-3">★ מקודם</span>
             <h2 className="text-lg font-bold text-[#1a4a5c] mb-1">מסלול מקודם</h2>
             <p className="text-xl font-black text-[#0F5468] mb-1">מבצע פתיחה — ₪140 + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span></p>
@@ -834,7 +804,11 @@ function TherapistDashboard() {
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">אזור ופרטים נוספים</h2>
-          <RegionCheckboxGroup selected={form.regions} onChange={v => setForm({...form, regions: v})} />
+          <div className="mb-5">
+            <div className="mb-1 text-sm font-semibold text-stone-800">ערים / אזורים</div>
+            <p className="mb-3 text-xs text-stone-500">בחר/י אזור כדי לפתוח את רשימת הערים. ניתן לבחור עד 3 ערים.</p>
+            <RegionCityPicker selected={form.regions} onChange={v => setForm({...form, regions: v})} maxCities={3} />
+          </div>
           <CheckboxGroup label="העדפות תרבותיות" options={CULTURAL_PREFS}
             selected={form.cultural_prefs} onChange={v => setForm({...form, cultural_prefs: v})} />
           <CheckboxGroup label="הסדרים" options={ARRANGEMENTS}

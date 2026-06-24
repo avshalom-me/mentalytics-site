@@ -1,10 +1,10 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { REGION_CITIES } from "@/app/lib/regions";
 import { NEWSLETTER_CONSENT_TEXT } from "@/app/lib/consent";
 import { gaEvent } from "@/app/lib/gtag";
+import RegionCityPicker from "@/app/components/RegionCityPicker";
 
 type Gender = "זכר" | "נקבה";
 
@@ -84,11 +84,7 @@ export default function TherapistSignupPage() {
   const [submitMsg, setSubmitMsg] = useState<string>("");
   const [errors, setErrors] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const regionLimitReached = useMemo(
-    () => form.regions.length >= 3,
-    [form.regions.length]
-  );
+  const [submitted, setSubmitted] = useState(false);
 
   function validate(): string[] {
     const e: string[] = [];
@@ -240,8 +236,9 @@ export default function TherapistSignupPage() {
           ? `הטופס נשלח, אבל יש בעיה בהעלאת חלק מהקבצים: ${warnings.join(
               " | "
             )}`
-          : "נשלח בהצלחה! הפרטים נקלטו וממתינים לאישור."
+          : ""
       );
+      setSubmitted(true);
 
       window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
@@ -251,6 +248,34 @@ export default function TherapistSignupPage() {
     } finally {
       setIsSubmitting(false);
     }
+  }
+
+  if (submitted) {
+    return (
+      <main className="mx-auto max-w-2xl px-6 py-20 text-center" dir="rtl">
+        <div className="rounded-3xl border border-green-200 bg-green-50 px-8 py-12">
+          <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 text-3xl text-green-700">
+            ✓
+          </div>
+          <h1 className="text-2xl font-black text-stone-900">הפרטים נשלחו בהצלחה!</h1>
+          <p className="mx-auto mt-3 max-w-md leading-7 text-stone-700">
+            הפרופיל שלך נקלט וממתין לאישור ידני לפני פרסום. נעדכן אותך במייל ברגע שהפרופיל יאושר.
+          </p>
+          {submitMsg && (
+            <p className="mx-auto mt-3 max-w-md rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {submitMsg}
+            </p>
+          )}
+          <Link
+            href="/therapists"
+            className="mt-7 inline-block rounded-full px-6 py-3 text-sm font-bold text-white"
+            style={{ background: "var(--teal)" }}
+          >
+            חזרה לאזור המטפלים
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -652,44 +677,12 @@ export default function TherapistSignupPage() {
               ערים / אזורים פיזיים
               {form.online === "כן" && <span className="mr-2 text-xs font-normal text-slate-700">(אופציונלי — כבר סימנת אונליין)</span>}
             </div>
-            <p className="text-xs text-slate-700 mb-3">אפשר לבחור עד 3 ערים.</p>
-            <div className="space-y-4">
-              {Object.entries(REGION_CITIES).map(([region, cities]) => (
-                <div key={region}>
-                  <p className="mb-1 text-xs font-bold text-slate-700 uppercase tracking-wide">{region}</p>
-                  <div className="grid gap-1 sm:grid-cols-3">
-                    {cities.map((city) => {
-                      const checked = form.regions.includes(city);
-                      const disabled = !checked && regionLimitReached;
-                      return (
-                        <label
-                          key={city}
-                          className={`flex items-center gap-2 text-sm ${disabled ? "opacity-40" : ""}`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            disabled={disabled}
-                            onChange={() =>
-                              setForm((p) => ({
-                                ...p,
-                                regions: toggleInArray(p.regions, city).slice(0, 3),
-                              }))
-                            }
-                          />
-                          <span>{city}</span>
-                        </label>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-            {regionLimitReached && (
-              <p className="mt-3 text-xs text-slate-700">
-                בחרת כבר 3 ערים. כדי לבחור עיר אחרת—בטל אחת.
-              </p>
-            )}
+            <p className="text-xs text-slate-700 mb-3">בחר/י אזור כדי לפתוח את רשימת הערים. ניתן לבחור עד 3 ערים.</p>
+            <RegionCityPicker
+              selected={form.regions}
+              onChange={(v) => setForm((p) => ({ ...p, regions: v }))}
+              maxCities={3}
+            />
           </div>
         </section>
 
@@ -936,12 +929,6 @@ export default function TherapistSignupPage() {
             {/* Promoted plan */}
             <div className="rounded-2xl p-5 flex flex-col relative"
               style={{ background: "linear-gradient(160deg,var(--teal-dark) 0%,var(--teal) 100%)", border: "2px solid var(--teal-dark)" }}>
-              <div className="absolute -top-3 right-4">
-                <span className="rounded-full px-3 py-1 text-xs font-black shadow"
-                  style={{ background: "#F5C842", color: "#1a3a0a" }}>
-                  מומלץ
-                </span>
-              </div>
               <span className="inline-block self-start rounded-full px-3 py-1 text-xs font-bold mb-3"
                 style={{ background: "rgba(255,255,255,0.2)", color: "#ffffff" }}>
                 מקודם
