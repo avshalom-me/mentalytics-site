@@ -1,5 +1,11 @@
 import { Resend } from "resend";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
+import {
+  isPromoActive,
+  SUBSCRIPTION_PROMO_PRICE,
+  SUBSCRIPTION_PROMO_MONTHS,
+  SUBSCRIPTION_REGULAR_PRICE,
+} from "@/app/lib/promo";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -252,11 +258,11 @@ export async function sendTherapistWelcomeEmail(opts: {
   }
 
   const subject = isPaid
-    ? "ברוך/ה הבא/ה למסלול המקודם של טיפול חכם 🎉"
+    ? "תודה על השדרוג למסלול המקודם של טיפול חכם 🎉"
     : "הפרופיל שלך אושר — ברוך/ה הבא/ה לטיפול חכם 🎉";
 
   const confirmationHtml = isPaid
-    ? `<p style="margin:0 0 12px;">תודה שהצטרפת ל<strong>מסלול המקודם</strong> של טיפול חכם! מהרגע הזה הפרופיל שלך משתתף במערכת ההתאמה החכמה ומקבל חשיפה מועדפת.</p>
+    ? `<p style="margin:0 0 12px;">תודה ששדרגת ל<strong>מסלול המקודם</strong> של טיפול חכם! הפרופיל שלך יעלה למערכת ההתאמה החכמה ויקבל חשיפה מועדפת <strong>מיד לאחר שצוות טיפול חכם יאשר אותו</strong> — נעדכן אותך במייל ברגע שזה קורה.</p>
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:14px 0 18px;">
         <p style="margin:0 0 8px;font-weight:bold;color:#0F5468;">מה כולל המסלול שלך:</p>
         <ul style="margin:0;padding-inline-start:18px;font-size:14px;line-height:1.6;">
@@ -287,7 +293,11 @@ export async function sendTherapistWelcomeEmail(opts: {
     : `
       <div style="background:linear-gradient(135deg,#0F5468,#1A7A96);border-radius:10px;padding:18px 20px;margin:0 0 22px;color:#fff;">
         <p style="margin:0 0 6px;font-weight:bold;font-size:15px;">רוצה להגיע ליותר מטופלים? שדרג/י למסלול המקודם</p>
-        <p style="margin:0 0 12px;font-size:13px;color:rgba(255,255,255,.85);">₪140 + מע"מ לחודש · ניתן לבטל בכל עת</p>
+        <p style="margin:0 0 12px;font-size:13px;color:rgba(255,255,255,.85);">${
+          isPromoActive()
+            ? `מבצע פתיחה — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ לחודש ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, אח"כ ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ`
+            : `₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ לחודש`
+        } · ניתן לבטל בכל עת</p>
         <ul style="margin:0 0 14px;padding-inline-start:18px;font-size:13.5px;line-height:1.7;color:rgba(255,255,255,.95);">
           <li>שילוב במערכת ההתאמה החכמה — הפניות מדויקות יותר לפי גיל, אזור, שפה, סוג הטיפול שבו את/ה מתמחה וסגנון טיפולי</li>
           <li>סטטיסטיקות על הפונים — אילו סוגי מטופלים צופים בפרופיל שלך, אזורים ואחוזי המרה</li>
@@ -337,6 +347,103 @@ export async function sendTherapistWelcomeEmail(opts: {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "unknown";
     console.error("sendTherapistWelcomeEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// Sent right after a therapist first submits their profile (status pending) —
+// confirms we received it and that the team will review it before publishing.
+export async function sendTherapistRegistrationReceivedEmail(opts: {
+  to: string;
+  name: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendTherapistRegistrationReceivedEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
+  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const subject = "תודה על ההצטרפות לטיפול חכם — הפרופיל בבדיקה 🎉";
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 👋</h1>
+      <p style="margin:0 0 14px;">תודה שהצטרפת לטיפול חכם! 🎉</p>
+      <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר — לטובת המטופלים וגם לטובתך.</p>
+      <p style="margin:0 0 18px;">נעדכן אותך במייל ברגע שהפרופיל יאושר. בינתיים אפשר להיכנס ללוח הבקרה לעדכן או להשלים פרטים.</p>
+      <p style="margin:0 0 16px;">
+        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
+      </p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">
+        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 052-790-6335<br/>
+        בברכה,<br/>
+        צוות טיפול חכם — Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, html });
+    if (error) {
+      console.error("sendTherapistRegistrationReceivedEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendTherapistRegistrationReceivedEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
+// Sent when an admin approves a PAYING therapist's listing (admin_approved
+// false→true) — the joyful "you're live in the matching system" congrats.
+export async function sendPromotedApprovedEmail(opts: {
+  to: string;
+  name: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendPromotedApprovedEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
+  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const subject = "הפרופיל המקודם שלך אושר ועלה לאוויר 🎉";
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 🎉</h1>
+      <p style="margin:0 0 14px;">שמחים לבשר — הפרופיל שלך אושר וכעת הוא חי במערכת ההתאמה החכמה של טיפול חכם!</p>
+      <p style="margin:0 0 18px;">מהרגע הזה מטופלים שמחפשים מטפל/ת שמתאים/ה בדיוק לפרופיל שלך (לפי תחום, גיל, אזור, שפה וסגנון טיפולי) יופנו אליך — ותוכל/י לעקוב אחרי הצפיות, הפניות ואחוזי ההמרה בלוח הבקרה.</p>
+      <p style="margin:0 0 16px;">
+        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
+      </p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">
+        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 052-790-6335<br/>
+        בהצלחה,<br/>
+        צוות טיפול חכם — Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, html });
+    if (error) {
+      console.error("sendPromotedApprovedEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendPromotedApprovedEmail: throw:", msg);
     return { ok: false, error: msg };
   }
 }

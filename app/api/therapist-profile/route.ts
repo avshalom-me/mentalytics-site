@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
 
 export const dynamic = "force-dynamic";
 
@@ -96,6 +97,20 @@ export async function PATCH(req: NextRequest) {
     update.tier = "free";
     const { data, error } = await supabaseAdmin.from("therapists").insert(update).select("id").single();
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+    // Confirm receipt + set the "awaiting review" expectation. Best-effort —
+    // a mail failure must never fail the profile creation.
+    if (user.email) {
+      try {
+        await sendTherapistRegistrationReceivedEmail({
+          to: user.email,
+          name: typeof body.full_name === "string" ? body.full_name : "",
+        });
+      } catch (e) {
+        console.error("therapist-profile: registration-received email failed:", e);
+      }
+    }
+
     return NextResponse.json({ ok: true, id: data.id, created: true });
   }
 

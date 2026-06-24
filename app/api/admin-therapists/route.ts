@@ -8,6 +8,7 @@ import {
   sendTherapistWelcomeEmail,
   sendTherapistRejectedEmail,
   sendTherapistCompletionRequestEmail,
+  sendPromotedApprovedEmail,
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 
@@ -278,6 +279,11 @@ export async function PATCH(request: Request) {
     // has vetted them. (Pending/free therapists are approved via the normal
     // status='approved' path, which also sets admin_approved.)
     if (body.action === "approve_listing") {
+      const { data: beforeListing } = await supabaseAdmin
+        .from("therapists")
+        .select("admin_approved, email, full_name")
+        .eq("id", id)
+        .single();
       const { error } = await supabaseAdmin
         .from("therapists")
         .update({ admin_approved: true })
@@ -293,6 +299,18 @@ export async function PATCH(request: Request) {
         after: { admin_approved: true },
         reason: "admin approved therapist for public listing",
       });
+      // Joyful "you're live" congrats — only on a genuine false→true transition,
+      // so a re-approve doesn't re-send it.
+      if (beforeListing && !beforeListing.admin_approved && beforeListing.email) {
+        try {
+          await sendPromotedApprovedEmail({
+            to: beforeListing.email,
+            name: beforeListing.full_name ?? "",
+          });
+        } catch (e) {
+          console.error("approve_listing: promoted-approved email failed:", e);
+        }
+      }
       return NextResponse.json({ ok: true, id, admin_approved: true });
     }
 
