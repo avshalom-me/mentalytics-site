@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 
 export default function PromotedSignupButton() {
   const [agreed, setAgreed] = useState(false);
@@ -54,7 +55,9 @@ export function UpgradeToPromotedButton() {
         className="block w-full text-center rounded-xl px-6 py-3 text-sm font-bold text-white transition hover:opacity-95"
         style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 12px rgba(15,84,104,.25)" }}
       >
-        שדרוג למסלול המקודם — ₪140 + מע&quot;מ / חודש
+        {isPromoActive()
+          ? `שדרוג למסלול המקודם — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ / חודש (3 חודשים ראשונים)`
+          : `שדרוג למסלול המקודם — ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ / חודש`}
         <ArrowLeft size={16} className="inline mr-2" />
       </Link>
     </div>

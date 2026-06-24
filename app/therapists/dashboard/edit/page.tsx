@@ -10,6 +10,7 @@ import {
   COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
+import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
@@ -217,6 +218,8 @@ export default function TherapistProfileEditPage() {
     setSaving(false);
   }
 
+  const promo = isPromoActive();
+
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   // ── Plan choice — shown right after the first profile submission ──
@@ -254,7 +257,18 @@ export default function TherapistProfileEditPage() {
           <div className="rounded-2xl border-2 border-[#1A7A96] p-6 flex flex-col relative" style={{ background: "linear-gradient(160deg,#f0f9fb,#e6f4f7)" }}>
             <span className="text-xs font-black rounded-full px-2.5 py-1 bg-yellow-100 text-yellow-800 border border-yellow-300 self-start mb-3">★ מקודם</span>
             <h2 className="text-lg font-bold text-[#1a4a5c] mb-1">מסלול מקודם</h2>
-            <p className="text-xl font-black text-[#0F5468] mb-1">מבצע פתיחה — ₪140 + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span></p>
+            {promo ? (
+              <>
+                <p className="text-xl font-black text-[#0F5468] mb-1">
+                  מבצע פתיחה — ₪{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span>
+                </p>
+                <p className="text-xs text-[#0F5468]/70 mb-1">
+                  ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן ₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ
+                </p>
+              </>
+            ) : (
+              <p className="text-xl font-black text-[#0F5468] mb-1">₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span></p>
+            )}
             <p className="text-xs text-[#0F5468]/70 mb-4">ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים</p>
             <ul className="space-y-2 text-sm leading-6 flex-1" style={{ color: "#1a4a5c" }}>
               <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבחינמי + הופעה במערכת ההתאמה החכמה</li>
