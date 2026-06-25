@@ -142,8 +142,15 @@ export default async function TherapistProfilePage({
     (t.training_areas?.length ?? 0) > 0 ||
     (t.age_groups?.length ?? 0) > 0;
 
+  // Compact "quick facts" chips surfaced in the hero.
+  const quickFacts: string[] = [];
+  if (t.regions && t.regions.length > 0) quickFacts.push(`📍 ${t.regions.slice(0, 2).join(", ")}`);
+  if (t.languages && t.languages.length > 0) quickFacts.push(`🗣 ${t.languages.join(", ")}`);
+  if (t.online) quickFacts.push("🌐 גם אונליין");
+  if (t.age_groups && t.age_groups.length > 0) quickFacts.push(`👤 ${t.age_groups.slice(0, 2).join(", ")}`);
+
   return (
-    <main className="mx-auto max-w-2xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <main className="mx-auto max-w-5xl px-5 py-10 pb-28 sm:pb-12" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <TrackView therapistId={id} source={source} context={viewerContext} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`
@@ -156,40 +163,36 @@ export default async function TherapistProfilePage({
 
       <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה לכל המטפלים</Link>
 
-      {/* Hero card — photo + identity + contact */}
-      <div className="rounded-3xl bg-white mb-8 p-5 sm:p-6" style={{ boxShadow: "0 4px 24px rgba(60,40,20,.10)", border: "1px solid #E8E0D8" }}>
-        <div className="flex flex-col sm:flex-row gap-5 items-start">
+      {/* Hero — warm teal band, large photo + identity + contact */}
+      <div className="rounded-3xl mb-8 p-6 sm:p-8" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
+        <div className="flex flex-col sm:flex-row gap-6 items-start">
 
-          {/* Photo — portrait, no forced crop */}
-          <div className="w-full sm:w-44 flex-shrink-0">
-            <div className="rounded-2xl overflow-hidden bg-stone-100 w-full sm:aspect-[3/4]" style={{ maxHeight: "260px" }}>
-              <img
-                src={photoUrl ?? avatarSrc}
-                alt={name}
-                className="w-full h-full object-cover object-top"
-                style={{ display: "block", maxHeight: "260px" }}
-              />
+          {/* Photo — larger, framed */}
+          <div className="w-full sm:w-44 flex-shrink-0 mx-auto sm:mx-0" style={{ maxWidth: "200px" }}>
+            <div className="rounded-2xl overflow-hidden bg-white w-full aspect-[3/4]"
+              style={{ border: "3px solid #fff", boxShadow: "0 6px 22px rgba(42,100,98,.22)" }}>
+              <img src={photoUrl ?? avatarSrc} alt={name} className="w-full h-full object-cover object-top" style={{ display: "block" }} />
             </div>
           </div>
 
           {/* Identity + contact */}
-          <div className="flex-1 min-w-0">
-            <h1 className="text-2xl sm:text-3xl font-black text-stone-900 leading-tight">{name}</h1>
-            {type && <p className="text-[#2e7d8c] font-semibold text-base mt-1">{type}</p>}
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {t.online && (
-                <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-xs font-medium text-blue-700">🌐 טיפול אונליין</span>
-              )}
-              {t.regions && t.regions.length > 0 && (
-                <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">📍 {t.regions.slice(0, 2).join(", ")}</span>
-              )}
-              {t.languages && t.languages.length > 0 && (
-                <span className="rounded-full bg-stone-100 border border-stone-200 px-3 py-1 text-xs font-medium text-stone-600">🗣 {t.languages.join(", ")}</span>
-              )}
+          <div className="flex-1 min-w-0 w-full">
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 style={{ fontSize: "clamp(2rem,5vw,2.75rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.1, margin: 0 }}>{name}</h1>
+              <span className="inline-flex items-center gap-1 rounded-full bg-white px-3 py-1 text-[13px] font-bold"
+                style={{ border: "1px solid var(--teal)", color: "var(--teal-dark)" }}>✓ מאומת</span>
             </div>
+            {type && <p className="mt-1.5" style={{ fontSize: "clamp(1.05rem,2.5vw,1.35rem)", fontWeight: 700, color: "var(--gold-dark)" }}>{type}</p>}
 
-            {/* Contact buttons */}
+            {quickFacts.length > 0 && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {quickFacts.map((f, i) => (
+                  <span key={i} className="rounded-full bg-white px-3.5 py-1.5 text-[13px] font-semibold"
+                    style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{f}</span>
+                ))}
+              </div>
+            )}
+
             <ContactButtons
               therapistId={id}
               therapistName={t.full_name ?? ""}
@@ -197,96 +200,113 @@ export default async function TherapistProfilePage({
               phone={t.phone}
               email={t.email}
               source={source}
+              mobileSticky
             />
           </div>
 
         </div>
       </div>
 
-      {/* Specialties — surfaced above the fold */}
-      {hasSpecialties && (
-        <div className="mb-8 px-1 space-y-4">
-          {t.training_areas && t.training_areas.length > 0 && (
-            <div>
-              <h2 className="text-sm font-bold text-stone-500 mb-2">תחומי טיפול</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {t.training_areas.map((area, i) => (
-                  <span key={i} className="rounded-full bg-teal-50 border border-teal-200 px-3 py-1 text-xs font-medium text-teal-800">{area}</span>
+      {/* Body — two columns on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
+
+        {/* Main column */}
+        <div className="lg:col-span-2 space-y-8">
+
+          {t.bio && (
+            <section>
+              <SectionTitle>כמה מילים עליי</SectionTitle>
+              <p className="text-stone-700 whitespace-pre-line" style={{ fontSize: "19px", lineHeight: 1.9 }}>{t.bio}</p>
+            </section>
+          )}
+
+          {hasSpecialties && (
+            <section className="space-y-5">
+              {t.training_areas && t.training_areas.length > 0 && (
+                <div>
+                  <SectionTitle>תחומי טיפול</SectionTitle>
+                  <div className="flex flex-wrap gap-2.5">
+                    {t.training_areas.map((area, i) => (
+                      <span key={i} className="rounded-full px-4 py-2 text-[15px] font-semibold"
+                        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>{area}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {t.age_groups && t.age_groups.length > 0 && (
+                <div>
+                  <SectionTitle>גיל מטופלים</SectionTitle>
+                  <div className="flex flex-wrap gap-2.5">
+                    {t.age_groups.map((g, i) => (
+                      <span key={i} className="rounded-full px-4 py-2 text-[15px] font-semibold"
+                        style={{ background: "var(--gold-pale)", border: "1px solid #f0e0b8", color: "var(--gold-dark)" }}>{g}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </section>
+          )}
+
+          {t.education && (
+            <Accordion title="השכלה והכשרה">
+              <p className="text-[15px] leading-8 text-stone-700 whitespace-pre-line">{t.education}</p>
+            </Accordion>
+          )}
+
+          {t.experience && (
+            <Accordion title="ניסיון מקצועי">
+              <p className="text-[15px] leading-8 text-stone-700 whitespace-pre-line">{t.experience}</p>
+            </Accordion>
+          )}
+
+          {/* Articles written by / attributed to this therapist */}
+          {articles.length > 0 && (
+            <section>
+              <SectionTitle>מאמרים מאת {name}</SectionTitle>
+              <div className="space-y-3">
+                {articles.map((art) => (
+                  <Link key={art.slug} href={`/research/community/${art.slug}`}
+                    className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
+                    {art.topic && <div className="text-xs font-bold text-[#2e7d8c] mb-1">{art.topic}</div>}
+                    <h3 className="font-bold text-stone-900 text-[15px]">{art.title}</h3>
+                    {art.summary && <p className="mt-1 text-sm text-stone-500 leading-6 line-clamp-2">{art.summary}</p>}
+                  </Link>
                 ))}
               </div>
-            </div>
+            </section>
           )}
-          {t.age_groups && t.age_groups.length > 0 && (
-            <div>
-              <h2 className="text-sm font-bold text-stone-500 mb-2">גיל מטופלים</h2>
-              <div className="flex flex-wrap gap-1.5">
-                {t.age_groups.map((g, i) => (
-                  <span key={i} className="rounded-full bg-indigo-50 border border-indigo-200 px-3 py-1 text-xs font-medium text-indigo-800">{g}</span>
-                ))}
-              </div>
-            </div>
-          )}
+
         </div>
-      )}
 
-      {/* Bio — open, large and prominent */}
-      {t.bio && (
-        <div className="mb-8 px-1">
-          <h2 className="text-lg font-extrabold text-stone-800 mb-3">כמה מילים עלי</h2>
-          <p className="text-base leading-8 text-stone-700 whitespace-pre-line">{t.bio}</p>
-        </div>
-      )}
-
-      {/* Collapsible sections */}
-      <div className="space-y-3">
-
-        {t.education && (
-          <Accordion title="השכלה והכשרה">
-            <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">{t.education}</p>
-          </Accordion>
-        )}
-
-        {t.experience && (
-          <Accordion title="ניסיון מקצועי">
-            <p className="text-sm leading-7 text-stone-700 whitespace-pre-line">{t.experience}</p>
-          </Accordion>
-        )}
-
+        {/* Side column — professional details card */}
         {hasDetails && (
-          <Accordion title="פרטים מקצועיים">
-            <div className="space-y-3">
-              {t.therapist_types && t.therapist_types.length > 0 && <DetailRow label="הכשרה" value={genderTitles(t.therapist_types, t.gender).join(", ")} />}
-              {t.assessment_types && t.assessment_types.length > 0 && <DetailRow label="אבחונים" value={t.assessment_types.join(", ")} />}
-              {t.regions && t.regions.length > 0 && <DetailRow label="אזורי פעילות" value={t.regions.join(", ")} />}
-              {t.languages && t.languages.length > 0 && <DetailRow label="שפות טיפול" value={t.languages.join(", ")} />}
-              {t.cultural_prefs && t.cultural_prefs.length > 0 && <DetailRow label="העדפות תרבותיות" value={t.cultural_prefs.join(", ")} />}
-              {t.arrangements && t.arrangements.length > 0 && <DetailRow label="הסדרים" value={t.arrangements.join(", ")} />}
+          <aside className="lg:sticky lg:top-6 self-start">
+            <div className="rounded-2xl bg-white p-5 sm:p-6" style={{ border: "1px solid var(--line)", boxShadow: "0 2px 14px rgba(61,140,138,.06)" }}>
+              <h2 className="text-base font-extrabold text-stone-900 mb-3">פרטים מקצועיים</h2>
+              <div>
+                {t.therapist_types && t.therapist_types.length > 0 && <DetailRow label="הכשרה" value={genderTitles(t.therapist_types, t.gender).join(", ")} />}
+                {t.assessment_types && t.assessment_types.length > 0 && <DetailRow label="אבחונים" value={t.assessment_types.join(", ")} />}
+                {t.regions && t.regions.length > 0 && <DetailRow label="אזורי פעילות" value={t.regions.join(", ")} />}
+                {t.languages && t.languages.length > 0 && <DetailRow label="שפות טיפול" value={t.languages.join(", ")} />}
+                {t.cultural_prefs && t.cultural_prefs.length > 0 && <DetailRow label="העדפות תרבותיות" value={t.cultural_prefs.join(", ")} />}
+                {t.arrangements && t.arrangements.length > 0 && <DetailRow label="הסדרים" value={t.arrangements.join(", ")} />}
+              </div>
             </div>
-          </Accordion>
+          </aside>
         )}
 
       </div>
 
-      {/* Articles written by / attributed to this therapist */}
-      {articles.length > 0 && (
-        <div className="mt-8 px-1">
-          <h2 className="text-lg font-extrabold text-stone-800 mb-3">מאמרים מאת {name}</h2>
-          <div className="space-y-3">
-            {articles.map((art) => (
-              <Link key={art.slug} href={`/research/community/${art.slug}`}
-                className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
-                {art.topic && (
-                  <div className="text-xs font-bold text-[#2e7d8c] mb-1">{art.topic}</div>
-                )}
-                <h3 className="font-bold text-stone-900 text-sm">{art.title}</h3>
-                {art.summary && <p className="mt-1 text-xs text-stone-500 leading-6 line-clamp-2">{art.summary}</p>}
-              </Link>
-            ))}
-          </div>
-        </div>
-      )}
-
     </main>
+  );
+}
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-4 text-xl sm:text-2xl font-extrabold text-stone-900"
+      style={{ borderInlineStart: "4px solid var(--gold)", paddingInlineStart: "12px" }}>
+      {children}
+    </h2>
   );
 }
 
@@ -294,7 +314,7 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
   return (
     <details className="rounded-2xl border border-[#E8E0D8] bg-white overflow-hidden group">
       <summary className="flex items-center justify-between gap-3 px-5 py-4 cursor-pointer select-none hover:bg-stone-50 transition-colors">
-        <span className="font-extrabold text-stone-900 text-sm">{title}</span>
+        <span className="font-extrabold text-stone-900 text-base">{title}</span>
         <span className="chevron text-stone-400 text-lg leading-none flex-shrink-0">▾</span>
       </summary>
       <div className="px-5 pb-5 pt-2 border-t border-[#EAE0D5]">
@@ -306,9 +326,9 @@ function Accordion({ title, children }: { title: string; children: React.ReactNo
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex gap-3 items-start text-sm py-2 border-b border-stone-100 last:border-0">
-      <span className="font-semibold text-stone-500 flex-shrink-0 min-w-[110px]">{label}</span>
-      <span className="text-stone-800">{value}</span>
+    <div className="py-2.5 border-b border-stone-100 last:border-0">
+      <div className="text-xs font-semibold text-stone-400 mb-0.5">{label}</div>
+      <div className="text-sm text-stone-800 leading-relaxed">{value}</div>
     </div>
   );
 }
