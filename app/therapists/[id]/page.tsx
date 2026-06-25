@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { genderTitle, genderTitles } from "@/app/lib/gender-text";
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
+import ProfileBackLink from "./ProfileBackLink";
 
 const BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 const BASE_URL = "https://www.mentalytics.co.il";
@@ -161,7 +162,7 @@ export default async function TherapistProfilePage({
         .chevron { transition: transform 0.2s; }
       `}</style>
 
-      <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה לכל המטפלים</Link>
+      <ProfileBackLink source={source} fallbackHref={source === "match" ? (sp.a === "child" ? "/kids" : "/adults") : "/therapists"} />
 
       {/* Hero — warm teal band, large photo + identity + contact */}
       <div className="rounded-3xl mb-8 p-6 sm:p-8" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
