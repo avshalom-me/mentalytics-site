@@ -34,6 +34,7 @@ type TherapistRow = {
   promoted_until: string | null;
   admin_approved: boolean | null;
   created_at: string | null;
+  completion_requested_at: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -71,7 +72,8 @@ async function buildTherapistsResponse() {
       promotion_source,
       promoted_until,
       admin_approved,
-      created_at
+      created_at,
+      completion_requested_at
       `
     )
     .order("full_name", { ascending: true });
@@ -225,6 +227,7 @@ async function buildTherapistsResponse() {
         promoted_until: t.promoted_until ?? null,
         admin_approved: t.admin_approved ?? false,
         created_at: t.created_at ?? null,
+        completion_requested_at: t.completion_requested_at ?? null,
         views_30d: viewsByTherapist[t.id] ?? 0,
         contacts_30d: contactsByTherapist[t.id] ?? 0,
         subscription: subByTherapist[t.id] ?? null,
@@ -343,6 +346,15 @@ export async function PATCH(request: Request) {
         name: t.full_name ?? "",
         message,
       });
+      if (!sent.ok) {
+        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
+      }
+      // Record that (and when) the request went out, so the admin UI can show it.
+      const requestedAt = new Date().toISOString();
+      await supabaseAdmin
+        .from("therapists")
+        .update({ completion_requested_at: requestedAt })
+        .eq("id", id);
       await writeAudit(supabaseAdmin, {
         therapistId: id,
         actorType: "admin",
@@ -351,10 +363,7 @@ export async function PATCH(request: Request) {
         after: { missing },
         reason: "admin requested profile completion",
       });
-      if (!sent.ok) {
-        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
-      }
-      return NextResponse.json({ ok: true, id, missing });
+      return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt });
     }
 
     // ── On-demand Sumit reconciliation ──────────────────────────────────────

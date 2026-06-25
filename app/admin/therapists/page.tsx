@@ -43,6 +43,7 @@ type AdminTherapist = {
   contacts_30d: number;
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
   missing: string[];
+  completion_requested_at: string | null;
 };
 
 type EditForm = {
@@ -341,6 +342,10 @@ export default function AdminTherapistsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      const sentAt = json.completion_requested_at ?? new Date().toISOString();
+      setTherapists((prev) =>
+        prev.map((x) => (x.id === completionFor.id ? { ...x, completion_requested_at: sentAt } : x))
+      );
       setCompletionFor(null);
       window.alert("בקשת ההשלמה נשלחה למטפל/ת.");
     } catch (err) {
@@ -451,6 +456,12 @@ export default function AdminTherapistsPage() {
                 {therapist.missing.length > 0 && (
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300">
                     ⚠️ פרופיל לא שלם: {therapist.missing.join(", ")}
+                  </span>
+                )}
+                {therapist.completion_requested_at && (
+                  <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 border border-blue-300"
+                    title={new Date(therapist.completion_requested_at).toLocaleString("he-IL")}>
+                    ✉️ נשלחה בקשת השלמה · {new Date(therapist.completion_requested_at).toLocaleDateString("he-IL")}
                   </span>
                 )}
               </div>
@@ -602,7 +613,7 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl border border-blue-400 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-800 disabled:opacity-50"
                   onClick={() => openCompletion(therapist)}>
-                  ✉️ בקש השלמה
+                  {therapist.completion_requested_at ? "✉️ שלח שוב בקשת השלמה" : "✉️ בקש השלמה"}
                 </button>
               )}
               <button type="button" disabled={isBusy}
