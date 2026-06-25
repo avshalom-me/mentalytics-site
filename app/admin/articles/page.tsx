@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ARTICLE_TOPICS } from "@/app/lib/articles";
+import { ARTICLE_TOPICS, ARTICLE_LIMITS } from "@/app/lib/articles";
 
 type AdminArticle = {
   id: string;
@@ -16,26 +16,168 @@ type AdminArticle = {
   created_at: string;
   approved_at: string | null;
   therapist_name: string | null;
+  image_url: string | null;
+  image_alt: string | null;
+  image_credit: string | null;
 };
 
+type TherapistLite = { id: string; full_name: string };
 type Data = { pending: AdminArticle[]; approved: AdminArticle[]; rejected: AdminArticle[] };
+
+// The image fields a picker resolves and an article carries.
+type ImageValue = {
+  image_url: string;
+  image_alt: string;
+  image_credit: string;
+  download_location: string;
+};
+const EMPTY_IMAGE: ImageValue = { image_url: "", image_alt: "", image_credit: "", download_location: "" };
+
+type UnsplashResult = {
+  thumb: string;
+  url: string;
+  alt: string;
+  credit: string;
+  credit_url: string;
+  download_location: string;
+};
 
 function fmt(d: string) {
   return new Date(d).toLocaleDateString("he-IL", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
+// ── Image picker: search Unsplash by topic/title, pick a candidate, or paste a
+// URL by hand. Falls back to manual-only when no UNSPLASH_ACCESS_KEY is set. ──
+function ImagePicker({ value, onChange, defaultQuery }: {
+  value: ImageValue;
+  onChange: (v: ImageValue) => void;
+  defaultQuery?: string;
+}) {
+  const [query, setQuery] = useState(defaultQuery ?? "");
+  const [results, setResults] = useState<UnsplashResult[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [configured, setConfigured] = useState<boolean | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function search() {
+    const q = query.trim();
+    if (!q) return;
+    setSearching(true);
+    setErr(null);
+    try {
+      const res = await fetch(`/api/admin-articles/unsplash?q=${encodeURIComponent(q)}`, { cache: "no-store" });
+      const json = await res.json();
+      if (!json.ok) {
+        setErr(json.error ?? "החיפוש נכשל");
+        setResults([]);
+      } else {
+        setConfigured(json.configured);
+        setResults(json.results ?? []);
+      }
+    } catch {
+      setErr("החיפוש נכשל");
+    }
+    setSearching(false);
+  }
+
+  function pick(r: UnsplashResult) {
+    onChange({
+      image_url: r.url,
+      image_alt: r.alt,
+      image_credit: r.credit ? `צילום: ${r.credit} / Unsplash` : "",
+      download_location: r.download_location,
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-3">
+      <div className="flex items-center gap-2">
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
+          placeholder="חיפוש תמונה (נושא/מילות מפתח)..."
+          className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm"
+        />
+        <button type="button" onClick={search} disabled={searching || !query.trim()}
+          className="rounded-lg bg-[#2e7d8c] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+          {searching ? "מחפש..." : "חיפוש"}
+        </button>
+      </div>
+
+      {err && <p className="text-xs text-red-600">{err}</p>}
+      {configured === false && (
+        <p className="text-xs text-stone-500">
+          חיפוש Unsplash לא מוגדר (חסר מפתח API). אפשר להדביק כתובת תמונה ידנית למטה.
+        </p>
+      )}
+
+      {results.length > 0 && (
+        <div className="grid grid-cols-3 gap-2">
+          {results.map((r, i) => {
+            const selected = value.image_url === r.url;
+            return (
+              <button type="button" key={i} onClick={() => pick(r)}
+                className={`relative rounded-lg overflow-hidden border-2 ${selected ? "border-[#2e7d8c]" : "border-transparent"}`}
+                title={r.credit ? `צילום: ${r.credit}` : ""}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={r.thumb} alt={r.alt || "candidate"} className="w-full h-20 object-cover" loading="lazy" />
+                {selected && <span className="absolute top-1 right-1 bg-[#2e7d8c] text-white text-[10px] rounded px-1">נבחר ✓</span>}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Manual URL + preview */}
+      <input
+        value={value.image_url}
+        onChange={(e) => onChange({ ...value, image_url: e.target.value, download_location: "" })}
+        placeholder="או הדבקת כתובת תמונה (https://...)"
+        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" dir="ltr"
+      />
+      {value.image_url && (
+        <div className="space-y-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={value.image_url} alt="preview" className="w-full max-h-40 object-cover rounded-lg" />
+          <input
+            value={value.image_credit}
+            onChange={(e) => onChange({ ...value, image_credit: e.target.value })}
+            placeholder="קרדיט צילום (אופציונלי)"
+            className="w-full rounded-lg border border-stone-200 px-3 py-2 text-xs"
+          />
+          <button type="button" onClick={() => onChange(EMPTY_IMAGE)}
+            className="text-xs font-semibold text-red-600 hover:underline">הסרת תמונה</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminArticlesPage() {
   const [data, setData] = useState<Data | null>(null);
+  const [therapists, setTherapists] = useState<TherapistLite[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({ title: "", summary: "", body: "", topic: "" });
+  const [editImage, setEditImage] = useState<ImageValue>(EMPTY_IMAGE);
+
+  // Create-form state
+  const [showCreate, setShowCreate] = useState(false);
+  const [createBusy, setCreateBusy] = useState(false);
+  const [createErr, setCreateErr] = useState<string | null>(null);
+  const [createForm, setCreateForm] = useState({ therapist_id: "", title: "", summary: "", body: "", topic: "" });
+  const [createImage, setCreateImage] = useState<ImageValue>(EMPTY_IMAGE);
 
   async function load() {
     const res = await fetch("/api/admin-articles", { cache: "no-store" });
     const json = await res.json();
-    if (json.ok) setData({ pending: json.pending, approved: json.approved, rejected: json.rejected });
+    if (json.ok) {
+      setData({ pending: json.pending, approved: json.approved, rejected: json.rejected });
+      setTherapists(json.therapists ?? []);
+    }
     setLoading(false);
   }
 
@@ -63,6 +205,27 @@ export default function AdminArticlesPage() {
     await load();
   }
 
+  async function createArticle() {
+    setCreateErr(null);
+    if (!createForm.therapist_id) { setCreateErr("יש לבחור מטפל/ת לשיוך"); return; }
+    setCreateBusy(true);
+    const res = await fetch("/api/admin-articles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...createForm, ...createImage }),
+    });
+    const json = await res.json();
+    setCreateBusy(false);
+    if (!json.ok) {
+      setCreateErr(json.error ?? "שגיאה ביצירת המאמר");
+      return;
+    }
+    setCreateForm({ therapist_id: "", title: "", summary: "", body: "", topic: "" });
+    setCreateImage(EMPTY_IMAGE);
+    setShowCreate(false);
+    await load();
+  }
+
   function approve(a: AdminArticle) {
     patch({ id: a.id, action: "approve" }, a.id);
   }
@@ -75,9 +238,15 @@ export default function AdminArticlesPage() {
     setEditId(a.id);
     setOpenId(a.id);
     setEditForm({ title: a.title, summary: a.summary, body: a.body, topic: a.topic ?? "" });
+    setEditImage({
+      image_url: a.image_url ?? "",
+      image_alt: a.image_alt ?? "",
+      image_credit: a.image_credit ?? "",
+      download_location: "",
+    });
   }
   function saveEdit(a: AdminArticle) {
-    patch({ id: a.id, action: "edit", ...editForm }, a.id);
+    patch({ id: a.id, action: "edit", ...editForm, ...editImage }, a.id);
   }
 
   function Card({ a }: { a: AdminArticle }) {
@@ -86,12 +255,18 @@ export default function AdminArticlesPage() {
     return (
       <div className="rounded-2xl border border-stone-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
-          <div>
-            <h3 className="font-bold text-stone-900">{a.title}</h3>
-            <p className="text-xs text-stone-500 mt-0.5">
-              מאת {a.therapist_name ?? "מטפל/ת"} · {fmt(a.created_at)}
-              {a.topic ? ` · ${a.topic}` : ""}
-            </p>
+          <div className="flex gap-3 min-w-0">
+            {a.image_url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={a.image_url} alt="" className="w-16 h-16 rounded-lg object-cover flex-shrink-0" />
+            )}
+            <div className="min-w-0">
+              <h3 className="font-bold text-stone-900">{a.title}</h3>
+              <p className="text-xs text-stone-500 mt-0.5">
+                מאת {a.therapist_name ?? "מטפל/ת"} · {fmt(a.created_at)}
+                {a.topic ? ` · ${a.topic}` : ""}
+              </p>
+            </div>
           </div>
           {a.status === "approved" && (
             <a href={`/research/community/${a.slug}`} target="_blank" rel="noreferrer"
@@ -132,6 +307,10 @@ export default function AdminArticlesPage() {
               rows={2} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder="תקציר" />
             <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
               rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7" placeholder="גוף המאמר" />
+            <div>
+              <p className="text-xs font-semibold text-stone-600 mb-1">תמונה</p>
+              <ImagePicker value={editImage} onChange={setEditImage} defaultQuery={editForm.topic || editForm.title} />
+            </div>
             <div className="flex gap-2">
               <button onClick={() => saveEdit(a)} disabled={busy === a.id}
                 className="rounded-lg bg-[#2e7d8c] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">שמירה</button>
@@ -167,7 +346,57 @@ export default function AdminArticlesPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-8 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <h1 className="text-2xl font-black text-stone-900 mb-6">מאמרים ממטפלים</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-black text-stone-900">מאמרים</h1>
+        <button onClick={() => setShowCreate((s) => !s)}
+          className="rounded-lg bg-[#2e7d8c] px-4 py-2 text-sm font-bold text-white hover:bg-[#266876]">
+          {showCreate ? "סגירה" : "+ כתיבת מאמר חדש"}
+        </button>
+      </div>
+
+      {showCreate && (
+        <div className="mb-10 rounded-2xl border border-[#2e7d8c]/30 bg-[#f3f9fa] p-5 space-y-3">
+          <h2 className="text-sm font-extrabold text-stone-800">מאמר עריכותי חדש</h2>
+          <p className="text-xs text-stone-500">המאמר יפורסם מיד ויְשׁוּיֵך למטפל/ת שתבחר/י — עם קישור לפרופיל, והמאמר יופיע גם בעמוד הפרופיל שלו/ה.</p>
+
+          <select value={createForm.therapist_id} onChange={(e) => setCreateForm({ ...createForm, therapist_id: e.target.value })}
+            className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm bg-white">
+            <option value="">— בחירת מטפל/ת לשיוך —</option>
+            {therapists.map((t) => <option key={t.id} value={t.id}>{t.full_name}</option>)}
+          </select>
+
+          <input value={createForm.title} onChange={(e) => setCreateForm({ ...createForm, title: e.target.value })}
+            className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder={`כותרת (${ARTICLE_LIMITS.titleMin}–${ARTICLE_LIMITS.titleMax} תווים)`} />
+
+          <select value={createForm.topic} onChange={(e) => setCreateForm({ ...createForm, topic: e.target.value })}
+            className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm bg-white">
+            <option value="">ללא נושא</option>
+            {ARTICLE_TOPICS.map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+
+          <textarea value={createForm.summary} onChange={(e) => setCreateForm({ ...createForm, summary: e.target.value })}
+            rows={2} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder={`תקציר (עד ${ARTICLE_LIMITS.summaryMax} תווים, מוצג בכרטיס)`} />
+
+          <textarea value={createForm.body} onChange={(e) => setCreateForm({ ...createForm, body: e.target.value })}
+            rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7"
+            placeholder={`גוף המאמר (${ARTICLE_LIMITS.bodyMin}–${ARTICLE_LIMITS.bodyMax} תווים, שורה ריקה = פסקה חדשה)`} />
+
+          <div>
+            <p className="text-xs font-semibold text-stone-600 mb-1">תמונה ראשית</p>
+            <ImagePicker value={createImage} onChange={setCreateImage} defaultQuery={createForm.topic || createForm.title} />
+          </div>
+
+          {createErr && <p className="text-xs text-red-600">{createErr}</p>}
+          <div className="flex gap-2">
+            <button onClick={createArticle} disabled={createBusy}
+              className="rounded-lg bg-green-600 px-5 py-2 text-sm font-bold text-white hover:bg-green-700 disabled:opacity-50">
+              {createBusy ? "מפרסם..." : "פרסום המאמר"}
+            </button>
+            <button onClick={() => setShowCreate(false)}
+              className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-semibold text-stone-600">ביטול</button>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <p className="text-sm text-stone-400">טוען...</p>

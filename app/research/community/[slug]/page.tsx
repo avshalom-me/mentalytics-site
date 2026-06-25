@@ -16,6 +16,9 @@ type ArticleRow = {
   approved_at: string | null;
   created_at: string;
   therapist_id: string;
+  image_url: string | null;
+  image_alt: string | null;
+  image_credit: string | null;
   therapists: { full_name: string | null } | { full_name: string | null }[] | null;
 };
 
@@ -23,7 +26,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, therapists(full_name)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, therapists(full_name)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -78,6 +81,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
     publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
     url: `${BASE_URL}/research/community/${a.slug}`,
     datePublished: published,
+    ...(a.image_url ? { image: a.image_url } : {}),
   };
 
   return (
@@ -88,6 +92,21 @@ export default async function CommunityArticlePage({ params }: { params: Promise
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">
         ← חזרה למאמרים ומידע שימושי
       </Link>
+
+      {a.image_url && (
+        <figure className="mb-8">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={a.image_url}
+            alt={a.image_alt || a.title}
+            className="w-full rounded-2xl object-cover"
+            style={{ maxHeight: "360px", border: "1px solid #E8E0D8" }}
+          />
+          {a.image_credit && (
+            <figcaption className="mt-2 text-xs text-stone-400 text-center">{a.image_credit}</figcaption>
+          )}
+        </figure>
+      )}
 
       {a.topic && (
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".08em", marginBottom: "10px" }}>

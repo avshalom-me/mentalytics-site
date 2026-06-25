@@ -57,6 +57,19 @@ async function getTherapist(id: string): Promise<{ therapist: TherapistRow; phot
   return { therapist: data as TherapistRow, photoUrl };
 }
 
+type ArticleLink = { slug: string; title: string; summary: string; topic: string | null };
+
+async function getTherapistArticles(id: string): Promise<ArticleLink[]> {
+  const { data } = await supabaseAdmin
+    .from("therapist_articles")
+    .select("slug, title, summary, topic")
+    .eq("therapist_id", id)
+    .eq("status", "approved")
+    .order("approved_at", { ascending: false })
+    .limit(20);
+  return (data ?? []) as ArticleLink[];
+}
+
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
   const result = await getTherapist(id);
@@ -99,6 +112,7 @@ export default async function TherapistProfilePage({
   const result = await getTherapist(id);
   if (!result) notFound();
 
+  const articles = await getTherapistArticles(id);
   const { therapist: t, photoUrl } = result;
   const name = t.full_name ?? "מטפל";
   const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
@@ -252,6 +266,25 @@ export default async function TherapistProfilePage({
         )}
 
       </div>
+
+      {/* Articles written by / attributed to this therapist */}
+      {articles.length > 0 && (
+        <div className="mt-8 px-1">
+          <h2 className="text-lg font-extrabold text-stone-800 mb-3">מאמרים מאת {name}</h2>
+          <div className="space-y-3">
+            {articles.map((art) => (
+              <Link key={art.slug} href={`/research/community/${art.slug}`}
+                className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
+                {art.topic && (
+                  <div className="text-xs font-bold text-[#2e7d8c] mb-1">{art.topic}</div>
+                )}
+                <h3 className="font-bold text-stone-900 text-sm">{art.title}</h3>
+                {art.summary && <p className="mt-1 text-xs text-stone-500 leading-6 line-clamp-2">{art.summary}</p>}
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
     </main>
   );

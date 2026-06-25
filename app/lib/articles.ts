@@ -16,6 +16,9 @@ export type TherapistArticle = {
   updated_at: string;
   approved_at: string | null;
   reviewed_by: string | null;
+  image_url: string | null;
+  image_alt: string | null;
+  image_credit: string | null;
 };
 
 // Optional topic buckets a therapist can tag an article with — mirrors the

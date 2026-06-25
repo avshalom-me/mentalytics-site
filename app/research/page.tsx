@@ -10,12 +10,12 @@ export const metadata: Metadata = {
 // Refresh the hub periodically so newly-approved community articles appear.
 export const revalidate = 300;
 
-type CommunityItem = { slug: string; title: string; summary: string; topic: string | null; author: string };
+type CommunityItem = { slug: string; title: string; summary: string; topic: string | null; author: string; img: string | null; imgAlt: string };
 
 async function getCommunityArticles(): Promise<CommunityItem[]> {
   const { data } = await supabaseAdmin
     .from("therapist_articles")
-    .select("slug, title, summary, topic, therapists(full_name)")
+    .select("slug, title, summary, topic, image_url, image_alt, therapists(full_name)")
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
     .limit(40);
@@ -27,6 +27,8 @@ async function getCommunityArticles(): Promise<CommunityItem[]> {
       summary: r.summary,
       topic: r.topic,
       author: t?.full_name ?? "מטפל/ת",
+      img: r.image_url ?? null,
+      imgAlt: r.image_alt ?? r.title,
     };
   });
 }
@@ -83,17 +85,27 @@ function ArticleCard({ href, title, desc, img, imgPosition = "center" }: { href:
   );
 }
 
-function CommunityCard({ slug, title, summary, topic, author }: CommunityItem) {
+function CommunityCard({ slug, title, summary, topic, author, img, imgAlt }: CommunityItem) {
   return (
     <Link href={`/research/community/${slug}`} className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
-      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", padding: "20px 22px" }}>
-      {topic && (
-        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".06em", marginBottom: "8px" }}>{topic}</div>
+      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", overflow: "hidden" }}>
+      {img && (
+        <div style={{ height: "168px", overflow: "hidden", background: "var(--surface)" }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={img} alt={imgAlt}
+            style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .45s ease", display: "block" }}
+            className="group-hover:scale-105" loading="lazy" />
+        </div>
       )}
-      <h3 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
-        className="group-hover:underline">{title}</h3>
-      {summary && <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{summary}</p>}
-      <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--faint)" }}>מאת {author}</div>
+      <div style={{ padding: "20px 22px" }}>
+        {topic && (
+          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".06em", marginBottom: "8px" }}>{topic}</div>
+        )}
+        <h3 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
+          className="group-hover:underline">{title}</h3>
+        {summary && <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{summary}</p>}
+        <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--faint)" }}>מאת {author}</div>
+      </div>
     </Link>
   );
 }
