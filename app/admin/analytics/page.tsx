@@ -76,6 +76,26 @@ function pct(a: number, b: number): string {
   return `${Math.round((a / b) * 100)}%`;
 }
 
+// Click-to-expand explanation shown under a rubric, so the admin can learn
+// what each metric actually means without cluttering the view.
+function Info({ title = "מה זה אומר?", children }: { title?: string; children: React.ReactNode }) {
+  return (
+    <details className="analytics-info mb-3 rounded-xl border border-stone-200 bg-stone-50 text-sm">
+      <summary className="cursor-pointer select-none list-none px-4 py-2 font-semibold text-stone-600 hover:text-stone-800 flex items-center gap-1.5">
+        <span className="text-[#2e7d8c]">ℹ️</span> {title}
+      </summary>
+      <div className="px-4 pb-3 pt-1 text-stone-600 leading-7 space-y-1.5">{children}</div>
+    </details>
+  );
+}
+
+// A single "term — meaning" line inside an Info box.
+function Term({ k, children }: { k: string; children: React.ReactNode }) {
+  return (
+    <p><span className="font-bold text-stone-800">{k}</span> — {children}</p>
+  );
+}
+
 // ── TAB 1: Funnel ──────────────────────────────────────────────────
 
 function FunnelCards({ f }: { f: Funnel }) {
@@ -86,6 +106,14 @@ function FunnelCards({ f }: { f: Funnel }) {
     { label: "יצירת קשר", value: f.contactClicks, color: "bg-green-50 border-green-200 text-green-800" },
   ];
   return (
+    <>
+    <Info title="מה זה אומר? משפך החשיפה→פנייה">
+      <Term k="כניסות לדירקטוריה">מספר הכניסות לעמוד מאגר המטפלים.</Term>
+      <Term k="חשיפות כרטיס">כמה פעמים כרטיס של מטפל הוצג למשתמש (ברשימה או בתוצאות ההתאמה) — לא בהכרח נלחץ.</Term>
+      <Term k="צפיות בפרופיל">כמה פעמים נכנסו בפועל לעמוד הפרופיל המלא של מטפל.</Term>
+      <Term k="יצירת קשר">כמה לחצו על וואטסאפ / טלפון / מייל ליצירת קשר.</Term>
+      <Term k="האחוז שמעל כל קופסה">שיעור המעבר מהשלב הקודם (למשל כמה מהחשיפות הפכו לצפיות). ככל שגבוה יותר — המעבר בין השלבים יעיל יותר.</Term>
+    </Info>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
       {steps.map((s, i) => (
         <div key={s.label} className="relative">
@@ -101,6 +129,7 @@ function FunnelCards({ f }: { f: Funnel }) {
         </div>
       ))}
     </div>
+    </>
   );
 }
 
@@ -110,6 +139,7 @@ function PopularFilters({ filters }: { filters: FilterEntry[] }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
       <h2 className="text-base font-black text-stone-800 mb-4">פילטרים פופולריים</h2>
+      <Info>הפילטרים שמשתמשים הכי בחרו בהם במאגר המטפלים (למשל אזור או עיר). המספר = כמה פעמים הפילטר הופעל. עוזר להבין מה הכי מחפשים.</Info>
       <div className="space-y-2">
         {filters.map((f) => (
           <div key={f.name} className="flex items-center gap-3">
@@ -133,6 +163,7 @@ function TrendChart({ trends }: { trends: TrendEntry[] }) {
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
       <h2 className="text-base font-black text-stone-800 mb-4">טרנד שבועי</h2>
+      <Info>אותם מדדי משפך (כניסות, חשיפות, צפיות, קשר) לאורך הזמן — כל נקודה היא שבוע. עוזר לראות מגמות: עלייה/ירידה בתנועה ובפניות לאורך השבועות.</Info>
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
@@ -156,6 +187,15 @@ function CTRTable({ rows }: { rows: CTRRow[] }) {
     <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden">
       <div className="px-5 py-4 border-b border-stone-200">
         <h2 className="text-base font-black text-stone-800">חשיפות מול קליקים למטפל</h2>
+        <div className="mt-3">
+          <Info>
+            <p>טבלה לכל מטפל — כמה נחשף, נצפה, ונוצר איתו קשר:</p>
+            <Term k="חשיפות">כמה פעמים הכרטיס שלו הוצג למשתמשים.</Term>
+            <Term k="צפיות">כמה נכנסו לעמוד הפרופיל שלו.</Term>
+            <Term k="קליקים">כמה לחצו ליצירת קשר (וואטסאפ/טלפון/מייל).</Term>
+            <Term k="CTR">אחוז ההמרה: קליקים חלקי חשיפות. ירוק = 10%+ (מצוין), כתום = 5%+ (סביר), אפור = פחות. ★ = מטפל משלם.</Term>
+          </Info>
+        </div>
       </div>
       <table className="w-full text-right text-sm">
         <thead>
@@ -319,6 +359,12 @@ function QuizDropoutChart({
         </div>
       </div>
 
+      <Info title="מה זה אומר? נשירה לפי שלב">
+        <Term k="התחילו / סיימו / השלמה">כמה משתמשים פתחו את השאלון, כמה הגיעו עד הסוף, והאחוז ביניהם. אדום = שיעור השלמה נמוך.</Term>
+        <Term k="כל שורה (קבוצת שלבים)">המספר = כמה משתמשים הגיעו לאותו חלק בשאלון. ככל שהבר קצר יותר — פחות אנשים הגיעו לשם.</Term>
+        <Term k="‎-% משמאל">שיעור הנשירה מהחלק הקודם. אדום (20%+) = נקודה שבה הרבה אנשים עוזבים — שווה לבדוק אותה.</Term>
+        <Term k="לחיצה על שורה">פותחת את תת-השלבים הפנימיים כדי לאתר במדויק איפה הנשירה.</Term>
+      </Info>
       <div className="space-y-1">
         {grouped.map((g, i) => {
           const prevCount = i > 0 ? grouped[i - 1].count : max;
@@ -510,6 +556,12 @@ function ExplainTab({ data }: { data: AnalyticsData }) {
         <h2 className="text-lg font-black text-stone-800">קליקים על &quot;✦ למה הוצע לי?&quot;</h2>
         <p className="text-xs text-stone-400">משתמשים לוחצים על כפתור הניתוח האישי בכרטיס המלצה</p>
       </div>
+      <Info>
+        <p>כמה משתמשים לחצו על כפתור <b>"✦ ניתוח אישי"</b> בכרטיס ההמלצה במאטצ'ינג (סקרנות להבין למה הותאם להם מטפל מסוים).</p>
+        <Term k="סה״כ קליקים + לפי שאלון">כמה לחיצות בסך הכל, ופילוח בין שאלון מבוגרים לילדים.</Term>
+        <Term k="טיפולים שהכי הסקרנו לגביהם">לאיזה סוגי טיפול היו הכי הרבה לחיצות ניתוח.</Term>
+        <Term k="פילוח דמוגרפי">מי לוחץ (גיל / מגדר / אזור / תחום) — מבוסס על תשובות השאלון בלבד, אנונימי.</Term>
+      </Info>
 
       {/* Totals */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-6">
@@ -562,6 +614,11 @@ function StatsTab({ data }: { data: AnalyticsData }) {
         <h2 className="text-lg font-black text-stone-800">פילוח צפיות לפי פרמטרים</h2>
         <p className="text-xs text-stone-400">נתונים מתוך צפיות בפרופיל מטפל (מערכת התאמה + דירקטוריה)</p>
       </div>
+      <Info>
+        <p>פילוח של <b>מי המשתמשים שצפו בפרופילים</b> של מטפלים, לפי המידע האנונימי שמסרו (אזור / נושא הפנייה / קבוצת גיל / מגדר). עוזר להבין מי קהל המשתמשים בפועל.</p>
+        <Term k="לפי אזור / נושא">מאיפה הצופים ועל איזה תחום (חרדה, זוגיות וכו').</Term>
+        <Term k="התפלגות ערוצי קשר">מאיזה אמצעי (וואטסאפ/טלפון/מייל) משתמשים בוחרים ליצור קשר.</Term>
+      </Info>
 
       <div className="grid gap-4 lg:grid-cols-2 mb-6">
         <HorizontalBars title="לפי אזור" data={data.demographics.byRegion} color="#2e7d8c" />
@@ -612,6 +669,12 @@ function TherapistsTab({ data }: { data: TherapistBreakdowns }) {
         <h2 className="text-lg font-black text-stone-800">פרופיל המטפלים הפעילים</h2>
         <p className="text-xs text-stone-400">פילוח לפי שדות הפרופיל — מטפלים מוצגים בהתאמות (משלמים + חינמיים מאושרים)</p>
       </div>
+      <Info>
+        <p>כאן הפילוח הוא של <b>המטפלים עצמם</b> (היצע), לא של המשתמשים. כלומר הרכב המאגר הפעיל.</p>
+        <Term k="מטפלים פעילים">סך המטפלים המוצגים בהתאמות, ובתוכם כמה משלמים / מקודמים (מתנה) / חינמיים.</Term>
+        <Term k="מקבלים פניות / אונליין / עם תמונה">איזה אחוז מהמטפלים פתוחים לפניות חדשות, מטפלים אונליין, ויש להם תמונת פרופיל.</Term>
+        <Term k="הגרפים למטה">התפלגות המטפלים לפי סוג, שיטות טיפול, גיל מטופלים, אזור, מגדר, הסדרי תשלום, שפות והעדפות תרבותיות — לזהות פערי היצע.</Term>
+      </Info>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
         <StatCard label="מטפלים פעילים" value={total}
@@ -698,6 +761,7 @@ export default function AdminAnalyticsPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <style>{`.analytics-info summary::-webkit-details-marker{display:none}`}</style>
 
       {/* Header */}
       <div className="mb-6">
