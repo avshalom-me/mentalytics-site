@@ -2805,10 +2805,13 @@ export default function AdultsPage() {
               <img
                 src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
                 alt={t.full_name ?? ""}
-                className="h-16 w-16 flex-shrink-0 rounded-xl object-cover"
+                className="h-[84px] w-[84px] flex-shrink-0 rounded-2xl object-cover"
               />
               <div className="flex-1 text-right">
-                <h3 className="text-lg font-bold text-[#1a3a5c]">{t.full_name || "ללא שם"}</h3>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-xl font-extrabold text-[#131F1E]">{t.full_name || "ללא שם"}</h3>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF4F3] px-2.5 py-0.5 text-[12px] font-bold text-[#2A6462]">✓ מאומת</span>
+                </div>
                 <p className="text-xs text-[#6b7280]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
                 {t.bio && <p className="mt-1 text-sm text-gray-700 line-clamp-2">{t.bio}</p>}
                 {t.regions?.length > 0 && (
@@ -2848,14 +2851,14 @@ export default function AdultsPage() {
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                   <a
                     href={profileHrefForMatch(t)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[var(--teal-dark)] transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[var(--teal-dark)] transition-colors"
                   >
                     פרופיל מלא ←
                   </a>
                   <button
                     onClick={() => fetchExplanation(t)}
                     disabled={explainLoading[t.id]}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
                   >
                     {explainLoading[t.id] ? "טוען..." : "✦ ניתוח אישי"}
                   </button>
