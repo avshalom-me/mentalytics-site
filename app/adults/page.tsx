@@ -2858,14 +2858,14 @@ export default function AdultsPage() {
                   <button
                     onClick={() => fetchExplanation(t)}
                     disabled={explainLoading[t.id]}
-                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm bg-gradient-to-r from-violet-600 via-fuchsia-600 to-rose-500 hover:opacity-90 hover:shadow-md transition-all disabled:opacity-60"
+                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm bg-[var(--gold)] hover:bg-[var(--gold-dark)] transition-colors disabled:opacity-60"
                   >
                     {explainLoading[t.id] ? "טוען..." : "✦ ניתוח אישי"}
                   </button>
                 </div>
                 {explainData[t.id] && (
-                  <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
-                    <p className="text-xs font-bold text-violet-900 mb-1">✦ {explainData[t.id]!.title}</p>
+                  <div className="mt-3 rounded-xl border border-[#f0e0b8] bg-[var(--gold-pale)] p-3 text-right">
+                    <p className="text-xs font-bold text-[var(--gold-dark)] mb-1">✦ {explainData[t.id]!.title}</p>
                     <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explainData[t.id]!.explanation}</p>
                     <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                   </div>
