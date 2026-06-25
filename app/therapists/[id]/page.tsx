@@ -168,7 +168,7 @@ export default async function TherapistProfilePage({
         <div className="flex flex-col sm:flex-row gap-6 items-start">
 
           {/* Photo — larger, framed */}
-          <div className="w-full sm:w-44 flex-shrink-0 mx-auto sm:mx-0" style={{ maxWidth: "200px" }}>
+          <div className="w-full sm:w-56 flex-shrink-0 mx-auto sm:mx-0" style={{ maxWidth: "240px" }}>
             <div className="rounded-2xl overflow-hidden bg-white w-full aspect-[3/4]"
               style={{ border: "3px solid #fff", boxShadow: "0 6px 22px rgba(42,100,98,.22)" }}>
               <img src={photoUrl ?? avatarSrc} alt={name} className="w-full h-full object-cover object-top" style={{ display: "block" }} />
