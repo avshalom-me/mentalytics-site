@@ -261,31 +261,34 @@ export default function TherapistProfileEditPage() {
       return;
     }
 
+    // The profile itself is already saved (PATCH succeeded). File uploads are
+    // best-effort from here: a failed upload must NOT hide the save or block
+    // the flow — we keep the failed file selected for an easy retry and surface
+    // a clear, non-blocking note (the admin can also request completion later).
+    let photoErr: string | null = null;
+    let certErr: string | null = null;
     if (photoFile || certFile) {
       setUploading(true);
-      const uploadErrors: string[] = [];
-      if (photoFile) {
-        const err = await uploadFile(photoFile, "photo", accessToken);
-        if (err) uploadErrors.push(err);
-      }
-      if (certFile) {
-        const err = await uploadFile(certFile, "certificate", accessToken);
-        if (err) uploadErrors.push(err);
-      }
+      if (photoFile) photoErr = await uploadFile(photoFile, "photo", accessToken);
+      if (certFile) certErr = await uploadFile(certFile, "certificate", accessToken);
       setUploading(false);
-      if (uploadErrors.length) {
-        setSaveErr(uploadErrors.join("; "));
-        setSaving(false);
-        return;
-      }
+    }
+    if (!photoErr) { setPhotoFile(null); setPhotoPreview(null); }
+    if (!certErr) setCertFile(null);
+
+    const base = json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.";
+    const uploadIssues = [photoErr, certErr].filter(Boolean) as string[];
+    setIsNew(false);
+    if (uploadIssues.length) {
+      setSaveMsg("");
+      setSaveErr(`${base} שימו לב: העלאת הקובץ לא הושלמה (${uploadIssues.join("; ")}). אפשר לנסות שוב בכל עת — הפרטים כבר נשמרו.`);
+    } else {
+      setSaveErr("");
+      setSaveMsg(base);
     }
 
-    setSaveMsg(json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.");
-    setIsNew(false);
-    setPhotoFile(null);
-    setCertFile(null);
-    setPhotoPreview(null);
-    // First-time registration: let the therapist pick a plan before finishing.
+    // First-time registration: let the therapist pick a plan before finishing —
+    // even if a file upload failed, since the profile was created.
     if (json.created) {
       setShowPlanChoice(true);
       setSaving(false);
