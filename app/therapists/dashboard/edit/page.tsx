@@ -142,9 +142,75 @@ export default function TherapistProfileEditPage() {
     init();
   }, []);
 
+  // Downscale a large image in the browser so it stays well under Vercel's
+  // ~4.5MB request-body cap before going through /api/therapist-upload. Only
+  // kicks in for oversized files, so normal photos are untouched.
+  async function downscaleImage(file: File): Promise<File> {
+    if (!file.type.startsWith("image/") || file.size <= 4 * 1024 * 1024) return file;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("load failed"));
+        img.src = url;
+      });
+      const maxDim = 1200;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(url); return file; }
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      if (!blob) return file;
+      return new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" });
+    } catch {
+      return file;
+    }
+  }
+
   async function uploadFile(file: File, type: "photo" | "certificate", accessToken: string): Promise<string | null> {
+    // Certificates can be large PDFs/scans — upload them straight to Supabase
+    // Storage via a signed URL so the bytes bypass the Vercel function (whose
+    // ~4.5MB body cap was returning 413). Photos keep going through the route
+    // (which compresses them server-side), with a client downscale as a guard.
+    if (type === "certificate") {
+      const ext = (file.name.split(".").pop() ?? "").toLowerCase();
+      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` };
+      const signRes = await fetch("/api/therapist-cert", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ action: "sign", ext, contentType: file.type, size: file.size }),
+      });
+      const sign = await signRes.json().catch(() => ({}));
+      if (!signRes.ok || !sign.ok) return sign.error ?? `שגיאה בהכנת העלאת תעודה (${signRes.status})`;
+
+      const { error: upErr } = await supabase.storage
+        .from("therapist-certificates")
+        .uploadToSignedUrl(sign.path, sign.token, file, { contentType: file.type || undefined });
+      if (upErr) return `שגיאה בהעלאת תעודה: ${upErr.message}`;
+
+      const commitRes = await fetch("/api/therapist-cert", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ action: "commit", path: sign.path, name: file.name, contentType: file.type, size: file.size }),
+      });
+      const commit = await commitRes.json().catch(() => ({}));
+      if (!commitRes.ok || !commit.ok) return commit.error ?? `שגיאה בשמירת תעודה (${commitRes.status})`;
+      return null;
+    }
+
+    const toSend = await downscaleImage(file);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", toSend);
     fd.append("type", type);
     const res = await fetch("/api/therapist-upload", {
       method: "POST",
