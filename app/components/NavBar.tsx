@@ -42,7 +42,7 @@ export default function NavBar() {
         </Link>
 
         {/* Desktop nav */}
-        <nav aria-label="ניווט ראשי" className="hidden md:flex items-center gap-6">
+        <nav aria-label="ניווט ראשי" className="hidden md:flex items-center gap-3 lg:gap-4">
           {navLinks.map(({ href, label, anchor }) =>
             anchor ? (
               <a key={href} href={href} style={{ fontSize: "14px", fontWeight: 500, color: "var(--muted)", transition: "color .18s", position: "relative", paddingBottom: "2px" }}
@@ -63,19 +63,19 @@ export default function NavBar() {
         {/* Desktop CTAs */}
         <div className="hidden md:flex items-center gap-2">
           <Link href="/therapists/join"
-            style={{ background: "white", color: "var(--teal-dark)", border: "1.5px solid var(--teal)", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "6px 15px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            style={{ background: "white", color: "var(--teal-dark)", border: "1.5px solid var(--teal)", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "6px 13px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--teal-pale)]">
             <LogIn size={14} />
             כניסה למטפלים
           </Link>
           <Link href="/kids"
-            style={{ background: "var(--gold)", color: "white", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "7px 16px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            style={{ background: "var(--gold)", color: "white", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "7px 13px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--gold-dark)]">
             <GraduationCap size={14} />
             התאמה לילדים
           </Link>
           <Link href="/adults"
-            style={{ background: "var(--teal)", color: "white", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "7px 16px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
+            style={{ background: "var(--teal)", color: "white", borderRadius: "50px", fontFamily: "inherit", fontWeight: 700, fontSize: "13px", padding: "7px 13px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--teal-dark)]">
             <User size={14} />
             התאמה למבוגרים
