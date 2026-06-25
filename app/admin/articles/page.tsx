@@ -53,14 +53,19 @@ function ImagePicker({ value, onChange, defaultQuery }: {
   onChange: (v: ImageValue) => void;
   defaultQuery?: string;
 }) {
-  const [query, setQuery] = useState(defaultQuery ?? "");
+  const [query, setQuery] = useState("");
+  const [touched, setTouched] = useState(false);
   const [results, setResults] = useState<UnsplashResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [configured, setConfigured] = useState<boolean | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
+  // Until the admin types in the search box, fall back to the article's
+  // topic/title so the field is pre-filled and the button is clickable.
+  const effectiveQuery = touched ? query : (query || defaultQuery || "");
+
   async function search() {
-    const q = query.trim();
+    const q = effectiveQuery.trim();
     if (!q) return;
     setSearching(true);
     setErr(null);
@@ -93,13 +98,13 @@ function ImagePicker({ value, onChange, defaultQuery }: {
     <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 space-y-3">
       <div className="flex items-center gap-2">
         <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          value={effectiveQuery}
+          onChange={(e) => { setTouched(true); setQuery(e.target.value); }}
           onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); search(); } }}
-          placeholder="חיפוש תמונה (נושא/מילות מפתח)..."
+          placeholder="חיפוש תמונה (באנגלית מומלץ)..."
           className="flex-1 rounded-lg border border-stone-200 px-3 py-2 text-sm"
         />
-        <button type="button" onClick={search} disabled={searching || !query.trim()}
+        <button type="button" onClick={search} disabled={searching || !effectiveQuery.trim()}
           className="rounded-lg bg-[#2e7d8c] px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
           {searching ? "מחפש..." : "חיפוש"}
         </button>
