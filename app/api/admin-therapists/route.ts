@@ -351,10 +351,13 @@ export async function PATCH(request: Request) {
       }
       // Record that (and when) the request went out, so the admin UI can show it.
       const requestedAt = new Date().toISOString();
-      await supabaseAdmin
+      const { error: stampErr } = await supabaseAdmin
         .from("therapists")
         .update({ completion_requested_at: requestedAt })
         .eq("id", id);
+      if (stampErr) {
+        console.error(`request_completion: failed to stamp completion_requested_at for ${id}:`, stampErr.message);
+      }
       await writeAudit(supabaseAdmin, {
         therapistId: id,
         actorType: "admin",

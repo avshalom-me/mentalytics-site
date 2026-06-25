@@ -39,7 +39,6 @@ export default function ContactButtons({
   therapistName,
   waLink,
   phone,
-  email,
   source = "directory",
   mobileSticky = false,
 }: {
@@ -47,7 +46,6 @@ export default function ContactButtons({
   therapistName: string;
   waLink: string | null;
   phone: string | null;
-  email: string | null;
   source?: "match" | "directory";
   mobileSticky?: boolean;
 }) {

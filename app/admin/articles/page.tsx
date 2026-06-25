@@ -126,7 +126,7 @@ function ImagePicker({ value, onChange, defaultQuery }: {
                 className={`relative rounded-lg overflow-hidden border-2 ${selected ? "border-[#2e7d8c]" : "border-transparent"}`}
                 title={r.credit ? `צילום: ${r.credit}` : ""}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={r.thumb} alt={r.alt || "candidate"} className="w-full h-20 object-cover" loading="lazy" />
+                <img src={r.thumb} alt={r.alt || "תמונה מועמדת"} className="w-full h-20 object-cover" loading="lazy" />
                 {selected && <span className="absolute top-1 right-1 bg-[#2e7d8c] text-white text-[10px] rounded px-1">נבחר ✓</span>}
               </button>
             );
@@ -144,7 +144,13 @@ function ImagePicker({ value, onChange, defaultQuery }: {
       {value.image_url && (
         <div className="space-y-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={value.image_url} alt="preview" className="w-full max-h-40 object-cover rounded-lg" />
+          <img src={value.image_url} alt="תצוגה מקדימה" className="w-full max-h-40 object-cover rounded-lg" />
+          <input
+            value={value.image_alt}
+            onChange={(e) => onChange({ ...value, image_alt: e.target.value })}
+            placeholder="טקסט חלופי לתמונה (alt) — לנגישות ו-SEO"
+            className="w-full rounded-lg border border-stone-200 px-3 py-2 text-xs"
+          />
           <input
             value={value.image_credit}
             onChange={(e) => onChange({ ...value, image_credit: e.target.value })}
@@ -362,7 +368,7 @@ export default function AdminArticlesPage() {
       {showCreate && (
         <div className="mb-10 rounded-2xl border border-[#2e7d8c]/30 bg-[#f3f9fa] p-5 space-y-3">
           <h2 className="text-sm font-extrabold text-stone-800">מאמר עריכותי חדש</h2>
-          <p className="text-xs text-stone-500">המאמר יפורסם מיד ויְשׁוּיֵך למטפל/ת שתבחר/י — עם קישור לפרופיל, והמאמר יופיע גם בעמוד הפרופיל שלו/ה.</p>
+          <p className="text-xs text-stone-500">המאמר יתפרסם מיד וישויך למטפל/ת שתבחר/י — עם קישור לפרופיל, ויופיע גם בעמוד הפרופיל שלו/ה.</p>
 
           <select value={createForm.therapist_id} onChange={(e) => setCreateForm({ ...createForm, therapist_id: e.target.value })}
             className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm bg-white">

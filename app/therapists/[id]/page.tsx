@@ -153,7 +153,7 @@ export default async function TherapistProfilePage({
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 pb-28 sm:pb-12" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <TrackView therapistId={id} source={source} context={viewerContext} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         details summary { list-style: none; }
@@ -199,7 +199,6 @@ export default async function TherapistProfilePage({
               therapistName={t.full_name ?? ""}
               waLink={waLink}
               phone={t.phone}
-              email={t.email}
               source={source}
               mobileSticky
             />
