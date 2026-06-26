@@ -594,6 +594,9 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   const age   = parseInt(A._age) || 0;
   const grpV  = gg(A);
   const showDev = (age > 0 && age < 7) || grpV === "ga" || A.toilet === "כן";
+  // Ages 1–2: only developmental + behavioral domains are relevant — hide the
+  // emotional / learning / social options entirely.
+  const onlyDevBeh = age >= 1 && age <= 2;
 
   function selArea(key: string, val: string) {
     setA({ ...A, [key]: val });
@@ -639,6 +642,11 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
     },
   ];
 
+  // For 1–2 year-olds, show only the developmental + behavioral domains.
+  const visibleAreas = onlyDevBeh
+    ? areas.filter(a => a.key === "a_dev" || a.key === "a_beh")
+    : areas;
+
   return (
     <div>
       <Card>
@@ -646,7 +654,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
         <StepQ>תחומי הקושי העיקריים</StepQ>
         <StepHint>דרג את רמת הקושי בכל תחום. ניתן ללחוץ על "הסבר מפורט" כדי לקרוא יותר על כל תחום.</StepHint>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {areas.map(({ key, title, desc, detail }) => (
+          {visibleAreas.map(({ key, title, desc, detail }) => (
             <div key={key}
               className={`bg-[var(--surface)] border-2 rounded-xl p-4 transition-all ${A[key] && A[key] !== "כלל לא" ? "border-[var(--teal)]" : "border-[var(--line)]"}`}>
               <div className="text-sm font-bold text-[#1a2a3a] mb-1">{title}</div>
