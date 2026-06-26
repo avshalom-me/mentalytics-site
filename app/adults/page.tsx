@@ -943,6 +943,7 @@ export default function AdultsPage() {
               <option value="">בחר/י</option>
               <option value="זכר">זכר</option>
               <option value="נקבה">נקבה</option>
+              <option value="לא מעוניין/ת לענות">לא מעוניין/ת לענות</option>
             </select>
           </div>
         </div>
