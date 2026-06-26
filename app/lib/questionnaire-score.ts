@@ -1201,16 +1201,49 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
   // חריגה מהטווח התקין → המלצה לדיאטנ/ית קלינית (סינון קשיח דרך
   // professionalType). הפנייה לרופא/ת המשפחה ממשיכה להופיע כבאנר טקסט בעמוד
   // התוצאות (רופא משפחה אינו במאגר המטפלים).
-  if (answers.bmiAbnormal) {
-    const dietitianAlreadyRecommended = recs.some(r => r.professionalType === "דיאטנ/ית קליני/ת");
-    if (!dietitianAlreadyRecommended) {
+  if (answers.bmi != null) {
+    const bmi = answers.bmi;
+    const eating1 = answers.emotional?.eating1Count ?? 0; // restriction-pattern symptoms
+    const underweight = bmi < 18.5;
+    const severeUnderweight = bmi < 16.5;
+    const overweight = bmi > 24.9;
+    const edRec = recs.find(r => r.treatment === "טיפול בהפרעות אכילה");
+
+    // Red flag: low BMI together with a restrictive eating pattern is a medical
+    // concern (possible restrictive eating disorder) → escalate the eating-disorder
+    // referral to URGENT so it sorts to the top and routes to ED specialists.
+    // A low BMI WITHOUT eating symptoms does NOT open this pathway (avoids
+    // over-medicalising someone naturally slim — they only get the gentle note).
+    if (underweight && (eating1 >= 2 || edRec)) {
+      const flag = severeUnderweight ? "תת-משקל משמעותי" : "תת-משקל";
+      if (edRec) {
+        edRec.urgent = true;
+        edRec.notes = `${edRec.notes ? edRec.notes + " " : ""}בנוסף, ${flag} בשילוב דפוס הגבלה אכילתית — מומלץ בירור רפואי דחוף.`;
+      } else {
+        recs.push({
+          id: uid("bmi-restrictive"),
+          symptomText: `${flag} בשילוב דפוס הגבלה אכילתית.`,
+          treatment: "טיפול בהפרעות אכילה",
+          treatmentLabel: "טיפול בהפרעות אכילה",
+          domain: "מורכבויות בתחום הרגשי/האישי",
+          urgent: true,
+          notes: "שילוב של תת-משקל עם דפוס הגבלה — מומלץ בירור רפואי דחוף לצד טיפול מתמחה בהפרעות אכילה.",
+        });
+      }
+    }
+
+    // Clinical dietitian referral for any abnormal BMI (deduped if eating
+    // section already recommended one). Urgent only on severe underweight.
+    if ((underweight || overweight) && !recs.some(r => r.professionalType === "דיאטנ/ית קליני/ת")) {
       recs.push({
         id: uid("bmi-dietitian"),
-        symptomText: "ה-BMI שדיווחת עליו אינו בטווח התקין.",
+        symptomText: underweight
+          ? "ה-BMI שדיווחת עליו מתחת לטווח התקין."
+          : "ה-BMI שדיווחת עליו מעל הטווח התקין.",
         treatment: "דיאטנ/ית קליני/ת",
         treatmentLabel: "דיאטנ/ית קליני/ת",
         domain: "מורכבויות בתחום הרגשי/האישי",
-        urgent: false,
+        urgent: severeUnderweight,
         notes: "ליווי תזונתי על-ידי דיאטנ/ית קליני/ת. במקביל מומלץ גם בירור אצל רופא/ת המשפחה.",
         professionalType: "דיאטנ/ית קליני/ת",
       });

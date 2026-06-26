@@ -7,6 +7,7 @@ export type QuestionnaireAnswers = {
   vision?: boolean;
   hearing?: boolean;
   bmiAbnormal?: boolean;
+  bmi?: number; // raw BMI (computed in the eating-disorder section); drives nuanced output + scoring
 
   // --- תחומים שנבחרו ---
   domains: ("emotional" | "functional" | "relationship" | "addiction" | "personal_development")[];

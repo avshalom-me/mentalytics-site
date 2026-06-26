@@ -1434,10 +1434,8 @@ export default function AdultsPage() {
           ); })()}
         </div>
         <NavRow onBack={() => setScreen("e6")} onNext={() => {
-          const bmiAbnormal = (bmiH > 0 && bmiW > 0)
-            ? (bmiW / Math.pow(bmiH / 100, 2)) < 18.5 || (bmiW / Math.pow(bmiH / 100, 2)) > 24.9
-            : undefined;
-          upd({ bmiAbnormal });
+          const bmi = (bmiH > 0 && bmiW > 0) ? bmiW / Math.pow(bmiH / 100, 2) : undefined;
+          upd({ bmi });
           setScreen(e6SleepChecked ? "e7-q" : (answers.emotional?.e8 ? "e8c" : "e9-q"));
         }} />
       </Card>
@@ -2568,11 +2566,24 @@ export default function AdultsPage() {
 
           {/* Alerts */}
           {err && <p className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">{err}</p>}
-          {answers.bmiAbnormal && (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-              ⚕️ ה-BMI שדיווחת עליו אינו בטווח הרגיל. בנפרד מהטיפול הנפשי, מומלץ לפנות לרופא/ת המשפחה לבירור רפואי.
-            </div>
-          )}
+          {(() => {
+            const bmi = answers.bmi;
+            if (bmi == null || (bmi >= 18.5 && bmi <= 24.9)) return null;
+            const severe = bmi < 16.5;
+            const under = bmi < 18.5;
+            const cat = under ? "תת-משקל" : bmi < 30 ? "עודף משקל" : "השמנה";
+            const cls = severe ? "border-red-300 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900";
+            const msg = severe
+              ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) נמוך באופן משמעותי. מעבר לטיפול הנפשי, חשוב לפנות בהקדם לבירור רפואי אצל רופא/ת המשפחה.`
+              : under
+                ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) מתחת לטווח התקין. לצד הטיפול הנפשי, שווה בירור אצל רופא/ת המשפחה.`
+                : `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) מעל הטווח התקין. אם רלוונטי, ליווי תזונתי/רפואי עשוי לתמוך — אין באמור משום אבחנה.`;
+            return (
+              <div className={`mb-4 rounded-xl border p-4 text-sm leading-relaxed ${cls}`}>
+                ⚕️ {msg}
+              </div>
+            );
+          })()}
           {multipleGroups && (
             <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
               📌 שים/י לב: נמצאו מספר סימנים עם הפניות שונות. המערכת סיננה את הפחות דחופות כך שבפניך מופיעות ההפניות העיקריות. יש לפנות ע"פ הקושי המשמעותי ביותר שאת/ה חווה.
