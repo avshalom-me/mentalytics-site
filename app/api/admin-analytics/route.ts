@@ -11,6 +11,25 @@ function periodToDate(period: Period): string | null {
   return new Date(Date.now() - ms).toISOString();
 }
 
+// PostgREST caps every select at 1000 rows. The event tables grow well past
+// that (analytics_events alone is in the thousands), so a plain select silently
+// returns only a 1000-row slice — which freezes all the counts once the table
+// crosses 1000 rows. Page through with .range() to aggregate the FULL set.
+// makeQuery must return a FRESH builder each call (a builder can't be reused
+// after it's awaited).
+async function fetchAllRows<T>(makeQuery: () => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }> }): Promise<T[]> {
+  const PAGE = 1000;
+  const all: T[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
+    if (error) throw new Error(error.message);
+    const rows = data ?? [];
+    all.push(...rows);
+    if (rows.length < PAGE) break;
+  }
+  return all;
+}
+
 type TherapistRow = {
   id: string;
   full_name: string | null;
@@ -37,32 +56,33 @@ export async function GET(req: NextRequest) {
   const since = periodToDate(safePeriod);
 
   try {
-    // Run all queries in parallel
-    const [eventsRes, viewsRes, clicksRes, therapistsRes] = await Promise.all([
-      // analytics_events (page_view, profile_impression, filter_used)
-      (() => {
+    // Paginated fetches (see fetchAllRows) so counts reflect ALL rows, not just
+    // the first 1000. Therapists is ~tens of rows so a single select is fine.
+    const [events, views, clicks, therapistsRes] = await Promise.all([
+      fetchAllRows<{ event_type: string; therapist_id: string | null; metadata: Record<string, string>; created_at: string }>(() => {
         let q = supabaseAdmin
           .from("analytics_events")
-          .select("event_type, therapist_id, metadata, created_at");
+          .select("event_type, therapist_id, metadata, created_at")
+          .order("created_at", { ascending: true });
         if (since) q = q.gte("created_at", since);
         return q;
-      })(),
-      // profile views from existing table (with context for demographics)
-      (() => {
+      }),
+      fetchAllRows<{ therapist_id: string; viewed_at: string; viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }>(() => {
         let q = supabaseAdmin
           .from("therapist_profile_views")
-          .select("therapist_id, viewed_at, viewer_region, viewer_issue, viewer_age_band, viewer_gender");
+          .select("therapist_id, viewed_at, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
+          .order("viewed_at", { ascending: true });
         if (since) q = q.gte("viewed_at", since);
         return q;
-      })(),
-      // contact clicks from existing table
-      (() => {
+      }),
+      fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string }>(() => {
         let q = supabaseAdmin
           .from("therapist_contact_clicks")
-          .select("therapist_id, click_type, clicked_at");
+          .select("therapist_id, click_type, clicked_at")
+          .order("clicked_at", { ascending: true });
         if (since) q = q.gte("clicked_at", since);
         return q;
-      })(),
+      }),
       // therapists for the impressions table + profile breakdowns (one fetch)
       supabaseAdmin
         .from("therapists")
@@ -72,9 +92,6 @@ export async function GET(req: NextRequest) {
         .in("status", ["paying", "approved"]),
     ]);
 
-    const events = (eventsRes.data ?? []) as { event_type: string; therapist_id: string | null; metadata: Record<string, string>; created_at: string }[];
-    const views = (viewsRes.data ?? []) as { therapist_id: string; viewed_at: string }[];
-    const clicks = (clicksRes.data ?? []) as { therapist_id: string; click_type: string; clicked_at: string }[];
     const therapists = (therapistsRes.data ?? []) as TherapistRow[];
 
     // --- Funnel ---
@@ -154,7 +171,7 @@ export async function GET(req: NextRequest) {
     const kidsQuiz = buildQuizFunnel("kids");
 
     // --- Demographics from profile views ---
-    const viewsWithContext = (viewsRes.data ?? []) as { therapist_id: string; viewed_at: string; viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }[];
+    const viewsWithContext = views;
 
     function countField(field: string) {
       const counts: Record<string, number> = {};
