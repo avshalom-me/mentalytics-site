@@ -152,6 +152,7 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const [regionFilter, setRegionFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
+  const [onlineOnly, setOnlineOnly] = useState(false);
 
   usePageView("directory");
   const trackFilter = useFilterTrack();
@@ -167,7 +168,10 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
     return Array.from(cities).sort((a, b) => a.localeCompare(b, "he"));
   }, [therapists, regionFilter]);
 
+  // Order is preserved from the server (promoted/paying therapists first), so
+  // any filter — including online-only — keeps promoted therapists at the top.
   const filtered = therapists.filter((t) => {
+    if (onlineOnly && !t.online) return false;
     if (regionFilter && !t.regions.some((c) => CITY_TO_REGION[c] === regionFilter)) return false;
     if (cityFilter && !t.regions.includes(cityFilter)) return false;
     return true;
@@ -232,9 +236,20 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
           <option value="">כל הערים</option>
           {availableCities.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
-        {(regionFilter || cityFilter) && (
+        <button
+          type="button"
+          onClick={() => { const v = !onlineOnly; setOnlineOnly(v); if (v) trackFilter("online", "true"); }}
+          aria-pressed={onlineOnly}
+          className="rounded-xl px-3 py-2 text-sm font-semibold border transition-colors"
+          style={onlineOnly
+            ? { background: "var(--teal)", color: "white", borderColor: "var(--teal)" }
+            : { background: "white", color: "var(--text-2)", borderColor: "var(--line)" }}
+        >
+          🌐 אונליין בלבד
+        </button>
+        {(regionFilter || cityFilter || onlineOnly) && (
           <button
-            onClick={() => { setRegionFilter(""); setCityFilter(""); }}
+            onClick={() => { setRegionFilter(""); setCityFilter(""); setOnlineOnly(false); }}
             style={{ fontSize: "12px", color: "var(--muted)", textDecoration: "underline", background: "none", border: "none", cursor: "pointer" }}
           >
             נקה
