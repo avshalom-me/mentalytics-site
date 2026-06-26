@@ -549,10 +549,6 @@ export default function AdultsPage() {
   const [ageTouched, setAgeTouched] = useState(false);
   const [visionAns, setVisionAns] = useState<boolean | null>(null);
   const [hearingAns, setHearingAns] = useState<boolean | null>(null);
-  const [height, setHeight] = useState<number>(0);
-  const [heightTouched, setHeightTouched] = useState(false);
-  const [weight, setWeight] = useState<number>(0);
-  const [weightTouched, setWeightTouched] = useState(false);
 
   // local form state (committed to answers on next)
   const [moodChecked, setMoodChecked] = useState<number[]>([]);
@@ -952,38 +948,8 @@ export default function AdultsPage() {
           </div>
         )}
 
-        <div className="mt-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל <span className="font-normal text-[#6b7280]">(לחישוב BMI — אופציונלי)</span></p>
-          <div className="flex gap-3">
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-[#6b7280]">גובה (ס&quot;מ)</label>
-              <input type="number" min={100} max={250} value={height || ""}
-                onChange={(e) => setHeight(Number(e.target.value))}
-                onBlur={() => setHeightTouched(true)}
-                className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none" placeholder="175" />
-            </div>
-            <div className="flex-1">
-              <label className="mb-1 block text-xs text-[#6b7280]">משקל (ק&quot;ג)</label>
-              <input type="number" min={20} max={300} value={weight || ""}
-                onChange={(e) => setWeight(Number(e.target.value))}
-                onBlur={() => setWeightTouched(true)}
-                className="w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none" placeholder="70" />
-            </div>
-          </div>
-          <div className="mt-2 min-h-[2.5rem]">
-            {heightTouched && weightTouched && height > 0 && weight > 0 && (() => { const bmi = weight / Math.pow(height / 100, 2); const ok = bmi >= 18.5 && bmi <= 24.9; return (
-              <p className={`rounded-lg p-2 text-xs ${ok ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
-                BMI: {bmi.toFixed(1)} – {ok ? "תקין ✓" : "אינו תקין – הפנייה לרופא משפחה"}
-              </p>
-            ); })()}
-          </div>
-        </div>
-
         <NavRow onBack={() => setScreen("disclaimer")} onNext={() => {
-          const bmiAbnormal = (height > 0 && weight > 0)
-            ? (weight / Math.pow(height / 100, 2)) < 18.5 || (weight / Math.pow(height / 100, 2)) > 24.9
-            : undefined;
-          upd({ age: localAge, bmiAbnormal });
+          upd({ age: localAge });
           setScreen("domains");
         }}
           nextDisabled={!localAge || localAge < 18 || !answers.gender} />
