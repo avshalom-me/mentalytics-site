@@ -67,18 +67,18 @@ export async function GET(req: NextRequest) {
         if (since) q = q.gte("created_at", since);
         return q;
       }),
-      fetchAllRows<{ therapist_id: string; viewed_at: string; viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }>(() => {
+      fetchAllRows<{ therapist_id: string; viewed_at: string; source?: string; viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }>(() => {
         let q = supabaseAdmin
           .from("therapist_profile_views")
-          .select("therapist_id, viewed_at, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
+          .select("therapist_id, viewed_at, source, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
           .order("viewed_at", { ascending: true });
         if (since) q = q.gte("viewed_at", since);
         return q;
       }),
-      fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string }>(() => {
+      fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source?: string }>(() => {
         let q = supabaseAdmin
           .from("therapist_contact_clicks")
-          .select("therapist_id, click_type, clicked_at")
+          .select("therapist_id, click_type, clicked_at, source")
           .order("clicked_at", { ascending: true });
         if (since) q = q.gte("clicked_at", since);
         return q;
@@ -94,11 +94,31 @@ export async function GET(req: NextRequest) {
 
     const therapists = (therapistsRes.data ?? []) as TherapistRow[];
 
-    // --- Funnel ---
-    const pageViews = events.filter(e => e.event_type === "page_view").length;
-    const impressions = events.filter(e => e.event_type === "profile_impression").length;
-    const profileViews = views.length;
-    const contactClicks = clicks.length;
+    // --- Funnel (split by acquisition source) ---
+    // Directory: landing page_view → card impression (IntersectionObserver) →
+    //   profile view (source=directory) → contact (source=directory).
+    // Matching: quiz completion (reaching results) → card impression
+    //   (source=match_card) → profile view (source=match) → contact (source=match).
+    // page_view / profile_impression are emitted only on the directory.
+    const dirEntries = events.filter(e => e.event_type === "page_view").length;
+    const dirImpressions = events.filter(e => e.event_type === "profile_impression").length;
+    const quizCompleted = events.filter(e => e.event_type === "quiz_complete").length;
+    const dirViews = views.filter(v => v.source === "directory").length;
+    const matchImpressions = views.filter(v => v.source === "match_card").length;
+    const matchViews = views.filter(v => v.source === "match").length;
+    const dirClicks = clicks.filter(c => (c.source ?? "directory") === "directory").length;
+    const matchClicks = clicks.filter(c => c.source === "match").length;
+
+    const funnelBySource = {
+      directory: { pageViews: dirEntries, impressions: dirImpressions, profileViews: dirViews, contactClicks: dirClicks },
+      match: { pageViews: quizCompleted, impressions: matchImpressions, profileViews: matchViews, contactClicks: matchClicks },
+    };
+    // Combined = sum of the two sources (so "הכל" stays consistent with the
+    // per-source split, and profile views no longer conflate match_card impressions).
+    const pageViews = dirEntries + quizCompleted;
+    const impressions = dirImpressions + matchImpressions;
+    const profileViews = dirViews + matchViews;
+    const contactClicks = dirClicks + matchClicks;
 
     // --- Popular filters ---
     const filterCounts: Record<string, number> = {};
@@ -329,6 +349,7 @@ export async function GET(req: NextRequest) {
       ok: true,
       period: safePeriod,
       funnel: { pageViews, impressions, profileViews, contactClicks },
+      funnelBySource,
       popularFilters,
       trends,
       therapistCTR,

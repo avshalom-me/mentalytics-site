@@ -10,6 +10,7 @@ type Period = "week" | "month" | "all";
 type Tab = "funnel" | "quiz" | "stats" | "explain" | "therapists";
 
 type Funnel = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
+type FunnelBySource = { directory: Funnel; match: Funnel };
 type FilterEntry = { name: string; count: number };
 type TrendEntry = { week: string; page_view: number; profile_impression: number; profile_view: number; contact_click: number };
 type CTRRow = { id: string; full_name: string; status: string; impressions: number; profile_views: number; clicks: number; ctr: number };
@@ -44,6 +45,7 @@ type TherapistBreakdowns = {
 
 type AnalyticsData = {
   funnel: Funnel;
+  funnelBySource: FunnelBySource;
   popularFilters: FilterEntry[];
   trends: TrendEntry[];
   therapistCTR: CTRRow[];
@@ -98,22 +100,10 @@ function Term({ k, children }: { k: string; children: React.ReactNode }) {
 
 // ── TAB 1: Funnel ──────────────────────────────────────────────────
 
-function FunnelCards({ f }: { f: Funnel }) {
-  const steps = [
-    { label: "כניסות לדירקטוריה", value: f.pageViews, color: "bg-blue-50 border-blue-200 text-blue-800" },
-    { label: "חשיפות כרטיס", value: f.impressions, color: "bg-purple-50 border-purple-200 text-purple-800" },
-    { label: "צפיות בפרופיל", value: f.profileViews, color: "bg-amber-50 border-amber-200 text-amber-800" },
-    { label: "יצירת קשר", value: f.contactClicks, color: "bg-green-50 border-green-200 text-green-800" },
-  ];
+type FunnelStep = { label: string; value: number; color: string };
+
+function FunnelCards({ steps }: { steps: FunnelStep[] }) {
   return (
-    <>
-    <Info title="מה זה אומר? משפך החשיפה→פנייה">
-      <Term k="כניסות לדירקטוריה">מספר הכניסות לעמוד מאגר המטפלים.</Term>
-      <Term k="חשיפות כרטיס">כמה פעמים כרטיס של מטפל הוצג למשתמש (ברשימה או בתוצאות ההתאמה) — לא בהכרח נלחץ.</Term>
-      <Term k="צפיות בפרופיל">כמה פעמים נכנסו בפועל לעמוד הפרופיל המלא של מטפל.</Term>
-      <Term k="יצירת קשר">כמה לחצו על וואטסאפ / טלפון / מייל ליצירת קשר.</Term>
-      <Term k="האחוז שמעל כל קופסה">שיעור המעבר מהשלב הקודם (למשל כמה מהחשיפות הפכו לצפיות). ככל שגבוה יותר — המעבר בין השלבים יעיל יותר.</Term>
-    </Info>
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
       {steps.map((s, i) => (
         <div key={s.label} className="relative">
@@ -129,8 +119,49 @@ function FunnelCards({ f }: { f: Funnel }) {
         </div>
       ))}
     </div>
-    </>
   );
+}
+
+const FUNNEL_COLORS = [
+  "bg-blue-50 border-blue-200 text-blue-800",
+  "bg-purple-50 border-purple-200 text-purple-800",
+  "bg-amber-50 border-amber-200 text-amber-800",
+  "bg-green-50 border-green-200 text-green-800",
+];
+type FunnelView = "all" | "directory" | "match";
+const FUNNEL_VIEWS: { value: FunnelView; label: string }[] = [
+  { value: "all", label: "הכל" },
+  { value: "directory", label: "מאגר המטפלים" },
+  { value: "match", label: "מערכת ההתאמה" },
+];
+
+function buildFunnelSteps(view: FunnelView, data: AnalyticsData): FunnelStep[] {
+  const C = FUNNEL_COLORS;
+  if (view === "directory") {
+    const f = data.funnelBySource.directory;
+    return [
+      { label: "כניסות למאגר", value: f.pageViews, color: C[0] },
+      { label: "חשיפות כרטיס", value: f.impressions, color: C[1] },
+      { label: "צפיות בפרופיל", value: f.profileViews, color: C[2] },
+      { label: "יצירת קשר", value: f.contactClicks, color: C[3] },
+    ];
+  }
+  if (view === "match") {
+    const f = data.funnelBySource.match;
+    return [
+      { label: "השלמות שאלון", value: f.pageViews, color: C[0] },
+      { label: "חשיפות במאטצ'ינג", value: f.impressions, color: C[1] },
+      { label: "צפיות בפרופיל", value: f.profileViews, color: C[2] },
+      { label: "יצירת קשר", value: f.contactClicks, color: C[3] },
+    ];
+  }
+  const f = data.funnel;
+  return [
+    { label: "כניסות (מאגר + שאלון)", value: f.pageViews, color: C[0] },
+    { label: "חשיפות כרטיס", value: f.impressions, color: C[1] },
+    { label: "צפיות בפרופיל", value: f.profileViews, color: C[2] },
+    { label: "יצירת קשר", value: f.contactClicks, color: C[3] },
+  ];
 }
 
 function PopularFilters({ filters }: { filters: FilterEntry[] }) {
@@ -248,9 +279,28 @@ function CTRTable({ rows }: { rows: CTRRow[] }) {
 }
 
 function FunnelTab({ data }: { data: AnalyticsData }) {
+  const [view, setView] = useState<FunnelView>("all");
   return (
     <>
-      <FunnelCards f={data.funnel} />
+      <Info title="מה זה אומר? משפך החשיפה→פנייה">
+        <Term k="מאגר המטפלים">המסלול של מי שמגיע דרך עמוד מאגר המטפלים: כניסה לעמוד ← חשיפת כרטיס ← צפייה בפרופיל ← יצירת קשר.</Term>
+        <Term k="מערכת ההתאמה">המסלול של מי שמילא/ה שאלון וקיבל/ה המלצות: השלמת שאלון ← חשיפת כרטיס בתוצאות ← צפייה בפרופיל ← יצירת קשר.</Term>
+        <Term k="חשיפות כרטיס">כמה פעמים כרטיס של מטפל הוצג (לא בהכרח נלחץ).</Term>
+        <Term k="צפיות בפרופיל">כניסות בפועל לעמוד הפרופיל המלא.</Term>
+        <Term k="יצירת קשר">לחיצות על וואטסאפ / טלפון / מייל.</Term>
+        <Term k="האחוז שמעל כל קופסה">שיעור המעבר מהשלב הקודם — ככל שגבוה יותר, המעבר יעיל יותר.</Term>
+      </Info>
+
+      <div className="mb-5 flex w-fit rounded-xl border border-stone-200 overflow-hidden text-sm font-semibold">
+        {FUNNEL_VIEWS.map(v => (
+          <button key={v.value} onClick={() => setView(v.value)}
+            className={`px-4 py-2 transition-colors ${view === v.value ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}>
+            {v.label}
+          </button>
+        ))}
+      </div>
+
+      <FunnelCards steps={buildFunnelSteps(view, data)} />
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <PopularFilters filters={data.popularFilters} />
         <TrendChart trends={data.trends} />
@@ -729,6 +779,10 @@ export default function AdminAnalyticsPage() {
         if (json.ok) {
           setData({
             funnel: json.funnel,
+            funnelBySource: json.funnelBySource ?? {
+              directory: { pageViews: 0, impressions: 0, profileViews: 0, contactClicks: 0 },
+              match: { pageViews: 0, impressions: 0, profileViews: 0, contactClicks: 0 },
+            },
             popularFilters: json.popularFilters,
             trends: json.trends,
             therapistCTR: json.therapistCTR,
