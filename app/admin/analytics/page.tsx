@@ -13,7 +13,8 @@ type Funnel = { pageViews: number; impressions: number; profileViews: number; co
 type FunnelBySource = { directory: Funnel; match: Funnel };
 type FilterEntry = { name: string; count: number };
 type TrendEntry = { week: string; page_view: number; profile_impression: number; profile_view: number; contact_click: number };
-type CTRRow = { id: string; full_name: string; status: string; impressions: number; profile_views: number; clicks: number; ctr: number };
+type CTRCell = { impressions: number; profile_views: number; clicks: number; ctr: number };
+type CTRRow = { id: string; full_name: string; status: string; all: CTRCell; directory: CTRCell; match: CTRCell };
 type QuizStepRow = { step: string; count: number };
 type QuizFunnel = { steps: QuizStepRow[]; started: number; completed: number };
 type ExplainAnalytics = {
@@ -213,14 +214,29 @@ function TrendChart({ trends }: { trends: TrendEntry[] }) {
 }
 
 function CTRTable({ rows }: { rows: CTRRow[] }) {
+  const [view, setView] = useState<FunnelView>("all");
   if (rows.length === 0) return null;
+  const sorted = [...rows].sort((a, b) => b[view].impressions - a[view].impressions);
+  const totImp = sorted.reduce((s, r) => s + r[view].impressions, 0);
+  const totVw = sorted.reduce((s, r) => s + r[view].profile_views, 0);
+  const totClk = sorted.reduce((s, r) => s + r[view].clicks, 0);
   return (
     <div className="rounded-2xl border border-stone-200 bg-white overflow-hidden">
       <div className="px-5 py-4 border-b border-stone-200">
-        <h2 className="text-base font-black text-stone-800">חשיפות מול קליקים למטפל</h2>
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <h2 className="text-base font-black text-stone-800">חשיפות מול קליקים למטפל</h2>
+          <div className="flex rounded-xl border border-stone-200 overflow-hidden text-xs font-semibold">
+            {FUNNEL_VIEWS.map(v => (
+              <button key={v.value} onClick={() => setView(v.value)}
+                className={`px-3 py-1.5 transition-colors ${view === v.value ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}>
+                {v.label}
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="mt-3">
           <Info>
-            <p>טבלה לכל מטפל — כמה נחשף, נצפה, ונוצר איתו קשר:</p>
+            <p>טבלה לכל מטפל — כמה נחשף, נצפה, ונוצר איתו קשר. ניתן לפצל לפי מקור (מאגר / התאמה):</p>
             <Term k="חשיפות">כמה פעמים הכרטיס שלו הוצג למשתמשים.</Term>
             <Term k="צפיות">כמה נכנסו לעמוד הפרופיל שלו.</Term>
             <Term k="קליקים">כמה לחצו ליצירת קשר (וואטסאפ/טלפון/מייל).</Term>
@@ -240,40 +256,76 @@ function CTRTable({ rows }: { rows: CTRRow[] }) {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
-            <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
-              <td className="px-5 py-3 text-stone-400 text-xs">{i + 1}</td>
-              <td className="px-5 py-3 font-semibold text-stone-800">
-                {r.full_name}
-                {r.status === "paying" && <span className="mr-2 rounded-full bg-yellow-100 border border-yellow-300 px-1.5 py-0.5 text-xs text-yellow-800">★</span>}
-              </td>
-              <td className="px-5 py-3 text-center text-purple-600 font-bold">{r.impressions}</td>
-              <td className="px-5 py-3 text-center text-amber-600 font-bold">{r.profile_views}</td>
-              <td className="px-5 py-3 text-center text-green-600 font-bold">{r.clicks}</td>
-              <td className="px-5 py-3 text-center">
-                <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-black ${
-                  r.ctr >= 10 ? "bg-green-100 text-green-800" : r.ctr >= 5 ? "bg-amber-100 text-amber-800" : "bg-stone-100 text-stone-600"
-                }`}>{r.ctr}%</span>
-              </td>
-            </tr>
-          ))}
+          {sorted.map((r, i) => {
+            const c = r[view];
+            return (
+              <tr key={r.id} className="border-b border-stone-100 hover:bg-stone-50 transition-colors">
+                <td className="px-5 py-3 text-stone-400 text-xs">{i + 1}</td>
+                <td className="px-5 py-3 font-semibold text-stone-800">
+                  {r.full_name}
+                  {r.status === "paying" && <span className="mr-2 rounded-full bg-yellow-100 border border-yellow-300 px-1.5 py-0.5 text-xs text-yellow-800">★</span>}
+                </td>
+                <td className="px-5 py-3 text-center text-purple-600 font-bold">{c.impressions}</td>
+                <td className="px-5 py-3 text-center text-amber-600 font-bold">{c.profile_views}</td>
+                <td className="px-5 py-3 text-center text-green-600 font-bold">{c.clicks}</td>
+                <td className="px-5 py-3 text-center">
+                  <span className={`inline-flex items-center justify-center rounded-full px-2.5 py-1 text-xs font-black ${
+                    c.ctr >= 10 ? "bg-green-100 text-green-800" : c.ctr >= 5 ? "bg-amber-100 text-amber-800" : "bg-stone-100 text-stone-600"
+                  }`}>{c.ctr}%</span>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
         <tfoot>
           <tr className="bg-stone-50 border-t-2 border-stone-200">
             <td className="px-5 py-3" colSpan={2}><span className="text-xs font-black text-stone-500">סה&quot;כ</span></td>
-            <td className="px-5 py-3 text-center font-black text-purple-600">{rows.reduce((s, r) => s + r.impressions, 0)}</td>
-            <td className="px-5 py-3 text-center font-black text-amber-600">{rows.reduce((s, r) => s + r.profile_views, 0)}</td>
-            <td className="px-5 py-3 text-center font-black text-green-600">{rows.reduce((s, r) => s + r.clicks, 0)}</td>
+            <td className="px-5 py-3 text-center font-black text-purple-600">{totImp}</td>
+            <td className="px-5 py-3 text-center font-black text-amber-600">{totVw}</td>
+            <td className="px-5 py-3 text-center font-black text-green-600">{totClk}</td>
             <td className="px-5 py-3 text-center">
-              {(() => {
-                const totalImp = rows.reduce((s, r) => s + r.impressions, 0);
-                const totalClk = rows.reduce((s, r) => s + r.clicks, 0);
-                return <span className="text-xs font-black text-stone-600">{totalImp > 0 ? `${Math.round((totalClk / totalImp) * 1000) / 10}%` : "—"}</span>;
-              })()}
+              <span className="text-xs font-black text-stone-600">{totImp > 0 ? `${Math.round((totClk / totImp) * 1000) / 10}%` : "—"}</span>
             </td>
           </tr>
         </tfoot>
       </table>
+    </div>
+  );
+}
+
+function ConvRow({ label, a, b, strong }: { label: string; a: number; b: number; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between py-1.5 border-b border-stone-100 last:border-0">
+      <span className="text-xs text-stone-500">{label}</span>
+      <span className={`text-sm ${strong ? "font-black text-[#0F5468]" : "font-bold text-stone-700"}`}>{pct(a, b)}</span>
+    </div>
+  );
+}
+
+function ConversionBySource({ fbs }: { fbs: FunnelBySource }) {
+  const cols: { key: string; label: string; f: Funnel }[] = [
+    { key: "directory", label: "מאגר המטפלים", f: fbs.directory },
+    { key: "match", label: "מערכת ההתאמה", f: fbs.match },
+  ];
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
+      <h2 className="text-base font-black text-stone-800 mb-1">יחסי המרה לפי מקור</h2>
+      <Info>
+        <p>אחוז המעבר בין שלבי המשפך בכל מסלול — להשוות איזה מקור ממיר טוב יותר.</p>
+        <Term k="חשיפה→צפייה">כמה מהחשיפות הפכו לכניסה לפרופיל.</Term>
+        <Term k="צפייה→פנייה">כמה מהצפיות בפרופיל הפכו ליצירת קשר.</Term>
+        <Term k="חשיפה→פנייה">אחוז ההמרה הכולל — מחשיפה ועד פנייה.</Term>
+      </Info>
+      <div className="grid grid-cols-2 gap-3">
+        {cols.map(c => (
+          <div key={c.key} className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="text-sm font-black text-stone-800 mb-2">{c.label}</div>
+            <ConvRow label="חשיפה→צפייה" a={c.f.profileViews} b={c.f.impressions} />
+            <ConvRow label="צפייה→פנייה" a={c.f.contactClicks} b={c.f.profileViews} />
+            <ConvRow label="חשיפה→פנייה" a={c.f.contactClicks} b={c.f.impressions} strong />
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -301,6 +353,7 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
       </div>
 
       <FunnelCards steps={buildFunnelSteps(view, data)} />
+      <ConversionBySource fbs={data.funnelBySource} />
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <PopularFilters filters={data.popularFilters} />
         <TrendChart trends={data.trends} />
@@ -666,6 +719,7 @@ function StatsTab({ data }: { data: AnalyticsData }) {
       </div>
       <Info>
         <p>פילוח של <b>מי המשתמשים שצפו בפרופילים</b> של מטפלים, לפי המידע האנונימי שמסרו (אזור / נושא הפנייה / קבוצת גיל / מגדר). עוזר להבין מי קהל המשתמשים בפועל.</p>
+        <p className="text-stone-500">שים/י לב: המידע הדמוגרפי מגיע ממשתמשי <b>מערכת ההתאמה</b> בלבד (נגזר מהשאלון) — גולשי מאגר המטפלים אינם מספקים נתונים דמוגרפיים, ולכן אין כאן פיצול לפי מקור.</p>
         <Term k="לפי אזור / נושא">מאיפה הצופים ועל איזה תחום (חרדה, זוגיות וכו').</Term>
         <Term k="התפלגות ערוצי קשר">מאיזה אמצעי (וואטסאפ/טלפון/מייל) משתמשים בוחרים ליצור קשר.</Term>
       </Info>

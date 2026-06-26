@@ -156,7 +156,10 @@ export async function GET(req: NextRequest) {
     for (const v of views) {
       const w = getWeek(v.viewed_at);
       ensureBucket(w);
-      weekBuckets[w].profile_view++;
+      // match_card is a card impression in the results list, not a profile
+      // entry — count it as an impression, in line with the funnel.
+      if (v.source === "match_card") weekBuckets[w].profile_impression++;
+      else weekBuckets[w].profile_view++;
     }
     for (const c of clicks) {
       const w = getWeek(c.clicked_at);
@@ -262,47 +265,52 @@ export async function GET(req: NextRequest) {
     // --- Impressions vs Clicks per therapist ---
     const therapistMap = new Map(therapists.map(t => [t.id, t]));
 
-    const impressionsByTherapist: Record<string, number> = {};
+    // Per-therapist counts split by source. Directory impressions come from the
+    // profile_impression event; matching impressions are the match_card views.
+    // Profile views exclude match_card (those are impressions, not entries).
+    type CtrAgg = { dirImpr: number; matchImpr: number; dirViews: number; matchViews: number; dirClicks: number; matchClicks: number };
+    const ctrByTherapist: Record<string, CtrAgg> = {};
+    const ensureCtr = (id: string): CtrAgg =>
+      (ctrByTherapist[id] ??= { dirImpr: 0, matchImpr: 0, dirViews: 0, matchViews: 0, dirClicks: 0, matchClicks: 0 });
+
     for (const e of events) {
-      if (e.event_type === "profile_impression" && e.therapist_id) {
-        impressionsByTherapist[e.therapist_id] = (impressionsByTherapist[e.therapist_id] ?? 0) + 1;
-      }
+      if (e.event_type === "profile_impression" && e.therapist_id) ensureCtr(e.therapist_id).dirImpr++;
     }
-
-    const clicksByTherapist: Record<string, number> = {};
-    for (const c of clicks) {
-      clicksByTherapist[c.therapist_id] = (clicksByTherapist[c.therapist_id] ?? 0) + 1;
-    }
-
-    const viewsByTherapist: Record<string, number> = {};
     for (const v of views) {
-      viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
+      if (!v.therapist_id) continue;
+      const a = ensureCtr(v.therapist_id);
+      if (v.source === "match_card") a.matchImpr++;
+      else if (v.source === "match") a.matchViews++;
+      else a.dirViews++;
+    }
+    for (const c of clicks) {
+      if (!c.therapist_id) continue;
+      const a = ensureCtr(c.therapist_id);
+      if (c.source === "match") a.matchClicks++;
+      else a.dirClicks++;
     }
 
-    const allTherapistIds = new Set([
-      ...Object.keys(impressionsByTherapist),
-      ...Object.keys(clicksByTherapist),
-      ...Object.keys(viewsByTherapist),
-    ]);
+    const ctrCell = (impr: number, vw: number, clk: number) => ({
+      impressions: impr,
+      profile_views: vw,
+      clicks: clk,
+      ctr: impr > 0 ? Math.round((clk / impr) * 1000) / 10 : 0,
+    });
 
-    const therapistCTR = Array.from(allTherapistIds)
-      .map(id => {
+    const therapistCTR = Object.entries(ctrByTherapist)
+      .map(([id, a]) => {
         const t = therapistMap.get(id);
-        const imp = impressionsByTherapist[id] ?? 0;
-        const clk = clicksByTherapist[id] ?? 0;
-        const vw = viewsByTherapist[id] ?? 0;
         return {
           id,
           full_name: t?.full_name ?? "—",
           status: t?.status ?? "unknown",
-          impressions: imp,
-          profile_views: vw,
-          clicks: clk,
-          ctr: imp > 0 ? Math.round((clk / imp) * 1000) / 10 : 0,
+          all: ctrCell(a.dirImpr + a.matchImpr, a.dirViews + a.matchViews, a.dirClicks + a.matchClicks),
+          directory: ctrCell(a.dirImpr, a.dirViews, a.dirClicks),
+          match: ctrCell(a.matchImpr, a.matchViews, a.matchClicks),
         };
       })
-      .filter(r => r.impressions > 0 || r.clicks > 0 || r.profile_views > 0)
-      .sort((a, b) => b.impressions - a.impressions);
+      .filter(r => r.all.impressions > 0 || r.all.clicks > 0 || r.all.profile_views > 0)
+      .sort((a, b) => b.all.impressions - a.all.impressions);
 
     // --- Listed-therapist profile breakdowns ---
     // Over therapists visible in matching (admin_approved), split paying vs
