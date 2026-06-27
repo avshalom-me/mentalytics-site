@@ -44,6 +44,27 @@ export const TRAINING_AREAS = [
 
 export const COGFUN_AGE_GROUPS = ["ילדים", "בני נוער", "מבוגרים"] as const;
 
+// Para-medical professions — shown in a separate rubric, not the main directory.
+export const PARA_MEDICAL_TYPES = [
+  "פיזיותרפיסט/ית",
+  "מרפא/ת בעיסוק",
+  "קלינאי/ת תקשורת",
+  "דיאטנ/ית קליני/ת",
+] as const;
+const PARA_MEDICAL_SET = new Set<string>(PARA_MEDICAL_TYPES);
+
+// Has at least one para-medical profession → appears in the para-medical rubric.
+export function isParaMedical(types: string[] | null | undefined): boolean {
+  return (types ?? []).some((t) => PARA_MEDICAL_SET.has(t));
+}
+
+// Appears in the main directory unless ALL their types are para-medical (so a
+// therapist who is both emotional + para-medical shows in both places).
+export function isMainListed(types: string[] | null | undefined): boolean {
+  const arr = types ?? [];
+  return arr.length === 0 || arr.some((t) => !PARA_MEDICAL_SET.has(t));
+}
+
 export const THERAPIST_TYPE_TO_TRAINING: Record<string, string> = {
   "מרפא/ת בעיסוק": "ריפוי בעיסוק",
   "קלינאי/ת תקשורת": "קלינאות תקשורת",

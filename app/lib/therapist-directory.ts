@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { CITY_TO_REGION } from "@/app/lib/regions";
+import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
 const NEW_THERAPIST_BOOST_DAYS = 7;
@@ -57,7 +58,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // tier. An optional filter (region / online) narrows the set BEFORE signing
 // photo URLs, so region landing pages only pay for their own subset.
 export async function loadPublicTherapists(
-  filter?: { region?: string; online?: boolean }
+  filter?: { region?: string; online?: boolean; category?: "main" | "para" }
 ): Promise<PublicTherapist[]> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
@@ -71,6 +72,12 @@ export async function loadPublicTherapists(
   if (error || !data) return [];
 
   let rows = data as TherapistRow[];
+  // Default to the "main" directory (exclude para-only therapists); the
+  // para-medical rubric explicitly asks for "para".
+  const category = filter?.category ?? "main";
+  rows = rows.filter((t) =>
+    category === "para" ? isParaMedical(t.therapist_types) : isMainListed(t.therapist_types)
+  );
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
 

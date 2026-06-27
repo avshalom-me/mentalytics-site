@@ -149,13 +149,14 @@ function TherapistCard({
   );
 }
 
-export default function TherapistsClient({ therapists }: { therapists: PublicTherapist[] }) {
+export default function TherapistsClient({ therapists, variant = "main" }: { therapists: PublicTherapist[]; variant?: "main" | "para" }) {
+  const isPara = variant === "para";
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
   const [regionFilter, setRegionFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [onlineOnly, setOnlineOnly] = useState(false);
 
-  usePageView("directory");
+  usePageView(isPara ? "para-medical" : "directory");
   const trackFilter = useFilterTrack();
 
   const availableCities = useMemo(() => {
@@ -199,12 +200,15 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl">
       {/* Header */}
       <div className="mb-8">
+        {isPara && (
+          <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-3 inline-block">← כל המטפלים</Link>
+        )}
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>
-          המטפלים שלנו
+          {isPara ? "שירותים פרה-רפואיים" : "המטפלים שלנו"}
         </p>
         <div className="flex flex-wrap items-end justify-between gap-3">
           <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
-            מצאו את המטפל המתאים לכם
+            {isPara ? "מטפלים פרה-רפואיים" : "מצאו את המטפל המתאים לכם"}
           </h1>
           <Link href="/therapists/join" style={{
             background: "var(--teal)", color: "white", borderRadius: "50px",
@@ -213,6 +217,11 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
             לאנשי מקצוע ▸
           </Link>
         </div>
+        {isPara && (
+          <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+            קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה. אפשר לסנן לפי אזור ואונליין.
+          </p>
+        )}
       </div>
 
       {/* Filters */}
@@ -258,18 +267,28 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
         )}
       </div>
 
-      {/* Browse-by-region links (internal linking + SEO landing pages) */}
-      <div className="mb-7 -mt-2">
-        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", marginInlineEnd: "8px" }}>עיון לפי אזור:</span>
-        <span className="inline-flex flex-wrap gap-1.5 align-middle">
-          <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--teal-pale)]"
-            style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)", background: "var(--teal-pale)" }}>🌐 אונליין</Link>
-          {ALL_REGIONS.map((region) => (
-            <Link key={region} href={`/therapists/region/${regionToSlug(region)}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
-              style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{region}</Link>
-          ))}
-        </span>
-      </div>
+      {/* Browse-by-region links (internal linking + SEO landing pages) — main only */}
+      {!isPara && (
+        <>
+          <div className="mb-3 -mt-2">
+            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", marginInlineEnd: "8px" }}>עיון לפי אזור:</span>
+            <span className="inline-flex flex-wrap gap-1.5 align-middle">
+              <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--teal-pale)]"
+                style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)", background: "var(--teal-pale)" }}>🌐 אונליין</Link>
+              {ALL_REGIONS.map((region) => (
+                <Link key={region} href={`/therapists/region/${regionToSlug(region)}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
+                  style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{region}</Link>
+              ))}
+            </span>
+          </div>
+          <div className="mb-7">
+            <Link href="/therapists/para-medical" className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold hover:opacity-90"
+              style={{ border: "1px solid var(--gold)", color: "var(--gold-dark)", background: "var(--gold-pale)" }}>
+              🩺 מטפלים פרה-רפואיים (קלינאות תקשורת, ריפוי בעיסוק, תזונה, פיזיותרפיה) ←
+            </Link>
+          </div>
+        </>
+      )}
 
       {filtered.length === 0 && (
         <p className="text-center text-gray-500 py-10">לא נמצאו מטפלים בסינון זה.</p>

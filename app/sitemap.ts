@@ -59,8 +59,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: a.updated_at ? new Date(a.updated_at) : undefined,
   }));
 
-  // Region + online landing pages (and the region hub).
+  // Region + online landing pages (and the region hub) + the para-medical rubric.
   const regionPages: MetadataRoute.Sitemap = [
+    { url: `${BASE}/therapists/para-medical`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region/${ONLINE_SLUG}`, priority: 0.7, changeFrequency: "weekly" as const },
     ...ALL_REGIONS.map((region) => ({
