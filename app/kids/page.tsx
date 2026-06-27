@@ -12,6 +12,7 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
+import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 
 function getOrCreateSessionId(): string | null {
@@ -2835,7 +2836,7 @@ function KidsMatchSection({ A, score, selection }: {
                     params.set("a", "child");
                     const r = normalizeKidsRegionKey(region, online);
                     if (r) params.set("r", r);
-                    return `/therapists/${t.id}?${params.toString()}`;
+                    return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
                   })();
                   return (
                     <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg">

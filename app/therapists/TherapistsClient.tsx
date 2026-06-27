@@ -3,6 +3,7 @@
 import { useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { therapistPath } from "@/app/lib/therapist-url";
 import { genderTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
@@ -70,7 +71,7 @@ function TherapistCard({
       className="rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)" }}
     >
-      <Link href={`/therapists/${t.id}`} className="block">
+      <Link href={therapistPath(t.id, t.full_name)} className="block">
         <div className="relative h-80 w-full overflow-hidden bg-gray-100">
           <img
             ref={imgRef}
@@ -133,7 +134,7 @@ function TherapistCard({
           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
           הודעה
         </button>
-        <Link href={`/therapists/${t.id}`} className="text-[13px] font-bold hover:underline" style={{ color: "var(--teal)", marginInlineStart: "auto" }}>
+        <Link href={therapistPath(t.id, t.full_name)} className="text-[13px] font-bold hover:underline" style={{ color: "var(--teal)", marginInlineStart: "auto" }}>
           פרופיל מלא ←
         </Link>
       </div>

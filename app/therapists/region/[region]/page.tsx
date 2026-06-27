@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
+import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 
@@ -52,7 +53,7 @@ function TherapistCard({ t }: { t: Awaited<ReturnType<typeof loadPublicTherapist
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
   return (
-    <Link href={`/therapists/${t.id}`} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
+    <Link href={therapistPath(t.id, t.full_name)} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" }}>
       <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -96,7 +97,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       "@type": "Person",
       name: t.full_name,
       jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
-      url: `${BASE}/therapists/${t.id}`,
+      url: `${BASE}${therapistPath(t.id, t.full_name)}`,
     })),
   };
 

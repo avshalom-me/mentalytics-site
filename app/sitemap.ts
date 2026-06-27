@@ -1,6 +1,7 @@
 import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { therapistPath } from "@/app/lib/therapist-url";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -35,12 +36,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, created_at")
+    .select("id, created_at, full_name")
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true);
 
   const therapistPages: MetadataRoute.Sitemap = (data ?? []).map((t) => ({
-    url: `${BASE}/therapists/${t.id}`,
+    url: `${BASE}${therapistPath(t.id, t.full_name)}`,
     priority: 0.7,
     changeFrequency: "monthly" as const,
     lastModified: t.created_at ? new Date(t.created_at) : undefined,

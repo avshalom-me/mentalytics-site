@@ -12,6 +12,7 @@ import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { buildAdultFacts } from "@/app/lib/explain-facts";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
+import { therapistPath } from "@/app/lib/therapist-url";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 
 // Anonymous viewer context derived from the questionnaire — used for impression
@@ -530,7 +531,7 @@ export default function AdultsPage() {
     if (gender) params.set("g", gender);
     const region = normalizeRegionKey(matchPrefs.region, matchPrefs.online);
     if (region) params.set("r", region);
-    return `/therapists/${t.id}?${params.toString()}`;
+    return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
   }
 
   const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);

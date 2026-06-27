@@ -1,8 +1,9 @@
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { genderTitle, genderTitles } from "@/app/lib/gender-text";
+import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/therapist-url";
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
@@ -72,7 +73,9 @@ async function getTherapistArticles(id: string): Promise<ArticleLink[]> {
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
-  const { id } = await params;
+  const { id: param } = await params;
+  const id = extractTherapistId(param);
+  if (!id) return { title: "מטפל לא נמצא" };
   const result = await getTherapist(id);
   if (!result) return { title: "מטפל לא נמצא" };
 
@@ -80,14 +83,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const name = therapist.full_name ?? "מטפל";
   const type = genderTitle(therapist.therapist_types?.[0] ?? "מטפל נפשי", therapist.gender);
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
+  const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
 
   return {
     title: `${name} — ${type} | טיפול חכם`,
     description: bioSnippet || `פרופיל של ${name}, ${type}. מצאו מטפל מתאים בטיפול חכם.`,
+    alternates: { canonical },
     openGraph: {
       title: `${name} — ${type}`,
       description: bioSnippet,
-      url: `${BASE_URL}/therapists/${id}`,
+      url: canonical,
     },
   };
 }
@@ -100,8 +105,10 @@ export default async function TherapistProfilePage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string }>;
 }) {
-  const { id } = await params;
+  const { id: param } = await params;
   const sp = await searchParams;
+  const id = extractTherapistId(param);
+  if (!id) notFound();
   const source: "match" | "directory" = sp.from === "match" ? "match" : "directory";
   const viewerContext = source === "match" ? {
     region: sp.r,
@@ -112,6 +119,19 @@ export default async function TherapistProfilePage({
   } : undefined;
   const result = await getTherapist(id);
   if (!result) notFound();
+
+  // Canonicalize the URL: redirect bare-UUID / mismatched slugs to the
+  // name-slug URL (308), keeping query params so match attribution survives.
+  const canonicalSeg = therapistSlug(id, result.therapist.full_name);
+  let decodedParam = param;
+  try { decodedParam = decodeURIComponent(param); } catch { /* keep raw */ }
+  if (decodedParam !== canonicalSeg) {
+    const qs = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) if (typeof v === "string" && v) qs.set(k, v);
+    const query = qs.toString();
+    // Encode the (Hebrew) slug — a redirect Location header must be ASCII.
+    permanentRedirect(`/therapists/${encodeURIComponent(canonicalSeg)}${query ? `?${query}` : ""}`);
+  }
 
   const articles = await getTherapistArticles(id);
   const { therapist: t, photoUrl } = result;
