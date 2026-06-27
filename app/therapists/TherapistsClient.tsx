@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import Link from "next/link";
-import { ALL_REGIONS, CITY_TO_REGION, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { genderTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
@@ -155,6 +155,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
   const [regionFilter, setRegionFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [onlineOnly, setOnlineOnly] = useState(false);
+  const [paraNoteOpen, setParaNoteOpen] = useState(false);
 
   usePageView(isPara ? "para-medical" : "directory");
   const trackFilter = useFilterTrack();
@@ -257,6 +258,17 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
         >
           🌐 אונליין בלבד
         </button>
+        {!isPara && (
+          <button
+            type="button"
+            onClick={() => setParaNoteOpen((o) => !o)}
+            aria-expanded={paraNoteOpen}
+            className="rounded-xl px-3 py-2 text-sm font-semibold border transition-colors"
+            style={{ background: paraNoteOpen ? "var(--gold-pale)" : "white", color: "var(--gold-dark)", borderColor: "var(--gold)" }}
+          >
+            🩺 מטפלים פרה-רפואיים *
+          </button>
+        )}
         {(regionFilter || cityFilter || onlineOnly) && (
           <button
             onClick={() => { setRegionFilter(""); setCityFilter(""); setOnlineOnly(false); }}
@@ -267,27 +279,14 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
         )}
       </div>
 
-      {/* Browse-by-region links (internal linking + SEO landing pages) — main only */}
-      {!isPara && (
-        <>
-          <div className="mb-3 -mt-2">
-            <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", marginInlineEnd: "8px" }}>עיון לפי אזור:</span>
-            <span className="inline-flex flex-wrap gap-1.5 align-middle">
-              <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--teal-pale)]"
-                style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)", background: "var(--teal-pale)" }}>🌐 אונליין</Link>
-              {ALL_REGIONS.map((region) => (
-                <Link key={region} href={`/therapists/region/${regionToSlug(region)}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
-                  style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{region}</Link>
-              ))}
-            </span>
-          </div>
-          <div className="mb-7">
-            <Link href="/therapists/para-medical" className="inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold hover:opacity-90"
-              style={{ border: "1px solid var(--gold)", color: "var(--gold-dark)", background: "var(--gold-pale)" }}>
-              🩺 מטפלים פרה-רפואיים (קלינאות תקשורת, ריפוי בעיסוק, תזונה, פיזיותרפיה) ←
-            </Link>
-          </div>
-        </>
+      {/* Para-medical note (opens on click of the filter-row button) — main only */}
+      {!isPara && paraNoteOpen && (
+        <div className="mb-7 -mt-3 rounded-xl p-3 text-sm leading-7" style={{ background: "var(--gold-pale)", border: "1px solid var(--gold)", color: "var(--gold-dark)" }}>
+          <p>* מטפלים פרה-רפואיים כוללים: קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית (דיאטנ/ית קליני/ת) ופיזיותרפיה.</p>
+          <Link href="/therapists/para-medical" className="mt-1 inline-block font-bold hover:underline">
+            צפייה ברשימת המטפלים הפרה-רפואיים ←
+          </Link>
+        </div>
       )}
 
       {filtered.length === 0 && (
