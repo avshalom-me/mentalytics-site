@@ -1,5 +1,6 @@
 import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -57,5 +58,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: a.updated_at ? new Date(a.updated_at) : undefined,
   }));
 
-  return [...staticPages, ...therapistPages, ...articlePages];
+  // Region + online landing pages (and the region hub).
+  const regionPages: MetadataRoute.Sitemap = [
+    { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
+    { url: `${BASE}/therapists/region/${ONLINE_SLUG}`, priority: 0.7, changeFrequency: "weekly" as const },
+    ...ALL_REGIONS.map((region) => ({
+      url: `${BASE}/therapists/region/${regionToSlug(region)}`,
+      priority: 0.7,
+      changeFrequency: "weekly" as const,
+    })),
+  ];
+
+  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages];
 }

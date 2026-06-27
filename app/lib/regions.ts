@@ -68,3 +68,17 @@ export const CITY_TO_REGION: Record<string, string> = Object.fromEntries(
 export function citiesForRegion(region: string): string[] {
   return REGION_CITIES[region] ?? [];
 }
+
+// ── Region <-> URL-slug helpers (pure; safe for client + server) ──────────────
+// Hebrew region names with spaces become hyphenated slugs (percent-encoded in
+// the URL, which Google handles fine and which matches Hebrew search queries).
+export const ONLINE_SLUG = "אונליין";
+
+export function regionToSlug(region: string): string {
+  return region.trim().replace(/\s+/g, "-");
+}
+
+export function slugToRegion(slug: string): string | null {
+  const decoded = decodeURIComponent(slug);
+  return ALL_REGIONS.find((r) => regionToSlug(r) === decoded) ?? null;
+}

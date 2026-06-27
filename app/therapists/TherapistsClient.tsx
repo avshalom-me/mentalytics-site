@@ -2,7 +2,7 @@
 
 import { useState, useRef, useMemo } from "react";
 import Link from "next/link";
-import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
+import { ALL_REGIONS, CITY_TO_REGION, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
@@ -255,6 +255,19 @@ export default function TherapistsClient({ therapists }: { therapists: PublicThe
             נקה
           </button>
         )}
+      </div>
+
+      {/* Browse-by-region links (internal linking + SEO landing pages) */}
+      <div className="mb-7 -mt-2">
+        <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)", marginInlineEnd: "8px" }}>עיון לפי אזור:</span>
+        <span className="inline-flex flex-wrap gap-1.5 align-middle">
+          <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--teal-pale)]"
+            style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)", background: "var(--teal-pale)" }}>🌐 אונליין</Link>
+          {ALL_REGIONS.map((region) => (
+            <Link key={region} href={`/therapists/region/${regionToSlug(region)}`} className="rounded-full px-3 py-1 text-xs font-semibold hover:bg-[var(--surface)]"
+              style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{region}</Link>
+          ))}
+        </span>
       </div>
 
       {filtered.length === 0 && (
