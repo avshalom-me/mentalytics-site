@@ -7,6 +7,9 @@ const BASE = "https://www.mentalytics.co.il";
 // build time — the build-time result was being cached, which left every
 // approved therapist out of the sitemap.
 export const dynamic = "force-dynamic";
+// Bypass Next's Data Cache for the Supabase queries below — a stale cached
+// (empty) therapist result was keeping every profile out of the sitemap.
+export const fetchCache = "force-no-store";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
