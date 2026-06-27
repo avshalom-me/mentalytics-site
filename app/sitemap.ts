@@ -3,6 +3,11 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 const BASE = "https://www.mentalytics.co.il";
 
+// Regenerate with fresh data instead of baking the therapist/article rows in at
+// build time — the build-time result was being cached, which left every
+// approved therapist out of the sitemap.
+export const dynamic = "force-dynamic";
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
