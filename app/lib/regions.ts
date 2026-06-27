@@ -87,3 +87,23 @@ export function slugToRegion(slug: string): string | null {
   }
   return ALL_REGIONS.find((r) => regionToSlug(r) === decoded) ?? null;
 }
+
+// Curated major cities that get their own SEO landing page (all present in
+// REGION_CITIES, so each maps to a region for the "nearby" fallback). Kept to
+// high-demand cities to avoid thin/empty city pages.
+export const CITY_SEO_LIST = [
+  "תל אביב", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד",
+  "נתניה", "באר שבע", "בני ברק", "חולון", "רמת גן", "רחובות",
+  "בת ים", "הרצליה", "כפר סבא", "רעננה", "מודיעין", "אשקלון",
+  "גבעתיים", "הוד השרון",
+] as const;
+
+export function slugToCity(slug: string): string | null {
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {
+    return null;
+  }
+  return (CITY_SEO_LIST as readonly string[]).find((c) => regionToSlug(c) === decoded) ?? null;
+}

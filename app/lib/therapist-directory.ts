@@ -58,7 +58,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // tier. An optional filter (region / online) narrows the set BEFORE signing
 // photo URLs, so region landing pages only pay for their own subset.
 export async function loadPublicTherapists(
-  filter?: { region?: string; online?: boolean; category?: "main" | "para" }
+  filter?: { region?: string; city?: string; online?: boolean; category?: "main" | "para" }
 ): Promise<PublicTherapist[]> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
@@ -80,6 +80,7 @@ export async function loadPublicTherapists(
   );
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
+  if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
 
   const boostCutoff = Date.now() - NEW_THERAPIST_BOOST_DAYS * 24 * 60 * 60 * 1000;
   const isNew = (t: TherapistRow) =>

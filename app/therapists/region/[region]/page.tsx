@@ -3,8 +3,9 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS } from "@/app/lib/regions";
+import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
+import TherapistResultCard from "@/app/components/TherapistResultCard";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -48,34 +49,6 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   return { title, description, alternates: { canonical: url }, openGraph: { title, description, url } };
 }
 
-function TherapistCard({ t }: { t: Awaited<ReturnType<typeof loadPublicTherapists>>[number] }) {
-  const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
-  const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
-  const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
-  return (
-    <Link href={therapistPath(t.id, t.full_name)} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
-      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" }}>
-      <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={t.profile_photo_url ?? avatar} alt={t.full_name}
-          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} loading="lazy" />
-      </div>
-      <div style={{ padding: "16px 18px" }}>
-        <h2 className="text-lg font-black text-stone-900 leading-tight group-hover:underline">{t.full_name}</h2>
-        {type && <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{type}</div>}
-        {bioSnippet && <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{bioSnippet}</p>}
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {t.online && (
-            <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
-          )}
-          {t.regions[0] && (
-            <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>📍 {t.regions[0]}</span>
-          )}
-        </div>
-      </div>
-    </Link>
-  );
-}
 
 export default async function RegionPage({ params }: { params: Promise<{ region: string }> }) {
   const { region: regionParam } = await params;
@@ -103,6 +76,9 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
   // Other regions for internal linking.
   const otherRegions = ALL_REGIONS.filter((reg) => !(r.kind === "region" && reg === r.region));
+  const regionCities = r.kind === "region"
+    ? (REGION_CITIES[r.region] ?? []).filter((c) => (CITY_SEO_LIST as readonly string[]).includes(c))
+    : [];
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -128,7 +104,20 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((t) => <TherapistCard key={t.id} t={t} />)}
+          {list.map((t) => <TherapistResultCard key={t.id} t={t} />)}
+        </div>
+      )}
+
+      {/* Cities within this region (internal linking → city pages) */}
+      {regionCities.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-[var(--line)]">
+          <h2 className="text-base font-extrabold text-stone-800 mb-3">ערים ב{label}</h2>
+          <div className="flex flex-wrap gap-2">
+            {regionCities.map((city) => (
+              <Link key={city} href={`/therapists/city/${regionToSlug(city)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{city}</Link>
+            ))}
+          </div>
         </div>
       )}
 
