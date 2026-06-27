@@ -79,6 +79,11 @@ export function regionToSlug(region: string): string {
 }
 
 export function slugToRegion(slug: string): string | null {
-  const decoded = decodeURIComponent(slug);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(slug);
+  } catch {
+    return null; // malformed (e.g. non-UTF-8) encoding → treat as not found
+  }
   return ALL_REGIONS.find((r) => regionToSlug(r) === decoded) ?? null;
 }

@@ -20,7 +20,12 @@ export function generateStaticParams() {
 
 type Resolved = { kind: "online" } | { kind: "region"; region: string } | null;
 function resolve(regionParam: string): Resolved {
-  const decoded = decodeURIComponent(regionParam);
+  let decoded: string;
+  try {
+    decoded = decodeURIComponent(regionParam);
+  } catch {
+    return null; // malformed encoding → 404 instead of a 500
+  }
   if (decoded === ONLINE_SLUG) return { kind: "online" };
   const region = slugToRegion(regionParam);
   return region ? { kind: "region", region } : null;
