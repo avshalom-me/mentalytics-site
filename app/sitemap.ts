@@ -3,13 +3,9 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 const BASE = "https://www.mentalytics.co.il";
 
-// Regenerate with fresh data instead of baking the therapist/article rows in at
-// build time — the build-time result was being cached, which left every
-// approved therapist out of the sitemap.
+// Regenerate per request so newly-approved therapists enter the sitemap without
+// waiting for a redeploy.
 export const dynamic = "force-dynamic";
-// Bypass Next's Data Cache for the Supabase queries below — a stale cached
-// (empty) therapist result was keeping every profile out of the sitemap.
-export const fetchCache = "force-no-store";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
@@ -38,7 +34,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, updated_at")
+    .select("id, created_at")
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true);
 
@@ -46,7 +42,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${BASE}/therapists/${t.id}`,
     priority: 0.7,
     changeFrequency: "monthly" as const,
-    lastModified: t.updated_at ? new Date(t.updated_at) : undefined,
+    lastModified: t.created_at ? new Date(t.created_at) : undefined,
   }));
 
   const { data: articles } = await supabaseAdmin
