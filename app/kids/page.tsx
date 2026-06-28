@@ -3194,6 +3194,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
           session_id: getOrCreateSessionId(),
           viewer_issue: "child",
           viewer_age_band: "child",
+          viewer_gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : undefined,
         }),
       }).catch(() => {});
     } catch {}

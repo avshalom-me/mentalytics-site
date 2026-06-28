@@ -21,10 +21,12 @@ const BodySchema = z.object({
   urgent: z.boolean().optional(),
   session_id: z.string().min(1).max(128).optional(),
   // Anonymous viewer context (sent client-side from the questionnaire answers).
-  viewer_region: z.string().optional(),
-  viewer_issue: z.string().optional(),
-  viewer_age_band: z.string().optional(),
-  viewer_gender: z.string().optional(),
+  // Nullable: the client sends null when a field is unknown (e.g. region isn't
+  // chosen yet on the results screen). Invalid/null values are nullified below.
+  viewer_region: z.string().nullable().optional(),
+  viewer_issue: z.string().nullable().optional(),
+  viewer_age_band: z.string().nullable().optional(),
+  viewer_gender: z.string().nullable().optional(),
 });
 
 // In-memory rate limiter: 60 events per IP per minute. Same shape as track-view.
