@@ -107,6 +107,7 @@ export default function AdminTherapistsPage() {
   const [filterTrainingArea, setFilterTrainingArea] = useState("");
   const [filterCultural, setFilterCultural] = useState("");
   const [filterAgeGroup, setFilterAgeGroup] = useState("");
+  const [filterPromotion, setFilterPromotion] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   // Edit modal state
@@ -375,7 +376,7 @@ export default function AdminTherapistsPage() {
   if (error) return <div className="p-6 text-center text-red-600">שגיאה: {error}</div>;
   if (therapists.length === 0) return <div className="p-6 text-center">לא נמצאו מטפלים.</div>;
 
-  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup;
+  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup || filterPromotion;
 
   function matchesFilters(t: AdminTherapist) {
     if (filterName && !t.full_name.toLowerCase().includes(filterName.toLowerCase())) return false;
@@ -384,6 +385,13 @@ export default function AdminTherapistsPage() {
     if (filterTrainingArea && !t.training_areas.includes(filterTrainingArea)) return false;
     if (filterCultural && !t.cultural_prefs.includes(filterCultural)) return false;
     if (filterAgeGroup && !t.age_groups.includes(filterAgeGroup)) return false;
+    if (filterPromotion) {
+      const isPaying = t.status === "paying";
+      const isPaid = isPaying && t.promotion_source === "paid";
+      if (filterPromotion === "paid" && !isPaid) return false;       // מקודם (בתשלום)
+      if (filterPromotion === "gift" && !(isPaying && !isPaid)) return false; // מקודם במתנה
+      if (filterPromotion === "none" && isPaying) return false;       // לא מקודם
+    }
     return true;
   }
 
@@ -696,7 +704,7 @@ export default function AdminTherapistsPage() {
             {showFilters ? "▾ סגור מסננים" : "▸ פתח מסננים"}
           </button>
           {hasActiveFilter && (
-            <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); }}
+            <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); setFilterPromotion(""); }}
               className="text-xs text-red-500 hover:underline">נקה הכל</button>
           )}
         </div>
@@ -750,6 +758,16 @@ export default function AdminTherapistsPage() {
                 className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
                 <option value="">הכל</option>
                 {AGE_GROUPS.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">קידום</label>
+              <select value={filterPromotion} onChange={(e) => setFilterPromotion(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                <option value="paid">מקודם (בתשלום)</option>
+                <option value="gift">מקודם במתנה</option>
+                <option value="none">לא מקודם</option>
               </select>
             </div>
           </div>
