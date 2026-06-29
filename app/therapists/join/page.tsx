@@ -177,7 +177,7 @@ export default function TherapistJoinPage() {
           <div>
             <p className="font-bold text-stone-900 mb-1">ללא סיכון — החזר כספי מלא</p>
             <p className="text-sm text-stone-700 leading-6">
-              במידה ולא תקבל/י פנייה מתאימה<span className="relative group inline-block align-baseline"><sup className="cursor-help font-bold mr-0.5" style={{ color: "var(--teal)", fontSize: "11px" }}>*</sup><span className="pointer-events-none absolute bottom-full mb-1 right-0 w-56 rounded-xl bg-stone-800 px-3 py-2 text-right text-xs leading-5 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-10">מפגש אינטייק בקליניקה ולא רק הודעה. מבוסס על אמון מול המטפל.</span></span> בחודשיים הראשונים לרישום במסלול המקודם — תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
+              במידה ולא תקבל/י פנייה מתאימה<span className="relative group inline-block align-baseline"><sup className="cursor-help font-bold mr-0.5" style={{ color: "var(--teal)", fontSize: "11px" }}>*</sup><span className="pointer-events-none absolute bottom-full mb-1 right-0 w-56 rounded-xl bg-stone-800 px-3 py-2 text-right text-xs leading-5 text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100 z-10">מפגש אינטייק בקליניקה. מבוסס אמון.</span></span> בחודשיים הראשונים לרישום במסלול המקודם — תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
             </p>
             <p className="text-sm text-stone-700 leading-6 mt-1">
               ניתן לבטל את המנוי בכל עת.
