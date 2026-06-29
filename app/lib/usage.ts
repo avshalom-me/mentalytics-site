@@ -61,8 +61,12 @@ export type UsageStatus = {
 };
 
 // Read the current usage for an IP+fingerprint without mutating anything.
-// `count` is the max across the IP row and the fp row so a user can't reset
-// by rotating one identifier alone.
+// The fingerprint is a stable per-device identifier; the raw IP is NOT — in
+// Israel the mobile carriers put many users behind a small pool of CGNAT /
+// dynamic IPs, so counting by IP falsely blocks a first-time visitor whose
+// shared IP was already exhausted by other people. We therefore gate on the
+// fingerprint whenever we have one, and fall back to the IP only when no
+// fingerprint is available (e.g. crypto.subtle missing in an old browser).
 export async function getUsage(
   ip: string,
   fp: string | null,
@@ -71,11 +75,16 @@ export async function getUsage(
   const identifiers = identifiersFor(ip, fp);
   const { data } = await supabase
     .from("quiz_usage")
-    .select("count")
+    .select("ip, count")
     .in("ip", identifiers)
     .eq("quiz_type", type);
 
-  const count = (data ?? []).reduce((m, r) => Math.max(m, r.count), 0);
+  const rows = data ?? [];
+  const fpKey = fp ? `fp:${fp}` : null;
+  const count = fpKey
+    ? rows.find((r) => r.ip === fpKey)?.count ?? 0
+    : rows.reduce((m, r) => Math.max(m, r.count), 0);
+
   const limit = MAX_FREE + (await getPaidCredits(fp));
   return { count, limit, allowed: count < limit, paymentRequired: count >= limit };
 }
