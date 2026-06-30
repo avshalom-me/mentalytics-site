@@ -83,7 +83,6 @@ export default function RecruitmentPage() {
 
   const direct = data?.campaigns.find((c) => c.campaign === "therapist-direct");
   const evocative = data?.campaigns.find((c) => c.campaign === "therapist-evocative");
-  const showAB = Boolean(direct || evocative);
 
   return (
     <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -121,10 +120,8 @@ export default function RecruitmentPage() {
               <div className="text-xs font-semibold mt-1 text-teal-700">סך הרשמות מטפלים (בטווח)</div>
             </div>
 
-            {/* A/B head-to-head */}
-            {showAB && (
-              <ABCompare direct={direct} evocative={evocative} />
-            )}
+            {/* A/B head-to-head — always shown as the scoreboard, even at 0:0 */}
+            <ABCompare direct={direct} evocative={evocative} />
 
             {/* All campaigns */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6 overflow-x-auto">
@@ -211,9 +208,13 @@ function ABCompare({ direct, evocative }: { direct?: CampaignRow; evocative?: Ca
         <ABCard title="מטפלים — ישירה (A)" row={direct} isLeader={leader === "a"} accent="#3D8C8A" />
         <ABCard title="מטפלים — מעוררת (B)" row={evocative} isLeader={leader === "b"} accent="#D49018" />
       </div>
-      {leader === null && (a > 0 || b > 0) && (
+      {a === 0 && b === 0 ? (
+        <p className="mt-4 text-center text-sm text-stone-500">
+          עדיין אין הרשמות מהמודעות — ברגע שמטפל יירשם דרך מודעה A או B היא תופיע כאן אוטומטית. 🟢
+        </p>
+      ) : leader === null ? (
         <p className="mt-4 text-center text-sm font-semibold text-stone-500">תיקו כרגע — צריך עוד נתונים כדי להכריע.</p>
-      )}
+      ) : null}
     </div>
   );
 }
