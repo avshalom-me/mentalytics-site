@@ -63,11 +63,15 @@ type ExplainResponse = {
 
 function buildTitle(body: Body): string {
   const isAssessment = (body.user_summary?.recommended_assessment_types?.length ?? 0) > 0;
-  if (!isAssessment) return "למה המטפל הזה הוצע לך";
   const gender = body.therapist.gender;
-  if (gender === "נקבה") return "למה המאבחנת הזאת הוצעה לך";
-  if (gender === "זכר") return "למה המאבחן הזה הוצע לך";
-  return "למה המאבחן/ת הוצע/ה לך";
+  if (isAssessment) {
+    if (gender === "נקבה") return "למה המאבחנת הזאת הוצעה לך";
+    if (gender === "זכר") return "למה המאבחן הזה הוצע לך";
+    return "למה המאבחן/ת הוצע/ה לך";
+  }
+  if (gender === "נקבה") return "למה המטפלת הזאת הוצעה לך";
+  if (gender === "זכר") return "למה המטפל הזה הוצע לך";
+  return "למה המטפל/ת הוצע/ה לך";
 }
 
 // ── Mock / fallback explanation builder ──────────────────────────────────────
