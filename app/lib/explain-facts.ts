@@ -33,6 +33,16 @@ function genderText(g: string | undefined): string | undefined {
   return g; // already Hebrew (זכר / נקבה / אחר)
 }
 
+// Translate a raw score/count into a qualitative severity word the LLM is
+// allowed to use. We never send the number or the measure name to the model
+// (those are forbidden in the prompt), so the summary must carry the meaning.
+function severityWord(value: number, min: number, max: number): "קלה" | "בינונית" | "גבוהה" {
+  const r = max > min ? (value - min) / (max - min) : 0;
+  if (r >= 0.66) return "גבוהה";
+  if (r >= 0.33) return "בינונית";
+  return "קלה";
+}
+
 /**
  * Build sanitised facts from an adult's questionnaire answers, scoped to the
  * domain of the recommendation. Different domains surface different things.
@@ -61,26 +71,24 @@ export function buildAdultFacts(
 
   if (isEmotional) {
     if (e.moodItems && e.moodItems.length > 0) {
-      facts.summary!.push(`סומנו ${e.moodItems.length} תסמיני מצב רוח ירוד מתוך 9`);
-      facts.scores!.mood_items_checked = e.moodItems.length;
+      facts.summary!.push(`דווח מצב רוח ירוד בעוצמה ${severityWord(e.moodItems.length, 0, 9)}`);
     }
     if (e.moodSuicidal) facts.flags!.push("מחשבות אובדניות בהקשר מצב רוח");
     if (e.maniaScreen1 && e.maniaScreen2) {
-      facts.summary!.push("דווחו מצב רוח מרומם + פרץ אנרגיה (סקרינינג מאניה חיובי)");
+      facts.summary!.push("דווחו תקופות של מצב רוח מרומם ופרץ אנרגיה");
     }
     if (e.e3a) facts.flags!.push("דווח על תפיסות שאחרים לא חולקים");
     if (e.e3b) facts.flags!.push("דווח על אמונות יוצאות דופן");
     if (e.prodromeSuicidal) facts.flags!.push("מחשבות אובדניות בהקשר הסקרינינג הפסיכוטי");
     if (e.gad7Scores && e.gad7Scores.length > 0) {
       const total = e.gad7Scores.reduce((a, b) => a + b, 0);
-      facts.scores!.gad7_total = total;
-      facts.scores!.gad7_max = e.gad7Scores.length * 3;
-      facts.summary!.push(`ציון GAD-7: ${total} מתוך ${e.gad7Scores.length * 3}`);
+      const len = e.gad7Scores.length;
+      facts.summary!.push(`דווחו דאגות וחרדה מתמשכות בעוצמה ${severityWord(total, len, len * 3)}`);
     }
     if (e.socialAnxiety) {
       facts.summary!.push(
         e.socialSeverity
-          ? `קשיים בתחום החרדה החברתית — עוצמה ${e.socialSeverity} מתוך 7`
+          ? `דווח קושי בחרדה חברתית בעוצמה ${severityWord(e.socialSeverity, 1, 7)}`
           : "דווחו קשיים בתחום החרדה החברתית",
       );
     }
@@ -90,18 +98,19 @@ export function buildAdultFacts(
     if (e.stressPain) facts.flags!.push("תסמינים גופניים בעת מתח");
     if (e.ocdScores && e.ocdScores.length > 0) {
       const total = e.ocdScores.reduce((a, b) => a + b, 0);
-      facts.scores!.ocd_total = total;
-      facts.summary!.push(`ציון תסמיני OCD: ${total} מתוך ${e.ocdScores.length * 3}`);
+      const len = e.ocdScores.length;
+      facts.summary!.push(`דווחו מחשבות חוזרות וצורך בפעולות חוזרות בעוצמה ${severityWord(total, len, len * 3)}`);
     }
     if (e.e6) facts.summary!.push("דווחו קשיים בהקשר אכילה ומשקל");
     if (e.e7) facts.summary!.push("דווחו קשיי שינה");
     if (e.tics) facts.flags!.push("דווחו טיקים");
     if (e.tinnitus) facts.flags!.push("דווח טנטון");
     if (e.e9) {
-      facts.summary!.push("דווח על אירוע טראומטי בעבר");
-      if (e.traumaScores) {
+      if (e.traumaScores && e.traumaScores.length > 0) {
         const total = e.traumaScores.reduce((a, b) => a + b, 0);
-        facts.scores!.trauma_severity = total;
+        facts.summary!.push(`דווח על אירוע טראומטי בעבר, עם תסמינים נמשכים בעוצמה ${severityWord(total, 0, e.traumaScores.length * 4)}`);
+      } else {
+        facts.summary!.push("דווח על אירוע טראומטי בעבר");
       }
       if (e.traumaSuicidal) facts.flags!.push("מחשבות אובדניות בהקשר טראומה");
     }
@@ -112,20 +121,20 @@ export function buildAdultFacts(
     if (f.f1Attention) facts.summary!.push("דווחו קשיי קשב וריכוז");
     if (f.f1Processing) facts.summary!.push("דווחו קשיי הבנה ועיבוד");
     if (f.adhd1Count != null) {
-      facts.scores!.adhd_inattention = f.adhd1Count;
-      facts.summary!.push(`תסמיני חוסר קשב: ${f.adhd1Count} מתוך 6`);
+      facts.summary!.push(`דווחו קשיי קשב וריכוז בעוצמה ${severityWord(f.adhd1Count, 0, 6)}`);
     }
     if (f.adhd2Count != null) {
-      facts.scores!.adhd_hyperactive = f.adhd2Count;
-      facts.summary!.push(`תסמיני היפראקטיביות: ${f.adhd2Count} מתוך 6`);
+      facts.summary!.push(`דווחו סימני אי-שקט ואנרגיה עודפת בעוצמה ${severityWord(f.adhd2Count, 0, 6)}`);
     }
     if (f.ldScores && f.ldScores.length > 0) {
       const total = f.ldScores.reduce((a, b) => a + b, 0);
-      facts.scores!.ld_total = total;
+      const len = f.ldScores.length;
+      facts.summary!.push(`דווחו קשיי למידה בעוצמה ${severityWord(total, len, len * 3)}`);
     }
     if (f.execScores && f.execScores.length > 0) {
       const total = f.execScores.reduce((a, b) => a + b, 0);
-      facts.scores!.executive_function_total = total;
+      const len = f.execScores.length;
+      facts.summary!.push(`דווחו קשיים בארגון ובתפקודים הניהוליים בעוצמה ${severityWord(total, len, len * 3)}`);
     }
     if (f.disabilityNl) facts.flags!.push("פנייה קודמת לביטוח לאומי");
   }
@@ -142,8 +151,7 @@ export function buildAdultFacts(
     if (r.r1) facts.summary!.push("דווחו קשיים בתפקוד המיני");
     if (r.rAbuse) facts.flags!.push("דווחה אלימות / שליטה בקשר זוגי");
     if (r.coupleScale) {
-      facts.scores!.couple_difficulty = r.coupleScale;
-      facts.summary!.push(`קושי בזוגיות: ${r.coupleScale} מתוך 7`);
+      facts.summary!.push(`דווח קושי בזוגיות בעוצמה ${severityWord(r.coupleScale, 1, 7)}`);
     }
     if (r.eftScores && r.dynScores && r.structScores) {
       const eftSum = r.eftScores.reduce((a, b) => a + b, 0);
@@ -180,7 +188,9 @@ export function buildAdultFacts(
   // Trim empty arrays so JSON stays small
   if (facts.summary!.length === 0) delete facts.summary;
   if (facts.flags!.length === 0) delete facts.flags;
-  if (Object.keys(facts.scores!).length === 0) delete facts.scores;
+  // Never send raw scores / measure names to the model — severity is conveyed
+  // qualitatively in `summary`. Keeps numbers and instrument names out of the LLM.
+  delete facts.scores;
 
   return facts;
 }
@@ -221,16 +231,13 @@ export function buildKidsFacts(
 
   if (isEmotional) {
     if (typeof A.q1 === "number" && A.q1 > 0) {
-      facts.scores!.anxiety = `${A.q1}/5`;
-      facts.summary!.push(`עוצמת דאגות/לחצים: ${A.q1} מתוך 5`);
+      facts.summary!.push(`דווחו דאגות/לחצים בעוצמה ${severityWord(A.q1, 1, 5)}`);
     }
     if (typeof A.q2 === "number" && A.q2 > 0) {
-      facts.scores!.self_image = `${A.q2}/5`;
-      facts.summary!.push(`קושי בדימוי עצמי: ${A.q2} מתוך 5`);
+      facts.summary!.push(`דווח קושי בדימוי עצמי בעוצמה ${severityWord(A.q2, 1, 5)}`);
     }
     if (typeof A.q3 === "number" && A.q3 > 0) {
-      facts.scores!.mood = `${A.q3}/5`;
-      facts.summary!.push(`עוצמת מצב רוח ירוד: ${A.q3} מתוך 5`);
+      facts.summary!.push(`דווח מצב רוח ירוד בעוצמה ${severityWord(A.q3, 1, 5)}`);
     }
     if (A.q3_sui === "כן") facts.flags!.push("דווח על מחשבות אובדניות");
     if (typeof A.aq_tot === "number" && A.aq_tot > 0) facts.scores!.aq_total = A.aq_tot;
@@ -268,7 +275,9 @@ export function buildKidsFacts(
 
   if (facts.summary!.length === 0) delete facts.summary;
   if (facts.flags!.length === 0) delete facts.flags;
-  if (Object.keys(facts.scores!).length === 0) delete facts.scores;
+  // Never send raw scores / measure names to the model — severity is conveyed
+  // qualitatively in `summary`. Keeps numbers and instrument names out of the LLM.
+  delete facts.scores;
 
   return facts;
 }

@@ -2887,7 +2887,7 @@ function KidsMatchSection({ A, score, selection }: {
                           {explainData[t.id] && (
                             <div className="mt-3 rounded-xl border border-[#f0e0b8] bg-[var(--gold-pale)] p-3 text-right">
                               <p className="text-xs font-bold text-[var(--gold-dark)] mb-1">✦ {explainData[t.id]!.title}</p>
-                              <p className="text-xs text-gray-700 mb-2 leading-relaxed">{explainData[t.id]!.explanation}</p>
+                              <p className="text-xs text-gray-700 mb-2 leading-relaxed whitespace-pre-line">{explainData[t.id]!.explanation}</p>
                               <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
                             </div>
                           )}
