@@ -2865,7 +2865,7 @@ function KidsMatchSection({ A, score, selection }: {
                             </div>
                             {t.personality_score != null && (
                               <div className={`inline-block rounded-full px-3 py-1 text-xs font-semibold text-white ${
-                                t.personality_score >= 85 ? "bg-emerald-600" : t.personality_score >= 70 ? "bg-teal-600" : t.personality_score >= 55 ? "bg-amber-600" : "bg-gray-500"
+                                t.personality_score >= 88 ? "bg-emerald-600" : t.personality_score >= 76 ? "bg-teal-600" : t.personality_score >= 64 ? "bg-amber-600" : "bg-gray-500"
                               }`}>אישיותי: {t.personality_score}%</div>
                             )}
                           </div>

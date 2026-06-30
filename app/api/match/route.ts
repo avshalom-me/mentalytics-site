@@ -501,9 +501,15 @@ function scoreTherapist(
   const { styleP1, styleP2, styleP3 } = input;
   if (styleP1 != null && styleP2 != null && styleP3 != null &&
       t1Raw != null && t2 != null && t3 != null) {
-    // All three Q scales aligned: 1=practical/immediate, 7=insight/deep/active
+    // All three Q scales aligned: 1=practical/immediate, 7=insight/deep/active.
+    // davg is the mean absolute gap across the three dims (0 = identical, 6 =
+    // opposite). A plain linear map (100*(1-davg/6)) punished typical 2-3 point
+    // gaps too hard (→ 50-67%), which read as a poor match even when it isn't.
+    // Use a concave curve with a 40 floor so good matches feel right and the
+    // worst case still reads as "low" rather than "0". Stays monotonic: smaller
+    // gap → higher score. Range [40,100].
     const davg = (Math.abs(styleP1 - t1Raw) + Math.abs(styleP2 - t2) + Math.abs(styleP3 - t3)) / 3;
-    personality_score = Math.round(100 * (1 - davg / 6));
+    personality_score = Math.round(40 + 60 * Math.pow(1 - davg / 6, 0.65));
   }
 
   return {
