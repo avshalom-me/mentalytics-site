@@ -213,9 +213,31 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
   };
 }
 
+// ── Rate limiting ─────────────────────────────────────────────────────────────
+// Public, unauthenticated endpoint that calls OpenAI — cap each IP at 30
+// requests/minute so it can't be abused to run up cost. In-memory only; resets
+// on cold start. Mirrors /api/explain-recommendation.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 30) return false;
+  entry.count++;
+  return true;
+}
+
 // ── Route handler ─────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+
   try {
     const raw = await req.json();
     const parsed = BodySchema.safeParse(raw);
