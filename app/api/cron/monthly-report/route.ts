@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildUnsubscribeUrl } from "@/app/lib/unsubscribe-token";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -249,19 +250,25 @@ export async function GET(req: NextRequest) {
 
   const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-  const { data: clicks } = await supabaseAdmin
-    .from("therapist_contact_clicks")
-    .select("therapist_id, click_type, source")
-    .gte("clicked_at", since);
+  // Page past the 1000-row cap — profile_views over 30 days already exceeds it,
+  // so a plain select would undercount each therapist's monthly view count.
+  const clicks = await fetchAllRows<ClickRow>(() =>
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("therapist_id, click_type, source")
+      .gte("clicked_at", since),
+  );
 
-  const { data: views } = await supabaseAdmin
-    .from("therapist_profile_views")
-    .select("therapist_id, source")
-    .gte("viewed_at", since);
+  const views = await fetchAllRows<ViewRow>(() =>
+    supabaseAdmin
+      .from("therapist_profile_views")
+      .select("therapist_id, source")
+      .gte("viewed_at", since),
+  );
 
   // Aggregate clicks per therapist
   const clickMap: Record<string, { wa: number; phone: number; email: number; match: number; directory: number }> = {};
-  for (const row of (clicks ?? []) as ClickRow[]) {
+  for (const row of clicks) {
     if (!clickMap[row.therapist_id]) clickMap[row.therapist_id] = { wa: 0, phone: 0, email: 0, match: 0, directory: 0 };
     const c = clickMap[row.therapist_id];
     if (row.click_type === "whatsapp") c.wa++;
@@ -273,7 +280,7 @@ export async function GET(req: NextRequest) {
 
   // Aggregate views per therapist
   const viewMap: Record<string, number> = {};
-  for (const row of (views ?? []) as ViewRow[]) {
+  for (const row of views) {
     viewMap[row.therapist_id] = (viewMap[row.therapist_id] ?? 0) + 1;
   }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeSupplyDemand } from "@/app/lib/supply-demand";
 import { buildRecommendations } from "@/app/lib/recommendations";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -57,16 +58,20 @@ export async function GET() {
 // (deduped against existing pending/accepted by type+target_key).
 export async function POST() {
   try {
-    const [tRes, vRes, cRes] = await Promise.all([
+    const [tRes, views, clicks] = await Promise.all([
       supabaseAdmin.from("therapists").select("id, full_name, regions, online").eq("status", "paying"),
-      supabaseAdmin.from("therapist_profile_views").select("therapist_id, viewer_region"),
-      supabaseAdmin.from("therapist_contact_clicks").select("therapist_id"),
+      // profile_views exceeds the 1000-row cap (all-time) — page past it so the
+      // generated recommendations rest on true demand, not a truncated count.
+      fetchAllRows<{ therapist_id: string | null; viewer_region: string | null }>(() =>
+        supabaseAdmin.from("therapist_profile_views").select("therapist_id, viewer_region"),
+      ),
+      fetchAllRows<{ therapist_id: string | null }>(() =>
+        supabaseAdmin.from("therapist_contact_clicks").select("therapist_id"),
+      ),
     ]);
     if (tRes.error) throw tRes.error;
-    if (vRes.error) throw vRes.error;
-    if (cRes.error) throw cRes.error;
 
-    const sd = computeSupplyDemand(tRes.data ?? [], vRes.data ?? [], cRes.data ?? []);
+    const sd = computeSupplyDemand(tRes.data ?? [], views, clicks);
     const computed = buildRecommendations(sd);
 
     // Dedup so "refresh" doesn't recreate a recommendation that is still active

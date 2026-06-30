@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeEnrichedStats } from "@/app/lib/therapist-stats";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -178,12 +179,14 @@ export async function GET(req: NextRequest) {
 
     // Comparison: average clicks for paying therapists
     try {
-      const { data: allClicks } = await supabaseAdmin
-        .from("therapist_contact_clicks")
-        .select("therapist_id")
-        .gte("clicked_at", monthAgo.toISOString());
+      const allClicks = await fetchAllRows<{ therapist_id: string }>(() =>
+        supabaseAdmin
+          .from("therapist_contact_clicks")
+          .select("therapist_id")
+          .gte("clicked_at", monthAgo.toISOString()),
+      );
 
-      if (allClicks && allClicks.length > 0) {
+      if (allClicks.length > 0) {
         const byTherapist = new Map<string, number>();
         for (const c of allClicks) {
           byTherapist.set(c.therapist_id, (byTherapist.get(c.therapist_id) ?? 0) + 1);

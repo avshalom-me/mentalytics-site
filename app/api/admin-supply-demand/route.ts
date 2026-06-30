@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeSupplyDemand } from "@/app/lib/supply-demand";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -19,28 +20,28 @@ export async function GET(req: NextRequest) {
   const since = periodToDate(safePeriod);
 
   try {
-    const [therapistsRes, viewsRes, clicksRes] = await Promise.all([
+    const [therapistsRes, views, clicks] = await Promise.all([
       supabaseAdmin.from("therapists").select("id, full_name, regions, online, promotion_source").eq("status", "paying"),
-      (() => {
+      // profile_views exceeds the 1000-row cap (default all-time period) — page
+      // past it so region demand and per-therapist view counts aren't truncated.
+      fetchAllRows<{ therapist_id: string | null; viewer_region: string | null }>(() => {
         let q = supabaseAdmin.from("therapist_profile_views").select("therapist_id, viewer_region");
         if (since) q = q.gte("viewed_at", since);
         return q;
-      })(),
-      (() => {
+      }),
+      fetchAllRows<{ therapist_id: string | null }>(() => {
         let q = supabaseAdmin.from("therapist_contact_clicks").select("therapist_id");
         if (since) q = q.gte("clicked_at", since);
         return q;
-      })(),
+      }),
     ]);
 
     if (therapistsRes.error) throw therapistsRes.error;
-    if (viewsRes.error) throw viewsRes.error;
-    if (clicksRes.error) throw clicksRes.error;
 
     const sd = computeSupplyDemand(
       therapistsRes.data ?? [],
-      viewsRes.data ?? [],
-      clicksRes.data ?? [],
+      views,
+      clicks,
     );
 
     // status='paying' bundles real payers with comped/promoted therapists.

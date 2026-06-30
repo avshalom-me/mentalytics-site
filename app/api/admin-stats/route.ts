@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -60,25 +61,25 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
     return NextResponse.json({ ok: false, error: tErr.message }, { status: 500 });
   }
 
-  // Fetch clicks, filtered by period if needed
+  // Fetch clicks + views, paging past the 1000-row cap. profile_views already
+  // exceeds 1000 for the default all-time period, which would otherwise freeze
+  // every therapist's view/CTR numbers below at a truncated total.
   const since = periodToDate(safePeriod);
-  let query = supabaseAdmin
-    .from("therapist_contact_clicks")
-    .select("therapist_id, click_type, source");
-  if (since) query = query.gte("clicked_at", since);
+  const clicks = await fetchAllRows<{ therapist_id: string; click_type: string; source: string }>(() => {
+    let q = supabaseAdmin.from("therapist_contact_clicks").select("therapist_id, click_type, source");
+    if (since) q = q.gte("clicked_at", since);
+    return q;
+  });
 
-  const { data: clicks } = await query;
-
-  // Fetch profile views
-  let viewsQuery = supabaseAdmin
-    .from("therapist_profile_views")
-    .select("therapist_id, source");
-  if (since) viewsQuery = viewsQuery.gte("viewed_at", since);
-  const { data: views } = await viewsQuery;
+  const views = await fetchAllRows<{ therapist_id: string; source: string }>(() => {
+    let q = supabaseAdmin.from("therapist_profile_views").select("therapist_id, source");
+    if (since) q = q.gte("viewed_at", since);
+    return q;
+  });
 
   // Aggregate profile views
   const viewsMap: Record<string, { total: number; match: number; directory: number }> = {};
-  for (const row of (views ?? []) as { therapist_id: string; source: string }[]) {
+  for (const row of views) {
     if (!viewsMap[row.therapist_id]) viewsMap[row.therapist_id] = { total: 0, match: 0, directory: 0 };
     viewsMap[row.therapist_id].total++;
     if (row.source === "match") viewsMap[row.therapist_id].match++;
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
     directory_whatsapp: number; directory_phone: number; directory_email: number;
   };
   const clickMap: Record<string, ClickCounts> = {};
-  for (const row of (clicks ?? []) as { therapist_id: string; click_type: string; source: string }[]) {
+  for (const row of clicks) {
     if (!clickMap[row.therapist_id]) {
       clickMap[row.therapist_id] = {
         whatsapp: 0, phone: 0, email: 0,

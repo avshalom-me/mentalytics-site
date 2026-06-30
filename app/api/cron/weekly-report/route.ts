@@ -4,6 +4,7 @@ import OpenAI from "openai";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeAttribution, type AttributionResult } from "@/app/lib/attribution-report";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // reasoning models need more headroom (Vercel caps to plan max)
@@ -104,23 +105,31 @@ async function aggregateTrend(now: Date, bucketDays: number, numBuckets: number)
   const since = new Date(now.getTime() - totalMs).toISOString();
   const until = now.toISOString();
 
-  const [eventsRes, viewsRes, clicksRes] = await Promise.all([
-    supabaseAdmin
-      .from("analytics_events")
-      .select("event_type, created_at")
-      .gte("created_at", since)
-      .lt("created_at", until)
-      .in("event_type", ["page_view", "quiz_complete"]),
-    supabaseAdmin
-      .from("therapist_profile_views")
-      .select("viewed_at")
-      .gte("viewed_at", since)
-      .lt("viewed_at", until),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("clicked_at")
-      .gte("clicked_at", since)
-      .lt("clicked_at", until),
+  // fetchAllRows pages past PostgREST's 1000-row cap (profile_views already
+  // exceeds it; page_views/clicks will). Counting capped rows undercounts.
+  const [events, views, clicks] = await Promise.all([
+    fetchAllRows<{ event_type: string; created_at: string }>(() =>
+      supabaseAdmin
+        .from("analytics_events")
+        .select("event_type, created_at")
+        .gte("created_at", since)
+        .lt("created_at", until)
+        .in("event_type", ["page_view", "quiz_complete"]),
+    ),
+    fetchAllRows<{ viewed_at: string }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("viewed_at")
+        .gte("viewed_at", since)
+        .lt("viewed_at", until),
+    ),
+    fetchAllRows<{ clicked_at: string }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("clicked_at")
+        .gte("clicked_at", since)
+        .lt("clicked_at", until),
+    ),
   ]);
 
   const buckets: TrendPoint[] = [];
@@ -143,17 +152,17 @@ async function aggregateTrend(now: Date, bucketDays: number, numBuckets: number)
     return numBuckets - 1 - periodsAgo;
   }
 
-  for (const e of (eventsRes.data ?? []) as { event_type: string; created_at: string }[]) {
+  for (const e of events) {
     const i = bucketIdx(e.created_at);
     if (i < 0 || i >= numBuckets) continue;
     if (e.event_type === "page_view") buckets[i].pageViews++;
     if (e.event_type === "quiz_complete") buckets[i].quizCompletions++;
   }
-  for (const v of (viewsRes.data ?? []) as { viewed_at: string }[]) {
+  for (const v of views) {
     const i = bucketIdx(v.viewed_at);
     if (i >= 0 && i < numBuckets) buckets[i].profileViews++;
   }
-  for (const c of (clicksRes.data ?? []) as { clicked_at: string }[]) {
+  for (const c of clicks) {
     const i = bucketIdx(c.clicked_at);
     if (i >= 0 && i < numBuckets) buckets[i].contactClicks++;
   }
@@ -214,27 +223,32 @@ type PatientData = {
 };
 
 async function aggregatePatientData(period: Period): Promise<PatientData> {
-  const [eventsRes, viewsRes, clicksRes] = await Promise.all([
-    supabaseAdmin
-      .from("analytics_events")
-      .select("event_type, metadata, created_at")
-      .gte("created_at", period.since)
-      .lt("created_at", period.until),
-    supabaseAdmin
-      .from("therapist_profile_views")
-      .select("therapist_id, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
-      .gte("viewed_at", period.since)
-      .lt("viewed_at", period.until),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("therapist_id, click_type")
-      .gte("clicked_at", period.since)
-      .lt("clicked_at", period.until),
+  // fetchAllRows pages past the 1000-row cap — analytics_events over a 7/30-day
+  // window (incl. ~7,800 impressions) and profile_views both exceed it, so a
+  // plain select would freeze every count below at 1000.
+  const [events, views, clicks] = await Promise.all([
+    fetchAllRows<{ event_type: string; metadata: Record<string, string> }>(() =>
+      supabaseAdmin
+        .from("analytics_events")
+        .select("event_type, metadata, created_at")
+        .gte("created_at", period.since)
+        .lt("created_at", period.until),
+    ),
+    fetchAllRows<{ viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
+        .gte("viewed_at", period.since)
+        .lt("viewed_at", period.until),
+    ),
+    fetchAllRows<{ click_type: string }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id, click_type")
+        .gte("clicked_at", period.since)
+        .lt("clicked_at", period.until),
+    ),
   ]);
-
-  const events = (eventsRes.data ?? []) as { event_type: string; metadata: Record<string, string> }[];
-  const views = (viewsRes.data ?? []) as { viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }[];
-  const clicks = (clicksRes.data ?? []) as { click_type: string }[];
 
   const pageViews = events.filter(e => e.event_type === "page_view").length;
   const impressions = events.filter(e => e.event_type === "profile_impression").length;
@@ -301,20 +315,23 @@ async function aggregateTherapistTrends(
   const since = new Date(now.getTime() - totalMs).toISOString();
   const until = now.toISOString();
 
-  const [therapistsRes, clicksRes] = await Promise.all([
+  const [therapistsRes, clicks] = await Promise.all([
     supabaseAdmin
       .from("therapists")
       .select("id, full_name")
       .eq("status", "paying"),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("therapist_id, clicked_at")
-      .gte("clicked_at", since)
-      .lt("clicked_at", until),
+    // Clicks across all paying therapists over the full trend window can exceed
+    // 1000 as the recruitment effort grows — page past the cap.
+    fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id, clicked_at")
+        .gte("clicked_at", since)
+        .lt("clicked_at", until),
+    ),
   ]);
 
   const therapists = (therapistsRes.data ?? []) as { id: string; full_name: string | null }[];
-  const clicks = (clicksRes.data ?? []) as { therapist_id: string; clicked_at: string }[];
 
   function bucketIdx(d: string): number {
     const t = new Date(d).getTime();
@@ -454,27 +471,31 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
   const payingList = list.filter(t => t.status === "paying");
   const payingIds = payingList.map(t => t.id);
 
-  const [viewsRes, clicksRes] = await Promise.all([
-    supabaseAdmin
-      .from("therapist_profile_views")
-      .select("therapist_id")
-      .gte("viewed_at", period.since)
-      .lt("viewed_at", period.until)
-      .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("therapist_id")
-      .gte("clicked_at", period.since)
-      .lt("clicked_at", period.until)
-      .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
+  const [views, clicks] = await Promise.all([
+    fetchAllRows<{ therapist_id: string }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id")
+        .gte("viewed_at", period.since)
+        .lt("viewed_at", period.until)
+        .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
+    ),
+    fetchAllRows<{ therapist_id: string }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id")
+        .gte("clicked_at", period.since)
+        .lt("clicked_at", period.until)
+        .in("therapist_id", payingIds.length > 0 ? payingIds : ["00000000-0000-0000-0000-000000000000"]),
+    ),
   ]);
 
   const viewsByT: Record<string, number> = {};
-  for (const v of (viewsRes.data ?? []) as { therapist_id: string }[]) {
+  for (const v of views) {
     viewsByT[v.therapist_id] = (viewsByT[v.therapist_id] ?? 0) + 1;
   }
   const clicksByT: Record<string, number> = {};
-  for (const c of (clicksRes.data ?? []) as { therapist_id: string }[]) {
+  for (const c of clicks) {
     clicksByT[c.therapist_id] = (clicksByT[c.therapist_id] ?? 0) + 1;
   }
 
@@ -519,25 +540,34 @@ async function aggregateTherapistData(period: Period): Promise<TherapistData> {
 // ── MARKETING (attribution by channel) ──────────────────────────────
 
 async function aggregateMarketingData(period: Period): Promise<AttributionResult> {
-  const [eventsRes, viewsRes, clicksRes] = await Promise.all([
-    supabaseAdmin
-      .from("analytics_events")
-      .select("event_type, channel")
-      .in("event_type", ["page_view", "profile_impression"])
-      .gte("created_at", period.since)
-      .lt("created_at", period.until),
-    supabaseAdmin
-      .from("therapist_profile_views")
-      .select("channel")
-      .gte("viewed_at", period.since)
-      .lt("viewed_at", period.until),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("channel, utm_campaign")
-      .gte("clicked_at", period.since)
-      .lt("clicked_at", period.until),
+  // page_views + impressions (~7,800) exceed the 1000-row cap; page past it so
+  // the per-channel funnel isn't frozen at 1000 (same bug fixed in
+  // admin-attribution). computeAttribution counts whatever rows it's given.
+  const [events, views, clicks] = await Promise.all([
+    fetchAllRows<{ event_type: string; channel: string | null }>(() =>
+      supabaseAdmin
+        .from("analytics_events")
+        .select("event_type, channel")
+        .in("event_type", ["page_view", "profile_impression"])
+        .gte("created_at", period.since)
+        .lt("created_at", period.until),
+    ),
+    fetchAllRows<{ channel: string | null }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("channel")
+        .gte("viewed_at", period.since)
+        .lt("viewed_at", period.until),
+    ),
+    fetchAllRows<{ channel: string | null; utm_campaign?: string | null }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("channel, utm_campaign")
+        .gte("clicked_at", period.since)
+        .lt("clicked_at", period.until),
+    ),
   ]);
-  return computeAttribution(eventsRes.data ?? [], viewsRes.data ?? [], clicksRes.data ?? []);
+  return computeAttribution(events, views, clicks);
 }
 
 // ── LLM SYNTHESIS ───────────────────────────────────────────────────

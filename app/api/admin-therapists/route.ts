@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelSubscription, listRecurringForCustomer, type RecurringItem } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import {
@@ -151,27 +152,33 @@ async function buildTherapistsResponse() {
   > = {};
 
   if (therapistIds.length > 0) {
-    const [viewsRes, clicksRes, subsRes] = await Promise.all([
-      supabaseAdmin
-        .from("therapist_profile_views")
-        .select("therapist_id")
-        .in("therapist_id", therapistIds)
-        .in("source", ["match", "directory"])
-        .gte("viewed_at", monthAgoIso),
-      supabaseAdmin
-        .from("therapist_contact_clicks")
-        .select("therapist_id")
-        .in("therapist_id", therapistIds)
-        .gte("clicked_at", monthAgoIso),
+    const [views, clicks, subsRes] = await Promise.all([
+      // 30-day views across all therapists already exceed the 1000-row cap —
+      // page past it so each therapist's views_30d isn't truncated.
+      fetchAllRows<{ therapist_id: string }>(() =>
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("therapist_id")
+          .in("therapist_id", therapistIds)
+          .in("source", ["match", "directory"])
+          .gte("viewed_at", monthAgoIso),
+      ),
+      fetchAllRows<{ therapist_id: string }>(() =>
+        supabaseAdmin
+          .from("therapist_contact_clicks")
+          .select("therapist_id")
+          .in("therapist_id", therapistIds)
+          .gte("clicked_at", monthAgoIso),
+      ),
       supabaseAdmin
         .from("subscriptions")
         .select("therapist_id, status, current_period_end, promo_reverts_at")
         .in("therapist_id", therapistIds),
     ]);
-    for (const v of (viewsRes.data ?? []) as Array<{ therapist_id: string }>) {
+    for (const v of views) {
       viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
     }
-    for (const c of (clicksRes.data ?? []) as Array<{ therapist_id: string }>) {
+    for (const c of clicks) {
       contactsByTherapist[c.therapist_id] = (contactsByTherapist[c.therapist_id] ?? 0) + 1;
     }
     for (const s of (subsRes.data ?? []) as Array<{
