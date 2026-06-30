@@ -30,24 +30,16 @@ export function bucketOf(channel: string | null | undefined): Bucket {
   return channel && (CHANNELS as readonly string[]).includes(channel) ? (channel as Channel) : "unknown";
 }
 
-export function computeAttribution(
-  events: { event_type: string; channel: string | null }[],
-  views: { channel: string | null }[],
-  clicks: { channel: string | null; utm_campaign?: string | null }[],
+type Counts = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
+const emptyCounts = (): Counts => ({ pageViews: 0, impressions: 0, profileViews: 0, contactClicks: 0 });
+const emptyByChannel = (): Record<Bucket, Counts> =>
+  Object.fromEntries(ALL_BUCKETS.map((b) => [b, emptyCounts()])) as Record<Bucket, Counts>;
+
+/** Shared tail: turn per-channel counts + campaign counts into the report shape. */
+function finalize(
+  byChannel: Record<Bucket, Counts>,
+  campaignCounts: Record<string, number>,
 ): AttributionResult {
-  const empty = () => ({ pageViews: 0, impressions: 0, profileViews: 0, contactClicks: 0 });
-  const byChannel: Record<Bucket, ReturnType<typeof empty>> = Object.fromEntries(
-    ALL_BUCKETS.map((b) => [b, empty()]),
-  ) as Record<Bucket, ReturnType<typeof empty>>;
-
-  for (const e of events) {
-    const b = byChannel[bucketOf(e.channel)];
-    if (e.event_type === "page_view") b.pageViews++;
-    else if (e.event_type === "profile_impression") b.impressions++;
-  }
-  for (const v of views) byChannel[bucketOf(v.channel)].profileViews++;
-  for (const c of clicks) byChannel[bucketOf(c.channel)].contactClicks++;
-
   const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
 
   const channels = ALL_BUCKETS.map((b) => {
@@ -68,17 +60,77 @@ export function computeAttribution(
       acc.profileViews += c.profileViews; acc.contactClicks += c.contactClicks;
       return acc;
     },
-    empty(),
+    emptyCounts(),
   );
 
-  const campaignCounts: Record<string, number> = {};
-  for (const c of clicks) {
-    if (c.utm_campaign) campaignCounts[c.utm_campaign] = (campaignCounts[c.utm_campaign] ?? 0) + 1;
-  }
   const topCampaigns = Object.entries(campaignCounts)
     .map(([campaign, contactClicks]) => ({ campaign, contactClicks }))
     .sort((a, b) => b.contactClicks - a.contactClicks)
     .slice(0, 15);
 
   return { channels, totals, topCampaigns };
+}
+
+/**
+ * Row-based: counts raw event/view/click rows. NOTE: callers must fetch ALL
+ * rows — a single PostgREST response caps at 1000, which silently undercounts
+ * any metric above 1000. Prefer computeAttributionFromCounts (DB-side
+ * aggregation) for the large tables (impressions / profile_views).
+ */
+export function computeAttribution(
+  events: { event_type: string; channel: string | null }[],
+  views: { channel: string | null }[],
+  clicks: { channel: string | null; utm_campaign?: string | null }[],
+): AttributionResult {
+  const byChannel = emptyByChannel();
+
+  for (const e of events) {
+    const b = byChannel[bucketOf(e.channel)];
+    if (e.event_type === "page_view") b.pageViews++;
+    else if (e.event_type === "profile_impression") b.impressions++;
+  }
+  for (const v of views) byChannel[bucketOf(v.channel)].profileViews++;
+  for (const c of clicks) byChannel[bucketOf(c.channel)].contactClicks++;
+
+  const campaignCounts: Record<string, number> = {};
+  for (const c of clicks) {
+    if (c.utm_campaign) campaignCounts[c.utm_campaign] = (campaignCounts[c.utm_campaign] ?? 0) + 1;
+  }
+
+  return finalize(byChannel, campaignCounts);
+}
+
+/**
+ * Aggregate-based: takes per-channel + per-campaign counts already computed in
+ * SQL (the admin_attribution_report RPC). Exact at any volume — no 1000-row
+ * cap. Counts may arrive as numbers or numeric strings (Postgres bigint).
+ */
+export function computeAttributionFromCounts(
+  channelRows: {
+    channel: string | null;
+    page_views: number | string;
+    impressions: number | string;
+    profile_views: number | string;
+    contact_clicks: number | string;
+  }[],
+  campaignRows: { campaign: string | null; contact_clicks: number | string }[],
+): AttributionResult {
+  const byChannel = emptyByChannel();
+
+  for (const r of channelRows) {
+    const c = byChannel[bucketOf(r.channel)];
+    c.pageViews += Number(r.page_views) || 0;
+    c.impressions += Number(r.impressions) || 0;
+    c.profileViews += Number(r.profile_views) || 0;
+    c.contactClicks += Number(r.contact_clicks) || 0;
+  }
+
+  const campaignCounts: Record<string, number> = {};
+  for (const r of campaignRows) {
+    if (r.campaign) {
+      campaignCounts[r.campaign] = (campaignCounts[r.campaign] ?? 0) + (Number(r.contact_clicks) || 0);
+    }
+  }
+
+  return finalize(byChannel, campaignCounts);
 }

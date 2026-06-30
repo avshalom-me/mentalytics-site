@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { computeAttribution } from "@/app/lib/attribution-report";
+import { computeAttributionFromCounts } from "@/app/lib/attribution-report";
 
 export const dynamic = "force-dynamic";
 
@@ -19,32 +19,27 @@ export async function GET(req: NextRequest) {
   const since = periodToDate(safePeriod);
 
   try {
-    const [eventsRes, viewsRes, clicksRes] = await Promise.all([
-      (() => {
-        let q = supabaseAdmin
-          .from("analytics_events")
-          .select("event_type, channel")
-          .in("event_type", ["page_view", "profile_impression"]);
-        if (since) q = q.gte("created_at", since);
-        return q;
-      })(),
-      (() => {
-        let q = supabaseAdmin.from("therapist_profile_views").select("channel");
-        if (since) q = q.gte("viewed_at", since);
-        return q;
-      })(),
-      (() => {
-        let q = supabaseAdmin.from("therapist_contact_clicks").select("channel, utm_campaign");
-        if (since) q = q.gte("clicked_at", since);
-        return q;
-      })(),
-    ]);
+    // Aggregate per-channel + per-campaign server-side (COUNT + GROUP BY) via
+    // RPC. The old approach fetched raw rows and counted them in JS, which hit
+    // PostgREST's 1000-row cap and silently froze any metric above 1000 at
+    // exactly 1000 (e.g. impressions 7800+ -> 1000). The RPC is exact + cheap.
+    const { data, error } = await supabaseAdmin.rpc("admin_attribution_report", {
+      p_since: since,
+    });
+    if (error) throw error;
 
-    if (eventsRes.error) throw eventsRes.error;
-    if (viewsRes.error) throw viewsRes.error;
-    if (clicksRes.error) throw clicksRes.error;
+    const agg = (data ?? {}) as {
+      channels?: {
+        channel: string | null;
+        page_views: number;
+        impressions: number;
+        profile_views: number;
+        contact_clicks: number;
+      }[];
+      campaigns?: { campaign: string | null; contact_clicks: number }[];
+    };
 
-    const result = computeAttribution(eventsRes.data ?? [], viewsRes.data ?? [], clicksRes.data ?? []);
+    const result = computeAttributionFromCounts(agg.channels ?? [], agg.campaigns ?? []);
 
     return NextResponse.json({
       ok: true,
