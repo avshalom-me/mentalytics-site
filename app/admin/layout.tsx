@@ -20,6 +20,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
       { href: "/admin/stats", label: "לחיצות", icon: "📊" },
       { href: "/admin/supply-demand", label: "היצע/ביקוש", icon: "⚖️" },
       { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
+      { href: "/admin/recruitment", label: "גיוס מטפלים", icon: "🧲" },
     ],
   },
   {

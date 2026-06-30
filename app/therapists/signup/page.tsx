@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { NEWSLETTER_CONSENT_TEXT } from "@/app/lib/consent";
 import { gaEvent } from "@/app/lib/gtag";
+import { getAttribution, getClickIds } from "@/app/lib/attribution";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 
 type Gender = "זכר" | "נקבה";
@@ -195,6 +196,24 @@ export default function TherapistSignupPage() {
       fd.append("acceptingNewClients", String(form.acceptingNewClients));
       fd.append("arrangements", JSON.stringify(form.arrangements));
       fd.append("newsletterConsent", String(form.newsletterConsent));
+
+      // Marketing attribution captured at landing — lets the admin measure
+      // which campaign / ad drove each therapist signup (e.g. the Facebook
+      // A/B test). Only meaningful fields are appended.
+      const attr = getAttribution();
+      if (attr) {
+        fd.append("channel", attr.channel);
+        if (attr.utm_source) fd.append("utm_source", attr.utm_source);
+        if (attr.utm_medium) fd.append("utm_medium", attr.utm_medium);
+        if (attr.utm_campaign) fd.append("utm_campaign", attr.utm_campaign);
+      }
+      const clicks = getClickIds();
+      if (clicks) {
+        if (clicks.gclid) fd.append("gclid", clicks.gclid);
+        if (clicks.gbraid) fd.append("gbraid", clicks.gbraid);
+        if (clicks.wbraid) fd.append("wbraid", clicks.wbraid);
+        if (clicks.fbclid) fd.append("fbclid", clicks.fbclid);
+      }
 
       for (const f of form.certificates) {
         fd.append("certificates", f);

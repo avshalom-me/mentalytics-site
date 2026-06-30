@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
+import { sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 
 export const runtime = "nodejs";
 
@@ -162,6 +163,27 @@ export async function POST(req: Request) {
       });
     }
 
+    // Marketing attribution (last touch) captured on the landing page and sent
+    // with the form. Stored on the therapist row so the admin recruitment
+    // report can attribute each signup to a campaign / ad. sanitize* validate
+    // and clamp the values; missing fields become null.
+    const fdStr = (k: string) => {
+      const v = fd.get(k);
+      return typeof v === "string" ? v : null;
+    };
+    const attrInput = {
+      channel: fdStr("channel"),
+      utm_source: fdStr("utm_source"),
+      utm_medium: fdStr("utm_medium"),
+      utm_campaign: fdStr("utm_campaign"),
+      gclid: fdStr("gclid"),
+      gbraid: fdStr("gbraid"),
+      wbraid: fdStr("wbraid"),
+      fbclid: fdStr("fbclid"),
+    };
+    const attr = sanitizeAttribution(attrInput);
+    const clicks = sanitizeClickIds(attrInput);
+
     const { data: therapist, error: insertErr } = await supabase
       .from("therapists")
       .insert({
@@ -169,6 +191,14 @@ export async function POST(req: Request) {
         email,
         phone,
         gender,
+        signup_channel: attr.channel,
+        signup_utm_source: attr.utm_source,
+        signup_utm_medium: attr.utm_medium,
+        signup_utm_campaign: attr.utm_campaign,
+        signup_gclid: clicks.gclid,
+        signup_gbraid: clicks.gbraid,
+        signup_wbraid: clicks.wbraid,
+        signup_fbclid: clicks.fbclid,
         online,
         price,
           bio: bio || null,
