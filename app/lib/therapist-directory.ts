@@ -21,6 +21,7 @@ type TherapistRow = {
   arrangements: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
+  promotion_source: string | null;
   created_at: string | null;
 };
 
@@ -55,15 +56,17 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 
 // Loads publicly-listed therapists (paying + approved, admin-vetted), ordered
 // promoted-first with a new-therapist boost and a daily rotation within each
-// tier. An optional filter (region / online) narrows the set BEFORE signing
-// photo URLs, so region landing pages only pay for their own subset.
+// tier. The promoted tier is split so PAID promotions (promotion_source="paid")
+// rank above GIFT promotions (manual/trial), which in turn rank above the free
+// approved tier. An optional filter (region / online) narrows the set BEFORE
+// signing photo URLs, so region landing pages only pay for their own subset.
 export async function loadPublicTherapists(
   filter?: { region?: string; city?: string; online?: boolean; category?: "main" | "para" }
 ): Promise<PublicTherapist[]> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, created_at`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, created_at`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
@@ -86,8 +89,16 @@ export async function loadPublicTherapists(
   const isNew = (t: TherapistRow) =>
     t.created_at != null && new Date(t.created_at).getTime() >= boostCutoff;
 
-  const payingNew = rows.filter((t) => t.status === "paying" && isNew(t));
-  const payingOld = rows.filter((t) => t.status === "paying" && !isNew(t));
+  // Promoted = status "paying". Within it, paid customers outrank gift
+  // (manual/trial) promotions; both outrank the free approved tier. The
+  // new-therapist boost is preserved WITHIN each class.
+  const isPaid = (t: TherapistRow) => t.status === "paying" && t.promotion_source === "paid";
+  const isGift = (t: TherapistRow) => t.status === "paying" && t.promotion_source !== "paid";
+
+  const paidNew = rows.filter((t) => isPaid(t) && isNew(t));
+  const paidOld = rows.filter((t) => isPaid(t) && !isNew(t));
+  const giftNew = rows.filter((t) => isGift(t) && isNew(t));
+  const giftOld = rows.filter((t) => isGift(t) && !isNew(t));
   const approvedNew = rows.filter((t) => t.status !== "paying" && isNew(t));
   const approvedOld = rows.filter((t) => t.status !== "paying" && !isNew(t));
 
@@ -98,6 +109,13 @@ export async function loadPublicTherapists(
     return [...arr.slice(offset), ...arr.slice(0, offset)];
   };
 
-  const ordered = [...rotate(payingNew), ...rotate(payingOld), ...rotate(approvedNew), ...approvedOld];
+  const ordered = [
+    ...rotate(paidNew),
+    ...rotate(paidOld),
+    ...rotate(giftNew),
+    ...rotate(giftOld),
+    ...rotate(approvedNew),
+    ...approvedOld,
+  ];
   return Promise.all(ordered.map(signRow));
 }
