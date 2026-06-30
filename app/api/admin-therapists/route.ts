@@ -27,6 +27,9 @@ type TherapistRow = {
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
   age_groups: string[] | null;
+  style_q1: number | null;
+  style_q2: number | null;
+  activity_level: number | null;
   profile_photo_path: string | null;
   status: string | null;
   manually_promoted: boolean | null;
@@ -66,6 +69,9 @@ async function buildTherapistsResponse() {
       cultural_prefs,
       arrangements,
       age_groups,
+      style_q1,
+      style_q2,
+      activity_level,
       profile_photo_path,
       status,
       manually_promoted,
@@ -218,6 +224,9 @@ async function buildTherapistsResponse() {
         cultural_prefs: t.cultural_prefs ?? [],
         arrangements: t.arrangements ?? [],
         age_groups: t.age_groups ?? [],
+        style_q1: t.style_q1 ?? null,
+        style_q2: t.style_q2 ?? null,
+        activity_level: t.activity_level ?? null,
         profile_photo_path: t.profile_photo_path ?? null,
         profile_photo_url,
         certificates: certsByTherapist[t.id] ?? [],
@@ -495,6 +504,14 @@ export async function PATCH(request: Request) {
       const update: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body.fields) update[key] = body.fields[key];
+      }
+      // Therapeutic-style answers (1–7 scale). Coerce to a valid smallint or
+      // null so an out-of-range/blank value clears the field rather than erroring.
+      for (const key of ["style_q1","style_q2","activity_level"]) {
+        if (key in body.fields) {
+          const n = Number(body.fields[key]);
+          update[key] = Number.isInteger(n) && n >= 1 && n <= 7 ? n : null;
+        }
       }
       const { error } = await supabaseAdmin.from("therapists").update(update).eq("id", id);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

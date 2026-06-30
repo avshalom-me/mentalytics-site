@@ -25,6 +25,9 @@ type AdminTherapist = {
   cultural_prefs: string[];
   arrangements: string[];
   age_groups: string[];
+  style_q1: number | null;
+  style_q2: number | null;
+  activity_level: number | null;
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   certificates: Array<{
@@ -59,6 +62,9 @@ type EditForm = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  style_q1: number | null;
+  style_q2: number | null;
+  activity_level: number | null;
 };
 
 function toggleItem(arr: string[], item: string): string[] {
@@ -88,6 +94,35 @@ function CheckboxGroup({
           </label>
         ))}
       </div>
+    </div>
+  );
+}
+
+// One row of the therapeutic-style questionnaire (1–7 scale). value=null means
+// the therapist never answered it; "—" clears it back to null.
+function StyleScaleRow({
+  question, low, high, value, onChange,
+}: {
+  question: string;
+  low: string;
+  high: string;
+  value: number | null;
+  onChange: (val: number | null) => void;
+}) {
+  return (
+    <div className="mb-4">
+      <div className="mb-1 text-sm font-semibold text-stone-800">{question}</div>
+      <div className="mb-1.5 text-xs text-stone-500">1 = {low} · 7 = {high}</div>
+      <select
+        value={value ?? ""}
+        onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))}
+        className="rounded-lg border border-stone-300 px-3 py-1.5 text-sm"
+      >
+        <option value="">— לא נענה —</option>
+        {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+          <option key={n} value={n}>{n}</option>
+        ))}
+      </select>
     </div>
   );
 }
@@ -161,6 +196,9 @@ export default function AdminTherapistsPage() {
       regions: [...t.regions],
       cultural_prefs: [...t.cultural_prefs],
       arrangements: [...t.arrangements],
+      style_q1: t.style_q1,
+      style_q2: t.style_q2,
+      activity_level: t.activity_level,
     });
   }
 
@@ -918,6 +956,32 @@ export default function AdminTherapistsPage() {
                 selected={editForm.arrangements}
                 onChange={(v) => setEditForm({ ...editForm, arrangements: v })}
               />
+
+              <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                <div className="mb-1 text-sm font-bold text-stone-800">סגנון טיפולי (3 שאלות)</div>
+                <div className="mb-3 text-xs text-stone-500">תשובות המטפל/ת לשאלון האישיותי — משמשות להתאמה אישיותית (35% ממשקל ההתאמה)</div>
+                <StyleScaleRow
+                  question="הבנה מעמיקה של שורשי הקושי כמרכיב מרכזי בשינוי"
+                  low="הקלה מיידית ותפקוד"
+                  high="תובנה ועומק"
+                  value={editForm.style_q1}
+                  onChange={(v) => setEditForm({ ...editForm, style_q1: v })}
+                />
+                <StyleScaleRow
+                  question="הצעת מסגרת ברורה, מטרות, כלים ומשימות בין פגישות"
+                  low="מרחב פתוח וגמיש"
+                  high="מובנה, מכוון ופרקטי"
+                  value={editForm.style_q2}
+                  onChange={(v) => setEditForm({ ...editForm, style_q2: v })}
+                />
+                <StyleScaleRow
+                  question="סגנון טבעי פעיל, מכוון ומעורב מילולית"
+                  low="מכיל, שוהה ומתבונן"
+                  high="פעיל, מכוון ומעורב"
+                  value={editForm.activity_level}
+                  onChange={(v) => setEditForm({ ...editForm, activity_level: v })}
+                />
+              </div>
             </div>
 
             <div className="mt-6 flex justify-end gap-3">
