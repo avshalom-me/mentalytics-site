@@ -250,7 +250,7 @@ export default function WhichTherapyPage() {
         </p>
 
         <p className="signature">
-          ד"ר אבשלום גליל, פסיכולוג קליני וחינוכי מדריך
+          <Link href="/therapists/906837b9-dda5-49ad-995f-e6cc41d77aa5" className="hover:underline" style={{ color: "var(--teal-dark)" }}>ד"ר אבשלום גליל</Link>, פסיכולוג קליני וחינוכי מדריך
         </p>
 
         <hr className="my-10 border-stone-200" />

@@ -227,7 +227,9 @@ export default function TherapistPatientMatchPage() {
           🧑‍⚕️
         </div>
         <div>
-          <p style={{ fontWeight: 800, color: "var(--text)", fontSize: "15px", marginBottom: "4px" }}>{`ד"ר אבשלום גליל`}</p>
+          <p style={{ fontWeight: 800, fontSize: "15px", marginBottom: "4px" }}>
+            <Link href="/therapists/906837b9-dda5-49ad-995f-e6cc41d77aa5" className="hover:underline" style={{ color: "var(--teal-dark)" }}>{`ד"ר אבשלום גליל`}</Link>
+          </p>
           <p style={{ fontSize: "13px", color: "var(--teal)", fontWeight: 600, marginBottom: "8px" }}>פסיכולוג קליני וחינוכי מומחה-מדריך</p>
           <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>
             {`מאמר זה נכתב על ידי ד"ר אבשלום גליל, פסיכולוג קליני וחינוכי מומחה-מדריך, ממייסדי "טיפול חכם".`}

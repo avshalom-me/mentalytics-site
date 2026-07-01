@@ -19,14 +19,17 @@ type ArticleRow = {
   image_url: string | null;
   image_alt: string | null;
   image_credit: string | null;
-  therapists: { full_name: string | null } | { full_name: string | null }[] | null;
+  therapists:
+    | { full_name: string | null; therapist_types: string[] | null }
+    | { full_name: string | null; therapist_types: string[] | null }[]
+    | null;
 };
 
 async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, therapists(full_name)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, therapists(full_name, therapist_types)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -38,6 +41,12 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
 function authorName(row: ArticleRow): string {
   const t = Array.isArray(row.therapists) ? row.therapists[0] : row.therapists;
   return t?.full_name ?? "מטפל/ת";
+}
+
+// Role/title line from the therapist's professional types (e.g. "פסיכולוג קליני").
+function authorRole(row: ArticleRow): string {
+  const t = Array.isArray(row.therapists) ? row.therapists[0] : row.therapists;
+  return (t?.therapist_types ?? []).filter(Boolean).join(" · ");
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
@@ -63,6 +72,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
   if (!a) notFound();
 
   const author = authorName(a);
+  const role = authorRole(a);
   const paragraphs = bodyToParagraphs(a.body);
   const published = a.approved_at || a.created_at;
   const dateLabel = new Date(published).toLocaleDateString("he-IL", {
@@ -120,8 +130,9 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         מאת{" "}
         <Link href={`/therapists/${a.therapist_id}`} className="font-semibold text-[#2e7d8c] hover:underline">
           {author}
-        </Link>{" "}
-        · {dateLabel}
+        </Link>
+        {role && <> · {role}</>}
+        {" "}· {dateLabel}
       </p>
 
       {a.summary && (
@@ -138,14 +149,14 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         ))}
       </article>
 
-      {/* Author attribution — clean, neutral surface (no colorful box) */}
+      {/* Author attribution — colored name (linked to profile) + role + note */}
       <div className="mt-12 rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6">
-        <p className="text-sm text-stone-700 leading-7">
-          מאמר זה נכתב על ידי{" "}
-          <Link href={`/therapists/${a.therapist_id}`} className="font-semibold text-[#2e7d8c] hover:underline">
-            {author}
-          </Link>
-          , מטפל/ת באתר טיפול חכם.
+        <Link href={`/therapists/${a.therapist_id}`} className="text-lg font-black text-[#2e7d8c] hover:underline">
+          {author}
+        </Link>
+        {role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
+        <p className="mt-2 text-sm text-stone-600 leading-7">
+          מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, מטפל/ת באתר טיפול חכם.
         </p>
         <Link
           href={`/therapists/${a.therapist_id}`}
