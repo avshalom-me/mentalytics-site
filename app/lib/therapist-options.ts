@@ -15,6 +15,35 @@ export const THERAPIST_TYPES = [
   "דיאטנ/ית קליני/ת",
 ] as const;
 
+// Gender-aware display label for a therapist type. The canonical THERAPIST_TYPES
+// values are stored in masculine / slash form; this renders the matching
+// gendered label from the therapist's `gender` ("נקבה"/"זכר"). Unknown or empty
+// gender falls back to the stored canonical value.
+const THERAPIST_TYPE_LABELS_BY_GENDER: Record<string, { m: string; f: string }> = {
+  "פסיכולוג קליני":        { m: "פסיכולוג קליני",        f: "פסיכולוגית קלינית" },
+  "פסיכולוג חינוכי":       { m: "פסיכולוג חינוכי",       f: "פסיכולוגית חינוכית" },
+  "פסיכולוג שיקומי/רפואי": { m: "פסיכולוג שיקומי/רפואי", f: "פסיכולוגית שיקומית/רפואית" },
+  "פסיכולוג התפתחותי":     { m: "פסיכולוג התפתחותי",     f: "פסיכולוגית התפתחותית" },
+  "פסיכולוג תעסוקתי":      { m: "פסיכולוג תעסוקתי",      f: "פסיכולוגית תעסוקתית" },
+  "יועצ/ת חינוכי":         { m: "יועץ חינוכי",           f: "יועצת חינוכית" },
+  'עו"ס קליני':            { m: 'עו"ס קליני',            f: 'עו"ס קלינית' },
+  "מטפל/ת בהבעה ויצירה":   { m: "מטפל בהבעה ויצירה",     f: "מטפלת בהבעה ויצירה" },
+  "מטפל מיני":             { m: "מטפל מיני",             f: "מטפלת מינית" },
+  "קרימינולוג קליני":      { m: "קרימינולוג קליני",      f: "קרימינולוגית קלינית" },
+  "פיזיותרפיסט/ית":        { m: "פיזיותרפיסט",           f: "פיזיותרפיסטית" },
+  "מרפא/ת בעיסוק":         { m: "מרפא בעיסוק",           f: "מרפאה בעיסוק" },
+  "קלינאי/ת תקשורת":       { m: "קלינאי תקשורת",         f: "קלינאית תקשורת" },
+  "דיאטנ/ית קליני/ת":      { m: "דיאטן קליני",           f: "דיאטנית קלינית" },
+};
+
+export function therapistTypeLabel(type: string, gender?: string | null): string {
+  const e = THERAPIST_TYPE_LABELS_BY_GENDER[type];
+  if (!e) return type;
+  if (gender === "נקבה") return e.f;
+  if (gender === "זכר") return e.m;
+  return type;
+}
+
 export const TRAINING_AREAS = [
   "טיפול דינאמי",
   "CBT",
