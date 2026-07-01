@@ -16,7 +16,7 @@ export default function NavBar() {
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="print:hidden" style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", transform: "translateZ(0)", WebkitTransform: "translateZ(0)", borderBottom: "1px solid var(--line)" }}>
+    <header className="print:hidden" style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderBottom: "1px solid var(--line)" }}>
       {/* Topbar */}
       <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)", padding: "7px 24px", fontSize: "13px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "8px" }}>
         <span>את/ה מטפל/ת?</span>

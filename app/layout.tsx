@@ -5,7 +5,6 @@ import { Heebo } from "next/font/google";
 import NavBar from "./components/NavBar";
 import AccessibilityWidget from "./components/AccessibilityWidget";
 import AttributionTracker from "./components/AttributionTracker";
-import ScrollXGuard from "./components/ScrollXGuard";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 
@@ -44,7 +43,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           דלג לתוכן הראשי
         </a>
         <AttributionTracker />
-        <ScrollXGuard />
         <NavBar />
         <AccessibilityWidget />
 

@@ -127,7 +127,7 @@ function TherapistLoginContent() {
   }
 
   return (
-    <main className="min-h-screen flex" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif", overflowX: "clip", maxWidth: "100%" }}>
+    <main className="min-h-screen flex" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         .pro-input:focus { outline: none; border-color: #3D8C8A; box-shadow: 0 0 0 3px rgba(61,140,138,.12); }
