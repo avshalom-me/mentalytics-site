@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { Fragment, useCallback, useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
 import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app/lib/match-fallback";
 import {
@@ -252,6 +252,20 @@ export default function AdminTherapistsPage() {
   const [filterAgeGroup, setFilterAgeGroup] = useState("");
   const [filterPromotion, setFilterPromotion] = useState("");
   const [showFilters, setShowFilters] = useState(false);
+
+  // ── Tabbed workspace ──
+  // The page used to stack every group (pending → approved → partial → signups)
+  // as one endless scroll of tall cards. Now one group shows at a time, and the
+  // long "approved" group is a compact table that expands a full card per row.
+  const [activeTab, setActiveTab] = useState<"action" | "approved" | "partial" | "signups">("action");
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+  const [approvedLimit, setApprovedLimit] = useState(50);
+  const toggleExpanded = (id: string) =>
+    setExpandedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
 
   // Edit modal state
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
@@ -768,6 +782,10 @@ export default function AdminTherapistsPage() {
     .filter((t) => !isStub(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0)
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
+  // A live search/filter jumps straight to the results (approved) table so the
+  // admin never has to also click the tab. Otherwise the chosen tab wins.
+  const shownTab = hasActiveFilter ? "approved" : activeTab;
+
   // ── FREE_REGION_FALLBACK (פיצ'ר זמני — ראו app/lib/match-fallback.ts) ──
   // שתי תגיות אפשריות על כרטיס של מטפל חינמי מאושר:
   //   גיבוי אזורי — הוא מכסה אזור שאין בו אף מטפל משלם.
@@ -1196,7 +1214,9 @@ export default function AdminTherapistsPage() {
       {incompleteCount > 0 && (
         <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-900">
           <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳) —{" "}
-          <a href="#partial-profiles" className="font-semibold underline">לסקציית הפרופילים החלקיים ↓</a>{" "}
+          <button type="button" onClick={() => setActiveTab("partial")} className="font-semibold underline">
+            לטאב הפרופילים החלקיים
+          </button>{" "}
           לשליחת תזכורת מותאמת לכל אחד או לכולם יחד.
         </div>
       )}
@@ -1278,14 +1298,37 @@ export default function AdminTherapistsPage() {
         )}
       </div>
 
-      {/* ── ממתינים לאישור / נדחו ── */}
+      {/* ── טאבים ── (מוסתרים כשמסננים — אז מוצגות התוצאות ישירות) */}
       {!hasActiveFilter && (
-        <section className="mb-12">
-          <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
-            ממתינים לאישור / נדחו ({pending.length})
-          </h2>
+        <div className="mb-6 flex flex-wrap gap-1 border-b border-stone-200">
+          {([
+            { key: "action", label: "דורש טיפול", count: pending.length, alert: pending.length > 0 },
+            { key: "approved", label: "מאושרים", count: approved.length, alert: false },
+            { key: "partial", label: "חלקיים", count: partials.length, alert: partials.length > 0 },
+            { key: "signups", label: "נרשמו", count: signups.length, alert: false },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`-mb-px rounded-t-lg px-4 py-2 text-sm font-bold transition-colors ${
+                shownTab === tab.key
+                  ? "border-x border-t border-stone-200 bg-white text-stone-900"
+                  : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {tab.label}{" "}
+              <span className={`text-xs ${tab.alert ? "text-amber-600" : "text-stone-400"}`}>({tab.count})</span>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* ── דורש טיפול (ממתינים לאישור / נדחו) ── */}
+      {shownTab === "action" && (
+        <section>
           {pending.length === 0 ? (
-            <p className="text-center text-gray-500">אין מטפלים הממתינים לאישור.</p>
+            <p className="py-8 text-center text-gray-500">🎉 אין מטפלים שדורשים טיפול כרגע.</p>
           ) : (
             <div className="space-y-6">
               {pending.map((t) => <TherapistCard key={t.id} therapist={t} />)}
@@ -1294,23 +1337,136 @@ export default function AdminTherapistsPage() {
         </section>
       )}
 
-      {/* ── מאושרים / תוצאות סינון ── */}
-      <section>
-        <h2 className="mb-4 text-xl font-bold text-right border-b pb-2">
-          {hasActiveFilter ? `תוצאות סינון (${approved.length})` : `מאושרים (${approved.length})`}
-        </h2>
-        {approved.length === 0 ? (
-          <p className="text-center text-gray-500">לא נמצאו מטפלים.</p>
-        ) : (
-          <div className="space-y-6">
-            {approved.map((t) => <TherapistCard key={t.id} therapist={t} />)}
-          </div>
-        )}
-      </section>
+      {/* ── מאושרים / תוצאות סינון — טבלה קומפקטה עם כרטיס נפתח לכל שורה ── */}
+      {shownTab === "approved" && (
+        <section>
+          {hasActiveFilter && (
+            <h2 className="mb-4 text-lg font-bold text-right">תוצאות סינון ({approved.length})</h2>
+          )}
+          {approved.length === 0 ? (
+            <p className="py-8 text-center text-gray-500">לא נמצאו מטפלים.</p>
+          ) : (
+            <>
+              <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-stone-50 text-right text-xs font-bold text-stone-600">
+                      <th className="w-8 px-3 py-2.5"></th>
+                      <th className="px-3 py-2.5">מטפל/ת</th>
+                      <th className="px-3 py-2.5">סטטוס</th>
+                      <th className="px-3 py-2.5">אזורים</th>
+                      <th className="whitespace-nowrap px-3 py-2.5">צפיות / פניות (30 י׳)</th>
+                      <th className="px-3 py-2.5">נרשם/ה</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {approved.slice(0, approvedLimit).map((t) => {
+                      const open = expandedIds.has(t.id);
+                      return (
+                        <Fragment key={t.id}>
+                          <tr
+                            onClick={() => toggleExpanded(t.id)}
+                            className="cursor-pointer border-b align-middle text-right hover:bg-stone-50"
+                          >
+                            <td className="px-3 py-2.5 text-stone-400">{open ? "▾" : "◂"}</td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center gap-3">
+                                {t.profile_photo_url && !brokenImages[t.id] ? (
+                                  <img
+                                    src={t.profile_photo_url}
+                                    alt=""
+                                    className="h-10 w-10 rounded-full bg-stone-100 object-cover"
+                                    referrerPolicy="no-referrer"
+                                    onError={() => setBrokenImages((prev) => ({ ...prev, [t.id]: true }))}
+                                  />
+                                ) : (
+                                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-stone-100 text-xs text-stone-400">
+                                    —
+                                  </div>
+                                )}
+                                <div>
+                                  <div className="font-medium text-stone-800">{t.full_name || "ללא שם"}</div>
+                                  <div className="text-xs text-stone-500" dir="ltr" style={{ textAlign: "right" }}>
+                                    {t.email}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <span
+                                className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                                  t.status === "paying" && !t.admin_approved
+                                    ? "bg-orange-100 text-orange-800"
+                                    : t.status === "paying"
+                                    ? "bg-yellow-100 text-yellow-800"
+                                    : t.status === "approved"
+                                    ? "bg-green-100 text-green-800"
+                                    : t.status === "rejected"
+                                    ? "bg-red-100 text-red-800"
+                                    : "bg-gray-100 text-gray-700"
+                                }`}
+                              >
+                                {t.status === "paying" && !t.admin_approved
+                                  ? "ממתין לאישור"
+                                  : t.status === "paying"
+                                  ? "מקודם"
+                                  : t.status === "approved"
+                                  ? "מאושר"
+                                  : t.status === "rejected"
+                                  ? "נדחה"
+                                  : "ממתין"}
+                              </span>
+                              {t.missing.length > 0 && (
+                                <span className="mr-1 inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
+                                  חסר מידע
+                                </span>
+                              )}
+                            </td>
+                            <td className="max-w-[180px] truncate px-3 py-2.5 text-stone-600">
+                              {(t.regions ?? []).join(", ") || "—"}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
+                              {t.views_30d} / {t.contacts_30d}
+                            </td>
+                            <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
+                              {t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}
+                            </td>
+                          </tr>
+                          {open && (
+                            <tr className="border-b bg-stone-50/60">
+                              <td colSpan={6} className="p-4">
+                                <TherapistCard therapist={t} />
+                              </td>
+                            </tr>
+                          )}
+                        </Fragment>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              {approved.length > approvedLimit && (
+                <div className="mt-4 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setApprovedLimit((n) => n + 50)}
+                    className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
+                  >
+                    טען עוד ({approved.length - approvedLimit} נוספים)
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      )}
 
       {/* ── פרופילים חלקיים ── */}
-      {!hasActiveFilter && partials.length > 0 && (
-        <section id="partial-profiles" className="mt-12">
+      {shownTab === "partial" && partials.length === 0 && (
+        <p className="py-8 text-center text-gray-500">אין פרופילים חלקיים.</p>
+      )}
+      {shownTab === "partial" && partials.length > 0 && (
+        <section id="partial-profiles">
           <h2 className="mb-2 text-xl font-bold text-right border-b pb-2">
             ⚠️ פרופילים חלקיים ({partials.length})
           </h2>
@@ -1397,8 +1553,11 @@ export default function AdminTherapistsPage() {
       )}
 
       {/* ── נרשמו ולא השלימו פרופיל ── */}
-      {!hasActiveFilter && signups.length > 0 && (
-        <section className="mt-12">
+      {shownTab === "signups" && signups.length === 0 && (
+        <p className="py-8 text-center text-gray-500">אין נרשמים שטרם השלימו פרופיל.</p>
+      )}
+      {shownTab === "signups" && signups.length > 0 && (
+        <section>
           <h2 className="mb-2 text-xl font-bold text-right border-b pb-2">
             🕓 נרשמו ולא השלימו פרופיל ({signups.length})
           </h2>

@@ -58,6 +58,25 @@ function normalizeStoragePath(path: string) {
   }
 }
 
+// Sign many storage paths in a SINGLE request instead of one round-trip each.
+// The admin list load used to call createSignedUrl() per photo AND per
+// certificate — hundreds of sequential Storage calls that dominated load time
+// (and got worse with every new therapist). createSignedUrls (plural) collapses
+// that into one call per bucket. Returns a map from normalized path → signed URL.
+async function batchSignUrls(paths: string[], expiresIn: number): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const unique = Array.from(new Set(paths.filter(Boolean)));
+  if (unique.length === 0) return map;
+  const { data, error } = await supabaseAdmin.storage
+    .from(PROFILE_PHOTOS_BUCKET)
+    .createSignedUrls(unique, expiresIn);
+  if (error || !data) return map;
+  for (const item of data) {
+    if (item.signedUrl && item.path) map.set(item.path, item.signedUrl);
+  }
+  return map;
+}
+
 async function buildTherapistsResponse(onlyId?: string) {
   let query = supabaseAdmin
     .from("therapists")
@@ -121,45 +140,46 @@ async function buildTherapistsResponse(onlyId?: string) {
   const certsByTherapist: Record<string, CertItem[]> = {};
   const therapistIds = rows.map((r) => r.id);
 
+  type CertRow = {
+    id: string;
+    therapist_id: string;
+    file_path: string;
+    original_name: string | null;
+    content_type: string | null;
+  };
+  let certRows: CertRow[] = [];
   if (therapistIds.length > 0) {
     const { data: certData } = await supabaseAdmin
       .from("therapist_certificates")
       .select("id, therapist_id, file_path, original_name, content_type, created_at")
       .in("therapist_id", therapistIds)
       .order("created_at", { ascending: true });
-
-    await Promise.all(
-      ((certData ?? []) as Array<{
-        id: string;
-        therapist_id: string;
-        file_path: string;
-        original_name: string | null;
-        content_type: string | null;
-      }>).map(async (c) => {
-        let signed_url: string | null = null;
-        // 24h expiry: the admin tab routinely stays open for hours — a 1h URL
-        // made photos/certs silently break mid-session.
-        const { data: signedData, error: signedError } =
-          await supabaseAdmin.storage
-            .from(PROFILE_PHOTOS_BUCKET)
-            .createSignedUrl(normalizeStoragePath(c.file_path), 60 * 60 * 24);
-        if (!signedError && signedData?.signedUrl) {
-          signed_url = signedData.signedUrl;
-        }
-        (certsByTherapist[c.therapist_id] ||= []).push({
-          id: c.id,
-          original_name: c.original_name ?? "תעודה",
-          content_type: c.content_type ?? "",
-          signed_url,
-        });
-      })
-    );
+    certRows = (certData ?? []) as CertRow[];
   }
 
-  // ── Per-therapist 30-day engagement + subscription health (batched) ──
+  // 24h expiry: the admin tab routinely stays open for hours — a 1h URL made
+  // photos/certs silently break mid-session. Sign every photo AND certificate
+  // in ONE batched Storage call (they share a bucket) instead of one call each.
+  const SIGN_TTL = 60 * 60 * 24;
+  const pathsToSign: string[] = [];
+  for (const r of rows) {
+    if (r.profile_photo_path) pathsToSign.push(normalizeStoragePath(r.profile_photo_path));
+  }
+  for (const c of certRows) pathsToSign.push(normalizeStoragePath(c.file_path));
+  const signedByPath = await batchSignUrls(pathsToSign, SIGN_TTL);
+
+  for (const c of certRows) {
+    (certsByTherapist[c.therapist_id] ||= []).push({
+      id: c.id,
+      original_name: c.original_name ?? "תעודה",
+      content_type: c.content_type ?? "",
+      signed_url: signedByPath.get(normalizeStoragePath(c.file_path)) ?? null,
+    });
+  }
+
+  // ── Per-therapist 30-day engagement + subscription health ──
   // Profile entries (match/directory views) and contact clicks over the last
-  // 30 days, plus the subscription's billing state. One query each, counted
-  // in memory — fine at the current scale (admin-only, low frequency).
+  // 30 days, plus the subscription's billing state.
   const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const viewsByTherapist: Record<string, number> = {};
   const contactsByTherapist: Record<string, number> = {};
@@ -169,35 +189,54 @@ async function buildTherapistsResponse(onlyId?: string) {
   > = {};
 
   if (therapistIds.length > 0) {
-    const [views, clicks, subsRes] = await Promise.all([
-      // 30-day views across all therapists already exceed the 1000-row cap —
-      // page past it so each therapist's views_30d isn't truncated.
-      fetchAllRows<{ therapist_id: string }>(() =>
-        supabaseAdmin
-          .from("therapist_profile_views")
-          .select("therapist_id")
-          .in("therapist_id", therapistIds)
-          .in("source", ["match", "directory"])
-          .gte("viewed_at", monthAgoIso),
-      ),
-      fetchAllRows<{ therapist_id: string }>(() =>
-        supabaseAdmin
-          .from("therapist_contact_clicks")
-          .select("therapist_id")
-          .in("therapist_id", therapistIds)
-          .gte("clicked_at", monthAgoIso),
-      ),
+    // Engagement counts come from a DB-side aggregate (one grouped query per
+    // table) instead of pulling every row and counting in memory — the views
+    // table grows fast during campaigns and blew past the 1000-row cap. Falls
+    // back to the row-pull method if the RPC isn't deployed yet.
+    const [engagement, subsRes] = await Promise.all([
+      supabaseAdmin.rpc("admin_engagement_counts", { ids: therapistIds, since: monthAgoIso }),
       supabaseAdmin
         .from("subscriptions")
         .select("therapist_id, status, current_period_end, promo_reverts_at")
         .in("therapist_id", therapistIds),
     ]);
-    for (const v of views) {
-      viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
+
+    if (!engagement.error && Array.isArray(engagement.data)) {
+      for (const row of engagement.data as Array<{
+        therapist_id: string;
+        views_30d: number | string;
+        contacts_30d: number | string;
+      }>) {
+        viewsByTherapist[row.therapist_id] = Number(row.views_30d) || 0;
+        contactsByTherapist[row.therapist_id] = Number(row.contacts_30d) || 0;
+      }
+    } else {
+      // Fallback: RPC not available — page past the 1000-row cap and count in memory.
+      const [views, clicks] = await Promise.all([
+        fetchAllRows<{ therapist_id: string }>(() =>
+          supabaseAdmin
+            .from("therapist_profile_views")
+            .select("therapist_id")
+            .in("therapist_id", therapistIds)
+            .in("source", ["match", "directory"])
+            .gte("viewed_at", monthAgoIso),
+        ),
+        fetchAllRows<{ therapist_id: string }>(() =>
+          supabaseAdmin
+            .from("therapist_contact_clicks")
+            .select("therapist_id")
+            .in("therapist_id", therapistIds)
+            .gte("clicked_at", monthAgoIso),
+        ),
+      ]);
+      for (const v of views) {
+        viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
+      }
+      for (const c of clicks) {
+        contactsByTherapist[c.therapist_id] = (contactsByTherapist[c.therapist_id] ?? 0) + 1;
+      }
     }
-    for (const c of clicks) {
-      contactsByTherapist[c.therapist_id] = (contactsByTherapist[c.therapist_id] ?? 0) + 1;
-    }
+
     for (const s of (subsRes.data ?? []) as Array<{
       therapist_id: string;
       status: string;
@@ -216,22 +255,10 @@ async function buildTherapistsResponse(onlyId?: string) {
     }
   }
 
-  const therapists = await Promise.all(
-    rows.map(async (t) => {
-      let profile_photo_url: string | null = null;
-
-      if (t.profile_photo_path) {
-        const normalizedPath = normalizeStoragePath(t.profile_photo_path);
-
-        const { data: signedData, error: signedError } =
-          await supabaseAdmin.storage
-            .from(PROFILE_PHOTOS_BUCKET)
-            .createSignedUrl(normalizedPath, 60 * 60 * 24);
-
-        if (!signedError && signedData?.signedUrl) {
-          profile_photo_url = signedData.signedUrl;
-        }
-      }
+  const therapists = rows.map((t) => {
+      const profile_photo_url = t.profile_photo_path
+        ? signedByPath.get(normalizeStoragePath(t.profile_photo_path)) ?? null
+        : null;
 
       return {
         id: t.id,
@@ -272,8 +299,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         subscription: subByTherapist[t.id] ?? null,
         missing: missingProfileFields(t, (certsByTherapist[t.id]?.length ?? 0) > 0),
       };
-    })
-  );
+    });
 
   return {
     ok: true as const,
