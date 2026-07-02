@@ -45,6 +45,12 @@ type ReportConfig = {
   prevLabel: string;   // "השבוע הקודם" / "החודש הקודם"
   midAvgLabel: string; // "ממוצע חודשי" / "ממוצע 3-חודשי"
   longAvgLabel: string; // "ממוצע רבעוני" / "ממוצע חצי שנתי"
+  // How many trailing buckets (excluding the current one) each average spans.
+  // Must match the labels above, per report type — the comparison used to
+  // hardcode weekly-shaped slices, so the monthly report averaged 4 buckets
+  // under a "3-month" header and 5 under a "6-month" header.
+  midAvgBuckets: number;
+  longAvgBuckets: number;
 };
 
 const CONFIGS: Record<ReportType, ReportConfig> = {
@@ -58,6 +64,8 @@ const CONFIGS: Record<ReportType, ReportConfig> = {
     prevLabel: "השבוע הקודם",
     midAvgLabel: "ממוצע 4-שבועי",
     longAvgLabel: "ממוצע 12-שבועי",
+    midAvgBuckets: 4,
+    longAvgBuckets: 12,
   },
   monthly: {
     type: "monthly",
@@ -69,6 +77,8 @@ const CONFIGS: Record<ReportType, ReportConfig> = {
     prevLabel: "החודש הקודם",
     midAvgLabel: "ממוצע 3-חודשי",
     longAvgLabel: "ממוצע 6-חודשי",
+    midAvgBuckets: 3,
+    longAvgBuckets: 6,
   },
 };
 
@@ -177,12 +187,18 @@ type ComparisonStats = {
   quarterAvg: { pageViews: number; profileViews: number; contactClicks: number; quizCompletions: number };
 };
 
-function computeComparison(trend: TrendPoint[]): ComparisonStats {
+function computeComparison(
+  trend: TrendPoint[],
+  midBuckets: number,
+  longBuckets: number
+): ComparisonStats {
   const current = trend[trend.length - 1] ?? { pageViews: 0, profileViews: 0, contactClicks: 0, quizCompletions: 0 };
-  // Prior 4 weeks (excluding current) — months avg
-  const monthSlice = trend.slice(-5, -1);
-  // Prior 12 weeks (excluding current) — quarter avg
-  const quarterSlice = trend.slice(0, -1);
+  // Buckets before the current one, most-recent last. Slice the trailing N of
+  // these per report type so the averages match their labels (weekly 4/12,
+  // monthly 3/6) instead of hardcoded weekly-shaped windows.
+  const prior = trend.slice(0, -1);
+  const monthSlice = prior.slice(-midBuckets);
+  const quarterSlice = prior.slice(-longBuckets);
 
   return {
     current: {
@@ -999,7 +1015,7 @@ export async function runReport(type: ReportType): Promise<{
       aggregateMarketingData(current),
     ]);
 
-    const comparison = computeComparison(trend);
+    const comparison = computeComparison(trend, config.midAvgBuckets, config.longAvgBuckets);
     patient.trend = trend;
     patient.comparison = comparison;
 

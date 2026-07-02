@@ -82,7 +82,12 @@ export async function GET(req: NextRequest) {
   let demoted = 0;
   let errors = 0;
   let stillActive = 0;
+  let softMisses = 0;
   let trialsExpired = 0;
+
+  // Consecutive ambiguous "not found at Sumit" reads required before we demote.
+  // A single transient empty/partial list must not tear down a paying customer.
+  const MISS_THRESHOLD = 2;
   let orphansFound = 0;
   let orphansCancelled = 0;
   let orphanAlerts = 0;
@@ -105,7 +110,7 @@ export async function GET(req: NextRequest) {
 
       const { data: sub } = await supabase
         .from("subscriptions")
-        .select("id, morning_token_id")
+        .select("id, morning_token_id, sync_miss_count")
         .eq("therapist_id", t.id)
         .eq("status", "active")
         .maybeSingle();
@@ -114,55 +119,82 @@ export async function GET(req: NextRequest) {
         ? items.find((i) => String(i.ID) === sub.morning_token_id)
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
 
-      if (!target || target.Status !== 0) {
-        // Either nothing matches at Sumit, or what's there is not active.
-        // Demote locally and email the therapist.
-        if (sub) {
-          await supabase
-            .from("subscriptions")
-            .update({ status: "cancelled", updated_at: new Date().toISOString() })
-            .eq("id", sub.id);
-        }
-        await supabase
-          .from("therapists")
-          .update({
-            status: "approved",
-            manually_promoted: false,
-            promotion_source: null,
-            promoted_since: null,
-            promoted_until: null,
-          })
-          .eq("id", t.id);
-
-        await writeAudit(supabase, {
-          therapistId: t.id,
-          actorType: "sumit",
-          action: "status_change:paying->approved",
-          before: { status: "paying", promotion_source: "paid" },
-          after: { status: "approved", promotion_source: null },
-          reason: target ? `sumit_status=${target.Status}` : "no_active_recurring_at_sumit",
-        });
-
-        if (t.email) {
-          await sendPromotionEndedEmail({
-            to: t.email,
-            name: t.full_name ?? "",
-            reason: "payment_failed" as PromotionEndedReason,
-          });
-        }
-        demoted++;
-      } else {
+      if (target && target.Status === 0) {
+        // Active at Sumit — healthy. Clear any accumulated miss streak.
         stillActive++;
-        if (sub && target.Date_NextBilling) {
+        if (sub) {
+          const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+          if (target.Date_NextBilling) {
+            patch.current_period_end = new Date(target.Date_NextBilling).toISOString();
+          }
+          if ((sub.sync_miss_count ?? 0) > 0) patch.sync_miss_count = 0;
+          await supabase.from("subscriptions").update(patch).eq("id", sub.id);
+        }
+        continue;
+      }
+
+      // Not active. Distinguish two cases:
+      //  - `target` present with Status != 0: Sumit AUTHORITATIVELY reports the
+      //    standing order cancelled/suspended/expired. Trust it and demote now.
+      //  - `!target`: the item wasn't in the returned list. This is AMBIGUOUS —
+      //    a transient empty/partial Sumit read looks identical to a real
+      //    cancel here, and demoting on a single miss has torn down genuinely
+      //    paying customers (whose still-active order the orphan sweep then
+      //    cancels for real). Require MISS_THRESHOLD consecutive misses first.
+      const authoritativeCancel = !!target;
+      if (!authoritativeCancel && sub) {
+        const misses = (sub.sync_miss_count ?? 0) + 1;
+        if (misses < MISS_THRESHOLD) {
           await supabase
             .from("subscriptions")
-            .update({
-              current_period_end: new Date(target.Date_NextBilling).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
+            .update({ sync_miss_count: misses, updated_at: new Date().toISOString() })
             .eq("id", sub.id);
+          softMisses++;
+          console.warn(
+            `Sumit sync: no recurring item found for therapist ${t.id} ` +
+              `(miss ${misses}/${MISS_THRESHOLD}); deferring demotion to a later run.`
+          );
+          continue;
         }
       }
+
+      // Authoritative cancel, or the ambiguous miss streak reached threshold.
+      if (sub) {
+        await supabase
+          .from("subscriptions")
+          .update({ status: "cancelled", updated_at: new Date().toISOString() })
+          .eq("id", sub.id);
+      }
+      await supabase
+        .from("therapists")
+        .update({
+          status: "approved",
+          manually_promoted: false,
+          promotion_source: null,
+          promoted_since: null,
+          promoted_until: null,
+        })
+        .eq("id", t.id);
+
+      await writeAudit(supabase, {
+        therapistId: t.id,
+        actorType: "sumit",
+        action: "status_change:paying->approved",
+        before: { status: "paying", promotion_source: "paid" },
+        after: { status: "approved", promotion_source: null },
+        reason: authoritativeCancel
+          ? `sumit_status=${target!.Status}`
+          : `no_active_recurring_at_sumit_after_${MISS_THRESHOLD}_misses`,
+      });
+
+      if (t.email) {
+        await sendPromotionEndedEmail({
+          to: t.email,
+          name: t.full_name ?? "",
+          reason: "payment_failed" as PromotionEndedReason,
+        });
+      }
+      demoted++;
     } catch (err) {
       errors++;
       console.error(`Sumit sync failed for therapist ${t.id}:`, err);
@@ -224,11 +256,17 @@ export async function GET(req: NextRequest) {
   // Sumit recurring id, verify it against Sumit, and if it's still active we
   // cancel it for real (bringing Sumit in line with the recorded intent) and
   // alert the admin if that cancel fails.
+  // Cooling window: skip subscriptions cancelled/touched within the last hour so
+  // a sub that pass (1) just marked cancelled can't be swept — and its real
+  // Sumit order cancelled — in the same run. A genuine orphan is still caught on
+  // the next run; the billing-leak guard tolerates that small delay.
+  const orphanCoolingIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const { data: cancelledSubs } = await supabase
     .from("subscriptions")
     .select("id, therapist_id, morning_token_id")
     .eq("status", "cancelled")
-    .not("morning_token_id", "is", null);
+    .not("morning_token_id", "is", null)
+    .lt("updated_at", orphanCoolingIso);
 
   for (const sub of cancelledSubs ?? []) {
     const recurringId = sub.morning_token_id as string | null;
@@ -338,6 +376,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     checked,
     stillActive,
+    softMisses,
     demoted,
     trialsExpired,
     orphansFound,

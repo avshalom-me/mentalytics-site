@@ -7,6 +7,11 @@ import { therapistTypeLabel } from "@/app/lib/therapist-options";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
+// ISR: these are public SEO landing pages whose content changes rarely. Without
+// this they were fully dynamic (a live Supabase read on every visit). Cache and
+// revalidate every 5 minutes.
+export const revalidate = 300;
+
 type ArticleRow = {
   id: string;
   title: string;
