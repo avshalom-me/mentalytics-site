@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeEnrichedStats } from "@/app/lib/therapist-stats";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 
 export const dynamic = "force-dynamic";
 
@@ -19,18 +18,15 @@ async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status:
   const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
   if (error || !user) return null;
 
+  // Strict user_id match only. No claim-by-email here: the dashboard always
+  // loads /api/therapist-profile first, which performs the (guarded) claim and
+  // links user_id — so by the time stats are requested, the link exists. An
+  // email match without that link proves nothing (emails are not verified).
   const { data } = await supabaseAdmin
     .from("therapists")
     .select("id, status")
     .eq("user_id", user.id)
-    .single();
-
-  if (!data && user.email) {
-    // Same takeover guard as the profile routes: never expose a live/paying
-    // profile's private stats to an unverified email match.
-    const byEmail = await findClaimableTherapistByEmail(user.email, "id, status");
-    return byEmail ? { id: byEmail.id as string, status: byEmail.status as string } : null;
-  }
+    .maybeSingle();
 
   return data ? { id: data.id, status: data.status } : null;
 }

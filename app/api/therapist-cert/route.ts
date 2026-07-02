@@ -17,6 +17,21 @@ const ALLOWED_EXT = ["pdf", "jpg", "jpeg", "png"];
 const ALLOWED_TYPES = ["application/pdf", "image/jpeg", "image/png"];
 const MAX_BYTES = 10 * 1024 * 1024;
 
+// Per-user rate limit: 10 cert operations per minute is far above any
+// legitimate use, and stops a stolen token from spam-filling the bucket.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 10) return false;
+  entry.count++;
+  return true;
+}
+
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
@@ -62,6 +77,9 @@ async function resolveTherapist(user: { id: string; email?: string | null }) {
 export async function POST(req: NextRequest) {
   const user = await getUser(req);
   if (!user) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!checkRateLimit(user.id)) {
+    return NextResponse.json({ ok: false, error: "יותר מדי העלאות. נסו שוב בעוד דקה." }, { status: 429 });
+  }
 
   let body: { action?: unknown; ext?: unknown; contentType?: unknown; size?: unknown; path?: unknown; name?: unknown };
   try {
@@ -95,6 +113,12 @@ export async function POST(req: NextRequest) {
     // anything that isn't this user's certificates path.
     if (!path.startsWith(`certificates/${user.id}-`)) {
       return NextResponse.json({ ok: false, error: "invalid path" }, { status: 400 });
+    }
+    // Re-validate the extension at commit too — the client controls this body,
+    // and only sign-time checked it until now.
+    const committedExt = path.split(".").pop()?.toLowerCase() ?? "";
+    if (!ALLOWED_EXT.includes(committedExt)) {
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
     }
     const therapist = await resolveTherapist(user);
     if (!therapist) {

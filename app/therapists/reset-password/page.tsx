@@ -51,7 +51,11 @@ export default function ResetPasswordPage() {
     setLoading(false);
     if (error) { setError(error.message); return; }
     setDone(true);
-    setTimeout(() => { window.location.href = "/therapists/dashboard"; }, 1500);
+    // Revoke ALL sessions (this one included): if the reset was prompted by a
+    // compromised account, an attacker's existing token must die with the old
+    // password. The user signs back in once with the new password.
+    try { await supabase.auth.signOut({ scope: "global" }); } catch { /* best-effort */ }
+    setTimeout(() => { window.location.href = "/therapists/login?reset=success"; }, 1500);
   }
 
   return (
@@ -70,7 +74,7 @@ export default function ResetPasswordPage() {
         ) : done ? (
           <div className="mt-4 rounded-xl border border-green-200 bg-green-50 px-4 py-4 text-center">
             <p className="text-sm font-bold text-green-800">הסיסמא עודכנה בהצלחה!</p>
-            <p className="mt-1 text-sm text-green-700">מעבירים אותך ללוח הבקרה...</p>
+            <p className="mt-1 text-sm text-green-700">מעבירים אותך להתחברות עם הסיסמא החדשה...</p>
           </div>
         ) : !ready ? (
           <div className="mt-4">

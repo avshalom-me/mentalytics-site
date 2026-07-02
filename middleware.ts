@@ -55,9 +55,32 @@ function needsAuth(pathname: string): boolean {
   return pathname.startsWith("/admin") || pathname.startsWith("/api/admin-");
 }
 
+// CSRF guard for state-changing admin requests. The browser caches Basic Auth
+// credentials and attaches them to ANY same-site request — including ones a
+// malicious third-party page fires (e.g. a hidden form POST to
+// /api/admin-therapists). Browsers always send an Origin header on cross-site
+// non-GET requests, so: a present-but-foreign Origin is rejected. A missing
+// Origin (curl, scripts, server-to-server) is allowed — those clients don't
+// hold cached credentials, so Basic Auth alone still gates them.
+function crossSiteWrite(request: NextRequest): boolean {
+  const method = request.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== request.headers.get("host");
+  } catch {
+    return true; // unparsable Origin → treat as cross-site
+  }
+}
+
 export function middleware(request: NextRequest) {
   if (!needsAuth(request.nextUrl.pathname)) {
     return NextResponse.next();
+  }
+
+  if (crossSiteWrite(request)) {
+    return new NextResponse("Cross-site request rejected", { status: 403 });
   }
 
   if (!isAuthorized(request)) {

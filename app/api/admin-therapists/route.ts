@@ -431,7 +431,9 @@ export async function PATCH(request: Request) {
         actorType: "admin",
         action: "request_completion",
         before: {},
-        after: { missing },
+        // Full message text included so the audit trail can reconstruct exactly
+        // what was emailed (it's admin-authored free text).
+        after: { missing, message },
         reason: "admin requested profile completion",
       });
       return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt });
@@ -469,7 +471,9 @@ export async function PATCH(request: Request) {
         actorType: "admin",
         action: "admin_message",
         before: {},
-        after: { subject },
+        // Full message text included so the audit trail can reconstruct exactly
+        // what was emailed (it's admin-authored free text).
+        after: { subject, message },
         reason: "admin sent a message to the therapist",
       });
       return NextResponse.json({ ok: true, id });

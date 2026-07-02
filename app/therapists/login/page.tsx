@@ -26,6 +26,11 @@ function TherapistLoginContent() {
     if (q === "register" || q === "login") setMode(q);
   }, [searchParams]);
 
+  // Arriving from a completed password reset (all sessions were revoked there).
+  // Derived straight from the URL — not via state — so it can't be lost to
+  // remounts during hydration.
+  const resetSuccess = searchParams.get("reset") === "success" && mode === "login";
+
   function switchMode(next: Mode) {
     setMode(next);
     setError("");
@@ -61,7 +66,7 @@ function TherapistLoginContent() {
         redirectTo: `${window.location.origin}/therapists/reset-password`,
       });
       if (error) {
-        setError(error.message);
+        setError("שליחת קישור האיפוס נכשלה. נסו שוב בעוד רגע.");
       } else {
         setSuccess("שלחנו אליך קישור לאיפוס הסיסמא. בדוק/י את תיבת המייל (כולל ספאם).");
       }
@@ -84,7 +89,13 @@ function TherapistLoginContent() {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback${plan === "promoted" ? "?plan=promoted" : ""}` },
       });
       if (error) {
-        setError(error.message);
+        // Don't surface raw Supabase error text (English, and can leak internal
+        // detail). Map the one actionable case; everything else stays generic.
+        setError(
+          /already|registered|exists/i.test(error.message)
+            ? "כתובת המייל הזו כבר רשומה במערכת — אפשר להתחבר או לאפס סיסמא."
+            : "ההרשמה נכשלה. נסו שוב בעוד רגע."
+        );
       } else if (data.session) {
         // Email confirmation is disabled → the user is signed in immediately.
         window.location.href = dashboardUrl;
@@ -393,9 +404,11 @@ function TherapistLoginContent() {
                 )}
               </div>
             )}
-            {success && (
+            {(success || resetSuccess) && (
               <div style={{ borderRadius: "10px", border: "1px solid #6EE7B7", background: "#ECFDF5", padding: "12px 14px" }}>
-                <p style={{ fontSize: "13px", color: "#065F46", fontWeight: 600 }}>{success}</p>
+                <p style={{ fontSize: "13px", color: "#065F46", fontWeight: 600 }}>
+                  {success || "הסיסמא עודכנה בהצלחה — אפשר להתחבר עם הסיסמא החדשה."}
+                </p>
               </div>
             )}
 

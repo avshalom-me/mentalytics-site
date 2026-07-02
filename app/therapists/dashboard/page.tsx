@@ -258,10 +258,21 @@ function TherapistDashboard() {
   useEffect(() => {
     if (!token) return;
     setLoadingStats(true);
-    fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(json => { if (json.ok) setStats(json); })
-      .finally(() => setLoadingStats(false));
+    // Long-lived tab: the page-load token may have expired by now — always fetch
+    // with a fresh session token (getSession refreshes it when needed).
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const fresh = session?.access_token ?? token;
+        const r = await fetch("/api/therapist-stats", { headers: { Authorization: `Bearer ${fresh}` } });
+        const json = await r.json();
+        if (json.ok) setStats(json);
+      } catch {
+        // stats are non-critical; the dashboard shows a placeholder
+      } finally {
+        setLoadingStats(false);
+      }
+    })();
   }, [token]);
 
   useEffect(() => {
