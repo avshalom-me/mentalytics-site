@@ -709,3 +709,61 @@ export async function sendTherapistCompletionRequestEmail(opts: {
     return { ok: false, error: msg };
   }
 }
+
+// General admin → therapist message with a custom subject + free-text body and
+// a direct "edit profile" button. Unlike the completion request it makes no
+// claim about missing fields or review, so it fits any nudge — e.g. "you
+// uploaded a certificate into the photo slot, here's the link to fix it". Does
+// NOT change the profile's status.
+export async function sendTherapistAdminMessageEmail(opts: {
+  to: string;
+  name: string;
+  subject: string;
+  message: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendTherapistAdminMessageEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  if (!opts.message?.trim()) {
+    return { ok: false, error: "empty message" };
+  }
+
+  const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
+  const editUrl = `${SITE_URL}/therapists/dashboard/edit`;
+  const subject = opts.subject?.trim() || "הודעה מצוות טיפול חכם";
+  const safeMessage = escapeHtml(opts.message);
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      ${EMAIL_LOGO_HEADER}
+      <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${safeName},</h1>
+      <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
+      <div style="text-align:center;margin:0 0 20px;">
+        <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">לעריכת הפרופיל שלי ←</a>
+      </div>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;text-align:center;">
+        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        טיפול חכם — Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, html });
+    if (error) {
+      console.error("sendTherapistAdminMessageEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendTherapistAdminMessageEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}

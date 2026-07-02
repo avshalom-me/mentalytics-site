@@ -9,6 +9,7 @@ import {
   sendTherapistWelcomeEmail,
   sendTherapistRejectedEmail,
   sendTherapistCompletionRequestEmail,
+  sendTherapistAdminMessageEmail,
   sendPromotedApprovedEmail,
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
@@ -408,6 +409,44 @@ export async function PATCH(request: Request) {
         reason: "admin requested profile completion",
       });
       return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt });
+    }
+
+    // Admin-triggered GENERAL message — a free-text note with a custom subject
+    // and a direct edit-profile link, for a therapist who has nothing formally
+    // "missing" but still needs to fix something (e.g. a certificate uploaded
+    // into the photo slot). Does NOT change status or the completion badge.
+    if (body.action === "send_message") {
+      const { data: t } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, email")
+        .eq("id", id)
+        .single();
+      if (!t || !t.email) {
+        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      }
+      const message = typeof body.message === "string" ? body.message.trim().slice(0, 4000) : "";
+      const subject = typeof body.subject === "string" ? body.subject.trim().slice(0, 200) : "";
+      if (!message) {
+        return NextResponse.json({ ok: false, error: "message required" }, { status: 400 });
+      }
+      const sent = await sendTherapistAdminMessageEmail({
+        to: t.email,
+        name: t.full_name ?? "",
+        subject,
+        message,
+      });
+      if (!sent.ok) {
+        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
+      }
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "admin_message",
+        before: {},
+        after: { subject },
+        reason: "admin sent a message to the therapist",
+      });
+      return NextResponse.json({ ok: true, id });
     }
 
     // ── On-demand Sumit reconciliation ──────────────────────────────────────

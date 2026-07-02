@@ -206,6 +206,13 @@ export default function AdminTherapistsPage() {
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
 
+  // General "send a message" composer — available for ANY therapist, including
+  // complete profiles (e.g. someone who uploaded a cert into the photo slot).
+  const [messageFor, setMessageFor] = useState<AdminTherapist | null>(null);
+  const [messageSubject, setMessageSubject] = useState("");
+  const [messageText, setMessageText] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
+
   // Bulk signup-reminder modal (for the "registered but incomplete" section)
   const [bulkReminderOpen, setBulkReminderOpen] = useState(false);
   const [bulkReminderText, setBulkReminderText] = useState(SIGNUP_REMINDER_DRAFT);
@@ -551,6 +558,40 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  const DEFAULT_MESSAGE_SUBJECT = "הודעה מצוות טיפול חכם";
+
+  function openMessage(t: AdminTherapist) {
+    setMessageFor(t);
+    setMessageSubject(DEFAULT_MESSAGE_SUBJECT);
+    setMessageText("");
+  }
+
+  async function sendMessage() {
+    if (!messageFor || !messageText.trim()) return;
+    try {
+      setMessageSending(true);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: messageFor.id,
+          action: "send_message",
+          subject: messageSubject,
+          message: messageText,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      setMessageFor(null);
+      window.alert("ההודעה נשלחה למטפל/ת.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setMessageSending(false);
+    }
+  }
+
   // Sends a PERSONALIZED completion reminder to every partial profile that
   // hasn't received one yet: same intro, but each recipient's email lists
   // exactly what THEY are missing (photo framed as optional). The email
@@ -856,6 +897,12 @@ export default function AdminTherapistsPage() {
                 className="rounded-xl bg-blue-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                 onClick={() => openEdit(therapist)}>
                 ערוך
+              </button>
+              <button type="button" disabled={isBusy}
+                className="rounded-xl border border-[#2e7d8c] bg-white px-4 py-2 text-sm font-medium text-[#2e7d8c] disabled:opacity-50"
+                onClick={() => openMessage(therapist)}
+                title="שלח הודעה חופשית + קישור ישיר לעריכת הפרופיל">
+                ✉️ שלח הודעה
               </button>
               {therapist.status === "paying" && !therapist.admin_approved && (
                 <button type="button" disabled={isBusy}
@@ -1552,6 +1599,50 @@ export default function AdminTherapistsPage() {
               <button type="button" onClick={sendBulkReminders} disabled={bulkReminderSending || !bulkReminderText.trim()}
                 className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
                 {bulkReminderSending ? "שולח..." : "✉️ שלח לכולם"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── הודעה כללית למטפל/ת ── */}
+      {messageFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+          onClick={() => { if (!messageSending) setMessageFor(null); }}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">
+              שליחת הודעה — {messageFor.full_name.trim() || messageFor.email || "מטפל/ת"}
+            </h3>
+            <p className="mb-3 text-sm text-stone-600 leading-6">
+              ההודעה תישלח למייל של המטפל/ת עם כפתור <b>קישור ישיר לעריכת הפרופיל</b>. מתאים גם
+              לפרופיל שנראה שלם — למשל אם הועלתה תעודה במקום תמונה.
+            </p>
+            <label className="mb-1 block text-sm font-semibold text-stone-800">נושא</label>
+            <input
+              value={messageSubject}
+              onChange={(e) => setMessageSubject(e.target.value)}
+              dir="rtl"
+              disabled={messageSending}
+              className="mb-3 w-full rounded-xl border border-stone-300 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            <label className="mb-1 block text-sm font-semibold text-stone-800">תוכן ההודעה</label>
+            <textarea
+              value={messageText}
+              onChange={(e) => setMessageText(e.target.value)}
+              rows={7}
+              dir="rtl"
+              disabled={messageSending}
+              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              placeholder="לדוגמה: שמנו לב שהתמונה שהעלית היא בעצם תעודה. אפשר להעלות תמונת פרופיל דרך הקישור המצורף."
+            />
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setMessageFor(null)} disabled={messageSending}
+                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                ביטול
+              </button>
+              <button type="button" onClick={sendMessage} disabled={messageSending || !messageText.trim()}
+                className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {messageSending ? "שולח..." : "✉️ שלח למטפל/ת"}
               </button>
             </div>
           </div>
