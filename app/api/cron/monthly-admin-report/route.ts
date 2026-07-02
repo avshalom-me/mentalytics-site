@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { runReport } from "@/app/api/cron/weekly-report/route";
+import { cronAuthorized } from "@/app/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -10,7 +11,7 @@ export async function GET(req: NextRequest) {
   if (!CRON_SECRET) {
     return NextResponse.json({ ok: false, error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
   }
-  if (req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const result = await runReport("monthly");

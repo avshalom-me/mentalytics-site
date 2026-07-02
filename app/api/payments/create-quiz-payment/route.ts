@@ -161,13 +161,26 @@ export async function POST(req: NextRequest) {
 
     const sumitDocumentId = (result.DocumentID ?? null) as number | null;
 
-    await supabase
+    const { error: completeErr } = await supabase
       .from("payments")
       .update({
         status: "completed",
         morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
       })
       .eq("id", payment.id);
+
+    if (completeErr) {
+      // The card WAS charged at Sumit, but we failed to mark the row completed.
+      // Do NOT return an error (that would prompt a client retry = double
+      // charge) and do NOT leave this silent — the cleanup cron would later
+      // flip the still-"pending" row to "failed", losing the customer's credit
+      // with no trace. Log loudly with the Sumit document id for manual
+      // reconciliation to "completed".
+      console.error(
+        `create-quiz-payment CRITICAL: Sumit charge succeeded (doc ${sumitDocumentId}) ` +
+          `but marking payment ${payment.id} completed failed: ${completeErr.message}`
+      );
+    }
 
     return NextResponse.json({ success: true, paymentId: payment.id });
   } catch (err: unknown) {

@@ -227,10 +227,13 @@ export async function POST(req: Request) {
       .single();
 
     if (insertErr || !therapist) {
+      // Log the real DB error server-side, but don't leak schema/constraint
+      // details to this unauthenticated public endpoint.
+      console.error("therapists/signup insert failed:", insertErr?.message);
       return new Response(
         JSON.stringify({
           ok: false,
-          error: insertErr?.message ?? "Insert failed",
+          error: "אירעה שגיאה בשמירת ההרשמה. נסה/י שוב מאוחר יותר.",
         }),
         { status: 500 }
       );

@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeAttribution, type AttributionResult } from "@/app/lib/attribution-report";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { cronAuthorized } from "@/app/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // reasoning models need more headroom (Vercel caps to plan max)
@@ -1077,7 +1078,7 @@ export async function GET(req: NextRequest) {
   if (!CRON_SECRET) {
     return NextResponse.json({ ok: false, error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
   }
-  if (req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const result = await runReport("weekly");

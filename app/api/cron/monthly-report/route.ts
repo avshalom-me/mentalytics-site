@@ -3,6 +3,7 @@ import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildUnsubscribeUrl } from "@/app/lib/unsubscribe-token";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { cronAuthorized } from "@/app/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -234,7 +235,7 @@ export async function GET(req: NextRequest) {
   if (!CRON_SECRET) {
     return NextResponse.json({ ok: false, error: "Server misconfigured: CRON_SECRET not set" }, { status: 500 });
   }
-  if (req.headers.get("authorization") !== `Bearer ${CRON_SECRET}`) {
+  if (!cronAuthorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
