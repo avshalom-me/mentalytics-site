@@ -1,0 +1,15 @@
+#!/bin/sh
+# Pre-push safety net: never let code that fails the TypeScript check reach
+# origin (Vercel deploys master automatically). Versioned in .githooks/ so
+# every clone/session shares it; activated once per clone with:
+#   git config core.hooksPath .githooks
+echo "pre-push: npx tsc --noEmit ..."
+npx tsc --noEmit
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ Type-check failed — push aborted. Fix the errors above and push again."
+  exit $status
+fi
+echo "✓ type-check passed"
+exit 0
