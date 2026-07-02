@@ -361,7 +361,14 @@ export default function TherapistProfileEditPage() {
             ) : (
               <p className="text-xl font-black text-[#0F5468] mb-1">₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span></p>
             )}
-            <p className="text-xs text-[#0F5468]/70 mb-4">ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה בחודשיים</p>
+            <div className="mb-4 rounded-lg bg-[#0F5468]/8 border border-[#0F5468]/15 px-3 py-2">
+              <p className="text-sm font-black text-[#0F5468] leading-6">
+                ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה<sup className="font-black">*</sup> בחודשיים הקרובים
+              </p>
+              <p className="mt-1 text-[11px] text-[#0F5468]/70 leading-5">
+                <span className="font-bold">* פנייה</span> = קבלת מטופל בקליניקה. מבוסס על אמון מול המטפל.
+              </p>
+            </div>
             <ul className="space-y-2 text-sm leading-6 flex-1" style={{ color: "#1a4a5c" }}>
               <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> כל מה שבחינמי + הופעה במערכת ההתאמה החכמה</li>
               <li className="flex items-start gap-2"><span className="font-bold mt-0.5 text-[#0F5468]">✓</span> דו&quot;ח צפיות, פילוח פונים ואחוזי המרה</li>
