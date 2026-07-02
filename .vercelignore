@@ -1,0 +1,5 @@
+# The promo-video/ Remotion project is a standalone workspace with its own
+# package.json / node_modules. It is not part of the Next.js site build — keep
+# it out of the Vercel build context so its deps (e.g. @remotion/cli) never
+# break the site's TypeScript check.
+promo-video
