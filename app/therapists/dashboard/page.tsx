@@ -285,11 +285,20 @@ function TherapistDashboard() {
       });
       const json = await res.json();
 
-      if (json.therapist) {
-        setProfile(json.therapist);
-      } else {
-        setIsNew(true);
+      // A brand-new registrant has a STUB row (auto-created on first login,
+      // empty name) rather than no row — GET always returns one now. Sending
+      // them to the dashboard (pricing banner, plan table, "what to improve")
+      // is wrong: they haven't registered yet. Route them straight to the
+      // registration form, where pricing is deferred to the final plan-choice
+      // step. A real profile (name filled) stays on the dashboard.
+      const isStub = !((json.therapist?.full_name ?? "") as string).trim();
+      if (!json.therapist || isStub) {
+        const upgrade = searchParams.get("upgrade") === "promoted" ? "?plan=promoted" : "";
+        window.location.href = `/therapists/dashboard/edit${upgrade}`;
+        return;
       }
+
+      setProfile(json.therapist);
       setLoading(false);
     }
 

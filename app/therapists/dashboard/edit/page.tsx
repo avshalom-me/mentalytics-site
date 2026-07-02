@@ -295,6 +295,12 @@ export default function TherapistProfileEditPage() {
     // First-time registration: let the therapist pick a plan before finishing —
     // even if a file upload failed, since the profile was created.
     if (json.created) {
+      // Came in via the "promoted" CTA (join page → register → here): the plan
+      // is already chosen, so skip the plan-choice screen and go to checkout.
+      if (new URLSearchParams(window.location.search).get("plan") === "promoted") {
+        window.location.href = "/therapists/checkout";
+        return;
+      }
       setShowPlanChoice(true);
       setSaving(false);
       window.scrollTo({ top: 0, behavior: "smooth" });
