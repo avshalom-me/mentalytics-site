@@ -6,7 +6,7 @@ import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
 } from "@/app/lib/therapist-options";
-import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
+import { missingProfileFields } from "@/app/lib/profile-completeness";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -92,6 +92,30 @@ const SIGNUP_REMINDER_DRAFT = `שמנו לב שנרשמת לטיפול חכם, �
 ההשלמה אורכת כ-5 דקות: פרטים מקצועיים, תמונת פרופיל ותעודת רישיון. אחרי אישור קצר מצידנו הפרופיל יופיע במערכת ההתאמה ובמדריך המטפלים — המסלול הבסיסי חינמי לגמרי.
 
 אם נתקלת בקושי טכני או בשאלה — אפשר לכתוב לנו ל-admin@getmentalytics.com ונשמח לעזור.`;
+
+// ── Personalized reminder for PARTIAL profiles (form saved, items missing) ──
+// The greeting ("שלום {שם},") comes from the email template; this builds the
+// body. The photo is deliberately framed as optional-but-recommended, and a
+// photo-only gap gets its own friendlier message.
+const PARTIAL_REMINDER_INTRO = `הפרופיל שלך בטיפול חכם כבר במערכת — נשאר להשלים כמה פרטים כדי שנוכל לאשר ולהציג אותו למטופלים שמחפשים מטפל/ת:`;
+
+const PHOTO_FIELD = "תמונת פרופיל";
+
+function partialReminderMessage(missing: string[], intro: string = PARTIAL_REMINDER_INTRO): string {
+  const photoOnly = missing.length === 1 && missing[0] === PHOTO_FIELD;
+  if (photoOnly) {
+    return `הפרופיל שלך בטיפול חכם מלא וכולל את כל הפרטים הנדרשים — חסרה בו רק תמונת פרופיל.
+
+התמונה אופציונלית, אבל מניסיוננו פרופילים עם תמונה מקבלים משמעותית יותר פניות ממטופלים. ההעלאה אורכת פחות מדקה מעמוד עריכת הפרופיל.`;
+  }
+  const bullets = missing
+    .map((m) => (m === PHOTO_FIELD ? `• ${m} (אופציונלי — אך פרופילים עם תמונה מקבלים יותר פניות)` : `• ${m}`))
+    .join("\n");
+  return `${intro}
+${bullets}
+
+ההשלמה אורכת דקות ספורות מעמוד עריכת הפרופיל, ולאחר השמירה הפרופיל נשלח אלינו אוטומטית לבדיקה.`;
+}
 
 function CheckboxGroup({
   label, options, selected, onChange,
@@ -187,6 +211,13 @@ export default function AdminTherapistsPage() {
   const [bulkReminderText, setBulkReminderText] = useState(SIGNUP_REMINDER_DRAFT);
   const [bulkReminderSending, setBulkReminderSending] = useState(false);
   const [bulkReminderProgress, setBulkReminderProgress] = useState("");
+
+  // Bulk PERSONALIZED reminder modal (for the partial-profiles section).
+  // Only the intro is edited; each recipient gets their own missing-items list.
+  const [partialBulkOpen, setPartialBulkOpen] = useState(false);
+  const [partialBulkIntro, setPartialBulkIntro] = useState(PARTIAL_REMINDER_INTRO);
+  const [partialBulkSending, setPartialBulkSending] = useState(false);
+  const [partialBulkProgress, setPartialBulkProgress] = useState("");
 
   const loadTherapists = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -454,7 +485,7 @@ export default function AdminTherapistsPage() {
     setCompletionText(
       isStub(t)
         ? SIGNUP_REMINDER_DRAFT
-        : defaultCompletionMessage(missingProfileFields(t, t.certificates.length > 0))
+        : partialReminderMessage(missingProfileFields(t, t.certificates.length > 0))
     );
   }
 
@@ -520,6 +551,48 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // Sends a PERSONALIZED completion reminder to every partial profile that
+  // hasn't received one yet: same intro, but each recipient's email lists
+  // exactly what THEY are missing (photo framed as optional). The email
+  // template itself greets them by name.
+  async function sendBulkPartialReminders() {
+    const targets = partials.filter((t) => !t.completion_requested_at && t.email);
+    if (targets.length === 0) return;
+    setPartialBulkSending(true);
+    const failures: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      const t = targets[i];
+      setPartialBulkProgress(`שולח ${i + 1} מתוך ${targets.length}...`);
+      const message = partialReminderMessage(
+        missingProfileFields(t, t.certificates.length > 0),
+        partialBulkIntro.trim() || PARTIAL_REMINDER_INTRO
+      );
+      try {
+        const res = await fetch("/api/admin-therapists", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: t.id, action: "request_completion", message }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+        const sentAt = json.completion_requested_at ?? new Date().toISOString();
+        setTherapists((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, completion_requested_at: sentAt } : x))
+        );
+      } catch {
+        failures.push(t.full_name || t.email);
+      }
+    }
+    setPartialBulkSending(false);
+    setPartialBulkProgress("");
+    setPartialBulkOpen(false);
+    if (failures.length) {
+      window.alert(`נשלחו ${targets.length - failures.length} תזכורות. נכשלו (${failures.length}): ${failures.join(", ")}`);
+    } else {
+      window.alert(`נשלחו ${targets.length} תזכורות מותאמות בהצלחה.`);
+    }
+  }
+
   // Promotes the therapist with the chosen expiry. monthsAhead=null means
   // an indefinite manual promotion (no expiry, won't be auto-demoted).
   // Anything > 0 creates a time-limited trial that the daily cron will
@@ -565,6 +638,11 @@ export default function AdminTherapistsPage() {
   const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
   const signups = therapists
     .filter(isStub)
+    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
+  // Partial profiles: the form WAS saved but required items are still missing
+  // (certificate / last name / regions / types / areas — and the optional photo).
+  const partials = therapists
+    .filter((t) => !isStub(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0)
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
   function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
@@ -913,7 +991,9 @@ export default function AdminTherapistsPage() {
 
       {incompleteCount > 0 && (
         <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-900">
-          <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳). עבור/עברי עליהם אחד-אחד — בכל פרופיל חסר יופיע כפתור <span className="font-semibold">&quot;✉️ בקש השלמה&quot;</span> לשליחה ידנית, רק באישורך.
+          <span className="font-bold">{incompleteCount}</span> פרופילים עם פרטים חסרים (תעודה / תמונה / שם משפחה / אזורים וכו׳) —{" "}
+          <a href="#partial-profiles" className="font-semibold underline">לסקציית הפרופילים החלקיים ↓</a>{" "}
+          לשליחת תזכורת מותאמת לכל אחד או לכולם יחד.
         </div>
       )}
 
@@ -1023,6 +1103,94 @@ export default function AdminTherapistsPage() {
           </div>
         )}
       </section>
+
+      {/* ── פרופילים חלקיים ── */}
+      {!hasActiveFilter && partials.length > 0 && (
+        <section id="partial-profiles" className="mt-12">
+          <h2 className="mb-2 text-xl font-bold text-right border-b pb-2">
+            ⚠️ פרופילים חלקיים ({partials.length})
+          </h2>
+          <p className="mb-4 text-sm text-stone-600 leading-6">
+            מטפלים שמילאו את הטופס אבל חסרים להם פריטים. הפנייה המרוכזת שולחת לכל אחד מייל
+            <b> מותאם אישית</b> — בשמו וברשימת מה שחסר לו בדיוק (תמונה מוזכרת כאופציונלית) — רק למי שטרם קיבל תזכורת.
+          </p>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => { setPartialBulkIntro(PARTIAL_REMINDER_INTRO); setPartialBulkOpen(true); }}
+              disabled={partials.every((t) => !!t.completion_requested_at)}
+              className="rounded-xl bg-[#2e7d8c] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              ✉️ שלח תזכורת מותאמת לכולם ({partials.filter((t) => !t.completion_requested_at).length} שטרם קיבלו)
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-stone-50 text-right text-xs font-bold text-stone-600">
+                  <th className="px-4 py-2.5">שם</th>
+                  <th className="px-4 py-2.5">סטטוס</th>
+                  <th className="px-4 py-2.5">מה חסר</th>
+                  <th className="px-4 py-2.5">נרשם/ה</th>
+                  <th className="px-4 py-2.5">תזכורת נשלחה</th>
+                  <th className="px-4 py-2.5">פעולות</th>
+                </tr>
+              </thead>
+              <tbody>
+                {partials.map((t) => {
+                  const missing = missingProfileFields(t, t.certificates.length > 0);
+                  return (
+                    <tr key={t.id} className="border-b last:border-0 text-right align-top">
+                      <td className="px-4 py-2.5">
+                        <div className="font-medium text-stone-800">{t.full_name}</div>
+                        <div className="text-xs text-stone-500" dir="ltr" style={{ textAlign: "right" }}>{t.email}</div>
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
+                          t.status === "paying" ? "bg-yellow-100 text-yellow-800" :
+                          t.status === "approved" ? "bg-green-100 text-green-800" :
+                          "bg-gray-100 text-gray-700"
+                        }`}>
+                          {t.status === "paying" ? "מקודם" : t.status === "approved" ? "מאושר" : "ממתין"}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 text-stone-700">
+                        {missing.map((m) => (
+                          <div key={m} className={m === PHOTO_FIELD ? "text-stone-400" : ""}>
+                            • {m}{m === PHOTO_FIELD ? " (אופציונלי)" : ""}
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 py-2.5 text-stone-600 whitespace-nowrap">
+                        {t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}
+                      </td>
+                      <td className="px-4 py-2.5 text-stone-600 whitespace-nowrap">
+                        {t.completion_requested_at
+                          ? new Date(t.completion_requested_at).toLocaleDateString("he-IL")
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <div className="flex gap-2 whitespace-nowrap">
+                          <button type="button"
+                            onClick={() => openCompletion(t)}
+                            className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">
+                            {t.completion_requested_at ? "✉️ שלח שוב" : "✉️ שלח תזכורת"}
+                          </button>
+                          <button type="button"
+                            onClick={() => openEdit(t)}
+                            className="rounded-lg border border-stone-300 bg-white px-3 py-1 text-xs font-medium text-stone-700">
+                            ערוך
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ── נרשמו ולא השלימו פרופיל ── */}
       {!hasActiveFilter && signups.length > 0 && (
@@ -1389,6 +1557,63 @@ export default function AdminTherapistsPage() {
           </div>
         </div>
       )}
+
+      {/* ── תזכורת מותאמת לפרופילים חלקיים ── */}
+      {partialBulkOpen && (() => {
+        const targets = partials.filter((t) => !t.completion_requested_at && t.email);
+        const example = targets[0] ?? null;
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 pt-10" dir="rtl"
+            onClick={() => { if (!partialBulkSending) setPartialBulkOpen(false); }}>
+            <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-lg font-bold text-stone-900">
+                תזכורת מותאמת אישית — {targets.length} נמענים
+              </h3>
+              <p className="mb-3 text-sm text-stone-600 leading-6">
+                כל נמען יקבל מייל בשמו, עם רשימת הפריטים שחסרים <b>לו</b>. תמונת פרופיל מוצגת
+                כאופציונלית, ומי שחסרה לו רק תמונה מקבל נוסח מיוחד. נשלח רק למי שטרם קיבל תזכורת.
+              </p>
+              <label className="mb-1 block text-sm font-semibold text-stone-800">משפט הפתיחה (עריך)</label>
+              <textarea
+                value={partialBulkIntro}
+                onChange={(e) => setPartialBulkIntro(e.target.value)}
+                rows={3}
+                dir="rtl"
+                disabled={partialBulkSending}
+                className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+              />
+              {example && (
+                <div className="mt-3 rounded-xl border border-stone-200 bg-stone-50 p-4">
+                  <div className="mb-1 text-xs font-bold text-stone-500">
+                    דוגמה — כך ייראה המייל של {example.full_name}:
+                  </div>
+                  <div className="whitespace-pre-line text-xs text-stone-700 leading-5">
+                    {`שלום ${example.full_name},\n\n` +
+                      partialReminderMessage(
+                        missingProfileFields(example, example.certificates.length > 0),
+                        partialBulkIntro.trim() || PARTIAL_REMINDER_INTRO
+                      ) +
+                      "\n\n[כפתור: לעריכת הפרופיל שלי]"}
+                  </div>
+                </div>
+              )}
+              {partialBulkProgress && (
+                <p className="mt-2 text-sm font-semibold text-[#2e7d8c]">{partialBulkProgress}</p>
+              )}
+              <div className="mt-4 flex justify-end gap-2">
+                <button type="button" onClick={() => setPartialBulkOpen(false)} disabled={partialBulkSending}
+                  className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                  ביטול
+                </button>
+                <button type="button" onClick={sendBulkPartialReminders} disabled={partialBulkSending || targets.length === 0}
+                  className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                  {partialBulkSending ? "שולח..." : `✉️ שלח ל-${targets.length} מטפלים`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </main>
   );
 }
