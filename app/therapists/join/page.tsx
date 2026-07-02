@@ -82,7 +82,21 @@ export default function TherapistJoinPage() {
             <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית.
           </p>
 
-          <div className="mt-6" />
+          {/* Primary CTA — above the fold so a convinced visitor can act
+              immediately (most ad traffic is mobile and won't scroll to find it). */}
+          <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
+            <Link
+              href="/therapists/login?mode=register"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
+              style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))", boxShadow: "0 8px 20px rgba(45,100,98,.25)" }}
+            >
+              פתחו פרופיל חינם
+              <ArrowLeft size={18} />
+            </Link>
+            <span className="text-sm text-stone-600">
+              המסלול הבסיסי חינם, תמיד.
+            </span>
+          </div>
         </div>
       </section>
 
@@ -195,7 +209,7 @@ export default function TherapistJoinPage() {
             className="inline-flex items-center gap-2 rounded-2xl px-8 py-4 text-base font-bold text-white transition hover:opacity-95 active:scale-95"
             style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))", boxShadow: "0 8px 20px rgba(45,100,98,.25)" }}
           >
-            הצטרפ/י לאחד המסלולים
+            פתחו פרופיל חינם
             <ArrowLeft size={18} />
           </Link>
         </div>
