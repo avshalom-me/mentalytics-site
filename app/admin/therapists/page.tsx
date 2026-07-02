@@ -77,6 +77,22 @@ function toggleItem(arr: string[], item: string): string[] {
   return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
 }
 
+// A stub row = an account that registered but never saved the profile form
+// (auto-created at first login, or backfilled). No name yet — shown in a
+// dedicated "registered but incomplete" section, not in the review queues.
+function isStub(t: AdminTherapist): boolean {
+  return !(t.full_name ?? "").trim();
+}
+
+// Default reminder for registrants who never finished the profile form. The
+// email template opens with "שלום מטפל/ת יקר/ה," and closes with the edit
+// button + contact footer, so this is just the middle. Editable before send.
+const SIGNUP_REMINDER_DRAFT = `שמנו לב שנרשמת לטיפול חכם, אבל טופס הפרופיל עדיין לא הושלם — ולכן הפרופיל שלך עוד לא מוצג למטופלים שמחפשים מטפל/ת.
+
+ההשלמה אורכת כ-5 דקות: פרטים מקצועיים, תמונת פרופיל ותעודת רישיון. אחרי אישור קצר מצידנו הפרופיל יופיע במערכת ההתאמה ובמדריך המטפלים — המסלול הבסיסי חינמי לגמרי.
+
+אם נתקלת בקושי טכני או בשאלה — אפשר לכתוב לנו ל-admin@getmentalytics.com ונשמח לעזור.`;
+
 function CheckboxGroup({
   label, options, selected, onChange,
 }: {
@@ -165,6 +181,12 @@ export default function AdminTherapistsPage() {
   const [completionFor, setCompletionFor] = useState<AdminTherapist | null>(null);
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
+
+  // Bulk signup-reminder modal (for the "registered but incomplete" section)
+  const [bulkReminderOpen, setBulkReminderOpen] = useState(false);
+  const [bulkReminderText, setBulkReminderText] = useState(SIGNUP_REMINDER_DRAFT);
+  const [bulkReminderSending, setBulkReminderSending] = useState(false);
+  const [bulkReminderProgress, setBulkReminderProgress] = useState("");
 
   const loadTherapists = useCallback(async (opts?: { silent?: boolean }) => {
     try {
@@ -429,7 +451,11 @@ export default function AdminTherapistsPage() {
   // message before it is sent — the wording is the admin's, not the system's.
   function openCompletion(t: AdminTherapist) {
     setCompletionFor(t);
-    setCompletionText(defaultCompletionMessage(missingProfileFields(t, t.certificates.length > 0)));
+    setCompletionText(
+      isStub(t)
+        ? SIGNUP_REMINDER_DRAFT
+        : defaultCompletionMessage(missingProfileFields(t, t.certificates.length > 0))
+    );
   }
 
   async function sendCompletion() {
@@ -454,6 +480,43 @@ export default function AdminTherapistsPage() {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setCompletionSending(false);
+    }
+  }
+
+  // Sends the signup reminder to every stub that hasn't received one yet,
+  // one request at a time (each request = one email server-side), with live
+  // progress. Failures don't stop the run; they're reported at the end.
+  async function sendBulkReminders() {
+    const targets = therapists.filter((t) => isStub(t) && !t.completion_requested_at && t.email);
+    if (targets.length === 0 || !bulkReminderText.trim()) return;
+    setBulkReminderSending(true);
+    const failures: string[] = [];
+    for (let i = 0; i < targets.length; i++) {
+      const t = targets[i];
+      setBulkReminderProgress(`שולח ${i + 1} מתוך ${targets.length}...`);
+      try {
+        const res = await fetch("/api/admin-therapists", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: t.id, action: "request_completion", message: bulkReminderText }),
+        });
+        const json = await res.json();
+        if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+        const sentAt = json.completion_requested_at ?? new Date().toISOString();
+        setTherapists((prev) =>
+          prev.map((x) => (x.id === t.id ? { ...x, completion_requested_at: sentAt } : x))
+        );
+      } catch {
+        failures.push(t.email);
+      }
+    }
+    setBulkReminderSending(false);
+    setBulkReminderProgress("");
+    setBulkReminderOpen(false);
+    if (failures.length) {
+      window.alert(`נשלחו ${targets.length - failures.length} תזכורות. נכשלו (${failures.length}): ${failures.join(", ")}`);
+    } else {
+      window.alert(`נשלחו ${targets.length} תזכורות בהצלחה.`);
     }
   }
 
@@ -497,9 +560,12 @@ export default function AdminTherapistsPage() {
   }
 
   const isListed = (t: AdminTherapist) => t.admin_approved && (t.status === "approved" || t.status === "paying");
-  const allFiltered = hasActiveFilter ? therapists.filter(matchesFilters) : null;
-  const pending = hasActiveFilter ? [] : therapists.filter((t) => !isListed(t));
+  const allFiltered = hasActiveFilter ? therapists.filter((t) => !isStub(t) && matchesFilters(t)) : null;
+  const pending = hasActiveFilter ? [] : therapists.filter((t) => !isListed(t) && !isStub(t));
   const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
+  const signups = therapists
+    .filter(isStub)
+    .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
   function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
     const showImage = therapist.profile_photo_url && !brokenImages[therapist.id];
@@ -806,7 +872,7 @@ export default function AdminTherapistsPage() {
   const isBypassed = typeof window !== "undefined" && !!localStorage.getItem("staff_token");
 
   const incompleteCount = therapists.filter(
-    (t) => t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0
+    (t) => !isStub(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0
   ).length;
 
   return (
@@ -957,6 +1023,78 @@ export default function AdminTherapistsPage() {
           </div>
         )}
       </section>
+
+      {/* ── נרשמו ולא השלימו פרופיל ── */}
+      {!hasActiveFilter && signups.length > 0 && (
+        <section className="mt-12">
+          <h2 className="mb-2 text-xl font-bold text-right border-b pb-2">
+            🕓 נרשמו ולא השלימו פרופיל ({signups.length})
+          </h2>
+          <p className="mb-4 text-sm text-stone-600 leading-6">
+            חשבונות שנפתחו אבל טופס הפרופיל מעולם לא נשמר — הם לא מוצגים למטופלים. אפשר לשלוח
+            תזכורת אישית לכל אחד, או לכולם יחד (רק למי שעוד לא קיבל).
+          </p>
+          <div className="mb-4">
+            <button
+              type="button"
+              onClick={() => { setBulkReminderText(SIGNUP_REMINDER_DRAFT); setBulkReminderOpen(true); }}
+              disabled={signups.every((t) => !!t.completion_requested_at)}
+              className="rounded-xl bg-[#2e7d8c] px-4 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              ✉️ שלח תזכורת לכולם ({signups.filter((t) => !t.completion_requested_at).length} שטרם קיבלו)
+            </button>
+          </div>
+          <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-stone-50 text-right text-xs font-bold text-stone-600">
+                  <th className="px-4 py-2.5">מייל</th>
+                  <th className="px-4 py-2.5">נרשם/ה</th>
+                  <th className="px-4 py-2.5">תעודה</th>
+                  <th className="px-4 py-2.5">תזכורת נשלחה</th>
+                  <th className="px-4 py-2.5">פעולות</th>
+                </tr>
+              </thead>
+              <tbody>
+                {signups.map((t) => (
+                  <tr key={t.id} className="border-b last:border-0 text-right">
+                    <td className="px-4 py-2.5 font-medium text-stone-800" dir="ltr" style={{ textAlign: "right" }}>{t.email}</td>
+                    <td className="px-4 py-2.5 text-stone-600">
+                      {t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {t.certificates.length > 0 ? (
+                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-semibold text-green-800">📄 העלה תעודה</span>
+                      ) : (
+                        <span className="text-stone-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5 text-stone-600">
+                      {t.completion_requested_at
+                        ? new Date(t.completion_requested_at).toLocaleDateString("he-IL")
+                        : "—"}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <div className="flex gap-2">
+                        <button type="button"
+                          onClick={() => openCompletion(t)}
+                          className="rounded-lg border border-blue-400 bg-blue-50 px-3 py-1 text-xs font-medium text-blue-800">
+                          {t.completion_requested_at ? "✉️ שלח שוב" : "✉️ שלח תזכורת"}
+                        </button>
+                        <button type="button"
+                          onClick={() => deleteTherapist(t.id)}
+                          className="rounded-lg border border-red-300 bg-red-50 px-3 py-1 text-xs font-medium text-red-700">
+                          מחק
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* ── Edit Modal ── */}
       {editingTherapist && editForm && (
@@ -1189,7 +1327,7 @@ export default function AdminTherapistsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
           onClick={() => setCompletionFor(null)}>
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-lg font-bold text-stone-900">בקשת השלמה — {completionFor.full_name || "מטפל/ת"}</h3>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">בקשת השלמה — {completionFor.full_name.trim() || completionFor.email || "מטפל/ת"}</h3>
             <p className="mb-3 text-sm text-stone-600">
               כתוב/כתבי את ההודעה שתישלח למייל של המטפל/ת. מולאה טיוטה לפי מה שחסר — אפשר לערוך, להוסיף או למחוק לגמרי ולכתוב משלך.
             </p>
@@ -1209,6 +1347,43 @@ export default function AdminTherapistsPage() {
               <button type="button" onClick={sendCompletion} disabled={completionSending || !completionText.trim()}
                 className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
                 {completionSending ? "שולח..." : "✉️ שלח למטפל/ת"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── תזכורת הרשמה לכולם ── */}
+      {bulkReminderOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+          onClick={() => { if (!bulkReminderSending) setBulkReminderOpen(false); }}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">
+              תזכורת השלמת הרשמה — {signups.filter((t) => !t.completion_requested_at).length} נמענים
+            </h3>
+            <p className="mb-3 text-sm text-stone-600">
+              ההודעה תישלח לכל מי שנרשם ולא השלים פרופיל <b>וטרם קיבל תזכורת</b>. המייל נפתח
+              ב&quot;שלום מטפל/ת יקר/ה&quot; ומסתיים בכפתור לעריכת הפרופיל — זה החלק האמצעי. אפשר לערוך.
+            </p>
+            <textarea
+              value={bulkReminderText}
+              onChange={(e) => setBulkReminderText(e.target.value)}
+              rows={9}
+              dir="rtl"
+              disabled={bulkReminderSending}
+              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+            />
+            {bulkReminderProgress && (
+              <p className="mt-2 text-sm font-semibold text-[#2e7d8c]">{bulkReminderProgress}</p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setBulkReminderOpen(false)} disabled={bulkReminderSending}
+                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                ביטול
+              </button>
+              <button type="button" onClick={sendBulkReminders} disabled={bulkReminderSending || !bulkReminderText.trim()}
+                className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+                {bulkReminderSending ? "שולח..." : "✉️ שלח לכולם"}
               </button>
             </div>
           </div>

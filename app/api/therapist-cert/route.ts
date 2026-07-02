@@ -54,7 +54,7 @@ async function resolveTherapist(user: { id: string; email?: string | null }) {
   if (!therapist) {
     const { data: created } = await supabaseAdmin
       .from("therapists")
-      .insert({ user_id: user.id, email: user.email, full_name: "", status: "pending", tier: "free" })
+      .insert({ user_id: user.id, email: user.email, full_name: "", gender: "", status: "pending", tier: "free" })
       .select("id")
       .single();
     therapist = created ?? null;

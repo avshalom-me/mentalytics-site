@@ -108,6 +108,9 @@ export async function POST(req: NextRequest) {
         user_id: user.id,
         email: user.email,
         full_name: "",
+        // gender is NOT NULL in the schema — omitting it made this stub
+        // insert fail silently, which orphaned uploaded files.
+        gender: "",
         status: "pending",
         tier: "free",
       })

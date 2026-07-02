@@ -49,6 +49,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Still nothing — a freshly registered account. Create a stub row NOW so
+  // every registrant is visible in the admin from the moment they sign up
+  // (before this, whoever abandoned the profile form simply didn't exist for
+  // the admin). The first real save (PATCH with a name) upgrades the stub.
+  if (!therapist) {
+    const { data: created, error: createErr } = await supabaseAdmin
+      .from("therapists")
+      .insert({ user_id: user.id, email: user.email, full_name: "", gender: "", status: "pending", tier: "free" })
+      .select("*")
+      .single();
+    if (createErr) {
+      // Unique-violation → a concurrent request created it first; re-read.
+      const { data: raced } = await supabaseAdmin
+        .from("therapists")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      therapist = raced ?? null;
+    } else {
+      therapist = created;
+    }
+  }
+
   // Generate signed photo URL if therapist has a profile photo
   let photoUrl: string | null = null;
   if (therapist?.profile_photo_path) {
@@ -87,7 +110,7 @@ export async function PATCH(req: NextRequest) {
   // Check if therapist exists for this user
   const { data: existing } = await supabaseAdmin
     .from("therapists")
-    .select("id, status")
+    .select("id, status, full_name")
     .eq("user_id", user.id)
     .single();
 
@@ -124,11 +147,30 @@ export async function PATCH(req: NextRequest) {
     update.rejection_reason = null;
   }
 
+  // A stub row (auto-created at first login, no name yet) getting its first
+  // real save IS the registration — behave exactly like the insert path:
+  // send the registration-received email and let the client show the
+  // plan-choice screen (created: true).
+  const wasStub = !(existing.full_name ?? "").trim();
+  const isFirstRealSave = wasStub && typeof update.full_name === "string" && update.full_name.trim() !== "";
+
   const { error } = await supabaseAdmin
     .from("therapists")
     .update(update)
     .eq("user_id", user.id);
 
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  return NextResponse.json({ ok: true, id: existing.id });
+
+  if (isFirstRealSave && user.email) {
+    try {
+      await sendTherapistRegistrationReceivedEmail({
+        to: user.email,
+        name: typeof body.full_name === "string" ? body.full_name : "",
+      });
+    } catch (e) {
+      console.error("therapist-profile: registration-received email failed:", e);
+    }
+  }
+
+  return NextResponse.json({ ok: true, id: existing.id, created: isFirstRealSave });
 }

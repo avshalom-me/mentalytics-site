@@ -104,6 +104,9 @@ export default function TherapistProfileEditPage() {
 
       if (json.therapist) {
         setProfile(json.therapist);
+        // A stub row (auto-created at first login) is still a NEW profile from
+        // the therapist's point of view — keep the welcome banner.
+        if (!(json.therapist.full_name ?? "").trim()) setIsNew(true);
         if (json.photoUrl) setProfilePhotoUrl(json.photoUrl);
         setForm({
           full_name: json.therapist.full_name ?? "",
