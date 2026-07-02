@@ -1,14 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildUnsubscribeUrl } from "@/app/lib/unsubscribe-token";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cronAuthorized } from "@/app/lib/cron-auth";
+import { sendBulkEmail } from "@/app/lib/email-quota";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 const CRON_SECRET = process.env.CRON_SECRET;
 const SITE_BASE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://www.mentalytics.co.il";
 
@@ -335,16 +334,21 @@ export async function GET(req: NextRequest) {
       subject = `הפרופיל שלך לא משדר במלוא הכוח — 5 דקות לתקן`;
     }
 
-    try {
-      await resend.emails.send({
-        from: "טיפול חכם <noreply@mentalytics.co.il>",
-        to: t.email,
-        subject,
-        html,
-      });
+    // Monthly reports go to every paying therapist at once — route through the
+    // daily bulk gate so the report run can't blow the Resend daily quota.
+    const r = await sendBulkEmail({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: t.email,
+      subject,
+      html,
+    });
+    if (r.ok) {
       sent++;
-    } catch (e: unknown) {
-      errors.push(`${t.email}: ${e instanceof Error ? e.message : "unknown error"}`);
+    } else if (r.skipped) {
+      skipped++;
+      errors.push(`${t.email}: deferred — daily bulk cap reached`);
+    } else {
+      errors.push(`${t.email}: ${r.error ?? "unknown error"}`);
     }
   }
 

@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { sendBulkEmail } from "./email-quota";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
 import {
   isPromoActive,
@@ -696,18 +697,12 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   </body>
 </html>`;
 
-  try {
-    const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, html });
-    if (error) {
-      console.error("sendTherapistCompletionRequestEmail: resend error:", error);
-      return { ok: false, error: String(error) };
-    }
-    return { ok: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "unknown";
-    console.error("sendTherapistCompletionRequestEmail: throw:", msg);
-    return { ok: false, error: msg };
-  }
+  // Completion reminders are the classic bulk burst — route them through the
+  // daily bulk gate so a mass send can't blow Resend's daily quota (and starve
+  // transactional mail). A deferred send returns ok:false with a clear message.
+  const r = await sendBulkEmail({ from: FROM, to: opts.to, subject, html });
+  if (!r.ok && !r.skipped) console.error("sendTherapistCompletionRequestEmail: send error:", r.error);
+  return { ok: r.ok, error: r.error };
 }
 
 // General admin → therapist message with a custom subject + free-text body and
