@@ -3,6 +3,11 @@ import type { Metadata } from "next";
 import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 
+// Evaluate the promo window per-request instead of baking it into the static
+// HTML at build time — otherwise the "מבצע פתיחה" copy wouldn't disappear on
+// its own when the deadline passes (it would linger until the next deploy).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "הצטרפות מטפלים | טיפול חכם",
   description:
