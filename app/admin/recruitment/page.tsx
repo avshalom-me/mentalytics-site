@@ -8,6 +8,7 @@ type Period = "week" | "month" | "all";
 type CampaignRow = {
   campaign: string;
   channel: string | null;
+  visitors: number;
   signups: number;
   approved: number;
   paying: number;
@@ -104,7 +105,7 @@ export default function RecruitmentPage() {
           </div>
         </div>
         <p className="text-sm text-stone-500 mb-6">
-          כמה מטפלים נרשמו דרך כל מודעה / מקור — והאם עברו אישור והפכו למקודמים. כך רואים איזו מודעה מביאה את הלידים הטובים יותר.
+          כמה <strong>מבקרים</strong> כל מודעה הביאה, כמה מהם <strong>נרשמו</strong>, ומי עברו אישור/הפכו למקודמים — הכל מהצד שלנו, בלי הממשק המבלבל של פייסבוק. כך רואים איזו מודעה מביאה את הלידים הטובים יותר.
         </p>
 
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
@@ -125,26 +126,30 @@ export default function RecruitmentPage() {
 
             {/* All campaigns */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6 overflow-x-auto">
-              <h2 className="text-base font-black text-stone-800 mb-4">הרשמות לפי קמפיין</h2>
+              <h2 className="text-base font-black text-stone-800 mb-4">מבקרים והרשמות לפי קמפיין</h2>
               {data.campaigns.length === 0 ? (
                 <p className="text-sm text-stone-400">
-                  עדיין אין הרשמות. הנתונים יופיעו כאן ברגע שמטפלים יירשמו דרך המודעות.
+                  עדיין אין תנועה או הרשמות מקמפיינים. הנתונים יופיעו כאן ברגע שמישהו יגיע דרך מודעה מתויגת.
                 </p>
               ) : (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="text-stone-500 text-xs border-b border-stone-200">
                       <th className="text-right font-semibold py-2 px-2">קמפיין</th>
+                      <th className="text-center font-semibold py-2 px-2">מבקרים</th>
                       <th className="text-center font-semibold py-2 px-2">הרשמות</th>
+                      <th className="text-center font-semibold py-2 px-2">המרה</th>
                       <th className="text-center font-semibold py-2 px-2">אושרו</th>
-                      <th className="text-center font-semibold py-2 px-2">מקודמים (שילמו)</th>
+                      <th className="text-center font-semibold py-2 px-2">מקודמים</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.campaigns.map((c) => (
                       <tr key={c.campaign} className="border-b border-stone-100">
                         <td className="py-2.5 px-2 font-semibold text-stone-700">{campaignLabel(c.campaign)}</td>
+                        <td className="text-center px-2 font-bold text-stone-900">{num(c.visitors)}</td>
                         <td className="text-center px-2 font-bold text-stone-900">{num(c.signups)}</td>
+                        <td className="text-center px-2 text-stone-600">{c.visitors > 0 ? `${pct(c.signups, c.visitors)}%` : "—"}</td>
                         <td className="text-center px-2 text-stone-600">{num(c.approved)}</td>
                         <td className="text-center px-2 text-stone-600">{num(c.paying)}</td>
                       </tr>
@@ -196,21 +201,29 @@ export default function RecruitmentPage() {
 }
 
 function ABCompare({ direct, evocative }: { direct?: CampaignRow; evocative?: CampaignRow }) {
-  const a = direct?.signups ?? 0;
-  const b = evocative?.signups ?? 0;
-  const leader = a === b ? null : a > b ? "a" : "b";
+  const aS = direct?.signups ?? 0;
+  const bS = evocative?.signups ?? 0;
+  const aV = direct?.visitors ?? 0;
+  const bV = evocative?.visitors ?? 0;
+  // Decide by signups (the real goal); fall back to visitors while signups are
+  // still tied (e.g. both 0), so the card shows who leads on traffic meanwhile.
+  const leader = aS !== bS ? (aS > bS ? "a" : "b") : aV === bV ? null : aV > bV ? "a" : "b";
 
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
       <h2 className="text-base font-black text-stone-800 mb-1">השוואת A/B — איזו מודעה מנצחת</h2>
-      <p className="text-xs text-stone-500 mb-4">המדד המוביל הוא מספר ההרשמות. &quot;אושרו&quot; ו&quot;מקודמים&quot; מראים את איכות הלידים.</p>
+      <p className="text-xs text-stone-500 mb-4">היעד הוא <strong>הרשמות</strong>. עד שיהיו — המובילה נקבעת לפי <strong>מבקרים</strong> (תנועה).</p>
       <div className="grid gap-4 sm:grid-cols-2">
         <ABCard title="מטפלים — ישירה (A)" row={direct} isLeader={leader === "a"} accent="#3D8C8A" />
         <ABCard title="מטפלים — מעוררת (B)" row={evocative} isLeader={leader === "b"} accent="#D49018" />
       </div>
-      {a === 0 && b === 0 ? (
+      {aV === 0 && bV === 0 ? (
         <p className="mt-4 text-center text-sm text-stone-500">
-          עדיין אין הרשמות מהמודעות — ברגע שמטפל יירשם דרך מודעה A או B היא תופיע כאן אוטומטית. 🟢
+          עדיין אין תנועה מהמודעות — יופיע כאן ברגע שמישהו ילחץ על מודעה A או B. 🟢
+        </p>
+      ) : aS === 0 && bS === 0 ? (
+        <p className="mt-4 text-center text-sm text-stone-500">
+          יש תנועה, אבל עדיין אין הרשמות. המנצחת תיקבע לפי הרשמות — צריך עוד מבקרים (עוד ימים או תקציב) כדי להכריע. 🟡
         </p>
       ) : leader === null ? (
         <p className="mt-4 text-center text-sm font-semibold text-stone-500">תיקו כרגע — צריך עוד נתונים כדי להכריע.</p>
@@ -230,6 +243,7 @@ function ABCard({
   isLeader: boolean;
   accent: string;
 }) {
+  const visitors = row?.visitors ?? 0;
   const signups = row?.signups ?? 0;
   return (
     <div
@@ -248,17 +262,21 @@ function ABCard({
         </span>
       )}
       <div className="text-sm font-black text-stone-800 mb-3">{title}</div>
-      <div className="text-4xl font-black" style={{ color: accent }}>{num(signups)}</div>
-      <div className="text-xs font-semibold text-stone-500 mt-1">הרשמות</div>
-      <div className="mt-4 flex gap-6 text-sm">
+      <div className="flex items-end gap-8">
         <div>
-          <span className="font-bold text-stone-800">{num(row?.approved ?? 0)}</span>
-          <span className="text-stone-500"> אושרו ({pct(row?.approved ?? 0, signups)}%)</span>
+          <div className="text-4xl font-black" style={{ color: accent }}>{num(visitors)}</div>
+          <div className="text-xs font-semibold text-stone-500 mt-1">מבקרים מהמודעה</div>
         </div>
         <div>
-          <span className="font-bold text-stone-800">{num(row?.paying ?? 0)}</span>
-          <span className="text-stone-500"> מקודמים</span>
+          <div className="text-4xl font-black text-stone-800">{num(signups)}</div>
+          <div className="text-xs font-semibold text-stone-500 mt-1">נרשמו</div>
         </div>
+      </div>
+      <div className="mt-4 text-sm text-stone-600">
+        המרה: <span className="font-bold text-stone-800">{pct(signups, visitors)}%</span>
+        {signups > 0 && (
+          <span> · {num(row?.approved ?? 0)} אושרו · {num(row?.paying ?? 0)} מקודמים</span>
+        )}
       </div>
     </div>
   );

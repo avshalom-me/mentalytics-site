@@ -51,10 +51,21 @@ export async function GET(req: NextRequest) {
       .select("signup_channel, signup_utm_campaign, status, admin_approved, created_at");
     if (since) q = q.gte("created_at", since);
 
-    const { data, error } = await q;
-    if (error) throw error;
+    // Signups (from therapists) + ad visitors per campaign (from analytics_events
+    // via RPC — distinct sessions, cap-safe) so the view shows the full funnel:
+    // how many people the ad brought, and how many of them registered.
+    const [therapistsRes, visitsRes] = await Promise.all([
+      q,
+      supabaseAdmin.rpc("admin_recruitment_visits", { p_since: since }),
+    ]);
+    if (therapistsRes.error) throw therapistsRes.error;
+    if (visitsRes.error) throw visitsRes.error;
 
-    const rows = (data ?? []) as Row[];
+    const rows = (therapistsRes.data ?? []) as Row[];
+    const visitorsByCampaign = new Map<string, number>();
+    for (const v of (visitsRes.data ?? []) as { campaign: string; visitors: number }[]) {
+      if (v.campaign) visitorsByCampaign.set(v.campaign, Number(v.visitors) || 0);
+    }
 
     const byCampaign = new Map<string, Bucket & { channel: string | null }>();
     const byChannel = new Map<string, Bucket>();
@@ -78,9 +89,22 @@ export async function GET(req: NextRequest) {
       tally(ch, r);
     }
 
-    const campaigns = [...byCampaign.entries()]
-      .map(([campaign, v]) => ({ campaign, ...v }))
-      .sort((a, b) => b.signups - a.signups);
+    // Merge signups + visitors, including campaigns that have visitors but no
+    // signups yet (a live ad before its first registration).
+    const campaignKeys = new Set<string>([...byCampaign.keys(), ...visitorsByCampaign.keys()]);
+    const campaigns = [...campaignKeys]
+      .map((campaign) => {
+        const c = byCampaign.get(campaign);
+        return {
+          campaign,
+          visitors: visitorsByCampaign.get(campaign) ?? 0,
+          signups: c?.signups ?? 0,
+          approved: c?.approved ?? 0,
+          paying: c?.paying ?? 0,
+          channel: c?.channel ?? null,
+        };
+      })
+      .sort((a, b) => b.signups - a.signups || b.visitors - a.visitors);
     const channels = [...byChannel.entries()]
       .map(([channel, v]) => ({ channel, ...v }))
       .sort((a, b) => b.signups - a.signups);
