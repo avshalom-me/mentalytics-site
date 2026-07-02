@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { FREE_REGION_FALLBACK_ENABLED, coversRegion } from "@/app/lib/match-fallback";
+import {
+  FREE_REGION_FALLBACK_ENABLED,
+  coversRegion,
+  expertiseOf,
+  overlaps,
+} from "@/app/lib/match-fallback";
 
 export const dynamic = "force-dynamic";
 
@@ -558,29 +563,76 @@ export async function POST(req: NextRequest) {
     const therapists = (data ?? []) as TherapistRow[];
 
     // ── FREE_REGION_FALLBACK (פיצ'ר זמני — ראו app/lib/match-fallback.ts) ──
-    // אין אף מטפל משלם שמכסה את האזור המבוקש (אזור שלם, לא רק העיר) והמטופל
-    // לא ביקש אונליין → מטפלים חינמיים מאושרים שמכסים את האזור נכנסים למאגר.
+    // המטופל לא ביקש אונליין, ובאזור המבוקש (אזור שלם, לא רק העיר) מתקיים
+    // אחד משניים:
+    //   region_empty  — אין אף מטפל משלם באזור → כל החינמיים באזור נכנסים.
+    //   expertise_gap — יש משלמים באזור אבל אף אחד לא בתחום הטיפול המבוקש /
+    //                   בסוג המטפל הנדרש → נכנסים רק חינמיים מהאזור שכן בתחום.
     let freeFallbackRegion: string | null = null;
+    let freeFallbackTrigger: "region_empty" | "expertise_gap" | null = null;
     const freeFallbackIds = new Set<string>();
     if (FREE_REGION_FALLBACK_ENABLED && !input.onlineRequired) {
       const patientRegion =
         input.region ?? (input.city ? CITY_TO_REGION[input.city] ?? null : null);
-      const payingCovers =
-        patientRegion != null &&
-        therapists.some((t) => coversRegion(parseArray(t.regions), patientRegion));
-      if (patientRegion && !payingCovers) {
-        const { data: freeData } = await supabaseAdmin
-          .from("therapists")
-          .select(MATCH_COLUMNS)
-          .eq("status", "approved")
-          .eq("admin_approved", true);
-        const freeInRegion = ((freeData ?? []) as TherapistRow[]).filter((t) =>
+      if (patientRegion) {
+        const expertiseNeed = uniqueStrings([
+          ...input.treatmentTypes,
+          ...input.diagnosisTypes,
+        ]);
+        // "רלוונטי" = בתחום המבוקש (אם התבקש) וגם בסוג המטפל הנדרש (אם התבקש)
+        const isRelevant = (t: TherapistRow) => {
+          if (
+            expertiseNeed.length > 0 &&
+            !overlaps(
+              expertiseOf(
+                parseArray(t.training_areas),
+                parseArray(t.assessment_types),
+                parseArray(t.couples_modalities)
+              ),
+              expertiseNeed
+            )
+          ) {
+            return false;
+          }
+          if (
+            input.requiredTherapistTypes.length > 0 &&
+            !overlaps(parseArray(t.therapist_types), input.requiredTherapistTypes)
+          ) {
+            return false;
+          }
+          return true;
+        };
+
+        const payingInRegion = therapists.filter((t) =>
           coversRegion(parseArray(t.regions), patientRegion)
         );
-        if (freeInRegion.length > 0) {
-          freeFallbackRegion = patientRegion;
-          for (const t of freeInRegion) freeFallbackIds.add(t.id);
-          therapists.push(...freeInRegion);
+        if (payingInRegion.length === 0) {
+          freeFallbackTrigger = "region_empty";
+        } else if (
+          (expertiseNeed.length > 0 || input.requiredTherapistTypes.length > 0) &&
+          !payingInRegion.some(isRelevant)
+        ) {
+          freeFallbackTrigger = "expertise_gap";
+        }
+
+        if (freeFallbackTrigger) {
+          const { data: freeData } = await supabaseAdmin
+            .from("therapists")
+            .select(MATCH_COLUMNS)
+            .eq("status", "approved")
+            .eq("admin_approved", true);
+          const freeCandidates = ((freeData ?? []) as TherapistRow[]).filter(
+            (t) =>
+              coversRegion(parseArray(t.regions), patientRegion) &&
+              (freeFallbackTrigger === "region_empty" || isRelevant(t))
+          );
+          if (freeCandidates.length > 0) {
+            freeFallbackRegion = patientRegion;
+            for (const t of freeCandidates) freeFallbackIds.add(t.id);
+            therapists.push(...freeCandidates);
+          } else {
+            freeFallbackTrigger = null;
+          }
         }
       }
     }
@@ -661,6 +713,8 @@ export async function POST(req: NextRequest) {
           metadata: {
             region: freeFallbackRegion,
             city: input.city,
+            trigger: freeFallbackTrigger,
+            requested_treatments: input.treatmentTypes,
             free_candidates: freeFallbackIds.size,
             free_returned: returnedFree.length,
             free_therapist_ids: returnedFree.map((m) => m.id),
@@ -680,7 +734,11 @@ export async function POST(req: NextRequest) {
       addiction_cbt_fallback: addictionCbtFallback,
       // FREE_REGION_FALLBACK (זמני)
       free_region_fallback: freeFallbackRegion
-        ? { region: freeFallbackRegion, candidates: freeFallbackIds.size }
+        ? {
+            region: freeFallbackRegion,
+            trigger: freeFallbackTrigger,
+            candidates: freeFallbackIds.size,
+          }
         : null,
     });
   } catch (error: any) {

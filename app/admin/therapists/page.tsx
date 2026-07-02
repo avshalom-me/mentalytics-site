@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
-import { FREE_REGION_FALLBACK_ENABLED, regionsCovered } from "@/app/lib/match-fallback";
+import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app/lib/match-fallback";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
@@ -175,6 +175,66 @@ function StyleScaleRow({
 }
 
 
+const DEFAULT_MESSAGE_SUBJECT = "הודעה מצוות טיפול חכם";
+
+// מודל שליחת הודעה — קומפוננטה נפרדת עם state מקומי לנושא/תוכן, כדי שהקלדה
+// תרנדר רק את המודל ולא את כל דף האדמין (שאחרת מפרק ובונה מחדש את כל כרטיסי
+// המטפלים בכל תו — מה שגרם לתקיעה של שניות בין הקשה להקשה).
+function MessageModal({
+  therapist, sending, onClose, onSend,
+}: {
+  therapist: AdminTherapist;
+  sending: boolean;
+  onClose: () => void;
+  onSend: (subject: string, text: string) => void;
+}) {
+  const [subject, setSubject] = useState(DEFAULT_MESSAGE_SUBJECT);
+  const [text, setText] = useState("");
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+      onClick={() => { if (!sending) onClose(); }}>
+      <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <h3 className="mb-1 text-lg font-bold text-stone-900">
+          שליחת הודעה — {therapist.full_name.trim() || therapist.email || "מטפל/ת"}
+        </h3>
+        <p className="mb-3 text-sm text-stone-600 leading-6">
+          ההודעה תישלח למייל של המטפל/ת עם כפתור <b>קישור ישיר לעריכת הפרופיל</b>. מתאים גם
+          לפרופיל שנראה שלם — למשל אם הועלתה תעודה במקום תמונה.
+        </p>
+        <label className="mb-1 block text-sm font-semibold text-stone-800">נושא</label>
+        <input
+          value={subject}
+          onChange={(e) => setSubject(e.target.value)}
+          dir="rtl"
+          disabled={sending}
+          className="mb-3 w-full rounded-xl border border-stone-300 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+        />
+        <label className="mb-1 block text-sm font-semibold text-stone-800">תוכן ההודעה</label>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          rows={7}
+          dir="rtl"
+          disabled={sending}
+          className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
+          placeholder="לדוגמה: שמנו לב שהתמונה שהעלית היא בעצם תעודה. אפשר להעלות תמונת פרופיל דרך הקישור המצורף."
+        />
+        <div className="mt-4 flex justify-end gap-2">
+          <button type="button" onClick={onClose} disabled={sending}
+            className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+            ביטול
+          </button>
+          <button type="button" onClick={() => onSend(subject, text)} disabled={sending || !text.trim()}
+            className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
+            {sending ? "שולח..." : "✉️ שלח למטפל/ת"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminTherapistsPage() {
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -210,8 +270,6 @@ export default function AdminTherapistsPage() {
   // General "send a message" composer — available for ANY therapist, including
   // complete profiles (e.g. someone who uploaded a cert into the photo slot).
   const [messageFor, setMessageFor] = useState<AdminTherapist | null>(null);
-  const [messageSubject, setMessageSubject] = useState("");
-  const [messageText, setMessageText] = useState("");
   const [messageSending, setMessageSending] = useState(false);
 
   // Bulk signup-reminder modal (for the "registered but incomplete" section)
@@ -559,16 +617,12 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  const DEFAULT_MESSAGE_SUBJECT = "הודעה מצוות טיפול חכם";
-
   function openMessage(t: AdminTherapist) {
     setMessageFor(t);
-    setMessageSubject(DEFAULT_MESSAGE_SUBJECT);
-    setMessageText("");
   }
 
-  async function sendMessage() {
-    if (!messageFor || !messageText.trim()) return;
+  async function sendMessage(subject: string, message: string) {
+    if (!messageFor || !message.trim()) return;
     try {
       setMessageSending(true);
       setError("");
@@ -578,8 +632,8 @@ export default function AdminTherapistsPage() {
         body: JSON.stringify({
           id: messageFor.id,
           action: "send_message",
-          subject: messageSubject,
-          message: messageText,
+          subject,
+          message,
         }),
       });
       const json = await res.json();
@@ -715,20 +769,50 @@ export default function AdminTherapistsPage() {
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
   // ── FREE_REGION_FALLBACK (פיצ'ר זמני — ראו app/lib/match-fallback.ts) ──
-  // אזורים שמכוסים ע"י מטפל משלם כלשהו; מטפל חינמי מאושר שמכסה אזור שאינו
-  // ברשימה יופיע בהתאמות כגיבוי לאותו אזור — ומסומן בתגית על הכרטיס.
+  // שתי תגיות אפשריות על כרטיס של מטפל חינמי מאושר:
+  //   גיבוי אזורי — הוא מכסה אזור שאין בו אף מטפל משלם.
+  //   גיבוי תחומי — באזור שיש בו משלמים, יש לו תחומי טיפול שאף משלם באזור
+  //                 לא מציע (ייכנס להתאמות כשמטופל יופנה בדיוק לתחום כזה).
   const payingCoveredRegions = new Set<string>();
+  const payingExpertiseByRegion = new Map<string, Set<string>>();
   if (FREE_REGION_FALLBACK_ENABLED) {
     for (const t of therapists) {
       if (t.status === "paying" && t.admin_approved) {
-        for (const r of regionsCovered(t.regions)) payingCoveredRegions.add(r);
+        const exp = expertiseOf(t.training_areas, t.assessment_types, t.couples_modalities);
+        for (const r of regionsCovered(t.regions)) {
+          payingCoveredRegions.add(r);
+          let set = payingExpertiseByRegion.get(r);
+          if (!set) payingExpertiseByRegion.set(r, (set = new Set()));
+          for (const e of exp) set.add(e);
+        }
       }
     }
   }
-  function fallbackRegionsFor(t: AdminTherapist): string[] {
-    if (!FREE_REGION_FALLBACK_ENABLED) return [];
-    if (!(t.status === "approved" && t.admin_approved)) return [];
-    return [...regionsCovered(t.regions)].filter((r) => !payingCoveredRegions.has(r));
+  function fallbackInfoFor(t: AdminTherapist): { emptyRegions: string[]; expertiseGaps: string[] } {
+    if (!FREE_REGION_FALLBACK_ENABLED || !(t.status === "approved" && t.admin_approved)) {
+      return { emptyRegions: [], expertiseGaps: [] };
+    }
+    const covered = [...regionsCovered(t.regions)];
+    const emptyRegions = covered.filter((r) => !payingCoveredRegions.has(r));
+    // Raw (display-cased) areas, compared via the normalized expertise set
+    const rawAreas = [
+      ...t.training_areas,
+      ...t.assessment_types,
+      ...(t.couples_modalities.length > 0 ? ["טיפול זוגי"] : []),
+    ];
+    const expertiseGaps: string[] = [];
+    for (const r of covered) {
+      if (!payingCoveredRegions.has(r)) continue; // already a full regional backup
+      const payingExp = payingExpertiseByRegion.get(r) ?? new Set<string>();
+      const gaps = rawAreas.filter(
+        (a) => !payingExp.has(a.trim().toLowerCase().replace(/\s+/g, " "))
+      );
+      if (gaps.length > 0) {
+        const shown = gaps.slice(0, 3).join(", ") + (gaps.length > 3 ? ` +${gaps.length - 3}` : "");
+        expertiseGaps.push(`${r}: ${shown}`);
+      }
+    }
+    return { emptyRegions, expertiseGaps };
   }
   // ── end FREE_REGION_FALLBACK ──
 
@@ -789,12 +873,20 @@ export default function AdminTherapistsPage() {
                   </span>
                 )}
                 {/* FREE_REGION_FALLBACK (זמני) */}
-                {fallbackRegionsFor(therapist).length > 0 && (
+                {fallbackInfoFor(therapist).emptyRegions.length > 0 && (
                   <span
                     className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800 border border-teal-300"
-                    title="פיצ'ר זמני: מטפל חינמי מוצג בהתאמות רק כשאין אף מטפל משלם באזור שביקש המטופל, ולא בבקשות אונליין"
+                    title="פיצ'ר זמני: מטפל חינמי מוצג בהתאמות כשאין אף מטפל משלם באזור שביקש המטופל (לא בבקשות אונליין)"
                   >
-                    🛟 גיבוי התאמות: {fallbackRegionsFor(therapist).join(", ")}
+                    🛟 גיבוי אזורי: {fallbackInfoFor(therapist).emptyRegions.join(", ")}
+                  </span>
+                )}
+                {fallbackInfoFor(therapist).expertiseGaps.length > 0 && (
+                  <span
+                    className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-800 border border-cyan-300"
+                    title="פיצ'ר זמני: מטפל חינמי מוצג בהתאמות גם כשיש משלמים באזור אבל אף אחד מהם לא בתחום שאליו הופנה המטופל — אלו התחומים שרק הוא מציע באזור (לא בבקשות אונליין)"
+                  >
+                    🛟 גיבוי תחומי — {fallbackInfoFor(therapist).expertiseGaps.join(" · ")}
                   </span>
                 )}
                 {therapist.certificates.length === 0 && (
@@ -1672,46 +1764,12 @@ export default function AdminTherapistsPage() {
 
       {/* ── הודעה כללית למטפל/ת ── */}
       {messageFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
-          onClick={() => { if (!messageSending) setMessageFor(null); }}>
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="mb-1 text-lg font-bold text-stone-900">
-              שליחת הודעה — {messageFor.full_name.trim() || messageFor.email || "מטפל/ת"}
-            </h3>
-            <p className="mb-3 text-sm text-stone-600 leading-6">
-              ההודעה תישלח למייל של המטפל/ת עם כפתור <b>קישור ישיר לעריכת הפרופיל</b>. מתאים גם
-              לפרופיל שנראה שלם — למשל אם הועלתה תעודה במקום תמונה.
-            </p>
-            <label className="mb-1 block text-sm font-semibold text-stone-800">נושא</label>
-            <input
-              value={messageSubject}
-              onChange={(e) => setMessageSubject(e.target.value)}
-              dir="rtl"
-              disabled={messageSending}
-              className="mb-3 w-full rounded-xl border border-stone-300 px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-            />
-            <label className="mb-1 block text-sm font-semibold text-stone-800">תוכן ההודעה</label>
-            <textarea
-              value={messageText}
-              onChange={(e) => setMessageText(e.target.value)}
-              rows={7}
-              dir="rtl"
-              disabled={messageSending}
-              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-indigo-200"
-              placeholder="לדוגמה: שמנו לב שהתמונה שהעלית היא בעצם תעודה. אפשר להעלות תמונת פרופיל דרך הקישור המצורף."
-            />
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setMessageFor(null)} disabled={messageSending}
-                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
-                ביטול
-              </button>
-              <button type="button" onClick={sendMessage} disabled={messageSending || !messageText.trim()}
-                className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
-                {messageSending ? "שולח..." : "✉️ שלח למטפל/ת"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <MessageModal
+          therapist={messageFor}
+          sending={messageSending}
+          onClose={() => setMessageFor(null)}
+          onSend={sendMessage}
+        />
       )}
 
       {/* ── תזכורת מותאמת לפרופילים חלקיים ── */}
