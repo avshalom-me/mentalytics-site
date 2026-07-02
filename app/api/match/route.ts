@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { FREE_REGION_FALLBACK_ENABLED, coversRegion } from "@/app/lib/match-fallback";
 
 export const dynamic = "force-dynamic";
 
@@ -538,11 +539,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const input = normalizeInput(body);
 
+    const MATCH_COLUMNS =
+      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level";
+
     const { data, error } = await supabaseAdmin
       .from("therapists")
-      .select(
-        "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level"
-      )
+      .select(MATCH_COLUMNS)
       .eq("status", "paying")
       .eq("admin_approved", true);
 
@@ -554,6 +556,35 @@ export async function POST(req: NextRequest) {
     }
 
     const therapists = (data ?? []) as TherapistRow[];
+
+    // ── FREE_REGION_FALLBACK (פיצ'ר זמני — ראו app/lib/match-fallback.ts) ──
+    // אין אף מטפל משלם שמכסה את האזור המבוקש (אזור שלם, לא רק העיר) והמטופל
+    // לא ביקש אונליין → מטפלים חינמיים מאושרים שמכסים את האזור נכנסים למאגר.
+    let freeFallbackRegion: string | null = null;
+    const freeFallbackIds = new Set<string>();
+    if (FREE_REGION_FALLBACK_ENABLED && !input.onlineRequired) {
+      const patientRegion =
+        input.region ?? (input.city ? CITY_TO_REGION[input.city] ?? null : null);
+      const payingCovers =
+        patientRegion != null &&
+        therapists.some((t) => coversRegion(parseArray(t.regions), patientRegion));
+      if (patientRegion && !payingCovers) {
+        const { data: freeData } = await supabaseAdmin
+          .from("therapists")
+          .select(MATCH_COLUMNS)
+          .eq("status", "approved")
+          .eq("admin_approved", true);
+        const freeInRegion = ((freeData ?? []) as TherapistRow[]).filter((t) =>
+          coversRegion(parseArray(t.regions), patientRegion)
+        );
+        if (freeInRegion.length > 0) {
+          freeFallbackRegion = patientRegion;
+          for (const t of freeInRegion) freeFallbackIds.add(t.id);
+          therapists.push(...freeInRegion);
+        }
+      }
+    }
+    // ── end FREE_REGION_FALLBACK ──
 
     const scored = therapists
       .map((therapist) => {
@@ -608,6 +639,8 @@ export async function POST(req: NextRequest) {
           phone: therapist.phone,
           profile_photo_url: photoUrl,
           status: therapist.status,
+          // FREE_REGION_FALLBACK (זמני): מטפל חינמי שנכנס כגיבוי אזורי
+          free_fallback: freeFallbackIds.has(therapist.id),
           match_score: result.score,
           personality_score: result.personality_score,
           combined_score: combinedScore(result.score, result.personality_score),
@@ -616,6 +649,28 @@ export async function POST(req: NextRequest) {
       })
     );
 
+    // FREE_REGION_FALLBACK (זמני): רישום הפעלה ל-analytics_events כדי שאפשר
+    // יהיה לראות באדמין מתי ולאיזה אזור המנגנון נכנס לפעולה. כשל ברישום לא
+    // מפיל את ההתאמה.
+    if (freeFallbackRegion) {
+      const returnedFree = ranked.filter((m) => freeFallbackIds.has(m.id));
+      try {
+        await supabaseAdmin.from("analytics_events").insert({
+          event_type: "match_free_fallback",
+          source: "match_api",
+          metadata: {
+            region: freeFallbackRegion,
+            city: input.city,
+            free_candidates: freeFallbackIds.size,
+            free_returned: returnedFree.length,
+            free_therapist_ids: returnedFree.map((m) => m.id),
+          },
+        });
+      } catch {
+        // logging only
+      }
+    }
+
     return NextResponse.json({
       ok: true,
       input_normalized: input,
@@ -623,6 +678,10 @@ export async function POST(req: NextRequest) {
       returned: ranked.length,
       matches: ranked,
       addiction_cbt_fallback: addictionCbtFallback,
+      // FREE_REGION_FALLBACK (זמני)
+      free_region_fallback: freeFallbackRegion
+        ? { region: freeFallbackRegion, candidates: freeFallbackIds.size }
+        : null,
     });
   } catch (error: any) {
     return NextResponse.json(

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
+import { FREE_REGION_FALLBACK_ENABLED, regionsCovered } from "@/app/lib/match-fallback";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
@@ -713,6 +714,24 @@ export default function AdminTherapistsPage() {
     .filter((t) => !isStub(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0)
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
+  // ── FREE_REGION_FALLBACK (פיצ'ר זמני — ראו app/lib/match-fallback.ts) ──
+  // אזורים שמכוסים ע"י מטפל משלם כלשהו; מטפל חינמי מאושר שמכסה אזור שאינו
+  // ברשימה יופיע בהתאמות כגיבוי לאותו אזור — ומסומן בתגית על הכרטיס.
+  const payingCoveredRegions = new Set<string>();
+  if (FREE_REGION_FALLBACK_ENABLED) {
+    for (const t of therapists) {
+      if (t.status === "paying" && t.admin_approved) {
+        for (const r of regionsCovered(t.regions)) payingCoveredRegions.add(r);
+      }
+    }
+  }
+  function fallbackRegionsFor(t: AdminTherapist): string[] {
+    if (!FREE_REGION_FALLBACK_ENABLED) return [];
+    if (!(t.status === "approved" && t.admin_approved)) return [];
+    return [...regionsCovered(t.regions)].filter((r) => !payingCoveredRegions.has(r));
+  }
+  // ── end FREE_REGION_FALLBACK ──
+
   function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
     const showImage = therapist.profile_photo_url && !brokenImages[therapist.id];
     const isBusy = actionLoadingId === therapist.id;
@@ -767,6 +786,15 @@ export default function AdminTherapistsPage() {
                 {therapist.status === "paying" && therapist.promotion_source === "trial" && therapist.promoted_until && (
                   <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 border border-orange-300">
                     ⏰ ניסיון עד {new Date(therapist.promoted_until).toLocaleDateString("he-IL")}
+                  </span>
+                )}
+                {/* FREE_REGION_FALLBACK (זמני) */}
+                {fallbackRegionsFor(therapist).length > 0 && (
+                  <span
+                    className="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-800 border border-teal-300"
+                    title="פיצ'ר זמני: מטפל חינמי מוצג בהתאמות רק כשאין אף מטפל משלם באזור שביקש המטופל, ולא בבקשות אונליין"
+                  >
+                    🛟 גיבוי התאמות: {fallbackRegionsFor(therapist).join(", ")}
                   </span>
                 )}
                 {therapist.certificates.length === 0 && (
