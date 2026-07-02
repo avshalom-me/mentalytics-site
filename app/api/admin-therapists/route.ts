@@ -449,6 +449,42 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: true, id });
     }
 
+    // Admin deletes a single certificate (e.g. the therapist uploaded the wrong
+    // file). Removes the storage object and the row. Scoped to this therapist.
+    if (body.action === "delete_cert") {
+      const certId = typeof body.certId === "string" ? body.certId : "";
+      if (!certId) {
+        return NextResponse.json({ ok: false, error: "certId required" }, { status: 400 });
+      }
+      const { data: cert } = await supabaseAdmin
+        .from("therapist_certificates")
+        .select("id, therapist_id, file_path")
+        .eq("id", certId)
+        .single();
+      if (!cert || cert.therapist_id !== id) {
+        return NextResponse.json({ ok: false, error: "certificate not found" }, { status: 404 });
+      }
+      // Remove the file first (best-effort); the row is the source of truth for
+      // the UI, so a storage-remove hiccup must not block deleting the row.
+      await supabaseAdmin.storage.from(PROFILE_PHOTOS_BUCKET).remove([cert.file_path]);
+      const { error: delErr } = await supabaseAdmin
+        .from("therapist_certificates")
+        .delete()
+        .eq("id", certId);
+      if (delErr) {
+        return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
+      }
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "delete_cert",
+        before: { file_path: cert.file_path },
+        after: {},
+        reason: "admin deleted a certificate",
+      });
+      return NextResponse.json({ ok: true, id, certId });
+    }
+
     // ── On-demand Sumit reconciliation ──────────────────────────────────────
     // Closes the gap where a standing order is still ACTIVE at Sumit but the
     // local subscription is already 'cancelled' — the status-change cancel

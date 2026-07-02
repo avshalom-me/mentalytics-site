@@ -77,7 +77,28 @@ export async function GET(req: NextRequest) {
     if (signed?.signedUrl) photoUrl = signed.signedUrl;
   }
 
-  return NextResponse.json({ ok: true, therapist: therapist ?? null, photoUrl, user_id: user.id, email: user.email });
+  // Existing certificates, so the edit page can show the therapist what they
+  // already uploaded (otherwise the field looks empty and they can't tell).
+  let certificates: Array<{ id: string; original_name: string; signed_url: string | null }> = [];
+  if (therapist?.id) {
+    const { data: certRows } = await supabaseAdmin
+      .from("therapist_certificates")
+      .select("id, file_path, original_name, created_at")
+      .eq("therapist_id", therapist.id)
+      .order("created_at", { ascending: true });
+    certificates = await Promise.all(
+      (certRows ?? []).map(async (c) => {
+        let signed_url: string | null = null;
+        const { data: signed } = await supabaseAdmin.storage
+          .from("therapist-certificates")
+          .createSignedUrl(c.file_path, 60 * 60 * 24);
+        if (signed?.signedUrl) signed_url = signed.signedUrl;
+        return { id: c.id, original_name: c.original_name ?? "תעודה", signed_url };
+      })
+    );
+  }
+
+  return NextResponse.json({ ok: true, therapist: therapist ?? null, photoUrl, certificates, user_id: user.id, email: user.email });
 }
 
 // PATCH — update the therapist profile

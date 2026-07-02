@@ -74,6 +74,7 @@ export default function TherapistProfileEditPage() {
   const [saveErr, setSaveErr] = useState("");
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
+  const [existingCerts, setExistingCerts] = useState<Array<{ id: string; original_name: string; signed_url: string | null }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -108,6 +109,7 @@ export default function TherapistProfileEditPage() {
         // the therapist's point of view — keep the welcome banner.
         if (!(json.therapist.full_name ?? "").trim()) setIsNew(true);
         if (json.photoUrl) setProfilePhotoUrl(json.photoUrl);
+        if (Array.isArray(json.certificates)) setExistingCerts(json.certificates);
         setForm({
           full_name: json.therapist.full_name ?? "",
           phone: json.therapist.phone ?? "",
@@ -567,6 +569,28 @@ export default function TherapistProfileEditPage() {
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תעודת רישיון / אישור מקצועי <span className="text-red-500">*</span></label>
             <p className="mb-2 text-xs text-stone-500">יש להוסיף תעודת רישיון מטפל או תעודה המוכיחה את המקצוע</p>
+            {existingCerts.length > 0 && (
+              <div className="mb-2 rounded-lg border border-stone-200 bg-stone-50 p-2.5">
+                <div className="mb-1.5 text-xs font-semibold text-stone-600">תעודות שכבר הועלו:</div>
+                <ul className="flex flex-wrap gap-1.5">
+                  {existingCerts.map(c => (
+                    <li key={c.id}>
+                      {c.signed_url ? (
+                        <a href={c.signed_url} target="_blank" rel="noreferrer"
+                          className="inline-flex items-center gap-1 rounded-lg border border-[#2e7d8c] bg-white px-2.5 py-1 text-xs font-medium text-[#2e7d8c] hover:bg-[#2e7d8c] hover:text-white transition-colors">
+                          📄 {c.original_name}
+                        </a>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-stone-300 bg-white px-2.5 py-1 text-xs text-stone-400">
+                          📄 {c.original_name}
+                        </span>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-1.5 text-[11px] text-stone-400">העלאת קובץ חדש תתווסף לתעודות הקיימות (לא תחליף אותן). להסרת תעודה שגויה — פנו אלינו ב-admin@getmentalytics.com.</p>
+              </div>
+            )}
             <input type="file" accept=".pdf,.jpg,.jpeg,.png"
               onChange={e => setCertFile(e.target.files?.[0] ?? null)}
               className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />

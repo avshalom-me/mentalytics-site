@@ -634,6 +634,33 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // Delete a single certificate (e.g. the therapist uploaded the wrong file).
+  async function deleteCert(therapistId: string, certId: string, certName: string) {
+    if (!window.confirm(`למחוק את התעודה "${certName}"? פעולה זו אינה הפיכה.`)) return;
+    try {
+      setActionLoadingId(therapistId);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: therapistId, action: "delete_cert", certId }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "מחיקה נכשלה");
+      setTherapists((prev) =>
+        prev.map((t) =>
+          t.id === therapistId
+            ? { ...t, certificates: t.certificates.filter((c) => c.id !== certId) }
+            : t
+        )
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   // Promotes the therapist with the chosen expiry. monthsAhead=null means
   // an indefinite manual promotion (no expiry, won't be auto-demoted).
   // Anything > 0 creates a time-limited trial that the daily cron will
@@ -871,21 +898,31 @@ export default function AdminTherapistsPage() {
               ) : (
                 <ul className="flex flex-wrap gap-2">
                   {therapist.certificates.map((c) => (
-                    <li key={c.id}>
+                    <li key={c.id} className="inline-flex items-center overflow-hidden rounded-lg border border-[#2e7d8c]">
                       {c.signed_url ? (
                         <a
                           href={c.signed_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1 rounded-lg border border-[#2e7d8c] bg-white px-3 py-1.5 text-xs font-medium text-[#2e7d8c] hover:bg-[#2e7d8c] hover:text-white transition-colors"
+                          className="inline-flex items-center gap-1 bg-white px-3 py-1.5 text-xs font-medium text-[#2e7d8c] hover:bg-[#2e7d8c] hover:text-white transition-colors"
                         >
                           📄 {c.original_name}
                         </a>
                       ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-xs text-gray-400">
+                        <span className="inline-flex items-center gap-1 bg-white px-3 py-1.5 text-xs text-gray-400">
                           📄 {c.original_name} (קישור לא זמין)
                         </span>
                       )}
+                      <button
+                        type="button"
+                        disabled={isBusy}
+                        onClick={() => deleteCert(therapist.id, c.id, c.original_name)}
+                        title="מחק תעודה"
+                        className="border-inline-start border-[#2e7d8c] bg-red-50 px-2 py-1.5 text-xs font-bold text-red-600 hover:bg-red-100 disabled:opacity-50"
+                        style={{ borderInlineStart: "1px solid #2e7d8c" }}
+                      >
+                        ✕
+                      </button>
                     </li>
                   ))}
                 </ul>
