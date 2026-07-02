@@ -81,6 +81,8 @@ export async function PATCH(req: NextRequest) {
   for (const key of allowed) {
     if (key in body) update[key] = body[key];
   }
+  // Stamp therapist-initiated edits so the admin can see the profile changed.
+  update.profile_updated_at = new Date().toISOString();
 
   // Check if therapist exists for this user
   const { data: existing } = await supabaseAdmin

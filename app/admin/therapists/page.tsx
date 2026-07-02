@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { REGION_CITIES } from "@/app/lib/regions";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
@@ -25,6 +25,11 @@ type AdminTherapist = {
   cultural_prefs: string[];
   arrangements: string[];
   age_groups: string[];
+  languages: string[];
+  couples_modalities: string[];
+  cogfun_age_groups: string[];
+  education: string;
+  experience: string;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -47,6 +52,7 @@ type AdminTherapist = {
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
   missing: string[];
   completion_requested_at: string | null;
+  profile_updated_at: string | null;
 };
 
 type EditForm = {
@@ -131,6 +137,7 @@ function StyleScaleRow({
 export default function AdminTherapistsPage() {
   const [therapists, setTherapists] = useState<AdminTherapist[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
   const [reconcilingId, setReconcilingId] = useState<string | null>(null);
@@ -148,6 +155,9 @@ export default function AdminTherapistsPage() {
   // Edit modal state
   const [editingTherapist, setEditingTherapist] = useState<AdminTherapist | null>(null);
   const [editForm, setEditForm] = useState<EditForm | null>(null);
+  // Snapshot of the therapist as loaded when the modal opened — saveEdit diffs
+  // against it and PATCHes only the fields the admin actually changed.
+  const [editBaseline, setEditBaseline] = useState<EditForm | null>(null);
   const [promotingId, setPromotingId] = useState<string | null>(null);
   const [giftMonths, setGiftMonths] = useState(1);
   const [editSaving, setEditSaving] = useState(false);
@@ -156,34 +166,42 @@ export default function AdminTherapistsPage() {
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
 
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTherapists() {
-      try {
+  const loadTherapists = useCallback(async (opts?: { silent?: boolean }) => {
+    try {
+      if (!opts?.silent) {
         setLoading(true);
         setError("");
-
-        const res = await fetch("/api/admin-therapists", { cache: "no-store" });
-        const json = await res.json();
-
-        if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load admin therapists");
-        if (!cancelled) setTherapists(json.therapists ?? []);
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Unknown error");
-      } finally {
-        if (!cancelled) setLoading(false);
       }
-    }
 
-    loadTherapists();
-    return () => { cancelled = true; };
+      const res = await fetch("/api/admin-therapists", { cache: "no-store" });
+      const json = await res.json();
+
+      if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load admin therapists");
+      setTherapists(json.therapists ?? []);
+      // Fresh signed URLs — clear images previously marked broken (expired URL).
+      setBrokenImages({});
+    } catch (err) {
+      // A failed silent refresh keeps the data we already have on screen.
+      if (!opts?.silent) setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      if (!opts?.silent) setLoading(false);
+    }
   }, []);
 
-  function openEdit(t: AdminTherapist) {
-    setEditingTherapist(t);
-    setEditError("");
-    setEditForm({
+  useEffect(() => {
+    loadTherapists();
+  }, [loadTherapists]);
+
+  // The admin tab is a long-lived workspace while therapists keep editing their
+  // profiles. Refetch whenever the tab regains focus so the list never goes stale.
+  useEffect(() => {
+    const onFocus = () => loadTherapists({ silent: true });
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, [loadTherapists]);
+
+  function toEditForm(t: AdminTherapist): EditForm {
+    return {
       full_name: t.full_name,
       email: t.email,
       phone: t.phone,
@@ -199,26 +217,71 @@ export default function AdminTherapistsPage() {
       style_q1: t.style_q1,
       style_q2: t.style_q2,
       activity_level: t.activity_level,
-    });
+    };
+  }
+
+  // Re-fetch the single therapist before opening the modal: editing a stale
+  // page-load snapshot used to overwrite updates the therapist made in the
+  // meantime (the modal saved ALL fields from old data).
+  async function openEdit(t: AdminTherapist) {
+    setEditError("");
+    setActionLoadingId(t.id);
+    let fresh = t;
+    try {
+      const res = await fetch(`/api/admin-therapists?id=${encodeURIComponent(t.id)}`, { cache: "no-store" });
+      const json = await res.json();
+      if (res.ok && json.ok && json.therapists?.[0]) {
+        fresh = json.therapists[0] as AdminTherapist;
+        setTherapists((prev) => prev.map((x) => (x.id === t.id ? fresh : x)));
+      }
+    } catch {
+      // Network hiccup — fall back to the data we have rather than blocking the edit.
+    }
+    setActionLoadingId(null);
+    setEditBaseline(toEditForm(fresh));
+    setEditForm(toEditForm(fresh));
+    setEditingTherapist(fresh);
   }
 
   async function saveEdit() {
     if (!editingTherapist || !editForm) return;
+    // Send only what actually changed vs. the freshly-loaded baseline, so an
+    // admin save can never clobber fields it didn't touch.
+    const changed: Record<string, unknown> = {};
+    if (editBaseline) {
+      for (const key of Object.keys(editForm) as (keyof EditForm)[]) {
+        const a = editForm[key];
+        const b = editBaseline[key];
+        const equal = Array.isArray(a) && Array.isArray(b)
+          ? a.length === b.length && a.every((v, i) => v === b[i])
+          : a === b;
+        if (!equal) changed[key] = a;
+      }
+    } else {
+      Object.assign(changed, editForm);
+    }
+    if (Object.keys(changed).length === 0) {
+      setEditingTherapist(null);
+      setEditForm(null);
+      setEditBaseline(null);
+      return;
+    }
     setEditSaving(true);
     setEditError("");
     try {
       const res = await fetch("/api/admin-therapists", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingTherapist.id, fields: editForm }),
+        body: JSON.stringify({ id: editingTherapist.id, fields: changed }),
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to save");
       setTherapists((prev) =>
-        prev.map((t) => t.id === editingTherapist.id ? { ...t, ...editForm } : t)
+        prev.map((t) => t.id === editingTherapist.id ? { ...t, ...changed } : t)
       );
       setEditingTherapist(null);
       setEditForm(null);
+      setEditBaseline(null);
     } catch (err) {
       setEditError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -510,6 +573,19 @@ export default function AdminTherapistsPage() {
                     ✉️ נשלחה בקשת השלמה · {new Date(therapist.completion_requested_at).toLocaleDateString("he-IL")}
                   </span>
                 )}
+                {therapist.profile_updated_at && (
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-semibold border ${
+                      therapist.completion_requested_at &&
+                      new Date(therapist.profile_updated_at) > new Date(therapist.completion_requested_at)
+                        ? "bg-green-100 text-green-800 border-green-300"
+                        : "bg-stone-100 text-stone-700 border-stone-300"
+                    }`}
+                    title={new Date(therapist.profile_updated_at).toLocaleString("he-IL")}
+                  >
+                    🕐 המטפל/ת עדכנ/ה · {new Date(therapist.profile_updated_at).toLocaleDateString("he-IL")}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -573,6 +649,32 @@ export default function AdminTherapistsPage() {
                 <span className="font-medium">הסדרים:</span>{" "}
                 {therapist.arrangements.length > 0 ? therapist.arrangements.join(", ") : "—"}
               </div>
+              <div className="md:col-span-2">
+                <span className="font-medium">גילאי טיפול:</span>{" "}
+                {therapist.age_groups.length > 0 ? therapist.age_groups.join(", ") : "—"}
+              </div>
+              <div className="md:col-span-2">
+                <span className="font-medium">שפות:</span>{" "}
+                {therapist.languages.length > 0 ? therapist.languages.join(", ") : "—"}
+              </div>
+              {therapist.couples_modalities.length > 0 && (
+                <div className="md:col-span-2">
+                  <span className="font-medium">הכשרות זוגיות:</span>{" "}
+                  {therapist.couples_modalities.join(", ")}
+                </div>
+              )}
+              {therapist.education && (
+                <div className="md:col-span-2">
+                  <span className="font-medium">השכלה:</span>{" "}
+                  <span className="whitespace-pre-line">{therapist.education}</span>
+                </div>
+              )}
+              {therapist.experience && (
+                <div className="md:col-span-2">
+                  <span className="font-medium">ניסיון:</span>{" "}
+                  <span className="whitespace-pre-line">{therapist.experience}</span>
+                </div>
+              )}
             </div>
 
             <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3">
@@ -710,7 +812,21 @@ export default function AdminTherapistsPage() {
   return (
     <main className="mx-auto max-w-6xl p-6" dir="rtl">
       <div className="flex items-center justify-between mb-8">
-        <h1 className="text-3xl font-bold">ניהול מטפלים</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-3xl font-bold">ניהול מטפלים</h1>
+          <button
+            onClick={async () => {
+              setRefreshing(true);
+              await loadTherapists({ silent: true });
+              setRefreshing(false);
+            }}
+            disabled={refreshing}
+            className="rounded-lg border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+            title="טעינה מחדש של כל הנתונים"
+          >
+            {refreshing ? "מרענן..." : "↻ רענן נתונים"}
+          </button>
+        </div>
         <button
           onClick={() => {
             // Stores the STAFF_BYPASS_TOKEN locally; it's sent to the score
@@ -849,7 +965,7 @@ export default function AdminTherapistsPage() {
             <div className="mb-5 flex items-center justify-between">
               <h2 className="text-xl font-bold">עריכת פרטים — {editingTherapist.full_name}</h2>
               <button
-                onClick={() => { setEditingTherapist(null); setEditForm(null); }}
+                onClick={() => { setEditingTherapist(null); setEditForm(null); setEditBaseline(null); }}
                 className="text-2xl text-stone-400 hover:text-stone-700 leading-none"
               >
                 ×
@@ -986,7 +1102,7 @@ export default function AdminTherapistsPage() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() => { setEditingTherapist(null); setEditForm(null); }}
+                onClick={() => { setEditingTherapist(null); setEditForm(null); setEditBaseline(null); }}
                 className="rounded-xl border border-stone-300 px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50"
               >
                 ביטול

@@ -28,6 +28,11 @@ type TherapistRow = {
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
   age_groups: string[] | null;
+  languages: string[] | null;
+  couples_modalities: string[] | null;
+  cogfun_age_groups: string[] | null;
+  education: string | null;
+  experience: string | null;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -39,6 +44,7 @@ type TherapistRow = {
   admin_approved: boolean | null;
   created_at: string | null;
   completion_requested_at: string | null;
+  profile_updated_at: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -51,8 +57,8 @@ function normalizeStoragePath(path: string) {
   }
 }
 
-async function buildTherapistsResponse() {
-  const { data, error } = await supabaseAdmin
+async function buildTherapistsResponse(onlyId?: string) {
+  let query = supabaseAdmin
     .from("therapists")
     .select(
       `
@@ -70,6 +76,11 @@ async function buildTherapistsResponse() {
       cultural_prefs,
       arrangements,
       age_groups,
+      languages,
+      couples_modalities,
+      cogfun_age_groups,
+      education,
+      experience,
       style_q1,
       style_q2,
       activity_level,
@@ -80,10 +91,13 @@ async function buildTherapistsResponse() {
       promoted_until,
       admin_approved,
       created_at,
-      completion_requested_at
+      completion_requested_at,
+      profile_updated_at
       `
     )
     .order("full_name", { ascending: true });
+  if (onlyId) query = query.eq("id", onlyId);
+  const { data, error } = await query;
 
   if (error) {
     return {
@@ -122,10 +136,12 @@ async function buildTherapistsResponse() {
         content_type: string | null;
       }>).map(async (c) => {
         let signed_url: string | null = null;
+        // 24h expiry: the admin tab routinely stays open for hours — a 1h URL
+        // made photos/certs silently break mid-session.
         const { data: signedData, error: signedError } =
           await supabaseAdmin.storage
             .from(PROFILE_PHOTOS_BUCKET)
-            .createSignedUrl(normalizeStoragePath(c.file_path), 60 * 60);
+            .createSignedUrl(normalizeStoragePath(c.file_path), 60 * 60 * 24);
         if (!signedError && signedData?.signedUrl) {
           signed_url = signedData.signedUrl;
         }
@@ -209,7 +225,7 @@ async function buildTherapistsResponse() {
         const { data: signedData, error: signedError } =
           await supabaseAdmin.storage
             .from(PROFILE_PHOTOS_BUCKET)
-            .createSignedUrl(normalizedPath, 60 * 60);
+            .createSignedUrl(normalizedPath, 60 * 60 * 24);
 
         if (!signedError && signedData?.signedUrl) {
           profile_photo_url = signedData.signedUrl;
@@ -231,6 +247,11 @@ async function buildTherapistsResponse() {
         cultural_prefs: t.cultural_prefs ?? [],
         arrangements: t.arrangements ?? [],
         age_groups: t.age_groups ?? [],
+        languages: t.languages ?? [],
+        couples_modalities: t.couples_modalities ?? [],
+        cogfun_age_groups: t.cogfun_age_groups ?? [],
+        education: t.education ?? "",
+        experience: t.experience ?? "",
         style_q1: t.style_q1 ?? null,
         style_q2: t.style_q2 ?? null,
         activity_level: t.activity_level ?? null,
@@ -244,6 +265,7 @@ async function buildTherapistsResponse() {
         admin_approved: t.admin_approved ?? false,
         created_at: t.created_at ?? null,
         completion_requested_at: t.completion_requested_at ?? null,
+        profile_updated_at: t.profile_updated_at ?? null,
         views_30d: viewsByTherapist[t.id] ?? 0,
         contacts_30d: contactsByTherapist[t.id] ?? 0,
         subscription: subByTherapist[t.id] ?? null,
@@ -259,8 +281,11 @@ async function buildTherapistsResponse() {
   };
 }
 
-export async function GET() {
-  const result = await buildTherapistsResponse();
+export async function GET(request: Request) {
+  // ?id=<uuid> → fetch one therapist fresh. Used by the edit modal so the
+  // admin never edits (and overwrites with) a stale page-load snapshot.
+  const id = new URL(request.url).searchParams.get("id") ?? undefined;
+  const result = await buildTherapistsResponse(id);
 
   if (!result.ok) {
     return NextResponse.json(

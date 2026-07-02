@@ -122,7 +122,7 @@ export async function POST(req: NextRequest) {
   if (type === "photo") {
     const { error: dbError } = await supabaseAdmin
       .from("therapists")
-      .update({ profile_photo_path: path })
+      .update({ profile_photo_path: path, profile_updated_at: new Date().toISOString() })
       .eq("id", therapist.id);
     if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
   } else {
@@ -137,6 +137,10 @@ export async function POST(req: NextRequest) {
         size_bytes: file.size,
       });
     if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
+    await supabaseAdmin
+      .from("therapists")
+      .update({ profile_updated_at: new Date().toISOString() })
+      .eq("id", therapist.id);
   }
 
   return NextResponse.json({ ok: true, path });

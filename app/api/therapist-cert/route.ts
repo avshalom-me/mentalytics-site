@@ -111,6 +111,10 @@ export async function POST(req: NextRequest) {
       size_bytes: typeof body.size === "number" ? body.size : 0,
     });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+    await supabaseAdmin
+      .from("therapists")
+      .update({ profile_updated_at: new Date().toISOString() })
+      .eq("id", therapist.id);
     return NextResponse.json({ ok: true, path });
   }
 
