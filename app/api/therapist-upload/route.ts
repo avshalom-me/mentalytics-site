@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -83,18 +84,13 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (!therapist && user.email) {
-    // Only auto-claim an UNLINKED row by email (user_id IS NULL); never re-bind
-    // a row already owned by another user.
-    const { data: byEmail } = await supabaseAdmin
-      .from("therapists")
-      .select("id")
-      .eq("email", user.email)
-      .is("user_id", null)
-      .maybeSingle();
+    // Only auto-claim an UNLINKED, not-yet-live row by email — never a row
+    // owned by another user, and never a live/paying profile (takeover risk).
+    const byEmail = await findClaimableTherapistByEmail(user.email, "id");
     if (byEmail) {
       // Link user_id for future requests
-      await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id);
-      therapist = byEmail;
+      await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id as string);
+      therapist = { id: byEmail.id as string };
     }
   }
 

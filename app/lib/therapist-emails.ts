@@ -19,6 +19,13 @@ const ADMIN_RECIPIENTS = (
   .map((s) => s.trim())
   .filter(Boolean);
 
+// Centered brand logo header for the top of the email card. Uses the hosted
+// PNG wordmark (email clients strip SVG). Kept as a plain string so any email
+// can drop it in right after the card's opening <div>.
+const EMAIL_LOGO_HEADER = `<div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
+        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+      </div>`;
+
 function escapeHtml(str: string): string {
   return str
     .replace(/&/g, "&amp;")
@@ -110,7 +117,7 @@ export async function sendPromotionEndedEmail(opts: {
       <p style="margin:0 0 24px;">לתחילת מסלול בתשלום:</p>
       <p style="margin:0 0 16px;">
         <a href="${checkoutUrl}"
-           style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
+           style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
           הרשמה למסלול המקודם
         </a>
       </p>
@@ -268,7 +275,7 @@ export async function sendPromotionGrantedEmail(opts: {
       <p style="margin:0 0 16px;">לצפייה בפרטים מלאים ובסטטיסטיקות שלך:</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}"
-           style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
+           style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
           לדשבורד שלי
         </a>
       </p>
@@ -369,7 +376,7 @@ export async function sendTherapistWelcomeEmail(opts: {
   const upsellHtml = isPaid
     ? ""
     : `
-      <div style="background:linear-gradient(135deg,#0F5468,#1A7A96);border-radius:10px;padding:18px 20px;margin:0 0 22px;color:#fff;">
+      <div style="background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);border-radius:10px;padding:18px 20px;margin:0 0 22px;color:#fff;">
         <p style="margin:0 0 6px;font-weight:bold;font-size:15px;">רוצה להגיע ליותר מטופלים? שדרג/י למסלול המקודם</p>
         <p style="margin:0 0 12px;font-size:13px;color:rgba(255,255,255,.85);">${
           isPromoActive()
@@ -396,7 +403,7 @@ export async function sendTherapistWelcomeEmail(opts: {
       <p style="margin:0 0 16px;">לעדכון הפרטים ולצפייה בלוח הבקרה שלך:</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}"
-           style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
+           style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
           ללוח הבקרה שלי
         </a>
       </p>
@@ -452,7 +459,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
       <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר — לטובת המטופלים וגם לטובתך.</p>
       <p style="margin:0 0 18px;">נעדכן אותך במייל ברגע שהפרופיל יאושר. בינתיים אפשר להיכנס ללוח הבקרה לעדכן או להשלים פרטים.</p>
       <p style="margin:0 0 16px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
+        <a href="${dashboardUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
@@ -500,7 +507,7 @@ export async function sendPromotedApprovedEmail(opts: {
       <p style="margin:0 0 14px;">שמחים לבשר — הפרופיל שלך אושר וכעת הוא חי במערכת ההתאמה החכמה של טיפול חכם!</p>
       <p style="margin:0 0 18px;">מהרגע הזה מטופלים שמחפשים מטפל/ת שמתאים/ה בדיוק לפרופיל שלך (לפי תחום, גיל, אזור, שפה וסגנון טיפולי) יופנו אליך — ותוכל/י לעקוב אחרי הצפיות, הפניות ואחוזי ההמרה בלוח הבקרה.</p>
       <p style="margin:0 0 16px;">
-        <a href="${dashboardUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
+        <a href="${dashboardUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
@@ -552,7 +559,7 @@ export async function sendArticleReviewedEmail(opts: {
   const bodyHtml = opts.approved
     ? `<p style="margin:0 0 16px;">המאמר שלך "<strong>${safeTitle}</strong>" אושר ופורסם במאגר המאמרים של טיפול חכם — עם שמך וקישור לפרופיל שלך. כתיבה כזו עוזרת למטופלים פוטנציאליים להכיר אותך.</p>
        <p style="margin:0 0 16px;">
-         <a href="${articleUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">צפייה במאמר</a>
+         <a href="${articleUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">צפייה במאמר</a>
        </p>
        <p style="margin:0;font-size:13px;color:#666;">מוזמן/ת לכתוב מאמרים נוספים מ<a href="${articlesUrl}" style="color:#0F5468;">אזור המאמרים שלך</a>.</p>`
     : `<p style="margin:0 0 16px;">תודה ששלחת את המאמר "<strong>${safeTitle}</strong>". לאחר בדיקה, הוא לא אושר לפרסום במתכונתו הנוכחית.</p>
@@ -621,7 +628,7 @@ export async function sendTherapistRejectedEmail(opts: {
       ${reasonBlock}
       <p style="margin:0 0 16px;">קל לתקן: היכנס/י לעריכת הפרופיל, עדכן/י את הפרטים הנדרשים והעלה/י תעודת רישיון או אישור מקצועי ברורים וקריאים. לאחר השמירה, הפרופיל יישלח שוב לבדיקה אוטומטית.</p>
       <p style="margin:0 0 16px;">
-        <a href="${editUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
+        <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
       </p>
       <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
@@ -671,16 +678,17 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
   <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
-      <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
+    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;">
+      ${EMAIL_LOGO_HEADER}
+      <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${safeName},</h1>
       <div style="white-space:pre-line;margin:0 0 18px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
-      <p style="margin:0 0 16px;">היכנס/י לעריכת הפרופיל, השלם/י את הפרטים, ולאחר השמירה הפרופיל יישלח אוטומטית לבדיקה.</p>
-      <p style="margin:0 0 16px;">
-        <a href="${editUrl}" style="display:inline-block;background:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
-      </p>
-      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      <p style="margin:0 0 22px;font-size:15px;">היכנס/י לעריכת הפרופיל, השלם/י את הפרטים, ולאחר השמירה הפרופיל יישלח אוטומטית לבדיקה.</p>
+      <div style="text-align:center;margin:0 0 20px;">
+        <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">לעריכת הפרופיל שלי ←</a>
+      </div>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
-      <p style="margin:0;font-size:12px;color:#888;">
+      <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
         טיפול חכם — Mentalytics
       </p>

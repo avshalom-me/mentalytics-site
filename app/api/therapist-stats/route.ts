@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeEnrichedStats } from "@/app/lib/therapist-stats";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +26,10 @@ async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status:
     .single();
 
   if (!data && user.email) {
-    const { data: byEmail } = await supabaseAdmin
-      .from("therapists")
-      .select("id, status")
-      .eq("email", user.email)
-      .is("user_id", null)
-      .maybeSingle();
-    return byEmail ? { id: byEmail.id, status: byEmail.status } : null;
+    // Same takeover guard as the profile routes: never expose a live/paying
+    // profile's private stats to an unverified email match.
+    const byEmail = await findClaimableTherapistByEmail(user.email, "id, status");
+    return byEmail ? { id: byEmail.id as string, status: byEmail.status as string } : null;
   }
 
   return data ? { id: data.id, status: data.status } : null;

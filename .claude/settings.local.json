@@ -260,7 +260,31 @@
       "PowerShell(Get-ChildItem C:\\\\projects\\\\mentalytics-site\\\\app -Directory -Recurse -Depth 2 | Select-Object -ExpandProperty FullName | ForEach-Object { $_.Replace\\('C:\\\\projects\\\\mentalytics-site\\\\',''\\) })",
       "Bash(grep -rniE \"\\(sk-[a-zA-Z0-9]{20}|api[_-]?key\\\\s*[:=]\\\\s*['\\\\\"][A-Za-z0-9]{16,}|Bearer [A-Za-z0-9\\\\-_\\\\.]{30,}\\)\" app --include=\"*.tsx\" --include=\"*.ts\")",
       "Bash(grep -v \"Bearer \\\\${\")",
-      "Bash(grep -v \"Bearer \\\\`\")"
+      "Bash(grep -v \"Bearer \\\\`\")",
+      "PowerShell(cd C:\\\\projects\\\\mentalytics-site; Write-Output '=== git diff --stat \\(unstaged\\) ==='; git diff --stat; Write-Output '=== is supabase tracked? ==='; git ls-files supabase/ | Select-Object -First 5; Write-Output '\\(count tracked in supabase/\\):'; \\(git ls-files supabase/ | Measure-Object\\).Count; Write-Output '=== .gitignore supabase lines ==='; Select-String -Path .gitignore -Pattern 'supabase' -SimpleMatch)",
+      "PowerShell(cd C:\\\\projects\\\\mentalytics-site; Write-Output '=== assume-unchanged / skip-worktree flags \\(lowercase = flagged\\) ==='; git ls-files -v app/lib/usage.ts app/api/questionnaire/adults/score/route.ts app/api/questionnaire/kids/score/route.ts; Write-Output '=== raw diff line count usage.ts ==='; \\(git diff HEAD -- app/lib/usage.ts | Measure-Object -Line\\).Lines; Write-Output '=== does git track the score route? ==='; git ls-files --error-unmatch app/api/questionnaire/adults/score/route.ts 2>&1; Write-Output '=== git hash of on-disk vs index for score route ==='; git diff HEAD -- app/api/questionnaire/adults/score/route.ts | Select-Object -First 5)",
+      "PowerShell(cd C:\\\\projects\\\\mentalytics-site; git add -A; Write-Output '=== staged stat ==='; git diff --cached --stat; Write-Output '=== usage.ts staged diff line count ==='; \\(git diff --cached -- app/lib/usage.ts | Measure-Object -Line\\).Lines)",
+      "Bash(node \"C:\\\\Users\\\\avsha\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--projects-mentalytics-site\\\\f1bada54-968d-466b-a229-e14bd126204e\\\\scratchpad\\\\shots.mjs\")",
+      "Bash(cp \"C:\\\\Users\\\\avsha\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--projects-mentalytics-site\\\\f1bada54-968d-466b-a229-e14bd126204e\\\\scratchpad\\\\shots.mjs\" \"C:\\\\projects\\\\mentalytics-site\\\\_shots.mjs\")",
+      "Bash(node _shots.mjs)",
+      "Bash(rm -f \"C:\\\\projects\\\\mentalytics-site\\\\_shots.mjs\")",
+      "Bash(mkdir -p '/c/Users/avsha/Dropbox/פרטי/Mentalitics/יח\"צ')",
+      "Bash(mv /c/projects/mentalytics-site/screenshots/*.jpg '/c/Users/avsha/Dropbox/פרטי/Mentalitics/יח\"צ/')",
+      "Bash(awk '{printf \"%6.0fKB  %s\\\\n\", $5/1024, $9}')",
+      "mcp__d37772c2-ec8c-472f-9086-87dcfac441d7__get_runtime_errors",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code} | x-vercel-cache: %header{x-vercel-cache} | cache-control: %header{cache-control} | age: %header{age}\\\\n\" \"https://www.mentalytics.co.il/therapists/e3262d01-f360-4cf6-aa75-6bb7bcea7035\" -L --max-redirs 3)",
+      "Bash(curl -s -o /dev/null -w \"second: HTTP %{http_code} | x-vercel-cache: %header{x-vercel-cache} | age: %header{age}\\\\n\" \"https://www.mentalytics.co.il/therapists/e3262d01-f360-4cf6-aa75-6bb7bcea7035\" -L --max-redirs 3)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npm run build 2>&1)",
+      "PowerShell(if \\(Test-Path .env.local\\) { Select-String -Path .env.local -Pattern \"ADMIN_USERNAME|ADMIN_PASSWORD|SUPABASE_URL\" | ForEach-Object { \\($_.Line -split '='\\)[0] } } else { \"no .env.local\" })",
+      "PowerShell($env:ADMIN_CREDS = \\(Select-String -Path .env.local -Pattern '^ADMIN_\\(USERNAME|PASSWORD\\)=' | ForEach-Object { \\($_.Line -split '=',2\\)[1] }\\) -join ':'; $b64 = [Convert]::ToBase64String\\([Text.Encoding]::UTF8.GetBytes\\($env:ADMIN_CREDS\\)\\); \"BASIC $b64\" | Out-File -Encoding utf8 \"$env:TEMP\\\\admin_b64.txt\"; \"written\")",
+      "PowerShell(Get-Content \"$env:TEMP\\\\admin_b64.txt\")",
+      "PowerShell(git add supabase/migrations/20260702_profile_updated_at.sql app/api/therapist-profile/route.ts app/api/therapist-upload/route.ts app/api/therapist-cert/route.ts app/api/admin-therapists/route.ts app/admin/therapists/page.tsx)",
+      "PowerShell(git push origin master)",
+      "PowerShell(node --version)",
+      "PowerShell(npm --version)",
+      "Bash(grep -n \"logo\\\\|<img\\\\|<svg\\\\|טיפול חכם</\\\\|text-align:center\\\\|header\" app/lib/therapist-emails.ts)",
+      "Bash(node -e 'const fs=require\\(\"fs\"\\);const b=fs.readFileSync\\(\"public/logo.png\"\\).toString\\(\"base64\"\\);fs.writeFileSync\\(process.env.TEMP+\"/logo64.txt\",\"data:image/png;base64,\"+b\\);console.log\\(\"len\",b.length\\)')"
     ]
   }
 }

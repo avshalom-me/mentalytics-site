@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
+import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 
 export const dynamic = "force-dynamic";
 
@@ -30,21 +31,16 @@ export async function GET(req: NextRequest) {
     .eq("user_id", user.id)
     .single();
 
-  // If not found, try to link by email (existing therapist)
+  // If not found, try to link an admin-pre-added row by email. Only
+  // not-yet-live rows are eligible — see findClaimableTherapistByEmail.
   if (!therapist && user.email) {
-    const { data: byEmail } = await supabaseAdmin
-      .from("therapists")
-      .select("*")
-      .eq("email", user.email)
-      .is("user_id", null)
-      .maybeSingle();
-
+    const byEmail = await findClaimableTherapistByEmail(user.email, "*");
     if (byEmail) {
       // Link the existing therapist to this user
       await supabaseAdmin
         .from("therapists")
         .update({ user_id: user.id })
-        .eq("id", byEmail.id);
+        .eq("id", byEmail.id as string);
       therapist = { ...byEmail, user_id: user.id };
     }
   }

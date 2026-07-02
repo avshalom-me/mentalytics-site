@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -39,15 +40,11 @@ async function resolveTherapist(user: { id: string; email?: string | null }) {
     .maybeSingle();
 
   if (!therapist && user.email) {
-    const { data: byEmail } = await supabaseAdmin
-      .from("therapists")
-      .select("id")
-      .eq("email", user.email)
-      .is("user_id", null)
-      .maybeSingle();
+    // Only a not-yet-live unclaimed row may be auto-claimed (takeover risk).
+    const byEmail = await findClaimableTherapistByEmail(user.email, "id");
     if (byEmail) {
-      await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id);
-      therapist = byEmail;
+      await supabaseAdmin.from("therapists").update({ user_id: user.id }).eq("id", byEmail.id as string);
+      therapist = { id: byEmail.id as string };
     }
   }
 
