@@ -20,6 +20,7 @@ type ArticleRow = {
   image_url: string | null;
   image_alt: string | null;
   image_credit: string | null;
+  canonical_url: string | null;
   therapists:
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null }
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null }[]
@@ -30,7 +31,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, therapists(full_name, therapist_types, gender)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, canonical_url, therapists(full_name, therapist_types, gender)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -59,13 +60,19 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const a = await getArticle(decodeURIComponent(slug));
   if (!a) return { title: "מאמר לא נמצא" };
   const desc = a.summary || a.body.slice(0, 150);
+  const ownUrl = `${BASE_URL}/research/community/${a.slug}`;
+  // If the article was first published elsewhere, point the canonical at that
+  // original so Google attributes the content there (no duplicate-content
+  // competition). Otherwise self-canonicalize.
+  const canonical = a.canonical_url?.trim() || ownUrl;
   return {
     title: `${a.title} | טיפול חכם`,
     description: desc,
+    alternates: { canonical },
     openGraph: {
       title: a.title,
       description: desc,
-      url: `${BASE_URL}/research/community/${a.slug}`,
+      url: ownUrl,
       type: "article",
     },
   };

@@ -1,6 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoreKidsQuestionnaire } from "@/app/lib/kids-score.server";
-import { cleanFp, consumeUsage, getIp, getUsage, isStaffBypass } from "@/app/lib/usage";
+import {
+  bumpAndCheckIpDaily,
+  cleanFp,
+  consumeUsage,
+  getIp,
+  getUsage,
+  isStaffBypass,
+  MAX_FREE,
+} from "@/app/lib/usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -21,6 +29,11 @@ export async function POST(request: NextRequest) {
     if (!staff) {
       const usage = await getUsage(ip, fp, "kids");
       if (usage.paymentRequired) {
+        return NextResponse.json({ ok: false, paymentRequired: true }, { status: 402 });
+      }
+      // Coarse per-IP daily backstop, only for genuinely free serves; paid
+      // users (limit > MAX_FREE) bypass it. See adults score route.
+      if (usage.limit <= MAX_FREE && !(await bumpAndCheckIpDaily(ip))) {
         return NextResponse.json({ ok: false, paymentRequired: true }, { status: 402 });
       }
     }

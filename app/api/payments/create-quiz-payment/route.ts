@@ -29,6 +29,27 @@ function checkRateLimit(key: string): boolean {
   return true;
 }
 
+// Persistent per-IP daily cap on card-charge ATTEMPTS. This is the real
+// anti-carding control: the short window above is in-memory (resets on cold
+// start, per-lambda), and both it and the pending-row idempotency index used to
+// be keyed on the client-controlled `fp`, so an attacker could rotate `fp` to
+// get a fresh bucket per value and run stolen-card validation at ~₪35 a probe.
+// Keyed on IP alone (via the shared quiz_ip_daily counter with a "qcharge:"
+// namespace) so fp rotation can't defeat it. Fails OPEN so a counter error
+// never blocks a real buyer. Set QUIZ_CHARGE_IP_DAILY_CAP=0 to disable.
+const CHARGE_IP_DAILY_CAP = Number(process.env.QUIZ_CHARGE_IP_DAILY_CAP ?? 10);
+async function chargeAttemptsUnderCap(ip: string): Promise<boolean> {
+  if (CHARGE_IP_DAILY_CAP <= 0 || !ip || ip === "unknown") return true;
+  const { data, error } = await supabase.rpc("bump_quiz_ip_daily", {
+    p_ip: `qcharge:${ip}`,
+  });
+  if (error) {
+    console.error("create-quiz-payment: charge-cap RPC failed:", error.message);
+    return true;
+  }
+  return typeof data === "number" ? data <= CHARGE_IP_DAILY_CAP : true;
+}
+
 // Strip everything that isn't a letter (Hebrew or Latin), space, hyphen,
 // apostrophe or dot — defends against control chars and any XSS surface in
 // downstream document renderers.
@@ -71,7 +92,12 @@ export async function POST(req: NextRequest) {
     }
 
     const ip = getIp(req);
-    if (!checkRateLimit(`${ip}:${fp}`)) {
+    // Rate-limit on IP alone — NOT ip:fp — so rotating the client-controlled
+    // fingerprint can't mint a fresh bucket per value (the carding bypass).
+    if (!checkRateLimit(ip)) {
+      return NextResponse.json({ error: "too many requests" }, { status: 429 });
+    }
+    if (!(await chargeAttemptsUnderCap(ip))) {
       return NextResponse.json({ error: "too many requests" }, { status: 429 });
     }
 

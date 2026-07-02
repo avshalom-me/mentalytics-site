@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoreQuestionnaire } from "@/app/lib/questionnaire-score";
 import type { QuestionnaireAnswers } from "@/app/lib/questionnaire-types";
-import { cleanFp, consumeUsage, getIp, getUsage, isStaffBypass } from "@/app/lib/usage";
+import {
+  bumpAndCheckIpDaily,
+  cleanFp,
+  consumeUsage,
+  getIp,
+  getUsage,
+  isStaffBypass,
+  MAX_FREE,
+} from "@/app/lib/usage";
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,6 +32,12 @@ export async function POST(request: NextRequest) {
     if (!staff) {
       const usage = await getUsage(ip, fp, "adults");
       if (usage.paymentRequired) {
+        return NextResponse.json({ ok: false, paymentRequired: true }, { status: 402 });
+      }
+      // Coarse per-IP daily backstop, only for genuinely free serves. Paid
+      // users (limit raised above MAX_FREE by a completed payment) bypass it,
+      // so a legitimate purchase is never blocked by the anti-abuse cap.
+      if (usage.limit <= MAX_FREE && !(await bumpAndCheckIpDaily(ip))) {
         return NextResponse.json({ ok: false, paymentRequired: true }, { status: 402 });
       }
     }

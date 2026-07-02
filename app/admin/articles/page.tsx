@@ -19,6 +19,7 @@ type AdminArticle = {
   image_url: string | null;
   image_alt: string | null;
   image_credit: string | null;
+  canonical_url: string | null;
 };
 
 type TherapistLite = { id: string; full_name: string };
@@ -172,14 +173,14 @@ export default function AdminArticlesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", summary: "", body: "", topic: "" });
+  const [editForm, setEditForm] = useState({ title: "", summary: "", body: "", topic: "", canonical_url: "" });
   const [editImage, setEditImage] = useState<ImageValue>(EMPTY_IMAGE);
 
   // Create-form state
   const [showCreate, setShowCreate] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState({ therapist_id: "", title: "", summary: "", body: "", topic: "" });
+  const [createForm, setCreateForm] = useState({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "" });
   const [createImage, setCreateImage] = useState<ImageValue>(EMPTY_IMAGE);
 
   async function load() {
@@ -231,7 +232,7 @@ export default function AdminArticlesPage() {
       setCreateErr(json.error ?? "שגיאה ביצירת המאמר");
       return;
     }
-    setCreateForm({ therapist_id: "", title: "", summary: "", body: "", topic: "" });
+    setCreateForm({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "" });
     setCreateImage(EMPTY_IMAGE);
     setShowCreate(false);
     await load();
@@ -248,7 +249,7 @@ export default function AdminArticlesPage() {
   function startEdit(a: AdminArticle) {
     setEditId(a.id);
     setOpenId(a.id);
-    setEditForm({ title: a.title, summary: a.summary, body: a.body, topic: a.topic ?? "" });
+    setEditForm({ title: a.title, summary: a.summary, body: a.body, topic: a.topic ?? "", canonical_url: a.canonical_url ?? "" });
     setEditImage({
       image_url: a.image_url ?? "",
       image_alt: a.image_alt ?? "",
@@ -321,6 +322,12 @@ export default function AdminArticlesPage() {
             <div>
               <p className="text-xs font-semibold text-stone-600 mb-1">תמונה</p>
               <ImagePicker value={editImage} onChange={setEditImage} defaultQuery={editForm.topic || editForm.title} />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-stone-600 mb-1">כתובת מקור מקורית (canonical)</p>
+              <input value={editForm.canonical_url} onChange={(e) => setEditForm({ ...editForm, canonical_url: e.target.value })}
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" dir="ltr" placeholder="https://... (אם המאמר פורסם קודם באתר אחר)" />
+              <p className="text-[11px] text-stone-400 mt-1">אם המאמר פורסם קודם במקום אחר (למשל האתר של המטפל/ת), הדבק כאן את הכתובת המקורית — גוגל ייחס את התוכן למקור ולא יראה בו כפילות. להשאיר ריק אם זה מקור ראשוני.</p>
             </div>
             <div className="flex gap-2">
               <button onClick={() => saveEdit(a)} disabled={busy === a.id}
@@ -395,6 +402,13 @@ export default function AdminArticlesPage() {
           <div>
             <p className="text-xs font-semibold text-stone-600 mb-1">תמונה ראשית</p>
             <ImagePicker value={createImage} onChange={setCreateImage} defaultQuery={createForm.topic || createForm.title} />
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-stone-600 mb-1">כתובת מקור מקורית (canonical)</p>
+            <input value={createForm.canonical_url} onChange={(e) => setCreateForm({ ...createForm, canonical_url: e.target.value })}
+              className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" dir="ltr" placeholder="https://... (אם המאמר פורסם קודם באתר אחר)" />
+            <p className="text-[11px] text-stone-400 mt-1">אם המאמר פורסם קודם במקום אחר (למשל האתר של המטפל/ת), הדבק כאן את הכתובת המקורית — גוגל ייחס את התוכן למקור ולא יראה בו כפילות. להשאיר ריק אם זה מקור ראשוני.</p>
           </div>
 
           {createErr && <p className="text-xs text-red-600">{createErr}</p>}

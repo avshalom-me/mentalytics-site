@@ -50,7 +50,7 @@ export async function GET() {
     supabaseAdmin
       .from("therapist_articles")
       .select(
-        "id, therapist_id, title, slug, summary, body, topic, status, rejection_reason, created_at, approved_at, image_url, image_alt, image_credit, therapists(full_name)"
+        "id, therapist_id, title, slug, summary, body, topic, status, rejection_reason, created_at, approved_at, image_url, image_alt, image_credit, canonical_url, therapists(full_name)"
       )
       .order("created_at", { ascending: false }),
     supabaseAdmin
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     image_url?: unknown;
     image_alt?: unknown;
     image_credit?: unknown;
+    canonical_url?: unknown;
     download_location?: unknown;
   };
   try {
@@ -113,6 +114,7 @@ export async function POST(req: NextRequest) {
   const imageUrl = typeof body.image_url === "string" ? body.image_url.trim() : "";
   const imageAlt = typeof body.image_alt === "string" ? body.image_alt.trim() : "";
   const imageCredit = typeof body.image_credit === "string" ? body.image_credit.trim() : "";
+  const canonicalUrl = typeof body.canonical_url === "string" ? body.canonical_url.trim() : "";
 
   if (!therapistId) {
     return NextResponse.json({ ok: false, error: "יש לבחור מטפל/ת לשיוך המאמר" }, { status: 400 });
@@ -137,6 +139,9 @@ export async function POST(req: NextRequest) {
   }
   if (imageUrl && !/^https:\/\//.test(imageUrl)) {
     return NextResponse.json({ ok: false, error: "כתובת התמונה חייבת להיות https" }, { status: 400 });
+  }
+  if (canonicalUrl && !/^https:\/\//.test(canonicalUrl)) {
+    return NextResponse.json({ ok: false, error: "כתובת המקור (canonical) חייבת להיות https" }, { status: 400 });
   }
 
   // The attributed therapist must be a real, publicly-listed therapist.
@@ -167,6 +172,7 @@ export async function POST(req: NextRequest) {
       image_url: imageUrl || null,
       image_alt: imageAlt || null,
       image_credit: imageCredit || null,
+      canonical_url: canonicalUrl || null,
     })
     .select("id, slug")
     .single();
@@ -196,6 +202,7 @@ export async function PATCH(req: NextRequest) {
     image_url?: unknown;
     image_alt?: unknown;
     image_credit?: unknown;
+    canonical_url?: unknown;
     download_location?: unknown;
   };
   try {
@@ -228,6 +235,13 @@ export async function PATCH(req: NextRequest) {
     }
     if (typeof body.image_alt === "string") update.image_alt = body.image_alt.trim() || null;
     if (typeof body.image_credit === "string") update.image_credit = body.image_credit.trim() || null;
+    if (typeof body.canonical_url === "string") {
+      const c = body.canonical_url.trim();
+      if (c && !/^https:\/\//.test(c)) {
+        return NextResponse.json({ ok: false, error: "כתובת המקור (canonical) חייבת להיות https" }, { status: 400 });
+      }
+      update.canonical_url = c || null;
+    }
     const { error } = await supabaseAdmin.from("therapist_articles").update(update).eq("id", id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     if (typeof update.image_url === "string") await triggerUnsplashDownload(body.download_location);
