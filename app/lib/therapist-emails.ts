@@ -134,8 +134,8 @@ export async function sendPromotionEndedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">${safeBody}</p>
       ${feedbackHtml}
@@ -205,8 +205,8 @@ export async function sendCancellationFeedbackEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:18px;margin:0 0 16px;">משוב ביטול ממטפל/ת</h1>
       <p style="margin:0 0 6px;"><strong>שם:</strong> ${safeName}</p>
       <p style="margin:0 0 16px;"><strong>מייל:</strong> ${safeEmail}</p>
@@ -280,8 +280,8 @@ export async function sendPromotionGrantedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">מזל טוב ${safeName} 🎉</h1>
       <p style="margin:0 0 12px;">${openingLine}</p>
       <p style="margin:0 0 20px;">${escapeHtml(durationLine)}</p>
@@ -418,8 +418,8 @@ export async function sendTherapistWelcomeEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 👋</h1>
       ${confirmationHtml}
       ${feedbackHtml}
@@ -477,8 +477,8 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 👋</h1>
       <p style="margin:0 0 14px;">תודה שהצטרפת לטיפול חכם! 🎉</p>
       <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר — לטובת המטופלים וגם לטובתך.</p>
@@ -526,8 +526,8 @@ export async function sendPromotedApprovedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 🎉</h1>
       <p style="margin:0 0 14px;">שמחים לבשר — הפרופיל שלך אושר וכעת הוא חי במערכת ההתאמה החכמה של טיפול חכם!</p>
       <p style="margin:0 0 18px;">מהרגע הזה מטופלים שמחפשים מטפל/ת שמתאים/ה בדיוק לפרופיל שלך (לפי תחום, גיל, אזור, שפה וסגנון טיפולי) יופנו אליך — ותוכל/י לעקוב אחרי הצפיות, הפניות ואחוזי ההמרה בלוח הבקרה.</p>
@@ -593,8 +593,8 @@ export async function sendArticleReviewedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       ${bodyHtml}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
@@ -646,8 +646,8 @@ export async function sendTherapistRejectedEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">תודה שנרשמת לטיפול חכם. לאחר בדיקת הפרטים, הפרופיל שלך עדיין לא אושר לפרסום.</p>
       ${reasonBlock}
@@ -702,8 +702,8 @@ export async function sendTherapistCompletionRequestEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       ${EMAIL_LOGO_HEADER}
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${safeName},</h1>
       <div style="white-space:pre-line;margin:0 0 18px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
@@ -755,8 +755,8 @@ export async function sendTherapistAdminMessageEmail(opts: {
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
-  <body style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;">
-    <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       ${EMAIL_LOGO_HEADER}
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${safeName},</h1>
       <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
