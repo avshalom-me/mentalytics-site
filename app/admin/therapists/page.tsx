@@ -8,6 +8,7 @@ import {
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
+import TherapistCrmPanel from "./components/TherapistCrmPanel";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -1066,6 +1067,13 @@ export default function AdminTherapistsPage() {
                 </ul>
               )}
             </div>
+
+            {/* CRM 360°: timeline + internal notes + follow-up tasks + Gmail. */}
+            <TherapistCrmPanel
+              therapistId={therapist.id}
+              therapistName={therapist.full_name}
+              email={therapist.email}
+            />
 
             <div className="mt-5 flex flex-wrap justify-end gap-2">
               <button type="button" disabled={isBusy}
