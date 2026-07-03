@@ -25,6 +25,10 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     ],
   },
   {
+    label: "כספים",
+    items: [{ href: "/admin/finance", label: "הכנסות והוצאות", icon: "💰" }],
+  },
+  {
     label: "שיווק",
     items: [
       { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
