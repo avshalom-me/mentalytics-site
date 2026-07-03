@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { sendBulkEmail } from "./email-quota";
+import { logEmail } from "./email-log";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
 import {
   isPromoActive,
@@ -8,7 +9,30 @@ import {
   SUBSCRIPTION_REGULAR_PRICE,
 } from "@/app/lib/promo";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+const resendClient = new Resend(process.env.RESEND_API_KEY);
+
+// Every email in this file flows through this one wrapper, so each outbound
+// send lands in crm_email_log (the CRM timeline reads it) without touching
+// the individual sender functions. Keyed by recipient address — the timeline
+// resolves therapist ↔ email by address, so no entity id is needed here.
+// Logging is fire-and-forget: it must never delay or fail a send.
+const resend = {
+  emails: {
+    send: async (payload: { from: string; to: string | string[]; subject: string; html: string }) => {
+      const result = await resendClient.emails.send(payload);
+      const recipient = Array.isArray(payload.to) ? payload.to[0] : payload.to;
+      void logEmail({
+        recipient,
+        recipientType: recipient.endsWith("@getmentalytics.com") ? "other" : "therapist",
+        subject: payload.subject,
+        sentBy: "system",
+        status: result.error ? "failed" : "sent",
+        error: result.error ? String(result.error.message ?? result.error) : undefined,
+      });
+      return result;
+    },
+  },
+};
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 const FROM = "טיפול חכם <noreply@mentalytics.co.il>";

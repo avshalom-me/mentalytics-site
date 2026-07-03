@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -46,6 +47,21 @@ export async function POST(req: NextRequest) {
         </div>
       `,
     });
+
+    // CRM lead capture — best-effort. The email to admin@ already went out;
+    // the DB row is what makes the inquiry visible (and workable) in the CRM.
+    try {
+      const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
+        lead_type: "general",
+        name: String(name),
+        contact: String(email),
+        message: subject ? `[${String(subject)}] ${String(message)}` : String(message),
+        source: "contact_form",
+      });
+      if (leadErr) console.error("crm_leads insert failed:", leadErr.message);
+    } catch (err) {
+      console.error("crm_leads insert threw:", err);
+    }
 
     return NextResponse.json({ ok: true });
   } catch (e: any) {

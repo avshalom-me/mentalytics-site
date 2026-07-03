@@ -112,6 +112,24 @@ export async function POST(req: NextRequest) {
       .from("therapist_contact_clicks")
       .insert({ therapist_id, click_type: "site_message", source: safeSource, ...sanitizeAttribution(body) });
 
+    // CRM lead capture — best-effort. The patient's message already went out
+    // above; a failure here must never surface to the sender.
+    try {
+      const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
+        lead_type: "patient",
+        name,
+        contact,
+        message: msg,
+        therapist_id,
+        source: "site_message",
+        page_source: safeSource,
+        ...sanitizeAttribution(body),
+      });
+      if (leadErr) console.error("crm_leads insert failed:", leadErr.message);
+    } catch (e) {
+      console.error("crm_leads insert threw:", e);
+    }
+
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה בשליחה";

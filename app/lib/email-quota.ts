@@ -1,5 +1,6 @@
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { logEmail } from "./email-log";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Daily-quota safety net for BULK email sends.
@@ -78,6 +79,15 @@ export async function sendBulkEmail(payload: BulkEmailPayload): Promise<BulkEmai
       subject: payload.subject,
       html: payload.html,
       ...(payload.replyTo ? { replyTo: payload.replyTo } : {}),
+    });
+    // CRM email history — fire-and-forget, never blocks the send result.
+    void logEmail({
+      recipient: Array.isArray(payload.to) ? payload.to[0] : payload.to,
+      subject: payload.subject,
+      template: "bulk",
+      sentBy: "system",
+      status: error ? "failed" : "sent",
+      error: error ? String((error as { message?: string })?.message ?? error) : undefined,
     });
     if (error) return { ok: false, error: String((error as { message?: string })?.message ?? error) };
     return { ok: true };
