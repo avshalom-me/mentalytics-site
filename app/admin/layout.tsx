@@ -13,6 +13,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin", label: "לוח בקרה", icon: "🏠" },
       { href: "/admin/tasks", label: "משימות", icon: "✅" },
+      { href: "/admin/guide", label: "מדריך המערכת", icon: "📖" },
     ],
   },
   {

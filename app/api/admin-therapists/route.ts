@@ -117,7 +117,29 @@ async function buildTherapistsResponse(onlyId?: string) {
     )
     .order("full_name", { ascending: true });
   if (onlyId) query = query.eq("id", onlyId);
-  const { data, error } = await query;
+
+  // Certificates and subscriptions don't need the therapist list first: every
+  // row in those tables belongs to a therapist anyway, so on the full-list
+  // path we fetch them WHOLE in parallel with the therapists query instead of
+  // filtering by ids afterwards. This collapses the request waterfall
+  // (therapists → certs → sign → engagement/subs) from four network hops to
+  // two — the hops, not the DB work, dominated the load time.
+  let certQuery = supabaseAdmin
+    .from("therapist_certificates")
+    .select("id, therapist_id, file_path, original_name, content_type, created_at")
+    .order("created_at", { ascending: true });
+  if (onlyId) certQuery = certQuery.eq("therapist_id", onlyId);
+
+  let subsQuery = supabaseAdmin
+    .from("subscriptions")
+    .select("therapist_id, status, current_period_end, promo_reverts_at");
+  if (onlyId) subsQuery = subsQuery.eq("therapist_id", onlyId);
+
+  const [{ data, error }, { data: certData }, subsRes] = await Promise.all([
+    query,
+    certQuery,
+    subsQuery,
+  ]);
 
   if (error) {
     return {
@@ -129,8 +151,6 @@ async function buildTherapistsResponse(onlyId?: string) {
 
   const rows = (data ?? []) as TherapistRow[];
 
-  // Fetch all certificate documents for these therapists and generate signed
-  // URLs so the admin can review them before approving/rejecting.
   type CertItem = {
     id: string;
     original_name: string;
@@ -147,15 +167,7 @@ async function buildTherapistsResponse(onlyId?: string) {
     original_name: string | null;
     content_type: string | null;
   };
-  let certRows: CertRow[] = [];
-  if (therapistIds.length > 0) {
-    const { data: certData } = await supabaseAdmin
-      .from("therapist_certificates")
-      .select("id, therapist_id, file_path, original_name, content_type, created_at")
-      .in("therapist_id", therapistIds)
-      .order("created_at", { ascending: true });
-    certRows = (certData ?? []) as CertRow[];
-  }
+  const certRows: CertRow[] = (certData ?? []) as CertRow[];
 
   // 24h expiry: the admin tab routinely stays open for hours — a 1h URL made
   // photos/certs silently break mid-session. Sign every photo AND certificate
@@ -166,7 +178,15 @@ async function buildTherapistsResponse(onlyId?: string) {
     if (r.profile_photo_path) pathsToSign.push(normalizeStoragePath(r.profile_photo_path));
   }
   for (const c of certRows) pathsToSign.push(normalizeStoragePath(c.file_path));
-  const signedByPath = await batchSignUrls(pathsToSign, SIGN_TTL);
+
+  // Second (and last) network hop: URL signing + engagement aggregate together.
+  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  const [signedByPath, engagement] = await Promise.all([
+    batchSignUrls(pathsToSign, SIGN_TTL),
+    therapistIds.length > 0
+      ? supabaseAdmin.rpc("admin_engagement_counts", { ids: therapistIds, since: monthAgoIso })
+      : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
+  ]);
 
   for (const c of certRows) {
     (certsByTherapist[c.therapist_id] ||= []).push({
@@ -178,9 +198,10 @@ async function buildTherapistsResponse(onlyId?: string) {
   }
 
   // ── Per-therapist 30-day engagement + subscription health ──
-  // Profile entries (match/directory views) and contact clicks over the last
-  // 30 days, plus the subscription's billing state.
-  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Engagement counts come from a DB-side aggregate (fetched above, in
+  // parallel with URL signing) instead of pulling every row and counting in
+  // memory — the views table grows fast during campaigns and blew past the
+  // 1000-row cap. Falls back to the row-pull method if the RPC isn't deployed.
   const viewsByTherapist: Record<string, number> = {};
   const contactsByTherapist: Record<string, number> = {};
   const subByTherapist: Record<
@@ -189,18 +210,6 @@ async function buildTherapistsResponse(onlyId?: string) {
   > = {};
 
   if (therapistIds.length > 0) {
-    // Engagement counts come from a DB-side aggregate (one grouped query per
-    // table) instead of pulling every row and counting in memory — the views
-    // table grows fast during campaigns and blew past the 1000-row cap. Falls
-    // back to the row-pull method if the RPC isn't deployed yet.
-    const [engagement, subsRes] = await Promise.all([
-      supabaseAdmin.rpc("admin_engagement_counts", { ids: therapistIds, since: monthAgoIso }),
-      supabaseAdmin
-        .from("subscriptions")
-        .select("therapist_id, status, current_period_end, promo_reverts_at")
-        .in("therapist_id", therapistIds),
-    ]);
-
     if (!engagement.error && Array.isArray(engagement.data)) {
       for (const row of engagement.data as Array<{
         therapist_id: string;

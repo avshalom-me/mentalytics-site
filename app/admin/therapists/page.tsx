@@ -850,6 +850,8 @@ export default function AdminTherapistsPage() {
                   alt={therapist.full_name}
                   className="h-full w-full object-contain"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
                   onError={() => setBrokenImages((prev) => ({ ...prev, [therapist.id]: true }))}
                 />
               </div>
@@ -1385,6 +1387,8 @@ export default function AdminTherapistsPage() {
                                     alt=""
                                     className="h-10 w-10 rounded-full bg-stone-100 object-cover"
                                     referrerPolicy="no-referrer"
+                                    loading="lazy"
+                                    decoding="async"
                                     onError={() => setBrokenImages((prev) => ({ ...prev, [t.id]: true }))}
                                   />
                                 ) : (
