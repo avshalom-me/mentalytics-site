@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { REFUND_CATEGORIES } from "@/app/lib/crm";
+import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, labelOf } from "@/app/lib/crm";
+import { createSumitExpenseDraft } from "@/app/lib/sumit-expense";
 
 // Finance overview + expense ledger.
 //
@@ -171,7 +172,77 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, expense: data });
+
+    // Optional handoff to Sumit as a DRAFT expense document (the accountant
+    // reads the books from Sumit). Refund categories are money back to
+    // therapists — not supplier expenses — and are never pushed.
+    let sumit: { status: string; error?: string } | null = null;
+    if (b.send_to_sumit && !REFUND_CATEGORIES.includes(String(b.category))) {
+      sumit = await pushExpenseToSumit(data);
+    }
+
+    return NextResponse.json({ ok: true, expense: data, sumit });
+  } catch {
+    return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
+  }
+}
+
+type ExpenseDbRow = {
+  id: string;
+  expense_date: string;
+  category: string;
+  vendor: string | null;
+  description: string | null;
+  amount: number;
+  vat_amount: number | null;
+  receipt_ref: string | null;
+};
+
+async function pushExpenseToSumit(e: ExpenseDbRow): Promise<{ status: string; error?: string }> {
+  const gross = Number(e.amount) + Number(e.vat_amount ?? 0);
+  const breakdown =
+    e.vat_amount != null
+      ? `לפני מע"מ ₪${Number(e.amount)}, מע"מ ₪${Number(e.vat_amount)}. `
+      : "";
+  const result = await createSumitExpenseDraft({
+    date: e.expense_date,
+    supplierName: e.vendor || "ספק כללי",
+    itemName: labelOf(EXPENSE_CATEGORIES, e.category) || "הוצאה",
+    amountGross: gross,
+    expenseNumber: e.receipt_ref ?? undefined,
+    description: `${breakdown}${e.description ?? ""} (נוצר אוטומטית מ-CRM טיפול חכם — טיוטה לאישור)`.trim(),
+  });
+
+  const update = result.ok
+    ? { sumit_doc_id: result.documentId, sumit_status: "draft_created", sumit_error: null }
+    : { sumit_status: "failed", sumit_error: result.error.slice(0, 300) };
+  const { error: updateErr } = await supabaseAdmin.from("expenses").update(update).eq("id", e.id);
+  if (updateErr) console.error("expenses sumit-status update failed:", updateErr.message);
+
+  return result.ok ? { status: "draft_created" } : { status: "failed", error: result.error };
+}
+
+// Late/retry send of an existing row to Sumit.
+export async function PATCH(req: NextRequest) {
+  try {
+    const b = await req.json();
+    if (b.action !== "send_to_sumit" || !b.id) {
+      return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });
+    }
+    const { data: row, error } = await supabaseAdmin
+      .from("expenses")
+      .select("id, expense_date, category, vendor, description, amount, vat_amount, receipt_ref, sumit_doc_id")
+      .eq("id", b.id)
+      .maybeSingle();
+    if (error || !row) return NextResponse.json({ ok: false, error: "רשומה לא נמצאה" }, { status: 404 });
+    if (row.sumit_doc_id) {
+      return NextResponse.json({ ok: false, error: "כבר נוצרה טיוטה ב-Sumit לרשומה זו" }, { status: 400 });
+    }
+    if (REFUND_CATEGORIES.includes(row.category)) {
+      return NextResponse.json({ ok: false, error: "החזרים לא נשלחים ל-Sumit כהוצאת ספק" }, { status: 400 });
+    }
+    const sumit = await pushExpenseToSumit(row);
+    return NextResponse.json({ ok: sumit.status === "draft_created", sumit });
   } catch {
     return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
   }

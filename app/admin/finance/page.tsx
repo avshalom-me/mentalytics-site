@@ -28,6 +28,9 @@ type Expense = {
   vat_amount: number | null;
   is_rnd: boolean;
   receipt_ref: string | null;
+  sumit_doc_id: number | null;
+  sumit_status: string | null;
+  sumit_error: string | null;
 };
 
 type Target = { metric: string; month: string; scenario: string; target: number };
@@ -60,7 +63,9 @@ export default function FinancePage() {
   const [fVat, setFVat] = useState("");
   const [fRnd, setFRnd] = useState(false);
   const [fRef, setFRef] = useState("");
+  const [fToSumit, setFToSumit] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [sumitNotice, setSumitNotice] = useState("");
 
   const load = useCallback(() => {
     setLoading(true);
@@ -95,6 +100,7 @@ export default function FinancePage() {
     setError("");
     try {
       const cat = EXPENSE_CATEGORIES.find((c) => c.value === fCategory);
+      const isRefund = REFUND_CATEGORIES.includes(fCategory);
       const res = await fetch("/api/admin-crm/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -108,6 +114,7 @@ export default function FinancePage() {
           is_rnd: fRnd,
           channel: cat?.channel ?? null,
           receipt_ref: fRef || null,
+          send_to_sumit: fToSumit && !isRefund,
         }),
       });
       const j = await res.json();
@@ -117,10 +124,35 @@ export default function FinancePage() {
         setFAmount("");
         setFVat("");
         setFRef("");
+        if (j.sumit?.status === "draft_created") {
+          setSumitNotice("✓ נוצרה טיוטת הוצאה ב-Sumit — לאישור סופי בתוך Sumit");
+        } else if (j.sumit?.status === "failed") {
+          setSumitNotice(`⚠ ההוצאה נשמרה, אבל יצירת הטיוטה ב-Sumit נכשלה: ${j.sumit.error ?? ""} — אפשר לנסות שוב מהטבלה`);
+        } else {
+          setSumitNotice("");
+        }
         load();
       } else setError(j.error || "שגיאה בשמירה");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function sendToSumit(id: string) {
+    setBusy(id);
+    setSumitNotice("");
+    try {
+      const res = await fetch("/api/admin-crm/finance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "send_to_sumit", id }),
+      });
+      const j = await res.json();
+      if (j.ok) setSumitNotice("✓ נוצרה טיוטת הוצאה ב-Sumit — לאישור סופי בתוך Sumit");
+      else setSumitNotice(`⚠ יצירת הטיוטה נכשלה: ${j.sumit?.error ?? j.error ?? ""}`);
+      load();
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -164,7 +196,8 @@ export default function FinancePage() {
           </a>
         </div>
         <p className="mb-5 text-sm text-stone-500">
-          הכנסות נקראות אוטומטית מהחיובים (לפני מע"מ). הוצאות והחזרים מוזנים כאן פעם אחת — ויוצאים בקובץ אחד לרו"ח.
+          הכנסות נקראות אוטומטית מהחיובים (לפני מע"מ). הוצאה מוזנת כאן פעם אחת ונוצרת כטיוטה ב-Sumit —
+          שם מאשרים אותה לספרים, והרו"ח רואה הכול במקום הרגיל שלו.
         </p>
 
         {error && (
@@ -290,7 +323,18 @@ export default function FinancePage() {
                   {saving ? "…" : "הוספה"}
                 </button>
               </div>
+              {!REFUND_CATEGORIES.includes(fCategory) && (
+                <label className="col-span-2 flex items-center gap-1.5 text-xs font-bold text-teal-700 sm:col-span-4 lg:col-span-8">
+                  <input type="checkbox" checked={fToSumit} onChange={(e) => setFToSumit(e.target.checked)} />
+                  צור גם טיוטת הוצאה ב-Sumit (לא נכנס לספרים עד אישור בתוך Sumit)
+                </label>
+              )}
             </form>
+            {sumitNotice && (
+              <div className={`-mt-4 mb-6 rounded-xl border p-3 text-sm ${sumitNotice.startsWith("✓") ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
+                {sumitNotice}
+              </div>
+            )}
 
             {/* Expense list */}
             {expenses.length > 0 && (
@@ -303,6 +347,7 @@ export default function FinancePage() {
                       <th className="px-4 py-2 text-start font-bold">ספק / תיאור</th>
                       <th className="px-4 py-2 text-start font-bold">סכום</th>
                       <th className="px-4 py-2 text-start font-bold">אסמכתא</th>
+                      <th className="px-4 py-2 text-start font-bold">Sumit</th>
                       <th className="px-4 py-2 text-start font-bold"></th>
                     </tr>
                   </thead>
@@ -332,6 +377,24 @@ export default function FinancePage() {
                           )}
                         </td>
                         <td className="px-4 py-2 text-xs text-stone-400">{e.receipt_ref || "—"}</td>
+                        <td className="px-4 py-2">
+                          {e.sumit_status === "draft_created" ? (
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700" title={`Sumit DocumentID: ${e.sumit_doc_id}`}>
+                              טיוטה ב-Sumit ✓
+                            </span>
+                          ) : REFUND_CATEGORIES.includes(e.category) ? (
+                            <span className="text-[11px] text-stone-300">—</span>
+                          ) : (
+                            <button
+                              onClick={() => sendToSumit(e.id)}
+                              disabled={busy === e.id}
+                              className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] font-bold text-stone-500 hover:bg-stone-100 disabled:opacity-50"
+                              title={e.sumit_status === "failed" ? `ניסיון קודם נכשל: ${e.sumit_error ?? ""}` : "יצירת טיוטת הוצאה ב-Sumit"}
+                            >
+                              {e.sumit_status === "failed" ? "נסה שוב ל-Sumit" : "שלח ל-Sumit"}
+                            </button>
+                          )}
+                        </td>
                         <td className="px-4 py-2">
                           <button
                             onClick={() => removeExpense(e.id)}
