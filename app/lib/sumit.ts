@@ -68,12 +68,61 @@ async function api<T>(path: string, body: Record<string, unknown>): Promise<T> {
   return env.Data;
 }
 
+// ---------- Charge validation ----------
+//
+// The envelope Status above only says the API call was PROCESSED — a card
+// DECLINE still comes back with Status=0. The decline lives inside
+// Data.Payment: ValidPayment=false plus the Shva code in Payment.Status
+// (e.g. "004" = issuer refusal, "006" = wrong CVV/ID). Verified live
+// 2026-07-04 on two real declines that sailed through as "paid"
+// subscriptions. Money has actually moved only when the payment is
+// explicitly valid, or — for responses that omit the Payment object — when
+// a document (invoice/receipt) was produced.
+
+export interface SumitPaymentInfo {
+  ValidPayment?: boolean;
+  Status?: string | null;
+  StatusDescription?: string | null;
+  [k: string]: unknown;
+}
+
+export class SumitPaymentDeclinedError extends Error {
+  readonly declineCode: string | null;
+  constructor(declineCode: string | null, message: string) {
+    super(message);
+    this.name = "SumitPaymentDeclinedError";
+    this.declineCode = declineCode;
+  }
+}
+
+function assertChargeSucceeded(
+  data: { Payment?: SumitPaymentInfo | null; DocumentID?: number | null; [k: string]: unknown },
+  context: string
+): void {
+  const payment = data.Payment;
+  if (payment?.ValidPayment === true) return;
+  if (!payment && data.DocumentID != null) return;
+  const code = payment?.Status?.trim() || null;
+  const desc = payment?.StatusDescription?.trim() || null;
+  // Include reconciliation ids in the message: in the unexpected case this
+  // fires on a charge that DID move money, the log line is the only pointer
+  // back to the Sumit document / standing order.
+  const ids = `DocumentID=${data.DocumentID ?? "null"} RecurringCustomerItemIDs=${JSON.stringify(
+    (data as { RecurringCustomerItemIDs?: unknown }).RecurringCustomerItemIDs ?? null
+  )}`;
+  throw new SumitPaymentDeclinedError(
+    code,
+    `Sumit ${context}: payment declined${code ? ` (code ${code})` : ""}${desc ? ` — ${desc}` : ""} [${ids}]`
+  );
+}
+
 // ---------- One-off charge (quiz) ----------
 
 export interface OneOffChargeResult {
   DocumentID?: number;
   DocumentURL?: string;
   CustomerID?: number;
+  Payment?: SumitPaymentInfo | null;
   // Sumit returns more fields; we keep this loose because we don't depend
   // on most of them downstream — the document/customer ids are what we
   // store for reconciliation.
@@ -87,7 +136,7 @@ export async function chargeQuizPayment(opts: {
   customerEmail: string;
   customerPhone: string;
 }): Promise<OneOffChargeResult> {
-  return api<OneOffChargeResult>("/billing/payments/charge/", {
+  const result = await api<OneOffChargeResult>("/billing/payments/charge/", {
     Customer: {
       ExternalIdentifier: `fp:${opts.fingerprint}`,
       SearchMode: 0, // Automatic — find-or-create by ExternalIdentifier
@@ -110,6 +159,8 @@ export async function chargeQuizPayment(opts: {
     SendDocumentByEmail: true,
     PreventStandingOrder: true, // explicit: this is a single charge, not a sub
   });
+  assertChargeSucceeded(result, "quiz charge");
+  return result;
 }
 
 // ---------- Subscription (charge + create standing order) ----------
@@ -117,7 +168,13 @@ export async function chargeQuizPayment(opts: {
 export interface SubscriptionChargeResult {
   DocumentID?: number;
   CustomerID?: number;
-  RecurringItemID?: number; // Sumit's id for the standing order
+  // Sumit's wire field: one standing-order id per Items[] element (we always
+  // send exactly one item, so this holds exactly one id on success).
+  RecurringCustomerItemIDs?: number[] | null;
+  Payment?: SumitPaymentInfo | null;
+  // Resolved standing-order id — NOT a wire field. Populated below from
+  // RecurringCustomerItemIDs (or the list-lookup fallback) for callers.
+  RecurringItemID?: number;
   [k: string]: unknown;
 }
 
@@ -167,11 +224,25 @@ export async function createSubscription(opts: {
     PreventStandingOrder: false, // explicit: create the standing order
   });
 
-  // /billing/recurring/charge returns the document + customer but does not
-  // surface the new RecurringItem ID in any reliable field name (verified
-  // via live testing — DocumentID was 1895650732, no RecurringItemID was
-  // populated in the Data envelope). Look it up by ExternalIdentifier so
-  // we can store it for later cancel/sync calls.
+  // A declined card must stop the flow HERE — before this line the caller
+  // used to record the decline as a paid subscription (payment "completed",
+  // therapist promoted, welcome email). Sumit cancels the standing order it
+  // just created on its own when the initial charge is declined (observed
+  // live on both real declines: item born with Status=1=Cancelled), so
+  // there is nothing to clean up remotely.
+  assertChargeSucceeded(charge, "subscription charge");
+
+  // The standing-order id arrives in RecurringCustomerItemIDs. (An earlier
+  // version read a nonexistent `RecurringItemID` wire field — that's why
+  // morning_token_id used to depend entirely on the list-lookup fallback
+  // below, which stays as a safety net.)
+  if (
+    !charge.RecurringItemID &&
+    Array.isArray(charge.RecurringCustomerItemIDs) &&
+    charge.RecurringCustomerItemIDs.length > 0
+  ) {
+    charge.RecurringItemID = charge.RecurringCustomerItemIDs[0];
+  }
   if (!charge.RecurringItemID) {
     try {
       const items = await listRecurringForCustomer({

@@ -105,7 +105,7 @@ Admin clicks "Demote to approved" in /admin/therapists
 ### לקוח Sumit (server-side)
 | קובץ | מטרה |
 |------|------|
-| `app/lib/sumit.ts` | לקוח API: chargeQuizPayment, createSubscription, cancelSubscription, listRecurringForCustomer. כל הקריאות עוברות `api()` helper שמעטף Credentials + מטפל ב-Status envelope. |
+| `app/lib/sumit.ts` | לקוח API: chargeQuizPayment, createSubscription, cancelSubscription, listRecurringForCustomer. כל הקריאות עוברות `api()` helper שמעטף Credentials + מטפל ב-Status envelope. **חשוב:** envelope Status=0 אומר רק שהקריאה עובדה — כרטיס שנדחה חוזר עם Status=0 ו-`Data.Payment.ValidPayment=false` (קוד שב"א ב-`Payment.Status`, למשל 004=סירוב מנפיק, 006=CVV/ת"ז שגויים). שני מסלולי החיוב מאמתים זאת ב-`assertChargeSucceeded` וזורקים `SumitPaymentDeclinedError` על דחייה (באג אמיתי 3-4/7/26: דחיות נרשמו כהצלחות). מזהה הוראת הקבע חוזר ב-`RecurringCustomerItemIDs` (מערך) — אין שדה `RecurringItemID` בתגובה. |
 
 ### API endpoints
 | Route | מטרה | אימות |

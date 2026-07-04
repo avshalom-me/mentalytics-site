@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { createSubscription, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import {
+  createSubscription,
+  SumitPaymentDeclinedError,
+  SUBSCRIPTION_BASE_PRICE,
+} from "@/app/lib/sumit";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, promoRevertDate } from "@/app/lib/promo";
 import { writeAudit } from "@/app/lib/audit";
 import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
@@ -182,9 +186,19 @@ export async function POST(req: NextRequest) {
         unitPrice,
       });
     } catch (err: unknown) {
+      await supabase.from("payments").update({ status: "failed" }).eq("id", payment.id);
+      // Card declined (issuer refusal, bad CVV, etc.) — an expected business
+      // outcome, not a provider outage. The client maps this error string to
+      // "החיוב נדחה ע"י חברת האשראי" either way; 402 keeps monitoring honest.
+      if (err instanceof SumitPaymentDeclinedError) {
+        console.warn(
+          `create-subscription: card declined for therapist=${therapist.id}` +
+            `${err.declineCode ? ` code=${err.declineCode}` : ""} (${err.message})`
+        );
+        return NextResponse.json({ error: "payment provider error" }, { status: 402 });
+      }
       const message = err instanceof Error ? err.message : "unknown error";
       console.error("Sumit createSubscription failed:", message);
-      await supabase.from("payments").update({ status: "failed" }).eq("id", payment.id);
       return NextResponse.json({ error: "payment provider error" }, { status: 502 });
     }
 

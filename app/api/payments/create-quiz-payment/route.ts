@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { chargeQuizPayment, QUIZ_BASE_PRICE } from "@/app/lib/sumit";
+import { chargeQuizPayment, SumitPaymentDeclinedError, QUIZ_BASE_PRICE } from "@/app/lib/sumit";
 import { sanitizeClickIds } from "@/app/lib/attribution";
 
 const supabase = createClient(
@@ -153,9 +153,18 @@ export async function POST(req: NextRequest) {
         customerPhone: cleanPhone,
       });
     } catch (err: unknown) {
+      await supabase.from("payments").update({ status: "failed" }).eq("id", payment.id);
+      // Card declined — expected business outcome, not a provider outage.
+      // Same error body either way (the client maps it to a decline message).
+      if (err instanceof SumitPaymentDeclinedError) {
+        console.warn(
+          `create-quiz-payment: card declined for fp=${fp.slice(0, 8)}…` +
+            `${err.declineCode ? ` code=${err.declineCode}` : ""}`
+        );
+        return NextResponse.json({ error: "payment provider error" }, { status: 402 });
+      }
       const message = err instanceof Error ? err.message : "unknown error";
       console.error("Sumit chargeQuizPayment failed:", message);
-      await supabase.from("payments").update({ status: "failed" }).eq("id", payment.id);
       return NextResponse.json({ error: "payment provider error" }, { status: 502 });
     }
 

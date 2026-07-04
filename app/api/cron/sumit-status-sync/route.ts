@@ -96,7 +96,7 @@ export async function GET(req: NextRequest) {
   // -------- (1) Sumit subscription state for paid therapists --------
   const { data: paidTherapists } = await supabase
     .from("therapists")
-    .select("id, full_name, email")
+    .select("id, full_name, email, admin_approved")
     .eq("status", "paying")
     .eq("promotion_source", "paid");
 
@@ -165,10 +165,15 @@ export async function GET(req: NextRequest) {
           .update({ status: "cancelled", updated_at: new Date().toISOString() })
           .eq("id", sub.id);
       }
+      // A therapist who paid before ever being admin-approved (the approval
+      // queue is independent of payment) must fall back to "pending", not
+      // "approved" — writing "approved" here listed an unreviewed profile as
+      // "מאושר-חינמי" while it still sat in the approval queue.
+      const demotedStatus = t.admin_approved ? "approved" : "pending";
       await supabase
         .from("therapists")
         .update({
-          status: "approved",
+          status: demotedStatus,
           manually_promoted: false,
           promotion_source: null,
           promoted_since: null,
@@ -179,9 +184,9 @@ export async function GET(req: NextRequest) {
       await writeAudit(supabase, {
         therapistId: t.id,
         actorType: "sumit",
-        action: "status_change:paying->approved",
+        action: `status_change:paying->${demotedStatus}`,
         before: { status: "paying", promotion_source: "paid" },
-        after: { status: "approved", promotion_source: null },
+        after: { status: demotedStatus, promotion_source: null },
         reason: authoritativeCancel
           ? `sumit_status=${target!.Status}`
           : `no_active_recurring_at_sumit_after_${MISS_THRESHOLD}_misses`,
@@ -205,17 +210,20 @@ export async function GET(req: NextRequest) {
   const nowIso = new Date().toISOString();
   const { data: expiredTrials } = await supabase
     .from("therapists")
-    .select("id, full_name, email, promotion_source")
+    .select("id, full_name, email, promotion_source, admin_approved")
     .in("promotion_source", ["trial", "manual"])
     .not("promoted_until", "is", null)
     .lte("promoted_until", nowIso);
 
   for (const t of expiredTrials ?? []) {
     try {
+      // Same rule as pass (1): only admin-approved therapists land on
+      // "approved"; the rest go back to the approval queue as "pending".
+      const demotedStatus = t.admin_approved ? "approved" : "pending";
       await supabase
         .from("therapists")
         .update({
-          status: "approved",
+          status: demotedStatus,
           manually_promoted: false,
           promotion_source: null,
           promoted_since: null,
@@ -226,9 +234,9 @@ export async function GET(req: NextRequest) {
       await writeAudit(supabase, {
         therapistId: t.id,
         actorType: "cron",
-        action: "status_change:paying->approved",
+        action: `status_change:paying->${demotedStatus}`,
         before: { status: "paying", promotion_source: t.promotion_source },
-        after: { status: "approved", promotion_source: null },
+        after: { status: demotedStatus, promotion_source: null },
         reason: "trial_or_manual_expired",
       });
 
