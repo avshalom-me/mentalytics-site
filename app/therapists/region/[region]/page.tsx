@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST } from "@/app/lib/regions";
+import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 
@@ -46,7 +46,14 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
     ? "רשימת מטפלים ופסיכולוגים המציעים טיפול אונליין — מותאמת אישית דרך טיפול חכם."
     : `מצאו פסיכולוגים ומטפלים מאומתים ב${label} — מותאם אישית דרך טיפול חכם.`;
   const url = `${BASE}/therapists/region/${regionParam}`;
-  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url } };
+  // Keep near-empty region pages out of the index until they have real content,
+  // so Google doesn't flag them as thin / near-duplicate. The online page is a
+  // distinct, always-valuable page and is never gated.
+  const robots =
+    !isOnline && (await countListed({ region: r.region })) < MIN_LISTED_FOR_INDEX
+      ? { index: false as const, follow: true }
+      : undefined;
+  return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 
 
@@ -96,6 +103,11 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
             ? "כל המטפלים והפסיכולוגים שמציעים טיפול אונליין דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית."
             : `כל המטפלים והפסיכולוגים המאומתים ב${label} דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית לפי הצורך, הגישה והאזור.`}
         </p>
+        {!isOnline && REGION_INTRO[r.region] && (
+          <p className="mt-4 text-stone-600 leading-8" style={{ maxWidth: "64ch" }}>
+            {REGION_INTRO[r.region]}
+          </p>
+        )}
       </div>
 
       {list.length === 0 ? (

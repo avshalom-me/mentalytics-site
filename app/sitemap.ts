@@ -2,6 +2,7 @@ import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
+import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -60,16 +61,21 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Region + online landing pages (and the region hub) + the para-medical rubric.
+  // Only region/city pages that have enough listed therapists are included —
+  // near-empty ones are noindex, so listing them here would only produce
+  // "submitted URL marked noindex" warnings and waste crawl budget. They rejoin
+  // the sitemap automatically once they fill up (regenerated per request).
+  const { regions: regionCounts, cities: cityCounts } = await countListedByRegionAndCity();
   const regionPages: MetadataRoute.Sitemap = [
     { url: `${BASE}/therapists/para-medical`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region/${ONLINE_SLUG}`, priority: 0.7, changeFrequency: "weekly" as const },
-    ...ALL_REGIONS.map((region) => ({
+    ...ALL_REGIONS.filter((region) => (regionCounts[region] ?? 0) >= MIN_LISTED_FOR_INDEX).map((region) => ({
       url: `${BASE}/therapists/region/${regionToSlug(region)}`,
       priority: 0.7,
       changeFrequency: "weekly" as const,
     })),
-    ...CITY_SEO_LIST.map((city) => ({
+    ...CITY_SEO_LIST.filter((city) => (cityCounts[city] ?? 0) >= MIN_LISTED_FOR_INDEX).map((city) => ({
       url: `${BASE}/therapists/city/${regionToSlug(city)}`,
       priority: 0.6,
       changeFrequency: "weekly" as const,

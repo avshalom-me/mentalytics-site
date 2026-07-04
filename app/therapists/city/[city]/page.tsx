@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { genderTitle } from "@/app/lib/gender-text";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToCity, regionToSlug, CITY_SEO_LIST, CITY_TO_REGION, REGION_CITIES, ONLINE_SLUG } from "@/app/lib/regions";
@@ -22,7 +22,12 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const title = `פסיכולוגים ומטפלים ב${city} | טיפול חכם`;
   const description = `מצאו פסיכולוגים ומטפלים מאומתים ב${city} — מותאם אישית דרך טיפול חכם.`;
   const url = `${BASE}/therapists/city/${cityParam}`;
-  return { title, description, alternates: { canonical: url }, openGraph: { title, description, url } };
+  // A city page is unique/valuable only once it has real in-city therapists;
+  // below the threshold it's near-empty (and near-duplicate of the region page),
+  // so keep it out of the index until it fills up.
+  const count = await countListed({ city });
+  const robots = count < MIN_LISTED_FOR_INDEX ? { index: false, follow: true } : undefined;
+  return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 
 export default async function CityPage({ params }: { params: Promise<{ city: string }> }) {

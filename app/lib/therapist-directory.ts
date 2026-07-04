@@ -1,9 +1,15 @@
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { CITY_TO_REGION } from "@/app/lib/regions";
+import { CITY_TO_REGION, ALL_REGIONS } from "@/app/lib/regions";
 import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
 const NEW_THERAPIST_BOOST_DAYS = 7;
+
+// A region/city landing page is only worth indexing once it has real content.
+// Below this many listed therapists it's near-empty (and near-duplicate of the
+// region/other cities), which Google flags as "thin" — so such pages are set to
+// noindex and kept out of the sitemap until they fill up.
+export const MIN_LISTED_FOR_INDEX = 3;
 const PROFILE_PHOTOS_BUCKET =
   process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 
@@ -60,9 +66,11 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // rank above GIFT promotions (manual/trial), which in turn rank above the free
 // approved tier. An optional filter (region / online) narrows the set BEFORE
 // signing photo URLs, so region landing pages only pay for their own subset.
-export async function loadPublicTherapists(
-  filter?: { region?: string; city?: string; online?: boolean; category?: "main" | "para" }
-): Promise<PublicTherapist[]> {
+type DirectoryFilter = { region?: string; city?: string; online?: boolean; category?: "main" | "para" };
+
+// Shared query + in-memory filtering (no photo signing). Used both by the full
+// loader and by the lightweight count helpers below.
+async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[]> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
@@ -84,6 +92,37 @@ export async function loadPublicTherapists(
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
+  return rows;
+}
+
+// Count listed therapists matching a filter — no photo signing, for deciding
+// whether a landing page is populated enough to index.
+export async function countListed(filter?: DirectoryFilter): Promise<number> {
+  return (await loadFilteredRows(filter)).length;
+}
+
+// One-query counts for every region and every city string, so the sitemap can
+// decide which landing pages to include without 30+ round-trips.
+export async function countListedByRegionAndCity(): Promise<{
+  regions: Record<string, number>;
+  cities: Record<string, number>;
+}> {
+  const rows = await loadFilteredRows();
+  const regions: Record<string, number> = {};
+  const cities: Record<string, number> = {};
+  for (const t of rows) {
+    for (const region of ALL_REGIONS) {
+      if (rowInRegion(t.regions, region)) regions[region] = (regions[region] ?? 0) + 1;
+    }
+    for (const c of t.regions ?? []) cities[c] = (cities[c] ?? 0) + 1;
+  }
+  return { regions, cities };
+}
+
+export async function loadPublicTherapists(
+  filter?: DirectoryFilter
+): Promise<PublicTherapist[]> {
+  const rows = await loadFilteredRows(filter);
 
   const boostCutoff = Date.now() - NEW_THERAPIST_BOOST_DAYS * 24 * 60 * 60 * 1000;
   const isNew = (t: TherapistRow) =>
