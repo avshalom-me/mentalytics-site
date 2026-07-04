@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { getOrCreateSessionId } from "./session";
-import { getAttribution } from "./attribution";
+import { captureAttribution, getAttribution } from "./attribution";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   const session_id = getOrCreateSessionId();
@@ -33,6 +33,25 @@ export function usePageView(page: string, source?: string) {
     sent.current = true;
     sendTrack("page_view", { source, metadata: { page } });
   }, [page, source]);
+}
+
+/**
+ * Landing view on a therapist RECRUITMENT page (/therapists/join). Dedicated
+ * event type — NOT page_view — so patient-funnel reports that count page_view
+ * (directory entries, weekly report, attribution report) stay clean of
+ * therapist-ad traffic. Powers the "מבקרים" column in /admin/recruitment
+ * (distinct sessions per utm_campaign).
+ */
+export function useRecruitPageView(page: string) {
+  const sent = useRef(false);
+  useEffect(() => {
+    if (sent.current) return;
+    sent.current = true;
+    // Capture the URL's utm before reading: getAttribution alone would keep a
+    // stale stored touch if this effect ever ran before AttributionTracker's.
+    captureAttribution();
+    sendTrack("recruit_page_view", { source: page, metadata: { page } });
+  }, [page]);
 }
 
 export function useFilterTrack() {

@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
+import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 
 export const dynamic = "force-dynamic";
 
@@ -17,6 +18,33 @@ async function getUser(req: NextRequest) {
   const { data: { user }, error } = await supabase.auth.getUser(token);
   if (error || !user) return null;
   return user;
+}
+
+// Signup attribution: which campaign / channel drove this registration.
+// The dashboard sends the client-captured touch as a URI-encoded JSON header
+// (the stub row is created by a GET, which has no body). Consumed only at
+// stub creation — an existing profile is never overwritten. Feeds the
+// signups-per-campaign columns in /admin/recruitment.
+function signupAttributionFromHeader(req: NextRequest): Record<string, string | null> {
+  const raw = req.headers.get(ATTRIBUTION_HEADER);
+  if (!raw) return {};
+  try {
+    const parsed = JSON.parse(decodeURIComponent(raw)) as unknown;
+    const att = sanitizeAttribution(parsed);
+    const clicks = sanitizeClickIds(parsed);
+    return {
+      signup_channel: att.channel,
+      signup_utm_source: att.utm_source,
+      signup_utm_medium: att.utm_medium,
+      signup_utm_campaign: att.utm_campaign,
+      signup_gclid: clicks.gclid,
+      signup_gbraid: clicks.gbraid,
+      signup_wbraid: clicks.wbraid,
+      signup_fbclid: clicks.fbclid,
+    };
+  } catch {
+    return {}; // malformed header — register without attribution
+  }
 }
 
 // GET — fetch the therapist profile for the logged-in user
@@ -52,7 +80,11 @@ export async function GET(req: NextRequest) {
   if (!therapist) {
     const { data: created, error: createErr } = await supabaseAdmin
       .from("therapists")
-      .insert({ user_id: user.id, email: user.email, full_name: "", gender: "", status: "pending", tier: "free" })
+      .insert({
+        user_id: user.id, email: user.email, full_name: "", gender: "",
+        status: "pending", tier: "free",
+        ...signupAttributionFromHeader(req),
+      })
       .select("*")
       .single();
     if (createErr) {

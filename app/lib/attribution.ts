@@ -236,6 +236,27 @@ export function getClickIds(): ClickIds | null {
   }
 }
 
+/**
+ * Signup-attribution transport. The therapist stub row is created by a GET
+ * (no request body), so the stored attribution + click ids ride in this
+ * request header. Value is URI-encoded JSON — fetch() header values must be
+ * Latin-1 safe and utm values can contain Hebrew.
+ */
+export const ATTRIBUTION_HEADER = "x-mnt-attribution";
+
+/** Build the header value from the stored touch. Null when nothing is stored. */
+export function getAttributionHeaderValue(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const att = getAttribution();
+    const clicks = getClickIds();
+    if (!att && !clicks) return null;
+    return encodeURIComponent(JSON.stringify({ ...att, ...clicks }));
+  } catch {
+    return null;
+  }
+}
+
 /** Validate + clamp click ids arriving in an API request body (server-side). */
 export function sanitizeClickIds(body: unknown): ClickIds {
   const b = (body ?? {}) as Record<string, unknown>;

@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
@@ -98,8 +99,14 @@ export default function TherapistProfileEditPage() {
   useEffect(() => {
     async function loadProfile(session: { access_token: string }) {
       setToken(session.access_token);
+      // Signup attribution rides along: consumed by the server only when this
+      // GET creates the stub row (a fresh registrant can land here directly).
+      const attHeader = getAttributionHeaderValue();
       const res = await fetch("/api/therapist-profile", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          ...(attHeader ? { [ATTRIBUTION_HEADER]: attHeader } : {}),
+        },
       });
       const json = await res.json();
 

@@ -7,6 +7,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 
 type Profile = {
   id: string;
@@ -280,8 +281,15 @@ function TherapistDashboard() {
       setToken(session.access_token);
       setUserEmail(session.user.email ?? "");
 
+      // Signup attribution rides along: consumed by the server only when this
+      // GET creates the stub row (first load after registration), so the
+      // campaign that recruited the therapist is credited in /admin/recruitment.
+      const attHeader = getAttributionHeaderValue();
       const res = await fetch("/api/therapist-profile", {
-        headers: { Authorization: `Bearer ${session.access_token}` },
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          ...(attHeader ? { [ATTRIBUTION_HEADER]: attHeader } : {}),
+        },
       });
       const json = await res.json();
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 
-const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete"] as const;
+const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete", "recruit_page_view"] as const;
 type EventType = (typeof VALID_EVENTS)[number];
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();

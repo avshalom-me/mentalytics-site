@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import RecruitPageTracker from "@/app/components/RecruitPageTracker";
 
 // Evaluate the promo window per-request instead of baking it into the static
 // HTML at build time — otherwise the "מבצע פתיחה" copy wouldn't disappear on
@@ -45,6 +46,10 @@ export default function TherapistJoinPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      {/* Ad-funnel tracking: without this, campaign visitors were only counted
+          if they later wandered into patient-facing pages (the 3-vs-hundreds
+          undercount in /admin/recruitment). */}
+      <RecruitPageTracker page="therapists-join" />
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         details summary::-webkit-details-marker { display: none; }
