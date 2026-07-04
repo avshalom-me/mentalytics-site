@@ -365,12 +365,14 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
 
 // ── TAB 2: Quiz Dropout ────────────────────────────────────────────
 
+// הרשימות כוללות גם מזהי שלבים מגרסאות קודמות של השאלון (למשל e4-chronic,
+// שמוזג לתוך e4-contexts) כדי שאירועים היסטוריים לא ייעלמו מהגרף.
 const ADULTS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   intro:    { label: "פתיחה",         steps: ["disclaimer", "intake", "domains"] },
   e1:       { label: "E1 — דיכאון",   steps: ["e1", "e1-q"] },
   e2:       { label: "E2 — מאניה",    steps: ["e2", "e2-2", "e2-q"] },
   e3:       { label: "E3 — פסיכוזה",  steps: ["e3", "e3-q"] },
-  e4:       { label: "E4 — חרדה",     steps: ["e4", "e4-chronic", "e4-medical", "e4-q", "e4-social", "e4-social-sev", "e4-flight", "e4-medanx", "e4-stresspain"] },
+  e4:       { label: "E4 — חרדה",     steps: ["e4", "e4-contexts", "e4-chronic", "e4-medical", "e4-q", "e4-social", "e4-social-sev", "e4-flight", "e4-medanx", "e4-stresspain"] },
   e5:       { label: "E5 — OCD",      steps: ["e5", "e5-q"] },
   e6:       { label: "E6 — אכילה",    steps: ["e6", "e6-q"] },
   e7:       { label: "E7 — שינה",     steps: ["e7-q"] },
@@ -378,15 +380,15 @@ const ADULTS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   e9:       { label: "E9 — טראומה",   steps: ["e9", "e9-q"] },
   e10:      { label: "E10 — אישיות",  steps: ["e10", "e10a", "e10b", "e10c"] },
   style:    { label: "סגנון טיפול",    steps: ["therapist-style"] },
-  func:     { label: "תפקוד",         steps: ["f-vision", "f1", "f1-subs", "f1-adhd", "f1-ld", "f1-ld-q", "f2", "f2-q", "f3", "f3-type", "f3-a", "f3-b"] },
-  relation: { label: "זוגיות / משפחה", steps: ["r-intake", "r1", "r1-scale", "r2-q", "r3", "r3-partner"] },
+  func:     { label: "תפקוד",         steps: ["f-vision", "f1", "f1-subs", "f1-adhd", "f1-ld", "f1-ld-q", "f2", "f2-q", "f3", "f3-type", "f3-a", "f3-b", "f3-disability"] },
+  relation: { label: "זוגיות / משפחה", steps: ["r-intake", "r-single", "r-single-no-detail", "r1", "r-abuse", "r1-scale", "r2-q", "r3-conflict", "r3-child", "r3-child-type", "r3", "r3-partner"] },
   addiction:{ label: "התמכרויות",      steps: ["a-types", "a-substances", "a-gaming", "a-porn-type", "a-porn-q", "a-sex-q", "a-gambling", "a-phone"] },
   end:      { label: "סיום",          steps: ["scoring"] },
 };
 
 const KIDS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   intro:   { label: "פתיחה",      steps: ["p-consent", "p-demo", "p-areas"] },
-  anxiety: { label: "חרדה",       steps: ["p-q1", "p-aq", "p-aq-grade", "p-q1-ga"] },
+  anxiety: { label: "חרדה",       steps: ["p-q1", "p-q1-pain", "p-aq", "p-aq-grade", "p-q1-ga"] },
   mood:    { label: "מצב רוח",    steps: ["p-q2", "p-q2-grade"] },
   mania:   { label: "מאניה",      steps: ["p-q3", "p-mq", "p-mq-sui"] },
   addict:  { label: "התמכרות",    steps: ["p-q4", "p-q4-types", "p-q4-s", "p-q4-g", "p-q4-b", "p-q4-ctrl"] },
@@ -394,7 +396,7 @@ const KIDS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   trauma:  { label: "טראומה",     steps: ["p-q6", "p-tq"] },
   psycho:  { label: "פסיכוזה",    steps: ["p-q7", "p-pq"] },
   eating:  { label: "אכילה",      steps: ["p-q8", "p-eq"] },
-  behav:   { label: "התנהגות",    steps: ["p-q9", "p-bq"] },
+  behav:   { label: "התנהגות",    steps: ["p-q9", "p-bq", "p-q9-adhd"] },
   distress:{ label: "מצוקה כללית", steps: ["p-q10", "p-q10-par", "p-q10-grade"] },
   extra:   { label: "התפתחות",    steps: ["p-ga-traits", "p-acad", "p-dev-toilet", "p-dev-sensory", "p-beh", "p-soc"] },
   end:     { label: "תוצאות",     steps: ["p-result"] },
@@ -537,9 +539,250 @@ function QuizDropoutChart({
   );
 }
 
-function QuizTab({ data }: { data: AnalyticsData }) {
+// ── ניתוח נשירה חכם (סוכן) ──────────────────────────────────────────
+
+type DropoutStepStat = {
+  step: string;
+  group: string;
+  desc: string;
+  reached: number;
+  exitedHere: number;
+  exitRate: number;
+  medianSec: number | null;
+  tags: string[];
+};
+type DropoutQuizAnalysis = {
+  started: number;
+  completed: number;
+  completionRate: number;
+  medianDurationMin: number | null;
+  dropouts: number;
+  steps: DropoutStepStat[];
+  topExits: DropoutStepStat[];
+  postQuiz?: { results: number; matchForm: number; matchResults: number };
+  sampleNote: string | null;
+};
+type DropoutAiFinding = {
+  step: string;
+  title: string;
+  evidence: string;
+  likely_reasons: string[];
+  suggestions: string[];
+};
+type DropoutAiQuizReport = { summary: string; findings: DropoutAiFinding[]; quick_wins: string[] };
+type DropoutAnalysisData = {
+  adults: DropoutQuizAnalysis;
+  kids: DropoutQuizAnalysis;
+  ai: { adults: DropoutAiQuizReport; kids: DropoutAiQuizReport } | null;
+  aiError: string | null;
+  generated_at: string;
+};
+
+function fmtSec(sec: number | null): string {
+  if (sec == null) return "—";
+  if (sec < 60) return `${sec} שנ'`;
+  return `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")} דק'`;
+}
+
+function ExitPointsTable({ analysis }: { analysis: DropoutQuizAnalysis }) {
+  if (analysis.topExits.length === 0) {
+    return <p className="text-sm text-stone-400">אין נטישות בתקופה הזו 🎉</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-right text-sm">
+        <thead>
+          <tr className="bg-stone-50 border-b border-stone-200 text-xs text-stone-500">
+            <th className="px-3 py-2 font-semibold">שלב</th>
+            <th className="px-3 py-2 font-semibold">מה מוצג שם</th>
+            <th className="px-3 py-2 font-semibold text-center">הגיעו</th>
+            <th className="px-3 py-2 font-semibold text-center">נטשו כאן</th>
+            <th className="px-3 py-2 font-semibold text-center">% נטישה</th>
+            <th className="px-3 py-2 font-semibold text-center">זמן חציוני</th>
+          </tr>
+        </thead>
+        <tbody>
+          {analysis.topExits.map(s => (
+            <tr key={s.step} className="border-b border-stone-100 align-top">
+              <td className="px-3 py-2.5 whitespace-nowrap">
+                <div className="font-mono text-xs text-stone-500">{s.step}</div>
+                <div className="text-xs font-bold text-stone-700">{s.group}</div>
+              </td>
+              <td className="px-3 py-2.5 text-xs text-stone-600 leading-5 max-w-[300px]">
+                {s.desc}
+                {s.tags.length > 0 && (
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {s.tags.map(t => (
+                      <span key={t} className="rounded-full bg-stone-100 border border-stone-200 px-1.5 py-0.5 text-[10px] text-stone-500">{t}</span>
+                    ))}
+                  </div>
+                )}
+              </td>
+              <td className="px-3 py-2.5 text-center font-bold text-stone-700">{s.reached}</td>
+              <td className="px-3 py-2.5 text-center font-black text-red-600">{s.exitedHere}</td>
+              <td className="px-3 py-2.5 text-center">
+                <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-black ${s.exitRate >= 20 ? "bg-red-100 text-red-700" : s.exitRate >= 10 ? "bg-amber-100 text-amber-700" : "bg-stone-100 text-stone-600"}`}>
+                  {s.exitRate}%
+                </span>
+              </td>
+              <td className="px-3 py-2.5 text-center text-xs text-stone-500">{fmtSec(s.medianSec)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function AiFindings({ report }: { report: DropoutAiQuizReport }) {
+  return (
+    <div className="space-y-3">
+      <p className="rounded-xl bg-violet-50 border border-violet-200 p-3 text-sm leading-6 text-violet-900">✦ {report.summary}</p>
+      {report.findings.map((f, i) => (
+        <div key={i} className="rounded-xl border border-stone-200 bg-white p-4">
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="rounded bg-stone-800 text-white font-mono text-[10px] px-1.5 py-0.5">{f.step}</span>
+            <h4 className="text-sm font-black text-stone-800">{f.title}</h4>
+          </div>
+          <p className="mt-1 text-xs text-stone-500">{f.evidence}</p>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div>
+              <div className="text-[11px] font-bold text-amber-700 mb-1">סיבות אפשריות</div>
+              <ul className="space-y-1">
+                {f.likely_reasons.map((r, j) => (
+                  <li key={j} className="text-xs text-stone-700 leading-5 flex gap-1.5"><span className="text-amber-500 mt-0.5">•</span>{r}</li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <div className="text-[11px] font-bold text-green-700 mb-1">איך לשפר</div>
+              <ul className="space-y-1">
+                {f.suggestions.map((r, j) => (
+                  <li key={j} className="text-xs text-stone-700 leading-5 flex gap-1.5"><span className="text-green-500 mt-0.5">✓</span>{r}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      ))}
+      {report.quick_wins.length > 0 && (
+        <div className="rounded-xl border border-green-200 bg-green-50 p-3">
+          <div className="text-xs font-black text-green-800 mb-1.5">⚡ צעדים מהירים</div>
+          <ul className="space-y-1">
+            {report.quick_wins.map((w, i) => (
+              <li key={i} className="text-xs text-green-900 leading-5 flex gap-1.5"><span className="mt-0.5">→</span>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizAnalysisSection({
+  title, analysis, ai,
+}: {
+  title: string;
+  analysis: DropoutQuizAnalysis;
+  ai: DropoutAiQuizReport | null;
+}) {
+  const rate = analysis.completionRate;
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-5">
+      <div className="flex items-center justify-between flex-wrap gap-3 mb-3">
+        <h3 className="text-base font-black text-stone-800">{title}</h3>
+        <div className="flex items-center gap-3 text-center">
+          <div><div className="text-lg font-black text-blue-700">{analysis.started}</div><div className="text-[10px] text-stone-500">התחילו</div></div>
+          <div><div className="text-lg font-black text-green-700">{analysis.completed}</div><div className="text-[10px] text-stone-500">סיימו</div></div>
+          <div><div className="text-lg font-black text-red-600">{analysis.dropouts}</div><div className="text-[10px] text-stone-500">נטשו</div></div>
+          <div><div className={`text-lg font-black ${rate >= 50 ? "text-green-700" : rate >= 25 ? "text-amber-700" : "text-red-700"}`}>{rate}%</div><div className="text-[10px] text-stone-500">השלמה</div></div>
+          {analysis.medianDurationMin != null && (
+            <div><div className="text-lg font-black text-stone-700">{analysis.medianDurationMin}</div><div className="text-[10px] text-stone-500">דק' (חציון)</div></div>
+          )}
+        </div>
+      </div>
+
+      {analysis.sampleNote && (
+        <p className="mb-3 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">⚠️ {analysis.sampleNote}</p>
+      )}
+
+      {analysis.postQuiz && analysis.completed > 0 && (
+        <p className="mb-3 text-xs text-stone-500">
+          אחרי סיום השאלון: {analysis.postQuiz.results} ראו תוצאות ← {analysis.postQuiz.matchForm} פתחו חיפוש מטפל ← {analysis.postQuiz.matchResults} הגיעו לרשימת מטפלים
+        </p>
+      )}
+
+      <div className="mb-4">
+        <div className="text-xs font-black text-stone-600 mb-2">📍 נקודות הנטישה המדויקות (השלב האחרון שנצפה לפני עזיבה)</div>
+        <ExitPointsTable analysis={analysis} />
+      </div>
+
+      {ai && <AiFindings report={ai} />}
+    </div>
+  );
+}
+
+function QuizAiAnalysisPanel({ period }: { period: Period }) {
+  const [data, setData] = useState<DropoutAnalysisData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // תוצאה של תקופה אחת אינה רלוונטית לאחרת — לנקות כשמחליפים
+  useEffect(() => { setData(null); setError(""); }, [period]);
+
+  function run(force = false) {
+    setLoading(true);
+    setError("");
+    fetch(`/api/admin-quiz-dropout?period=${period}${force ? "&force=1" : ""}`, { cache: "no-store" })
+      .then(r => r.json())
+      .then(json => {
+        if (json.ok) setData(json);
+        else setError(json.error ?? "שגיאה לא ידועה");
+      })
+      .catch(() => setError("שגיאת רשת"))
+      .finally(() => setLoading(false));
+  }
+
+  return (
+    <div className="rounded-2xl border-2 border-violet-200 bg-violet-50/40 p-5 mb-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-base font-black text-stone-800">🧭 ניתוח נשירה חכם</h2>
+          <p className="text-xs text-stone-500 mt-0.5">
+            איפה בדיוק כל משתמש נטש (לפי מסלול אמיתי, לא לפי מוני שלבים), סיבות אפשריות והצעות שיפור
+          </p>
+        </div>
+        <button
+          onClick={() => run(Boolean(data))}
+          disabled={loading}
+          className="rounded-xl bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-sm font-bold px-5 py-2.5 transition-colors"
+        >
+          {loading ? "מנתח… (עד ½ דקה)" : data ? "🔄 נתח מחדש" : "▶ הפעל ניתוח"}
+        </button>
+      </div>
+
+      {error && (
+        <p className="mt-3 rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+
+      {data && !loading && (
+        <div className="mt-4">
+          {data.aiError && (
+            <p className="mb-3 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">⚠️ {data.aiError}</p>
+          )}
+          <QuizAnalysisSection title="🧑 שאלון מבוגרים" analysis={data.adults} ai={data.ai?.adults ?? null} />
+          <QuizAnalysisSection title="🧒 שאלון ילדים" analysis={data.kids} ai={data.ai?.kids ?? null} />
+          <p className="text-[11px] text-stone-400 text-left">נותח: {new Date(data.generated_at).toLocaleString("he-IL")}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuizTab({ data, period }: { data: AnalyticsData; period: Period }) {
   return (
     <>
+      <QuizAiAnalysisPanel period={period} />
       <QuizDropoutChart quiz={data.quizDropout.adults} title="שאלון מבוגרים — נשירה לפי שלב" groups={ADULTS_GROUPS} />
       <QuizDropoutChart quiz={data.quizDropout.kids} title="שאלון ילדים — נשירה לפי שלב" groups={KIDS_GROUPS} />
     </>
@@ -913,7 +1156,7 @@ export default function AdminAnalyticsPage() {
       {!loading && data && (
         <>
           {tab === "funnel" && <FunnelTab data={data} />}
-          {tab === "quiz" && <QuizTab data={data} />}
+          {tab === "quiz" && <QuizTab data={data} period={period} />}
           {tab === "stats" && <StatsTab data={data} />}
           {tab === "therapists" && <TherapistsTab data={data.therapistBreakdowns} />}
           {tab === "explain" && <ExplainTab data={data} />}
