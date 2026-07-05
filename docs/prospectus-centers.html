@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <!--
   מקור הפרוספקט למרכזים (עמוד A4 אחד). ה-PDF ב-public/prospectus-centers.pdf
-  נוצר מכאן. לחידוש אחרי עריכה מריצים Chrome ב-headless:
-  chrome --headless --disable-gpu --no-pdf-header-footer \
+  נוצר מכאן. הלוגו נטען מ-logo.svg שלצד הקובץ (docs/logo.svg). לחידוש אחרי עריכה:
+  chrome --headless --disable-gpu --allow-file-access-from-files --no-pdf-header-footer \
     --print-to-pdf="public/prospectus-centers.pdf" "file:///<abs-path>/docs/prospectus-centers.html"
 -->
 <html lang="he" dir="rtl">
@@ -13,74 +13,95 @@
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { font-family: 'Heebo', sans-serif; color: #131F1E; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 210mm; min-height: 297mm; padding: 14mm 15mm; position: relative; }
-  .brand { display: flex; align-items: baseline; gap: 5px; font-size: 27px; font-weight: 900; }
-  .brand .t { color: #3D8C8A; } .brand .h { color: #D49018; }
-  .kick { display: inline-flex; align-items: center; gap: 6px; background: #EAF4F3; color: #2A6462; border: 1px solid #C2DFDE; border-radius: 999px; padding: 5px 14px; font-size: 11px; font-weight: 700; letter-spacing: .05em; }
-  h1 { font-size: 27px; font-weight: 900; line-height: 1.28; margin-top: 12px; }
+  .page { width: 210mm; min-height: 297mm; padding: 13mm 15mm 0; position: relative; }
+
+  .head { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #EAF4F3; }
+  .head img { height: 62px; width: auto; }
+  .eyebrow { display: inline-block; margin-top: 13px; background: #EAF4F3; color: #2A6462; border: 1px solid #C2DFDE; border-radius: 999px; padding: 5px 16px; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
+
+  h1 { font-size: 26px; font-weight: 900; line-height: 1.25; margin: 16px 0 0; }
   h1 .a { color: #3D8C8A; }
-  .lead { font-size: 13.5px; line-height: 1.7; color: #3E5250; margin-top: 10px; max-width: 175mm; }
-  h2 { font-size: 16px; font-weight: 900; margin: 20px 0 12px; }
+  .lead { font-size: 13px; line-height: 1.7; color: #3E5250; margin-top: 9px; max-width: 172mm; }
+
+  .sec-title { font-size: 15px; font-weight: 900; margin: 18px 0 11px; display: flex; align-items: center; gap: 8px; }
+  .sec-title::before { content: ""; width: 4px; height: 15px; background: #D49018; border-radius: 2px; display: inline-block; }
+
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 14px 15px; }
-  .card .ic { width: 34px; height: 34px; border-radius: 9px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; font-size: 18px; }
+  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 14px 15px; display: flex; gap: 12px; }
+  .card .ic { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; font-size: 19px; }
   .card h3 { font-size: 13.5px; font-weight: 800; margin-bottom: 3px; }
   .card p { font-size: 11.5px; line-height: 1.55; color: #6B807E; }
-  .stats { border: 1px solid #E8E0D8; border-radius: 16px; padding: 15px 16px; margin-top: 8px; }
-  .stats .tag { display: inline-flex; align-items: center; gap: 5px; background: #8B2E0A14; color: #8B2E0A; border: 1px solid #8B2E0A33; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 700; }
-  .stats h3 { font-size: 15px; font-weight: 900; margin: 8px 0 4px; }
+
+  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 16px; padding: 15px 16px; margin-top: 6px; }
+  .stats .tag { display: inline-flex; align-items: center; gap: 5px; background: #D4901815; color: #A87010; border: 1px solid #D4901833; border-radius: 999px; padding: 3px 11px; font-size: 10.5px; font-weight: 800; }
+  .stats h3 { font-size: 14.5px; font-weight: 900; margin: 8px 0 4px; }
   .stats .sub { font-size: 11.5px; color: #6B807E; line-height: 1.5; margin-bottom: 11px; }
-  .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
   .sitem { display: flex; gap: 8px; }
   .sitem .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: 0 0 auto; }
   .sitem b { font-size: 11.5px; font-weight: 800; display: block; }
   .sitem span { font-size: 10.5px; color: #6B807E; line-height: 1.45; }
-  .cta { margin-top: 20px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border: 1px solid #D8E4E8; border-radius: 18px; padding: 18px 20px; text-align: center; }
-  .cta h2 { margin: 0 0 5px; font-size: 19px; }
-  .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 150mm; margin: 0 auto; }
-  .cta .mail { display: inline-block; margin-top: 12px; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 26px; border-radius: 999px; }
-  .foot { margin-top: 14px; text-align: center; font-size: 10.5px; color: #6B807E; }
+
+  .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 11px; }
+  .step { border: 1px solid #E8E0D8; border-radius: 14px; padding: 13px 14px; }
+  .step .n { width: 24px; height: 24px; border-radius: 50%; background: #3D8C8A; color: #fff; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
+  .step h4 { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
+  .step p { font-size: 11px; line-height: 1.5; color: #6B807E; }
+
+  .cta { margin: 18px -15mm 0; padding: 18px 15mm 16px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
+  .cta h2 { font-size: 19px; font-weight: 900; margin: 0 0 5px; }
+  .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 155mm; margin: 0 auto 12px; }
+  .cta .mail { display: inline-block; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 30px; border-radius: 999px; }
+  .cta .foot { margin-top: 12px; font-size: 10.5px; color: #6B807E; }
 </style>
 </head>
 <body>
 <div class="page">
-  <div style="display:flex;align-items:center;justify-content:space-between;">
-    <div class="brand"><span class="t">טיפול</span><span class="h">חכם</span></div>
-    <div class="kick">✦ למרכזים טיפוליים</div>
+  <div class="head">
+    <img src="logo.svg" alt="טיפול חכם">
+    <div class="eyebrow">מסלול המרכזים הטיפוליים</div>
   </div>
 
-  <h1>כל מטפלי המרכז — מותאמים למטופלים הנכונים,<br><span class="a">עם ניהול וסטטיסטיקות במקום אחד.</span></h1>
+  <h1>מה המרכז מקבל — <span class="a">חשיפה, ניהול וסטטיסטיקות במקום אחד</span></h1>
   <p class="lead">
-    <b>"טיפול חכם"</b> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית — פלטפורמה שנבנתה על ידי פסיכולוג קליני.
-    המרכז שלכם מקבל חשיפה במערכת ההתאמות, פורטל ניהול מרכזי, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי אחד שנסגר איתכם אישית.
+    <b>"טיפול חכם"</b> היא פלטפורמה ישראלית להתאמת טיפול נפשי, שנבנתה על ידי פסיכולוג קליני. מטופלים עוברים שאלון חכם
+    ומופנים למטפלים המתאימים ביותר. המרכז שלכם מצטרף כיחידה אחת — כל המטפלים במערכת ההתאמות, פורטל ניהול מרכזי, ודוח
+    חודשי שחושף מי מחפש אתכם — במחיר חודשי אחד שנסגר איתכם אישית.
   </p>
 
-  <h2>מה המרכז מקבל</h2>
+  <div class="sec-title">מה כלול במסלול</div>
   <div class="grid">
-    <div class="card"><div class="ic">👥</div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.</p></div>
-    <div class="card"><div class="ic">🗂️</div><h3>פורטל ניהול מרכזי משלכם</h3><p>חשבון כניסה עם גישה לכל פרופילי המטפלים במקום אחד וסטטיסטיקות מרוכזות — בלי להיכנס לכל מטפל בנפרד.</p></div>
-    <div class="card"><div class="ic">📊</div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — באנונימיות מלאה.</p></div>
-    <div class="card"><div class="ic">🛡️</div><h3>ללא התחייבות — ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div>
+    <div class="card"><div class="ic">👥</div><div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.</p></div></div>
+    <div class="card"><div class="ic">🗂️</div><div><h3>פורטל ניהול מרכזי משלכם</h3><p>חשבון כניסה עם גישה לכל פרופילי המטפלים במקום אחד וסטטיסטיקות מרוכזות — בלי להיכנס לכל מטפל בנפרד.</p></div></div>
+    <div class="card"><div class="ic">📊</div><div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — באנונימיות מלאה.</p></div></div>
+    <div class="card"><div class="ic">🛡️</div><div><h3>ללא התחייבות — ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div></div>
   </div>
 
   <div class="stats">
-    <div class="tag">📈 דוח סטטיסטיקות חודשי</div>
+    <div class="tag">📈 הדוח החודשי — בלעדי למרכזים</div>
     <h3>איזה מטופלים מחפשים את המרכז שלכם — ובאזור שלכם</h3>
     <div class="sub">מרכזים עובדים שנים בלי לדעת מאיפה מגיעים הפונים ומה הם מחפשים. הדוח החודשי חושף בדיוק את זה, מרוכז לכל המרכז.</div>
     <div class="srow">
-      <div class="sitem"><span class="dot" style="background:#0F5468"></span><span><b>כמה אנשים ראו אתכם באמת</b>צפיות, אנשים שונים, כמה פנו בפועל, ואחוז המרה.</span></div>
+      <div class="sitem"><span class="dot" style="background:#0F5468"></span><span><b>כמה אנשים ראו אתכם באמת</b>צפיות, אנשים שונים, כמה פנו בפועל, ואחוז המרה מצפייה לפנייה.</span></div>
       <div class="sitem"><span class="dot" style="background:#1A7A96"></span><span><b>מאיזו גיאוגרפיה מגיעים</b>מרכז, שרון, ירושלים, חיפה, צפון, דרום או אונליין.</span></div>
       <div class="sitem"><span class="dot" style="background:#8B2E0A"></span><span><b>עם איזה קשיים פונים</b>רגשי, זוגי, התמכרות, תפקודי, מיני, הדרכת הורים ועוד.</span></div>
       <div class="sitem"><span class="dot" style="background:#2A5C3A"></span><span><b>גילאים ומגדר של הפונים</b>התפלגות לפי טווחי גיל ומגדר — מי הקהל שלכם.</span></div>
     </div>
   </div>
 
+  <div class="sec-title">איך זה עובד</div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h4>מטופל ממלא שאלון</h4><p>שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום.</p></div>
+    <div class="step"><div class="n">2</div><h4>התאמה למטפלי המרכז</h4><p>המערכת מפנה אותו למטפלים המתאימים ביותר מבין מטפלי המרכז.</p></div>
+    <div class="step"><div class="n">3</div><h4>אתם רואים הכול</h4><p>פורטל ניהול וסטטיסטיקות מרוכזות של כל הפניות והצפיות.</p></div>
+  </div>
+
   <div class="cta">
     <h2>רוצים הצעה למרכז שלכם?</h2>
     <p>המחיר נקבע אישית לפי גודל המרכז והצרכים, ואפשר להתחיל עם חודשי התנסות במתנה. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
     <div class="mail">admin@getmentalytics.com</div>
+    <div class="foot">טיפול חכם — Mentalytics · mentalytics.co.il · פלטפורמה שנבנתה על ידי פסיכולוג קליני</div>
   </div>
-  <div class="foot">טיפול חכם — Mentalytics · mentalytics.co.il · פלטפורמה שנבנתה על ידי פסיכולוג קליני</div>
 </div>
 </body>
 </html>
