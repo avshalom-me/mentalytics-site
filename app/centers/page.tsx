@@ -82,8 +82,8 @@ export default function CentersInfoPage() {
           <span style={{ color: "var(--teal)" }}>עם ניהול וסטטיסטיקות במקום אחד.</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-8 text-stone-700">
-          <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית.
-          המרכז שלכם מקבל חשיפה במערכת ההתאמות, פורטל ניהול מרכזי, ודוח חודשי שחושף מי מחפש אתכם — הכול במחיר חודשי אחד שנסגר איתכם אישית.
+          <strong>&quot;טיפול חכם&quot;</strong> היא פלטפורמה ישראלית שנבנתה על ידי פסיכולוגים וחוקרים. מטופלים עוברים שאלון חכם ואינטייק אוטומטי,
+          ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מקבל חשיפה במערכת ההתאמות, פורטל ניהול מרכזי, ודוח חודשי שחושף מי מחפש אתכם — הכול במחיר חודשי אחד שנסגר איתכם אישית.
         </p>
       </section>
 
@@ -134,7 +134,7 @@ export default function CentersInfoPage() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[
             { icon: Brain, n: "1", title: "מטופל ממלא שאלון", body: "שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום." },
-            { icon: Users, n: "2", title: "התאמה למטפלי המרכז", body: "המערכת מפנה אותו למטפלים המתאימים ביותר מבין מטפלי המרכז." },
+            { icon: Users, n: "2", title: "התאמה גיאוגרפית", body: "המערכת מפנה אותו למטפלים המתאימים או למרכז הטיפולי המתאים ביותר באזור הגיאוגרפי שלו." },
             { icon: BarChart3, n: "3", title: "אתם רואים הכול", body: "פורטל ניהול וסטטיסטיקות מרוכזות של כל הפניות והצפיות." },
           ].map(({ icon: Icon, n, title, body }) => (
             <div key={n} className="rounded-2xl border border-[#E8E0D8] bg-white p-5">
@@ -166,7 +166,7 @@ export default function CentersInfoPage() {
             כבר לקוחות? כניסה לפורטל
           </Link>
         </div>
-        <p className="mt-4 text-xs text-stone-500">טיפול חכם — Mentalytics · פלטפורמה שנבנתה על ידי פסיכולוג קליני</p>
+        <p className="mt-4 text-xs text-stone-500">טיפול חכם — Mentalytics · פלטפורמה שנבנתה על ידי פסיכולוגים וחוקרים</p>
       </section>
     </main>
   );
