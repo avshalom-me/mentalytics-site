@@ -20,6 +20,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     label: "לקוחות",
     items: [
       { href: "/admin/therapists", label: "מטפלים", icon: "👥" },
+      { href: "/admin/centers", label: "מרכזים טיפוליים", icon: "🏥" },
       { href: "/admin/leads", label: "לידים ופניות", icon: "📥" },
       { href: "/admin/guarantee", label: "תקופת ביטחון", icon: "🛡️" },
       { href: "/admin/deals", label: "עסקאות B2B", icon: "🤝" },
@@ -28,6 +29,10 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   {
     label: "כספים",
     items: [{ href: "/admin/finance", label: "הכנסות והוצאות", icon: "💰" }],
+  },
+  {
+    label: "צוות",
+    items: [{ href: "/admin/staff", label: "שעות עבודה", icon: "🕒" }],
   },
   {
     label: "שיווק",

@@ -262,6 +262,92 @@ export async function createSubscription(opts: {
   return charge;
 }
 
+// ---------- Therapy-center subscription ----------
+//
+// Same recurring/charge endpoint as therapist subscriptions, with two
+// differences: a per-center negotiated price, and optional GIFT MONTHS —
+// implemented with the documented `Date_Start` field on the recurring item
+// ("First payment date. Defaults to the current date."), so the card is
+// tokenized and the standing order created NOW, but the first charge happens
+// only when the gift ends. With a future Date_Start there is no immediate
+// payment, so charge validation switches from "payment valid" to "standing
+// order exists".
+
+export async function createCenterSubscription(opts: {
+  centerId: string;
+  centerName: string;
+  payerName: string;
+  payerEmail: string;
+  payerPhone?: string;
+  companyNumber?: string; // ח.פ / עוסק מורשה — מודפס על החשבונית
+  singleUseToken: string;
+  unitPrice: number;      // המחיר החודשי שסוכם, לפני מע"מ
+  planTitle: string;
+  firstChargeDate?: string; // "YYYY-MM-DD"; מוגדר רק כשיש חודשי מתנה
+}): Promise<SubscriptionChargeResult> {
+  const externalId = `center:${opts.centerId}`;
+  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
+    Customer: {
+      ExternalIdentifier: externalId,
+      SearchMode: 0,
+      Name: opts.payerName || opts.centerName,
+      EmailAddress: opts.payerEmail,
+      Phone: opts.payerPhone || null,
+      CompanyNumber: opts.companyNumber || null,
+    },
+    SingleUseToken: opts.singleUseToken,
+    Items: [
+      {
+        Item: {
+          Name: `מנוי חודשי למרכז טיפולי — ${opts.planTitle} | טיפול חכם`,
+          SKU: "CENTER-MONTHLY",
+          Duration_Months: 1,
+        },
+        Quantity: 1,
+        UnitPrice: opts.unitPrice,
+        Recurrence: 999, // עד ביטול, כמו מנויי מטפלים
+        ...(opts.firstChargeDate ? { Date_Start: opts.firstChargeDate } : {}),
+      },
+    ],
+    VATIncluded: false,
+    UpdateCustomerByEmail: true,
+    UpdateCustomerByEmail_AttachDocument: true,
+    SendCopyToOrganization: true,
+    PreventStandingOrder: false,
+  });
+
+  if (!opts.firstChargeDate) {
+    // חיוב מיידי — אותה ולידציה כמו מנוי מטפל: דחיית כרטיס חייבת לעצור כאן.
+    assertChargeSucceeded(charge, "center subscription charge");
+  }
+  // עם Date_Start עתידי אין תשלום מיידי לוודא; הצלחת המעטפת (Status=0)
+  // פירושה שהוראת הקבע נוצרה והכרטיס נשמר.
+
+  if (
+    !charge.RecurringItemID &&
+    Array.isArray(charge.RecurringCustomerItemIDs) &&
+    charge.RecurringCustomerItemIDs.length > 0
+  ) {
+    charge.RecurringItemID = charge.RecurringCustomerItemIDs[0];
+  }
+  if (!charge.RecurringItemID) {
+    try {
+      const items = await listRecurringForCustomer({
+        externalIdentifier: externalId,
+        includeInactive: false,
+      });
+      const newest = items
+        .filter((i) => i.Status === 0)
+        .sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+      if (newest) charge.RecurringItemID = newest.ID;
+    } catch (e) {
+      console.error("createCenterSubscription: failed to resolve RecurringItemID:", e);
+    }
+  }
+
+  return charge;
+}
+
 // ---------- Cancel a standing order ----------
 //
 // Sumit's /billing/recurring/cancel takes the customer (resolved by
