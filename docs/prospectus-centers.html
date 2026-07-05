@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<!--
+  מקור הפרוספקט למרכזים (עמוד A4 אחד). ה-PDF ב-public/prospectus-centers.pdf
+  נוצר מכאן. לחידוש אחרי עריכה מריצים Chrome ב-headless:
+  chrome --headless --disable-gpu --no-pdf-header-footer \
+    --print-to-pdf="public/prospectus-centers.pdf" "file:///<abs-path>/docs/prospectus-centers.html"
+-->
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
+  @page { size: A4; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { font-family: 'Heebo', sans-serif; color: #131F1E; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .page { width: 210mm; min-height: 297mm; padding: 14mm 15mm; position: relative; }
+  .brand { display: flex; align-items: baseline; gap: 5px; font-size: 27px; font-weight: 900; }
+  .brand .t { color: #3D8C8A; } .brand .h { color: #D49018; }
+  .kick { display: inline-flex; align-items: center; gap: 6px; background: #EAF4F3; color: #2A6462; border: 1px solid #C2DFDE; border-radius: 999px; padding: 5px 14px; font-size: 11px; font-weight: 700; letter-spacing: .05em; }
+  h1 { font-size: 27px; font-weight: 900; line-height: 1.28; margin-top: 12px; }
+  h1 .a { color: #3D8C8A; }
+  .lead { font-size: 13.5px; line-height: 1.7; color: #3E5250; margin-top: 10px; max-width: 175mm; }
+  h2 { font-size: 16px; font-weight: 900; margin: 20px 0 12px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
+  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 14px 15px; }
+  .card .ic { width: 34px; height: 34px; border-radius: 9px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; margin-bottom: 8px; font-size: 18px; }
+  .card h3 { font-size: 13.5px; font-weight: 800; margin-bottom: 3px; }
+  .card p { font-size: 11.5px; line-height: 1.55; color: #6B807E; }
+  .stats { border: 1px solid #E8E0D8; border-radius: 16px; padding: 15px 16px; margin-top: 8px; }
+  .stats .tag { display: inline-flex; align-items: center; gap: 5px; background: #8B2E0A14; color: #8B2E0A; border: 1px solid #8B2E0A33; border-radius: 999px; padding: 3px 10px; font-size: 10.5px; font-weight: 700; }
+  .stats h3 { font-size: 15px; font-weight: 900; margin: 8px 0 4px; }
+  .stats .sub { font-size: 11.5px; color: #6B807E; line-height: 1.5; margin-bottom: 11px; }
+  .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; }
+  .sitem { display: flex; gap: 8px; }
+  .sitem .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: 0 0 auto; }
+  .sitem b { font-size: 11.5px; font-weight: 800; display: block; }
+  .sitem span { font-size: 10.5px; color: #6B807E; line-height: 1.45; }
+  .cta { margin-top: 20px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border: 1px solid #D8E4E8; border-radius: 18px; padding: 18px 20px; text-align: center; }
+  .cta h2 { margin: 0 0 5px; font-size: 19px; }
+  .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 150mm; margin: 0 auto; }
+  .cta .mail { display: inline-block; margin-top: 12px; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 26px; border-radius: 999px; }
+  .foot { margin-top: 14px; text-align: center; font-size: 10.5px; color: #6B807E; }
+</style>
+</head>
+<body>
+<div class="page">
+  <div style="display:flex;align-items:center;justify-content:space-between;">
+    <div class="brand"><span class="t">טיפול</span><span class="h">חכם</span></div>
+    <div class="kick">✦ למרכזים טיפוליים</div>
+  </div>
+
+  <h1>כל מטפלי המרכז — מותאמים למטופלים הנכונים,<br><span class="a">עם ניהול וסטטיסטיקות במקום אחד.</span></h1>
+  <p class="lead">
+    <b>"טיפול חכם"</b> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית — פלטפורמה שנבנתה על ידי פסיכולוג קליני.
+    המרכז שלכם מקבל חשיפה במערכת ההתאמות, פורטל ניהול מרכזי, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי אחד שנסגר איתכם אישית.
+  </p>
+
+  <h2>מה המרכז מקבל</h2>
+  <div class="grid">
+    <div class="card"><div class="ic">👥</div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.</p></div>
+    <div class="card"><div class="ic">🗂️</div><h3>פורטל ניהול מרכזי משלכם</h3><p>חשבון כניסה עם גישה לכל פרופילי המטפלים במקום אחד וסטטיסטיקות מרוכזות — בלי להיכנס לכל מטפל בנפרד.</p></div>
+    <div class="card"><div class="ic">📊</div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — באנונימיות מלאה.</p></div>
+    <div class="card"><div class="ic">🛡️</div><h3>ללא התחייבות — ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div>
+  </div>
+
+  <div class="stats">
+    <div class="tag">📈 דוח סטטיסטיקות חודשי</div>
+    <h3>איזה מטופלים מחפשים את המרכז שלכם — ובאזור שלכם</h3>
+    <div class="sub">מרכזים עובדים שנים בלי לדעת מאיפה מגיעים הפונים ומה הם מחפשים. הדוח החודשי חושף בדיוק את זה, מרוכז לכל המרכז.</div>
+    <div class="srow">
+      <div class="sitem"><span class="dot" style="background:#0F5468"></span><span><b>כמה אנשים ראו אתכם באמת</b>צפיות, אנשים שונים, כמה פנו בפועל, ואחוז המרה.</span></div>
+      <div class="sitem"><span class="dot" style="background:#1A7A96"></span><span><b>מאיזו גיאוגרפיה מגיעים</b>מרכז, שרון, ירושלים, חיפה, צפון, דרום או אונליין.</span></div>
+      <div class="sitem"><span class="dot" style="background:#8B2E0A"></span><span><b>עם איזה קשיים פונים</b>רגשי, זוגי, התמכרות, תפקודי, מיני, הדרכת הורים ועוד.</span></div>
+      <div class="sitem"><span class="dot" style="background:#2A5C3A"></span><span><b>גילאים ומגדר של הפונים</b>התפלגות לפי טווחי גיל ומגדר — מי הקהל שלכם.</span></div>
+    </div>
+  </div>
+
+  <div class="cta">
+    <h2>רוצים הצעה למרכז שלכם?</h2>
+    <p>המחיר נקבע אישית לפי גודל המרכז והצרכים, ואפשר להתחיל עם חודשי התנסות במתנה. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
+    <div class="mail">admin@getmentalytics.com</div>
+  </div>
+  <div class="foot">טיפול חכם — Mentalytics · mentalytics.co.il · פלטפורמה שנבנתה על ידי פסיכולוג קליני</div>
+</div>
+</body>
+</html>

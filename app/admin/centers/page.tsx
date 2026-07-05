@@ -248,11 +248,15 @@ export default function AdminCentersPage() {
           + הצעה למרכז חדש
         </button>
       </div>
-      <p className="mb-6 text-sm text-stone-500 max-w-3xl">
+      <p className="mb-3 text-sm text-stone-500 max-w-3xl">
         יוצרים הצעה עם המסלולים והסכום החודשי שסגרתם, מעתיקים את הקישור ושולחים למרכז.
         בקישור הם רואים מה הם מקבלים בכל מסלול וממלאים פרטי אשראי. אפשר להגדיר חודשי מתנה —
         הכרטיס נשמר מיד והחיוב הראשון יוצא רק בתום המתנה.
       </p>
+      <div className="mb-6 flex flex-wrap gap-4 text-xs">
+        <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
+        <a href="/centers" target="_blank" className="font-bold text-[#0F5468] underline">🔗 עמוד ההסבר למרכזים</a>
+      </div>
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
       {loading && <p className="text-sm text-stone-400 animate-pulse">טוען…</p>}

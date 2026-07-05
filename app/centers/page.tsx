@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkles, Users, LayoutDashboard, BarChart3, MapPin, Activity, ShieldCheck, Brain, ArrowLeft } from "lucide-react";
+import { Sparkles, Users, LayoutDashboard, BarChart3, MapPin, Activity, ShieldCheck, Brain, ArrowLeft, FileDown } from "lucide-react";
 import PrintButton from "./PrintButton";
 
 // עמוד הסבר ציבורי למרכזים טיפוליים — משמש גם כפרוספקט להדפסה/שמירה כ-PDF
@@ -58,10 +58,17 @@ export default function CentersInfoPage() {
         }
       `}</style>
 
-      {/* לוגו + פעולה */}
-      <div className="mb-8 flex items-center justify-between gap-4">
+      {/* לוגו + פעולות */}
+      <div className="mb-8 flex flex-wrap items-center justify-between gap-3">
         <img src="/logo.svg" alt="טיפול חכם" style={{ height: "42px", width: "auto" }} />
-        <PrintButton />
+        <div className="print:hidden flex items-center gap-2">
+          <a href="/prospectus-centers.pdf" target="_blank"
+            className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white transition hover:opacity-95"
+            style={{ background: "var(--teal)" }}>
+            <FileDown size={16} /> פרוספקט PDF
+          </a>
+          <PrintButton />
+        </div>
       </div>
 
       {/* Hero */}
