@@ -29,6 +29,16 @@ type Center = {
   paid_at: string | null;
   cancelled_at: string | null;
   created_at: string;
+  therapist_count: number;
+};
+
+type TherapistPoolItem = {
+  id: string;
+  full_name: string;
+  email: string | null;
+  status: string;
+  center_account_id: string | null;
+  center_name: string | null;
 };
 
 const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = {
@@ -66,14 +76,21 @@ export default function AdminCentersPage() {
   const [fGift, setFGift] = useState("0");
   const [fPlans, setFPlans] = useState<PlanDraft[]>([emptyPlan()]);
 
+  // ניהול שיוך מטפלים למרכז
+  const [manageFor, setManageFor] = useState<Center | null>(null);
+  const [pool, setPool] = useState<TherapistPoolItem[]>([]);
+  const [poolLoading, setPoolLoading] = useState(false);
+  const [poolSearch, setPoolSearch] = useState("");
+  const [selectedTx, setSelectedTx] = useState<Set<string>>(new Set());
+
   // נועל את גלילת העמוד שמאחורי המודל — בלעדיו, גלילה עם העכבר מעל הרקע
   // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
   useEffect(() => {
-    if (!editing) return;
+    if (!editing && !manageFor) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [editing]);
+  }, [editing, manageFor]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -189,6 +206,38 @@ export default function AdminCentersPage() {
     }
   }
 
+  async function openManage(c: Center) {
+    setManageFor(c);
+    setPoolSearch("");
+    setPoolLoading(true);
+    setPool([]);
+    setSelectedTx(new Set());
+    try {
+      const res = await fetch("/api/admin-centers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "list_therapists" }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setPool(j.therapists);
+        setSelectedTx(new Set((j.therapists as TherapistPoolItem[]).filter((t) => t.center_account_id === c.id).map((t) => t.id)));
+      } else {
+        setError(j.error ?? "שגיאה");
+      }
+    } catch {
+      setError("שגיאת רשת");
+    } finally {
+      setPoolLoading(false);
+    }
+  }
+
+  async function saveTherapists() {
+    if (!manageFor) return;
+    const j = await post({ action: "set_therapists", id: manageFor.id, therapist_ids: [...selectedTx] });
+    if (j.ok) setManageFor(null);
+  }
+
   const isLockedEditing = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
 
   return (
@@ -266,6 +315,10 @@ export default function AdminCentersPage() {
               <button onClick={() => copyLink(c)}
                 className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
                 {copied === c.id ? "✓ הועתק!" : "🔗 העתקת קישור למרכז"}
+              </button>
+              <button onClick={() => openManage(c)}
+                className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-100">
+                👥 ניהול מטפלים ({c.therapist_count})
               </button>
               {(c.status === "draft" || c.status === "sent") && (
                 <>
@@ -395,6 +448,78 @@ export default function AdminCentersPage() {
               <button onClick={save} disabled={busy || !fName.trim()}
                 className="w-full rounded-xl bg-stone-800 py-2.5 text-sm font-bold text-white disabled:opacity-40">
                 {busy ? "שומר…" : "שמירה"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* מודל: ניהול שיוך מטפלים למרכז */}
+      {manageFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
+          <div className="absolute inset-0 bg-black/30" onClick={() => setManageFor(null)} />
+          <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="rounded-t-2xl border-b border-stone-100 px-6 py-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-stone-800">מטפלי {manageFor.name}</h3>
+                <button onClick={() => setManageFor(null)} className="text-stone-400 hover:text-stone-600">✕</button>
+              </div>
+              <p className="mt-1 text-xs text-stone-500">סמנו את המטפלים ששייכים למרכז — הם יופיעו בפורטל המרכז ובסטטיסטיקות המרוכזות. מטפל משויך למרכז אחד בלבד.</p>
+              <input
+                value={poolSearch}
+                onChange={(e) => setPoolSearch(e.target.value)}
+                placeholder="חיפוש לפי שם…"
+                className="mt-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm"
+              />
+            </div>
+
+            <div className="overflow-y-auto px-4 py-3">
+              {poolLoading ? (
+                <p className="py-6 text-center text-sm text-stone-400">טוען מטפלים…</p>
+              ) : (() => {
+                const q = poolSearch.trim().toLowerCase();
+                const filtered = q ? pool.filter((t) => t.full_name.toLowerCase().includes(q)) : pool;
+                if (filtered.length === 0) return <p className="py-6 text-center text-sm text-stone-400">לא נמצאו מטפלים</p>;
+                return (
+                  <div className="space-y-1">
+                    {filtered.map((t) => {
+                      const checked = selectedTx.has(t.id);
+                      const otherCenter = t.center_account_id && t.center_account_id !== manageFor.id ? t.center_name : null;
+                      return (
+                        <label key={t.id} className={`flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2 ${checked ? "border-indigo-300 bg-indigo-50" : "border-stone-200 hover:bg-stone-50"}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              setSelectedTx((prev) => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(t.id); else next.delete(t.id);
+                                return next;
+                              });
+                            }}
+                            className="h-4 w-4 accent-indigo-600"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold text-stone-800">{t.full_name}</div>
+                            <div className="truncate text-xs text-stone-400">
+                              {t.email ?? "—"}
+                              {otherCenter && <span className="text-amber-600"> · משויך כרגע ל{otherCenter}</span>}
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-stone-400">{t.status}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="flex items-center justify-between rounded-b-2xl border-t border-stone-100 px-6 py-4">
+              <span className="text-xs text-stone-500">{selectedTx.size} נבחרו</span>
+              <button onClick={saveTherapists} disabled={busy}
+                className="rounded-xl bg-stone-800 px-6 py-2 text-sm font-bold text-white disabled:opacity-40">
+                {busy ? "שומר…" : "שמירת השיוך"}
               </button>
             </div>
           </div>

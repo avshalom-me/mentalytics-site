@@ -37,7 +37,19 @@ export async function GET() {
       .select("*")
       .order("created_at", { ascending: false });
     if (error) throw error;
-    return NextResponse.json({ ok: true, centers: data ?? [] });
+
+    // כמה מטפלים משויכים לכל מרכז (לתצוגה בכרטיס + כפתור ניהול המטפלים).
+    const { data: linked } = await supabaseAdmin
+      .from("therapists")
+      .select("center_account_id")
+      .not("center_account_id", "is", null);
+    const counts = new Map<string, number>();
+    (linked ?? []).forEach((t) => {
+      const cid = t.center_account_id as string;
+      counts.set(cid, (counts.get(cid) ?? 0) + 1);
+    });
+    const centers = (data ?? []).map((c) => ({ ...c, therapist_count: counts.get(c.id as string) ?? 0 }));
+    return NextResponse.json({ ok: true, centers });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
   }
@@ -77,6 +89,33 @@ export async function POST(req: NextRequest) {
         .single();
       if (error) throw error;
       return NextResponse.json({ ok: true, center: data });
+    }
+
+    // רשימת מטפלים לבורר השיוך — מי כבר משויך למרכז כלשהו (וכותרתו).
+    if (action === "list_therapists") {
+      const q = str(body.q, 60).toLowerCase();
+      let query = supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, email, status, center_account_id")
+        .order("full_name", { ascending: true })
+        .limit(500);
+      if (q) query = query.ilike("full_name", `%${q}%`);
+      const { data, error } = await query;
+      if (error) throw error;
+      const centerNames = new Map<string, string>();
+      const { data: centers } = await supabaseAdmin.from("therapy_center_accounts").select("id, name");
+      (centers ?? []).forEach((c) => centerNames.set(c.id as string, c.name as string));
+      return NextResponse.json({
+        ok: true,
+        therapists: (data ?? []).map((t) => ({
+          id: t.id,
+          full_name: t.full_name || "(ללא שם)",
+          email: t.email,
+          status: t.status,
+          center_account_id: t.center_account_id,
+          center_name: t.center_account_id ? centerNames.get(t.center_account_id as string) ?? null : null,
+        })),
+      });
     }
 
     const id = typeof body.id === "string" ? body.id : "";
@@ -120,6 +159,31 @@ export async function POST(req: NextRequest) {
       const { error } = await supabaseAdmin.from("therapy_center_accounts").update(update).eq("id", id);
       if (error) throw error;
       return NextResponse.json({ ok: true });
+    }
+
+    // שיוך מטפלים למרכז: קובע center_account_id למטפלים שנבחרו, ומנתק כל מטפל
+    // שהיה משויך למרכז הזה ולא נכלל ברשימה החדשה. שיוך למרכז אחד בכל רגע.
+    if (action === "set_therapists") {
+      const raw = Array.isArray(body.therapist_ids) ? body.therapist_ids : [];
+      const idsSet = [...new Set(raw.filter((x): x is string => typeof x === "string" && x.length > 0))].slice(0, 500);
+
+      // נתק מטפלים שהיו משויכים למרכז ואינם ברשימה החדשה.
+      let unassign = supabaseAdmin
+        .from("therapists")
+        .update({ center_account_id: null })
+        .eq("center_account_id", id);
+      if (idsSet.length > 0) unassign = unassign.not("id", "in", `(${idsSet.join(",")})`);
+      await unassign.throwOnError();
+
+      // שייך את הנבחרים (דורס שיוך קודם למרכז אחר — שיוך יחיד).
+      if (idsSet.length > 0) {
+        await supabaseAdmin
+          .from("therapists")
+          .update({ center_account_id: id })
+          .in("id", idsSet)
+          .throwOnError();
+      }
+      return NextResponse.json({ ok: true, count: idsSet.length });
     }
 
     if (action === "mark_sent") {

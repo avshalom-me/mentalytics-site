@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft, Sparkles, BarChart3, MapPin, Activity, Users } from "lucide-react";
+import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft, Sparkles, BarChart3, MapPin, Activity, Users, LayoutDashboard } from "lucide-react";
 
 // טופס הצטרפות ותשלום למרכז טיפולי. בחירת מסלול (אם הוצעו כמה) + פרטי
 // אשראי. הכרטיס עובר טוקניזציה בדפדפן ישירות מול Sumit — כמו בצ'קאאוט של
@@ -149,6 +149,17 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           )}
           <br />ניצור אתכם קשר להשלמת קליטת המטפלים של המרכז.
         </p>
+        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-[#D8E4E8] bg-[#F0F7FA] p-4 text-right">
+          <p className="text-sm font-bold text-stone-800">
+            <LayoutDashboard size={15} className="ml-1 inline" style={{ color: "var(--teal)" }} />
+            פורטל ניהול המרכז
+          </p>
+          <p className="mt-1 text-xs leading-6 text-stone-600">
+            להיכנס לפורטל, לצפות בפרופילי המטפלים ובסטטיסטיקות המרוכזות —{" "}
+            <a href="/centers/login?mode=register" className="font-bold underline">הירשמו כאן</a>{" "}
+            עם המייל <span className="font-mono">{payerEmail}</span>.
+          </p>
+        </div>
       </div>
     );
   }
@@ -351,6 +362,11 @@ function StandardBenefits({ giftMonths }: { giftMonths: number }) {
             icon={Users}
             title="כניסה מלאה למערכת ההתאמות החכמה"
             body="מטופלים שממלאים את שאלון ההתאמה מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות — פניות מדויקות, לא סתם חשיפה."
+          />
+          <BenefitRow
+            icon={LayoutDashboard}
+            title="פורטל ניהול מרכזי משלכם"
+            body="חשבון כניסה משלכם עם גישה לכל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות של כל המרכז — לא צריך להיכנס לכל מטפל בנפרד."
           />
           <BenefitRow
             icon={ShieldCheck}
