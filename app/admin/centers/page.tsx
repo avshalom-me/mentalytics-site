@@ -66,6 +66,15 @@ export default function AdminCentersPage() {
   const [fGift, setFGift] = useState("0");
   const [fPlans, setFPlans] = useState<PlanDraft[]>([emptyPlan()]);
 
+  // נועל את גלילת העמוד שמאחורי המודל — בלעדיו, גלילה עם העכבר מעל הרקע
+  // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
+  useEffect(() => {
+    if (!editing) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [editing]);
+
   const load = useCallback(() => {
     setLoading(true);
     setError("");
@@ -298,18 +307,20 @@ export default function AdminCentersPage() {
         );
       })}
 
-      {/* מודל יצירה/עריכה */}
+      {/* מודל יצירה/עריכה — כותרת וכפתור השמירה קבועים; רק תוכן הטופס גולל,
+          כך שגם הצעה עם 4 מסלולים נשארת נגישה במסך נמוך בלי לאבד את הפעולות. */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-4 py-10" dir="rtl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
           <div className="absolute inset-0 bg-black/30" onClick={() => setEditing(null)} />
-          <div className="relative w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl">
-            <div className="mb-4 flex items-center justify-between">
+          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+            <div className="flex items-center justify-between rounded-t-2xl border-b border-stone-100 px-6 py-4">
               <h3 className="text-lg font-black text-stone-800">
                 {editing === "new" ? "הצעה למרכז חדש" : `עריכה — ${(editing as Center).name}`}
               </h3>
               <button onClick={() => setEditing(null)} className="text-stone-400 hover:text-stone-600">✕</button>
             </div>
 
+            <div className="overflow-y-auto px-6 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="שם המרכז *">
                 <input value={fName} onChange={(e) => setFName(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
@@ -375,11 +386,14 @@ export default function AdminCentersPage() {
               <textarea value={fNotes} onChange={(e) => setFNotes(e.target.value)} rows={2}
                 className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
             </Field>
+            </div>
 
-            <button onClick={save} disabled={busy || !fName.trim()}
-              className="mt-3 w-full rounded-xl bg-stone-800 py-2.5 text-sm font-bold text-white disabled:opacity-40">
-              {busy ? "שומר…" : "שמירה"}
-            </button>
+            <div className="rounded-b-2xl border-t border-stone-100 px-6 py-4">
+              <button onClick={save} disabled={busy || !fName.trim()}
+                className="w-full rounded-xl bg-stone-800 py-2.5 text-sm font-bold text-white disabled:opacity-40">
+                {busy ? "שומר…" : "שמירה"}
+              </button>
+            </div>
           </div>
         </div>
       )}

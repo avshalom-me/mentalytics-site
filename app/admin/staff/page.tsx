@@ -68,6 +68,16 @@ export default function AdminStaffPage() {
   const [fOut, setFOut] = useState("");
   const [fNote, setFNote] = useState("");
 
+  // נועל את גלילת העמוד שמאחורי המודל — בלעדיו, גלילה מעל הרקע הכהה מזיזה
+  // את דף האדמין שמתחת במקום את תוכן המודל.
+  const anyModalOpen = showNewEmployee || editSession !== null || addFor !== null;
+  useEffect(() => {
+    if (!anyModalOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [anyModalOpen]);
+
   const load = useCallback(() => {
     setLoading(true);
     setError("");
@@ -346,12 +356,12 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="relative w-full max-w-sm rounded-2xl bg-white p-5 shadow-2xl">
-        <div className="mb-4 flex items-center justify-between">
+      <div className="relative flex max-h-[85vh] w-full max-w-sm flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="flex items-center justify-between rounded-t-2xl border-b border-stone-100 px-5 py-4">
           <h3 className="text-base font-black text-stone-800">{title}</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600">✕</button>
         </div>
-        {children}
+        <div className="overflow-y-auto px-5 py-4">{children}</div>
       </div>
     </div>
   );

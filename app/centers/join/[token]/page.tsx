@@ -100,6 +100,10 @@ function Shell({ children }: { children: React.ReactNode }) {
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
+      <div className="mb-8 text-center">
+        {/* מקור האמת ללוגו הוא קובץ ה-SVG עצמו — לא לשחזר אותו בקוד */}
+        <img src="/logo.svg" alt="טיפול חכם" style={{ height: "48px", width: "auto", display: "inline-block" }} />
+      </div>
       {children}
     </main>
   );
