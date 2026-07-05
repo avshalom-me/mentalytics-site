@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { createCenterSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
+import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
 
 // הרשמת מרכז טיפולי למנוי — נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
 // אימות: הטוקן הסודי מהקישור שהאדמין שלח (אין חשבון משתמש). הכרטיס עובר
@@ -206,6 +207,21 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Center subscription completed: center=${center.id} gift=${giftMonths} price=${plan.monthly_price}`);
+
+    // מייל ברוכים-הבאים עם קישור לפורטל — best-effort, לעולם לא מכשיל תשלום שהושלם.
+    try {
+      await sendCenterWelcomeEmail({
+        to: payerEmail,
+        centerName: center.name,
+        planTitle: plan.title,
+        monthlyPrice: plan.monthly_price,
+        giftMonths,
+        billingStartsAt: firstChargeDate ?? now.toISOString().slice(0, 10),
+      });
+    } catch (mailErr) {
+      console.error("centers/subscribe: welcome email failed:", mailErr instanceof Error ? mailErr.message : mailErr);
+    }
+
     return NextResponse.json({ ok: true, gift_months: giftMonths, billing_starts_at: firstChargeDate ?? null });
   } catch (err) {
     console.error("centers/subscribe error:", err instanceof Error ? err.message : err);

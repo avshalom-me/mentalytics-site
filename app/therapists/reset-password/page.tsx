@@ -13,6 +13,12 @@ export default function ResetPasswordPage() {
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
 
+  // עמוד איפוס משותף למטפלים ולמרכזים. ctx=center מגיע מקישור האיפוס של
+  // /centers/login ומנתב את היעד בסיום בחזרה לסביבת המרכזים.
+  const isCenter =
+    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ctx") === "center";
+  const loginPath = isCenter ? "/centers/login" : "/therapists/login";
+
   useEffect(() => {
     async function init() {
       // The recovery link may arrive as a PKCE `code` param or as a hash token.
@@ -55,7 +61,7 @@ export default function ResetPasswordPage() {
     // compromised account, an attacker's existing token must die with the old
     // password. The user signs back in once with the new password.
     try { await supabase.auth.signOut({ scope: "global" }); } catch { /* best-effort */ }
-    setTimeout(() => { window.location.href = "/therapists/login?reset=success"; }, 1500);
+    setTimeout(() => { window.location.href = `${loginPath}?reset=success`; }, 1500);
   }
 
   return (
@@ -81,7 +87,7 @@ export default function ResetPasswordPage() {
             <p className="text-sm text-stone-600 leading-7">
               הקישור לאיפוס אינו תקף או שפג תוקפו. נא לבקש קישור חדש.
             </p>
-            <Link href="/therapists/login"
+            <Link href={loginPath}
               className="mt-5 inline-block rounded-xl px-5 py-2.5 text-sm font-bold text-white"
               style={{ background: "var(--teal)" }}>
               חזרה לכניסה

@@ -8,6 +8,21 @@ import { therapistPath } from "@/app/lib/therapist-url";
 
 export const dynamic = "force-dynamic";
 
+// הגבלת קצב לפי IP — הנתיב מאומת בטוקן, אבל זה חוסם ניסיונות claim חוזרים
+// וקריאות מוגזמות. in-memory, מתאפס ב-cold start.
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
+    return true;
+  }
+  if (entry.count >= 60) return false;
+  entry.count++;
+  return true;
+}
+
 type Center = {
   id: string;
   name: string;
@@ -59,7 +74,8 @@ async function resolveCenter(req: NextRequest): Promise<Center | null> {
     .from("therapy_center_accounts")
     .select(cols)
     .is("user_id", null)
-    .eq("status", "active");
+    .eq("status", "active")
+    .order("created_at", { ascending: true }); // התאמה דטרמיניסטית אם יש כמה
   const claimable = (candidates ?? []).find((c) => {
     const e = (c.email ?? "").trim().toLowerCase();
     const p = (c.payer_email ?? "").trim().toLowerCase();
@@ -100,6 +116,11 @@ function tallyBy<T>(rows: T[], key: (r: T) => string | null | undefined) {
 }
 
 export async function GET(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+  }
+
   const center = await resolveCenter(req);
   if (!center) {
     return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });

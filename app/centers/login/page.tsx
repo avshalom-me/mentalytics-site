@@ -22,6 +22,9 @@ function CenterLoginContent() {
   const [success, setSuccess] = useState("");
   const [signupPending, setSignupPending] = useState(false);
 
+  // הגעה מאיפוס סיסמה מוצלח (כל ה-sessions בוטלו שם) — נגזר מה-URL.
+  const resetSuccess = params.get("reset") === "success" && mode === "login";
+
   // אם כבר מחוברים — ישר לדשבורד.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -42,8 +45,10 @@ function CenterLoginContent() {
     setSuccess("");
 
     if (mode === "reset") {
+      // ctx=center כדי שעמוד האיפוס המשותף יחזיר את המרכז ל-/centers/login
+      // (ולא לסביבת המטפלים) בסיום.
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/therapists/reset-password`,
+        redirectTo: `${window.location.origin}/therapists/reset-password?ctx=center`,
       });
       setError(error ? "שליחת הקישור נכשלה. נסו שוב." : "");
       if (!error) setSuccess("שלחנו קישור לאיפוס סיסמה. בדקו את תיבת המייל (כולל ספאם).");
@@ -109,6 +114,12 @@ function CenterLoginContent() {
             {mode === "register" ? "הירשמו עם המייל שאיתו קיבלתם את ההצעה" : "פורטל הניהול של המרכז"}
           </p>
         </div>
+
+        {resetSuccess && (
+          <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-center text-sm font-semibold text-green-800">
+            הסיסמה עודכנה — אפשר להיכנס עם הסיסמה החדשה.
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

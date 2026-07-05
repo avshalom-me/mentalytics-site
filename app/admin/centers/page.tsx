@@ -30,6 +30,7 @@ type Center = {
   cancelled_at: string | null;
   created_at: string;
   therapist_count: number;
+  user_id: string | null;
 };
 
 type TherapistPoolItem = {
@@ -309,6 +310,9 @@ export default function AdminCentersPage() {
             {c.status === "active" && c.payer_name && (
               <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
                 משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
+                {c.user_id
+                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל</strong>
+                  : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "—"})</span>}
                 {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע — ביטול רק דרך ממשק Sumit</strong>}
               </p>
             )}

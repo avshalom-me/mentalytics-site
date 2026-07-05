@@ -118,6 +118,9 @@ export default function CenterDashboardPage() {
             <p className="text-xs text-stone-500">
               פורטל ניהול מרכז{center.plan_title ? ` · ${center.plan_title}` : ""}
               {center.status === "active" ? " · מנוי פעיל" : ""}
+              {center.status === "active" && center.billing_starts_at
+                ? ` · חיוב חודשי מ-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}`
+                : ""}
             </p>
           </div>
         </div>
