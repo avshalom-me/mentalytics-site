@@ -344,14 +344,17 @@ export default function AdminCentersPage() {
                 </Field>
 
                 <div className="mt-2 mb-1 flex items-center justify-between">
-                  <span className="text-xs font-black text-stone-700">המסלולים בהצעה (עד 4)</span>
+                  <span className="text-xs font-black text-stone-700">המסלול והמחיר</span>
                   {fPlans.length < 4 && (
                     <button onClick={() => setFPlans([...fPlans, emptyPlan()])}
                       className="rounded-full border border-stone-300 px-2.5 py-0.5 text-xs text-stone-600 hover:bg-stone-50">
-                      + מסלול
+                      + מסלול נוסף (לא חובה)
                     </button>
                   )}
                 </div>
+                <p className="mb-2 text-[11px] leading-4 text-stone-400">
+                  כל הצעה כוללת אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי מפורט, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז מעל המחיר. כאן מגדירים רק את שם המסלול, המחיר החודשי, ותוספות ספציפיות למרכז הזה (אם יש).
+                </p>
                 {fPlans.map((p, i) => (
                   <div key={i} className="mb-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
                     <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
@@ -374,7 +377,7 @@ export default function AdminCentersPage() {
                       value={p.featuresText}
                       onChange={(e) => setFPlans(fPlans.map((x, j) => (j === i ? { ...x, featuresText: e.target.value } : x)))}
                       rows={4}
-                      placeholder={"מה המרכז מקבל במסלול — שורה לכל סעיף:\nעד 10 פרופילי מטפלים במערכת ההתאמה\nדוח סטטיסטיקות חודשי\nליווי והטמעה"}
+                      placeholder={"תוספות ספציפיות למרכז — שורה לכל סעיף (לא חובה):\nעד 10 פרופילי מטפלים\nהופעה ראשונה בתוצאות החיפוש\nליווי והטמעה ייעודי"}
                       className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-xs leading-5"
                     />
                   </div>

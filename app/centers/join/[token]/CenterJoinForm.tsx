@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft } from "lucide-react";
+import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft, Sparkles, BarChart3, MapPin, Activity, Users } from "lucide-react";
 
 // טופס הצטרפות ותשלום למרכז טיפולי. בחירת מסלול (אם הוצעו כמה) + פרטי
 // אשראי. הכרטיס עובר טוקניזציה בדפדפן ישירות מול Sumit — כמו בצ'קאאוט של
@@ -175,7 +175,11 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
         )}
       </div>
 
-      {/* מסלולים */}
+      {/* מה כלול בכל מנוי — קבוע לכל ההצעות */}
+      <StandardBenefits giftMonths={offer.gift_months} />
+
+      {/* מסלול/י המנוי */}
+      <h2 className="text-lg font-black text-stone-900 mb-3">{offer.plans.length > 1 ? "בחירת מסלול" : "המנוי שלכם"}</h2>
       <div className={`grid gap-4 mb-8 ${offer.plans.length > 1 ? "sm:grid-cols-2" : ""}`}>
         {offer.plans.map((p) => {
           const selected = planKey === p.key;
@@ -320,10 +324,88 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
         <ShieldCheck size={16} style={{ color: "var(--teal-dark)" }} className="mt-0.5 flex-shrink-0" />
         <p className="text-xs text-stone-600 leading-5">
           התשלום מעובד באופן מאובטח על ידי Sumit. פרטי כרטיס האשראי נשלחים ישירות אליהם דרך חיבור מוצפן
-          ואינם נשמרים באתר שלנו. ניתן לבטל את המנוי בכל עת.
+          ואינם נשמרים באתר שלנו. ניתן לבטל את המנוי בכל עת — כולל במהלך חודשי המתנה.
         </p>
       </div>
     </>
+  );
+}
+
+// מה שכל מנוי מרכז כולל — תוכן קבוע (לא תלוי בהצעה הספציפית), כדי שכל מרכז
+// יראה את הערך המלא: כניסה למערכת ההתאמות, דוח סטטיסטיקות מפורט, וביטול חופשי.
+function StandardBenefits({ giftMonths }: { giftMonths: number }) {
+  const statCards: { icon: typeof BarChart3; color: string; title: string; body: string }[] = [
+    { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אתכם — באמת", body: "סך צפיות בפרופילי המרכז, כמה אנשים שונים (לא חזרות), כמה פנו בפועל, ואחוז ההמרה מצפייה לפנייה." },
+    { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום או אונליין — היכן נמצא הביקוש האמיתי לשירותים שלכם." },
+    { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אתכם." },
+    { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — מי הקהל שלכם ואיך לפנות אליו נכון." },
+  ];
+  return (
+    <div className="mb-8 space-y-4">
+      <div className="rounded-3xl border border-[#E8E0D8] bg-white p-6">
+        <h2 className="mb-4 flex items-center gap-2 text-lg font-black text-stone-900">
+          <Sparkles size={18} style={{ color: "var(--teal)" }} /> מה כולל המנוי
+        </h2>
+        <div className="space-y-3">
+          <BenefitRow
+            icon={Users}
+            title="כניסה מלאה למערכת ההתאמות החכמה"
+            body="מטופלים שממלאים את שאלון ההתאמה מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות — פניות מדויקות, לא סתם חשיפה."
+          />
+          <BenefitRow
+            icon={ShieldCheck}
+            title="אפשרות לסיים את ההתקשרות בכל עת"
+            body={`אין התחייבות לתקופה. אפשר לבטל את המנוי בכל שלב${giftMonths > 0 ? " — כולל במהלך חודשי המתנה" : ""}, בלי קנסות ובלי בירוקרטיה.`}
+          />
+        </div>
+      </div>
+
+      <div className="rounded-3xl border border-[#E8E0D8] bg-white p-6">
+        <div className="mb-3 inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold uppercase"
+          style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
+          <BarChart3 size={12} /> דוח סטטיסטיקות חודשי
+        </div>
+        <h3 className="mb-2 text-base font-black text-stone-900">
+          איזה סוגי מטופלים מחפשים את המרכז שלכם — ובאזור שלכם
+        </h3>
+        <p className="mb-5 text-sm leading-7 text-stone-600">
+          דוח חודשי שחושף מאיפה מגיעים הפונים, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר — תוך שמירה מוחלטת על אנונימיות המטופלים.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {statCards.map(({ icon: Icon, color, title, body }, i) => (
+            <div key={i} className="flex gap-3 rounded-2xl border border-[#E8E0D8] bg-[#FCFBF9] p-4">
+              <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
+                <Icon size={18} style={{ color }} />
+              </div>
+              <div>
+                <h4 className="mb-0.5 text-sm font-bold text-stone-900">{title}</h4>
+                <p className="text-xs leading-5 text-stone-600">{body}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-4 flex items-start gap-2 rounded-xl p-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
+          <ShieldCheck size={15} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
+          <p className="text-xs leading-5 text-stone-600">
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BenefitRow({ icon: Icon, title, body }: { icon: typeof Users; title: string; body: string }) {
+  return (
+    <div className="flex gap-3">
+      <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: "var(--teal-pale)" }}>
+        <Icon size={18} style={{ color: "var(--teal)" }} />
+      </div>
+      <div>
+        <h3 className="mb-0.5 text-sm font-bold text-stone-900">{title}</h3>
+        <p className="text-xs leading-5 text-stone-600">{body}</p>
+      </div>
+    </div>
   );
 }
 
