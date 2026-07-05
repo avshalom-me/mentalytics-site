@@ -50,22 +50,29 @@ async function resolveCenter(req: NextRequest): Promise<Center | null> {
   const email = (user.email ?? "").trim().toLowerCase();
   if (!email) return null;
 
-  // claim: חשבון פעיל, לא מקושר, שהמייל שלו תואם. ilike למקרה-רישיות.
-  const { data: claimable } = await supabaseAdmin
+  // claim: מושכים את המרכזים הפעילים שטרם קושרו ומשווים מייל בדיוק ב-JS.
+  // חשוב לא להזרים את המייל (שבשליטת המשתמש) ל-ilike/or של PostgREST: ILIKE
+  // מפרש _ ו-% כ-wildcards (offic_@clinic יתפוס office@clinic ⇒ השתלטות),
+  // ו-.or() עם מחרוזת גולמית פותח הזרקת-filter. מספר המרכזים הפעילים זעום,
+  // אז השוואה מדויקת ב-JS בטוחה לגמרי.
+  const { data: candidates } = await supabaseAdmin
     .from("therapy_center_accounts")
     .select(cols)
     .is("user_id", null)
-    .eq("status", "active")
-    .or(`email.ilike.${email},payer_email.ilike.${email}`)
-    .maybeSingle();
+    .eq("status", "active");
+  const claimable = (candidates ?? []).find((c) => {
+    const e = (c.email ?? "").trim().toLowerCase();
+    const p = (c.payer_email ?? "").trim().toLowerCase();
+    return e === email || p === email;
+  }) as Center | undefined;
   if (!claimable) return null;
 
   await supabaseAdmin
     .from("therapy_center_accounts")
     .update({ user_id: user.id, updated_at: new Date().toISOString() })
-    .eq("id", (claimable as Center).id)
+    .eq("id", claimable.id)
     .is("user_id", null); // מרוץ: לא לדרוס קישור שנוצר בו-זמנית
-  return { ...(claimable as Center), user_id: user.id };
+  return { ...claimable, user_id: user.id };
 }
 
 type TherapistRow = {

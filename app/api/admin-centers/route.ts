@@ -165,7 +165,10 @@ export async function POST(req: NextRequest) {
     // שהיה משויך למרכז הזה ולא נכלל ברשימה החדשה. שיוך למרכז אחד בכל רגע.
     if (action === "set_therapists") {
       const raw = Array.isArray(body.therapist_ids) ? body.therapist_ids : [];
-      const idsSet = [...new Set(raw.filter((x): x is string => typeof x === "string" && x.length > 0))].slice(0, 500);
+      // רק UUID תקינים — הערכים נכנסים למחרוזת filter גולמית (not.in.(...)),
+      // אז ערך עם פסיק/סוגר היה שובר או משנה את משמעות ה-filter.
+      const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      const idsSet = [...new Set(raw.filter((x): x is string => typeof x === "string" && UUID_RE.test(x)))].slice(0, 500);
 
       // נתק מטפלים שהיו משויכים למרכז ואינם ברשימה החדשה.
       let unassign = supabaseAdmin
