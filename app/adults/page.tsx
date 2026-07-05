@@ -116,7 +116,25 @@ function CheckList({
   );
 }
 
-// Ordered milestone screens — used for progress calculation
+// Canonical order in which difficulty domains are always presented — regardless
+// of the order the user ticked them on the domains screen. Keeping navigation and
+// the progress bar locked to this single order is what prevents the timeline from
+// jumping backwards (e.g. picking "תעסוקתי" then "רגשי" used to start at 80% and
+// drop to 24%). ADULTS_SCREENS_ORDER below must stay consistent with this.
+const ADULTS_DOMAIN_ORDER = ["emotional", "relationship", "functional", "addiction", "personal_development"] as const;
+
+// Sort selected domains into the canonical presentation order.
+function orderDomains<T extends string>(ds: readonly T[]): T[] {
+  const rank = (d: string) => {
+    const i = (ADULTS_DOMAIN_ORDER as readonly string[]).indexOf(d);
+    return i < 0 ? ADULTS_DOMAIN_ORDER.length : i;
+  };
+  return [...ds].sort((a, b) => rank(a) - rank(b));
+}
+
+// Ordered milestone screens — used for progress calculation. The per-domain blocks
+// must follow ADULTS_DOMAIN_ORDER (emotional → relationship → functional → addiction)
+// so progress only ever moves forward. therapist-style closes the emotional block.
 const ADULTS_SCREENS_ORDER = [
   "disclaimer","intake","domains",
   "e1","e1-q","e2","e2-q","e3","e3-q",
@@ -124,8 +142,8 @@ const ADULTS_SCREENS_ORDER = [
   "e5","e5-q","e6","e6-q","e7-q","e8c","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
-  "f-vision","f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
   "r-intake","r-single","r-single-no-detail","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-child","r3-child-type",
+  "f-vision","f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -629,8 +647,8 @@ export default function AdultsPage() {
   // If personal_development is combined with any other domain, its flow is
   // skipped — the other domains run as usual and scoring ignores it too.
   function effectiveDomains(ds: QuestionnaireAnswers["domains"]): QuestionnaireAnswers["domains"] {
-    if (ds.length > 1) return ds.filter((d) => d !== "personal_development");
-    return ds;
+    const filtered = ds.length > 1 ? ds.filter((d) => d !== "personal_development") : ds;
+    return orderDomains(filtered) as QuestionnaireAnswers["domains"];
   }
 
   function startDomains() {
