@@ -11,6 +11,7 @@ import {
   sendTherapistCompletionRequestEmail,
   sendTherapistAdminMessageEmail,
   sendPromotedApprovedEmail,
+  sendArticleInviteEmail,
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 
@@ -484,6 +485,34 @@ export async function PATCH(request: Request) {
         // what was emailed (it's admin-authored free text).
         after: { subject, message },
         reason: "admin sent a message to the therapist",
+      });
+      return NextResponse.json({ ok: true, id });
+    }
+
+    // Admin-triggered "write an article, get 2 months promoted free" invite —
+    // a fixed-template offer (no admin free text) with a comparison table and a
+    // link to the therapist's article composer. Does NOT change status or grant
+    // the promotion; the gift is granted manually once the article is approved.
+    if (body.action === "article_invite") {
+      const { data: t } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, email")
+        .eq("id", id)
+        .single();
+      if (!t || !t.email) {
+        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      }
+      const sent = await sendArticleInviteEmail({ to: t.email, name: t.full_name ?? "" });
+      if (!sent.ok) {
+        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
+      }
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "article_invite",
+        before: {},
+        after: {},
+        reason: "admin invited the therapist to write an article for a promo gift",
       });
       return NextResponse.json({ ok: true, id });
     }

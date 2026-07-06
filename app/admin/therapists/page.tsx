@@ -662,6 +662,35 @@ export default function AdminTherapistsPage() {
     }
   }
 
+  // One-click "write an article, get 2 months promoted free" invite. Fixed
+  // template (no composer) — confirms, sends, and reports. Does not change the
+  // therapist's status; the gift is granted manually once an article lands.
+  async function sendArticleInvite(t: AdminTherapist) {
+    if (!t.email) {
+      window.alert("למטפל/ת אין כתובת מייל.");
+      return;
+    }
+    if (!window.confirm(
+      `לשלוח ל${t.full_name.trim() || t.email} הזמנה לכתוב מאמר בתמורה לחודשיים קידום במתנה?`
+    )) return;
+    try {
+      setActionLoadingId(t.id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, action: "article_invite" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      window.alert("ההזמנה לכתיבת מאמר נשלחה למטפל/ת.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
   // Sends a PERSONALIZED completion reminder to every partial profile that
   // hasn't received one yet: same intro, but each recipient's email lists
   // exactly what THEY are missing (photo framed as optional). The email
@@ -1089,6 +1118,14 @@ export default function AdminTherapistsPage() {
                 title="שלח הודעה חופשית + קישור ישיר לעריכת הפרופיל">
                 ✉️ שלח הודעה
               </button>
+              {(therapist.status === "approved" || therapist.status === "paying") && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl border border-[#d4a017] bg-[#FDF6E3] px-4 py-2 text-sm font-medium text-[#a87010] disabled:opacity-50"
+                  onClick={() => sendArticleInvite(therapist)}
+                  title="הזמן לכתוב מאמר בתמורה לחודשיים קידום במתנה">
+                  🎁 הזמן לכתוב מאמר
+                </button>
+              )}
               {therapist.status === "paying" && !therapist.admin_approved && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"

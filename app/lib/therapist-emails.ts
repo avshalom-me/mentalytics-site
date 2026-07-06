@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { sendBulkEmail } from "./email-quota";
 import { logEmail } from "./email-log";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
+import { buildArticleInviteEmail } from "./article-invite-email";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -726,6 +727,29 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   // transactional mail). A deferred send returns ok:false with a clear message.
   const r = await sendBulkEmail({ from: FROM, to: opts.to, subject, html });
   if (!r.ok && !r.skipped) console.error("sendTherapistCompletionRequestEmail: send error:", r.error);
+  return { ok: r.ok, error: r.error };
+}
+
+// Admin-triggered personal invitation to write an article for the site in
+// exchange for two months of promoted-tier exposure, free. Explains the offer,
+// links to the article composer in the therapist's personal area, and includes
+// a free-vs-promoted comparison table. Routed through the daily bulk gate since
+// an admin may invite many "selected" therapists in one sitting — a deferred
+// send returns ok:false with a clear message. The HTML itself lives in the
+// dependency-light builder module so it can be previewed in isolation.
+export async function sendArticleInviteEmail(opts: {
+  to: string;
+  name: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendArticleInviteEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+
+  const { subject, html } = buildArticleInviteEmail({ name: opts.name, siteUrl: SITE_URL });
+
+  const r = await sendBulkEmail({ from: FROM, to: opts.to, subject, html });
+  if (!r.ok && !r.skipped) console.error("sendArticleInviteEmail: send error:", r.error);
   return { ok: r.ok, error: r.error };
 }
 
