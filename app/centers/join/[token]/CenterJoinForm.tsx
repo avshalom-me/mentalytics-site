@@ -12,7 +12,11 @@ export type CenterOffer = {
   name: string;
   contact_name: string | null;
   gift_months: number;
-  plans: { key: string; title: string; monthly_price: number; features: string[]; total_with_vat: number }[];
+  price_per_therapist: number;
+  therapist_count: number;
+  per_therapist_with_vat: number;
+  monthly_total: number;
+  monthly_total_with_vat: number;
   vat_pct: number;
 };
 
@@ -36,7 +40,6 @@ function giftLabel(n: number): string {
 }
 
 export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
-  const [planKey, setPlanKey] = useState(offer.plans.length === 1 ? offer.plans[0].key : "");
   const [payerName, setPayerName] = useState("");
   const [payerEmail, setPayerEmail] = useState("");
   const [payerPhone, setPayerPhone] = useState("");
@@ -53,10 +56,8 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
   const [error, setError] = useState("");
   const [done, setDone] = useState<{ billing_starts_at: string | null } | null>(null);
 
-  const plan = offer.plans.find((p) => p.key === planKey) ?? null;
   const cardDigits = cardNumber.replace(/\s/g, "");
   const canSubmit =
-    plan &&
     payerName.trim() &&
     payerEmail.trim() &&
     payerPhone.trim() &&
@@ -69,7 +70,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!canSubmit || loading || !plan) return;
+    if (!canSubmit || loading) return;
     setLoading(true);
     setError("");
 
@@ -109,7 +110,6 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           token: offer.token,
-          plan_key: plan.key,
           payer_name: payerName.trim(),
           payer_email: payerEmail.trim(),
           payer_phone: payerPhone.trim(),
@@ -189,54 +189,31 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       {/* מה כלול בכל מנוי — קבוע לכל ההצעות */}
       <StandardBenefits giftMonths={offer.gift_months} />
 
-      {/* מסלול/י המנוי */}
-      <h2 className="text-lg font-black text-stone-900 mb-3">{offer.plans.length > 1 ? "בחירת מסלול" : "המנוי שלכם"}</h2>
-      <div className={`grid gap-4 mb-8 ${offer.plans.length > 1 ? "sm:grid-cols-2" : ""}`}>
-        {offer.plans.map((p) => {
-          const selected = planKey === p.key;
-          return (
-            <button
-              key={p.key}
-              type="button"
-              onClick={() => setPlanKey(p.key)}
-              className="rounded-3xl border-2 p-6 text-right transition-all"
-              style={{
-                borderColor: selected ? "var(--teal)" : "var(--line)",
-                background: selected ? "var(--teal-pale)" : "#fff",
-                boxShadow: selected ? "0 8px 24px rgba(61,140,138,.15)" : "none",
-              }}
-            >
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <h2 className="text-lg font-black text-stone-900">{p.title}</h2>
-                {offer.plans.length > 1 && (
-                  <span
-                    className="flex h-5 w-5 items-center justify-center rounded-full border-2"
-                    style={{ borderColor: selected ? "var(--teal)" : "#d6d3d1", background: selected ? "var(--teal)" : "#fff" }}
-                  >
-                    {selected && <span className="h-2 w-2 rounded-full bg-white" />}
-                  </span>
-                )}
-              </div>
-              <div className="mb-4">
-                <span className="text-3xl font-black" style={{ color: "var(--teal-dark)" }}>
-                  ₪{p.monthly_price.toLocaleString("he-IL")}
-                </span>
-                <span className="text-sm text-stone-500"> + מע&quot;מ / חודש</span>
-                <div className="text-xs text-stone-400 mt-0.5">₪{p.total_with_vat.toLocaleString("he-IL")} כולל מע&quot;מ</div>
-              </div>
-              {p.features.length > 0 && (
-                <ul className="space-y-1.5">
-                  {p.features.map((f, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm leading-6 text-stone-700">
-                      <span className="mt-0.5 font-bold" style={{ color: "var(--teal)" }}>✓</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </button>
-          );
-        })}
+      {/* פרטי ההצעה — מחיר לכל מטפל × מספר מטפלים = סה"כ */}
+      <h2 className="text-lg font-black text-stone-900 mb-3">פרטי ההצעה</h2>
+      <div className="rounded-3xl border-2 p-6 mb-8" style={{ borderColor: "var(--teal)", background: "var(--teal-pale)" }}>
+        <div className="space-y-2.5 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-stone-700">מחיר לכל מטפל</span>
+            <span className="font-bold text-stone-900">₪{offer.price_per_therapist.toLocaleString("he-IL")} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ / חודש</span></span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-stone-700">מספר מטפלים</span>
+            <span className="font-bold text-stone-900">{offer.therapist_count}</span>
+          </div>
+          <div className="border-t pt-3 mt-1 flex items-center justify-between" style={{ borderColor: "var(--teal-mid)" }}>
+            <span className="font-black text-stone-900">סה&quot;כ חודשי</span>
+            <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
+              ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
+            </span>
+          </div>
+          <div className="text-xs text-stone-500 text-left">
+            ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · {offer.therapist_count} מטפלים × ₪{offer.price_per_therapist.toLocaleString("he-IL")}
+          </div>
+        </div>
+        <p className="mt-4 text-xs leading-5 text-stone-500">
+          המחיר והיקף ההתקשרות נקבעו יחד איתכם בשיחת ההתאמה, בהתאם לצרכי המרכז.
+        </p>
       </div>
 
       {/* טופס תשלום */}
@@ -306,7 +283,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           <span className="text-xs leading-5 text-stone-700">
             אני מאשר/ת את{" "}
             <a href="/billing-policy" target="_blank" className="underline font-bold">תקנון הרכישה</a>{" "}
-            ואת החיוב החודשי המתחדש{plan ? ` של ₪${plan.monthly_price.toLocaleString("he-IL")} + מע"מ` : ""} עד לביטול
+            ואת החיוב החודשי המתחדש של ₪{offer.monthly_total.toLocaleString("he-IL")} + מע&quot;מ עד לביטול
             {offer.gift_months > 0 ? `, החל מתום תקופת המתנה (${giftLabel(offer.gift_months)})` : ""}.
           </span>
         </label>
@@ -321,10 +298,8 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
             <Loader2 size={18} className="inline animate-spin" />
           ) : offer.gift_months > 0 ? (
             <>שמירת פרטי תשלום — ללא חיוב היום<ArrowLeft size={16} className="inline mr-2" /></>
-          ) : plan ? (
-            <>חיוב מאובטח — ₪{plan.total_with_vat.toLocaleString("he-IL")}<ArrowLeft size={16} className="inline mr-2" /></>
           ) : (
-            "בחרו מסלול למעלה"
+            <>חיוב מאובטח — ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")}<ArrowLeft size={16} className="inline mr-2" /></>
           )}
         </button>
 

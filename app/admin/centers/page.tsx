@@ -7,8 +7,6 @@ import { useCallback, useEffect, useState } from "react";
 // את הקישור ושולחים למרכז ← המרכז ממלא אשראי בדף ההצטרפות ← המנוי מופיע
 // כאן כפעיל, עם ביטול וסנכרון מול Sumit.
 
-type Plan = { key: string; title: string; monthly_price: number; features: string[] };
-
 type Center = {
   id: string;
   name: string;
@@ -17,10 +15,10 @@ type Center = {
   phone: string | null;
   notes: string | null;
   token: string;
-  plans: Plan[];
+  price_per_therapist: number | null;
+  therapist_count: number | null; // מספר המטפלים בתמחור ההצעה
   gift_months: number;
   status: "draft" | "sent" | "active" | "cancelled";
-  selected_plan_key: string | null;
   agreed_monthly_price: number | null;
   billing_starts_at: string | null;
   payer_name: string | null;
@@ -29,9 +27,21 @@ type Center = {
   paid_at: string | null;
   cancelled_at: string | null;
   created_at: string;
-  therapist_count: number;
+  linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   user_id: string | null;
 };
+
+const VAT_RATE = 0.18;
+// סה"כ חודשי לפני מע"מ = מחיר-למטפל × מספר-מטפלים.
+function monthlyTotal(pricePerTherapist: number | null, count: number | null): number {
+  return Math.round((Number(pricePerTherapist) || 0) * (Number(count) || 0) * 100) / 100;
+}
+function withVat(n: number): number {
+  return Math.round(n * (1 + VAT_RATE) * 100) / 100;
+}
+function ils(n: number): string {
+  return Number(n).toLocaleString("he-IL", { maximumFractionDigits: 2 });
+}
 
 type TherapistPoolItem = {
   id: string;
@@ -48,11 +58,6 @@ const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = 
   active: { label: "מנוי פעיל", cls: "bg-green-50 border-green-300 text-green-800" },
   cancelled: { label: "בוטל", cls: "bg-red-50 border-red-300 text-red-700" },
 };
-
-// טופס מסלול בעריכה: features כטקסט חופשי (שורה = שורת "מה מקבלים")
-type PlanDraft = { title: string; monthly_price: string; featuresText: string };
-
-const emptyPlan = (): PlanDraft => ({ title: "", monthly_price: "", featuresText: "" });
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "—";
@@ -75,7 +80,8 @@ export default function AdminCentersPage() {
   const [fPhone, setFPhone] = useState("");
   const [fNotes, setFNotes] = useState("");
   const [fGift, setFGift] = useState("0");
-  const [fPlans, setFPlans] = useState<PlanDraft[]>([emptyPlan()]);
+  const [fPricePerTherapist, setFPricePerTherapist] = useState("");
+  const [fTherapistCount, setFTherapistCount] = useState("");
 
   // ניהול שיוך מטפלים למרכז
   const [manageFor, setManageFor] = useState<Center | null>(null);
@@ -133,7 +139,7 @@ export default function AdminCentersPage() {
     setEditing("new");
     setFName(""); setFContact(""); setFEmail(""); setFPhone(""); setFNotes("");
     setFGift("0");
-    setFPlans([emptyPlan()]);
+    setFPricePerTherapist(""); setFTherapistCount("");
   }
 
   function openEdit(c: Center) {
@@ -144,21 +150,11 @@ export default function AdminCentersPage() {
     setFPhone(c.phone ?? "");
     setFNotes(c.notes ?? "");
     setFGift(String(c.gift_months));
-    setFPlans(
-      c.plans.length > 0
-        ? c.plans.map((p) => ({ title: p.title, monthly_price: String(p.monthly_price), featuresText: p.features.join("\n") }))
-        : [emptyPlan()]
-    );
+    setFPricePerTherapist(c.price_per_therapist != null ? String(c.price_per_therapist) : "");
+    setFTherapistCount(c.therapist_count != null ? String(c.therapist_count) : "");
   }
 
   async function save() {
-    const plans = fPlans
-      .filter((p) => p.title.trim() || p.monthly_price.trim())
-      .map((p) => ({
-        title: p.title,
-        monthly_price: Number(p.monthly_price),
-        features: p.featuresText.split("\n").map((f) => f.trim()).filter(Boolean),
-      }));
     const payload: Record<string, unknown> = {
       name: fName,
       contact_name: fContact,
@@ -166,13 +162,19 @@ export default function AdminCentersPage() {
       phone: fPhone,
       notes: fNotes,
       gift_months: Number(fGift),
-      plans,
+      price_per_therapist: Number(fPricePerTherapist),
+      therapist_count: Number(fTherapistCount),
     };
-    const editingLocked = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
-    if (editingLocked) {
-      // אחרי תשלום — רק פרטי קשר והערות ניתנים לעדכון
-      delete payload.plans;
-      delete payload.gift_months;
+    // חודשי מתנה נעולים אחרי תשלום; מחיר/מספר-מטפלים ניתנים לעריכה תמיד
+    // (במרכז פעיל השרת מפרסם את השינוי ל-Sumit). מרכז מבוטל — עריכת קשר בלבד.
+    if (editing !== "new" && editing !== null) {
+      if (editing.status === "active") {
+        delete payload.gift_months;
+      } else if (editing.status === "cancelled") {
+        delete payload.gift_months;
+        delete payload.price_per_therapist;
+        delete payload.therapist_count;
+      }
     }
     const j = editing === "new"
       ? await post({ action: "create", ...payload })
@@ -199,7 +201,7 @@ export default function AdminCentersPage() {
       setError("למרכז אין אימייל — הוסיפו בעריכת ההצעה");
       return;
     }
-    if (!confirm(`לשלוח את ההצעה במייל אל ${c.email}? המרכז יקבל את המסלולים, המחיר, המתנה וקישור ההצטרפות.`)) return;
+    if (!confirm(`לשלוח את ההצעה במייל אל ${c.email}? המרכז יקבל את המחיר לכל מטפל, מספר המטפלים, הסכום הכולל, המתנה וקישור ההצטרפות.`)) return;
     const j = await post({ action: "send_proposal", id: c.id });
     if (j.ok) alert(`ההצעה נשלחה ל${c.email}.`);
   }
@@ -249,7 +251,12 @@ export default function AdminCentersPage() {
     if (j.ok) setManageFor(null);
   }
 
+  // חודשי מתנה נעולים אחרי תשלום (active/cancelled). מחיר/מספר-מטפלים ננעלים
+  // רק כשההצעה בוטלה — במרכז פעיל אפשר לעדכן (מתפרסם ל-Sumit בשמירה).
   const isLockedEditing = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
+  const pricingLocked = editing !== "new" && editing !== null && editing.status === "cancelled";
+  const isActiveEditing = editing !== "new" && editing !== null && editing.status === "active";
+  const fTotal = monthlyTotal(Number(fPricePerTherapist) || 0, Number(fTherapistCount) || 0);
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -260,8 +267,8 @@ export default function AdminCentersPage() {
         </button>
       </div>
       <p className="mb-3 text-sm text-stone-500 max-w-3xl">
-        יוצרים הצעה עם המסלולים והסכום החודשי שסגרתם, מעתיקים את הקישור ושולחים למרכז.
-        בקישור הם רואים מה הם מקבלים בכל מסלול וממלאים פרטי אשראי. אפשר להגדיר חודשי מתנה —
+        יוצרים הצעה עם המחיר לכל מטפל ומספר המטפלים שסגרתם בשיחת ההתאמה, שולחים למרכז במייל (או מעתיקים את הקישור).
+        המרכז רואה את הסכום החודשי הכולל וממלא פרטי אשראי. אפשר להגדיר חודשי מתנה —
         הכרטיס נשמר מיד והחיוב הראשון יוצא רק בתום המתנה.
       </p>
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
@@ -280,7 +287,8 @@ export default function AdminCentersPage() {
 
       {centers.map((c) => {
         const st = STATUS_LABELS[c.status];
-        const chosenPlan = c.plans.find((p) => p.key === c.selected_plan_key);
+        const total = monthlyTotal(c.price_per_therapist, c.therapist_count);
+        const priced = (Number(c.price_per_therapist) || 0) > 0 && (Number(c.therapist_count) || 0) > 0;
         return (
           <div key={c.id} className="mb-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -302,17 +310,21 @@ export default function AdminCentersPage() {
                 </p>
               </div>
               <div className="text-left">
-                {c.status === "active" && chosenPlan ? (
+                {c.status === "active" ? (
                   <>
-                    <div className="text-xl font-black text-green-700">₪{Number(c.agreed_monthly_price).toLocaleString("he-IL")} <span className="text-xs font-normal">+ מע&quot;מ/חודש</span></div>
-                    <div className="text-xs text-stone-500">{chosenPlan.title} · חיוב ראשון {fmtDate(c.billing_starts_at)}</div>
+                    <div className="text-xl font-black text-green-700">₪{Number(c.agreed_monthly_price ?? total).toLocaleString("he-IL")} <span className="text-xs font-normal">+ מע&quot;מ/חודש</span></div>
+                    <div className="text-xs text-stone-500">
+                      {priced && <>{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · </>}
+                      חיוב ראשון {fmtDate(c.billing_starts_at)}
+                    </div>
+                  </>
+                ) : priced ? (
+                  <>
+                    <div className="text-xl font-black text-stone-800">₪{ils(total)} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ/חודש</span></div>
+                    <div className="text-xs text-stone-500">{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · ₪{ils(withVat(total))} כולל מע&quot;מ</div>
                   </>
                 ) : (
-                  <div className="text-xs text-stone-500">
-                    {c.plans.map((p) => (
-                      <div key={p.key}><strong>{p.title}</strong>: ₪{p.monthly_price.toLocaleString("he-IL")} + מע&quot;מ</div>
-                    ))}
-                  </div>
+                  <div className="text-xs text-amber-600">טרם הוגדר מחיר/מספר מטפלים</div>
                 )}
               </div>
             </div>
@@ -336,7 +348,7 @@ export default function AdminCentersPage() {
               </button>
               <button onClick={() => openManage(c)}
                 className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-100">
-                👥 ניהול מטפלים ({c.therapist_count})
+                👥 ניהול מטפלים ({c.linked_therapist_count})
               </button>
               {(c.status === "draft" || c.status === "sent") && (
                 <>
@@ -384,7 +396,7 @@ export default function AdminCentersPage() {
       })}
 
       {/* מודל יצירה/עריכה — כותרת וכפתור השמירה קבועים; רק תוכן הטופס גולל,
-          כך שגם הצעה עם 4 מסלולים נשארת נגישה במסך נמוך בלי לאבד את הפעולות. */}
+          כך שהטופס נשאר נגיש במסך נמוך בלי לאבד את פעולת השמירה. */}
       {editing && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
           <div className="absolute inset-0 bg-black/30" onClick={() => setEditing(null)} />
@@ -413,51 +425,44 @@ export default function AdminCentersPage() {
             </div>
 
             {!isLockedEditing && (
-              <>
-                <Field label="🎁 חודשי מתנה (0 = בלי מתנה; הכרטיס נשמר מיד והחיוב הראשון יוצא בתום המתנה)">
-                  <input type="number" min={0} max={12} value={fGift} onChange={(e) => setFGift(e.target.value)}
-                    className="w-24 rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
-                </Field>
+              <Field label="🎁 חודשי מתנה (0 = בלי מתנה; הכרטיס נשמר מיד והחיוב הראשון יוצא בתום המתנה)">
+                <input type="number" min={0} max={12} value={fGift} onChange={(e) => setFGift(e.target.value)}
+                  className="w-24 rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+              </Field>
+            )}
 
-                <div className="mt-2 mb-1 flex items-center justify-between">
-                  <span className="text-xs font-black text-stone-700">המסלול והמחיר</span>
-                  {fPlans.length < 4 && (
-                    <button onClick={() => setFPlans([...fPlans, emptyPlan()])}
-                      className="rounded-full border border-stone-300 px-2.5 py-0.5 text-xs text-stone-600 hover:bg-stone-50">
-                      + מסלול נוסף (לא חובה)
-                    </button>
-                  )}
+            {!pricingLocked && (
+              <>
+                <div className="mt-2 mb-1">
+                  <span className="text-xs font-black text-stone-700">המחיר וההיקף (כפי שנקבעו בשיחת ההתאמה)</span>
                 </div>
                 <p className="mb-2 text-[11px] leading-4 text-stone-400">
-                  כל הצעה כוללת אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי מפורט, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז מעל המחיר. כאן מגדירים רק את שם המסלול, המחיר החודשי, ותוספות ספציפיות למרכז הזה (אם יש).
+                  כל מנוי כולל אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז בדף ההצטרפות. כאן מגדירים רק את המחיר לכל מטפל ואת מספר המטפלים.
                 </p>
-                {fPlans.map((p, i) => (
-                  <div key={i} className="mb-3 rounded-xl border border-stone-200 bg-stone-50 p-3">
-                    <div className="grid gap-2 sm:grid-cols-[1fr_140px_auto]">
-                      <input value={p.title} placeholder={`שם המסלול (למשל "מסלול בסיס")`}
-                        onChange={(e) => setFPlans(fPlans.map((x, j) => (j === i ? { ...x, title: e.target.value } : x)))}
-                        className="rounded-lg border border-stone-300 px-3 py-2 text-sm" />
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm text-stone-500">₪</span>
-                        <input value={p.monthly_price} placeholder="לחודש" inputMode="decimal"
-                          onChange={(e) => setFPlans(fPlans.map((x, j) => (j === i ? { ...x, monthly_price: e.target.value.replace(/[^\d.]/g, "") } : x)))}
-                          className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
-                        <span className="text-xs text-stone-400 whitespace-nowrap">+ מע&quot;מ</span>
-                      </div>
-                      {fPlans.length > 1 && (
-                        <button onClick={() => setFPlans(fPlans.filter((_, j) => j !== i))}
-                          className="text-red-400 hover:text-red-600 text-sm">✕</button>
-                      )}
-                    </div>
-                    <textarea
-                      value={p.featuresText}
-                      onChange={(e) => setFPlans(fPlans.map((x, j) => (j === i ? { ...x, featuresText: e.target.value } : x)))}
-                      rows={4}
-                      placeholder={"תוספות ספציפיות למרכז — שורה לכל סעיף (לא חובה):\nעד 10 פרופילי מטפלים\nהופעה ראשונה בתוצאות החיפוש\nליווי והטמעה ייעודי"}
-                      className="mt-2 w-full rounded-lg border border-stone-300 px-3 py-2 text-xs leading-5"
-                    />
-                  </div>
-                ))}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="מחיר לכל מטפל (₪ לחודש, לפני מע&quot;מ) *">
+                    <input value={fPricePerTherapist} inputMode="decimal" placeholder="למשל 80"
+                      onChange={(e) => setFPricePerTherapist(e.target.value.replace(/[^\d.]/g, ""))}
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                  </Field>
+                  <Field label="מספר מטפלים *">
+                    <input value={fTherapistCount} inputMode="numeric" placeholder="למשל 5"
+                      onChange={(e) => setFTherapistCount(e.target.value.replace(/\D/g, ""))}
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                  </Field>
+                </div>
+                <div className="mt-1 mb-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-2 text-xs text-stone-600">
+                  {fTotal > 0 ? (
+                    <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · {Number(fTherapistCount) || 0} × ₪{ils(Number(fPricePerTherapist) || 0)} · ₪{ils(withVat(fTotal))} כולל מע&quot;מ</>
+                  ) : (
+                    "הזינו מחיר לכל מטפל ומספר מטפלים כדי לראות את הסכום החודשי הכולל."
+                  )}
+                </div>
+                {isActiveEditing && (
+                  <p className="mb-2 text-[11px] leading-4 text-amber-600">
+                    ⚠️ שינוי המחיר או מספר המטפלים במרכז פעיל יעדכן מיד את הסכום החודשי בהוראת הקבע ב-Sumit (מהחיוב הבא).
+                  </p>
+                )}
               </>
             )}
 
@@ -468,7 +473,7 @@ export default function AdminCentersPage() {
             </div>
 
             <div className="rounded-b-2xl border-t border-stone-100 px-6 py-4">
-              <button onClick={save} disabled={busy || !fName.trim()}
+              <button onClick={save} disabled={busy || !fName.trim() || (!pricingLocked && fTotal <= 0)}
                 className="w-full rounded-xl bg-stone-800 py-2.5 text-sm font-bold text-white disabled:opacity-40">
                 {busy ? "שומר…" : "שמירה"}
               </button>

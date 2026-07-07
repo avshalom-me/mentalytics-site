@@ -281,11 +281,13 @@ export async function createCenterSubscription(opts: {
   payerPhone?: string;
   companyNumber?: string; // ח.פ / עוסק מורשה — מודפס על החשבונית
   singleUseToken: string;
-  unitPrice: number;      // המחיר החודשי שסוכם, לפני מע"מ
-  planTitle: string;
+  unitPrice: number;      // הסכום החודשי הכולל שסוכם (מחיר-למטפל × מספר-מטפלים), לפני מע"מ
+  therapistCount: number; // מספר המטפלים — מודפס בשם הפריט בחשבונית
   firstChargeDate?: string; // "YYYY-MM-DD"; מוגדר רק כשיש חודשי מתנה
 }): Promise<SubscriptionChargeResult> {
   const externalId = `center:${opts.centerId}`;
+  // Quantity=1, UnitPrice=הסכום הכולל — כדי שעדכון מחיר/מספר-מטפלים בעתיד יעבור
+  // דרך updateRecurringPrice (שמעדכן UnitPrice) בלי לגעת בכמות ב-Sumit.
   const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
     Customer: {
       ExternalIdentifier: externalId,
@@ -299,7 +301,7 @@ export async function createCenterSubscription(opts: {
     Items: [
       {
         Item: {
-          Name: `מנוי חודשי למרכז טיפולי — ${opts.planTitle} | טיפול חכם`,
+          Name: `מנוי חודשי למרכז טיפולי — ${opts.therapistCount} מטפלים | טיפול חכם`,
           SKU: "CENTER-MONTHLY",
           Duration_Months: 1,
         },

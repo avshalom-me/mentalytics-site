@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { centerPricing } from "@/app/lib/center-pricing";
 import CenterJoinForm, { type CenterOffer } from "./CenterJoinForm";
 
 // דף הצטרפות למרכז טיפולי — נפתח מהקישור הסודי שהאדמין שולח עם הצעת המחיר.
@@ -14,16 +15,12 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false }, // קישור פרטי — לא לאינדוקס
 };
 
-const VAT_RATE = 0.18;
-
-type Plan = { key: string; title: string; monthly_price: number; features: string[] };
-
 export default async function CenterJoinPage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;
 
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, contact_name, status, plans, gift_months, selected_plan_key, billing_starts_at")
+    .select("id, name, contact_name, status, price_per_therapist, therapist_count, gift_months, billing_starts_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -71,18 +68,38 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     );
   }
 
-  const plans = ((center.plans ?? []) as Plan[]).map((p) => ({
-    ...p,
-    total_with_vat: Math.round(p.monthly_price * (1 + VAT_RATE) * 100) / 100,
-  }));
+  const pricePerTherapist = Number(center.price_per_therapist) || 0;
+  const therapistCount = Math.floor(Number(center.therapist_count) || 0);
+
+  // הצעה שעדיין לא תומחרה (טיוטה שנשלחה בטעות) — לא מציגים טופס תשלום.
+  if (pricePerTherapist <= 0 || therapistCount <= 0) {
+    return (
+      <Shell>
+        <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
+          <div className="text-4xl mb-3">📝</div>
+          <h1 className="text-xl font-black text-stone-900 mb-2">ההצעה בהכנה</h1>
+          <p className="text-sm leading-6 text-stone-600">
+            נשלים את פרטי ההצעה ונחזור אליכם. לשאלות:{" "}
+            <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
+          </p>
+        </div>
+      </Shell>
+    );
+  }
+
+  const p = centerPricing(pricePerTherapist, therapistCount);
 
   const offer: CenterOffer = {
     token,
     name: center.name,
     contact_name: center.contact_name,
     gift_months: center.gift_months ?? 0,
-    plans,
-    vat_pct: Math.round(VAT_RATE * 100),
+    price_per_therapist: p.pricePerTherapist,
+    therapist_count: p.therapistCount,
+    per_therapist_with_vat: p.perTherapistWithVat,
+    monthly_total: p.monthlyTotal,
+    monthly_total_with_vat: p.monthlyTotalWithVat,
+    vat_pct: p.vatPct,
   };
 
   return (

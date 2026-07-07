@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { createCenterSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
 import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
+import { centerPricing } from "@/app/lib/center-pricing";
 
 // הרשמת מרכז טיפולי למנוי — נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
 // אימות: הטוקן הסודי מהקישור שהאדמין שלח (אין חשבון משתמש). הכרטיס עובר
@@ -29,8 +30,6 @@ function sanitizeName(raw: string): string {
   return raw.replace(/[^\p{L}\p{N}\s"'.\-–—()]/gu, "").trim().slice(0, 120);
 }
 
-type Plan = { key: string; title: string; monthly_price: number; features: string[] };
-
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
@@ -45,14 +44,13 @@ export async function POST(req: NextRequest) {
   }
 
   const token = typeof body.token === "string" ? body.token.trim() : "";
-  const planKey = typeof body.plan_key === "string" ? body.plan_key : "";
   const payerName = sanitizeName(typeof body.payer_name === "string" ? body.payer_name : "");
   const payerEmail = typeof body.payer_email === "string" ? body.payer_email.trim().slice(0, 200) : "";
   const payerPhone = typeof body.payer_phone === "string" ? body.payer_phone.trim().slice(0, 30) : "";
   const companyNumber = typeof body.company_number === "string" ? body.company_number.replace(/\D/g, "").slice(0, 9) : "";
   const singleUseToken = typeof body.singleUseToken === "string" ? body.singleUseToken.trim() : "";
 
-  if (!token || !planKey || !payerName || !payerEmail || !singleUseToken) {
+  if (!token || !payerName || !payerEmail || !singleUseToken) {
     return NextResponse.json({ ok: false, error: "חסרים פרטים" }, { status: 400 });
   }
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payerEmail)) {
@@ -76,11 +74,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "ההצעה הזו כבר לא בתוקף — פנו אלינו לקבלת הצעה חדשה" }, { status: 400 });
     }
 
-    const plans = (center.plans ?? []) as Plan[];
-    const plan = plans.find((p) => p.key === planKey);
-    if (!plan) {
-      return NextResponse.json({ ok: false, error: "המסלול שנבחר לא נמצא" }, { status: 400 });
+    // מודל התמחור: מחיר-למטפל × מספר-מטפלים = סה"כ חודשי (לפני מע"מ).
+    const pricePerTherapist = Number(center.price_per_therapist) || 0;
+    const therapistCount = Math.floor(Number(center.therapist_count) || 0);
+    if (pricePerTherapist <= 0 || therapistCount <= 0) {
+      return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר ומספר מטפלים — פנו אלינו" }, { status: 400 });
     }
+    const monthlyTotal = centerPricing(pricePerTherapist, therapistCount).monthlyTotal;
 
     // מנעול כפילות אטומי: שורת payment במצב pending. אינדקס ייחודי
     // (reference_id, payment_type) WHERE pending חוסם הגשה כפולה מקבילה —
@@ -99,12 +99,12 @@ export async function POST(req: NextRequest) {
       .insert({
         payment_type: "center_subscription",
         reference_id: center.id,
-        amount: plan.monthly_price,
+        amount: monthlyTotal,
         status: "pending",
         metadata: {
           center_name: center.name,
-          plan_key: plan.key,
-          plan_title: plan.title,
+          price_per_therapist: pricePerTherapist,
+          therapist_count: therapistCount,
           gift_months: center.gift_months,
           payer_name: payerName,
           payer_email: payerEmail,
@@ -139,8 +139,8 @@ export async function POST(req: NextRequest) {
         payerPhone,
         companyNumber: companyNumber || undefined,
         singleUseToken,
-        unitPrice: plan.monthly_price,
-        planTitle: plan.title,
+        unitPrice: monthlyTotal,
+        therapistCount,
         firstChargeDate,
       });
     } catch (err) {
@@ -169,8 +169,7 @@ export async function POST(req: NextRequest) {
         .from("therapy_center_accounts")
         .update({
           status: "active",
-          selected_plan_key: plan.key,
-          agreed_monthly_price: plan.monthly_price,
+          agreed_monthly_price: monthlyTotal,
           billing_starts_at: firstChargeDate ?? now.toISOString().slice(0, 10),
           payer_name: payerName,
           payer_email: payerEmail,
@@ -206,15 +205,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, pending: true, message: "התשלום התקבל; נעדכן את הסטטוס בקרוב." });
     }
 
-    console.log(`Center subscription completed: center=${center.id} gift=${giftMonths} price=${plan.monthly_price}`);
+    console.log(`Center subscription completed: center=${center.id} gift=${giftMonths} therapists=${therapistCount} total=${monthlyTotal}`);
 
     // מייל ברוכים-הבאים עם קישור לפורטל — best-effort, לעולם לא מכשיל תשלום שהושלם.
     try {
       await sendCenterWelcomeEmail({
         to: payerEmail,
         centerName: center.name,
-        planTitle: plan.title,
-        monthlyPrice: plan.monthly_price,
+        pricePerTherapist,
+        therapistCount,
         giftMonths,
         billingStartsAt: firstChargeDate ?? now.toISOString().slice(0, 10),
       });

@@ -1,7 +1,8 @@
 import "server-only";
 import { Resend } from "resend";
 import { logEmail } from "./email-log";
-import { buildCenterProposalEmail, type CenterPlan } from "./center-proposal-email";
+import { buildCenterProposalEmail } from "./center-proposal-email";
+import { centerPricing, ilCurrency } from "./center-pricing";
 
 // מיילים למרכזים טיפוליים. נפרד מ-therapist-emails כי הנמען והתוכן שונים
 // (מרכז, לא מטפל בודד). כל שליחה נרשמת ל-crm_email_log (fire-and-forget).
@@ -37,7 +38,8 @@ export async function sendCenterProposalEmail(opts: {
   to: string;
   centerName: string;
   contactName: string | null;
-  plans: CenterPlan[];
+  pricePerTherapist: number;
+  therapistCount: number;
   giftMonths: number;
   token: string;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -49,7 +51,8 @@ export async function sendCenterProposalEmail(opts: {
   const { subject, html } = buildCenterProposalEmail({
     centerName: opts.centerName,
     contactName: opts.contactName,
-    plans: opts.plans,
+    pricePerTherapist: opts.pricePerTherapist,
+    therapistCount: opts.therapistCount,
     giftMonths: opts.giftMonths,
     token: opts.token,
     siteUrl: SITE_URL,
@@ -85,8 +88,8 @@ export async function sendCenterProposalEmail(opts: {
 export async function sendCenterWelcomeEmail(opts: {
   to: string;
   centerName: string;
-  planTitle: string;
-  monthlyPrice: number;
+  pricePerTherapist: number;
+  therapistCount: number;
   giftMonths: number;
   billingStartsAt: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -96,8 +99,8 @@ export async function sendCenterWelcomeEmail(opts: {
   }
 
   const name = escapeHtml(opts.centerName || "המרכז");
-  const plan = escapeHtml(opts.planTitle || "מנוי חודשי");
-  const price = Math.round(opts.monthlyPrice).toLocaleString("he-IL");
+  const pr = centerPricing(opts.pricePerTherapist, opts.therapistCount);
+  const priceLine = `${pr.therapistCount} מטפלים × ₪${ilCurrency(pr.pricePerTherapist)} = ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`;
   const portalUrl = `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
   const subject = `ברוכים הבאים לטיפול חכם — ${name} 🎉`;
@@ -112,7 +115,7 @@ export async function sendCenterWelcomeEmail(opts: {
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">ברוכים הבאים, ${name} 🎉</h1>
       <p style="margin:0 0 14px;">המנוי של המרכז לטיפול חכם פעיל. מטפלי המרכז ייכנסו למערכת ההתאמות החכמה, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות.</p>
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 16px;margin:0 0 18px;">
-        <p style="margin:0 0 6px;font-weight:bold;">${plan} — ₪${price} + מע"מ לחודש</p>
+        <p style="margin:0 0 6px;font-weight:bold;">${priceLine}</p>
         <p style="margin:0;font-size:13px;color:#3E5250;">${giftLine(opts.giftMonths, opts.billingStartsAt)}</p>
       </div>
       <p style="margin:0 0 10px;font-weight:bold;">פורטל ניהול המרכז</p>

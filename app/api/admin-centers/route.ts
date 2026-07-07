@@ -1,32 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { cancelSubscription, listRecurringForCustomer } from "@/app/lib/sumit";
+import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
+import { centerPricing } from "@/app/lib/center-pricing";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // מוגן ע"י ה-middleware של האדמין (/api/admin-*).
 
 export const dynamic = "force-dynamic";
 
-export type CenterPlan = { key: string; title: string; monthly_price: number; features: string[] };
-
-function sanitizePlans(raw: unknown): CenterPlan[] | { error: string } {
-  if (!Array.isArray(raw) || raw.length === 0) return { error: "נדרש לפחות מסלול אחד" };
-  if (raw.length > 4) return { error: "עד 4 מסלולים" };
-  const plans: CenterPlan[] = [];
-  for (let i = 0; i < raw.length; i++) {
-    const p = raw[i] as Record<string, unknown>;
-    const title = typeof p.title === "string" ? p.title.trim().slice(0, 80) : "";
-    const price = typeof p.monthly_price === "number" ? p.monthly_price : Number(p.monthly_price);
-    const features = Array.isArray(p.features)
-      ? p.features.filter((f): f is string => typeof f === "string" && f.trim() !== "").map((f) => f.trim().slice(0, 200)).slice(0, 15)
-      : [];
-    if (!title) return { error: `מסלול ${i + 1}: חסרה כותרת` };
-    if (isNaN(price) || price <= 0 || price > 100_000) return { error: `מסלול "${title}": מחיר חודשי לא תקין` };
-    plans.push({ key: `plan-${i + 1}`, title, monthly_price: Math.round(price * 100) / 100, features });
-  }
-  return plans;
+// מודל התמחור: מחיר-למטפל × מספר-מטפלים. מפרסר ומאמת מגוף הבקשה.
+function parsePricing(body: Record<string, unknown>):
+  | { pricePerTherapist: number; therapistCount: number }
+  | { error: string } {
+  const price =
+    typeof body.price_per_therapist === "number" ? body.price_per_therapist : Number(body.price_per_therapist);
+  const count =
+    typeof body.therapist_count === "number" ? body.therapist_count : Number(body.therapist_count);
+  if (isNaN(price) || price <= 0 || price > 100_000) return { error: "מחיר לכל מטפל לא תקין" };
+  if (isNaN(count) || count < 1 || count > 1000) return { error: "מספר מטפלים לא תקין (1–1000)" };
+  return { pricePerTherapist: Math.round(price * 100) / 100, therapistCount: Math.floor(count) };
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
@@ -49,7 +43,9 @@ export async function GET() {
       const cid = t.center_account_id as string;
       counts.set(cid, (counts.get(cid) ?? 0) + 1);
     });
-    const centers = (data ?? []).map((c) => ({ ...c, therapist_count: counts.get(c.id as string) ?? 0 }));
+    // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
+    // therapist_count שבטבלה, שהוא מספר המטפלים שבתמחור ההצעה).
+    const centers = (data ?? []).map((c) => ({ ...c, linked_therapist_count: counts.get(c.id as string) ?? 0 }));
     return NextResponse.json({ ok: true, centers });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
@@ -69,8 +65,8 @@ export async function POST(req: NextRequest) {
     if (action === "create") {
       const name = str(body.name, 120);
       if (!name) return NextResponse.json({ ok: false, error: "חסר שם מרכז" }, { status: 400 });
-      const plans = sanitizePlans(body.plans);
-      if ("error" in plans) return NextResponse.json({ ok: false, error: plans.error }, { status: 400 });
+      const priced = parsePricing(body);
+      if ("error" in priced) return NextResponse.json({ ok: false, error: priced.error }, { status: 400 });
       const gift = Number(body.gift_months ?? 0);
       if (isNaN(gift) || gift < 0 || gift > 12) return NextResponse.json({ ok: false, error: "חודשי מתנה: 0-12" }, { status: 400 });
 
@@ -83,7 +79,8 @@ export async function POST(req: NextRequest) {
           phone: str(body.phone, 30) || null,
           notes: str(body.notes, 2000) || null,
           gift_months: Math.round(gift),
-          plans,
+          price_per_therapist: priced.pricePerTherapist,
+          therapist_count: priced.therapistCount,
           token: randomBytes(24).toString("hex"),
         })
         .select("*")
@@ -141,20 +138,49 @@ export async function POST(req: NextRequest) {
       if (body.phone !== undefined) update.phone = str(body.phone, 30) || null;
       if (body.notes !== undefined) update.notes = str(body.notes, 2000) || null;
 
-      // תנאי ההצעה (מסלולים, מחיר, מתנה) נעולים אחרי שהמרכז שילם — שינוי
-      // שלהם לא היה משנה את הוראת הקבע ב-Sumit והיה יוצר פער מסוכן.
+      // חודשי מתנה משפיעים על מועד החיוב הראשון שנקבע בעת ההצטרפות — נעולים
+      // אחרי תשלום כדי לא ליצור פער מול Date_Start שכבר נשמר ב-Sumit.
       const editable = center.status === "draft" || center.status === "sent";
-      if (body.plans !== undefined) {
-        if (!editable) return NextResponse.json({ ok: false, error: "אי אפשר לשנות מסלולים אחרי תשלום — יש לבטל וליצור הצעה חדשה" }, { status: 400 });
-        const plans = sanitizePlans(body.plans);
-        if ("error" in plans) return NextResponse.json({ ok: false, error: plans.error }, { status: 400 });
-        update.plans = plans;
-      }
       if (body.gift_months !== undefined) {
         if (!editable) return NextResponse.json({ ok: false, error: "אי אפשר לשנות חודשי מתנה אחרי תשלום" }, { status: 400 });
         const gift = Number(body.gift_months);
         if (isNaN(gift) || gift < 0 || gift > 12) return NextResponse.json({ ok: false, error: "חודשי מתנה: 0-12" }, { status: 400 });
         update.gift_months = Math.round(gift);
+      }
+
+      // מחיר-למטפל / מספר-מטפלים — ניתנים לעריכה גם אחרי תשלום. במרכז פעיל
+      // השינוי מתפרסם מיד להוראת הקבע ב-Sumit (הסכום הכולל = מחיר × מספר),
+      // ורק אם Sumit אישר — מעדכנים את הסכום המוסכם בטבלה.
+      if (body.price_per_therapist !== undefined || body.therapist_count !== undefined) {
+        const newPrice = body.price_per_therapist !== undefined ? Number(body.price_per_therapist) : Number(center.price_per_therapist);
+        const newCount = body.therapist_count !== undefined ? Number(body.therapist_count) : Number(center.therapist_count);
+        if (isNaN(newPrice) || newPrice <= 0 || newPrice > 100_000) return NextResponse.json({ ok: false, error: "מחיר לכל מטפל לא תקין" }, { status: 400 });
+        if (isNaN(newCount) || newCount < 1 || newCount > 1000) return NextResponse.json({ ok: false, error: "מספר מטפלים לא תקין (1–1000)" }, { status: 400 });
+        const pp = Math.round(newPrice * 100) / 100;
+        const cnt = Math.floor(newCount);
+        update.price_per_therapist = pp;
+        update.therapist_count = cnt;
+
+        if (center.status === "active") {
+          const newTotal = centerPricing(pp, cnt).monthlyTotal;
+          const oldTotal = Number(center.agreed_monthly_price) || 0;
+          if (Math.round(newTotal * 100) !== Math.round(oldTotal * 100)) {
+            if (!center.sumit_recurring_id) {
+              return NextResponse.json({ ok: false, error: "לא ניתן לעדכן חיוב — חסר מזהה הוראת קבע ב-Sumit. עדכנו ידנית בממשק Sumit." }, { status: 400 });
+            }
+            try {
+              await updateRecurringPrice({
+                recurringItemId: Number(center.sumit_recurring_id),
+                customerExternalId: `center:${center.id}`,
+                unitPrice: newTotal,
+              });
+            } catch (e) {
+              console.error(`admin-centers update: Sumit price update failed for center=${center.id}:`, e instanceof Error ? e.message : e);
+              return NextResponse.json({ ok: false, error: "עדכון החיוב ב-Sumit נכשל — לא בוצע שינוי. נסו שוב." }, { status: 502 });
+            }
+            update.agreed_monthly_price = newTotal;
+          }
+        }
       }
 
       const { error } = await supabaseAdmin.from("therapy_center_accounts").update(update).eq("id", id);
@@ -199,11 +225,15 @@ export async function POST(req: NextRequest) {
       if (!center.email) {
         return NextResponse.json({ ok: false, error: "למרכז אין כתובת מייל — עדכנו אימייל בעריכת ההצעה" }, { status: 400 });
       }
+      if (!(Number(center.price_per_therapist) > 0) || !(Number(center.therapist_count) > 0)) {
+        return NextResponse.json({ ok: false, error: "יש להגדיר מחיר לכל מטפל ומספר מטפלים לפני שליחת ההצעה" }, { status: 400 });
+      }
       const sent = await sendCenterProposalEmail({
         to: center.email as string,
         centerName: center.name as string,
         contactName: (center.contact_name as string | null) ?? null,
-        plans: (center.plans as CenterPlan[]) ?? [],
+        pricePerTherapist: Number(center.price_per_therapist),
+        therapistCount: Number(center.therapist_count),
         giftMonths: Number(center.gift_months ?? 0),
         token: center.token as string,
       });
