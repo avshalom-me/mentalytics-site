@@ -153,7 +153,7 @@ export async function sendPromotionEndedEmail(opts: {
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>
@@ -308,7 +308,7 @@ export async function sendPromotionGrantedEmail(opts: {
 
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         בהצלחה,<br/>
         טיפול חכם — Mentalytics
       </p>
@@ -435,7 +435,7 @@ export async function sendTherapistWelcomeEmail(opts: {
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         בהצלחה,<br/>
         טיפול חכם — Mentalytics
       </p>
@@ -489,7 +489,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 052-790-6335<br/>
+        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 055-993-1403<br/>
         בברכה,<br/>
         צוות טיפול חכם — Mentalytics
       </p>
@@ -537,7 +537,7 @@ export async function sendPromotedApprovedEmail(opts: {
       </p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 052-790-6335<br/>
+        לכל שאלה אנחנו כאן: admin@getmentalytics.com · 055-993-1403<br/>
         בהצלחה,<br/>
         צוות טיפול חכם — Mentalytics
       </p>
@@ -600,7 +600,7 @@ export async function sendArticleReviewedEmail(opts: {
       ${bodyHtml}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>
@@ -659,7 +659,7 @@ export async function sendTherapistRejectedEmail(opts: {
       <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>
@@ -715,7 +715,7 @@ export async function sendTherapistCompletionRequestEmail(opts: {
       <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>
@@ -790,7 +790,7 @@ export async function sendTherapistAdminMessageEmail(opts: {
       <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
-        לכל שאלה: admin@getmentalytics.com | 052-790-6335<br/>
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         טיפול חכם — Mentalytics
       </p>
     </div>

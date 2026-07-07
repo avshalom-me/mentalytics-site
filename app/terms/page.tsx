@@ -105,7 +105,7 @@ export default function TermsPage() {
           <p>לשאלות ופניות:</p>
           <ul className="list-disc list-inside space-y-1 text-sm mt-2">
             <li>מייל: <a href="mailto:admin@getmentalytics.com" className="text-[#0F5468] underline">admin@getmentalytics.com</a></li>
-            <li>טלפון: <a href="tel:0527906335" className="text-[#0F5468] underline">052-790-6335</a></li>
+            <li>טלפון: <a href="tel:0559931403" className="text-[#0F5468] underline">055-993-1403</a></li>
           </ul>
         </section>
 

@@ -38,7 +38,7 @@ export default function BillingPolicyPage() {
             <li>כתובת: אשכולית 28/3, פרדס חנה</li>
             <li>כתובת אתר: mentalytics.co.il</li>
             <li>מייל: <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a></li>
-            <li>טלפון: <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a></li>
+            <li>טלפון: <a href="tel:0559931403" className="underline hover:text-[#0F5468]">055-993-1403</a></li>
           </ul>
         </section>
 
@@ -88,7 +88,7 @@ export default function BillingPolicyPage() {
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">8. ביטול מנוי</h2>
           <p>ניתן לבטל את המנוי בכל עת.</p>
           <p>הביטול ייכנס לתוקף מתום תקופת החיוב הנוכחית. אם בוצע חיוב לחודש חדש — השירות ימשיך עד סוף אותו חודש, ולא יבוצע חיוב נוסף לאחר מכן.</p>
-          <p className="mt-2">ביטול מנוי ניתן לבצע דרך פנייה למייל <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a> או בטלפון <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a>.</p>
+          <p className="mt-2">ביטול מנוי ניתן לבצע דרך פנייה למייל <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a> או בטלפון <a href="tel:0559931403" className="underline hover:text-[#0F5468]">055-993-1403</a>.</p>
         </section>
 
         <section>
@@ -114,7 +114,7 @@ export default function BillingPolicyPage() {
           <p>בקשות החזר או ביטול מנוי יש להגיש באחד מהאמצעים הבאים:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>מייל: <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a></li>
-            <li>טלפון: <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a></li>
+            <li>טלפון: <a href="tel:0559931403" className="underline hover:text-[#0F5468]">055-993-1403</a></li>
           </ul>
           <p className="mt-2">הבקשה תטופל בתוך 5 ימי עסקים. ההחזר יבוצע לאמצעי התשלום שבו בוצע החיוב המקורי.</p>
         </section>
@@ -158,7 +158,7 @@ export default function BillingPolicyPage() {
           <p>לכל שאלה, בקשה או בירור בנושא תשלומים, ביטולים והחזרים:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>מייל: <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a></li>
-            <li>טלפון: <a href="tel:0527906335" className="underline hover:text-[#0F5468]">052-790-6335</a></li>
+            <li>טלפון: <a href="tel:0559931403" className="underline hover:text-[#0F5468]">055-993-1403</a></li>
           </ul>
         </section>
 
