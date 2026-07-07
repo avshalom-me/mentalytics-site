@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { resolveCenter } from "@/app/lib/center-auth";
 import { writeAudit } from "@/app/lib/audit";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
+import { CENTER_THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 
 // ניהול פרופילי מטפלים על-ידי המרכז, מתוך הפורטל. פרופיל שנוצר כאן שייך
 // למרכז (center_account_id מוגדר, user_id ריק) — רק מנהלי המרכז עורכים אותו,
@@ -25,20 +26,9 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-// אותם שדות שהמטפל עצמו רשאי לערוך (therapist-profile PATCH) — מקור אחד לאמת
-// היה עדיף, אבל הרשימה יציבה ומוגדרת גם שם כקבוע מקומי.
-const ALLOWED_FIELDS = [
-  "full_name", "email", "phone", "bio", "gender", "online",
-  "therapist_types", "training_areas", "assessment_types",
-  "couples_modalities", "cogfun_age_groups",
-  "regions", "cultural_prefs", "arrangements", "age_groups", "languages",
-  "style_q1", "style_q2", "activity_level",
-  "education", "experience",
-] as const;
-
 function pickAllowed(body: Record<string, unknown>): Record<string, unknown> {
   const update: Record<string, unknown> = {};
-  for (const key of ALLOWED_FIELDS) {
+  for (const key of CENTER_THERAPIST_EDIT_FIELDS) {
     if (key in body) update[key] = body[key];
   }
   return update;

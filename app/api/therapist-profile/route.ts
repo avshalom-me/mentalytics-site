@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
+import { THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 
 export const dynamic = "force-dynamic";
 
@@ -140,17 +141,8 @@ export async function PATCH(req: NextRequest) {
 
   const body = await req.json();
 
-  const allowed = [
-    "full_name", "phone", "bio", "gender", "online",
-    "therapist_types", "training_areas", "assessment_types",
-    "couples_modalities", "cogfun_age_groups",
-    "regions", "cultural_prefs", "arrangements", "age_groups", "languages",
-    "style_q1", "style_q2", "activity_level",
-    "education", "experience",
-  ];
-
   const update: Record<string, unknown> = {};
-  for (const key of allowed) {
+  for (const key of THERAPIST_EDIT_FIELDS) {
     if (key in body) update[key] = body[key];
   }
   // Stamp therapist-initiated edits so the admin can see the profile changed.
