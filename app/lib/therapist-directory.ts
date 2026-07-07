@@ -28,6 +28,7 @@ type TherapistRow = {
   profile_photo_path: string | null;
   status: string | null;
   promotion_source: string | null;
+  center_account_id: string | null;
   created_at: string | null;
 };
 
@@ -66,7 +67,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // rank above GIFT promotions (manual/trial), which in turn rank above the free
 // approved tier. An optional filter (region / online) narrows the set BEFORE
 // signing photo URLs, so region landing pages only pay for their own subset.
-type DirectoryFilter = { region?: string; city?: string; online?: boolean; category?: "main" | "para" };
+type DirectoryFilter = { region?: string; city?: string; online?: boolean; category?: "main" | "para"; centerId?: string };
 
 // Shared query + in-memory filtering (no photo signing). Used both by the full
 // loader and by the lightweight count helpers below.
@@ -74,7 +75,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, created_at`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, center_account_id, created_at`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
@@ -83,6 +84,9 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (error || !data) return [];
 
   let rows = data as TherapistRow[];
+  // A center's public page wants exactly its therapists — skip the main/para
+  // category filter there (a center may include para-medical therapists too).
+  if (filter?.centerId) return rows.filter((t) => t.center_account_id === filter.centerId);
   // Default to the "main" directory (exclude para-only therapists); the
   // para-medical rubric explicitly asks for "para".
   const category = filter?.category ?? "main";
@@ -128,14 +132,24 @@ export async function loadPublicTherapists(
   const isNew = (t: TherapistRow) =>
     t.created_at != null && new Date(t.created_at).getTime() >= boostCutoff;
 
-  // Promoted = status "paying". Within it, paid customers outrank gift
-  // (manual/trial) promotions; both outrank the free approved tier. The
-  // new-therapist boost is preserved WITHIN each class.
+  // Promoted = status "paying". Tiers, highest first:
+  //   paid   — individual full-price subscribers (promotion_source="paid")
+  //   center — promoted via their center's subscription (promotion_source="center")
+  //   gift   — manual/trial gift promotions
+  //   free   — approved, unpaid
+  // Center therapists rank as a distinct promoted tier (a paid-plan benefit:
+  // "all center therapists appear at the top of their region"), above gift
+  // promotions and above the free tier. The new-therapist boost is preserved
+  // WITHIN each class.
   const isPaid = (t: TherapistRow) => t.status === "paying" && t.promotion_source === "paid";
-  const isGift = (t: TherapistRow) => t.status === "paying" && t.promotion_source !== "paid";
+  const isCenter = (t: TherapistRow) => t.status === "paying" && t.promotion_source === "center";
+  const isGift = (t: TherapistRow) =>
+    t.status === "paying" && t.promotion_source !== "paid" && t.promotion_source !== "center";
 
   const paidNew = rows.filter((t) => isPaid(t) && isNew(t));
   const paidOld = rows.filter((t) => isPaid(t) && !isNew(t));
+  const centerNew = rows.filter((t) => isCenter(t) && isNew(t));
+  const centerOld = rows.filter((t) => isCenter(t) && !isNew(t));
   const giftNew = rows.filter((t) => isGift(t) && isNew(t));
   const giftOld = rows.filter((t) => isGift(t) && !isNew(t));
   const approvedNew = rows.filter((t) => t.status !== "paying" && isNew(t));
@@ -151,6 +165,8 @@ export async function loadPublicTherapists(
   const ordered = [
     ...rotate(paidNew),
     ...rotate(paidOld),
+    ...rotate(centerNew),
+    ...rotate(centerOld),
     ...rotate(giftNew),
     ...rotate(giftOld),
     ...rotate(approvedNew),

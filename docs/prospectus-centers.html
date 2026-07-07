@@ -21,21 +21,21 @@
 
   h1 { font-size: 23px; font-weight: 900; line-height: 1.25; margin: 12px 0 0; }
   h1 .a { color: #3D8C8A; }
-  .lead { font-size: 12px; line-height: 1.6; color: #3E5250; margin-top: 7px; max-width: 172mm; }
+  .lead { font-size: 11.5px; line-height: 1.55; color: #3E5250; margin-top: 6px; max-width: 172mm; }
 
-  .sec-title { font-size: 14px; font-weight: 900; margin: 13px 0 8px; display: flex; align-items: center; gap: 8px; }
+  .sec-title { font-size: 13px; font-weight: 900; margin: 11px 0 7px; display: flex; align-items: center; gap: 8px; }
   .sec-title::before { content: ""; width: 4px; height: 15px; background: #D49018; border-radius: 2px; display: inline-block; }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 11px 13px; display: flex; gap: 10px; }
-  .card .ic { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; font-size: 19px; }
-  .card h3 { font-size: 13.5px; font-weight: 800; margin-bottom: 3px; }
-  .card p { font-size: 11.5px; line-height: 1.55; color: #6B807E; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .card { border: 1px solid #E8E0D8; border-radius: 12px; padding: 10px 11px; display: block; }
+  .card .ic { width: 30px; height: 30px; border-radius: 8px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; font-size: 16px; margin-bottom: 6px; }
+  .card h3 { font-size: 12px; font-weight: 800; margin-bottom: 3px; }
+  .card p { font-size: 10px; line-height: 1.45; color: #6B807E; }
 
-  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 16px; padding: 12px 14px; margin-top: 4px; }
+  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 14px; padding: 10px 13px; margin-top: 3px; }
   .stats .tag { display: inline-flex; align-items: center; gap: 5px; background: #D4901815; color: #A87010; border: 1px solid #D4901833; border-radius: 999px; padding: 3px 11px; font-size: 10.5px; font-weight: 800; }
   .stats h3 { font-size: 14.5px; font-weight: 900; margin: 8px 0 4px; }
-  .stats .sub { font-size: 11.5px; color: #6B807E; line-height: 1.5; margin-bottom: 11px; }
+  .stats .sub { font-size: 11px; color: #6B807E; line-height: 1.45; margin-bottom: 9px; }
   .srow { display: grid; grid-template-columns: 1fr 1fr; gap: 9px 16px; }
   .sitem { display: flex; gap: 8px; }
   .sitem .dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 5px; flex: 0 0 auto; }
@@ -43,12 +43,12 @@
   .sitem span { font-size: 10.5px; color: #6B807E; line-height: 1.45; }
 
   .steps { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 9px; }
-  .step { border: 1px solid #E8E0D8; border-radius: 14px; padding: 10px 11px; }
+  .step { border: 1px solid #E8E0D8; border-radius: 12px; padding: 9px 10px; }
   .step .n { width: 24px; height: 24px; border-radius: 50%; background: #3D8C8A; color: #fff; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
   .step h4 { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
-  .step p { font-size: 11px; line-height: 1.5; color: #6B807E; }
+  .step p { font-size: 10px; line-height: 1.4; color: #6B807E; }
 
-  .cta { margin: 13px -15mm 0; padding: 14px 15mm 13px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
+  .cta { margin: 11px -15mm 0; padding: 12px 15mm 11px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
   .cta h2 { font-size: 19px; font-weight: 900; margin: 0 0 5px; }
   .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 155mm; margin: 0 auto 12px; }
   .cta .mail { display: inline-block; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 30px; border-radius: 999px; }
@@ -73,7 +73,9 @@
   <div class="sec-title">מה כלול במסלול</div>
   <div class="grid">
     <div class="card"><div class="ic">👥</div><div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.</p></div></div>
-    <div class="card"><div class="ic">🗂️</div><div><h3>מערכת ניהול מטפלים — בשליטת המרכז</h3><p>מנהלי המרכז מוסיפים ועורכים את פרופילי המטפלים ישירות מהפורטל: פרטים, תמונה, תעודות והתמחויות. אחרי אישור קצר שלנו — הפרופיל נכנס אוטומטית למערכת ההתאמות.</p></div></div>
+    <div class="card"><div class="ic">📈</div><div><h3>המטפלים שלכם בראש רשימת האזור</h3><p>כל מטפלי המרכז מקודמים אוטומטית למקומות הראשונים ברשימת המטפלים של האזור — מעל המטפלים החינמיים — כך שמחפשים באזור רואים אתכם קודם.</p></div></div>
+    <div class="card"><div class="ic">🌐</div><div><h3>עמוד מרכז מקודם בגוגל</h3><p>עמוד ציבורי משלכם עם מידע על המרכז, שמות המנהלים והצוות ויצירת קשר — וכל המטפלים מרוכזים ומקושרים לפרופילים, מותאם ל-SEO.</p></div></div>
+    <div class="card"><div class="ic">🗂️</div><div><h3>מערכת ניהול מטפלים — בשליטת המרכז</h3><p>מנהלי המרכז מוסיפים ועורכים את פרופילי המטפלים ישירות מהפורטל: פרטים, תמונה, תעודות והתמחויות. אחרי אישור קצר — הפרופיל נכנס אוטומטית להתאמות.</p></div></div>
     <div class="card"><div class="ic">📊</div><div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — לכל המרכז וגם פר-מטפל, באנונימיות מלאה.</p></div></div>
     <div class="card"><div class="ic">🛡️</div><div><h3>ללא התחייבות — ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div></div>
   </div>

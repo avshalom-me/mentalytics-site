@@ -21,10 +21,17 @@ export type PortalCenter = {
   price_per_therapist: number | null;
   therapist_count: number | null;
   billing_starts_at: string | null;
+  slug: string | null;
+  public_page_enabled: boolean | null;
+  public_description: string | null;
+  public_managers: string | null;
+  public_city: string | null;
+  public_website: string | null;
+  public_phone: string | null;
 };
 
 const COLS =
-  "id, name, status, user_id, email, payer_email, price_per_therapist, therapist_count, billing_starts_at";
+  "id, name, status, user_id, email, payer_email, price_per_therapist, therapist_count, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone";
 
 export async function resolveCenter(req: NextRequest): Promise<PortalCenter | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");

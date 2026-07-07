@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
+import { listPublicCenters } from "@/app/lib/center-public";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -82,5 +83,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages];
+  // Public center pages (paid-plan benefit) — only active centers whose public
+  // page is enabled.
+  const centers = await listPublicCenters();
+  const centerPages: MetadataRoute.Sitemap = centers.map((c) => ({
+    url: `${BASE}/centers/${c.slug}`,
+    priority: 0.6,
+    changeFrequency: "weekly" as const,
+    lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
+  }));
+
+  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages, ...centerPages];
 }

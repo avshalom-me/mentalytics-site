@@ -5,6 +5,7 @@ import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } fr
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists } from "@/app/lib/center-promotion";
+import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // מוגן ע"י ה-middleware של האדמין (/api/admin-*).
@@ -82,6 +83,7 @@ export async function POST(req: NextRequest) {
           gift_months: Math.round(gift),
           price_per_therapist: priced.pricePerTherapist,
           therapist_count: priced.therapistCount,
+          slug: await ensureUniqueCenterSlug(name),
           token: randomBytes(24).toString("hex"),
         })
         .select("*")
@@ -138,6 +140,22 @@ export async function POST(req: NextRequest) {
       if (body.email !== undefined) update.email = str(body.email, 200) || null;
       if (body.phone !== undefined) update.phone = str(body.phone, 30) || null;
       if (body.notes !== undefined) update.notes = str(body.notes, 2000) || null;
+
+      // שדות העמוד הציבורי (SEO) — ניתנים לעריכה בכל סטטוס.
+      if (body.public_description !== undefined) update.public_description = str(body.public_description, 5000) || null;
+      if (body.public_managers !== undefined) update.public_managers = str(body.public_managers, 500) || null;
+      if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
+      if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
+      if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
+      if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
+      // ודא slug כשמדליקים את העמוד או עורכים תוכן ציבורי (מרכזים ותיקים בלי slug).
+      const touchesPublic =
+        body.public_page_enabled !== undefined || body.public_description !== undefined ||
+        body.public_managers !== undefined || body.public_city !== undefined ||
+        body.public_website !== undefined || body.public_phone !== undefined;
+      if (touchesPublic && !center.slug) {
+        update.slug = await ensureUniqueCenterSlug((update.name as string) ?? center.name, id);
+      }
 
       // חודשי מתנה משפיעים על מועד החיוב הראשון שנקבע בעת ההצטרפות — נעולים
       // אחרי תשלום כדי לא ליצור פער מול Date_Start שכבר נשמר ב-Sumit.

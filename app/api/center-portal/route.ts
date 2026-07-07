@@ -86,6 +86,17 @@ export async function GET(req: NextRequest) {
     const planTitle =
       Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null;
 
+    // מידע העמוד הציבורי — משותף לשני מסלולי המענה (עם/בלי מטפלים).
+    const publicPage = {
+      slug: center.slug,
+      enabled: !!center.public_page_enabled,
+      description: center.public_description,
+      managers: center.public_managers,
+      city: center.public_city,
+      website: center.public_website,
+      phone: center.public_phone,
+    };
+
     // אין מטפלים עדיין — מחזירים שלד ריק (המרכז חדש / טרם שויכו מטפלים).
     if (ids.length === 0) {
       return NextResponse.json({
@@ -97,6 +108,7 @@ export async function GET(req: NextRequest) {
           billing_starts_at: center.billing_starts_at,
           therapist_quota: Math.floor(Number(center.therapist_count) || 0),
           linked_count: 0,
+          public_page: publicPage,
         },
         therapists: [],
         stats: null,
@@ -179,6 +191,7 @@ export async function GET(req: NextRequest) {
         billing_starts_at: center.billing_starts_at,
         therapist_quota: Math.floor(Number(center.therapist_count) || 0),
         linked_count: therapists.length,
+        public_page: publicPage,
       },
       therapists: therapistList,
       stats: {
@@ -201,4 +214,52 @@ export async function GET(req: NextRequest) {
       { status: 500 },
     );
   }
+}
+
+// עריכת העמוד הציבורי של המרכז ע"י מנהלי המרכז (action: "update_public_page").
+// המרכז שולט בתוכן שלו; slug נוצר אוטומטית מהשם אם עדיין אין.
+export async function POST(req: NextRequest) {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  if (!checkRateLimit(ip)) {
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+  }
+  const center = await resolveCenter(req);
+  if (!center) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  if (center.status !== "active") {
+    return NextResponse.json({ ok: false, error: "המנוי של המרכז אינו פעיל" }, { status: 403 });
+  }
+
+  let body: Record<string, unknown>;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
+  }
+  if (body.action !== "update_public_page") {
+    return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });
+  }
+
+  const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if (body.public_description !== undefined) update.public_description = str(body.public_description, 5000) || null;
+  if (body.public_managers !== undefined) update.public_managers = str(body.public_managers, 500) || null;
+  if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
+  if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
+  if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
+  if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
+
+  // ודא slug (מרכזים שנוצרו לפני פיצ'ר העמוד הציבורי).
+  const { ensureUniqueCenterSlug } = await import("@/app/lib/center-public");
+  const slug = center.slug ?? (await ensureUniqueCenterSlug(center.name, center.id));
+  if (!center.slug) update.slug = slug;
+
+  const { error } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .update(update)
+    .eq("id", center.id);
+  if (error) {
+    console.error(`center-portal update_public_page failed (center=${center.id}):`, error.message);
+    return NextResponse.json({ ok: false, error: "העדכון נכשל" }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, slug });
 }

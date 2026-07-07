@@ -35,6 +35,16 @@ type Stats = {
   trend: { label: string; clicks: number }[];
 };
 
+type PublicPage = {
+  slug: string | null;
+  enabled: boolean;
+  description: string | null;
+  managers: string | null;
+  city: string | null;
+  website: string | null;
+  phone: string | null;
+};
+
 type PortalData = {
   center: {
     name: string;
@@ -43,6 +53,7 @@ type PortalData = {
     billing_starts_at: string | null;
     therapist_quota: number;
     linked_count: number;
+    public_page: PublicPage;
   };
   therapists: TherapistItem[];
   stats: Stats | null;
@@ -245,6 +256,9 @@ export default function CenterDashboardPage() {
         )}
       </section>
 
+      {/* עמוד המרכז הציבורי */}
+      {center.status === "active" && <PublicPageEditor initial={center.public_page} />}
+
       {/* סטטיסטיקות מרוכזות — פילוח הפונים */}
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || stats.clicks_month.total > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -278,6 +292,104 @@ export default function CenterDashboardPage() {
         </section>
       )}
     </main>
+  );
+}
+
+// עורך העמוד הציבורי של המרכז — state מקומי כדי שהקלדה לא תרנדר את כל הדשבורד.
+function PublicPageEditor({ initial }: { initial: PublicPage }) {
+  const [enabled, setEnabled] = useState(initial.enabled);
+  const [description, setDescription] = useState(initial.description ?? "");
+  const [managers, setManagers] = useState(initial.managers ?? "");
+  const [city, setCity] = useState(initial.city ?? "");
+  const [website, setWebsite] = useState(initial.website ?? "");
+  const [phone, setPhone] = useState(initial.phone ?? "");
+  const [slug, setSlug] = useState(initial.slug);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  async function save() {
+    setSaving(true); setMsg(""); setErr("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) { window.location.href = "/centers/login"; return; }
+      const res = await fetch("/api/center-portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+        body: JSON.stringify({
+          action: "update_public_page",
+          public_page_enabled: enabled,
+          public_description: description,
+          public_managers: managers,
+          public_city: city,
+          public_website: website,
+          public_phone: phone,
+        }),
+      });
+      const json = await res.json();
+      if (!json.ok) { setErr(json.error ?? "שמירה נכשלה"); return; }
+      if (json.slug) setSlug(json.slug);
+      setMsg("נשמר ✓");
+    } catch {
+      setErr("שגיאת רשת");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="mb-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="text-base font-black text-stone-800">🌐 עמוד המרכז הציבורי</h2>
+        <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
+          פרסום העמוד באתר
+        </label>
+      </div>
+      <p className="mb-4 text-xs text-stone-500">
+        עמוד ציבורי מקודם בגוגל עם המידע על המרכז וכל המטפלים שלו.
+        {slug && (
+          <> הכתובת שלכם: <a href={`/centers/${slug}`} target="_blank" className="font-bold text-teal-700 underline">/centers/{slug}</a></>
+        )}
+      </p>
+
+      <label className="mb-1 block text-sm font-semibold text-stone-700">תיאור המרכז</label>
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4}
+        placeholder="ספרו על המרכז, הגישה הטיפולית, תחומי ההתמחות והצוות…"
+        className="mb-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+
+      <label className="mb-1 block text-sm font-semibold text-stone-700">שמות המנהלים / הצוות</label>
+      <input value={managers} onChange={(e) => setManagers(e.target.value)}
+        placeholder="ד״ר כהן, גב׳ לוי…"
+        className="mb-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">עיר / כתובת</label>
+          <input value={city} onChange={(e) => setCity(e.target.value)}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון ציבורי</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+      </div>
+
+      <label className="mb-1 mt-3 block text-sm font-semibold text-stone-700">אתר המרכז</label>
+      <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://…"
+        className="mb-4 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+
+      <div className="flex items-center gap-3">
+        <button onClick={save} disabled={saving}
+          className="rounded-full px-6 py-2 text-sm font-bold text-white transition hover:opacity-95 disabled:opacity-50"
+          style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+          {saving ? "שומר…" : "שמירת העמוד"}
+        </button>
+        {msg && <span className="text-sm font-semibold text-green-700">{msg}</span>}
+        {err && <span className="text-sm font-semibold text-red-600">{err}</span>}
+      </div>
+    </section>
   );
 }
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Sparkles, Users, LayoutDashboard, BarChart3, MapPin, Activity, ShieldCheck, Brain, ArrowLeft, FileDown } from "lucide-react";
+import { Sparkles, Users, LayoutDashboard, BarChart3, MapPin, Activity, ShieldCheck, Brain, ArrowLeft, FileDown, Globe, TrendingUp } from "lucide-react";
 import PrintButton from "./PrintButton";
 
 // עמוד הסבר ציבורי למרכזים טיפוליים — משמש גם כפרוספקט להדפסה/שמירה כ-PDF
@@ -18,6 +18,16 @@ const included: { icon: typeof Users; title: string; body: string }[] = [
     icon: Users,
     title: "כל מטפלי המרכז במערכת ההתאמות החכמה",
     body: "מטופלים שממלאים את שאלון ההתאמה מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.",
+  },
+  {
+    icon: TrendingUp,
+    title: "המטפלים שלכם בראש רשימת האזור",
+    body: "כל מטפלי המרכז מקודמים אוטומטית למקומות הראשונים ברשימת המטפלים של האזור שלכם — מעל המטפלים החינמיים — כך שמי שמחפש באזור רואה אתכם קודם.",
+  },
+  {
+    icon: Globe,
+    title: "עמוד מרכז מקודם בגוגל",
+    body: "עמוד ציבורי משלכם באתר, מותאם למנועי חיפוש (SEO), עם המידע על המרכז, שמות המנהלים והצוות, יצירת קשר — וכל המטפלים של המרכז מרוכזים במקום אחד ומקושרים לפרופילים שלהם.",
   },
   {
     icon: LayoutDashboard,

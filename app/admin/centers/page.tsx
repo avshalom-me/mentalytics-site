@@ -30,6 +30,13 @@ type Center = {
   created_at: string;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   user_id: string | null;
+  slug: string | null;
+  public_page_enabled: boolean | null;
+  public_description: string | null;
+  public_managers: string | null;
+  public_city: string | null;
+  public_website: string | null;
+  public_phone: string | null;
 };
 
 // חישובי הכסף מגיעים ממקור האמת המשותף (center-pricing) — לא לשכפל כאן.
@@ -75,6 +82,13 @@ export default function AdminCentersPage() {
   const [fGift, setFGift] = useState("0");
   const [fPricePerTherapist, setFPricePerTherapist] = useState("");
   const [fTherapistCount, setFTherapistCount] = useState("");
+  // עמוד המרכז הציבורי (SEO)
+  const [fPubEnabled, setFPubEnabled] = useState(false);
+  const [fPubDesc, setFPubDesc] = useState("");
+  const [fPubManagers, setFPubManagers] = useState("");
+  const [fPubCity, setFPubCity] = useState("");
+  const [fPubWebsite, setFPubWebsite] = useState("");
+  const [fPubPhone, setFPubPhone] = useState("");
 
   // ניהול שיוך מטפלים למרכז
   const [manageFor, setManageFor] = useState<Center | null>(null);
@@ -133,6 +147,7 @@ export default function AdminCentersPage() {
     setFName(""); setFContact(""); setFEmail(""); setFPhone(""); setFNotes("");
     setFGift("0");
     setFPricePerTherapist(""); setFTherapistCount("");
+    setFPubEnabled(false); setFPubDesc(""); setFPubManagers(""); setFPubCity(""); setFPubWebsite(""); setFPubPhone("");
   }
 
   function openEdit(c: Center) {
@@ -145,6 +160,12 @@ export default function AdminCentersPage() {
     setFGift(String(c.gift_months));
     setFPricePerTherapist(c.price_per_therapist != null ? String(c.price_per_therapist) : "");
     setFTherapistCount(c.therapist_count != null ? String(c.therapist_count) : "");
+    setFPubEnabled(!!c.public_page_enabled);
+    setFPubDesc(c.public_description ?? "");
+    setFPubManagers(c.public_managers ?? "");
+    setFPubCity(c.public_city ?? "");
+    setFPubWebsite(c.public_website ?? "");
+    setFPubPhone(c.public_phone ?? "");
   }
 
   async function save() {
@@ -158,6 +179,15 @@ export default function AdminCentersPage() {
       price_per_therapist: Number(fPricePerTherapist),
       therapist_count: Number(fTherapistCount),
     };
+    // שדות העמוד הציבורי — רק בעריכה (למרכז קיים עם slug), לא ביצירה.
+    if (editing !== "new" && editing !== null) {
+      payload.public_page_enabled = fPubEnabled;
+      payload.public_description = fPubDesc;
+      payload.public_managers = fPubManagers;
+      payload.public_city = fPubCity;
+      payload.public_website = fPubWebsite;
+      payload.public_phone = fPubPhone;
+    }
     // חודשי מתנה נעולים אחרי תשלום; מחיר/מספר-מטפלים ניתנים לעריכה תמיד
     // (במרכז פעיל השרת מפרסם את השינוי ל-Sumit). מרכז מבוטל — עריכת קשר בלבד.
     if (editing !== "new" && editing !== null) {
@@ -465,6 +495,51 @@ export default function AdminCentersPage() {
               <textarea value={fNotes} onChange={(e) => setFNotes(e.target.value)} rows={2}
                 className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
             </Field>
+
+            {/* עמוד המרכז הציבורי (SEO) — רק למרכז קיים */}
+            {editing !== "new" && editing !== null && (
+              <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4">
+                <div className="mb-3 flex items-center justify-between gap-2">
+                  <h4 className="text-sm font-black text-teal-900">🌐 עמוד המרכז הציבורי (SEO)</h4>
+                  <label className="flex items-center gap-2 text-xs font-semibold text-stone-700">
+                    <input type="checkbox" checked={fPubEnabled} onChange={(e) => setFPubEnabled(e.target.checked)} />
+                    עמוד פעיל וגלוי לציבור
+                  </label>
+                </div>
+                {editing.slug && (
+                  <p className="mb-3 text-xs text-stone-500">
+                    כתובת:{" "}
+                    <a href={`/centers/${editing.slug}`} target="_blank" className="font-mono font-bold text-teal-700 underline">
+                      /centers/{editing.slug}
+                    </a>
+                    {editing.status !== "active" && <span className="text-amber-600"> · יפורסם רק כשהמרכז פעיל</span>}
+                  </p>
+                )}
+                <Field label="תיאור המרכז (מוצג בעמוד ובגוגל)">
+                  <textarea value={fPubDesc} onChange={(e) => setFPubDesc(e.target.value)} rows={3}
+                    placeholder="על המרכז, הגישה, תחומי ההתמחות והצוות…"
+                    className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </Field>
+                <Field label="שמות המנהלים / הצוות">
+                  <input value={fPubManagers} onChange={(e) => setFPubManagers(e.target.value)}
+                    placeholder="ד״ר כהן, גב׳ לוי…" className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </Field>
+                <div className="grid grid-cols-2 gap-3">
+                  <Field label="עיר / כתובת">
+                    <input value={fPubCity} onChange={(e) => setFPubCity(e.target.value)}
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                  </Field>
+                  <Field label="טלפון ציבורי">
+                    <input value={fPubPhone} onChange={(e) => setFPubPhone(e.target.value)} dir="ltr"
+                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                  </Field>
+                </div>
+                <Field label="אתר המרכז">
+                  <input value={fPubWebsite} onChange={(e) => setFPubWebsite(e.target.value)} dir="ltr"
+                    placeholder="https://…" className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </Field>
+              </div>
+            )}
             </div>
 
             <div className="rounded-b-2xl border-t border-stone-100 px-6 py-4">
