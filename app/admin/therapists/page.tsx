@@ -52,6 +52,8 @@ type AdminTherapist = {
   views_30d: number;
   contacts_30d: number;
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
+  center_account_id: string | null;
+  center_name: string | null;
   missing: string[];
   completion_requested_at: string | null;
   profile_updated_at: string | null;
@@ -920,6 +922,16 @@ export default function AdminTherapistsPage() {
                 {therapist.status === "paying" && therapist.promotion_source === "trial" && therapist.promoted_until && (
                   <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-semibold text-orange-800 border border-orange-300">
                     ⏰ ניסיון עד {new Date(therapist.promoted_until).toLocaleDateString("he-IL")}
+                  </span>
+                )}
+                {therapist.center_account_id && (
+                  <span
+                    className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-800 border border-indigo-300"
+                    title={therapist.promotion_source === "center"
+                      ? "מקודם דרך מנוי המרכז — הקידום מנוהל אוטומטית לפי השיוך למרכז (מסך המרכזים)"
+                      : "משויך למרכז טיפולי (מסך המרכזים ← ניהול מטפלים)"}
+                  >
+                    🏢 מרכז: {therapist.center_name ?? "—"}{therapist.promotion_source === "center" ? " · מקודם" : ""}
                   </span>
                 )}
                 {/* FREE_REGION_FALLBACK (זמני) */}

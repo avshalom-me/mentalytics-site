@@ -9,7 +9,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // subscription state, etc.). Schema is intentionally loose so we can
 // extend without migrations.
 
-export type AuditActorType = "admin" | "self" | "sumit" | "cron" | "system";
+export type AuditActorType = "admin" | "self" | "sumit" | "cron" | "system" | "center";
 
 export interface AuditEntry {
   therapistId: string;

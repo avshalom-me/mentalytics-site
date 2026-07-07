@@ -14,6 +14,7 @@ import {
   sendArticleInviteEmail,
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
+import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 
 type TherapistRow = {
   id: string;
@@ -47,6 +48,7 @@ type TherapistRow = {
   created_at: string | null;
   completion_requested_at: string | null;
   profile_updated_at: string | null;
+  center_account_id: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -113,7 +115,8 @@ async function buildTherapistsResponse(onlyId?: string) {
       admin_approved,
       created_at,
       completion_requested_at,
-      profile_updated_at
+      profile_updated_at,
+      center_account_id
       `
     )
     .order("full_name", { ascending: true });
@@ -265,6 +268,15 @@ async function buildTherapistsResponse(onlyId?: string) {
     }
   }
 
+  // שמות המרכזים למטפלים משויכים — כדי שהאדמין יראה תג "מרכז: X" על הכרטיס.
+  const centerNameById = new Map<string, string>();
+  if (rows.some((r) => r.center_account_id)) {
+    const { data: centerRows } = await supabaseAdmin
+      .from("therapy_center_accounts")
+      .select("id, name");
+    (centerRows ?? []).forEach((c) => centerNameById.set(c.id as string, (c.name as string) ?? ""));
+  }
+
   const therapists = rows.map((t) => {
       const profile_photo_url = t.profile_photo_path
         ? signedByPath.get(normalizeStoragePath(t.profile_photo_path)) ?? null
@@ -307,6 +319,8 @@ async function buildTherapistsResponse(onlyId?: string) {
         views_30d: viewsByTherapist[t.id] ?? 0,
         contacts_30d: contactsByTherapist[t.id] ?? 0,
         subscription: subByTherapist[t.id] ?? null,
+        center_account_id: t.center_account_id ?? null,
+        center_name: t.center_account_id ? centerNameById.get(t.center_account_id) ?? null : null,
         missing: missingProfileFields(t, (certsByTherapist[t.id]?.length ?? 0) > 0),
       };
     });
@@ -705,7 +719,7 @@ export async function PATCH(request: Request) {
     const { data: before } = await supabaseAdmin
       .from("therapists")
       .select(
-        "status, manually_promoted, promotion_source, promoted_since, promoted_until, email, full_name, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages"
+        "status, manually_promoted, promotion_source, promoted_since, promoted_until, email, full_name, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages, center_account_id"
       )
       .eq("id", id)
       .maybeSingle();
@@ -797,6 +811,15 @@ export async function PATCH(request: Request) {
     }
 
     if (status === "approved" || status === "rejected") {
+      // מטפל שמקודם דרך מרכז מנוהל אך ורק דרך השיוך למרכז — "הורדה לחינמי"
+      // ידנית הייתה מתבטלת בקידום האוטומטי הבא ויוצרת מצב לא עקבי.
+      if (status === "approved" && before.status === "paying" && before.promotion_source === "center") {
+        return NextResponse.json(
+          { ok: false, error: "המטפל/ת מקודם/ת דרך מנוי מרכז — להסרה מההתאמות נתקו אותו/ה מהמרכז (ניהול מטפלים במסך המרכזים)." },
+          { status: 400 }
+        );
+      }
+
       extraFields.manually_promoted = false;
       extraFields.promotion_source = null;
       extraFields.promoted_since = null;
@@ -805,16 +828,20 @@ export async function PATCH(request: Request) {
       // First-time approval (pending → approved): send the free onboarding
       // email with profile feedback + an invitation to write an article. Only
       // on the pending→approved transition, so re-approvals don't re-send it.
-      if (status === "approved" && before.status === "pending") {
+      // Center-owned profiles are skipped: the upsell to a personal paid plan
+      // is wrong for them (the center's subscription covers promotion).
+      if (status === "approved" && before.status === "pending" && !before.center_account_id) {
         sendFreeWelcome = true;
       }
 
       // Store/clear the rejection reason. On rejection (e.g. an unreadable
       // certificate) notify the therapist so they can fix and re-submit —
-      // except for paying→rejected, which already gets a cancellation email.
+      // except for paying→rejected, which already gets a cancellation email,
+      // and center-owned profiles, where the CENTER fixes it from the portal
+      // (the "נדחה — לתיקון" badge) — the individual therapist has no account.
       if (status === "rejected") {
         extraFields.rejection_reason = rejectionReason || null;
-        if (before.status !== "paying") sendRejectedEmail = true;
+        if (before.status !== "paying" && !before.center_account_id) sendRejectedEmail = true;
       } else {
         extraFields.rejection_reason = null;
       }
@@ -890,6 +917,17 @@ export async function PATCH(request: Request) {
         { ok: false, error: error.message },
         { status: 500 }
       );
+    }
+
+    // מטפל של מרכז פעיל שאושר זה עתה — נכנס מיד למערכת ההתאמות
+    // (status='paying', promotion_source='center'). ההורדה הסימטרית קורית
+    // בניתוק מהמרכז / ביטול מנוי המרכז.
+    if (status === "approved" && before.center_account_id) {
+      try {
+        await promoteCenterTherapists(before.center_account_id as string);
+      } catch (e) {
+        console.error(`admin-therapists: center promotion after approval failed for ${id}:`, e instanceof Error ? e.message : e);
+      }
     }
 
     // Fire the email AFTER the DB commit so the customer never gets a

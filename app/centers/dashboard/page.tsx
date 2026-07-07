@@ -36,7 +36,14 @@ type Stats = {
 };
 
 type PortalData = {
-  center: { name: string; status: string; plan_title: string | null; billing_starts_at: string | null };
+  center: {
+    name: string;
+    status: string;
+    plan_title: string | null;
+    billing_starts_at: string | null;
+    therapist_quota: number;
+    linked_count: number;
+  };
   therapists: TherapistItem[];
   stats: Stats | null;
 };
@@ -50,6 +57,15 @@ export default function CenterDashboardPage() {
   const [data, setData] = useState<PortalData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [justCreated, setJustCreated] = useState(false);
+
+  // חזרה מיצירת מטפל חדש (?created=1) — באנר הצלחה חד-פעמי.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("created") === "1") {
+      setJustCreated(true);
+      window.history.replaceState({}, "", "/centers/dashboard");
+    }
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -129,6 +145,12 @@ export default function CenterDashboardPage() {
         </button>
       </div>
 
+      {justCreated && (
+        <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-semibold text-green-800">
+          ✓ הפרופיל נוצר ונשלח לאישור צוות טיפול חכם. לאחר האישור המטפל/ת ייכנס/תיכנס אוטומטית למערכת ההתאמות — הסטטוס מתעדכן כאן בטבלה.
+        </div>
+      )}
+
       {/* מדדים מרכזיים */}
       <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
@@ -139,10 +161,33 @@ export default function CenterDashboardPage() {
 
       {/* רשימת המטפלים */}
       <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-        <h2 className="mb-4 text-base font-black text-stone-800">המטפלים של המרכז</h2>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-black text-stone-800">
+            המטפלים של המרכז
+            {center.therapist_quota > 0 && (
+              <span className="mr-2 text-xs font-semibold text-stone-400">
+                {center.linked_count}/{center.therapist_quota} במנוי
+              </span>
+            )}
+          </h2>
+          {center.status === "active" && (
+            center.therapist_quota > 0 && center.linked_count >= center.therapist_quota ? (
+              <span className="rounded-full border border-stone-200 bg-stone-50 px-4 py-1.5 text-xs text-stone-500"
+                title="כל מקומות המנוי בשימוש — להרחבה פנו אלינו">
+                המכסה מלאה ({center.therapist_quota}) · להרחבה: admin@getmentalytics.com
+              </span>
+            ) : (
+              <Link href="/centers/dashboard/therapists/new"
+                className="rounded-full px-4 py-1.5 text-sm font-bold text-white transition hover:opacity-95"
+                style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+                ➕ הוספת מטפל/ת
+              </Link>
+            )
+          )}
+        </div>
         {therapists.length === 0 ? (
           <p className="text-sm text-stone-400">
-            עדיין לא שויכו מטפלים למרכז. אנחנו נשייך את מטפלי המרכז בקרוב — לכל שאלה: admin@getmentalytics.com
+            עדיין לא נוספו מטפלים למרכז. הוסיפו את המטפלים שלכם בכפתור למעלה — כל פרופיל עובר אישור קצר של צוות טיפול חכם ואז נכנס אוטומטית למערכת ההתאמות.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -153,7 +198,7 @@ export default function CenterDashboardPage() {
                   <th className="py-2 font-semibold text-center">סטטוס</th>
                   <th className="py-2 font-semibold text-center">צפיות (חודש)</th>
                   <th className="py-2 font-semibold text-center">פניות (חודש)</th>
-                  <th className="py-2 font-semibold text-left">פרופיל</th>
+                  <th className="py-2 font-semibold text-left">פעולות</th>
                 </tr>
               </thead>
               <tbody>
@@ -172,15 +217,22 @@ export default function CenterDashboardPage() {
                       </div>
                     </td>
                     <td className="py-2.5 text-center">
-                      {t.approved ? (
-                        <span className="rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-bold text-green-800">מוצג</span>
+                      {t.status === "paying" && t.approved ? (
+                        <span className="rounded-full bg-green-50 border border-green-200 px-2 py-0.5 text-xs font-bold text-green-800">פעיל בהתאמות</span>
+                      ) : t.status === "approved" && t.approved ? (
+                        <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-bold text-teal-800">מאושר</span>
+                      ) : t.status === "rejected" ? (
+                        <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700" title="ערכו את הפרופיל ושמרו — יישלח שוב לבדיקה">נדחה — לתיקון</span>
                       ) : (
                         <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-xs text-stone-500">ממתין לאישור</span>
                       )}
                     </td>
                     <td className="py-2.5 text-center font-bold text-[#1A7A96]">{t.month_views}</td>
                     <td className="py-2.5 text-center font-bold text-[#2A5C3A]">{t.month_clicks}</td>
-                    <td className="py-2.5 text-left">
+                    <td className="py-2.5 text-left whitespace-nowrap">
+                      <Link href={`/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline ml-3">
+                        ✏️ עריכה
+                      </Link>
                       <Link href={t.profile_path} target="_blank" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--teal)] hover:underline">
                         לצפייה <ExternalLink size={12} />
                       </Link>

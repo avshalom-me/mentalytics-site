@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerPricing } from "@/app/lib/center-pricing";
+import { promoteCenterTherapists, demoteCenterTherapists } from "@/app/lib/center-promotion";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // מוגן ע"י ה-middleware של האדמין (/api/admin-*).
@@ -158,6 +159,20 @@ export async function POST(req: NextRequest) {
         if (isNaN(newCount) || newCount < 1 || newCount > 1000) return NextResponse.json({ ok: false, error: "מספר מטפלים לא תקין (1–1000)" }, { status: 400 });
         const pp = Math.round(newPrice * 100) / 100;
         const cnt = Math.floor(newCount);
+
+        // אי אפשר להקטין את המכסה מתחת למספר המטפלים המשויכים בפועל —
+        // קודם מנתקים מטפלים, אחרת המרכז משלם על פחות ממה שמוצג.
+        const { count: linkedNow } = await supabaseAdmin
+          .from("therapists")
+          .select("id", { count: "exact", head: true })
+          .eq("center_account_id", id);
+        if ((linkedNow ?? 0) > cnt) {
+          return NextResponse.json(
+            { ok: false, error: `למרכז משויכים כרגע ${linkedNow} מטפלים — אי אפשר להקטין את המכסה ל-${cnt}. נתקו מטפלים קודם (ניהול מטפלים).` },
+            { status: 400 },
+          );
+        }
+
         update.price_per_therapist = pp;
         update.therapist_count = cnt;
 
@@ -197,6 +212,22 @@ export async function POST(req: NextRequest) {
       const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       const idsSet = [...new Set(raw.filter((x): x is string => typeof x === "string" && UUID_RE.test(x)))].slice(0, 500);
 
+      // אכיפת המכסה: המרכז משלם לפי therapist_count — אי אפשר לשייך יותר.
+      const quota = Math.floor(Number(center.therapist_count) || 0);
+      if (quota > 0 && idsSet.length > quota) {
+        return NextResponse.json(
+          { ok: false, error: `ההצעה של המרכז כוללת ${quota} מטפלים — נבחרו ${idsSet.length}. להוספת מטפלים יש להגדיל את מספר המטפלים בעריכת המרכז (יעדכן את החיוב).` },
+          { status: 400 },
+        );
+      }
+
+      // מי משויך כרגע — כדי להוריד מקידום 'center' את מי שמנותק עכשיו.
+      const { data: currentLinked } = await supabaseAdmin
+        .from("therapists")
+        .select("id")
+        .eq("center_account_id", id);
+      const removedIds = (currentLinked ?? []).map((t) => t.id).filter((tid) => !idsSet.includes(tid));
+
       // נתק מטפלים שהיו משויכים למרכז ואינם ברשימה החדשה.
       let unassign = supabaseAdmin
         .from("therapists")
@@ -204,6 +235,11 @@ export async function POST(req: NextRequest) {
         .eq("center_account_id", id);
       if (idsSet.length > 0) unassign = unassign.not("id", "in", `(${idsSet.join(",")})`);
       await unassign.throwOnError();
+
+      // מטפל שנותק מאבד את קידום המרכז (רק promotion_source='center').
+      if (removedIds.length > 0) {
+        await demoteCenterTherapists({ therapistIds: removedIds }, `unlinked from center ${id}`);
+      }
 
       // שייך את הנבחרים (דורס שיוך קודם למרכז אחר — שיוך יחיד).
       if (idsSet.length > 0) {
@@ -213,7 +249,10 @@ export async function POST(req: NextRequest) {
           .in("id", idsSet)
           .throwOnError();
       }
-      return NextResponse.json({ ok: true, count: idsSet.length });
+
+      // מרכז פעיל ⇒ מטפלים מאושרים שזה עתה שויכו נכנסים להתאמות מיד.
+      const promoted = await promoteCenterTherapists(id);
+      return NextResponse.json({ ok: true, count: idsSet.length, promoted });
     }
 
     // שליחת ההצעה במייל למרכז — מפרט מסלולים/מחיר/מתנה + קישור ההצטרפות.
@@ -275,7 +314,9 @@ export async function POST(req: NextRequest) {
         .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         .eq("id", id)
         .throwOnError();
-      return NextResponse.json({ ok: true });
+      // מטפלי המרכז יוצאים ממערכת ההתאמות (נשארים במאגר החינמי אם אושרו).
+      const demoted = await demoteCenterTherapists({ centerId: id }, "center subscription cancelled by admin");
+      return NextResponse.json({ ok: true, demoted });
     }
 
     if (action === "sync_sumit") {
@@ -293,6 +334,7 @@ export async function POST(req: NextRequest) {
           .from("therapy_center_accounts")
           .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq("id", id);
+        await demoteCenterTherapists({ centerId: id }, "center standing order cancelled at Sumit (sync)");
       }
       return NextResponse.json({
         ok: true,

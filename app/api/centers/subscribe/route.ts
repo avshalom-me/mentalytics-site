@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { createCenterSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
 import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
 import { centerPricing } from "@/app/lib/center-pricing";
+import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 
 // הרשמת מרכז טיפולי למנוי — נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
 // אימות: הטוקן הסודי מהקישור שהאדמין שלח (אין חשבון משתמש). הכרטיס עובר
@@ -206,6 +207,15 @@ export async function POST(req: NextRequest) {
     }
 
     console.log(`Center subscription completed: center=${center.id} gift=${giftMonths} therapists=${therapistCount} total=${monthlyTotal}`);
+
+    // המרכז פעיל — מטפלים משויכים ומאושרים נכנסים למערכת ההתאמות מיד.
+    // best-effort: כשל כאן לא מכשיל תשלום שהושלם (השיוך יסונכרן בפעולת אדמין הבאה).
+    try {
+      const promoted = await promoteCenterTherapists(center.id);
+      if (promoted > 0) console.log(`centers/subscribe: promoted ${promoted} linked therapists for center=${center.id}`);
+    } catch (promoteErr) {
+      console.error("centers/subscribe: promote linked therapists failed:", promoteErr instanceof Error ? promoteErr.message : promoteErr);
+    }
 
     // מייל ברוכים-הבאים עם קישור לפורטל — best-effort, לעולם לא מכשיל תשלום שהושלם.
     try {

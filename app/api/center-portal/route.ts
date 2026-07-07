@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
+import { resolveCenter } from "@/app/lib/center-auth";
 
 // פורטל המרכז הטיפולי — API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
 // מצטברות לכל המרכז. הכניסה היא בחשבון Supabase Auth של המרכז (מקביל למטפל).
@@ -23,73 +24,7 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-type Center = {
-  id: string;
-  name: string;
-  status: string;
-  user_id: string | null;
-  email: string | null;
-  payer_email: string | null;
-  price_per_therapist: number | null;
-  therapist_count: number | null;
-  billing_starts_at: string | null;
-};
-
-// אימות: מזהים את המרכז לפי user_id. אם עדיין לא מקושר — מקשרים חשבון פעיל
-// שכתובת המייל שלו (contact או payer) תואמת למי שנרשם (claim-by-email).
-//
-// אבטחה: המייל אינו מאומת בהרשמה (auto-confirm), ולכן ה-claim מוגבל למרכז
-// שכבר שילם (status='active') בלבד. החשיפה מוגבלת ממילא — פרופילים ציבוריים
-// של מטפלי המרכז וסטטיסטיקה אנונימית מצטברת; אין כאן פרטי מטופלים.
-async function resolveCenter(req: NextRequest): Promise<Center | null> {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!token) return null;
-
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabaseAuth = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-  );
-  const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
-  if (error || !user) return null;
-
-  const cols = "id, name, status, user_id, email, payer_email, price_per_therapist, therapist_count, billing_starts_at";
-
-  const { data: byUser } = await supabaseAdmin
-    .from("therapy_center_accounts")
-    .select(cols)
-    .eq("user_id", user.id)
-    .maybeSingle();
-  if (byUser) return byUser as Center;
-
-  const email = (user.email ?? "").trim().toLowerCase();
-  if (!email) return null;
-
-  // claim: מושכים את המרכזים הפעילים שטרם קושרו ומשווים מייל בדיוק ב-JS.
-  // חשוב לא להזרים את המייל (שבשליטת המשתמש) ל-ilike/or של PostgREST: ILIKE
-  // מפרש _ ו-% כ-wildcards (offic_@clinic יתפוס office@clinic ⇒ השתלטות),
-  // ו-.or() עם מחרוזת גולמית פותח הזרקת-filter. מספר המרכזים הפעילים זעום,
-  // אז השוואה מדויקת ב-JS בטוחה לגמרי.
-  const { data: candidates } = await supabaseAdmin
-    .from("therapy_center_accounts")
-    .select(cols)
-    .is("user_id", null)
-    .eq("status", "active")
-    .order("created_at", { ascending: true }); // התאמה דטרמיניסטית אם יש כמה
-  const claimable = (candidates ?? []).find((c) => {
-    const e = (c.email ?? "").trim().toLowerCase();
-    const p = (c.payer_email ?? "").trim().toLowerCase();
-    return e === email || p === email;
-  }) as Center | undefined;
-  if (!claimable) return null;
-
-  await supabaseAdmin
-    .from("therapy_center_accounts")
-    .update({ user_id: user.id, updated_at: new Date().toISOString() })
-    .eq("id", claimable.id)
-    .is("user_id", null); // מרוץ: לא לדרוס קישור שנוצר בו-זמנית
-  return { ...claimable, user_id: user.id };
-}
+// אימות משותף לכל נתיבי הפורטל — resolveCenter ב-app/lib/center-auth.ts.
 
 type TherapistRow = {
   id: string;
@@ -155,7 +90,14 @@ export async function GET(req: NextRequest) {
     if (ids.length === 0) {
       return NextResponse.json({
         ok: true,
-        center: { name: center.name, status: center.status, plan_title: planTitle, billing_starts_at: center.billing_starts_at },
+        center: {
+          name: center.name,
+          status: center.status,
+          plan_title: planTitle,
+          billing_starts_at: center.billing_starts_at,
+          therapist_quota: Math.floor(Number(center.therapist_count) || 0),
+          linked_count: 0,
+        },
         therapists: [],
         stats: null,
         generated_at: new Date().toISOString(),
@@ -230,10 +172,18 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       ok: true,
-      center: { name: center.name, status: center.status, plan_title: planTitle, billing_starts_at: center.billing_starts_at },
+      center: {
+        name: center.name,
+        status: center.status,
+        plan_title: planTitle,
+        billing_starts_at: center.billing_starts_at,
+        therapist_quota: Math.floor(Number(center.therapist_count) || 0),
+        linked_count: therapists.length,
+      },
       therapists: therapistList,
       stats: {
-        listed_count: therapists.filter((t) => t.admin_approved).length,
+        // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
+        listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,
         views_month: realViews.length,
         clicks_week: clicksByType(clicksWeek),
         clicks_month: clicksByType(clicksMonth),
