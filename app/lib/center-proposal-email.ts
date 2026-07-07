@@ -32,10 +32,13 @@ export function buildCenterProposalEmail(opts: {
   siteUrl: string;
 }): { subject: string; html: string } {
   const siteUrl = opts.siteUrl.replace(/\/$/, "");
-  const name = escapeHtml(opts.centerName || "המרכז");
-  const greetName = escapeHtml(opts.contactName?.trim() || opts.centerName || "");
+  const rawName = (opts.centerName || "המרכז").trim();
+  const name = escapeHtml(rawName);
+  const greetName = escapeHtml(opts.contactName?.trim() || rawName);
   const joinUrl = `${siteUrl}/centers/join/${opts.token}`;
-  const subject = `הצעה לשיתוף פעולה — טיפול חכם ל${name}`;
+  // הנושא הוא טקסט רגיל (כותרת מייל) — בלי escape של HTML, אחרת "A & B"
+  // יוצג כ-"A &amp; B" בתיבת הדואר.
+  const subject = `הצעה לשיתוף פעולה — טיפול חכם ל${rawName}`;
 
   const p = centerPricing(opts.pricePerTherapist, opts.therapistCount);
 

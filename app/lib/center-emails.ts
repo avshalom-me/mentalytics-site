@@ -98,12 +98,14 @@ export async function sendCenterWelcomeEmail(opts: {
     return { ok: false, error: "resend not configured" };
   }
 
-  const name = escapeHtml(opts.centerName || "המרכז");
+  const rawName = (opts.centerName || "המרכז").trim();
+  const name = escapeHtml(rawName);
   const pr = centerPricing(opts.pricePerTherapist, opts.therapistCount);
   const priceLine = `${pr.therapistCount} מטפלים × ₪${ilCurrency(pr.pricePerTherapist)} = ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`;
   const portalUrl = `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
-  const subject = `ברוכים הבאים לטיפול חכם — ${name} 🎉`;
+  // נושא = טקסט רגיל, בלי HTML entities.
+  const subject = `ברוכים הבאים לטיפול חכם — ${rawName} 🎉`;
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">

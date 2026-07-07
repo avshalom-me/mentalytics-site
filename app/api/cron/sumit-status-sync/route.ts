@@ -5,6 +5,7 @@ import { Resend } from "resend";
 import { listRecurringForCustomer, cancelSubscription, updateRecurringPrice, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
+import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -381,6 +382,69 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -------- (5) Center standing orders --------
+  // מרכז טיפולי משלם בהוראת קבע משלו (`center:<id>`), ומטפליו מקודמים דרך
+  // promotion_source='center'. אם Sumit ביטל את ההוראה (כרטיס נדחה שוב ושוב)
+  // — בלי הסעיף הזה המרכז נשאר "active" ומטפליו ממשיכים לקבל הפניות בחינם,
+  // עד שאדמין לוחץ ידנית "סטטוס מ-Sumit". כמו בסעיף (1): מורידים רק כש-Sumit
+  // מחזיר סטטוס לא-פעיל מפורשות; פריט שלא נמצא = קריאה עמומה, מדלגים ומנסים
+  // בריצה הבאה (מספר המרכזים קטן, העיכוב זניח).
+  let centersChecked = 0;
+  let centersCancelled = 0;
+  let centerTherapistsDemoted = 0;
+  const { data: activeCenters } = await supabase
+    .from("therapy_center_accounts")
+    .select("id, name, sumit_recurring_id")
+    .eq("status", "active")
+    .not("sumit_recurring_id", "is", null);
+
+  for (const c of activeCenters ?? []) {
+    centersChecked++;
+    try {
+      const items = await listRecurringForCustomer({
+        externalIdentifier: `center:${c.id}`,
+        includeInactive: true,
+      });
+      const ours = items.find((i) => Number(i.ID) === Number(c.sumit_recurring_id));
+      if (!ours || ours.Status === 0) continue; // פעיל, או קריאה עמומה — לא נוגעים.
+
+      await supabase
+        .from("therapy_center_accounts")
+        .update({
+          status: "cancelled",
+          cancelled_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", c.id)
+        .eq("status", "active"); // מרוץ מול פעולת אדמין מקבילה
+      centersCancelled++;
+
+      centerTherapistsDemoted += await demoteCenterTherapists(
+        { centerId: c.id as string },
+        "center standing order cancelled at Sumit (cron sync)",
+      );
+
+      // התראה לאדמין — ביטול מנוי מרכז הוא אירוע עסקי שדורש מעקב אנושי.
+      try {
+        await resend.emails.send({
+          from: "טיפול חכם <noreply@mentalytics.co.il>",
+          to: ALERT_TO,
+          subject: `⚠️ מנוי המרכז "${c.name}" בוטל ב-Sumit`,
+          html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+            <p>הסנכרון היומי זיהה שהוראת הקבע של המרכז <strong>${String(c.name).replace(/</g, "&lt;")}</strong> אינה פעילה יותר ב-Sumit (ככל הנראה חיובים שנכשלו).</p>
+            <p>המרכז סומן כמבוטל ומטפליו הוסרו ממערכת ההתאמות. מומלץ ליצור קשר עם המרכז לעדכון אמצעי תשלום ולחדש את המנוי.</p>
+            <p><strong>center_id:</strong> ${c.id}<br/><strong>מזהה הוראת קבע:</strong> ${c.sumit_recurring_id}</p>
+          </div>`,
+        });
+      } catch (mailErr) {
+        console.error("center cancel alert email failed:", mailErr);
+      }
+    } catch (err) {
+      errors++;
+      console.error(`Center sync failed for center ${c.id}:`, err);
+    }
+  }
+
   return NextResponse.json({
     checked,
     stillActive,
@@ -391,6 +455,9 @@ export async function GET(req: NextRequest) {
     orphansCancelled,
     orphanAlerts,
     promosReverted,
+    centersChecked,
+    centersCancelled,
+    centerTherapistsDemoted,
     errors,
   });
 }

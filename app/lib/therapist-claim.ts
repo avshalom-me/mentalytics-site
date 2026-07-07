@@ -14,6 +14,14 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
  * explicitly. Only unclaimed, not-yet-live rows are eligible for auto-claim
  * (the legitimate "admin pre-added your pending profile, now claim it" flow).
  *
+ * CENTER-OWNED PROFILES ARE NEVER CLAIMABLE: a profile created by a therapy
+ * center from the center portal (center_account_id set, user_id null) is
+ * managed exclusively by the center's managers and intentionally has no
+ * therapist login. Without this exclusion, anyone registering with the
+ * profile's (unverified) email address would seize a center's therapist
+ * profile — and once the center's subscription promotes it into matching,
+ * the attacker controls a live promoted profile.
+ *
  * @param columns  columns to select on the matched row (default "id")
  * @returns the eligible row, or null when there is no safe match
  */
@@ -27,6 +35,7 @@ export async function findClaimableTherapistByEmail(
     .select(columns)
     .eq("email", email)
     .is("user_id", null)
+    .is("center_account_id", null)
     .not("admin_approved", "is", true)
     .not("status", "in", "(approved,paying)")
     .maybeSingle();

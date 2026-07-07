@@ -230,7 +230,7 @@ export default function CenterDashboardPage() {
                     <td className="py-2.5 text-center font-bold text-[#1A7A96]">{t.month_views}</td>
                     <td className="py-2.5 text-center font-bold text-[#2A5C3A]">{t.month_clicks}</td>
                     <td className="py-2.5 text-left whitespace-nowrap">
-                      <Link href={`/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline ml-3">
+                      <Link href={`/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline me-3">
                         ✏️ עריכה
                       </Link>
                       <Link href={t.profile_path} target="_blank" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--teal)] hover:underline">

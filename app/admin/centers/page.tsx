@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { centerPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 
 // מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -31,17 +32,9 @@ type Center = {
   user_id: string | null;
 };
 
-const VAT_RATE = 0.18;
-// סה"כ חודשי לפני מע"מ = מחיר-למטפל × מספר-מטפלים.
-function monthlyTotal(pricePerTherapist: number | null, count: number | null): number {
-  return Math.round((Number(pricePerTherapist) || 0) * (Number(count) || 0) * 100) / 100;
-}
-function withVat(n: number): number {
-  return Math.round(n * (1 + VAT_RATE) * 100) / 100;
-}
-function ils(n: number): string {
-  return Number(n).toLocaleString("he-IL", { maximumFractionDigits: 2 });
-}
+// חישובי הכסף מגיעים ממקור האמת המשותף (center-pricing) — לא לשכפל כאן.
+const pricing = (pricePerTherapist: number | string | null, count: number | string | null) =>
+  centerPricing(Number(pricePerTherapist) || 0, Number(count) || 0);
 
 type TherapistPoolItem = {
   id: string;
@@ -256,7 +249,8 @@ export default function AdminCentersPage() {
   const isLockedEditing = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
   const pricingLocked = editing !== "new" && editing !== null && editing.status === "cancelled";
   const isActiveEditing = editing !== "new" && editing !== null && editing.status === "active";
-  const fTotal = monthlyTotal(Number(fPricePerTherapist) || 0, Number(fTherapistCount) || 0);
+  const fPricing = pricing(fPricePerTherapist, fTherapistCount);
+  const fTotal = fPricing.monthlyTotal;
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -287,8 +281,9 @@ export default function AdminCentersPage() {
 
       {centers.map((c) => {
         const st = STATUS_LABELS[c.status];
-        const total = monthlyTotal(c.price_per_therapist, c.therapist_count);
-        const priced = (Number(c.price_per_therapist) || 0) > 0 && (Number(c.therapist_count) || 0) > 0;
+        const p = pricing(c.price_per_therapist, c.therapist_count);
+        const total = p.monthlyTotal;
+        const priced = p.pricePerTherapist > 0 && p.therapistCount > 0;
         return (
           <div key={c.id} className="mb-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -321,7 +316,7 @@ export default function AdminCentersPage() {
                 ) : priced ? (
                   <>
                     <div className="text-xl font-black text-stone-800">₪{ils(total)} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ/חודש</span></div>
-                    <div className="text-xs text-stone-500">{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · ₪{ils(withVat(total))} כולל מע&quot;מ</div>
+                    <div className="text-xs text-stone-500">{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · ₪{ils(p.monthlyTotalWithVat)} כולל מע&quot;מ</div>
                   </>
                 ) : (
                   <div className="text-xs text-amber-600">טרם הוגדר מחיר/מספר מטפלים</div>
@@ -453,7 +448,7 @@ export default function AdminCentersPage() {
                 </div>
                 <div className="mt-1 mb-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-2 text-xs text-stone-600">
                   {fTotal > 0 ? (
-                    <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · {Number(fTherapistCount) || 0} × ₪{ils(Number(fPricePerTherapist) || 0)} · ₪{ils(withVat(fTotal))} כולל מע&quot;מ</>
+                    <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · {Number(fTherapistCount) || 0} × ₪{ils(Number(fPricePerTherapist) || 0)} · ₪{ils(fPricing.monthlyTotalWithVat)} כולל מע&quot;מ</>
                   ) : (
                     "הזינו מחיר לכל מטפל ומספר מטפלים כדי לראות את הסכום החודשי הכולל."
                   )}
