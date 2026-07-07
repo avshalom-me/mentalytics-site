@@ -13,26 +13,26 @@
   @page { size: A4; margin: 0; }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { font-family: 'Heebo', sans-serif; color: #131F1E; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 210mm; min-height: 297mm; padding: 13mm 15mm 0; position: relative; }
+  .page { width: 210mm; min-height: 297mm; padding: 10mm 15mm 0; position: relative; }
 
   .head { text-align: center; padding-bottom: 12px; border-bottom: 2px solid #EAF4F3; }
-  .head img { height: 62px; width: auto; }
+  .head img { height: 54px; width: auto; }
   .eyebrow { display: inline-block; margin-top: 13px; background: #EAF4F3; color: #2A6462; border: 1px solid #C2DFDE; border-radius: 999px; padding: 5px 16px; font-size: 11px; font-weight: 800; letter-spacing: .06em; }
 
-  h1 { font-size: 26px; font-weight: 900; line-height: 1.25; margin: 16px 0 0; }
+  h1 { font-size: 23px; font-weight: 900; line-height: 1.25; margin: 12px 0 0; }
   h1 .a { color: #3D8C8A; }
-  .lead { font-size: 13px; line-height: 1.7; color: #3E5250; margin-top: 9px; max-width: 172mm; }
+  .lead { font-size: 12px; line-height: 1.6; color: #3E5250; margin-top: 7px; max-width: 172mm; }
 
-  .sec-title { font-size: 15px; font-weight: 900; margin: 18px 0 11px; display: flex; align-items: center; gap: 8px; }
+  .sec-title { font-size: 14px; font-weight: 900; margin: 13px 0 8px; display: flex; align-items: center; gap: 8px; }
   .sec-title::before { content: ""; width: 4px; height: 15px; background: #D49018; border-radius: 2px; display: inline-block; }
 
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 11px; }
-  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 14px 15px; display: flex; gap: 12px; }
+  .card { border: 1px solid #E8E0D8; border-radius: 14px; padding: 11px 13px; display: flex; gap: 10px; }
   .card .ic { width: 38px; height: 38px; flex: 0 0 auto; border-radius: 10px; background: #EAF4F3; display: flex; align-items: center; justify-content: center; font-size: 19px; }
   .card h3 { font-size: 13.5px; font-weight: 800; margin-bottom: 3px; }
   .card p { font-size: 11.5px; line-height: 1.55; color: #6B807E; }
 
-  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 16px; padding: 15px 16px; margin-top: 6px; }
+  .stats { border: 1px solid #E8DCC8; background: #FDFAF3; border-radius: 16px; padding: 12px 14px; margin-top: 4px; }
   .stats .tag { display: inline-flex; align-items: center; gap: 5px; background: #D4901815; color: #A87010; border: 1px solid #D4901833; border-radius: 999px; padding: 3px 11px; font-size: 10.5px; font-weight: 800; }
   .stats h3 { font-size: 14.5px; font-weight: 900; margin: 8px 0 4px; }
   .stats .sub { font-size: 11.5px; color: #6B807E; line-height: 1.5; margin-bottom: 11px; }
@@ -42,13 +42,13 @@
   .sitem b { font-size: 11.5px; font-weight: 800; display: block; }
   .sitem span { font-size: 10.5px; color: #6B807E; line-height: 1.45; }
 
-  .steps { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 11px; }
-  .step { border: 1px solid #E8E0D8; border-radius: 14px; padding: 13px 14px; }
+  .steps { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 9px; }
+  .step { border: 1px solid #E8E0D8; border-radius: 14px; padding: 10px 11px; }
   .step .n { width: 24px; height: 24px; border-radius: 50%; background: #3D8C8A; color: #fff; font-size: 13px; font-weight: 900; display: flex; align-items: center; justify-content: center; margin-bottom: 7px; }
   .step h4 { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
   .step p { font-size: 11px; line-height: 1.5; color: #6B807E; }
 
-  .cta { margin: 18px -15mm 0; padding: 18px 15mm 16px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
+  .cta { margin: 13px -15mm 0; padding: 14px 15mm 13px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
   .cta h2 { font-size: 19px; font-weight: 900; margin: 0 0 5px; }
   .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 155mm; margin: 0 auto 12px; }
   .cta .mail { display: inline-block; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 30px; border-radius: 999px; }
@@ -66,14 +66,15 @@
   <p class="lead">
     <b>"טיפול חכם"</b> היא פלטפורמה ישראלית להתאמת טיפול נפשי, שנבנתה על ידי פסיכולוגים וחוקרים. מטופלים עוברים שאלון
     חכם ואינטייק אוטומטי, ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מצטרף כיחידה אחת — כל
-    המטפלים במערכת ההתאמות, פורטל ניהול מרכזי, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי אחד שנסגר איתכם אישית.
+    המטפלים במערכת ההתאמות, מערכת לניהול פרופילי המטפלים, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי פשוט:
+    <b>מחיר מוזל לכל מטפל × מספר המטפלים</b>, שנסגר איתכם אישית בשיחת ההתאמה.
   </p>
 
   <div class="sec-title">מה כלול במסלול</div>
   <div class="grid">
     <div class="card"><div class="ic">👥</div><div><h3>כל מטפלי המרכז במערכת ההתאמות</h3><p>מטופלים מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות אישיות — פניות מדויקות, לא סתם חשיפה.</p></div></div>
-    <div class="card"><div class="ic">🗂️</div><div><h3>פורטל ניהול מרכזי משלכם</h3><p>חשבון כניסה עם גישה לכל פרופילי המטפלים במקום אחד וסטטיסטיקות מרוכזות — בלי להיכנס לכל מטפל בנפרד.</p></div></div>
-    <div class="card"><div class="ic">📊</div><div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — באנונימיות מלאה.</p></div></div>
+    <div class="card"><div class="ic">🗂️</div><div><h3>מערכת ניהול מטפלים — בשליטת המרכז</h3><p>מנהלי המרכז מוסיפים ועורכים את פרופילי המטפלים ישירות מהפורטל: פרטים, תמונה, תעודות והתמחויות. אחרי אישור קצר שלנו — הפרופיל נכנס אוטומטית למערכת ההתאמות.</p></div></div>
+    <div class="card"><div class="ic">📊</div><div><h3>דוח סטטיסטיקות חודשי מרוכז</h3><p>איזה מטופלים מחפשים את המרכז ובאזורכם, מאיפה הם מגיעים, ולמה חלק לא יוצרים קשר — לכל המרכז וגם פר-מטפל, באנונימיות מלאה.</p></div></div>
     <div class="card"><div class="ic">🛡️</div><div><h3>ללא התחייבות — ביטול בכל עת</h3><p>אין התחייבות לתקופה. אפשר לסיים בכל שלב, כולל בחודשי המתנה, בלי קנסות ובלי בירוקרטיה.</p></div></div>
   </div>
 
@@ -91,14 +92,15 @@
 
   <div class="sec-title">איך זה עובד</div>
   <div class="steps">
-    <div class="step"><div class="n">1</div><h4>מטופל ממלא שאלון</h4><p>שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום.</p></div>
-    <div class="step"><div class="n">2</div><h4>התאמה גיאוגרפית</h4><p>המערכת מפנה אותו למטפלים המתאימים או למרכז הטיפולי המתאים ביותר באזור הגיאוגרפי שלו.</p></div>
-    <div class="step"><div class="n">3</div><h4>אתם רואים הכול</h4><p>פורטל ניהול וסטטיסטיקות מרוכזות של כל הפניות והצפיות.</p></div>
+    <div class="step"><div class="n">1</div><h4>אתם מוסיפים את המטפלים</h4><p>מנהלי המרכז מזינים את פרופילי המטפלים בפורטל — פרטים, תמונה, תעודות והתמחויות.</p></div>
+    <div class="step"><div class="n">2</div><h4>מטופל ממלא שאלון</h4><p>שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום.</p></div>
+    <div class="step"><div class="n">3</div><h4>התאמה מדויקת</h4><p>המערכת מפנה אותו למטפל המתאים במרכז שלכם — לפי תחום, גיל, שפה ואזור.</p></div>
+    <div class="step"><div class="n">4</div><h4>אתם רואים הכול</h4><p>פורטל ניהול וסטטיסטיקות מרוכזות — לכל המרכז ופר-מטפל.</p></div>
   </div>
 
   <div class="cta">
     <h2>רוצים הצעה למרכז שלכם?</h2>
-    <p>המחיר נקבע אישית לפי גודל המרכז והצרכים, ואפשר להתחיל עם חודשי התנסות במתנה. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
+    <p>המחיר נקבע אישית בשיחת התאמה — מחיר מוזל לכל מטפל, לפי מספר המטפלים במרכז — ואפשר להתחיל עם חודשי התנסות במתנה שבהם לא נגבה תשלום כלל. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
     <div class="mail">admin@getmentalytics.com</div>
     <div class="foot">טיפול חכם — Mentalytics · mentalytics.co.il · פלטפורמה שנבנתה על ידי פסיכולוגים וחוקרים</div>
   </div>
