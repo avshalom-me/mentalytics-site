@@ -30,8 +30,8 @@ type Center = {
   user_id: string | null;
   email: string | null;
   payer_email: string | null;
-  selected_plan_key: string | null;
-  plans: { key: string; title: string }[] | null;
+  price_per_therapist: number | null;
+  therapist_count: number | null;
   billing_starts_at: string | null;
 };
 
@@ -53,7 +53,7 @@ async function resolveCenter(req: NextRequest): Promise<Center | null> {
   const { data: { user }, error } = await supabaseAuth.auth.getUser(token);
   if (error || !user) return null;
 
-  const cols = "id, name, status, user_id, email, payer_email, selected_plan_key, plans, billing_starts_at";
+  const cols = "id, name, status, user_id, email, payer_email, price_per_therapist, therapist_count, billing_starts_at";
 
   const { data: byUser } = await supabaseAdmin
     .from("therapy_center_accounts")
@@ -147,7 +147,9 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    const planTitle = (center.plans ?? []).find((p) => p.key === center.selected_plan_key)?.title ?? null;
+    // תווית המנוי במודל החדש: מספר מטפלים (התמחור המלא מוצג רק באדמין).
+    const planTitle =
+      Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null;
 
     // אין מטפלים עדיין — מחזירים שלד ריק (המרכז חדש / טרם שויכו מטפלים).
     if (ids.length === 0) {
