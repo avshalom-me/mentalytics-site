@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cancelSubscription, listRecurringForCustomer } from "@/app/lib/sumit";
+import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // מוגן ע"י ה-middleware של האדמין (/api/admin-*).
@@ -187,6 +188,34 @@ export async function POST(req: NextRequest) {
           .throwOnError();
       }
       return NextResponse.json({ ok: true, count: idsSet.length });
+    }
+
+    // שליחת ההצעה במייל למרכז — מפרט מסלולים/מחיר/מתנה + קישור ההצטרפות.
+    // רלוונטי רק להצעה שטרם שולמה, וגם מסמן אותה אוטומטית כ"נשלחה".
+    if (action === "send_proposal") {
+      if (center.status !== "draft" && center.status !== "sent") {
+        return NextResponse.json({ ok: false, error: "רלוונטי רק להצעה שטרם שולמה" }, { status: 400 });
+      }
+      if (!center.email) {
+        return NextResponse.json({ ok: false, error: "למרכז אין כתובת מייל — עדכנו אימייל בעריכת ההצעה" }, { status: 400 });
+      }
+      const sent = await sendCenterProposalEmail({
+        to: center.email as string,
+        centerName: center.name as string,
+        contactName: (center.contact_name as string | null) ?? null,
+        plans: (center.plans as CenterPlan[]) ?? [],
+        giftMonths: Number(center.gift_months ?? 0),
+        token: center.token as string,
+      });
+      if (!sent.ok) {
+        return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
+      }
+      await supabaseAdmin
+        .from("therapy_center_accounts")
+        .update({ status: "sent", updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .throwOnError();
+      return NextResponse.json({ ok: true, status: "sent" });
     }
 
     if (action === "mark_sent") {

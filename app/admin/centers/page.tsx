@@ -194,6 +194,16 @@ export default function AdminCentersPage() {
     }
   }
 
+  async function sendProposal(c: Center) {
+    if (!c.email) {
+      setError("למרכז אין אימייל — הוסיפו בעריכת ההצעה");
+      return;
+    }
+    if (!confirm(`לשלוח את ההצעה במייל אל ${c.email}? המרכז יקבל את המסלולים, המחיר, המתנה וקישור ההצטרפות.`)) return;
+    const j = await post({ action: "send_proposal", id: c.id });
+    if (j.ok) alert(`ההצעה נשלחה ל${c.email}.`);
+  }
+
   async function syncSumit(c: Center) {
     const j = await post({ action: "sync_sumit", id: c.id });
     if (j.ok) {
@@ -330,9 +340,14 @@ export default function AdminCentersPage() {
               </button>
               {(c.status === "draft" || c.status === "sent") && (
                 <>
+                  <button onClick={() => sendProposal(c)} disabled={busy || !c.email}
+                    title={c.email ? "שליחת ההצעה במייל למרכז + קישור הצטרפות" : "אין אימייל למרכז — הוסיפו בעריכה"}
+                    className="rounded-full border border-teal-400 bg-teal-600 px-3 py-1 font-bold text-white hover:bg-teal-700 disabled:opacity-40">
+                    ✉️ שלח הצעה במייל
+                  </button>
                   <button onClick={() => post({ action: "mark_sent", id: c.id })} disabled={busy}
                     className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
-                    {c.status === "sent" ? "החזרה לטיוטה" : "סימון כנשלחה"}
+                    {c.status === "sent" ? "החזרה לטיוטה" : "סימון כנשלחה ידנית"}
                   </button>
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכה

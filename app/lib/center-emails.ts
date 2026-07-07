@@ -1,6 +1,7 @@
 import "server-only";
 import { Resend } from "resend";
 import { logEmail } from "./email-log";
+import { buildCenterProposalEmail, type CenterPlan } from "./center-proposal-email";
 
 // מיילים למרכזים טיפוליים. נפרד מ-therapist-emails כי הנמען והתוכן שונים
 // (מרכז, לא מטפל בודד). כל שליחה נרשמת ל-crm_email_log (fire-and-forget).
@@ -25,6 +26,56 @@ function giftLine(giftMonths: number, billingStartsAt: string | null): string {
     : null;
   const label = giftMonths === 1 ? "החודש הראשון" : giftMonths === 2 ? "החודשיים הראשונים" : `${giftMonths} החודשים הראשונים`;
   return `${label} על חשבוננו — פרטי התשלום נשמרו והחיוב הראשון יתבצע רק ב-${when ?? "תום תקופת המתנה"}.`;
+}
+
+/**
+ * מייל הצעה למרכז — נשלח מהאדמין ("שלח הצעה במייל"). מפרט את המסלולים,
+ * המחיר החודשי, חודשי המתנה, וכפתור בולט לקישור ההצטרפות/תשלום. ה-HTML נבנה
+ * במודול הבילדר הנקי (ניתן לתצוגה מקדימה), וכאן רק שולחים ורושמים ל-CRM.
+ */
+export async function sendCenterProposalEmail(opts: {
+  to: string;
+  centerName: string;
+  contactName: string | null;
+  plans: CenterPlan[];
+  giftMonths: number;
+  token: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendCenterProposalEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+
+  const { subject, html } = buildCenterProposalEmail({
+    centerName: opts.centerName,
+    contactName: opts.contactName,
+    plans: opts.plans,
+    giftMonths: opts.giftMonths,
+    token: opts.token,
+    siteUrl: SITE_URL,
+  });
+
+  try {
+    const { error } = await resendClient.emails.send({ from: FROM, to: opts.to, subject, html });
+    void logEmail({
+      recipient: opts.to,
+      recipientType: "organization",
+      subject,
+      template: "center_proposal",
+      sentBy: "admin",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    if (error) {
+      console.error("sendCenterProposalEmail: resend error:", error);
+      return { ok: false, error: String(error.message ?? error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendCenterProposalEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
 }
 
 /**
