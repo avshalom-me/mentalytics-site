@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAttribution } from "@/app/lib/attribution";
+import { gaEvent } from "@/app/lib/gtag";
 
 type Props = {
   therapistId: string;
@@ -67,6 +68,8 @@ export default function SiteMessageModal({
         setError(json.error || "שגיאה בשליחה");
       } else {
         setDone(true);
+        // GA4 conversion: patient sent a site message to a therapist (a lead).
+        gaEvent("generate_lead", { method: "site_message", source });
       }
     } catch {
       setError("שגיאה בשליחה");

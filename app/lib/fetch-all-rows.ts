@@ -43,5 +43,14 @@ export async function fetchAllRows<T>(buildQuery: () => RangeQuery<T>): Promise<
     if (batch.length < PAGE_SIZE) break;
   }
 
+  // If we stopped on the backstop rather than a short page, the result may be
+  // truncated silently — log loudly so it's caught before it skews a report.
+  if (rows.length >= MAX_ROWS) {
+    console.warn(
+      `fetchAllRows: hit the ${MAX_ROWS}-row backstop — result may be truncated. ` +
+        `Aggregate this query in SQL (COUNT/GROUP BY via RPC) instead of paging.`,
+    );
+  }
+
   return rows;
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import SiteMessageModal from "../SiteMessageModal";
 import { getAttribution } from "@/app/lib/attribution";
+import { gaEvent } from "@/app/lib/gtag";
 
 const wasvg = (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -29,6 +30,9 @@ function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", s
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source, ...attribution }),
   }).catch(() => {});
+  // GA4 conversion: the patient reached out to a therapist — the key patient-side
+  // lead. Mark it a Key Event + import to Google Ads so paid search optimizes to it.
+  gaEvent("generate_lead", { method: clickType, source });
 }
 
 // Shared pill styling for the large, prominent profile contact buttons.

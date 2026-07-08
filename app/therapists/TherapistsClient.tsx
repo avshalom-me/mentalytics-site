@@ -7,6 +7,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { genderTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
+import { gaEvent } from "@/app/lib/gtag";
 
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
@@ -14,6 +15,8 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source: "directory" }),
   }).catch(() => {});
+  // GA4 conversion — the patient reached out to a therapist (the key lead).
+  gaEvent("generate_lead", { method: clickType, source: "directory" });
 }
 
 export type PublicTherapist = {
