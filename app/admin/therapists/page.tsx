@@ -281,6 +281,7 @@ export default function AdminTherapistsPage() {
   const [giftMonths, setGiftMonths] = useState(1);
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
+  const [photoBusy, setPhotoBusy] = useState(false);
   const [completionFor, setCompletionFor] = useState<AdminTherapist | null>(null);
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
@@ -737,6 +738,94 @@ export default function AdminTherapistsPage() {
       window.alert(`נשלחו ${targets.length - failures.length} תזכורות. נכשלו (${failures.length}): ${failures.join(", ")}`);
     } else {
       window.alert(`נשלחו ${targets.length} תזכורות מותאמות בהצלחה.`);
+    }
+  }
+
+  // Downscale a large image in the browser so it stays under Vercel's ~4.5MB
+  // request-body cap before hitting the admin photo route (phone photos are
+  // routinely bigger). Only kicks in for oversized files; the server still
+  // does the final resize/compress. Mirrors the therapist edit page.
+  async function downscaleForUpload(file: File): Promise<File> {
+    if (!file.type.startsWith("image/") || file.size <= 4 * 1024 * 1024) return file;
+    try {
+      const url = URL.createObjectURL(file);
+      const img = document.createElement("img");
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("load failed"));
+        img.src = url;
+      });
+      const maxDim = 1200;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) { URL.revokeObjectURL(url); return file; }
+      ctx.drawImage(img, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.85));
+      return blob ? new File([blob], file.name.replace(/\.\w+$/, ".jpg"), { type: "image/jpeg" }) : file;
+    } catch {
+      return file;
+    }
+  }
+
+  // Admin replaces a therapist's profile photo (compressed server-side).
+  async function uploadAdminPhoto(therapistId: string, file: File) {
+    try {
+      setPhotoBusy(true);
+      setEditError("");
+      const toSend = await downscaleForUpload(file);
+      const fd = new FormData();
+      fd.append("therapistId", therapistId);
+      fd.append("file", toSend);
+      const res = await fetch("/api/admin-therapist-photo", { method: "POST", body: fd });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "העלאת התמונה נכשלה");
+      setBrokenImages((prev) => { const n = { ...prev }; delete n[therapistId]; return n; });
+      setTherapists((prev) =>
+        prev.map((t) => (t.id === therapistId ? { ...t, profile_photo_url: json.photoUrl, profile_photo_path: json.path } : t))
+      );
+      setEditingTherapist((prev) =>
+        prev && prev.id === therapistId ? { ...prev, profile_photo_url: json.photoUrl, profile_photo_path: json.path } : prev
+      );
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setPhotoBusy(false);
+    }
+  }
+
+  // Admin removes a therapist's profile photo (e.g. a wrong image / a cert
+  // uploaded into the photo slot).
+  async function deleteAdminPhoto(therapistId: string) {
+    if (!window.confirm("למחוק את תמונת הפרופיל של המטפל/ת?")) return;
+    try {
+      setPhotoBusy(true);
+      setEditError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: therapistId, action: "delete_photo" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "מחיקת התמונה נכשלה");
+      setTherapists((prev) =>
+        prev.map((t) => (t.id === therapistId ? { ...t, profile_photo_url: null, profile_photo_path: null } : t))
+      );
+      setEditingTherapist((prev) =>
+        prev && prev.id === therapistId ? { ...prev, profile_photo_url: null, profile_photo_path: null } : prev
+      );
+    } catch (err) {
+      setEditError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setPhotoBusy(false);
     }
   }
 
@@ -1724,6 +1813,47 @@ export default function AdminTherapistsPage() {
             {editError && (
               <div className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700">{editError}</div>
             )}
+
+            {/* Profile photo — replace / remove */}
+            <div className="mb-4 flex items-center gap-4 rounded-xl border border-stone-200 bg-stone-50 p-3">
+              {editingTherapist.profile_photo_url && !brokenImages[editingTherapist.id] ? (
+                <img
+                  src={editingTherapist.profile_photo_url}
+                  alt=""
+                  className="h-16 w-16 rounded-xl object-cover border border-stone-200"
+                  referrerPolicy="no-referrer"
+                  onError={() => setBrokenImages((prev) => ({ ...prev, [editingTherapist.id]: true }))}
+                />
+              ) : (
+                <div className="flex h-16 w-16 items-center justify-center rounded-xl bg-stone-100 text-xs text-stone-400">
+                  אין תמונה
+                </div>
+              )}
+              <div className="flex flex-1 flex-wrap items-center gap-2">
+                <label className={`cursor-pointer rounded-lg border border-[#2e7d8c] bg-white px-3 py-1.5 text-xs font-semibold text-[#2e7d8c] hover:bg-[#2e7d8c] hover:text-white ${photoBusy ? "opacity-50 pointer-events-none" : ""}`}>
+                  {photoBusy ? "מעלה..." : editingTherapist.profile_photo_url ? "החלף תמונה" : "העלה תמונה"}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    disabled={photoBusy}
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) uploadAdminPhoto(editingTherapist.id, f);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                {editingTherapist.profile_photo_url && (
+                  <button type="button" disabled={photoBusy}
+                    onClick={() => deleteAdminPhoto(editingTherapist.id)}
+                    className="rounded-lg border border-red-300 bg-red-50 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50">
+                    מחק תמונה
+                  </button>
+                )}
+                <span className="text-xs text-stone-400">התמונה נשמרת ומיושרת אוטומטית</span>
+              </div>
+            </div>
 
             <div className="space-y-3">
               {/* Basic fields */}

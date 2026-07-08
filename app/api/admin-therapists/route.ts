@@ -580,6 +580,39 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: true, id, certId });
     }
 
+    // Admin removes a therapist's profile photo (e.g. they uploaded a certificate
+    // or a wrong image into the photo slot). Clears the path + storage file.
+    // Uploading a replacement is a separate multipart route (admin-therapist-photo).
+    if (body.action === "delete_photo") {
+      const { data: t } = await supabaseAdmin
+        .from("therapists")
+        .select("id, profile_photo_path")
+        .eq("id", id)
+        .single();
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      if (t.profile_photo_path) {
+        await supabaseAdmin.storage.from(PROFILE_PHOTOS_BUCKET).remove([t.profile_photo_path]);
+      }
+      const { error: delErr } = await supabaseAdmin
+        .from("therapists")
+        .update({ profile_photo_path: null })
+        .eq("id", id);
+      if (delErr) {
+        return NextResponse.json({ ok: false, error: delErr.message }, { status: 500 });
+      }
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "delete_photo",
+        before: { profile_photo_path: t.profile_photo_path },
+        after: {},
+        reason: "admin removed the profile photo",
+      });
+      return NextResponse.json({ ok: true, id });
+    }
+
     // ── On-demand Sumit reconciliation ──────────────────────────────────────
     // Closes the gap where a standing order is still ACTIVE at Sumit but the
     // local subscription is already 'cancelled' — the status-change cancel

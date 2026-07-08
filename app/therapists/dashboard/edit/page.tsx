@@ -288,6 +288,27 @@ export default function TherapistProfileEditPage() {
     if (!photoErr) { setPhotoFile(null); setPhotoPreview(null); }
     if (!certErr) setCertFile(null);
 
+    // Refresh the stored photo URL + cert list from the server so the therapist
+    // immediately SEES the new photo/cert. Previously the preview reverted to
+    // the old page-load image after a successful upload, so people thought it
+    // failed and re-uploaded repeatedly (one uploaded the same photo 5×).
+    if ((photoFile && !photoErr) || (certFile && !certErr)) {
+      try {
+        const refetch = await fetch("/api/therapist-profile", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+          cache: "no-store",
+        });
+        const rj = await refetch.json();
+        if (rj.ok) {
+          if (rj.photoUrl) setProfilePhotoUrl(rj.photoUrl);
+          if (Array.isArray(rj.certificates)) setExistingCerts(rj.certificates);
+        }
+      } catch {
+        // Non-blocking — the save/upload already succeeded; only the on-screen
+        // preview refresh failed.
+      }
+    }
+
     const base = json.created ? "הפרופיל נוצר בהצלחה! הוא ממתין לאישור." : "הפרטים עודכנו בהצלחה.";
     const uploadIssues = [photoErr, certErr].filter(Boolean) as string[];
     setIsNew(false);
