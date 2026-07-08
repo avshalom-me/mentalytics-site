@@ -797,16 +797,10 @@ export async function sendTherapistAdminMessageEmail(opts: {
   </body>
 </html>`;
 
-  try {
-    const { error } = await resend.emails.send({ from: FROM, to: opts.to, subject, html });
-    if (error) {
-      console.error("sendTherapistAdminMessageEmail: resend error:", error);
-      return { ok: false, error: String(error) };
-    }
-    return { ok: true };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : "unknown";
-    console.error("sendTherapistAdminMessageEmail: throw:", msg);
-    return { ok: false, error: msg };
-  }
+  // Route through the shared bulk gate so it's daily-capped and recorded in the
+  // CRM email history like every other admin→therapist mail (a raw send here
+  // would skip both). A single message barely touches the cap.
+  const r = await sendBulkEmail({ from: FROM, to: opts.to, subject, html });
+  if (!r.ok && !r.skipped) console.error("sendTherapistAdminMessageEmail: send error:", r.error);
+  return { ok: r.ok, error: r.error };
 }

@@ -64,12 +64,23 @@ async function resolveTherapist(user: { id: string; email?: string | null }) {
   }
 
   if (!therapist) {
-    const { data: created } = await supabaseAdmin
+    const { data: created, error: createErr } = await supabaseAdmin
       .from("therapists")
       .insert({ user_id: user.id, email: user.email, full_name: "", gender: "", status: "pending", tier: "free" })
       .select("id")
       .single();
-    therapist = created ?? null;
+    if (createErr) {
+      // Unique-violation on the therapists(user_id) index → a concurrent
+      // first request created the row first; re-read it instead of failing.
+      const { data: raced } = await supabaseAdmin
+        .from("therapists")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      therapist = raced ?? null;
+    } else {
+      therapist = created ?? null;
+    }
   }
   return therapist;
 }

@@ -113,9 +113,20 @@ export async function POST(req: NextRequest) {
       .select("id")
       .single();
     if (createErr || !created) {
-      return NextResponse.json({ ok: false, error: createErr?.message ?? "Could not create therapist record" }, { status: 500 });
+      // Unique-violation on therapists(user_id) → a concurrent first request
+      // won the insert; re-read that row instead of returning a 500.
+      const { data: raced } = await supabaseAdmin
+        .from("therapists")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (!raced) {
+        return NextResponse.json({ ok: false, error: createErr?.message ?? "Could not create therapist record" }, { status: 500 });
+      }
+      therapist = raced;
+    } else {
+      therapist = created;
     }
-    therapist = created;
   }
 
   if (type === "photo") {
