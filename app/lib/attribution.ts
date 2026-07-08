@@ -14,6 +14,8 @@ export const CHANNELS = [
   "google_organic",  // organic Google search
   "meta_paid",       // paid Facebook / Instagram (utm_medium paid + meta source)
   "meta_organic",    // organic Facebook / Instagram (fbclid alone, or social medium)
+  "tiktok_paid",     // paid TikTok (utm_medium paid + tiktok source)
+  "tiktok_organic",  // organic TikTok (ttclid alone, or tiktok referrer)
   "whatsapp",        // WhatsApp referral or utm_source=whatsapp
   "direct",          // no referrer, no campaign params
   "referral",        // any other website (incl. organic social)
@@ -80,6 +82,10 @@ function isMetaSource(src: string): boolean {
   );
 }
 
+function isTikTokSource(src: string): boolean {
+  return src.includes("tiktok") || src.includes("tik_tok") || src === "tt";
+}
+
 /** Derive a single normalized channel from URL params + referrer. */
 function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const src = (params.get("utm_source") || "").trim().toLowerCase();
@@ -96,6 +102,7 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
+    if (isTikTokSource(src)) return PAID_MEDIUMS.has(med) ? "tiktok_paid" : "tiktok_organic";
     if (PAID_MEDIUMS.has(med)) return "other"; // tagged paid, unknown source
     return "other";
   }
@@ -103,12 +110,15 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // fbclid present but no paid UTM → Meta-originated, treated as organic social.
   // (Paid Meta campaigns must be tagged with a paid utm_medium to count as paid.)
   if (params.has("fbclid")) return "meta_organic";
+  // ttclid alone = TikTok-originated; treat as organic unless tagged paid (like fbclid).
+  if (params.has("ttclid")) return "tiktok_organic";
 
   // No UTM — infer from the referrer.
   if (!ref) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
   if (ref.includes("google.")) return "google_organic";
   if (ref.includes("facebook.") || ref.includes("instagram.") || ref.includes("fb.")) return "meta_organic";
+  if (ref.includes("tiktok.")) return "tiktok_organic";
   return "referral";
 }
 
@@ -279,6 +289,8 @@ export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
   google_organic: "גוגל — אורגני",
   meta_paid: "Meta — בתשלום",
   meta_organic: "Meta — אורגני",
+  tiktok_paid: "TikTok — בתשלום",
+  tiktok_organic: "TikTok — אורגני",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
   referral: "הפניה מאתר אחר",
