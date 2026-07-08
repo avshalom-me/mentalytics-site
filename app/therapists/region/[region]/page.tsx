@@ -6,6 +6,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
 import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -90,6 +91,8 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      {/* Count paid-search / directory landings in the patient funnel, tagged with channel (google_paid etc.). */}
+      <PageViewTracker page={isOnline ? "region:online" : `region:${r.region}`} source={isOnline ? "online" : "region"} />
 
       <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← כל המטפלים</Link>
 
