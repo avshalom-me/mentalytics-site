@@ -39,6 +39,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin/attribution", label: "מקורות לידים", icon: "🎯" },
       { href: "/admin/recruitment", label: "גיוס מטפלים", icon: "🧲" },
+      { href: "/admin/ads", label: "פרסום ממומן", icon: "📣" },
       { href: "/admin/recommendations", label: "המלצות", icon: "💡" },
     ],
   },
