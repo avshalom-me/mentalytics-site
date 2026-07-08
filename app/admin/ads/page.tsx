@@ -5,11 +5,14 @@ import { useEffect, useState } from "react";
 type Tier = "paid" | "gift" | "free";
 type Therapist = { tier: Tier; full_name: string; regions: string[]; types: string[]; online: boolean };
 type RegionRow = { region: string; slug: string; paid: number; gift: number; free: number; sw: boolean };
+type SdStatus = "needs_therapists" | "needs_patients" | "balanced" | "empty";
+type RegionBalance = { region: string; label: string; therapists: number; demand: number; demandPerTherapist: number | null; status: SdStatus };
 type Data = {
   counts: { paid: number; gift: number; free: number };
   online: { paid: number; gift: number; free: number };
   onlineSlug: string;
   byRegion: RegionRow[];
+  supplyDemand: RegionBalance[];
   therapists: Therapist[];
   generated_at: string;
 };
@@ -49,6 +52,13 @@ function prio(paid: number, gift: number) {
   if (paid > 0) return <span className="font-bold text-green-700">🟢 גבוהה</span>;
   if (gift > 0) return <span className="font-semibold text-amber-600">🟡 שנייה</span>;
   return <span className="text-stone-400">⚪ נמוכה</span>;
+}
+
+function sdRec(status: SdStatus) {
+  if (status === "needs_patients") return <span className="font-bold text-green-700">🟢 פרסם למטופלים</span>;
+  if (status === "needs_therapists") return <span className="font-semibold text-amber-600">🧲 גייס מטפלים</span>;
+  if (status === "balanced") return <span className="text-stone-500">⚖️ מאוזן</span>;
+  return <span className="text-stone-400">— אין פעילות</span>;
 }
 
 export default function AdsPage() {
@@ -138,6 +148,37 @@ function AdsContent({ data }: { data: Data }) {
             ))}
           </tbody>
         </table>
+      </Card>
+
+      {/* Supply × demand cross-insight */}
+      <Card title="⚖️ היצע × ביקוש — מה לעשות בכל אזור">
+        <p className="text-xs text-stone-500 mb-4">
+          מחבר בין <strong>הביקוש</strong> (מטופלים שחיפשו באזור) ל<strong>מקודמים</strong> שלך: אזור עם ביקוש בלי מטפל → <strong>גייס</strong> (אל תפרסם למטופלים לריק); אזור עם מטפלים → <strong>פרסם למטופלים</strong>.
+        </p>
+        {data.supplyDemand.length === 0 ? (
+          <p className="text-sm text-stone-400">אין עדיין מספיק נתוני ביקוש.</p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-stone-500 text-xs border-b border-stone-200">
+                <th className="text-right font-semibold py-2 px-2">אזור</th>
+                <th className="text-center font-semibold py-2 px-2">מקודמים</th>
+                <th className="text-center font-semibold py-2 px-2">ביקוש</th>
+                <th className="text-right font-semibold py-2 px-2">המלצה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[...data.supplyDemand].sort((a, b) => b.demand - a.demand).map((r) => (
+                <tr key={r.region} className="border-b border-stone-100">
+                  <td className="py-2.5 px-2 font-semibold text-stone-700">{r.label}</td>
+                  <td className="text-center px-2 font-bold text-stone-900">{r.therapists}</td>
+                  <td className="text-center px-2 text-stone-600">{r.demand}</td>
+                  <td className="py-2.5 px-2">{sdRec(r.status)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
       </Card>
 
       {/* Keywords + tagged URLs */}
