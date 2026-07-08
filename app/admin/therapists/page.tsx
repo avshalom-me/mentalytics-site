@@ -57,6 +57,7 @@ type AdminTherapist = {
   missing: string[];
   completion_requested_at: string | null;
   profile_updated_at: string | null;
+  article_invite_sent_at: string | null;
 };
 
 type EditForm = {
@@ -685,6 +686,10 @@ export default function AdminTherapistsPage() {
       });
       const json = await res.json();
       if (!res.ok || !json.ok) throw new Error(json.error || "שליחה נכשלה");
+      const sentAt = json.article_invite_sent_at ?? new Date().toISOString();
+      setTherapists((prev) =>
+        prev.map((x) => (x.id === t.id ? { ...x, article_invite_sent_at: sentAt } : x))
+      );
       window.alert("ההזמנה לכתיבת מאמר נשלחה למטפל/ת.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -980,6 +985,12 @@ export default function AdminTherapistsPage() {
                     🕐 המטפל/ת עדכנ/ה · {new Date(therapist.profile_updated_at).toLocaleDateString("he-IL")}
                   </span>
                 )}
+                {therapist.article_invite_sent_at && (
+                  <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300"
+                    title={new Date(therapist.article_invite_sent_at).toLocaleString("he-IL")}>
+                    🎁 נשלחה הצעת מאמר · {new Date(therapist.article_invite_sent_at).toLocaleDateString("he-IL")}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -1134,8 +1145,10 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl border border-[#d4a017] bg-[#FDF6E3] px-4 py-2 text-sm font-medium text-[#a87010] disabled:opacity-50"
                   onClick={() => sendArticleInvite(therapist)}
-                  title="הזמן לכתוב מאמר בתמורה לחודשיים קידום במתנה">
-                  🎁 הזמן לכתוב מאמר
+                  title={therapist.article_invite_sent_at
+                    ? `כבר נשלחה הצעת מאמר ב-${new Date(therapist.article_invite_sent_at).toLocaleDateString("he-IL")} — לחיצה תשלח שוב`
+                    : "הזמן לכתוב מאמר בתמורה לחודשיים קידום במתנה"}>
+                  {therapist.article_invite_sent_at ? "🎁 שלח שוב הצעת מאמר" : "🎁 הזמן לכתוב מאמר"}
                 </button>
               )}
               {therapist.status === "paying" && !therapist.admin_approved && (
@@ -1480,6 +1493,12 @@ export default function AdminTherapistsPage() {
                               {t.missing.length > 0 && (
                                 <span className="mr-1 inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
                                   חסר מידע
+                                </span>
+                              )}
+                              {t.article_invite_sent_at && (
+                                <span className="mr-1 inline-block rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800"
+                                  title={`נשלחה הצעת מאמר · ${new Date(t.article_invite_sent_at).toLocaleDateString("he-IL")}`}>
+                                  🎁 מאמר
                                 </span>
                               )}
                             </td>

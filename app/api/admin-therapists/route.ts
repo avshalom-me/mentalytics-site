@@ -48,6 +48,7 @@ type TherapistRow = {
   created_at: string | null;
   completion_requested_at: string | null;
   profile_updated_at: string | null;
+  article_invite_sent_at: string | null;
   center_account_id: string | null;
 };
 
@@ -116,6 +117,7 @@ async function buildTherapistsResponse(onlyId?: string) {
       created_at,
       completion_requested_at,
       profile_updated_at,
+      article_invite_sent_at,
       center_account_id
       `
     )
@@ -316,6 +318,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         created_at: t.created_at ?? null,
         completion_requested_at: t.completion_requested_at ?? null,
         profile_updated_at: t.profile_updated_at ?? null,
+        article_invite_sent_at: t.article_invite_sent_at ?? null,
         views_30d: viewsByTherapist[t.id] ?? 0,
         contacts_30d: contactsByTherapist[t.id] ?? 0,
         subscription: subByTherapist[t.id] ?? null,
@@ -520,6 +523,16 @@ export async function PATCH(request: Request) {
       if (!sent.ok) {
         return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
       }
+      // Stamp when the invite went out so the admin UI can badge it (and not
+      // re-send blindly). Best-effort — the email already succeeded.
+      const invitedAt = new Date().toISOString();
+      const { error: stampErr } = await supabaseAdmin
+        .from("therapists")
+        .update({ article_invite_sent_at: invitedAt })
+        .eq("id", id);
+      if (stampErr) {
+        console.error(`article_invite: failed to stamp article_invite_sent_at for ${id}:`, stampErr.message);
+      }
       await writeAudit(supabaseAdmin, {
         therapistId: id,
         actorType: "admin",
@@ -528,7 +541,7 @@ export async function PATCH(request: Request) {
         after: {},
         reason: "admin invited the therapist to write an article for a promo gift",
       });
-      return NextResponse.json({ ok: true, id });
+      return NextResponse.json({ ok: true, id, article_invite_sent_at: invitedAt });
     }
 
     // Admin deletes a single certificate (e.g. the therapist uploaded the wrong
