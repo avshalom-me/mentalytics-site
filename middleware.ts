@@ -20,6 +20,12 @@ function safeEqual(a: string, b: string): boolean {
 }
 
 function isAuthorized(request: NextRequest): boolean {
+  // `next dev` only — Vercel always sets NODE_ENV=production for deployed
+  // environments (preview + prod), so this never applies to a live site.
+  // Lets local tooling (and Claude) exercise /admin/* without the real
+  // password ever leaving .env.local.
+  if (process.env.NODE_ENV === "development") return true;
+
   if (!ADMIN_PASSWORD) return false;
 
   const authHeader = request.headers.get("authorization");

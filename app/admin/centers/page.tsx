@@ -420,12 +420,20 @@ export default function AdminCentersPage() {
         );
       })}
 
-      {/* מודל יצירה/עריכה — כותרת וכפתור השמירה קבועים; רק תוכן הטופס גולל,
-          כך שהטופס נשאר נגיש במסך נמוך בלי לאבד את פעולת השמירה. */}
+      {/* מודל יצירה/עריכה — כותרת וכפתור השמירה קבועים בתוך הכרטיס; תוכן הטופס
+          גולל בפנים. בנוסף, המעטפת החיצונית עצמה גוללת (min-h-full + overflow-y-auto)
+          כרשת ביטחון: אם הכרטיס כולה גבוה מגובה המסך בפועל (למשל בזום/רזולוציה
+          מסוימים), items-center היה חותך פרוסה גם מהכותרת למעלה וגם מהכפתור למטה —
+          ושום גלילה של תוכן הטופס הפנימי לא יכלה לחשוף אותן (הן לא חלק ממנו).
+          עכשיו אפשר תמיד לגלול את כל המודל (כותרת+טופס+כפתור) כיחידה אחת. */}
       {editing && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
-          <div className="absolute inset-0 bg-black/30" onClick={() => setEditing(null)} />
-          <div className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl">
+        <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl" onClick={() => setEditing(null)}>
+          <div className="fixed inset-0 bg-black/30" />
+          <div className="flex min-h-full items-center justify-center p-4">
+          <div
+            className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between rounded-t-2xl border-b border-stone-100 px-6 py-4">
               <h3 className="text-lg font-black text-stone-800">
                 {editing === "new" ? "הצעה למרכז חדש" : `עריכה — ${(editing as Center).name}`}
@@ -433,7 +441,7 @@ export default function AdminCentersPage() {
               <button onClick={() => setEditing(null)} className="text-stone-400 hover:text-stone-600">✕</button>
             </div>
 
-            <div className="overflow-y-auto px-6 py-4">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="שם המרכז *">
                 <input value={fName} onChange={(e) => setFName(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
@@ -548,6 +556,7 @@ export default function AdminCentersPage() {
                 {busy ? "שומר…" : "שמירה"}
               </button>
             </div>
+          </div>
           </div>
         </div>
       )}
