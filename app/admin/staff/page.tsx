@@ -361,7 +361,7 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
           <h3 className="text-base font-black text-stone-800">{title}</h3>
           <button onClick={onClose} className="text-stone-400 hover:text-stone-600">✕</button>
         </div>
-        <div className="overflow-y-auto px-5 py-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4">{children}</div>
       </div>
     </div>
   );
