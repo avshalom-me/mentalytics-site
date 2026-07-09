@@ -184,10 +184,15 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
       return { ok: false, month: label, flagged: 0, totalPromoted: 0, error: tErr.message, status: 500 };
     }
 
-    const promoted = (therapists ?? []) as { id: string; full_name: string | null; promoted_since: string | null }[];
+    const paying = (therapists ?? []) as { id: string; full_name: string | null; promoted_since: string | null }[];
+    // Only evaluate therapists who were actually promoted during (or before) the
+    // reported month — someone promoted AFTER it ended barely appeared in it, so
+    // flagging them for "0 clicks last month" would be noise. promoted_since=null
+    // (legacy/long-standing) counts as "promoted before".
+    const promoted = paying.filter((t) => t.promoted_since == null || t.promoted_since < untilIso);
     const ids = promoted.map((t) => t.id);
     if (ids.length === 0) {
-      return { ok: true, month: label, flagged: 0, totalPromoted: 0, emailStatus: "skipped: no promoted therapists" };
+      return { ok: true, month: label, flagged: 0, totalPromoted: 0, emailStatus: "skipped: no therapists promoted during the month" };
     }
 
     // Contact clicks + profile views for the month, scoped to promoted therapists.
