@@ -80,6 +80,28 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         </p>
       </div>
 
+      {/* Prominent quiz CTA — same offer as the region/online pages, tailored to the city. */}
+      <div
+        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
+        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
+      >
+        <div>
+          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>
+            לא בטוחים מי מתאים לכם?
+          </p>
+          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
+            {`ענו על שאלון קצר (כ-2 דקות) שנבנה על ידי פסיכולוגים, ונתאים לכם מטפל ב${city} או באונליין לפי הצורך והגישה שלכם.`}
+          </p>
+        </div>
+        <Link
+          href="/adults"
+          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
+          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
+        >
+          למילוי השאלון
+        </Link>
+      </div>
+
       {inCity.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
           {inCity.map((t) => <TherapistResultCard key={t.id} t={t} />)}
