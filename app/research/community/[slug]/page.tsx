@@ -180,7 +180,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
       </p>
 
       {a.summary && (
-        <p className="text-lg text-stone-700 leading-8 mb-8" style={{ fontWeight: 500 }}>
+        <p className="text-[19px] md:text-[22px] text-stone-700 leading-9 mb-8" style={{ fontWeight: 500 }}>
           {a.summary}
         </p>
       )}
