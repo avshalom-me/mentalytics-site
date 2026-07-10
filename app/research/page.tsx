@@ -15,7 +15,7 @@ type CommunityItem = { slug: string; title: string; summary: string; topic: stri
 async function getCommunityArticles(): Promise<CommunityItem[]> {
   const { data } = await supabaseAdmin
     .from("therapist_articles")
-    .select("slug, title, summary, topic, image_url, image_alt, therapists(full_name)")
+    .select("slug, title, summary, topic, image_url, image_alt, author_name, therapists(full_name)")
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
     .limit(40);
@@ -26,7 +26,7 @@ async function getCommunityArticles(): Promise<CommunityItem[]> {
       title: r.title,
       summary: r.summary,
       topic: r.topic,
-      author: t?.full_name ?? "מטפל/ת",
+      author: r.author_name?.trim() || t?.full_name || "מטפל/ת",
       img: r.image_url ?? null,
       imgAlt: r.image_alt ?? r.title,
     };

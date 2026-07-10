@@ -26,6 +26,7 @@ type ArticleRow = {
   image_alt: string | null;
   image_credit: string | null;
   canonical_url: string | null;
+  author_name: string | null;
   therapists:
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null }
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null }[]
@@ -36,7 +37,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, canonical_url, therapists(full_name, therapist_types, gender)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -88,8 +89,11 @@ export default async function CommunityArticlePage({ params }: { params: Promise
   const a = await getArticle(decodeURIComponent(slug));
   if (!a) notFound();
 
-  const author = authorName(a);
-  const role = authorRole(a);
+  // A house/editorial byline (e.g. "צוות טיפול חכם") overrides the therapist
+  // attribution: no profile link, no professional role, no per-therapist noun.
+  const house = a.author_name?.trim() || null;
+  const author = house ?? authorName(a);
+  const role = house ? "" : authorRole(a);
   const authorT = Array.isArray(a.therapists) ? a.therapists[0] : a.therapists;
   const authorNoun = authorT?.gender === "נקבה" ? "מטפלת" : authorT?.gender === "זכר" ? "מטפל" : "מטפל/ת";
   const paragraphs = bodyToParagraphs(a.body);
@@ -147,9 +151,13 @@ export default async function CommunityArticlePage({ params }: { params: Promise
 
       <p className="text-sm text-stone-500 mb-8">
         מאת{" "}
-        <Link href={`/therapists/${a.therapist_id}`} className="font-semibold text-[#2e7d8c] hover:underline">
-          {author}
-        </Link>
+        {house ? (
+          <span className="font-semibold text-[#2e7d8c]">{author}</span>
+        ) : (
+          <Link href={`/therapists/${a.therapist_id}`} className="font-semibold text-[#2e7d8c] hover:underline">
+            {author}
+          </Link>
+        )}
         {role && <> · {role}</>}
         {" "}· {dateLabel}
       </p>
@@ -168,21 +176,37 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         ))}
       </article>
 
-      {/* Author attribution — colored name (linked to profile) + role + note */}
+      {/* Author attribution — colored name + role + note. A house byline links
+          to the homepage instead of a therapist profile. */}
       <div className="mt-12 rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6">
-        <Link href={`/therapists/${a.therapist_id}`} className="text-lg font-black text-[#2e7d8c] hover:underline">
-          {author}
-        </Link>
-        {role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
-        <p className="mt-2 text-sm text-stone-600 leading-7">
-          מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, {authorNoun} באתר טיפול חכם.
-        </p>
-        <Link
-          href={`/therapists/${a.therapist_id}`}
-          className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline"
-        >
-          לצפייה בפרופיל המלא ←
-        </Link>
+        {house ? (
+          <>
+            <span className="text-lg font-black text-[#2e7d8c]">{author}</span>
+            <p className="mt-2 text-sm text-stone-600 leading-7">
+              מאמר זה נכתב על ידי {author}. טיפול חכם עוזר לכם למצוא את הטיפול והמטפל/ת המתאימים —
+              בחינם ובאנונימיות.
+            </p>
+            <Link href="/" className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline">
+              למציאת מטפל/ת מתאים/ה ←
+            </Link>
+          </>
+        ) : (
+          <>
+            <Link href={`/therapists/${a.therapist_id}`} className="text-lg font-black text-[#2e7d8c] hover:underline">
+              {author}
+            </Link>
+            {role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
+            <p className="mt-2 text-sm text-stone-600 leading-7">
+              מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, {authorNoun} באתר טיפול חכם.
+            </p>
+            <Link
+              href={`/therapists/${a.therapist_id}`}
+              className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline"
+            >
+              לצפייה בפרופיל המלא ←
+            </Link>
+          </>
+        )}
       </div>
     </main>
   );

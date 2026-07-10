@@ -67,6 +67,9 @@ async function getTherapistArticles(id: string): Promise<ArticleLink[]> {
     .select("slug, title, summary, topic")
     .eq("therapist_id", id)
     .eq("status", "approved")
+    // House/editorial pieces (author_name set) are backed by a therapist_id for
+    // integrity but are NOT the therapist's own work — keep them off the profile.
+    .is("author_name", null)
     .order("approved_at", { ascending: false })
     .limit(20);
   return (data ?? []) as ArticleLink[];
