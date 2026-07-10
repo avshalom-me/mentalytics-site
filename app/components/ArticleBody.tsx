@@ -66,14 +66,14 @@ export function ArticleBody({ body }: { body: string }) {
       {blocks.map((block, i) => {
         if (block.startsWith("## ")) {
           return (
-            <h2 key={i} className="text-2xl md:text-[28px] font-black text-stone-900 pt-4">
+            <h2 key={i} className="text-2xl md:text-[30px] font-black text-stone-900 pt-4">
               {parseInline(block.slice(3).trim())}
             </h2>
           );
         }
         if (block.startsWith("### ")) {
           return (
-            <h3 key={i} className="text-[20px] md:text-[23px] font-bold text-stone-900 pt-2">
+            <h3 key={i} className="text-[21px] md:text-[24px] font-bold text-stone-900 pt-2">
               {parseInline(block.slice(4).trim())}
             </h3>
           );
@@ -82,7 +82,7 @@ export function ArticleBody({ body }: { body: string }) {
         const isList = lines.every((l) => /^\s*[-•]\s+/.test(l));
         if (isList) {
           return (
-            <ul key={i} className="list-disc space-y-2 pr-6 text-[17px] leading-8 text-stone-700 md:text-[19px] md:leading-9">
+            <ul key={i} className="list-disc space-y-2 pr-6 text-[18px] leading-8 text-stone-700 md:text-[21px] md:leading-9">
               {lines.map((l, j) => (
                 <li key={j}>{parseInline(l.replace(/^\s*[-•]\s+/, ""))}</li>
               ))}
@@ -90,7 +90,7 @@ export function ArticleBody({ body }: { body: string }) {
           );
         }
         return (
-          <p key={i} className="text-[17px] leading-8 text-stone-700 md:text-[19px] md:leading-9">
+          <p key={i} className="text-[18px] leading-8 text-stone-700 md:text-[21px] md:leading-9">
             {parseInline(lines.join(" "))}
           </p>
         );

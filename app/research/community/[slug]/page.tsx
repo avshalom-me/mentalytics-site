@@ -164,7 +164,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         </p>
       )}
 
-      <h1 className="text-3xl font-black text-stone-900 mb-3">{a.title}</h1>
+      <h1 className="text-3xl md:text-[34px] font-black text-stone-900 mb-3">{a.title}</h1>
 
       <p className="text-sm text-stone-500 mb-8">
         מאת{" "}
@@ -180,7 +180,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
       </p>
 
       {a.summary && (
-        <p className="text-[19px] md:text-[22px] text-stone-700 leading-9 mb-8" style={{ fontWeight: 500 }}>
+        <p className="text-[20px] md:text-[24px] text-stone-700 leading-9 mb-8" style={{ fontWeight: 500 }}>
           {a.summary}
         </p>
       )}
