@@ -64,6 +64,34 @@ export function ArticleBody({ body }: { body: string }) {
   return (
     <article className="space-y-5">
       {blocks.map((block, i) => {
+        // Inline image: a block that is exactly ![alt](url) or ![alt](url "caption").
+        const img = block.match(/^!\[([^\]]*)\]\((https?:\/\/[^)\s]+)(?:\s+"([^"]*)")?\)$/);
+        if (img) {
+          const [, alt, src, caption] = img;
+          return (
+            <figure key={i} className="my-8">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={src} alt={alt} loading="lazy" className="w-full rounded-xl border border-[#E8E0D8]" />
+              {caption && <figcaption className="mt-2 text-center text-sm text-stone-500">{caption}</figcaption>}
+            </figure>
+          );
+        }
+        // Pull-quote: a block whose every line starts with "> ".
+        const qlines = block.split("\n");
+        if (qlines.every((l) => /^\s*>\s?/.test(l))) {
+          const quote = qlines.map((l) => l.replace(/^\s*>\s?/, "")).join(" ");
+          return (
+            <blockquote
+              key={i}
+              className="my-8 flex items-start gap-3 rounded-e-2xl border-s-4 border-[#3D8C8A] bg-[#EAF4F3] py-5 pe-6 ps-5"
+            >
+              <span aria-hidden className="-mt-1 text-5xl font-black leading-none text-[#3D8C8A]">&#8221;</span>
+              <p className="self-center text-[21px] font-bold leading-[1.55] text-[#2A6462] md:text-[25px]">
+                {parseInline(quote)}
+              </p>
+            </blockquote>
+          );
+        }
         if (block.startsWith("## ")) {
           return (
             <h2 key={i} className="text-2xl md:text-[30px] font-black text-stone-900 pt-4">
