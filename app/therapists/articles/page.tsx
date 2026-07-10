@@ -178,10 +178,12 @@ export default function TherapistArticlesPage() {
               required
               rows={12}
               maxLength={ARTICLE_LIMITS.bodyMax}
-              placeholder="כתבו בחופשיות. אפשר לחלק לפסקאות בעזרת שורה ריקה בין הפסקאות."
+              placeholder="כתבו בחופשיות. שורה ריקה = פסקה חדשה. לכותרת משנה התחילו שורה ב-##, ולקישור השתמשו ב-[טקסט](כתובת)."
               className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm leading-7 outline-none focus:border-[#2e7d8c]"
             />
-            <p className="mt-1 text-xs text-stone-400">{body.length} תווים (מינימום {ARTICLE_LIMITS.bodyMin})</p>
+            <p className="mt-1 text-xs text-stone-400">
+              {body.length} תווים (מינימום {ARTICLE_LIMITS.bodyMin}) · עיצוב: <code>## כותרת</code>, <code>[טקסט](כתובת)</code> לקישור, <code>**מודגש**</code>, <code>-</code> לרשימה
+            </p>
           </div>
 
           {msg && <p className="text-sm text-emerald-600 font-semibold">{msg}</p>}

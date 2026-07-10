@@ -2,10 +2,21 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { bodyToParagraphs } from "@/app/lib/articles";
+import { ArticleBody } from "@/app/components/ArticleBody";
 import { therapistTypeLabel } from "@/app/lib/therapist-options";
 
 const BASE_URL = "https://www.mentalytics.co.il";
+
+// A search-snippet-length description: strip markdown markers, collapse
+// whitespace, and cut at a word boundary near 160 chars (Google truncates
+// beyond that). Used for both the <meta> tag and the Article JSON-LD.
+function metaDescription(raw: string): string {
+  const clean = raw.replace(/[#*_>[\]()]/g, "").replace(/\s+/g, " ").trim();
+  if (clean.length <= 160) return clean;
+  const cut = clean.slice(0, 157);
+  const at = cut.lastIndexOf(" ");
+  return (at > 80 ? cut.slice(0, at) : cut).trimEnd() + "…";
+}
 
 // ISR: these are public SEO landing pages whose content changes rarely. Without
 // this they were fully dynamic (a live Supabase read on every visit). Cache and
@@ -21,6 +32,7 @@ type ArticleRow = {
   topic: string | null;
   approved_at: string | null;
   created_at: string;
+  updated_at: string | null;
   therapist_id: string;
   image_url: string | null;
   image_alt: string | null;
@@ -37,7 +49,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -65,14 +77,16 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const a = await getArticle(decodeURIComponent(slug));
   if (!a) return { title: "מאמר לא נמצא" };
-  const desc = a.summary || a.body.slice(0, 150);
+  const desc = metaDescription(a.summary || a.body);
   const ownUrl = `${BASE_URL}/research/community/${a.slug}`;
   // If the article was first published elsewhere, point the canonical at that
   // original so Google attributes the content there (no duplicate-content
   // competition). Otherwise self-canonicalize.
   const canonical = a.canonical_url?.trim() || ownUrl;
   return {
-    title: `${a.title} | טיפול חכם`,
+    // Bare title — the root layout's "%s | טיפול חכם" template adds the brand
+    // suffix (returning it here too double-suffixed every article title).
+    title: a.title,
     description: desc,
     alternates: { canonical },
     openGraph: {
@@ -96,7 +110,6 @@ export default async function CommunityArticlePage({ params }: { params: Promise
   const role = house ? "" : authorRole(a);
   const authorT = Array.isArray(a.therapists) ? a.therapists[0] : a.therapists;
   const authorNoun = authorT?.gender === "נקבה" ? "מטפלת" : authorT?.gender === "זכר" ? "מטפל" : "מטפל/ת";
-  const paragraphs = bodyToParagraphs(a.body);
   const published = a.approved_at || a.created_at;
   const dateLabel = new Date(published).toLocaleDateString("he-IL", {
     day: "numeric",
@@ -108,12 +121,16 @@ export default async function CommunityArticlePage({ params }: { params: Promise
     "@context": "https://schema.org",
     "@type": "Article",
     headline: a.title,
-    description: a.summary || a.body.slice(0, 150),
+    description: metaDescription(a.summary || a.body),
     inLanguage: "he",
-    author: { "@type": "Person", name: author },
+    // A house byline ("צוות טיפול חכם") is the organization, not a person.
+    author: house
+      ? { "@type": "Organization", name: author }
+      : { "@type": "Person", name: author },
     publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
     url: `${BASE_URL}/research/community/${a.slug}`,
     datePublished: published,
+    dateModified: a.updated_at || published,
     ...(a.image_url ? { image: a.image_url } : {}),
   };
 
@@ -168,13 +185,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         </p>
       )}
 
-      <article className="space-y-5">
-        {paragraphs.map((p, i) => (
-          <p key={i} className="text-stone-700 leading-8">
-            {p}
-          </p>
-        ))}
-      </article>
+      <ArticleBody body={a.body} />
 
       {/* Author attribution — colored name + role + note. A house byline links
           to the homepage instead of a therapist profile. */}

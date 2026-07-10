@@ -321,6 +321,9 @@ export default function AdminArticlesPage() {
               rows={2} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder="תקציר" />
             <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
               rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7" placeholder="גוף המאמר" />
+            <p className="text-[11px] text-stone-400 leading-5">
+              עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה. שורה ריקה = פסקה חדשה.
+            </p>
             <div>
               <p className="text-xs font-semibold text-stone-600 mb-1">תמונה</p>
               <ImagePicker value={editImage} onChange={setEditImage} defaultQuery={editForm.topic || editForm.title} />
@@ -406,6 +409,9 @@ export default function AdminArticlesPage() {
           <textarea value={createForm.body} onChange={(e) => setCreateForm({ ...createForm, body: e.target.value })}
             rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7"
             placeholder={`גוף המאמר (${ARTICLE_LIMITS.bodyMin}–${ARTICLE_LIMITS.bodyMax} תווים, שורה ריקה = פסקה חדשה)`} />
+          <p className="text-[11px] text-stone-400 leading-5">
+            עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה. שורה ריקה = פסקה חדשה.
+          </p>
 
           <div>
             <p className="text-xs font-semibold text-stone-600 mb-1">תמונה ראשית</p>
