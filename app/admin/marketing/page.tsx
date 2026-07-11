@@ -342,6 +342,25 @@ function FunnelCard({
   );
 }
 
+type AdsCampaignRow = {
+  id: string;
+  name: string;
+  utmCampaign: string | null;
+  cost: number;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  avgCpc: number;
+};
+type AdsData = {
+  ok: boolean;
+  configured: boolean;
+  campaigns?: AdsCampaignRow[];
+  byDay?: { date: string; cost: number }[];
+  total?: number;
+  error?: string;
+};
+
 function FunnelsCampaigns() {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [channels, setChannels] = useState<AttrChannel[] | null>(null);
@@ -349,6 +368,7 @@ function FunnelsCampaigns() {
   const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
   const [cac, setCac] = useState<FinMonth | null>(null);
+  const [ads, setAds] = useState<AdsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -366,11 +386,12 @@ function FunnelsCampaigns() {
       asJson(`/api/admin-attribution?period=${period}`),
       asJson(`/api/admin-analytics?period=${period}`),
       asJson(`/api/admin-crm/finance`),
+      asJson(`/api/admin-google-ads?period=${period}`),
     ])
-      .then(([a, an, fin]) => {
+      .then(([a, an, fin, gads]) => {
         if (ignore) return;
-        // Core = attribution + analytics. Finance (CAC) is optional; if it fails
-        // the CAC card shows "unavailable" but the funnels still render.
+        // Core = attribution + analytics. Finance (CAC) and Google Ads are
+        // optional; if they fail their cards show a fallback but the rest renders.
         if (!a?.ok || !an?.ok) {
           setError("שגיאה בטעינת נתוני המשפכים");
           return;
@@ -382,6 +403,7 @@ function FunnelsCampaigns() {
         // finance builds months newest-first, so the CURRENT month is index 0.
         const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
         setCac(months[0] ?? null);
+        setAds((gads as AdsData) ?? null);
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -499,6 +521,91 @@ function FunnelsCampaigns() {
               )}
             </div>
           </div>
+
+          {/* Google Ads spend — auto, when the API is connected */}
+          {ads && (
+            <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-base font-black text-stone-800">פרסום ממומן — Google Ads</h3>
+                {ads.ok && ads.configured && (
+                  <span className="text-xs text-stone-500">
+                    סה״כ הוצאה: <span className="font-bold text-stone-800">₪{num(Math.round(ads.total ?? 0))}</span>
+                  </span>
+                )}
+              </div>
+              {ads.configured === false ? (
+                <p className="text-sm text-stone-400">
+                  לא מחובר. הזן את משתני הסביבה של Google Ads ב-Vercel כדי לראות הוצאה, CPC ו-CPL אוטומטית.
+                </p>
+              ) : ads.ok === false ? (
+                <p className="text-sm text-red-600">לא ניתן לטעון נתוני Google Ads: {ads.error}</p>
+              ) : ads.campaigns && ads.campaigns.length ? (
+                <>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-200 text-xs text-stone-500">
+                        <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
+                        <th className="px-2 py-2 text-center font-semibold">הוצאה</th>
+                        <th className="px-2 py-2 text-center font-semibold">קליקים</th>
+                        <th className="px-2 py-2 text-center font-semibold">CTR</th>
+                        <th className="px-2 py-2 text-center font-semibold">CPC</th>
+                        <th className="px-2 py-2 text-center font-semibold">CPL</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ads.campaigns.map((c) => {
+                        const contacts = c.utmCampaign
+                          ? campaigns?.find((x) => x.campaign === c.utmCampaign)?.contactClicks ?? 0
+                          : 0;
+                        const cpl = contacts > 0 ? Math.round(c.cost / contacts) : null;
+                        return (
+                          <tr key={c.id} className="border-b border-stone-100">
+                            <td className="px-2 py-2 font-semibold text-stone-700">
+                              {c.name}
+                              {c.utmCampaign && <span className="text-xs text-stone-400"> · {c.utmCampaign}</span>}
+                            </td>
+                            <td className="px-2 text-center font-bold text-stone-900">₪{num(Math.round(c.cost))}</td>
+                            <td className="px-2 text-center text-stone-600">{num(c.clicks)}</td>
+                            <td className="px-2 text-center text-stone-500">{c.ctr.toFixed(1)}%</td>
+                            <td className="px-2 text-center text-stone-500">₪{c.avgCpc.toFixed(2)}</td>
+                            <td className="px-2 text-center font-bold text-[#2A6462]">
+                              {cpl != null ? `₪${num(cpl)}` : "—"}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {ads.byDay &&
+                    ads.byDay.length > 1 &&
+                    (() => {
+                      const max = Math.max(1, ...ads.byDay!.map((d) => d.cost));
+                      return (
+                        <div className="mt-4">
+                          <p className="mb-1 text-xs font-semibold text-stone-500">הוצאה יומית</p>
+                          <div className="flex items-end gap-0.5" style={{ height: "48px" }}>
+                            {ads.byDay!.map((d) => (
+                              <div
+                                key={d.date}
+                                title={`${d.date}: ₪${num(Math.round(d.cost))}`}
+                                className="flex-1 rounded-t bg-[#3D8C8A]"
+                                style={{ height: `${Math.max(4, (d.cost / max) * 100)}%` }}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  <p className="mt-3 text-[11px] text-stone-400">
+                    CPL = הוצאת הקמפיין ÷ הפניות שיוחסו אליו (utm_campaign). &quot;—&quot; = אין עדיין פנייה מיוחסת. הנתונים נמשכים
+                    אוטומטית מ-Google Ads.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-stone-400">אין הוצאה בטווח זה.</p>
+              )}
+            </div>
+          )}
 
           <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
             <h3 className="mb-3 text-base font-black text-stone-800">קמפיינים מובילים (לפי פניות)</h3>

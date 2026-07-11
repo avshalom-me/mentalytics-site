@@ -1,0 +1,161 @@
+// Read-only Google Ads API client — pulls per-campaign spend + performance so the
+// marketing dashboard can show real cost / CPC / CTR / CPL without manual entry.
+// Uses the REST API (searchStream) + a refresh-token OAuth flow — no new npm
+// dependency. All secrets come from env (set in Vercel); when they're absent the
+// dashboard degrades gracefully to a "not configured" state.
+
+const DEV_TOKEN = process.env.GOOGLE_ADS_DEVELOPER_TOKEN;
+const CLIENT_ID = process.env.GOOGLE_ADS_CLIENT_ID;
+const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
+const REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
+const CUSTOMER_ID = (process.env.GOOGLE_ADS_CUSTOMER_ID || "").replace(/\D/g, "");
+const LOGIN_CUSTOMER_ID = (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "").replace(/\D/g, "");
+// Google deprecates API versions ~3×/year; overridable via env so it can be
+// bumped without a code change if a call ever returns a version error.
+const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v18";
+
+export function googleAdsConfigured(): boolean {
+  return Boolean(DEV_TOKEN && CLIENT_ID && CLIENT_SECRET && REFRESH_TOKEN && CUSTOMER_ID);
+}
+
+export type AdsCampaign = {
+  id: string;
+  name: string;
+  utmCampaign: string | null; // parsed from the campaign's final_url_suffix
+  cost: number; // ILS
+  clicks: number;
+  impressions: number;
+  conversions: number;
+  ctr: number; // %
+  avgCpc: number; // ILS
+};
+
+export type AdsResult = {
+  campaigns: AdsCampaign[];
+  byDay: { date: string; cost: number }[];
+  total: number;
+};
+
+type GaqlRow = {
+  campaign?: { id?: string | number; name?: string; finalUrlSuffix?: string | null };
+  metrics?: {
+    costMicros?: string | number;
+    clicks?: string | number;
+    impressions?: string | number;
+    conversions?: string | number;
+  };
+  segments?: { date?: string };
+};
+
+async function getAccessToken(): Promise<string> {
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: CLIENT_ID!,
+      client_secret: CLIENT_SECRET!,
+      refresh_token: REFRESH_TOKEN!,
+      grant_type: "refresh_token",
+    }),
+    cache: "no-store",
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`OAuth refresh failed (${res.status}): ${text.slice(0, 300)}`);
+  return JSON.parse(text).access_token as string;
+}
+
+function parseUtmCampaign(suffix?: string | null): string | null {
+  if (!suffix) return null;
+  const m = /utm_campaign=([^&]+)/.exec(suffix);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function isoDate(d: Date): string {
+  return d.toISOString().slice(0, 10);
+}
+
+export async function fetchGoogleAdsCampaigns(days: number): Promise<AdsResult> {
+  const token = await getAccessToken();
+  const end = new Date();
+  const start = new Date(end.getTime() - (days - 1) * 86_400_000);
+  // GAQL uses snake_case field names; the REST response returns camelCase.
+  const query =
+    "SELECT campaign.id, campaign.name, campaign.final_url_suffix, " +
+    "metrics.cost_micros, metrics.clicks, metrics.impressions, metrics.conversions, segments.date " +
+    "FROM campaign " +
+    `WHERE segments.date BETWEEN '${isoDate(start)}' AND '${isoDate(end)}' ` +
+    "AND campaign.status != 'REMOVED'";
+
+  const res = await fetch(
+    `https://googleads.googleapis.com/${API_VERSION}/customers/${CUSTOMER_ID}/googleAds:searchStream`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "developer-token": DEV_TOKEN!,
+        ...(LOGIN_CUSTOMER_ID ? { "login-customer-id": LOGIN_CUSTOMER_ID } : {}),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ query }),
+      cache: "no-store",
+    }
+  );
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Google Ads API error (${res.status}): ${text.slice(0, 500)}`);
+
+  // searchStream returns an array of batches: [{ results: [...] }, ...]
+  const batches = JSON.parse(text) as { results?: GaqlRow[] }[];
+  const rows: GaqlRow[] = Array.isArray(batches) ? batches.flatMap((b) => b.results ?? []) : [];
+
+  const byId = new Map<string, AdsCampaign>();
+  const byDayMap = new Map<string, number>();
+
+  for (const r of rows) {
+    const id = String(r.campaign?.id ?? "");
+    if (!id) continue;
+    const cost = Number(r.metrics?.costMicros ?? 0) / 1_000_000;
+    const clicks = Number(r.metrics?.clicks ?? 0);
+    const impressions = Number(r.metrics?.impressions ?? 0);
+    const conversions = Number(r.metrics?.conversions ?? 0);
+    const date = r.segments?.date ?? "";
+
+    let c = byId.get(id);
+    if (!c) {
+      c = {
+        id,
+        name: r.campaign?.name ?? id,
+        utmCampaign: parseUtmCampaign(r.campaign?.finalUrlSuffix),
+        cost: 0,
+        clicks: 0,
+        impressions: 0,
+        conversions: 0,
+        ctr: 0,
+        avgCpc: 0,
+      };
+      byId.set(id, c);
+    }
+    c.cost += cost;
+    c.clicks += clicks;
+    c.impressions += impressions;
+    c.conversions += conversions;
+    if (date) byDayMap.set(date, (byDayMap.get(date) ?? 0) + cost);
+  }
+
+  const round2 = (n: number) => Math.round(n * 100) / 100;
+  const campaigns = [...byId.values()]
+    .map((c) => ({
+      ...c,
+      cost: round2(c.cost),
+      ctr: c.impressions > 0 ? Math.round((c.clicks / c.impressions) * 1000) / 10 : 0,
+      avgCpc: c.clicks > 0 ? round2(c.cost / c.clicks) : 0,
+    }))
+    .sort((a, b) => b.cost - a.cost);
+
+  const byDay = [...byDayMap.entries()]
+    .map(([date, cost]) => ({ date, cost: round2(cost) }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const total = round2(campaigns.reduce((s, c) => s + c.cost, 0));
+
+  return { campaigns, byDay, total };
+}
