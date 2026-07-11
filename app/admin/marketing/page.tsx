@@ -2,6 +2,7 @@
 
 import { useEffect, useState, Fragment } from "react";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
+import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
@@ -528,6 +529,251 @@ function FunnelsCampaigns() {
   );
 }
 
+// ---- PHASE 3: demand, supply quality, recruitment. Same lazy-fetch-existing-
+// endpoints pattern as Phase 2 (supply-demand / analytics / recruitment). ----
+
+type NameCount = { name: string; count: number };
+type Demographics = { byRegion: NameCount[]; byIssue: NameCount[]; byAgeBand: NameCount[]; byGender: NameCount[] };
+type Breakdowns = { total: number; withPhoto: number; acceptingNew: number; onlineCount: number };
+type RegionRow = { region: string; label: string; therapists: number; demand: number; demandPerTherapist: number | null; status: string };
+type CampaignRow = { campaign: string; visitors: number; signups: number; approved: number; paying: number };
+
+const REGION_ACTION: Record<string, { label: string; cls: string }> = {
+  needs_therapists: { label: "לגייס מטפלים", cls: "bg-amber-100 text-amber-700" },
+  needs_patients: { label: "להביא מטופלים", cls: "bg-[#EAF4F3] text-[#2A6462]" },
+  balanced: { label: "מאוזן", cls: "bg-green-100 text-green-700" },
+  empty: { label: "ריק", cls: "bg-stone-100 text-stone-400" },
+};
+
+function DemoCard({ title, items, labelOf }: { title: string; items: NameCount[]; labelOf: (k: string) => string }) {
+  const total = items.reduce((s, i) => s + i.count, 0) || 1;
+  const top = items.slice(0, 5);
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <h4 className="mb-2 text-sm font-black text-stone-700">{title}</h4>
+      <div className="space-y-1.5">
+        {top.map((i) => {
+          const share = Math.round((i.count / total) * 100);
+          return (
+            <div key={i.name}>
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-semibold text-stone-600">{labelOf(i.name)}</span>
+                <span className="text-stone-400">{share}%</span>
+              </div>
+              <div className="mt-0.5 h-1.5 rounded-full bg-stone-100">
+                <div className="h-full rounded-full bg-[#3D8C8A]" style={{ width: `${Math.max(3, share)}%` }} />
+              </div>
+            </div>
+          );
+        })}
+        {!top.length && <p className="text-xs text-stone-400">אין נתונים לטווח זה.</p>}
+      </div>
+    </div>
+  );
+}
+
+function QualityCard({ label, count, total }: { label: string; count: number; total: number }) {
+  const p = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-4 text-center">
+      <div className="text-3xl font-black text-[#2A6462]">{p}%</div>
+      <div className="mt-1 text-xs font-semibold text-stone-600">{label}</div>
+      <div className="text-[11px] text-stone-400">
+        {num(count)} מתוך {num(total)}
+      </div>
+    </div>
+  );
+}
+
+function DemandSupply() {
+  const [period, setPeriod] = useState<"week" | "month" | "all">("month");
+  const [demo, setDemo] = useState<Demographics | null>(null);
+  const [breakdowns, setBreakdowns] = useState<Breakdowns | null>(null);
+  const [regions, setRegions] = useState<RegionRow[] | null>(null);
+  const [sdMeta, setSdMeta] = useState<{ starvingCount: number; demandNoRegion: number; onlineTherapistCount: number } | null>(null);
+  const [campaigns, setCampaigns] = useState<CampaignRow[] | null>(null);
+  const [totalSignups, setTotalSignups] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let ignore = false;
+    setLoading(true);
+    setError("");
+    const asJson = (url: string) =>
+      fetch(url, { cache: "no-store" })
+        .then((r) => r.json())
+        .catch(() => ({ ok: false }));
+    Promise.all([
+      asJson(`/api/admin-supply-demand?period=${period}`),
+      asJson(`/api/admin-analytics?period=${period}`),
+      asJson(`/api/admin-therapist-campaigns?period=${period}`),
+    ])
+      .then(([sd, an, rec]) => {
+        if (ignore) return;
+        if (!sd?.ok || !an?.ok) {
+          setError("שגיאה בטעינת נתוני ביקוש/היצע");
+          return;
+        }
+        setDemo(an.demographics ?? null);
+        setBreakdowns(an.therapistBreakdowns ?? null);
+        setRegions(sd.regions ?? []);
+        setSdMeta({
+          starvingCount: sd.starvingCount ?? 0,
+          demandNoRegion: sd.demandNoRegion ?? 0,
+          onlineTherapistCount: sd.onlineTherapistCount ?? 0,
+        });
+        setCampaigns(rec?.ok ? rec.campaigns ?? [] : []);
+        setTotalSignups(rec?.ok ? rec.totalSignups ?? 0 : 0);
+      })
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [period]);
+
+  return (
+    <>
+      <div className="mb-5 flex justify-end">
+        <div className="inline-flex rounded-full border border-stone-200 bg-white p-1">
+          {P2_PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                period === p.key ? "bg-[#2A6462] text-white" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <p className="text-sm text-stone-400">טוען…</p>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {!loading && !error && (
+        <>
+          {/* Demand demographics — for ad targeting */}
+          {demo && (
+            <div className="mb-6">
+              <h3 className="mb-1 text-base font-black text-stone-800">דמוגרפיית ביקוש</h3>
+              <p className="mb-3 text-xs text-stone-500">מי המטופלים שמחפשים (מצפיות פרופיל) — לטרגוט פרסום.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <DemoCard title="אזור" items={demo.byRegion} labelOf={(k) => REGION_LABELS[k as keyof typeof REGION_LABELS] ?? k} />
+                <DemoCard title="נושא" items={demo.byIssue} labelOf={(k) => ISSUE_LABELS[k as keyof typeof ISSUE_LABELS] ?? k} />
+                <DemoCard title="גיל" items={demo.byAgeBand} labelOf={(k) => AGE_LABELS[k as keyof typeof AGE_LABELS] ?? k} />
+                <DemoCard title="מגדר" items={demo.byGender} labelOf={(k) => GENDER_LABELS[k as keyof typeof GENDER_LABELS] ?? k} />
+              </div>
+            </div>
+          )}
+
+          {/* Where to act — supply vs demand by region */}
+          {regions && (
+            <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-base font-black text-stone-800">איפה לפעול — היצע מול ביקוש</h3>
+                <a href="/admin/supply-demand" className="text-xs font-semibold text-[#3D8C8A] hover:underline">
+                  ניתוח מלא ←
+                </a>
+              </div>
+              <p className="mb-3 text-xs text-stone-500">
+                {sdMeta ? `${num(sdMeta.onlineTherapistCount)} מציעים אונליין · ${num(sdMeta.starvingCount)} מטפלים בלי פניות · ${num(sdMeta.demandNoRegion)} צפיות ללא אזור מזוהה.` : ""}
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-200 text-xs text-stone-500">
+                    <th className="px-2 py-2 text-right font-semibold">אזור</th>
+                    <th className="px-2 py-2 text-center font-semibold">היצע</th>
+                    <th className="px-2 py-2 text-center font-semibold">ביקוש</th>
+                    <th className="px-2 py-2 text-center font-semibold">ביקוש/מטפל</th>
+                    <th className="px-2 py-2 text-center font-semibold">פעולה</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...regions]
+                    .sort((a, b) => b.demand - a.demand)
+                    .map((r) => {
+                      const act = REGION_ACTION[r.status] ?? REGION_ACTION.empty;
+                      return (
+                        <tr key={r.region} className="border-b border-stone-100">
+                          <td className="px-2 py-2 font-semibold text-stone-700">{r.label}</td>
+                          <td className="px-2 text-center text-stone-600">{num(r.therapists)}</td>
+                          <td className="px-2 text-center text-stone-600">{num(r.demand)}</td>
+                          <td className="px-2 text-center text-stone-500">{r.demandPerTherapist ?? "—"}</td>
+                          <td className="px-2 text-center">
+                            <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${act.cls}`}>{act.label}</span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {/* Supply quality */}
+          {breakdowns && (
+            <div className="mb-6">
+              <h3 className="mb-1 text-base font-black text-stone-800">איכות היצע</h3>
+              <p className="mb-3 text-xs text-stone-500">מבין {num(breakdowns.total)} המטפלים המוצגים — משפיע ישירות על המרה.</p>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <QualityCard label="עם תמונת פרופיל" count={breakdowns.withPhoto} total={breakdowns.total} />
+                <QualityCard label="מקבלים מטופלים חדשים" count={breakdowns.acceptingNew} total={breakdowns.total} />
+                <QualityCard label="מציעים אונליין" count={breakdowns.onlineCount} total={breakdowns.total} />
+              </div>
+            </div>
+          )}
+
+          {/* Recruitment funnel */}
+          {campaigns && (
+            <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
+              <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="text-base font-black text-stone-800">משפך גיוס מטפלים</h3>
+                <a href="/admin/recruitment" className="text-xs font-semibold text-[#3D8C8A] hover:underline">
+                  ניתוח מלא ←
+                </a>
+              </div>
+              <p className="mb-3 text-xs text-stone-500">{num(totalSignups)} הרשמות מטפלים בטווח — לפי קמפיין.</p>
+              {campaigns.some((c) => c.signups > 0 || c.visitors > 0) ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-xs text-stone-500">
+                      <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
+                      <th className="px-2 py-2 text-center font-semibold">מבקרים</th>
+                      <th className="px-2 py-2 text-center font-semibold">נרשמו</th>
+                      <th className="px-2 py-2 text-center font-semibold">אושרו</th>
+                      <th className="px-2 py-2 text-center font-semibold">משלמים</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaigns
+                      .filter((c) => c.signups > 0 || c.visitors > 0)
+                      .map((c) => (
+                        <tr key={c.campaign} className="border-b border-stone-100">
+                          <td className="px-2 py-2 font-semibold text-stone-700">{c.campaign}</td>
+                          <td className="px-2 text-center text-stone-500">{num(c.visitors)}</td>
+                          <td className="px-2 text-center font-bold text-stone-900">{num(c.signups)}</td>
+                          <td className="px-2 text-center text-stone-600">{num(c.approved)}</td>
+                          <td className="px-2 text-center text-stone-600">{num(c.paying)}</td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-stone-400">אין עדיין הרשמות מתויגות בקמפיין לטווח זה.</p>
+              )}
+            </div>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 export default function MarketingPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
@@ -535,7 +781,7 @@ export default function MarketingPage() {
   const [period, setPeriod] = useState("d7");
   const [showAi, setShowAi] = useState(false);
   const [openMetric, setOpenMetric] = useState<string | null>(null);
-  const [tab, setTab] = useState<"overview" | "funnels">("overview");
+  const [tab, setTab] = useState<"overview" | "funnels" | "demand">("overview");
 
   useEffect(() => {
     setLoading(true);
@@ -564,6 +810,7 @@ export default function MarketingPage() {
             [
               ["overview", "סקירה"],
               ["funnels", "משפכים וקמפיינים"],
+              ["demand", "ביקוש והיצע"],
             ] as const
           ).map(([key, label]) => (
             <button
@@ -579,6 +826,8 @@ export default function MarketingPage() {
         </div>
 
         {tab === "funnels" && <FunnelsCampaigns />}
+
+        {tab === "demand" && <DemandSupply />}
 
         {tab === "overview" && (
           <>
