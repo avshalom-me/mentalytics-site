@@ -573,6 +573,9 @@ async function aggregateMarketingData(period: Period): Promise<AttributionResult
       supabaseAdmin
         .from("therapist_profile_views")
         .select("channel")
+        // match_card = card impression, not a profile view — exclude so viewToClick
+        // matches /admin/attribution (the admin_attribution_report RPC).
+        .neq("source", "match_card")
         .gte("viewed_at", period.since)
         .lt("viewed_at", period.until),
     ),

@@ -508,7 +508,10 @@ function FunnelsCampaigns() {
                           <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
                           <td className="px-2 text-center font-bold text-stone-900">
                             {num(r.contacts)}
-                            {r.sessions > 0 && r.contacts > 0 && <span className="text-stone-400"> · {conv}%</span>}
+                            {/* conv = clicks ÷ distinct sessions; hide when >100% (multiple contacts in one session) */}
+                            {r.sessions > 0 && r.contacts > 0 && conv <= 100 && (
+                              <span className="text-stone-400"> · {conv}%</span>
+                            )}
                           </td>
                           <td className="px-2 text-center text-stone-500">{r.whatsapp || "—"}</td>
                           <td className="px-2 text-center text-stone-500">{r.phone || "—"}</td>
@@ -600,7 +603,7 @@ function FunnelsCampaigns() {
                   לא מחובר. הזן את משתני הסביבה של Google Ads ב-Vercel כדי לראות הוצאה, CPC ו-CPL אוטומטית.
                 </p>
               ) : ads.ok === false ? (
-                <p className="text-sm text-red-600">לא ניתן לטעון נתוני Google Ads: {ads.error}</p>
+                <p className="text-sm text-red-600">לא ניתן לטעון נתוני Google Ads: {ads.error ?? "שגיאה"}</p>
               ) : ads.campaigns && ads.campaigns.length ? (
                 <>
                   <table className="w-full text-sm">
@@ -616,8 +619,10 @@ function FunnelsCampaigns() {
                     </thead>
                     <tbody>
                       {ads.campaigns.map((c) => {
+                        // Join on the uncapped per-campaign funnel data (not the
+                        // top-15 topCampaigns), so a campaign ranked #16+ still gets a CPL.
                         const contacts = c.utmCampaign
-                          ? campaigns?.find((x) => x.campaign === c.utmCampaign)?.contactClicks ?? 0
+                          ? campFunnel?.find((x) => x.campaign === c.utmCampaign)?.contacts ?? 0
                           : 0;
                         const cpl = contacts > 0 ? Math.round(c.cost / contacts) : null;
                         return (

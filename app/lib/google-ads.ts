@@ -1,3 +1,5 @@
+import "server-only"; // compile-time tripwire: this module holds API secrets and must never be pulled into a client bundle.
+
 // Read-only Google Ads API client — pulls per-campaign spend + performance so the
 // marketing dashboard can show real cost / CPC / CTR / CPL without manual entry.
 // Uses the REST API (searchStream) + a refresh-token OAuth flow — no new npm
@@ -72,7 +74,15 @@ function parseUtmCampaign(suffix?: string | null): string | null {
 }
 
 function isoDate(d: Date): string {
-  return d.toISOString().slice(0, 10);
+  // Format in the ad account's timezone (Asia/Jerusalem), NOT UTC — GAQL
+  // segments.date is in the account TZ, so a UTC date would shift the window a
+  // day and drop today's spend during the 00:00–03:00 UTC-vs-Israel gap.
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Jerusalem",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 export async function fetchGoogleAdsCampaigns(days: number): Promise<AdsResult> {
@@ -104,8 +114,9 @@ export async function fetchGoogleAdsCampaigns(days: number): Promise<AdsResult> 
   const text = await res.text();
   if (!res.ok) throw new Error(`Google Ads API error (${res.status}): ${text.slice(0, 500)}`);
 
-  // searchStream returns an array of batches: [{ results: [...] }, ...]
-  const batches = JSON.parse(text) as { results?: GaqlRow[] }[];
+  // searchStream returns an array of batches: [{ results: [...] }, ...]. Some
+  // zero-row ranges return an empty body — treat that as no results, not a parse error.
+  const batches = text.trim() ? (JSON.parse(text) as { results?: GaqlRow[] }[]) : [];
   const rows: GaqlRow[] = Array.isArray(batches) ? batches.flatMap((b) => b.results ?? []) : [];
 
   const byId = new Map<string, AdsCampaign>();
