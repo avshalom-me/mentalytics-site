@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import QuizCtaBanner from "../QuizCtaBanner";
 
 export const metadata: Metadata = {
   title: "מה חשוב לבדוק כשבוחרים מטפל?",
@@ -69,9 +70,12 @@ export default function ChoosingTherapistPage() {
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">מה חשוב לבדוק כשבוחרים מטפל?</h1>
-      <p className="text-stone-600 leading-7 mb-10">
+      <p className="text-stone-600 leading-7 mb-6">
         בחירת מטפל היא אחת ההחלטות החשובות שתקבלו. המחקר מראה שהתאמה טובה בין מטופל למטפל מכפילה את הסיכוי להצלחת הטיפול.
+        המדריך הזה יעזור לכם לדעת מה לבדוק ואיך למצוא את המטפל/ת הנכון/ה — ואם תרצו קיצור דרך, השאלון שלנו יתאים לכם התאמה אישית.
       </p>
+
+      <QuizCtaBanner heading="מחפשים מטפל/ת ולא יודעים מאיפה להתחיל?" />
 
       {/* Criteria */}
       <div className="space-y-4 mb-10">
@@ -114,6 +118,8 @@ export default function ChoosingTherapistPage() {
       <div className="mt-6 rounded-2xl p-5 bg-emerald-50 border border-emerald-200 text-sm text-emerald-900 leading-7">
         <strong>חשוב:</strong> מותר לנסות מטפל אחר אם הפגישות הראשונות לא מרגישות נכונות. זה לא כישלון — זה חלק מהתהליך.
       </div>
+
+      <QuizCtaBanner />
 
       <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
         <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
