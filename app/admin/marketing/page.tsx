@@ -596,9 +596,11 @@ function FunnelsCampaigns() {
                         </div>
                       );
                     })()}
-                  <p className="mt-3 text-[11px] text-stone-400">
-                    CPL = הוצאת הקמפיין ÷ הפניות שיוחסו אליו (utm_campaign). &quot;—&quot; = אין עדיין פנייה מיוחסת. הנתונים נמשכים
-                    אוטומטית מ-Google Ads.
+                  <p className="mt-3 text-[11px] leading-5 text-stone-400">
+                    הוצאה, קליקים, CTR ו-CPC נמשכים אוטומטית מ-Google Ads.{" "}
+                    <span className="font-semibold text-stone-500">CPL מחושב אצלנו</span> — הוצאת הקמפיין ÷ הפניות שהוא הביא
+                    (לפי utm_campaign). Google לא יודעת CPL, כי היא לא רואה מי יצר קשר באתר. &quot;—&quot; = אין utm_campaign זמין
+                    בקמפיין (למשל קמפיין ישן שה-utm שלו בכתובת ולא ב-Final URL suffix), או שעדיין אין פנייה מיוחסת.
                   </p>
                 </>
               ) : (
