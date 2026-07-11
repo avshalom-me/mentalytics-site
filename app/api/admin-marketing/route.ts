@@ -3,85 +3,82 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
-// PHASE 1 marketing/leads dashboard — READ-ONLY. Serves the AI insight from the
-// latest weekly report, 30-day KPIs (with the prior 30 days for deltas), and
-// the business-plan targets annotated with the actuals we can derive today.
-// Funnels / campaigns / demand come in later phases.
+// PHASE 1 marketing/leads dashboard — READ-ONLY. KPIs over 2 / 7 / 30 days (each
+// with the prior same-length window for a delta), the latest weekly-report AI
+// insight (shown on-demand on the page), and business-plan targets annotated
+// with the actuals we can derive today. Funnels / campaigns come in later phases.
 
-function daysAgoIso(days: number): string {
-  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+const PERIODS = [2, 7, 30] as const;
+
+function iso(daysAgo: number): string {
+  return new Date(Date.now() - daysAgo * 86_400_000).toISOString();
 }
 
-// A metric whose name ends in `_max` is a ceiling (lower is better); everything
-// else is a goal (higher is better). Drives the pass/fail direction on the page.
+// A metric whose name contains `_max` is a ceiling (lower is better) — e.g.
+// cpl_max, cac_max, churn_max_pct; everything else is a goal (higher is better).
+// Drives the pass/fail direction on the page.
 function directionFor(metric: string): "ceiling" | "goal" {
-  return metric.endsWith("_max") ? "ceiling" : "goal";
+  return metric.includes("_max") ? "ceiling" : "goal";
+}
+
+function countRows(table: string, col: string, sinceIso: string, untilIso?: string) {
+  let q = supabaseAdmin.from(table).select("id", { count: "exact", head: true }).gte(col, sinceIso);
+  if (untilIso) q = q.lt(col, untilIso);
+  return q;
+}
+function countExplain(sinceIso: string) {
+  return supabaseAdmin
+    .from("analytics_events")
+    .select("id", { count: "exact", head: true })
+    .eq("event_type", "therapist_explain_click")
+    .gte("created_at", sinceIso);
 }
 
 export async function GET() {
   try {
-    const d30 = daysAgoIso(30);
-    const d60 = daysAgoIso(60);
+    const aiQ = supabaseAdmin
+      .from("weekly_reports")
+      .select(
+        "week_start, week_end, ai_summary, ai_recommendations, ai_silent_therapists_advice, ai_marketing, created_at"
+      )
+      .order("created_at", { ascending: false })
+      .limit(1);
+    // "therapists_total" in the business plan = all registered therapists (the
+    // top of the supply funnel), not just paying ones. `paying` is surfaced
+    // separately as context.
+    const therapistsTotalQ = supabaseAdmin
+      .from("therapists")
+      .select("id", { count: "exact", head: true });
+    const payingQ = supabaseAdmin
+      .from("therapists")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "paying")
+      .eq("admin_approved", true);
+    const targetsQ = supabaseAdmin
+      .from("plan_targets")
+      .select("id, metric, month, scenario, target")
+      .order("month", { ascending: true });
 
-    const [
-      aiRes,
-      contactsRes,
-      contactsPrevRes,
-      profileViewsRes,
-      explainClicksRes,
-      payingRes,
-      planTargetsRes,
-    ] = await Promise.all([
-      // Latest weekly report → the AI narrative.
-      supabaseAdmin
-        .from("weekly_reports")
-        .select(
-          "week_start, week_end, ai_summary, ai_recommendations, ai_silent_therapists_advice, ai_marketing, created_at"
-        )
-        .order("created_at", { ascending: false })
-        .limit(1),
-      // Contacts (therapist contact clicks), last 30 days.
-      supabaseAdmin
-        .from("therapist_contact_clicks")
-        .select("id", { count: "exact", head: true })
-        .gte("clicked_at", d30),
-      // Contacts, the 30 days before that (for the delta).
-      supabaseAdmin
-        .from("therapist_contact_clicks")
-        .select("id", { count: "exact", head: true })
-        .gte("clicked_at", d60)
-        .lt("clicked_at", d30),
-      // Profile views, last 30 days.
-      supabaseAdmin
-        .from("therapist_profile_views")
-        .select("id", { count: "exact", head: true })
-        .gte("viewed_at", d30),
-      // "AI explain" clicks on therapist cards, last 30 days.
-      supabaseAdmin
-        .from("analytics_events")
-        .select("id", { count: "exact", head: true })
-        .eq("event_type", "therapist_explain_click")
-        .gte("created_at", d30),
-      // Paying, admin-approved therapists (the therapists_total actual).
-      supabaseAdmin
-        .from("therapists")
-        .select("id", { count: "exact", head: true })
-        .eq("status", "paying")
-        .eq("admin_approved", true),
-      // Business-plan targets — all rows.
-      supabaseAdmin
-        .from("plan_targets")
-        .select("id, metric, month, scenario, target")
-        .order("month", { ascending: true }),
+    // 4 counts per period, in order: contacts, contactsPrev, profileViews, explainClicks.
+    const periodQs = PERIODS.flatMap((d) => [
+      countRows("therapist_contact_clicks", "clicked_at", iso(d)),
+      countRows("therapist_contact_clicks", "clicked_at", iso(2 * d), iso(d)),
+      countRows("therapist_profile_views", "viewed_at", iso(d)),
+      countExplain(iso(d)),
+    ]);
+
+    // Two typed Promise.all groups (kept apart so the period results stay a
+    // single count-query type), run concurrently.
+    const [[aiRes, totalRes, payingRes, targetsRes], periodRes] = await Promise.all([
+      Promise.all([aiQ, therapistsTotalQ, payingQ, targetsQ]),
+      Promise.all(periodQs),
     ]);
 
     if (aiRes.error) throw aiRes.error;
-    if (contactsRes.error) throw contactsRes.error;
-    if (contactsPrevRes.error) throw contactsPrevRes.error;
-    if (profileViewsRes.error) throw profileViewsRes.error;
-    if (explainClicksRes.error) throw explainClicksRes.error;
+    if (totalRes.error) throw totalRes.error;
     if (payingRes.error) throw payingRes.error;
-    if (planTargetsRes.error) throw planTargetsRes.error;
+    if (targetsRes.error) throw targetsRes.error;
+    for (const r of periodRes) if (r.error) throw r.error;
 
     const report = aiRes.data?.[0] ?? null;
     const ai = report
@@ -95,22 +92,27 @@ export async function GET() {
         }
       : null;
 
-    const contacts = contactsRes.count ?? 0;
-    const contactsPrev = contactsPrevRes.count ?? 0;
-    const profileViews = profileViewsRes.count ?? 0;
-    const explainClicks = explainClicksRes.count ?? 0;
-    const conversionPct = profileViews > 0 ? (contacts / profileViews) * 100 : 0;
+    const kpis: Record<string, unknown> = {};
+    PERIODS.forEach((d, i) => {
+      const b = i * 4;
+      const contacts = periodRes[b].count ?? 0;
+      const contactsPrev = periodRes[b + 1].count ?? 0;
+      const profileViews = periodRes[b + 2].count ?? 0;
+      const explainClicks = periodRes[b + 3].count ?? 0;
+      kpis[`d${d}`] = {
+        contacts,
+        contactsPrev,
+        profileViews,
+        explainClicks,
+        conversionPct: profileViews > 0 ? (contacts / profileViews) * 100 : 0,
+      };
+    });
 
+    const totalTherapists = totalRes.count ?? 0;
     const paying = payingRes.count ?? 0;
-
-    // Actuals we can compute right now. Everything not here stays null (e.g.
-    // CPL / CAC need ad spend, lead→treatment needs outcome data, churn is not
-    // wired up yet). The page renders those as "טרם מחושב".
-    const actualByMetric: Record<string, number> = {
-      therapists_total: paying,
-    };
-
-    const targets = (planTargetsRes.data ?? []).map((t) => ({
+    // Actuals we can compute now; everything else stays null → "טרם מחושב".
+    const actualByMetric: Record<string, number> = { therapists_total: totalTherapists };
+    const targets = (targetsRes.data ?? []).map((t) => ({
       id: t.id,
       metric: t.metric,
       month: t.month,
@@ -123,14 +125,9 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       ai,
-      kpis: {
-        contacts,
-        contactsPrev,
-        profileViews,
-        conversionPct,
-        explainClicks,
-      },
+      kpis,
       targets,
+      payingTherapists: paying,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {
