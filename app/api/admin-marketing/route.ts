@@ -26,6 +26,17 @@ function countRows(table: string, col: string, sinceIso: string, untilIso?: stri
   if (untilIso) q = q.lt(col, untilIso);
   return q;
 }
+// Real profile-page views only. `source='match_card'` rows are impressions (a
+// card shown in match results), not views — the rest of admin (analytics /
+// stats) treats them as impressions, so they must be excluded here too or the
+// conversion denominator inflates and view→contact % under-reports.
+function countProfileViews(sinceIso: string) {
+  return supabaseAdmin
+    .from("therapist_profile_views")
+    .select("id", { count: "exact", head: true })
+    .neq("source", "match_card")
+    .gte("viewed_at", sinceIso);
+}
 // "Personal AI analysis" = both explain surfaces: the treatment-type one
 // (recommendation_explain_click, live for a while) and the newer per-therapist
 // one (therapist_explain_click). Counting only the latter under-reported to 0.
@@ -64,7 +75,7 @@ export async function GET() {
     const registeredQ = tCount().not("full_name", "is", null).neq("full_name", "");
     const paidQ = tCount().eq("status", "paying").eq("promotion_source", "paid");
     const trialQ = tCount().eq("status", "paying").neq("promotion_source", "paid");
-    const freeQ = tCount().eq("status", "approved");
+    const freeQ = tCount().eq("status", "approved").eq("admin_approved", true);
 
     // Questionnaires completed in the current calendar month (UTC on Vercel).
     const now = new Date();
@@ -79,7 +90,7 @@ export async function GET() {
     const periodQs = PERIODS.flatMap((d) => [
       countRows("therapist_contact_clicks", "clicked_at", iso(d)),
       countRows("therapist_contact_clicks", "clicked_at", iso(2 * d), iso(d)),
-      countRows("therapist_profile_views", "viewed_at", iso(d)),
+      countProfileViews(iso(d)),
       countExplain(iso(d)),
     ]);
 
@@ -135,6 +146,7 @@ export async function GET() {
       paid,
       trial,
       free,
+      listed: paid + trial + free, // approved & shown to patients (= /admin dashboard's paying+approved)
       paying: paid + trial,
       pendingNamed: Math.max(0, registered - paid - trial - free),
       incomplete: Math.max(0, total - registered),
@@ -142,8 +154,10 @@ export async function GET() {
     const quizThisMonth = quizMonthRes.count ?? 0;
 
     // Actuals we can compute now; everything else stays null → "טרם מחושב".
+    // therapists_total = listed/active supply (consistent with the main admin
+    // dashboard), not raw registrations.
     const actualByMetric: Record<string, number> = {
-      therapists_total: registered,
+      therapists_total: supply.listed,
       questionnaires_month: quizThisMonth,
     };
     const targets = (targetsRes.data ?? []).map((t) => ({

@@ -39,6 +39,7 @@ type Supply = {
   paid: number;
   trial: number;
   free: number;
+  listed: number;
   paying: number;
   pendingNamed: number;
   incomplete: number;
@@ -63,9 +64,9 @@ const PERIODS: { key: string; label: string }[] = [
 // Insertion order here is the display order (most important first).
 const METRIC_INFO: Record<string, { label: string; explain: string }> = {
   therapists_total: {
-    label: "מטפלים רשומים",
+    label: "מטפלים פעילים",
     explain:
-      "מטפלים שהשלימו הרשמה (יש להם שם) — לא כולל הרשמות לא-גמורות שרק נפתחו ולא הוגשו. הפילוח המלא מופיע בכרטיס 'פילוח היצע מטפלים' למעלה.",
+      "מטפלים מאושרים המוצגים למטופלים (בתשלום + מקודמים + חינמיים) — לא כולל ממתינים לאישור והרשמות לא-גמורות. עקבי עם לוח הבקרה הראשי. הפילוח המלא בכרטיס 'פילוח היצע מטפלים' למעלה.",
   },
   questionnaires_month: {
     label: "שאלונים בחודש",
@@ -187,7 +188,7 @@ function SupplyPanel({ s }: { s: Supply }) {
       <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-base font-black text-stone-800">פילוח היצע מטפלים</h2>
         <span className="text-xs text-stone-500">
-          {num(s.registered)} רשומים · {num(s.paying)} פעילים (בתשלום/מקודמים)
+          {num(s.listed)} מוצגים למטופלים · {num(s.registered)} רשומים
         </span>
       </div>
       <p className="mb-3 text-xs text-stone-500">
