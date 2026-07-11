@@ -332,6 +332,7 @@ function FunnelCard({
 function FunnelsCampaigns() {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [channels, setChannels] = useState<AttrChannel[] | null>(null);
+  const [totalContacts, setTotalContacts] = useState(0);
   const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
   const [cac, setCac] = useState<FinMonth | null>(null);
@@ -341,23 +342,31 @@ function FunnelsCampaigns() {
   useEffect(() => {
     setLoading(true);
     setError("");
+    // Each fetch resolves to {ok:false} on failure so Promise.all never rejects
+    // and one endpoint failing doesn't blank the whole tab.
+    const asJson = (url: string) =>
+      fetch(url, { cache: "no-store" })
+        .then((r) => r.json())
+        .catch(() => ({ ok: false }));
     Promise.all([
-      fetch(`/api/admin-attribution?period=${period}`, { cache: "no-store" }).then((r) => r.json()),
-      fetch(`/api/admin-analytics?period=${period}`, { cache: "no-store" }).then((r) => r.json()),
-      fetch(`/api/admin-crm/finance`, { cache: "no-store" }).then((r) => r.json()),
+      asJson(`/api/admin-attribution?period=${period}`),
+      asJson(`/api/admin-analytics?period=${period}`),
+      asJson(`/api/admin-crm/finance`),
     ])
       .then(([a, an, fin]) => {
-        if (!a?.ok || !an?.ok || !fin?.ok) {
+        // Core = attribution + analytics. Finance (CAC) is optional; if it fails
+        // the CAC card shows "unavailable" but the funnels still render.
+        if (!a?.ok || !an?.ok) {
           setError("שגיאה בטעינת נתוני המשפכים");
           return;
         }
         setChannels(a.channels ?? []);
+        setTotalContacts(a.totals?.contactClicks ?? 0);
         setCampaigns(a.topCampaigns ?? []);
         setFunnel(an.funnelBySource ?? null);
-        const months: FinMonth[] = fin.months ?? [];
+        const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
         setCac(months.length ? months[months.length - 1] : null);
       })
-      .catch(() => setError("שגיאה בטעינת נתוני המשפכים"))
       .finally(() => setLoading(false));
   }, [period]);
 
@@ -382,60 +391,72 @@ function FunnelsCampaigns() {
       {loading && <p className="text-sm text-stone-400">טוען…</p>}
       {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {!loading && !error && funnel && (
+      {!loading && !error && (
         <>
-          <div className="mb-5 grid gap-3 lg:grid-cols-2">
-            <FunnelCard
-              eyebrow="מסלול 1"
-              title="מאגר המטפלים"
-              headline={pct(funnel.directory.contactClicks, funnel.directory.profileViews)}
-              steps={[
-                { label: "חשיפות בדירקטורי", value: funnel.directory.impressions, color: "#C2DFDE" },
-                { label: "צפיות פרופיל", value: funnel.directory.profileViews, color: "#3D8C8A" },
-                { label: "פניות", value: funnel.directory.contactClicks, color: "#D49018" },
-              ]}
-            />
-            <FunnelCard
-              eyebrow="מסלול 2 ✦"
-              title="שאלון ההתאמה"
-              headline={pct(funnel.match.contactClicks, funnel.match.profileViews)}
-              steps={[
-                { label: "סיימו שאלון", value: funnel.match.pageViews, color: "#2A6462" },
-                { label: "צפיות פרופיל (התאמה)", value: funnel.match.profileViews, color: "#3D8C8A" },
-                { label: "פניות", value: funnel.match.contactClicks, color: "#D49018" },
-              ]}
-              note={`${num(funnel.match.impressions)} כרטיסי מטפל הוצגו בהתאמות`}
-            />
-          </div>
+          {funnel && (
+            <div className="mb-5 grid gap-3 lg:grid-cols-2">
+              <FunnelCard
+                eyebrow="מסלול 1"
+                title="מאגר המטפלים"
+                headline={pct(funnel.directory.contactClicks, funnel.directory.profileViews)}
+                steps={[
+                  { label: "חשיפות בדירקטורי", value: funnel.directory.impressions, color: "#C2DFDE" },
+                  { label: "צפיות פרופיל", value: funnel.directory.profileViews, color: "#3D8C8A" },
+                  { label: "פניות", value: funnel.directory.contactClicks, color: "#D49018" },
+                ]}
+              />
+              <FunnelCard
+                eyebrow="מסלול 2 ✦"
+                title="שאלון ההתאמה"
+                headline={pct(funnel.match.contactClicks, funnel.match.profileViews)}
+                steps={[
+                  { label: "סיימו שאלון", value: funnel.match.pageViews, color: "#2A6462" },
+                  { label: "צפיות פרופיל (התאמה)", value: funnel.match.profileViews, color: "#3D8C8A" },
+                  { label: "פניות", value: funnel.match.contactClicks, color: "#D49018" },
+                ]}
+                note={`${num(funnel.match.impressions)} כרטיסי מטפל הוצגו בהתאמות`}
+              />
+            </div>
+          )}
 
           <div className="mb-5 grid gap-3 lg:grid-cols-3">
             <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5 lg:col-span-2">
-              <h3 className="mb-3 text-base font-black text-stone-800">פניות לפי ערוץ</h3>
-              {channels && channels.length ? (
+              <div className="mb-3 flex items-baseline justify-between gap-2">
+                <h3 className="text-base font-black text-stone-800">פניות לפי ערוץ</h3>
+                <a href="/admin/attribution" className="text-xs font-semibold text-[#3D8C8A] hover:underline">
+                  ניתוח מלא ←
+                </a>
+              </div>
+              {/* Contacts + share only. Per-channel view→contact from attribution is
+                  unreliable here (match_card impressions land under "unknown" as
+                  profile views), so efficiency lives on /admin/attribution. */}
+              {channels && channels.some((c) => c.contactClicks > 0) ? (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-stone-200 text-xs text-stone-500">
                       <th className="px-2 py-2 text-right font-semibold">ערוץ</th>
-                      <th className="px-2 py-2 text-center font-semibold">צפיות</th>
                       <th className="px-2 py-2 text-center font-semibold">פניות</th>
-                      <th className="px-2 py-2 text-center font-semibold">המרה</th>
+                      <th className="px-2 py-2 text-center font-semibold">חלק</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {channels.map((c) => (
-                      <tr key={c.channel} className="border-b border-stone-100">
-                        <td className="px-2 py-2 font-semibold text-stone-700">
-                          {CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}
-                        </td>
-                        <td className="px-2 text-center text-stone-600">{num(c.profileViews)}</td>
-                        <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
-                        <td className="px-2 text-center text-stone-500">{c.viewToClick.toFixed(1)}%</td>
-                      </tr>
-                    ))}
+                    {channels
+                      .filter((c) => c.contactClicks > 0)
+                      .map((c) => (
+                        <tr key={c.channel} className="border-b border-stone-100">
+                          <td className="px-2 py-2 font-semibold text-stone-700">
+                            {CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}
+                          </td>
+                          <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
+                          <td className="px-2 text-center text-stone-500">
+                            {totalContacts > 0 ? `${Math.round((c.contactClicks / totalContacts) * 100)}%` : "—"}
+                          </td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               ) : (
-                <p className="text-sm text-stone-400">אין נתוני ערוצים לטווח זה.</p>
+                <p className="text-sm text-stone-400">אין עדיין פניות מתויגות בערוץ לטווח זה.</p>
               )}
             </div>
 
