@@ -10,9 +10,10 @@ const CLIENT_SECRET = process.env.GOOGLE_ADS_CLIENT_SECRET;
 const REFRESH_TOKEN = process.env.GOOGLE_ADS_REFRESH_TOKEN;
 const CUSTOMER_ID = (process.env.GOOGLE_ADS_CUSTOMER_ID || "").replace(/\D/g, "");
 const LOGIN_CUSTOMER_ID = (process.env.GOOGLE_ADS_LOGIN_CUSTOMER_ID || "").replace(/\D/g, "");
-// Google deprecates API versions ~3×/year; overridable via env so it can be
-// bumped without a code change if a call ever returns a version error.
-const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v18";
+// Google deprecates API versions ~3×/year (keeps ~3 recent majors live);
+// overridable via env so it can be bumped without a code change if a call ever
+// returns a 404/version error.
+const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v24";
 
 export function googleAdsConfigured(): boolean {
   return Boolean(DEV_TOKEN && CLIENT_ID && CLIENT_SECRET && REFRESH_TOKEN && CUSTOMER_ID);
