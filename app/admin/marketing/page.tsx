@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
+import { CHANNEL_LABELS } from "@/app/lib/attribution";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
@@ -255,6 +256,234 @@ function currentTargets(targets: Target[]): Target[] {
   return out;
 }
 
+// ---- PHASE 2: funnels + campaigns. Reuses the existing read-only admin
+// endpoints (attribution / analytics / finance) rather than re-implementing the
+// aggregation here — the cross-page audit flagged that duplication as the main
+// risk, so this tab lazy-fetches those APIs when opened. ----
+
+type FunnelSrc = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
+type AttrChannel = {
+  channel: string;
+  profileViews: number;
+  contactClicks: number;
+  viewToClick: number;
+};
+type FinMonth = { month: string; ad_spend: number; new_paying: number; cac_actual: number | null };
+
+const P2_PERIODS: { key: "week" | "month" | "all"; label: string }[] = [
+  { key: "week", label: "7 ימים" },
+  { key: "month", label: "30 ימים" },
+  { key: "all", label: "הכל" },
+];
+
+function pct(n: number, d: number): number {
+  return d > 0 ? Math.round((n / d) * 1000) / 10 : 0;
+}
+
+function FunnelCard({
+  eyebrow,
+  title,
+  steps,
+  headline,
+  note,
+}: {
+  eyebrow: string;
+  title: string;
+  steps: { label: string; value: number; color: string }[];
+  headline: number;
+  note?: string;
+}) {
+  const top = steps[0]?.value || 1;
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-5">
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <div>
+          <p className="text-xs font-semibold text-[#3D8C8A]">{eyebrow}</p>
+          <h3 className="text-base font-black text-stone-800">{title}</h3>
+        </div>
+        <div className="text-center">
+          <div className="text-lg font-black text-[#D49018]">{headline.toFixed(1)}%</div>
+          <div className="text-[11px] text-stone-400">צפייה→פנייה</div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        {steps.map((s, i) => {
+          const w = Math.max(6, (s.value / top) * 100);
+          const conv = i > 0 && steps[i - 1].value > 0 ? (s.value / steps[i - 1].value) * 100 : null;
+          return (
+            <div key={s.label}>
+              <div className="mb-0.5 flex items-center justify-between text-xs">
+                <span className="font-semibold text-stone-600">{s.label}</span>
+                <span className="text-stone-500">
+                  {num(s.value)}
+                  {conv != null && <span className="text-stone-400"> · {conv.toFixed(0)}%</span>}
+                </span>
+              </div>
+              <div className="h-6 rounded-lg" style={{ width: `${w}%`, minWidth: "2.5rem", background: s.color }} />
+            </div>
+          );
+        })}
+      </div>
+      {note && <p className="mt-3 text-xs text-stone-400">{note}</p>}
+    </div>
+  );
+}
+
+function FunnelsCampaigns() {
+  const [period, setPeriod] = useState<"week" | "month" | "all">("month");
+  const [channels, setChannels] = useState<AttrChannel[] | null>(null);
+  const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
+  const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
+  const [cac, setCac] = useState<FinMonth | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    setLoading(true);
+    setError("");
+    Promise.all([
+      fetch(`/api/admin-attribution?period=${period}`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/admin-analytics?period=${period}`, { cache: "no-store" }).then((r) => r.json()),
+      fetch(`/api/admin-crm/finance`, { cache: "no-store" }).then((r) => r.json()),
+    ])
+      .then(([a, an, fin]) => {
+        if (!a?.ok || !an?.ok || !fin?.ok) {
+          setError("שגיאה בטעינת נתוני המשפכים");
+          return;
+        }
+        setChannels(a.channels ?? []);
+        setCampaigns(a.topCampaigns ?? []);
+        setFunnel(an.funnelBySource ?? null);
+        const months: FinMonth[] = fin.months ?? [];
+        setCac(months.length ? months[months.length - 1] : null);
+      })
+      .catch(() => setError("שגיאה בטעינת נתוני המשפכים"))
+      .finally(() => setLoading(false));
+  }, [period]);
+
+  return (
+    <>
+      <div className="mb-5 flex justify-end">
+        <div className="inline-flex rounded-full border border-stone-200 bg-white p-1">
+          {P2_PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                period === p.key ? "bg-[#2A6462] text-white" : "text-stone-500 hover:text-stone-800"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {loading && <p className="text-sm text-stone-400">טוען…</p>}
+      {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {!loading && !error && funnel && (
+        <>
+          <div className="mb-5 grid gap-3 lg:grid-cols-2">
+            <FunnelCard
+              eyebrow="מסלול 1"
+              title="מאגר המטפלים"
+              headline={pct(funnel.directory.contactClicks, funnel.directory.profileViews)}
+              steps={[
+                { label: "חשיפות בדירקטורי", value: funnel.directory.impressions, color: "#C2DFDE" },
+                { label: "צפיות פרופיל", value: funnel.directory.profileViews, color: "#3D8C8A" },
+                { label: "פניות", value: funnel.directory.contactClicks, color: "#D49018" },
+              ]}
+            />
+            <FunnelCard
+              eyebrow="מסלול 2 ✦"
+              title="שאלון ההתאמה"
+              headline={pct(funnel.match.contactClicks, funnel.match.profileViews)}
+              steps={[
+                { label: "סיימו שאלון", value: funnel.match.pageViews, color: "#2A6462" },
+                { label: "צפיות פרופיל (התאמה)", value: funnel.match.profileViews, color: "#3D8C8A" },
+                { label: "פניות", value: funnel.match.contactClicks, color: "#D49018" },
+              ]}
+              note={`${num(funnel.match.impressions)} כרטיסי מטפל הוצגו בהתאמות`}
+            />
+          </div>
+
+          <div className="mb-5 grid gap-3 lg:grid-cols-3">
+            <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5 lg:col-span-2">
+              <h3 className="mb-3 text-base font-black text-stone-800">פניות לפי ערוץ</h3>
+              {channels && channels.length ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-xs text-stone-500">
+                      <th className="px-2 py-2 text-right font-semibold">ערוץ</th>
+                      <th className="px-2 py-2 text-center font-semibold">צפיות</th>
+                      <th className="px-2 py-2 text-center font-semibold">פניות</th>
+                      <th className="px-2 py-2 text-center font-semibold">המרה</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {channels.map((c) => (
+                      <tr key={c.channel} className="border-b border-stone-100">
+                        <td className="px-2 py-2 font-semibold text-stone-700">
+                          {CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}
+                        </td>
+                        <td className="px-2 text-center text-stone-600">{num(c.profileViews)}</td>
+                        <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
+                        <td className="px-2 text-center text-stone-500">{c.viewToClick.toFixed(1)}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="text-sm text-stone-400">אין נתוני ערוצים לטווח זה.</p>
+              )}
+            </div>
+
+            <div className="rounded-2xl border border-stone-200 bg-white p-5">
+              <h3 className="mb-1 text-base font-black text-stone-800">CAC אמיתי</h3>
+              <p className="mb-3 text-xs text-stone-500">עלות רכישת מטפל משלם — החודש הנוכחי (מעמוד הכספים).</p>
+              {cac && cac.cac_actual != null ? (
+                <>
+                  <div className="text-3xl font-black text-[#2A6462]">₪{num(cac.cac_actual)}</div>
+                  <div className="mt-2 text-xs text-stone-500">
+                    ₪{num(cac.ad_spend)} הוצאת פרסום ÷ {num(cac.new_paying)} מטפלים חדשים
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-stone-400">לא הוזנה הוצאת פרסום החודש בעמוד הכספים — לכן CAC לא מחושב.</p>
+              )}
+            </div>
+          </div>
+
+          <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
+            <h3 className="mb-3 text-base font-black text-stone-800">קמפיינים מובילים (לפי פניות)</h3>
+            {campaigns && campaigns.length ? (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-200 text-xs text-stone-500">
+                    <th className="px-2 py-2 text-right font-semibold">קמפיין (utm_campaign)</th>
+                    <th className="px-2 py-2 text-center font-semibold">פניות</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map((c) => (
+                    <tr key={c.campaign} className="border-b border-stone-100">
+                      <td className="px-2 py-2 font-semibold text-stone-700">{c.campaign}</td>
+                      <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <p className="text-sm text-stone-400">אין עדיין פניות מתויגות בקמפיין לטווח זה.</p>
+            )}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 export default function MarketingPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
@@ -262,6 +491,7 @@ export default function MarketingPage() {
   const [period, setPeriod] = useState("d7");
   const [showAi, setShowAi] = useState(false);
   const [openMetric, setOpenMetric] = useState<string | null>(null);
+  const [tab, setTab] = useState<"overview" | "funnels">("overview");
 
   useEffect(() => {
     setLoading(true);
@@ -279,31 +509,56 @@ export default function MarketingPage() {
   return (
     <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-black text-stone-900">שיווק ופניות</h1>
-            <p className="mt-1 text-sm text-stone-500">תמונת מצב שיווקית — מדדים, יעדים, ותובנת AI לפי דרישה.</p>
-          </div>
-          {/* Period toggle */}
-          <div className="inline-flex rounded-full border border-stone-200 bg-white p-1">
-            {PERIODS.map((p) => (
-              <button
-                key={p.key}
-                onClick={() => setPeriod(p.key)}
-                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
-                  period === p.key ? "bg-[#2A6462] text-white" : "text-stone-500 hover:text-stone-800"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+        <div className="mb-4">
+          <h1 className="text-2xl font-black text-stone-900">שיווק ופניות</h1>
+          <p className="mt-1 text-sm text-stone-500">תמונת מצב שיווקית — מדדים, משפכים, יעדים ותובנת AI.</p>
         </div>
 
-        {loading && <p className="text-sm text-stone-400">טוען…</p>}
-        {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+        {/* Tabs */}
+        <div className="mb-6 flex gap-1 border-b border-stone-200">
+          {(
+            [
+              ["overview", "סקירה"],
+              ["funnels", "משפכים וקמפיינים"],
+            ] as const
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-bold transition ${
+                tab === key ? "border-[#2A6462] text-[#2A6462]" : "border-transparent text-stone-400 hover:text-stone-700"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
-        {data && !loading && k && (
+        {tab === "funnels" && <FunnelsCampaigns />}
+
+        {tab === "overview" && (
+          <>
+            {/* Period toggle */}
+            <div className="mb-5 flex justify-end">
+              <div className="inline-flex rounded-full border border-stone-200 bg-white p-1">
+                {PERIODS.map((p) => (
+                  <button
+                    key={p.key}
+                    onClick={() => setPeriod(p.key)}
+                    className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                      period === p.key ? "bg-[#2A6462] text-white" : "text-stone-500 hover:text-stone-800"
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {loading && <p className="text-sm text-stone-400">טוען…</p>}
+            {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+            {data && !loading && k && (
           <>
             {/* KPI row — DATA FIRST */}
             <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -434,6 +689,8 @@ export default function MarketingPage() {
             </div>
 
             <p className="text-xs text-stone-400">עודכן: {new Date(data.generated_at).toLocaleString("he-IL")}</p>
+          </>
+        )}
           </>
         )}
       </div>
