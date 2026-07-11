@@ -308,7 +308,10 @@ function FunnelCard({
       </div>
       <div className="space-y-2">
         {steps.map((s, i) => {
-          const w = Math.max(6, (s.value / top) * 100);
+          // Clamp: a step can exceed the previous one (e.g. one quiz → many
+          // profile opens), which isn't a monotone funnel — cap the bar at 100%
+          // and hide the ">100%" step conversion since it reads as nonsense.
+          const w = Math.min(100, Math.max(6, (s.value / top) * 100));
           const conv = i > 0 && steps[i - 1].value > 0 ? (s.value / steps[i - 1].value) * 100 : null;
           return (
             <div key={s.label}>
@@ -316,7 +319,7 @@ function FunnelCard({
                 <span className="font-semibold text-stone-600">{s.label}</span>
                 <span className="text-stone-500">
                   {num(s.value)}
-                  {conv != null && <span className="text-stone-400"> · {conv.toFixed(0)}%</span>}
+                  {conv != null && conv <= 100 && <span className="text-stone-400"> · {conv.toFixed(0)}%</span>}
                 </span>
               </div>
               <div className="h-6 rounded-lg" style={{ width: `${w}%`, minWidth: "2.5rem", background: s.color }} />
@@ -340,6 +343,7 @@ function FunnelsCampaigns() {
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let ignore = false; // guard against a slower earlier request overwriting a newer one
     setLoading(true);
     setError("");
     // Each fetch resolves to {ok:false} on failure so Promise.all never rejects
@@ -354,6 +358,7 @@ function FunnelsCampaigns() {
       asJson(`/api/admin-crm/finance`),
     ])
       .then(([a, an, fin]) => {
+        if (ignore) return;
         // Core = attribution + analytics. Finance (CAC) is optional; if it fails
         // the CAC card shows "unavailable" but the funnels still render.
         if (!a?.ok || !an?.ok) {
@@ -364,10 +369,16 @@ function FunnelsCampaigns() {
         setTotalContacts(a.totals?.contactClicks ?? 0);
         setCampaigns(a.topCampaigns ?? []);
         setFunnel(an.funnelBySource ?? null);
+        // finance builds months newest-first, so the CURRENT month is index 0.
         const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
-        setCac(months.length ? months[months.length - 1] : null);
+        setCac(months[0] ?? null);
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (!ignore) setLoading(false);
+      });
+    return () => {
+      ignore = true;
+    };
   }, [period]);
 
   return (
@@ -418,6 +429,7 @@ function FunnelsCampaigns() {
               />
             </div>
           )}
+          {!funnel && <p className="mb-5 text-sm text-stone-400">אין נתוני משפך לטווח זה.</p>}
 
           <div className="mb-5 grid gap-3 lg:grid-cols-3">
             <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5 lg:col-span-2">
@@ -462,7 +474,9 @@ function FunnelsCampaigns() {
 
             <div className="rounded-2xl border border-stone-200 bg-white p-5">
               <h3 className="mb-1 text-base font-black text-stone-800">CAC אמיתי</h3>
-              <p className="mb-3 text-xs text-stone-500">עלות רכישת מטפל משלם — החודש הנוכחי (מעמוד הכספים).</p>
+              <p className="mb-3 text-xs text-stone-500">
+                עלות רכישת מטפל משלם — {cac ? formatMonth(cac.month) : "החודש הנוכחי"} (מעמוד הכספים).
+              </p>
               {cac && cac.cac_actual != null ? (
                 <>
                   <div className="text-3xl font-black text-[#2A6462]">₪{num(cac.cac_actual)}</div>
