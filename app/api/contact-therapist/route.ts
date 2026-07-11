@@ -108,9 +108,10 @@ export async function POST(req: NextRequest) {
       `,
     });
 
-    await supabaseAdmin
+    const { error: clickErr } = await supabaseAdmin
       .from("therapist_contact_clicks")
       .insert({ therapist_id, click_type: "site_message", source: safeSource, ...sanitizeAttribution(body) });
+    if (clickErr) console.error("therapist_contact_clicks (site_message) insert failed:", clickErr.message);
 
     // CRM lead capture — best-effort. The patient's message already went out
     // above; a failure here must never surface to the sender.

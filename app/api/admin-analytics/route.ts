@@ -106,7 +106,10 @@ export async function GET(req: NextRequest) {
     const dirViews = views.filter(v => v.source === "directory").length;
     const matchImpressions = views.filter(v => v.source === "match_card").length;
     const matchViews = views.filter(v => v.source === "match").length;
-    const dirClicks = clicks.filter(c => (c.source ?? "directory") === "directory").length;
+    // Everything that isn't a match-flow click counts as directory-side (directory,
+    // profile-page site messages, or legacy null) so site_message contacts aren't
+    // dropped from the funnel total.
+    const dirClicks = clicks.filter(c => c.source !== "match").length;
     const matchClicks = clicks.filter(c => c.source === "match").length;
 
     const funnelBySource = {
