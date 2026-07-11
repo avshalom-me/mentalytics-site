@@ -360,6 +360,16 @@ type AdsData = {
   total?: number;
   error?: string;
 };
+type CampaignFunnelRow = {
+  campaign: string;
+  sessions: number;
+  viewed_profile: number;
+  contacts: number;
+  whatsapp: number;
+  phone: number;
+  email: number;
+  site_message: number;
+};
 
 function FunnelsCampaigns() {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
@@ -369,6 +379,7 @@ function FunnelsCampaigns() {
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
   const [cac, setCac] = useState<FinMonth | null>(null);
   const [ads, setAds] = useState<AdsData | null>(null);
+  const [campFunnel, setCampFunnel] = useState<CampaignFunnelRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -387,8 +398,9 @@ function FunnelsCampaigns() {
       asJson(`/api/admin-analytics?period=${period}`),
       asJson(`/api/admin-crm/finance`),
       asJson(`/api/admin-google-ads?period=${period}`),
+      asJson(`/api/admin-campaign-funnel?period=${period}`),
     ])
-      .then(([a, an, fin, gads]) => {
+      .then(([a, an, fin, gads, cf]) => {
         if (ignore) return;
         // Core = attribution + analytics. Finance (CAC) and Google Ads are
         // optional; if they fail their cards show a fallback but the rest renders.
@@ -404,6 +416,7 @@ function FunnelsCampaigns() {
         const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
         setCac(months[0] ?? null);
         setAds((gads as AdsData) ?? null);
+        setCampFunnel(cf?.ok ? (cf.rows as CampaignFunnelRow[]) ?? [] : []);
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -462,6 +475,55 @@ function FunnelsCampaigns() {
             </div>
           )}
           {!funnel && <p className="mb-5 text-sm text-stone-400">אין נתוני משפך לטווח זה.</p>}
+
+          {/* Per-campaign on-site funnel: ad click -> profile view -> contact by type */}
+          {campFunnel && campFunnel.some((r) => r.campaign.startsWith("g-")) && (
+            <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
+              <h3 className="mb-1 text-base font-black text-stone-800">משפך לפי קמפיין ממומן</h3>
+              <p className="mb-3 text-xs text-stone-500">
+                מה עשו מי שהגיעו מכל קמפיין: כניסות ← צפו בפרופיל ← פנו (לפי סוג הפנייה).
+              </p>
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-stone-200 text-xs text-stone-500">
+                    <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
+                    <th className="px-2 py-2 text-center font-semibold">כניסות</th>
+                    <th className="px-2 py-2 text-center font-semibold">צפו בפרופיל</th>
+                    <th className="px-2 py-2 text-center font-semibold">פניות</th>
+                    <th className="px-2 py-2 text-center font-semibold">💬</th>
+                    <th className="px-2 py-2 text-center font-semibold">📞</th>
+                    <th className="px-2 py-2 text-center font-semibold">✉️</th>
+                    <th className="px-2 py-2 text-center font-semibold">📝</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campFunnel
+                    .filter((r) => r.campaign.startsWith("g-"))
+                    .map((r) => {
+                      const conv = r.sessions > 0 ? Math.round((r.contacts / r.sessions) * 1000) / 10 : 0;
+                      return (
+                        <tr key={r.campaign} className="border-b border-stone-100">
+                          <td className="px-2 py-2 font-semibold text-stone-700">{r.campaign}</td>
+                          <td className="px-2 text-center text-stone-600">{num(r.sessions)}</td>
+                          <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
+                          <td className="px-2 text-center font-bold text-stone-900">
+                            {num(r.contacts)}
+                            {r.sessions > 0 && r.contacts > 0 && <span className="text-stone-400"> · {conv}%</span>}
+                          </td>
+                          <td className="px-2 text-center text-stone-500">{r.whatsapp || "—"}</td>
+                          <td className="px-2 text-center text-stone-500">{r.phone || "—"}</td>
+                          <td className="px-2 text-center text-stone-500">{r.email || "—"}</td>
+                          <td className="px-2 text-center text-stone-500">{r.site_message || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[11px] text-stone-400">
+                💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר. כניסות/צפיות = סשנים ייחודיים; הכל לפי utm_campaign.
+              </p>
+            </div>
+          )}
 
           <div className="mb-5 grid gap-3 lg:grid-cols-3">
             <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5 lg:col-span-2">
