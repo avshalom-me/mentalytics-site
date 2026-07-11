@@ -33,11 +33,22 @@ type Target = {
   direction: "ceiling" | "goal";
 };
 
+type Supply = {
+  total: number;
+  registered: number;
+  paid: number;
+  trial: number;
+  free: number;
+  paying: number;
+  pendingNamed: number;
+  incomplete: number;
+};
+
 type Data = {
   ai: Ai | null;
   kpis: Record<string, PeriodKpis>;
   targets: Target[];
-  payingTherapists: number;
+  supply: Supply;
   generated_at: string;
 };
 
@@ -54,11 +65,11 @@ const METRIC_INFO: Record<string, { label: string; explain: string }> = {
   therapists_total: {
     label: "מטפלים רשומים",
     explain:
-      "סך המטפלים הרשומים בפלטפורמה (כל הסטטוסים) — ראש משפך ההיצע. בפועל מחושב מספר כל המטפלים במערכת.",
+      "מטפלים שהשלימו הרשמה (יש להם שם) — לא כולל הרשמות לא-גמורות שרק נפתחו ולא הוגשו. הפילוח המלא מופיע בכרטיס 'פילוח היצע מטפלים' למעלה.",
   },
   questionnaires_month: {
     label: "שאלונים בחודש",
-    explain: "כמה שאלוני התאמה הושלמו החודש — ראש המשפך של מסלול השאלון. טרם מחובר למדידה אוטומטית כאן.",
+    explain: "כמה שאלוני התאמה הושלמו החודש (אירוע quiz_complete) — ראש המשפך של מסלול השאלון.",
   },
   cpl_max: {
     label: "עלות מקס׳ לליד (CPL)",
@@ -151,6 +162,55 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
     <span className={`font-bold ${up ? "text-green-700" : "text-red-600"}`}>
       {up ? "▲" : "▼"} {Math.abs(pct)}% מ{unit} הקודם
     </span>
+  );
+}
+
+// Supply split by commitment tier. The 3 "active" tiers (listed on the site)
+// get a proportional stacked bar; pending/incomplete are pipeline states shown
+// as separate chips so they're never conflated with real supply.
+function SupplyPanel({ s }: { s: Supply }) {
+  const active = s.paid + s.trial + s.free || 1;
+  const bar = [
+    { label: "משלמים", n: s.paid, color: "#2A6462" },
+    { label: "מקודמים (מתנה)", n: s.trial, color: "#3D8C8A" },
+    { label: "חינמיים", n: s.free, color: "#C2DFDE" },
+  ];
+  const chips = [
+    { label: "משלמים", n: s.paid, dot: "#2A6462", hint: "תשלום בפועל" },
+    { label: "מקודמים (מתנה)", n: s.trial, dot: "#3D8C8A", hint: "קידום/ניסיון חינם" },
+    { label: "חינמיים", n: s.free, dot: "#C2DFDE", hint: "מאושרים בדירקטורי" },
+    { label: "ממתינים לאישור", n: s.pendingNamed, dot: "#D49018", hint: "הוגשו, טרם אושרו" },
+    { label: "הרשמות לא-גמורות", n: s.incomplete, dot: "#DDE9E8", hint: "נפתחו ולא הושלמו" },
+  ];
+  return (
+    <div className="mb-5 rounded-2xl border border-stone-200 bg-white p-5">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-black text-stone-800">פילוח היצע מטפלים</h2>
+        <span className="text-xs text-stone-500">
+          {num(s.registered)} רשומים · {num(s.paying)} פעילים (בתשלום/מקודמים)
+        </span>
+      </div>
+      <p className="mb-3 text-xs text-stone-500">
+        מתוך {num(s.total)} שנפתחו במערכת — {num(s.incomplete)} הרשמות לא-גמורות אינן נספרות כרשומים.
+      </p>
+      <div className="mb-3 flex h-3 w-full overflow-hidden rounded-full bg-stone-100">
+        {bar.map((x) => (
+          <div key={x.label} style={{ width: `${(x.n / active) * 100}%`, background: x.color }} title={`${x.label}: ${x.n}`} />
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+        {chips.map((t) => (
+          <div key={t.label} className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+            <div className="flex items-center gap-1.5">
+              <span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: t.dot }} />
+              <span className="text-xl font-black text-stone-900">{num(t.n)}</span>
+            </div>
+            <div className="mt-0.5 text-xs font-semibold text-stone-600">{t.label}</div>
+            <div className="text-[11px] text-stone-400">{t.hint}</div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -256,6 +316,9 @@ export default function MarketingPage() {
               <KpiCard label="צפיות פרופיל" value={num(k.profileViews)} />
             </div>
 
+            {/* Supply tier breakdown */}
+            <SupplyPanel s={data.supply} />
+
             {/* Targets vs actuals — short, one row per metric, click for explanation */}
             <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
               <h2 className="mb-1 text-base font-black text-stone-800">יעדים מול ביצוע</h2>
@@ -301,7 +364,8 @@ export default function MarketingPage() {
                               {info.explain}
                               {t.metric === "therapists_total" && (
                                 <span className="mt-1 block font-semibold text-[#2A6462]">
-                                  מתוכם {num(data.payingTherapists)} משלמים ומאושרים.
+                                  מתוכם {num(data.supply.paid)} בתשלום, {num(data.supply.trial)} מקודמים במתנה,{" "}
+                                  {num(data.supply.free)} חינמיים. ({num(data.supply.incomplete)} הרשמות לא-גמורות לא נספרות.)
                                 </span>
                               )}
                               <span className="mt-1 block text-stone-400">

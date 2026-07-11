@@ -26,11 +26,14 @@ function countRows(table: string, col: string, sinceIso: string, untilIso?: stri
   if (untilIso) q = q.lt(col, untilIso);
   return q;
 }
+// "Personal AI analysis" = both explain surfaces: the treatment-type one
+// (recommendation_explain_click, live for a while) and the newer per-therapist
+// one (therapist_explain_click). Counting only the latter under-reported to 0.
 function countExplain(sinceIso: string) {
   return supabaseAdmin
     .from("analytics_events")
     .select("id", { count: "exact", head: true })
-    .eq("event_type", "therapist_explain_click")
+    .in("event_type", ["recommendation_explain_click", "therapist_explain_click"])
     .gte("created_at", sinceIso);
 }
 
@@ -43,21 +46,34 @@ export async function GET() {
       )
       .order("created_at", { ascending: false })
       .limit(1);
-    // "therapists_total" in the business plan = all registered therapists (the
-    // top of the supply funnel), not just paying ones. `paying` is surfaced
-    // separately as context.
-    const therapistsTotalQ = supabaseAdmin
-      .from("therapists")
-      .select("id", { count: "exact", head: true });
-    const payingQ = supabaseAdmin
-      .from("therapists")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "paying")
-      .eq("admin_approved", true);
     const targetsQ = supabaseAdmin
       .from("plan_targets")
       .select("id, metric, month, scenario, target")
       .order("month", { ascending: true });
+
+    // Supply tiers. "therapists_total" (the plan metric) = therapists who
+    // actually completed registration, i.e. have a name — NOT the ~86 nameless
+    // abandoned drafts. We count each tier so the dashboard can show the split:
+    //   paid  = real paying (promotion_source='paid')
+    //   trial = gifted / promoted for free (paying status but not 'paid')
+    //   free  = approved directory listings (not paying)
+    // pendingNamed (submitted, awaiting approval) and incomplete (no name) are
+    // derived on the client from total/registered.
+    const tCount = () => supabaseAdmin.from("therapists").select("id", { count: "exact", head: true });
+    const totalQ = tCount();
+    const registeredQ = tCount().not("full_name", "is", null).neq("full_name", "");
+    const paidQ = tCount().eq("status", "paying").eq("promotion_source", "paid");
+    const trialQ = tCount().eq("status", "paying").neq("promotion_source", "paid");
+    const freeQ = tCount().eq("status", "approved");
+
+    // Questionnaires completed in the current calendar month (UTC on Vercel).
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)).toISOString();
+    const quizMonthQ = supabaseAdmin
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("event_type", "quiz_complete")
+      .gte("created_at", monthStart);
 
     // 4 counts per period, in order: contacts, contactsPrev, profileViews, explainClicks.
     const periodQs = PERIODS.flatMap((d) => [
@@ -69,15 +85,15 @@ export async function GET() {
 
     // Two typed Promise.all groups (kept apart so the period results stay a
     // single count-query type), run concurrently.
-    const [[aiRes, totalRes, payingRes, targetsRes], periodRes] = await Promise.all([
-      Promise.all([aiQ, therapistsTotalQ, payingQ, targetsQ]),
-      Promise.all(periodQs),
-    ]);
+    const [[aiRes, targetsRes, totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes], periodRes] =
+      await Promise.all([
+        Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, trialQ, freeQ, quizMonthQ]),
+        Promise.all(periodQs),
+      ]);
 
     if (aiRes.error) throw aiRes.error;
-    if (totalRes.error) throw totalRes.error;
-    if (payingRes.error) throw payingRes.error;
     if (targetsRes.error) throw targetsRes.error;
+    for (const r of [totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
 
     const report = aiRes.data?.[0] ?? null;
@@ -108,10 +124,28 @@ export async function GET() {
       };
     });
 
-    const totalTherapists = totalRes.count ?? 0;
-    const paying = payingRes.count ?? 0;
+    const total = totalRes.count ?? 0;
+    const registered = registeredRes.count ?? 0;
+    const paid = paidRes.count ?? 0;
+    const trial = trialRes.count ?? 0;
+    const free = freeRes.count ?? 0;
+    const supply = {
+      total,
+      registered,
+      paid,
+      trial,
+      free,
+      paying: paid + trial,
+      pendingNamed: Math.max(0, registered - paid - trial - free),
+      incomplete: Math.max(0, total - registered),
+    };
+    const quizThisMonth = quizMonthRes.count ?? 0;
+
     // Actuals we can compute now; everything else stays null → "טרם מחושב".
-    const actualByMetric: Record<string, number> = { therapists_total: totalTherapists };
+    const actualByMetric: Record<string, number> = {
+      therapists_total: registered,
+      questionnaires_month: quizThisMonth,
+    };
     const targets = (targetsRes.data ?? []).map((t) => ({
       id: t.id,
       metric: t.metric,
@@ -127,7 +161,7 @@ export async function GET() {
       ai,
       kpis,
       targets,
-      payingTherapists: paying,
+      supply,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {
