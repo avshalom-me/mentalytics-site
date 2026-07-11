@@ -5,7 +5,7 @@ import { getOrCreateSessionId } from "./session";
 import { captureAttribution, getAttribution } from "./attribution";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view" | "therapist_explain_click" | "matching_click";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   const session_id = getOrCreateSessionId();
@@ -24,6 +24,21 @@ export function trackQuizStep(quizType: "adults" | "kids", step: string, progres
 export function trackQuizComplete(quizType: "adults" | "kids") {
   sendTrack("quiz_complete", { metadata: { quiz_type: quizType } });
   gaEvent("quiz_complete", { quiz_type: quizType });
+}
+
+/**
+ * Patient clicked "✦ ניתוח אישי" — an AI explanation of why a SPECIFIC therapist
+ * fits them. The highest-intent action short of a contact click; previously
+ * fired the OpenAI call but was tracked nowhere. Persisted per therapist_id so
+ * the admin can see which therapists drive deep evaluation.
+ */
+export function trackTherapistExplain(therapistId: string, quizType: "adults" | "kids") {
+  sendTrack("therapist_explain_click", { therapist_id: therapistId, source: quizType === "adults" ? "adult" : "child" });
+}
+
+/** Patient entered the matching flow for a treatment type (top of the match funnel). */
+export function trackMatchingClick(quizType: "adults" | "kids", treatment: string) {
+  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata: { treatment } });
 }
 
 export function usePageView(page: string, source?: string) {

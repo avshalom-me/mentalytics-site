@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
-import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain } from "@/app/lib/useTrack";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import {
   parseKidsBoxes,
@@ -2604,6 +2604,7 @@ function KidsMatchSection({ A, score, selection }: {
 
   async function fetchExplanation(t: KidsMatchResult) {
     if (explainLoading[t.id] || explainData[t.id]) return;
+    trackTherapistExplain(t.id, "kids");
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const res = await fetch("/api/explain-match", {

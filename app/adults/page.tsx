@@ -8,7 +8,7 @@ import type {
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
-import { trackQuizStep, trackQuizComplete } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { buildAdultFacts } from "@/app/lib/explain-facts";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
@@ -767,6 +767,7 @@ export default function AdultsPage() {
 
   async function fetchExplanation(t: any) {
     if (explainLoading[t.id] || explainData[t.id]) return;
+    trackTherapistExplain(t.id, "adults");
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const recommendedTreatments = scoring?.recommendations.map(r => r.treatment) ?? [];
@@ -2448,7 +2449,7 @@ export default function AdultsPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); }}
+              onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); trackMatchingClick("adults", group.treatment); }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
             >
               🔍 מצא/י לי מטפל — {group.treatmentLabel} ←
@@ -2494,6 +2495,7 @@ export default function AdultsPage() {
           setSelectedRec(null);
           setScreen("match-form");
           (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
+          trackMatchingClick("adults", "combined_emotional");
         }}
         className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
@@ -2517,6 +2519,7 @@ export default function AdultsPage() {
           setSelectedRec(null);
           setScreen("match-form");
           (window as any).gtag?.("event", "matching_click", { treatment: "combined_relationship" });
+          trackMatchingClick("adults", "combined_relationship");
         }}
         className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--gold-dark), var(--gold))", border: "1px solid #C8961A" }}
