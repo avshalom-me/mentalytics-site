@@ -611,20 +611,25 @@ function DemandSupply() {
     ])
       .then(([sd, an, rec]) => {
         if (ignore) return;
-        if (!sd?.ok || !an?.ok) {
-          setError("שגיאה בטעינת נתוני ביקוש/היצע");
-          return;
+        // Render each section from whatever loaded — one endpoint failing must
+        // not blank the others.
+        if (an?.ok) {
+          setDemo(an.demographics ?? null);
+          setBreakdowns(an.therapistBreakdowns ?? null);
         }
-        setDemo(an.demographics ?? null);
-        setBreakdowns(an.therapistBreakdowns ?? null);
-        setRegions(sd.regions ?? []);
-        setSdMeta({
-          starvingCount: sd.starvingCount ?? 0,
-          demandNoRegion: sd.demandNoRegion ?? 0,
-          onlineTherapistCount: sd.onlineTherapistCount ?? 0,
-        });
-        setCampaigns(rec?.ok ? rec.campaigns ?? [] : []);
-        setTotalSignups(rec?.ok ? rec.totalSignups ?? 0 : 0);
+        if (sd?.ok) {
+          setRegions(sd.regions ?? []);
+          setSdMeta({
+            starvingCount: sd.starvingCount ?? 0,
+            demandNoRegion: sd.demandNoRegion ?? 0,
+            onlineTherapistCount: sd.onlineTherapistCount ?? 0,
+          });
+        }
+        if (rec?.ok) {
+          setCampaigns(rec.campaigns ?? []);
+          setTotalSignups(rec.totalSignups ?? 0);
+        }
+        if (!sd?.ok && !an?.ok && !rec?.ok) setError("שגיאה בטעינת נתוני ביקוש/היצע");
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -661,7 +666,9 @@ function DemandSupply() {
           {demo && (
             <div className="mb-6">
               <h3 className="mb-1 text-base font-black text-stone-800">דמוגרפיית ביקוש</h3>
-              <p className="mb-3 text-xs text-stone-500">מי המטופלים שמחפשים (מצפיות פרופיל) — לטרגוט פרסום.</p>
+              <p className="mb-3 text-xs text-stone-500">
+                מי המטופלים שמחפשים (משוקלל לפי צפיות וחשיפות בהתאמות) — לטרגוט פרסום.
+              </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <DemoCard title="אזור" items={demo.byRegion} labelOf={(k) => REGION_LABELS[k as keyof typeof REGION_LABELS] ?? k} />
                 <DemoCard title="נושא" items={demo.byIssue} labelOf={(k) => ISSUE_LABELS[k as keyof typeof ISSUE_LABELS] ?? k} />
@@ -681,7 +688,10 @@ function DemandSupply() {
                 </a>
               </div>
               <p className="mb-3 text-xs text-stone-500">
-                {sdMeta ? `${num(sdMeta.onlineTherapistCount)} מציעים אונליין · ${num(sdMeta.starvingCount)} מטפלים בלי פניות · ${num(sdMeta.demandNoRegion)} צפיות ללא אזור מזוהה.` : ""}
+                ביקוש = צפיות פרופיל וחשיפות בהתאמות.
+                {sdMeta
+                  ? ` ${num(sdMeta.onlineTherapistCount)} מציעים אונליין (מצב נוכחי) · ${num(sdMeta.starvingCount)} בלי פניות בטווח · ${num(sdMeta.demandNoRegion)} צפיות ללא אזור.`
+                  : ""}
               </p>
               <table className="w-full text-sm">
                 <thead>
@@ -718,8 +728,12 @@ function DemandSupply() {
           {/* Supply quality */}
           {breakdowns && (
             <div className="mb-6">
-              <h3 className="mb-1 text-base font-black text-stone-800">איכות היצע</h3>
-              <p className="mb-3 text-xs text-stone-500">מבין {num(breakdowns.total)} המטפלים המוצגים — משפיע ישירות על המרה.</p>
+              <h3 className="mb-1 text-base font-black text-stone-800">
+                איכות היצע <span className="text-xs font-normal text-stone-400">(מצב נוכחי)</span>
+              </h3>
+              <p className="mb-3 text-xs text-stone-500">
+                מבין {num(breakdowns.total)} המטפלים המוצגים כרגע — משפיע ישירות על המרה. אינו מושפע מהטווח.
+              </p>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                 <QualityCard label="עם תמונת פרופיל" count={breakdowns.withPhoto} total={breakdowns.total} />
                 <QualityCard label="מקבלים מטופלים חדשים" count={breakdowns.acceptingNew} total={breakdowns.total} />
@@ -739,30 +753,35 @@ function DemandSupply() {
               </div>
               <p className="mb-3 text-xs text-stone-500">{num(totalSignups)} הרשמות מטפלים בטווח — לפי קמפיין.</p>
               {campaigns.some((c) => c.signups > 0 || c.visitors > 0) ? (
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-stone-200 text-xs text-stone-500">
-                      <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
-                      <th className="px-2 py-2 text-center font-semibold">מבקרים</th>
-                      <th className="px-2 py-2 text-center font-semibold">נרשמו</th>
-                      <th className="px-2 py-2 text-center font-semibold">אושרו</th>
-                      <th className="px-2 py-2 text-center font-semibold">משלמים</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {campaigns
-                      .filter((c) => c.signups > 0 || c.visitors > 0)
-                      .map((c) => (
-                        <tr key={c.campaign} className="border-b border-stone-100">
-                          <td className="px-2 py-2 font-semibold text-stone-700">{c.campaign}</td>
-                          <td className="px-2 text-center text-stone-500">{num(c.visitors)}</td>
-                          <td className="px-2 text-center font-bold text-stone-900">{num(c.signups)}</td>
-                          <td className="px-2 text-center text-stone-600">{num(c.approved)}</td>
-                          <td className="px-2 text-center text-stone-600">{num(c.paying)}</td>
-                        </tr>
-                      ))}
-                  </tbody>
-                </table>
+                <>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-200 text-xs text-stone-500">
+                        <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
+                        <th className="px-2 py-2 text-center font-semibold">מבקרים</th>
+                        <th className="px-2 py-2 text-center font-semibold">נרשמו</th>
+                        <th className="px-2 py-2 text-center font-semibold">אושרו</th>
+                        <th className="px-2 py-2 text-center font-semibold">משלמים</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {campaigns
+                        .filter((c) => c.signups > 0 || c.visitors > 0)
+                        .map((c) => (
+                          <tr key={c.campaign} className="border-b border-stone-100">
+                            <td className="px-2 py-2 font-semibold text-stone-700">{c.campaign}</td>
+                            <td className="px-2 text-center text-stone-500">{c.visitors > 0 ? num(c.visitors) : "—"}</td>
+                            <td className="px-2 text-center font-bold text-stone-900">{num(c.signups)}</td>
+                            <td className="px-2 text-center text-stone-600">{num(c.approved)}</td>
+                            <td className="px-2 text-center text-stone-600">{num(c.paying)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                  <p className="mt-2 text-[11px] text-stone-400">
+                    מבקרים מיוחסים לפי UTM; הרשמות לפי שדה הקמפיין של המטפל — לכן ייתכן פער בין המקורות (הרשמות לא-מתויגות מופיעות תחת "ללא קמפיין").
+                  </p>
+                </>
               ) : (
                 <p className="text-sm text-stone-400">אין עדיין הרשמות מתויגות בקמפיין לטווח זה.</p>
               )}
