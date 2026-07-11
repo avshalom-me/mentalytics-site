@@ -86,6 +86,10 @@ export async function GET() {
       .eq("event_type", "quiz_complete")
       .gte("created_at", monthStart);
 
+    // Subscriptions drive churn. Only real paying therapists have a Sumit
+    // subscription (gifted/trial promotions do not), so this is a small table.
+    const subsQ = supabaseAdmin.from("subscriptions").select("therapist_id, status");
+
     // 4 counts per period, in order: contacts, contactsPrev, profileViews, explainClicks.
     const periodQs = PERIODS.flatMap((d) => [
       countRows("therapist_contact_clicks", "clicked_at", iso(d)),
@@ -96,14 +100,17 @@ export async function GET() {
 
     // Two typed Promise.all groups (kept apart so the period results stay a
     // single count-query type), run concurrently.
-    const [[aiRes, targetsRes, totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes], periodRes] =
-      await Promise.all([
-        Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, trialQ, freeQ, quizMonthQ]),
-        Promise.all(periodQs),
-      ]);
+    const [
+      [aiRes, targetsRes, totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes, subsRes],
+      periodRes,
+    ] = await Promise.all([
+      Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, trialQ, freeQ, quizMonthQ, subsQ]),
+      Promise.all(periodQs),
+    ]);
 
     if (aiRes.error) throw aiRes.error;
     if (targetsRes.error) throw targetsRes.error;
+    if (subsRes.error) throw subsRes.error;
     for (const r of [totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
 
@@ -153,6 +160,22 @@ export async function GET() {
     };
     const quizThisMonth = quizMonthRes.count ?? 0;
 
+    // Cumulative churn: therapists who ever had a subscription but no longer have
+    // an active one. cancelled_at is unreliable (nullable), so we compare the
+    // ever-paid vs currently-active sets rather than timestamps. A stable MONTHLY
+    // churn rate needs more history (the paying base is still ~tiny), so this is
+    // cumulative-to-date.
+    const subs = (subsRes.data ?? []) as { therapist_id: string; status: string }[];
+    const everPaid = new Set(subs.map((s) => s.therapist_id));
+    const activePaying = new Set(subs.filter((s) => s.status === "active").map((s) => s.therapist_id));
+    const churnedCount = [...everPaid].filter((id) => !activePaying.has(id)).length;
+    const churn = {
+      everPaid: everPaid.size,
+      active: activePaying.size,
+      churned: churnedCount,
+      pct: everPaid.size > 0 ? Math.round((churnedCount / everPaid.size) * 1000) / 10 : null,
+    };
+
     // Actuals we can compute now; everything else stays null → "טרם מחושב".
     // therapists_total = listed/active supply (consistent with the main admin
     // dashboard), not raw registrations.
@@ -160,6 +183,7 @@ export async function GET() {
       therapists_total: supply.listed,
       questionnaires_month: quizThisMonth,
     };
+    if (churn.pct != null) actualByMetric.churn_max_pct = churn.pct;
     const targets = (targetsRes.data ?? []).map((t) => ({
       id: t.id,
       metric: t.metric,
@@ -176,6 +200,7 @@ export async function GET() {
       kpis,
       targets,
       supply,
+      churn,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

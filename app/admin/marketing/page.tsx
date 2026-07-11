@@ -46,11 +46,14 @@ type Supply = {
   incomplete: number;
 };
 
+type Churn = { everPaid: number; active: number; churned: number; pct: number | null };
+
 type Data = {
   ai: Ai | null;
   kpis: Record<string, PeriodKpis>;
   targets: Target[];
   supply: Supply;
+  churn: Churn;
   generated_at: string;
 };
 
@@ -90,7 +93,7 @@ const METRIC_INFO: Record<string, { label: string; explain: string }> = {
   churn_max_pct: {
     label: "נטישת מטפלים (Churn)",
     explain:
-      "אחוז המטפלים המשלמים שנוטשים בחודש — מדד בריאות מרכזי. תקרה שיורדת עם הזמן. עדיין לא מחושב — אפשר לגזור מתשלומים שנכשלו/מנויים שפגו.",
+      "אחוז המטפלים ששילמו אי-פעם ואין להם יותר מנוי פעיל — מדד בריאות מרכזי. מחושב מצטבר (לא חודשי) כי בסיס המשלמים עדיין קטן מכדי לחשב שיעור חודשי יציב.",
   },
   teachers_total: {
     label: "מורים / אנשי חינוך",
@@ -110,6 +113,12 @@ const SCENARIO_LABELS: Record<string, string> = {
 
 function num(n: number) {
   return n.toLocaleString("he-IL");
+}
+// Percent metrics render with %, cost ceilings with ₪, counts plain.
+function fmtMetricVal(metric: string, v: number): string {
+  if (metric.endsWith("_pct")) return `${v}%`;
+  if (metric === "cpl_max" || metric === "cac_max") return `₪${num(v)}`;
+  return num(v);
 }
 function formatMonth(iso: string): string {
   const d = new Date(iso);
@@ -640,9 +649,11 @@ export default function MarketingPage() {
                           </td>
                           <td className="px-2 text-center text-stone-600">
                             <span className="text-stone-400">{t.direction === "ceiling" ? "≤ " : "≥ "}</span>
-                            {num(t.target)}
+                            {fmtMetricVal(t.metric, t.target)}
                           </td>
-                          <td className="px-2 text-center font-bold text-stone-900">{t.actual == null ? "—" : num(t.actual)}</td>
+                          <td className="px-2 text-center font-bold text-stone-900">
+                            {t.actual == null ? "—" : fmtMetricVal(t.metric, t.actual)}
+                          </td>
                           <td className="px-2 text-center">
                             <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-bold ${verdict.cls}`}>
                               {verdict.label}
@@ -657,6 +668,12 @@ export default function MarketingPage() {
                                 <span className="mt-1 block font-semibold text-[#2A6462]">
                                   מתוכם {num(data.supply.paid)} בתשלום, {num(data.supply.trial)} מקודמים במתנה,{" "}
                                   {num(data.supply.free)} חינמיים. ({num(data.supply.incomplete)} הרשמות לא-גמורות לא נספרות.)
+                                </span>
+                              )}
+                              {t.metric === "churn_max_pct" && (
+                                <span className="mt-1 block font-semibold text-[#2A6462]">
+                                  {num(data.churn.everPaid)} מטפלים שילמו אי-פעם · {num(data.churn.churned)} נטשו ·{" "}
+                                  {num(data.churn.active)} פעילים כעת.
                                 </span>
                               )}
                               <span className="mt-1 block text-stone-400">
