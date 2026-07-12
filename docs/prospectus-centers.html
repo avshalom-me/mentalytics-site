@@ -69,18 +69,7 @@
   .step h4 { font-size: 12.5px; font-weight: 800; margin-bottom: 2px; }
   .step p { font-size: 10px; line-height: 1.4; color: #6B807E; }
 
-  .tracks { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; page-break-inside: avoid; }
-  .track { border: 1px solid #C2DFDE; border-radius: 12px; padding: 10px 12px; background: #F7FAF9; }
-  .track.alt { background: #FDFAF3; border-color: #E8DCC8; }
-  .track .th { font-size: 12px; font-weight: 900; color: #2A6462; margin-bottom: 4px; }
-  .track.alt .th { color: #A87010; }
-  .track .th span { font-weight: 700; color: #6B807E; font-size: 10px; }
-  .track p { font-size: 10px; line-height: 1.45; color: #3E5250; }
-  .track .tp { margin-top: 6px; font-size: 10.5px; font-weight: 800; color: #131F1E; border-top: 1px dashed #C2DFDE; padding-top: 5px; }
-  .track.alt .tp { border-color: #E8DCC8; }
-  .tracks-note { margin-top: 7px; font-size: 10px; color: #6B807E; text-align: center; }
-
-  .cta { margin: 11px -15mm 0; padding: 12px 15mm 11px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; page-break-inside: avoid; }
+  .cta { margin: 11px -15mm 0; padding: 12px 15mm 11px; background: linear-gradient(135deg,#F0F7FA 0%,#E6F4F7 55%,#F5E8DC 100%); border-top: 1px solid #D8E4E8; text-align: center; }
   .cta h2 { font-size: 19px; font-weight: 900; margin: 0 0 5px; }
   .cta p { font-size: 12px; color: #3E5250; line-height: 1.6; max-width: 155mm; margin: 0 auto 12px; }
   .cta .mail { display: inline-block; background: linear-gradient(135deg,#2A6462,#3D8C8A); color: #fff; font-weight: 800; font-size: 14px; padding: 11px 30px; border-radius: 999px; }
@@ -97,9 +86,9 @@
   <h1>מה המרכז מקבל — <span class="a">חשיפה, ניהול וסטטיסטיקות במקום אחד</span></h1>
   <p class="lead">
     <b>"טיפול חכם"</b> היא פלטפורמה ישראלית להתאמת טיפול נפשי, שנבנתה על ידי פסיכולוגים וחוקרים. מטופלים עוברים שאלון
-    חכם ואינטייק אוטומטי, ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מצטרף למערכת ההתאמות,
-    מקבל מיקום גבוה באזור ודוח חודשי שחושף מי מחפש אתכם — <b>בשני מסלולים לבחירה, לפי איך שתרצו לעבוד</b>.
-    המחיר נסגר איתכם אישית בשיחת ההתאמה.
+    חכם ואינטייק אוטומטי, ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מצטרף כיחידה אחת — כל
+    המטפלים במערכת ההתאמות, מערכת לניהול פרופילי המטפלים, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי פשוט:
+    <b>מחיר מוזל לכל מטפל × מספר המטפלים</b>, שנסגר איתכם אישית בשיחת ההתאמה.
   </p>
 
   <div class="sec-title">מה כלול במסלול</div>
@@ -124,24 +113,17 @@
     </div>
   </div>
 
-  <div class="sec-title">שני מסלולים לבחירה</div>
-  <div class="tracks">
-    <div class="track">
-      <div class="th">מסלול מלא <span>— מטפל אחר מטפל</span></div>
-      <p>כל מטפלי המרכז נכנסים אישית למערכת ההתאמות — פרופיל לכל מטפל, ניהול מהפורטל, וסטטיסטיקות פר-מטפל ופר-מרכז. מטופלים מותאמים למטפל הספציפי במרכז.</p>
-      <div class="tp">מחיר לפי מספר המטפלים</div>
-    </div>
-    <div class="track alt">
-      <div class="th">מסלול אינטייק במרכז <span>— אתם משבצים</span></div>
-      <p>המרכז נכנס כרובריקה אחת במערכת ההתאמות, עם שיטות הטיפול שבהן אתם עובדים ומיקום גבוה באזור. הפניות מגיעות למרכז — ואתם עושים את האינטייק ומשבצים למטפל הנכון. סטטיסטיקות פר-מרכז.</p>
-      <div class="tp">מחיר קבוע לפי גודל המרכז</div>
-    </div>
+  <div class="sec-title">איך זה עובד</div>
+  <div class="steps">
+    <div class="step"><div class="n">1</div><h4>אתם מוסיפים את המטפלים</h4><p>מנהלי המרכז מזינים את פרופילי המטפלים בפורטל — פרטים, תמונה, תעודות והתמחויות.</p></div>
+    <div class="step"><div class="n">2</div><h4>מטופל ממלא שאלון</h4><p>שאלון חכם מנתח את סוג הקושי, ההעדפות והמיקום.</p></div>
+    <div class="step"><div class="n">3</div><h4>התאמה מדויקת</h4><p>המערכת מפנה אותו למטפל המתאים במרכז שלכם — לפי תחום, גיל, שפה ואזור.</p></div>
+    <div class="step"><div class="n">4</div><h4>אתם רואים הכול</h4><p>פורטל ניהול וסטטיסטיקות מרוכזות — לכל המרכז ופר-מטפל.</p></div>
   </div>
-  <div class="tracks-note">בשני המסלולים: חודשיים ראשונים במתנה · ללא התחייבות · ביטול בכל עת · המחיר נסגר איתכם אישית בשיחה.</div>
 
   <div class="cta">
     <h2>רוצים הצעה למרכז שלכם?</h2>
-    <p>המחיר נקבע אישית בשיחת התאמה — לפי המסלול וגודל המרכז — ואפשר להתחיל עם חודשי התנסות במתנה שבהם לא נגבה תשלום כלל. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
+    <p>המחיר נקבע אישית בשיחת התאמה — מחיר מוזל לכל מטפל, לפי מספר המטפלים במרכז — ואפשר להתחיל עם חודשי התנסות במתנה שבהם לא נגבה תשלום כלל. נשמח לתאם שיחה ולהכין הצעה מותאמת.</p>
     <div class="mail">admin@getmentalytics.com</div>
     <div class="foot">טיפול חכם — Mentalytics · mentalytics.co.il · פלטפורמה שנבנתה על ידי פסיכולוגים וחוקרים</div>
   </div>
