@@ -43,3 +43,10 @@ next-env.d.ts
 # claude agent local files
 .claude/worktrees/
 .claude/launch.json
+
+# Internal centers sales sheet — confidential (price floors, margins, negotiation
+# strategy). NOT committed: the repo is public. The PDF lives in a private Supabase
+# Storage bucket ('internal-docs') and is served via /api/admin-sales-sheet.
+# Keep these files locally to regenerate/re-upload; never commit them.
+docs/sales-centers.html
+docs/sales-centers.pdf
