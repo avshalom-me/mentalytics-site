@@ -49,7 +49,11 @@ export default function LeadsPage() {
     setLoading(true);
     setError("");
     const params = new URLSearchParams();
-    if (statusFilter !== "all") params.set("status", statusFilter);
+    // "all" = active (exclude closed/archived); "archived" = closed only;
+    // otherwise a specific active status. Closing a lead moves it to the archive.
+    if (statusFilter === "archived") params.set("archived", "true");
+    else if (statusFilter === "all") params.set("archived", "false");
+    else params.set("status", statusFilter);
     if (typeFilter !== "all") params.set("lead_type", typeFilter);
     fetch(`/api/admin-crm/leads?${params}`)
       .then((r) => r.json())
@@ -113,8 +117,8 @@ export default function LeadsPage() {
         {/* Filters */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="flex overflow-hidden rounded-full border border-stone-200 bg-white">
-            <FilterChip label="הכול" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
-            {LEAD_STATUSES.map((s) => (
+            <FilterChip label="פעילות" active={statusFilter === "all"} onClick={() => setStatusFilter("all")} />
+            {LEAD_STATUSES.filter((s) => s.value !== "closed").map((s) => (
               <FilterChip
                 key={s.value}
                 label={s.label}
@@ -122,6 +126,7 @@ export default function LeadsPage() {
                 onClick={() => setStatusFilter(s.value)}
               />
             ))}
+            <FilterChip label="ארכיון" active={statusFilter === "archived"} onClick={() => setStatusFilter("archived")} />
           </div>
           <select
             value={typeFilter}
@@ -144,7 +149,9 @@ export default function LeadsPage() {
 
         {!loading && leads.length === 0 && (
           <div className="rounded-2xl border border-stone-200 bg-white p-6 text-center text-sm text-stone-400">
-            אין לידים בסינון הנוכחי. פניות חדשות מהאתר יופיעו כאן אוטומטית.
+            {statusFilter === "archived"
+              ? "הארכיון ריק. פניות שתסגרו יופיעו כאן."
+              : "אין לידים בסינון הנוכחי. פניות חדשות מהאתר יופיעו כאן אוטומטית."}
           </div>
         )}
 
@@ -203,10 +210,15 @@ export default function LeadsPage() {
                   )}
                   {l.status !== "closed" && (
                     <ActionBtn onClick={() => setStatus(l.id, "closed")} disabled={busy === l.id}>
-                      סגירה
+                      העבר לארכיון
                     </ActionBtn>
                   )}
-                  {(l.status === "converted" || l.status === "closed") && (
+                  {l.status === "closed" && (
+                    <ActionBtn onClick={() => setStatus(l.id, "new")} disabled={busy === l.id}>
+                      שחזר מהארכיון
+                    </ActionBtn>
+                  )}
+                  {l.status === "converted" && (
                     <ActionBtn onClick={() => setStatus(l.id, "new")} disabled={busy === l.id}>
                       החזרה לחדשה
                     </ActionBtn>

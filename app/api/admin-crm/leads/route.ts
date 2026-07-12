@@ -10,6 +10,7 @@ const VALID_TYPES = ["patient", "therapist", "teacher", "organization", "general
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
   const status = params.get("status"); // optional filter
+  const archived = params.get("archived"); // "true" = closed only, "false" = exclude closed
   const leadType = params.get("lead_type");
   const therapistId = params.get("therapist_id");
   const limit = Math.min(Number(params.get("limit") ?? 200), 500);
@@ -21,6 +22,10 @@ export async function GET(req: NextRequest) {
     .limit(limit);
 
   if (status && VALID_STATUSES.includes(status)) q = q.eq("status", status);
+  // A closed lead is an archived lead. The active list excludes closed;
+  // the archive shows only closed. Absent param keeps the full set (other callers).
+  if (archived === "true") q = q.eq("status", "closed");
+  else if (archived === "false") q = q.neq("status", "closed");
   if (leadType && VALID_TYPES.includes(leadType)) q = q.eq("lead_type", leadType);
   if (therapistId) q = q.eq("therapist_id", therapistId);
 
