@@ -369,6 +369,8 @@ type CampaignFunnelRow = {
   phone: number;
   email: number;
   site_message: number;
+  from_match: number;
+  from_directory: number;
 };
 type RecruitRow = { campaign: string; signups: number };
 
@@ -480,18 +482,19 @@ function FunnelsCampaigns() {
           )}
           {!funnel && <p className="mb-5 text-sm text-stone-400">אין נתוני משפך לטווח זה.</p>}
 
-          {/* Per-campaign on-site funnel: ad click -> profile view -> contact by type */}
+          {/* Per-campaign funnel: billed clicks -> site sessions -> profile view -> contact (by type + source) */}
           {campFunnel && campFunnel.some((r) => r.campaign.startsWith("g-")) && (
             <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
               <h3 className="mb-1 text-base font-black text-stone-800">משפך לפי קמפיין ממומן</h3>
               <p className="mb-3 text-xs text-stone-500">
-                מה עשו מי שהגיעו מכל קמפיין: כניסות ← צפו בפרופיל ← פנו (לפי סוג הפנייה).
+                מה עשו מי שהגיעו מכל קמפיין: קליקים בגוגל ← כניסות לאתר ← צפו בפרופיל ← פנו (לפי סוג ומקור).
               </p>
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-stone-200 text-xs text-stone-500">
                     <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
-                    <th className="px-2 py-2 text-center font-semibold">כניסות</th>
+                    <th className="px-2 py-2 text-center font-semibold">קליקים (גוגל)</th>
+                    <th className="px-2 py-2 text-center font-semibold">כניסות לאתר</th>
                     <th className="px-2 py-2 text-center font-semibold">צפו בפרופיל</th>
                     <th className="px-2 py-2 text-center font-semibold">פניות</th>
                     <th className="px-2 py-2 text-center font-semibold">💬</th>
@@ -504,17 +507,37 @@ function FunnelsCampaigns() {
                   {campFunnel
                     .filter((r) => r.campaign.startsWith("g-"))
                     .map((r) => {
-                      const conv = r.sessions > 0 ? Math.round((r.contacts / r.sessions) * 1000) / 10 : 0;
+                      // Billed clicks from Google Ads = the REAL top-of-funnel. Site
+                      // "sessions" over-counts (bots + our own setup/test loads that
+                      // hit the tagged URL), so conversion is measured against billed
+                      // clicks when available, falling back to sessions only if the
+                      // Ads API is absent.
+                      const billed =
+                        ads?.ok && ads.configured
+                          ? ads.campaigns?.find((a) => a.utmCampaign === r.campaign)?.clicks
+                          : undefined;
+                      const denom = billed && billed > 0 ? billed : r.sessions;
+                      const conv = denom > 0 ? Math.round((r.contacts / denom) * 1000) / 10 : 0;
                       return (
                         <tr key={r.campaign} className="border-b border-stone-100">
                           <td className="px-2 py-2 font-semibold text-stone-700">{r.campaign}</td>
-                          <td className="px-2 text-center text-stone-600">{num(r.sessions)}</td>
-                          <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
                           <td className="px-2 text-center font-bold text-stone-900">
-                            {num(r.contacts)}
-                            {/* conv = clicks ÷ distinct sessions; hide when >100% (multiple contacts in one session) */}
-                            {r.sessions > 0 && r.contacts > 0 && conv <= 100 && (
-                              <span className="text-stone-400"> · {conv}%</span>
+                            {billed != null ? num(billed) : "—"}
+                          </td>
+                          <td className="px-2 text-center text-stone-400">{num(r.sessions)}</td>
+                          <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
+                          <td className="px-2 py-1 text-center">
+                            <div className="font-bold text-stone-900">
+                              {num(r.contacts)}
+                              {/* conv = contacts ÷ billed clicks; hide when >100% (multiple contacts per click) */}
+                              {r.contacts > 0 && conv <= 100 && (
+                                <span className="font-normal text-stone-400"> · {conv}%</span>
+                              )}
+                            </div>
+                            {r.contacts > 0 && (
+                              <div className="text-[10px] text-stone-400">
+                                🎯 {r.from_match} · 📁 {r.from_directory}
+                              </div>
                             )}
                           </td>
                           <td className="px-2 text-center text-stone-500">{r.whatsapp || "—"}</td>
@@ -526,8 +549,11 @@ function FunnelsCampaigns() {
                     })}
                 </tbody>
               </table>
-              <p className="mt-2 text-[11px] text-stone-400">
-                💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר. כניסות/צפיות = סשנים ייחודיים; הכל לפי utm_campaign.
+              <p className="mt-2 text-[11px] leading-5 text-stone-400">
+                💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר · 🎯 מהתאמות · 📁 ממאגר המטפלים.{" "}
+                <span className="font-semibold text-stone-500">קליקים (גוגל)</span> = לחיצות בתשלום בפועל — המספר האמיתי.{" "}
+                <span className="font-semibold text-stone-500">כניסות לאתר</span> סופרות כל כניסה ל-URL מתויג (כולל בוטים
+                ובדיקות), ולכן גבוהות מהקליקים; אחוז ההמרה מחושב מול הקליקים בפועל. הכל לפי utm_campaign.
               </p>
             </div>
           )}
