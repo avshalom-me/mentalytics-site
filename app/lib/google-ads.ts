@@ -85,6 +85,11 @@ function inferUtmFromName(name: string): string | null {
   if (n.includes("jerusalem") || n.includes("ירושלים")) return "g-jerusalem";
   if (n.includes("g-how") || n.includes("howto") || n.includes("how to")) return "g-howto";
   if (n.includes("online") || n.includes("אונליין") || n.includes("search-patients")) return "g-online";
+  // Therapist-recruitment campaigns (Demand Gen + Display). The suffix is set on
+  // these, so parseUtmCampaign normally wins; this is a fallback if it's ever
+  // read at the ad-group level (which the campaign query can't see).
+  if (n.includes("demandgen") || n.includes("demand-gen")) return "therapist-demandgen";
+  if (n.includes("therapist") && n.includes("display")) return "therapist-display";
   return null;
 }
 
