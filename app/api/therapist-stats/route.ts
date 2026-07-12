@@ -34,11 +34,12 @@ async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status:
 type ClickRow = { click_type: string; source: string; clicked_at: string };
 
 function sumByType(rows: ClickRow[]) {
-  const result = { whatsapp: 0, phone: 0, email: 0, total: 0 };
+  const result = { whatsapp: 0, phone: 0, email: 0, site_message: 0, total: 0 };
   for (const row of rows) {
     if (row.click_type === "whatsapp") result.whatsapp++;
     else if (row.click_type === "phone") result.phone++;
     else if (row.click_type === "email") result.email++;
+    else if (row.click_type === "site_message") result.site_message++;
     result.total++;
   }
   return result;

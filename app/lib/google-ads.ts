@@ -73,6 +73,21 @@ function parseUtmCampaign(suffix?: string | null): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+// Fallback for campaigns whose utm lives in the ad's Final URL rather than the
+// campaign's final_url_suffix (the API can only read the suffix): infer the
+// utm_campaign from the campaign name so CPL can still join to contacts. The
+// suffix (parseUtmCampaign) always takes precedence — add a Final URL suffix to
+// a campaign and this heuristic is bypassed. Name-based, so keep the campaign
+// names recognizable.
+function inferUtmFromName(name: string): string | null {
+  const n = name.toLowerCase();
+  if (n.includes("telaviv") || n.includes("tel-aviv") || n.includes("תל אביב") || n.includes("תל-אביב")) return "g-telaviv";
+  if (n.includes("jerusalem") || n.includes("ירושלים")) return "g-jerusalem";
+  if (n.includes("g-how") || n.includes("howto") || n.includes("how to")) return "g-howto";
+  if (n.includes("online") || n.includes("אונליין") || n.includes("search-patients")) return "g-online";
+  return null;
+}
+
 function isoDate(d: Date): string {
   // Format in the ad account's timezone (Asia/Jerusalem), NOT UTC — GAQL
   // segments.date is in the account TZ, so a UTC date would shift the window a
@@ -136,7 +151,7 @@ export async function fetchGoogleAdsCampaigns(days: number): Promise<AdsResult> 
       c = {
         id,
         name: r.campaign?.name ?? id,
-        utmCampaign: parseUtmCampaign(r.campaign?.finalUrlSuffix),
+        utmCampaign: parseUtmCampaign(r.campaign?.finalUrlSuffix) ?? inferUtmFromName(r.campaign?.name ?? ""),
         cost: 0,
         clicks: 0,
         impressions: 0,
