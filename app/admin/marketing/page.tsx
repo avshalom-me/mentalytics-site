@@ -370,6 +370,7 @@ type CampaignFunnelRow = {
   email: number;
   site_message: number;
 };
+type RecruitRow = { campaign: string; signups: number };
 
 function FunnelsCampaigns() {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
@@ -380,6 +381,7 @@ function FunnelsCampaigns() {
   const [cac, setCac] = useState<FinMonth | null>(null);
   const [ads, setAds] = useState<AdsData | null>(null);
   const [campFunnel, setCampFunnel] = useState<CampaignFunnelRow[] | null>(null);
+  const [recruit, setRecruit] = useState<RecruitRow[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -399,8 +401,9 @@ function FunnelsCampaigns() {
       asJson(`/api/admin-crm/finance`),
       asJson(`/api/admin-google-ads?period=${period}`),
       asJson(`/api/admin-campaign-funnel?period=${period}`),
+      asJson(`/api/admin-therapist-campaigns?period=${period}`),
     ])
-      .then(([a, an, fin, gads, cf]) => {
+      .then(([a, an, fin, gads, cf, rec]) => {
         if (ignore) return;
         // Core = attribution + analytics. Finance (CAC) and Google Ads are
         // optional; if they fail their cards show a fallback but the rest renders.
@@ -417,6 +420,7 @@ function FunnelsCampaigns() {
         setCac(months[0] ?? null);
         setAds((gads as AdsData) ?? null);
         setCampFunnel(cf?.ok ? (cf.rows as CampaignFunnelRow[]) ?? [] : []);
+        setRecruit(rec?.ok ? (rec.campaigns as RecruitRow[]) ?? [] : []);
       })
       .finally(() => {
         if (!ignore) setLoading(false);
@@ -614,7 +618,7 @@ function FunnelsCampaigns() {
                         <th className="px-2 py-2 text-center font-semibold">קליקים</th>
                         <th className="px-2 py-2 text-center font-semibold">CTR</th>
                         <th className="px-2 py-2 text-center font-semibold">CPC</th>
-                        <th className="px-2 py-2 text-center font-semibold">CPL</th>
+                        <th className="px-2 py-2 text-center font-semibold">עלות/המרה</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -624,7 +628,17 @@ function FunnelsCampaigns() {
                         const contacts = c.utmCampaign
                           ? campFunnel?.find((x) => x.campaign === c.utmCampaign)?.contacts ?? 0
                           : 0;
-                        const cpl = contacts > 0 ? Math.round(c.cost / contacts) : null;
+                        const signups = c.utmCampaign
+                          ? recruit?.find((x) => x.campaign === c.utmCampaign)?.signups ?? 0
+                          : 0;
+                        // Adaptive cost-per-acquisition: patient campaigns → cost per
+                        // contact; recruitment campaigns → cost per therapist signup.
+                        const acq =
+                          contacts > 0
+                            ? { cost: Math.round(c.cost / contacts), unit: "פנייה" }
+                            : signups > 0
+                              ? { cost: Math.round(c.cost / signups), unit: "הרשמה" }
+                              : null;
                         return (
                           <tr key={c.id} className="border-b border-stone-100">
                             <td className="px-2 py-2 font-semibold text-stone-700">
@@ -636,7 +650,14 @@ function FunnelsCampaigns() {
                             <td className="px-2 text-center text-stone-500">{c.ctr.toFixed(1)}%</td>
                             <td className="px-2 text-center text-stone-500">₪{c.avgCpc.toFixed(2)}</td>
                             <td className="px-2 text-center font-bold text-[#2A6462]">
-                              {cpl != null ? `₪${num(cpl)}` : "—"}
+                              {acq ? (
+                                <>
+                                  ₪{num(acq.cost)}
+                                  <span className="text-[10px] font-normal text-stone-400"> / {acq.unit}</span>
+                                </>
+                              ) : (
+                                "—"
+                              )}
                             </td>
                           </tr>
                         );
@@ -665,9 +686,9 @@ function FunnelsCampaigns() {
                     })()}
                   <p className="mt-3 text-[11px] leading-5 text-stone-400">
                     הוצאה, קליקים, CTR ו-CPC נמשכים אוטומטית מ-Google Ads.{" "}
-                    <span className="font-semibold text-stone-500">CPL מחושב אצלנו</span> — הוצאת הקמפיין ÷ הפניות שהוא הביא
-                    (לפי utm_campaign). Google לא יודעת CPL, כי היא לא רואה מי יצר קשר באתר. &quot;—&quot; = אין utm_campaign זמין
-                    בקמפיין (למשל קמפיין ישן שה-utm שלו בכתובת ולא ב-Final URL suffix), או שעדיין אין פנייה מיוחסת.
+                    <span className="font-semibold text-stone-500">עלות/המרה מחושבת אצלנו</span> לפי מטרת הקמפיין: קמפיין
+                    מטופלים = הוצאה ÷ פניות (&quot;/ פנייה&quot;); קמפיין גיוס מטפלים = הוצאה ÷ הרשמות (&quot;/ הרשמה&quot;) — הכל
+                    לפי utm_campaign. &quot;—&quot; = אין utm_campaign זמין, או שעדיין אין המרה מיוחסת.
                   </p>
                 </>
               ) : (
