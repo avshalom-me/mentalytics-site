@@ -11,6 +11,7 @@ export type Bucket = Channel | "unknown";
 export type ChannelFunnel = {
   channel: Bucket;
   pageViews: number;
+  sessions?: number;          // distinct visits (distinct session_id among page_views); honest visit count vs raw pageViews
   impressions: number;
   profileViews: number;
   contactClicks: number;
@@ -39,6 +40,7 @@ const emptyByChannel = (): Record<Bucket, Counts> =>
 function finalize(
   byChannel: Record<Bucket, Counts>,
   campaignCounts: Record<string, number>,
+  sessionsByChannel?: Record<Bucket, number>,
 ): AttributionResult {
   const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
 
@@ -47,6 +49,7 @@ function finalize(
     return {
       channel: b,
       ...c,
+      sessions: sessionsByChannel?.[b],
       viewToClick: pct(c.contactClicks, c.profileViews),
       impressionToClick: pct(c.contactClicks, c.impressions),
     };
@@ -78,16 +81,23 @@ function finalize(
  * aggregation) for the large tables (impressions / profile_views).
  */
 export function computeAttribution(
-  events: { event_type: string; channel: string | null }[],
+  events: { event_type: string; channel: string | null; session_id?: string | null }[],
   views: { channel: string | null }[],
   clicks: { channel: string | null; utm_campaign?: string | null }[],
 ): AttributionResult {
   const byChannel = emptyByChannel();
+  // Distinct session_id per channel among page_views — the honest "visits"
+  // count (raw pageViews over-counts: bots, prefetch, multi-page sessions).
+  const sessionSets = Object.fromEntries(ALL_BUCKETS.map((b) => [b, new Set<string>()])) as Record<Bucket, Set<string>>;
 
   for (const e of events) {
-    const b = byChannel[bucketOf(e.channel)];
-    if (e.event_type === "page_view") b.pageViews++;
-    else if (e.event_type === "profile_impression") b.impressions++;
+    const bucket = bucketOf(e.channel);
+    if (e.event_type === "page_view") {
+      byChannel[bucket].pageViews++;
+      if (e.session_id) sessionSets[bucket].add(e.session_id);
+    } else if (e.event_type === "profile_impression") {
+      byChannel[bucket].impressions++;
+    }
   }
   for (const v of views) byChannel[bucketOf(v.channel)].profileViews++;
   for (const c of clicks) byChannel[bucketOf(c.channel)].contactClicks++;
@@ -97,7 +107,8 @@ export function computeAttribution(
     if (c.utm_campaign) campaignCounts[c.utm_campaign] = (campaignCounts[c.utm_campaign] ?? 0) + 1;
   }
 
-  return finalize(byChannel, campaignCounts);
+  const sessionsByChannel = Object.fromEntries(ALL_BUCKETS.map((b) => [b, sessionSets[b].size])) as Record<Bucket, number>;
+  return finalize(byChannel, campaignCounts, sessionsByChannel);
 }
 
 /**

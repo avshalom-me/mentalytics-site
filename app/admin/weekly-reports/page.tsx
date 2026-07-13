@@ -12,6 +12,7 @@ type FilterEntry = { name: string; count: number };
 type ChannelFunnel = {
   channel: string;
   pageViews: number;
+  sessions?: number;
   impressions: number;
   profileViews: number;
   contactClicks: number;
@@ -121,7 +122,8 @@ function MarketingSection({ marketing, advice }: { marketing?: MarketingData; ad
             <thead className="bg-stone-50 border-b border-stone-200 text-xs">
               <tr>
                 <th className="px-3 py-2 font-semibold text-stone-500">ערוץ</th>
-                <th className="px-3 py-2 font-semibold text-stone-500 text-center">כניסות</th>
+                <th className="px-3 py-2 font-semibold text-stone-500 text-center">ביקורים</th>
+                <th className="px-3 py-2 font-semibold text-stone-400 text-center">כניסות</th>
                 <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפיות</th>
                 <th className="px-3 py-2 font-semibold text-stone-500 text-center">פניות</th>
                 <th className="px-3 py-2 font-semibold text-stone-500 text-center">צפייה→פנייה</th>
@@ -131,7 +133,8 @@ function MarketingSection({ marketing, advice }: { marketing?: MarketingData; ad
               {channels.map(c => (
                 <tr key={c.channel} className="border-b border-stone-100">
                   <td className="px-3 py-2 font-semibold text-stone-800">{CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}</td>
-                  <td className="px-3 py-2 text-center text-stone-600">{c.pageViews}</td>
+                  <td className="px-3 py-2 text-center text-stone-600">{c.sessions ?? "—"}</td>
+                  <td className="px-3 py-2 text-center text-stone-400">{c.pageViews}</td>
                   <td className="px-3 py-2 text-center text-stone-600">{c.profileViews}</td>
                   <td className="px-3 py-2 text-center font-bold text-stone-800">{c.contactClicks}</td>
                   <td className="px-3 py-2 text-center text-stone-600">{c.profileViews > 0 ? `${c.viewToClick}%` : "—"}</td>
@@ -139,6 +142,9 @@ function MarketingSection({ marketing, advice }: { marketing?: MarketingData; ad
               ))}
             </tbody>
           </table>
+          <p className="text-[11px] text-stone-400 leading-5 px-3 py-2">
+            <b>ביקורים</b> = מבקרים ייחודיים. <b>כניסות</b> = צפיות-עמוד גולמיות (כולל בוטים/פרי-פץ') — גבוה מהקליקים שגוגל מחייבת. ל-CPL השתמשו במשפך הקמפיינים בדשבורד, המיושר מול הקליקים המחויבים.
+          </p>
         </div>
       )}
       {advice && (

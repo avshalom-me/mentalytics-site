@@ -561,10 +561,10 @@ async function aggregateMarketingData(period: Period): Promise<AttributionResult
   // the per-channel funnel isn't frozen at 1000 (same bug fixed in
   // admin-attribution). computeAttribution counts whatever rows it's given.
   const [events, views, clicks] = await Promise.all([
-    fetchAllRows<{ event_type: string; channel: string | null }>(() =>
+    fetchAllRows<{ event_type: string; channel: string | null; session_id: string | null }>(() =>
       supabaseAdmin
         .from("analytics_events")
-        .select("event_type, channel")
+        .select("event_type, channel, session_id")
         .in("event_type", ["page_view", "profile_impression"])
         .gte("created_at", period.since)
         .lt("created_at", period.until),
@@ -611,8 +611,12 @@ async function generateInsights(
 
   const mk = current.marketing;
   const channelLines = mk.channels.length
-    ? mk.channels.map(c => `- ${CHANNEL_LABELS[c.channel] ?? c.channel}: ${c.pageViews} כניסות, ${c.profileViews} צפיות, ${c.contactClicks} פניות, המרה צפייה→פנייה ${c.viewToClick}%`).join("\n")
+    ? mk.channels.map(c => `- ${CHANNEL_LABELS[c.channel] ?? c.channel}: ${c.sessions ?? c.pageViews} ביקורים ייחודיים (${c.pageViews} צפיות-עמוד גולמיות), ${c.profileViews} צפיות בפרופיל, ${c.contactClicks} פניות, המרה צפייה→פנייה ${c.viewToClick}%`).join("\n")
     : "(אין עדיין נתוני מקור לתקופה זו)";
+  // Guardrail for the model: raw page-views over-count (bots/prefetch) and a
+  // contact whose channel is "unknown" is an un-attributed click, not a funnel
+  // impossibility — so it doesn't repeat "X entries, 0 views is a tracking bug".
+  const marketingCaveat = `הערת מדידה: "ביקורים ייחודיים" הם המספר האמין; "צפיות-עמוד גולמיות" (כניסות) כוללות בוטים/פרי-פץ' ולכן גבוהות מהקליקים שגוגל מחייבת — אל תתייחס אליהן כאל קליקים בתשלום. ערוץ "לא ידוע" עם פניות ובלי צפיות = קליקים ישנים ללא תיוג מקור (נסגר לאחרונה), לא באג פאנל.`;
   const campaignLines = mk.topCampaigns.length ? JSON.stringify(mk.topCampaigns) : "(אין קמפיינים מתויגים ב-UTM)";
 
   const prompt = `אתה אנליסט מוצר עבור "טיפול חכם" — פלטפורמה ישראלית לחיבור בין מטופלים למטפלים. אני מנהל המוצר וקיבלת את הנתונים האחרונים (${config.periodLabel}).
@@ -683,6 +687,7 @@ ${JSON.stringify(current.therapist.silentPayingTherapists.slice(0, 15).map(t => 
 ## ערוצי שיווק — מאיפה הגיעו המבקרים (attribution)
 ${channelLines}
 קמפיינים מובילים (לפי פניות): ${campaignLines}
+${marketingCaveat}
 
 ---
 
@@ -702,7 +707,7 @@ ${channelLines}
 תן 3-5 פעולות קונקרטיות.
 
 **חלק 4 — ערוצי שיווק:**
-נתח מאילו ערוצים מגיעים הלידים ואיזה ערוץ ממיר טוב יותר (צפייה→פנייה). אם רוב התנועה "ישיר"/"אורגני" כי עדיין אין פרסום בתשלום — ציין זאת מפורשות, והמלץ על מה לשים דגש כשמתחילים לפרסם בתשלום (איזה ערוץ/אזור, ומול איזה benchmark של המרה אורגנית). 2-4 נקודות.
+נתח מאילו ערוצים מגיעים הלידים ואיזה ערוץ ממיר טוב יותר (צפייה→פנייה). אם רוב התנועה "ישיר"/"אורגני" כי עדיין אין פרסום בתשלום — ציין זאת מפורשות, והמלץ על מה לשים דגש כשמתחילים לפרסם בתשלום (איזה ערוץ/אזור, ומול איזה benchmark של המרה אורגנית). 2-4 נקודות. השתמש ב"ביקורים ייחודיים" (לא ב"צפיות-עמוד גולמיות") להשוואות ולחישובי המרה, וכבד את הערת המדידה למעלה.
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
@@ -897,7 +902,8 @@ function buildMarketingSection(marketing: AttributionResult, advice: string): st
   const rows = marketing.channels.map(c => `
     <tr>
       <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:13px;">${escapeHtml(CHANNEL_LABELS[c.channel] ?? c.channel)}</td>
-      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${c.pageViews}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${c.sessions ?? "—"}</td>
+      <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;color:#999;">${c.pageViews}</td>
       <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${c.profileViews}</td>
       <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;font-weight:bold;">${c.contactClicks}</td>
       <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:12px;">${c.profileViews > 0 ? c.viewToClick + "%" : "—"}</td>
@@ -906,13 +912,17 @@ function buildMarketingSection(marketing: AttributionResult, advice: string): st
     <table style="width:100%;border-collapse:collapse;margin:8px 0;background:white;">
       <thead><tr style="background:#f5f5f4;">
         <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">ערוץ</th>
-        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">כניסות</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">ביקורים</th>
+        <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#999;">כניסות</th>
         <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפיות</th>
         <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">פניות</th>
         <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפייה→פנייה</th>
       </tr></thead>
       <tbody>${rows}</tbody>
-    </table>` : "";
+    </table>
+    <p style="font-size:11px;color:#999;margin:4px 0 0;line-height:1.6;">
+      <b>ביקורים</b> = מבקרים ייחודיים (sessions). <b>כניסות</b> = צפיות-עמוד גולמיות, כולל בוטים ופרי-פץ' — לרוב גבוה מהקליקים שגוגל מחייבת עליהם. לחישוב עלות-לפנייה (CPL) השתמשו במשפך הקמפיינים בדשבורד, שמיושר מול הקליקים המחויבים בפועל.
+    </p>` : "";
   const adviceHtml = advice ? `<div style="background:white;padding:14px 16px;border-radius:8px;border:1px solid #e8e0d8;margin-top:8px;">${mdToHtml(advice)}</div>` : "";
   return table + adviceHtml;
 }
