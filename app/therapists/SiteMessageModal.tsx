@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getAttribution } from "@/app/lib/attribution";
+import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
 
 type Props = {
@@ -60,6 +61,7 @@ export default function SiteMessageModal({
           sender_contact: contact,
           message,
           source,
+          session_id: getOrCreateSessionId(),
           ...(getAttribution() ?? {}),
         }),
       });

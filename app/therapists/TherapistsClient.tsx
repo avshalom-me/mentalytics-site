@@ -8,12 +8,24 @@ import { genderTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
 import { gaEvent } from "@/app/lib/gtag";
+import { getAttribution } from "@/app/lib/attribution";
+import { getOrCreateSessionId } from "@/app/lib/session";
 
+// Card-level contact buttons — the one surface where a contact click happens
+// WITHOUT a profile view. Attribution must ride along here exactly like on the
+// profile page's ContactButtons: without it these clicks landed as
+// channel=NULL / utm=NULL and vanished from the per-campaign funnel.
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source: "directory" }),
+    body: JSON.stringify({
+      therapist_id: therapistId,
+      click_type: clickType,
+      source: "directory",
+      session_id: getOrCreateSessionId(),
+      ...(getAttribution() ?? {}),
+    }),
   }).catch(() => {});
   // GA4 conversion — the patient reached out to a therapist (the key lead).
   gaEvent("generate_lead", { method: clickType, source: "directory" });

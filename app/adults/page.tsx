@@ -9,6 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { buildAdultFacts } from "@/app/lib/explain-facts";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
@@ -500,6 +501,9 @@ export default function AdultsPage() {
       viewer_gender: normalizeGenderKey(answers.gender),
       session_id: sessionId,
     };
+    // Attribution rides along so match-card impressions stop landing under the
+    // "unknown" channel in the attribution report (they carried no channel/utm).
+    const attribution = getAttribution() ?? {};
     for (const t of matchResults) {
       fetch("/api/track-view", {
         method: "POST",
@@ -509,6 +513,7 @@ export default function AdultsPage() {
           source: "match_card",
           match_score: t.combined_score ?? t.match_score ?? null,
           ...viewer,
+          ...attribution,
         }),
       }).catch(() => {});
     }
@@ -709,13 +714,15 @@ export default function AdultsPage() {
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations });
       setScreen("results");
-      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
       trackQuizComplete("adults");
     } catch (e) {
+      // Scoring failed — the user sees an error, not results, so this is NOT a
+      // completion. Firing quiz_complete here inflated the funnel top on every
+      // server hiccup. (The inline gtag "quiz_completed" duplicate is gone too:
+      // trackQuizComplete already reports quiz_complete to GA4, matching the DB
+      // event name.)
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
       setScreen("results");
-      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "adults" });
-      trackQuizComplete("adults");
     } finally {
       setLoading(false);
     }
@@ -2449,7 +2456,7 @@ export default function AdultsPage() {
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); (window as any).gtag?.("event", "matching_click", { treatment: group.treatment }); trackMatchingClick("adults", group.treatment); }}
+              onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
             >
               🔍 מצא/י לי מטפל — {group.treatmentLabel} ←
@@ -2494,7 +2501,6 @@ export default function AdultsPage() {
           setCombinedNeedsSexualTherapy(false);
           setSelectedRec(null);
           setScreen("match-form");
-          (window as any).gtag?.("event", "matching_click", { treatment: "combined_emotional" });
           trackMatchingClick("adults", "combined_emotional");
         }}
         className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
@@ -2518,7 +2524,6 @@ export default function AdultsPage() {
           setCombinedNeedsSexualTherapy(needsSexual);
           setSelectedRec(null);
           setScreen("match-form");
-          (window as any).gtag?.("event", "matching_click", { treatment: "combined_relationship" });
           trackMatchingClick("adults", "combined_relationship");
         }}
         className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import SiteMessageModal from "../SiteMessageModal";
 import { getAttribution } from "@/app/lib/attribution";
+import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
 
 const wasvg = (
@@ -28,7 +29,13 @@ function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", s
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ therapist_id: therapistId, click_type: clickType, source, ...attribution }),
+    body: JSON.stringify({
+      therapist_id: therapistId,
+      click_type: clickType,
+      source,
+      session_id: getOrCreateSessionId(),
+      ...attribution,
+    }),
   }).catch(() => {});
   // GA4 conversion: the patient reached out to a therapist — the key patient-side
   // lead. Mark it a Key Event + import to Google Ads so paid search optimizes to it.

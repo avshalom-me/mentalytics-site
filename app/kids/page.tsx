@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, useRef } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import {
   parseKidsBoxes,
@@ -2580,6 +2581,9 @@ function KidsMatchSection({ A, score, selection }: {
       viewer_gender: null,
       session_id: sessionId,
     };
+    // Attribution rides along so match-card impressions stop landing under the
+    // "unknown" channel in the attribution report (they carried no channel/utm).
+    const attribution = getAttribution() ?? {};
     for (const t of results) {
       fetch("/api/track-view", {
         method: "POST",
@@ -2589,6 +2593,7 @@ function KidsMatchSection({ A, score, selection }: {
           source: "match_card",
           match_score: t.combined_score ?? t.match_score ?? null,
           ...viewer,
+          ...attribution,
         }),
       }).catch(() => {});
     }
@@ -2652,6 +2657,12 @@ function KidsMatchSection({ A, score, selection }: {
   async function doMatch() {
     setLoading(true);
     setError("");
+    // Top of the kids match funnel — mirrors the adults' trackMatchingClick on
+    // "מצא לי מטפל". Until now the kids flow emitted no matching_click at all.
+    trackMatchingClick(
+      "kids",
+      isAssessment ? `assessment:${treatments[0] ?? ""}` : isProfessional ? `professional:${treatments[0] ?? ""}` : treatments.join("+")
+    );
     try {
       const res = await fetch("/api/match", {
         method: "POST",
@@ -3780,7 +3791,8 @@ export default function KidsPage() {
 
   useEffect(() => {
     if (step === "p-result") {
-      (window as any).gtag?.("event", "quiz_completed", { quiz_type: "kids" });
+      // trackQuizComplete already reports quiz_complete to GA4 — the inline
+      // "quiz_completed" duplicate (a second GA4 name for the same action) is gone.
       trackQuizComplete("kids");
       fetchScore(A);
     }

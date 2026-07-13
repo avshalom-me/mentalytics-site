@@ -108,9 +108,13 @@ export async function POST(req: NextRequest) {
       `,
     });
 
+    const sessionId =
+      typeof body?.session_id === "string" && body.session_id.length > 0 && body.session_id.length <= 128
+        ? body.session_id
+        : null;
     const { error: clickErr } = await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type: "site_message", source: safeSource, ...sanitizeAttribution(body) });
+      .insert({ therapist_id, click_type: "site_message", source: safeSource, session_id: sessionId, ...sanitizeAttribution(body) });
     if (clickErr) console.error("therapist_contact_clicks (site_message) insert failed:", clickErr.message);
 
     // CRM lead capture — best-effort. The patient's message already went out

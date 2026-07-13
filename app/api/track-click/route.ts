@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { therapist_id, click_type, source } = body ?? {};
+    const { therapist_id, click_type, source, session_id } = body ?? {};
 
     if (!therapist_id || typeof therapist_id !== "string") {
       return NextResponse.json({ ok: false, error: "Missing therapist_id" }, { status: 400 });
@@ -38,10 +38,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "Invalid click_type" }, { status: 400 });
     }
     const safeSource: Source = VALID_SOURCES.includes(source as Source) ? source : "directory";
+    // Same session key the views/impressions carry — lets a click be joined to
+    // the visitor's funnel (e.g. card-click with no profile view).
+    const safeSessionId =
+      typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128 ? session_id : null;
 
     const { error } = await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type, source: safeSource, ...sanitizeAttribution(body) });
+      .insert({ therapist_id, click_type, source: safeSource, session_id: safeSessionId, ...sanitizeAttribution(body) });
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

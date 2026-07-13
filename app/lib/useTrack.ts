@@ -39,6 +39,9 @@ export function trackTherapistExplain(therapistId: string, quizType: "adults" | 
 /** Patient entered the matching flow for a treatment type (top of the match funnel). */
 export function trackMatchingClick(quizType: "adults" | "kids", treatment: string) {
   sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata: { treatment } });
+  // Single GA4 emission point (was inline gtag at each call site, which bypassed
+  // the channel-attaching wrapper and only covered the adults flow).
+  gaEvent("matching_click", { quiz_type: quizType, treatment });
 }
 
 export function usePageView(page: string, source?: string) {
