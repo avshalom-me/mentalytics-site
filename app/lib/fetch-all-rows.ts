@@ -9,6 +9,12 @@
  * true }`; for grouped counts on very large tables, prefer a SQL aggregation
  * (RPC) over fetching everything.
  *
+ * Paging is PARALLEL past the first page: sequential paging cost one network
+ * round-trip per 1000 rows, which put /api/admin-analytics (analytics_events
+ * is tens of thousands of rows) at 20-30s wall time. Page 0 is fetched alone —
+ * a small table stays a single request — and only if it comes back full do we
+ * fan out in waves of concurrent range requests.
+ *
  * Pass a THUNK that builds a fresh query each call — `.range()` must be applied
  * to a clean builder, and an awaited builder can't be reused.
  *
@@ -25,6 +31,8 @@ type RangeQuery<T> = {
 };
 
 const PAGE_SIZE = 1000;
+// Concurrent range requests per wave once the table is known to exceed one page.
+const WAVE_PAGES = 10;
 // Backstop so a runaway/huge table can't spin forever. Past this, the call site
 // should aggregate in SQL instead of fetching every row.
 const MAX_ROWS = 200_000;
@@ -32,15 +40,26 @@ const MAX_ROWS = 200_000;
 export async function fetchAllRows<T>(buildQuery: () => RangeQuery<T>): Promise<T[]> {
   const rows: T[] = [];
 
-  for (let from = 0; from < MAX_ROWS; from += PAGE_SIZE) {
-    const { data, error } = await buildQuery().range(from, from + PAGE_SIZE - 1);
-    if (error) throw new Error(error.message);
+  // First page alone: most tables fit in it, and it tells us whether to fan out.
+  const first = await buildQuery().range(0, PAGE_SIZE - 1);
+  if (first.error) throw new Error(first.error.message);
+  rows.push(...(first.data ?? []));
+  if ((first.data ?? []).length < PAGE_SIZE) return rows;
 
-    const batch = data ?? [];
-    rows.push(...batch);
-
-    // A short page means we've reached the end.
-    if (batch.length < PAGE_SIZE) break;
+  // Waves of concurrent pages. Pages are contiguous and Promise.all preserves
+  // order, so concatenation keeps row order; the first short page marks the end
+  // of the set (pages beyond it are empty).
+  outer: for (let waveStart = PAGE_SIZE; waveStart < MAX_ROWS; waveStart += PAGE_SIZE * WAVE_PAGES) {
+    const offsets = Array.from({ length: WAVE_PAGES }, (_, i) => waveStart + i * PAGE_SIZE);
+    const results = await Promise.all(
+      offsets.map((from) => buildQuery().range(from, from + PAGE_SIZE - 1)),
+    );
+    for (const { data, error } of results) {
+      if (error) throw new Error(error.message);
+      const batch = data ?? [];
+      rows.push(...batch);
+      if (batch.length < PAGE_SIZE) break outer;
+    }
   }
 
   // If we stopped on the backstop rather than a short page, the result may be

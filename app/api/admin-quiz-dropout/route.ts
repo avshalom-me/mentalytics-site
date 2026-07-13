@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import {
   ADULTS_TERMINAL_STEPS,
   KIDS_TERMINAL_STEPS,
@@ -25,21 +26,6 @@ function periodToDate(period: Period): string | null {
   if (period === "all") return null;
   const ms = period === "week" ? 7 * 86_400_000 : 30 * 86_400_000;
   return new Date(Date.now() - ms).toISOString();
-}
-
-// PostgREST caps selects at 1000 rows — page through (same pattern as
-// /api/admin-analytics, see the comment there).
-async function fetchAllRows<T>(makeQuery: () => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }> }): Promise<T[]> {
-  const PAGE = 1000;
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    const rows = data ?? [];
-    all.push(...rows);
-    if (rows.length < PAGE) break;
-  }
-  return all;
 }
 
 // ── טיפוסי הפלט ───────────────────────────────────────────────────────────────
