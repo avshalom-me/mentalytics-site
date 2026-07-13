@@ -36,6 +36,7 @@ function StatsTable({
   const wa  = (r: TherapistStat) => source === "match" ? r.match_whatsapp    : r.directory_whatsapp;
   const ph  = (r: TherapistStat) => source === "match" ? r.match_phone        : r.directory_phone;
   const em  = (r: TherapistStat) => source === "match" ? r.match_email        : r.directory_email;
+  const sm  = (r: TherapistStat) => source === "match" ? r.match_site_message : r.directory_site_message;
   const tot = (r: TherapistStat) => source === "match" ? r.match_clicks       : r.directory_clicks;
 
   // Only show therapists that have at least one click or view from this source
@@ -52,6 +53,7 @@ function StatsTable({
   const totalWa  = filtered.reduce((s, r) => s + wa(r), 0);
   const totalPh  = filtered.reduce((s, r) => s + ph(r), 0);
   const totalEm  = filtered.reduce((s, r) => s + em(r), 0);
+  const totalSm  = filtered.reduce((s, r) => s + sm(r), 0);
   const totalAll = filtered.reduce((s, r) => s + tot(r), 0);
 
   return (
@@ -95,6 +97,7 @@ function StatsTable({
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">💬 וואטסאפ</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">📞 טלפון</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">✉️ מייל</th>
+                <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">📝 הודעה באתר</th>
                 <th className="px-5 py-3 font-semibold text-stone-500 text-xs text-center">סה&quot;כ</th>
               </tr>
             </thead>
@@ -108,6 +111,7 @@ function StatsTable({
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={wa(r)} color="text-green-600" /></td>
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={ph(r)} color="text-stone-700" /></td>
                   <td className="px-5 py-3.5 text-center"><StatsBadge value={em(r)} color="text-blue-600" /></td>
+                  <td className="px-5 py-3.5 text-center"><StatsBadge value={sm(r)} color="text-amber-600" /></td>
                   <td className="px-5 py-3.5 text-center">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-stone-100 font-black text-stone-800 text-sm">{tot(r)}</span>
                   </td>
@@ -125,6 +129,7 @@ function StatsTable({
                 <td className="px-5 py-3 text-center font-black text-green-600">{totalWa}</td>
                 <td className="px-5 py-3 text-center font-black text-stone-700">{totalPh}</td>
                 <td className="px-5 py-3 text-center font-black text-blue-600">{totalEm}</td>
+                <td className="px-5 py-3 text-center font-black text-amber-600">{totalSm}</td>
                 <td className="px-5 py-3 text-center">
                   <span className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-stone-800 font-black text-white text-base">{totalAll}</span>
                 </td>

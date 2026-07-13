@@ -73,8 +73,12 @@ export async function GET() {
     const tCount = () => supabaseAdmin.from("therapists").select("id", { count: "exact", head: true });
     const totalQ = tCount();
     const registeredQ = tCount().not("full_name", "is", null).neq("full_name", "");
-    const paidQ = tCount().eq("status", "paying").eq("promotion_source", "paid");
-    const trialQ = tCount().eq("status", "paying").neq("promotion_source", "paid");
+    // admin_approved gates visibility for PAYING therapists too (a therapist who
+    // paid during signup stays hidden until vetted) — without the filter,
+    // "מוצגים למטופלים" here would overcount vs. /admin/analytics the moment a
+    // paid-but-unvetted therapist exists. Unvetted payers fall into pendingNamed.
+    const paidQ = tCount().eq("status", "paying").eq("promotion_source", "paid").eq("admin_approved", true);
+    const trialQ = tCount().eq("status", "paying").neq("promotion_source", "paid").eq("admin_approved", true);
     const freeQ = tCount().eq("status", "approved").eq("admin_approved", true);
 
     // Questionnaires completed in the current calendar month (UTC on Vercel).

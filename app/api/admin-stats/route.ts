@@ -14,15 +14,18 @@ export type TherapistStat = {
   whatsapp: number;
   phone: number;
   email_clicks: number;
+  site_message: number;
   total: number;
   match_clicks: number;
   directory_clicks: number;
   match_whatsapp: number;
   match_phone: number;
   match_email: number;
+  match_site_message: number;
   directory_whatsapp: number;
   directory_phone: number;
   directory_email: number;
+  directory_site_message: number;
   profile_views: number;
   match_views: number;
   directory_views: number;
@@ -77,59 +80,64 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
     return q;
   });
 
-  // Aggregate profile views
+  // Aggregate profile views. match_card rows are CARD IMPRESSIONS in the match
+  // results list, not profile entries — the else-branch used to dump them into
+  // "directory views", inflating that column ~4x (1,664 impressions vs ~500
+  // real directory views). Count only real profile entries, like the rest of
+  // admin (analytics / marketing / attribution).
   const viewsMap: Record<string, { total: number; match: number; directory: number }> = {};
   for (const row of views) {
+    if (row.source === "match_card") continue;
     if (!viewsMap[row.therapist_id]) viewsMap[row.therapist_id] = { total: 0, match: 0, directory: 0 };
     viewsMap[row.therapist_id].total++;
     if (row.source === "match") viewsMap[row.therapist_id].match++;
     else viewsMap[row.therapist_id].directory++;
   }
 
-  // Aggregate
+  // Aggregate. site_message counts like any other contact type — it used to be
+  // in the source splits but missing from the per-type columns and the total,
+  // so the columns didn't add up once site messages existed.
   type ClickCounts = {
-    whatsapp: number; phone: number; email: number;
+    whatsapp: number; phone: number; email: number; site_message: number;
     match: number; directory: number;
-    match_whatsapp: number; match_phone: number; match_email: number;
-    directory_whatsapp: number; directory_phone: number; directory_email: number;
+    match_whatsapp: number; match_phone: number; match_email: number; match_site_message: number;
+    directory_whatsapp: number; directory_phone: number; directory_email: number; directory_site_message: number;
   };
+  const emptyClickCounts = (): ClickCounts => ({
+    whatsapp: 0, phone: 0, email: 0, site_message: 0,
+    match: 0, directory: 0,
+    match_whatsapp: 0, match_phone: 0, match_email: 0, match_site_message: 0,
+    directory_whatsapp: 0, directory_phone: 0, directory_email: 0, directory_site_message: 0,
+  });
   const clickMap: Record<string, ClickCounts> = {};
   for (const row of clicks) {
-    if (!clickMap[row.therapist_id]) {
-      clickMap[row.therapist_id] = {
-        whatsapp: 0, phone: 0, email: 0,
-        match: 0, directory: 0,
-        match_whatsapp: 0, match_phone: 0, match_email: 0,
-        directory_whatsapp: 0, directory_phone: 0, directory_email: 0,
-      };
-    }
-    const c = clickMap[row.therapist_id];
+    const c = (clickMap[row.therapist_id] ??= emptyClickCounts());
     if (row.click_type === "whatsapp") c.whatsapp++;
     else if (row.click_type === "phone") c.phone++;
     else if (row.click_type === "email") c.email++;
+    else if (row.click_type === "site_message") c.site_message++;
 
     if (row.source === "match") {
       c.match++;
       if (row.click_type === "whatsapp") c.match_whatsapp++;
       else if (row.click_type === "phone") c.match_phone++;
       else if (row.click_type === "email") c.match_email++;
+      else if (row.click_type === "site_message") c.match_site_message++;
     } else {
+      // directory + profile (a site message sent from a directory-origin
+      // profile page records source='profile') both belong to the directory side.
       c.directory++;
       if (row.click_type === "whatsapp") c.directory_whatsapp++;
       else if (row.click_type === "phone") c.directory_phone++;
       else if (row.click_type === "email") c.directory_email++;
+      else if (row.click_type === "site_message") c.directory_site_message++;
     }
   }
 
   const rows = (therapists ?? []) as { id: string; full_name: string | null; email: string | null; status: string }[];
 
   const stats: TherapistStat[] = rows.map((t) => {
-    const c = clickMap[t.id] ?? {
-      whatsapp: 0, phone: 0, email: 0,
-      match: 0, directory: 0,
-      match_whatsapp: 0, match_phone: 0, match_email: 0,
-      directory_whatsapp: 0, directory_phone: 0, directory_email: 0,
-    };
+    const c = clickMap[t.id] ?? emptyClickCounts();
     const v = viewsMap[t.id] ?? { total: 0, match: 0, directory: 0 };
     return {
       id: t.id,
@@ -139,15 +147,18 @@ export async function GET(req: NextRequest): Promise<NextResponse<AdminStatsResp
       whatsapp: c.whatsapp,
       phone: c.phone,
       email_clicks: c.email,
-      total: c.whatsapp + c.phone + c.email,
+      site_message: c.site_message,
+      total: c.whatsapp + c.phone + c.email + c.site_message,
       match_clicks: c.match,
       directory_clicks: c.directory,
       match_whatsapp: c.match_whatsapp,
       match_phone: c.match_phone,
       match_email: c.match_email,
+      match_site_message: c.match_site_message,
       directory_whatsapp: c.directory_whatsapp,
       directory_phone: c.directory_phone,
       directory_email: c.directory_email,
+      directory_site_message: c.directory_site_message,
       profile_views: v.total,
       match_views: v.match,
       directory_views: v.directory,

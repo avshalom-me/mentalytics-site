@@ -44,6 +44,8 @@ type TherapistBreakdowns = {
   byCulturalPref: FilterEntry[];
 };
 
+type ClickTypeBySource = { directory: Record<string, number>; match: Record<string, number> };
+
 type AnalyticsData = {
   funnel: Funnel;
   funnelBySource: FunnelBySource;
@@ -53,6 +55,7 @@ type AnalyticsData = {
   quizDropout: { adults: QuizFunnel; kids: QuizFunnel };
   demographics: { byRegion: FilterEntry[]; byIssue: FilterEntry[]; byAgeBand: FilterEntry[]; byGender: FilterEntry[] };
   clickTypeBreakdown: Record<string, number>;
+  clickTypeBySource: ClickTypeBySource;
   explainAnalytics: ExplainAnalytics;
   therapistBreakdowns: TherapistBreakdowns;
   generated_at: string;
@@ -112,7 +115,11 @@ function FunnelCards({ steps }: { steps: FunnelStep[] }) {
             <div className="text-3xl font-black">{s.value.toLocaleString("he-IL")}</div>
             <div className="text-xs font-semibold mt-1">{s.label}</div>
           </div>
-          {i > 0 && steps[i - 1].value > 0 && (
+          {/* Step conversion — hidden when the step EXCEEDS the previous one
+              (e.g. one directory entry exposes ~11 cards, one quiz spawns many
+              card impressions): ">100%" reads as nonsense, same rule as the
+              marketing funnel cards. */}
+          {i > 0 && steps[i - 1].value > 0 && s.value <= steps[i - 1].value && (
             <div className="absolute -top-3 right-1/2 translate-x-1/2 rounded-full bg-stone-800 text-white text-xs font-bold px-2 py-0.5">
               {pct(s.value, steps[i - 1].value)}
             </div>
@@ -165,6 +172,9 @@ function buildFunnelSteps(view: FunnelView, data: AnalyticsData): FunnelStep[] {
   ];
 }
 
+// The online toggle sends filter_value="true" — show a human label for it.
+const FILTER_VALUE_LABELS: Record<string, string> = { true: "אונליין", false: "לא אונליין" };
+
 function PopularFilters({ filters }: { filters: FilterEntry[] }) {
   if (filters.length === 0) return null;
   const max = filters[0]?.count ?? 1;
@@ -175,7 +185,7 @@ function PopularFilters({ filters }: { filters: FilterEntry[] }) {
       <div className="space-y-2">
         {filters.map((f) => (
           <div key={f.name} className="flex items-center gap-3">
-            <span className="w-20 text-xs font-semibold text-stone-600 text-left shrink-0">{f.name}</span>
+            <span className="w-20 text-xs font-semibold text-stone-600 text-left shrink-0">{FILTER_VALUE_LABELS[f.name] ?? f.name}</span>
             <div className="flex-1 h-6 bg-stone-100 rounded-full overflow-hidden">
               <div className="h-full bg-[#2e7d8c] rounded-full flex items-center justify-end px-2"
                 style={{ width: `${Math.max((f.count / max) * 100, 8)}%` }}>
@@ -302,8 +312,23 @@ function ConvRow({ label, a, b, strong }: { label: string; a: number; b: number;
   );
 }
 
-function ConversionBySource({ fbs }: { fbs: FunnelBySource }) {
-  const cols: { key: string; label: string; f: Funnel }[] = [
+// Per-source contact-type chips: "כמה וואטסאפ / טלפון / מייל / הודעה" in each track.
+function ClickTypeChips({ counts }: { counts: Record<string, number> }) {
+  const entries = Object.entries(counts).filter(([, n]) => n > 0);
+  if (entries.length === 0) return <span className="text-xs text-stone-300">אין פניות בטווח</span>;
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {entries.map(([type, n]) => (
+        <span key={type} className="rounded-full bg-white border border-stone-200 px-2 py-0.5 text-xs text-stone-600">
+          {CLICK_TYPE_LABELS[type] ?? type} <b className="text-stone-900">{n}</b>
+        </span>
+      ))}
+    </div>
+  );
+}
+
+function ConversionBySource({ fbs, clickTypes }: { fbs: FunnelBySource; clickTypes: ClickTypeBySource }) {
+  const cols: { key: "directory" | "match"; label: string; f: Funnel }[] = [
     { key: "directory", label: "מאגר המטפלים", f: fbs.directory },
     { key: "match", label: "מערכת ההתאמה", f: fbs.match },
   ];
@@ -315,6 +340,7 @@ function ConversionBySource({ fbs }: { fbs: FunnelBySource }) {
         <Term k="חשיפה→צפייה">כמה מהחשיפות הפכו לכניסה לפרופיל.</Term>
         <Term k="צפייה→פנייה">כמה מהצפיות בפרופיל הפכו ליצירת קשר.</Term>
         <Term k="חשיפה→פנייה">אחוז ההמרה הכולל — מחשיפה ועד פנייה.</Term>
+        <Term k="הצ'יפים למטה">פירוק הפניות של המסלול לפי אמצעי (וואטסאפ / טלפון / מייל / הודעה באתר). במאגר אפשר לפנות גם ישירות מהכרטיס — בלי להיכנס לפרופיל.</Term>
       </Info>
       <div className="grid grid-cols-2 gap-3">
         {cols.map(c => (
@@ -323,6 +349,9 @@ function ConversionBySource({ fbs }: { fbs: FunnelBySource }) {
             <ConvRow label="חשיפה→צפייה" a={c.f.profileViews} b={c.f.impressions} />
             <ConvRow label="צפייה→פנייה" a={c.f.contactClicks} b={c.f.profileViews} />
             <ConvRow label="חשיפה→פנייה" a={c.f.contactClicks} b={c.f.impressions} strong />
+            <div className="mt-2.5 pt-2.5 border-t border-stone-200">
+              <ClickTypeChips counts={clickTypes[c.key]} />
+            </div>
           </div>
         ))}
       </div>
@@ -353,7 +382,7 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
       </div>
 
       <FunnelCards steps={buildFunnelSteps(view, data)} />
-      <ConversionBySource fbs={data.funnelBySource} />
+      <ConversionBySource fbs={data.funnelBySource} clickTypes={data.clickTypeBySource} />
       <div className="grid gap-6 lg:grid-cols-2 mb-6">
         <PopularFilters filters={data.popularFilters} />
         <TrendChart trends={data.trends} />
@@ -834,9 +863,16 @@ function DonutChart({ title, data }: { title: string; data: FilterEntry[] }) {
   );
 }
 
+const CLICK_TYPE_LABELS: Record<string, string> = {
+  whatsapp: "וואטסאפ",
+  phone: "טלפון",
+  email: "מייל",
+  site_message: "הודעה באתר",
+};
+
 function ClickBreakdown({ breakdown }: { breakdown: Record<string, number> }) {
-  const labels: Record<string, string> = { whatsapp: "וואטסאפ", phone: "טלפון", email: "מייל" };
-  const colors: Record<string, string> = { whatsapp: "bg-green-500", phone: "bg-stone-700", email: "bg-blue-500" };
+  const labels = CLICK_TYPE_LABELS;
+  const colors: Record<string, string> = { whatsapp: "bg-green-500", phone: "bg-stone-700", email: "bg-blue-500", site_message: "bg-amber-500" };
   const total = Object.values(breakdown).reduce((s, v) => s + v, 0);
   if (total === 0) return null;
 
@@ -1086,6 +1122,7 @@ export default function AdminAnalyticsPage() {
             quizDropout: json.quizDropout,
             demographics: json.demographics,
             clickTypeBreakdown: json.clickTypeBreakdown,
+            clickTypeBySource: json.clickTypeBySource ?? { directory: {}, match: {} },
             explainAnalytics: json.explainAnalytics ?? {
               total: 0,
               byQuestionnaireType: [],

@@ -95,11 +95,14 @@ export async function computeEnrichedStats(
   const sinceIso = sinceDate.toISOString();
   const periodDays = Math.round((Date.now() - sinceDate.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Views in window
+  // Views in window. match_card rows are card impressions in the match-results
+  // list, not profile entries — including them inflated the therapist's "views"
+  // (and skewed no_click_rate) relative to every admin report, which excludes them.
   const { data: viewsData } = await supabaseAdmin
     .from("therapist_profile_views")
     .select("session_id, viewer_region, viewer_issue, viewer_age_band, viewer_gender, viewed_at")
     .eq("therapist_id", therapistId)
+    .neq("source", "match_card")
     .gte("viewed_at", sinceIso);
 
   const views = (viewsData ?? []) as ViewRow[];

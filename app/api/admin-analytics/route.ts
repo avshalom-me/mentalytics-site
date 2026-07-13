@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+// Shared parallel-paging fetcher (waves of concurrent range requests). The old
+// local copy here paged SEQUENTIALLY — one round-trip per 1000 rows — which is
+// what made this endpoint (and every admin tab that calls it) take 20-30s once
+// analytics_events grew into the tens of thousands of rows.
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -9,25 +14,6 @@ function periodToDate(period: Period): string | null {
   if (period === "all") return null;
   const ms = period === "week" ? 7 * 86_400_000 : 30 * 86_400_000;
   return new Date(Date.now() - ms).toISOString();
-}
-
-// PostgREST caps every select at 1000 rows. The event tables grow well past
-// that (analytics_events alone is in the thousands), so a plain select silently
-// returns only a 1000-row slice — which freezes all the counts once the table
-// crosses 1000 rows. Page through with .range() to aggregate the FULL set.
-// makeQuery must return a FRESH builder each call (a builder can't be reused
-// after it's awaited).
-async function fetchAllRows<T>(makeQuery: () => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: { message: string } | null }> }): Promise<T[]> {
-  const PAGE = 1000;
-  const all: T[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await makeQuery().range(from, from + PAGE - 1);
-    if (error) throw new Error(error.message);
-    const rows = data ?? [];
-    all.push(...rows);
-    if (rows.length < PAGE) break;
-  }
-  return all;
 }
 
 type TherapistRow = {
@@ -217,10 +203,18 @@ export async function GET(req: NextRequest) {
       byGender: countField("viewer_gender"),
     };
 
-    // --- Click type breakdown ---
+    // --- Click type breakdown (total + split by acquisition source) ---
+    // The per-source split answers "כמה וואטסאפ/טלפון/הודעה בכל מסלול" directly;
+    // 'profile' (site message from a directory-origin profile) counts as directory.
     const clickTypeBreakdown: Record<string, number> = {};
+    const clickTypeBySource: { directory: Record<string, number>; match: Record<string, number> } = {
+      directory: {},
+      match: {},
+    };
     for (const c of clicks) {
       clickTypeBreakdown[c.click_type] = (clickTypeBreakdown[c.click_type] ?? 0) + 1;
+      const side = c.source === "match" ? "match" : "directory";
+      clickTypeBySource[side][c.click_type] = (clickTypeBySource[side][c.click_type] ?? 0) + 1;
     }
 
     // --- Recommendation-explain clicks ("✦ למה הוצע לי?") ---
@@ -367,6 +361,7 @@ export async function GET(req: NextRequest) {
       quizDropout: { adults: adultsQuiz, kids: kidsQuiz },
       demographics,
       clickTypeBreakdown,
+      clickTypeBySource,
       explainAnalytics,
       therapistBreakdowns,
       generated_at: new Date().toISOString(),

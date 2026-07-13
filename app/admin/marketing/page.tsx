@@ -290,19 +290,29 @@ function pct(n: number, d: number): number {
   return d > 0 ? Math.round((n / d) * 1000) / 10 : 0;
 }
 
+const CLICK_TYPE_LABELS: Record<string, string> = {
+  whatsapp: "💬 וואטסאפ",
+  phone: "📞 טלפון",
+  email: "✉️ מייל",
+  site_message: "📝 הודעה באתר",
+};
+
 function FunnelCard({
   eyebrow,
   title,
   steps,
   headline,
   note,
+  clickTypes,
 }: {
   eyebrow: string;
   title: string;
   steps: { label: string; value: number; color: string }[];
   headline: number;
   note?: string;
+  clickTypes?: Record<string, number>;
 }) {
+  const clickEntries = Object.entries(clickTypes ?? {}).filter(([, n]) => n > 0);
   const top = steps[0]?.value || 1;
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -337,6 +347,15 @@ function FunnelCard({
           );
         })}
       </div>
+      {clickEntries.length > 0 && (
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {clickEntries.map(([type, n]) => (
+            <span key={type} className="rounded-full bg-stone-50 border border-stone-200 px-2 py-0.5 text-xs text-stone-600">
+              {CLICK_TYPE_LABELS[type] ?? type} <b className="text-stone-900">{num(n)}</b>
+            </span>
+          ))}
+        </div>
+      )}
       {note && <p className="mt-3 text-xs text-stone-400">{note}</p>}
     </div>
   );
@@ -380,6 +399,7 @@ function FunnelsCampaigns() {
   const [totalContacts, setTotalContacts] = useState(0);
   const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
+  const [clickTypes, setClickTypes] = useState<{ directory: Record<string, number>; match: Record<string, number> } | null>(null);
   const [cac, setCac] = useState<FinMonth | null>(null);
   const [ads, setAds] = useState<AdsData | null>(null);
   const [campFunnel, setCampFunnel] = useState<CampaignFunnelRow[] | null>(null);
@@ -417,6 +437,7 @@ function FunnelsCampaigns() {
         setTotalContacts(a.totals?.contactClicks ?? 0);
         setCampaigns(a.topCampaigns ?? []);
         setFunnel(an.funnelBySource ?? null);
+        setClickTypes(an.clickTypeBySource ?? null);
         // finance builds months newest-first, so the CURRENT month is index 0.
         const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
         setCac(months[0] ?? null);
@@ -466,6 +487,8 @@ function FunnelsCampaigns() {
                   { label: "צפיות פרופיל", value: funnel.directory.profileViews, color: "#3D8C8A" },
                   { label: "פניות", value: funnel.directory.contactClicks, color: "#D49018" },
                 ]}
+                clickTypes={clickTypes?.directory}
+                note="במאגר אפשר לפנות גם ישירות מהכרטיס — בלי כניסה לפרופיל."
               />
               <FunnelCard
                 eyebrow="מסלול 2 ✦"
@@ -476,6 +499,7 @@ function FunnelsCampaigns() {
                   { label: "צפיות פרופיל (התאמה)", value: funnel.match.profileViews, color: "#3D8C8A" },
                   { label: "פניות", value: funnel.match.contactClicks, color: "#D49018" },
                 ]}
+                clickTypes={clickTypes?.match}
                 note={`${num(funnel.match.impressions)} כרטיסי מטפל הוצגו בהתאמות`}
               />
             </div>
@@ -736,7 +760,17 @@ function FunnelsCampaigns() {
                 <tbody>
                   {campaigns.map((c) => (
                     <tr key={c.campaign} className="border-b border-stone-100">
-                      <td className="px-2 py-2 font-semibold text-stone-700">{c.campaign}</td>
+                      <td className="px-2 py-2 font-semibold text-stone-700">
+                        {c.campaign}
+                        {/* Recruitment campaigns (therapist-*) target THERAPISTS; a patient
+                            contact attributed to one means a recruitment visitor browsed
+                            the patient site. Tag it so it isn't read as a patient campaign. */}
+                        {c.campaign.startsWith("therapist") && (
+                          <span className="mr-1.5 rounded-full bg-amber-50 border border-amber-200 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                            קמפיין גיוס
+                          </span>
+                        )}
+                      </td>
                       <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
                     </tr>
                   ))}
