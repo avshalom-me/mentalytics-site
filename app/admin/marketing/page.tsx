@@ -1,6 +1,9 @@
 "use client";
 
 import { useEffect, useState, Fragment } from "react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+} from "recharts";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
 
@@ -388,6 +391,68 @@ const P2_PERIODS: { key: "week" | "month" | "all"; label: string }[] = [
 
 function pct(n: number, d: number): number {
   return d > 0 ? Math.round((n / d) * 1000) / 10 : 0;
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return `${d.getDate()}/${d.getMonth() + 1}`;
+}
+
+// Daily Google Ads spend. Replaces the old 48px label-less bar strip (thin bars,
+// value only on hover, no axes/dates) with a proper charted view: ₪ y-axis,
+// dated x-axis, gridlines, an interactive tooltip, the peak day highlighted, and
+// an avg/peak summary line.
+function DailySpendChart({ data }: { data: { date: string; cost: number }[] }) {
+  if (!data || data.length < 2) return null;
+  const rows = data.map((d) => ({ ...d, label: dayLabel(d.date), costR: Math.round(d.cost) }));
+  const total = rows.reduce((s, d) => s + d.cost, 0);
+  const avg = total / rows.length;
+  const peak = rows.reduce((m, d) => (d.cost > m.cost ? d : m), rows[0]);
+  // Cap x-axis labels to ~7 so 30-day ranges stay readable.
+  const interval = Math.max(0, Math.ceil(rows.length / 7) - 1);
+  return (
+    <div className="mt-5">
+      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+        <p className="text-sm font-black text-stone-700">הוצאה יומית</p>
+        <p className="text-xs text-stone-500">
+          ממוצע <span className="font-bold text-stone-700">₪{num(Math.round(avg))}</span>/יום · שיא{" "}
+          <span className="font-bold text-stone-700">₪{num(peak.costR)}</span> ב-{peak.label}
+        </p>
+      </div>
+      <ResponsiveContainer width="100%" height={200}>
+        <BarChart data={rows} margin={{ top: 8, right: 4, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
+          <XAxis
+            dataKey="label"
+            interval={interval}
+            tick={{ fontSize: 10, fill: "#78716c" }}
+            tickLine={false}
+            axisLine={{ stroke: "#e7e5e4" }}
+          />
+          <YAxis
+            tickFormatter={(v) => `₪${v}`}
+            tick={{ fontSize: 10, fill: "#78716c" }}
+            width={48}
+            allowDecimals={false}
+            tickLine={false}
+            axisLine={false}
+          />
+          <Tooltip
+            cursor={{ fill: "rgba(61,140,138,0.08)" }}
+            formatter={(v) => [`₪${num(Math.round(Number(v)))}`, "הוצאה"]}
+            labelFormatter={(l) => `יום ${l}`}
+            contentStyle={{ fontFamily: "Heebo", fontSize: 12, direction: "rtl", borderRadius: 12, border: "1px solid #e7e5e4" }}
+          />
+          <Bar dataKey="cost" radius={[4, 4, 0, 0]} maxBarSize={40} isAnimationActive={false}>
+            {rows.map((d) => (
+              <Cell key={d.date} fill={d.date === peak.date ? "#D49018" : "#3D8C8A"} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }
 
 const CLICK_TYPE_LABELS: Record<string, string> = {
@@ -856,26 +921,7 @@ function FunnelsCampaigns() {
                       })}
                     </tbody>
                   </table>
-                  {ads.byDay &&
-                    ads.byDay.length > 1 &&
-                    (() => {
-                      const max = Math.max(1, ...ads.byDay!.map((d) => d.cost));
-                      return (
-                        <div className="mt-4">
-                          <p className="mb-1 text-xs font-semibold text-stone-500">הוצאה יומית</p>
-                          <div className="flex items-end gap-0.5" style={{ height: "48px" }}>
-                            {ads.byDay!.map((d) => (
-                              <div
-                                key={d.date}
-                                title={`${d.date}: ₪${num(Math.round(d.cost))}`}
-                                className="flex-1 rounded-t bg-[#3D8C8A]"
-                                style={{ height: `${Math.max(4, (d.cost / max) * 100)}%` }}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                  {ads.byDay && ads.byDay.length > 1 && <DailySpendChart data={ads.byDay} />}
                   <p className="mt-3 text-[11px] leading-5 text-stone-400">
                     הוצאה, קליקים, CTR ו-CPC נמשכים אוטומטית מ-Google Ads.{" "}
                     <span className="font-semibold text-stone-500">עלות/המרה מחושבת אצלנו</span> לפי מטרת הקמפיין: קמפיין
