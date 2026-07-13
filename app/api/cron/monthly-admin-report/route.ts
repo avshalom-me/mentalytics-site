@@ -3,7 +3,9 @@ import { runReport } from "@/app/api/cron/weekly-report/route";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// runReport("monthly") uses the reasoning LLM (~150-180s on real data); 120 was
+// too tight and this monthly cron could 504. Match the weekly cron's headroom.
+export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 

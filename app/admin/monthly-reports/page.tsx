@@ -5,6 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from "recharts";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
+import { triggerReport } from "@/app/lib/trigger-report";
 
 type FilterEntry = { name: string; count: number };
 
@@ -531,21 +532,15 @@ export default function MonthlyReportsPage() {
 
   async function runNow() {
     setRunning(true);
-    setRunMsg("");
-    try {
-      const r = await fetch("/api/admin-trigger-monthly-report", { method: "POST", cache: "no-store" });
-      const json = await r.json();
-      if (json.ok) {
-        setRunMsg(`הופק דוח לחודש ${json.period_start} (${json.emailStatus})`);
-        load();
-      } else {
-        setRunMsg(`שגיאה: ${json.error}`);
-      }
-    } catch (e) {
-      setRunMsg(`שגיאה: ${e instanceof Error ? e.message : "unknown"}`);
-    } finally {
-      setRunning(false);
+    setRunMsg("מפיק דוח — כולל ניתוח AI, עשוי לקחת 2-3 דקות…");
+    const json = await triggerReport("/api/admin-trigger-monthly-report");
+    if (json.ok) {
+      setRunMsg(`הופק דוח לחודש ${json.period_start} (${json.emailStatus})`);
+      load();
+    } else {
+      setRunMsg(`שגיאה: ${json.error}`);
     }
+    setRunning(false);
   }
 
   return (

@@ -708,11 +708,18 @@ ${channelLines}
 
   // Reasoning models work best via the Responses API and reject `temperature`.
   const SYSTEM = "אתה אנליסט מוצר ישראלי ענייני. אתה כותב עברית טבעית, ממוקדת מספרים וללא מליצות.";
-  const response = await openai.responses.create({
-    model: REPORT_LLM_MODEL,
-    reasoning: { effort: REPORT_LLM_EFFORT as "minimal" | "low" | "medium" | "high" },
-    input: `${SYSTEM}\n\n${prompt}`,
-  });
+  // Cap the call below the 300s function limit (aggregations run before this,
+  // email/DB after) and disable the SDK's default retries — a retry on a
+  // slow-but-eventually-fine call would blow the budget. On overrun this THROWS,
+  // caught by runReport → clean JSON error instead of a platform 504.
+  const response = await openai.responses.create(
+    {
+      model: REPORT_LLM_MODEL,
+      reasoning: { effort: REPORT_LLM_EFFORT as "minimal" | "low" | "medium" | "high" },
+      input: `${SYSTEM}\n\n${prompt}`,
+    },
+    { timeout: 240_000, maxRetries: 0 },
+  );
 
   const text = response.output_text ?? "";
 
