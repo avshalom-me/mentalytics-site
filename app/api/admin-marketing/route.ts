@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -94,6 +95,26 @@ export async function GET() {
     // subscription (gifted/trial promotions do not), so this is a small table.
     const subsQ = supabaseAdmin.from("subscriptions").select("therapist_id, status");
 
+    // Contact COVERAGE of paying therapists — the dashboard's reason to exist:
+    // does every paying (then promoted) therapist actually receive inquiries?
+    // Raw rows, aggregated here: clicks is a small table, real profile views in
+    // the last 30d likewise; both fetched cap-safe.
+    const payingListQ = supabaseAdmin
+      .from("therapists")
+      .select("id, full_name, promotion_source")
+      .eq("status", "paying")
+      .eq("admin_approved", true);
+    const clicksAllQ = fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
+      supabaseAdmin.from("therapist_contact_clicks").select("therapist_id, clicked_at")
+    );
+    const views30Q = fetchAllRows<{ therapist_id: string }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id")
+        .in("source", ["match", "directory"])
+        .gte("viewed_at", iso(30))
+    );
+
     // 4 counts per period, in order: contacts, contactsPrev, profileViews, explainClicks.
     const periodQs = PERIODS.flatMap((d) => [
       countRows("therapist_contact_clicks", "clicked_at", iso(d)),
@@ -102,19 +123,26 @@ export async function GET() {
       countExplain(iso(d)),
     ]);
 
-    // Two typed Promise.all groups (kept apart so the period results stay a
+    // Typed Promise.all groups (kept apart so the period results stay a
     // single count-query type), run concurrently.
     const [
       [aiRes, targetsRes, totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes, subsRes],
       periodRes,
+      payingListRes,
+      clicksAll,
+      views30,
     ] = await Promise.all([
       Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, trialQ, freeQ, quizMonthQ, subsQ]),
       Promise.all(periodQs),
+      payingListQ,
+      clicksAllQ,
+      views30Q,
     ]);
 
     if (aiRes.error) throw aiRes.error;
     if (targetsRes.error) throw targetsRes.error;
     if (subsRes.error) throw subsRes.error;
+    if (payingListRes.error) throw payingListRes.error;
     for (const r of [totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
 
@@ -164,6 +192,65 @@ export async function GET() {
     };
     const quizThisMonth = quizMonthRes.count ?? 0;
 
+    // --- Contact coverage of paying/promoted therapists ---
+    type PayingRow = { id: string; full_name: string | null; promotion_source: string | null };
+    const payingList = (payingListRes.data ?? []) as PayingRow[];
+    const payingIdSet = new Set(payingList.map((t) => t.id));
+
+    // Last contact ever + per-window covered sets, from one pass over all clicks.
+    const lastContactAt = new Map<string, number>();
+    for (const c of clicksAll) {
+      if (!payingIdSet.has(c.therapist_id)) continue;
+      const ts = new Date(c.clicked_at).getTime();
+      if (ts > (lastContactAt.get(c.therapist_id) ?? 0)) lastContactAt.set(c.therapist_id, ts);
+    }
+    const views30ByTherapist = new Map<string, number>();
+    for (const v of views30) {
+      if (payingIdSet.has(v.therapist_id)) {
+        views30ByTherapist.set(v.therapist_id, (views30ByTherapist.get(v.therapist_id) ?? 0) + 1);
+      }
+    }
+
+    const tierOf = (t: PayingRow) => (t.promotion_source === "paid" ? "paid" : "trial");
+    const coveredInWindow = (t: PayingRow, days: number) =>
+      (lastContactAt.get(t.id) ?? 0) >= Date.now() - days * 86_400_000;
+
+    const coveragePeriods: Record<string, { paid: number; trial: number }> = {};
+    for (const d of PERIODS) {
+      const p = { paid: 0, trial: 0 };
+      for (const t of payingList) if (coveredInWindow(t, d)) p[tierOf(t)]++;
+      coveragePeriods[`d${d}`] = p;
+    }
+
+    // "Starving" = paying/promoted, listed, and no contact in the last 30 days.
+    // Never-contacted first, then longest-since; paid before trial.
+    const nowMs = Date.now();
+    const starving = payingList
+      .filter((t) => !coveredInWindow(t, 30))
+      .map((t) => {
+        const last = lastContactAt.get(t.id) ?? null;
+        return {
+          id: t.id,
+          name: t.full_name ?? "—",
+          tier: tierOf(t),
+          views30: views30ByTherapist.get(t.id) ?? 0,
+          daysSinceContact: last ? Math.floor((nowMs - last) / 86_400_000) : null,
+        };
+      })
+      .sort((a, b) => {
+        if (a.tier !== b.tier) return a.tier === "paid" ? -1 : 1;
+        const aDays = a.daysSinceContact ?? Number.MAX_SAFE_INTEGER;
+        const bDays = b.daysSinceContact ?? Number.MAX_SAFE_INTEGER;
+        return bDays !== aDays ? bDays - aDays : b.views30 - a.views30;
+      });
+
+    const coverage = {
+      paidTotal: payingList.filter((t) => tierOf(t) === "paid").length,
+      trialTotal: payingList.filter((t) => tierOf(t) === "trial").length,
+      periods: coveragePeriods,
+      starving,
+    };
+
     // Cumulative churn: therapists who ever had a subscription but no longer have
     // an active one. cancelled_at is unreliable (nullable), so we compare the
     // ever-paid vs currently-active sets rather than timestamps. A stable MONTHLY
@@ -205,6 +292,7 @@ export async function GET() {
       targets,
       supply,
       churn,
+      coverage,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

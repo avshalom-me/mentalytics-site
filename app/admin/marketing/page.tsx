@@ -49,12 +49,21 @@ type Supply = {
 
 type Churn = { everPaid: number; active: number; churned: number; pct: number | null };
 
+type StarvingRow = { id: string; name: string; tier: "paid" | "trial"; views30: number; daysSinceContact: number | null };
+type Coverage = {
+  paidTotal: number;
+  trialTotal: number;
+  periods: Record<string, { paid: number; trial: number }>;
+  starving: StarvingRow[];
+};
+
 type Data = {
   ai: Ai | null;
   kpis: Record<string, PeriodKpis>;
   targets: Target[];
   supply: Supply;
   churn: Churn;
+  coverage: Coverage | null;
   generated_at: string;
 };
 
@@ -177,6 +186,95 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
   );
 }
 
+// THE goal metric: does every paying (then promoted) therapist get inquiries?
+// A coverage chip per tier for the selected period, plus the 30-day "starving"
+// list — who to act on (promote harder / point campaigns at their region).
+function CoverageChip({ label, covered, total }: { label: string; covered: number; total: number }) {
+  const ratio = total > 0 ? covered / total : 1;
+  const cls =
+    ratio >= 1 ? "bg-green-100 text-green-800 border-green-200"
+    : ratio >= 0.5 ? "bg-amber-100 text-amber-800 border-amber-200"
+    : "bg-red-100 text-red-700 border-red-200";
+  return (
+    <div className={`rounded-xl border px-4 py-2.5 text-center ${cls}`}>
+      <div className="text-2xl font-black leading-tight">
+        {num(covered)}<span className="text-sm font-bold opacity-60"> / {num(total)}</span>
+      </div>
+      <div className="text-xs font-semibold">{label}</div>
+    </div>
+  );
+}
+
+function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
+  const p = c.periods[periodKey] ?? { paid: 0, trial: 0 };
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? c.starving : c.starving.slice(0, 6);
+  return (
+    <div className="mb-5 rounded-2xl border-2 border-[#C2DFDE] bg-white p-5">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-black text-stone-800">🎯 כיסוי פניות — מטפלים בתשלום</h2>
+        <span className="text-xs text-stone-400">המדד המרכזי: שכל מטפל משלם יקבל פניות</span>
+      </div>
+      <p className="mb-3 text-xs text-stone-500">כמה מהמטפלים המוצגים קיבלו לפחות פנייה אחת ({periodLabel} אחרונים).</p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} />
+        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} />
+      </div>
+      {c.starving.length > 0 ? (
+        <>
+          <div className="mb-1.5 text-xs font-black text-stone-600">
+            ללא פנייה מעל 30 יום ({num(c.starving.length)}) — כאן צריך לפעול:
+          </div>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-200 text-xs text-stone-500">
+                <th className="px-2 py-1.5 text-right font-semibold">מטפל/ת</th>
+                <th className="px-2 py-1.5 text-center font-semibold">מסלול</th>
+                <th className="px-2 py-1.5 text-center font-semibold">צפיות פרופיל (30 י׳)</th>
+                <th className="px-2 py-1.5 text-center font-semibold">פנייה אחרונה</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((s) => (
+                <tr key={s.id} className="border-b border-stone-100">
+                  <td className="px-2 py-1.5 font-semibold text-stone-700">{s.name}</td>
+                  <td className="px-2 text-center">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                      s.tier === "paid" ? "bg-[#FDF6E3] text-[#A87010] border border-[#D49018]/30" : "bg-[#EAF4F3] text-[#2A6462]"
+                    }`}>
+                      {s.tier === "paid" ? "בתשלום" : "מקודם"}
+                    </span>
+                  </td>
+                  {/* Low views → an exposure problem (region/profile); decent views with
+                      no contacts → a conversion problem (photo/bio/pricing). */}
+                  <td className="px-2 text-center text-stone-600">{num(s.views30)}</td>
+                  <td className="px-2 text-center text-stone-500">
+                    {s.daysSinceContact == null ? (
+                      <span className="font-bold text-red-600">אף פעם</span>
+                    ) : (
+                      `לפני ${num(s.daysSinceContact)} ימים`
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {c.starving.length > 6 && (
+            <button onClick={() => setShowAll(!showAll)} className="mt-2 text-xs font-semibold text-[#3D8C8A] hover:underline">
+              {showAll ? "הצג פחות ▴" : `הצג את כל ${num(c.starving.length)} ▾`}
+            </button>
+          )}
+          <p className="mt-2 text-[11px] text-stone-400">
+            צפיות נמוכות = בעיית חשיפה (אזור/קידום) · צפיות תקינות בלי פניות = בעיית המרה בפרופיל (תמונה/תיאור).
+          </p>
+        </>
+      ) : (
+        <p className="text-sm font-semibold text-green-700">🎉 כל המטפלים בתשלום קיבלו פנייה ב-30 הימים האחרונים.</p>
+      )}
+    </div>
+  );
+}
+
 // Supply split by commitment tier. The 3 "active" tiers (listed on the site)
 // get a proportional stacked bar; pending/incomplete are pipeline states shown
 // as separate chips so they're never conflated with real supply.
@@ -272,6 +370,8 @@ function currentTargets(targets: Target[]): Target[] {
 // risk, so this tab lazy-fetches those APIs when opened. ----
 
 type FunnelSrc = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
+type TierExposure = { therapists: number; impressions: number; profileViews: number; contactClicks: number };
+type ExposureByTier = { paying: TierExposure; free: TierExposure };
 type AttrChannel = {
   channel: string;
   profileViews: number;
@@ -400,6 +500,7 @@ function FunnelsCampaigns() {
   const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
   const [clickTypes, setClickTypes] = useState<{ directory: Record<string, number>; match: Record<string, number> } | null>(null);
+  const [exposure, setExposure] = useState<ExposureByTier | null>(null);
   const [cac, setCac] = useState<FinMonth | null>(null);
   const [ads, setAds] = useState<AdsData | null>(null);
   const [campFunnel, setCampFunnel] = useState<CampaignFunnelRow[] | null>(null);
@@ -438,6 +539,7 @@ function FunnelsCampaigns() {
         setCampaigns(a.topCampaigns ?? []);
         setFunnel(an.funnelBySource ?? null);
         setClickTypes(an.clickTypeBySource ?? null);
+        setExposure(an.exposureByTier ?? null);
         // finance builds months newest-first, so the CURRENT month is index 0.
         const months: FinMonth[] = fin?.ok ? fin.months ?? [] : [];
         setCac(months[0] ?? null);
@@ -505,6 +607,45 @@ function FunnelsCampaigns() {
             </div>
           )}
           {!funnel && <p className="mb-5 text-sm text-stone-400">אין נתוני משפך לטווח זה.</p>}
+
+          {/* Exposure fairness: paying+promoted share of exposure vs their share of supply.
+              The promotion promise is a bigger stage — this is its scoreboard. */}
+          {exposure &&
+            (() => {
+              const p = exposure.paying;
+              const f = exposure.free;
+              const share = (a: number, b: number) => (a + b > 0 ? Math.round((a / (a + b)) * 100) : 0);
+              const supplyShare = share(p.therapists, f.therapists);
+              const rows = [
+                { label: "חשיפות", v: share(p.impressions, f.impressions) },
+                { label: "צפיות פרופיל", v: share(p.profileViews, f.profileViews) },
+                { label: "פניות", v: share(p.contactClicks, f.contactClicks) },
+              ];
+              const working = rows[0].v >= supplyShare;
+              return (
+                <div className="mb-5 rounded-2xl border border-stone-200 bg-white p-5">
+                  <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                    <h3 className="text-base font-black text-stone-800">האם המשלמים מקבלים את הבמה?</h3>
+                    <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${working ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                      {working ? "הקידום עובד" : "⚠ חשיפת המשלמים נמוכה מחלקם"}
+                    </span>
+                  </div>
+                  <p className="mb-3 text-xs text-stone-500">
+                    מטפלים בתשלום ומקודמים הם <b>{supplyShare}%</b> מההיצע המוצג ({num(p.therapists)} מתוך{" "}
+                    {num(p.therapists + f.therapists)}) — כמה מהחשיפה הם מקבלים בטווח שנבחר:
+                  </p>
+                  <div className="grid grid-cols-3 gap-2">
+                    {rows.map((r) => (
+                      <div key={r.label} className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-center">
+                        <div className={`text-2xl font-black ${r.v >= supplyShare ? "text-[#2A6462]" : "text-red-600"}`}>{r.v}%</div>
+                        <div className="mt-0.5 text-xs font-semibold text-stone-600">{r.label}</div>
+                        <div className="text-[10px] text-stone-400">מתוך כלל {r.label === "פניות" ? "הפניות" : r.label === "חשיפות" ? "החשיפות" : "הצפיות"}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })()}
 
           {/* Per-campaign funnel: billed clicks -> site sessions -> profile view -> contact (by type + source) */}
           {campFunnel && campFunnel.some((r) => r.campaign.startsWith("g-")) && (
@@ -576,8 +717,9 @@ function FunnelsCampaigns() {
               <p className="mt-2 text-[11px] leading-5 text-stone-400">
                 💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר · 🎯 מהתאמות · 📁 ממאגר המטפלים.{" "}
                 <span className="font-semibold text-stone-500">קליקים (גוגל)</span> = לחיצות בתשלום בפועל — המספר האמיתי.{" "}
-                <span className="font-semibold text-stone-500">כניסות לאתר</span> סופרות כל כניסה ל-URL מתויג (כולל בוטים
-                ובדיקות), ולכן גבוהות מהקליקים; אחוז ההמרה מחושב מול הקליקים בפועל. הכל לפי utm_campaign.
+                <span className="font-semibold text-stone-500">כניסות לאתר</span> = ביקורים (sessions) שהשאירו פעילות
+                מתועדת כלשהי עם תיוג הקמפיין — מכל עמוד נחיתה, כולל בוטים ובדיקות — ולכן גבוהות מהקליקים; אחוז ההמרה
+                מחושב מול הקליקים בפועל. הכל לפי utm_campaign.
               </p>
             </div>
           )}
@@ -1140,6 +1282,9 @@ export default function MarketingPage() {
               <KpiCard label={'"ניתוח אישי" (AI)'} value={num(k.explainClicks)} />
               <KpiCard label="צפיות פרופיל" value={num(k.profileViews)} />
             </div>
+
+            {/* Contact coverage of paying therapists — the core goal */}
+            {data.coverage && <CoveragePanel c={data.coverage} periodKey={period} periodLabel={periodLabel} />}
 
             {/* Supply tier breakdown */}
             <SupplyPanel s={data.supply} />

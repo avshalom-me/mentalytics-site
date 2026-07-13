@@ -314,6 +314,26 @@ export async function GET(req: NextRequest) {
     // free. Reuses the therapists query above — no extra DB round-trip.
     const listed = therapists.filter(t => t.admin_approved);
 
+    // --- Exposure fairness: do paying therapists get the stage? ---
+    // Supply share vs. share of impressions/views/contacts among LISTED
+    // therapists. If promotion works, the paying share of exposure should sit
+    // well above their share of supply.
+    const exposureByTier = {
+      paying: { therapists: 0, impressions: 0, profileViews: 0, contactClicks: 0 },
+      free: { therapists: 0, impressions: 0, profileViews: 0, contactClicks: 0 },
+    };
+    for (const t of listed) {
+      exposureByTier[t.status === "paying" ? "paying" : "free"].therapists++;
+    }
+    for (const [id, a] of Object.entries(ctrByTherapist)) {
+      const t = therapistMap.get(id);
+      if (!t?.admin_approved) continue;
+      const side = exposureByTier[t.status === "paying" ? "paying" : "free"];
+      side.impressions += a.dirImpr + a.matchImpr;
+      side.profileViews += a.dirViews + a.matchViews;
+      side.contactClicks += a.dirClicks + a.matchClicks;
+    }
+
     function countTherapistField(field: keyof TherapistRow) {
       const counts: Record<string, number> = {};
       for (const t of listed) {
@@ -364,6 +384,7 @@ export async function GET(req: NextRequest) {
       clickTypeBySource,
       explainAnalytics,
       therapistBreakdowns,
+      exposureByTier,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

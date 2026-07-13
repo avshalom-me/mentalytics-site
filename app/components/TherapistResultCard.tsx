@@ -1,15 +1,19 @@
 import Link from "next/link";
 import { genderTitle } from "@/app/lib/gender-text";
 import { therapistPath } from "@/app/lib/therapist-url";
+import CardImpression from "@/app/components/CardImpression";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
 // Server-rendered therapist card for the region / city SEO landing pages
-// (links to the profile; no client tracking — clicks track on the profile).
+// (links to the profile; contact clicks track on the profile). Wrapped in a
+// client impression tracker so cards shown here count as "חשיפות" like the
+// main directory's.
 export default function TherapistResultCard({ t }: { t: PublicTherapist }) {
   const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
   return (
+    <CardImpression therapistId={t.id}>
     <Link href={therapistPath(t.id, t.full_name)} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" }}>
       <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)" }}>
@@ -31,5 +35,6 @@ export default function TherapistResultCard({ t }: { t: PublicTherapist }) {
         </div>
       </div>
     </Link>
+    </CardImpression>
   );
 }
