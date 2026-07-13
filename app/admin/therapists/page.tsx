@@ -261,7 +261,7 @@ export default function AdminTherapistsPage() {
   // The page used to stack every group (pending → approved → partial → signups)
   // as one endless scroll of tall cards. Now one group shows at a time, and the
   // long "approved" group is a compact table that expands a full card per row.
-  const [activeTab, setActiveTab] = useState<"action" | "approved" | "partial" | "signups">("action");
+  const [activeTab, setActiveTab] = useState<"action" | "approved" | "rejected" | "partial" | "signups">("action");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
   const [approvedLimit, setApprovedLimit] = useState(50);
   const toggleExpanded = (id: string) =>
@@ -897,7 +897,23 @@ export default function AdminTherapistsPage() {
 
   const isListed = (t: AdminTherapist) => t.admin_approved && (t.status === "approved" || t.status === "paying");
   const allFiltered = hasActiveFilter ? therapists.filter((t) => !isStub(t) && matchesFilters(t)) : null;
-  const pending = hasActiveFilter ? [] : therapists.filter((t) => !isListed(t) && !isStub(t));
+  // Newest activity first: a fresh signup or a renewed/completed profile jumps
+  // to the top of the review queue (the API returns alphabetical order).
+  const latestActivity = (t: AdminTherapist) => {
+    const a = t.created_at ?? "";
+    const b = t.profile_updated_at ?? "";
+    return b > a ? b : a;
+  };
+  const byLatestActivity = (a: AdminTherapist, b: AdminTherapist) =>
+    latestActivity(b).localeCompare(latestActivity(a));
+  // Rejected therapists get their own tab — they're a decided pile, not an
+  // action queue, and mixing them in "דורש טיפול" buried the real work.
+  const pending = hasActiveFilter
+    ? []
+    : therapists.filter((t) => !isListed(t) && !isStub(t) && t.status !== "rejected").sort(byLatestActivity);
+  const rejected = hasActiveFilter
+    ? []
+    : therapists.filter((t) => t.status === "rejected" && !isStub(t)).sort(byLatestActivity);
   const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
   const signups = therapists
     .filter(isStub)
@@ -960,12 +976,16 @@ export default function AdminTherapistsPage() {
   }
   // ── end FREE_REGION_FALLBACK ──
 
-  function TherapistCard({ therapist }: { therapist: AdminTherapist }) {
+  // Render FUNCTION, not a component: a component type defined inside the page
+  // gets a new identity on every state change, so React unmounted and remounted
+  // EVERY card (images reloading, scroll anchoring lost — the "screen jumps"
+  // when clicking עריכה/אישור). Returning plain JSX keeps the DOM diffed in place.
+  function renderTherapistCard(therapist: AdminTherapist) {
     const showImage = therapist.profile_photo_url && !brokenImages[therapist.id];
     const isBusy = actionLoadingId === therapist.id;
 
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div key={therapist.id} className="rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
         <div className="grid gap-6 md:grid-cols-[220px_1fr]">
           <div>
             {showImage ? (
@@ -1465,6 +1485,7 @@ export default function AdminTherapistsPage() {
           {([
             { key: "action", label: "דורש טיפול", count: pending.length, alert: pending.length > 0 },
             { key: "approved", label: "מאושרים", count: approved.length, alert: false },
+            { key: "rejected", label: "נדחו", count: rejected.length, alert: false },
             { key: "partial", label: "חלקיים", count: partials.length, alert: partials.length > 0 },
             { key: "signups", label: "נרשמו", count: signups.length, alert: false },
           ] as const).map((tab) => (
@@ -1485,14 +1506,27 @@ export default function AdminTherapistsPage() {
         </div>
       )}
 
-      {/* ── דורש טיפול (ממתינים לאישור / נדחו) ── */}
+      {/* ── דורש טיפול (ממתינים לאישור — חדשים/מחודשים ראשונים; נדחו בטאב נפרד) ── */}
       {shownTab === "action" && (
         <section>
           {pending.length === 0 ? (
             <p className="py-8 text-center text-gray-500">🎉 אין מטפלים שדורשים טיפול כרגע.</p>
           ) : (
             <div className="space-y-6">
-              {pending.map((t) => <TherapistCard key={t.id} therapist={t} />)}
+              {pending.map((t) => renderTherapistCard(t))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── נדחו — ערימה מוכרעת, לא תור עבודה ── */}
+      {shownTab === "rejected" && (
+        <section>
+          {rejected.length === 0 ? (
+            <p className="py-8 text-center text-gray-500">אין מטפלים שנדחו.</p>
+          ) : (
+            <div className="space-y-6">
+              {rejected.map((t) => renderTherapistCard(t))}
             </div>
           )}
         </section>
@@ -1604,7 +1638,7 @@ export default function AdminTherapistsPage() {
                           {open && (
                             <tr className="border-b bg-stone-50/60">
                               <td colSpan={6} className="p-4">
-                                <TherapistCard therapist={t} />
+                                {renderTherapistCard(t)}
                               </td>
                             </tr>
                           )}
