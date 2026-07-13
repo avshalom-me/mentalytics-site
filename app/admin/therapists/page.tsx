@@ -286,6 +286,13 @@ export default function AdminTherapistsPage() {
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
 
+  // Rejection dialog — replaces the old window.prompt so the admin can also
+  // choose whether the therapist gets the rejection email (silent reject).
+  const [rejectFor, setRejectFor] = useState<AdminTherapist | null>(null);
+  const [rejectReason, setRejectReason] = useState("");
+  const [rejectNotify, setRejectNotify] = useState(true);
+  const [rejectSaving, setRejectSaving] = useState(false);
+
   // General "send a message" composer — available for ANY therapist, including
   // complete profiles (e.g. someone who uploaded a cert into the photo slot).
   const [messageFor, setMessageFor] = useState<AdminTherapist | null>(null);
@@ -452,7 +459,8 @@ export default function AdminTherapistsPage() {
     status: "approved" | "rejected" | "pending" | "paying",
     promotedUntil?: string | null,
     reason?: string,
-    giftMonthsCount?: number | null
+    giftMonthsCount?: number | null,
+    notifyRejection?: boolean
   ) {
     try {
       setActionLoadingId(id);
@@ -466,6 +474,8 @@ export default function AdminTherapistsPage() {
           ...(promotedUntil ? { promoted_until: promotedUntil } : {}),
           ...(giftMonthsCount ? { gift_months: giftMonthsCount } : {}),
           ...(reason ? { reason } : {}),
+          // Only sent as false — absent means the server default (email on).
+          ...(notifyRejection === false ? { notify_rejection: false } : {}),
         }),
       });
       const json = await res.json();
@@ -1314,12 +1324,9 @@ export default function AdminTherapistsPage() {
               <button type="button" disabled={isBusy}
                 className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                 onClick={() => {
-                  const reason = window.prompt(
-                    "סיבת הדחייה (תישלח למטפל/ת. למשל: התעודה אינה קריאה — נא להעלות תעודת רישיון ברורה):",
-                    ""
-                  );
-                  if (reason === null) return;
-                  updateStatus(therapist.id, "rejected", null, reason);
+                  setRejectReason("");
+                  setRejectNotify(true);
+                  setRejectFor(therapist);
                 }}>
                 {isBusy ? "מעדכן..." : "דחה"}
               </button>
@@ -2159,6 +2166,62 @@ export default function AdminTherapistsPage() {
               <button type="button" onClick={sendBulkReminders} disabled={bulkReminderSending || !bulkReminderText.trim()}
                 className="rounded-xl bg-[#2e7d8c] px-5 py-2 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-50">
                 {bulkReminderSending ? "שולח..." : "✉️ שלח לכולם"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── דחיית מטפל/ת — עם שליטה על מייל הדחייה ── */}
+      {rejectFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+          onClick={() => { if (!rejectSaving) setRejectFor(null); }}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">דחיית {rejectFor.full_name || "מטפל/ת"}</h3>
+            <p className="mb-3 text-sm text-stone-600">
+              הפרופיל יעבור לטאב &quot;נדחו&quot;. הסיבה נשמרת תמיד; המייל למטפל/ת — לבחירתך.
+            </p>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              rows={4}
+              dir="rtl"
+              disabled={rejectSaving}
+              className="w-full rounded-xl border border-stone-300 px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-red-200"
+              placeholder="סיבת הדחייה (למשל: התעודה אינה קריאה — נא להעלות תעודת רישיון ברורה)"
+            />
+            <label className="mt-3 flex cursor-pointer items-start gap-2 text-sm text-stone-700">
+              <input
+                type="checkbox"
+                checked={rejectNotify}
+                onChange={(e) => setRejectNotify(e.target.checked)}
+                disabled={rejectSaving}
+                className="mt-0.5 h-4 w-4 accent-red-600"
+              />
+              <span>
+                ✉️ לשלוח למטפל/ת מייל על הדחייה (כולל הסיבה)
+                {!rejectNotify && (
+                  <span className="mt-0.5 block text-xs font-semibold text-amber-700">
+                    דחייה שקטה — המטפל/ת לא יקבל שום הודעה.
+                  </span>
+                )}
+              </span>
+            </label>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setRejectFor(null)} disabled={rejectSaving}
+                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                ביטול
+              </button>
+              <button type="button" disabled={rejectSaving}
+                className="rounded-xl bg-red-600 px-5 py-2 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-50"
+                onClick={async () => {
+                  if (!rejectFor) return;
+                  setRejectSaving(true);
+                  await updateStatus(rejectFor.id, "rejected", null, rejectReason.trim() || undefined, undefined, rejectNotify);
+                  setRejectSaving(false);
+                  setRejectFor(null);
+                }}>
+                {rejectSaving ? "דוחה..." : rejectNotify ? "דחה ושלח מייל" : "דחה בשקט"}
               </button>
             </div>
           </div>

@@ -885,9 +885,13 @@ export async function PATCH(request: Request) {
       // except for paying→rejected, which already gets a cancellation email,
       // and center-owned profiles, where the CENTER fixes it from the portal
       // (the "נדחה — לתיקון" badge) — the individual therapist has no account.
+      // notify_rejection=false → SILENT rejection: the admin chose not to email
+      // the therapist (e.g. spam/duplicate signups). The reason is still stored
+      // as an internal note. Default (absent/true) keeps the email.
       if (status === "rejected") {
         extraFields.rejection_reason = rejectionReason || null;
-        if (before.status !== "paying" && !before.center_account_id) sendRejectedEmail = true;
+        const notifyRejection = body?.notify_rejection !== false;
+        if (before.status !== "paying" && !before.center_account_id && notifyRejection) sendRejectedEmail = true;
       } else {
         extraFields.rejection_reason = null;
       }
@@ -1024,6 +1028,9 @@ export async function PATCH(request: Request) {
         status,
         promotion_source: extraFields.promotion_source ?? null,
         promoted_until: extraFields.promoted_until ?? null,
+        // On rejection, record whether the therapist was emailed — a silent
+        // rejection should be visible as such in the trail.
+        ...(status === "rejected" ? { rejection_email_sent: sendRejectedEmail } : {}),
       },
       reason: body?.reason ?? null,
     });
