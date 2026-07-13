@@ -54,7 +54,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await supabaseAdmin.from("analytics_events").insert({
+    // A swallowed insert error here silently drops events — a DB CHECK
+    // constraint that lags behind VALID_EVENTS rejected matching_click /
+    // therapist_explain_click for 2 days with zero trace. Log + surface it.
+    const { error } = await supabaseAdmin.from("analytics_events").insert({
       event_type,
       source: safeSource,
       therapist_id: safeTherapistId,
@@ -62,6 +65,10 @@ export async function POST(req: NextRequest) {
       metadata: safeMetadata,
       ...sanitizeAttribution(body),
     });
+    if (error) {
+      console.error("analytics_events insert failed:", error.message);
+      return NextResponse.json({ ok: false }, { status: 500 });
+    }
 
     return NextResponse.json({ ok: true });
   } catch {
