@@ -58,6 +58,13 @@ export async function POST(req: NextRequest) {
     .eq("id", therapistId);
   if (dbError) return NextResponse.json({ ok: false, error: dbError.message }, { status: 500 });
 
+  // Best-effort cleanup of the replaced photo (photos/ only — never touch a
+  // legacy path that might point at a certificate file).
+  const oldPath = therapist.profile_photo_path as string | null;
+  if (oldPath && oldPath !== path && oldPath.startsWith("photos/")) {
+    await supabaseAdmin.storage.from(BUCKET).remove([oldPath]);
+  }
+
   // Signed URL so the admin sees the new photo immediately.
   let photoUrl: string | null = null;
   const { data: signed } = await supabaseAdmin.storage.from(BUCKET).createSignedUrl(path, 60 * 60 * 24);
