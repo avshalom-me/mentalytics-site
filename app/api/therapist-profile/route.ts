@@ -5,8 +5,66 @@ import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emai
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 import { THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
+import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
 
 export const dynamic = "force-dynamic";
+
+// Marketing-consent captured at registration lives on the auth user's metadata
+// (set by supabase.auth.signUp on the login page). Apply it to the therapist row
+// the first time we see it, and write an immutable consent_events audit row.
+// Idempotent: no-op once the row already reflects consent, so it never
+// double-records or touches therapists who registered before this existed.
+async function applySignupConsent(
+  user: { id: string; email?: string | null; user_metadata?: Record<string, unknown> | null },
+  therapist: Record<string, unknown> | null,
+  req: NextRequest,
+): Promise<Record<string, unknown> | null> {
+  if (!therapist?.id) return therapist;
+  const wantsConsent = user.user_metadata?.newsletter_consent === true;
+  if (!wantsConsent || therapist.newsletter_consent === true) return therapist;
+
+  // Grant only ONCE, ever. newsletter_consent defaults to false (not null), so we
+  // can't tell "never decided" from "withdrew" by the flag alone — check the audit
+  // trail. If any newsletter consent decision was already recorded (granted or
+  // later withdrawn via the unsubscribe link), don't re-grant: otherwise a
+  // dashboard reload would silently undo an unsubscribe (the metadata stays true).
+  const { data: prior } = await supabaseAdmin
+    .from("consent_events")
+    .select("id")
+    .eq("therapist_id", therapist.id as string)
+    .eq("consent_type", "newsletter")
+    .limit(1)
+    .maybeSingle();
+  if (prior) return therapist;
+
+  const { error: updErr } = await supabaseAdmin
+    .from("therapists")
+    .update({ newsletter_consent: true })
+    .eq("id", therapist.id as string);
+  if (updErr) {
+    console.error("applySignupConsent: flag update failed:", updErr.message);
+    return therapist; // don't audit a grant we didn't persist
+  }
+
+  const version =
+    typeof user.user_metadata?.newsletter_consent_version === "string"
+      ? (user.user_metadata!.newsletter_consent_version as string)
+      : NEWSLETTER_CONSENT_VERSION;
+  const { error: auditErr } = await supabaseAdmin.from("consent_events").insert({
+    therapist_id: therapist.id,
+    email: user.email ?? "",
+    consent_type: "newsletter",
+    action: "granted",
+    consent_text: NEWSLETTER_CONSENT_TEXT,
+    consent_version: version,
+    source: "signup",
+    ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || null,
+    user_agent: req.headers.get("user-agent") || null,
+  });
+  if (auditErr) console.error("applySignupConsent: audit insert failed:", auditErr.message);
+
+  return { ...therapist, newsletter_consent: true };
+}
 
 // Get the authenticated user from the Bearer token
 async function getUser(req: NextRequest) {
@@ -100,6 +158,11 @@ export async function GET(req: NextRequest) {
       therapist = created;
     }
   }
+
+  // Apply a registration-time marketing-consent opt-in (from auth metadata) the
+  // first time we resolve this therapist. Idempotent; existing therapists who
+  // never opted in are untouched.
+  therapist = await applySignupConsent(user, therapist, req);
 
   // Generate signed photo URL if therapist has a profile photo
   let photoUrl: string | null = null;

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import Link from "next/link";
 import { BarChart2, ShieldCheck, Users, LogIn, UserPlus, MailCheck } from "lucide-react";
+import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
 
 type Mode = "login" | "register" | "reset";
 
@@ -20,6 +21,10 @@ function TherapistLoginContent() {
   const [showRegisterHint, setShowRegisterHint] = useState(false);
   const [success, setSuccess] = useState("");
   const [signupPending, setSignupPending] = useState(false);
+  // Marketing-email opt-in, captured only at registration. Unchecked by default
+  // (explicit consent). Stored on the auth user's metadata at sign-up and
+  // applied to the therapist row + consent_events audit server-side.
+  const [newsletterConsent, setNewsletterConsent] = useState(false);
 
   useEffect(() => {
     const q = searchParams.get("mode");
@@ -86,7 +91,15 @@ function TherapistLoginContent() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback${plan === "promoted" ? "?plan=promoted" : ""}` },
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback${plan === "promoted" ? "?plan=promoted" : ""}`,
+          // Persisted on the auth user; the server reads it when the therapist
+          // row is first created and writes newsletter_consent + a consent_events
+          // audit row. Only true when the therapist explicitly ticked the box.
+          data: newsletterConsent
+            ? { newsletter_consent: true, newsletter_consent_version: NEWSLETTER_CONSENT_VERSION }
+            : {},
+        },
       });
       if (error) {
         // Don't surface raw Supabase error text (English, and can leak internal
@@ -410,6 +423,20 @@ function TherapistLoginContent() {
                   {success || "הסיסמא עודכנה בהצלחה — אפשר להתחבר עם הסיסמא החדשה."}
                 </p>
               </div>
+            )}
+
+            {mode === "register" && (
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "9px", cursor: "pointer", marginTop: "2px" }}>
+                <input
+                  type="checkbox"
+                  checked={newsletterConsent}
+                  onChange={(e) => setNewsletterConsent(e.target.checked)}
+                  style={{ marginTop: "2px", width: "16px", height: "16px", accentColor: "var(--teal)", flexShrink: 0 }}
+                />
+                <span style={{ fontSize: "12.5px", lineHeight: 1.6, color: "var(--text-2)" }}>
+                  {NEWSLETTER_CONSENT_TEXT}
+                </span>
+              </label>
             )}
 
             <button
