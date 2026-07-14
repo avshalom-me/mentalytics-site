@@ -137,7 +137,7 @@ function orderDomains<T extends string>(ds: readonly T[]): T[] {
 // must follow ADULTS_DOMAIN_ORDER (emotional → relationship → functional → addiction)
 // so progress only ever moves forward. therapist-style closes the emotional block.
 const ADULTS_SCREENS_ORDER = [
-  "disclaimer","intake","domains",
+  "disclaimer","domains","intake",
   "e1","e1-q","e2","e2-q","e3","e3-q",
   "e4","e4-contexts","e4-q","e4-social","e4-social-sev",
   "e5","e5-q","e6","e6-q","e7-q","e8c","e9-q",
@@ -150,7 +150,7 @@ const ADULTS_SCREENS_ORDER = [
 ];
 
 // Always-visited spine of the questionnaire, regardless of which domains were selected.
-const ADULTS_CORE_SCREENS = ["disclaimer", "intake", "domains", "therapist-style", "scoring"];
+const ADULTS_CORE_SCREENS = ["disclaimer", "domains", "intake", "therapist-style", "scoring"];
 
 // Map of which domain each screen belongs to. Screens not listed are core.
 function screenDomain(s: string): string | null {
@@ -942,7 +942,7 @@ export default function AdultsPage() {
           <span>קראתי את ההצהרה לעיל, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
         </label>
         <div className="mt-5">
-          <button type="button" disabled={!agreed} onClick={() => setScreen("intake")} className="w-full rounded-xl bg-[#1a3a5c] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]">
+          <button type="button" disabled={!agreed} onClick={() => setScreen("domains")} className="w-full rounded-xl bg-[#1a3a5c] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]">
             קראתי והסכמתי – נמשיך ←
           </button>
         </div>
@@ -954,7 +954,7 @@ export default function AdultsPage() {
   if (screen === "intake") return (
     <Layout screen={screen} domains={answers.domains}>
       <Card badge="פרטים ראשוניים">
-        <p className="mb-4 font-semibold text-[#1a3a5c]">נתחיל עם כמה שאלות כלליות</p>
+        <p className="mb-4 font-semibold text-[#1a3a5c]">עוד שתי שאלות כלליות לפני שנמשיך</p>
         <div className="mb-4 flex gap-4">
           <div className="flex-1">
             <label className="mb-1 block text-xs text-[#6b7280]">גיל</label>
@@ -980,9 +980,9 @@ export default function AdultsPage() {
           </div>
         )}
 
-        <NavRow onBack={() => setScreen("disclaimer")} onNext={() => {
+        <NavRow onBack={() => setScreen("domains")} onNext={() => {
           upd({ age: localAge });
-          setScreen("domains");
+          startDomains();
         }}
           nextDisabled={!localAge || localAge < 18 || !answers.gender} />
       </Card>
@@ -1027,7 +1027,7 @@ export default function AdultsPage() {
             );
           })()}
         </div>
-        <NavRow onBack={() => setScreen("intake")} onNext={startDomains} nextDisabled={answers.domains.length === 0} />
+        <NavRow onBack={() => setScreen("disclaimer")} onNext={() => setScreen("intake")} nextDisabled={answers.domains.length === 0} />
       </Card>
     </Layout>
   );
