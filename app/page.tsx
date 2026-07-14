@@ -200,7 +200,7 @@ export default function HomePage() {
               border: "none", transition: "all .22s", cursor: "pointer",
             }} className="hover:bg-[var(--teal-dark)] hover:-translate-y-0.5">
               <img src="/icons/btn-adults.svg" alt="" width={22} height={22} style={{ display: "block" }} />
-              התאמה למבוגרים ←
+              שאלון התאמה למבוגרים ←
             </Link>
             <Link href="/kids" style={{
               display: "inline-flex", alignItems: "center", gap: "8px",
@@ -209,7 +209,7 @@ export default function HomePage() {
               border: "none", transition: "all .22s", cursor: "pointer",
             }} className="hover:bg-[var(--gold-dark)] hover:-translate-y-0.5">
               <img src="/icons/btn-kids.svg" alt="" width={22} height={22} style={{ display: "block" }} />
-              התאמה לילדים ←
+              שאלון התאמה לילדים ←
             </Link>
           </div>
 
