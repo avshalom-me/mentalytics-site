@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useMemo } from "react";
+import { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -45,7 +45,34 @@ export type PublicTherapist = {
   arrangements: string[];
   profile_photo_path: string | null;
   profile_photo_url: string | null;
+  // Ranking tier for the directory: 0 = paying (paid + center), 1 = gift
+  // (manual/trial promotions), 2 = free. The list is grouped by tier and
+  // shuffled WITHIN each tier per visit (see shuffleWithinTiers).
+  tier?: number;
 };
+
+// Fisher-Yates shuffle within each tier, preserving tier order (paying → gift →
+// free). Runs client-side on every mount so the position between therapists in
+// the SAME tier rotates on each visit — no single therapist is permanently first.
+function shuffleWithinTiers(list: PublicTherapist[]): PublicTherapist[] {
+  const byTier = new Map<number, PublicTherapist[]>();
+  for (const t of list) {
+    const tier = t.tier ?? 1;
+    let grp = byTier.get(tier);
+    if (!grp) byTier.set(tier, (grp = []));
+    grp.push(t);
+  }
+  const out: PublicTherapist[] = [];
+  for (const tier of [...byTier.keys()].sort((a, b) => a - b)) {
+    const grp = byTier.get(tier)!;
+    for (let i = grp.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [grp[i], grp[j]] = [grp[j], grp[i]];
+    }
+    out.push(...grp);
+  }
+  return out;
+}
 
 function TherapistCard({
   t,
@@ -175,6 +202,14 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
   usePageView(isPara ? "para-medical" : "directory");
   const trackFilter = useFilterTrack();
 
+  // Per-visit rotation: start from the server (tier) order so SSR and the first
+  // client render match (no hydration mismatch), then reshuffle within each tier
+  // right after mount. Every entry to the page gives a fresh within-tier order.
+  const [displayList, setDisplayList] = useState<PublicTherapist[]>(therapists);
+  useEffect(() => {
+    setDisplayList(shuffleWithinTiers(therapists));
+  }, [therapists]);
+
   const availableCities = useMemo(() => {
     const cities = new Set<string>();
     for (const t of therapists) {
@@ -186,9 +221,10 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     return Array.from(cities).sort((a, b) => a.localeCompare(b, "he"));
   }, [therapists, regionFilter]);
 
-  // Order is preserved from the server (promoted/paying therapists first), so
-  // any filter — including online-only — keeps promoted therapists at the top.
-  const filtered = therapists.filter((t) => {
+  // Tier order is preserved (paying → gift → free), with a per-visit shuffle
+  // WITHIN each tier, so any filter — including online-only — keeps paying
+  // therapists at the top while rotating who leads inside each tier.
+  const filtered = displayList.filter((t) => {
     if (onlineOnly && !t.online) return false;
     if (regionFilter && !t.regions.some((c) => CITY_TO_REGION[c] === regionFilter)) return false;
     if (cityFilter && !t.regions.includes(cityFilter)) return false;

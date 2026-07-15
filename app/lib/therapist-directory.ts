@@ -36,6 +36,16 @@ function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
 }
 
+// Directory ranking tier for the client-side per-visit shuffle:
+//   0 = paying  — real money on the table (individual "paid" + center-subscription)
+//   1 = gift    — manual / trial promotions (comped, no payment)
+//   2 = free    — approved, unpaid
+function tierOf(t: TherapistRow): number {
+  if (t.status === "paying" && (t.promotion_source === "paid" || t.promotion_source === "center")) return 0;
+  if (t.status === "paying") return 1; // manual / trial gift
+  return 2; // approved free
+}
+
 async function signRow(t: TherapistRow): Promise<PublicTherapist> {
   let profile_photo_url: string | null = null;
   if (t.profile_photo_path) {
@@ -58,6 +68,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
     arrangements: t.arrangements ?? [],
     profile_photo_path: t.profile_photo_path ?? null,
     profile_photo_url,
+    tier: tierOf(t),
   };
 }
 
