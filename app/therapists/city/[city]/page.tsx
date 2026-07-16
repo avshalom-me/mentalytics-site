@@ -90,7 +90,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
             לא בטוחים מי מתאים לכם?
           </p>
           <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {`ענו על שאלון קצר (כ-2 דקות) שנבנה על ידי פסיכולוגים, ונתאים לכם מטפל ב${city} או באונליין לפי הצורך והגישה שלכם.`}
+            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת."}
           </p>
         </div>
         <Link
