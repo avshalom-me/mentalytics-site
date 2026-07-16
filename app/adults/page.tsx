@@ -2836,81 +2836,94 @@ export default function AdultsPage() {
         </div>
       )}
       <div className="space-y-4">
-        {(matchResults ?? []).map((t: any) => (
-          <div key={t.id} className="rounded-2xl bg-white p-5 shadow-lg">
-            <div className="flex items-start gap-4">
-              <img
-                src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                alt={t.full_name ?? ""}
-                className="h-[84px] w-[84px] flex-shrink-0 rounded-2xl object-cover"
-              />
-              <div className="flex-1 text-right">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-xl font-extrabold text-[#131F1E]">{t.full_name || "ללא שם"}</h3>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-[#EAF4F3] px-2.5 py-0.5 text-[12px] font-bold text-[#2A6462]">✓ מאומת</span>
-                </div>
-                <p className="text-xs text-[#6b7280]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
-                {t.bio && <p className="mt-1 text-sm text-gray-700 line-clamp-2">{t.bio}</p>}
-                {t.regions?.length > 0 && (
-                  <p className="mt-1 text-xs text-gray-500">📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}</p>
-                )}
-                <div className="mt-2 flex flex-wrap gap-2 items-center">
-                  <div className={`inline-block rounded-full px-3 py-1 text-xs font-bold text-white ${
-                    (t.combined_score ?? t.match_score) >= 85 ? "bg-[#1a3a5c]" :
-                    (t.combined_score ?? t.match_score) >= 70 ? "bg-[#2a5a8c]" :
-                    (t.combined_score ?? t.match_score) >= 55 ? "bg-amber-700" : "bg-gray-500"
-                  }`}>
-                    ✦ התאמה כוללת: {t.combined_score ?? t.match_score}%
+        {(matchResults ?? []).map((t: any) => {
+          const overall = t.combined_score ?? t.match_score;
+          const pref = selectedRec?.couplesModality ?? combinedCouplesModality;
+          const tMods = Array.isArray(t.couples_modalities) ? t.couples_modalities : [];
+          const matchesPref = pref && tMods.some((m: string) => String(m).trim().toLowerCase() === String(pref).trim().toLowerCase());
+          return (
+            <div
+              key={t.id}
+              className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+            >
+              <div className="flex items-stretch gap-4">
+                <img
+                  src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                  alt={t.full_name ?? ""}
+                  className="h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl object-cover"
+                />
+                <div className="min-w-0 flex-1 text-right">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-lg font-extrabold text-[var(--text)]">{t.full_name || "ללא שם"}</h3>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ מאומת</span>
                   </div>
-                  <div className="inline-block rounded-full border border-[#1a3a5c] px-3 py-1 text-xs font-semibold text-[#1a3a5c]">
-                    מקצועי: {t.match_score}%
-                  </div>
-                  {t.personality_score != null && (
-                    <div className={`inline-block rounded-full px-3 py-1 text-xs font-semibold text-white ${
-                      t.personality_score >= 88 ? "bg-emerald-600" :
-                      t.personality_score >= 76 ? "bg-teal-600" :
-                      t.personality_score >= 64 ? "bg-amber-600" : "bg-gray-500"
-                    }`}>
-                      אישיותי: {t.personality_score}%
+                  <p className="mt-0.5 text-xs text-[var(--muted)]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
+                  {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
+                  {t.regions?.length > 0 && (
+                    <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}</p>
+                  )}
+                  {matchesPref && (
+                    <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
+                      ✓ עובד/ת בגישת {pref} שהותאמה לך
                     </div>
                   )}
-                  {(() => {
-                    const pref = selectedRec?.couplesModality ?? combinedCouplesModality;
-                    const tMods = Array.isArray(t.couples_modalities) ? t.couples_modalities : [];
-                    const matchesPref = pref && tMods.some((m: string) => String(m).trim().toLowerCase() === String(pref).trim().toLowerCase());
-                    return matchesPref ? (
-                      <div className="inline-block rounded-full border border-emerald-300 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800">
-                        ✓ עובד/ת בגישת {pref} שהותאמה לך
-                      </div>
-                    ) : null;
-                  })()}
                 </div>
-                <div className="mt-4 flex flex-wrap items-center gap-2">
-                  <a
-                    href={profileHrefForMatch(t)}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm hover:bg-[var(--teal-dark)] transition-colors"
-                  >
-                    פרופיל מלא ←
-                  </a>
-                  <button
-                    onClick={() => fetchExplanation(t)}
-                    disabled={explainLoading[t.id]}
-                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2.5 text-sm font-semibold text-white shadow-sm bg-[var(--gold)] hover:bg-[var(--gold-dark)] transition-colors disabled:opacity-60"
-                  >
-                    {explainLoading[t.id] ? "טוען..." : "✦ ניתוח אישי"}
-                  </button>
-                </div>
-                {explainData[t.id] && (
-                  <div className="mt-3 rounded-xl border border-[#f0e0b8] bg-[var(--gold-pale)] p-3 text-right">
-                    <p className="text-xs font-bold text-[var(--gold-dark)] mb-1">✦ {explainData[t.id]!.title}</p>
-                    <p className="text-xs text-gray-700 mb-2 leading-relaxed whitespace-pre-line">{explainData[t.id]!.explanation}</p>
-                    <p className="text-[10px] text-gray-400">{explainData[t.id]!.tone_note}</p>
+                <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
+                  <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
+                    {overall}<span className="align-super text-base font-extrabold">%</span>
                   </div>
-                )}
+                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">התאמה כוללת</div>
+                  <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-[10.5px] text-[var(--muted)]">מקצועי <b className="font-extrabold text-[var(--teal-dark)]">{t.match_score}%</b></span>
+                    {t.personality_score != null && (
+                      <span className="text-[10.5px] text-[var(--muted)]">אישיותי <b className="font-extrabold text-[var(--teal-dark)]">{t.personality_score}%</b></span>
+                    )}
+                  </div>
+                </div>
               </div>
+              <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
+                <a
+                  href={profileHrefForMatch(t)}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
+                >
+                  פרופיל מלא ←
+                </a>
+                <button
+                  onClick={() => fetchExplanation(t)}
+                  disabled={explainLoading[t.id]}
+                  className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#EAD9B0] bg-white px-4 py-2 text-[13px] font-bold text-[var(--gold-dark)] transition-colors hover:border-[var(--gold)] hover:bg-[var(--gold-pale)] disabled:opacity-60"
+                >
+                  <span
+                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
+                    style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
+                  >✦</span>
+                  {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
+                </button>
+              </div>
+              {explainData[t.id] && (
+                <div
+                  className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-3.5 text-right"
+                  style={{ borderInlineStart: "3px solid var(--gold)" }}
+                >
+                  <div className="mb-1.5 flex items-center gap-2">
+                    <span
+                      className="inline-flex h-[26px] w-[26px] flex-shrink-0 items-center justify-center rounded-full text-[13px] text-white shadow-sm"
+                      style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
+                    >✦</span>
+                    <span className="text-[12.5px] font-extrabold text-[var(--gold-dark)]">{explainData[t.id]!.title}</span>
+                    <span
+                      className="rounded-full border border-[#EAD9B0] bg-white px-2 py-[1px] text-[9.5px] font-bold text-[var(--gold-dark)]"
+                      style={{ marginInlineStart: "auto" }}
+                    >ניתוח AI</span>
+                  </div>
+                  <p className="whitespace-pre-line text-[13px] leading-relaxed text-[var(--text-2)]">{explainData[t.id]!.explanation}</p>
+                  <p className="mt-2 text-[10.5px] text-[var(--faint)]">{explainData[t.id]!.tone_note}</p>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </Layout>
   );
