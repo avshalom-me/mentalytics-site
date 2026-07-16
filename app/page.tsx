@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import ContactForm from "./components/ContactForm";
 import TooltipAsterisk from "./components/TooltipAsterisk";
+import OutputShowcase from "./components/OutputShowcase";
 
 export const metadata: Metadata = {
   title: "טיפול חכם — מתאימים את החיבור הנכון",
@@ -334,6 +335,9 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ─── OUTPUT SHOWCASE (animated phone demo) ─── */}
+      <OutputShowcase />
 
       {/* ─── TWO PATHS ─── */}
       <div id="adults" style={{ display: "grid", gridTemplateColumns: "1fr 1fr" }} className="paths-grid">
