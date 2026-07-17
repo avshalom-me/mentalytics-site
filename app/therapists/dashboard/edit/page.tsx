@@ -12,6 +12,7 @@ import {
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
+import { gaEvent } from "@/app/lib/gtag";
 
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
@@ -323,6 +324,14 @@ export default function TherapistProfileEditPage() {
     // First-time registration: let the therapist pick a plan before finishing —
     // even if a file upload failed, since the profile was created.
     if (json.created) {
+      // GA4 conversion: the therapist finished registration (profile created).
+      // This is the mid-funnel signal Google Ads (Demand Gen) needs to optimize
+      // toward — ad clicks alone can't train it. Fires once (json.created is true
+      // only on first creation) and before the promoted-CTA early return below,
+      // so both plan paths are counted. Mark "therapist_registration" as a Key
+      // Event in the GA4 admin UI to import it as an Ads conversion.
+      gaEvent("therapist_registration");
+
       // Came in via the "promoted" CTA (join page → register → here): the plan
       // is already chosen, so skip the plan-choice screen and go to checkout.
       if (new URLSearchParams(window.location.search).get("plan") === "promoted") {
