@@ -89,7 +89,7 @@ export default function CenterDashboardPage() {
         const res = await fetch("/api/center-portal", { headers: { Authorization: `Bearer ${session.access_token}` } });
         const json = await res.json();
         if (res.status === 401) {
-          setError("החשבון שלכם עדיין לא מקושר למרכז פעיל. ודאו שנרשמתם עם המייל שאיתו קיבלתם את ההצעה, או פנו אלינו.");
+          setError("החשבון שלכם עדיין לא מקושר למרכז. נחבר אתכם ידנית — פנו אלינו עם שם המרכז והמייל שאיתו נרשמתם, ונשלים את הקישור תוך יום עסקים.");
         } else if (!json.ok) {
           setError(json.error ?? "שגיאה בטעינת הנתונים");
         } else {

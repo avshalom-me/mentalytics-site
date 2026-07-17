@@ -3,13 +3,11 @@ import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 // אימות פורטל המרכז — משותף לכל נתיבי /api/center-portal/*.
-// מזהים את המרכז לפי user_id של חשבון ה-Supabase Auth. אם עדיין לא מקושר —
-// מקשרים חשבון פעיל שכתובת המייל שלו (contact או payer) תואמת למי שנרשם
-// (claim-by-email).
-//
-// אבטחה: המייל אינו מאומת בהרשמה (auto-confirm), ולכן ה-claim מוגבל למרכז
-// שכבר שילם (status='active') בלבד. החשיפה מוגבלת ממילא — פרופילים ציבוריים
-// של מטפלי המרכז וסטטיסטיקה אנונימית מצטברת; אין כאן פרטי מטופלים.
+// מזהים את המרכז אך ורק לפי user_id של חשבון ה-Supabase Auth. אין
+// claim-by-email: המייל אינו מאומת בהרשמה (auto-confirm), ולכן "יש לי אימייל
+// תואם" אינו הוכחת בעלות — קישור חשבון למרכז נעשה ידנית ע"י אדמין בלבד
+// (ההסבר המלא ב-resolveCenter למטה). זהו אותו עיקרון שאוכף therapist-claim.ts
+// עבור פרופילי מטפלים חיים.
 
 export type PortalCenter = {
   id: string;
@@ -52,31 +50,24 @@ export async function resolveCenter(req: NextRequest): Promise<PortalCenter | nu
     .maybeSingle();
   if (byUser) return byUser as PortalCenter;
 
-  const email = (user.email ?? "").trim().toLowerCase();
-  if (!email) return null;
-
-  // claim: מושכים את המרכזים הפעילים שטרם קושרו ומשווים מייל בדיוק ב-JS.
-  // חשוב לא להזרים את המייל (שבשליטת המשתמש) ל-ilike/or של PostgREST: ILIKE
-  // מפרש _ ו-% כ-wildcards (offic_@clinic יתפוס office@clinic ⇒ השתלטות),
-  // ו-.or() עם מחרוזת גולמית פותח הזרקת-filter. מספר המרכזים הפעילים זעום,
-  // אז השוואה מדויקת ב-JS בטוחה לגמרי.
-  const { data: candidates } = await supabaseAdmin
-    .from("therapy_center_accounts")
-    .select(COLS)
-    .is("user_id", null)
-    .eq("status", "active")
-    .order("created_at", { ascending: true }); // התאמה דטרמיניסטית אם יש כמה
-  const claimable = (candidates ?? []).find((c) => {
-    const e = (c.email ?? "").trim().toLowerCase();
-    const p = (c.payer_email ?? "").trim().toLowerCase();
-    return e === email || p === email;
-  }) as PortalCenter | undefined;
-  if (!claimable) return null;
-
-  await supabaseAdmin
-    .from("therapy_center_accounts")
-    .update({ user_id: user.id, updated_at: new Date().toISOString() })
-    .eq("id", claimable.id)
-    .is("user_id", null); // מרוץ: לא לדרוס קישור שנוצר בו-זמנית
-  return { ...claimable, user_id: user.id };
+  // ── אין fallback ל-claim-by-email (סגירת פרצת השתלטות) ──────────────────
+  // בעבר, אם לא נמצא מרכז לפי user_id, קושר כאן אוטומטית מרכז פעיל שכתובת
+  // המייל שלו תואמת למי שנרשם. המייל אינו מאומת בהרשמה (auto-confirm), ולכן
+  // מי שנרשם ראשון עם המייל של מרכז פעיל היה משתלט עליו: עריכת פרטי הקשר של
+  // מטפלי המרכז (הסטת לידים), הוספת פרופילים למנוי המרכז, ונעילת הבעלים
+  // האמיתי בחוץ. זו בדיוק הפרצה שנסגרה למטפלים ב-therapist-claim.ts, שם
+  // פרופיל חי/משלם לעולם לא נתפס אוטומטית אלא מקושר ע"י אדמין.
+  //
+  // ── קישור מרכז לחשבון: תהליך ידני, פעם אחת לכל מרכז ─────────────────────
+  // כשמרכז שילם (status='active') ורוצה גישה לפורטל, המנהל מבצע פעם אחת:
+  //   1. Supabase → Authentication → Users → לאתר את המשתמש לפי המייל שאיתו
+  //      נרשם המרכז → להעתיק את ה-UUID שלו (ודאו שזה באמת מי שביקש גישה —
+  //      זהו שלב האימות היחיד שמחליף אימות-מייל).
+  //   2. Supabase → SQL Editor → להריץ:
+  //        update public.therapy_center_accounts
+  //           set user_id = '<AUTH_USER_UUID>', updated_at = now()
+  //         where id = '<CENTER_ID>' and user_id is null;
+  // מרגע זה הכניסה לפורטל מזוהה אוטומטית דרך ה-lookup לפי user_id שלמעלה.
+  // עד הקישור, הדשבורד מציג למרכז "החשבון עדיין לא מקושר — פנו אלינו".
+  return null;
 }
