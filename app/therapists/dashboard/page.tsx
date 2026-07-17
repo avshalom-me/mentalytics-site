@@ -432,7 +432,9 @@ function TherapistDashboard() {
       {profile && profile.status !== "paying" && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
-            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">מבצע פתיחה — הצטרפות למערכת ההתאמה החכמה</div>
+            <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">
+              {isPromoActive() ? "מבצע פתיחה — הצטרפות למערכת ההתאמה החכמה" : "הצטרפות למערכת ההתאמה החכמה"}
+            </div>
             {isPromoActive() ? (
               <>
                 <div className="flex items-end gap-3 mb-1">
