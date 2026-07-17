@@ -22,10 +22,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!center) return { title: "מרכז לא נמצא", robots: { index: false, follow: false } };
 
   const cityPart = center.public_city ? ` ב${center.public_city}` : "";
-  const title = `${center.name} — מרכז טיפולי${cityPart} | טיפול חכם`;
+  const title = `${center.name} - מרכז טיפולי${cityPart} | טיפול חכם`;
   const description =
     (center.public_description?.trim()?.slice(0, 155)) ||
-    `${center.name} — מרכז טיפולי${cityPart}. הכירו את המטפלים של המרכז וקבעו התאמה אישית דרך טיפול חכם.`;
+    `${center.name} - מרכז טיפולי${cityPart}. הכירו את המטפלים של המרכז וקבעו התאמה אישית דרך טיפול חכם.`;
   const url = `${BASE}/centers/${center.slug}`;
   return {
     title,

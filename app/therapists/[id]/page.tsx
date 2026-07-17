@@ -89,11 +89,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
 
   return {
-    title: `${name} — ${type} | טיפול חכם`,
+    title: `${name} - ${type} | טיפול חכם`,
     description: bioSnippet || `פרופיל של ${name}, ${type}. מצאו מטפל מתאים בטיפול חכם.`,
     alternates: { canonical },
     openGraph: {
-      title: `${name} — ${type}`,
+      title: `${name} - ${type}`,
       description: bioSnippet,
       url: canonical,
     },
