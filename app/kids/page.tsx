@@ -7,6 +7,7 @@ import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
+import { CrisisResources } from "@/app/components/CrisisResources";
 import {
   parseKidsBoxes,
   type KidsRecommendationGroup,
@@ -1042,9 +1043,10 @@ function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onN
         <StepTag>מצב רוח — אובדנות</StepTag>
         <StepQ>האם קיימות מחשבות אובדניות חוזרות?</StepQ>
         <StepHint>או ניסיונות אובדניים בעבר</StepHint>
-        <YNRow val={A.q3_sui||""} onChange={v=>{ const nA={...A,q3_sui:v}; setA(nA); onNext(nA); }} />
+        <YNRow val={A.q3_sui||""} onChange={v=>{ const nA={...A,q3_sui:v}; setA(nA); if (v !== "כן") onNext(nA); }} />
+        {A.q3_sui === "כן" && <CrisisResources className="mt-4" />}
       </Card>
-      <NavRow onBack={onBack} />
+      <NavRow onBack={onBack} onNext={A.q3_sui === "כן" ? () => onNext(A) : undefined} />
     </div>
   );
 }

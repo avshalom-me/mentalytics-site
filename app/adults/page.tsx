@@ -11,6 +11,7 @@ import { getFingerprint } from "@/app/lib/fingerprint";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
+import { CrisisResources } from "@/app/components/CrisisResources";
 import { buildAdultFacts } from "@/app/lib/explain-facts";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -1052,6 +1053,7 @@ export default function AdultsPage() {
         <p className="mb-3 font-semibold text-[#1a3a5c]">בשבועיים האחרונים, כמה מהתסמינים הבאים חווית? סמן/י את התסמינים המתאימים:</p>
         <CheckList items={qItems.mood} checked={moodChecked}
           onChange={(i, v) => setMoodChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
+        {moodChecked.includes(8) && <CrisisResources className="mt-4" />}
         <NavRow onBack={() => setScreen("e1")}
           onNext={() => {
             const suicidal = moodChecked.includes(8);
@@ -1113,6 +1115,7 @@ export default function AdultsPage() {
             מחשבות על מוות
           </label>
         </div>
+        {maniaDeath && <CrisisResources className="mt-4" />}
         <NavRow onBack={() => setScreen("e2")}
           onNext={() => { updE({ maniaItems: maniaChecked, maniaDeath }); setScreen("e3"); }} />
       </Card>
@@ -1203,6 +1206,7 @@ export default function AdultsPage() {
             קיימות מחשבות אובדניות
           </label>
         </div>
+        {prodromeSuicidal && <CrisisResources className="mt-4" />}
         <NavRow onNext={() => {
           updE({ prodromeItems: prodromeChecked, prodromeSuicidal });
           // Tics/tinnitus follow-up runs at the original e8 position (after
@@ -1588,6 +1592,7 @@ export default function AdultsPage() {
                   קיימות מחשבות אובדניות בהקשר הטראומה
                 </label>
               </div>
+              {traumaSuicidal && <CrisisResources className="mt-3" />}
             </>
           )}
           <NavRow
@@ -2051,8 +2056,8 @@ export default function AdultsPage() {
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם חווית/חווה <strong>אלימות, הפחדות, או שליטה</strong> מצד בן/בת הזוג?</p>
         <YesNo
           onYes={() => {
-            updR({ rAbuse: true });
-            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(); }
+            const a = updR({ rAbuse: true });
+            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(a); }
           }}
           onNo={() => { updR({ rAbuse: false }); setScreen("r1-scale"); }} />
       </Card>
@@ -2066,10 +2071,10 @@ export default function AdultsPage() {
         <ScaleRow label="" group="couple" values={[1,2,3,4,5,6,7]} value={coupleScale} onChange={setCoupleScale} />
         <NavRow onBack={() => setScreen("r-abuse")}
           onNext={() => {
-            updR({ coupleScale, coupleInRelationship: true });
+            const a = updR({ coupleScale, coupleInRelationship: true });
             if (coupleScale >= 4) { setScreen("r2-q"); }
             else if (hasChildren) { setScreen("r3-conflict"); }
-            else { nextDomain(); }
+            else { nextDomain(a); }
           }}
           nextDisabled={coupleScale === 0} />
       </Card>
@@ -2098,8 +2103,8 @@ export default function AdultsPage() {
         ))}
         <NavRow onBack={() => setScreen("r1-scale")}
           onNext={() => {
-            updR({ eftScores, dynScores, structScores });
-            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(); }
+            const a = updR({ eftScores, dynScores, structScores });
+            if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(a); }
           }}
           nextDisabled={!eftScores.some(s => s > 0) || !dynScores.some(s => s > 0) || !structScores.some(s => s > 0)} />
       </Card>
@@ -2163,7 +2168,7 @@ export default function AdultsPage() {
         <p className="mb-1 font-semibold text-[#1a3a5c]">האם יש <strong>בעיות התנהגות, קשיים חברתיים, או קשיים רגשיים</strong> אצל הילד/ים?</p>
         <YesNo
           onYes={() => { updR({ r3ChildIssues: true }); setScreen("r3-child-type"); }}
-          onNo={() => { updR({ r3ChildIssues: false }); nextDomain(); }} />
+          onNo={() => { nextDomain(updR({ r3ChildIssues: false })); }} />
       </Card>
     </Layout>
   );
@@ -2174,12 +2179,12 @@ export default function AdultsPage() {
         <p className="mb-3 font-semibold text-[#1a3a5c]">הקושי הוא בעיקר:</p>
         <div className="flex flex-col gap-3">
           <button type="button"
-            onClick={() => { updR({ r3ChildType: "child" }); nextDomain(); }}
+            onClick={() => { nextDomain(updR({ r3ChildType: "child" })); }}
             className="rounded-xl bg-[#2d7a4f] px-4 py-3 text-right text-sm font-bold text-white hover:bg-[#1f5a38]">
             אצל הילד עצמו (רגשי, התנהגותי, חברתי)
           </button>
           <button type="button"
-            onClick={() => { updR({ r3ChildType: "family" }); nextDomain(); }}
+            onClick={() => { nextDomain(updR({ r3ChildType: "family" })); }}
             className="rounded-xl bg-[#1a3a5c] px-4 py-3 text-right text-sm font-bold text-white hover:bg-[#0f2540]">
             בדינמיקה המשפחתית (יחסים בין בני המשפחה)
           </button>
@@ -2593,7 +2598,22 @@ export default function AdultsPage() {
           </div>
 
           {/* Alerts */}
-          {err && <p className="mb-3 rounded-xl border border-red-300 bg-red-50 p-3 text-sm text-red-900">{err}</p>}
+          {err && (
+            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-center">
+              <p className="font-bold text-red-900 mb-1">אירעה תקלה זמנית בחישוב התוצאות</p>
+              <p className="text-sm text-red-700 mb-4">התשובות שלך נשמרו — אפשר לנסות שוב, לא ייגבה תשלום נוסף.</p>
+              <button
+                type="button"
+                onClick={() => goScoring()}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700 transition-colors"
+              >
+                🔄 נסה/י שוב
+              </button>
+            </div>
+          )}
+          {(answers.emotional?.moodSuicidal || answers.emotional?.prodromeSuicidal || answers.emotional?.maniaDeath || answers.emotional?.traumaSuicidal) && (
+            <CrisisResources className="mb-4" />
+          )}
           {(() => {
             const bmi = answers.bmi;
             if (bmi == null || (bmi >= 18.5 && bmi <= 24.9)) return null;
@@ -2619,7 +2639,7 @@ export default function AdultsPage() {
           )}
 
           {/* No results */}
-          {recs.length === 0 && (
+          {!err && recs.length === 0 && (
             <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4 space-y-3">
               <p className="font-bold text-[#1a2a3a]">לא נמצאו ממצאים מובהקים בשאלון.</p>
               <p className="text-sm text-gray-600">מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.</p>
