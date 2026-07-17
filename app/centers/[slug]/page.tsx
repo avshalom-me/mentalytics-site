@@ -116,7 +116,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {therapists.map((t) => <TherapistResultCard key={t.id} t={t} />)}
+            {therapists.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/centers/${center.slug}`} />)}
           </div>
         )}
       </section>

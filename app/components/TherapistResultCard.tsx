@@ -8,13 +8,18 @@ import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 // (links to the profile; contact clicks track on the profile). Wrapped in a
 // client impression tracker so cards shown here count as "חשיפות" like the
 // main directory's.
-export default function TherapistResultCard({ t }: { t: PublicTherapist }) {
+export default function TherapistResultCard({ t, backHref }: { t: PublicTherapist; backHref?: string }) {
   const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
+  // "ret" lets the profile's back link return to THIS listing page (region /
+  // city / online / center) rather than the generic /therapists directory.
+  const profileHref = backHref
+    ? `${therapistPath(t.id, t.full_name)}?ret=${encodeURIComponent(backHref)}`
+    : therapistPath(t.id, t.full_name);
   return (
     <CardImpression therapistId={t.id}>
-    <Link href={therapistPath(t.id, t.full_name)} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
+    <Link href={profileHref} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" }}>
       <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)" }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}

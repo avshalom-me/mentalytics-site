@@ -18,7 +18,10 @@ export default function ProfileBackLink({
   const cls = "text-sm text-stone-500 hover:underline mb-6 inline-block";
 
   if (source !== "match") {
-    return <Link href="/therapists" className={cls}>← חזרה לכל המטפלים</Link>;
+    // Returns to the exact listing the visitor came from (region / city /
+    // online / center), or /therapists as a fallback. A real link — works
+    // without JS and is crawlable.
+    return <Link href={fallbackHref} className={cls}>← חזרה לרשימה</Link>;
   }
 
   return (

@@ -106,13 +106,20 @@ export default async function TherapistProfilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string }>;
+  searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string; ret?: string }>;
 }) {
   const { id: param } = await params;
   const sp = await searchParams;
   const id = extractTherapistId(param);
   if (!id) notFound();
   const source: "match" | "directory" = sp.from === "match" ? "match" : "directory";
+  // Where "back to the list" returns for a directory visitor: the listing page
+  // they came from (region / city / online / center), passed as ?ret=. Only
+  // internal listing paths are honoured — never an arbitrary/attacker URL.
+  const directoryBack =
+    typeof sp.ret === "string" && /^\/(therapists|centers)\/[^/]/.test(sp.ret) && !sp.ret.startsWith("//")
+      ? sp.ret
+      : "/therapists";
   const viewerContext = source === "match" ? {
     region: sp.r,
     issue: sp.i,
@@ -185,7 +192,7 @@ export default async function TherapistProfilePage({
         .chevron { transition: transform 0.2s; }
       `}</style>
 
-      <ProfileBackLink source={source} fallbackHref={source === "match" ? (sp.a === "child" ? "/kids" : "/adults") : "/therapists"} />
+      <ProfileBackLink source={source} fallbackHref={source === "match" ? (sp.a === "child" ? "/kids" : "/adults") : directoryBack} />
 
       {/* Hero — warm teal band, large photo + identity + contact */}
       <div className="rounded-3xl mb-8 p-6 sm:p-8" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
