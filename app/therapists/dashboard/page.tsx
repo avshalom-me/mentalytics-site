@@ -131,6 +131,12 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
             טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי — מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
             שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
           </p>
+          <p className="mt-2 text-[11px] leading-5 text-stone-500">
+            ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
+            אליכם <strong>ישירות</strong> — דרך האתר הפרטי שלכם, הטלפון או המייל — בלי לחזור ללחוץ כאן.
+            פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
+            מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
+          </p>
 
           {/* ── Enhanced stats: paying only ── */}
           {isPaying && sourceData && (
