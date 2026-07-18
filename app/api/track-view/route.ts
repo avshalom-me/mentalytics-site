@@ -6,7 +6,7 @@ import {
   isValidAgeBand,
   isValidGender,
 } from "@/app/lib/stats-categories";
-import { sanitizeAttribution } from "@/app/lib/attribution";
+import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 
 // "match_card"   = impression in the match-results list
 // "match"        = entry into the full profile page coming from match results
@@ -77,6 +77,28 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const attribution = sanitizeAttribution(body);
+    // Same server-side safety net as track-click: the client's stored utm can
+    // be lost mid-session (gclid-only re-landing, blocked storage). When the
+    // campaign tag is missing but this session's analytics events carry one,
+    // restore it — only if its channel doesn't contradict the incoming one.
+    if (!attribution.utm_campaign && safeSessionId) {
+      const { data: tagged } = await supabaseAdmin
+        .from("analytics_events")
+        .select("channel, utm_source, utm_medium, utm_campaign")
+        .eq("session_id", safeSessionId)
+        .not("utm_campaign", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (tagged && (!attribution.channel || tagged.channel === attribution.channel)) {
+        attribution.utm_campaign = tagged.utm_campaign;
+        attribution.utm_source = attribution.utm_source ?? tagged.utm_source;
+        attribution.utm_medium = attribution.utm_medium ?? tagged.utm_medium;
+        if (!attribution.channel && isValidChannel(tagged.channel)) attribution.channel = tagged.channel;
+      }
+    }
+
     await supabaseAdmin
       .from("therapist_profile_views")
       .insert({
@@ -88,7 +110,7 @@ export async function POST(req: NextRequest) {
         viewer_gender: safeGender,
         match_score: safeScore,
         session_id: safeSessionId,
-        ...sanitizeAttribution(body),
+        ...attribution,
       });
 
     return NextResponse.json({ ok: true });
