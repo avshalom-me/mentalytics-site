@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { sanitizeAttribution } from "@/app/lib/attribution";
+import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 const VALID_SOURCES = ["match", "directory"] as const;
@@ -43,9 +43,33 @@ export async function POST(req: NextRequest) {
     const safeSessionId =
       typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128 ? session_id : null;
 
+    const attribution = sanitizeAttribution(body);
+    // Server-side safety net: the client's stored utm can be lost mid-session
+    // (seen live 16/7: a gclid-only re-landing overwrote the stored g-online
+    // tag with nulls, so 3 paid contacts vanished from the campaign funnel).
+    // When the campaign tag is missing but this session's own analytics events
+    // carry one, restore it from the latest tagged event — only if its channel
+    // doesn't contradict the one the click arrived with.
+    if (!attribution.utm_campaign && safeSessionId) {
+      const { data: tagged } = await supabaseAdmin
+        .from("analytics_events")
+        .select("channel, utm_source, utm_medium, utm_campaign")
+        .eq("session_id", safeSessionId)
+        .not("utm_campaign", "is", null)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (tagged && (!attribution.channel || tagged.channel === attribution.channel)) {
+        attribution.utm_campaign = tagged.utm_campaign;
+        attribution.utm_source = attribution.utm_source ?? tagged.utm_source;
+        attribution.utm_medium = attribution.utm_medium ?? tagged.utm_medium;
+        if (!attribution.channel && isValidChannel(tagged.channel)) attribution.channel = tagged.channel;
+      }
+    }
+
     const { error } = await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type, source: safeSource, session_id: safeSessionId, ...sanitizeAttribution(body) });
+      .insert({ therapist_id, click_type, source: safeSource, session_id: safeSessionId, ...attribution });
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

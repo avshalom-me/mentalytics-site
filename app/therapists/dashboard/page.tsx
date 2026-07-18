@@ -126,6 +126,11 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
             <span className="text-sm text-stone-600">סה"כ פניות</span>
             <span className="text-xl font-black text-[#0F5468]">{data.total}</span>
           </div>
+          <p className="mt-3 text-[11px] leading-5 text-stone-500">
+            💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
+            טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי — מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
+            שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
+          </p>
 
           {/* ── Enhanced stats: paying only ── */}
           {isPaying && sourceData && (

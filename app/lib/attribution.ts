@@ -154,7 +154,24 @@ export function captureAttribution(): void {
     const existing = localStorage.getItem(STORAGE_KEY);
     if (existing && !hasCampaignSignal) return; // keep the prior touch
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(buildAttribution(params, referrer)));
+    const next = buildAttribution(params, referrer);
+    // A gclid-only landing (campaign signal but no utm params — Google strips
+    // the suffix on some ad assets) must not wipe a previously captured
+    // campaign tag from the same channel: that orphaned paid conversions from
+    // their campaign (seen live 16/7, g-online). Keep the richer prior tag.
+    if (existing && !next.utm_campaign) {
+      try {
+        const prev = JSON.parse(existing) as Partial<Attribution>;
+        if (prev.utm_campaign && prev.channel === next.channel) {
+          next.utm_source = next.utm_source ?? prev.utm_source ?? null;
+          next.utm_medium = next.utm_medium ?? prev.utm_medium ?? null;
+          next.utm_campaign = prev.utm_campaign;
+        }
+      } catch {
+        /* corrupt stored value — fall through with the fresh capture */
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 
     // Persist the raw ad click ids (last-touch) so a later conversion can be
     // uploaded to the ad platform with exact click attribution. Only overwrite
