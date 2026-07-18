@@ -29,6 +29,10 @@ function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", s
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    // keepalive: on mobile the tap immediately jumps to WhatsApp / the dialer,
+    // backgrounding the page — without it the in-flight request can be killed
+    // and the contact silently undercounted.
+    keepalive: true,
     body: JSON.stringify({
       therapist_id: therapistId,
       click_type: clickType,
