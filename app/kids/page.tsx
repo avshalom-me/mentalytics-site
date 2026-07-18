@@ -8,6 +8,7 @@ import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingC
 import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
+import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import {
   parseKidsBoxes,
   type KidsRecommendationGroup,
@@ -3728,6 +3729,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         >
           ← שאלון חדש
         </button>
+      </div>
+
+      {/* Anonymous feedback — why did you stop / what was unclear */}
+      <div className="print:hidden" data-html2canvas-ignore="true">
+        <QuizFeedbackBox quizType="kids" />
       </div>
     </div>
   );

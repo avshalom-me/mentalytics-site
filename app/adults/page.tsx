@@ -16,6 +16,7 @@ import { buildAdultFacts } from "@/app/lib/explain-facts";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import { therapistPath } from "@/app/lib/therapist-url";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
+import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 
 // Anonymous viewer context derived from the questionnaire — used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -2692,6 +2693,11 @@ export default function AdultsPage() {
             >
               💾 שמירה כ-PDF
             </button>
+          </div>
+
+          {/* Anonymous feedback — why did you stop / what was unclear */}
+          <div className="print:hidden" data-html2canvas-ignore="true">
+            <QuizFeedbackBox quizType="adults" />
           </div>
         </div>
       </Layout>
