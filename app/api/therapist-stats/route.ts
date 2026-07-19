@@ -116,6 +116,10 @@ export async function GET(req: NextRequest) {
 
   // Enhanced stats (paying only)
   if (isPaying) {
+    // Paying dashboards lead with the 6-month picture (rows already span the
+    // full fetch window = sixMonthsAgo), then a month toggle — no week view.
+    result.half_year = sumByType(rows);
+    result.half_year_by_source = sumBySource(rows);
     result.week_by_source = sumBySource(weekRows);
     result.month_by_source = sumBySource(monthRows);
     result.trends = buildMonthlyTrends(rows);
@@ -125,43 +129,35 @@ export async function GET(req: NextRequest) {
     //   match_impressions = source = 'match_card'        — card impressions in the match-results list
     // Aggregated to two rows so the dashboard can show them side by side.
     try {
-      const [weekEntries, monthEntries, weekImpressions, monthImpressions] = await Promise.all([
+      const countViews = (sources: string[], sinceDate: Date) =>
         supabaseAdmin
           .from("therapist_profile_views")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
-          .in("source", ["match", "directory"])
-          .gte("viewed_at", weekAgo.toISOString()),
-        supabaseAdmin
-          .from("therapist_profile_views")
-          .select("*", { count: "exact", head: true })
-          .eq("therapist_id", info.id)
-          .in("source", ["match", "directory"])
-          .gte("viewed_at", monthAgo.toISOString()),
-        supabaseAdmin
-          .from("therapist_profile_views")
-          .select("*", { count: "exact", head: true })
-          .eq("therapist_id", info.id)
-          .eq("source", "match_card")
-          .gte("viewed_at", weekAgo.toISOString()),
-        supabaseAdmin
-          .from("therapist_profile_views")
-          .select("*", { count: "exact", head: true })
-          .eq("therapist_id", info.id)
-          .eq("source", "match_card")
-          .gte("viewed_at", monthAgo.toISOString()),
-      ]);
+          .in("source", sources)
+          .gte("viewed_at", sinceDate.toISOString());
+      const [weekEntries, monthEntries, halfYearEntries, weekImpressions, monthImpressions, halfYearImpressions] =
+        await Promise.all([
+          countViews(["match", "directory"], weekAgo),
+          countViews(["match", "directory"], monthAgo),
+          countViews(["match", "directory"], sixMonthsAgo),
+          countViews(["match_card"], weekAgo),
+          countViews(["match_card"], monthAgo),
+          countViews(["match_card"], sixMonthsAgo),
+        ]);
       result.profile_views = {
         week: weekEntries.count ?? 0,
         month: monthEntries.count ?? 0,
+        half_year: halfYearEntries.count ?? 0,
       };
       result.match_impressions = {
         week: weekImpressions.count ?? 0,
         month: monthImpressions.count ?? 0,
+        half_year: halfYearImpressions.count ?? 0,
       };
     } catch {
-      result.profile_views = { week: 0, month: 0 };
-      result.match_impressions = { week: 0, month: 0 };
+      result.profile_views = { week: 0, month: 0, half_year: 0 };
+      result.match_impressions = { week: 0, month: 0, half_year: 0 };
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)

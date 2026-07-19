@@ -43,24 +43,43 @@ type TrendMonth = { label: string; total: number; match: number; directory: numb
 type StatsResponse = {
   week: StatsBucket;
   month: StatsBucket;
+  half_year?: StatsBucket;
   week_by_source?: SourceBreakdown;
   month_by_source?: SourceBreakdown;
+  half_year_by_source?: SourceBreakdown;
   trends?: TrendMonth[];
-  profile_views?: { week: number; month: number };
-  match_impressions?: { week: number; month: number };
+  profile_views?: { week: number; month: number; half_year?: number };
+  match_impressions?: { week: number; month: number; half_year?: number };
   enriched?: EnrichedStatsData;
 };
 
-function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse | null; loadingStats: boolean; isPaying: boolean }) {
-  const [period, setPeriod] = useState<"week" | "month">("week");
+type StatsPeriod = "week" | "month" | "half_year";
 
-  const data = stats?.[period];
-  const sourceData = period === "week" ? stats?.week_by_source : stats?.month_by_source;
+function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse | null; loadingStats: boolean; isPaying: boolean }) {
+  // Paying/promoted therapists lead with the 6-month picture, then last month
+  // (no week view — too noisy at their volumes). Free therapists keep week/month.
+  const periods: { key: StatsPeriod; label: string }[] = isPaying
+    ? [{ key: "half_year", label: "6 חודשים" }, { key: "month", label: "חודש אחרון" }]
+    : [{ key: "week", label: "שבוע" }, { key: "month", label: "חודש" }];
+  const [period, setPeriod] = useState<StatsPeriod>(periods[0].key);
+  // isPaying can flip after mount (the profile fetch resolves later than the
+  // token) — snap the selection back to the first valid period for the tier.
+  useEffect(() => {
+    if (!periods.some((p) => p.key === period)) setPeriod(isPaying ? "half_year" : "week");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isPaying]);
+
+  const data = period === "half_year" ? stats?.half_year : stats?.[period];
+  const sourceData =
+    period === "half_year" ? stats?.half_year_by_source :
+    period === "week" ? stats?.week_by_source : stats?.month_by_source;
   const views = stats?.profile_views;
   const impressions = stats?.match_impressions;
-  const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
-  const viewsValue = views ? (period === "week" ? views.week : views.month) : 0;
-  const impressionsValue = impressions ? (period === "week" ? impressions.week : impressions.month) : 0;
+  const periodLabel =
+    period === "half_year" ? "6 החודשים האחרונים" :
+    period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
+  const viewsValue = views ? (period === "half_year" ? views.half_year ?? 0 : views[period]) : 0;
+  const impressionsValue = impressions ? (period === "half_year" ? impressions.half_year ?? 0 : impressions[period]) : 0;
   const conversionPct = impressionsValue > 0 ? Math.round((viewsValue / impressionsValue) * 100) : null;
 
   return (
@@ -68,18 +87,15 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-extrabold text-stone-900">פניות מהפרופיל שלך</h2>
         <div className="flex rounded-xl border border-stone-200 overflow-hidden text-xs font-semibold">
-          <button
-            onClick={() => setPeriod("week")}
-            className={`px-3 py-1.5 transition-colors ${period === "week" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
-          >
-            שבוע
-          </button>
-          <button
-            onClick={() => setPeriod("month")}
-            className={`px-3 py-1.5 transition-colors ${period === "month" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
-          >
-            חודש
-          </button>
+          {periods.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`px-3 py-1.5 transition-colors ${period === p.key ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
 
