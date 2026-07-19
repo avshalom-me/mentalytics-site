@@ -39,63 +39,114 @@ type Profile = {
 
 type StatsBucket = { whatsapp: number; phone: number; email: number; site_message: number; total: number };
 type SourceBreakdown = { match: StatsBucket; directory: StatsBucket };
-type TrendMonth = { label: string; total: number; match: number; directory: number };
 type StatsResponse = {
   week: StatsBucket;
   month: StatsBucket;
-  half_year?: StatsBucket;
-  week_by_source?: SourceBreakdown;
-  month_by_source?: SourceBreakdown;
-  half_year_by_source?: SourceBreakdown;
-  trends?: TrendMonth[];
-  profile_views?: { week: number; month: number; half_year?: number };
-  match_impressions?: { week: number; month: number; half_year?: number };
+  profile_views?: { all_time: number };
+  match_impressions?: { all_time: number };
+  all_time_contacts?: { total: number; match: number; directory: number };
   enriched?: EnrichedStatsData;
 };
 
-type StatsPeriod = "week" | "month" | "half_year";
-
 function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse | null; loadingStats: boolean; isPaying: boolean }) {
-  // Paying/promoted therapists lead with the 6-month picture, then last month
-  // (no week view — too noisy at their volumes). Free therapists keep week/month.
-  const periods: { key: StatsPeriod; label: string }[] = isPaying
-    ? [{ key: "half_year", label: "6 חודשים" }, { key: "month", label: "חודש אחרון" }]
-    : [{ key: "week", label: "שבוע" }, { key: "month", label: "חודש" }];
-  const [period, setPeriod] = useState<StatsPeriod>(periods[0].key);
-  // isPaying can flip after mount (the profile fetch resolves later than the
-  // token) — snap the selection back to the first valid period for the tier.
-  useEffect(() => {
-    if (!periods.some((p) => p.key === period)) setPeriod(isPaying ? "half_year" : "week");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isPaying]);
+  // Free-tier toggle only; the paying view is cumulative with no period splits.
+  const [period, setPeriod] = useState<"week" | "month">("week");
 
-  const data = period === "half_year" ? stats?.half_year : stats?.[period];
-  const sourceData =
-    period === "half_year" ? stats?.half_year_by_source :
-    period === "week" ? stats?.week_by_source : stats?.month_by_source;
-  const views = stats?.profile_views;
-  const impressions = stats?.match_impressions;
-  const periodLabel =
-    period === "half_year" ? "6 החודשים האחרונים" :
-    period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
-  const viewsValue = views ? (period === "half_year" ? views.half_year ?? 0 : views[period]) : 0;
-  const impressionsValue = impressions ? (period === "half_year" ? impressions.half_year ?? 0 : impressions[period]) : 0;
+  const data = stats?.[period];
+  const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
+  const viewsValue = stats?.profile_views?.all_time ?? 0;
+  const impressionsValue = stats?.match_impressions?.all_time ?? 0;
   const conversionPct = impressionsValue > 0 ? Math.round((viewsValue / impressionsValue) * 100) : null;
+  const contacts = stats?.all_time_contacts;
 
+  // ── Paying/promoted: cumulative numbers since joining — no period splits
+  // (product decision 19/7: the totals tell the real value story; month/week
+  // slicing made quiet weeks read as "the site brings nothing").
+  if (isPaying) {
+    return (
+      <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
+        <h2 className="text-lg font-extrabold text-stone-900">הפרופיל שלך במספרים</h2>
+        <p className="text-xs text-stone-500 mt-0.5 mb-4">נתונים מצטברים מאז הצטרפותך לאתר</p>
+
+        {loadingStats ? (
+          <div className="text-sm text-stone-400 py-4 text-center">טוען נתונים...</div>
+        ) : !contacts ? (
+          <div className="text-sm text-stone-400 py-4 text-center">לא ניתן לטעון נתונים</div>
+        ) : (
+          <>
+            {/* Exposure → interest */}
+            <h3 className="text-sm font-bold text-stone-800 mb-1">חשיפה ועניין</h3>
+            <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל — לפני שלב יצירת הקשר</p>
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
+                <div className="text-lg font-black text-indigo-700">{impressionsValue.toLocaleString("he-IL")}</div>
+                <div className="text-xs text-indigo-600 font-semibold mt-1">✨ הופעות במאטצ'ינג</div>
+                <div className="text-[10px] text-indigo-500 mt-0.5">פעמים שהופעת ברשימת ההמלצות</div>
+              </div>
+              <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
+                <div className="text-lg font-black text-purple-700">{viewsValue.toLocaleString("he-IL")}</div>
+                <div className="text-xs text-purple-600 font-semibold mt-1">👁 כניסות לפרופיל</div>
+                <div className="text-[10px] text-purple-500 mt-0.5">לחיצות שהובילו לעמוד שלך</div>
+              </div>
+            </div>
+            {conversionPct !== null && (
+              <div className="text-xs text-stone-500 text-center mb-4">
+                יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מהמופיעים נכנסו לפרופיל
+              </div>
+            )}
+
+            {/* Total contacts — cumulative, with source split */}
+            <div className="rounded-xl bg-[#f0ece4] px-4 py-3 flex items-center justify-between">
+              <span className="text-sm text-stone-600">סה"כ פניות דרך האתר</span>
+              <span className="text-xl font-black text-[#0F5468]">{contacts.total.toLocaleString("he-IL")}</span>
+            </div>
+            {contacts.total > 0 && (
+              <div className="mt-2 flex items-center justify-center gap-4 text-xs text-stone-500">
+                <span>🎯 {contacts.match} ממערכת ההתאמה</span>
+                <span>🔍 {contacts.directory} ממאגר המטפלים</span>
+              </div>
+            )}
+            {contacts.total === 0 && viewsValue > 0 && (
+              <div className="mt-3 rounded-xl bg-stone-50 border border-stone-200 px-4 py-3 text-center text-xs text-stone-600">
+                עדיין אין פניות — אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
+              </div>
+            )}
+
+            <p className="mt-3 text-[11px] leading-5 text-stone-500">
+              💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
+              טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי — מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
+              שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
+            </p>
+            <p className="mt-2 text-[11px] leading-5 text-stone-500">
+              ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
+              אליכם <strong>ישירות</strong> — דרך האתר הפרטי שלכם, הטלפון או המייל — בלי לחזור ללחוץ כאן.
+              פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
+              מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
+            </p>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // ── Free tier: unchanged week/month view
   return (
     <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-extrabold text-stone-900">פניות מהפרופיל שלך</h2>
         <div className="flex rounded-xl border border-stone-200 overflow-hidden text-xs font-semibold">
-          {periods.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={`px-3 py-1.5 transition-colors ${period === p.key ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
-            >
-              {p.label}
-            </button>
-          ))}
+          <button
+            onClick={() => setPeriod("week")}
+            className={`px-3 py-1.5 transition-colors ${period === "week" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+          >
+            שבוע
+          </button>
+          <button
+            onClick={() => setPeriod("month")}
+            className={`px-3 py-1.5 transition-colors ${period === "month" ? "bg-[#0F5468] text-white" : "bg-white text-stone-500 hover:bg-stone-50"}`}
+          >
+            חודש
+          </button>
         </div>
       </div>
 
@@ -151,93 +202,6 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
             פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
             מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
           </p>
-
-          {/* ── Enhanced stats: paying only ── */}
-          {isPaying && sourceData && (
-            <div className="mt-5 pt-5 border-t border-[#E8E0D8]">
-              {/* Funnel steps 1+2: exposure → profile entries */}
-              {(impressionsValue > 0 || viewsValue > 0) && (
-                <div className="mb-5">
-                  <h3 className="text-sm font-bold text-stone-800 mb-1">חשיפה ועניין</h3>
-                  <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל — לפני שלב יצירת הקשר</p>
-                  <div className="grid grid-cols-2 gap-3 mb-2">
-                    <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
-                      <div className="text-lg font-black text-indigo-700">{impressionsValue}</div>
-                      <div className="text-xs text-indigo-600 font-semibold mt-1">✨ הופעות במאטצ'ינג</div>
-                      <div className="text-[10px] text-indigo-500 mt-0.5">פעמים שהופעת ברשימת ההמלצות</div>
-                    </div>
-                    <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
-                      <div className="text-lg font-black text-purple-700">{viewsValue}</div>
-                      <div className="text-xs text-purple-600 font-semibold mt-1">👁 כניסות לפרופיל</div>
-                      <div className="text-[10px] text-purple-500 mt-0.5">לחיצות שהובילו לעמוד שלך</div>
-                    </div>
-                  </div>
-                  {conversionPct !== null && (
-                    <div className="text-xs text-stone-500 text-center">
-                      יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מהמופיעים נכנסו לפרופיל
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Funnel step 3: contacts by source */}
-              <h3 className="text-sm font-bold text-stone-800 mb-1">פניות לפי מקור</h3>
-              <p className="text-[11px] text-stone-500 mb-3">אנשים שלחצו ליצירת קשר (וואטסאפ / טלפון / מייל)</p>
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center">
-                  <div className="text-lg font-black text-teal-700">{sourceData.match.total}</div>
-                  <div className="text-xs text-teal-600 font-semibold">🎯 ממערכת ההתאמה</div>
-                </div>
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3 text-center">
-                  <div className="text-lg font-black text-stone-700">{sourceData.directory.total}</div>
-                  <div className="text-xs text-stone-500 font-semibold">🔍 ממאגר המטפלים</div>
-                </div>
-              </div>
-              {sourceData.match.total + sourceData.directory.total === 0 && viewsValue > 0 && (
-                <div className="rounded-xl bg-[#f0ece4] px-4 py-3 mb-4 text-center text-xs text-stone-600">
-                  עדיין אין פניות — אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
-                </div>
-              )}
-
-              {/* Monthly trends */}
-              {stats?.trends && stats.trends.length > 0 && (
-                <div>
-                  <h3 className="text-sm font-bold text-stone-800 mb-3">📈 מגמה חודשית</h3>
-                  <div className="space-y-2">
-                    {stats.trends.map(m => {
-                      const maxTotal = Math.max(...stats.trends!.map(t => t.total), 1);
-                      const barWidth = Math.round((m.total / maxTotal) * 100);
-                      const [y, mo] = m.label.split("-");
-                      const monthNames = ["", "ינואר", "פברואר", "מרץ", "אפריל", "מאי", "יוני", "יולי", "אוגוסט", "ספטמבר", "אוקטובר", "נובמבר", "דצמבר"];
-                      const label = `${monthNames[Number(mo)]} ${y}`;
-                      return (
-                        <div key={m.label} className="flex items-center gap-2">
-                          <span className="text-xs text-stone-500 w-20 text-left flex-shrink-0">{label}</span>
-                          <div className="flex-1 h-5 bg-stone-100 rounded-full overflow-hidden relative">
-                            {m.total > 0 && (
-                              <div className="h-full rounded-full flex overflow-hidden" style={{ width: `${barWidth}%` }}>
-                                {m.match > 0 && (
-                                  <div className="h-full bg-teal-500" style={{ width: `${(m.match / m.total) * 100}%` }} />
-                                )}
-                                {m.directory > 0 && (
-                                  <div className="h-full bg-stone-400" style={{ width: `${(m.directory / m.total) * 100}%` }} />
-                                )}
-                              </div>
-                            )}
-                          </div>
-                          <span className="text-xs font-bold text-stone-700 w-6 text-right">{m.total}</span>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-stone-500">
-                    <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-teal-500" /> התאמה</span>
-                    <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-full bg-stone-400" /> מאגר</span>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
         </>
       )}
     </div>
@@ -376,9 +340,9 @@ function TherapistDashboard() {
       improvements.push({ icon: "🎓", text: "הוסף/י פרטי השכלה והכשרה — מחזק את האמינות המקצועית." });
 
     if (profile.status === "paying") {
-      const imp = stats?.match_impressions?.month ?? 0;
-      const views = stats?.profile_views?.month ?? 0;
-      const contacts = stats?.month?.total ?? 0;
+      const imp = stats?.match_impressions?.all_time ?? 0;
+      const views = stats?.profile_views?.all_time ?? 0;
+      const contacts = stats?.all_time_contacts?.total ?? 0;
       if (imp >= 20 && views / imp < 0.15)
         improvements.push({ icon: "👁️", text: "הופעת הרבה בתוצאות ההתאמה אך מעט נכנסו לפרופיל — תמונה וכותרת ביו חזקה מגדילות את אחוז ההקלקה." });
       if (views >= 15 && contacts === 0)

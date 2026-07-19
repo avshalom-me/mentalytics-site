@@ -44,15 +44,6 @@ function sumByType(rows: ClickRow[]) {
   return result;
 }
 
-function sumBySource(rows: ClickRow[]) {
-  const match = rows.filter(r => r.source === "match");
-  const directory = rows.filter(r => r.source === "directory");
-  return {
-    match: sumByType(match),
-    directory: sumByType(directory),
-  };
-}
-
 /** מגמות חודשיות — 6 חודשים אחרונים */
 function buildMonthlyTrends(rows: ClickRow[]) {
   const now = new Date();
@@ -116,48 +107,41 @@ export async function GET(req: NextRequest) {
 
   // Enhanced stats (paying only)
   if (isPaying) {
-    // Paying dashboards lead with the 6-month picture (rows already span the
-    // full fetch window = sixMonthsAgo), then a month toggle — no week view.
-    result.half_year = sumByType(rows);
-    result.half_year_by_source = sumBySource(rows);
-    result.week_by_source = sumBySource(weekRows);
-    result.month_by_source = sumBySource(monthRows);
     result.trends = buildMonthlyTrends(rows);
 
-    // Profile views split:
-    //   profile_entries = source IN ('match', 'directory') — actual entries into the full profile page
-    //   match_impressions = source = 'match_card'        — card impressions in the match-results list
-    // Aggregated to two rows so the dashboard can show them side by side.
+    // Paying dashboards show CUMULATIVE numbers since joining — no period
+    // splits (product decision 19/7): all-time exposure, all-time profile
+    // entries, and all-time contacts split by acquisition source.
     try {
-      const countViews = (sources: string[], sinceDate: Date) =>
+      const countViews = (sources: string[]) =>
         supabaseAdmin
           .from("therapist_profile_views")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
-          .in("source", sources)
-          .gte("viewed_at", sinceDate.toISOString());
-      const [weekEntries, monthEntries, halfYearEntries, weekImpressions, monthImpressions, halfYearImpressions] =
-        await Promise.all([
-          countViews(["match", "directory"], weekAgo),
-          countViews(["match", "directory"], monthAgo),
-          countViews(["match", "directory"], sixMonthsAgo),
-          countViews(["match_card"], weekAgo),
-          countViews(["match_card"], monthAgo),
-          countViews(["match_card"], sixMonthsAgo),
-        ]);
-      result.profile_views = {
-        week: weekEntries.count ?? 0,
-        month: monthEntries.count ?? 0,
-        half_year: halfYearEntries.count ?? 0,
+          .in("source", sources);
+      const countClicks = (matchOnly: boolean) => {
+        let q = supabaseAdmin
+          .from("therapist_contact_clicks")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id);
+        if (matchOnly) q = q.eq("source", "match");
+        return q;
       };
-      result.match_impressions = {
-        week: weekImpressions.count ?? 0,
-        month: monthImpressions.count ?? 0,
-        half_year: halfYearImpressions.count ?? 0,
-      };
+      const [entries, impressions, contactsTotal, contactsMatch] = await Promise.all([
+        countViews(["match", "directory"]),
+        countViews(["match_card"]),
+        countClicks(false),
+        countClicks(true),
+      ]);
+      const total = contactsTotal.count ?? 0;
+      const match = contactsMatch.count ?? 0;
+      result.profile_views = { all_time: entries.count ?? 0 };
+      result.match_impressions = { all_time: impressions.count ?? 0 };
+      result.all_time_contacts = { total, match, directory: total - match };
     } catch {
-      result.profile_views = { week: 0, month: 0, half_year: 0 };
-      result.match_impressions = { week: 0, month: 0, half_year: 0 };
+      result.profile_views = { all_time: 0 };
+      result.match_impressions = { all_time: 0 };
+      result.all_time_contacts = { total: 0, match: 0, directory: 0 };
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)
