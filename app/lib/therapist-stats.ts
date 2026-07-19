@@ -29,6 +29,8 @@ export interface BucketRow {
 export interface EnrichedStats {
   by_region: BucketRow[];
   by_issue: BucketRow[];
+  by_treatment: BucketRow[];
+  by_symptom: BucketRow[];
   by_age_band: BucketRow[];
   by_gender: BucketRow[];
   conversion: {
@@ -48,20 +50,30 @@ type ViewRow = {
   session_id: string | null;
   viewer_region: string | null;
   viewer_issue: string | null;
+  viewer_treatment: string | null;
+  viewer_symptom: string | null;
   viewer_age_band: string | null;
   viewer_gender: string | null;
   viewed_at: string;
 };
 
-/** Apply k-anon: roll up rare buckets into "other". */
+/**
+ * Apply k-anon: roll up rare buckets into "אחר".
+ * NULL context is NOT "אחר" — it means the visitor came without quiz context
+ * (directory browsing). Lumping those into "אחר" made it the biggest slice and
+ * hid the real story, so they get their own honest label (unknownLabel), or
+ * are dropped entirely for fields that only exist in the match flow.
+ */
 function groupByField<T extends string>(
   views: ViewRow[],
   field: keyof ViewRow,
   labels: Record<T, string>,
+  unknownLabel: string | null,
 ): BucketRow[] {
   const counts = new Map<string, number>();
   for (const v of views) {
     const key = (v[field] as string | null) ?? "unknown";
+    if (key === "unknown" && unknownLabel === null) continue; // field N/A for this visitor
     counts.set(key, (counts.get(key) ?? 0) + 1);
   }
 
@@ -69,7 +81,11 @@ function groupByField<T extends string>(
   let otherViews = 0;
 
   for (const [key, count] of counts.entries()) {
-    if (count < K_ANON_MIN || key === "unknown") {
+    if (key === "unknown") {
+      if (count >= K_ANON_MIN) buckets.push({ key, label: unknownLabel!, views: count });
+      continue;
+    }
+    if (count < K_ANON_MIN) {
       otherViews += count;
       continue;
     }
@@ -78,7 +94,7 @@ function groupByField<T extends string>(
   }
 
   if (otherViews >= K_ANON_MIN) {
-    buckets.push({ key: "other", label: "אחר", views: otherViews });
+    buckets.push({ key: "other", label: "אחר (קבוצות קטנות)", views: otherViews });
   }
 
   return buckets.sort((a, b) => b.views - a.views);
@@ -100,7 +116,7 @@ export async function computeEnrichedStats(
   // (and skewed no_click_rate) relative to every admin report, which excludes them.
   const { data: viewsData } = await supabaseAdmin
     .from("therapist_profile_views")
-    .select("session_id, viewer_region, viewer_issue, viewer_age_band, viewer_gender, viewed_at")
+    .select("session_id, viewer_region, viewer_issue, viewer_treatment, viewer_symptom, viewer_age_band, viewer_gender, viewed_at")
     .eq("therapist_id", therapistId)
     .neq("source", "match_card")
     .gte("viewed_at", sinceIso);
@@ -128,6 +144,8 @@ export async function computeEnrichedStats(
     return {
       by_region: empty,
       by_issue: empty,
+      by_treatment: empty,
+      by_symptom: empty,
       by_age_band: empty,
       by_gender: empty,
       conversion: {
@@ -141,10 +159,16 @@ export async function computeEnrichedStats(
   }
 
   return {
-    by_region: groupByField<RegionCategory>(views, "viewer_region", REGION_LABELS),
-    by_issue: groupByField<IssueCategory>(views, "viewer_issue", ISSUE_LABELS),
-    by_age_band: groupByField<AgeBand>(views, "viewer_age_band", AGE_LABELS),
-    by_gender: groupByField<Gender>(views, "viewer_gender", GENDER_LABELS),
+    // NULL region/issue = the visitor browsed in from the directory without a
+    // quiz — labeled honestly instead of inflating "אחר".
+    by_region: groupByField<RegionCategory>(views, "viewer_region", REGION_LABELS, "מהמאגר (ללא שאלון)"),
+    by_issue: groupByField<IssueCategory>(views, "viewer_issue", ISSUE_LABELS, "מהמאגר (ללא שאלון)"),
+    // Treatment/symptom exist only for match-flow visitors (and only from
+    // 19/7/26 on) — visitors without them are simply not part of these charts.
+    by_treatment: groupByField<string>(views, "viewer_treatment", {} as Record<string, string>, null),
+    by_symptom: groupByField<string>(views, "viewer_symptom", {} as Record<string, string>, null),
+    by_age_band: groupByField<AgeBand>(views, "viewer_age_band", AGE_LABELS, "לא צוין"),
+    by_gender: groupByField<Gender>(views, "viewer_gender", GENDER_LABELS, "לא צוין"),
     conversion: {
       total_views: totalViews,
       unique_sessions: uniqueSessions,

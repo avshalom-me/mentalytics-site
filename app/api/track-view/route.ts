@@ -34,6 +34,21 @@ function clampScore(x: unknown): number | null {
   return Math.max(0, Math.min(100, Math.round(n)));
 }
 
+// Free-text match context (treatment label / specific finding) — not enum-
+// validated because the label set lives in the quiz code, but clamped and
+// stripped of markup characters. k-anon (3+ identical values) at display time
+// makes junk injections invisible anyway.
+const BLOCKED_CONTEXT_CHARS = ["<", ">", "&", '"', "'", "`", String.fromCharCode(92)];
+function cleanContextText(x: unknown, max: number): string | null {
+  if (typeof x !== "string") return null;
+  const t = Array.from(x)
+    .filter((ch) => !BLOCKED_CONTEXT_CHARS.includes(ch))
+    .join("")
+    .trim()
+    .slice(0, max);
+  return t.length > 0 ? t : null;
+}
+
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
@@ -55,6 +70,10 @@ export async function POST(req: NextRequest) {
     const safeAgeBand = isValidAgeBand(viewer_age_band) ? viewer_age_band : null;
     const safeGender = isValidGender(viewer_gender) ? viewer_gender : null;
     const safeScore = safeSource === "directory" ? null : clampScore(match_score);
+    // Match-flow-only context: which treatment recommendation (and which
+    // specific quiz finding) led this visitor to the profile.
+    const safeTreatment = safeSource === "directory" ? null : cleanContextText(body?.viewer_treatment, 80);
+    const safeSymptom = safeSource === "directory" ? null : cleanContextText(body?.viewer_symptom, 160);
     const safeSessionId = typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128
       ? session_id
       : null;
@@ -108,6 +127,8 @@ export async function POST(req: NextRequest) {
         viewer_issue: safeIssue,
         viewer_age_band: safeAgeBand,
         viewer_gender: safeGender,
+        viewer_treatment: safeTreatment,
+        viewer_symptom: safeSymptom,
         match_score: safeScore,
         session_id: safeSessionId,
         ...attribution,

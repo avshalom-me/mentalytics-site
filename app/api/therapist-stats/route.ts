@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeEnrichedStats } from "@/app/lib/therapist-stats";
-import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 export const dynamic = "force-dynamic";
 
@@ -172,31 +171,8 @@ export async function GET(req: NextRequest) {
       // Non-critical — dashboard shows a placeholder if this is absent
     }
 
-    // Comparison: average clicks for paying therapists
-    try {
-      const allClicks = await fetchAllRows<{ therapist_id: string }>(() =>
-        supabaseAdmin
-          .from("therapist_contact_clicks")
-          .select("therapist_id")
-          .gte("clicked_at", monthAgo.toISOString()),
-      );
-
-      if (allClicks.length > 0) {
-        const byTherapist = new Map<string, number>();
-        for (const c of allClicks) {
-          byTherapist.set(c.therapist_id, (byTherapist.get(c.therapist_id) ?? 0) + 1);
-        }
-        const counts = Array.from(byTherapist.values());
-        const avg = Math.round(counts.reduce((a, b) => a + b, 0) / counts.length);
-        result.comparison = {
-          your_month: monthRows.length,
-          avg_month: avg,
-          therapist_count: counts.length,
-        };
-      }
-    } catch {
-      // comparison not critical
-    }
+    // (The vs-average comparison block was removed per product decision 19/7 —
+    // it read as judgmental and the average is skewed by a few heavy profiles.)
   }
 
   return NextResponse.json(result);

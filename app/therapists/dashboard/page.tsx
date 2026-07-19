@@ -40,7 +40,6 @@ type Profile = {
 type StatsBucket = { whatsapp: number; phone: number; email: number; site_message: number; total: number };
 type SourceBreakdown = { match: StatsBucket; directory: StatsBucket };
 type TrendMonth = { label: string; total: number; match: number; directory: number };
-type Comparison = { your_month: number; avg_month: number; therapist_count: number };
 type StatsResponse = {
   week: StatsBucket;
   month: StatsBucket;
@@ -49,7 +48,6 @@ type StatsResponse = {
   trends?: TrendMonth[];
   profile_views?: { week: number; month: number };
   match_impressions?: { week: number; month: number };
-  comparison?: Comparison;
   enriched?: EnrichedStatsData;
 };
 
@@ -182,24 +180,6 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
               {sourceData.match.total + sourceData.directory.total === 0 && viewsValue > 0 && (
                 <div className="rounded-xl bg-[#f0ece4] px-4 py-3 mb-4 text-center text-xs text-stone-600">
                   עדיין אין פניות — אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
-                </div>
-              )}
-
-              {/* Comparison */}
-              {stats?.comparison && (
-                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 mb-4">
-                  <h4 className="text-xs font-bold text-amber-800 mb-2">📊 השוואה לממוצע (30 ימים)</h4>
-                  <div className="flex items-center gap-4 text-sm">
-                    <div className="text-center">
-                      <div className="text-lg font-black text-amber-800">{stats.comparison.your_month}</div>
-                      <div className="text-xs text-amber-600">הפניות שלך</div>
-                    </div>
-                    <div className="text-stone-300 text-lg">|</div>
-                    <div className="text-center">
-                      <div className="text-lg font-black text-amber-800">{stats.comparison.avg_month}</div>
-                      <div className="text-xs text-amber-600">ממוצע ({stats.comparison.therapist_count} מטפלים)</div>
-                    </div>
-                  </div>
                 </div>
               )}
 

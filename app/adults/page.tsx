@@ -556,6 +556,11 @@ export default function AdultsPage() {
     if (gender) params.set("g", gender);
     const region = normalizeRegionKey(matchPrefs.region, matchPrefs.online);
     if (region) params.set("r", region);
+    // Which treatment recommendation (and which specific finding) sent this
+    // visitor — feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
+    const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
+    if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
+    if (selectedRec?.symptomText) params.set("sy", selectedRec.symptomText.slice(0, 160));
     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
   }
 

@@ -2851,6 +2851,9 @@ function KidsMatchSection({ A, score, selection }: {
                     params.set("a", "child");
                     const r = normalizeKidsRegionKey(region, online);
                     if (r) params.set("r", r);
+                    // Which treatment/assessment recommendation sent this visitor —
+                    // feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
+                    if (treatmentLabels.length > 0) params.set("t", treatmentLabels.join(" + ").slice(0, 80));
                     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
                   })();
                   return (

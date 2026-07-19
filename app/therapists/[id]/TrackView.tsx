@@ -10,6 +10,8 @@ export interface ViewerContext {
   age_band?: string;
   gender?: string;
   match_score?: number;
+  treatment?: string;
+  symptom?: string;
 }
 
 export default function TrackView({
@@ -34,6 +36,8 @@ export default function TrackView({
         viewer_issue: context?.issue ?? null,
         viewer_age_band: context?.age_band ?? null,
         viewer_gender: context?.gender ?? null,
+        viewer_treatment: context?.treatment ?? null,
+        viewer_symptom: context?.symptom ?? null,
         match_score: context?.match_score ?? null,
         session_id,
         ...attribution,

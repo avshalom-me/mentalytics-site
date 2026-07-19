@@ -106,7 +106,7 @@ export default async function TherapistProfilePage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string; ret?: string }>;
+  searchParams: Promise<{ from?: string; r?: string; i?: string; a?: string; g?: string; s?: string; t?: string; sy?: string; ret?: string }>;
 }) {
   const { id: param } = await params;
   const sp = await searchParams;
@@ -126,6 +126,8 @@ export default async function TherapistProfilePage({
     age_band: sp.a,
     gender: sp.g,
     match_score: sp.s ? Number(sp.s) : undefined,
+    treatment: sp.t,
+    symptom: sp.sy,
   } : undefined;
   const result = await getTherapist(id);
   if (!result) notFound();

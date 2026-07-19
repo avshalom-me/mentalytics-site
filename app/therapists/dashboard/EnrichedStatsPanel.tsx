@@ -1,7 +1,7 @@
 "use client";
 
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { MapPin, Activity, Users, TrendingUp, Lock } from "lucide-react";
+import { MapPin, Activity, Users, TrendingUp, Lock, Stethoscope, ClipboardList } from "lucide-react";
 
 export interface BucketRow {
   key: string;
@@ -12,6 +12,8 @@ export interface BucketRow {
 export interface EnrichedStatsData {
   by_region: BucketRow[];
   by_issue: BucketRow[];
+  by_treatment: BucketRow[];
+  by_symptom: BucketRow[];
   by_age_band: BucketRow[];
   by_gender: BucketRow[];
   conversion: {
@@ -27,7 +29,10 @@ export interface EnrichedStatsData {
   };
 }
 
-const PALETTE = ["#0F5468", "#1A7A96", "#4A9FB5", "#7EC8A4", "#F4A574", "#D4A0C8", "#C96B55", "#6F8F7A"];
+// Adjacent entries are deliberately DIFFERENT hues (teal → gold → purple →
+// terracotta → blue → green → pink → brown): with 2-4 buckets per chart the
+// old blue-gradient palette made neighbouring slices indistinguishable.
+const PALETTE = ["#2A6462", "#D49018", "#7C5CBF", "#C96B55", "#3E7CB1", "#5C9E6E", "#D4739E", "#8B6F47"];
 
 function SectionCard({ icon: Icon, title, subtitle, children, accentColor = "#0F5468" }: {
   icon: any;
@@ -116,8 +121,33 @@ function DonutChart({ data }: { data: BucketRow[] }) {
   );
 }
 
+// Ranked list with proportional bars — for long labels (specific findings)
+// that don't fit as chart axis text.
+function RankedList({ data, emptyMessage }: { data: BucketRow[]; emptyMessage: string }) {
+  if (data.length === 0) return <EmptyState message={emptyMessage} />;
+  const max = Math.max(...data.map((d) => d.views), 1);
+  return (
+    <div className="space-y-2.5">
+      {data.map((d, i) => (
+        <div key={d.key}>
+          <div className="flex items-baseline justify-between gap-2 mb-1">
+            <span className="text-[13px] leading-5 text-stone-700">{d.label}</span>
+            <span className="text-xs font-bold text-stone-500 flex-shrink-0">{d.views}</span>
+          </div>
+          <div className="h-2 rounded-full bg-stone-100 overflow-hidden">
+            <div
+              className="h-full rounded-full"
+              style={{ width: `${Math.max(6, Math.round((d.views / max) * 100))}%`, background: PALETTE[i % PALETTE.length] }}
+            />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }) {
-  const { by_region, by_issue, by_age_band, by_gender, conversion, data_quality } = data;
+  const { by_region, by_issue, by_treatment, by_symptom, by_age_band, by_gender, conversion, data_quality } = data;
   const contactRate = conversion.total_views > 0
     ? Math.round((conversion.contacted / conversion.total_views) * 1000) / 10
     : 0;
@@ -183,6 +213,14 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
 
         <SectionCard icon={Activity} title="מה הצורך שלהם" subtitle="סוגי הקשיים שהביאו אותם אליך" accentColor="#8B2E0A">
           <DonutChart data={by_issue} />
+        </SectionCard>
+
+        <SectionCard icon={Stethoscope} title="איזה טיפול הוביל אותם אליך" subtitle="ההמלצה שקיבלו בשאלון לפני שנכנסו לפרופיל שלך" accentColor="#7C5CBF">
+          <RankedList data={by_treatment} emptyMessage="נאסף החל מ-19/7 — יוצג כשיצטברו מספיק כניסות מהשאלון" />
+        </SectionCard>
+
+        <SectionCard icon={ClipboardList} title="ואילו קשיים ספציפיים" subtitle="הממצא המדויק בשאלון שבגללו הופנו אליך" accentColor="#C96B55">
+          <RankedList data={by_symptom} emptyMessage="נאסף החל מ-19/7 — יוצג כשיצטברו מספיק כניסות מהשאלון" />
         </SectionCard>
 
         <SectionCard icon={Users} title="גילאים עיקריים" subtitle="התפלגות הגילאים של הפונים" accentColor="#2A5C3A">
