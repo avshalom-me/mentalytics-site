@@ -1,14 +1,38 @@
 import Link from "next/link";
 import { genderTitle } from "@/app/lib/gender-text";
 import { therapistPath } from "@/app/lib/therapist-url";
+import { CITY_TO_REGION } from "@/app/lib/regions";
 import CardImpression from "@/app/components/CardImpression";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
+
+// Context-aware ordering for the card's city chip: on a city landing page the
+// page's own city shows first (a Kfar-Saba visitor seeing "📍 נתניה" on a
+// Kfar-Saba page read as a bug — regions[0] was just whatever city the
+// therapist typed first), then other cities in the page's region, then the
+// rest. All cities are shown (therapists list at most ~3), like the matching
+// results already do.
+function orderRegions(regions: string[], contextCity?: string, contextRegion?: string): string[] {
+  if (regions.length < 2) return regions;
+  const score = (c: string) =>
+    c === contextCity ? 0 : contextRegion && (CITY_TO_REGION[c] === contextRegion || c === contextRegion) ? 1 : 2;
+  return [...regions].sort((a, b) => score(a) - score(b));
+}
 
 // Server-rendered therapist card for the region / city SEO landing pages
 // (links to the profile; contact clicks track on the profile). Wrapped in a
 // client impression tracker so cards shown here count as "חשיפות" like the
 // main directory's.
-export default function TherapistResultCard({ t, backHref }: { t: PublicTherapist; backHref?: string }) {
+export default function TherapistResultCard({
+  t,
+  backHref,
+  contextCity,
+  contextRegion,
+}: {
+  t: PublicTherapist;
+  backHref?: string;
+  contextCity?: string;
+  contextRegion?: string;
+}) {
   const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
@@ -34,8 +58,10 @@ export default function TherapistResultCard({ t, backHref }: { t: PublicTherapis
           {t.online && (
             <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
           )}
-          {t.regions[0] && (
-            <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>📍 {t.regions[0]}</span>
+          {t.regions.length > 0 && (
+            <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
+              📍 {orderRegions(t.regions, contextCity, contextRegion).join(", ")}
+            </span>
           )}
         </div>
       </div>

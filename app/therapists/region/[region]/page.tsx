@@ -148,7 +148,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/region/${regionParam}`} />)}
+          {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/region/${regionParam}`} contextRegion={isOnline ? undefined : r.region} />)}
         </div>
       )}
 

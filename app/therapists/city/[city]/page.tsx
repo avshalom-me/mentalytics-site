@@ -108,7 +108,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
 
       {inCity.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
-          {inCity.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} />)}
+          {inCity.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextCity={city} contextRegion={region ?? undefined} />)}
         </div>
       )}
 
@@ -117,7 +117,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים נוספים באזור {region}</h2>
           <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) — לרבים מהם נוחות גם לתושבי {city}.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {nearby.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} />)}
+            {nearby.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
           </div>
         </div>
       )}

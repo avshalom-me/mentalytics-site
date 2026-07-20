@@ -145,8 +145,10 @@ function TherapistCard({
             {t.online && (
               <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
             )}
-            {t.regions[0] && (
-              <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>📍 {t.regions[0]}</span>
+            {t.regions.length > 0 && (
+              // All cities, not just the first-entered one — the matching
+              // results already show the full list and it reads fine (≤3).
+              <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>📍 {t.regions.join(", ")}</span>
             )}
             {t.training_areas[0] && (
               <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--gold-pale)", border: "1px solid #f0e0b8", color: "var(--gold-dark)" }}>{t.training_areas[0]}</span>
