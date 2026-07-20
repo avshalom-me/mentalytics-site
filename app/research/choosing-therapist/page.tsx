@@ -3,9 +3,13 @@ import type { Metadata } from "next";
 import QuizCtaBanner from "../QuizCtaBanner";
 
 export const metadata: Metadata = {
-  title: "איך לבחור מטפל מתאים — המדריך המלא | טיפול חכם",
+  // "פסיכולוג" leads the title: GSC (20/7/26) shows 87 distinct "פסיכולוג"
+  // queries vs 34 "מטפל" ones — it's the word people actually search with.
+  // No "| טיפול חכם" suffix here — the root layout's title template appends it
+  // (the old title hardcoded it too and rendered the brand twice).
+  title: "איך למצוא פסיכולוג שמתאים לך — המדריך המלא",
   description:
-    "איך מוצאים ובוחרים מטפל נפשי שמתאים לכם: הכשרה ורישיון, התמחות, הגישה הטיפולית, הברית הטיפולית, לוגיסטיקה ועלות — כולל שאלות לשיחת ההיכרות וסימני אזהרה.",
+    "איך מוצאים ובוחרים פסיכולוג או מטפל נפשי שמתאים לכם: הכשרה ורישיון, התמחות, הגישה הטיפולית, הברית הטיפולית, לוגיסטיקה ועלות — כולל שאלות לשיחת ההיכרות וסימני אזהרה.",
   keywords: [
     "איך למצוא פסיכולוג",
     "איך לבחור מטפל",
@@ -21,9 +25,9 @@ export const metadata: Metadata = {
     canonical: "https://www.mentalytics.co.il/research/choosing-therapist",
   },
   openGraph: {
-    title: "איך לבחור מטפל מתאים — המדריך המלא",
+    title: "איך למצוא פסיכולוג שמתאים לך — המדריך המלא",
     description:
-      "מה חשוב לבדוק כשמחפשים מטפל: הכשרה, התמחות, גישה טיפולית, כימיה, לוגיסטיקה ועלות — ואיך לזהות מתי כדאי לחפש התאמה אחרת.",
+      "מה חשוב לבדוק כשמחפשים פסיכולוג או מטפל: הכשרה, התמחות, גישה טיפולית, כימיה, לוגיסטיקה ועלות — ואיך לזהות מתי כדאי לחפש התאמה אחרת.",
     locale: "he_IL",
     type: "article",
     siteName: "טיפול חכם",
@@ -33,9 +37,9 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "איך לבחור מטפל מתאים — המדריך המלא",
+  "headline": "איך למצוא פסיכולוג שמתאים לך — המדריך המלא",
   "description":
-    "איך מוצאים ובוחרים מטפל נפשי שמתאים לכם: הכשרה ורישיון, התמחות, הגישה הטיפולית, הברית הטיפולית, לוגיסטיקה ועלות.",
+    "איך מוצאים ובוחרים פסיכולוג או מטפל נפשי שמתאים לכם: הכשרה ורישיון, התמחות, הגישה הטיפולית, הברית הטיפולית, לוגיסטיקה ועלות.",
   "inLanguage": "he",
   "datePublished": "2026-07-11",
   "dateModified": "2026-07-11",
@@ -59,7 +63,7 @@ const breadcrumbLd = {
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "בית", "item": "https://www.mentalytics.co.il" },
     { "@type": "ListItem", "position": 2, "name": "מאמרים ומידע שימושי", "item": "https://www.mentalytics.co.il/research" },
-    { "@type": "ListItem", "position": 3, "name": "איך לבחור מטפל מתאים", "item": "https://www.mentalytics.co.il/research/choosing-therapist" },
+    { "@type": "ListItem", "position": 3, "name": "איך למצוא פסיכולוג שמתאים", "item": "https://www.mentalytics.co.il/research/choosing-therapist" },
   ],
 };
 
@@ -89,7 +93,7 @@ export default function ChoosingTherapistPage() {
           מידע מקצועי · בחירת מטפל
         </p>
         <h1 style={{ fontSize: "clamp(1.7rem,4vw,2.3rem)", fontWeight: 900, color: "var(--text)", lineHeight: 1.3, letterSpacing: "-.02em", marginBottom: "16px" }}>
-          איך לבחור מטפל מתאים — ומה חשוב לבדוק לפני שמתחילים
+          איך למצוא פסיכולוג או מטפל שמתאים — ומה חשוב לבדוק לפני שמתחילים
         </h1>
         <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8 }}>
           {`בחירת מטפל היא אחת ההחלטות המשמעותיות שתקבלו בתהליך. המחקר עקבי בנקודה אחת: איכות הקשר בין מטופל למטפל היא מהמנבאים החזקים ביותר להצלחת הטיפול — לעיתים אף יותר מהשיטה עצמה. המדריך הזה מפרט מאיפה מתחילים לחפש, מה חשוב לבדוק, אילו שאלות לשאול בשיחת ההיכרות, ואיך לזהות מתי כדאי לחפש התאמה אחרת.`}

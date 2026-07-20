@@ -164,7 +164,7 @@ export default function RecommendedPsychologistPage() {
           </ul>
           <p className="mt-4">
             {`הרחבנו על כל אחד מהקריטריונים האלה, כולל שאלות לשיחת ההיכרות וסימני אזהרה, במדריך `}
-            <Link href="/research/choosing-therapist" style={{ color: "var(--teal-dark)", fontWeight: 600 }} className="hover:underline">איך לבחור מטפל מתאים</Link>
+            <Link href="/research/choosing-therapist" style={{ color: "var(--teal-dark)", fontWeight: 600 }} className="hover:underline">איך למצוא פסיכולוג שמתאים</Link>
             {`.`}
           </p>
         </section>
@@ -236,7 +236,7 @@ export default function RecommendedPsychologistPage() {
       <div className="mt-10 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
         <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
         <ul className="space-y-2 text-sm">
-          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← איך לבחור מטפל מתאים — המדריך המלא</Link></li>
+          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← איך למצוא פסיכולוג שמתאים לך — המדריך המלא</Link></li>
           <li><Link href="/research/therapist-types" className="text-[#2e7d8c] hover:underline">← סוגי המטפלים בישראל</Link></li>
           <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
           <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
