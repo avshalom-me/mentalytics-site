@@ -7,6 +7,7 @@ import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CI
 import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import CitySeoSection from "@/app/therapists/CitySeoSection";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -65,6 +66,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
   const isOnline = r.kind === "online";
   const list = await loadPublicTherapists(isOnline ? { online: true } : { region: r.region });
+  const onlineCount = isOnline ? list.length : await countListed({ online: true });
   const label = isOnline ? "טיפול אונליין" : r.region;
   const heading = isOnline ? "מטפלים ופסיכולוגים לטיפול אונליין" : `פסיכולוגים ומטפלים ב${label}`;
 
@@ -147,6 +149,15 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/region/${regionParam}`} />)}
         </div>
       )}
+
+      {/* SEO content — below the listings (patients rarely scroll here; crawlers do) */}
+      <CitySeoSection
+        placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
+        kind={isOnline ? "online" : "region"}
+        therapists={list}
+        onlineCount={onlineCount}
+        regionName={null}
+      />
 
       {/* Cities within this region (internal linking → city pages) */}
       {regionCities.length > 0 && (

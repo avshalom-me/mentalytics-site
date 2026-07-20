@@ -116,15 +116,13 @@ export function slugToRegion(slug: string): string | null {
   return ALL_REGIONS.find((r) => regionToSlug(r) === decoded) ?? null;
 }
 
-// Curated major cities that get their own SEO landing page (all present in
-// REGION_CITIES, so each maps to a region for the "nearby" fallback). Kept to
-// high-demand cities to avoid thin/empty city pages.
-export const CITY_SEO_LIST = [
-  "תל אביב", "ירושלים", "חיפה", "ראשון לציון", "פתח תקווה", "אשדוד",
-  "נתניה", "באר שבע", "בני ברק", "חולון", "רמת גן", "רחובות",
-  "בת ים", "הרצליה", "כפר סבא", "רעננה", "מודיעין", "אשקלון",
-  "גבעתיים", "הוד השרון",
-] as const;
+// Every city in the vocabulary gets its own landing page (was a curated list
+// of 20 majors — which left high-supply towns like פרדס חנה-כרכור with no page
+// at all). Thin-page protection lives elsewhere and keeps this safe:
+//   - pages with fewer than MIN_LISTED_FOR_INDEX therapists are noindex,
+//   - the sitemap only includes cities at/above that threshold,
+// so a city page becomes indexable automatically the moment supply fills in.
+export const CITY_SEO_LIST: readonly string[] = Object.values(REGION_CITIES).flat();
 
 export function slugToCity(slug: string): string | null {
   let decoded: string;

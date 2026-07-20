@@ -7,6 +7,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToCity, regionToSlug, CITY_SEO_LIST, CITY_TO_REGION, REGION_CITIES, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import CitySeoSection from "@/app/therapists/CitySeoSection";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -38,6 +39,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
 
   const inCity = await loadPublicTherapists({ city });
   const region = CITY_TO_REGION[city] ?? null;
+  const onlineCount = await countListed({ online: true });
 
   // Region fallback so a thin/empty city page still offers nearby options.
   let nearby: Awaited<ReturnType<typeof loadPublicTherapists>> = [];
@@ -123,6 +125,9 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           עדיין אין מטפלים מוצגים ב{city}. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link>, לבחור <Link href={`/therapists/region/${ONLINE_SLUG}`} className="font-semibold text-[#2e7d8c] hover:underline">טיפול אונליין</Link>, או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
         </div>
       )}
+
+      {/* SEO content — below the listings (patients rarely scroll here; crawlers do) */}
+      <CitySeoSection placeName={city} kind="city" therapists={inCity} onlineCount={onlineCount} regionName={region} />
 
       {/* Internal linking */}
       <div className="mt-12 pt-8 border-t border-[var(--line)]">
