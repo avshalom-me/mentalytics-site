@@ -8,6 +8,7 @@ import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
+import { loadLocalArticles } from "@/app/lib/local-articles";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -67,6 +68,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   const isOnline = r.kind === "online";
   const list = await loadPublicTherapists(isOnline ? { online: true } : { region: r.region });
   const onlineCount = isOnline ? list.length : await countListed({ online: true });
+  const localArticles = await loadLocalArticles(isOnline ? { online: true } : { region: r.region });
   const label = isOnline ? "טיפול אונליין" : r.region;
   const heading = isOnline ? "מטפלים ופסיכולוגים לטיפול אונליין" : `פסיכולוגים ומטפלים ב${label}`;
 
@@ -156,7 +158,8 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         kind={isOnline ? "online" : "region"}
         therapists={list}
         onlineCount={onlineCount}
-        regionName={null}
+        regionName={isOnline ? null : r.region}
+        articles={localArticles}
       />
 
       {/* Cities within this region (internal linking → city pages) */}

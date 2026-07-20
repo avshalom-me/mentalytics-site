@@ -1,5 +1,7 @@
 import Link from "next/link";
 import type { PublicTherapist } from "./TherapistsClient";
+import { REGION_PRICE_RANGE, REGION_PUBLIC_SERVICES } from "@/app/lib/region-public-services";
+import type { LocalArticle } from "@/app/lib/local-articles";
 
 // SEO content block for city/region landing pages, rendered BELOW the
 // therapist listings (patients rarely scroll past the cards; crawlers read it
@@ -46,12 +48,15 @@ export default function CitySeoSection({
   therapists,
   onlineCount,
   regionName,
+  articles = [],
 }: {
   placeName: string;
   kind: Kind;
   therapists: PublicTherapist[];
   onlineCount: number;
+  /** Canonical region this place belongs to (the region itself on region pages) — keys price + public-services data. */
   regionName?: string | null;
+  articles?: LocalArticle[];
 }) {
   const h = hashPlace(placeName);
   const total = therapists.length;
@@ -87,7 +92,7 @@ export default function CitySeoSection({
     statsBits.push(
       `${inPlace} מוצגים כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
     );
-    if (regionName) statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
+    if (regionName && kind === "city") statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
     statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else {
     statsBits.push(`ההיצע ${inPlace} מתעדכן — בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
@@ -97,11 +102,16 @@ export default function CitySeoSection({
 
   // FAQ — phrasing varies by place hash; the content stays honest and generic-
   // free (no invented city facts, no fake price differences between cities).
+  // Region-aware price range (see region-public-services.ts — anchored to the
+  // hebpsy tariff surveys; center runs higher than the periphery).
+  const price = (regionName && REGION_PRICE_RANGE[regionName]) || { min: 300, max: 550 };
   const costQ = kind === "online" ? "כמה עולה טיפול פסיכולוגי אונליין?" : `כמה עולה טיפול פסיכולוגי פרטי ${inPlace}?`;
   const costA =
-    (h % 2 === 0
-      ? `טווח המחירים המקובל בישראל לפגישת טיפול פרטית נע לרוב בין 250 ל־500 ש״ח, בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד), לניסיון ולאזור.`
-      : `בישראל, פגישת טיפול פרטית עולה לרוב בין 250 ל־500 ש״ח — המחיר תלוי בעיקר בהכשרה ובניסיון של המטפל, פחות בעיר עצמה.`) +
+    (kind === "online"
+      ? `בטיפול אונליין הטווח רחב במיוחד — לרוב בין 280 ל־550 ש״ח לפגישה — כי אפשר לבחור מטפל מכל אזור בארץ, כולל אזורים שבהם התעריפים נמוכים יותר.`
+      : h % 2 === 0
+        ? `לפי סקרי התעריפים בענף, הממוצע הארצי לפגישת טיפול פרטית הוא סביב 400 ש״ח, ובאזור זה המחיר נע לרוב בין ${price.min} ל־${price.max} ש״ח — בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד) ולניסיון.`
+        : `${inPlace} פגישת טיפול פרטית עולה לרוב בין ${price.min} ל־${price.max} ש״ח (הממוצע הארצי בסקרי התעריפים — סביב 400 ש״ח). המחיר מושפע בעיקר מההכשרה ומהניסיון של המטפל.`) +
     ` פרטים מדויקים אפשר לברר ישירות מול המטפל — יצירת הקשר דרך הפרופיל היא ללא עלות וללא התחייבות.`;
 
   const chooseQ = `איך בוחרים ${kind === "online" ? "מטפל אונליין" : `פסיכולוג ${inPlace}`} שמתאים לי?`;
@@ -123,12 +133,28 @@ export default function CitySeoSection({
       ? `דרך הקופה הטיפול מסובסד, אך זמני ההמתנה ארוכים לרוב (חודשים במקרים רבים) והבחירה במטפל מוגבלת. טיפול פרטי מתחיל מהר, מאפשר לבחור מטפל שמתאים לכם — וחלק מהביטוחים המשלימים מחזירים חלק מהעלות.`
       : `לשני המסלולים יתרונות: הקופה זולה משמעותית אבל כרוכה בהמתנה ארוכה ובבחירה מוגבלת; במסלול פרטי מתחילים תוך ימים ובוחרים בדיוק את המטפל. כדאי לבדוק גם החזרים מהביטוח המשלים שלכם.`;
 
-  const faq = [
+  const faq: { q: string; a: string; link: { href: string; label: string } | null }[] = [
     { q: costQ, a: costA, link: null },
     { q: chooseQ, a: chooseA, link: { href: "/research/choosing-therapist", label: "למדריך המלא: איך למצוא פסיכולוג שמתאים ←" } },
     { q: onlineQ, a: onlineA, link: kind === "online" ? null : { href: "/therapists/region/אונליין", label: "לכל המטפלים אונליין ←" } },
     { q: kupaQ, a: kupaA, link: null },
   ];
+
+  // Public mental-health services in the region (hospitals / psychiatric
+  // departments, with operator) — curated in region-public-services.ts.
+  const services = regionName && kind !== "online" ? REGION_PUBLIC_SERVICES[regionName] ?? [] : [];
+  if (services.length > 0) {
+    const servicesList = services
+      .map((s) => `${s.name} — ${s.kind === "מרכז לבריאות הנפש" ? "מרכז לבריאות הנפש" : "מחלקה פסיכיאטרית"} (${s.city}; ${s.operator})`)
+      .join(" · ");
+    faq.push({
+      q: `אילו שירותי בריאות נפש ציבוריים יש באזור${regionName ? ` ${regionName}` : ""}?`,
+      a:
+        `מוסדות ציבוריים מרכזיים באזור: ${servicesList}. ` +
+        `בנוסף, לכל קופות החולים (כללית, מכבי, מאוחדת, לאומית) מרפאות בריאות נפש אזוריות — טיפול ציבורי במסגרת הסל, בחינם או בהשתתפות נמוכה, בהפניה מרופא/ת המשפחה. זמני ההמתנה משתנים ממרפאה למרפאה.`,
+      link: null,
+    });
+  }
 
   const faqLd = {
     "@context": "https://schema.org",
@@ -147,6 +173,28 @@ export default function CitySeoSection({
         {headings[h % headings.length]}
       </h2>
       <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
+
+      {articles.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>
+            מאמרים ממטפלים {kind === "online" ? "שמטפלים אונליין" : inPlace}
+          </h3>
+          <ul className="space-y-2">
+            {articles.map((a) => (
+              <li key={a.slug} className="text-sm leading-7">
+                <Link
+                  href={`/research/community/${encodeURIComponent(a.slug)}`}
+                  className="font-semibold hover:underline"
+                  style={{ color: "var(--teal-dark)" }}
+                >
+                  {a.title}
+                </Link>
+                <span className="text-stone-500"> — מאת {a.author}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <div className="space-y-2.5">
         {faq.map((f) => (

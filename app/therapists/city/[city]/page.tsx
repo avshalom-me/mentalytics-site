@@ -8,6 +8,7 @@ import { slugToCity, regionToSlug, CITY_SEO_LIST, CITY_TO_REGION, REGION_CITIES,
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
+import { loadLocalArticles } from "@/app/lib/local-articles";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -40,6 +41,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
   const inCity = await loadPublicTherapists({ city });
   const region = CITY_TO_REGION[city] ?? null;
   const onlineCount = await countListed({ online: true });
+  const localArticles = await loadLocalArticles({ city });
 
   // Region fallback so a thin/empty city page still offers nearby options.
   let nearby: Awaited<ReturnType<typeof loadPublicTherapists>> = [];
@@ -127,7 +129,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       )}
 
       {/* SEO content — below the listings (patients rarely scroll here; crawlers do) */}
-      <CitySeoSection placeName={city} kind="city" therapists={inCity} onlineCount={onlineCount} regionName={region} />
+      <CitySeoSection placeName={city} kind="city" therapists={inCity} onlineCount={onlineCount} regionName={region} articles={localArticles} />
 
       {/* Internal linking */}
       <div className="mt-12 pt-8 border-t border-[var(--line)]">
