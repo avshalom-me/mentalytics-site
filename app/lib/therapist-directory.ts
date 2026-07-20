@@ -78,7 +78,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // rank above GIFT promotions (manual/trial), which in turn rank above the free
 // approved tier. An optional filter (region / online) narrows the set BEFORE
 // signing photo URLs, so region landing pages only pay for their own subset.
-type DirectoryFilter = { region?: string; city?: string; online?: boolean; category?: "main" | "para"; centerId?: string };
+type DirectoryFilter = { region?: string; city?: string; online?: boolean; specialty?: string; category?: "main" | "para"; centerId?: string };
 
 // Shared query + in-memory filtering (no photo signing). Used both by the full
 // loader and by the lightweight count helpers below.
@@ -107,6 +107,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
+  if (filter?.specialty) rows = rows.filter((t) => (t.training_areas ?? []).includes(filter.specialty!));
   return rows;
 }
 
@@ -116,22 +117,25 @@ export async function countListed(filter?: DirectoryFilter): Promise<number> {
   return (await loadFilteredRows(filter)).length;
 }
 
-// One-query counts for every region and every city string, so the sitemap can
-// decide which landing pages to include without 30+ round-trips.
+// One-query counts for every region, city and specialty string, so the sitemap
+// can decide which landing pages to include without 30+ round-trips.
 export async function countListedByRegionAndCity(): Promise<{
   regions: Record<string, number>;
   cities: Record<string, number>;
+  specialties: Record<string, number>;
 }> {
   const rows = await loadFilteredRows();
   const regions: Record<string, number> = {};
   const cities: Record<string, number> = {};
+  const specialties: Record<string, number> = {};
   for (const t of rows) {
     for (const region of ALL_REGIONS) {
       if (rowInRegion(t.regions, region)) regions[region] = (regions[region] ?? 0) + 1;
     }
     for (const c of t.regions ?? []) cities[c] = (cities[c] ?? 0) + 1;
+    for (const a of t.training_areas ?? []) specialties[a] = (specialties[a] ?? 0) + 1;
   }
-  return { regions, cities };
+  return { regions, cities, specialties };
 }
 
 export async function loadPublicTherapists(

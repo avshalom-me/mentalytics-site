@@ -65,12 +65,23 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
     })),
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "בית", item: BASE },
+      { "@type": "ListItem", position: 2, name: "המטפלים שלנו", item: `${BASE}/therapists` },
+      { "@type": "ListItem", position: 3, name: city, item: `${BASE}/therapists/city/${cityParam}` },
+    ],
+  };
+
   const otherCities = (region ? REGION_CITIES[region] ?? [] : [])
     .filter((c) => c !== city && (CITY_SEO_LIST as readonly string[]).includes(c));
 
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
       {/* Count paid-search / directory landings in the patient funnel, tagged with channel (google_paid etc.). */}
       <PageViewTracker page={`city:${city}`} source="city" />
 

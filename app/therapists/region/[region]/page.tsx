@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
+import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
@@ -86,6 +87,16 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
     })),
   };
 
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "בית", item: BASE },
+      { "@type": "ListItem", position: 2, name: "המטפלים שלנו", item: `${BASE}/therapists` },
+      { "@type": "ListItem", position: 3, name: label, item: `${BASE}/therapists/region/${regionParam}` },
+    ],
+  };
+
   // Other regions for internal linking.
   const otherRegions = ALL_REGIONS.filter((reg) => !(r.kind === "region" && reg === r.region));
   const regionCities = r.kind === "region"
@@ -95,6 +106,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
       {/* Count paid-search / directory landings in the patient funnel, tagged with channel (google_paid etc.). */}
       <PageViewTracker page={isOnline ? "region:online" : `region:${r.region}`} source={isOnline ? "online" : "region"} />
 
@@ -186,6 +198,17 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           {otherRegions.map((reg) => (
             <Link key={reg} href={`/therapists/region/${regionToSlug(reg)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
               style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{reg}</Link>
+          ))}
+        </div>
+      </div>
+
+      {/* Specialty landing pages (internal linking / crawl discovery) */}
+      <div className="mt-8 pt-6 border-t border-[var(--line)]">
+        <h2 className="text-base font-extrabold text-stone-800 mb-3">לפי התמחות</h2>
+        <div className="flex flex-wrap gap-2">
+          {SPECIALTY_LIST.slice(0, 12).map((s) => (
+            <Link key={s} href={`/therapists/specialty/${specialtyToSlug(s)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+              style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{s}</Link>
           ))}
         </div>
       </div>
