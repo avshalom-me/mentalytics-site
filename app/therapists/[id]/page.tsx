@@ -8,7 +8,6 @@ import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
 
-const BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 const BASE_URL = "https://www.mentalytics.co.il";
 
 type TherapistRow = {
@@ -32,7 +31,7 @@ type TherapistRow = {
   experience: string | null;
 };
 
-async function getTherapist(id: string): Promise<{ therapist: TherapistRow; photoUrl: string | null } | null> {
+async function getTherapist(id: string): Promise<TherapistRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(`
@@ -47,16 +46,9 @@ async function getTherapist(id: string): Promise<{ therapist: TherapistRow; phot
     .single();
 
   if (error || !data) return null;
-
-  let photoUrl: string | null = null;
-  if (data.profile_photo_path) {
-    const { data: signed } = await supabaseAdmin.storage
-      .from(BUCKET)
-      .createSignedUrl(data.profile_photo_path, 60 * 60 * 24);
-    if (signed?.signedUrl) photoUrl = signed.signedUrl;
-  }
-
-  return { therapist: data as TherapistRow, photoUrl };
+  // Photos are served via the stable /therapist-photo/<id> route (indexable),
+  // so no signed URL is generated here.
+  return data as TherapistRow;
 }
 
 type ArticleLink = { slug: string; title: string; summary: string; topic: string | null };
@@ -79,14 +71,16 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id: param } = await params;
   const id = extractTherapistId(param);
   if (!id) return { title: "מטפל לא נמצא" };
-  const result = await getTherapist(id);
-  if (!result) return { title: "מטפל לא נמצא" };
+  const therapist = await getTherapist(id);
+  if (!therapist) return { title: "מטפל לא נמצא" };
 
-  const { therapist } = result;
   const name = therapist.full_name ?? "מטפל";
   const type = genderTitle(therapist.therapist_types?.[0] ?? "מטפל נפשי", therapist.gender);
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
+  // Stable, crawlable photo URL (see app/therapist-photo/[id]/route.ts). Gives
+  // the profile an indexable og:image instead of an expiring signed URL.
+  const ogImage = therapist.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : `${BASE_URL}/logo.svg.png`;
 
   return {
     title: `${name} - ${type} | טיפול חכם`,
@@ -96,6 +90,13 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
       title: `${name} - ${type}`,
       description: bioSnippet,
       url: canonical,
+      images: [{ url: ogImage, alt: name }],
+    },
+    twitter: {
+      card: therapist.profile_photo_path ? "summary_large_image" : "summary",
+      title: `${name} - ${type}`,
+      description: bioSnippet,
+      images: [ogImage],
     },
   };
 }
@@ -129,12 +130,12 @@ export default async function TherapistProfilePage({
     treatment: sp.t,
     symptom: sp.sy,
   } : undefined;
-  const result = await getTherapist(id);
-  if (!result) notFound();
+  const therapistRow = await getTherapist(id);
+  if (!therapistRow) notFound();
 
   // Canonicalize the URL: redirect bare-UUID / mismatched slugs to the
   // name-slug URL (308), keeping query params so match attribution survives.
-  const canonicalSeg = therapistSlug(id, result.therapist.full_name);
+  const canonicalSeg = therapistSlug(id, therapistRow.full_name);
   let decodedParam = param;
   try { decodedParam = decodeURIComponent(param); } catch { /* keep raw */ }
   if (decodedParam !== canonicalSeg) {
@@ -146,10 +147,13 @@ export default async function TherapistProfilePage({
   }
 
   const articles = await getTherapistArticles(id);
-  const { therapist: t, photoUrl } = result;
+  const t = therapistRow;
   const name = t.full_name ?? "מטפל";
   const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
+  // Stable public photo URL (indexable) — replaces the 24h signed URL for both
+  // display and structured data. Falls back to the gender avatar when no photo.
+  const photoSrc = t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : avatarSrc;
   const waLink = t.phone
     ? `https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`
     : null;
@@ -160,6 +164,7 @@ export default async function TherapistProfilePage({
     "name": name,
     "description": t.bio ?? undefined,
     "jobTitle": type || undefined,
+    "image": t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : undefined,
     "url": `${BASE_URL}/therapists/${id}`,
     "worksFor": { "@type": "Organization", "name": "טיפול חכם", "url": BASE_URL },
   };
@@ -204,7 +209,7 @@ export default async function TherapistProfilePage({
           <div className="w-full sm:w-56 flex-shrink-0 mx-auto sm:mx-0" style={{ maxWidth: "240px" }}>
             <div className="rounded-2xl overflow-hidden bg-white w-full aspect-[3/4]"
               style={{ border: "3px solid #fff", boxShadow: "0 6px 22px rgba(42,100,98,.22)" }}>
-              <img src={photoUrl ?? avatarSrc} alt={name} className="w-full h-full object-cover object-top" style={{ display: "block" }} />
+              <img src={photoSrc} alt={name} className="w-full h-full object-cover object-top" style={{ display: "block" }} />
             </div>
           </div>
 

@@ -5,8 +5,23 @@ import TooltipAsterisk from "./components/TooltipAsterisk";
 import OutputShowcase from "./components/OutputShowcase";
 
 export const metadata: Metadata = {
-  title: "טיפול חכם — מתאימים את החיבור הנכון",
-  description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול, סוג המטפל, והמטפל הנכון עבורכם — לילדים ולמבוגרים.",
+  // absolute → avoids the layout's "%s | טיפול חכם" template double-branding.
+  // Front-loads the high-intent phrases people actually search (מצאו פסיכולוג /
+  // מטפל מתאים) while keeping the brand.
+  title: { absolute: "טיפול חכם — מצאו פסיכולוג ומטפל מתאים בהתאמה אישית" },
+  description:
+    "רוצים למצוא פסיכולוג או מטפל מתאים? מלאו שאלון קצר וקבלו התאמה אישית למטפל הנכון — לפי סוג הקושי, הגישה הטיפולית, האזור והשפה. לילדים ולמבוגרים.",
+  keywords: [
+    "מציאת מטפל",
+    "מציאת פסיכולוג",
+    "פסיכולוג מומלץ",
+    "מטפל מתאים",
+    "התאמת מטפל",
+    "טיפול נפשי",
+    "פסיכולוג",
+    "פסיכותרפיה",
+  ],
+  alternates: { canonical: "https://www.mentalytics.co.il" },
 };
 
 const faqs = [
@@ -84,10 +99,31 @@ export default function HomePage() {
     "@context": "https://schema.org",
     "@type": ["MedicalBusiness", "HealthAndBeautyBusiness"],
     name: "טיפול חכם",
+    // Latin-script brand name — anchors "Mentalytics" queries to THIS entity,
+    // disambiguating from the Swedish "Mentalytics AB", "mentalics", "Mentaily".
+    alternateName: "Mentalytics",
     url: BASE_URL,
-    description: "מערכת הכוונה טיפולית חכמה — התאמת מטפלים על בסיס שאלונים מבוססי מחקר",
+    logo: `${BASE_URL}/logo.svg.png`,
+    image: `${BASE_URL}/logo.svg.png`,
+    email: "admin@getmentalytics.com",
+    description: "מערכת הכוונה טיפולית חכמה — התאמת מטפלים ופסיכולוגים על בסיס שאלונים מבוססי מחקר",
     areaServed: { "@type": "Country", name: "IL" },
     serviceType: "Therapist Matching",
+    // sameAs: external profiles that confirm this is the same entity (the main
+    // brand-disambiguation signal). Fill with the real Facebook/Instagram/
+    // LinkedIn/Google-Business URLs when available.
+    sameAs: [] as string[],
+  };
+
+  // FAQ rich-result + AI-answer eligibility for the homepage FAQ block.
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
   };
 
   // WebSite entity schema — helps Google resolve the site entity (name +
@@ -108,6 +144,7 @@ export default function HomePage() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
 
       <style>{`
         @keyframes fadeIn {

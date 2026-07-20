@@ -34,6 +34,7 @@ async function getCommunityArticles(): Promise<CommunityItem[]> {
 }
 
 const QUESTIONS = [
+  { href: "/research/recommended-psychologist", icon: "⭐", title: "פסיכולוג מומלץ — איך מוצאים פסיכולוג טוב?", desc: "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לכם.", img: "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/which-therapy",    icon: "🔍", title: "איזה טיפול פסיכולוגי מתאים לי?",    desc: "מדריך מעשי לבחירת סוג הטיפול הנכון לפי הצורך, האישיות וסגנון החיים.",   img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/therapy-for-child", icon: "👧", title: "איך לבחור פסיכולוג לילד?",           desc: "מה חשוב לבדוק, מה לשאול, ואיך יודעים שמצאתם את האיש הנכון לילד שלכם.",  img: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/cbt-vs-dynamic",   icon: "⚖️", title: "הבדל בין CBT לטיפול דינמי",          desc: "שתי הגישות הנפוצות ביותר — מה ההבדל בפועל, ומי מתאים לאיזה מטופל?",    img: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=600&h=260&fit=crop&auto=format&q=75" },
