@@ -262,11 +262,17 @@ export default function AdminArticlesPage() {
     patch({ id: a.id, action: "edit", ...editForm, ...editImage }, a.id);
   }
 
-  function Card({ a }: { a: AdminArticle }) {
+  // Render helper — NOT a nested component. Defining a component inside the page
+  // and rendering it as <Card/> gives it a new function identity on every parent
+  // render, so React unmounts+remounts the whole card on each keystroke: the edit
+  // field loses focus and the page jumps to the top. Calling it as renderCard(a)
+  // inlines the JSX so cards reconcile in place. (Same pattern as renderGroupCard
+  // in the adults quiz.) The root element carries the list key.
+  function renderCard(a: AdminArticle) {
     const isOpen = openId === a.id;
     const isEditing = editId === a.id;
     return (
-      <div className="rounded-2xl border border-stone-200 bg-white p-5">
+      <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-5">
         <div className="flex items-start justify-between gap-3">
           <div className="flex gap-3 min-w-0">
             {a.image_url && (
@@ -457,7 +463,7 @@ export default function AdminArticlesPage() {
             {data.pending.length === 0 ? (
               <p className="text-sm text-stone-400">אין מאמרים הממתינים לאישור.</p>
             ) : (
-              <div className="space-y-3">{data.pending.map((a) => <Card key={a.id} a={a} />)}</div>
+              <div className="space-y-3">{data.pending.map((a) => renderCard(a))}</div>
             )}
           </section>
 
@@ -466,14 +472,14 @@ export default function AdminArticlesPage() {
             {data.approved.length === 0 ? (
               <p className="text-sm text-stone-400">אין מאמרים שפורסמו.</p>
             ) : (
-              <div className="space-y-3">{data.approved.map((a) => <Card key={a.id} a={a} />)}</div>
+              <div className="space-y-3">{data.approved.map((a) => renderCard(a))}</div>
             )}
           </section>
 
           {data.rejected.length > 0 && (
             <section>
               <h2 className="text-sm font-extrabold text-stone-700 mb-3">נדחו ({data.rejected.length})</h2>
-              <div className="space-y-3">{data.rejected.map((a) => <Card key={a.id} a={a} />)}</div>
+              <div className="space-y-3">{data.rejected.map((a) => renderCard(a))}</div>
             </section>
           )}
         </>
