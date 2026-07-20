@@ -105,13 +105,32 @@ export default function CitySeoSection({
   // Region-aware price range (see region-public-services.ts — anchored to the
   // hebpsy tariff surveys; center runs higher than the periphery).
   const price = (regionName && REGION_PRICE_RANGE[regionName]) || { min: 300, max: 550 };
+  // A context sentence explaining WHY this area sits where it does relative to
+  // the national average — real local prose, not just swapped numbers. Tier is
+  // derived from the range itself (>=350 center, >=300 mid, else periphery).
+  const tier = price.min >= 350 ? "high" : price.min >= 300 ? "mid" : "low";
+  const cityPrefix = kind === "city" && regionName ? `${placeName} שייכת לאזור ${regionName}, ו` : "";
+  const areaRef = regionName ? `באזור ${regionName}` : "באזור";
+  const priceContext =
+    kind === "online"
+      ? ""
+      : tier === "high"
+        ? (h % 2 === 0
+            ? `${cityPrefix}${cityPrefix ? "זהו" : `${areaRef} — `} מאזורי הביקוש הגבוהים בארץ, שבהם תעריפי הטיפול גבוהים לרוב מהממוצע הארצי. `
+            : `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול בלב המרכז נוטים להיות מעל הממוצע הארצי, בשל הביקוש הגבוה וריכוז הקליניקות. `)
+        : tier === "mid"
+          ? `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול קרובים לרוב לממוצע הארצי. `
+          : (h % 2 === 0
+              ? `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}בשל המרחק ממרכז הארץ, התעריפים נמוכים לרוב מהממוצע הארצי. `
+              : `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}התעריפים נוחים יותר בהשוואה לגוש דן ולמרכז. `);
   const costQ = kind === "online" ? "כמה עולה טיפול פסיכולוגי אונליין?" : `כמה עולה טיפול פסיכולוגי פרטי ${inPlace}?`;
   const costA =
+    priceContext +
     (kind === "online"
       ? `בטיפול אונליין הטווח רחב במיוחד — לרוב בין 280 ל־550 ש״ח לפגישה — כי אפשר לבחור מטפל מכל אזור בארץ, כולל אזורים שבהם התעריפים נמוכים יותר.`
       : h % 2 === 0
-        ? `לפי סקרי התעריפים בענף, הממוצע הארצי לפגישת טיפול פרטית הוא סביב 400 ש״ח, ובאזור זה המחיר נע לרוב בין ${price.min} ל־${price.max} ש״ח — בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד) ולניסיון.`
-        : `${inPlace} פגישת טיפול פרטית עולה לרוב בין ${price.min} ל־${price.max} ש״ח (הממוצע הארצי בסקרי התעריפים — סביב 400 ש״ח). המחיר מושפע בעיקר מההכשרה ומהניסיון של המטפל.`) +
+        ? `לפי סקרי התעריפים בענף, הממוצע הארצי לפגישת טיפול פרטית הוא סביב 400 ש״ח, וכאן המחיר נע לרוב בין ${price.min} ל־${price.max} ש״ח — בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד) ולניסיון.`
+        : `בפועל, פגישת טיפול פרטית ${inPlace} עולה לרוב בין ${price.min} ל־${price.max} ש״ח (הממוצע הארצי בסקרי התעריפים — סביב 400 ש״ח). המחיר מושפע בעיקר מההכשרה ומהניסיון של המטפל.`) +
     ` פרטים מדויקים אפשר לברר ישירות מול המטפל — יצירת הקשר דרך הפרופיל היא ללא עלות וללא התחייבות.`;
 
   const chooseQ = `איך בוחרים ${kind === "online" ? "מטפל אונליין" : `פסיכולוג ${inPlace}`} שמתאים לי?`;
