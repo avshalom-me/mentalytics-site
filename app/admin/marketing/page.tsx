@@ -550,6 +550,7 @@ type CampaignFunnelRow = {
   quiz_completed: number;
   viewed_profile: number;
   contacts: number;
+  contacting_people: number;
   whatsapp: number;
   phone: number;
   email: number;
@@ -728,7 +729,7 @@ function FunnelsCampaigns() {
                     <th className="px-2 py-2 text-center font-semibold">כניסות לאתר</th>
                     <th className="px-2 py-2 text-center font-semibold">מילאו שאלון</th>
                     <th className="px-2 py-2 text-center font-semibold">צפו בפרופיל</th>
-                    <th className="px-2 py-2 text-center font-semibold">פניות</th>
+                    <th className="px-2 py-2 text-center font-semibold">פנו (אנשים)</th>
                     <th className="px-2 py-2 text-center font-semibold">💬</th>
                     <th className="px-2 py-2 text-center font-semibold">📞</th>
                     <th className="px-2 py-2 text-center font-semibold">✉️</th>
@@ -749,7 +750,11 @@ function FunnelsCampaigns() {
                           ? ads.campaigns?.find((a) => a.utmCampaign === r.campaign)?.clicks
                           : undefined;
                       const denom = billed && billed > 0 ? billed : r.sessions;
-                      const conv = denom > 0 ? Math.round((r.contacts / denom) * 1000) / 10 : 0;
+                      // Conversion is measured in PEOPLE, not clicks — one
+                      // enthusiastic visitor tapping whatsapp+phone 5 times is
+                      // one lead (learned the hard way 20/7: 22 click-events
+                      // that were really 2-4 people read as a paid-ads boom).
+                      const conv = denom > 0 ? Math.round((r.contacting_people / denom) * 1000) / 10 : 0;
                       return (
                         <tr key={r.campaign} className="border-b border-stone-100">
                           <td className="px-2 py-2 font-semibold text-stone-700">{r.campaign}</td>
@@ -761,15 +766,15 @@ function FunnelsCampaigns() {
                           <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
                           <td className="px-2 py-1 text-center">
                             <div className="font-bold text-stone-900">
-                              {num(r.contacts)}
-                              {/* conv = contacts ÷ billed clicks; hide when >100% (multiple contacts per click) */}
-                              {r.contacts > 0 && conv <= 100 && (
+                              {num(r.contacting_people)}
+                              {/* conv = contacting PEOPLE ÷ billed clicks; hide when >100% */}
+                              {r.contacting_people > 0 && conv <= 100 && (
                                 <span className="font-normal text-stone-400"> · {conv}%</span>
                               )}
                             </div>
                             {r.contacts > 0 && (
                               <div className="text-[10px] text-stone-400">
-                                🎯 {r.from_match} · 📁 {r.from_directory}
+                                {r.contacts} לחיצות · 🎯 {r.from_match} · 📁 {r.from_directory}
                               </div>
                             )}
                           </td>
@@ -784,10 +789,12 @@ function FunnelsCampaigns() {
               </table>
               <p className="mt-2 text-[11px] leading-5 text-stone-400">
                 💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר · 🎯 מהתאמות · 📁 ממאגר המטפלים.{" "}
+                <span className="font-semibold text-stone-500">פנו (אנשים)</span> = בני אדם ייחודיים שיצרו קשר — מבקר
+                שלחץ וואטסאפ+טלפון כמה פעמים נספר פעם אחת (מספר הלחיצות מוצג מתחת).{" "}
                 <span className="font-semibold text-stone-500">קליקים (גוגל)</span> = לחיצות בתשלום בפועל — המספר האמיתי.{" "}
                 <span className="font-semibold text-stone-500">כניסות לאתר</span> = ביקורים (sessions) שהשאירו פעילות
                 מתועדת כלשהי עם תיוג הקמפיין — מכל עמוד נחיתה, כולל בוטים ובדיקות — ולכן גבוהות מהקליקים; אחוז ההמרה
-                מחושב מול הקליקים בפועל. הכל לפי utm_campaign.
+                מחושב באנשים מול הקליקים בפועל. הכל לפי utm_campaign.
               </p>
             </div>
           )}
