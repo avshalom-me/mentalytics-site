@@ -4,7 +4,7 @@ import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { genderTitle } from "@/app/lib/gender-text";
-import { SPECIALTY_LIST, SPECIALTY_CONTENT, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
+import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -41,6 +41,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
   const onlineHere = list.filter((t) => t.online).length;
   const heading = specialtyTitle(specialty);
   const content = SPECIALTY_CONTENT[specialty] ?? null;
+  const deepDive = SPECIALTY_DEEP_DIVE[specialty] ?? null;
   const communityArticles = content ? await loadArticlesByTopics(content.topics) : [];
 
   const jsonLd = {
@@ -132,7 +133,50 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
             ))}
           </div>
 
-          <div className="mt-6">
+          {/* Expert deep-dive (theory, techniques, structure) — technique lists
+              collapsed so the page stays calm; fully server-rendered for SEO. */}
+          {deepDive && (
+            <div className="mt-6">
+              {deepDive.sections.map((sec, si) =>
+                sec.collapsible ? (
+                  <details key={si} className="mt-3 rounded-xl px-4 py-3" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+                    <summary className="cursor-pointer text-[15px] font-bold" style={{ color: "var(--text-2)" }}>
+                      {sec.heading}
+                    </summary>
+                    {sec.bullets && (
+                      <ul className="mt-3 space-y-2">
+                        {sec.bullets.map((b, bi) => (
+                          <li key={bi} className="text-sm leading-7 text-stone-600">
+                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> — {b.desc}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </details>
+                ) : (
+                  <div key={si} className={si === 0 ? "" : "mt-5"}>
+                    {sec.heading && (
+                      <h3 className="text-base font-extrabold mb-2" style={{ color: "var(--text)" }}>{sec.heading}</h3>
+                    )}
+                    {sec.paragraphs?.map((p, pi) => (
+                      <p key={pi} className="text-[15px] leading-8 text-stone-600">{p}</p>
+                    ))}
+                    {sec.bullets && (
+                      <ul className="mt-2 space-y-2">
+                        {sec.bullets.map((b, bi) => (
+                          <li key={bi} className="text-sm leading-7 text-stone-600">
+                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> — {b.desc}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )
+              )}
+            </div>
+          )}
+
+          <div className="mt-8">
             <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>להעמקה באתר</h3>
             <ul className="space-y-2">
               {content.related.map((r) => (
