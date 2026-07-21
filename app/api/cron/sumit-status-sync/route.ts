@@ -58,7 +58,7 @@ function verifyCron(req: NextRequest): boolean {
   return timingSafeEqual(a, b);
 }
 
-// Hourly sync that does two things:
+// Daily sync (vercel.json: 06:45 UTC) that does two things:
 //
 // 1. For every paid subscription, check Sumit's standing-order status. If
 //    Sumit has cancelled / suspended / let it expire (almost always due to
@@ -69,8 +69,15 @@ function verifyCron(req: NextRequest): boolean {
 //    demote and notify. This is how time-limited gifts auto-clean up.
 //
 // Sumit does not push payment-event webhooks (only CRM card-view triggers).
-// Polling at hourly resolution caps the "free-after-cancel" window at ~60
-// minutes, which is acceptable for the size of a chargeback we'd see.
+// Polling once a day caps the "free-after-cancel" window at ~24 hours,
+// which is acceptable for the size of a chargeback we'd see.
+//
+// Sumit API-quota note: every listRecurringForCustomer call below is one
+// quota-counted API call per customer per run — there is no bulk endpoint.
+// Pass (1) scales with paying therapists (fine: revenue scales with them);
+// pass (3) used to scale with ALL-TIME cancelled subscriptions, which only
+// ever grows — that unbounded term is what the decay schedule in pass (3)
+// now caps.
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "server misconfigured" }, { status: 503 });
@@ -92,6 +99,8 @@ export async function GET(req: NextRequest) {
   let orphansFound = 0;
   let orphansCancelled = 0;
   let orphanAlerts = 0;
+  let orphansConfirmedInactive = 0; // newly stamped as confirmed-dead this run
+  let orphansDeferredByDecay = 0; // confirmed-dead items skipped this run
   let promosReverted = 0;
 
   // -------- (1) Sumit subscription state for paid therapists --------
@@ -270,27 +279,120 @@ export async function GET(req: NextRequest) {
   // Sumit order cancelled — in the same run. A genuine orphan is still caught on
   // the next run; the billing-leak guard tolerates that small delay.
   const orphanCoolingIso = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const { data: cancelledSubs } = await supabase
-    .from("subscriptions")
-    .select("id, therapist_id, morning_token_id")
-    .eq("status", "cancelled")
-    .not("morning_token_id", "is", null)
-    .lt("updated_at", orphanCoolingIso);
 
-  for (const sub of cancelledSubs ?? []) {
+  // Decay schedule (API-quota control): the cancelled list only ever grows,
+  // and probing Sumit for every dead subscription every single day is an
+  // unbounded quota consumer. Once Sumit AUTHORITATIVELY confirms an item
+  // inactive (returns it with a non-zero status — a merely-missing item is
+  // ambiguous and keeps its daily check), we stamp sumit_confirmed_inactive_at
+  // and re-verify on a slowing cadence:
+  //   unconfirmed              -> every run (daily)
+  //   confirmed < 90 days ago  -> weekly (Sunday runs)
+  //   confirmed >= 90 days ago -> monthly (1st-of-month runs)
+  // Nothing is ever permanently excluded — a resurrected order (manual
+  // reactivation at Sumit, suspended->active) is still caught within a week
+  // or a month. Billing is monthly, so that latency almost always means zero
+  // wrong charges; and the moment a confirmed item is found ACTIVE the stamp
+  // is cleared (back to daily) and the leak path below cancels + alerts.
+  const runDate = new Date();
+  const monthlySweep = runDate.getUTCDate() === 1;
+  const weeklySweep = runDate.getUTCDay() === 0; // Sunday
+  const confirmedRecentIso = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+
+  type OrphanSubRow = {
+    id: string;
+    therapist_id: string;
+    morning_token_id: string | null;
+    sumit_confirmed_inactive_at: string | null;
+  };
+  const orphanQuery = () =>
+    supabase
+      .from("subscriptions")
+      .select("id, therapist_id, morning_token_id, sumit_confirmed_inactive_at")
+      .eq("status", "cancelled")
+      .not("morning_token_id", "is", null)
+      .lt("updated_at", orphanCoolingIso);
+
+  // Unconfirmed items are swept on every run.
+  const { data: unconfirmedSubs } = await orphanQuery().is(
+    "sumit_confirmed_inactive_at",
+    null
+  );
+  // Confirmed items re-enter the sweep on the weekly/monthly cadence.
+  let confirmedDue: OrphanSubRow[] = [];
+  if (monthlySweep) {
+    const { data } = await orphanQuery().not("sumit_confirmed_inactive_at", "is", null);
+    confirmedDue = data ?? [];
+  } else if (weeklySweep) {
+    // gt on timestamptz is NULL-safe: unstamped rows never match.
+    const { data } = await orphanQuery().gt("sumit_confirmed_inactive_at", confirmedRecentIso);
+    confirmedDue = data ?? [];
+  }
+  const cancelledSubs: OrphanSubRow[] = [...(unconfirmedSubs ?? []), ...confirmedDue];
+
+  // Observability: how many confirmed-dead items were NOT probed this run.
+  {
+    const { count } = await supabase
+      .from("subscriptions")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "cancelled")
+      .not("morning_token_id", "is", null)
+      .not("sumit_confirmed_inactive_at", "is", null);
+    orphansDeferredByDecay = Math.max(0, (count ?? 0) - confirmedDue.length);
+  }
+
+  for (const sub of cancelledSubs) {
     const recurringId = sub.morning_token_id as string | null;
     if (!recurringId) continue;
+
+    // A non-numeric id can never match a Sumit recurring item (Sumit ids are
+    // numeric; e.g. a legacy Morning-era token) — probing Sumit for it is a
+    // guaranteed-wasted call every day. Stamp it once so the decay schedule
+    // retires it from the daily sweep without ever hitting the API.
+    if (!/^\d+$/.test(recurringId)) {
+      if (!sub.sumit_confirmed_inactive_at) {
+        await supabase
+          .from("subscriptions")
+          .update({ sumit_confirmed_inactive_at: new Date().toISOString() })
+          .eq("id", sub.id);
+        orphansConfirmedInactive++;
+      }
+      continue;
+    }
+
     try {
       const items = await listRecurringForCustomer({
         externalIdentifier: sub.therapist_id,
         includeInactive: true,
       });
       const target = items.find((i) => String(i.ID) === recurringId);
-      // Genuinely inactive at Sumit (or gone) — local and remote agree, fine.
-      if (!target || target.Status !== 0) continue;
+
+      if (!target || target.Status !== 0) {
+        // Genuinely inactive at Sumit (or gone) — local and remote agree.
+        // Stamp the first AUTHORITATIVE confirmation (item present with a
+        // non-zero status). A missing item stays unstamped: a transient
+        // partial list read is indistinguishable from deletion, so it keeps
+        // its daily check until Sumit returns the item explicitly.
+        if (target && !sub.sumit_confirmed_inactive_at) {
+          await supabase
+            .from("subscriptions")
+            .update({ sumit_confirmed_inactive_at: new Date().toISOString() })
+            .eq("id", sub.id);
+          orphansConfirmedInactive++;
+        }
+        continue;
+      }
 
       // Active at Sumit but cancelled locally → billing leak. Reconcile.
+      // A previously-confirmed item showing up ACTIVE has resurrected —
+      // clear the stamp so it returns to daily scrutiny until re-confirmed.
       orphansFound++;
+      if (sub.sumit_confirmed_inactive_at) {
+        await supabase
+          .from("subscriptions")
+          .update({ sumit_confirmed_inactive_at: null })
+          .eq("id", sub.id);
+      }
       try {
         await cancelSubscription({
           recurringItemId: parseInt(recurringId, 10),
@@ -454,6 +556,8 @@ export async function GET(req: NextRequest) {
     orphansFound,
     orphansCancelled,
     orphanAlerts,
+    orphansConfirmedInactive,
+    orphansDeferredByDecay,
     promosReverted,
     centersChecked,
     centersCancelled,
