@@ -13,7 +13,9 @@ export default function ProfileLinkPromo({ therapistId, fullName }: { therapistI
   const [copied, setCopied] = useState<"url" | "html" | null>(null);
 
   const url = `https://www.mentalytics.co.il${therapistPath(therapistId, fullName)}`;
-  const html = `<a href="${url}" title="${fullName} — פרופיל בטיפול חכם">הפרופיל המקצועי שלי בטיפול חכם</a>`;
+  // Quotes in a name would break the copied attribute — escape for the snippet.
+  const safeName = fullName.replace(/"/g, "&quot;");
+  const html = `<a href="${url}" title="${safeName} — פרופיל בטיפול חכם">הפרופיל המקצועי שלי בטיפול חכם</a>`;
 
   async function copy(kind: "url" | "html", text: string) {
     try {

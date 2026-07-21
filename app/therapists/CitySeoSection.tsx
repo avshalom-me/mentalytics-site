@@ -116,7 +116,7 @@ export default function CitySeoSection({
       ? ""
       : tier === "high"
         ? (h % 2 === 0
-            ? `${cityPrefix}${cityPrefix ? "זהו" : `${areaRef} — `} מאזורי הביקוש הגבוהים בארץ, שבהם תעריפי הטיפול גבוהים לרוב מהממוצע הארצי. `
+            ? `${cityPrefix}${cityPrefix ? "זהו" : `${areaRef} —`} מאזורי הביקוש הגבוהים בארץ, שבהם תעריפי הטיפול גבוהים לרוב מהממוצע הארצי. `
             : `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול בלב המרכז נוטים להיות מעל הממוצע הארצי, בשל הביקוש הגבוה וריכוז הקליניקות. `)
         : tier === "mid"
           ? `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול קרובים לרוב לממוצע הארצי. `
