@@ -23,6 +23,25 @@ type Row = {
   therapists: { full_name: string | null; regions: string[] | null; online: boolean | null } | null;
 };
 
+// Approved therapist articles matched by TOPIC (therapist_articles.topic) —
+// for the specialty landing pages ("מאמרים בנושא" under טיפול זוגי etc.).
+export async function loadArticlesByTopics(topics: string[], limit = 4): Promise<LocalArticle[]> {
+  if (topics.length === 0) return [];
+  const { data } = await supabaseAdmin
+    .from("therapist_articles")
+    .select("slug, title, summary, topic, therapists(full_name)")
+    .eq("status", "approved")
+    .is("author_name", null)
+    .in("topic", topics)
+    .order("approved_at", { ascending: false })
+    .limit(limit);
+
+  const rows = (data ?? []) as unknown as { slug: string; title: string; summary: string | null; therapists: { full_name: string | null } | null }[];
+  return rows
+    .filter((r) => r.therapists?.full_name)
+    .map((r) => ({ slug: r.slug, title: r.title, summary: r.summary, author: r.therapists!.full_name! }));
+}
+
 export async function loadLocalArticles(
   place: { city: string } | { region: string } | { online: true },
   limit = 6

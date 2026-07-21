@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
+import ProfileLinkPromo from "./ProfileLinkPromo";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
@@ -523,6 +524,12 @@ function TherapistDashboard() {
 
       {/* Enriched stats (paying only) */}
       {token && !isNew && profile?.status === "paying" && stats?.enriched && <EnrichedStatsPanel data={stats.enriched} />}
+
+      {/* Backlink tool — every listed therapist linking from their personal site
+          is a relevant dofollow backlink + better name-search for them. */}
+      {token && !isNew && profile && (profile.status === "approved" || profile.status === "paying") && profile.admin_approved && profile.full_name && (
+        <ProfileLinkPromo therapistId={profile.id} fullName={profile.full_name} />
+      )}
 
       {/* What to improve */}
       {!isNew && profile && (

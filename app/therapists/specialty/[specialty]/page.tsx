@@ -4,7 +4,8 @@ import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { genderTitle } from "@/app/lib/gender-text";
-import { SPECIALTY_LIST, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
+import { SPECIALTY_LIST, SPECIALTY_CONTENT, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
+import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
@@ -39,6 +40,8 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
   const list = await loadPublicTherapists({ specialty });
   const onlineHere = list.filter((t) => t.online).length;
   const heading = specialtyTitle(specialty);
+  const content = SPECIALTY_CONTENT[specialty] ?? null;
+  const communityArticles = content ? await loadArticlesByTopics(content.topics) : [];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -114,6 +117,50 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/specialty/${slug}`} />)}
         </div>
+      )}
+
+      {/* Treatment deep-dive — below the listings (the city-pages pattern):
+          prose distilled from our own editorial articles + links into them. */}
+      {content && (
+        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
+            על {specialty} — מה חשוב לדעת
+          </h2>
+          <div className="space-y-4">
+            {content.paragraphs.map((p, i) => (
+              <p key={i} className="text-[15px] leading-8 text-stone-600">{p}</p>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>להעמקה באתר</h3>
+            <ul className="space-y-2">
+              {content.related.map((r) => (
+                <li key={r.href} className="text-sm leading-7">
+                  <Link href={r.href} className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+                    {r.label} ←
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          {communityArticles.length > 0 && (
+            <div className="mt-6">
+              <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>מאמרים ממטפלים בנושא</h3>
+              <ul className="space-y-2">
+                {communityArticles.map((a) => (
+                  <li key={a.slug} className="text-sm leading-7">
+                    <Link href={`/research/community/${encodeURIComponent(a.slug)}`} className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+                      {a.title}
+                    </Link>
+                    <span className="text-stone-500"> — מאת {a.author}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
       )}
 
       {/* Internal linking: other specialties + regions */}
