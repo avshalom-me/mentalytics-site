@@ -11,6 +11,7 @@ export type CenterOffer = {
   token: string;
   name: string;
   contact_name: string | null;
+  billing_track: "per_therapist" | "center_entity";
   gift_months: number;
   price_per_therapist: number;
   therapist_count: number;
@@ -193,23 +194,39 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       <h2 className="text-lg font-black text-stone-900 mb-3">פרטי ההצעה</h2>
       <div className="rounded-3xl border-2 p-6 mb-8" style={{ borderColor: "var(--teal)", background: "var(--teal-pale)" }}>
         <div className="space-y-2.5 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-stone-700">מחיר לכל מטפל</span>
-            <span className="font-bold text-stone-900">₪{offer.price_per_therapist.toLocaleString("he-IL")} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ / חודש</span></span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-stone-700">מספר מטפלים</span>
-            <span className="font-bold text-stone-900">{offer.therapist_count}</span>
-          </div>
-          <div className="border-t pt-3 mt-1 flex items-center justify-between" style={{ borderColor: "var(--teal-mid)" }}>
-            <span className="font-black text-stone-900">סה&quot;כ חודשי</span>
-            <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
-              ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
-            </span>
-          </div>
-          <div className="text-xs text-stone-500 text-left">
-            ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · {offer.therapist_count} מטפלים × ₪{offer.price_per_therapist.toLocaleString("he-IL")}
-          </div>
+          {offer.billing_track === "center_entity" ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="font-black text-stone-900">מנוי חודשי — מרכז טיפולי</span>
+                <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
+                  ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
+                </span>
+              </div>
+              <div className="text-xs text-stone-500 text-left">
+                ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · המרכז מוצג כרובריקה אחת במערכת ההתאמות
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-700">מחיר לכל מטפל</span>
+                <span className="font-bold text-stone-900">₪{offer.price_per_therapist.toLocaleString("he-IL")} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ / חודש</span></span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-stone-700">מספר מטפלים</span>
+                <span className="font-bold text-stone-900">{offer.therapist_count}</span>
+              </div>
+              <div className="border-t pt-3 mt-1 flex items-center justify-between" style={{ borderColor: "var(--teal-mid)" }}>
+                <span className="font-black text-stone-900">סה&quot;כ חודשי</span>
+                <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
+                  ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
+                </span>
+              </div>
+              <div className="text-xs text-stone-500 text-left">
+                ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · {offer.therapist_count} מטפלים × ₪{offer.price_per_therapist.toLocaleString("he-IL")}
+              </div>
+            </>
+          )}
         </div>
         <p className="mt-4 text-xs leading-5 text-stone-500">
           המחיר והיקף ההתקשרות נקבעו יחד איתכם בשיחת ההתאמה, בהתאם לצרכי המרכז.

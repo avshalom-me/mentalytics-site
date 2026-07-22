@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { centerPricing } from "@/app/lib/center-pricing";
+import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import CenterJoinForm, { type CenterOffer } from "./CenterJoinForm";
 
 // דף הצטרפות למרכז טיפולי — נפתח מהקישור הסודי שהאדמין שולח עם הצעת המחיר.
@@ -20,7 +20,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
 
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, contact_name, status, price_per_therapist, therapist_count, gift_months, billing_starts_at")
+    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, gift_months, billing_starts_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -68,11 +68,16 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     );
   }
 
-  const pricePerTherapist = Number(center.price_per_therapist) || 0;
-  const therapistCount = Math.floor(Number(center.therapist_count) || 0);
+  const billingTrack = center.billing_track === "center_entity" ? "center_entity" : "per_therapist";
+  const p = centerMonthlyPricing({
+    billing_track: billingTrack,
+    price_per_therapist: center.price_per_therapist,
+    therapist_count: center.therapist_count,
+    fixed_monthly_price: center.fixed_monthly_price,
+  });
 
   // הצעה שעדיין לא תומחרה (טיוטה שנשלחה בטעות) — לא מציגים טופס תשלום.
-  if (pricePerTherapist <= 0 || therapistCount <= 0) {
+  if (p.monthlyTotal <= 0) {
     return (
       <Shell>
         <div className="rounded-3xl border border-stone-200 bg-white p-10 text-center shadow-sm">
@@ -87,12 +92,11 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     );
   }
 
-  const p = centerPricing(pricePerTherapist, therapistCount);
-
   const offer: CenterOffer = {
     token,
     name: center.name,
     contact_name: center.contact_name,
+    billing_track: billingTrack,
     gift_months: center.gift_months ?? 0,
     price_per_therapist: p.pricePerTherapist,
     therapist_count: p.therapistCount,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { centerPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
+import { centerPricing, centerEntityPricing, centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 
 // מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -37,6 +37,8 @@ type Center = {
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
+  billing_track: "per_therapist" | "center_entity" | null;
+  fixed_monthly_price: number | null;
 };
 
 // חישובי הכסף מגיעים ממקור האמת המשותף (center-pricing) — לא לשכפל כאן.
@@ -82,6 +84,8 @@ export default function AdminCentersPage() {
   const [fGift, setFGift] = useState("0");
   const [fPricePerTherapist, setFPricePerTherapist] = useState("");
   const [fTherapistCount, setFTherapistCount] = useState("");
+  const [fBillingTrack, setFBillingTrack] = useState<"per_therapist" | "center_entity">("per_therapist");
+  const [fFixedPrice, setFFixedPrice] = useState("");
   // עמוד המרכז הציבורי (SEO)
   const [fPubEnabled, setFPubEnabled] = useState(false);
   const [fPubDesc, setFPubDesc] = useState("");
@@ -147,6 +151,7 @@ export default function AdminCentersPage() {
     setFName(""); setFContact(""); setFEmail(""); setFPhone(""); setFNotes("");
     setFGift("0");
     setFPricePerTherapist(""); setFTherapistCount("");
+    setFBillingTrack("per_therapist"); setFFixedPrice("");
     setFPubEnabled(false); setFPubDesc(""); setFPubManagers(""); setFPubCity(""); setFPubWebsite(""); setFPubPhone("");
   }
 
@@ -160,6 +165,8 @@ export default function AdminCentersPage() {
     setFGift(String(c.gift_months));
     setFPricePerTherapist(c.price_per_therapist != null ? String(c.price_per_therapist) : "");
     setFTherapistCount(c.therapist_count != null ? String(c.therapist_count) : "");
+    setFBillingTrack(c.billing_track === "center_entity" ? "center_entity" : "per_therapist");
+    setFFixedPrice(c.fixed_monthly_price != null ? String(c.fixed_monthly_price) : "");
     setFPubEnabled(!!c.public_page_enabled);
     setFPubDesc(c.public_description ?? "");
     setFPubManagers(c.public_managers ?? "");
@@ -176,8 +183,10 @@ export default function AdminCentersPage() {
       phone: fPhone,
       notes: fNotes,
       gift_months: Number(fGift),
-      price_per_therapist: Number(fPricePerTherapist),
-      therapist_count: Number(fTherapistCount),
+      billing_track: fBillingTrack,
+      ...(fBillingTrack === "center_entity"
+        ? { fixed_monthly_price: Number(fFixedPrice) }
+        : { price_per_therapist: Number(fPricePerTherapist), therapist_count: Number(fTherapistCount) }),
     };
     // שדות העמוד הציבורי — רק בעריכה (למרכז קיים עם slug), לא ביצירה.
     if (editing !== "new" && editing !== null) {
@@ -197,6 +206,8 @@ export default function AdminCentersPage() {
         delete payload.gift_months;
         delete payload.price_per_therapist;
         delete payload.therapist_count;
+        delete payload.fixed_monthly_price;
+        delete payload.billing_track;
       }
     }
     const j = editing === "new"
@@ -279,7 +290,9 @@ export default function AdminCentersPage() {
   const isLockedEditing = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
   const pricingLocked = editing !== "new" && editing !== null && editing.status === "cancelled";
   const isActiveEditing = editing !== "new" && editing !== null && editing.status === "active";
-  const fPricing = pricing(fPricePerTherapist, fTherapistCount);
+  const fPricing = fBillingTrack === "center_entity"
+    ? centerEntityPricing(Number(fFixedPrice) || 0)
+    : pricing(fPricePerTherapist, fTherapistCount);
   const fTotal = fPricing.monthlyTotal;
 
   return (
@@ -312,9 +325,10 @@ export default function AdminCentersPage() {
 
       {centers.map((c) => {
         const st = STATUS_LABELS[c.status];
-        const p = pricing(c.price_per_therapist, c.therapist_count);
+        const isEntity = c.billing_track === "center_entity";
+        const p = centerMonthlyPricing(c);
         const total = p.monthlyTotal;
-        const priced = p.pricePerTherapist > 0 && p.therapistCount > 0;
+        const priced = isEntity ? total > 0 : (Number(c.price_per_therapist) > 0 && Number(c.therapist_count) > 0);
         return (
           <div key={c.id} className="mb-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -322,6 +336,9 @@ export default function AdminCentersPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-black text-stone-800">{c.name}</h2>
                   <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
+                  {isEntity && (
+                    <span className="rounded-full bg-teal-50 border border-teal-300 px-2.5 py-0.5 text-xs font-bold text-teal-800">🏢 מרכז כישות</span>
+                  )}
                   {c.gift_months > 0 && (
                     <span className="rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800">
                       🎁 {c.gift_months} חודשי מתנה
@@ -340,17 +357,17 @@ export default function AdminCentersPage() {
                   <>
                     <div className="text-xl font-black text-green-700">₪{Number(c.agreed_monthly_price ?? total).toLocaleString("he-IL")} <span className="text-xs font-normal">+ מע&quot;מ/חודש</span></div>
                     <div className="text-xs text-stone-500">
-                      {priced && <>{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · </>}
+                      {isEntity ? <>מרכז כישות אחת · </> : (priced && <>{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · </>)}
                       חיוב ראשון {fmtDate(c.billing_starts_at)}
                     </div>
                   </>
                 ) : priced ? (
                   <>
                     <div className="text-xl font-black text-stone-800">₪{ils(total)} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ/חודש</span></div>
-                    <div className="text-xs text-stone-500">{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))} · ₪{ils(p.monthlyTotalWithVat)} כולל מע&quot;מ</div>
+                    <div className="text-xs text-stone-500">{isEntity ? "מרכז כישות אחת" : <>{c.therapist_count} מטפלים × ₪{ils(Number(c.price_per_therapist))}</>} · ₪{ils(p.monthlyTotalWithVat)} כולל מע&quot;מ</div>
                   </>
                 ) : (
-                  <div className="text-xs text-amber-600">טרם הוגדר מחיר/מספר מטפלים</div>
+                  <div className="text-xs text-amber-600">{isEntity ? "טרם הוגדר מחיר חודשי" : "טרם הוגדר מחיר/מספר מטפלים"}</div>
                 )}
               </div>
             </div>
@@ -372,10 +389,14 @@ export default function AdminCentersPage() {
                 className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
                 {copied === c.id ? "✓ הועתק!" : "🔗 העתקת קישור למרכז"}
               </button>
-              <button onClick={() => openManage(c)}
-                className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-100">
-                👥 ניהול מטפלים ({c.linked_therapist_count})
-              </button>
+              {isEntity ? (
+                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-stone-500">רובריקה אחת — הפרופיל נערך ב-/admin/therapists</span>
+              ) : (
+                <button onClick={() => openManage(c)}
+                  className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-100">
+                  👥 ניהול מטפלים ({c.linked_therapist_count})
+                </button>
+              )}
               {(c.status === "draft" || c.status === "sent") && (
                 <>
                   <button onClick={() => sendProposal(c)} disabled={busy || !c.email}
@@ -468,33 +489,69 @@ export default function AdminCentersPage() {
             {!pricingLocked && (
               <>
                 <div className="mt-2 mb-1">
-                  <span className="text-xs font-black text-stone-700">המחיר וההיקף (כפי שנקבעו בשיחת ההתאמה)</span>
+                  <span className="text-xs font-black text-stone-700">מסלול ומחיר (כפי שנקבעו בשיחת ההתאמה)</span>
                 </div>
-                <p className="mb-2 text-[11px] leading-4 text-stone-400">
-                  כל מנוי כולל אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז בדף ההצטרפות. כאן מגדירים רק את המחיר לכל מטפל ואת מספר המטפלים.
-                </p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <Field label="מחיר לכל מטפל (₪ לחודש, לפני מע&quot;מ) *">
-                    <input value={fPricePerTherapist} inputMode="decimal" placeholder="למשל 80"
-                      onChange={(e) => setFPricePerTherapist(e.target.value.replace(/[^\d.]/g, ""))}
-                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
-                  </Field>
-                  <Field label="מספר מטפלים *">
-                    <input value={fTherapistCount} inputMode="numeric" placeholder="למשל 5"
-                      onChange={(e) => setFTherapistCount(e.target.value.replace(/\D/g, ""))}
-                      className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
-                  </Field>
+                {/* בורר מסלול חיוב — לא ניתן להחליף במרכז פעיל */}
+                <div className="mb-2 grid grid-cols-2 gap-2">
+                  <button type="button" disabled={isActiveEditing}
+                    onClick={() => setFBillingTrack("per_therapist")}
+                    className={`rounded-lg border px-3 py-2 text-right text-xs disabled:opacity-50 ${fBillingTrack === "per_therapist" ? "border-teal-500 bg-teal-50 font-bold text-teal-800" : "border-stone-300 text-stone-600"}`}>
+                    מסלול 1 — מחיר לכל מטפל
+                    <span className="block text-[10px] font-normal text-stone-500">פרופיל לכל מטפל · מחיר × מספר</span>
+                  </button>
+                  <button type="button" disabled={isActiveEditing}
+                    onClick={() => setFBillingTrack("center_entity")}
+                    className={`rounded-lg border px-3 py-2 text-right text-xs disabled:opacity-50 ${fBillingTrack === "center_entity" ? "border-teal-500 bg-teal-50 font-bold text-teal-800" : "border-stone-300 text-stone-600"}`}>
+                    מסלול 2 — מרכז כישות אחת
+                    <span className="block text-[10px] font-normal text-stone-500">רובריקה אחת בהתאמות · מחיר חודשי קבוע</span>
+                  </button>
                 </div>
+                {fBillingTrack === "center_entity" ? (
+                  <>
+                    <p className="mb-2 text-[11px] leading-4 text-stone-400">
+                      המרכז מוצג כרובריקה אחת (&quot;מרכז טיפולי X&quot;) במערכת ההתאמות לפי סוגי הטיפול שהוא מציע; הפניות מגיעות למרכז. את הפרופיל המורחב (סוגי טיפול, אזורים, גילאים ועוד) עורכים ב-/admin/therapists או בפורטל המרכז.
+                    </p>
+                    <Field label="מחיר חודשי קבוע (₪ לחודש, לפני מע&quot;מ) *">
+                      <input value={fFixedPrice} inputMode="decimal" placeholder="למשל 350"
+                        onChange={(e) => setFFixedPrice(e.target.value.replace(/[^\d.]/g, ""))}
+                        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-2 text-[11px] leading-4 text-stone-400">
+                      כל מנוי כולל אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז בדף ההצטרפות. כאן מגדירים רק את המחיר לכל מטפל ואת מספר המטפלים.
+                    </p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="מחיר לכל מטפל (₪ לחודש, לפני מע&quot;מ) *">
+                        <input value={fPricePerTherapist} inputMode="decimal" placeholder="למשל 80"
+                          onChange={(e) => setFPricePerTherapist(e.target.value.replace(/[^\d.]/g, ""))}
+                          className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                      </Field>
+                      <Field label="מספר מטפלים *">
+                        <input value={fTherapistCount} inputMode="numeric" placeholder="למשל 5"
+                          onChange={(e) => setFTherapistCount(e.target.value.replace(/\D/g, ""))}
+                          className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                      </Field>
+                    </div>
+                  </>
+                )}
                 <div className="mt-1 mb-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-2 text-xs text-stone-600">
                   {fTotal > 0 ? (
-                    <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · {Number(fTherapistCount) || 0} × ₪{ils(Number(fPricePerTherapist) || 0)} · ₪{ils(fPricing.monthlyTotalWithVat)} כולל מע&quot;מ</>
+                    fBillingTrack === "center_entity" ? (
+                      <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · מרכז כישות אחת · ₪{ils(fPricing.monthlyTotalWithVat)} כולל מע&quot;מ</>
+                    ) : (
+                      <>סה&quot;כ חודשי: <strong className="text-stone-900">₪{ils(fTotal)}</strong> + מע&quot;מ · {Number(fTherapistCount) || 0} × ₪{ils(Number(fPricePerTherapist) || 0)} · ₪{ils(fPricing.monthlyTotalWithVat)} כולל מע&quot;מ</>
+                    )
                   ) : (
-                    "הזינו מחיר לכל מטפל ומספר מטפלים כדי לראות את הסכום החודשי הכולל."
+                    fBillingTrack === "center_entity"
+                      ? "הזינו מחיר חודשי קבוע כדי לראות את הסכום הכולל."
+                      : "הזינו מחיר לכל מטפל ומספר מטפלים כדי לראות את הסכום החודשי הכולל."
                   )}
                 </div>
                 {isActiveEditing && (
                   <p className="mb-2 text-[11px] leading-4 text-amber-600">
-                    ⚠️ שינוי המחיר או מספר המטפלים במרכז פעיל יעדכן מיד את הסכום החודשי בהוראת הקבע ב-Sumit (מהחיוב הבא).
+                    ⚠️ שינוי המחיר במרכז פעיל יעדכן מיד את הסכום החודשי בהוראת הקבע ב-Sumit (מהחיוב הבא). לא ניתן להחליף מסלול חיוב במרכז פעיל.
                   </p>
                 )}
               </>
