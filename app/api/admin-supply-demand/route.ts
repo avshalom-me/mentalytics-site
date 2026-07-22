@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const [therapistsRes, views, clicks] = await Promise.all([
-      supabaseAdmin.from("therapists").select("id, full_name, regions, online, promotion_source").eq("status", "paying"),
+      supabaseAdmin.from("therapists").select("id, full_name, regions, online, promotion_source").eq("status", "paying").neq("entity_type", "center"),
       // profile_views exceeds the 1000-row cap (default all-time period) — page
       // past it so region demand and per-therapist view counts aren't truncated.
       fetchAllRows<{ therapist_id: string | null; viewer_region: string | null }>(() => {

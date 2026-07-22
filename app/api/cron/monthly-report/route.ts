@@ -242,6 +242,7 @@ export async function GET(req: NextRequest) {
     .from("therapists")
     .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status")
     .eq("status", "paying")
+    .neq("entity_type", "center") // הישות אינה מטפל — לא לשלוח לה דוח ביצועים חודשי
     .eq("unsubscribed_from_stats", false);
 
   if (!therapists || therapists.length === 0) {

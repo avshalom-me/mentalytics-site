@@ -178,7 +178,8 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
     const { data: therapists, error: tErr } = await supabaseAdmin
       .from("therapists")
       .select("id, full_name, promoted_since")
-      .eq("status", "paying");
+      .eq("status", "paying")
+      .neq("entity_type", "center"); // הישות אינה מטפל — לא לשלוח לה מייל "מעורבות נמוכה"
 
     if (tErr) {
       return { ok: false, month: label, flagged: 0, totalPromoted: 0, error: tErr.message, status: 500 };

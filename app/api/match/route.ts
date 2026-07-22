@@ -628,7 +628,8 @@ export async function POST(req: NextRequest) {
             .select(MATCH_COLUMNS)
             .eq("status", "approved")
             .eq("admin_approved", true)
-            .eq("accepting_new_patients", true);
+            .eq("accepting_new_patients", true)
+            .neq("entity_type", "center"); // ישות-מרכז (למשל מרכז שבוטל) אינה גיבוי חינמי
           const freeCandidates = ((freeData ?? []) as TherapistRow[]).filter(
             (t) =>
               coversRegion(parseArray(t.regions), patientRegion) &&

@@ -284,6 +284,17 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       if (syncEntity === "ensure") await ensureCenterEntityRow(id);
       else if (syncEntity === "remove") await removeCenterEntityRow(id);
+      // מסלול 2: שינוי מייל/טלפון המרכז מתפשט לפרטי הקשר של שורת הישות, כדי
+      // שהפניות מההתאמות ימשיכו להגיע למרכז ולא לכתובת ישנה.
+      const centerNowEntity =
+        update.billing_track === "center_entity" ||
+        (update.billing_track === undefined && (center.billing_track as string) === "center_entity");
+      if (centerNowEntity && (body.email !== undefined || body.phone !== undefined)) {
+        const contactPatch: Record<string, unknown> = {};
+        if (body.email !== undefined) contactPatch.email = str(body.email, 200) || null;
+        if (body.phone !== undefined) contactPatch.phone = str(body.phone, 30) || null;
+        await supabaseAdmin.from("therapists").update(contactPatch).eq("center_account_id", id).eq("entity_type", "center");
+      }
       return NextResponse.json({ ok: true });
     }
 

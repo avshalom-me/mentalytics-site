@@ -44,6 +44,7 @@ export async function GET() {
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
+    .neq("entity_type", "center") // ישות-מרכז מופיעה רק בהתאמות החידון, לא ב-API ציבורי
     .order("full_name", { ascending: true });
 
   if (error) {
