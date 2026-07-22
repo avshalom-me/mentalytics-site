@@ -47,6 +47,7 @@ type TherapistRow = {
   age_groups: unknown;
   languages: unknown;
   entity_type: string | null; // 'center' = שורת ישות-מרכז (מסלול 2); אחרת מטפל רגיל
+  center_account_id: string | null;
 };
 
 type NormalizedMatchInput = {
@@ -549,7 +550,7 @@ export async function POST(req: NextRequest) {
     const input = normalizeInput(body);
 
     const MATCH_COLUMNS =
-      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level, entity_type";
+      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level, entity_type, center_account_id";
 
     const { data, error } = await supabaseAdmin
       .from("therapists")
@@ -682,6 +683,20 @@ export async function POST(req: NextRequest) {
     const addictionCbtFallback = addictionRequested &&
       scored.every(({ result }) => !result.normalizedTherapist.trainingAreas.some(a => normalizeText(a) === ADDICTION_LABEL));
 
+    // מסלול 2: כרטיס מרכז מקשר לעמוד הפרופיל הציבורי /centers/<slug> (לא לעמוד
+    // מטפל שנחסם). שולפים את ה-slug של המרכזים שהופיעו בתוצאות בבת-אחת.
+    const centerSlugById = new Map<string, string>();
+    const entityCenterIds = top
+      .filter((x) => x.therapist.entity_type === "center" && x.therapist.center_account_id)
+      .map((x) => x.therapist.center_account_id as string);
+    if (entityCenterIds.length > 0) {
+      const { data: slugRows } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select("id, slug")
+        .in("id", entityCenterIds);
+      for (const r of slugRows ?? []) if (r.slug) centerSlugById.set(r.id as string, r.slug as string);
+    }
+
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {
         const photoUrl = await buildSignedPhotoUrl(therapist.profile_photo_path);
@@ -701,6 +716,9 @@ export async function POST(req: NextRequest) {
           profile_photo_url: photoUrl,
           status: therapist.status,
           entity_type: therapist.entity_type, // 'center' → כרטיס מוצג כ"מרכז טיפולי"
+          profile_slug: therapist.entity_type === "center" && therapist.center_account_id
+            ? (centerSlugById.get(therapist.center_account_id) ?? null)
+            : null,
           // FREE_REGION_FALLBACK (זמני): מטפל חינמי שנכנס כגיבוי אזורי
           free_fallback: freeFallbackIds.has(therapist.id),
           match_score: result.score,

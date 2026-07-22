@@ -561,6 +561,7 @@ export default function AdultsPage() {
     const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
     if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
     if (selectedRec?.symptomText) params.set("sy", selectedRec.symptomText.slice(0, 160));
+    if (t.entity_type === "center" && t.profile_slug) return `/centers/${t.profile_slug}`;
     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
   }
 

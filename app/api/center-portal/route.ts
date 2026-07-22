@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { resolveCenter } from "@/app/lib/center-auth";
+import { signCenterAssets, type CenterTeamMember } from "@/app/lib/center-public";
 
 // פורטל המרכז הטיפולי — API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
 // מצטברות לכל המרכז. הכניסה היא בחשבון Supabase Auth של המרכז (מקביל למטפל).
@@ -105,6 +106,10 @@ export async function GET(req: NextRequest) {
       : (Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null);
 
     // מידע העמוד הציבורי — משותף לשני מסלולי המענה (עם/בלי מטפלים).
+    const teamRaw: CenterTeamMember[] = Array.isArray(center.team_members)
+      ? (center.team_members as CenterTeamMember[])
+      : [];
+    const signedAssets = await signCenterAssets({ logo_path: (center.logo_path as string | null) ?? null, team_members: teamRaw });
     const publicPage = {
       slug: center.slug,
       enabled: !!center.public_page_enabled,
@@ -113,6 +118,9 @@ export async function GET(req: NextRequest) {
       city: center.public_city,
       website: center.public_website,
       phone: center.public_phone,
+      logo_path: (center.logo_path as string | null) ?? null,
+      logo_url: signedAssets.logoUrl,
+      team: teamRaw.map((m, i) => ({ name: m.name, role: m.role, photo_path: m.photo_path ?? null, photo_url: signedAssets.team[i]?.photoUrl ?? null })),
     };
 
     // אין נתונים להצגה — מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
@@ -270,6 +278,19 @@ export async function POST(req: NextRequest) {
   if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
   if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
   if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
+  // פרופיל ויזואלי (מסלול 2): לוגו + צוות/ראשי-המרכז — נשמרים self-serve מהפורטל.
+  if (body.logo_path !== undefined) update.logo_path = typeof body.logo_path === "string" && body.logo_path.trim() ? body.logo_path.trim() : null;
+  if (body.team_members !== undefined) {
+    const raw = Array.isArray(body.team_members) ? body.team_members : [];
+    update.team_members = raw.slice(0, 12).map((m) => {
+      const mm = (m ?? {}) as Record<string, unknown>;
+      return {
+        name: str(mm.name, 80),
+        role: str(mm.role, 80),
+        photo_path: typeof mm.photo_path === "string" ? mm.photo_path.slice(0, 300) : null,
+      };
+    }).filter((m) => m.name);
+  }
 
   // ודא slug (מרכזים שנוצרו לפני פיצ'ר העמוד הציבורי).
   const { ensureUniqueCenterSlug } = await import("@/app/lib/center-public");

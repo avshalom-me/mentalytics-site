@@ -5,19 +5,24 @@ import { slugify } from "@/app/lib/articles";
 
 // עזרי העמוד הציבורי של המרכז (/centers/<slug>).
 
+export type CenterTeamMember = { name: string; role: string; photo_path: string | null };
+
 export type PublicCenter = {
   id: string;
   name: string;
   slug: string;
+  billing_track: string | null;
   public_description: string | null;
   public_managers: string | null;
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
+  logo_path: string | null;
+  team_members: CenterTeamMember[];
 };
 
 const PUBLIC_COLS =
-  "id, name, slug, public_description, public_managers, public_city, public_website, public_phone";
+  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, logo_path, team_members";
 
 // slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר — מוסיפים
 // סיומת מספרית. excludeId מאפשר לשמור על ה-slug של המרכז עצמו בעדכון.
@@ -46,10 +51,38 @@ export const getPublicCenterBySlug = cache(async (slug: string): Promise<PublicC
     .select(PUBLIC_COLS)
     .eq("slug", slug)
     .eq("status", "active")
-    .eq("public_page_enabled", true)
+    // מרכז מסלול-2 (כישות) גלוי כשהוא פעיל — הפרופיל הוא המוצר; מסלול 1 דורש הדלקה.
+    .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
     .maybeSingle();
-  return (data as PublicCenter | null) ?? null;
+  if (!data) return null;
+  const c = data as Record<string, unknown>;
+  return {
+    ...(c as unknown as PublicCenter),
+    team_members: Array.isArray(c.team_members) ? (c.team_members as CenterTeamMember[]) : [],
+  };
 });
+
+// חתימת URLs ללוגו ולתמונות הצוות (bucket פרטי). מחושב בצד-שרת בכל רינדור עמוד.
+export async function signCenterAssets(
+  center: { logo_path: string | null; team_members: CenterTeamMember[] },
+): Promise<{ logoUrl: string | null; team: { name: string; role: string; photoUrl: string | null }[] }> {
+  const paths: string[] = [];
+  if (center.logo_path) paths.push(center.logo_path);
+  for (const m of center.team_members) if (m.photo_path) paths.push(m.photo_path);
+  const urlByPath = new Map<string, string>();
+  if (paths.length > 0) {
+    const { data } = await supabaseAdmin.storage.from("therapist-certificates").createSignedUrls(paths, 60 * 60 * 24);
+    (data ?? []).forEach((s, i) => { if (s.signedUrl) urlByPath.set(paths[i], s.signedUrl); });
+  }
+  return {
+    logoUrl: center.logo_path ? (urlByPath.get(center.logo_path) ?? null) : null,
+    team: center.team_members.map((m) => ({
+      name: m.name,
+      role: m.role,
+      photoUrl: m.photo_path ? (urlByPath.get(m.photo_path) ?? null) : null,
+    })),
+  };
+}
 
 // כל המרכזים שעמודם הציבורי פעיל — ל-sitemap.
 export async function listPublicCenters(): Promise<{ slug: string; updated_at: string | null }[]> {

@@ -19,11 +19,37 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  const type = formData.get("type") as string | null; // "photo" | "certificate"
-  const therapistId = formData.get("therapist_id") as string | null;
+  const type = formData.get("type") as string | null; // "photo" | "certificate" | "center_image"
 
-  if (!file || !type || !therapistId) {
-    return NextResponse.json({ ok: false, error: "Missing file, type or therapist_id" }, { status: 400 });
+  if (!file || !type) {
+    return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
+  }
+
+  // תמונת מרכז (לוגו / תמונת חבר צוות) — מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל
+  // דרך update_public_page. אין צורך ב-therapist_id — התמונה משויכת למרכז.
+  if (type === "center_image") {
+    const inputBuffer = Buffer.from(await file.arrayBuffer());
+    let out: Buffer;
+    try {
+      out = await sharp(inputBuffer)
+        .rotate()
+        .resize(512, 512, { fit: "inside", withoutEnlargement: true }) // שומר יחס — מתאים ללוגו וגם לפורטרט
+        .webp({ quality: 82 })
+        .toBuffer();
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
+    }
+    const p = `center-assets/${center.id}-${Date.now()}.webp`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("therapist-certificates")
+      .upload(p, out, { contentType: "image/webp", upsert: true });
+    if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, path: p });
+  }
+
+  const therapistId = formData.get("therapist_id") as string | null;
+  if (!therapistId) {
+    return NextResponse.json({ ok: false, error: "Missing therapist_id" }, { status: 400 });
   }
 
   // בעלות: המטפל חייב להיות משויך למרכז המחובר.

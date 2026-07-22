@@ -43,6 +43,9 @@ type PublicPage = {
   city: string | null;
   website: string | null;
   phone: string | null;
+  logo_path: string | null;
+  logo_url: string | null;
+  team: { name: string; role: string; photo_path: string | null; photo_url: string | null }[];
 };
 
 type PortalData = {
@@ -331,6 +334,7 @@ export default function CenterDashboardPage() {
 }
 
 // עורך העמוד הציבורי של המרכז — state מקומי כדי שהקלדה לא תרנדר את כל הדשבורד.
+type TeamRow = { name: string; role: string; photo_path: string | null; photo_url: string | null };
 function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [description, setDescription] = useState(initial.description ?? "");
@@ -339,9 +343,47 @@ function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [website, setWebsite] = useState(initial.website ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [slug, setSlug] = useState(initial.slug);
+  const [logoPath, setLogoPath] = useState<string | null>(initial.logo_path);
+  const [logoPreview, setLogoPreview] = useState<string | null>(initial.logo_url);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [team, setTeam] = useState<TeamRow[]>(initial.team ?? []);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+
+  // העלאת תמונת מרכז (לוגו / תמונת חבר צוות) — מחזירה נתיב אחסון שנשמר בשמירה.
+  async function uploadCenterImage(file: File): Promise<string | null> {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) { window.location.href = "/centers/login"; return null; }
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("type", "center_image");
+    const res = await fetch("/api/center-portal/upload", {
+      method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body: fd,
+    });
+    const json = await res.json();
+    if (!json.ok) { setErr(json.error ?? "העלאת התמונה נכשלה"); return null; }
+    return json.path as string;
+  }
+
+  async function onLogoFile(file: File | null) {
+    if (!file) return;
+    setLogoBusy(true); setErr("");
+    const path = await uploadCenterImage(file);
+    if (path) { setLogoPath(path); setLogoPreview(URL.createObjectURL(file)); }
+    setLogoBusy(false);
+  }
+
+  async function onMemberPhoto(idx: number, file: File | null) {
+    if (!file) return;
+    setErr("");
+    const path = await uploadCenterImage(file);
+    if (path) setTeam((prev) => prev.map((m, i) => i === idx ? { ...m, photo_path: path, photo_url: URL.createObjectURL(file) } : m));
+  }
+
+  function setMember(idx: number, patch: Partial<TeamRow>) {
+    setTeam((prev) => prev.map((m, i) => i === idx ? { ...m, ...patch } : m));
+  }
 
   async function save() {
     setSaving(true); setMsg(""); setErr("");
@@ -359,6 +401,8 @@ function PublicPageEditor({ initial }: { initial: PublicPage }) {
           public_city: city,
           public_website: website,
           public_phone: phone,
+          logo_path: logoPath,
+          team_members: team.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), role: m.role.trim(), photo_path: m.photo_path })),
         }),
       });
       const json = await res.json();
@@ -382,11 +426,59 @@ function PublicPageEditor({ initial }: { initial: PublicPage }) {
         </label>
       </div>
       <p className="mb-4 text-xs text-stone-500">
-        עמוד ציבורי מקודם בגוגל עם המידע על המרכז וכל המטפלים שלו.
+        עמוד ציבורי מקודם בגוגל עם הלוגו, המידע על המרכז והצוות המוביל.
         {slug && (
           <> הכתובת שלכם: <a href={`/centers/${slug}`} target="_blank" className="font-bold text-teal-700 underline">/centers/{slug}</a></>
         )}
       </p>
+
+      {/* לוגו המרכז */}
+      <label className="mb-1 block text-sm font-semibold text-stone-700">לוגו המרכז</label>
+      <div className="mb-4 flex items-center gap-3">
+        {logoPreview ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={logoPreview} alt="לוגו" className="h-16 w-16 rounded-xl border border-stone-200 bg-white object-contain p-1" />
+        ) : (
+          <div className="flex h-16 w-16 items-center justify-center rounded-xl border border-dashed border-stone-300 bg-white text-[10px] text-stone-400">ללא לוגו</div>
+        )}
+        <label className="cursor-pointer rounded-full border border-stone-300 bg-white px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50">
+          {logoBusy ? "מעלה…" : logoPreview ? "החלפת לוגו" : "העלאת לוגו"}
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => onLogoFile(e.target.files?.[0] ?? null)} />
+        </label>
+        {logoPreview && (
+          <button onClick={() => { setLogoPath(null); setLogoPreview(null); }} className="text-xs font-semibold text-red-600 hover:underline">הסרה</button>
+        )}
+      </div>
+
+      {/* צוות / ראשי המרכז */}
+      <label className="mb-1 block text-sm font-semibold text-stone-700">הצוות המוביל / ראשי המרכז</label>
+      <p className="mb-2 text-xs text-stone-500">אנשי המקצוע הבכירים שיוצגו בעמוד — שם, תפקיד ותמונה.</p>
+      <div className="mb-2 space-y-2">
+        {team.map((m, i) => (
+          <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white p-2.5">
+            <label className="cursor-pointer">
+              {m.photo_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={m.photo_url} alt="" className="h-11 w-11 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-teal-50 text-[9px] text-teal-700">תמונה</div>
+              )}
+              <input type="file" accept="image/*" className="hidden" onChange={(e) => onMemberPhoto(i, e.target.files?.[0] ?? null)} />
+            </label>
+            <input value={m.name} onChange={(e) => setMember(i, { name: e.target.value })} placeholder="שם מלא"
+              className="min-w-[120px] flex-1 rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm" />
+            <input value={m.role} onChange={(e) => setMember(i, { role: e.target.value })} placeholder="תפקיד (למשל מנהל קליני)"
+              className="min-w-[140px] flex-1 rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm" />
+            <button onClick={() => setTeam((prev) => prev.filter((_, x) => x !== i))} className="px-1.5 text-stone-400 hover:text-red-600" title="הסרה">✕</button>
+          </div>
+        ))}
+      </div>
+      {team.length < 12 && (
+        <button onClick={() => setTeam((prev) => [...prev, { name: "", role: "", photo_path: null, photo_url: null }])}
+          className="mb-4 rounded-full border border-teal-300 bg-teal-50 px-4 py-1.5 text-xs font-bold text-teal-800 hover:bg-teal-100">
+          ➕ הוספת איש/אשת צוות
+        </button>
+      )}
 
       <label className="mb-1 block text-sm font-semibold text-stone-700">תיאור המרכז</label>
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={4}

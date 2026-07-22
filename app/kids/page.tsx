@@ -2484,6 +2484,7 @@ type KidsMatchResult = {
   email: string | null;
   profile_photo_url: string | null;
   entity_type: string | null; // 'center' = מרכז טיפולי כישות (מסלול 2)
+  profile_slug: string | null; // עמוד הפרופיל הציבורי של המרכז (מסלול 2)
   match_score: number;
   personality_score: number | null;
   combined_score: number | null;
@@ -2856,6 +2857,7 @@ function KidsMatchSection({ A, score, selection }: {
                     // Which treatment/assessment recommendation sent this visitor —
                     // feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
                     if (treatmentLabels.length > 0) params.set("t", treatmentLabels.join(" + ").slice(0, 80));
+                    if (t.entity_type === "center" && t.profile_slug) return `/centers/${t.profile_slug}`;
                     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
                   })();
                   return (
