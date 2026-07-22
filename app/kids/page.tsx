@@ -2483,6 +2483,7 @@ type KidsMatchResult = {
   phone: string | null;
   email: string | null;
   profile_photo_url: string | null;
+  entity_type: string | null; // 'center' = מרכז טיפולי כישות (מסלול 2)
   match_score: number;
   personality_score: number | null;
   combined_score: number | null;
@@ -2871,9 +2872,12 @@ function KidsMatchSection({ A, score, selection }: {
                         <div className="min-w-0 flex-1 text-right">
                           <div className="flex flex-wrap items-center gap-2">
                             <h3 className="text-lg font-extrabold text-[var(--text)]">{t.full_name || "ללא שם"}</h3>
+                            {t.entity_type === "center" && (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--gold-dark)]">🏢 מרכז טיפולי</span>
+                            )}
                             <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ מאומת</span>
                           </div>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">{t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
+                          <p className="mt-0.5 text-xs text-[var(--muted)]">{t.entity_type === "center" ? "מרכז טיפולי" : t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
                           {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
                           {regionsArr.length > 0 && (
                             <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {regionsArr.join(", ")}</p>

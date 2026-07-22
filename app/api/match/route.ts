@@ -46,6 +46,7 @@ type TherapistRow = {
   activity_level: number | null;
   age_groups: unknown;
   languages: unknown;
+  entity_type: string | null; // 'center' = שורת ישות-מרכז (מסלול 2); אחרת מטפל רגיל
 };
 
 type NormalizedMatchInput = {
@@ -517,6 +518,9 @@ function scoreTherapist(
     const davg = (Math.abs(styleP1 - t1Raw) + Math.abs(styleP2 - t2) + Math.abs(styleP3 - t3)) / 3;
     personality_score = Math.round(40 + 60 * Math.pow(1 - davg / 6, 0.65));
   }
+  // מרכז כישות (entity_type='center') מנוקד לפי התאמה מקצועית בלבד — הציון הסופי
+  // מורכב רק מההתאמה המקצועית (combinedScore מחזיר את המקצועי כשאישיות null).
+  if (therapist.entity_type === "center") personality_score = null;
 
   return {
     score,
@@ -545,13 +549,16 @@ export async function POST(req: NextRequest) {
     const input = normalizeInput(body);
 
     const MATCH_COLUMNS =
-      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level";
+      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level, entity_type";
 
     const { data, error } = await supabaseAdmin
       .from("therapists")
       .select(MATCH_COLUMNS)
       .eq("status", "paying")
-      .eq("admin_approved", true);
+      .eq("admin_approved", true)
+      // Marked "not accepting new patients" → never offered as a match
+      // (stays visible only in the public directory).
+      .eq("accepting_new_patients", true);
 
     if (error) {
       return NextResponse.json(
@@ -620,7 +627,8 @@ export async function POST(req: NextRequest) {
             .from("therapists")
             .select(MATCH_COLUMNS)
             .eq("status", "approved")
-            .eq("admin_approved", true);
+            .eq("admin_approved", true)
+            .eq("accepting_new_patients", true);
           const freeCandidates = ((freeData ?? []) as TherapistRow[]).filter(
             (t) =>
               coversRegion(parseArray(t.regions), patientRegion) &&
@@ -691,6 +699,7 @@ export async function POST(req: NextRequest) {
           phone: therapist.phone,
           profile_photo_url: photoUrl,
           status: therapist.status,
+          entity_type: therapist.entity_type, // 'center' → כרטיס מוצג כ"מרכז טיפולי"
           // FREE_REGION_FALLBACK (זמני): מטפל חינמי שנכנס כגיבוי אזורי
           free_fallback: freeFallbackIds.has(therapist.id),
           match_score: result.score,
