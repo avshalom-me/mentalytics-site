@@ -449,7 +449,7 @@ export default function AdminCentersPage() {
           לא נחתכת. (הדפוס ההיברידי הקודם עם max-h-[90vh]+גלילה פנימית חתך תוכן
           בזומים מסוימים.) */}
       {editing && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl" onClick={() => setEditing(null)}>
+        <div className="fixed inset-0 z-[110] overflow-y-auto" dir="rtl" onClick={() => setEditing(null)}>
           <div className="fixed inset-0 bg-black/30" />
           <div className="flex min-h-full items-start justify-center p-4">
           <div
@@ -621,7 +621,7 @@ export default function AdminCentersPage() {
 
       {/* מודל: ניהול שיוך מטפלים למרכז */}
       {manageFor && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" dir="rtl">
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" dir="rtl">
           <div className="absolute inset-0 bg-black/30" onClick={() => setManageFor(null)} />
           <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col rounded-2xl bg-white shadow-2xl">
             <div className="rounded-t-2xl border-b border-stone-100 px-6 py-4">
