@@ -5,7 +5,7 @@
 //
 // המודל: מחיר-למטפל × מספר-מטפלים = סה"כ חודשי. אין "מסלולים" — המחיר וההיקף
 // נקבעים בשיחת ההתאמה, ומצוין זאת במפורש.
-import { centerPricing, ilCurrency } from "./center-pricing";
+import { centerMonthlyPricing, ilCurrency } from "./center-pricing";
 
 function escapeHtml(str: string): string {
   return str
@@ -25,8 +25,10 @@ function giftLabel(n: number): string {
 export function buildCenterProposalEmail(opts: {
   centerName: string;
   contactName: string | null;
+  billingTrack?: string | null;
   pricePerTherapist: number;
   therapistCount: number;
+  fixedMonthlyPrice?: number | null;
   giftMonths: number;
   token: string;
   siteUrl: string;
@@ -40,7 +42,13 @@ export function buildCenterProposalEmail(opts: {
   // יוצג כ-"A &amp; B" בתיבת הדואר.
   const subject = `הצעה לשיתוף פעולה — טיפול חכם ל${rawName}`;
 
-  const p = centerPricing(opts.pricePerTherapist, opts.therapistCount);
+  const isEntity = opts.billingTrack === "center_entity";
+  const p = centerMonthlyPricing({
+    billing_track: opts.billingTrack,
+    price_per_therapist: opts.pricePerTherapist,
+    therapist_count: opts.therapistCount,
+    fixed_monthly_price: opts.fixedMonthlyPrice,
+  });
 
   const giftBadge =
     opts.giftMonths > 0
@@ -52,8 +60,19 @@ export function buildCenterProposalEmail(opts: {
       </div>`
       : "";
 
-  // תיבת התמחור: מחיר-למטפל × מספר-מטפלים = סה"כ.
-  const pricingBox = `
+  // תיבת התמחור — לפי מסלול המרכז. מסלול 2 (מרכז כישות) = סכום חודשי קבוע.
+  const pricingBox = isEntity
+    ? `
+      <div style="border:1px solid #DDE9E8;border-radius:12px;overflow:hidden;margin:0 0 8px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#1a4a5c;">
+          <tr style="background:#F0F7FA;">
+            <td style="padding:14px 16px;font-weight:900;color:#0F5468;">מנוי חודשי — מרכז טיפולי</td>
+            <td style="padding:14px 16px;text-align:left;font-weight:900;color:#0F5468;font-size:17px;">₪${ilCurrency(p.monthlyTotal)} <span style="font-size:12px;font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td>
+          </tr>
+        </table>
+      </div>
+      <p style="margin:0 0 18px;font-size:12px;color:#6B807E;">₪${ilCurrency(p.monthlyTotalWithVat)} לחודש כולל מע&quot;מ (${p.vatPct}%). המרכז מוצג כרובריקה אחת במערכת ההתאמות.</p>`
+    : `
       <div style="border:1px solid #DDE9E8;border-radius:12px;overflow:hidden;margin:0 0 8px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#1a4a5c;">
           <tr>

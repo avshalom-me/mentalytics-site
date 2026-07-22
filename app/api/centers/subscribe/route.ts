@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { createCenterSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
 import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
-import { centerPricing } from "@/app/lib/center-pricing";
+import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 
 // הרשמת מרכז טיפולי למנוי — נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
@@ -75,13 +75,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "ההצעה הזו כבר לא בתוקף — פנו אלינו לקבלת הצעה חדשה" }, { status: 400 });
     }
 
-    // מודל התמחור: מחיר-למטפל × מספר-מטפלים = סה"כ חודשי (לפני מע"מ).
+    // סכום חודשי לפי מסלול המרכז: מסלול 1 (מחיר×מספר) / מסלול 2 (מחיר קבוע).
+    const billingTrack = (center.billing_track as string) ?? "per_therapist";
     const pricePerTherapist = Number(center.price_per_therapist) || 0;
     const therapistCount = Math.floor(Number(center.therapist_count) || 0);
-    if (pricePerTherapist <= 0 || therapistCount <= 0) {
-      return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר ומספר מטפלים — פנו אלינו" }, { status: 400 });
+    const monthlyTotal = centerMonthlyPricing({
+      billing_track: billingTrack,
+      price_per_therapist: pricePerTherapist,
+      therapist_count: therapistCount,
+      fixed_monthly_price: center.fixed_monthly_price as number | null,
+    }).monthlyTotal;
+    if (monthlyTotal <= 0) {
+      return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר — פנו אלינו" }, { status: 400 });
     }
-    const monthlyTotal = centerPricing(pricePerTherapist, therapistCount).monthlyTotal;
 
     // מנעול כפילות אטומי: שורת payment במצב pending. אינדקס ייחודי
     // (reference_id, payment_type) WHERE pending חוסם הגשה כפולה מקבילה —
@@ -104,8 +110,10 @@ export async function POST(req: NextRequest) {
         status: "pending",
         metadata: {
           center_name: center.name,
+          billing_track: billingTrack,
           price_per_therapist: pricePerTherapist,
           therapist_count: therapistCount,
+          monthly_total: monthlyTotal,
           gift_months: center.gift_months,
           payer_name: payerName,
           payer_email: payerEmail,
@@ -222,8 +230,10 @@ export async function POST(req: NextRequest) {
       await sendCenterWelcomeEmail({
         to: payerEmail,
         centerName: center.name,
+        billingTrack,
         pricePerTherapist,
         therapistCount,
+        fixedMonthlyPrice: center.fixed_monthly_price as number | null,
         giftMonths,
         billingStartsAt: firstChargeDate ?? now.toISOString().slice(0, 10),
       });

@@ -2,7 +2,7 @@ import "server-only";
 import { Resend } from "resend";
 import { logEmail } from "./email-log";
 import { buildCenterProposalEmail } from "./center-proposal-email";
-import { centerPricing, ilCurrency } from "./center-pricing";
+import { centerMonthlyPricing, ilCurrency } from "./center-pricing";
 
 // מיילים למרכזים טיפוליים. נפרד מ-therapist-emails כי הנמען והתוכן שונים
 // (מרכז, לא מטפל בודד). כל שליחה נרשמת ל-crm_email_log (fire-and-forget).
@@ -38,8 +38,10 @@ export async function sendCenterProposalEmail(opts: {
   to: string;
   centerName: string;
   contactName: string | null;
+  billingTrack?: string | null;
   pricePerTherapist: number;
   therapistCount: number;
+  fixedMonthlyPrice?: number | null;
   giftMonths: number;
   token: string;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -51,8 +53,10 @@ export async function sendCenterProposalEmail(opts: {
   const { subject, html } = buildCenterProposalEmail({
     centerName: opts.centerName,
     contactName: opts.contactName,
+    billingTrack: opts.billingTrack,
     pricePerTherapist: opts.pricePerTherapist,
     therapistCount: opts.therapistCount,
+    fixedMonthlyPrice: opts.fixedMonthlyPrice,
     giftMonths: opts.giftMonths,
     token: opts.token,
     siteUrl: SITE_URL,
@@ -88,8 +92,10 @@ export async function sendCenterProposalEmail(opts: {
 export async function sendCenterWelcomeEmail(opts: {
   to: string;
   centerName: string;
+  billingTrack?: string | null;
   pricePerTherapist: number;
   therapistCount: number;
+  fixedMonthlyPrice?: number | null;
   giftMonths: number;
   billingStartsAt: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -100,8 +106,15 @@ export async function sendCenterWelcomeEmail(opts: {
 
   const rawName = (opts.centerName || "המרכז").trim();
   const name = escapeHtml(rawName);
-  const pr = centerPricing(opts.pricePerTherapist, opts.therapistCount);
-  const priceLine = `${pr.therapistCount} מטפלים × ₪${ilCurrency(pr.pricePerTherapist)} = ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`;
+  const pr = centerMonthlyPricing({
+    billing_track: opts.billingTrack,
+    price_per_therapist: opts.pricePerTherapist,
+    therapist_count: opts.therapistCount,
+    fixed_monthly_price: opts.fixedMonthlyPrice,
+  });
+  const priceLine = opts.billingTrack === "center_entity"
+    ? `מנוי חודשי — מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`
+    : `${pr.therapistCount} מטפלים × ₪${ilCurrency(pr.pricePerTherapist)} = ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`;
   const portalUrl = `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
   // נושא = טקסט רגיל, בלי HTML entities.
