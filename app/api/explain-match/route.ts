@@ -59,6 +59,10 @@ type ExplainResponse = {
   tone_note: string;
 };
 
+// Fixed disclaimer — set server-side so the model never has to echo it.
+const TONE_NOTE =
+  "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית.";
+
 // ── Title helper ──────────────────────────────────────────────────────────────
 
 function buildTitle(body: Body): string {
@@ -102,7 +106,7 @@ function buildMockExplanation(body: Body): ExplainResponse {
   return {
     title: buildTitle(body),
     explanation,
-    tone_note: "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית.",
+    tone_note: TONE_NOTE,
   };
 }
 
@@ -134,12 +138,35 @@ function buildPrompt(body: Body): string {
 
 // ── OpenAI call ───────────────────────────────────────────────────────────────
 
-async function callOpenAI(body: Body): Promise<ExplainResponse> {
+// The model returns ONLY the explanation text; title + tone_note are built
+// server-side. strict json_schema constrains decoding, so a response with
+// missing/renamed keys (seen in production with plain json_object mode) cannot
+// be generated.
+const RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "match_explanation",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: { explanation: { type: "string" } },
+      required: ["explanation"],
+      additionalProperties: false,
+    },
+  },
+} as const;
+
+// The API call succeeded but the content is unusable (refusal, truncation,
+// bad JSON) — the one case worth a single retry; transport errors are already
+// retried inside the SDK.
+class BadAiResponseError extends Error {}
+
+async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     max_tokens: 800,
     temperature: 0.5,
-    response_format: { type: "json_object" },
+    response_format: RESPONSE_FORMAT,
     messages: [
       {
         role: "system",
@@ -182,11 +209,10 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
 - אל תציין הבדלים בין סוגי רישיון/תואר.
 - אם addiction_cbt_fallback הוא true — ציין שלא נמצא מומחה להתמכרויות באזור וש-CBT הוא גישה יעילה גם להתמכרויות.
 - אל תאבחן, אל תבטיח הצלחה, אל תכתוב "הטוב ביותר". השתמש ב-"נמצאה התאמה", "מבין המומחים הזמינים".
-- הכותרת נקבעת בצד השרת — אל תייצר אותה.
+- הכותרת וההערה המשפטית נקבעות בצד השרת — אל תייצר אותן.
 - החזר JSON בלבד:
 {
-  "explanation": string,       // שתי הפסקאות מופרדות ב-"\\n\\n"
-  "tone_note": "ההתאמה מבוססת על תשובות השאלון ואינה מהווה אבחנה או המלצה בלעדית."
+  "explanation": string        // שתי הפסקאות מופרדות ב-"\\n\\n"
 }`,
       },
       {
@@ -196,21 +222,43 @@ async function callOpenAI(body: Body): Promise<ExplainResponse> {
     ],
   });
 
-  const content = response.choices[0]?.message?.content ?? "";
-  const parsed = JSON.parse(content) as Partial<ExplainResponse>;
+  const choice = response.choices[0];
+  const content = choice?.message?.content ?? "";
+  const diag = `finish_reason=${choice?.finish_reason ?? "none"}, refusal=${
+    choice?.message?.refusal ? "yes" : "no"
+  }, content_length=${content.length}`;
 
-  if (
-    typeof parsed.explanation !== "string" ||
-    typeof parsed.tone_note !== "string"
-  ) {
-    throw new Error("OpenAI response missing required fields");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new BadAiResponseError(`OpenAI response was not valid JSON (${diag})`);
+  }
+
+  const fields = (
+    typeof parsed === "object" && parsed !== null ? parsed : {}
+  ) as Partial<ExplainResponse>;
+  if (typeof fields.explanation !== "string" || fields.explanation.trim() === "") {
+    throw new BadAiResponseError(
+      `OpenAI response missing required fields (keys=[${Object.keys(fields).join(",")}], ${diag})`
+    );
   }
 
   return {
     title: buildTitle(body),
-    explanation: parsed.explanation,
-    tone_note: parsed.tone_note,
+    explanation: fields.explanation,
+    tone_note: TONE_NOTE,
   };
+}
+
+async function callOpenAI(body: Body): Promise<ExplainResponse> {
+  try {
+    return await callOpenAIOnce(body);
+  } catch (err) {
+    if (!(err instanceof BadAiResponseError)) throw err;
+    console.warn("[explain-match] unusable OpenAI content, retrying once:", err.message);
+    return callOpenAIOnce(body);
+  }
 }
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────

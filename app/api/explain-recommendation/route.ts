@@ -57,6 +57,16 @@ type ExplainResponse = {
   evidence_note: string;
 };
 
+// Fixed disclaimer — set server-side so the model never has to echo it.
+const EVIDENCE_NOTE =
+  "ההסבר מבוסס על תשובותיך לשאלון בלבד ואינו מהווה אבחון או המלצה רפואית.";
+
+// The title is a fixed template (the prompt used to ask the model for the
+// same string) — built server-side for both the AI and fallback paths.
+function buildTitle(body: Body): string {
+  return `למה הוצע ${body.recommendation.treatment_label}`;
+}
+
 // ── Mock / fallback explanation builder ──────────────────────────────────────
 
 function buildMockExplanation(body: Body): ExplainResponse {
@@ -67,13 +77,12 @@ function buildMockExplanation(body: Body): ExplainResponse {
     : "על בסיס מכלול התשובות בשאלון, ";
 
   return {
-    title: `למה הוצע ${recommendation.treatment_label}`,
+    title: buildTitle(body),
     explanation:
       factsText +
       `נמצאה התאמה ל${recommendation.treatment_label}. ` +
       "זוהי גישה רלוונטית לסוג הקושי שעלה. כדאי לבחון עם המטפל את ההתאמה הספציפית למצבך.",
-    evidence_note:
-      "ההסבר מבוסס על תשובותיך לשאלון בלבד ואינו מהווה אבחון או המלצה רפואית.",
+    evidence_note: EVIDENCE_NOTE,
   };
 }
 
@@ -129,41 +138,84 @@ const SYSTEM_PROMPT = `אתה עוזר שמסביר בעברית פשוטה, ח�
 - אורך כולל לשתי הפסקאות: כ-150-220 מילים.
 - אם recommendation.urgent הוא true — הוסף בסוף משפט קצר על כך שזו הפנייה דחופה יותר וכדאי לפעול בקרוב.
 
+הכותרת וההערה המשפטית נקבעות בצד השרת — אל תייצר אותן.
 החזר JSON בלבד:
 {
-  "title": string,             // כותרת קצרה: "למה הוצע X" (X = שם הטיפול)
-  "explanation": string,       // שתי הפסקאות מופרדות ב-"\\n\\n" (שורה ריקה)
-  "evidence_note": "ההסבר מבוסס על תשובותיך לשאלון בלבד ואינו מהווה אבחון או המלצה רפואית."
+  "explanation": string        // שתי הפסקאות מופרדות ב-"\\n\\n" (שורה ריקה)
 }`;
 
-async function callOpenAI(body: Body): Promise<ExplainResponse> {
+// The model returns ONLY the explanation text; title + evidence_note are built
+// server-side. strict json_schema constrains decoding, so a response with
+// missing/renamed keys (seen in production with plain json_object mode) cannot
+// be generated.
+const RESPONSE_FORMAT = {
+  type: "json_schema",
+  json_schema: {
+    name: "recommendation_explanation",
+    strict: true,
+    schema: {
+      type: "object",
+      properties: { explanation: { type: "string" } },
+      required: ["explanation"],
+      additionalProperties: false,
+    },
+  },
+} as const;
+
+// The API call succeeded but the content is unusable (refusal, truncation,
+// bad JSON) — the one case worth a single retry; transport errors are already
+// retried inside the SDK.
+class BadAiResponseError extends Error {}
+
+async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
   const response = await openai.chat.completions.create({
     model: "gpt-4o-mini",
     max_tokens: 800,
     temperature: 0.4,
-    response_format: { type: "json_object" },
+    response_format: RESPONSE_FORMAT,
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: buildPrompt(body) },
     ],
   });
 
-  const content = response.choices[0]?.message?.content ?? "";
-  const parsed = JSON.parse(content) as Partial<ExplainResponse>;
+  const choice = response.choices[0];
+  const content = choice?.message?.content ?? "";
+  const diag = `finish_reason=${choice?.finish_reason ?? "none"}, refusal=${
+    choice?.message?.refusal ? "yes" : "no"
+  }, content_length=${content.length}`;
 
-  if (
-    typeof parsed.title !== "string" ||
-    typeof parsed.explanation !== "string" ||
-    typeof parsed.evidence_note !== "string"
-  ) {
-    throw new Error("OpenAI response missing required fields");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(content);
+  } catch {
+    throw new BadAiResponseError(`OpenAI response was not valid JSON (${diag})`);
+  }
+
+  const fields = (
+    typeof parsed === "object" && parsed !== null ? parsed : {}
+  ) as Partial<ExplainResponse>;
+  if (typeof fields.explanation !== "string" || fields.explanation.trim() === "") {
+    throw new BadAiResponseError(
+      `OpenAI response missing required fields (keys=[${Object.keys(fields).join(",")}], ${diag})`
+    );
   }
 
   return {
-    title: parsed.title,
-    explanation: parsed.explanation,
-    evidence_note: parsed.evidence_note,
+    title: buildTitle(body),
+    explanation: fields.explanation,
+    evidence_note: EVIDENCE_NOTE,
   };
+}
+
+async function callOpenAI(body: Body): Promise<ExplainResponse> {
+  try {
+    return await callOpenAIOnce(body);
+  } catch (err) {
+    if (!(err instanceof BadAiResponseError)) throw err;
+    console.warn("[explain-recommendation] unusable OpenAI content, retrying once:", err.message);
+    return callOpenAIOnce(body);
+  }
 }
 
 // ── Rate limiting ─────────────────────────────────────────────────────────────
