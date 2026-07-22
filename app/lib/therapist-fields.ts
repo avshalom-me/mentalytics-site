@@ -10,6 +10,7 @@ export const THERAPIST_EDIT_FIELDS = [
   "regions", "cultural_prefs", "arrangements", "age_groups", "languages",
   "style_q1", "style_q2", "activity_level",
   "education", "experience",
+  "accepting_new_patients",
 ] as const;
 
 // הפורטל מנהל פרופילים שאין להם חשבון מטפל, ולכן מנהל המרכז קובע גם את מייל

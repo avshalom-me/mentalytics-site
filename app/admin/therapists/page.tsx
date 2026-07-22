@@ -58,6 +58,8 @@ type AdminTherapist = {
   completion_requested_at: string | null;
   profile_updated_at: string | null;
   article_invite_sent_at: string | null;
+  accepting_new_patients: boolean;
+  accepting_new_changed_at: string | null;
 };
 
 type EditForm = {
@@ -67,6 +69,7 @@ type EditForm = {
   bio: string;
   gender: string;
   online: boolean;
+  accepting_new_patients: boolean;
   therapist_types: string[];
   training_areas: string[];
   assessment_types: string[];
@@ -255,6 +258,7 @@ export default function AdminTherapistsPage() {
   const [filterCultural, setFilterCultural] = useState("");
   const [filterAgeGroup, setFilterAgeGroup] = useState("");
   const [filterPromotion, setFilterPromotion] = useState("");
+  const [filterAvailability, setFilterAvailability] = useState("");
   const [showFilters, setShowFilters] = useState(false);
 
   // ── Tabbed workspace ──
@@ -353,6 +357,7 @@ export default function AdminTherapistsPage() {
       bio: t.bio,
       gender: t.gender,
       online: t.online,
+      accepting_new_patients: t.accepting_new_patients !== false,
       therapist_types: [...t.therapist_types],
       training_areas: [...t.training_areas],
       assessment_types: [...t.assessment_types],
@@ -886,7 +891,7 @@ export default function AdminTherapistsPage() {
   if (error) return <div className="p-6 text-center text-red-600">שגיאה: {error}</div>;
   if (therapists.length === 0) return <div className="p-6 text-center">לא נמצאו מטפלים.</div>;
 
-  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup || filterPromotion;
+  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup || filterPromotion || filterAvailability;
 
   function matchesFilters(t: AdminTherapist) {
     if (filterName && !t.full_name.toLowerCase().includes(filterName.toLowerCase())) return false;
@@ -902,6 +907,8 @@ export default function AdminTherapistsPage() {
       if (filterPromotion === "gift" && !(isPaying && !isPaid)) return false; // מקודם במתנה
       if (filterPromotion === "none" && isPaying) return false;       // לא מקודם
     }
+    if (filterAvailability === "unavailable" && t.accepting_new_patients !== false) return false;
+    if (filterAvailability === "available" && t.accepting_new_patients === false) return false;
     return true;
   }
 
@@ -1056,6 +1063,14 @@ export default function AdminTherapistsPage() {
                       : "משויך למרכז טיפולי (מסך המרכזים ← ניהול מטפלים)"}
                   >
                     🏢 מרכז: {therapist.center_name ?? "—"}{therapist.promotion_source === "center" ? " · מקודם" : ""}
+                  </span>
+                )}
+                {therapist.accepting_new_patients === false && (
+                  <span
+                    className="rounded-full bg-stone-200 px-3 py-1 text-xs font-semibold text-stone-700 border border-stone-400"
+                    title={`לא זמין/ה לקבלת מטופלים חדשים — לא מופיע/ה בהתאמות ולא ניתן לשלוח הודעה מהאתר${therapist.accepting_new_changed_at ? ` (מאז ${new Date(therapist.accepting_new_changed_at).toLocaleDateString("he-IL")})` : ""}`}
+                  >
+                    ⏸ לא זמין למטופלים חדשים
                   </span>
                 )}
                 {/* FREE_REGION_FALLBACK (זמני) */}
@@ -1482,6 +1497,15 @@ export default function AdminTherapistsPage() {
                 <option value="none">לא מקודם</option>
               </select>
             </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">זמינות</label>
+              <select value={filterAvailability} onChange={(e) => setFilterAvailability(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                <option value="unavailable">⏸ לא זמינים למטופלים חדשים</option>
+                <option value="available">זמינים בלבד</option>
+              </select>
+            </div>
           </div>
         )}
       </div>
@@ -1623,6 +1647,12 @@ export default function AdminTherapistsPage() {
                               {t.missing.length > 0 && (
                                 <span className="mr-1 inline-block rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
                                   חסר מידע
+                                </span>
+                              )}
+                              {t.accepting_new_patients === false && (
+                                <span className="mr-1 inline-block rounded-full border border-stone-300 bg-stone-100 px-2 py-0.5 text-xs font-semibold text-stone-600"
+                                  title="לא זמין/ה לקבלת מטופלים חדשים — מחוץ להתאמות, בלי הודעות מהאתר">
+                                  ⏸ לא זמין
                                 </span>
                               )}
                               {t.article_invite_sent_at && (
@@ -1954,6 +1984,21 @@ export default function AdminTherapistsPage() {
                   onChange={(e) => setEditForm({ ...editForm, online: e.target.checked })}
                 />
                 מטפל/ת אונליין
+              </label>
+
+              <label className={`flex cursor-pointer items-start gap-2 rounded-xl border p-3 text-sm font-semibold ${!editForm.accepting_new_patients ? "border-amber-300 bg-amber-50 text-amber-900" : "border-stone-200 text-stone-800"}`}>
+                <input
+                  type="checkbox"
+                  className="mt-0.5"
+                  checked={!editForm.accepting_new_patients}
+                  onChange={(e) => setEditForm({ ...editForm, accepting_new_patients: !e.target.checked })}
+                />
+                <span>
+                  ⏸ כעת לא זמין/ה לקבלת מטופלים / אבחונים חדשים
+                  <span className="mt-0.5 block text-xs font-normal text-stone-500">
+                    מסומן = לא יופיע בהתאמות ולא ניתן לשלוח הודעה מהאתר; נשאר במאגר הכללי בלבד.
+                  </span>
+                </span>
               </label>
 
               <CheckboxGroup

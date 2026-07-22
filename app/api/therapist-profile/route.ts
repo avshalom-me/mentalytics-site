@@ -214,9 +214,19 @@ export async function PATCH(req: NextRequest) {
   // Check if therapist exists for this user
   const { data: existing } = await supabaseAdmin
     .from("therapists")
-    .select("id, status, full_name")
+    .select("id, status, full_name, accepting_new_patients")
     .eq("user_id", user.id)
     .single();
+
+  // Stamp availability changes (only real flips — the form re-sends the whole
+  // state on every save) so the admin can see "לא זמין מאז...".
+  if (
+    existing &&
+    typeof update.accepting_new_patients === "boolean" &&
+    update.accepting_new_patients !== (existing.accepting_new_patients !== false)
+  ) {
+    update.accepting_new_changed_at = new Date().toISOString();
+  }
 
   if (!existing) {
     // Create new therapist record

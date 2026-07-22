@@ -30,6 +30,7 @@ type TherapistRow = {
   promotion_source: string | null;
   center_account_id: string | null;
   created_at: string | null;
+  accepting_new_patients: boolean | null;
 };
 
 function rowInRegion(regions: string[] | null, region: string): boolean {
@@ -40,7 +41,9 @@ function rowInRegion(regions: string[] | null, region: string): boolean {
 //   0 = paying  — real money on the table (individual "paid" + center-subscription)
 //   1 = gift    — manual / trial promotions (comped, no payment)
 //   2 = free    — approved, unpaid
+//   3 = not accepting new patients — still listed, always last
 function tierOf(t: TherapistRow): number {
+  if (t.accepting_new_patients === false) return 3;
   if (t.status === "paying" && (t.promotion_source === "paid" || t.promotion_source === "center")) return 0;
   if (t.status === "paying") return 1; // manual / trial gift
   return 2; // approved free
@@ -69,6 +72,7 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
     profile_photo_path: t.profile_photo_path ?? null,
     profile_photo_url,
     tier: tierOf(t),
+    accepting_new_patients: t.accepting_new_patients !== false,
   };
 }
 
@@ -86,7 +90,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, center_account_id, created_at`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
@@ -141,7 +145,12 @@ export async function countListedByRegionAndCity(): Promise<{
 export async function loadPublicTherapists(
   filter?: DirectoryFilter
 ): Promise<PublicTherapist[]> {
-  const rows = await loadFilteredRows(filter);
+  const allRows = await loadFilteredRows(filter);
+
+  // Therapists not accepting new patients stay listed but always sort last —
+  // no point showcasing someone patients can't currently reach.
+  const unavailable = allRows.filter((t) => t.accepting_new_patients === false);
+  const rows = allRows.filter((t) => t.accepting_new_patients !== false);
 
   const boostCutoff = Date.now() - NEW_THERAPIST_BOOST_DAYS * 24 * 60 * 60 * 1000;
   const isNew = (t: TherapistRow) =>
@@ -186,6 +195,7 @@ export async function loadPublicTherapists(
     ...rotate(giftOld),
     ...rotate(approvedNew),
     ...approvedOld,
+    ...rotate(unavailable),
   ];
   return Promise.all(ordered.map(signRow));
 }

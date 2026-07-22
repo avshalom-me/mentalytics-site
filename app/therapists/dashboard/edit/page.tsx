@@ -84,6 +84,7 @@ export default function TherapistProfileEditPage() {
 
   const [form, setForm] = useState({
     full_name: "", phone: "", bio: "", gender: "", online: false,
+    accepting_new_patients: true,
     therapist_types: [] as string[], training_areas: [] as string[],
     assessment_types: [] as string[], regions: [] as string[],
     cultural_prefs: [] as string[], arrangements: [] as string[],
@@ -124,6 +125,7 @@ export default function TherapistProfileEditPage() {
           bio: json.therapist.bio ?? "",
           gender: json.therapist.gender ?? "",
           online: json.therapist.online ?? false,
+          accepting_new_patients: json.therapist.accepting_new_patients ?? true,
           therapist_types: json.therapist.therapist_types ?? [],
           training_areas: (json.therapist.training_areas ?? []).filter((a: string) => !PLAY_MODALITIES_SET.has(a)),
           couples_modalities: json.therapist.couples_modalities ?? [],
@@ -506,6 +508,27 @@ export default function TherapistProfileEditPage() {
               rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="תפקידים, מסגרות עבודה, שנות ניסיון..." />
           </div>
+        </div>
+
+        {/* Availability — pausing new patient inquiries without leaving the directory */}
+        <div className={`rounded-2xl border p-6 ${!form.accepting_new_patients ? "border-amber-300 bg-amber-50" : "border-[#E8E0D8] bg-white"}`}>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-3">זמינות לקבלת מטופלים</h2>
+          <label className="flex items-start gap-3 cursor-pointer">
+            <input type="checkbox" className="mt-1" checked={!form.accepting_new_patients}
+              onChange={e => setForm({ ...form, accepting_new_patients: !e.target.checked })} />
+            <span>
+              <span className="block text-sm font-bold text-stone-800">כעת לא זמין/ה לקבלת מטופלים / אבחונים חדשים</span>
+              <span className="mt-1 block text-xs leading-5 text-stone-500">
+                כשמסומן: הפרופיל נשאר גלוי במאגר המטפלים, אבל לא יוצע בהתאמות חדשות ולא ניתן יהיה לשלוח
+                אליך פניות דרך האתר. אפשר לבטל את הסימון בכל רגע — כשמתפנה מקום, פשוט חוזרים לקבל פניות.
+              </span>
+            </span>
+          </label>
+          {!form.accepting_new_patients && (
+            <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-amber-700 border border-amber-200">
+              ⏸ הפרופיל מסומן כלא זמין — מטופלים חדשים יופנו למטפלים אחרים עד שתחזרו לזמינות.
+            </p>
+          )}
         </div>
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">

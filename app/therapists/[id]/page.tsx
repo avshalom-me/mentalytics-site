@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { CITY_TO_REGION } from "@/app/lib/regions";
 import { genderTitle, genderTitles } from "@/app/lib/gender-text";
 import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/therapist-url";
 import ContactButtons from "./ContactButtons";
@@ -29,6 +30,7 @@ type TherapistRow = {
   profile_photo_path: string | null;
   education: string | null;
   experience: string | null;
+  accepting_new_patients: boolean | null;
 };
 
 async function getTherapist(id: string): Promise<TherapistRow | null> {
@@ -38,7 +40,8 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
       id, full_name, bio, gender, online,
       therapist_types, training_areas, assessment_types,
       regions, cultural_prefs, arrangements, languages, age_groups,
-      phone, email, profile_photo_path, education, experience
+      phone, email, profile_photo_path, education, experience,
+      accepting_new_patients
     `)
     .eq("id", id)
     .in("status", ["approved", "paying"])
@@ -49,6 +52,41 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
   // Photos are served via the stable /therapist-photo/<id> route (indexable),
   // so no signed URL is generated here.
   return data as TherapistRow;
+}
+
+type SimilarTherapist = {
+  id: string;
+  full_name: string | null;
+  gender: string | null;
+  therapist_types: string[] | null;
+  regions: string[] | null;
+  profile_photo_path: string | null;
+  status: string | null;
+};
+
+// Alternatives shown on an unavailable therapist's profile: same professional
+// type, overlapping region (city-level or region-level), currently accepting.
+// Paying therapists first, then up to `limit` total.
+async function getSimilarTherapists(t: TherapistRow, limit = 3): Promise<SimilarTherapist[]> {
+  const types = (t.therapist_types ?? []).filter(Boolean);
+  const regionSet = new Set(
+    (t.regions ?? []).map((c) => CITY_TO_REGION[c] ?? c)
+  );
+  if (types.length === 0 || regionSet.size === 0) return [];
+
+  const { data } = await supabaseAdmin
+    .from("therapists")
+    .select("id, full_name, gender, therapist_types, regions, profile_photo_path, status, accepting_new_patients")
+    .in("status", ["approved", "paying"])
+    .eq("admin_approved", true)
+    .eq("accepting_new_patients", true)
+    .neq("id", t.id)
+    .overlaps("therapist_types", types);
+
+  const candidates = ((data ?? []) as (SimilarTherapist & { accepting_new_patients: boolean | null })[])
+    .filter((c) => (c.regions ?? []).some((city) => regionSet.has(CITY_TO_REGION[city] ?? city)));
+  candidates.sort((a, b) => (a.status === "paying" ? 0 : 1) - (b.status === "paying" ? 0 : 1));
+  return candidates.slice(0, limit);
 }
 
 type ArticleLink = { slug: string; title: string; summary: string; topic: string | null };
@@ -146,7 +184,11 @@ export default async function TherapistProfilePage({
     permanentRedirect(`/therapists/${encodeURIComponent(canonicalSeg)}${query ? `?${query}` : ""}`);
   }
 
-  const articles = await getTherapistArticles(id);
+  const unavailable = therapistRow.accepting_new_patients === false;
+  const [articles, similar] = await Promise.all([
+    getTherapistArticles(id),
+    unavailable ? getSimilarTherapists(therapistRow) : Promise.resolve([]),
+  ]);
   const t = therapistRow;
   const name = t.full_name ?? "מטפל";
   const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
@@ -231,18 +273,73 @@ export default async function TherapistProfilePage({
               </div>
             )}
 
-            <ContactButtons
-              therapistId={id}
-              therapistName={t.full_name ?? ""}
-              waLink={waLink}
-              phone={t.phone}
-              source={source}
-              mobileSticky
-            />
+            {unavailable ? (
+              <div className="mt-6 rounded-2xl bg-white p-4 sm:p-5" style={{ border: "1.5px solid var(--gold)" }}>
+                <p className="font-extrabold text-stone-900">
+                  🕐 {name} {t.gender === "נקבה" ? "אינה זמינה" : "אינו זמין"} כרגע לקבלת מטופלים / אבחונים חדשים
+                </p>
+                <p className="mt-1 text-sm text-stone-600 leading-6">
+                  אפשר להתרשם מהפרופיל, אך לא ניתן לשלוח פנייה חדשה בשלב זה. כדי למצוא מטפל/ת פנוי/ה שמתאים/ה לכם:
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link href="/adults" className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold text-white hover:opacity-90" style={{ background: "var(--teal)" }}>
+                    🎯 שאלון התאמה למבוגרים
+                  </Link>
+                  <Link href="/kids" className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold hover:bg-[#EAF4F3]" style={{ border: "1.5px solid var(--teal)", color: "var(--teal-dark)", background: "white" }}>
+                    שאלון לילדים ונוער
+                  </Link>
+                  <Link href="/therapists" className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-extrabold hover:bg-stone-50" style={{ border: "1px solid var(--line)", color: "var(--text-2)", background: "white" }}>
+                    לכל המטפלים במאגר
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <ContactButtons
+                therapistId={id}
+                therapistName={t.full_name ?? ""}
+                waLink={waLink}
+                phone={t.phone}
+                source={source}
+                mobileSticky
+              />
+            )}
           </div>
 
         </div>
       </div>
+
+      {/* Unavailable therapist → offer available colleagues of the same type + area */}
+      {unavailable && similar.length > 0 && (
+        <section className="mb-10">
+          <SectionTitle>מטפלים מאותו תחום ואזור שזמינים כעת</SectionTitle>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {similar.map((s) => (
+              <Link key={s.id} href={therapistPath(s.id, s.full_name)}
+                className="flex items-center gap-4 rounded-2xl bg-white p-4 transition hover:shadow-md"
+                style={{ border: "1px solid var(--line)" }}>
+                <img
+                  src={s.profile_photo_path ? `/therapist-photo/${s.id}` : (s.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                  alt={s.full_name ?? ""}
+                  className="h-16 w-16 rounded-full object-cover object-top flex-shrink-0"
+                  style={{ border: "2px solid var(--teal-mid)" }}
+                  loading="lazy"
+                />
+                <div className="min-w-0">
+                  <div className="font-extrabold text-stone-900 truncate">{s.full_name}</div>
+                  {s.therapist_types?.[0] && (
+                    <div className="text-sm font-semibold" style={{ color: "var(--teal)" }}>
+                      {genderTitle(s.therapist_types[0], s.gender)}
+                    </div>
+                  )}
+                  {(s.regions?.length ?? 0) > 0 && (
+                    <div className="text-xs text-stone-500 truncate">📍 {s.regions!.slice(0, 2).join(", ")}</div>
+                  )}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Body — two columns on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">

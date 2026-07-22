@@ -50,6 +50,8 @@ type TherapistRow = {
   profile_updated_at: string | null;
   article_invite_sent_at: string | null;
   center_account_id: string | null;
+  accepting_new_patients: boolean | null;
+  accepting_new_changed_at: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -118,7 +120,9 @@ async function buildTherapistsResponse(onlyId?: string) {
       completion_requested_at,
       profile_updated_at,
       article_invite_sent_at,
-      center_account_id
+      center_account_id,
+      accepting_new_patients,
+      accepting_new_changed_at
       `
     )
     .order("full_name", { ascending: true });
@@ -319,6 +323,8 @@ async function buildTherapistsResponse(onlyId?: string) {
         completion_requested_at: t.completion_requested_at ?? null,
         profile_updated_at: t.profile_updated_at ?? null,
         article_invite_sent_at: t.article_invite_sent_at ?? null,
+        accepting_new_patients: t.accepting_new_patients !== false,
+        accepting_new_changed_at: t.accepting_new_changed_at ?? null,
         views_30d: viewsByTherapist[t.id] ?? 0,
         contacts_30d: contactsByTherapist[t.id] ?? 0,
         subscription: subByTherapist[t.id] ?? null,
@@ -735,7 +741,7 @@ export async function PATCH(request: Request) {
 
     // עדכון שדות מלאים (עריכה)
     if (body.fields) {
-      const allowed = ["full_name","email","phone","bio","gender","online","therapist_types","training_areas","assessment_types","regions","cultural_prefs","arrangements"];
+      const allowed = ["full_name","email","phone","bio","gender","online","therapist_types","training_areas","assessment_types","regions","cultural_prefs","arrangements","accepting_new_patients"];
       const update: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body.fields) update[key] = body.fields[key];
@@ -747,6 +753,11 @@ export async function PATCH(request: Request) {
           const n = Number(body.fields[key]);
           update[key] = Number.isInteger(n) && n >= 1 && n <= 7 ? n : null;
         }
+      }
+      // Availability flips get a timestamp ("לא זמין מאז..."). The edit modal
+      // only sends changed fields, so presence here means an actual flip.
+      if (typeof update.accepting_new_patients === "boolean") {
+        update.accepting_new_changed_at = new Date().toISOString();
       }
       const { error } = await supabaseAdmin.from("therapists").update(update).eq("id", id);
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

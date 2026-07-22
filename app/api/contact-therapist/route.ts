@@ -67,13 +67,22 @@ export async function POST(req: NextRequest) {
 
     const { data: therapist, error: therapistErr } = await supabaseAdmin
       .from("therapists")
-      .select("id, full_name, email, status")
+      .select("id, full_name, email, status, accepting_new_patients")
       .eq("id", therapist_id)
       .in("status", ["approved", "paying"])
       .maybeSingle();
 
     if (therapistErr || !therapist || !therapist.email) {
       return NextResponse.json({ ok: false, error: "מטפל לא זמין" }, { status: 404 });
+    }
+
+    // Server-side enforcement of the availability flag — the UI hides the
+    // button, but a stale open tab (or a direct POST) must be rejected too.
+    if (therapist.accepting_new_patients === false) {
+      return NextResponse.json(
+        { ok: false, error: "המטפל/ת אינו/ה מקבל/ת כרגע פניות חדשות. אפשר למצוא מטפלים אחרים במאגר או למלא שאלון התאמה." },
+        { status: 409 }
+      );
     }
 
     const safeSource: Source = VALID_SOURCES.includes(source as Source) ? source : "directory";

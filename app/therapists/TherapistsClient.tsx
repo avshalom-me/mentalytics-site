@@ -50,9 +50,13 @@ export type PublicTherapist = {
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   // Ranking tier for the directory: 0 = paying (paid + center), 1 = gift
-  // (manual/trial promotions), 2 = free. The list is grouped by tier and
-  // shuffled WITHIN each tier per visit (see shuffleWithinTiers).
+  // (manual/trial promotions), 2 = free, 3 = not accepting new patients
+  // (always last). The list is grouped by tier and shuffled WITHIN each
+  // tier per visit (see shuffleWithinTiers).
   tier?: number;
+  // false = "כעת לא זמין/ה לקבלת מטופלים חדשים": card shows a note instead of
+  // contact buttons (the server also rejects site messages for them).
+  accepting_new_patients: boolean;
 };
 
 // Fisher-Yates shuffle within each tier, preserving tier order (paying → gift →
@@ -97,6 +101,7 @@ function TherapistCard({
   const [messageOpen, setMessageOpen] = useState(false);
   const showImage = t.profile_photo_url && !brokenImages[t.id];
   const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
+  const unavailable = t.accepting_new_patients === false;
 
   const handleImageError = () => {
     if (retryCount.current < 2 && imgRef.current && t.profile_photo_url) {
@@ -157,7 +162,13 @@ function TherapistCard({
         </div>
       </Link>
       <div className="px-5 pb-5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-        {t.phone && (
+        {unavailable && (
+          <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold"
+            style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--muted)" }}>
+            ⏸ {t.gender === "נקבה" ? "לא זמינה כרגע למטופלים חדשים" : "לא זמין כרגע למטופלים חדשים"}
+          </span>
+        )}
+        {!unavailable && t.phone && (
           <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
             target="_blank" rel="noopener noreferrer"
             onClick={() => trackClick(t.id, "whatsapp")}
@@ -166,7 +177,7 @@ function TherapistCard({
             וואטסאפ
           </a>
         )}
-        {t.phone && (
+        {!unavailable && t.phone && (
           <a href={`tel:${t.phone}`}
             onClick={() => trackClick(t.id, "phone")}
             className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-[13px] font-bold text-stone-700 hover:bg-stone-200">
@@ -174,14 +185,16 @@ function TherapistCard({
             חיוג
           </a>
         )}
-        <button
-          type="button"
-          onClick={() => setMessageOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90" style={{ background: "var(--teal)" }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-          הודעה
-        </button>
+        {!unavailable && (
+          <button
+            type="button"
+            onClick={() => setMessageOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90" style={{ background: "var(--teal)" }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            הודעה
+          </button>
+        )}
         <Link href={therapistPath(t.id, t.full_name)} className="text-[13px] font-bold hover:underline" style={{ color: "var(--teal)", marginInlineStart: "auto" }}>
           פרופיל מלא ←
         </Link>
