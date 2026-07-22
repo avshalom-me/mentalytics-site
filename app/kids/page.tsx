@@ -2621,6 +2621,7 @@ function KidsMatchSection({ A, score, selection }: {
         body: JSON.stringify({
           questionnaire_type: "child",
           user_summary: {
+            gender: A.gender || undefined,
             region_preference: city || region || undefined,
             online_preference: online || undefined,
             therapist_gender_preference: gender || undefined,

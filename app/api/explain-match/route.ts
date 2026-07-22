@@ -14,6 +14,8 @@ const BodySchema = z.object({
   user_summary: z
     .object({
       age_group: z.string().optional(),
+      // adult flow: the user's gender; child flow: the child's gender.
+      gender: z.string().nullable().optional(),
       region_preference: z.string().optional(),
       online_preference: z.boolean().optional(),
       therapist_gender_preference: z.string().nullable().optional(),
@@ -68,14 +70,16 @@ const TONE_NOTE =
 function buildTitle(body: Body): string {
   const isAssessment = (body.user_summary?.recommended_assessment_types?.length ?? 0) > 0;
   const gender = body.therapist.gender;
+  // Child questionnaires are filled by parents — the match is for their child.
+  const forWhom = body.questionnaire_type === "child" ? "לילדכם" : "לך";
   if (isAssessment) {
-    if (gender === "נקבה") return "למה המאבחנת הזאת הוצעה לך";
-    if (gender === "זכר") return "למה המאבחן הזה הוצע לך";
-    return "למה המאבחן/ת הוצע/ה לך";
+    if (gender === "נקבה") return `למה המאבחנת הזאת הוצעה ${forWhom}`;
+    if (gender === "זכר") return `למה המאבחן הזה הוצע ${forWhom}`;
+    return `למה המאבחן/ת הוצע/ה ${forWhom}`;
   }
-  if (gender === "נקבה") return "למה המטפלת הזאת הוצעה לך";
-  if (gender === "זכר") return "למה המטפל הזה הוצע לך";
-  return "למה המטפל/ת הוצע/ה לך";
+  if (gender === "נקבה") return `למה המטפלת הזאת הוצעה ${forWhom}`;
+  if (gender === "זכר") return `למה המטפל הזה הוצע ${forWhom}`;
+  return `למה המטפל/ת הוצע/ה ${forWhom}`;
 }
 
 // ── Mock / fallback explanation builder ──────────────────────────────────────
@@ -112,8 +116,46 @@ function buildMockExplanation(body: Body): ExplainResponse {
 
 // ── OpenAI prompt builder ─────────────────────────────────────────────────────
 
+// Deterministic band label for the personality score — the model misreads
+// numeric thresholds, so only this label (never the number) is sent to it.
+function personalityFitLabel(score: number | null | undefined): string | null {
+  if (score == null) return null;
+  if (score >= 88) return "התאמה סגנונית גבוהה מאוד";
+  if (score >= 76) return "התאמה סגנונית טובה";
+  if (score >= 64) return "התאמה סגנונית חלקית";
+  return "פער סגנוני";
+}
+
+// Exact addressing directive, computed server-side — the model applies it
+// verbatim instead of deriving pronouns from conditional prompt rules (which
+// gpt-4o-mini follows unreliably).
+function addressingInstruction(body: Body): string {
+  const g = body.user_summary?.gender;
+  if (body.questionnaire_type === "child") {
+    const child =
+      g === "נקבה" ? 'על הילדה כתוב בלשון נקבה: "ילדתכם", "היא", "שלה"'
+      : g === "זכר" ? 'על הילד כתוב בלשון זכר: "ילדכם", "הוא", "שלו"'
+      : 'על הילד/ה כתוב "הילד/ה שלכם"';
+    return `פנה אל ההורים ברבים ("אתם", "שלכם"); ${child}.`;
+  }
+  if (g === "נקבה") return 'פנה אל הקוראת ביחיד בלשון נקבה ("את", "שלך", "ציינת") — לא ברבים.';
+  if (g === "זכר") return 'פנה אל הקורא ביחיד בלשון זכר ("אתה", "שלך", "ציינת") — לא ברבים.';
+  return 'פנה בניסוח ניטרלי בשם הפועל ("כדאי לבדוק", "אפשר לפנות") — בלי "אתה/את" ובלי לשון רבים.';
+}
+
+// Whether the online option is worth mentioning: the user asked for it, or the
+// therapist's regions don't clearly cover the user's area. On a clear region
+// match the field is omitted entirely so the model has nothing to say about it.
+function onlineRelevant(body: Body): boolean {
+  if (body.user_summary?.online_preference) return true;
+  const userRegion = body.user_summary?.region_preference;
+  if (!userRegion) return true;
+  return !(body.therapist.regions ?? []).includes(userRegion);
+}
+
 function buildPrompt(body: Body): string {
   return JSON.stringify({
+    addressing: addressingInstruction(body),
     questionnaire_type: body.questionnaire_type,
     search_mode: body.search_mode ?? "single",
     user_summary: body.user_summary ?? {},
@@ -124,12 +166,11 @@ function buildPrompt(body: Body): string {
       couples_modalities: body.therapist.couples_modalities ?? [],
       regions: body.therapist.regions ?? [],
       gender: body.therapist.gender ?? null,
-      online: body.therapist.online ?? false,
+      online: onlineRelevant(body) ? (body.therapist.online ?? false) : undefined,
       bio: body.therapist.bio ?? null,
     },
     match_result: {
-      match_score: body.match_result.match_score,
-      personality_score: body.match_result.personality_score ?? null,
+      personality_fit: personalityFitLabel(body.match_result.personality_score),
       match_reasons: body.match_result.match_reasons,
     },
     addiction_cbt_fallback: body.addiction_cbt_fallback ?? false,
@@ -172,6 +213,11 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
         role: "system",
         content: `אתה עוזר שמסביר בעברית פשוטה, חמה וכנה מדוע איש/ת מקצוע מסוים/ת הוצע/ה למשתמש, על בסיס תשובות השאלון שלו.
 
+**למי אתה כותב:**
+שדה addressing שבקלט קובע את צורת הפנייה (יחיד/רבים, זכר/נקבה/ניטרלי) — פעל לפיו במדויק, בכל משפט בהסבר.
+- אם questionnaire_type הוא "child" — את השאלון מילאו הורים על ילדם, וההורים הם שקוראים את ההסבר; המטופל/ת הוא הילד/ה. אסור לנסח כאילו ההורה הוא המטופל (לא "הצרכים שלך" ולא "התהליך הטיפולי שלך" — הצרכים והטיפול הם של הילד/ה). הכשרה בהדרכת הורים או ניסיון בעבודה עם הורים הם יתרון — קשור אותם לליווי של ההורים לצד הטיפול בילד/ה.
+- במצב adult הקורא הוא המטופל עצמו — אדם יחיד.
+
 **חשוב — הבחן בין שני מצבים:**
 
 אם recommended_assessment_types קיים ואינו ריק — מדובר בהפניה לאבחון (לא לטיפול). במקרה זה:
@@ -196,19 +242,22 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
 - **כלל עיגון:** קשור כל נקודת חוזק לצורך ספציפי שעלה אצל המשתמש — אל תכתוב שבחים כלליים ("מטפל/ת מנוסה ומקצועי/ת") שאינם נשענים על שדה שסופק.
 
 **פסקה 2 — התאמה כנה, מיקום וסגנון**:
-- מיקום: תמיד התייחס לאזור/מרחק (therapist.regions מול user_summary.region_preference); אם online=true — ציין אותו כפתרון לפערי מרחק.
-- רק בהפניה לטיפול: אם personality_score קיים ואינו null — התייחס להתאמה הסגנונית לפי הסולם: 88+ "התאמה סגנונית גבוהה מאוד"; 76-87 "טובה"; 64-75 "חלקית"; מתחת ל-64 "פער סגנוני".
+- מיקום: תמיד התייחס לאזור/מרחק (therapist.regions מול user_summary.region_preference). הזכר אונליין רק כשהוא מגשר על פער מרחק או כשהמשתמש העדיף אונליין; כשאין פער מרחק — אל תדון בצורת המפגש כלל (לא "אונליין" ולא "פרונטלי").
+- רק בהפניה לטיפול: אם match_result.personality_fit קיים — שלב את התיאור המילולי הזה כלשונו, והצג אותו כממצא של תהליך ההתאמה ("נמצאה התאמה סגנונית טובה") — לא כדבר שהמשתמש אמר או ציין. אם הוא "פער סגנוני" — הצג אותו בעדינות, כהזמנה לבחון את החיבור האישי בשיחת ההיכרות.
 - אם יש פער אמיתי (צורך שעלה ואינו בתחום ההתמחות) — ציין אותו בכנות ובעדינות, והסבר למה בכל זאת זו ההתאמה הקרובה ביותר שנמצאה מבין הזמינים. אם אין פער משמעותי — אל תמציא אחד.
 - אם search_mode הוא "combined" — הדגש אילו צרכים מכוסים ואילו פחות.
+- סיים בעובדה מעשית מקורקעת — למשל נקודה אחת ששווה לברר בשיחת ההיכרות (עדיף כזו שנוגעת לפער, אם קיים) — ולא בשבח מסכם או בהבטחה כללית ("תהליך שיכול להועיל לך").
 
 **כללים:**
-- כתוב בגוף שלישי לפי gender: "זכר" → לשון זכר; "נקבה" → לשון נקבה; אחר → ניטרלי.
+- כתוב על המטפל/ת בגוף שלישי לפי therapist.gender: "זכר" → לשון זכר; "נקבה" → לשון נקבה; אחר → ניטרלי.
+- אסור לנקוב במספרים, ציונים או אחוזים משום סוג (ציון התאמה, ציון סגנוני וכו') — תיאור מילולי בלבד.
+- user_summary.therapist_gender_preference הוא בקשת המשתמש לגבי מגדר המטפל/ת. מותר לכל היותר לציין שהבקשה נענתה; אסור להסיק ממנה דבר על קהל המטופלים של המטפל/ת (אל תכתוב "מטפלת נשים" וכדומה).
 - אל תחזור על match_reasons מילה במילה — סנתז.
 - התבסס אך ורק על השדות שסופקו. אל תמציא ותק, שנות ניסיון, הסמכות או התמחויות שלא צוינו.
 - מותר להשתמש ב-bio כמקור לתובנות, אך אל תצטט מילולית ואל תסיק ממנו פרטים שאינם כתובים בו במפורש.
 - אל תציין הבדלים בין סוגי רישיון/תואר.
 - אם addiction_cbt_fallback הוא true — ציין שלא נמצא מומחה להתמכרויות באזור וש-CBT הוא גישה יעילה גם להתמכרויות.
-- אל תאבחן, אל תבטיח הצלחה, אל תכתוב "הטוב ביותר". השתמש ב-"נמצאה התאמה", "מבין המומחים הזמינים".
+- אל תאבחן ואל תבטיח הצלחה — אל תשתמש בפועל "להבטיח" כלל, ואל תכתוב "הטוב ביותר" בשום הקשר (גם לא "בצורה הטובה ביותר"). השתמש ב-"נמצאה התאמה", "מבין המומחים הזמינים". אסור גם סופרלטיבים ושבחים מסכמים ("מתאימה מאוד", "התאמה מצוינת") — תועלת מנוסחת בלשון צנועה ומותנית ("יכול לעזור", "עשוי להקל").
 - הכותרת וההערה המשפטית נקבעות בצד השרת — אל תייצר אותן.
 - החזר JSON בלבד:
 {

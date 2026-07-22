@@ -789,6 +789,7 @@ export default function AdultsPage() {
       const couplesModality = selectedRec?.couplesModality ?? (combinedTreatments ? combinedCouplesModality : undefined);
       const userSummary = {
         age_group: answers.age ? `${answers.age}` : undefined,
+        gender: answers.gender || undefined,
         region_preference: matchPrefs.city || matchPrefs.region || undefined,
         online_preference: matchPrefs.online || undefined,
         therapist_gender_preference: matchPrefs.genderPref || undefined,
