@@ -92,9 +92,43 @@ export default function CentersInfoPage() {
           <span style={{ color: "var(--teal)" }}>עם ניהול וסטטיסטיקות במקום אחד.</span>
         </h1>
         <p className="mt-4 max-w-2xl text-lg leading-8 text-stone-700">
-          <strong>&quot;טיפול חכם&quot;</strong> היא פלטפורמה ישראלית שנבנתה על ידי פסיכולוגים וחוקרים. מטופלים עוברים שאלון חכם ואינטייק אוטומטי,
-          ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מקבל חשיפה במערכת ההתאמות, מערכת לניהול פרופילי המטפלים, ודוח חודשי שחושף מי מחפש אתכם — במחיר חודשי פשוט: <strong>מחיר מוזל לכל מטפל × מספר המטפלים</strong>, שנסגר איתכם אישית בשיחת ההתאמה.
+          <strong>&quot;טיפול חכם&quot;</strong> היא פלטפורמה ישראלית שנבנתה על ידי פסיכולוגים וחוקרים. מטופלים עוברים שאלון חכם,
+          ומופנים למטפלים או למרכזים הטיפוליים המתאימים ביותר. המרכז שלכם מקבל חשיפה במערכת ההתאמות, מערכת ניהול, ודוח חודשי שחושף מי מחפש אתכם — ב<strong>שני מסלולים לבחירתכם</strong> (ראו למטה), במחיר שנסגר איתכם אישית בשיחת ההתאמה.
         </p>
+      </section>
+
+      {/* שני מסלולים */}
+      <section className="mb-10">
+        <h2 className="mb-1 text-xl font-black text-stone-900">שני מסלולים להצטרפות</h2>
+        <p className="mb-5 text-sm leading-6 text-stone-600">בוחרים את הדרך שבה המרכז נכנס למערכת ההתאמות — לפי איך שנוח לכם לקבל ולשבץ פניות.</p>
+        <div className="grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border-2 p-5" style={{ borderColor: "var(--teal-mid)", background: "var(--teal-pale)" }}>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold" style={{ color: "var(--teal-dark)", border: "1px solid var(--teal-mid)" }}>
+              <Brain size={13} /> אינטייק אוטומטי
+            </div>
+            <h3 className="mb-2 text-lg font-black text-stone-900">כל מטפל בנפרד</h3>
+            <ul className="space-y-1.5 text-sm leading-6 text-stone-700">
+              <li>• לכל מטפל/ת פרופיל אישי במערכת.</li>
+              <li>• <strong>המערכת עושה את האינטייק</strong> (השאלון) ומפנה כל פונה ישירות למטפל/ת המתאים/ה במרכז.</li>
+              <li>• המטפלים מקודמים לראש רשימת האזור, עם פורטל וסטטיסטיקות פר-מטפל.</li>
+              <li>• תמחור: <strong>מחיר מוזל לכל מטפל × מספר המטפלים</strong>.</li>
+            </ul>
+            <p className="mt-3 text-xs text-stone-500">מתאים למרכז שרוצה שכל מטפל יקבל פניות מדויקות וישירות.</p>
+          </div>
+          <div className="rounded-2xl border-2 p-5" style={{ borderColor: "#E8DCC8", background: "var(--gold-pale)" }}>
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-bold" style={{ color: "var(--gold-dark)", border: "1px solid #E8DCC8" }}>
+              <Users size={13} /> ללא אינטייק — המרכז מוצג כאחד
+            </div>
+            <h3 className="mb-2 text-lg font-black text-stone-900">המרכז כרובריקה אחת</h3>
+            <ul className="space-y-1.5 text-sm leading-6 text-stone-700">
+              <li>• המרכז מוצג כישות אחת (&quot;מרכז טיפולי X&quot;) במערכת ההתאמות, לפי סוגי הטיפול שהוא מציע.</li>
+              <li>• <strong>הפנייה מגיעה למרכז</strong> — וצוות המרכז עושה את האינטייק והשיבוץ הפנימי בעצמו.</li>
+              <li>• עמוד פרופיל מרכז מלא: לוגו, הצוות המוביל, ותחומי ההתמחות.</li>
+              <li>• תמחור: <strong>מחיר חודשי קבוע</strong> (ללא תלות במספר המטפלים).</li>
+            </ul>
+            <p className="mt-3 text-xs text-stone-500">מתאים למרכז שמעדיף לשלוט בעצמו באינטייק ובשיבוץ הפונים.</p>
+          </div>
+        </div>
       </section>
 
       {/* מה המרכז מקבל */}
