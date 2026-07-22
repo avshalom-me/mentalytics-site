@@ -421,18 +421,18 @@ export default function AdminCentersPage() {
         );
       })}
 
-      {/* מודל יצירה/עריכה — כותרת וכפתור השמירה קבועים בתוך הכרטיס; תוכן הטופס
-          גולל בפנים. בנוסף, המעטפת החיצונית עצמה גוללת (min-h-full + overflow-y-auto)
-          כרשת ביטחון: אם הכרטיס כולה גבוה מגובה המסך בפועל (למשל בזום/רזולוציה
-          מסוימים), items-center היה חותך פרוסה גם מהכותרת למעלה וגם מהכפתור למטה —
-          ושום גלילה של תוכן הטופס הפנימי לא יכלה לחשוף אותן (הן לא חלק ממנו).
-          עכשיו אפשר תמיד לגלול את כל המודל (כותרת+טופס+כפתור) כיחידה אחת. */}
+      {/* מודל יצירה/עריכה. הכרטיס זורם בגובה טבעי (בלי max-h ובלי גלילה פנימית)
+          בתוך שכבה שכולה גוללת (overflow-y-auto). items-start + my-auto ממרכז את
+          הכרטיס כשהוא נמוך מהמסך, וכשהוא גבוה יותר (זום/מסך קצר) השכבה פשוט גוללת
+          אותו במלואו — כך כל התוכן, מהכותרת ועד כפתור השמירה, תמיד נגיש ואף פרוסה
+          לא נחתכת. (הדפוס ההיברידי הקודם עם max-h-[90vh]+גלילה פנימית חתך תוכן
+          בזומים מסוימים.) */}
       {editing && (
         <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl" onClick={() => setEditing(null)}>
           <div className="fixed inset-0 bg-black/30" />
-          <div className="flex min-h-full items-center justify-center p-4">
+          <div className="flex min-h-full items-start justify-center p-4">
           <div
-            className="relative flex max-h-[90vh] w-full max-w-2xl flex-col rounded-2xl bg-white shadow-2xl"
+            className="relative my-auto w-full max-w-2xl rounded-2xl bg-white shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between rounded-t-2xl border-b border-stone-100 px-6 py-4">
@@ -442,7 +442,7 @@ export default function AdminCentersPage() {
               <button onClick={() => setEditing(null)} className="text-stone-400 hover:text-stone-600">✕</button>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-4">
+            <div className="px-6 py-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <Field label="שם המרכז *">
                 <input value={fName} onChange={(e) => setFName(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
