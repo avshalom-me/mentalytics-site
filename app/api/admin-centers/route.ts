@@ -4,8 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerPricing } from "@/app/lib/center-pricing";
-// centerMonthlyPricing available if a unified total is needed; track-1 uses centerPricing directly.
-import { promoteCenterTherapists, demoteCenterTherapists } from "@/app/lib/center-promotion";
+import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
@@ -49,7 +48,8 @@ export async function GET() {
     const { data: linked } = await supabaseAdmin
       .from("therapists")
       .select("center_account_id")
-      .not("center_account_id", "is", null);
+      .not("center_account_id", "is", null)
+      .neq("entity_type", "center"); // שורת ישות-המרכז אינה "מטפל משויך"
     const counts = new Map<string, number>();
     (linked ?? []).forEach((t) => {
       const cid = t.center_account_id as string;
@@ -101,6 +101,10 @@ export async function POST(req: NextRequest) {
         .select("*")
         .single();
       if (error) throw error;
+      // מסלול 2: שורת ישות-המרכז נוצרת מיד (נערכת ע"י אדמין/פורטל, מקודמת בתשלום+אישור).
+      if (priced.billingTrack === "center_entity" && data?.id) {
+        await ensureCenterEntityRow(data.id as string);
+      }
       return NextResponse.json({ ok: true, center: data });
     }
 
@@ -110,6 +114,7 @@ export async function POST(req: NextRequest) {
       let query = supabaseAdmin
         .from("therapists")
         .select("id, full_name, email, status, center_account_id")
+        .neq("entity_type", "center") // שורת ישות-מרכז אינה מטפל שניתן לשייך
         .order("full_name", { ascending: true })
         .limit(500);
       if (q) query = query.ilike("full_name", `%${q}%`);
@@ -143,6 +148,7 @@ export async function POST(req: NextRequest) {
 
     if (action === "update") {
       const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      let syncEntity: "ensure" | "remove" | null = null; // מסלול 2: יצירה/הסרה של שורת ישות-המרכז
       if (body.name !== undefined) {
         const name = str(body.name, 120);
         if (!name) return NextResponse.json({ ok: false, error: "חסר שם מרכז" }, { status: 400 });
@@ -186,7 +192,10 @@ export async function POST(req: NextRequest) {
         body.billing_track !== undefined ||
         body.price_per_therapist !== undefined || body.therapist_count !== undefined ||
         body.fixed_monthly_price !== undefined;
-      if (touchesPricing && center.status !== "cancelled") {
+      if (touchesPricing && center.status === "cancelled") {
+        return NextResponse.json({ ok: false, error: "אי אפשר לעדכן תמחור למרכז מבוטל" }, { status: 400 });
+      }
+      if (touchesPricing) {
         const currentTrack = (center.billing_track as string) ?? "per_therapist";
         const effTrack =
           body.billing_track === "center_entity" || body.billing_track === "per_therapist"
@@ -206,6 +215,7 @@ export async function POST(req: NextRequest) {
           update.price_per_therapist = null;
           update.therapist_count = null;
           newTotal = update.fixed_monthly_price as number;
+          syncEntity = "ensure";
         } else {
           const newPrice = body.price_per_therapist !== undefined ? Number(body.price_per_therapist) : Number(center.price_per_therapist);
           const newCount = body.therapist_count !== undefined ? Number(body.therapist_count) : Number(center.therapist_count);
@@ -233,6 +243,7 @@ export async function POST(req: NextRequest) {
           update.therapist_count = cnt;
           update.fixed_monthly_price = null;
           newTotal = centerPricing(pp, cnt).monthlyTotal;
+          if (currentTrack === "center_entity") syncEntity = "remove"; // הוחזר ממסלול 2 למסלול 1
         }
 
         if (center.status === "active") {
@@ -258,12 +269,18 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabaseAdmin.from("therapy_center_accounts").update(update).eq("id", id);
       if (error) throw error;
+      if (syncEntity === "ensure") await ensureCenterEntityRow(id);
+      else if (syncEntity === "remove") await removeCenterEntityRow(id);
       return NextResponse.json({ ok: true });
     }
 
     // שיוך מטפלים למרכז: קובע center_account_id למטפלים שנבחרו, ומנתק כל מטפל
     // שהיה משויך למרכז הזה ולא נכלל ברשימה החדשה. שיוך למרכז אחד בכל רגע.
     if (action === "set_therapists") {
+      // מסלול 2 (מרכז כישות) — אין ניהול מטפלים בודדים; המרכז הוא רובריקה אחת.
+      if ((center.billing_track as string) === "center_entity") {
+        return NextResponse.json({ ok: false, error: "מרכז במסלול 'מרכז כישות אחת' מיוצג כרובריקה אחת ואינו מנהל מטפלים בודדים." }, { status: 400 });
+      }
       const raw = Array.isArray(body.therapist_ids) ? body.therapist_ids : [];
       // רק UUID תקינים — הערכים נכנסים למחרוזת filter גולמית (not.in.(...)),
       // אז ערך עם פסיק/סוגר היה שובר או משנה את משמעות ה-filter.
@@ -283,14 +300,16 @@ export async function POST(req: NextRequest) {
       const { data: currentLinked } = await supabaseAdmin
         .from("therapists")
         .select("id")
-        .eq("center_account_id", id);
+        .eq("center_account_id", id)
+        .neq("entity_type", "center");
       const removedIds = (currentLinked ?? []).map((t) => t.id).filter((tid) => !idsSet.includes(tid));
 
       // נתק מטפלים שהיו משויכים למרכז ואינם ברשימה החדשה.
       let unassign = supabaseAdmin
         .from("therapists")
         .update({ center_account_id: null })
-        .eq("center_account_id", id);
+        .eq("center_account_id", id)
+        .neq("entity_type", "center"); // לעולם לא לנתק את שורת ישות-המרכז
       if (idsSet.length > 0) unassign = unassign.not("id", "in", `(${idsSet.join(",")})`);
       await unassign.throwOnError();
 
