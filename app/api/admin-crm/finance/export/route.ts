@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, labelOf } from "@/app/lib/crm";
+import { materializeRecurringExpenses } from "@/app/lib/recurring-expenses";
 
 // Monthly accountant package: one CSV, income section then expenses section.
 // UTF-8 BOM so Hebrew opens correctly in Excel. Amounts are ₪ before VAT
@@ -27,6 +28,9 @@ export async function GET(req: NextRequest) {
   const toIso = to.toISOString();
 
   try {
+    // Due recurring expenses become real rows before the accountant package is built.
+    await materializeRecurringExpenses();
+
     const [payments, expenses, therapists] = await Promise.all([
       fetchAllRows<{ payment_type: string; reference_id: string; amount: number; created_at: string }>(() =>
         supabaseAdmin

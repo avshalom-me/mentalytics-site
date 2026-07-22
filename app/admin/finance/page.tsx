@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HelpTip from "../components/HelpTip";
-import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, labelOf } from "@/app/lib/crm";
+import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE, labelOf } from "@/app/lib/crm";
 
 type MonthRow = {
   month: string;
@@ -31,12 +31,47 @@ type Expense = {
   sumit_doc_id: number | null;
   sumit_status: string | null;
   sumit_error: string | null;
+  recurring_id: string | null;
+};
+
+type Recurring = {
+  id: string;
+  start_date: string;
+  months_total: number | null;
+  category: string;
+  vendor: string | null;
+  description: string | null;
+  amount: number;
+  vat_amount: number | null;
+  is_rnd: boolean;
+  active: boolean;
+  occurrences_done: number;
+  next_date: string | null;
 };
 
 type Target = { metric: string; month: string; scenario: string; target: number };
 
 function ils(n: number): string {
   return `₪${Number(n).toLocaleString("he-IL")}`;
+}
+
+// Automatic VAT: `auto` adds 18% on top of a before-VAT amount, `included`
+// splits a gross receipt total, `none` for VAT-exempt suppliers (e.g. abroad),
+// `manual` keeps the old free-text field for edge cases.
+type VatMode = "auto" | "none" | "included" | "manual";
+
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+function splitVat(amount: number, mode: VatMode, manualVat: string): { net: number; vat: number | null } {
+  if (mode === "included") {
+    const net = round2(amount / (1 + VAT_RATE));
+    return { net, vat: round2(amount - net) };
+  }
+  if (mode === "auto") return { net: amount, vat: round2(amount * VAT_RATE) };
+  if (mode === "manual") return { net: amount, vat: manualVat ? Number(manualVat) : null };
+  return { net: amount, vat: null };
 }
 
 function monthLabel(m: string): string {
@@ -48,6 +83,7 @@ function monthLabel(m: string): string {
 export default function FinancePage() {
   const [months, setMonths] = useState<MonthRow[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [targets, setTargets] = useState<Target[]>([]);
   const [cumulative, setCumulative] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -60,10 +96,13 @@ export default function FinancePage() {
   const [fVendor, setFVendor] = useState("");
   const [fDesc, setFDesc] = useState("");
   const [fAmount, setFAmount] = useState("");
+  const [fVatMode, setFVatMode] = useState<VatMode>("auto");
   const [fVat, setFVat] = useState("");
   const [fRnd, setFRnd] = useState(false);
   const [fRef, setFRef] = useState("");
   const [fToSumit, setFToSumit] = useState(true);
+  const [fRecurring, setFRecurring] = useState(false);
+  const [fMonths, setFMonths] = useState("");
   const [saving, setSaving] = useState(false);
   const [sumitNotice, setSumitNotice] = useState("");
 
@@ -76,6 +115,7 @@ export default function FinancePage() {
         if (j.ok) {
           setMonths(j.months);
           setExpenses(j.expenses);
+          setRecurring(j.recurring ?? []);
           setTargets(j.targets);
           setCumulative(j.cumulative_net);
         } else setError(j.error || "שגיאה בטעינה");
@@ -101,6 +141,8 @@ export default function FinancePage() {
     try {
       const cat = EXPENSE_CATEGORIES.find((c) => c.value === fCategory);
       const isRefund = REFUND_CATEGORIES.includes(fCategory);
+      const isRecurring = fRecurring && !isRefund;
+      const { net, vat } = splitVat(Number(fAmount), fVatMode, fVat);
       const res = await fetch("/api/admin-crm/finance", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -109,12 +151,14 @@ export default function FinancePage() {
           category: fCategory,
           vendor: fVendor || null,
           description: fDesc || null,
-          amount: Number(fAmount),
-          vat_amount: fVat ? Number(fVat) : null,
+          amount: net,
+          vat_amount: vat,
           is_rnd: fRnd,
           channel: cat?.channel ?? null,
           receipt_ref: fRef || null,
-          send_to_sumit: fToSumit && !isRefund,
+          send_to_sumit: fToSumit && !isRefund && !isRecurring,
+          recurring: isRecurring,
+          recurring_months: isRecurring && fMonths ? Number(fMonths) : null,
         }),
       });
       const j = await res.json();
@@ -124,7 +168,13 @@ export default function FinancePage() {
         setFAmount("");
         setFVat("");
         setFRef("");
-        if (j.sumit?.status === "draft_created") {
+        setFRecurring(false);
+        setFMonths("");
+        if (j.recurring) {
+          setSumitNotice(
+            "✓ נוצרה הוצאה קבועה — הרשומה החודשית נוצרת אוטומטית; שליחה ל-Sumit נעשית מהטבלה לכל חודש בנפרד"
+          );
+        } else if (j.sumit?.status === "draft_created") {
           setSumitNotice("✓ נוצרה טיוטת הוצאה ב-Sumit — לאישור סופי בתוך Sumit");
         } else if (j.sumit?.status === "failed") {
           setSumitNotice(`⚠ ההוצאה נשמרה, אבל יצירת הטיוטה ב-Sumit נכשלה: ${j.sumit.error ?? ""} — אפשר לנסות שוב מהטבלה`);
@@ -171,6 +221,36 @@ export default function FinancePage() {
     }
   }
 
+  async function stopRecurring(id: string) {
+    if (!confirm("לעצור את ההוצאה הקבועה? רשומות שכבר נוצרו יישארו, ולא ייווצרו חדשות.")) return;
+    setBusy(id);
+    try {
+      await fetch("/api/admin-crm/finance", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "stop_recurring", id }),
+      });
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function removeRecurring(id: string) {
+    if (!confirm("למחוק את ההוצאה הקבועה מהרשימה? רשומות חודשיות שכבר נוצרו יישארו.")) return;
+    setBusy(id);
+    try {
+      await fetch("/api/admin-crm/finance", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recurring_id: id }),
+      });
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const current = months[0];
   const cacTarget = targets
     .filter((t) => t.metric === "cac_max")
@@ -179,6 +259,10 @@ export default function FinancePage() {
   const ebitdaOptimistic = ebitdaTargets.find((t) => t.scenario === "optimistic");
 
   const thisMonth = new Date().toISOString().slice(0, 7);
+
+  const isRefundCat = REFUND_CATEGORIES.includes(fCategory);
+  const amountNum = Number(fAmount) || 0;
+  const vatPreview = splitVat(amountNum, fVatMode, fVat);
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -311,8 +395,18 @@ export default function FinancePage() {
               </select>
               <input value={fVendor} onChange={(e) => setFVendor(e.target.value)} placeholder="ספק" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
               <input value={fDesc} onChange={(e) => setFDesc(e.target.value)} placeholder="תיאור" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
-              <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ""))} placeholder='סכום ₪ לפני מע"מ' inputMode="decimal" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
-              <input value={fVat} onChange={(e) => setFVat(e.target.value.replace(/[^\d.]/g, ""))} placeholder='מע"מ ₪' inputMode="decimal" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
+              <input value={fAmount} onChange={(e) => setFAmount(e.target.value.replace(/[^\d.]/g, ""))} placeholder={fVatMode === "included" ? 'סכום ₪ כולל מע"מ' : 'סכום ₪ לפני מע"מ'} inputMode="decimal" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
+              <div className="flex flex-col gap-1">
+                <select value={fVatMode} onChange={(e) => setFVatMode(e.target.value as VatMode)} className="rounded-xl border border-stone-200 px-2 py-2 text-sm text-stone-600">
+                  <option value="auto">מע"מ 18% (אוטומטי)</option>
+                  <option value="included">הסכום כולל מע"מ</option>
+                  <option value="none">ללא מע"מ</option>
+                  <option value="manual">מע"מ ידני</option>
+                </select>
+                {fVatMode === "manual" && (
+                  <input value={fVat} onChange={(e) => setFVat(e.target.value.replace(/[^\d.]/g, ""))} placeholder='מע"מ ₪' inputMode="decimal" className="rounded-xl border border-stone-200 px-3 py-1.5 text-sm" />
+                )}
+              </div>
               <input value={fRef} onChange={(e) => setFRef(e.target.value)} placeholder="מס' חשבונית" className="rounded-xl border border-stone-200 px-3 py-2 text-sm" />
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1 text-xs font-bold text-stone-500">
@@ -323,7 +417,39 @@ export default function FinancePage() {
                   {saving ? "…" : "הוספה"}
                 </button>
               </div>
-              {!REFUND_CATEGORIES.includes(fCategory) && (
+              {amountNum > 0 && (
+                <div className="col-span-2 text-xs text-stone-500 sm:col-span-4 lg:col-span-8">
+                  לפני מע"מ <b>{ils(vatPreview.net)}</b> · מע"מ{" "}
+                  <b>{vatPreview.vat != null ? ils(vatPreview.vat) : "—"}</b> · סה"כ{" "}
+                  <b>{ils(round2(vatPreview.net + (vatPreview.vat ?? 0)))}</b>
+                  {fRecurring && !isRefundCat ? " לחודש" : ""}
+                </div>
+              )}
+              {!isRefundCat && (
+                <div className="col-span-2 flex flex-wrap items-center gap-3 border-t border-stone-100 pt-2 sm:col-span-4 lg:col-span-8">
+                  <label className="flex items-center gap-1.5 text-xs font-bold text-stone-600">
+                    <input type="checkbox" checked={fRecurring} onChange={(e) => setFRecurring(e.target.checked)} />
+                    הוצאה קבועה (חודשית)
+                  </label>
+                  {fRecurring && (
+                    <>
+                      <input
+                        value={fMonths}
+                        onChange={(e) => setFMonths(e.target.value.replace(/\D/g, ""))}
+                        placeholder="מס' חודשים"
+                        inputMode="numeric"
+                        className="w-28 rounded-xl border border-stone-200 px-3 py-1.5 text-sm"
+                      />
+                      <span className="text-xs text-stone-400">
+                        {fMonths
+                          ? `רשומה חודשית תיווצר אוטומטית בתאריך הזה, למשך ${fMonths} חודשים`
+                          : "ריק = ללא הגבלה — רשומה חודשית תיווצר אוטומטית עד עצירה ידנית"}
+                      </span>
+                    </>
+                  )}
+                </div>
+              )}
+              {!isRefundCat && !fRecurring && (
                 <label className="col-span-2 flex items-center gap-1.5 text-xs font-bold text-teal-700 sm:col-span-4 lg:col-span-8">
                   <input type="checkbox" checked={fToSumit} onChange={(e) => setFToSumit(e.target.checked)} />
                   צור גם טיוטת הוצאה ב-Sumit (לא נכנס לספרים עד אישור בתוך Sumit)
@@ -334,6 +460,86 @@ export default function FinancePage() {
               <div className={`-mt-4 mb-6 rounded-xl border p-3 text-sm ${sumitNotice.startsWith("✓") ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-amber-200 bg-amber-50 text-amber-700"}`}>
                 {sumitNotice}
               </div>
+            )}
+
+            {/* Recurring expense templates */}
+            {recurring.length > 0 && (
+              <>
+                <div className="mb-2 text-sm font-black text-stone-500">הוצאות קבועות</div>
+                <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+                  <table className="w-full min-w-[560px] text-sm">
+                    <thead>
+                      <tr className="border-b border-stone-200 text-xs text-stone-400">
+                        <th className="px-4 py-2 text-start font-bold">התחלה</th>
+                        <th className="px-4 py-2 text-start font-bold">קטגוריה</th>
+                        <th className="px-4 py-2 text-start font-bold">ספק / תיאור</th>
+                        <th className="px-4 py-2 text-start font-bold">סכום חודשי</th>
+                        <th className="px-4 py-2 text-start font-bold">חודשים</th>
+                        <th className="px-4 py-2 text-start font-bold">הרשומה הבאה</th>
+                        <th className="px-4 py-2 text-start font-bold"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {recurring.map((r) => (
+                        <tr key={r.id} className={`border-b border-stone-100 last:border-b-0 ${!r.active ? "opacity-60" : ""}`}>
+                          <td className="px-4 py-2 text-stone-600">{r.start_date}</td>
+                          <td className="px-4 py-2">
+                            <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-xs font-bold text-stone-600">
+                              {labelOf(EXPENSE_CATEGORIES, r.category)}
+                            </span>
+                            {r.is_rnd && <span className="ms-1 text-xs text-teal-700">מו"פ</span>}
+                          </td>
+                          <td className="px-4 py-2 text-stone-600">
+                            {[r.vendor, r.description].filter(Boolean).join(" · ") || "—"}
+                          </td>
+                          <td className="px-4 py-2 font-bold text-stone-800">
+                            {ils(Number(r.amount))}
+                            {r.vat_amount != null && (
+                              <span className="ms-1 text-xs font-normal text-stone-400">+{ils(Number(r.vat_amount))} מע"מ</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2 text-stone-600">
+                            {r.months_total != null
+                              ? `${r.occurrences_done}/${r.months_total}`
+                              : `${r.occurrences_done} · ללא הגבלה`}
+                          </td>
+                          <td className="px-4 py-2 text-stone-600">
+                            {!r.active ? (
+                              <span className="rounded-full border border-stone-200 bg-stone-50 px-2 py-0.5 text-[11px] font-bold text-stone-500">הופסקה</span>
+                            ) : r.next_date == null ? (
+                              <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">הסתיימה ✓</span>
+                            ) : (
+                              r.next_date
+                            )}
+                          </td>
+                          <td className="px-4 py-2">
+                            <div className="flex items-center gap-2">
+                              {r.active && r.next_date != null && (
+                                <button
+                                  onClick={() => stopRecurring(r.id)}
+                                  disabled={busy === r.id}
+                                  className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] font-bold text-stone-500 hover:bg-stone-100 disabled:opacity-50"
+                                  title="עצירה — לא ייווצרו רשומות חדשות"
+                                >
+                                  ⏸ עצירה
+                                </button>
+                              )}
+                              <button
+                                onClick={() => removeRecurring(r.id)}
+                                disabled={busy === r.id}
+                                className="text-stone-300 hover:text-red-500"
+                                title="מחיקה מהרשימה (רשומות שנוצרו יישארו)"
+                              >
+                                🗑
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
             )}
 
             {/* Expense list */}
@@ -365,6 +571,11 @@ export default function FinancePage() {
                           >
                             {labelOf(EXPENSE_CATEGORIES, e.category)}
                           </span>
+                          {e.recurring_id && (
+                            <span className="ms-1 rounded-full border border-teal-200 bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700" title="נוצר אוטומטית מהוצאה קבועה">
+                              🔁 קבועה
+                            </span>
+                          )}
                           {e.is_rnd && <span className="ms-1 text-xs text-teal-700">מו"פ</span>}
                         </td>
                         <td className="px-4 py-2 text-stone-600">

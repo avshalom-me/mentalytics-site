@@ -48,6 +48,10 @@ export const TASK_PRIORITIES = [
 // patient inquiry arrived within this many days of the subscription start.
 export const GUARANTEE_DAYS = 60;
 
+// Israeli VAT rate — drives the automatic VAT calculation in the expense form
+// (isomorphic on purpose: the form computes live, the export recomputes).
+export const VAT_RATE = 0.18;
+
 // Expense ledger categories. `refund_*` categories are money returned to
 // therapists — kept in the same ledger so the monthly balance is honest, but
 // reported separately (refund rate vs the 20% the business plan budgeted).

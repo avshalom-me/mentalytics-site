@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, labelOf } from "@/app/lib/crm";
 import { createSumitExpenseDraft } from "@/app/lib/sumit-expense";
+import { materializeRecurringExpenses, nextOccurrence } from "@/app/lib/recurring-expenses";
 
 // Finance overview + expense ledger.
 //
@@ -40,7 +41,10 @@ export async function GET(req: NextRequest) {
     const sinceIso = since.toISOString();
     const sinceDate = sinceIso.slice(0, 10);
 
-    const [payments, expenses, allFirstPayments, targetsRes] = await Promise.all([
+    // Recurring templates whose month has arrived become real rows before we read.
+    await materializeRecurringExpenses();
+
+    const [payments, expenses, allFirstPayments, targetsRes, recurringRes, recurringRefs] = await Promise.all([
       fetchAllRows<PaymentRow>(() =>
         supabaseAdmin
           .from("payments")
@@ -66,6 +70,11 @@ export async function GET(req: NextRequest) {
           .order("created_at", { ascending: true })
       ),
       supabaseAdmin.from("plan_targets").select("*").in("metric", ["cac_max", "ebitda_year"]),
+      supabaseAdmin.from("recurring_expenses").select("*").order("created_at", { ascending: false }),
+      // Materialized-row count per template ("נוצרו X רשומות") — small set, id refs only.
+      fetchAllRows<{ recurring_id: string }>(() =>
+        supabaseAdmin.from("expenses").select("recurring_id").not("recurring_id", "is", null)
+      ),
     ]);
 
     const firstPaymentMonth = new Map<string, string>();
@@ -132,12 +141,24 @@ export async function GET(req: NextRequest) {
 
     const cumulativeNet = rows.reduce((s, r) => s + r.net, 0);
 
+    const doneById = new Map<string, number>();
+    for (const r of recurringRefs) {
+      doneById.set(r.recurring_id, (doneById.get(r.recurring_id) ?? 0) + 1);
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const recurring = (recurringRes.data ?? []).map((r) => ({
+      ...r,
+      occurrences_done: doneById.get(r.id) ?? 0,
+      next_date: r.active ? nextOccurrence(r, today) : null,
+    }));
+
     return NextResponse.json({
       ok: true,
       months: rows,
       expenses: expenses.slice(0, 500),
       cumulative_net: cumulativeNet,
       targets: targetsRes.data ?? [],
+      recurring,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";
@@ -151,6 +172,41 @@ export async function POST(req: NextRequest) {
     const amount = Number(b.amount);
     if (!b.expense_date || !b.category || !Number.isFinite(amount) || amount <= 0) {
       return NextResponse.json({ ok: false, error: "חסרים תאריך, קטגוריה או סכום תקין" }, { status: 400 });
+    }
+
+    // Recurring (fixed) expense: store a template instead of a single row, then
+    // materialize immediately so the first month shows up right away. Refunds
+    // can't recur, and Sumit drafts are per materialized row (sent from the
+    // table month by month), so send_to_sumit is ignored here.
+    if (b.recurring) {
+      if (REFUND_CATEGORIES.includes(String(b.category))) {
+        return NextResponse.json({ ok: false, error: "החזר לא יכול להיות הוצאה קבועה" }, { status: 400 });
+      }
+      const monthsTotal =
+        b.recurring_months != null && b.recurring_months !== "" ? Number(b.recurring_months) : null;
+      if (monthsTotal != null && (!Number.isInteger(monthsTotal) || monthsTotal <= 0)) {
+        return NextResponse.json({ ok: false, error: "מספר חודשים לא תקין" }, { status: 400 });
+      }
+      const { data: template, error: recErr } = await supabaseAdmin
+        .from("recurring_expenses")
+        .insert({
+          start_date: String(b.expense_date),
+          months_total: monthsTotal,
+          category: String(b.category),
+          vendor: b.vendor ? String(b.vendor).slice(0, 200) : null,
+          description: b.description ? String(b.description).slice(0, 500) : null,
+          amount,
+          vat_amount: b.vat_amount != null && b.vat_amount !== "" ? Number(b.vat_amount) : null,
+          is_rnd: !!b.is_rnd,
+          channel: b.channel ? String(b.channel) : null,
+          note: b.note ? String(b.note).slice(0, 1000) : null,
+          created_by: String(b.created_by ?? "admin").slice(0, 60),
+        })
+        .select()
+        .single();
+      if (recErr) return NextResponse.json({ ok: false, error: recErr.message }, { status: 500 });
+      await materializeRecurringExpenses();
+      return NextResponse.json({ ok: true, recurring: template });
     }
 
     const { data, error } = await supabaseAdmin
@@ -222,10 +278,19 @@ async function pushExpenseToSumit(e: ExpenseDbRow): Promise<{ status: string; er
   return result.ok ? { status: "draft_created" } : { status: "failed", error: result.error };
 }
 
-// Late/retry send of an existing row to Sumit.
+// Late/retry send of an existing row to Sumit, or stopping a recurring expense.
 export async function PATCH(req: NextRequest) {
   try {
     const b = await req.json();
+    if (b.action === "stop_recurring") {
+      if (!b.id) return NextResponse.json({ ok: false, error: "חסר id" }, { status: 400 });
+      const { error } = await supabaseAdmin
+        .from("recurring_expenses")
+        .update({ active: false })
+        .eq("id", b.id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
     if (b.action !== "send_to_sumit" || !b.id) {
       return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });
     }
@@ -250,9 +315,16 @@ export async function PATCH(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const { id } = await req.json();
-    if (!id) return NextResponse.json({ ok: false, error: "חסר id" }, { status: 400 });
-    const { error } = await supabaseAdmin.from("expenses").delete().eq("id", id);
+    const b = await req.json();
+    // Deleting a recurring template stops future months; already-materialized
+    // rows survive (FK is ON DELETE SET NULL) — they are real past expenses.
+    if (b.recurring_id) {
+      const { error } = await supabaseAdmin.from("recurring_expenses").delete().eq("id", b.recurring_id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+      return NextResponse.json({ ok: true });
+    }
+    if (!b.id) return NextResponse.json({ ok: false, error: "חסר id" }, { status: 400 });
+    const { error } = await supabaseAdmin.from("expenses").delete().eq("id", b.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     return NextResponse.json({ ok: true });
   } catch {
