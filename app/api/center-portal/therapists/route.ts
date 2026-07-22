@@ -58,18 +58,23 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "create") {
+      // מסלול 2 (מרכז כישות) — אין הוספת מטפלים בודדים; המרכז הוא רובריקה אחת.
+      if ((center.billing_track as string) === "center_entity") {
+        return NextResponse.json({ ok: false, error: "מרכז במסלול 'מרכז כישות אחת' מיוצג כרובריקה אחת ואינו מוסיף מטפלים בודדים." }, { status: 400 });
+      }
       const fields = pickAllowed(body);
       const fullName = typeof fields.full_name === "string" ? fields.full_name.trim() : "";
       if (!fullName) {
         return NextResponse.json({ ok: false, error: "חסר שם המטפל/ת" }, { status: 400 });
       }
 
-      // אכיפת המכסה: המרכז משלם לפי therapist_count.
+      // אכיפת המכסה: המרכז משלם לפי therapist_count (לא כולל שורת ישות-המרכז).
       const quota = Math.floor(Number(center.therapist_count) || 0);
       const { count: linkedNow } = await supabaseAdmin
         .from("therapists")
         .select("id", { count: "exact", head: true })
-        .eq("center_account_id", center.id);
+        .eq("center_account_id", center.id)
+        .neq("entity_type", "center");
       if (quota > 0 && (linkedNow ?? 0) >= quota) {
         return NextResponse.json(
           { ok: false, error: `המנוי שלכם כולל ${quota} מטפלים וכולם בשימוש. להוספת מטפל/ת נוסף/ת פנו אלינו — admin@getmentalytics.com` },

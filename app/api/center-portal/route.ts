@@ -62,13 +62,30 @@ export async function GET(req: NextRequest) {
   }
 
   try {
+    // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים — היא
+    // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
+    const isEntity = (center.billing_track as string) === "center_entity";
+    let entity: { id: string; status: string; admin_approved: boolean } | null = null;
+    if (isEntity) {
+      const { data: e } = await supabaseAdmin
+        .from("therapists")
+        .select("id, status, admin_approved")
+        .eq("center_account_id", center.id)
+        .eq("entity_type", "center")
+        .maybeSingle();
+      if (e) entity = { id: e.id as string, status: e.status as string, admin_approved: !!e.admin_approved };
+    }
+
     const { data: therapistsData } = await supabaseAdmin
       .from("therapists")
       .select("id, full_name, status, admin_approved, profile_photo_path, regions, online")
       .eq("center_account_id", center.id)
+      .neq("entity_type", "center")
       .order("full_name", { ascending: true });
     const therapists = (therapistsData ?? []) as TherapistRow[];
     const ids = therapists.map((t) => t.id);
+    // מסלול 2: הסטטיסטיקות המרוכזות מתייחסות לשורת ישות-המרכז (רובריקה אחת).
+    const statIds = isEntity && entity ? [entity.id] : ids;
 
     // חתימות תמונה (batch אחד) לתצוגת רשימת המטפלים.
     const photoById = new Map<string, string>();
@@ -83,8 +100,9 @@ export async function GET(req: NextRequest) {
     }
 
     // תווית המנוי במודל החדש: מספר מטפלים (התמחור המלא מוצג רק באדמין).
-    const planTitle =
-      Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null;
+    const planTitle = isEntity
+      ? "מרכז כישות אחת"
+      : (Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null);
 
     // מידע העמוד הציבורי — משותף לשני מסלולי המענה (עם/בלי מטפלים).
     const publicPage = {
@@ -97,13 +115,16 @@ export async function GET(req: NextRequest) {
       phone: center.public_phone,
     };
 
-    // אין מטפלים עדיין — מחזירים שלד ריק (המרכז חדש / טרם שויכו מטפלים).
-    if (ids.length === 0) {
+    // אין נתונים להצגה — מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
+    // שטרם נכנסה להתאמות).
+    if (statIds.length === 0) {
       return NextResponse.json({
         ok: true,
         center: {
           name: center.name,
           status: center.status,
+          billing_track: center.billing_track,
+          entity,
           plan_title: planTitle,
           billing_starts_at: center.billing_starts_at,
           therapist_quota: Math.floor(Number(center.therapist_count) || 0),
@@ -126,14 +147,14 @@ export async function GET(req: NextRequest) {
         supabaseAdmin
           .from("therapist_contact_clicks")
           .select("therapist_id, click_type, clicked_at")
-          .in("therapist_id", ids)
+          .in("therapist_id", statIds)
           .gte("clicked_at", sixMonthsAgo),
       ),
       fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null; viewer_region: string | null; viewer_issue: string | null; viewer_age_band: string | null; viewer_gender: string | null }>(() =>
         supabaseAdmin
           .from("therapist_profile_views")
           .select("therapist_id, viewed_at, source, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
-          .in("therapist_id", ids)
+          .in("therapist_id", statIds)
           .gte("viewed_at", mAgo),
       ),
     ]);
@@ -187,6 +208,8 @@ export async function GET(req: NextRequest) {
       center: {
         name: center.name,
         status: center.status,
+        billing_track: center.billing_track,
+        entity,
         plan_title: planTitle,
         billing_starts_at: center.billing_starts_at,
         therapist_quota: Math.floor(Number(center.therapist_count) || 0),

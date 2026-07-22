@@ -16,8 +16,10 @@ export type PortalCenter = {
   user_id: string | null;
   email: string | null;
   payer_email: string | null;
+  billing_track: string | null;
   price_per_therapist: number | null;
   therapist_count: number | null;
+  fixed_monthly_price: number | null;
   billing_starts_at: string | null;
   slug: string | null;
   public_page_enabled: boolean | null;
@@ -29,7 +31,7 @@ export type PortalCenter = {
 };
 
 const COLS =
-  "id, name, status, user_id, email, payer_email, price_per_therapist, therapist_count, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone";
+  "id, name, status, user_id, email, payer_email, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone";
 
 export async function resolveCenter(req: NextRequest): Promise<PortalCenter | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");

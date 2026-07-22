@@ -49,6 +49,8 @@ type PortalData = {
   center: {
     name: string;
     status: string;
+    billing_track?: string | null;
+    entity?: { id: string; status: string; admin_approved: boolean } | null;
     plan_title: string | null;
     billing_starts_at: string | null;
     therapist_quota: number;
@@ -129,6 +131,7 @@ export default function CenterDashboardPage() {
 
   if (!data) return null;
   const { center, therapists, stats } = data;
+  const isEntity = center.billing_track === "center_entity"; // מסלול 2 — מרכז כישות אחת
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -163,14 +166,45 @@ export default function CenterDashboardPage() {
       )}
 
       {/* מדדים מרכזיים */}
-      <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
-        <StatCard icon={Eye} label="צפיות בפרופילים" value={stats?.views_month ?? 0} sub="30 יום" color="#1A7A96" />
+      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+        {!isEntity && (
+          <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
+        )}
+        <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="30 יום" color="#1A7A96" />
         <StatCard icon={MessageCircle} label="פניות מטופלים" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
         <StatCard icon={Activity} label="פניות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
       </div>
 
-      {/* רשימת המטפלים */}
+      {/* מסלול 2 — עריכת פרופיל המרכז (רובריקה אחת בהתאמות) */}
+      {isEntity && (
+        <section className="mb-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-5">
+          <h2 className="mb-1 text-base font-black text-stone-800">פרופיל המרכז במערכת ההתאמות</h2>
+          <p className="mb-4 text-sm leading-6 text-stone-600">
+            המרכז מוצג כרובריקה אחת (&quot;מרכז טיפולי&quot;) למטופלים המתאימים, לפי סוגי הטיפול, האזורים, הגילאים והשפות שתגדירו. ככל שהפרופיל מלא ומדויק יותר — כך ההתאמות טובות יותר.
+          </p>
+          {center.entity ? (
+            <div className="flex flex-wrap items-center gap-3">
+              <Link href={`/centers/dashboard/therapists/${center.entity.id}`}
+                className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
+                style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+                ✏️ עריכת פרופיל המרכז
+              </Link>
+              {center.entity.admin_approved && center.entity.status === "paying" ? (
+                <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-bold text-green-800">✓ מוצג בהתאמות</span>
+              ) : center.status !== "active" ? (
+                <span className="rounded-full border border-stone-200 bg-stone-100 px-3 py-1 text-xs text-stone-500">יופיע בהתאמות לאחר הפעלת המנוי ואישור הפרופיל</span>
+              ) : (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800">ממתין לאישור צוות טיפול חכם</span>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-amber-700">הפרופיל בהכנה — אם הכפתור אינו מופיע, פנו אלינו: admin@getmentalytics.com</p>
+          )}
+        </section>
+      )}
+
+      {/* רשימת המטפלים (מסלול 1) */}
+      {!isEntity && (
       <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-base font-black text-stone-800">
@@ -255,6 +289,7 @@ export default function CenterDashboardPage() {
           </div>
         )}
       </section>
+      )}
 
       {/* עמוד המרכז הציבורי */}
       {center.status === "active" && <PublicPageEditor initial={center.public_page} />}
