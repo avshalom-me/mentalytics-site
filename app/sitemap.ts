@@ -47,7 +47,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     .from("therapists")
     .select("id, created_at, full_name")
     .in("status", ["approved", "paying"])
-    .eq("admin_approved", true);
+    .eq("admin_approved", true)
+    .neq("entity_type", "center"); // ישות-מרכז אינה עמוד מטפל ציבורי
 
   const therapistPages: MetadataRoute.Sitemap = (data ?? []).map((t) => ({
     url: `${BASE}${therapistPath(t.id, t.full_name)}`,

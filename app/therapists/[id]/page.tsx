@@ -46,6 +46,7 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
     .eq("id", id)
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
+    .neq("entity_type", "center") // עמוד ישות-מרכז אינו פרופיל מטפל ציבורי (404)
     .single();
 
   if (error || !data) return null;
@@ -80,6 +81,7 @@ async function getSimilarTherapists(t: TherapistRow, limit = 3): Promise<Similar
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .eq("accepting_new_patients", true)
+    .neq("entity_type", "center")
     .neq("id", t.id)
     .overlaps("therapist_types", types);
 

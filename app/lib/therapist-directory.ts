@@ -94,6 +94,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
+    .neq("entity_type", "center") // ישות-מרכז מופיעה רק בהתאמות החידון, לא במאגר/עמודים הציבוריים
     .order("full_name", { ascending: true });
 
   if (error || !data) return [];

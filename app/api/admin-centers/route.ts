@@ -208,6 +208,19 @@ export async function POST(req: NextRequest) {
 
         let newTotal = 0;
         if (effTrack === "center_entity") {
+          // מעבר למסלול 2 כשעדיין משויכים מטפלים בודדים — חוסם עד ניתוקם, אחרת
+          // הם נשארים משויכים ומקודמים יחד עם הישות בתשלום (מרכז משלם מחיר קבוע
+          // אחד ומקבל את הרובריקה + N פרופילים).
+          if (currentTrack !== "center_entity") {
+            const { count: linkedIndiv } = await supabaseAdmin
+              .from("therapists")
+              .select("id", { count: "exact", head: true })
+              .eq("center_account_id", id)
+              .neq("entity_type", "center");
+            if ((linkedIndiv ?? 0) > 0) {
+              return NextResponse.json({ ok: false, error: `למרכז משויכים ${linkedIndiv} מטפלים בודדים — נתקו אותם (ניהול מטפלים) לפני מעבר למסלול "מרכז כישות אחת".` }, { status: 400 });
+            }
+          }
           const fixed = body.fixed_monthly_price !== undefined ? Number(body.fixed_monthly_price) : Number(center.fixed_monthly_price);
           if (isNaN(fixed) || fixed <= 0 || fixed > 1_000_000) return NextResponse.json({ ok: false, error: "מחיר חודשי קבוע לא תקין" }, { status: 400 });
           update.billing_track = "center_entity";
