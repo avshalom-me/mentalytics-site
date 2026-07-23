@@ -31,10 +31,11 @@ export type PortalCenter = {
   public_phone: string | null;
   logo_path: string | null;
   team_members: unknown;
+  gallery: unknown;
 };
 
 const COLS =
-  "id, name, status, user_id, email, payer_email, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, num_locations, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone, logo_path, team_members";
+  "id, name, status, user_id, email, payer_email, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, num_locations, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone, logo_path, team_members, gallery";
 
 export async function resolveCenter(req: NextRequest): Promise<PortalCenter | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");

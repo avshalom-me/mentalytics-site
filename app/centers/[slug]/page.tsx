@@ -1,11 +1,13 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { MapPin, Globe, Phone, Users, ArrowLeft, Sparkles, BadgeCheck, Layers } from "lucide-react";
+import { MapPin, Globe, Phone, Users, ArrowLeft, Sparkles, BadgeCheck, Layers, Camera } from "lucide-react";
 import { getPublicCenterBySlug, signCenterAssets } from "@/app/lib/center-public";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import TrackView from "@/app/therapists/[id]/TrackView";
+import CenterMessageButton from "./CenterMessageButton";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 // עמוד מרכז ציבורי (SEO). מסלול 1 — מציג את מטפלי המרכז. מסלול 2 (מרכז כישות)
@@ -23,6 +25,10 @@ const REGION_LABELS: Record<string, string> = {
 const regionLabel = (r: string) => REGION_LABELS[r] ?? r;
 
 type CenterEntity = {
+  id: string;
+  status: string;
+  email: string | null;
+  accepting_new_patients: boolean | null;
   therapist_types: string[] | null;
   training_areas: string[] | null;
   regions: string[] | null;
@@ -33,7 +39,7 @@ type CenterEntity = {
 async function getCenterEntity(centerId: string): Promise<CenterEntity | null> {
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("therapist_types, training_areas, regions, online, languages")
+    .select("id, status, email, accepting_new_patients, therapist_types, training_areas, regions, online, languages")
     .eq("center_account_id", centerId)
     .eq("entity_type", "center")
     .maybeSingle();
@@ -46,7 +52,8 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!center) return { title: "מרכז לא נמצא", robots: { index: false, follow: false } };
 
   const cityPart = center.public_city ? ` ב${center.public_city}` : "";
-  const title = `${center.name} - מרכז טיפולי${cityPart} | טיפול חכם`;
+  // בלי "| טיפול חכם" — תבנית ה-layout כבר מוסיפה את המותג (אחרת הוא מוכפל).
+  const title = `${center.name} - מרכז טיפולי${cityPart}`;
   const description =
     (center.public_description?.trim()?.slice(0, 155)) ||
     `${center.name} - מרכז טיפולי${cityPart}. הכירו את המרכז והצוות, וקבעו התאמה אישית דרך טיפול חכם.`;
@@ -93,6 +100,12 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
   const website = center.public_website?.trim();
   const websiteHref = website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : null;
 
+  // הודעה למרכז דרך מערכת ההודעות — רק כשהישות חיה (בהתאמות) ויש לה מייל.
+  const canMessage = !!(
+    entity && entity.email && ["approved", "paying"].includes(entity.status) && entity.accepting_new_patients !== false
+  );
+  const galleryPhotos = assets.gallery.filter((g) => g.url);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "MedicalOrganization",
@@ -112,6 +125,9 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      {/* מסלול 2: צפייה בעמוד המרכז נספרת כצפייה בפרופיל הישות — מזינה את
+          "צפיות בפרופיל" בפורטל המרכז (דה-דופ לפי session בצד השרת). */}
+      {isEntity && entity && <TrackView therapistId={entity.id} source="directory" />}
 
       <Link href="/therapists" className="mb-6 inline-block text-sm text-[var(--muted)] hover:underline">← כל המטפלים</Link>
 
@@ -193,6 +209,28 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </section>
       )}
 
+      {/* גלריית המרכז — תמונות אמיתיות של המקום (הכניסה, חדרי הטיפול) */}
+      {galleryPhotos.length > 0 && (
+        <section className="mt-14">
+          <h2 className="mb-1 flex items-center gap-2 text-[1.28rem] font-black tracking-tight text-[var(--text)]">
+            <Camera size={20} style={{ color: "var(--teal)" }} /> המרכז שלנו
+          </h2>
+          <p className="mb-5 text-sm text-[var(--muted)]">הצצה למרחב שבו מתקיימים הטיפולים.</p>
+          <div className={`grid gap-3 ${galleryPhotos.length === 1 ? "grid-cols-1 sm:max-w-xl" : galleryPhotos.length === 2 ? "grid-cols-2" : "grid-cols-2 md:grid-cols-3"}`}>
+            {galleryPhotos.map((g) => (
+              <figure key={g.path} className="overflow-hidden rounded-[18px] border border-[var(--line)] bg-white shadow-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={g.url!} alt={g.caption || `תמונה מ${center.name}`} loading="lazy"
+                  className="h-52 w-full object-cover md:h-56" />
+                {g.caption && (
+                  <figcaption className="px-3.5 py-2.5 text-[12.5px] font-semibold text-[var(--text-2)]">{g.caption}</figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* הצוות המוביל (מסלול 2) */}
       {isEntity && assets.team.length > 0 && (
         <section className="mt-14">
@@ -257,6 +295,9 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
             style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))", boxShadow: "0 8px 20px rgba(45,100,98,.25)" }}>
             למילוי שאלון התאמה <ArrowLeft size={16} />
           </Link>
+          {canMessage && entity && (
+            <CenterMessageButton entityId={entity.id} centerName={center.name} />
+          )}
           {center.public_phone && (
             <a href={`tel:${center.public_phone.replace(/[^\d+]/g, "")}`}
               className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-7 py-3 text-base font-bold transition hover:bg-[var(--teal-pale)]"

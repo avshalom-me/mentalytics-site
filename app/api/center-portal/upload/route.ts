@@ -19,27 +19,30 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  const type = formData.get("type") as string | null; // "photo" | "certificate" | "center_image"
+  const type = formData.get("type") as string | null; // "photo" | "certificate" | "center_image" | "center_gallery"
 
   if (!file || !type) {
     return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
   }
 
-  // תמונת מרכז (לוגו / תמונת חבר צוות) — מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל
-  // דרך update_public_page. אין צורך ב-therapist_id — התמונה משויכת למרכז.
-  if (type === "center_image") {
+  // תמונת מרכז — מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל דרך update_public_page.
+  // אין צורך ב-therapist_id — התמונה משויכת למרכז.
+  //   center_image   — לוגו / תמונת חבר צוות (קטן, 512).
+  //   center_gallery — תמונת גלריה של המרכז (הכניסה/חדרים) — רזולוציה גבוהה יותר.
+  if (type === "center_image" || type === "center_gallery") {
+    const isGallery = type === "center_gallery";
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     let out: Buffer;
     try {
       out = await sharp(inputBuffer)
         .rotate()
-        .resize(512, 512, { fit: "inside", withoutEnlargement: true }) // שומר יחס — מתאים ללוגו וגם לפורטרט
-        .webp({ quality: 82 })
+        .resize(isGallery ? 1600 : 512, isGallery ? 1200 : 512, { fit: "inside", withoutEnlargement: true }) // שומר יחס
+        .webp({ quality: isGallery ? 80 : 82 })
         .toBuffer();
     } catch {
       return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
     }
-    const p = `center-assets/${center.id}-${Date.now()}.webp`;
+    const p = `center-assets/${center.id}-${isGallery ? "g-" : ""}${Date.now()}.webp`;
     const { error: upErr } = await supabaseAdmin.storage
       .from("therapist-certificates")
       .upload(p, out, { contentType: "image/webp", upsert: true });

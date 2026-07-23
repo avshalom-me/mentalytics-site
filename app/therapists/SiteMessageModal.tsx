@@ -86,7 +86,8 @@ export default function SiteMessageModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center px-4 py-6 bg-black/50"
+      // z-[110] — מעל ה-NavBar הדביק (z-100), כמו מודאלי האדמין
+      className="fixed inset-0 z-[110] flex items-center justify-center px-4 py-6 bg-black/50"
       onClick={onClose}
     >
       <div

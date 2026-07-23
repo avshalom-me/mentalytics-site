@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { resolveCenter } from "@/app/lib/center-auth";
-import { signCenterAssets, type CenterTeamMember } from "@/app/lib/center-public";
+import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto } from "@/app/lib/center-public";
 
 // פורטל המרכז הטיפולי — API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
 // מצטברות לכל המרכז. הכניסה היא בחשבון Supabase Auth של המרכז (מקביל למטפל).
@@ -109,7 +109,14 @@ export async function GET(req: NextRequest) {
     const teamRaw: CenterTeamMember[] = Array.isArray(center.team_members)
       ? (center.team_members as CenterTeamMember[])
       : [];
-    const signedAssets = await signCenterAssets({ logo_path: (center.logo_path as string | null) ?? null, team_members: teamRaw });
+    const galleryRaw: CenterGalleryPhoto[] = Array.isArray(center.gallery)
+      ? (center.gallery as CenterGalleryPhoto[])
+      : [];
+    const signedAssets = await signCenterAssets({
+      logo_path: (center.logo_path as string | null) ?? null,
+      team_members: teamRaw,
+      gallery: galleryRaw,
+    });
     const publicPage = {
       slug: center.slug,
       enabled: !!center.public_page_enabled,
@@ -121,6 +128,7 @@ export async function GET(req: NextRequest) {
       logo_path: (center.logo_path as string | null) ?? null,
       logo_url: signedAssets.logoUrl,
       team: teamRaw.map((m, i) => ({ name: m.name, role: m.role, photo_path: m.photo_path ?? null, photo_url: signedAssets.team[i]?.photoUrl ?? null })),
+      gallery: galleryRaw.map((g, i) => ({ path: g.path, caption: g.caption ?? null, url: signedAssets.gallery[i]?.url ?? null })),
     };
 
     // אין נתונים להצגה — מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
@@ -271,6 +279,10 @@ export async function POST(req: NextRequest) {
   }
 
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+  // נתיב תמונת-מרכז חוקי: רק מתוך תיקיית center-assets. חוסם שתילת נתיב שרירותי
+  // מה-bucket (למשל תעודה של מטפל) שהיה נחתם ומוצג בעמוד הציבורי.
+  const assetPath = (v: unknown): string | null =>
+    typeof v === "string" && v.startsWith("center-assets/") && v.length <= 300 ? v : null;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.public_description !== undefined) update.public_description = str(body.public_description, 5000) || null;
   if (body.public_managers !== undefined) update.public_managers = str(body.public_managers, 500) || null;
@@ -278,8 +290,8 @@ export async function POST(req: NextRequest) {
   if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
   if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
   if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
-  // פרופיל ויזואלי (מסלול 2): לוגו + צוות/ראשי-המרכז — נשמרים self-serve מהפורטל.
-  if (body.logo_path !== undefined) update.logo_path = typeof body.logo_path === "string" && body.logo_path.trim() ? body.logo_path.trim() : null;
+  // פרופיל ויזואלי: לוגו + צוות/ראשי-המרכז + גלריית המרכז — self-serve מהפורטל.
+  if (body.logo_path !== undefined) update.logo_path = assetPath(body.logo_path);
   if (body.team_members !== undefined) {
     const raw = Array.isArray(body.team_members) ? body.team_members : [];
     update.team_members = raw.slice(0, 12).map((m) => {
@@ -287,9 +299,16 @@ export async function POST(req: NextRequest) {
       return {
         name: str(mm.name, 80),
         role: str(mm.role, 80),
-        photo_path: typeof mm.photo_path === "string" ? mm.photo_path.slice(0, 300) : null,
+        photo_path: assetPath(mm.photo_path),
       };
     }).filter((m) => m.name);
+  }
+  if (body.gallery !== undefined) {
+    const raw = Array.isArray(body.gallery) ? body.gallery : [];
+    update.gallery = raw.slice(0, 8).map((g) => {
+      const gg = (g ?? {}) as Record<string, unknown>;
+      return { path: assetPath(gg.path), caption: str(gg.caption, 120) || null };
+    }).filter((g): g is { path: string; caption: string | null } => !!g.path);
   }
 
   // ודא slug (מרכזים שנוצרו לפני פיצ'ר העמוד הציבורי).
