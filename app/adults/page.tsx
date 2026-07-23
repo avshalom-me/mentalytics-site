@@ -468,7 +468,10 @@ export default function AdultsPage() {
     try {
       const referrer = document.referrer || "";
       const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
-      if (!cameFromProfile) return;
+      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי — לא הפרופיל —
+      // ולכן בודקים גם את סוג הניווט, אחרת המשתמש נזרק לתחילת השאלון.
+      const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
+      if (!cameFromProfile && navType !== "back_forward") return;
       const raw = sessionStorage.getItem("adults_match_state_v1");
       if (!raw) return;
       const saved = JSON.parse(raw);

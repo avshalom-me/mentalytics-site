@@ -229,6 +229,28 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     setDisplayList(shuffleWithinTiers(therapists));
   }, [therapists]);
 
+  // שחזור הסינון מה-URL — כדי ש"אחורה" מפרופיל יחזיר את הרשימה המסוננת
+  // ולא את הרשימה המלאה (ה-state לבדו אובד ברימאונט של ניווט חזרה).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const region = p.get("region") ?? "";
+    const city = p.get("city") ?? "";
+    if (region && ALL_REGIONS.includes(region)) setRegionFilter(region);
+    if (city && CITY_TO_REGION[city]) setCityFilter(city);
+    if (p.get("online") === "1") setOnlineOnly(true);
+  }, []);
+
+  // סנכרון הסינון ל-URL (replaceState — בלי להוסיף רשומות היסטוריה).
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    const set = (k: string, v: string) => { if (v) p.set(k, v); else p.delete(k); };
+    set("region", regionFilter);
+    set("city", cityFilter);
+    set("online", onlineOnly ? "1" : "");
+    const qs = p.toString();
+    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+  }, [regionFilter, cityFilter, onlineOnly]);
+
   const availableCities = useMemo(() => {
     const cities = new Set<string>();
     for (const t of therapists) {
