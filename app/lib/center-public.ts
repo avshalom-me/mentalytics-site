@@ -7,6 +7,8 @@ import { slugify } from "@/app/lib/articles";
 
 export type CenterTeamMember = { name: string; role: string; photo_path: string | null };
 export type CenterGalleryPhoto = { path: string; caption: string | null };
+export type CenterDirector = { name?: string; role?: string; note?: string; photo_path?: string | null };
+export type CenterFaqItem = { q: string; a: string };
 
 export type PublicCenter = {
   id: string;
@@ -18,13 +20,21 @@ export type PublicCenter = {
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
+  public_founded_year: number | null;
+  public_team_size: number | null;
+  public_address: string | null;
+  public_hours: string | null;
+  public_accessibility: string | null;
+  public_director: CenterDirector;
+  public_faq: CenterFaqItem[];
+  num_locations: number | null;
   logo_path: string | null;
   team_members: CenterTeamMember[];
   gallery: CenterGalleryPhoto[];
 };
 
 const PUBLIC_COLS =
-  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, logo_path, team_members, gallery";
+  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery";
 
 // slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר — מוסיפים
 // סיומת מספרית. excludeId מאפשר לשמור על ה-slug של המרכז עצמו בעדכון.
@@ -69,22 +79,35 @@ export const getPublicCenterBySlug = cache(async (slug: string): Promise<PublicC
     ...(c as unknown as PublicCenter),
     team_members: Array.isArray(c.team_members) ? (c.team_members as CenterTeamMember[]) : [],
     gallery: Array.isArray(c.gallery) ? (c.gallery as CenterGalleryPhoto[]) : [],
+    public_director: (c.public_director && typeof c.public_director === "object" && !Array.isArray(c.public_director)
+      ? (c.public_director as CenterDirector)
+      : {}),
+    public_faq: Array.isArray(c.public_faq) ? (c.public_faq as CenterFaqItem[]) : [],
   };
 });
 
-// חתימת URLs ללוגו, לתמונות הצוות ולגלריה (bucket פרטי). מחושב בצד-שרת בכל רינדור עמוד.
+// חתימת URLs ללוגו, לתמונות הצוות, לגלריה ולתמונת המנהל/ת (bucket פרטי).
+// מחושב בצד-שרת בכל רינדור עמוד.
 export async function signCenterAssets(
-  center: { logo_path: string | null; team_members: CenterTeamMember[]; gallery?: CenterGalleryPhoto[] },
+  center: {
+    logo_path: string | null;
+    team_members: CenterTeamMember[];
+    gallery?: CenterGalleryPhoto[];
+    public_director?: CenterDirector | null;
+  },
 ): Promise<{
   logoUrl: string | null;
   team: { name: string; role: string; photoUrl: string | null }[];
   gallery: { path: string; caption: string | null; url: string | null }[];
+  directorPhotoUrl: string | null;
 }> {
   const galleryItems = center.gallery ?? [];
+  const directorPhoto = center.public_director?.photo_path ?? null;
   const paths: string[] = [];
   if (center.logo_path) paths.push(center.logo_path);
   for (const m of center.team_members) if (m.photo_path) paths.push(m.photo_path);
   for (const g of galleryItems) if (g.path) paths.push(g.path);
+  if (directorPhoto) paths.push(directorPhoto);
   const urlByPath = new Map<string, string>();
   if (paths.length > 0) {
     const { data } = await supabaseAdmin.storage.from("therapist-certificates").createSignedUrls(paths, 60 * 60 * 24);
@@ -102,6 +125,7 @@ export async function signCenterAssets(
       caption: g.caption ?? null,
       url: g.path ? (urlByPath.get(g.path) ?? null) : null,
     })),
+    directorPhotoUrl: directorPhoto ? (urlByPath.get(directorPhoto) ?? null) : null,
   };
 }
 

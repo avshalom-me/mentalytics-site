@@ -14,6 +14,13 @@ export type PublicPage = {
   city: string | null;
   website: string | null;
   phone: string | null;
+  founded_year: number | null;
+  team_size: number | null;
+  address: string | null;
+  hours: string | null;
+  accessibility: string | null;
+  director: { name: string; role: string; note: string; photo_path: string | null; photo_url: string | null };
+  faq: { q: string; a: string }[];
   logo_path: string | null;
   logo_url: string | null;
   team: { name: string; role: string; photo_path: string | null; photo_url: string | null }[];
@@ -22,6 +29,7 @@ export type PublicPage = {
 
 type TeamRow = { name: string; role: string; photo_path: string | null; photo_url: string | null };
 type GalleryRow = { path: string; caption: string; url: string | null };
+type FaqRow = { q: string; a: string };
 
 export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [enabled, setEnabled] = useState(initial.enabled);
@@ -37,9 +45,36 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [team, setTeam] = useState<TeamRow[]>(initial.team ?? []);
   const [gallery, setGallery] = useState<GalleryRow[]>((initial.gallery ?? []).map((g) => ({ path: g.path, caption: g.caption ?? "", url: g.url })));
   const [galleryBusy, setGalleryBusy] = useState(false);
+  // עובדות-אמון + מידע פרקטי + דבר המנהל/ת + שאלות נפוצות
+  const [foundedYear, setFoundedYear] = useState(initial.founded_year ? String(initial.founded_year) : "");
+  const [teamSize, setTeamSize] = useState(initial.team_size ? String(initial.team_size) : "");
+  const [address, setAddress] = useState(initial.address ?? "");
+  const [hours, setHours] = useState(initial.hours ?? "");
+  const [accessibility, setAccessibility] = useState(initial.accessibility ?? "");
+  const [dirName, setDirName] = useState(initial.director?.name ?? "");
+  const [dirRole, setDirRole] = useState(initial.director?.role ?? "");
+  const [dirNote, setDirNote] = useState(initial.director?.note ?? "");
+  const [dirPhotoPath, setDirPhotoPath] = useState<string | null>(initial.director?.photo_path ?? null);
+  const [dirPhotoPreview, setDirPhotoPreview] = useState<string | null>(initial.director?.photo_url ?? null);
+  const [faq, setFaq] = useState<FaqRow[]>(initial.faq ?? []);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+
+  // מד שלמות פרופיל — מחושב חי מה-state, כולל רמזים למה שחסר.
+  const completeness: { label: string; done: boolean }[] = [
+    { label: "לוגו", done: !!logoPath },
+    { label: "תיאור המרכז", done: description.trim().length >= 40 },
+    { label: "איש/אשת צוות אחד לפחות", done: team.some((m) => m.name.trim()) },
+    { label: "2+ תמונות של המרכז", done: gallery.length >= 2 },
+    { label: "דבר המנהל/ת", done: !!(dirName.trim() && dirNote.trim()) },
+    { label: "שנת ייסוד", done: !!foundedYear.trim() },
+    { label: "גודל הצוות", done: !!teamSize.trim() },
+    { label: "כתובת", done: !!address.trim() },
+    { label: "שעות פעילות", done: !!hours.trim() },
+    { label: "שאלה נפוצה אחת לפחות", done: faq.some((f) => f.q.trim() && f.a.trim()) },
+  ];
+  const donePct = Math.round((completeness.filter((c) => c.done).length / completeness.length) * 100);
 
   // העלאת תמונת מרכז (לוגו / חבר צוות / גלריה) — מחזירה נתיב אחסון שנשמר בשמירה.
   async function uploadCenterImage(file: File, kind: "center_image" | "center_gallery"): Promise<string | null> {
@@ -69,6 +104,13 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
     setErr("");
     const path = await uploadCenterImage(file, "center_image");
     if (path) setTeam((prev) => prev.map((m, i) => i === idx ? { ...m, photo_path: path, photo_url: URL.createObjectURL(file) } : m));
+  }
+
+  async function onDirectorPhoto(file: File | null) {
+    if (!file) return;
+    setErr("");
+    const path = await uploadCenterImage(file, "center_image");
+    if (path) { setDirPhotoPath(path); setDirPhotoPreview(URL.createObjectURL(file)); }
   }
 
   async function onGalleryFiles(files: FileList | null) {
@@ -107,6 +149,13 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
           logo_path: logoPath,
           team_members: team.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), role: m.role.trim(), photo_path: m.photo_path })),
           gallery: gallery.map((g) => ({ path: g.path, caption: g.caption.trim() || null })),
+          founded_year: foundedYear.trim() || null,
+          team_size: teamSize.trim() || null,
+          address,
+          hours,
+          accessibility,
+          director: { name: dirName, role: dirRole, note: dirNote, photo_path: dirPhotoPath },
+          faq: faq.filter((f) => f.q.trim() && f.a.trim()),
         }),
       });
       const json = await res.json();
@@ -136,6 +185,22 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         )}
       </p>
 
+      {/* מד שלמות פרופיל — פרופיל מלא = יותר אמון ויותר פניות */}
+      <div className="mb-5 rounded-xl border border-stone-200 bg-white p-3.5">
+        <div className="mb-1.5 flex items-center justify-between">
+          <span className="text-xs font-black text-stone-700">שלמות הפרופיל</span>
+          <span className="text-sm font-black" style={{ color: donePct >= 80 ? "#15803d" : donePct >= 50 ? "var(--gold-dark)" : "#b91c1c" }}>{donePct}%</span>
+        </div>
+        <div className="h-2 overflow-hidden rounded-full bg-stone-100">
+          <div className="h-full rounded-full transition-all" style={{ width: `${donePct}%`, background: "linear-gradient(90deg,var(--teal),var(--teal-dark))" }} />
+        </div>
+        {donePct < 100 && (
+          <p className="mt-2 text-[11px] leading-5 text-stone-500">
+            חסר: {completeness.filter((c) => !c.done).map((c) => c.label).join(" · ")}
+          </p>
+        )}
+      </div>
+
       {/* לוגו המרכז */}
       <label className="mb-1 block text-sm font-semibold text-stone-700">לוגו המרכז</label>
       <div className="mb-4 flex items-center gap-3">
@@ -152,6 +217,30 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         {logoPreview && (
           <button onClick={() => { setLogoPath(null); setLogoPreview(null); }} className="text-xs font-semibold text-red-600 hover:underline">הסרה</button>
         )}
+      </div>
+
+      {/* דבר המנהל/ת — פנים, שם והסמכה שהופכים "ישות" לאנשים */}
+      <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
+        <label className="mb-1 block text-sm font-semibold text-stone-700">💬 דבר מנהל/ת המרכז</label>
+        <p className="mb-2 text-xs text-stone-500">2-3 משפטים אישיים וחמים מהמנהל/ת — האלמנט שהופך את המרכז מאנונימי לאנושי.</p>
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <label className="cursor-pointer">
+            {dirPhotoPreview ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={dirPhotoPreview} alt="" className="h-12 w-12 rounded-full object-cover" />
+            ) : (
+              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-teal-50 text-[9px] text-teal-700">תמונה</div>
+            )}
+            <input type="file" accept="image/*" className="hidden" onChange={(e) => onDirectorPhoto(e.target.files?.[0] ?? null)} />
+          </label>
+          <input value={dirName} onChange={(e) => setDirName(e.target.value)} placeholder="שם המנהל/ת"
+            className="min-w-[130px] flex-1 rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm" />
+          <input value={dirRole} onChange={(e) => setDirRole(e.target.value)} placeholder='תפקיד והסמכה (למשל: פסיכולוגית קלינית, מנהלת המרכז)'
+            className="min-w-[180px] flex-[1.4] rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm" />
+        </div>
+        <textarea value={dirNote} onChange={(e) => setDirNote(e.target.value)} rows={3} maxLength={600}
+          placeholder='למשל: "הקמנו את המרכז מתוך אמונה שלכל אדם מגיע טיפול שמותאם באמת אליו…"'
+          className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
       </div>
 
       {/* צוות / ראשי המרכז */}
@@ -227,7 +316,23 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         placeholder="ד״ר כהן, גב׳ לוי…"
         className="mb-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
 
+      {/* עובדות-אמון — מוצגות כמספרים גדולים בעמוד, רק כשמולאו */}
       <div className="grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">שנת ייסוד המרכז</label>
+          <input value={foundedYear} onChange={(e) => setFoundedYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            inputMode="numeric" placeholder="למשל 2012" dir="ltr"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">מספר אנשי צוות</label>
+          <input value={teamSize} onChange={(e) => setTeamSize(e.target.value.replace(/\D/g, "").slice(0, 4))}
+            inputMode="numeric" placeholder="למשל 14" dir="ltr"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-semibold text-stone-700">עיר / כתובת</label>
           <input value={city} onChange={(e) => setCity(e.target.value)}
@@ -240,9 +345,55 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         </div>
       </div>
 
+      {/* מידע פרקטי — השאלות האמיתיות של פונה חרד */}
+      <label className="mb-1 mt-3 block text-sm font-semibold text-stone-700">כתובת מלאה (לניווט)</label>
+      <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="למשל: רח' הרצל 12, קומה 2, תל אביב"
+        className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">שעות פעילות</label>
+          <textarea value={hours} onChange={(e) => setHours(e.target.value)} rows={2}
+            placeholder={"א'-ה' 8:00-20:00\nו' 8:00-13:00"}
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+        <div>
+          <label className="mb-1 block text-sm font-semibold text-stone-700">נגישות</label>
+          <textarea value={accessibility} onChange={(e) => setAccessibility(e.target.value)} rows={2}
+            placeholder="למשל: גישה לכיסאות גלגלים, מעלית, חניית נכים בסמוך"
+            className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        </div>
+      </div>
+
       <label className="mb-1 mt-3 block text-sm font-semibold text-stone-700">אתר המרכז</label>
       <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://…"
         className="mb-4 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+
+      {/* שאלות נפוצות */}
+      <label className="mb-1 block text-sm font-semibold text-stone-700">❓ שאלות נפוצות (עד 6)</label>
+      <p className="mb-2 text-xs text-stone-500">מה שפונים שואלים אתכם בטלפון שוב ושוב — עלויות, זמני המתנה, למי מתאים. עוזר גם לקידום בגוגל.</p>
+      <div className="mb-2 space-y-2">
+        {faq.map((f, i) => (
+          <div key={i} className="rounded-xl border border-stone-200 bg-white p-2.5">
+            <div className="flex items-start gap-2">
+              <div className="min-w-0 flex-1 space-y-1.5">
+                <input value={f.q} onChange={(e) => setFaq((prev) => prev.map((x, xi) => xi === i ? { ...x, q: e.target.value } : x))}
+                  placeholder="השאלה (למשל: כמה זמן ממתינים לפגישה ראשונה?)" maxLength={200}
+                  className="w-full rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm font-semibold" />
+                <textarea value={f.a} onChange={(e) => setFaq((prev) => prev.map((x, xi) => xi === i ? { ...x, a: e.target.value } : x))}
+                  placeholder="התשובה" rows={2} maxLength={1000}
+                  className="w-full rounded-lg border border-stone-300 px-2.5 py-1.5 text-sm" />
+              </div>
+              <button onClick={() => setFaq((prev) => prev.filter((_, xi) => xi !== i))} className="px-1.5 text-stone-400 hover:text-red-600" title="הסרה">✕</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {faq.length < 6 && (
+        <button onClick={() => setFaq((prev) => [...prev, { q: "", a: "" }])}
+          className="mb-4 rounded-full border border-teal-300 bg-teal-50 px-4 py-1.5 text-xs font-bold text-teal-800 hover:bg-teal-100">
+          ➕ הוספת שאלה
+        </button>
+      )}
 
       <div className="flex items-center gap-3">
         <button onClick={save} disabled={saving}

@@ -1,7 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { MapPin, Globe, Phone, Users, ArrowLeft, Sparkles, BadgeCheck, Layers, Camera } from "lucide-react";
+import { MapPin, Globe, Phone, Users, ArrowLeft, Sparkles, BadgeCheck, Layers, Camera, Clock, Accessibility, Languages, Handshake, HelpCircle, Navigation } from "lucide-react";
+import { treatmentExplainer } from "@/app/lib/treatment-explainers";
 import { getPublicCenterBySlug, signCenterAssets } from "@/app/lib/center-public";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -34,12 +35,13 @@ type CenterEntity = {
   regions: string[] | null;
   online: boolean | null;
   languages: string[] | null;
+  arrangements: string[] | null;
 };
 
 async function getCenterEntity(centerId: string): Promise<CenterEntity | null> {
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, status, email, accepting_new_patients, therapist_types, training_areas, regions, online, languages")
+    .select("id, status, email, accepting_new_patients, therapist_types, training_areas, regions, online, languages, arrangements")
     .eq("center_account_id", centerId)
     .eq("entity_type", "center")
     .maybeSingle();
@@ -106,6 +108,41 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
   );
   const galleryPhotos = assets.gallery.filter((g) => g.url);
 
+  // פס עובדות-אמון — רק עובדות שמולאו, בלי המצאות.
+  const yearsActive = center.public_founded_year ? Math.max(0, new Date().getFullYear() - center.public_founded_year) : null;
+  const locationsCount = Math.max(1, Math.floor(Number(center.num_locations) || 1));
+  const facts: { value: string; label: string }[] = [
+    ...(yearsActive && yearsActive >= 2 ? [{ value: String(yearsActive), label: "שנות פעילות" }] : []),
+    ...(center.public_team_size ? [{ value: String(center.public_team_size), label: "אנשי צוות" }] : []),
+    ...(locationsCount > 1 ? [{ value: String(locationsCount), label: "סניפים" }] : []),
+    ...(offerChips.length >= 3 ? [{ value: String(offerChips.length), label: "תחומי טיפול" }] : []),
+  ];
+
+  // דבר המנהל/ת — מוצג רק כשיש שם + טקסט.
+  const director = center.public_director;
+  const showDirector = !!(director?.name?.trim() && director?.note?.trim());
+
+  // מילון הגישות — רק לצ'יפים שיש להם הסבר (תוכן פלטפורמה).
+  const explainedChips = offerChips
+    .map((c) => ({ label: c, text: treatmentExplainer(c) }))
+    .filter((c): c is { label: string; text: string } => !!c.text);
+
+  // מידע פרקטי — רק שורות עם תוכן.
+  const practicalRows = {
+    address: center.public_address?.trim() || null,
+    hours: center.public_hours?.trim() || null,
+    accessibility: center.public_accessibility?.trim() || null,
+    languages: (entity?.languages ?? []).filter(Boolean),
+    arrangements: (entity?.arrangements ?? []).filter(Boolean),
+  };
+  const hasPractical = !!(practicalRows.address || practicalRows.hours || practicalRows.accessibility
+    || practicalRows.languages.length > 0 || practicalRows.arrangements.length > 0);
+  const mapsHref = practicalRows.address
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(practicalRows.address)}`
+    : null;
+
+  const faqItems = (center.public_faq ?? []).filter((f) => f.q?.trim() && f.a?.trim());
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "MedicalOrganization",
@@ -114,7 +151,11 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
     url: `${BASE}/centers/${center.slug}`,
     ...(assets.logoUrl ? { logo: assets.logoUrl } : {}),
     ...(center.public_description ? { description: center.public_description } : {}),
-    ...(center.public_city ? { address: { "@type": "PostalAddress", addressLocality: center.public_city, addressCountry: "IL" } } : {}),
+    ...(center.public_founded_year ? { foundingDate: String(center.public_founded_year) } : {}),
+    ...(center.public_team_size ? { numberOfEmployees: { "@type": "QuantitativeValue", value: center.public_team_size } } : {}),
+    ...(center.public_city || center.public_address
+      ? { address: { "@type": "PostalAddress", ...(center.public_address ? { streetAddress: center.public_address } : {}), ...(center.public_city ? { addressLocality: center.public_city } : {}), addressCountry: "IL" } }
+      : {}),
     ...(center.public_website ? { sameAs: [center.public_website] } : {}),
     ...(center.public_phone ? { telephone: center.public_phone } : {}),
     ...(therapists.length > 0
@@ -125,6 +166,19 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      {faqItems.length > 0 && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "FAQPage",
+            mainEntity: faqItems.map((f) => ({
+              "@type": "Question",
+              name: f.q,
+              acceptedAnswer: { "@type": "Answer", text: f.a },
+            })),
+          }).replace(/</g, "\\u003c"),
+        }} />
+      )}
       {/* מסלול 2: צפייה בעמוד המרכז נספרת כצפייה בפרופיל הישות — מזינה את
           "צפיות בפרופיל" בפורטל המרכז (דה-דופ לפי session בצד השרת). */}
       {isEntity && entity && <TrackView therapistId={entity.id} source="directory" />}
@@ -174,6 +228,45 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </div>
       </header>
 
+      {/* פס עובדות-אמון — מספרים גדולים, רק עובדות שמולאו */}
+      {facts.length > 0 && (
+        <section className="mt-10 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] px-6 py-6">
+          <div className={`grid gap-6 text-center ${facts.length === 2 ? "grid-cols-2" : facts.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
+            {facts.map((f) => (
+              <div key={f.label}>
+                <div className="text-[clamp(1.9rem,3.4vw,2.6rem)] font-black leading-none" style={{ color: "var(--teal)" }}>{f.value}</div>
+                <div className="mt-1.5 text-[13px] font-semibold text-[var(--text-2)]">{f.label}</div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* דבר מנהל/ת המרכז — פנים ושם מאחורי המרכז */}
+      {showDirector && (
+        <section className="mt-10">
+          <div className="rounded-[22px] border border-[var(--line)] bg-white p-7 shadow-sm md:p-9"
+            style={{ borderInlineStart: "4px solid var(--gold)" }}>
+            <div className="flex flex-wrap items-start gap-5">
+              {assets.directorPhotoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={assets.directorPhotoUrl} alt={director.name ?? ""} className="h-[76px] w-[76px] flex-shrink-0 rounded-full object-cover" />
+              ) : (
+                <div className="flex h-[76px] w-[76px] flex-shrink-0 items-center justify-center rounded-full text-2xl font-extrabold text-white"
+                  style={{ background: "linear-gradient(140deg,var(--teal),var(--teal-dark))" }}>
+                  {initials(director.name ?? "")}
+                </div>
+              )}
+              <div className="min-w-[240px] flex-1">
+                <p className="whitespace-pre-line text-[16.5px] font-light leading-8 text-[var(--text)]">&ldquo;{director.note?.trim()}&rdquo;</p>
+                <p className="mt-4 text-[15px] font-extrabold text-[var(--text)]">{director.name}</p>
+                {director.role && <p className="mt-0.5 text-[12.5px] text-[var(--muted)]">{director.role}</p>}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
       {/* מה המרכז מציע (מסלול 2) */}
       {showOffer && (
         <section className="mt-14">
@@ -206,6 +299,24 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
               </>
             )}
           </div>
+
+          {/* מילון הגישות — הסבר בשפה פשוטה לכל גישה שהמרכז מציע (תוכן פלטפורמה) */}
+          {explainedChips.length > 0 && (
+            <div className="mt-4 overflow-hidden rounded-[18px] border border-[var(--line)] bg-white">
+              <p className="border-b border-[var(--line)] bg-[var(--surface)] px-5 py-3 text-[13px] font-extrabold text-[var(--text-2)]">
+                📖 מה זה אומר בעצם? הסבר קצר על כל גישה
+              </p>
+              {explainedChips.map((c, i) => (
+                <details key={c.label} className={`group ${i > 0 ? "border-t border-[var(--line)]" : ""}`}>
+                  <summary className="flex cursor-pointer list-none items-center justify-between px-5 py-3.5 text-[14.5px] font-bold text-[var(--text)] hover:bg-[var(--surface)] [&::-webkit-details-marker]:hidden">
+                    {c.label}
+                    <span className="text-[var(--faint)] transition-transform group-open:rotate-180">▾</span>
+                  </summary>
+                  <p className="px-5 pb-4 text-[14px] leading-7 text-[var(--text-2)]">{c.text}</p>
+                </details>
+              ))}
+            </div>
+          )}
         </section>
       )}
 
@@ -253,6 +364,99 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
                 <p className="text-[15px] font-extrabold tracking-tight text-[var(--text)]">{m.name}</p>
                 {m.role && <p className="mt-1.5 text-[12.5px] leading-5 text-[var(--muted)]">{m.role}</p>}
               </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* מידע פרקטי — השאלות הקונקרטיות של פונה: איפה, מתי, איך */}
+      {hasPractical && (
+        <section className="mt-14">
+          <h2 className="mb-1 flex items-center gap-2 text-[1.28rem] font-black tracking-tight text-[var(--text)]">
+            <MapPin size={20} style={{ color: "var(--teal)" }} /> מידע פרקטי
+          </h2>
+          <p className="mb-5 text-sm text-[var(--muted)]">כל מה שכדאי לדעת לפני שמגיעים.</p>
+          <div className="grid gap-4 rounded-[20px] border border-[var(--line)] bg-white p-6 shadow-sm sm:grid-cols-2">
+            {practicalRows.address && (
+              <div className="flex items-start gap-3">
+                <MapPin size={17} className="mt-0.5 flex-shrink-0" style={{ color: "var(--teal)" }} />
+                <div>
+                  <p className="text-[13px] font-extrabold text-[var(--text)]">כתובת</p>
+                  <p className="mt-0.5 text-[14px] leading-6 text-[var(--text-2)]">{practicalRows.address}</p>
+                  {mapsHref && (
+                    <a href={mapsHref} target="_blank" rel="noopener noreferrer nofollow"
+                      className="mt-1 inline-flex items-center gap-1 text-[12.5px] font-bold hover:underline" style={{ color: "var(--teal-dark)" }}>
+                      <Navigation size={12} /> ניווט במפות
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+            {practicalRows.hours && (
+              <div className="flex items-start gap-3">
+                <Clock size={17} className="mt-0.5 flex-shrink-0" style={{ color: "var(--teal)" }} />
+                <div>
+                  <p className="text-[13px] font-extrabold text-[var(--text)]">שעות פעילות</p>
+                  <p className="mt-0.5 whitespace-pre-line text-[14px] leading-6 text-[var(--text-2)]">{practicalRows.hours}</p>
+                </div>
+              </div>
+            )}
+            {practicalRows.accessibility && (
+              <div className="flex items-start gap-3">
+                <Accessibility size={17} className="mt-0.5 flex-shrink-0" style={{ color: "var(--teal)" }} />
+                <div>
+                  <p className="text-[13px] font-extrabold text-[var(--text)]">נגישות</p>
+                  <p className="mt-0.5 whitespace-pre-line text-[14px] leading-6 text-[var(--text-2)]">{practicalRows.accessibility}</p>
+                </div>
+              </div>
+            )}
+            {practicalRows.languages.length > 0 && (
+              <div className="flex items-start gap-3">
+                <Languages size={17} className="mt-0.5 flex-shrink-0" style={{ color: "var(--teal)" }} />
+                <div>
+                  <p className="text-[13px] font-extrabold text-[var(--text)]">שפות טיפול</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {practicalRows.languages.map((l) => (
+                      <span key={l} className="rounded-full border border-[var(--line)] bg-[var(--surface)] px-2.5 py-0.5 text-[12.5px] font-semibold text-[var(--text-2)]">{l}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+            {practicalRows.arrangements.length > 0 && (
+              <div className="flex items-start gap-3 sm:col-span-2">
+                <Handshake size={17} className="mt-0.5 flex-shrink-0" style={{ color: "var(--teal)" }} />
+                <div>
+                  <p className="text-[13px] font-extrabold text-[var(--text)]">הסדרים והחזרים</p>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {practicalRows.arrangements.map((a) => (
+                      <span key={a} className="rounded-full border border-[#E9D6A6] px-2.5 py-0.5 text-[12.5px] font-semibold"
+                        style={{ background: "var(--gold-pale)", color: "var(--gold-dark)" }}>{a}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
+      {/* שאלות נפוצות */}
+      {faqItems.length > 0 && (
+        <section className="mt-14">
+          <h2 className="mb-1 flex items-center gap-2 text-[1.28rem] font-black tracking-tight text-[var(--text)]">
+            <HelpCircle size={20} style={{ color: "var(--teal)" }} /> שאלות נפוצות
+          </h2>
+          <p className="mb-5 text-sm text-[var(--muted)]">תשובות מהמרכז לשאלות שחוזרות אצל פונים.</p>
+          <div className="overflow-hidden rounded-[20px] border border-[var(--line)] bg-[var(--surface)]">
+            {faqItems.map((f, i) => (
+              <details key={i} className={`group ${i > 0 ? "border-t border-[var(--line)]" : ""}`}>
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 text-[15px] font-bold text-[var(--text)] hover:bg-white [&::-webkit-details-marker]:hidden">
+                  {f.q}
+                  <span className="flex-shrink-0 text-[var(--faint)] transition-transform group-open:rotate-180">▾</span>
+                </summary>
+                <p className="whitespace-pre-line bg-white px-6 pb-5 pt-1 text-[14.5px] leading-7 text-[var(--text-2)]">{f.a}</p>
+              </details>
             ))}
           </div>
         </section>

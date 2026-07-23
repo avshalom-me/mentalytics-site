@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { resolveCenter } from "@/app/lib/center-auth";
-import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto } from "@/app/lib/center-public";
+import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type CenterDirector, type CenterFaqItem } from "@/app/lib/center-public";
 
 // פורטל המרכז הטיפולי — API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
 // מצטברות לכל המרכז. הכניסה היא בחשבון Supabase Auth של המרכז (מקביל למטפל).
@@ -112,10 +112,16 @@ export async function GET(req: NextRequest) {
     const galleryRaw: CenterGalleryPhoto[] = Array.isArray(center.gallery)
       ? (center.gallery as CenterGalleryPhoto[])
       : [];
+    const directorRaw: CenterDirector =
+      center.public_director && typeof center.public_director === "object" && !Array.isArray(center.public_director)
+        ? (center.public_director as CenterDirector)
+        : {};
+    const faqRaw: CenterFaqItem[] = Array.isArray(center.public_faq) ? (center.public_faq as CenterFaqItem[]) : [];
     const signedAssets = await signCenterAssets({
       logo_path: (center.logo_path as string | null) ?? null,
       team_members: teamRaw,
       gallery: galleryRaw,
+      public_director: directorRaw,
     });
     const publicPage = {
       slug: center.slug,
@@ -125,6 +131,19 @@ export async function GET(req: NextRequest) {
       city: center.public_city,
       website: center.public_website,
       phone: center.public_phone,
+      founded_year: center.public_founded_year ?? null,
+      team_size: center.public_team_size ?? null,
+      address: center.public_address,
+      hours: center.public_hours,
+      accessibility: center.public_accessibility,
+      director: {
+        name: directorRaw.name ?? "",
+        role: directorRaw.role ?? "",
+        note: directorRaw.note ?? "",
+        photo_path: directorRaw.photo_path ?? null,
+        photo_url: signedAssets.directorPhotoUrl,
+      },
+      faq: faqRaw.map((f) => ({ q: f.q ?? "", a: f.a ?? "" })),
       logo_path: (center.logo_path as string | null) ?? null,
       logo_url: signedAssets.logoUrl,
       team: teamRaw.map((m, i) => ({ name: m.name, role: m.role, photo_path: m.photo_path ?? null, photo_url: signedAssets.team[i]?.photoUrl ?? null })),
@@ -309,6 +328,33 @@ export async function POST(req: NextRequest) {
       const gg = (g ?? {}) as Record<string, unknown>;
       return { path: assetPath(gg.path), caption: str(gg.caption, 120) || null };
     }).filter((g): g is { path: string; caption: string | null } => !!g.path);
+  }
+  // עובדות-אמון: שנת ייסוד + גודל צוות (מוצגים רק כשמולאו).
+  const intOrNull = (v: unknown, min: number, max: number): number | null => {
+    const n = Math.floor(Number(v));
+    return Number.isFinite(n) && n >= min && n <= max ? n : null;
+  };
+  if (body.founded_year !== undefined) update.public_founded_year = intOrNull(body.founded_year, 1900, 2100);
+  if (body.team_size !== undefined) update.public_team_size = intOrNull(body.team_size, 0, 10000);
+  // מידע פרקטי: כתובת, שעות פעילות, נגישות.
+  if (body.address !== undefined) update.public_address = str(body.address, 200) || null;
+  if (body.hours !== undefined) update.public_hours = str(body.hours, 500) || null;
+  if (body.accessibility !== undefined) update.public_accessibility = str(body.accessibility, 500) || null;
+  // דבר המנהל/ת: {name, role, note, photo_path}.
+  if (body.director !== undefined) {
+    const d = (body.director ?? {}) as Record<string, unknown>;
+    const name = str(d.name, 80);
+    update.public_director = name
+      ? { name, role: str(d.role, 120), note: str(d.note, 600), photo_path: assetPath(d.photo_path) }
+      : {};
+  }
+  // שאלות נפוצות: עד 6 זוגות {q, a} — נשמרות רק שורות מלאות.
+  if (body.faq !== undefined) {
+    const raw = Array.isArray(body.faq) ? body.faq : [];
+    update.public_faq = raw.slice(0, 6).map((f) => {
+      const ff = (f ?? {}) as Record<string, unknown>;
+      return { q: str(ff.q, 200), a: str(ff.a, 1000) };
+    }).filter((f) => f.q && f.a);
   }
 
   // ודא slug (מרכזים שנוצרו לפני פיצ'ר העמוד הציבורי).

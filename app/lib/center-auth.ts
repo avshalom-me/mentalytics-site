@@ -29,13 +29,20 @@ export type PortalCenter = {
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
+  public_founded_year: number | null;
+  public_team_size: number | null;
+  public_address: string | null;
+  public_hours: string | null;
+  public_accessibility: string | null;
+  public_director: unknown;
+  public_faq: unknown;
   logo_path: string | null;
   team_members: unknown;
   gallery: unknown;
 };
 
 const COLS =
-  "id, name, status, user_id, email, payer_email, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, num_locations, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone, logo_path, team_members, gallery";
+  "id, name, status, user_id, email, payer_email, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, num_locations, billing_starts_at, slug, public_page_enabled, public_description, public_managers, public_city, public_website, public_phone, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, logo_path, team_members, gallery";
 
 export async function resolveCenter(req: NextRequest): Promise<PortalCenter | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
