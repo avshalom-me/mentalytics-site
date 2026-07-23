@@ -29,6 +29,7 @@ type Center = {
   cancelled_at: string | null;
   created_at: string;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
+  pending_therapist_count: number; // כמה מהם ממתינים לאישור (כולל ישות-המרכז)
   user_id: string | null;
   slug: string | null;
   public_page_enabled: boolean | null;
@@ -411,13 +412,24 @@ export default function AdminCentersPage() {
                 className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
                 {copied === c.id ? "✓ הועתק!" : "🔗 העתקת קישור למרכז"}
               </button>
-              {isEntity ? (
-                <span className="rounded-full border border-stone-200 bg-stone-50 px-3 py-1 text-stone-500">רובריקה אחת — הפרופיל נערך ב-/admin/therapists</span>
-              ) : (
+              {!isEntity && (
                 <button onClick={() => openManage(c)}
                   className="rounded-full border border-indigo-300 bg-indigo-50 px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-100">
-                  👥 ניהול מטפלים ({c.linked_therapist_count})
+                  👥 שיוך מטפלים ({c.linked_therapist_count})
                 </button>
+              )}
+              {/* כל ניהול הפרופילים של המרכז נעשה מכאן — הם מוסתרים מ"ניהול מטפלים" הכללי */}
+              {(isEntity || c.linked_therapist_count > 0) && (
+                <a href={`/admin/therapists?center=${c.id}`}
+                  className="rounded-full border border-indigo-300 bg-white px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-50">
+                  🛠 {isEntity ? "פרופיל המרכז (עריכה ואישור)" : "הפרופילים באדמין"}
+                </a>
+              )}
+              {c.pending_therapist_count > 0 && (
+                <a href={`/admin/therapists?center=${c.id}`}
+                  className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-bold text-amber-800 hover:bg-amber-100">
+                  ⏳ ממתינים לאישור: {c.pending_therapist_count}
+                </a>
               )}
               {(c.status === "draft" || c.status === "sent") && (
                 <>

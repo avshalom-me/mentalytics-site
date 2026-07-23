@@ -308,6 +308,11 @@ export default function AdminTherapistsPage() {
   const [bulkReminderSending, setBulkReminderSending] = useState(false);
   const [bulkReminderProgress, setBulkReminderProgress] = useState("");
 
+  // מצב מרכז (?center=<id>) — העמוד מציג רק את מטפלי המרכז; ברירת המחדל
+  // מסתירה משויכי-מרכז לגמרי (ניהולם תחת "מרכזים טיפוליים").
+  const [centerScope, setCenterScope] = useState<string | null>(null);
+  const [centerScopeName, setCenterScopeName] = useState("");
+
   // Bulk PERSONALIZED reminder modal (for the partial-profiles section).
   // Only the intro is edited; each recipient gets their own missing-items list.
   const [partialBulkOpen, setPartialBulkOpen] = useState(false);
@@ -326,7 +331,15 @@ export default function AdminTherapistsPage() {
       const json = await res.json();
 
       if (!res.ok || !json.ok) throw new Error(json.error || "Failed to load admin therapists");
-      setTherapists(json.therapists ?? []);
+      // ניהול מרכזים נעשה תחת /admin/centers, לא כאן: כברירת מחדל מטפלים
+      // משויכי-מרכז (וגם שורת ישות-מרכז) מוסתרים מהעמוד. עם ?center=<id>
+      // (כניסה מכרטיס המרכז) העמוד מציג את מטפלי אותו מרכז בלבד.
+      const scope = new URLSearchParams(window.location.search).get("center");
+      const all = (json.therapists ?? []) as AdminTherapist[];
+      const rows = scope ? all.filter((t) => t.center_account_id === scope) : all.filter((t) => !t.center_account_id);
+      setCenterScope(scope);
+      setCenterScopeName(scope ? rows.find((t) => t.center_name)?.center_name ?? "" : "");
+      setTherapists(rows);
       // Fresh signed URLs — clear images previously marked broken (expired URL).
       setBrokenImages({});
     } catch (err) {
@@ -1380,9 +1393,21 @@ export default function AdminTherapistsPage() {
 
   return (
     <main className="mx-auto max-w-6xl p-6" dir="rtl">
+      {/* מצב מרכז — כניסה מכרטיס מרכז ב-/admin/centers */}
+      {centerScope && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-indigo-300 bg-indigo-50 px-5 py-3">
+          <span className="text-sm font-bold text-indigo-900">
+            🏢 מציג את הפרופילים של {centerScopeName ? `"${centerScopeName}"` : "המרכז"} בלבד ({therapists.length})
+          </span>
+          <a href="/admin/centers" className="rounded-full border border-indigo-300 bg-white px-4 py-1.5 text-xs font-bold text-indigo-800 hover:bg-indigo-100">
+            ← חזרה למרכזים טיפוליים
+          </a>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-3xl font-bold">ניהול מטפלים</h1>
+          <h1 className="text-3xl font-bold">{centerScope ? "פרופילי המרכז" : "ניהול מטפלים"}</h1>
           <button
             onClick={async () => {
               setRefreshing(true);

@@ -48,20 +48,28 @@ export async function GET() {
       .order("created_at", { ascending: false });
     if (error) throw error;
 
-    // כמה מטפלים משויכים לכל מרכז (לתצוגה בכרטיס + כפתור ניהול המטפלים).
+    // כמה מטפלים משויכים לכל מרכז (לתצוגה בכרטיס + כפתור ניהול המטפלים),
+    // וכמה מהם ממתינים לאישור. הפרופילים המשויכים אינם מוצגים ב"ניהול
+    // מטפלים" הכללי — כרטיס המרכז הוא הכניסה היחידה אליהם, ולכן הוא חייב
+    // לסמן כשמשהו מחכה לאישור (כולל שורת ישות-המרכז במסלול 2).
     const { data: linked } = await supabaseAdmin
       .from("therapists")
-      .select("center_account_id")
-      .not("center_account_id", "is", null)
-      .neq("entity_type", "center"); // שורת ישות-המרכז אינה "מטפל משויך"
+      .select("center_account_id, status, entity_type")
+      .not("center_account_id", "is", null);
     const counts = new Map<string, number>();
+    const pendingCounts = new Map<string, number>();
     (linked ?? []).forEach((t) => {
       const cid = t.center_account_id as string;
-      counts.set(cid, (counts.get(cid) ?? 0) + 1);
+      if (t.entity_type !== "center") counts.set(cid, (counts.get(cid) ?? 0) + 1); // שורת ישות אינה "מטפל משויך"
+      if (t.status === "pending") pendingCounts.set(cid, (pendingCounts.get(cid) ?? 0) + 1);
     });
     // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
     // therapist_count שבטבלה, שהוא מספר המטפלים שבתמחור ההצעה).
-    const centers = (data ?? []).map((c) => ({ ...c, linked_therapist_count: counts.get(c.id as string) ?? 0 }));
+    const centers = (data ?? []).map((c) => ({
+      ...c,
+      linked_therapist_count: counts.get(c.id as string) ?? 0,
+      pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
+    }));
     return NextResponse.json({ ok: true, centers });
   } catch (err) {
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : "Unknown error" }, { status: 500 });
