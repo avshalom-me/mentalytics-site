@@ -3,7 +3,7 @@ import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
-import { centerPricing } from "@/app/lib/center-pricing";
+import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 
@@ -35,6 +35,10 @@ function parseCenterPricing(body: Record<string, unknown>): ParsedPricing | { er
 }
 
 const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+// הנחה (₪ קבוע לחודש) ומספר מיקומים (מכפיל מחיר) — חלים על שני המסלולים.
+function parseDiscount(v: unknown): number { const n = Number(v); return isNaN(n) || n < 0 ? 0 : Math.round(n * 100) / 100; }
+function parseLocations(v: unknown): number { const n = Math.floor(Number(v)); return isNaN(n) || n < 1 ? 1 : Math.min(n, 100); }
 
 export async function GET() {
   try {
@@ -95,6 +99,8 @@ export async function POST(req: NextRequest) {
           price_per_therapist: priced.billingTrack === "per_therapist" ? priced.pricePerTherapist : null,
           therapist_count: priced.billingTrack === "per_therapist" ? priced.therapistCount : null,
           fixed_monthly_price: priced.billingTrack === "center_entity" ? priced.fixedMonthlyPrice : null,
+          discount_amount: parseDiscount(body.discount_amount),
+          num_locations: parseLocations(body.num_locations),
           slug: await ensureUniqueCenterSlug(name),
           token: randomBytes(24).toString("hex"),
         })
@@ -191,7 +197,8 @@ export async function POST(req: NextRequest) {
       const touchesPricing =
         body.billing_track !== undefined ||
         body.price_per_therapist !== undefined || body.therapist_count !== undefined ||
-        body.fixed_monthly_price !== undefined;
+        body.fixed_monthly_price !== undefined ||
+        body.discount_amount !== undefined || body.num_locations !== undefined;
       if (touchesPricing && center.status === "cancelled") {
         return NextResponse.json({ ok: false, error: "אי אפשר לעדכן תמחור למרכז מבוטל" }, { status: 400 });
       }
@@ -227,7 +234,6 @@ export async function POST(req: NextRequest) {
           update.fixed_monthly_price = Math.round(fixed * 100) / 100;
           update.price_per_therapist = null;
           update.therapist_count = null;
-          newTotal = update.fixed_monthly_price as number;
           syncEntity = "ensure";
         } else {
           const newPrice = body.price_per_therapist !== undefined ? Number(body.price_per_therapist) : Number(center.price_per_therapist);
@@ -255,9 +261,22 @@ export async function POST(req: NextRequest) {
           update.price_per_therapist = pp;
           update.therapist_count = cnt;
           update.fixed_monthly_price = null;
-          newTotal = centerPricing(pp, cnt).monthlyTotal;
           if (currentTrack === "center_entity") syncEntity = "remove"; // הוחזר ממסלול 2 למסלול 1
         }
+
+        // מיקומים והנחה — חלים על שני המסלולים; הסכום הסופי מחושב דרך הדיספצ'ר.
+        const effLocations = body.num_locations !== undefined ? parseLocations(body.num_locations) : (Number(center.num_locations) || 1);
+        const effDiscount = body.discount_amount !== undefined ? parseDiscount(body.discount_amount) : (Number(center.discount_amount) || 0);
+        if (body.num_locations !== undefined) update.num_locations = effLocations;
+        if (body.discount_amount !== undefined) update.discount_amount = effDiscount;
+        newTotal = centerMonthlyPricing({
+          billing_track: effTrack,
+          price_per_therapist: effTrack === "per_therapist" ? ((update.price_per_therapist as number | null) ?? center.price_per_therapist) : null,
+          therapist_count: effTrack === "per_therapist" ? ((update.therapist_count as number | null) ?? center.therapist_count) : null,
+          fixed_monthly_price: effTrack === "center_entity" ? ((update.fixed_monthly_price as number | null) ?? center.fixed_monthly_price) : null,
+          num_locations: effLocations,
+          discount_amount: effDiscount,
+        }).monthlyTotal;
 
         if (center.status === "active") {
           const oldTotal = Number(center.agreed_monthly_price) || 0;
@@ -381,6 +400,8 @@ export async function POST(req: NextRequest) {
         pricePerTherapist: Number(center.price_per_therapist),
         therapistCount: Number(center.therapist_count),
         fixedMonthlyPrice: Number(center.fixed_monthly_price),
+        discountAmount: Number(center.discount_amount) || 0,
+        numLocations: Number(center.num_locations) || 1,
         giftMonths: Number(center.gift_months ?? 0),
         token: center.token as string,
       });

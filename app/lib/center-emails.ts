@@ -42,6 +42,8 @@ export async function sendCenterProposalEmail(opts: {
   pricePerTherapist: number;
   therapistCount: number;
   fixedMonthlyPrice?: number | null;
+  discountAmount?: number | null;
+  numLocations?: number | null;
   giftMonths: number;
   token: string;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -57,6 +59,8 @@ export async function sendCenterProposalEmail(opts: {
     pricePerTherapist: opts.pricePerTherapist,
     therapistCount: opts.therapistCount,
     fixedMonthlyPrice: opts.fixedMonthlyPrice,
+    discountAmount: opts.discountAmount,
+    numLocations: opts.numLocations,
     giftMonths: opts.giftMonths,
     token: opts.token,
     siteUrl: SITE_URL,
@@ -96,6 +100,8 @@ export async function sendCenterWelcomeEmail(opts: {
   pricePerTherapist: number;
   therapistCount: number;
   fixedMonthlyPrice?: number | null;
+  discountAmount?: number | null;
+  numLocations?: number | null;
   giftMonths: number;
   billingStartsAt: string | null;
 }): Promise<{ ok: boolean; error?: string }> {
@@ -111,10 +117,16 @@ export async function sendCenterWelcomeEmail(opts: {
     price_per_therapist: opts.pricePerTherapist,
     therapist_count: opts.therapistCount,
     fixed_monthly_price: opts.fixedMonthlyPrice,
+    num_locations: opts.numLocations,
+    discount_amount: opts.discountAmount,
   });
+  const extra = [
+    pr.numLocations > 1 ? `${pr.numLocations} מיקומים` : "",
+    pr.discountAmount > 0 ? `כולל הנחה ₪${ilCurrency(pr.discountAmount)}` : "",
+  ].filter(Boolean).join(" · ");
   const priceLine = opts.billingTrack === "center_entity"
-    ? `מנוי חודשי — מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`
-    : `${pr.therapistCount} מטפלים × ₪${ilCurrency(pr.pricePerTherapist)} = ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש`;
+    ? `מנוי חודשי — מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`
+    : `${pr.therapistCount} מטפלים · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`;
   const portalUrl = `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
   // נושא = טקסט רגיל, בלי HTML entities.

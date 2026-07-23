@@ -84,6 +84,8 @@ export async function POST(req: NextRequest) {
       price_per_therapist: pricePerTherapist,
       therapist_count: therapistCount,
       fixed_monthly_price: center.fixed_monthly_price as number | null,
+      num_locations: center.num_locations as number | null,
+      discount_amount: center.discount_amount as number | null,
     }).monthlyTotal;
     if (monthlyTotal <= 0) {
       return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר — פנו אלינו" }, { status: 400 });
@@ -234,6 +236,8 @@ export async function POST(req: NextRequest) {
         pricePerTherapist,
         therapistCount,
         fixedMonthlyPrice: center.fixed_monthly_price as number | null,
+        discountAmount: center.discount_amount as number | null,
+        numLocations: center.num_locations as number | null,
         giftMonths,
         billingStartsAt: firstChargeDate ?? now.toISOString().slice(0, 10),
       });

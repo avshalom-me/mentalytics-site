@@ -29,6 +29,8 @@ export function buildCenterProposalEmail(opts: {
   pricePerTherapist: number;
   therapistCount: number;
   fixedMonthlyPrice?: number | null;
+  discountAmount?: number | null;
+  numLocations?: number | null;
   giftMonths: number;
   token: string;
   siteUrl: string;
@@ -48,7 +50,10 @@ export function buildCenterProposalEmail(opts: {
     price_per_therapist: opts.pricePerTherapist,
     therapist_count: opts.therapistCount,
     fixed_monthly_price: opts.fixedMonthlyPrice,
+    num_locations: opts.numLocations,
+    discount_amount: opts.discountAmount,
   });
+  const baseUnit = isEntity ? (p.numLocations > 0 ? p.baseTotal / p.numLocations : p.baseTotal) : p.pricePerTherapist;
 
   const giftBadge =
     opts.giftMonths > 0
@@ -60,36 +65,26 @@ export function buildCenterProposalEmail(opts: {
       </div>`
       : "";
 
-  // תיבת התמחור — לפי מסלול המרכז. מסלול 2 (מרכז כישות) = סכום חודשי קבוע.
-  const pricingBox = isEntity
-    ? `
+  // תיבת התמחור — מאוחדת: שורות בסיס (לפי מסלול) + מיקומים + הנחה + סה"כ.
+  const cell = "padding:12px 16px;border-bottom:1px solid #EAF0EE;";
+  const baseRows = isEntity
+    ? `<tr><td style="${cell}">מחיר חודשי בסיס — מרכז טיפולי</td><td style="${cell}text-align:left;font-weight:bold;">₪${ilCurrency(baseUnit)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td></tr>`
+    : `<tr><td style="${cell}">מחיר לכל מטפל</td><td style="${cell}text-align:left;font-weight:bold;">₪${ilCurrency(p.pricePerTherapist)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ / חודש</span></td></tr>
+       <tr><td style="${cell}">מספר מטפלים</td><td style="${cell}text-align:left;font-weight:bold;">${p.therapistCount}</td></tr>`;
+  const adjustRows =
+    (p.numLocations > 1 ? `<tr><td style="${cell}">מספר מיקומים</td><td style="${cell}text-align:left;font-weight:bold;">× ${p.numLocations} = ₪${ilCurrency(p.baseTotal)}</td></tr>` : "") +
+    (p.discountAmount > 0 ? `<tr><td style="${cell}color:#2A5C3A;">הנחה</td><td style="${cell}text-align:left;font-weight:bold;color:#2A5C3A;">− ₪${ilCurrency(p.discountAmount)}</td></tr>` : "");
+  const pricingBox = `
       <div style="border:1px solid #DDE9E8;border-radius:12px;overflow:hidden;margin:0 0 8px;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#1a4a5c;">
-          <tr style="background:#F0F7FA;">
-            <td style="padding:14px 16px;font-weight:900;color:#0F5468;">מנוי חודשי — מרכז טיפולי</td>
-            <td style="padding:14px 16px;text-align:left;font-weight:900;color:#0F5468;font-size:17px;">₪${ilCurrency(p.monthlyTotal)} <span style="font-size:12px;font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td>
-          </tr>
-        </table>
-      </div>
-      <p style="margin:0 0 18px;font-size:12px;color:#6B807E;">₪${ilCurrency(p.monthlyTotalWithVat)} לחודש כולל מע&quot;מ (${p.vatPct}%). המרכז מוצג כרובריקה אחת במערכת ההתאמות.</p>`
-    : `
-      <div style="border:1px solid #DDE9E8;border-radius:12px;overflow:hidden;margin:0 0 8px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;font-size:14px;color:#1a4a5c;">
-          <tr>
-            <td style="padding:12px 16px;border-bottom:1px solid #EAF0EE;">מחיר לכל מטפל</td>
-            <td style="padding:12px 16px;border-bottom:1px solid #EAF0EE;text-align:left;font-weight:bold;">₪${ilCurrency(p.pricePerTherapist)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ / חודש</span></td>
-          </tr>
-          <tr>
-            <td style="padding:12px 16px;border-bottom:1px solid #EAF0EE;">מספר מטפלים</td>
-            <td style="padding:12px 16px;border-bottom:1px solid #EAF0EE;text-align:left;font-weight:bold;">${p.therapistCount}</td>
-          </tr>
+          ${baseRows}${adjustRows}
           <tr style="background:#F0F7FA;">
             <td style="padding:14px 16px;font-weight:900;color:#0F5468;">סה&quot;כ חודשי</td>
             <td style="padding:14px 16px;text-align:left;font-weight:900;color:#0F5468;font-size:17px;">₪${ilCurrency(p.monthlyTotal)} <span style="font-size:12px;font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td>
           </tr>
         </table>
       </div>
-      <p style="margin:0 0 18px;font-size:12px;color:#6B807E;">₪${ilCurrency(p.monthlyTotalWithVat)} לחודש כולל מע&quot;מ (${p.vatPct}%). ${p.therapistCount} מטפלים × ₪${ilCurrency(p.pricePerTherapist)}.</p>`;
+      <p style="margin:0 0 18px;font-size:12px;color:#6B807E;">₪${ilCurrency(p.monthlyTotalWithVat)} לחודש כולל מע&quot;מ (${p.vatPct}%).${isEntity ? " המרכז מוצג כרובריקה אחת במערכת ההתאמות." : ""}</p>`;
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">

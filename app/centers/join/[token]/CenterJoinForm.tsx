@@ -16,6 +16,9 @@ export type CenterOffer = {
   price_per_therapist: number;
   therapist_count: number;
   per_therapist_with_vat: number;
+  base_total: number;
+  discount_amount: number;
+  num_locations: number;
   monthly_total: number;
   monthly_total_with_vat: number;
   vat_pct: number;
@@ -195,17 +198,10 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       <div className="rounded-3xl border-2 p-6 mb-8" style={{ borderColor: "var(--teal)", background: "var(--teal-pale)" }}>
         <div className="space-y-2.5 text-sm">
           {offer.billing_track === "center_entity" ? (
-            <>
-              <div className="flex items-center justify-between">
-                <span className="font-black text-stone-900">מנוי חודשי — מרכז טיפולי</span>
-                <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
-                  ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
-                </span>
-              </div>
-              <div className="text-xs text-stone-500 text-left">
-                ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · המרכז מוצג כרובריקה אחת במערכת ההתאמות
-              </div>
-            </>
+            <div className="flex items-center justify-between">
+              <span className="text-stone-700">מחיר חודשי בסיס — מרכז טיפולי</span>
+              <span className="font-bold text-stone-900">₪{(offer.num_locations > 0 ? offer.base_total / offer.num_locations : offer.base_total).toLocaleString("he-IL")} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ</span></span>
+            </div>
           ) : (
             <>
               <div className="flex items-center justify-between">
@@ -216,17 +212,29 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
                 <span className="text-stone-700">מספר מטפלים</span>
                 <span className="font-bold text-stone-900">{offer.therapist_count}</span>
               </div>
-              <div className="border-t pt-3 mt-1 flex items-center justify-between" style={{ borderColor: "var(--teal-mid)" }}>
-                <span className="font-black text-stone-900">סה&quot;כ חודשי</span>
-                <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
-                  ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
-                </span>
-              </div>
-              <div className="text-xs text-stone-500 text-left">
-                ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%) · {offer.therapist_count} מטפלים × ₪{offer.price_per_therapist.toLocaleString("he-IL")}
-              </div>
             </>
           )}
+          {offer.num_locations > 1 && (
+            <div className="flex items-center justify-between">
+              <span className="text-stone-700">מספר מיקומים</span>
+              <span className="font-bold text-stone-900">× {offer.num_locations} = ₪{offer.base_total.toLocaleString("he-IL")}</span>
+            </div>
+          )}
+          {offer.discount_amount > 0 && (
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-700">הנחה</span>
+              <span className="font-bold text-emerald-700">− ₪{offer.discount_amount.toLocaleString("he-IL")}</span>
+            </div>
+          )}
+          <div className="border-t pt-3 mt-1 flex items-center justify-between" style={{ borderColor: "var(--teal-mid)" }}>
+            <span className="font-black text-stone-900">סה&quot;כ חודשי</span>
+            <span className="text-2xl font-black" style={{ color: "var(--teal-dark)" }}>
+              ₪{offer.monthly_total.toLocaleString("he-IL")} <span className="text-sm font-normal text-stone-500">+ מע&quot;מ</span>
+            </span>
+          </div>
+          <div className="text-xs text-stone-500 text-left">
+            ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")} לחודש כולל מע&quot;מ ({offer.vat_pct}%){offer.billing_track === "center_entity" ? " · המרכז מוצג כרובריקה אחת במערכת ההתאמות" : ""}
+          </div>
         </div>
         <p className="mt-4 text-xs leading-5 text-stone-500">
           המחיר והיקף ההתקשרות נקבעו יחד איתכם בשיחת ההתאמה, בהתאם לצרכי המרכז.

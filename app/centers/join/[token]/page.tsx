@@ -20,7 +20,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
 
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, gift_months, billing_starts_at")
+    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, discount_amount, num_locations, gift_months, billing_starts_at")
     .eq("token", token)
     .maybeSingle();
 
@@ -74,6 +74,8 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     price_per_therapist: center.price_per_therapist,
     therapist_count: center.therapist_count,
     fixed_monthly_price: center.fixed_monthly_price,
+    num_locations: center.num_locations,
+    discount_amount: center.discount_amount,
   });
 
   // הצעה שעדיין לא תומחרה (טיוטה שנשלחה בטעות) — לא מציגים טופס תשלום.
@@ -101,6 +103,9 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     price_per_therapist: p.pricePerTherapist,
     therapist_count: p.therapistCount,
     per_therapist_with_vat: p.perTherapistWithVat,
+    base_total: p.baseTotal,
+    discount_amount: p.discountAmount,
+    num_locations: p.numLocations,
     monthly_total: p.monthlyTotal,
     monthly_total_with_vat: p.monthlyTotalWithVat,
     vat_pct: p.vatPct,
