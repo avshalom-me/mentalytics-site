@@ -214,5 +214,10 @@ export async function GET(req: NextRequest) {
     }),
   );
 
-  return NextResponse.json({ ok: true, therapist, photoUrl, certificates });
+  // מסלול 2 — מרכז כישות אחת: מספר המיקומים/סניפים קובע כמה אזורים מותר לסמן
+  // בטופס (אזור אחד לכל מיקום, עד 4 ערים באזור). הטופס מסתמך על זה + על
+  // entity_type=center כדי להסתיר תעודות/שאלות סגנון.
+  const numLocations = Math.max(1, Math.floor(Number(center.num_locations) || 1));
+
+  return NextResponse.json({ ok: true, therapist, photoUrl, certificates, numLocations });
 }

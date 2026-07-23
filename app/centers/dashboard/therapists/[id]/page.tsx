@@ -73,6 +73,10 @@ export default function CenterTherapistFormPage() {
   const [saveErr, setSaveErr] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
   const [status, setStatus] = useState<string | null>(null);
+  // מסלול 2 — מרכז כישות אחת: הטופס מתאים את עצמו (בלי תעודות/שאלות סגנון,
+  // ומספר המיקומים קובע כמה אזורים מותר לסמן).
+  const [isEntity, setIsEntity] = useState(false);
+  const [numLocations, setNumLocations] = useState(1);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -116,6 +120,8 @@ export default function CenterTherapistFormPage() {
         } else {
           const t = json.therapist;
           setStatus(t.status ?? null);
+          setIsEntity(t.entity_type === "center");
+          setNumLocations(Math.max(1, Math.floor(Number(json.numLocations) || 1)));
           setProfilePhotoUrl(json.photoUrl ?? null);
           setExistingCerts(json.certificates ?? []);
           setForm({
@@ -254,14 +260,20 @@ export default function CenterTherapistFormPage() {
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-black text-stone-900">
-            {isNew ? "הוספת מטפל/ת למרכז" : `עריכת פרופיל — ${form.full_name || "מטפל/ת"}`}
+            {isNew
+              ? "הוספת מטפל/ת למרכז"
+              : isEntity
+                ? `עריכת פרופיל המרכז — ${form.full_name || "המרכז"}`
+                : `עריכת פרופיל — ${form.full_name || "מטפל/ת"}`}
           </h1>
           <p className="mt-1 text-xs text-stone-500">
-            {isNew
-              ? "הפרופיל יישלח לאישור צוות טיפול חכם, ולאחר האישור ייכנס אוטומטית למערכת ההתאמות."
-              : status === "pending"
-                ? "הפרופיל ממתין לאישור צוות טיפול חכם."
-                : "שינויים נשמרים מיד. הקידום במערכת ההתאמות מנוהל אוטומטית דרך מנוי המרכז."}
+            {isEntity
+              ? 'המרכז מוצג במערכת ההתאמות כרובריקה אחת ("מרכז טיפולי"). ההתאמה למטופלים מבוססת על ההתאמה המקצועית בלבד — מלאו את תחומי הטיפול, קבוצות הגיל, השפות והאזורים.'
+              : isNew
+                ? "הפרופיל יישלח לאישור צוות טיפול חכם, ולאחר האישור ייכנס אוטומטית למערכת ההתאמות."
+                : status === "pending"
+                  ? "הפרופיל ממתין לאישור צוות טיפול חכם."
+                  : "שינויים נשמרים מיד. הקידום במערכת ההתאמות מנוהל אוטומטית דרך מנוי המרכז."}
           </p>
         </div>
         <Link href="/centers/dashboard" className="inline-flex items-center gap-1 rounded-full border border-stone-300 px-4 py-1.5 text-sm font-semibold text-stone-600 hover:bg-stone-50 whitespace-nowrap">
@@ -271,11 +283,11 @@ export default function CenterTherapistFormPage() {
 
       <form onSubmit={handleSave} className="space-y-5">
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
-          <h2 className="text-lg font-extrabold text-stone-900 mb-5">פרטים אישיים</h2>
+          <h2 className="text-lg font-extrabold text-stone-900 mb-5">{isEntity ? "פרטי המרכז" : "פרטים אישיים"}</h2>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">שם מלא *</label>
+              <label className="mb-1 block text-sm font-semibold text-stone-700">{isEntity ? "שם המרכז *" : "שם מלא *"}</label>
               <input value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})}
                 required className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" />
             </div>
@@ -289,82 +301,97 @@ export default function CenterTherapistFormPage() {
               <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})}
                 className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">מגדר</label>
-              <select value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}
-                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]">
-                <option value="">בחר</option>
-                <option value="זכר">זכר</option>
-                <option value="נקבה">נקבה</option>
-              </select>
-            </div>
+            {!isEntity && (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-stone-700">מגדר</label>
+                <select value={form.gender} onChange={e => setForm({...form, gender: e.target.value})}
+                  className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]">
+                  <option value="">בחר</option>
+                  <option value="זכר">זכר</option>
+                  <option value="נקבה">נקבה</option>
+                </select>
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input type="checkbox" id="online" checked={form.online}
                 onChange={e => setForm({...form, online: e.target.checked})} />
-              <label htmlFor="online" className="text-sm font-semibold text-stone-700">מטפל/ת אונליין</label>
+              <label htmlFor="online" className="text-sm font-semibold text-stone-700">{isEntity ? "המרכז מציע גם טיפול אונליין" : "מטפל/ת אונליין"}</label>
             </div>
           </div>
 
           <div className="mt-4">
-            <label className="mb-1 block text-sm font-semibold text-stone-700">ביוגרפיה קצרה</label>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">{isEntity ? "תיאור המרכז" : "ביוגרפיה קצרה"}</label>
             <textarea value={form.bio} onChange={e => setForm({...form, bio: e.target.value})}
               rows={4} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
-              placeholder="על המטפל/ת, הגישה הטיפולית, ומה מייחד אותו/ה..." />
+              placeholder={isEntity ? "על המרכז, הגישה הטיפולית, ומה מייחד אותו..." : "על המטפל/ת, הגישה הטיפולית, ומה מייחד אותו/ה..."} />
           </div>
 
           <div className="mt-4">
-            <label className="mb-1 block text-sm font-semibold text-stone-700">השכלה והכשרה</label>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">{isEntity ? "הכשרות והסמכות הצוות" : "השכלה והכשרה"}</label>
             <textarea value={form.education} onChange={e => setForm({...form, education: e.target.value})}
               rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
-              placeholder="תארים, התמחויות, הכשרות רלוונטיות..." />
+              placeholder={isEntity ? "תחומי הכשרה, הסמכות והתמחויות של צוות המרכז..." : "תארים, התמחויות, הכשרות רלוונטיות..."} />
           </div>
 
           <div className="mt-4">
-            <label className="mb-1 block text-sm font-semibold text-stone-700">ניסיון מקצועי</label>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">{isEntity ? "ותק וניסיון המרכז" : "ניסיון מקצועי"}</label>
             <textarea value={form.experience} onChange={e => setForm({...form, experience: e.target.value})}
               rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
-              placeholder="תפקידים, מסגרות עבודה, שנות ניסיון..." />
+              placeholder={isEntity ? "ותק המרכז, מסגרות עבודה, תחומי מומחיות..." : "תפקידים, מסגרות עבודה, שנות ניסיון..."} />
           </div>
         </div>
 
-        <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
-          <h2 className="text-lg font-extrabold text-stone-900 mb-5">תמונה ותעודות</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
-              {(photoPreview || profilePhotoUrl) && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview ?? profilePhotoUrl ?? ""} alt="" className="mb-2 h-24 w-24 rounded-full object-cover border border-stone-200" />
-              )}
-              <input type="file" accept="image/*" onChange={e => {
-                const f = e.target.files?.[0] ?? null;
-                setPhotoFile(f);
-                setPhotoPreview(f ? URL.createObjectURL(f) : null);
-              }} className="block w-full text-xs" />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">תעודה / רישיון (PDF / JPG / PNG)</label>
-              {existingCerts.length > 0 && (
-                <ul className="mb-2 space-y-1 text-xs text-stone-600">
-                  {existingCerts.map(c => (
-                    <li key={c.id}>
-                      📄 {c.signed_url
-                        ? <a href={c.signed_url} target="_blank" className="underline">{c.original_name}</a>
-                        : c.original_name}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setCertFile(e.target.files?.[0] ?? null)}
-                className="block w-full text-xs" />
-              <p className="mt-1 text-[11px] text-stone-400">תעודת הרישיון נדרשת לאישור הפרופיל ואינה מוצגת באתר.</p>
+        {isEntity ? (
+          <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
+            <h2 className="text-lg font-extrabold text-stone-900 mb-2">הלוגו והצוות של המרכז</h2>
+            <p className="text-sm leading-6 text-stone-600">
+              לוגו המרכז וחברי הצוות (שם, תפקיד ותמונה) מנוהלים בעמוד הפרופיל הציבורי של המרכז.
+              במרכז טיפולי אין צורך להעלות תעודות רישיון לכל מטפל — הסמכות הצוות מנוהלות אצלכם.
+            </p>
+            <Link href="/centers/dashboard" className="mt-3 inline-flex items-center gap-1 text-sm font-bold underline" style={{ color: "var(--teal)" }}>
+              <ArrowRight size={15} /> לניהול הפרופיל הציבורי בפורטל
+            </Link>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
+            <h2 className="text-lg font-extrabold text-stone-900 mb-5">תמונה ותעודות</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
+                {(photoPreview || profilePhotoUrl) && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={photoPreview ?? profilePhotoUrl ?? ""} alt="" className="mb-2 h-24 w-24 rounded-full object-cover border border-stone-200" />
+                )}
+                <input type="file" accept="image/*" onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  setPhotoFile(f);
+                  setPhotoPreview(f ? URL.createObjectURL(f) : null);
+                }} className="block w-full text-xs" />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-stone-700">תעודה / רישיון (PDF / JPG / PNG)</label>
+                {existingCerts.length > 0 && (
+                  <ul className="mb-2 space-y-1 text-xs text-stone-600">
+                    {existingCerts.map(c => (
+                      <li key={c.id}>
+                        📄 {c.signed_url
+                          ? <a href={c.signed_url} target="_blank" className="underline">{c.original_name}</a>
+                          : c.original_name}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setCertFile(e.target.files?.[0] ?? null)}
+                  className="block w-full text-xs" />
+                <p className="mt-1 text-[11px] text-stone-400">תעודת הרישיון נדרשת לאישור הפרופיל ואינה מוצגת באתר.</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">התמחות מקצועית</h2>
-          <CheckboxGroup label="סוג מטפל" options={THERAPIST_TYPES}
+          <CheckboxGroup label={isEntity ? "סוגי מטפלים במרכז" : "סוג מטפל"} options={THERAPIST_TYPES}
             selected={form.therapist_types} onChange={v => {
               const added = v.filter(t => !form.therapist_types.includes(t));
               let nextTraining = form.training_areas;
@@ -412,8 +439,16 @@ export default function CenterTherapistFormPage() {
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">אזור ופרטים נוספים</h2>
           <div className="mb-5">
             <div className="mb-1 text-sm font-semibold text-stone-800">ערים / אזורים</div>
-            <p className="mb-3 text-xs text-stone-500">בחרו אזור כדי לפתוח את רשימת הערים. ניתן לבחור עד 3 ערים.</p>
-            <RegionCityPicker selected={form.regions} onChange={v => setForm({...form, regions: v})} maxCities={3} />
+            <p className="mb-3 text-xs text-stone-500">
+              {isEntity
+                ? `בחרו אזור כדי לפתוח את רשימת הערים. מספר המיקומים/סניפים במנוי (${numLocations}) קובע כמה אזורים ניתן לסמן — עד 4 ערים בכל אזור.`
+                : "בחרו אזור כדי לפתוח את רשימת הערים. ניתן לבחור עד 3 ערים."}
+            </p>
+            {isEntity ? (
+              <RegionCityPicker selected={form.regions} onChange={v => setForm({...form, regions: v})} maxRegions={numLocations} />
+            ) : (
+              <RegionCityPicker selected={form.regions} onChange={v => setForm({...form, regions: v})} maxCities={3} />
+            )}
           </div>
           <CheckboxGroup label="העדפות תרבותיות" options={CULTURAL_PREFS}
             selected={form.cultural_prefs} onChange={v => setForm({...form, cultural_prefs: v})} />
@@ -421,6 +456,7 @@ export default function CenterTherapistFormPage() {
             selected={form.arrangements} onChange={v => setForm({...form, arrangements: v})} />
         </div>
 
+        {!isEntity && (
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-1">סגנון טיפולי</h2>
           <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית — משמשות להתאמה אישיותית עם מטופלים. מומלץ למלא יחד עם המטפל/ת.</p>
@@ -446,6 +482,7 @@ export default function CenterTherapistFormPage() {
             onChange={v => setForm({...form, activity_level: v})}
           />
         </div>
+        )}
 
         <div className="sticky bottom-4">
           <button type="submit" disabled={saving || !form.full_name.trim()}
