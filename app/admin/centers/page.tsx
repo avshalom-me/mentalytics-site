@@ -248,6 +248,15 @@ export default function AdminCentersPage() {
     if (j.ok) alert(`ההצעה נשלחה ל${c.email}.`);
   }
 
+  async function del(c: Center) {
+    if (c.status === "active") {
+      setError("אי אפשר למחוק מרכז פעיל — בטלו קודם את המנוי");
+      return;
+    }
+    if (!confirm(`למחוק לצמיתות את "${c.name}"? הטיוטה, קישור ההצטרפות והפרופיל (אם נוצר) יימחקו. פעולה בלתי הפיכה.`)) return;
+    await post({ action: "delete", id: c.id });
+  }
+
   async function syncSumit(c: Center) {
     const j = await post({ action: "sync_sumit", id: c.id });
     if (j.ok) {
@@ -423,6 +432,11 @@ export default function AdminCentersPage() {
                   </button>
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכה
+                  </button>
+                  <button onClick={() => del(c)} disabled={busy}
+                    title="מחיקת הטיוטה מהמערכת"
+                    className="rounded-full border border-red-200 px-3 py-1 text-red-600 hover:bg-red-50 disabled:opacity-40">
+                    🗑 מחק טיוטה
                   </button>
                 </>
               )}

@@ -152,6 +152,19 @@ export async function POST(req: NextRequest) {
       .single();
     if (!center) return NextResponse.json({ ok: false, error: "מרכז לא נמצא" }, { status: 404 });
 
+    // מחיקת מרכז — רק כשאין מנוי חי (טיוטה/נשלחה/מבוטל). מרכז פעיל יש לבטל קודם.
+    if (action === "delete") {
+      if (center.status === "active") {
+        return NextResponse.json({ ok: false, error: "אי אפשר למחוק מרכז פעיל — בטלו קודם את המנוי" }, { status: 400 });
+      }
+      // מסירים שורת ישות-מרכז (אם נוצרה) ומנתקים מטפלים משויכים לפני המחיקה.
+      await supabaseAdmin.from("therapists").delete().eq("center_account_id", id).eq("entity_type", "center");
+      await supabaseAdmin.from("therapists").update({ center_account_id: null }).eq("center_account_id", id);
+      const { error } = await supabaseAdmin.from("therapy_center_accounts").delete().eq("id", id);
+      if (error) throw error;
+      return NextResponse.json({ ok: true, deleted: true });
+    }
+
     if (action === "update") {
       const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
       let syncEntity: "ensure" | "remove" | null = null; // מסלול 2: יצירה/הסרה של שורת ישות-המרכז
