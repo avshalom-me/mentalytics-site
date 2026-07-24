@@ -17,6 +17,7 @@ import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatmen
 import { therapistPath } from "@/app/lib/therapist-url";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
+import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 
 // Anonymous viewer context derived from the questionnaire — used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -2863,6 +2864,13 @@ export default function AdultsPage() {
       />
       <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים – {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
+      {(matchResults ?? []).length > 0 && (
+        <SaveMatchesButton
+          matches={matchResults ?? []}
+          quizType="adults"
+          treatmentLabel={combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel ?? null}
+        />
+      )}
       {(matchResults ?? []).length === 0 && (
         <div className="rounded-2xl bg-white p-6 text-center text-sm text-[#6b7280] shadow">לא נמצאו מטפלים מתאימים. נסה/י לשנות את הפרמטרים.</div>
       )}

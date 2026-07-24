@@ -9,6 +9,7 @@ import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
+import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import {
   parseKidsBoxes,
   type KidsRecommendationGroup,
@@ -2845,6 +2846,7 @@ function KidsMatchSection({ A, score, selection }: {
           ) : (
             <>
               <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
+              <SaveMatchesButton matches={results} quizType="kids" treatmentLabel={treatmentLabels.join(" + ") || null} />
               <div className="space-y-4">
                 {results.map(t => {
                   const regionsArr = toArr(t.regions);

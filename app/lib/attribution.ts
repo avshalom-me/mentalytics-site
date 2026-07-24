@@ -186,6 +186,43 @@ export function captureAttribution(): void {
   }
 }
 
+/**
+ * Restore attribution from a saved-match token (the /match/<token> page).
+ * The token carries the ORIGINAL campaign that produced the match — including
+ * across devices, where localStorage starts empty. A stored PAID/tagged touch
+ * on this device still wins (it is either the same touch or a newer one);
+ * we only fill in when the current state is empty or an untagged
+ * direct/whatsapp/referral touch (which is exactly what clicking the saved
+ * link from WhatsApp looks like).
+ */
+export function seedAttribution(seed: Partial<Attribution>): void {
+  if (typeof window === "undefined") return;
+  try {
+    const cap = (v: unknown) =>
+      typeof v === "string" && v.length > 0 ? v.slice(0, UTM_MAX) : null;
+    const next: Attribution = {
+      channel: isValidChannel(seed.channel) ? seed.channel : "other",
+      utm_source: cap(seed.utm_source),
+      utm_medium: cap(seed.utm_medium),
+      utm_campaign: cap(seed.utm_campaign),
+    };
+    if (!next.utm_campaign && next.channel === "other") return; // nothing worth seeding
+
+    const existingRaw = localStorage.getItem(STORAGE_KEY);
+    if (existingRaw) {
+      try {
+        const prev = JSON.parse(existingRaw) as Partial<Attribution>;
+        if (prev.utm_campaign) return; // an explicit tagged touch already owns this visitor
+      } catch {
+        /* corrupt — overwrite below */
+      }
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    /* localStorage blocked */
+  }
+}
+
 /** Read the stored attribution (capturing now as a fallback if none exists). */
 export function getAttribution(): Attribution | null {
   if (typeof window === "undefined") return null;

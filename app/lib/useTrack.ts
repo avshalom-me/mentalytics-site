@@ -5,7 +5,7 @@ import { getOrCreateSessionId } from "./session";
 import { captureAttribution, getAttribution } from "./attribution";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view" | "therapist_explain_click" | "matching_click";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_saved";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   const session_id = getOrCreateSessionId();
@@ -42,6 +42,12 @@ export function trackMatchingClick(quizType: "adults" | "kids", treatment: strin
   // Single GA4 emission point (was inline gtag at each call site, which bypassed
   // the channel-attaching wrapper and only covered the adults flow).
   gaEvent("matching_click", { quiz_type: quizType, treatment });
+}
+
+/** Patient saved their match list (WhatsApp-to-self / copy link). */
+export function trackMatchSaved(quizType: "adults" | "kids", token: string, count: number) {
+  sendTrack("match_saved", { source: quizType === "adults" ? "adult" : "child", metadata: { token, count } });
+  gaEvent("match_saved", { quiz_type: quizType });
 }
 
 export function usePageView(page: string, source?: string) {
