@@ -137,6 +137,16 @@ export default function CitySeoSection({
   const chooseA =
     `המחקר עקבי: איכות הקשר בין מטופל למטפל היא מהמנבאים החזקים ביותר להצלחת הטיפול — לעיתים יותר מהשיטה עצמה. חשוב לבדוק הכשרה ורישיון, התמחות בקושי שלכם, ותחושת נוחות בשיחה הראשונה.`;
 
+  // "מומלץ" intent — the review-flavored query variant ("פסיכולוג מומלץ בחיפה").
+  // Answered honestly: what a real recommendation is (credentials, license
+  // registry, fit), what WE verify, and no fabricated reviews.
+  const recQ = kind === "online" ? "איך מזהים פסיכולוג מומלץ לטיפול אונליין?" : `איך מזהים פסיכולוג מומלץ ${inPlace}?`;
+  const recA =
+    (h % 2 === 0
+      ? `המלצה אמיתית היא לא כוכבים באתר — היא שילוב של שלושה דברים: הכשרה ורישיון בתוקף (אפשר לוודא בפנקס הפסיכולוגים של משרד הבריאות), ניסיון מוכח בקושי הספציפי שלכם, ותחושת חיבור בשיחה הראשונה.`
+      : `לפני שסומכים על "מומלץ", כדאי לבדוק שלושה דברים: שהמטפל מחזיק בהכשרה וברישיון בתוקף, שיש לו ניסיון בקושי שאיתו אתם מתמודדים, ושנוח לכם איתו בשיחה ראשונה — המחקר מראה שהחיבור האישי מנבא הצלחה יותר מכל המלצה.`) +
+    ` כל המטפלים המוצגים כאן עברו אימות תעודות והכשרה לפני שפורסמו, כך שנקודת הפתיחה בטוחה — ומשם ההמלצה הכי טובה היא ההתרשמות שלכם.`;
+
   const onlineQ =
     kind === "online"
       ? "האם טיפול אונליין באמת עובד כמו טיפול בקליניקה?"
@@ -155,6 +165,7 @@ export default function CitySeoSection({
   const faq: { q: string; a: string; link: { href: string; label: string } | null }[] = [
     { q: costQ, a: costA, link: null },
     { q: chooseQ, a: chooseA, link: { href: "/research/choosing-therapist", label: "למדריך המלא: איך למצוא פסיכולוג שמתאים ←" } },
+    { q: recQ, a: recA, link: { href: "/research/recommended-psychologist", label: "המדריך: מה באמת הופך פסיכולוג למומלץ ←" } },
     { q: onlineQ, a: onlineA, link: kind === "online" ? null : { href: "/therapists/region/אונליין", label: "לכל המטפלים אונליין ←" } },
     { q: kupaQ, a: kupaA, link: null },
   ];
