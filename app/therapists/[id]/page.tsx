@@ -2,7 +2,9 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { CITY_TO_REGION } from "@/app/lib/regions";
+import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { TRAINING_AREAS } from "@/app/lib/therapist-options";
+import { specialtyToSlug } from "@/app/lib/specialties";
 import { genderTitle, genderTitles } from "@/app/lib/gender-text";
 import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/therapist-url";
 import ContactButtons from "./ContactButtons";
@@ -432,6 +434,34 @@ export default async function TherapistProfilePage({
         )}
 
       </div>
+
+      {/* Internal linking (SEO M5): therapist profiles are the site's
+          strongest-ranking pages (name searches) — flow that equity to the
+          city / specialty / online landing pages with descriptive anchors. */}
+      {(() => {
+        const cityLinks = (t.regions ?? []).filter((c: string) => (CITY_SEO_LIST as readonly string[]).includes(c)).slice(0, 3);
+        const areaLinks = (t.training_areas ?? []).filter((a: string) => (TRAINING_AREAS as readonly string[]).includes(a)).slice(0, 3);
+        if (cityLinks.length === 0 && areaLinks.length === 0 && !t.online) return null;
+        return (
+          <div className="mx-auto mt-10 max-w-5xl border-t border-[var(--line)] pt-6">
+            <h2 className="text-sm font-extrabold text-stone-500 mb-3">עוד בטיפול חכם</h2>
+            <div className="flex flex-wrap gap-2">
+              {cityLinks.map((c: string) => (
+                <Link key={c} href={`/therapists/city/${regionToSlug(c)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                  style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>פסיכולוגים ומטפלים ב{c}</Link>
+              ))}
+              {areaLinks.map((a: string) => (
+                <Link key={a} href={`/therapists/specialty/${specialtyToSlug(a)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                  style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>מטפלי {a}</Link>
+              ))}
+              {t.online && (
+                <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                  style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>🌐 מטפלים אונליין</Link>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
     </main>
   );

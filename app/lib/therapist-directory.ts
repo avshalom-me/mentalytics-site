@@ -25,6 +25,7 @@ type TherapistRow = {
   regions: string[] | null;
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
+  age_groups: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
   promotion_source: string | null;
@@ -82,7 +83,17 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 // rank above GIFT promotions (manual/trial), which in turn rank above the free
 // approved tier. An optional filter (region / online) narrows the set BEFORE
 // signing photo URLs, so region landing pages only pay for their own subset.
-type DirectoryFilter = { region?: string; city?: string; online?: boolean; specialty?: string; category?: "main" | "para"; centerId?: string };
+type DirectoryFilter = {
+  region?: string;
+  city?: string;
+  online?: boolean;
+  specialty?: string;
+  /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
+  trainingAreasAny?: string[];
+  ageGroupsAny?: string[];
+  category?: "main" | "para";
+  centerId?: string;
+};
 
 // Shared query + in-memory filtering (no photo signing). Used both by the full
 // loader and by the lightweight count helpers below.
@@ -90,7 +101,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, age_groups, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
@@ -113,6 +124,12 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
   if (filter?.specialty) rows = rows.filter((t) => (t.training_areas ?? []).includes(filter.specialty!));
+  if (filter?.trainingAreasAny?.length) {
+    rows = rows.filter((t) => filter.trainingAreasAny!.some((a) => (t.training_areas ?? []).includes(a)));
+  }
+  if (filter?.ageGroupsAny?.length) {
+    rows = rows.filter((t) => filter.ageGroupsAny!.some((a) => (t.age_groups ?? []).includes(a)));
+  }
   return rows;
 }
 

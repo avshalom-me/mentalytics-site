@@ -14,6 +14,8 @@ const LINKS: { href: string; label: string }[] = [
   { href: "/therapists/city/חיפה", label: "פסיכולוגים בחיפה" },
   { href: "/therapists/specialty/CBT", label: "טיפול CBT" },
   { href: "/therapists/specialty/טיפול-זוגי", label: "טיפול זוגי" },
+  { href: "/therapists/topic/טיפול-בחרדה", label: "טיפול בחרדה" },
+  { href: "/therapists/topic/פסיכולוג-ילדים", label: "פסיכולוג ילדים" },
   { href: "/therapists", label: "כל המטפלים" },
 ];
 

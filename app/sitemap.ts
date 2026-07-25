@@ -4,6 +4,8 @@ import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib
 import { therapistPath } from "@/app/lib/therapist-url";
 import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
+import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic } from "@/app/lib/topics";
+import { countListed } from "@/app/lib/therapist-directory";
 import { listPublicCenters } from "@/app/lib/center-public";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -97,6 +99,38 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
+  // Topic (condition/audience) pages + the city×topic pilot — only combos with
+  // real supply enter the sitemap (the anti-doorway discipline).
+  const topicPages: MetadataRoute.Sitemap = [];
+  for (const topic of TOPICS) {
+    const count = await countListed(topic.filter);
+    if (count >= MIN_LISTED_FOR_INDEX) {
+      topicPages.push({
+        url: `${BASE}/therapists/topic/${topic.slug}`,
+        priority: 0.6,
+        changeFrequency: "weekly" as const,
+      });
+    }
+  }
+  const cityTopicSlugs = [
+    ...CITY_TOPIC_SLUGS,
+    ...CITY_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-")),
+  ];
+  for (const slug of cityTopicSlugs) {
+    const topic = slugToCityTopic(slug);
+    if (!topic) continue;
+    for (const city of PILOT_CITIES) {
+      const count = await countListed({ ...topic.filter, city });
+      if (count >= MIN_CITY_TOPIC) {
+        topicPages.push({
+          url: `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`,
+          priority: 0.55,
+          changeFrequency: "weekly" as const,
+        });
+      }
+    }
+  }
+
   // Public center pages (paid-plan benefit) — only active centers whose public
   // page is enabled.
   const centers = await listPublicCenters();
@@ -107,5 +141,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
   }));
 
-  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages, ...centerPages];
+  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages, ...topicPages, ...centerPages];
 }
