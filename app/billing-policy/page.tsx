@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "תקנון רכישה — חיוב, ביטול והחזרים | טיפול חכם",
+  title: "תקנון רכישה - חיוב, ביטול והחזרים | טיפול חכם",
   description: "תקנון רכישה, מדיניות חיוב, ביטול מנוי והחזרים כספיים עבור מטפלים ומשתמשים בפלטפורמת טיפול חכם.",
 };
 
@@ -19,22 +19,22 @@ export default function BillingPolicyPage() {
         ← חזרה לדף ההרשמה
       </Link>
 
-      <h1 className="mt-6 text-3xl font-black text-stone-900 mb-2">תקנון רכישה — חיוב, ביטול והחזרים</h1>
-      <p className="text-sm text-stone-500 mb-10">טיפול חכם — מנטליטיקס | עודכן לאחרונה: מאי 2026</p>
+      <h1 className="mt-6 text-3xl font-black text-stone-900 mb-2">תקנון רכישה - חיוב, ביטול והחזרים</h1>
+      <p className="text-sm text-stone-500 mb-10">טיפול חכם - מנטליטיקס | עודכן לאחרונה: מאי 2026</p>
 
       <div className="space-y-8 text-sm leading-7 text-stone-700">
 
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">1. כללי</h2>
-          <p>תקנון זה מהווה הסכם מחייב בין המשתמש/ת (להלן: &quot;המשתמש&quot;) לבין טיפול חכם — מנטליטיקס (להלן: &quot;החברה&quot;), המפעילה את פלטפורמת &quot;טיפול חכם&quot; בכתובת mentalytics.co.il (להלן: &quot;האתר&quot;).</p>
-          <p className="mt-2">השימוש באתר ורכישת שירותים בו מהווים הסכמה לתנאי תקנון זה. אם אינך מסכימ/ה לתנאים — אין לבצע רכישה.</p>
+          <p>תקנון זה מהווה הסכם מחייב בין המשתמש/ת (להלן: &quot;המשתמש&quot;) לבין טיפול חכם - מנטליטיקס (להלן: &quot;החברה&quot;), המפעילה את פלטפורמת &quot;טיפול חכם&quot; בכתובת mentalytics.co.il (להלן: &quot;האתר&quot;).</p>
+          <p className="mt-2">השימוש באתר ורכישת שירותים בו מהווים הסכמה לתנאי תקנון זה. אם אינך מסכימ/ה לתנאים - אין לבצע רכישה.</p>
           <p className="mt-2">השירות מיועד לבגירים (גיל 18 ומעלה) בלבד. רכישת שירותים באתר מהווה הצהרה כי המשתמש/ת הוא/היא מעל גיל 18.</p>
         </section>
 
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">2. פרטי החברה</h2>
           <ul className="list-disc pr-6 mt-2 space-y-1">
-            <li>שם החברה: טיפול חכם — מנטליטיקס</li>
+            <li>שם החברה: טיפול חכם - מנטליטיקס</li>
             <li>כתובת: אשכולית 28/3, פרדס חנה</li>
             <li>כתובת אתר: mentalytics.co.il</li>
             <li>מייל: <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a></li>
@@ -56,7 +56,7 @@ export default function BillingPolicyPage() {
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>הרכישה מתבצעת באתר באמצעות טופס תשלום מאובטח.</li>
             <li>התשלום מעובד על ידי חברת סליקה מורשית (Sumit / UPay).</li>
-            <li>החברה אינה שומרת פרטי כרטיס אשראי — כל מידע פיננסי מוחזק באופן מאובטח על ידי חברת הסליקה בלבד.</li>
+            <li>החברה אינה שומרת פרטי כרטיס אשראי - כל מידע פיננסי מוחזק באופן מאובטח על ידי חברת הסליקה בלבד.</li>
             <li>עם השלמת התשלום תופק חשבונית מס / קבלה אוטומטית ותישלח למייל הרשום.</li>
             <li>לפני ביצוע רכישה, המשתמש נדרש לאשר את תקנון הרכישה באמצעות סימון ✓.</li>
           </ul>
@@ -66,7 +66,7 @@ export default function BillingPolicyPage() {
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">5. אספקת השירות</h2>
           <p>כלל השירותים הנרכשים באתר הם <strong>שירותים דיגיטליים</strong> הניתנים באופן מקוון בלבד. אין משלוח פיזי של מוצרים.</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
-            <li><strong>מנוי מטפלים (מסלול מקודם):</strong> הגישה לשירות מופעלת מיד עם אישור התשלום. השירות כולל הופעה במערכת ההתאמה, סטטיסטיקות ודו&quot;חות — וזמין לשימוש מרגע ההפעלה.</li>
+            <li><strong>מנוי מטפלים (מסלול מקודם):</strong> הגישה לשירות מופעלת מיד עם אישור התשלום. השירות כולל הופעה במערכת ההתאמה, סטטיסטיקות ודו&quot;חות - וזמין לשימוש מרגע ההפעלה.</li>
             <li><strong>שאלון התאמה (מטופלים):</strong> הגישה לשאלון ניתנת מיד עם השלמת התשלום. השירות נצרך במלואו עם תחילת מילוי השאלון.</li>
           </ul>
         </section>
@@ -87,7 +87,7 @@ export default function BillingPolicyPage() {
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">8. ביטול מנוי</h2>
           <p>ניתן לבטל את המנוי בכל עת.</p>
-          <p>הביטול ייכנס לתוקף מתום תקופת החיוב הנוכחית. אם בוצע חיוב לחודש חדש — השירות ימשיך עד סוף אותו חודש, ולא יבוצע חיוב נוסף לאחר מכן.</p>
+          <p>הביטול ייכנס לתוקף מתום תקופת החיוב הנוכחית. אם בוצע חיוב לחודש חדש - השירות ימשיך עד סוף אותו חודש, ולא יבוצע חיוב נוסף לאחר מכן.</p>
           <p className="mt-2">ביטול מנוי ניתן לבצע דרך פנייה למייל <a href="mailto:admin@getmentalytics.com" className="underline hover:text-[#0F5468]">admin@getmentalytics.com</a> או בטלפון <a href="tel:0559931403" className="underline hover:text-[#0F5468]">055-993-1403</a>.</p>
         </section>
 
@@ -98,11 +98,11 @@ export default function BillingPolicyPage() {
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li>לא התקבלה אף פנייה דרך המערכת במהלך אותם חודשים.</li>
             <li>הבקשה מוגשת במהלך החודש העוקב לתום החודשיים הראשונים בלבד.</li>
-            <li>לאחר סיום החודש העוקב — לא ניתן להגיש בקשת החזר.</li>
+            <li>לאחר סיום החודש העוקב - לא ניתן להגיש בקשת החזר.</li>
           </ul>
           <div className="mt-3 rounded-xl bg-stone-50 border border-stone-200 px-4 py-3">
             <p className="font-semibold text-stone-800">לדוגמה:</p>
-            <p>מטפל/ת שנרשמ/ה בתחילת ינואר — זכאי/ת לבקש החזר עבור ינואר ופברואר, במהלך חודש מרץ עד סוף החודש בלבד.</p>
+            <p>מטפל/ת שנרשמ/ה בתחילת ינואר - זכאי/ת לבקש החזר עבור ינואר ופברואר, במהלך חודש מרץ עד סוף החודש בלבד.</p>
           </div>
 
           <h3 className="font-bold text-stone-800 mt-4 mb-1">שאלון התאמה (מטופלים):</h3>
@@ -122,7 +122,7 @@ export default function BillingPolicyPage() {
         <section>
           <h2 className="text-lg font-extrabold text-stone-900 mb-2">11. אבטחת מידע ותשלומים</h2>
           <p>האתר משתמש בהצפנת SSL ומעבד תשלומים באמצעות חברת סליקה מורשית (Sumit / UPay). החברה אינה שומרת ואינה חשופה לפרטי כרטיסי אשראי של משתמשים.</p>
-          <p className="mt-2">למידע נוסף על הגנת המידע האישי — ראו את <Link href="/privacy" className="underline hover:text-[#0F5468]">מדיניות הפרטיות</Link>.</p>
+          <p className="mt-2">למידע נוסף על הגנת המידע האישי - ראו את <Link href="/privacy" className="underline hover:text-[#0F5468]">מדיניות הפרטיות</Link>.</p>
         </section>
 
         <section>

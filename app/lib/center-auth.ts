@@ -2,10 +2,10 @@ import "server-only";
 import type { NextRequest } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
-// אימות פורטל המרכז — משותף לכל נתיבי /api/center-portal/*.
+// אימות פורטל המרכז - משותף לכל נתיבי /api/center-portal/*.
 // מזהים את המרכז אך ורק לפי user_id של חשבון ה-Supabase Auth. אין
 // claim-by-email: המייל אינו מאומת בהרשמה (auto-confirm), ולכן "יש לי אימייל
-// תואם" אינו הוכחת בעלות — קישור חשבון למרכז נעשה ידנית ע"י אדמין בלבד
+// תואם" אינו הוכחת בעלות - קישור חשבון למרכז נעשה ידנית ע"י אדמין בלבד
 // (ההסבר המלא ב-resolveCenter למטה). זהו אותו עיקרון שאוכף therapist-claim.ts
 // עבור פרופילי מטפלים חיים.
 
@@ -74,13 +74,13 @@ export async function resolveCenter(req: NextRequest): Promise<PortalCenter | nu
   // ── קישור מרכז לחשבון: תהליך ידני, פעם אחת לכל מרכז ─────────────────────
   // כשמרכז שילם (status='active') ורוצה גישה לפורטל, המנהל מבצע פעם אחת:
   //   1. Supabase → Authentication → Users → לאתר את המשתמש לפי המייל שאיתו
-  //      נרשם המרכז → להעתיק את ה-UUID שלו (ודאו שזה באמת מי שביקש גישה —
+  //      נרשם המרכז → להעתיק את ה-UUID שלו (ודאו שזה באמת מי שביקש גישה -
   //      זהו שלב האימות היחיד שמחליף אימות-מייל).
   //   2. Supabase → SQL Editor → להריץ:
   //        update public.therapy_center_accounts
   //           set user_id = '<AUTH_USER_UUID>', updated_at = now()
   //         where id = '<CENTER_ID>' and user_id is null;
   // מרגע זה הכניסה לפורטל מזוהה אוטומטית דרך ה-lookup לפי user_id שלמעלה.
-  // עד הקישור, הדשבורד מציג למרכז "החשבון עדיין לא מקושר — פנו אלינו".
+  // עד הקישור, הדשבורד מציג למרכז "החשבון עדיין לא מקושר - פנו אלינו".
   return null;
 }

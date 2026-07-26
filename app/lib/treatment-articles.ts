@@ -54,7 +54,7 @@ export const TREATMENT_ARTICLES: Record<string, TreatmentArticle> = {
   "טיפול בהפרעות אכילה":    PENDING,
   "טיפול באנקופרזיס":       PENDING,
 
-  // Professional referrals — separate article eventually
+  // Professional referrals - separate article eventually
   "פסיכיאטר":              PENDING,
   "פסיכיאטר ילדים":        PENDING,
   "דיאטנ/ית קליני/ת":       PENDING,

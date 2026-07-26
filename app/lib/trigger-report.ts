@@ -14,7 +14,7 @@ export async function triggerReport(url: string): Promise<TriggerResult> {
   try {
     res = await fetch(url, { method: "POST", cache: "no-store" });
   } catch {
-    return { ok: false, error: "שגיאת רשת — בדוק את החיבור ונסה שוב." };
+    return { ok: false, error: "שגיאת רשת - בדוק את החיבור ונסה שוב." };
   }
 
   const text = await res.text();
@@ -22,12 +22,12 @@ export async function triggerReport(url: string): Promise<TriggerResult> {
     const json = JSON.parse(text) as TriggerResult & { ok: boolean; error?: string };
     return json.ok ? json : { ok: false, error: json.error ?? "שגיאה לא ידועה" };
   } catch {
-    // Not our JSON — a platform error page. A 504 (or a body mentioning timeout)
+    // Not our JSON - a platform error page. A 504 (or a body mentioning timeout)
     // means the LLM generation exceeded the function's time budget.
     if (res.status === 504 || /timeout|timed out/i.test(text)) {
       return {
         ok: false,
-        error: "הפקת הדוח ארכה יותר מדי (חריגת זמן). ההפקה כוללת ניתוח AI ויכולה לקחת 2-3 דקות — נסה/י שוב.",
+        error: "הפקת הדוח ארכה יותר מדי (חריגת זמן). ההפקה כוללת ניתוח AI ויכולה לקחת 2-3 דקות - נסה/י שוב.",
       };
     }
     return { ok: false, error: `שגיאת שרת (${res.status}). נסה/י שוב בעוד רגע.` };

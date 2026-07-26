@@ -14,6 +14,6 @@ export const THERAPIST_EDIT_FIELDS = [
 ] as const;
 
 // הפורטל מנהל פרופילים שאין להם חשבון מטפל, ולכן מנהל המרכז קובע גם את מייל
-// הקשר. מטפל עצמאי אינו יכול לשנות את המייל שלו — הוא קשור לחשבון ה-Auth שלו,
+// הקשר. מטפל עצמאי אינו יכול לשנות את המייל שלו - הוא קשור לחשבון ה-Auth שלו,
 // ולכן הוא נעדר מ-THERAPIST_EDIT_FIELDS ומתווסף רק כאן.
 export const CENTER_THERAPIST_EDIT_FIELDS = ["email", ...THERAPIST_EDIT_FIELDS] as const;

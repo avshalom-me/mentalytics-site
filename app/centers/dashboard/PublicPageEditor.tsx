@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
 
-// עורך העמוד הציבורי של המרכז — קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
+// עורך העמוד הציבורי של המרכז - קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
 // תרנדר את הדף המארח). מוצגת בעמוד העריכה /centers/dashboard/profile.
 
 export type PublicPage = {
@@ -61,7 +61,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
 
-  // מד שלמות פרופיל — מחושב חי מה-state, כולל רמזים למה שחסר.
+  // מד שלמות פרופיל - מחושב חי מה-state, כולל רמזים למה שחסר.
   const completeness: { label: string; done: boolean }[] = [
     { label: "לוגו", done: !!logoPath },
     { label: "תיאור המרכז", done: description.trim().length >= 40 },
@@ -76,7 +76,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   ];
   const donePct = Math.round((completeness.filter((c) => c.done).length / completeness.length) * 100);
 
-  // העלאת תמונת מרכז (לוגו / חבר צוות / גלריה) — מחזירה נתיב אחסון שנשמר בשמירה.
+  // העלאת תמונת מרכז (לוגו / חבר צוות / גלריה) - מחזירה נתיב אחסון שנשמר בשמירה.
   async function uploadCenterImage(file: File, kind: "center_image" | "center_gallery"): Promise<string | null> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { window.location.href = "/centers/login"; return null; }
@@ -116,12 +116,12 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   async function onGalleryFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setErr(""); setGalleryBusy(true);
-    // העלאה סדרתית — עד המכסה (8 תמונות).
+    // העלאה סדרתית - עד המכסה (8 תמונות).
     const room = Math.max(0, 8 - gallery.length);
     for (const file of Array.from(files).slice(0, room)) {
       const path = await uploadCenterImage(file, "center_gallery");
       if (path) setGallery((prev) => [...prev, { path, caption: "", url: URL.createObjectURL(file) }]);
-      else break; // שגיאה — נעצור, ההודעה כבר מוצגת
+      else break; // שגיאה - נעצור, ההודעה כבר מוצגת
     }
     setGalleryBusy(false);
   }
@@ -185,7 +185,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         )}
       </p>
 
-      {/* מד שלמות פרופיל — פרופיל מלא = יותר אמון ויותר פניות */}
+      {/* מד שלמות פרופיל - פרופיל מלא = יותר אמון ויותר פניות */}
       <div className="mb-5 rounded-xl border border-stone-200 bg-white p-3.5">
         <div className="mb-1.5 flex items-center justify-between">
           <span className="text-xs font-black text-stone-700">שלמות הפרופיל</span>
@@ -219,10 +219,10 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         )}
       </div>
 
-      {/* דבר המנהל/ת — פנים, שם והסמכה שהופכים "ישות" לאנשים */}
+      {/* דבר המנהל/ת - פנים, שם והסמכה שהופכים "ישות" לאנשים */}
       <div className="mb-4 rounded-xl border border-stone-200 bg-white p-3.5">
         <label className="mb-1 block text-sm font-semibold text-stone-700">💬 דבר מנהל/ת המרכז</label>
-        <p className="mb-2 text-xs text-stone-500">2-3 משפטים אישיים וחמים מהמנהל/ת — האלמנט שהופך את המרכז מאנונימי לאנושי.</p>
+        <p className="mb-2 text-xs text-stone-500">2-3 משפטים אישיים וחמים מהמנהל/ת - האלמנט שהופך את המרכז מאנונימי לאנושי.</p>
         <div className="mb-2 flex flex-wrap items-center gap-2">
           <label className="cursor-pointer">
             {dirPhotoPreview ? (
@@ -245,7 +245,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
 
       {/* צוות / ראשי המרכז */}
       <label className="mb-1 block text-sm font-semibold text-stone-700">הצוות המוביל / ראשי המרכז</label>
-      <p className="mb-2 text-xs text-stone-500">אנשי המקצוע הבכירים שיוצגו בעמוד — שם, תפקיד ותמונה.</p>
+      <p className="mb-2 text-xs text-stone-500">אנשי המקצוע הבכירים שיוצגו בעמוד - שם, תפקיד ותמונה.</p>
       <div className="mb-2 space-y-2">
         {team.map((m, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white p-2.5">
@@ -276,7 +276,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
       {/* גלריית המרכז */}
       <label className="mb-1 block text-sm font-semibold text-stone-700">📷 תמונות המרכז</label>
       <p className="mb-2 text-xs text-stone-500">
-        הכניסה למרכז, חדרי הטיפול, חלל ההמתנה — עד 8 תמונות. תמונות אמיתיות של המקום מחזקות מאוד את תחושת האמון של פונים.
+        הכניסה למרכז, חדרי הטיפול, חלל ההמתנה - עד 8 תמונות. תמונות אמיתיות של המקום מחזקות מאוד את תחושת האמון של פונים.
       </p>
       {gallery.length > 0 && (
         <div className="mb-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -316,7 +316,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         placeholder="ד״ר כהן, גב׳ לוי…"
         className="mb-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
 
-      {/* עובדות-אמון — מוצגות כמספרים גדולים בעמוד, רק כשמולאו */}
+      {/* עובדות-אמון - מוצגות כמספרים גדולים בעמוד, רק כשמולאו */}
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-sm font-semibold text-stone-700">שנת ייסוד המרכז</label>
@@ -345,7 +345,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
         </div>
       </div>
 
-      {/* מידע פרקטי — השאלות האמיתיות של פונה חרד */}
+      {/* מידע פרקטי - השאלות האמיתיות של פונה חרד */}
       <label className="mb-1 mt-3 block text-sm font-semibold text-stone-700">כתובת מלאה (לניווט)</label>
       <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="למשל: רח' הרצל 12, קומה 2, תל אביב"
         className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
@@ -370,7 +370,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
 
       {/* שאלות נפוצות */}
       <label className="mb-1 block text-sm font-semibold text-stone-700">❓ שאלות נפוצות (עד 6)</label>
-      <p className="mb-2 text-xs text-stone-500">מה שפונים שואלים אתכם בטלפון שוב ושוב — עלויות, זמני המתנה, למי מתאים. עוזר גם לקידום בגוגל.</p>
+      <p className="mb-2 text-xs text-stone-500">מה שפונים שואלים אתכם בטלפון שוב ושוב - עלויות, זמני המתנה, למי מתאים. עוזר גם לקידום בגוגל.</p>
       <div className="mb-2 space-y-2">
         {faq.map((f, i) => (
           <div key={i} className="rounded-xl border border-stone-200 bg-white p-2.5">

@@ -84,7 +84,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   // competition). Otherwise self-canonicalize.
   const canonical = a.canonical_url?.trim() || ownUrl;
   return {
-    // Bare title — the root layout's "%s | טיפול חכם" template adds the brand
+    // Bare title - the root layout's "%s | טיפול חכם" template adds the brand
     // suffix (returning it here too double-suffixed every article title).
     title: a.title,
     description: desc,
@@ -187,14 +187,14 @@ export default async function CommunityArticlePage({ params }: { params: Promise
 
       <ArticleBody body={a.body} />
 
-      {/* Author attribution — colored name + role + note. A house byline links
+      {/* Author attribution - colored name + role + note. A house byline links
           to the homepage instead of a therapist profile. */}
       <div className="mt-12 rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6">
         {house ? (
           <>
             <span className="text-lg font-black text-[#2e7d8c]">{author}</span>
             <p className="mt-2 text-sm text-stone-600 leading-7">
-              מאמר זה נכתב על ידי {author}. טיפול חכם עוזר לכם למצוא את הטיפול והמטפל/ת המתאימים —
+              מאמר זה נכתב על ידי {author}. טיפול חכם עוזר לכם למצוא את הטיפול והמטפל/ת המתאימים -
               בחינם ובאנונימיות.
             </p>
             <Link href="/" className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline">

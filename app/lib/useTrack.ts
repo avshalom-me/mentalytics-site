@@ -27,7 +27,7 @@ export function trackQuizComplete(quizType: "adults" | "kids") {
 }
 
 /**
- * Patient clicked "✦ ניתוח אישי" — an AI explanation of why a SPECIFIC therapist
+ * Patient clicked "✦ ניתוח אישי" - an AI explanation of why a SPECIFIC therapist
  * fits them. The highest-intent action short of a contact click; previously
  * fired the OpenAI call but was tracked nowhere. Persisted per therapist_id so
  * the admin can see which therapists drive deep evaluation.
@@ -61,7 +61,7 @@ export function usePageView(page: string, source?: string) {
 
 /**
  * Landing view on a therapist RECRUITMENT page (/therapists/join). Dedicated
- * event type — NOT page_view — so patient-funnel reports that count page_view
+ * event type - NOT page_view - so patient-funnel reports that count page_view
  * (directory entries, weekly report, attribution report) stay clean of
  * therapist-ad traffic. Powers the "מבקרים" column in /admin/recruitment
  * (distinct sessions per utm_campaign).

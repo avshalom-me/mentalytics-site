@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import CenterJoinForm, { type CenterOffer } from "./CenterJoinForm";
 
-// דף הצטרפות למרכז טיפולי — נפתח מהקישור הסודי שהאדמין שולח עם הצעת המחיר.
+// דף הצטרפות למרכז טיפולי - נפתח מהקישור הסודי שהאדמין שולח עם הצעת המחיר.
 // server component: טוען את ההצעה לפי ה-token בצד השרת בלבד (הטבלה סגורה
 // ל-service_role), ומעביר לטופס רק את מה שהמרכז אמור לראות.
 
@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "הצטרפות מרכז טיפולי | טיפול חכם",
   description: "הצטרפות מרכזים טיפוליים לפלטפורמת טיפול חכם",
-  robots: { index: false, follow: false }, // קישור פרטי — לא לאינדוקס
+  robots: { index: false, follow: false }, // קישור פרטי - לא לאינדוקס
 };
 
 export default async function CenterJoinPage({ params }: { params: Promise<{ token: string }> }) {
@@ -46,7 +46,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
           <div className="text-4xl mb-3">✅</div>
           <h1 className="text-xl font-black text-stone-900 mb-2">המנוי של {center.name} פעיל</h1>
           <p className="text-sm leading-6 text-stone-600">
-            פרטי התשלום נקלטו בהצלחה{center.billing_starts_at ? ` — החיוב הראשון ב-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}` : ""}.
+            פרטי התשלום נקלטו בהצלחה{center.billing_starts_at ? ` - החיוב הראשון ב-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}` : ""}.
             <br />לשאלות: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
           </p>
         </div>
@@ -61,7 +61,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
           <div className="text-4xl mb-3">⏸️</div>
           <h1 className="text-xl font-black text-stone-900 mb-2">ההצעה הזו כבר אינה בתוקף</h1>
           <p className="text-sm leading-6 text-stone-600">
-            נשמח להכין לכם הצעה מעודכנת — כתבו לנו: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
+            נשמח להכין לכם הצעה מעודכנת - כתבו לנו: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
           </p>
         </div>
       </Shell>
@@ -78,7 +78,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     discount_amount: center.discount_amount,
   });
 
-  // הצעה שעדיין לא תומחרה (טיוטה שנשלחה בטעות) — לא מציגים טופס תשלום.
+  // הצעה שעדיין לא תומחרה (טיוטה שנשלחה בטעות) - לא מציגים טופס תשלום.
   if (p.monthlyTotal <= 0) {
     return (
       <Shell>
@@ -127,7 +127,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     >
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
       <div className="mb-8 text-center">
-        {/* מקור האמת ללוגו הוא קובץ ה-SVG עצמו — לא לשחזר אותו בקוד */}
+        {/* מקור האמת ללוגו הוא קובץ ה-SVG עצמו - לא לשחזר אותו בקוד */}
         <img src="/logo.svg" alt="טיפול חכם" style={{ height: "48px", width: "auto", display: "inline-block" }} />
       </div>
       {children}

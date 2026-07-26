@@ -6,7 +6,7 @@ const BASE = "https://www.mentalytics.co.il";
 
 export const metadata: Metadata = {
   title: "מטפלים ופסיכולוגים לפי אזור | טיפול חכם",
-  description: "בחרו אזור כדי למצוא פסיכולוגים ומטפלים מאומתים בקרבתכם, או עברו לטיפול אונליין — דרך טיפול חכם.",
+  description: "בחרו אזור כדי למצוא פסיכולוגים ומטפלים מאומתים בקרבתכם, או עברו לטיפול אונליין - דרך טיפול חכם.",
   alternates: { canonical: `${BASE}/therapists/region` },
 };
 

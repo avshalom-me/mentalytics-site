@@ -73,7 +73,7 @@ export const TRAINING_AREAS = [
 
 export const COGFUN_AGE_GROUPS = ["ילדים", "בני נוער", "מבוגרים"] as const;
 
-// Para-medical professions — shown in a separate rubric, not the main directory.
+// Para-medical professions - shown in a separate rubric, not the main directory.
 export const PARA_MEDICAL_TYPES = [
   "פיזיותרפיסט/ית",
   "מרפא/ת בעיסוק",

@@ -1,12 +1,12 @@
-// חישוב תמחור מרכז טיפולי — מקור אמת אחד לסכום החודשי, בשימוש במייל ההצעה,
+// חישוב תמחור מרכז טיפולי - מקור אמת אחד לסכום החודשי, בשימוש במייל ההצעה,
 // במייל הברוכים-הבאים, בדף ההצטרפות ובאדמין. נקי מתלויות שרת (גם client).
 //
 // נוסחה:  בסיס × מספר-מיקומים − הנחה  (ואז + מע"מ)
 //   מסלול 1 (per_therapist): בסיס = מחיר-למטפל × מספר-מטפלים
 //   מסלול 2 (center_entity): בסיס = מחיר חודשי קבוע
-//   num_locations  — מכפיל (סניפים/מיקומים), ברירת מחדל 1
-//   discount_amount — הנחה בסכום קבוע (₪) לחודש, נגזרת מהסכום שאחרי המיקומים
-// חודשי המתנה (gift_months) אינם חלק מהסכום — הם רק דוחים את החיוב הראשון.
+//   num_locations  - מכפיל (סניפים/מיקומים), ברירת מחדל 1
+//   discount_amount - הנחה בסכום קבוע (₪) לחודש, נגזרת מהסכום שאחרי המיקומים
+// חודשי המתנה (gift_months) אינם חלק מהסכום - הם רק דוחים את החיוב הראשון.
 
 export const CENTER_VAT_RATE = 0.18;
 
@@ -46,14 +46,14 @@ function assemble(base: number, numLocations: number | string, discountAmount: n
   };
 }
 
-// מסלול 1 — בסיס בלבד (מחיר-למטפל × מספר), בלי מיקומים/הנחה. לחישוב הבסיס.
+// מסלול 1 - בסיס בלבד (מחיר-למטפל × מספר), בלי מיקומים/הנחה. לחישוב הבסיס.
 export function centerPricing(pricePerTherapist: number, therapistCount: number): CenterPricing {
   const perT = Number(pricePerTherapist) || 0;
   const count = Math.max(0, Math.floor(Number(therapistCount) || 0));
   return assemble(perT * count, 1, 0, perT, count);
 }
 
-// מסלול 2 — מרכז כישות אחת, מחיר חודשי קבוע (בסיס בלבד).
+// מסלול 2 - מרכז כישות אחת, מחיר חודשי קבוע (בסיס בלבד).
 export function centerEntityPricing(fixedMonthlyPrice: number): CenterPricing {
   const fixed = round2(Number(fixedMonthlyPrice) || 0);
   return assemble(fixed, 1, 0, fixed, 0);
@@ -61,7 +61,7 @@ export function centerEntityPricing(fixedMonthlyPrice: number): CenterPricing {
 
 export type CenterBillingTrack = "per_therapist" | "center_entity";
 
-// דיספצ'ר — מקור האמת היחיד לסכום החודשי הסופי של מרכז, כולל מיקומים והנחה.
+// דיספצ'ר - מקור האמת היחיד לסכום החודשי הסופי של מרכז, כולל מיקומים והנחה.
 export function centerMonthlyPricing(input: {
   billing_track?: string | null;
   price_per_therapist?: number | string | null;
@@ -74,7 +74,7 @@ export function centerMonthlyPricing(input: {
   const perT = isEntity ? 0 : (Number(input.price_per_therapist) || 0);
   const count = isEntity ? 0 : Math.max(0, Math.floor(Number(input.therapist_count) || 0));
   const base = isEntity ? round2(Number(input.fixed_monthly_price) || 0) : round2(perT * count);
-  const ppDisplay = isEntity ? base : perT; // לישות אין מחיר-למטפל נפרד — משקף את הבסיס
+  const ppDisplay = isEntity ? base : perT; // לישות אין מחיר-למטפל נפרד - משקף את הבסיס
   return assemble(base, input.num_locations ?? 1, input.discount_amount ?? 0, ppDisplay, count);
 }
 

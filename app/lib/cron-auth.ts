@@ -4,7 +4,7 @@ import type { NextRequest } from "next/server";
 
 // Constant-time Bearer check for cron routes. Fails closed when CRON_SECRET is
 // unset. Same pattern the payment crons (cleanup-pending-payments,
-// sumit-status-sync) already use — shared here so the report crons stop using a
+// sumit-status-sync) already use - shared here so the report crons stop using a
 // plain `!==`, which is a (minor) timing side-channel on the secret.
 export function cronAuthorized(req: NextRequest): boolean {
   const expected = process.env.CRON_SECRET;

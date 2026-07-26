@@ -64,7 +64,7 @@ function FeedbackForm() {
           <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-2xl text-green-700">✓</div>
           <h1 className="text-2xl font-black text-stone-900">תודה על המשוב 🙏</h1>
           <p className="mx-auto mt-3 max-w-sm leading-7 text-stone-700">
-            המשוב שלך עוזר לנו להשתפר. אם תרצה/י לחזור בעתיד — תמיד אפשר להירשם מחדש.
+            המשוב שלך עוזר לנו להשתפר. אם תרצה/י לחזור בעתיד - תמיד אפשר להירשם מחדש.
           </p>
           <Link href="/" className="mt-7 inline-block rounded-full px-6 py-3 text-sm font-bold text-white" style={{ background: "var(--teal)" }}>
             חזרה לדף הבית
@@ -74,7 +74,7 @@ function FeedbackForm() {
         <>
           <h1 className="text-2xl font-black text-stone-900 mb-2">נשמח לשמוע ממך</h1>
           <p className="text-stone-600 leading-7 mb-6">
-            מצטערים לראות אותך עוזב/ת. אם יש דקה — ספר/י לנו מה גרם לביטול. זה עוזר לנו להשתפר עבור המטפלים הבאים.
+            מצטערים לראות אותך עוזב/ת. אם יש דקה - ספר/י לנו מה גרם לביטול. זה עוזר לנו להשתפר עבור המטפלים הבאים.
           </p>
 
           <form onSubmit={handleSubmit} className="space-y-6">

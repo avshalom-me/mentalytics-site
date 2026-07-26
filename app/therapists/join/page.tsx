@@ -5,7 +5,7 @@ import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUB
 import RecruitPageTracker from "@/app/components/RecruitPageTracker";
 
 // Evaluate the promo window per-request instead of baking it into the static
-// HTML at build time — otherwise the "מבצע פתיחה" copy wouldn't disappear on
+// HTML at build time - otherwise the "מבצע פתיחה" copy wouldn't disappear on
 // its own when the deadline passes (it would linger until the next deploy).
 export const dynamic = "force-dynamic";
 
@@ -30,7 +30,7 @@ const faqs = [
   },
   {
     q: "מה קורה אם לא אקבל פניות?",
-    a: "ללא סיכון — אם לא תקבל/י פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם, תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.",
+    a: "ללא סיכון - אם לא תקבל/י פנייה מתאימה בחודשיים הראשונים לרישום במסלול המקודם, תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.",
   },
   {
     q: "כמה עולה המסלול החינמי?",
@@ -92,7 +92,7 @@ export default function TherapistJoinPage() {
             <strong>&quot;טיפול חכם&quot;</strong> מחברת בין מטופלים למטפלים על בסיס התאמה פסיכולוגית מקצועית.
           </p>
 
-          {/* Primary CTA — above the fold so a convinced visitor can act
+          {/* Primary CTA - above the fold so a convinced visitor can act
               immediately (most ad traffic is mobile and won't scroll to find it). */}
           <div className="mt-8 flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:gap-5">
             <Link
@@ -110,7 +110,7 @@ export default function TherapistJoinPage() {
         </div>
       </section>
 
-      {/* HOW IT WORKS — right after hero */}
+      {/* HOW IT WORKS - right after hero */}
       <section className="mt-14">
         <h2 className="text-2xl font-extrabold text-stone-900 mb-3">איך זה עובד?</h2>
         <p className="text-stone-700 leading-8 mb-6 max-w-3xl">
@@ -138,7 +138,7 @@ export default function TherapistJoinPage() {
 
         <div className="rounded-2xl p-6" style={{ background: "#FDF6EE", border: "1px solid #E8DCC8" }}>
           <p className="leading-8 text-stone-800">
-            לאחר מכן — המטופלים מקבלים <strong>התאמה למטפלים שמתאימים בדיוק לפרופיל שלהם</strong>, כולל <strong>סוכן AI</strong> שמסביר להם את ההתאמה במפורט במידה ורוצים.
+            לאחר מכן - המטופלים מקבלים <strong>התאמה למטפלים שמתאימים בדיוק לפרופיל שלהם</strong>, כולל <strong>סוכן AI</strong> שמסביר להם את ההתאמה במפורט במידה ורוצים.
           </p>
           <p className="mt-3 leading-8 text-stone-800">
             <strong>ואת/ה?</strong> מקבל/ת פניות הרבה יותר מדויקות.
@@ -163,7 +163,7 @@ export default function TherapistJoinPage() {
               <ul className="space-y-2.5 text-sm text-stone-700 leading-6">
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום - אזור או עיר</li>
                 <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> הופעה ראשונה בתוצאות החיפוש</li>
                 <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> מערכת ההתאמה החכמה</li>
                 <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> סטטיסטיקות וניתוח פרופיל הפונים</li>
@@ -175,7 +175,7 @@ export default function TherapistJoinPage() {
               <h3 className="text-lg font-bold mb-4" style={{ color: "var(--teal-dark)" }}>התאמה חכמה + סטטיסטיקות מתקדמות</h3>
               <ul className="space-y-2.5 text-sm leading-6" style={{ color: "var(--teal-dark)" }}>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה ראשונה בתוצאות החיפוש</li>
-                <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה במערכת ההתאמה — מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
+                <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> הופעה במערכת ההתאמה - מטופלים מופנים לפי הכלי הטיפולי, על בסיס התאמה אישיותית, על בסיס גיל, אזור, שפה, העדפה תרבותית ועוד</li>
                 <li className="flex items-start gap-2"><span className="font-bold mt-0.5" style={{ color: "var(--teal)" }}>✓</span> <span>🤖 סוכן בינה מלאכותית אישי הכולל:</span>
                   <ul className="mt-1.5 space-y-1 pr-2" style={{ color: "var(--teal-dark)" }}>
                     <li>א. דו&quot;ח צפיות בפרופיל, אחוזי המרה של הצפיות להקשה על המספר ועוד</li>
@@ -199,9 +199,9 @@ export default function TherapistJoinPage() {
         <div className="mt-4 rounded-2xl p-5 flex items-start gap-3" style={{ background: "#F0F7F2", border: "1px solid #C8DDD0" }}>
           <ShieldCheck size={22} style={{ color: "#2A5C3A" }} className="mt-0.5 flex-shrink-0" />
           <div>
-            <p className="font-bold text-stone-900 mb-1">ללא סיכון — החזר כספי מלא</p>
+            <p className="font-bold text-stone-900 mb-1">ללא סיכון - החזר כספי מלא</p>
             <p className="text-sm text-stone-700 leading-6">
-              במידה ולא תקבל/י פנייה מתאימה<span className="relative group inline-block align-baseline"><sup className="cursor-help font-bold mr-0.5" style={{ color: "var(--teal)", fontSize: "11px" }}>*</sup><span className="pointer-events-none absolute bottom-full mb-1 right-0 w-56 rounded-xl bg-stone-800 px-3 py-2 text-right text-xs leading-5 text-white hidden shadow-lg group-hover:block z-10">מפגש אינטייק בקליניקה. מבוסס אמון.</span></span> בחודשיים הראשונים לרישום במסלול המקודם — תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
+              במידה ולא תקבל/י פנייה מתאימה<span className="relative group inline-block align-baseline"><sup className="cursor-help font-bold mr-0.5" style={{ color: "var(--teal)", fontSize: "11px" }}>*</sup><span className="pointer-events-none absolute bottom-full mb-1 right-0 w-56 rounded-xl bg-stone-800 px-3 py-2 text-right text-xs leading-5 text-white hidden shadow-lg group-hover:block z-10">מפגש אינטייק בקליניקה. מבוסס אמון.</span></span> בחודשיים הראשונים לרישום במסלול המקודם - תוכל/י לקבל את כל הכסף חזרה במהירות ובקלות.
             </p>
             <p className="text-sm text-stone-700 leading-6 mt-1">
               ניתן לבטל את המנוי בכל עת.
@@ -225,7 +225,7 @@ export default function TherapistJoinPage() {
         </div>
       </section>
 
-      {/* STATS DEEP-DIVE — exclusive to promoted */}
+      {/* STATS DEEP-DIVE - exclusive to promoted */}
       <section className="mt-12">
         <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
           style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
@@ -233,17 +233,17 @@ export default function TherapistJoinPage() {
           בלעדי למסלול המקודם
         </div>
         <h2 className="text-2xl md:text-3xl font-extrabold text-stone-900 mb-3">
-          דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>איזה סוגי מטופלים מחפשים אותך — ואיזה מדלגים עליך</span>
+          דו&quot;ח שמראה לך <span style={{ color: "#8B2E0A" }}>איזה סוגי מטופלים מחפשים אותך - ואיזה מדלגים עליך</span>
         </h2>
         <p className="text-stone-700 leading-8 mb-8 max-w-3xl">
-          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה — תוך שמירה מוחלטת על אנונימיות המטופלים.
+          מטפלים עובדים שנים בלי לדעת מאיפה מגיעים הפונים שלהם, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר. הדו&quot;ח החודשי שלנו חושף בדיוק את זה - תוך שמירה מוחלטת על אנונימיות המטופלים.
         </p>
         <div className="grid gap-4 md:grid-cols-2 mb-6">
           {[
-            { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אותך — באמת", body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה." },
-            { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין — גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך." },
-            { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אותך." },
-            { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון." },
+            { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אותך - באמת", body: "סך צפיות בפרופיל, כמה אנשים שונים (לא חזרות), כמה פנו אליך בפועל, ואחוז ההמרה מצפייה לפנייה." },
+            { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום, או אונליין - גרף שמראה לך היכן נמצא הביקוש האמיתי לשירותים שלך." },
+            { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד - פילוח שמראה למה מחפשים דווקא אותך." },
+            { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר - כדי שתבין מי הקהל שלך ואיך לפנות אליו נכון." },
           ].map(({ icon: Icon, title, body, color }, i) => (
             <div key={i} className="rounded-2xl border border-[#E8E0D8] bg-white p-5 flex gap-4">
               <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl" style={{ background: `${color}15` }}>
@@ -259,7 +259,7 @@ export default function TherapistJoinPage() {
         <div className="rounded-xl p-4 flex items-start gap-3" style={{ background: "#F0F7FA", border: "1px solid #D8E4E8" }}>
           <ShieldCheck size={18} style={{ color: "#0F5468" }} className="mt-0.5 flex-shrink-0" />
           <p className="text-sm text-stone-700 leading-6">
-            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי — לא על ידינו וגם לא על ידך.
+            <strong>שמירה מוחלטת על פרטיות:</strong> הנתונים מוצגים רק ברמת קבוצות גדולות. אין שום דרך לזהות מטופל ספציפי - לא על ידינו וגם לא על ידך.
           </p>
         </div>
       </section>

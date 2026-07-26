@@ -4,7 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 // Callers pass a service-role supabase client so the insert always succeeds
 // regardless of the request's auth context.
 //
-// before/after are JSON snapshots of the relevant fields — pick whichever
+// before/after are JSON snapshots of the relevant fields - pick whichever
 // columns matter for the change (status, promotion_source, promoted_until,
 // subscription state, etc.). Schema is intentionally loose so we can
 // extend without migrations.
@@ -26,7 +26,7 @@ export async function writeAudit(
   entry: AuditEntry
 ): Promise<void> {
   // Best-effort. We never want an audit-log failure to abort the actual
-  // business operation that triggered it — but do log so the admin sees
+  // business operation that triggered it - but do log so the admin sees
   // there's a problem with the audit pipeline.
   const { error } = await supabase.from("therapist_audit_log").insert({
     therapist_id: entry.therapistId,

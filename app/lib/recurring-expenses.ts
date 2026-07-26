@@ -4,7 +4,7 @@ import { fetchAllRows } from "./fetch-all-rows";
 // Recurring (fixed) monthly expenses: `recurring_expenses` rows are templates
 // that materialize into real `expenses` rows, one per month, on the template's
 // day-of-month (clamped in shorter months: started on the 31st → Feb 28).
-// Materialization is lazy — the finance read routes call it before reading —
+// Materialization is lazy - the finance read routes call it before reading -
 // and idempotent via the unique (recurring_id, recurring_occurrence) index.
 
 export type RecurringExpense = {
@@ -24,7 +24,7 @@ export type RecurringExpense = {
   created_at: string;
 };
 
-// Hard stop per template (50 years of months) — safety net against bad dates.
+// Hard stop per template (50 years of months) - safety net against bad dates.
 const MAX_OCCURRENCES = 600;
 
 export function occurrenceDate(startDate: string, occurrence: number): string {
@@ -59,7 +59,7 @@ export function occurrencesDue(r: Pick<RecurringExpense, "start_date" | "months_
 }
 
 // Insert every due-but-missing occurrence of every active template. Best-effort:
-// failures are logged, never thrown — the finance screen should still render.
+// failures are logged, never thrown - the finance screen should still render.
 export async function materializeRecurringExpenses(): Promise<void> {
   try {
     const today = new Date().toISOString().slice(0, 10);
@@ -102,7 +102,7 @@ export async function materializeRecurringExpenses(): Promise<void> {
     }
     if (!inserts.length) return;
 
-    // Concurrent readers may race here — ON CONFLICT DO NOTHING keeps it safe.
+    // Concurrent readers may race here - ON CONFLICT DO NOTHING keeps it safe.
     const { error: insErr } = await supabaseAdmin.from("expenses").upsert(inserts, {
       onConflict: "recurring_id,recurring_occurrence",
       ignoreDuplicates: true,

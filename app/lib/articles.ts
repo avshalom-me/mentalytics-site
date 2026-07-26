@@ -21,7 +21,7 @@ export type TherapistArticle = {
   image_credit: string | null;
 };
 
-// Optional topic buckets a therapist can tag an article with — mirrors the
+// Optional topic buckets a therapist can tag an article with - mirrors the
 // /research hub so approved articles slot in naturally.
 export const ARTICLE_TOPICS = [
   "טיפול במבוגרים",

@@ -6,11 +6,11 @@ import { GUARANTEE_DAYS } from "./crm";
 // The money-back guarantee tracker. A paying (Sumit-subscribed) therapist is
 // entitled to a full refund if no patient inquiry ("פנייה") arrived within
 // GUARANTEE_DAYS of their subscription start. This module answers: for every
-// paid therapist whose window is open (or expired empty) — how many inquiries
+// paid therapist whose window is open (or expired empty) - how many inquiries
 // arrived, and how much time is left to act.
 //
 // An inquiry is counted as any row in therapist_contact_clicks inside the
-// window (site messages, WhatsApp / phone / email clicks) — matching the
+// window (site messages, WhatsApp / phone / email clicks) - matching the
 // public definition on the plan-choice page.
 //
 // Window anchor: therapists.promoted_since (set when the paid promotion

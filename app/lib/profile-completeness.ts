@@ -28,7 +28,7 @@ export function missingProfileFields(t: ProfileLike, hasCertificate: boolean): s
 }
 
 /** A ready-to-edit draft for the admin's completion request, listing the
- *  detected gaps. It is only a starting point — the admin edits or replaces it
+ *  detected gaps. It is only a starting point - the admin edits or replaces it
  *  before sending, so the wording is the admin's, not the system's. */
 export function defaultCompletionMessage(missing: string[]): string {
   if (missing.length === 0) {

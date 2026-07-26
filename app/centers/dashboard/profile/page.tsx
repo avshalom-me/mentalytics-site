@@ -6,7 +6,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import { ArrowRight, Loader2, ExternalLink } from "lucide-react";
 import PublicPageEditor, { type PublicPage } from "../PublicPageEditor";
 
-// אזור העריכה של המרכז — מקביל ל"עריכת פרטים אישיים" של מטפל: הדשבורד הראשי
+// אזור העריכה של המרכז - מקביל ל"עריכת פרטים אישיים" של מטפל: הדשבורד הראשי
 // נשאר סטטיסטיקה ונתונים, וכל השינויים והעריכות מרוכזים כאן.
 //   מסלול 2 (מרכז כישות): גם פרופיל ההתאמות (רובריקת המרכז) + העמוד הציבורי.
 //   מסלול 1: העמוד הציבורי (מטפלים נערכים מרשימת המטפלים בדשבורד).
@@ -37,7 +37,7 @@ export default function CenterProfileEditPage() {
         const res = await fetch("/api/center-portal", { headers: { Authorization: `Bearer ${session.access_token}` } });
         const json = await res.json();
         if (res.status === 401) {
-          setError("החשבון שלכם עדיין לא מקושר למרכז — פנו אלינו: admin@getmentalytics.com");
+          setError("החשבון שלכם עדיין לא מקושר למרכז - פנו אלינו: admin@getmentalytics.com");
         } else if (!json.ok) {
           setError(json.error ?? "שגיאה בטעינת הנתונים");
         } else {
@@ -77,7 +77,7 @@ export default function CenterProfileEditPage() {
 
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-stone-900">עריכת הפרופיל — {center.name}</h1>
+          <h1 className="text-2xl font-black text-stone-900">עריכת הפרופיל - {center.name}</h1>
           <p className="mt-1 text-xs text-stone-500">
             כאן מרוכזים כל השינויים והעריכות של פרטי המרכז. שינויים בעמוד הציבורי עולים מיד לאוויר.
           </p>
@@ -87,7 +87,7 @@ export default function CenterProfileEditPage() {
         </Link>
       </div>
 
-      {/* מסלול 2 — פרופיל ההתאמות של המרכז */}
+      {/* מסלול 2 - פרופיל ההתאמות של המרכז */}
       {isEntity && (
         <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
           <h2 className="mb-1 text-base font-black text-stone-800">🎯 פרופיל ההתאמות</h2>
@@ -110,12 +110,12 @@ export default function CenterProfileEditPage() {
               )}
             </div>
           ) : (
-            <p className="text-sm text-amber-700">הפרופיל בהכנה — אם הכפתור אינו מופיע, פנו אלינו: admin@getmentalytics.com</p>
+            <p className="text-sm text-amber-700">הפרופיל בהכנה - אם הכפתור אינו מופיע, פנו אלינו: admin@getmentalytics.com</p>
           )}
         </section>
       )}
 
-      {/* העמוד הציבורי — לוגו, צוות, גלריה ופרטי המרכז */}
+      {/* העמוד הציבורי - לוגו, צוות, גלריה ופרטי המרכז */}
       {center.status === "active" ? (
         <PublicPageEditor initial={center.public_page} />
       ) : (

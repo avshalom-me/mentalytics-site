@@ -60,7 +60,7 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   const conversionPct = impressionsValue > 0 ? Math.round((viewsValue / impressionsValue) * 100) : null;
   const contacts = stats?.all_time_contacts;
 
-  // ── Paying/promoted: cumulative numbers since joining — no period splits
+  // ── Paying/promoted: cumulative numbers since joining - no period splits
   // (product decision 19/7: the totals tell the real value story; month/week
   // slicing made quiet weeks read as "the site brings nothing").
   if (isPaying) {
@@ -77,7 +77,7 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
           <>
             {/* Exposure → interest */}
             <h3 className="text-sm font-bold text-stone-800 mb-1">חשיפה ועניין</h3>
-            <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל — לפני שלב יצירת הקשר</p>
+            <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל - לפני שלב יצירת הקשר</p>
             <div className="grid grid-cols-2 gap-3 mb-2">
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
                 <div className="text-lg font-black text-indigo-700">{impressionsValue.toLocaleString("he-IL")}</div>
@@ -96,7 +96,7 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
               </div>
             )}
 
-            {/* Total contacts — cumulative, with source split */}
+            {/* Total contacts - cumulative, with source split */}
             <div className="rounded-xl bg-[#f0ece4] px-4 py-3 flex items-center justify-between">
               <span className="text-sm text-stone-600">סה"כ פניות דרך האתר</span>
               <span className="text-xl font-black text-[#0F5468]">{contacts.total.toLocaleString("he-IL")}</span>
@@ -109,18 +109,18 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
             )}
             {contacts.total === 0 && viewsValue > 0 && (
               <div className="mt-3 rounded-xl bg-stone-50 border border-stone-200 px-4 py-3 text-center text-xs text-stone-600">
-                עדיין אין פניות — אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
+                עדיין אין פניות - אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
               </div>
             )}
 
             <p className="mt-3 text-[11px] leading-5 text-stone-500">
               💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
-              טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי — מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
+              טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי - מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
               שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
             </p>
             <p className="mt-2 text-[11px] leading-5 text-stone-500">
               ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
-              אליכם <strong>ישירות</strong> — דרך האתר הפרטי שלכם, הטלפון או המייל — בלי לחזור ללחוץ כאן.
+              אליכם <strong>ישירות</strong> - דרך האתר הפרטי שלכם, הטלפון או המייל - בלי לחזור ללחוץ כאן.
               פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
               מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
             </p>
@@ -194,12 +194,12 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
           </div>
           <p className="mt-3 text-[11px] leading-5 text-stone-500">
             💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
-            טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי — מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
+            טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי - מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
             שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
           </p>
           <p className="mt-2 text-[11px] leading-5 text-stone-500">
             ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
-            אליכם <strong>ישירות</strong> — דרך האתר הפרטי שלכם, הטלפון או המייל — בלי לחזור ללחוץ כאן.
+            אליכם <strong>ישירות</strong> - דרך האתר הפרטי שלכם, הטלפון או המייל - בלי לחזור ללחוץ כאן.
             פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
             מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
           </p>
@@ -237,7 +237,7 @@ function TherapistDashboard() {
   useEffect(() => {
     if (!token) return;
     setLoadingStats(true);
-    // Long-lived tab: the page-load token may have expired by now — always fetch
+    // Long-lived tab: the page-load token may have expired by now - always fetch
     // with a fresh session token (getSession refreshes it when needed).
     (async () => {
       try {
@@ -272,7 +272,7 @@ function TherapistDashboard() {
       const json = await res.json();
 
       // A brand-new registrant has a STUB row (auto-created on first login,
-      // empty name) rather than no row — GET always returns one now. Sending
+      // empty name) rather than no row - GET always returns one now. Sending
       // them to the dashboard (pricing banner, plan table, "what to improve")
       // is wrong: they haven't registered yet. Route them straight to the
       // registration form, where pricing is deferred to the final plan-choice
@@ -318,36 +318,36 @@ function TherapistDashboard() {
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   const statusLabel = profile?.status === "paying" && !profile?.admin_approved
-    ? { text: "שולם — ממתין לאישור מנהל (טרם מופיע בהתאמות)", color: "bg-orange-50 text-orange-800 border border-orange-300" }
+    ? { text: "שולם - ממתין לאישור מנהל (טרם מופיע בהתאמות)", color: "bg-orange-50 text-orange-800 border border-orange-300" }
     : profile?.status === "paying"
-    ? { text: "מקודם — מופיע בהתאמות", color: "bg-yellow-50 text-yellow-800 border border-yellow-300" }
+    ? { text: "מקודם - מופיע בהתאמות", color: "bg-yellow-50 text-yellow-800 border border-yellow-300" }
     : profile?.status === "approved"
-    ? { text: "מאושר — מופיע בדף המטפלים", color: "bg-green-100 text-green-800" }
+    ? { text: "מאושר - מופיע בדף המטפלים", color: "bg-green-100 text-green-800" }
     : profile?.status === "rejected"
     ? { text: "נדחה", color: "bg-red-100 text-red-800" }
     : { text: "ממתין לאישור", color: "bg-yellow-100 text-yellow-800" };
 
-  // "What to improve" — prioritized, actionable suggestions tied to profile
+  // "What to improve" - prioritized, actionable suggestions tied to profile
   // completeness and (for promoted therapists) the funnel. Empty = looks good.
   const improvements: { icon: string; text: string }[] = [];
   if (profile) {
     if (!profile.profile_photo_path)
-      improvements.push({ icon: "🖼️", text: "הוסף/י תמונת פרופיל — פרופילים עם תמונה מקבלים פניות רבות יותר באופן משמעותי." });
+      improvements.push({ icon: "🖼️", text: "הוסף/י תמונת פרופיל - פרופילים עם תמונה מקבלים פניות רבות יותר באופן משמעותי." });
     if (!profile.bio || profile.bio.trim().length < 80)
-      improvements.push({ icon: "✍️", text: "הרחב/י את הביוגרפיה (2–3 משפטים על הגישה, הניסיון והייחוד שלך) — מגביר אמון והקלקות." });
+      improvements.push({ icon: "✍️", text: "הרחב/י את הביוגרפיה (2–3 משפטים על הגישה, הניסיון והייחוד שלך) - מגביר אמון והקלקות." });
     if ((!profile.regions || profile.regions.length === 0) && !profile.online)
-      improvements.push({ icon: "📍", text: "הוסף/י אזורי טיפול או סמן/י עבודה אונליין — בלי זה קשה למטופלים למצוא אותך." });
+      improvements.push({ icon: "📍", text: "הוסף/י אזורי טיפול או סמן/י עבודה אונליין - בלי זה קשה למטופלים למצוא אותך." });
     if (!profile.education || !profile.education.trim())
-      improvements.push({ icon: "🎓", text: "הוסף/י פרטי השכלה והכשרה — מחזק את האמינות המקצועית." });
+      improvements.push({ icon: "🎓", text: "הוסף/י פרטי השכלה והכשרה - מחזק את האמינות המקצועית." });
 
     if (profile.status === "paying") {
       const imp = stats?.match_impressions?.all_time ?? 0;
       const views = stats?.profile_views?.all_time ?? 0;
       const contacts = stats?.all_time_contacts?.total ?? 0;
       if (imp >= 20 && views / imp < 0.15)
-        improvements.push({ icon: "👁️", text: "הופעת הרבה בתוצאות ההתאמה אך מעט נכנסו לפרופיל — תמונה וכותרת ביו חזקה מגדילות את אחוז ההקלקה." });
+        improvements.push({ icon: "👁️", text: "הופעת הרבה בתוצאות ההתאמה אך מעט נכנסו לפרופיל - תמונה וכותרת ביו חזקה מגדילות את אחוז ההקלקה." });
       if (views >= 15 && contacts === 0)
-        improvements.push({ icon: "💬", text: "אנשים נכנסו לפרופיל אך עדיין לא פנו — ביו ברור, הסדרים שקופים ומחיר עוזרים להפוך צפייה לפנייה." });
+        improvements.push({ icon: "💬", text: "אנשים נכנסו לפרופיל אך עדיין לא פנו - ביו ברור, הסדרים שקופים ומחיר עוזרים להפוך צפייה לפנייה." });
     }
   }
 
@@ -375,7 +375,7 @@ function TherapistDashboard() {
         </div>
       </div>
 
-      {/* Rejection notice — reason + how to re-submit */}
+      {/* Rejection notice - reason + how to re-submit */}
       {profile?.status === "rejected" && (
         <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4">
           <h2 className="text-sm font-extrabold text-red-800 mb-1">הפרופיל לא אושר</h2>
@@ -385,27 +385,27 @@ function TherapistDashboard() {
             <p className="text-sm text-red-700 leading-6">הפרופיל לא אושר במתכונתו הנוכחית.</p>
           )}
           <p className="text-sm text-red-700 leading-6 mt-1">
-            עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; — הפרופיל יישלח שוב לאישור.
+            עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; - הפרופיל יישלח שוב לאישור.
           </p>
         </div>
       )}
 
-      {/* Paid but awaiting admin approval — not yet shown in matching */}
+      {/* Paid but awaiting admin approval - not yet shown in matching */}
       {profile && profile.status === "paying" && !profile.admin_approved && (
         <div className="mb-6 rounded-2xl bg-orange-50 border border-orange-200 px-5 py-4">
-          <h2 className="text-sm font-extrabold text-orange-800 mb-1">התשלום התקבל — הפרופיל ממתין לאישור</h2>
+          <h2 className="text-sm font-extrabold text-orange-800 mb-1">התשלום התקבל - הפרופיל ממתין לאישור</h2>
           <p className="text-sm text-orange-700 leading-6">
             תודה! קיבלנו את התשלום. הפרופיל שלך יופיע בהתאמות לפונים רק לאחר שמנהל יאשר את התעודות שלך. נעדכן אותך במייל כשהפרופיל יאושר.
           </p>
         </div>
       )}
 
-      {/* Pricing banner — only for non-paying therapists */}
+      {/* Pricing banner - only for non-paying therapists */}
       {profile && profile.status !== "paying" && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
             <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">
-              {isPromoActive() ? "מבצע פתיחה — הצטרפות למערכת ההתאמה החכמה" : "הצטרפות למערכת ההתאמה החכמה"}
+              {isPromoActive() ? "מבצע פתיחה - הצטרפות למערכת ההתאמה החכמה" : "הצטרפות למערכת ההתאמה החכמה"}
             </div>
             {isPromoActive() ? (
               <>
@@ -478,7 +478,7 @@ function TherapistDashboard() {
               <ul className="space-y-2 text-xs text-stone-600 leading-5">
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי עם תמונה, ביוגרפיה ותחומי התמחות</li>
                 <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> נגיש לכל מי שמחפש מטפלים באתר</li>
-                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+                <li className="flex items-start gap-1.5"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום - אזור או עיר</li>
                 <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">מערכת ההתאמה החכמה</span></li>
                 <li className="flex items-start gap-1.5"><span className="text-stone-300 mt-0.5">✗</span> <span className="text-stone-400">סטטיסטיקות וניתוח פרופיל הפונים</span></li>
               </ul>
@@ -493,7 +493,7 @@ function TherapistDashboard() {
               </div>
               <ul className="space-y-2 text-xs leading-5" style={{ color: profile.status === "paying" ? "#1a4a5c" : "#9ca3af" }}>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> כל מה שבמסלול החינמי</li>
-                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> מערכת התאמה חכמה — פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+                <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> מערכת התאמה חכמה - פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> דו"ח צפיות, לחיצות ואחוזי המרה</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> פילוח הפונים: אזור, קושי, גיל ומגדר</li>
                 <li className="flex items-start gap-1.5"><span className="font-bold mt-0.5" style={{ color: profile.status === "paying" ? "#0F5468" : "#d1d5db" }}>✓</span> השוואה לממוצע המטפלים באתר</li>
@@ -503,11 +503,11 @@ function TherapistDashboard() {
         </div>
       )}
 
-      {/* Write-an-article CTA — for any approved therapist (free or paying) */}
+      {/* Write-an-article CTA - for any approved therapist (free or paying) */}
       {profile && (profile.status === "approved" || profile.status === "paying") && (
         <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
-            <h2 className="text-base font-extrabold text-stone-900">כתבו מאמר — קבלו יותר פניות</h2>
+            <h2 className="text-base font-extrabold text-stone-900">כתבו מאמר - קבלו יותר פניות</h2>
             <p className="text-sm text-stone-500 mt-0.5 leading-6">
               מידע מקצועי קצר עוזר למטופלים להכיר אתכם. כל מאמר מאושר מתפרסם במאגר המאמרים עם שמכם וקישור לפרופיל.
             </p>
@@ -525,7 +525,7 @@ function TherapistDashboard() {
       {/* Enriched stats (paying only) */}
       {token && !isNew && profile?.status === "paying" && stats?.enriched && <EnrichedStatsPanel data={stats.enriched} />}
 
-      {/* Backlink tool — every listed therapist linking from their personal site
+      {/* Backlink tool - every listed therapist linking from their personal site
           is a relevant dofollow backlink + better name-search for them. */}
       {token && !isNew && profile && (profile.status === "approved" || profile.status === "paying") && profile.admin_approved && profile.full_name && (
         <ProfileLinkPromo therapistId={profile.id} fullName={profile.full_name} />
@@ -537,7 +537,7 @@ function TherapistDashboard() {
           <h2 className="text-base font-extrabold text-stone-900 mb-3">💡 מה כדאי לשפר</h2>
           {improvements.length === 0 ? (
             <p className="text-sm text-stone-600 leading-6">
-              הפרופיל שלך נראה מצוין — כל הפרטים המרכזיים מולאו. המשך/י כך! 🎉
+              הפרופיל שלך נראה מצוין - כל הפרטים המרכזיים מולאו. המשך/י כך! 🎉
             </p>
           ) : (
             <>
@@ -570,7 +570,7 @@ function TherapistDashboard() {
         </div>
       )}
 
-      {/* Edit personal details — for existing profiles */}
+      {/* Edit personal details - for existing profiles */}
       {!isNew && profile && (
         <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-5 flex items-center justify-between gap-4 flex-wrap">
           <div>

@@ -5,16 +5,16 @@ import type { LocalArticle } from "@/app/lib/local-articles";
 
 // SEO content block for city/region landing pages, rendered BELOW the
 // therapist listings (patients rarely scroll past the cards; crawlers read it
-// all — the alhasapa/betipulnet pattern). Three anti-"doorway page" measures:
+// all - the alhasapa/betipulnet pattern). Three anti-"doorway page" measures:
 //  1. The stats are DERIVED FROM LIVE DATA, so every city's text is genuinely
 //     different (and self-updates as supply changes).
 //  2. Headings/phrasings rotate deterministically per place name.
 //  3. Small-supply places get adapted wording instead of boilerplate.
-// Native <details> accordions — no JS, SSR-rendered, fully indexable.
+// Native <details> accordions - no JS, SSR-rendered, fully indexable.
 
 type Kind = "city" | "region" | "online";
 
-// Deterministic per-place variant picker (stable across builds — no Math.random,
+// Deterministic per-place variant picker (stable across builds - no Math.random,
 // which would make Google see a different page on every crawl).
 function hashPlace(name: string): number {
   let h = 0;
@@ -54,7 +54,7 @@ export default function CitySeoSection({
   kind: Kind;
   therapists: PublicTherapist[];
   onlineCount: number;
-  /** Canonical region this place belongs to (the region itself on region pages) — keys price + public-services data. */
+  /** Canonical region this place belongs to (the region itself on region pages) - keys price + public-services data. */
   regionName?: string | null;
   articles?: LocalArticle[];
 }) {
@@ -69,12 +69,12 @@ export default function CitySeoSection({
   const inPlace = kind === "online" ? "בטיפול אונליין" : `ב${placeName}`;
 
   const headings = [
-    `טיפול פסיכולוגי ${inPlace} — מה חשוב לדעת`,
+    `טיפול פסיכולוגי ${inPlace} - מה חשוב לדעת`,
     `מחפשים פסיכולוג ${inPlace}? כמה דברים שכדאי לדעת`,
-    `פסיכולוגים ומטפלים ${inPlace} — שאלות ותשובות`,
+    `פסיכולוגים ומטפלים ${inPlace} - שאלות ותשובות`,
   ];
 
-  // Live-data supply paragraph — this is what makes each page genuinely unique.
+  // Live-data supply paragraph - this is what makes each page genuinely unique.
   const typesText = types.map((t) => `${t.label} (${t.count})`).join(" · ");
   const statsBits: string[] = [];
   if (total >= 3) {
@@ -95,18 +95,18 @@ export default function CitySeoSection({
     if (regionName && kind === "city") statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
     statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else {
-    statsBits.push(`ההיצע ${inPlace} מתעדכן — בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
+    statsBits.push(`ההיצע ${inPlace} מתעדכן - בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
     if (regionName) statsBits.push(`ומטפלים נוספים באזור ${regionName}`);
   }
   const statsParagraph = `${statsBits.join(", ")}. הרשימה מתעדכנת באופן שוטף.`;
 
-  // FAQ — phrasing varies by place hash; the content stays honest and generic-
+  // FAQ - phrasing varies by place hash; the content stays honest and generic-
   // free (no invented city facts, no fake price differences between cities).
-  // Region-aware price range (see region-public-services.ts — anchored to the
+  // Region-aware price range (see region-public-services.ts - anchored to the
   // hebpsy tariff surveys; center runs higher than the periphery).
   const price = (regionName && REGION_PRICE_RANGE[regionName]) || { min: 300, max: 550 };
   // A context sentence explaining WHY this area sits where it does relative to
-  // the national average — real local prose, not just swapped numbers. Tier is
+  // the national average - real local prose, not just swapped numbers. Tier is
   // derived from the range itself (>=350 center, >=300 mid, else periphery).
   const tier = price.min >= 350 ? "high" : price.min >= 300 ? "mid" : "low";
   const cityPrefix = kind === "city" && regionName ? `${placeName} שייכת לאזור ${regionName}, ו` : "";
@@ -116,7 +116,7 @@ export default function CitySeoSection({
       ? ""
       : tier === "high"
         ? (h % 2 === 0
-            ? `${cityPrefix}${cityPrefix ? "זהו" : `${areaRef} —`} מאזורי הביקוש הגבוהים בארץ, שבהם תעריפי הטיפול גבוהים לרוב מהממוצע הארצי. `
+            ? `${cityPrefix}${cityPrefix ? "זהו" : `${areaRef} -`} מאזורי הביקוש הגבוהים בארץ, שבהם תעריפי הטיפול גבוהים לרוב מהממוצע הארצי. `
             : `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול בלב המרכז נוטים להיות מעל הממוצע הארצי, בשל הביקוש הגבוה וריכוז הקליניקות. `)
         : tier === "mid"
           ? `${cityPrefix}${cityPrefix ? "" : `${areaRef} `}תעריפי הטיפול קרובים לרוב לממוצע הארצי. `
@@ -127,39 +127,39 @@ export default function CitySeoSection({
   const costA =
     priceContext +
     (kind === "online"
-      ? `בטיפול אונליין הטווח רחב במיוחד — לרוב בין 280 ל־550 ש״ח לפגישה — כי אפשר לבחור מטפל מכל אזור בארץ, כולל אזורים שבהם התעריפים נמוכים יותר.`
+      ? `בטיפול אונליין הטווח רחב במיוחד - לרוב בין 280 ל־550 ש״ח לפגישה - כי אפשר לבחור מטפל מכל אזור בארץ, כולל אזורים שבהם התעריפים נמוכים יותר.`
       : h % 2 === 0
-        ? `לפי סקרי התעריפים בענף, הממוצע הארצי לפגישת טיפול פרטית הוא סביב 400 ש״ח, וכאן המחיר נע לרוב בין ${price.min} ל־${price.max} ש״ח — בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד) ולניסיון.`
-        : `בפועל, פגישת טיפול פרטית ${inPlace} עולה לרוב בין ${price.min} ל־${price.max} ש״ח (הממוצע הארצי בסקרי התעריפים — סביב 400 ש״ח). המחיר מושפע בעיקר מההכשרה ומהניסיון של המטפל.`) +
-    ` פרטים מדויקים אפשר לברר ישירות מול המטפל — יצירת הקשר דרך הפרופיל היא ללא עלות וללא התחייבות.`;
+        ? `לפי סקרי התעריפים בענף, הממוצע הארצי לפגישת טיפול פרטית הוא סביב 400 ש״ח, וכאן המחיר נע לרוב בין ${price.min} ל־${price.max} ש״ח - בהתאם להכשרת המטפל (פסיכולוג מומחה, עו״ס קליני, מטפל CBT ועוד) ולניסיון.`
+        : `בפועל, פגישת טיפול פרטית ${inPlace} עולה לרוב בין ${price.min} ל־${price.max} ש״ח (הממוצע הארצי בסקרי התעריפים - סביב 400 ש״ח). המחיר מושפע בעיקר מההכשרה ומהניסיון של המטפל.`) +
+    ` פרטים מדויקים אפשר לברר ישירות מול המטפל - יצירת הקשר דרך הפרופיל היא ללא עלות וללא התחייבות.`;
 
   const chooseQ = `איך בוחרים ${kind === "online" ? "מטפל אונליין" : `פסיכולוג ${inPlace}`} שמתאים לי?`;
   const chooseA =
-    `המחקר עקבי: איכות הקשר בין מטופל למטפל היא מהמנבאים החזקים ביותר להצלחת הטיפול — לעיתים יותר מהשיטה עצמה. חשוב לבדוק הכשרה ורישיון, התמחות בקושי שלכם, ותחושת נוחות בשיחה הראשונה.`;
+    `המחקר עקבי: איכות הקשר בין מטופל למטפל היא מהמנבאים החזקים ביותר להצלחת הטיפול - לעיתים יותר מהשיטה עצמה. חשוב לבדוק הכשרה ורישיון, התמחות בקושי שלכם, ותחושת נוחות בשיחה הראשונה.`;
 
-  // "מומלץ" intent — the review-flavored query variant ("פסיכולוג מומלץ בחיפה").
+  // "מומלץ" intent - the review-flavored query variant ("פסיכולוג מומלץ בחיפה").
   // Answered honestly: what a real recommendation is (credentials, license
   // registry, fit), what WE verify, and no fabricated reviews.
   const recQ = kind === "online" ? "איך מזהים פסיכולוג מומלץ לטיפול אונליין?" : `איך מזהים פסיכולוג מומלץ ${inPlace}?`;
   const recA =
     (h % 2 === 0
-      ? `המלצה אמיתית היא לא כוכבים באתר — היא שילוב של שלושה דברים: הכשרה ורישיון בתוקף (אפשר לוודא בפנקס הפסיכולוגים של משרד הבריאות), ניסיון מוכח בקושי הספציפי שלכם, ותחושת חיבור בשיחה הראשונה.`
-      : `לפני שסומכים על "מומלץ", כדאי לבדוק שלושה דברים: שהמטפל מחזיק בהכשרה וברישיון בתוקף, שיש לו ניסיון בקושי שאיתו אתם מתמודדים, ושנוח לכם איתו בשיחה ראשונה — המחקר מראה שהחיבור האישי מנבא הצלחה יותר מכל המלצה.`) +
-    ` כל המטפלים המוצגים כאן עברו אימות תעודות והכשרה לפני שפורסמו, כך שנקודת הפתיחה בטוחה — ומשם ההמלצה הכי טובה היא ההתרשמות שלכם.`;
+      ? `המלצה אמיתית היא לא כוכבים באתר - היא שילוב של שלושה דברים: הכשרה ורישיון בתוקף (אפשר לוודא בפנקס הפסיכולוגים של משרד הבריאות), ניסיון מוכח בקושי הספציפי שלכם, ותחושת חיבור בשיחה הראשונה.`
+      : `לפני שסומכים על "מומלץ", כדאי לבדוק שלושה דברים: שהמטפל מחזיק בהכשרה וברישיון בתוקף, שיש לו ניסיון בקושי שאיתו אתם מתמודדים, ושנוח לכם איתו בשיחה ראשונה - המחקר מראה שהחיבור האישי מנבא הצלחה יותר מכל המלצה.`) +
+    ` כל המטפלים המוצגים כאן עברו אימות תעודות והכשרה לפני שפורסמו, כך שנקודת הפתיחה בטוחה - ומשם ההמלצה הכי טובה היא ההתרשמות שלכם.`;
 
   const onlineQ =
     kind === "online"
       ? "האם טיפול אונליין באמת עובד כמו טיפול בקליניקה?"
-      : `לא מצאתם מטפל פנוי ${inPlace} — מה עושים?`;
+      : `לא מצאתם מטפל פנוי ${inPlace} - מה עושים?`;
   const onlineA =
     kind === "online"
-      ? `מחקרים מהשנים האחרונות מראים שטיפול בשיחת וידאו משיג תוצאות דומות לטיפול פנים־אל־פנים ברוב הקשיים הנפוצים (חרדה, דיכאון, קשיי הסתגלות). היתרון: גישה למטפל המתאים ביותר — לא רק לקרוב ביותר.`
+      ? `מחקרים מהשנים האחרונות מראים שטיפול בשיחת וידאו משיג תוצאות דומות לטיפול פנים־אל־פנים ברוב הקשיים הנפוצים (חרדה, דיכאון, קשיי הסתגלות). היתרון: גישה למטפל המתאים ביותר - לא רק לקרוב ביותר.`
       : `שווה לשקול טיפול אונליין: מחקרים מראים שטיפול בווידאו משיג תוצאות דומות לטיפול בקליניקה ברוב הקשיים הנפוצים, והוא פותח גישה ל־${onlineCount} מטפלים מאומתים מכל הארץ${regionName ? `, בנוסף למטפלים באזור ${regionName}` : ""}.`;
 
   const kupaQ = "טיפול פרטי או דרך קופת החולים?";
   const kupaA =
     h % 2 === 0
-      ? `דרך הקופה הטיפול מסובסד, אך זמני ההמתנה ארוכים לרוב (חודשים במקרים רבים) והבחירה במטפל מוגבלת. טיפול פרטי מתחיל מהר, מאפשר לבחור מטפל שמתאים לכם — וחלק מהביטוחים המשלימים מחזירים חלק מהעלות.`
+      ? `דרך הקופה הטיפול מסובסד, אך זמני ההמתנה ארוכים לרוב (חודשים במקרים רבים) והבחירה במטפל מוגבלת. טיפול פרטי מתחיל מהר, מאפשר לבחור מטפל שמתאים לכם - וחלק מהביטוחים המשלימים מחזירים חלק מהעלות.`
       : `לשני המסלולים יתרונות: הקופה זולה משמעותית אבל כרוכה בהמתנה ארוכה ובבחירה מוגבלת; במסלול פרטי מתחילים תוך ימים ובוחרים בדיוק את המטפל. כדאי לבדוק גם החזרים מהביטוח המשלים שלכם.`;
 
   const faq: { q: string; a: string; link: { href: string; label: string } | null }[] = [
@@ -171,17 +171,17 @@ export default function CitySeoSection({
   ];
 
   // Public mental-health services in the region (hospitals / psychiatric
-  // departments, with operator) — curated in region-public-services.ts.
+  // departments, with operator) - curated in region-public-services.ts.
   const services = regionName && kind !== "online" ? REGION_PUBLIC_SERVICES[regionName] ?? [] : [];
   if (services.length > 0) {
     const servicesList = services
-      .map((s) => `${s.name} — ${s.kind === "מרכז לבריאות הנפש" ? "מרכז לבריאות הנפש" : "מחלקה פסיכיאטרית"} (${s.city}; ${s.operator})`)
+      .map((s) => `${s.name} - ${s.kind === "מרכז לבריאות הנפש" ? "מרכז לבריאות הנפש" : "מחלקה פסיכיאטרית"} (${s.city}; ${s.operator})`)
       .join(" · ");
     faq.push({
       q: `אילו שירותי בריאות נפש ציבוריים יש באזור${regionName ? ` ${regionName}` : ""}?`,
       a:
         `מוסדות ציבוריים מרכזיים באזור: ${servicesList}. ` +
-        `בנוסף, לכל קופות החולים (כללית, מכבי, מאוחדת, לאומית) מרפאות בריאות נפש אזוריות — טיפול ציבורי במסגרת הסל, בחינם או בהשתתפות נמוכה, בהפניה מרופא/ת המשפחה. זמני ההמתנה משתנים ממרפאה למרפאה.`,
+        `בנוסף, לכל קופות החולים (כללית, מכבי, מאוחדת, לאומית) מרפאות בריאות נפש אזוריות - טיפול ציבורי במסגרת הסל, בחינם או בהשתתפות נמוכה, בהפניה מרופא/ת המשפחה. זמני ההמתנה משתנים ממרפאה למרפאה.`,
       link: null,
     });
   }
@@ -219,7 +219,7 @@ export default function CitySeoSection({
                 >
                   {a.title}
                 </Link>
-                <span className="text-stone-500"> — מאת {a.author}</span>
+                <span className="text-stone-500"> - מאת {a.author}</span>
               </li>
             ))}
           </ul>

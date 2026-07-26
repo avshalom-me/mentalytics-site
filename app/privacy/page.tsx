@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "מדיניות פרטיות",
-  description: "מדיניות הפרטיות של טיפול חכם — כיצד אנו שומרים על האנונימיות שלכם, אילו נתונים נאספים ואיך מטופלים ומטפלים יכולים לשלוט בפרטיותם.",
+  description: "מדיניות הפרטיות של טיפול חכם - כיצד אנו שומרים על האנונימיות שלכם, אילו נתונים נאספים ואיך מטופלים ומטפלים יכולים לשלוט בפרטיותם.",
 };
 
 export default function PrivacyPage() {
@@ -48,7 +48,7 @@ export default function PrivacyPage() {
             אנחנו לא מוכרים, מעבירים או משתפים מידע אישי עם גורמים חיצוניים, למעט:
           </p>
           <ul className="list-disc list-inside space-y-1 text-sm mt-2">
-            <li>ספקי תשתית הכרחיים (Supabase לאחסון, Vercel לאירוח) — בכפוף למדיניות הפרטיות שלהם</li>
+            <li>ספקי תשתית הכרחיים (Supabase לאחסון, Vercel לאירוח) - בכפוף למדיניות הפרטיות שלהם</li>
             <li>כשנדרש על פי חוק</li>
           </ul>
         </section>

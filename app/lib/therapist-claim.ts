@@ -8,7 +8,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
  * auto-confirmed), so the address on the auth user is NOT proof of ownership.
  * If we auto-linked any matching row, whoever registered first with a given
  * email could seize that profile. We therefore refuse to hand over a LIVE
- * profile — one that is admin_approved, or already approved/paying — because
+ * profile - one that is admin_approved, or already approved/paying - because
  * taking it over is a full account takeover (edit a live, paying, publicly
  * listed profile). Live profiles must be linked to their owner by an admin
  * explicitly. Only unclaimed, not-yet-live rows are eligible for auto-claim
@@ -19,7 +19,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
  * managed exclusively by the center's managers and intentionally has no
  * therapist login. Without this exclusion, anyone registering with the
  * profile's (unverified) email address would seize a center's therapist
- * profile — and once the center's subscription promotes it into matching,
+ * profile - and once the center's subscription promotes it into matching,
  * the attacker controls a live promoted profile.
  *
  * @param columns  columns to select on the matched row (default "id")

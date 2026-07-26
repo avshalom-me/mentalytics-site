@@ -11,7 +11,7 @@ import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 
-// Card-level contact buttons — the one surface where a contact click happens
+// Card-level contact buttons - the one surface where a contact click happens
 // WITHOUT a profile view. Attribution must ride along here exactly like on the
 // profile page's ContactButtons: without it these clicks landed as
 // channel=NULL / utm=NULL and vanished from the per-campaign funnel.
@@ -20,7 +20,7 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // keepalive: on mobile the tap immediately jumps to WhatsApp / the dialer,
-    // backgrounding the page — without it the in-flight request can be killed
+    // backgrounding the page - without it the in-flight request can be killed
     // and the contact silently undercounted.
     keepalive: true,
     body: JSON.stringify({
@@ -31,7 +31,7 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
       ...(getAttribution() ?? {}),
     }),
   }).catch(() => {});
-  // GA4 conversion — the patient reached out to a therapist (the key lead).
+  // GA4 conversion - the patient reached out to a therapist (the key lead).
   gaEvent("generate_lead", { method: clickType, source: "directory" });
 }
 
@@ -61,7 +61,7 @@ export type PublicTherapist = {
 
 // Fisher-Yates shuffle within each tier, preserving tier order (paying → gift →
 // free). Runs client-side on every mount so the position between therapists in
-// the SAME tier rotates on each visit — no single therapist is permanently first.
+// the SAME tier rotates on each visit - no single therapist is permanently first.
 function shuffleWithinTiers(list: PublicTherapist[]): PublicTherapist[] {
   const byTier = new Map<number, PublicTherapist[]>();
   for (const t of list) {
@@ -151,7 +151,7 @@ function TherapistCard({
               <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
             )}
             {t.regions.length > 0 && (
-              // All cities, not just the first-entered one — the matching
+              // All cities, not just the first-entered one - the matching
               // results already show the full list and it reads fine (≤3).
               <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>📍 {t.regions.join(", ")}</span>
             )}
@@ -229,7 +229,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     setDisplayList(shuffleWithinTiers(therapists));
   }, [therapists]);
 
-  // שחזור הסינון מה-URL — כדי ש"אחורה" מפרופיל יחזיר את הרשימה המסוננת
+  // שחזור הסינון מה-URL - כדי ש"אחורה" מפרופיל יחזיר את הרשימה המסוננת
   // ולא את הרשימה המלאה (ה-state לבדו אובד ברימאונט של ניווט חזרה).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -240,7 +240,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     if (p.get("online") === "1") setOnlineOnly(true);
   }, []);
 
-  // סנכרון הסינון ל-URL (replaceState — בלי להוסיף רשומות היסטוריה).
+  // סנכרון הסינון ל-URL (replaceState - בלי להוסיף רשומות היסטוריה).
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const set = (k: string, v: string) => { if (v) p.set(k, v); else p.delete(k); };
@@ -263,7 +263,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
   }, [therapists, regionFilter]);
 
   // Tier order is preserved (paying → gift → free), with a per-visit shuffle
-  // WITHIN each tier, so any filter — including online-only — keeps paying
+  // WITHIN each tier, so any filter - including online-only - keeps paying
   // therapists at the top while rotating who leads inside each tier.
   const filtered = displayList.filter((t) => {
     if (onlineOnly && !t.online) return false;
@@ -371,7 +371,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
         )}
       </div>
 
-      {/* Para-medical note (opens on click of the filter-row button) — main only */}
+      {/* Para-medical note (opens on click of the filter-row button) - main only */}
       {!isPara && paraNoteOpen && (
         <div className="mb-7 -mt-3 rounded-xl p-3 text-sm leading-7" style={{ background: "var(--gold-pale)", border: "1px solid var(--gold)", color: "var(--gold-dark)" }}>
           <p>* מטפלים פרה-רפואיים כוללים: קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית (דיאטנ/ית קליני/ת) ופיזיותרפיה.</p>

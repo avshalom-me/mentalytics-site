@@ -10,7 +10,7 @@ import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 
-// Condition/audience landing pages ("טיפול בחרדה", "פסיכולוג ילדים") — the
+// Condition/audience landing pages ("טיפול בחרדה", "פסיכולוג ילדים") - the
 // missing keyword layers (docs/seo-roadmap.md M3). Conditions list therapists
 // trained in the approaches that treat the condition; audiences filter by the
 // real age_groups tags. Same thin-page gates as cities/specialties.
@@ -65,7 +65,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
     ],
   };
 
-  // City sub-pages (the M4 pilot) — link only combos that are actually indexable.
+  // City sub-pages (the M4 pilot) - link only combos that are actually indexable.
   const cityLinks: { city: string; count: number }[] = [];
   if ((CITY_TOPIC_SLUGS as readonly string[]).includes(topic.slug)) {
     for (const city of PILOT_CITIES) {
@@ -92,7 +92,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "68ch" }}>{topic.intro}</p>
         {list.length >= MIN_LISTED_FOR_INDEX && (
           <p className="mt-2 text-sm text-stone-500">
-            {topic.supplyNote} — {list.length} מטפלים מאומתים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
+            {topic.supplyNote} - {list.length} מטפלים מאומתים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
           </p>
         )}
       </div>
@@ -107,7 +107,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
             לא בטוחים מה מתאים לכם?
           </p>
           <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים — נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."}
+            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."}
           </p>
         </div>
         <Link
@@ -148,7 +148,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
           <div className="flex flex-wrap gap-2">
             {cityLinks.map(({ city }) => (
               <Link key={city} href={`/therapists/city/${regionToSlug(city)}/${topic.slug}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
-                style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{topic.name} — {city}</Link>
+                style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{topic.name} - {city}</Link>
             ))}
           </div>
         </div>

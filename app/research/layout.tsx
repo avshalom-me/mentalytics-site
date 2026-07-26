@@ -2,7 +2,7 @@ import Link from "next/link";
 
 // Shared layout for ALL /research pages (editorial articles + community
 // therapist articles): appends a "מחפשים מטפל?" internal-links block after
-// every article. SEO purpose: the articles earn topical authority — this
+// every article. SEO purpose: the articles earn topical authority - this
 // funnels it (and readers) to the money pages (city / online / specialty
 // landings + the quiz) with descriptive anchor text.
 

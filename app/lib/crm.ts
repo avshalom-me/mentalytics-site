@@ -1,4 +1,4 @@
-// Shared CRM vocabulary — isomorphic (imported by both admin pages and API
+// Shared CRM vocabulary - isomorphic (imported by both admin pages and API
 // routes). Labels are the single source of truth for status/stage names so
 // every screen renders the same Hebrew for the same state.
 
@@ -48,24 +48,24 @@ export const TASK_PRIORITIES = [
 // patient inquiry arrived within this many days of the subscription start.
 export const GUARANTEE_DAYS = 60;
 
-// Israeli VAT rate — drives the automatic VAT calculation in the expense form
+// Israeli VAT rate - drives the automatic VAT calculation in the expense form
 // (isomorphic on purpose: the form computes live, the export recomputes).
 export const VAT_RATE = 0.18;
 
 // Expense ledger categories. `refund_*` categories are money returned to
-// therapists — kept in the same ledger so the monthly balance is honest, but
+// therapists - kept in the same ledger so the monthly balance is honest, but
 // reported separately (refund rate vs the 20% the business plan budgeted).
 // `ad` categories carry a channel and feed the live CAC calculation.
 export const EXPENSE_CATEGORIES = [
-  { value: "advertising_google", label: "פרסום — גוגל", channel: "google_paid" },
-  { value: "advertising_meta", label: "פרסום — מטא", channel: "meta_paid" },
-  { value: "advertising_other", label: "פרסום — אחר", channel: "other" },
+  { value: "advertising_google", label: "פרסום - גוגל", channel: "google_paid" },
+  { value: "advertising_meta", label: "פרסום - מטא", channel: "meta_paid" },
+  { value: "advertising_other", label: "פרסום - אחר", channel: "other" },
   { value: "software", label: "תוכנה ותשתיות", channel: null },
   { value: "rnd", label: "מחקר ופיתוח", channel: null },
   { value: "accounting_legal", label: "רו\"ח / משפטי", channel: null },
   { value: "salaries", label: "שכר וקבלני משנה", channel: null },
-  { value: "refund_guarantee", label: "החזר — אחריות (גרנטי)", channel: null },
-  { value: "refund_other", label: "החזר — אחר", channel: null },
+  { value: "refund_guarantee", label: "החזר - אחריות (גרנטי)", channel: null },
+  { value: "refund_other", label: "החזר - אחר", channel: null },
   { value: "office", label: "משרד ושונות", channel: null },
   { value: "other", label: "אחר", channel: null },
 ] as const;

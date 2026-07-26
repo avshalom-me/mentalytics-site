@@ -76,7 +76,7 @@ function finalize(
 
 /**
  * Row-based: counts raw event/view/click rows. NOTE: callers must fetch ALL
- * rows — a single PostgREST response caps at 1000, which silently undercounts
+ * rows - a single PostgREST response caps at 1000, which silently undercounts
  * any metric above 1000. Prefer computeAttributionFromCounts (DB-side
  * aggregation) for the large tables (impressions / profile_views).
  */
@@ -86,7 +86,7 @@ export function computeAttribution(
   clicks: { channel: string | null; utm_campaign?: string | null }[],
 ): AttributionResult {
   const byChannel = emptyByChannel();
-  // Distinct session_id per channel among page_views — the honest "visits"
+  // Distinct session_id per channel among page_views - the honest "visits"
   // count (raw pageViews over-counts: bots, prefetch, multi-page sessions).
   const sessionSets = Object.fromEntries(ALL_BUCKETS.map((b) => [b, new Set<string>()])) as Record<Bucket, Set<string>>;
 
@@ -113,7 +113,7 @@ export function computeAttribution(
 
 /**
  * Aggregate-based: takes per-channel + per-campaign counts already computed in
- * SQL (the admin_attribution_report RPC). Exact at any volume — no 1000-row
+ * SQL (the admin_attribution_report RPC). Exact at any volume - no 1000-row
  * cap. Counts may arrive as numbers or numeric strings (Postgres bigint).
  */
 export function computeAttributionFromCounts(

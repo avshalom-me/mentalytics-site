@@ -88,7 +88,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
         </p>
       </div>
 
-      {/* Quiz CTA — same offer as the city/region pages */}
+      {/* Quiz CTA - same offer as the city/region pages */}
       <div
         className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
         style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
@@ -98,7 +98,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
             לא בטוחים שזו הגישה המתאימה לכם?
           </p>
           <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים — נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."}
+            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."}
           </p>
         </div>
         <Link
@@ -120,12 +120,12 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
         </div>
       )}
 
-      {/* Treatment deep-dive — below the listings (the city-pages pattern):
+      {/* Treatment deep-dive - below the listings (the city-pages pattern):
           prose distilled from our own editorial articles + links into them. */}
       {content && (
         <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
-            על {specialty} — מה חשוב לדעת
+            על {specialty} - מה חשוב לדעת
           </h2>
           <div className="space-y-4">
             {content.paragraphs.map((p, i) => (
@@ -133,7 +133,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
             ))}
           </div>
 
-          {/* Expert deep-dive (theory, techniques, structure) — technique lists
+          {/* Expert deep-dive (theory, techniques, structure) - technique lists
               collapsed so the page stays calm; fully server-rendered for SEO. */}
           {deepDive && (
             <div className="mt-6">
@@ -147,7 +147,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
                       <ul className="mt-3 space-y-2">
                         {sec.bullets.map((b, bi) => (
                           <li key={bi} className="text-sm leading-7 text-stone-600">
-                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> — {b.desc}
+                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> - {b.desc}
                           </li>
                         ))}
                       </ul>
@@ -165,7 +165,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
                       <ul className="mt-2 space-y-2">
                         {sec.bullets.map((b, bi) => (
                           <li key={bi} className="text-sm leading-7 text-stone-600">
-                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> — {b.desc}
+                            <strong style={{ color: "var(--text-2)" }}>{b.term}</strong> - {b.desc}
                           </li>
                         ))}
                       </ul>
@@ -198,7 +198,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
                     <Link href={`/research/community/${encodeURIComponent(a.slug)}`} className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
                       {a.title}
                     </Link>
-                    <span className="text-stone-500"> — מאת {a.author}</span>
+                    <span className="text-stone-500"> - מאת {a.author}</span>
                   </li>
                 ))}
               </ul>

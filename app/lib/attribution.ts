@@ -1,5 +1,5 @@
 /**
- * Marketing attribution — single source of truth for "where did this visitor
+ * Marketing attribution - single source of truth for "where did this visitor
  * come from". Captured first on the landing page, persisted in localStorage,
  * and attached to every tracked funnel event (page_view, profile_impression,
  * profile_view, contact_click) so the admin can report lead source and
@@ -42,10 +42,10 @@ const STORAGE_KEY_CLICKS = "mnt_click_ids";
 const CLICK_ID_MAX = 512;
 
 export type ClickIds = {
-  gclid: string | null; // Google Ads — standard web click id
-  gbraid: string | null; // Google Ads — web-to-app (iOS)
-  wbraid: string | null; // Google Ads — app-to-web (iOS)
-  fbclid: string | null; // Meta — click id (for future Meta CAPI)
+  gclid: string | null; // Google Ads - standard web click id
+  gbraid: string | null; // Google Ads - web-to-app (iOS)
+  wbraid: string | null; // Google Ads - app-to-web (iOS)
+  fbclid: string | null; // Meta - click id (for future Meta CAPI)
 };
 
 function readClickIdsFromParams(params: URLSearchParams): ClickIds {
@@ -92,12 +92,12 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const med = (params.get("utm_medium") || "").trim().toLowerCase();
   const ref = (referrer || "").trim().toLowerCase();
 
-  // Google Ads click ids are paid-exclusive — they alone prove paid traffic.
+  // Google Ads click ids are paid-exclusive - they alone prove paid traffic.
   // fbclid is NOT: Meta appends it to organic clicks too (shares, profile-link
   // taps, in-app browser), so it must never imply paid on its own (see below).
   if (params.has("gclid") || params.has("gbraid") || params.has("wbraid")) return "google_paid";
 
-  // Explicit UTM tagging — trust the medium to separate paid from organic.
+  // Explicit UTM tagging - trust the medium to separate paid from organic.
   if (src) {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
@@ -113,7 +113,7 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // ttclid alone = TikTok-originated; treat as organic unless tagged paid (like fbclid).
   if (params.has("ttclid")) return "tiktok_organic";
 
-  // No UTM — infer from the referrer.
+  // No UTM - infer from the referrer.
   if (!ref) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
   if (ref.includes("google.")) return "google_organic";
@@ -155,7 +155,7 @@ export function captureAttribution(): void {
     if (existing && !hasCampaignSignal) return; // keep the prior touch
 
     const next = buildAttribution(params, referrer);
-    // A gclid-only landing (campaign signal but no utm params — Google strips
+    // A gclid-only landing (campaign signal but no utm params - Google strips
     // the suffix on some ad assets) must not wipe a previously captured
     // campaign tag from the same channel: that orphaned paid conversions from
     // their campaign (seen live 16/7, g-online). Keep the richer prior tag.
@@ -168,27 +168,27 @@ export function captureAttribution(): void {
           next.utm_campaign = prev.utm_campaign;
         }
       } catch {
-        /* corrupt stored value — fall through with the fresh capture */
+        /* corrupt stored value - fall through with the fresh capture */
       }
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 
     // Persist the raw ad click ids (last-touch) so a later conversion can be
     // uploaded to the ad platform with exact click attribution. Only overwrite
-    // when this landing actually carries click ids — a utm-only or organic
+    // when this landing actually carries click ids - a utm-only or organic
     // landing must not wipe a gclid captured on an earlier paid visit.
     const clicks = readClickIdsFromParams(params);
     if (hasAnyClickId(clicks)) {
       localStorage.setItem(STORAGE_KEY_CLICKS, JSON.stringify(clicks));
     }
   } catch {
-    /* localStorage blocked — attribution stays unknown */
+    /* localStorage blocked - attribution stays unknown */
   }
 }
 
 /**
  * Restore attribution from a saved-match token (the /match/<token> page).
- * The token carries the ORIGINAL campaign that produced the match — including
+ * The token carries the ORIGINAL campaign that produced the match - including
  * across devices, where localStorage starts empty. A stored PAID/tagged touch
  * on this device still wins (it is either the same touch or a newer one);
  * we only fill in when the current state is empty or an untagged
@@ -214,7 +214,7 @@ export function seedAttribution(seed: Partial<Attribution>): void {
         const prev = JSON.parse(existingRaw) as Partial<Attribution>;
         if (prev.utm_campaign) return; // an explicit tagged touch already owns this visitor
       } catch {
-        /* corrupt — overwrite below */
+        /* corrupt - overwrite below */
       }
     }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
@@ -303,7 +303,7 @@ export function getClickIds(): ClickIds | null {
 /**
  * Signup-attribution transport. The therapist stub row is created by a GET
  * (no request body), so the stored attribution + click ids ride in this
- * request header. Value is URI-encoded JSON — fetch() header values must be
+ * request header. Value is URI-encoded JSON - fetch() header values must be
  * Latin-1 safe and utm values can contain Hebrew.
  */
 export const ATTRIBUTION_HEADER = "x-mnt-attribution";
@@ -324,7 +324,7 @@ export function getAttributionHeaderValue(): string | null {
 /** Validate + clamp click ids arriving in an API request body (server-side). */
 export function sanitizeClickIds(body: unknown): ClickIds {
   const b = (body ?? {}) as Record<string, unknown>;
-  // Click ids are opaque url-safe tokens — accept only [A-Za-z0-9._-].
+  // Click ids are opaque url-safe tokens - accept only [A-Za-z0-9._-].
   const clean = (v: unknown): string | null => {
     if (typeof v !== "string") return null;
     const t = v.trim().slice(0, CLICK_ID_MAX);
@@ -339,12 +339,12 @@ export function sanitizeClickIds(body: unknown): ClickIds {
 }
 
 export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
-  google_paid: "גוגל — בתשלום",
-  google_organic: "גוגל — אורגני",
-  meta_paid: "Meta — בתשלום",
-  meta_organic: "Meta — אורגני",
-  tiktok_paid: "TikTok — בתשלום",
-  tiktok_organic: "TikTok — אורגני",
+  google_paid: "גוגל - בתשלום",
+  google_organic: "גוגל - אורגני",
+  meta_paid: "Meta - בתשלום",
+  meta_organic: "Meta - אורגני",
+  tiktok_paid: "TikTok - בתשלום",
+  tiktok_organic: "TikTok - אורגני",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
   referral: "הפניה מאתר אחר",

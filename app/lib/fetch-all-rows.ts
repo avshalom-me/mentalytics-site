@@ -11,11 +11,11 @@
  *
  * Paging is PARALLEL past the first page: sequential paging cost one network
  * round-trip per 1000 rows, which put /api/admin-analytics (analytics_events
- * is tens of thousands of rows) at 20-30s wall time. Page 0 is fetched alone —
- * a small table stays a single request — and only if it comes back full do we
+ * is tens of thousands of rows) at 20-30s wall time. Page 0 is fetched alone -
+ * a small table stays a single request - and only if it comes back full do we
  * fan out in waves of concurrent range requests.
  *
- * Pass a THUNK that builds a fresh query each call — `.range()` must be applied
+ * Pass a THUNK that builds a fresh query each call - `.range()` must be applied
  * to a clean builder, and an awaited builder can't be reused.
  *
  *   const rows = await fetchAllRows<{ channel: string | null }>(
@@ -63,10 +63,10 @@ export async function fetchAllRows<T>(buildQuery: () => RangeQuery<T>): Promise<
   }
 
   // If we stopped on the backstop rather than a short page, the result may be
-  // truncated silently — log loudly so it's caught before it skews a report.
+  // truncated silently - log loudly so it's caught before it skews a report.
   if (rows.length >= MAX_ROWS) {
     console.warn(
-      `fetchAllRows: hit the ${MAX_ROWS}-row backstop — result may be truncated. ` +
+      `fetchAllRows: hit the ${MAX_ROWS}-row backstop - result may be truncated. ` +
         `Aggregate this query in SQL (COUNT/GROUP BY via RPC) instead of paging.`,
     );
   }

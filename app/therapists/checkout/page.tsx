@@ -212,12 +212,12 @@ function CheckoutForm() {
       </Link>
 
       <h1 className="mt-6 text-2xl font-extrabold text-stone-900 mb-1">
-        סיכום הזמנה — מסלול מקודם
+        סיכום הזמנה - מסלול מקודם
       </h1>
 
       <div className="mt-4 rounded-xl border border-[#E8E0D8] bg-white p-4">
         <div className="flex justify-between items-center">
-          <span className="font-bold text-stone-800">מנוי חודשי — מסלול מקודם</span>
+          <span className="font-bold text-stone-800">מנוי חודשי - מסלול מקודם</span>
           {promo ? (
             <span className="text-left">
               <span className="font-black text-[#0F5468]">&#8362;{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ</span>
@@ -399,7 +399,7 @@ function CheckoutForm() {
               תקנון הרכישה
             </Link>{" "}
             {promo
-              ? `ואת החיוב החודשי המתחדש — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים ולאחר מכן ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ — עד לביטול.`
+              ? `ואת החיוב החודשי המתחדש - ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים ולאחר מכן ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ - עד לביטול.`
               : `ואת החיוב החודשי המתחדש של ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ עד לביטול.`}
           </span>
         </label>
@@ -417,7 +417,7 @@ function CheckoutForm() {
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
             <>
-              חיוב מאובטח — ₪{promo ? SUBSCRIPTION_PROMO_TOTAL : SUBSCRIPTION_REGULAR_TOTAL}
+              חיוב מאובטח - ₪{promo ? SUBSCRIPTION_PROMO_TOTAL : SUBSCRIPTION_REGULAR_TOTAL}
               <ArrowLeft size={16} className="inline mr-2" />
             </>
           )}

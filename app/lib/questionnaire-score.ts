@@ -223,7 +223,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       if (sev >= 4) {
         recs.push({
           id: uid("social-anxiety-high"),
-          symptomText: "נמצאו קשיים בתחום החרדה החברתית — בעוצמה גבוהה.",
+          symptomText: "נמצאו קשיים בתחום החרדה החברתית - בעוצמה גבוהה.",
           treatment: emotTreatment,
           treatmentLabel: emotLabel,
           domain: "מורכבויות בתחום הרגשי/האישי",
@@ -805,7 +805,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         urgent: false,
       });
     } else if (r.rSingleCBTScale !== undefined && r.rSingleDynScale !== undefined) {
-      // לא מחפש עזרה עם דפוסים/פרידה, אך ביקש סיוע בתחום הזוגי —
+      // לא מחפש עזרה עם דפוסים/פרידה, אך ביקש סיוע בתחום הזוגי -
       // CBT אם ציון ממוקד > ציון מעמיק; דינאמי אחרת (כולל שוויון)
       const useCBT = r.rSingleCBTScale > r.rSingleDynScale;
       recs.push({
@@ -1213,12 +1213,12 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // concern (possible restrictive eating disorder) → escalate the eating-disorder
     // referral to URGENT so it sorts to the top and routes to ED specialists.
     // A low BMI WITHOUT eating symptoms does NOT open this pathway (avoids
-    // over-medicalising someone naturally slim — they only get the gentle note).
+    // over-medicalising someone naturally slim - they only get the gentle note).
     if (underweight && (eating1 >= 2 || edRec)) {
       const flag = severeUnderweight ? "תת-משקל משמעותי" : "תת-משקל";
       if (edRec) {
         edRec.urgent = true;
-        edRec.notes = `${edRec.notes ? edRec.notes + " " : ""}בנוסף, ${flag} בשילוב דפוס הגבלה אכילתית — מומלץ בירור רפואי דחוף.`;
+        edRec.notes = `${edRec.notes ? edRec.notes + " " : ""}בנוסף, ${flag} בשילוב דפוס הגבלה אכילתית - מומלץ בירור רפואי דחוף.`;
       } else {
         recs.push({
           id: uid("bmi-restrictive"),
@@ -1227,7 +1227,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "טיפול בהפרעות אכילה",
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: true,
-          notes: "שילוב של תת-משקל עם דפוס הגבלה — מומלץ בירור רפואי דחוף לצד טיפול מתמחה בהפרעות אכילה.",
+          notes: "שילוב של תת-משקל עם דפוס הגבלה - מומלץ בירור רפואי דחוף לצד טיפול מתמחה בהפרעות אכילה.",
         });
       }
     }

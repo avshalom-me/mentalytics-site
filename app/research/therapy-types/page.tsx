@@ -2,15 +2,15 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "סוגי הטיפולים השונים — CBT, דינמי, DBT, EMDR ועוד",
-  description: "מדריך מקיף לסוגי הטיפולים הנפשיים — CBT, דינמי, DBT, EMDR, ACT ועוד. מה ההבדל, למי מתאים כל טיפול, וכמה זמן לוקח.",
+  title: "סוגי הטיפולים השונים - CBT, דינמי, DBT, EMDR ועוד",
+  description: "מדריך מקיף לסוגי הטיפולים הנפשיים - CBT, דינמי, DBT, EMDR, ACT ועוד. מה ההבדל, למי מתאים כל טיפול, וכמה זמן לוקח.",
 };
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "סוגי הטיפולים השונים",
-  "description": "מדריך מקיף לסוגי הטיפולים הנפשיים — CBT, דינמי, DBT, EMDR, ACT ועוד.",
+  "description": "מדריך מקיף לסוגי הטיפולים הנפשיים - CBT, דינמי, DBT, EMDR, ACT ועוד.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
   "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
@@ -28,22 +28,22 @@ const THERAPIES = [
     color: "#EDF2FC", border: "#B4C8F0",
     focus: "חקירת הדפוסים הלא-מודעים, חוויות ילדות והשפעתן על ההווה",
     suitable: "דיכאון כרוני, קשיים ביחסים, הפרעות אישיות, רצון להבנה עמוקה",
-    duration: "ארוך טווח — חודשים עד שנים",
+    duration: "ארוך טווח - חודשים עד שנים",
     style: "שיחות חופשיות, מיעוט הנחיות, עומק רגשי",
   },
   {
-    name: "CBT — טיפול קוגניטיבי-התנהגותי",
+    name: "CBT - טיפול קוגניטיבי-התנהגותי",
     short: "CBT",
     anchor: "cbt",
     icon: "🔄",
     color: "#EBF5F1", border: "#A8D4C0",
     focus: "זיהוי ושינוי דפוסי חשיבה שליליים והתנהגויות בעייתיות",
     suitable: "חרדה, דיכאון, OCD, פוביות, PTSD, קשיי שינה",
-    duration: "קצר-בינוני — 12-20 פגישות בדרך כלל",
+    duration: "קצר-בינוני - 12-20 פגישות בדרך כלל",
     style: "מובנה, עם שיעורי בית, ממוקד בהווה",
   },
   {
-    name: "DBT — טיפול דיאלקטי-התנהגותי",
+    name: "DBT - טיפול דיאלקטי-התנהגותי",
     short: "DBT",
     anchor: "dbt",
     icon: "⚖️",
@@ -54,18 +54,18 @@ const THERAPIES = [
     style: "שיטתי, כולל מיומנויות מעשיות, לרוב גם פרטני וגם קבוצתי",
   },
   {
-    name: "EMDR — עיבוד תנועות עיניים",
+    name: "EMDR - עיבוד תנועות עיניים",
     short: "EMDR",
     anchor: "emdr",
     icon: "👁️",
     color: "#FEF3EB", border: "#F4C8A4",
     focus: "עיבוד זיכרונות טראומטיים דרך גירוי דו-צדדי",
     suitable: "PTSD, טראומה, תאונות, אלימות, אובדן",
-    duration: "ממוקד יחסית — אפשרי בעשרות פגישות",
+    duration: "ממוקד יחסית - אפשרי בעשרות פגישות",
     style: "מובנה, עם פרוטוקול ספציפי, פחות שיחתי",
   },
   {
-    name: "ACT — טיפול בקבלה ומחויבות",
+    name: "ACT - טיפול בקבלה ומחויבות",
     short: "ACT",
     anchor: "act",
     icon: "🧭",
@@ -73,7 +73,7 @@ const THERAPIES = [
     focus: "קבלת רגשות קשים מבלי להיאבק בהם, ופעולה לפי ערכים אישיים",
     suitable: "חרדה, דיכאון, כאב כרוני, שחיקה",
     duration: "קצר-בינוני",
-    style: "מבוסס מיינדפולנס, פחות מאשר CBT — מחפש קבלה, לא שינוי מחשבות",
+    style: "מבוסס מיינדפולנס, פחות מאשר CBT - מחפש קבלה, לא שינוי מחשבות",
   },
   {
     name: "טיפול משפחתי וזוגי",
@@ -106,7 +106,7 @@ const THERAPIES = [
     focus: "ביטוי רגשי דרך אמנות, מוזיקה, תנועה, דרמה",
     suitable: "ילדים, טראומה, קושי בביטוי מילולי",
     duration: "משתנה",
-    style: "פחות מילולי — הגוף והיצירה הם הכלי",
+    style: "פחות מילולי - הגוף והיצירה הם הכלי",
   },
   {
     name: "טיפול COG-FUN",
@@ -116,7 +116,7 @@ const THERAPIES = [
     color: "#EDF2FC", border: "#B4C8F0",
     focus: "פיתוח תפקודים ניהוליים ומיומנויות יומיומיות",
     suitable: "ילדים עם ADHD, קשיי ארגון ותכנון",
-    duration: "ממוקד — בדרך כלל 20 פגישות",
+    duration: "ממוקד - בדרך כלל 20 פגישות",
     style: "משימות מעשיות עם ריפוי בעיסוק",
   },
 ];
@@ -171,7 +171,7 @@ export default function TherapyTypesPage() {
       </div>
 
       <div className="mt-10 rounded-2xl p-5 bg-amber-50 border border-amber-200 text-sm text-amber-900 leading-7">
-        <strong>חשוב לזכור:</strong> אין גישה "הכי טובה" באופן אוניברסלי. ההתאמה בין הגישה לאדם, לקושי ולסגנון האישי — היא שקובעת.
+        <strong>חשוב לזכור:</strong> אין גישה "הכי טובה" באופן אוניברסלי. ההתאמה בין הגישה לאדם, לקושי ולסגנון האישי - היא שקובעת.
       </div>
 
       <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">

@@ -16,20 +16,20 @@ const heebo = Heebo({
 
 export const metadata: Metadata = {
   title: { default: "טיפול חכם", template: "%s | טיפול חכם" },
-  description: "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+  description: "מערכת הכוונה טיפולית חכמה - מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
   metadataBase: new URL("https://www.mentalytics.co.il"),
   openGraph: {
     siteName: "טיפול חכם",
     locale: "he_IL",
     type: "website",
     url: "https://www.mentalytics.co.il",
-    title: "טיפול חכם — הכוונה טיפולית חכמה",
-    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם — לילדים ולמבוגרים.",
+    title: "טיפול חכם - הכוונה טיפולית חכמה",
+    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם - לילדים ולמבוגרים.",
     images: [{ url: "/logo.svg.png", width: 512, height: 512, alt: "טיפול חכם" }],
   },
   twitter: {
     card: "summary",
-    title: "טיפול חכם — הכוונה טיפולית חכמה",
+    title: "טיפול חכם - הכוונה טיפולית חכמה",
     description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
     images: ["/logo.svg.png"],
   },
@@ -59,7 +59,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
           <div className="mx-auto max-w-5xl px-6 py-8">
             <div className="flex flex-wrap items-center justify-between gap-4">
-              <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם — Mentalytics</span>
+              <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם - Mentalytics</span>
               <ul className="flex flex-wrap gap-5 list-none">
                 {[
                   { href: "/centers", label: "למרכזים טיפוליים" },

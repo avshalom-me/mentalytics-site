@@ -2,15 +2,15 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "הבדל בין CBT לטיפול דינמי — מה ההבדל ומה מתאים לך?",
-  description: "CBT מול טיפול דינמי — מה ההבדל בין הגישות, כמה זמן לוקח כל טיפול, ואיך יודעים מה מתאים לך? מדריך מקיף ופשוט.",
+  title: "הבדל בין CBT לטיפול דינמי - מה ההבדל ומה מתאים לך?",
+  description: "CBT מול טיפול דינמי - מה ההבדל בין הגישות, כמה זמן לוקח כל טיפול, ואיך יודעים מה מתאים לך? מדריך מקיף ופשוט.",
 };
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
   "headline": "הבדל בין CBT לטיפול דינמי",
-  "description": "CBT מול טיפול דינמי — מה ההבדל בין הגישות ואיך יודעים מה מתאים לך?",
+  "description": "CBT מול טיפול דינמי - מה ההבדל בין הגישות ואיך יודעים מה מתאים לך?",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
   "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
@@ -27,7 +27,7 @@ export default function CbtVsDynamicPage() {
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">הבדל בין CBT לטיפול דינמי</h1>
       <p className="text-stone-600 leading-7 mb-8">
-        CBT והטיפול הדינמי הן שתי הגישות הנפוצות ביותר בטיפול נפשי כיום — ולעיתים קרובות מטופלים לא בטוחים מה ההבדל ביניהן ומה מתאים להם.
+        CBT והטיפול הדינמי הן שתי הגישות הנפוצות ביותר בטיפול נפשי כיום - ולעיתים קרובות מטופלים לא בטוחים מה ההבדל ביניהן ומה מתאים להם.
       </p>
 
       {/* Article */}
@@ -44,12 +44,12 @@ export default function CbtVsDynamicPage() {
       {/* Side by side comparison */}
       <div className="grid md:grid-cols-2 gap-5 mb-8">
         <div className="rounded-2xl p-6 bg-blue-50 border border-blue-200">
-          <h2 className="font-extrabold text-blue-900 text-xl mb-4">CBT — טיפול קוגניטיבי-התנהגותי</h2>
+          <h2 className="font-extrabold text-blue-900 text-xl mb-4">CBT - טיפול קוגניטיבי-התנהגותי</h2>
           <ul className="space-y-3 text-sm leading-7 text-blue-900">
-            <li>• <strong>מיקוד:</strong> ההווה — מחשבות, רגשות והתנהגויות כיום.</li>
+            <li>• <strong>מיקוד:</strong> ההווה - מחשבות, רגשות והתנהגויות כיום.</li>
             <li>• <strong>אופי:</strong> מובנה, עם כלים מעשיים ומשימות בין הפגישות.</li>
             <li>• <strong>משך:</strong> לרוב 12–20 מפגשים (ממוקד).</li>
-            <li>• <strong>תפקיד המטפל:</strong> אקטיבי — מלמד, מכוון, נותן כלים.</li>
+            <li>• <strong>תפקיד המטפל:</strong> אקטיבי - מלמד, מכוון, נותן כלים.</li>
             <li>• <strong>מחקר:</strong> הגישה המוכחת ביותר מחקרית.</li>
           </ul>
         </div>
@@ -57,9 +57,9 @@ export default function CbtVsDynamicPage() {
         <div className="rounded-2xl p-6 bg-purple-50 border border-purple-200">
           <h2 className="font-extrabold text-purple-900 text-xl mb-4">טיפול דינמי / פסיכואנליטי</h2>
           <ul className="space-y-3 text-sm leading-7 text-purple-900">
-            <li>• <strong>מיקוד:</strong> שורשים — דפוסים ישנים, ילדות, קשרים.</li>
-            <li>• <strong>אופי:</strong> פתוח, אסוציאטיבי — "אמור כל מה שעולה לך".</li>
-            <li>• <strong>משך:</strong> לרוב ארוך יותר — חצי שנה עד שנים.</li>
+            <li>• <strong>מיקוד:</strong> שורשים - דפוסים ישנים, ילדות, קשרים.</li>
+            <li>• <strong>אופי:</strong> פתוח, אסוציאטיבי - "אמור כל מה שעולה לך".</li>
+            <li>• <strong>משך:</strong> לרוב ארוך יותר - חצי שנה עד שנים.</li>
             <li>• <strong>תפקיד המטפל:</strong> מקשיב, מפרש, משקף.</li>
             <li>• <strong>מחקר:</strong> יעיל לבעיות אישיות מורכבות ולטווח ארוך.</li>
           </ul>
@@ -72,7 +72,7 @@ export default function CbtVsDynamicPage() {
           <div>
             <strong>CBT מתאים יותר אם:</strong>
             <ul className="mt-1 mr-4 space-y-1">
-              <li>• יש לך בעיה ספציפית — חרדה, פוביה, OCD, דיכאון אפיזודי.</li>
+              <li>• יש לך בעיה ספציפית - חרדה, פוביה, OCD, דיכאון אפיזודי.</li>
               <li>• אתה מעדיף מבנה וכלים מעשיים שניתן ליישם מחוץ לפגישה.</li>
               <li>• הזמן או התקציב מוגבלים.</li>
               <li>• אתה מחפש שינוי מהיר יחסית.</li>
@@ -93,7 +93,7 @@ export default function CbtVsDynamicPage() {
       <div className="rounded-2xl p-6 bg-white border border-[#E8E0D8]">
         <h2 className="font-extrabold text-stone-900 text-xl mb-3">האמת: לא חייבים לבחור</h2>
         <p className="text-sm leading-7 text-stone-700">
-          מטפלים רבים עובדים בגישה אינטגרטיבית — משלבים כלים מ-CBT עם עומק דינמי. הגורם המנבא הטוב ביותר להצלחה הוא איכות הקשר עם המטפל, לא הגישה הספציפית.
+          מטפלים רבים עובדים בגישה אינטגרטיבית - משלבים כלים מ-CBT עם עומק דינמי. הגורם המנבא הטוב ביותר להצלחה הוא איכות הקשר עם המטפל, לא הגישה הספציפית.
         </p>
       </div>
 

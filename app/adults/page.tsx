@@ -19,7 +19,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 
-// Anonymous viewer context derived from the questionnaire — used for impression
+// Anonymous viewer context derived from the questionnaire - used for impression
 // tracking and to seed match-attribution params on the profile-page link.
 function normalizeAgeBand(a: number): string | null {
   if (!a || isNaN(a)) return null;
@@ -120,7 +120,7 @@ function CheckList({
   );
 }
 
-// Canonical order in which difficulty domains are always presented — regardless
+// Canonical order in which difficulty domains are always presented - regardless
 // of the order the user ticked them on the domains screen. Keeping navigation and
 // the progress bar locked to this single order is what prevents the timeline from
 // jumping backwards (e.g. picking "תעסוקתי" then "רגשי" used to start at 80% and
@@ -136,7 +136,7 @@ function orderDomains<T extends string>(ds: readonly T[]): T[] {
   return [...ds].sort((a, b) => rank(a) - rank(b));
 }
 
-// Ordered milestone screens — used for progress calculation. The per-domain blocks
+// Ordered milestone screens - used for progress calculation. The per-domain blocks
 // must follow ADULTS_DOMAIN_ORDER (emotional → relationship → functional → addiction)
 // so progress only ever moves forward. therapist-style closes the emotional block.
 const ADULTS_SCREENS_ORDER = [
@@ -214,7 +214,7 @@ function ProgressBar({ pct }: { pct: number }) {
 
 // Compact "tabs" header rendered above match-form / match-results so the user
 // can switch between their recommendations (or jump back to the full list) at
-// any point in the matching flow — without losing context.
+// any point in the matching flow - without losing context.
 function RecommendationsStrip({
   groups,
   combinableGroups,
@@ -331,7 +331,7 @@ function NavRow({ onBack: _onBack, onNext, nextLabel = "המשך ←", nextDisab
 
 function YesNo({ onYes, onNo, value }: { onYes: () => void; onNo: () => void; value?: boolean }) {
   // When `value` is provided, render in stateful mode (button reflects the
-  // current selection) — used in screens where the user can change their answer
+  // current selection) - used in screens where the user can change their answer
   // before pressing Continue. When omitted, falls back to the original
   // immediate-action behaviour.
   const yesSelected = value === true;
@@ -400,7 +400,7 @@ export default function AdultsPage() {
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
-  // Per-recommendation AI explanation ("למה הוצע לי?") — keyed on treatment string.
+  // Per-recommendation AI explanation ("למה הוצע לי?") - keyed on treatment string.
   const [recExplainData, setRecExplainData] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
   const [recExplainLoading, setRecExplainLoading] = useState<Record<string, boolean>>({});
   const [err, setErr] = useState("");
@@ -436,7 +436,7 @@ export default function AdultsPage() {
     );
   }, [recommendationGroups]);
 
-  // Relationship groups eligible for combined search — excludes parenting/child referrals
+  // Relationship groups eligible for combined search - excludes parenting/child referrals
   // which target a different professional type and don't make sense to bundle with couple/sexual therapy.
   const NON_COMBINABLE_RELATIONSHIP = new Set(["הדרכת הורים", "טיפול ילדים"]);
   const combinableRelationshipGroups = useMemo(() => {
@@ -469,7 +469,7 @@ export default function AdultsPage() {
     try {
       const referrer = document.referrer || "";
       const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
-      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי — לא הפרופיל —
+      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי - לא הפרופיל -
       // ולכן בודקים גם את סוג הניווט, אחרת המשתמש נזרק לתחילת השאלון.
       const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
       if (!cameFromProfile && navType !== "back_forward") return;
@@ -561,7 +561,7 @@ export default function AdultsPage() {
     const region = normalizeRegionKey(matchPrefs.region, matchPrefs.online);
     if (region) params.set("r", region);
     // Which treatment recommendation (and which specific finding) sent this
-    // visitor — feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
+    // visitor - feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
     const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
     if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
     if (selectedRec?.symptomText) params.set("sy", selectedRec.symptomText.slice(0, 160));
@@ -583,7 +583,7 @@ export default function AdultsPage() {
   // temp state (not in answers)
   const [localAge, setLocalAge] = useState<number>(0);
   const [ageTouched, setAgeTouched] = useState(false);
-  // Optional height/weight for BMI — asked only inside the eating-disorder
+  // Optional height/weight for BMI - asked only inside the eating-disorder
   // screen (e6-q), where it's clinically relevant.
   const [bmiH, setBmiH] = useState<number>(0);
   const [bmiW, setBmiW] = useState<number>(0);
@@ -662,7 +662,7 @@ export default function AdultsPage() {
   }
 
   // If personal_development is combined with any other domain, its flow is
-  // skipped — the other domains run as usual and scoring ignores it too.
+  // skipped - the other domains run as usual and scoring ignores it too.
   function effectiveDomains(ds: QuestionnaireAnswers["domains"]): QuestionnaireAnswers["domains"] {
     const filtered = ds.length > 1 ? ds.filter((d) => d !== "personal_development") : ds;
     return orderDomains(filtered) as QuestionnaireAnswers["domains"];
@@ -720,7 +720,7 @@ export default function AdultsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...(ao ?? answers), _fp: fp, _staffToken: staffToken }),
       });
-      // Server enforced the free limit and refused to score — show the paywall.
+      // Server enforced the free limit and refused to score - show the paywall.
       if (res.status === 402) { setUsageAllowed(false); return; }
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
@@ -728,7 +728,7 @@ export default function AdultsPage() {
       setScreen("results");
       trackQuizComplete("adults");
     } catch (e) {
-      // Scoring failed — the user sees an error, not results, so this is NOT a
+      // Scoring failed - the user sees an error, not results, so this is NOT a
       // completion. Firing quiz_complete here inflated the funnel top on every
       // server hiccup. (The inline gtag "quiz_completed" duplicate is gone too:
       // trackQuizComplete already reports quiz_complete to GA4, matching the DB
@@ -849,7 +849,7 @@ export default function AdultsPage() {
     const domain = group.recs[0]?.domain ?? "";
     const firstDomain = answers.domains?.[0];
 
-    // Fire-and-forget analytics event — captures who clicks and on what.
+    // Fire-and-forget analytics event - captures who clicks and on what.
     try {
       fetch("/api/track-explain", {
         method: "POST",
@@ -879,8 +879,8 @@ export default function AdultsPage() {
       const coupleModality = group.recs[0]?.couplesModality;
       const COUPLE_MODALITY_WHY: Record<string, string> = {
         EFT: "EFT (Emotionally Focused Therapy) מתמקד בזיהוי דפוסי תגובה שליליים חוזרים בזוגיות, גישה לרגשות עמוקים שמניעים אותם, ובניית קשר רגשי בטוח ואינטימי יותר בין בני הזוג.",
-        "דינאמי": "טיפול זוגי דינאמי בוחן כיצד ההיסטוריה האישית של כל אחד מבני הזוג — דפוסים לא-מודעים, קונפליקטים פנימיים וחוויות עבר — משפיעים על הדינמיקה הזוגית, ומסייע בהפחתת דפוסים בעייתיים חוזרים.",
-        "מבני": "טיפול זוגי מבני מתמקד בשיפור דפוסי התקשורת, חלוקת התפקידים, הגבולות ומבנה הכוח בזוגיות ובמשפחה — עם דגש על שינוי מעשי באינטראקציות היומיומיות.",
+        "דינאמי": "טיפול זוגי דינאמי בוחן כיצד ההיסטוריה האישית של כל אחד מבני הזוג - דפוסים לא-מודעים, קונפליקטים פנימיים וחוויות עבר - משפיעים על הדינמיקה הזוגית, ומסייע בהפחתת דפוסים בעייתיים חוזרים.",
+        "מבני": "טיפול זוגי מבני מתמקד בשיפור דפוסי התקשורת, חלוקת התפקידים, הגבולות ומבנה הכוח בזוגיות ובמשפחה - עם דגש על שינוי מעשי באינטראקציות היומיומיות.",
       };
       const treatmentRationale = coupleModality && COUPLE_MODALITY_WHY[coupleModality]
         ? { why: COUPLE_MODALITY_WHY[coupleModality] }
@@ -942,7 +942,7 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains}>
       <Card>
         <div className="mb-4 rounded-xl p-4 text-sm font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
-          🔒 מילוי השאלון אנונימי לחלוטין — לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
+          🔒 מילוי השאלון אנונימי לחלוטין - לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
         </div>
         <div className="mb-6 rounded-xl p-6 leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
           <p className="mb-3 text-sm font-bold" style={{ color: "var(--text)" }}>📋 הצהרה והבהרה</p>
@@ -1076,7 +1076,7 @@ export default function AdultsPage() {
     </Layout>
   );
 
-  // Mania screening — DSM-5 requires BOTH elevated mood AND increased energy.
+  // Mania screening - DSM-5 requires BOTH elevated mood AND increased energy.
   // We ask both in one screen with progressive reveal: the second question only
   // shows once the first is answered. The maniaScreen1 / maniaScreen2 booleans
   // are stored separately so downstream scoring sees the same shape as before.
@@ -1134,7 +1134,7 @@ export default function AdultsPage() {
     </Layout>
   );
 
-  // Merged screening for 3א + 3ב + 7 — three uncommon, often-stigmatising "do
+  // Merged screening for 3א + 3ב + 7 - three uncommon, often-stigmatising "do
   // any of these apply?" gates that previously took 3 sequential YesNo screens.
   // Most users will leave everything unchecked and skip; positives still trigger
   // the same follow-up branches (prodrome questionnaire for 3א/3ב, tics+tinnitus
@@ -1187,7 +1187,7 @@ export default function AdultsPage() {
             onClick={() => { updE({ e3a: false, e3b: false, e8: false, e3: false }); setScreen("e4"); }}
             className="mt-3 w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
           >
-            לא — אף אחד מהמשפטים אינו מתאר אותי (דלג/י)
+            לא - אף אחד מהמשפטים אינו מתאר אותי (דלג/י)
           </button>
           <NavRow
             onNext={() => {
@@ -1196,7 +1196,7 @@ export default function AdultsPage() {
               const ce3b = cur.e3b ?? false;
               // The tics/tinnitus follow-up for the somatic checkbox runs at the
               // original e8 position (after the sleep/eating sub-questionnaires),
-              // not here — so continue linearly even when e8 was checked.
+              // not here - so continue linearly even when e8 was checked.
               if (ce3a || ce3b) setScreen("e3-q");
               else setScreen("e4");
             }}
@@ -1380,7 +1380,7 @@ export default function AdultsPage() {
     </Layout>
   );
 
-  // Eating/sleep — gate removed. We show the two checkboxes directly; the
+  // Eating/sleep - gate removed. We show the two checkboxes directly; the
   // underlying e6 / e7 booleans are populated based on what was checked, so the
   // downstream sub-questionnaires (e6-q for eating, e7-q for sleep) still receive
   // the same triggers. Neither checked → skip straight to e8.
@@ -1411,7 +1411,7 @@ export default function AdultsPage() {
           }}
           className="mt-3 w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
         >
-          לא — איני חווה אף אחד מהקשיים האלה (דלג/י)
+          לא - איני חווה אף אחד מהקשיים האלה (דלג/י)
         </button>
         <NavRow
           onNext={() => {
@@ -1456,7 +1456,7 @@ export default function AdultsPage() {
             updE({ eating3Count: next.length });
           }} />
         <div className="mt-4 border-t border-[#eee] pt-4">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל <span className="font-normal text-[#6b7280]">(לחישוב BMI — אופציונלי)</span></p>
+          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">גובה ומשקל <span className="font-normal text-[#6b7280]">(לחישוב BMI - אופציונלי)</span></p>
           <div className="flex gap-3">
             <div className="flex-1">
               <label className="mb-1 block text-xs text-[#6b7280]">גובה (ס&quot;מ)</label>
@@ -1558,10 +1558,10 @@ export default function AdultsPage() {
               onClick={() => { setTraumaType("__none__"); updE({ e9: false }); setScreen("e10"); }}
               className={`w-full rounded-xl border-2 px-4 py-3 text-right text-sm font-semibold transition-all ${noTrauma ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white text-[#1a3a5c] hover:border-[#1a3a5c]"}`}
             >
-              לא חוויתי אירוע טראומטי — דלג/י
+              לא חוויתי אירוע טראומטי - דלג/י
             </button>
           </div>
-          <p className="mb-2 text-xs text-[#6b7280]">או — בחר/י סוג אירוע למילוי השאלון:</p>
+          <p className="mb-2 text-xs text-[#6b7280]">או - בחר/י סוג אירוע למילוי השאלון:</p>
           <select value={noTrauma ? "" : traumaType} onChange={(e) => setTraumaType(e.target.value)}
             className="mb-3 w-full rounded-lg border-2 border-[#ddd6c8] px-3 py-2 text-sm focus:border-[#2e7d8c] focus:outline-none">
             <option value="">בחר/י סוג אירוע</option>
@@ -1794,13 +1794,13 @@ export default function AdultsPage() {
               <input type="checkbox" checked={att}
                 onChange={(e) => updF({ f1Attention: e.target.checked, f1: e.target.checked || proc })}
                 className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
-              קושי בריכוז — חוסר ריכוז / קושי להתמיד במשימה (ADHD)
+              קושי בריכוז - חוסר ריכוז / קושי להתמיד במשימה (ADHD)
             </label>
             <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
               <input type="checkbox" checked={proc}
                 onChange={(e) => updF({ f1Processing: e.target.checked, f1: e.target.checked || att })}
                 className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
-              קושי בהבנה ועיבוד — המשימה קשה להבנה גם עם ריכוז מלא (לקויות למידה)
+              קושי בהבנה ועיבוד - המשימה קשה להבנה גם עם ריכוז מלא (לקויות למידה)
             </label>
           </div>
           <NavRow
@@ -1905,7 +1905,7 @@ export default function AdultsPage() {
         <div className="flex flex-col gap-2">
           {([
             ["young", "צעיר/ה בתחילת דרכי", "טרם התחלתי לעבוד, לפני / במהלך לימודים"],
-            ["career-change", "אדם בוגר — שינוי קריירה", "כבר עובד/ת, מחפש/ת שינוי כיוון מקצועי"],
+            ["career-change", "אדם בוגר - שינוי קריירה", "כבר עובד/ת, מחפש/ת שינוי כיוון מקצועי"],
             ["disability", "בעל/ת מוגבלות", ""],
             ["burnout", "שחיקה בעבודה / דכדוך / חוסר כיוון", "עובד/ת, אך מרגיש/ה ירידה במוטיבציה או בשביעות רצון"],
             ["other", "אחר", ""],
@@ -1993,7 +1993,7 @@ export default function AdultsPage() {
         </div>
         <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
           onNext={() => {
-            // "ללא זוגיות כרגע" מתנהג כמו דילוג על שאלות הזוגיות — עובר למסלול היחיד/ה (r-single)
+            // "ללא זוגיות כרגע" מתנהג כמו דילוג על שאלות הזוגיות - עובר למסלול היחיד/ה (r-single)
             if (noRelationship && !hasChildren) { setScreen("r-single"); }
             else if (inRelationship || hasChildren) { setScreen("r1"); }
             else { setScreen("r-single"); }
@@ -2476,7 +2476,7 @@ export default function AdultsPage() {
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
               className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
             >
-              🔍 מצא/י לי מטפל — {group.treatmentLabel} ←
+              🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
             </button>
             <button
               type="button"
@@ -2525,7 +2525,7 @@ export default function AdultsPage() {
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
         <div className="font-bold text-sm text-white">חפש/י מטפל שמשלב את הגישות הרגשיות ←</div>
-        <div className="mt-1 text-xs text-white/75">החיפוש המשולב מתייחס לתחום הרגשי בלבד — טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
+        <div className="mt-1 text-xs text-white/75">החיפוש המשולב מתייחס לתחום הרגשי בלבד - טיפול זוגי/התמכרות מטופלים בנפרד. כולל: {emotionalGroups.map(g => g.treatmentLabel).join(", ")}</div>
       </button>
     );
 
@@ -2567,11 +2567,11 @@ export default function AdultsPage() {
             <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm space-y-1.5 text-[#2a3a4a]">
               <div className="flex justify-between">
                 <span className="font-semibold">גיל:</span>
-                <span>{answers.age || "—"}</span>
+                <span>{answers.age || "-"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="font-semibold">מגדר:</span>
-                <span>{answers.gender || "—"}</span>
+                <span>{answers.gender || "-"}</span>
               </div>
               <div className="pt-1 border-t border-gray-200">
                 <div className="font-semibold mb-1">תחומי קושי שסומנו:</div>
@@ -2602,7 +2602,7 @@ export default function AdultsPage() {
                   </div>
                   <div className="flex items-start gap-2.5">
                     <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
-                    <span>לחלופין — חפש/י מטפל שמשלב כמה גישות בכפתור שבתחתית</span>
+                    <span>לחלופין - חפש/י מטפל שמשלב כמה גישות בכפתור שבתחתית</span>
                   </div>
                 </div>
               </div>
@@ -2613,7 +2613,7 @@ export default function AdultsPage() {
           {err && (
             <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 p-5 text-center">
               <p className="font-bold text-red-900 mb-1">אירעה תקלה זמנית בחישוב התוצאות</p>
-              <p className="text-sm text-red-700 mb-4">התשובות שלך נשמרו — אפשר לנסות שוב, לא ייגבה תשלום נוסף.</p>
+              <p className="text-sm text-red-700 mb-4">התשובות שלך נשמרו - אפשר לנסות שוב, לא ייגבה תשלום נוסף.</p>
               <button
                 type="button"
                 onClick={() => goScoring()}
@@ -2634,10 +2634,10 @@ export default function AdultsPage() {
             const cat = under ? "תת-משקל" : bmi < 30 ? "עודף משקל" : "השמנה";
             const cls = severe ? "border-red-300 bg-red-50 text-red-900" : "border-amber-200 bg-amber-50 text-amber-900";
             const msg = severe
-              ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) נמוך באופן משמעותי. מעבר לטיפול הנפשי, חשוב לפנות בהקדם לבירור רפואי אצל רופא/ת המשפחה.`
+              ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} - ${cat}) נמוך באופן משמעותי. מעבר לטיפול הנפשי, חשוב לפנות בהקדם לבירור רפואי אצל רופא/ת המשפחה.`
               : under
-                ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) מתחת לטווח התקין. לצד הטיפול הנפשי, שווה בירור אצל רופא/ת המשפחה.`
-                : `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} — ${cat}) מעל הטווח התקין. אם רלוונטי, ליווי תזונתי/רפואי עשוי לתמוך — אין באמור משום אבחנה.`;
+                ? `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} - ${cat}) מתחת לטווח התקין. לצד הטיפול הנפשי, שווה בירור אצל רופא/ת המשפחה.`
+                : `ה-BMI שדיווחת עליו (${bmi.toFixed(1)} - ${cat}) מעל הטווח התקין. אם רלוונטי, ליווי תזונתי/רפואי עשוי לתמוך - אין באמור משום אבחנה.`;
             return (
               <div className={`mb-4 rounded-xl border p-4 text-sm leading-relaxed ${cls}`}>
                 ⚕️ {msg}
@@ -2706,7 +2706,7 @@ export default function AdultsPage() {
             </button>
           </div>
 
-          {/* Anonymous feedback — why did you stop / what was unclear */}
+          {/* Anonymous feedback - why did you stop / what was unclear */}
           <div className="print:hidden" data-html2canvas-ignore="true">
             <QuizFeedbackBox quizType="adults" />
           </div>
@@ -2745,7 +2745,7 @@ export default function AdultsPage() {
       <Card badge="חיפוש מטפל">
         {combinedTreatments ? (
           <>
-            <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש משולב — <span className="text-[#2e7d8c]">כל הצרכים הרגשיים</span></p>
+            <p className="mb-1 font-semibold text-[#1a3a5c]">חיפוש משולב - <span className="text-[#2e7d8c]">כל הצרכים הרגשיים</span></p>
             <p className="mb-4 text-xs text-[#6b7280]">מחפש מטפל שמכסה את מירב הטיפולים המומלצים: {(combinedLabels ?? combinedTreatments).join(", ")}</p>
           </>
         ) : (

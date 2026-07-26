@@ -32,7 +32,7 @@ function TherapistLoginContent() {
   }, [searchParams]);
 
   // Arriving from a completed password reset (all sessions were revoked there).
-  // Derived straight from the URL — not via state — so it can't be lost to
+  // Derived straight from the URL - not via state - so it can't be lost to
   // remounts during hydration.
   const resetSuccess = searchParams.get("reset") === "success" && mode === "login";
 
@@ -106,7 +106,7 @@ function TherapistLoginContent() {
         // detail). Map the one actionable case; everything else stays generic.
         setError(
           /already|registered|exists/i.test(error.message)
-            ? "כתובת המייל הזו כבר רשומה במערכת — אפשר להתחבר או לאפס סיסמא."
+            ? "כתובת המייל הזו כבר רשומה במערכת - אפשר להתחבר או לאפס סיסמא."
             : "ההרשמה נכשלה. נסו שוב בעוד רגע."
         );
       } else if (data.session) {
@@ -136,7 +136,7 @@ function TherapistLoginContent() {
             <span className="font-bold text-stone-800">{email}</span>
           </p>
           <p className="mt-3 leading-7 text-stone-500 text-sm">
-            לחצ/י על הקישור במייל כדי לאשר את החשבון ולהיכנס. אם המייל לא הגיע — בדוק/י בתיקיית הספאם.
+            לחצ/י על הקישור במייל כדי לאשר את החשבון ולהיכנס. אם המייל לא הגיע - בדוק/י בתיקיית הספאם.
           </p>
           <button
             onClick={() => { setSignupPending(false); switchMode("login"); }}
@@ -237,7 +237,7 @@ function TherapistLoginContent() {
               </div>
               <div>
                 <div style={{ fontSize: "15.5px", fontWeight: 800, color: "white" }}>חדש/ה כאן?</div>
-                <div style={{ fontSize: "13px", color: "rgba(255,255,255,.65)", marginTop: "2px" }}>פתיחת חשבון והצטרפות — ללא עלות ←</div>
+                <div style={{ fontSize: "13px", color: "rgba(255,255,255,.65)", marginTop: "2px" }}>פתיחת חשבון והצטרפות - ללא עלות ←</div>
               </div>
             </div>
           </button>
@@ -313,7 +313,7 @@ function TherapistLoginContent() {
             </h1>
             <p style={{ fontSize: "14px", color: "var(--muted)" }}>
               {mode === "register"
-                ? "הצטרפות ללא עלות — תוך דקות"
+                ? "הצטרפות ללא עלות - תוך דקות"
                 : mode === "reset"
                 ? "נשלח אליך קישור לקביעת סיסמא חדשה"
                 : "כניסה לפאנל הניהול המקצועי"}
@@ -420,7 +420,7 @@ function TherapistLoginContent() {
             {(success || resetSuccess) && (
               <div style={{ borderRadius: "10px", border: "1px solid #6EE7B7", background: "#ECFDF5", padding: "12px 14px" }}>
                 <p style={{ fontSize: "13px", color: "#065F46", fontWeight: 600 }}>
-                  {success || "הסיסמא עודכנה בהצלחה — אפשר להתחבר עם הסיסמא החדשה."}
+                  {success || "הסיסמא עודכנה בהצלחה - אפשר להתחבר עם הסיסמא החדשה."}
                 </p>
               </div>
             )}

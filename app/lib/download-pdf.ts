@@ -1,6 +1,6 @@
 // Capture a DOM element to canvas and bundle it into a downloadable PDF.
 // Works on iOS Safari where `window.print()` requires multi-tap gymnastics
-// in the share sheet — here the user gets a real file download instead.
+// in the share sheet - here the user gets a real file download instead.
 //
 // Dynamic imports keep the ~200KB of html2canvas + jspdf out of the main bundle.
 
@@ -36,7 +36,7 @@ export async function downloadResultsPDF(
     detailsEls.forEach((d) => { d.open = true; });
 
     // Capture at 3x for crisp text. html2canvas-pro is used (not html2canvas)
-    // because it supports Tailwind v4 oklch() colors — the original threw on them
+    // because it supports Tailwind v4 oklch() colors - the original threw on them
     // and forced a window.print() fallback.
     let canvas: HTMLCanvasElement;
     try {

@@ -59,7 +59,7 @@ type ViewRow = {
 
 /**
  * Apply k-anon: roll up rare buckets into "אחר".
- * NULL context is NOT "אחר" — it means the visitor came without quiz context
+ * NULL context is NOT "אחר" - it means the visitor came without quiz context
  * (directory browsing). Lumping those into "אחר" made it the biggest slice and
  * hid the real story, so they get their own honest label (unknownLabel), or
  * are dropped entirely for fields that only exist in the match flow.
@@ -102,7 +102,7 @@ function groupByField<T extends string>(
 
 /**
  * Compute enriched stats for a therapist over a time window.
- * Returns null if the therapist isn't in paying status — caller should gate.
+ * Returns null if the therapist isn't in paying status - caller should gate.
  */
 export async function computeEnrichedStats(
   therapistId: string,
@@ -112,7 +112,7 @@ export async function computeEnrichedStats(
   const periodDays = Math.round((Date.now() - sinceDate.getTime()) / (1000 * 60 * 60 * 24));
 
   // Views in window. match_card rows are card impressions in the match-results
-  // list, not profile entries — including them inflated the therapist's "views"
+  // list, not profile entries - including them inflated the therapist's "views"
   // (and skewed no_click_rate) relative to every admin report, which excludes them.
   const { data: viewsData } = await supabaseAdmin
     .from("therapist_profile_views")
@@ -138,7 +138,7 @@ export async function computeEnrichedStats(
 
   const enoughData = totalViews >= MIN_VIEWS_FOR_REPORT;
 
-  // If below threshold — return empty buckets but keep counts for UI
+  // If below threshold - return empty buckets but keep counts for UI
   const empty: BucketRow[] = [];
   if (!enoughData) {
     return {
@@ -160,11 +160,11 @@ export async function computeEnrichedStats(
 
   return {
     // NULL region/issue = the visitor browsed in from the directory without a
-    // quiz — labeled honestly instead of inflating "אחר".
+    // quiz - labeled honestly instead of inflating "אחר".
     by_region: groupByField<RegionCategory>(views, "viewer_region", REGION_LABELS, "מהמאגר (ללא שאלון)"),
     by_issue: groupByField<IssueCategory>(views, "viewer_issue", ISSUE_LABELS, "מהמאגר (ללא שאלון)"),
     // Treatment/symptom exist only for match-flow visitors (and only from
-    // 19/7/26 on) — visitors without them are simply not part of these charts.
+    // 19/7/26 on) - visitors without them are simply not part of these charts.
     by_treatment: groupByField<string>(views, "viewer_treatment", {} as Record<string, string>, null),
     by_symptom: groupByField<string>(views, "viewer_symptom", {} as Record<string, string>, null),
     by_age_band: groupByField<AgeBand>(views, "viewer_age_band", AGE_LABELS, "לא צוין"),

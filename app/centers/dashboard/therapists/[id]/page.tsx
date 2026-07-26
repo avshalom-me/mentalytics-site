@@ -13,7 +13,7 @@ import {
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { ArrowRight, Loader2 } from "lucide-react";
 
-// טופס פרופיל מטפל בפורטל המרכז — יצירה ('new') או עריכה (UUID). הפרופיל
+// טופס פרופיל מטפל בפורטל המרכז - יצירה ('new') או עריכה (UUID). הפרופיל
 // בבעלות המרכז: רק מנהלי המרכז עורכים אותו, אין למטפל הבודד חשבון משלו.
 // שיקוף של טופס העריכה העצמית של מטפל (dashboard/edit), מול ה-API של הפורטל.
 
@@ -73,7 +73,7 @@ export default function CenterTherapistFormPage() {
   const [saveErr, setSaveErr] = useState("");
   const [saveMsg, setSaveMsg] = useState("");
   const [status, setStatus] = useState<string | null>(null);
-  // מסלול 2 — מרכז כישות אחת: הטופס מתאים את עצמו (בלי תעודות/שאלות סגנון,
+  // מסלול 2 - מרכז כישות אחת: הטופס מתאים את עצמו (בלי תעודות/שאלות סגנון,
   // ומספר המיקומים קובע כמה אזורים מותר לסמן).
   const [isEntity, setIsEntity] = useState(false);
   const [numLocations, setNumLocations] = useState(1);
@@ -182,11 +182,11 @@ export default function CenterTherapistFormPage() {
     setSaveErr("");
     setSaveMsg("");
 
-    // token טרי בעת ה-submit — לא token שנתפס בטעינה (טפסים ארוכים ⇒ 401).
+    // token טרי בעת ה-submit - לא token שנתפס בטעינה (טפסים ארוכים ⇒ 401).
     const { data: { session } } = await supabase.auth.getSession();
     const accessToken = session?.access_token ?? token;
     if (!accessToken) {
-      setSaveErr("פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש — הפרטים יישמרו.");
+      setSaveErr("פג תוקף החיבור. רענן/י את העמוד והתחבר/י מחדש - הפרטים יישמרו.");
       setSaving(false);
       return;
     }
@@ -211,7 +211,7 @@ export default function CenterTherapistFormPage() {
     }
     const savedId: string = json.id;
 
-    // העלאות — best-effort: כשל לא מסתיר את השמירה שהצליחה.
+    // העלאות - best-effort: כשל לא מסתיר את השמירה שהצליחה.
     const uploadIssues: string[] = [];
     if (photoFile) {
       const err = await uploadFile(photoFile, "photo", savedId, accessToken);
@@ -229,7 +229,7 @@ export default function CenterTherapistFormPage() {
     }
 
     if (isNew) {
-      // חזרה לדשבורד — המטפל החדש יופיע שם כ"ממתין לאישור".
+      // חזרה לדשבורד - המטפל החדש יופיע שם כ"ממתין לאישור".
       window.location.href = "/centers/dashboard?created=1";
       return;
     }
@@ -263,12 +263,12 @@ export default function CenterTherapistFormPage() {
             {isNew
               ? "הוספת מטפל/ת למרכז"
               : isEntity
-                ? `עריכת פרופיל המרכז — ${form.full_name || "המרכז"}`
-                : `עריכת פרופיל — ${form.full_name || "מטפל/ת"}`}
+                ? `עריכת פרופיל המרכז - ${form.full_name || "המרכז"}`
+                : `עריכת פרופיל - ${form.full_name || "מטפל/ת"}`}
           </h1>
           <p className="mt-1 text-xs text-stone-500">
             {isEntity
-              ? 'המרכז מוצג במערכת ההתאמות כרובריקה אחת ("מרכז טיפולי"). ההתאמה למטופלים מבוססת על ההתאמה המקצועית בלבד — מלאו את תחומי הטיפול, קבוצות הגיל, השפות והאזורים.'
+              ? 'המרכז מוצג במערכת ההתאמות כרובריקה אחת ("מרכז טיפולי"). ההתאמה למטופלים מבוססת על ההתאמה המקצועית בלבד - מלאו את תחומי הטיפול, קבוצות הגיל, השפות והאזורים.'
               : isNew
                 ? "הפרופיל יישלח לאישור צוות טיפול חכם, ולאחר האישור ייכנס אוטומטית למערכת ההתאמות."
                 : status === "pending"
@@ -346,7 +346,7 @@ export default function CenterTherapistFormPage() {
             <h2 className="text-lg font-extrabold text-stone-900 mb-2">הלוגו והצוות של המרכז</h2>
             <p className="text-sm leading-6 text-stone-600">
               לוגו המרכז וחברי הצוות (שם, תפקיד ותמונה) מנוהלים בעמוד הפרופיל הציבורי של המרכז.
-              במרכז טיפולי אין צורך להעלות תעודות רישיון לכל מטפל — הסמכות הצוות מנוהלות אצלכם.
+              במרכז טיפולי אין צורך להעלות תעודות רישיון לכל מטפל - הסמכות הצוות מנוהלות אצלכם.
             </p>
             <Link href="/centers/dashboard" className="mt-3 inline-flex items-center gap-1 text-sm font-bold underline" style={{ color: "var(--teal)" }}>
               <ArrowRight size={15} /> לניהול הפרופיל הציבורי בפורטל
@@ -424,7 +424,7 @@ export default function CenterTherapistFormPage() {
               selected={form.play_therapy_modalities} onChange={v => setForm({...form, play_therapy_modalities: v})} />
           )}
           {form.training_areas.includes("טיפול COG-FUN לקשיי קשב וריכוז") && (
-            <CheckboxGroup label="טיפול COG-FUN — לאילו קבוצות גיל?" options={COGFUN_AGE_GROUPS}
+            <CheckboxGroup label="טיפול COG-FUN - לאילו קבוצות גיל?" options={COGFUN_AGE_GROUPS}
               selected={form.cogfun_age_groups} onChange={v => setForm({...form, cogfun_age_groups: v})} />
           )}
           <CheckboxGroup label="סוגי אבחון" options={ASSESSMENT_TYPES}
@@ -441,7 +441,7 @@ export default function CenterTherapistFormPage() {
             <div className="mb-1 text-sm font-semibold text-stone-800">ערים / אזורים</div>
             <p className="mb-3 text-xs text-stone-500">
               {isEntity
-                ? `בחרו אזור כדי לפתוח את רשימת הערים. מספר המיקומים/סניפים במנוי (${numLocations}) קובע כמה אזורים ניתן לסמן — עד 4 ערים בכל אזור.`
+                ? `בחרו אזור כדי לפתוח את רשימת הערים. מספר המיקומים/סניפים במנוי (${numLocations}) קובע כמה אזורים ניתן לסמן - עד 4 ערים בכל אזור.`
                 : "בחרו אזור כדי לפתוח את רשימת הערים. ניתן לבחור עד 3 ערים."}
             </p>
             {isEntity ? (
@@ -459,18 +459,18 @@ export default function CenterTherapistFormPage() {
         {!isEntity && (
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-1">סגנון טיפולי</h2>
-          <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית — משמשות להתאמה אישיותית עם מטופלים. מומלץ למלא יחד עם המטפל/ת.</p>
+          <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית - משמשות להתאמה אישיותית עם מטופלים. מומלץ למלא יחד עם המטפל/ת.</p>
           <StyleQuestion
             name="style_q1"
             question="בעבודתו/ה הטיפולית, המטפל/ת נוטה לראות בהבנה מעמיקה של שורשי הקושי, העבר והדפוסים הלא-מודעים מרכיב מרכזי בשינוי הטיפולי."
-            hint="1 = בכלל לא — העבודה ממוקדת בהקלה מיידית ובתפקוד | 7 = מאוד — עבודה מבוססת תובנה ועומק"
+            hint="1 = בכלל לא - העבודה ממוקדת בהקלה מיידית ובתפקוד | 7 = מאוד - עבודה מבוססת תובנה ועומק"
             value={form.style_q1}
             onChange={v => setForm({...form, style_q1: v})}
           />
           <StyleQuestion
             name="style_q2"
             question="בעבודתו/ה הטיפולית, המטפל/ת נוטה להציע למטופלים מסגרת ברורה, מטרות מוגדרות, כלים ומשימות בין פגישות."
-            hint="1 = בכלל לא — עבודה במרחב פתוח וגמיש | 7 = מאוד — עבודה מובנית, מכוונת ופרקטית"
+            hint="1 = בכלל לא - עבודה במרחב פתוח וגמיש | 7 = מאוד - עבודה מובנית, מכוונת ופרקטית"
             value={form.style_q2}
             onChange={v => setForm({...form, style_q2: v})}
           />

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "מי אנחנו",
-  description: "הכירו את הצוות מאחורי טיפול חכם — מערכת הכוונה טיפולית מבוססת מחקר שפותחה על ידי פסיכולוגים קליניים, לעזור לכם למצוא את המטפל הנכון.",
+  description: "הכירו את הצוות מאחורי טיפול חכם - מערכת הכוונה טיפולית מבוססת מחקר שפותחה על ידי פסיכולוגים קליניים, לעזור לכם למצוא את המטפל הנכון.",
 };
 
 type TeamMember = {
@@ -125,13 +125,13 @@ export default function AboutPage() {
             כולנו הכרנו מטפלים מצוינים וגם הפנינו אליהם, אבל שוב ושוב ראינו שלא תמיד נוצרת התאמה טובה. לפעמים סוג הטיפול לא היה המדויק ביותר עבור האדם שפנה, ולפעמים פשוט לא נוצר החיבור האנושי והאישי שכל כך חשוב להצלחת התהליך. פעמים רבות המטופל בכלל לא ידע מה הוא מחפש.
           </p>
 
-          {/* Founding moment — gold side border */}
+          {/* Founding moment - gold side border */}
           <div style={{ borderInlineStart: "4px solid var(--gold)", paddingInlineStart: "22px" }}>
             <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch" }}>
               משם התחיל רעיון קטן, שהלך וגדל: האם אפשר להפוך את בחירת המטפל למקצועית יותר?
             </p>
             <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch", marginTop: "12px" }}>
-              כך נולדה <strong style={{ color: "var(--teal)" }}>"טיפול חכם"</strong> — מערכת שנבנתה במשך מספר שנים, הנשענת על ידע מחקרי וקליני, ומסייעת להתאים בין מטפלים למטופלים לא רק לפי זמינות או המלצה מקרית, אלא לפי הצרכים, הבנת הקשיים, ההעדפות וסוג הטיפול המתאים ביותר לכל אדם.
+              כך נולדה <strong style={{ color: "var(--teal)" }}>"טיפול חכם"</strong> - מערכת שנבנתה במשך מספר שנים, הנשענת על ידע מחקרי וקליני, ומסייעת להתאים בין מטפלים למטופלים לא רק לפי זמינות או המלצה מקרית, אלא לפי הצרכים, הבנת הקשיים, ההעדפות וסוג הטיפול המתאים ביותר לכל אדם.
             </p>
           </div>
         </div>
@@ -150,7 +150,7 @@ export default function AboutPage() {
         }}>
           <img src="/icons/lightbulb.svg" alt="" width={28} height={28} style={{ flexShrink: 0, display: "block" }} />
           <p style={{ fontSize: "16px", fontWeight: 600, color: "var(--teal-dark)", lineHeight: 1.7, margin: 0 }}>
-            אנחנו לא מחליפים טיפול או אבחון מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובמקצועיות
+            אנחנו לא מחליפים טיפול או אבחון מקצועי - אנחנו עוזרים לכם להגיע אליו במהירות ובמקצועיות
           </p>
         </div>
       </section>
@@ -252,7 +252,7 @@ export default function AboutPage() {
               {
                 icon: "/icons/starting-point.svg",
                 title: "נקודת התחלה ואבחון, לא תחליף",
-                body: "אנחנו לא מחליפים טיפול מקצועי — אנחנו עוזרים לכם להגיע אליו במהירות ובביטחון.",
+                body: "אנחנו לא מחליפים טיפול מקצועי - אנחנו עוזרים לכם להגיע אליו במהירות ובביטחון.",
               },
             ].map((v, i) => (
               <div

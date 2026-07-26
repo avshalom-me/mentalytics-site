@@ -6,7 +6,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2 } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 
-// דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד — כל השינויים
+// דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד - כל השינויים
 // והעריכות מרוכזים באזור עריכה נפרד (/centers/dashboard/profile), כמו אצל
 // מטפל בודד. הנתונים מ-/api/center-portal (מאומת בטוקן).
 
@@ -64,7 +64,7 @@ export default function CenterDashboardPage() {
   const [error, setError] = useState("");
   const [justCreated, setJustCreated] = useState(false);
 
-  // חזרה מיצירת מטפל חדש (?created=1) — באנר הצלחה חד-פעמי.
+  // חזרה מיצירת מטפל חדש (?created=1) - באנר הצלחה חד-פעמי.
   useEffect(() => {
     if (new URLSearchParams(window.location.search).get("created") === "1") {
       setJustCreated(true);
@@ -83,7 +83,7 @@ export default function CenterDashboardPage() {
         const res = await fetch("/api/center-portal", { headers: { Authorization: `Bearer ${session.access_token}` } });
         const json = await res.json();
         if (res.status === 401) {
-          setError("החשבון שלכם עדיין לא מקושר למרכז. נחבר אתכם ידנית — פנו אלינו עם שם המרכז והמייל שאיתו נרשמתם, ונשלים את הקישור תוך יום עסקים.");
+          setError("החשבון שלכם עדיין לא מקושר למרכז. נחבר אתכם ידנית - פנו אלינו עם שם המרכז והמייל שאיתו נרשמתם, ונשלים את הקישור תוך יום עסקים.");
         } else if (!json.ok) {
           setError(json.error ?? "שגיאה בטעינת הנתונים");
         } else {
@@ -123,7 +123,7 @@ export default function CenterDashboardPage() {
 
   if (!data) return null;
   const { center, therapists, stats } = data;
-  const isEntity = center.billing_track === "center_entity"; // מסלול 2 — מרכז כישות אחת
+  const isEntity = center.billing_track === "center_entity"; // מסלול 2 - מרכז כישות אחת
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -153,7 +153,7 @@ export default function CenterDashboardPage() {
 
       {justCreated && (
         <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-semibold text-green-800">
-          ✓ הפרופיל נוצר ונשלח לאישור צוות טיפול חכם. לאחר האישור המטפל/ת ייכנס/תיכנס אוטומטית למערכת ההתאמות — הסטטוס מתעדכן כאן בטבלה.
+          ✓ הפרופיל נוצר ונשלח לאישור צוות טיפול חכם. לאחר האישור המטפל/ת ייכנס/תיכנס אוטומטית למערכת ההתאמות - הסטטוס מתעדכן כאן בטבלה.
         </div>
       )}
 
@@ -167,12 +167,12 @@ export default function CenterDashboardPage() {
         <StatCard icon={Activity} label="פניות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
       </div>
 
-      {/* מסלול 2 — הפרופיל של המרכז: סטטוס + כניסה לאזור העריכה */}
+      {/* מסלול 2 - הפרופיל של המרכז: סטטוס + כניסה לאזור העריכה */}
       {isEntity && (
         <section className="mb-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-5">
           <h2 className="mb-1 text-base font-black text-stone-800">הפרופיל של המרכז</h2>
           <p className="mb-4 text-sm leading-6 text-stone-600">
-            המרכז מוצג כרובריקה אחת (&quot;מרכז טיפולי&quot;) במערכת ההתאמות, ולצדה עמוד ציבורי עם הלוגו, הצוות והתמונות. כל השינויים והעריכות — בלחיצה אחת:
+            המרכז מוצג כרובריקה אחת (&quot;מרכז טיפולי&quot;) במערכת ההתאמות, ולצדה עמוד ציבורי עם הלוגו, הצוות והתמונות. כל השינויים והעריכות - בלחיצה אחת:
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Link href="/centers/dashboard/profile"
@@ -212,7 +212,7 @@ export default function CenterDashboardPage() {
           {center.status === "active" && (
             center.therapist_quota > 0 && center.linked_count >= center.therapist_quota ? (
               <span className="rounded-full border border-stone-200 bg-stone-50 px-4 py-1.5 text-xs text-stone-500"
-                title="כל מקומות המנוי בשימוש — להרחבה פנו אלינו">
+                title="כל מקומות המנוי בשימוש - להרחבה פנו אלינו">
                 המכסה מלאה ({center.therapist_quota}) · להרחבה: admin@getmentalytics.com
               </span>
             ) : (
@@ -226,7 +226,7 @@ export default function CenterDashboardPage() {
         </div>
         {therapists.length === 0 ? (
           <p className="text-sm text-stone-400">
-            עדיין לא נוספו מטפלים למרכז. הוסיפו את המטפלים שלכם בכפתור למעלה — כל פרופיל עובר אישור קצר של צוות טיפול חכם ואז נכנס אוטומטית למערכת ההתאמות.
+            עדיין לא נוספו מטפלים למרכז. הוסיפו את המטפלים שלכם בכפתור למעלה - כל פרופיל עובר אישור קצר של צוות טיפול חכם ואז נכנס אוטומטית למערכת ההתאמות.
           </p>
         ) : (
           <div className="overflow-x-auto">
@@ -261,7 +261,7 @@ export default function CenterDashboardPage() {
                       ) : t.status === "approved" && t.approved ? (
                         <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-bold text-teal-800">מאושר</span>
                       ) : t.status === "rejected" ? (
-                        <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700" title="ערכו את הפרופיל ושמרו — יישלח שוב לבדיקה">נדחה — לתיקון</span>
+                        <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700" title="ערכו את הפרופיל ושמרו - יישלח שוב לבדיקה">נדחה - לתיקון</span>
                       ) : (
                         <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-xs text-stone-500">ממתין לאישור</span>
                       )}
@@ -285,7 +285,7 @@ export default function CenterDashboardPage() {
       </section>
       )}
 
-      {/* עמוד המרכז הציבורי — סטטוס + כניסה לאזור העריכה (מסלול 1; במסלול 2 זה בכרטיס הפרופיל למעלה) */}
+      {/* עמוד המרכז הציבורי - סטטוס + כניסה לאזור העריכה (מסלול 1; במסלול 2 זה בכרטיס הפרופיל למעלה) */}
       {!isEntity && center.status === "active" && (
         <section className="mb-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-5">
           <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
@@ -315,11 +315,11 @@ export default function CenterDashboardPage() {
         </section>
       )}
 
-      {/* סטטיסטיקות מרוכזות — פילוח הפונים */}
+      {/* סטטיסטיקות מרוכזות - פילוח הפונים */}
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || stats.clicks_month.total > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
           <h2 className="mb-1 text-base font-black text-stone-800">מי מחפש את המרכז שלכם</h2>
-          <p className="mb-5 text-xs text-stone-400">פילוח מצטבר של כלל הפונים למטפלי המרכז (30 יום) — נתונים אנונימיים לחלוטין</p>
+          <p className="mb-5 text-xs text-stone-400">פילוח מצטבר של כלל הפונים למטפלי המרכז (30 יום) - נתונים אנונימיים לחלוטין</p>
 
           <div className="grid gap-6 md:grid-cols-2">
             <Bars title="לפי אזור" icon={MapPin} data={stats.by_region.map((b) => ({ name: REGION_LABELS[b.name] ?? b.name, count: b.count }))} color="#0F5468" />
@@ -341,7 +341,7 @@ export default function CenterDashboardPage() {
           {/* מגמה */}
           {stats.trend.some((m) => m.clicks > 0) && (
             <div className="mt-6 border-t border-stone-100 pt-5">
-              <h3 className="mb-3 text-sm font-black text-stone-700">מגמת פניות — 6 חודשים</h3>
+              <h3 className="mb-3 text-sm font-black text-stone-700">מגמת פניות - 6 חודשים</h3>
               <TrendBars trend={stats.trend} />
             </div>
           )}

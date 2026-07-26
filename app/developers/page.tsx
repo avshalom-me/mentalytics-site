@@ -16,14 +16,14 @@ export const metadata: Metadata = {
   openGraph: {
     title: "בית למפתחים | טיפול חכם",
     description:
-      "חממה לרעיונות מקצועיים בתחום בריאות הנפש והלמידה — מרעיון ראשוני ועד למוצר דיגיטלי שלם.",
+      "חממה לרעיונות מקצועיים בתחום בריאות הנפש והלמידה - מרעיון ראשוני ועד למוצר דיגיטלי שלם.",
   },
 };
 
 const BENEFITS = [
   "ליווי באפיון, מיקוד ודיוק קהל היעד.",
   "בחינת אפשרויות לפיילוט, מחקר ושיפור מתמשך.",
-  "חשיפה לקהל רלוונטי — מטפלים, הורים ומשתמשים שמחפשים פתרונות.",
+  "חשיפה לקהל רלוונטי - מטפלים, הורים ומשתמשים שמחפשים פתרונות.",
   "שיתופי פעולה ואפשרויות שילוב בפלטפורמת טיפול חכם.",
 ];
 
@@ -168,7 +168,7 @@ export default function DevelopersPage() {
         }
         .dev-pulse-dot { animation: pulseDot 2.4s ease-in-out infinite; }
 
-        /* 3D floating cards scene — desktop only */
+        /* 3D floating cards scene - desktop only */
         .dev-3d-scene { display: none; position: relative; width: 190px; height: 155px; flex-shrink: 0; }
         @media (min-width: 768px) { .dev-3d-scene { display: block; } }
 
@@ -263,9 +263,9 @@ export default function DevelopersPage() {
                 </div>
               </div>
 
-              {/* 3D floating cards — desktop decoration */}
+              {/* 3D floating cards - desktop decoration */}
               <div className="dev-3d-scene" aria-hidden>
-                {/* Card — back layer */}
+                {/* Card - back layer */}
                 <div style={{
                   position: "absolute",
                   width: "158px", height: "100px",
@@ -276,7 +276,7 @@ export default function DevelopersPage() {
                   boxShadow: "0 14px 36px rgba(212,144,24,.2)",
                   opacity: 0.75,
                 }} />
-                {/* Card — mid layer */}
+                {/* Card - mid layer */}
                 <div style={{
                   position: "absolute",
                   width: "158px", height: "100px",
@@ -287,7 +287,7 @@ export default function DevelopersPage() {
                   boxShadow: "0 14px 36px rgba(61,140,138,.18)",
                   opacity: 0.88,
                 }} />
-                {/* Card — front layer with fake UI */}
+                {/* Card - front layer with fake UI */}
                 <div style={{
                   position: "absolute",
                   width: "158px", height: "100px",
@@ -321,10 +321,10 @@ export default function DevelopersPage() {
           />
           <div className="mt-6 grid gap-4">
             <ProseCard>
-              אם פיתחתם כלי, אפליקציה, שאלון או פתרון שמסייע לאנשים — נשמח להכיר. הפלטפורמה של טיפול חכם נבנית כמערכת חכמה להתאמת פתרונות בתחום הנפש והלמידה, וכלים דיגיטליים יוכלו להשתלב כחלק ממערך ההמלצות לצד טיפול, אבחון ואנשי מקצוע.
+              אם פיתחתם כלי, אפליקציה, שאלון או פתרון שמסייע לאנשים - נשמח להכיר. הפלטפורמה של טיפול חכם נבנית כמערכת חכמה להתאמת פתרונות בתחום הנפש והלמידה, וכלים דיגיטליים יוכלו להשתלב כחלק ממערך ההמלצות לצד טיפול, אבחון ואנשי מקצוע.
             </ProseCard>
             <ProseCard>
-              אנחנו מעוניינים לעודד פיתוח כלים שאפשר ללמוד מהם ולבחון אותם. במסגרת הבית למפתחים ניתן לחשוב יחד על פיילוטים, איסוף משוב, שיתופי פעולה עם חוקרים — ולהפוך רעיון טוב לכלי שניתן לדייק ולבסס לאורך זמן.
+              אנחנו מעוניינים לעודד פיתוח כלים שאפשר ללמוד מהם ולבחון אותם. במסגרת הבית למפתחים ניתן לחשוב יחד על פיילוטים, איסוף משוב, שיתופי פעולה עם חוקרים - ולהפוך רעיון טוב לכלי שניתן לדייק ולבסס לאורך זמן.
             </ProseCard>
           </div>
         </section>
@@ -392,7 +392,7 @@ export default function DevelopersPage() {
             </h2>
 
             <p style={{ maxWidth: "52ch", margin: "0 auto 12px", lineHeight: 1.8, color: "var(--text-2)", fontSize: "16px" }}>
-              אם יש לכם אפליקציה קיימת, תוכנה בפיתוח, שאלון מקצועי, רעיון ראשוני או צורך מהשטח שאתם רוצים להפוך לכלי דיגיטלי — זה המקום להתחיל.
+              אם יש לכם אפליקציה קיימת, תוכנה בפיתוח, שאלון מקצועי, רעיון ראשוני או צורך מהשטח שאתם רוצים להפוך לכלי דיגיטלי - זה המקום להתחיל.
             </p>
             <p style={{ maxWidth: "52ch", margin: "0 auto 20px", lineHeight: 1.8, color: "var(--muted)", fontSize: "15px" }}>
               בואו לקחת חלק בבניית הדור הבא של הכלים הדיגיטליים בתחום בריאות הנפש, הטיפול, ההורות והלמידה.

@@ -56,8 +56,8 @@ export function UpgradeToPromotedButton() {
         style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 12px rgba(15,84,104,.25)" }}
       >
         {isPromoActive()
-          ? `שדרוג למסלול המקודם — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ / חודש (3 חודשים ראשונים)`
-          : `שדרוג למסלול המקודם — ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ / חודש`}
+          ? `שדרוג למסלול המקודם - ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ / חודש (3 חודשים ראשונים)`
+          : `שדרוג למסלול המקודם - ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ / חודש`}
         <ArrowLeft size={16} className="inline mr-2" />
       </Link>
     </div>

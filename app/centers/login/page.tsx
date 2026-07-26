@@ -7,7 +7,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import { Building2, Loader2, MailCheck } from "lucide-react";
 
 // כניסת מרכזים טיפוליים לפורטל הניהול. חשבון Supabase Auth נפרד (כמו מטפלים),
-// עם המייל שאיתו נשלחה ההצעה — כדי שהחשבון הפעיל יזוהה אוטומטית בכניסה
+// עם המייל שאיתו נשלחה ההצעה - כדי שהחשבון הפעיל יזוהה אוטומטית בכניסה
 // הראשונה (claim-by-email ב-/api/center-portal).
 
 type Mode = "login" | "register" | "reset";
@@ -22,10 +22,10 @@ function CenterLoginContent() {
   const [success, setSuccess] = useState("");
   const [signupPending, setSignupPending] = useState(false);
 
-  // הגעה מאיפוס סיסמה מוצלח (כל ה-sessions בוטלו שם) — נגזר מה-URL.
+  // הגעה מאיפוס סיסמה מוצלח (כל ה-sessions בוטלו שם) - נגזר מה-URL.
   const resetSuccess = params.get("reset") === "success" && mode === "login";
 
-  // אם כבר מחוברים — ישר לדשבורד.
+  // אם כבר מחוברים - ישר לדשבורד.
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) window.location.href = "/centers/dashboard";
@@ -73,7 +73,7 @@ function CenterLoginContent() {
     if (error) {
       setError(
         /already|registered|exists/i.test(error.message)
-          ? "כתובת המייל כבר רשומה — אפשר להתחבר או לאפס סיסמה."
+          ? "כתובת המייל כבר רשומה - אפשר להתחבר או לאפס סיסמה."
           : "ההרשמה נכשלה. נסו שוב.",
       );
     } else if (data.session) {
@@ -117,7 +117,7 @@ function CenterLoginContent() {
 
         {resetSuccess && (
           <div className="mb-4 rounded-xl border border-green-200 bg-green-50 px-4 py-2.5 text-center text-sm font-semibold text-green-800">
-            הסיסמה עודכנה — אפשר להיכנס עם הסיסמה החדשה.
+            הסיסמה עודכנה - אפשר להיכנס עם הסיסמה החדשה.
           </div>
         )}
 

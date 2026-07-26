@@ -12,7 +12,7 @@ export default async function PaymentSuccessPage({
   searchParams: Promise<{ pid?: string }>;
 }) {
   const { pid } = await searchParams;
-  // Only fire the GA4 conversion for a real, completed subscription payment — a
+  // Only fire the GA4 conversion for a real, completed subscription payment - a
   // direct / bookmarked / refreshed visit must not fake one. Use the actual
   // charged amount so a promo (₪90) doesn't report as the regular ₪140.
   const paidAmount = await getCompletedPaymentAmount(pid, "subscription");

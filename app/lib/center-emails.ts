@@ -26,11 +26,11 @@ function giftLine(giftMonths: number, billingStartsAt: string | null): string {
     ? new Date(billingStartsAt.includes("T") ? billingStartsAt : billingStartsAt + "T00:00:00").toLocaleDateString("he-IL")
     : null;
   const label = giftMonths === 1 ? "החודש הראשון" : giftMonths === 2 ? "החודשיים הראשונים" : `${giftMonths} החודשים הראשונים`;
-  return `${label} על חשבוננו — פרטי התשלום נשמרו והחיוב הראשון יתבצע רק ב-${when ?? "תום תקופת המתנה"}.`;
+  return `${label} על חשבוננו - פרטי התשלום נשמרו והחיוב הראשון יתבצע רק ב-${when ?? "תום תקופת המתנה"}.`;
 }
 
 /**
- * מייל הצעה למרכז — נשלח מהאדמין ("שלח הצעה במייל"). מפרט את המסלולים,
+ * מייל הצעה למרכז - נשלח מהאדמין ("שלח הצעה במייל"). מפרט את המסלולים,
  * המחיר החודשי, חודשי המתנה, וכפתור בולט לקישור ההצטרפות/תשלום. ה-HTML נבנה
  * במודול הבילדר הנקי (ניתן לתצוגה מקדימה), וכאן רק שולחים ורושמים ל-CRM.
  */
@@ -125,12 +125,12 @@ export async function sendCenterWelcomeEmail(opts: {
     pr.discountAmount > 0 ? `כולל הנחה ₪${ilCurrency(pr.discountAmount)}` : "",
   ].filter(Boolean).join(" · ");
   const priceLine = opts.billingTrack === "center_entity"
-    ? `מנוי חודשי — מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`
+    ? `מנוי חודשי - מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`
     : `${pr.therapistCount} מטפלים · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`;
   const portalUrl = `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
   // נושא = טקסט רגיל, בלי HTML entities.
-  const subject = `ברוכים הבאים לטיפול חכם — ${rawName} 🎉`;
+  const subject = `ברוכים הבאים לטיפול חכם - ${rawName} 🎉`;
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
@@ -146,7 +146,7 @@ export async function sendCenterWelcomeEmail(opts: {
         <p style="margin:0;font-size:13px;color:#3E5250;">${giftLine(opts.giftMonths, opts.billingStartsAt)}</p>
       </div>
       <p style="margin:0 0 10px;font-weight:bold;">פורטל ניהול המרכז</p>
-      <p style="margin:0 0 16px;">בפורטל תראו את כל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות — כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים. להתחברות, הירשמו עם כתובת המייל הזו (${to}):</p>
+      <p style="margin:0 0 16px;">בפורטל תראו את כל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות - כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים. להתחברות, הירשמו עם כתובת המייל הזו (${to}):</p>
       <p style="margin:0 0 16px;">
         <a href="${portalUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">כניסה לפורטל המרכז</a>
       </p>
@@ -154,7 +154,7 @@ export async function sendCenterWelcomeEmail(opts: {
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com<br/>
-        צוות טיפול חכם — Mentalytics
+        צוות טיפול חכם - Mentalytics
       </p>
     </div>
   </body>

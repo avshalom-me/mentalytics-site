@@ -69,7 +69,7 @@ export default function StaffHoursPage() {
       setStatus(json);
       return true;
     } catch {
-      setError("שגיאת רשת — נסו שוב");
+      setError("שגיאת רשת - נסו שוב");
       return false;
     } finally {
       setLoading(false);
@@ -103,7 +103,7 @@ export default function StaffHoursPage() {
           <Clock size={26} style={{ color: "var(--teal)" }} />
         </div>
         <h1 className="text-2xl font-black text-stone-900">דיווח שעות עבודה</h1>
-        <p className="text-sm text-stone-500 mt-1">טיפול חכם — צוות</p>
+        <p className="text-sm text-stone-500 mt-1">טיפול חכם - צוות</p>
       </div>
 
       {!status ? (
@@ -168,7 +168,7 @@ export default function StaffHoursPage() {
                   style={{ background: "linear-gradient(135deg,#8B2E0A,#B54A1E)" }}
                 >
                   <LogOut size={18} className="inline ml-2" />
-                  דיווח יציאה — עכשיו
+                  דיווח יציאה - עכשיו
                 </button>
               </>
             ) : (
@@ -179,7 +179,7 @@ export default function StaffHoursPage() {
                 style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}
               >
                 <LogIn size={18} className="inline ml-2" />
-                דיווח כניסה — עכשיו
+                דיווח כניסה - עכשיו
               </button>
             )}
           </div>

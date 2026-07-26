@@ -73,7 +73,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }));
 
   // Region + online landing pages (and the region hub) + the para-medical rubric.
-  // Only region/city pages that have enough listed therapists are included —
+  // Only region/city pages that have enough listed therapists are included -
   // near-empty ones are noindex, so listing them here would only produce
   // "submitted URL marked noindex" warnings and waste crawl budget. They rejoin
   // the sitemap automatically once they fill up (regenerated per request).
@@ -92,7 +92,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.6,
       changeFrequency: "weekly" as const,
     })),
-    // Specialty landing pages — same populated-enough gate as regions/cities.
+    // Specialty landing pages - same populated-enough gate as regions/cities.
     ...SPECIALTY_LIST.filter((s) => (specialtyCounts[s] ?? 0) >= MIN_LISTED_FOR_INDEX).map((s) => ({
       url: `${BASE}/therapists/specialty/${specialtyToSlug(s)}`,
       priority: 0.6,
@@ -100,7 +100,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
   ];
 
-  // Topic (condition/audience) pages + the city×topic pilot — only combos with
+  // Topic (condition/audience) pages + the city×topic pilot - only combos with
   // real supply enter the sitemap (the anti-doorway discipline).
   const topicPages: MetadataRoute.Sitemap = [];
   for (const topic of TOPICS) {
@@ -132,7 +132,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }
   }
 
-  // Public center pages (paid-plan benefit) — only active centers whose public
+  // Public center pages (paid-plan benefit) - only active centers whose public
   // page is enabled.
   const centers = await listPublicCenters();
   const centerPages: MetadataRoute.Sitemap = centers.map((c) => ({

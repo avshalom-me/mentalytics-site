@@ -3,12 +3,12 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { extractTherapistId } from "@/app/lib/therapist-url";
 
 // כתובת תמונה ציבורית ויציבה למטפל: /therapist-photo/<id>. הבאקט פרטי והתמונות
-// הוגשו עד כה דרך signed URLs עם תפוגה של 24ש' + query token — לא ניתנים
+// הוגשו עד כה דרך signed URLs עם תפוגה של 24ש' + query token - לא ניתנים
 // לאינדוקס (גוגל תמונות / og:image / זחלני AI). כאן מגישים את הבייטים דרך URL
 // יציב שנשמר ב-CDN, בלי לחשוף את הבאקט (רק profile_photo_path של מטפל מאושר,
-// לעולם לא תעודות). לא תחת /api — כי robots.txt חוסם /api/.
+// לעולם לא תעודות). לא תחת /api - כי robots.txt חוסם /api/.
 //
-// חשוב: לא כאן ה-canonical של הפרופיל — זו רק כתובת התמונה.
+// חשוב: לא כאן ה-canonical של הפרופיל - זו רק כתובת התמונה.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const id = extractTherapistId(raw) ?? raw;
   if (!UUID_RE.test(id)) return new NextResponse("not found", { status: 404 });
 
-  // רק מטפל שמוצג בפומבי (מאושר), ורק שדה התמונה — לעולם לא תעודות.
+  // רק מטפל שמוצג בפומבי (מאושר), ורק שדה התמונה - לעולם לא תעודות.
   const { data } = await supabaseAdmin
     .from("therapists")
     .select("profile_photo_path")
@@ -44,7 +44,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     status: 200,
     headers: {
       "Content-Type": upstream.headers.get("content-type") ?? "image/webp",
-      // נשמר ב-CDN יום, ומוגש stale עד שבוע בזמן רענון — כמעט אף פעם לא פוגע ב-origin.
+      // נשמר ב-CDN יום, ומוגש stale עד שבוע בזמן רענון - כמעט אף פעם לא פוגע ב-origin.
       "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
     },
   });

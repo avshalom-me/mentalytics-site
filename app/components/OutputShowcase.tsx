@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 // The therapist names are deliberately playful (Freud/Jung) and the pane-4
 // explanation text is a REAL output of /api/explain-match (generated once with
 // a dummy questionnaire payload), so the demo shows exactly what the live
-// system produces — including its two-paragraph structure and the disclaimer.
+// system produces - including its two-paragraph structure and the disclaimer.
 //
 // Self-contained: markup + scoped styles (osw- prefix), no external deps.
 
@@ -17,7 +17,7 @@ const CYCLE_MS = 4600;
 const PANES = 4;
 
 const STEPS = [
-  { t: "מיפוי הקשיים", d: "תמונה ברורה של מה שמעסיק אתכם — בלי תוויות" },
+  { t: "מיפוי הקשיים", d: "תמונה ברורה של מה שמעסיק אתכם - בלי תוויות" },
   { t: "המלצות + ניתוח אישי", d: "סוגי הטיפול שמתאימים לכם, מוסבר במילים פשוטות" },
   { t: "מטפלים מותאמים", d: "דירוג לפי התאמה מקצועית ואישיותית" },
   { t: "ניתוח AI אישי", d: "הסבר במילים פשוטות למה המטפל הותאם דווקא לך" },
@@ -25,7 +25,7 @@ const STEPS = [
 
 export default function OutputShowcase() {
   const [idx, setIdx] = useState(0);
-  // Bumped on every pane change — remounts the step progress bar so its CSS
+  // Bumped on every pane change - remounts the step progress bar so its CSS
   // animation restarts from zero.
   const [cycle, setCycle] = useState(0);
   const paused = useRef(false);
@@ -61,7 +61,7 @@ export default function OutputShowcase() {
       <div className="osw-head">
         <span className="osw-eyebrow">כך זה נראה מבפנים</span>
         <h2>
-          מהשאלון — עד <em>המטפל המתאים</em>
+          מהשאלון - עד <em>המטפל המתאים</em>
         </h2>
         <p>דוח אישי ברור, ניתוח מותאם, ורשימת מטפלים שמדורגת בדיוק בשבילך.</p>
       </div>
@@ -129,7 +129,7 @@ export default function OutputShowcase() {
                   ))}
                 </div>
                 <div className="rise osw-doc-note">
-                  הדוח מתאר את מה ששיתפת — במילים פשוטות, בלי אבחנות ובלי תוויות. הוא שלך בלבד, וניתן לשמירה ולשיתוף עם מטפל.
+                  הדוח מתאר את מה ששיתפת - במילים פשוטות, בלי אבחנות ובלי תוויות. הוא שלך בלבד, וניתן לשמירה ולשיתוף עם מטפל.
                 </div>
               </div>
 
@@ -160,7 +160,7 @@ export default function OutputShowcase() {
                   </div>
                   <p className="osw-ai-text">
                     מהתשובות שלך עולה תקופה עמוסה, שמורגשת גם בשינה וגם בריכוז. לצד זה בולטת{" "}
-                    <span className="hl">מוטיבציה גבוהה לשינוי</span> — נקודת פתיחה מצוינת. טיפול רגשי ממוקד
+                    <span className="hl">מוטיבציה גבוהה לשינוי</span> - נקודת פתיחה מצוינת. טיפול רגשי ממוקד
                     יכול לעזור לתרגם אותה לכלים יומיומיים, בקצב שלך.
                   </p>
                 </div>

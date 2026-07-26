@@ -17,7 +17,7 @@ const FEMININE_MAP: Record<string, string> = {
 
 /**
  * מחזיר את הצורה המותאמת למגדר של תואר מקצועי.
- * אם המגדר הוא "נקבה" והתואר קיים במיפוי — מחזיר לשון נקבה.
+ * אם המגדר הוא "נקבה" והתואר קיים במיפוי - מחזיר לשון נקבה.
  * אחרת מחזיר את המקור כפי שהוא.
  */
 export function genderTitle(title: string, gender: string | null | undefined): string {

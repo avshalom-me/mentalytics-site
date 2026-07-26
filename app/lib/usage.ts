@@ -4,7 +4,7 @@ import { createClient } from "@supabase/supabase-js";
 // Server-side quiz usage tracking + free-tier enforcement.
 // Single source of truth shared by /api/usage/check, the questionnaire
 // score routes, and anywhere else that needs to gate on the free limit.
-// Uses the service-role key — server-only, never import into client code.
+// Uses the service-role key - server-only, never import into client code.
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +18,7 @@ export const MAX_FREE = 5;
 // fingerprint, so a script sending a fresh random _fp per request would
 // otherwise get unlimited free results. This caps free serves per IP per UTC
 // day regardless of fingerprint. Set to 0 to disable (default is a generous
-// value chosen to sit well above this site's realistic per-IP legit traffic —
+// value chosen to sit well above this site's realistic per-IP legit traffic -
 // raise it via QUIZ_FREE_IP_DAILY_CAP if CGNAT users ever hit it). Never
 // applied to paid users or to "unknown" IPs.
 export const FREE_IP_DAILY_CAP = Number(process.env.QUIZ_FREE_IP_DAILY_CAP ?? 40);
@@ -39,7 +39,7 @@ export function getIp(req: { headers: { get(name: string): string | null } }): s
 }
 
 // Staff escape hatch. The token lives only in STAFF_BYPASS_TOKEN (server env)
-// and travels from the ?staff= URL param into the request — it is never
+// and travels from the ?staff= URL param into the request - it is never
 // shipped in the client bundle. Bypass is granted only when the env is set
 // AND matches, so a leaked/blank env can never open the gate.
 export function isStaffBypass(token: unknown): boolean {
@@ -72,7 +72,7 @@ export type UsageStatus = {
 };
 
 // Read the current usage for an IP+fingerprint without mutating anything.
-// The fingerprint is a stable per-device identifier; the raw IP is NOT — in
+// The fingerprint is a stable per-device identifier; the raw IP is NOT - in
 // Israel the mobile carriers put many users behind a small pool of CGNAT /
 // dynamic IPs, so counting by IP falsely blocks a first-time visitor whose
 // shared IP was already exhausted by other people. We therefore gate on the
@@ -105,7 +105,7 @@ export async function getUsage(
 //
 // Uses an atomic SQL increment (increment_quiz_usage RPC) rather than a JS
 // read-modify-write: the previous version read the count then wrote count+1,
-// so two concurrent /score requests both read N and both wrote N+1 — the pair
+// so two concurrent /score requests both read N and both wrote N+1 - the pair
 // advanced the counter by 1 instead of 2, letting a user shave free runs by
 // firing requests in parallel. The RPC does `count = count + 1` in the
 // database, so concurrent calls compose correctly.
@@ -128,7 +128,7 @@ export async function consumeUsage(
 // Coarse per-IP daily backstop against fingerprint-rotation abuse of the free
 // tier. Atomically bumps the IP's daily attempt counter and returns whether
 // the IP is still at/under FREE_IP_DAILY_CAP. Fails OPEN (returns true) on a
-// disabled cap, an "unknown" IP, or any RPC error — a coarse abuse limit must
+// disabled cap, an "unknown" IP, or any RPC error - a coarse abuse limit must
 // never block a legitimate user because of a transient counter failure. Call
 // this only for genuinely free serves; paid users must bypass it at the call
 // site.

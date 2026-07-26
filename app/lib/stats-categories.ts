@@ -1,13 +1,13 @@
 /**
  * Unified taxonomy for therapist stats tracking.
- * Keep this file the single source of truth — DB enforces only `text`,
+ * Keep this file the single source of truth - DB enforces only `text`,
  * but API validation uses these constants.
  */
 
 import { CITY_TO_REGION } from "./regions";
 
 export const ISSUE_CATEGORIES = [
-  "emotional",       // רגשי — דיכאון/חרדה/טראומה/דימוי עצמי
+  "emotional",       // רגשי - דיכאון/חרדה/טראומה/דימוי עצמי
   "relationship",    // זוגיות/משפחה
   "addiction",       // התמכרות
   "functional",      // תפקודי/תעסוקתי/קשב וריכוז/אקדמי
@@ -153,8 +153,8 @@ const APP_REGION_TO_BUCKET: Record<string, RegionCategory> = {
 };
 
 /**
- * Map a therapist `regions` entry — which may be a city name, an app region
- * name, or already a stats bucket — to a stats region bucket.
+ * Map a therapist `regions` entry - which may be a city name, an app region
+ * name, or already a stats bucket - to a stats region bucket.
  * Used to put therapist supply on the same axis as patient demand (viewer_region).
  */
 export function therapistAreaToBucket(raw: string | null | undefined): RegionCategory | null {

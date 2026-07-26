@@ -115,7 +115,7 @@ export default function TherapistProfileEditPage() {
       if (json.therapist) {
         setProfile(json.therapist);
         // A stub row (auto-created at first login) is still a NEW profile from
-        // the therapist's point of view — keep the welcome banner.
+        // the therapist's point of view - keep the welcome banner.
         if (!(json.therapist.full_name ?? "").trim()) setIsNew(true);
         if (json.photoUrl) setProfilePhotoUrl(json.photoUrl);
         if (Array.isArray(json.certificates)) setExistingCerts(json.certificates);
@@ -193,7 +193,7 @@ export default function TherapistProfileEditPage() {
   }
 
   async function uploadFile(file: File, type: "photo" | "certificate", accessToken: string): Promise<string | null> {
-    // Certificates can be large PDFs/scans — upload them straight to Supabase
+    // Certificates can be large PDFs/scans - upload them straight to Supabase
     // Storage via a signed URL so the bytes bypass the Vercel function (whose
     // ~4.5MB body cap was returning 413). Photos keep going through the route
     // (which compresses them server-side), with a client downscale as a guard.
@@ -246,7 +246,7 @@ export default function TherapistProfileEditPage() {
     setSaveErr("");
 
     // Fetch a FRESH token at submit time. The token captured at page load can
-    // expire while a therapist fills the (long) form — Supabase JWTs last ~1h —
+    // expire while a therapist fills the (long) form - Supabase JWTs last ~1h -
     // which previously surfaced as a raw "Unauthorized" on save. getSession()
     // returns the auto-refreshed token held by the client.
     const { data: { session } } = await supabase.auth.getSession();
@@ -278,7 +278,7 @@ export default function TherapistProfileEditPage() {
 
     // The profile itself is already saved (PATCH succeeded). File uploads are
     // best-effort from here: a failed upload must NOT hide the save or block
-    // the flow — we keep the failed file selected for an easy retry and surface
+    // the flow - we keep the failed file selected for an easy retry and surface
     // a clear, non-blocking note (the admin can also request completion later).
     let photoErr: string | null = null;
     let certErr: string | null = null;
@@ -307,7 +307,7 @@ export default function TherapistProfileEditPage() {
           if (Array.isArray(rj.certificates)) setExistingCerts(rj.certificates);
         }
       } catch {
-        // Non-blocking — the save/upload already succeeded; only the on-screen
+        // Non-blocking - the save/upload already succeeded; only the on-screen
         // preview refresh failed.
       }
     }
@@ -317,18 +317,18 @@ export default function TherapistProfileEditPage() {
     setIsNew(false);
     if (uploadIssues.length) {
       setSaveMsg("");
-      setSaveErr(`${base} שימו לב: העלאת הקובץ לא הושלמה (${uploadIssues.join("; ")}). אפשר לנסות שוב בכל עת — הפרטים כבר נשמרו.`);
+      setSaveErr(`${base} שימו לב: העלאת הקובץ לא הושלמה (${uploadIssues.join("; ")}). אפשר לנסות שוב בכל עת - הפרטים כבר נשמרו.`);
     } else {
       setSaveErr("");
       setSaveMsg(base);
     }
 
-    // First-time registration: let the therapist pick a plan before finishing —
+    // First-time registration: let the therapist pick a plan before finishing -
     // even if a file upload failed, since the profile was created.
     if (json.created) {
       // GA4 conversion: the therapist finished registration (profile created).
       // This is the mid-funnel signal Google Ads (Demand Gen) needs to optimize
-      // toward — ad clicks alone can't train it. Fires once (json.created is true
+      // toward - ad clicks alone can't train it. Fires once (json.created is true
       // only on first creation) and before the promoted-CTA early return below,
       // so both plan paths are counted. Mark "therapist_registration" as a Key
       // Event in the GA4 admin UI to import it as an Ads conversion.
@@ -353,7 +353,7 @@ export default function TherapistProfileEditPage() {
 
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
-  // ── Plan choice — shown right after the first profile submission ──
+  // ── Plan choice - shown right after the first profile submission ──
   if (showPlanChoice) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -364,7 +364,7 @@ export default function TherapistProfileEditPage() {
             ✓ הפרופיל נשלח
           </div>
           <h1 className="text-2xl font-black text-stone-900 mb-2">נותר רק לבחור מסלול</h1>
-          <p className="text-stone-600 leading-7">הפרופיל שלך נשמר וממתין לאישור. בחר/י איך תופיע/י באתר — תמיד אפשר לשנות מאוחר יותר מלוח הבקרה.</p>
+          <p className="text-stone-600 leading-7">הפרופיל שלך נשמר וממתין לאישור. בחר/י איך תופיע/י באתר - תמיד אפשר לשנות מאוחר יותר מלוח הבקרה.</p>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
@@ -375,7 +375,7 @@ export default function TherapistProfileEditPage() {
             <p className="text-2xl font-black text-stone-800 mb-4">₪0 <span className="text-sm font-normal text-stone-500">/ לתמיד</span></p>
             <ul className="space-y-2 text-sm text-stone-700 leading-6 flex-1">
               <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> דף פרופיל אישי נגיש לכל מי שמחפש מטפלים</li>
-              <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום — אזור או עיר</li>
+              <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> חיפוש לפי מיקום - אזור או עיר</li>
               <li className="flex items-start gap-2 text-stone-400"><span className="text-stone-300 mt-0.5">✗</span> מערכת ההתאמה החכמה וסטטיסטיקות</li>
             </ul>
             <button onClick={() => { window.location.href = "/therapists/dashboard"; }}
@@ -391,7 +391,7 @@ export default function TherapistProfileEditPage() {
             {promo ? (
               <>
                 <p className="text-xl font-black text-[#0F5468] mb-1">
-                  מבצע פתיחה — ₪{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span>
+                  מבצע פתיחה - ₪{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ <span className="text-sm font-normal">/ לחודש</span>
                 </p>
                 <p className="text-xs text-[#0F5468]/70 mb-1">
                   ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן ₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ
@@ -402,7 +402,7 @@ export default function TherapistProfileEditPage() {
             )}
             <div className="mb-4 rounded-lg bg-[#0F5468]/8 border border-[#0F5468]/15 px-3 py-2">
               <p className="text-sm font-black text-[#0F5468] leading-6">
-                ללא סיכון — החזר כספי מלא אם לא תקבל/י פנייה<sup className="font-black">*</sup> בחודשיים הקרובים
+                ללא סיכון - החזר כספי מלא אם לא תקבל/י פנייה<sup className="font-black">*</sup> בחודשיים הקרובים
               </p>
               <p className="mt-1 text-[11px] text-[#0F5468]/70 leading-5">
                 <span className="font-bold">* פנייה</span> = קבלת מטופל בקליניקה. מבוסס על אמון מול המטפל.
@@ -435,7 +435,7 @@ export default function TherapistProfileEditPage() {
         <p className="text-sm text-stone-500 mt-0.5">עדכון הפרופיל המקצועי שלך. שינויים נשמרים מיד עם הלחיצה על &quot;שמור פרטים&quot;.</p>
       </div>
 
-      {/* Rejection notice — reason + how to re-submit */}
+      {/* Rejection notice - reason + how to re-submit */}
       {profile?.status === "rejected" && (
         <div className="mb-6 rounded-2xl bg-red-50 border border-red-200 px-5 py-4">
           <h2 className="text-sm font-extrabold text-red-800 mb-1">הפרופיל לא אושר</h2>
@@ -445,14 +445,14 @@ export default function TherapistProfileEditPage() {
             <p className="text-sm text-red-700 leading-6">הפרופיל לא אושר במתכונתו הנוכחית.</p>
           )}
           <p className="text-sm text-red-700 leading-6 mt-1">
-            עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; — הפרופיל יישלח שוב לאישור.
+            עדכן/י את הפרטים והעלה/י תעודת רישיון ברורה וקריאה, ולחץ/י &quot;שמור פרטים&quot; - הפרופיל יישלח שוב לאישור.
           </p>
         </div>
       )}
 
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-4 text-sm text-blue-800">
-          ברוך הבא! מלא את הפרטים שלך ולחץ שמור — הפרופיל יישלח לאישור.
+          ברוך הבא! מלא את הפרטים שלך ולחץ שמור - הפרופיל יישלח לאישור.
         </div>
       )}
 
@@ -510,7 +510,7 @@ export default function TherapistProfileEditPage() {
           </div>
         </div>
 
-        {/* Availability — pausing new patient inquiries without leaving the directory */}
+        {/* Availability - pausing new patient inquiries without leaving the directory */}
         <div className={`rounded-2xl border p-6 ${!form.accepting_new_patients ? "border-amber-300 bg-amber-50" : "border-[#E8E0D8] bg-white"}`}>
           <h2 className="text-lg font-extrabold text-stone-900 mb-3">זמינות לקבלת מטופלים</h2>
           <label className="flex items-start gap-3 cursor-pointer">
@@ -520,13 +520,13 @@ export default function TherapistProfileEditPage() {
               <span className="block text-sm font-bold text-stone-800">כעת לא זמין/ה לקבלת מטופלים / אבחונים חדשים</span>
               <span className="mt-1 block text-xs leading-5 text-stone-500">
                 כשמסומן: הפרופיל נשאר גלוי במאגר המטפלים, אבל לא יוצע בהתאמות חדשות ולא ניתן יהיה לשלוח
-                אליך פניות דרך האתר. אפשר לבטל את הסימון בכל רגע — כשמתפנה מקום, פשוט חוזרים לקבל פניות.
+                אליך פניות דרך האתר. אפשר לבטל את הסימון בכל רגע - כשמתפנה מקום, פשוט חוזרים לקבל פניות.
               </span>
             </span>
           </label>
           {!form.accepting_new_patients && (
             <p className="mt-3 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-amber-700 border border-amber-200">
-              ⏸ הפרופיל מסומן כלא זמין — מטופלים חדשים יופנו למטפלים אחרים עד שתחזרו לזמינות.
+              ⏸ הפרופיל מסומן כלא זמין - מטופלים חדשים יופנו למטפלים אחרים עד שתחזרו לזמינות.
             </p>
           )}
         </div>
@@ -566,7 +566,7 @@ export default function TherapistProfileEditPage() {
               selected={form.play_therapy_modalities} onChange={v => setForm({...form, play_therapy_modalities: v})} />
           )}
           {form.training_areas.includes("טיפול COG-FUN לקשיי קשב וריכוז") && (
-            <CheckboxGroup label="טיפול COG-FUN — לאילו קבוצות גיל?" options={COGFUN_AGE_GROUPS}
+            <CheckboxGroup label="טיפול COG-FUN - לאילו קבוצות גיל?" options={COGFUN_AGE_GROUPS}
               selected={form.cogfun_age_groups} onChange={v => setForm({...form, cogfun_age_groups: v})} />
           )}
           <CheckboxGroup label="סוגי אבחון" options={ASSESSMENT_TYPES}
@@ -592,25 +592,25 @@ export default function TherapistProfileEditPage() {
 
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-1">סגנון טיפולי</h2>
-          <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית שלך — ישמשו להתאמה אישיותית עם מטופלים</p>
+          <p className="text-xs text-stone-500 mb-5">3 שאלות על הגישה הטיפולית שלך - ישמשו להתאמה אישיותית עם מטופלים</p>
           <StyleQuestion
             name="style_q1"
             question="בעבודתי הטיפולית, אני נוטה לראות בהבנה מעמיקה של שורשי הקושי, העבר והדפוסים הלא-מודעים מרכיב מרכזי בשינוי הטיפולי."
-            hint="1 = בכלל לא מסכים/ה — עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד | 7 = מסכים/ה מאוד — עבודתי מבוססת תובנה ועומק"
+            hint="1 = בכלל לא מסכים/ה - עבודתי ממוקדת יותר בהקלה מיידית ובתפקוד | 7 = מסכים/ה מאוד - עבודתי מבוססת תובנה ועומק"
             value={form.style_q1}
             onChange={v => setForm({...form, style_q1: v})}
           />
           <StyleQuestion
             name="style_q2"
             question="בעבודתי הטיפולית, אני נוטה להציע למטופלים מסגרת ברורה, מטרות מוגדרות, כלים ומשימות בין פגישות."
-            hint="1 = בכלל לא מסכים/ה — אני עובד/ת יותר במרחב פתוח וגמיש | 7 = מסכים/ה מאוד — אני עובד/ת באופן מובנה, מכוון ופרקטי"
+            hint="1 = בכלל לא מסכים/ה - אני עובד/ת יותר במרחב פתוח וגמיש | 7 = מסכים/ה מאוד - אני עובד/ת באופן מובנה, מכוון ופרקטי"
             value={form.style_q2}
             onChange={v => setForm({...form, style_q2: v})}
           />
           <StyleQuestion
             name="activity_level"
             question="בטיפול, הסגנון הטבעי שלי הוא להיות פעיל/ה, מכוון/ת ומעורב/ת מילולית, יותר מאשר שקט/ה, מכיל/ה ומתבונן/ת."
-            hint="1 = בכלל לא מסכים/ה — אני יותר מכיל/ה, שוהה ומתבונן/ת | 7 = מסכים/ה מאוד — אני יותר פעיל/ה, מכוון/ת ומעורב/ת"
+            hint="1 = בכלל לא מסכים/ה - אני יותר מכיל/ה, שוהה ומתבונן/ת | 7 = מסכים/ה מאוד - אני יותר פעיל/ה, מכוון/ת ומעורב/ת"
             value={form.activity_level}
             onChange={v => setForm({...form, activity_level: v})}
           />
@@ -661,7 +661,7 @@ export default function TherapistProfileEditPage() {
                     </li>
                   ))}
                 </ul>
-                <p className="mt-1.5 text-[11px] text-stone-400">העלאת קובץ חדש תתווסף לתעודות הקיימות (לא תחליף אותן). להסרת תעודה שגויה — פנו אלינו ב-admin@getmentalytics.com.</p>
+                <p className="mt-1.5 text-[11px] text-stone-400">העלאת קובץ חדש תתווסף לתעודות הקיימות (לא תחליף אותן). להסרת תעודה שגויה - פנו אלינו ב-admin@getmentalytics.com.</p>
               </div>
             )}
             <input type="file" accept=".pdf,.jpg,.jpeg,.png"

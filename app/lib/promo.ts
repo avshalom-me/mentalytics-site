@@ -1,19 +1,19 @@
 // Promoted-plan pricing + the early-bird promotion.
 //
 // This module is intentionally free of secrets / server-only code so it can be
-// imported from client components, API routes, and cron jobs alike — one source
+// imported from client components, API routes, and cron jobs alike - one source
 // of truth for the prices and the promo window.
 //
 // Early-bird promo: therapists who subscribe on or before the signup deadline
 // (end of day, Israel time) pay SUBSCRIPTION_PROMO_PRICE for the first
 // SUBSCRIPTION_PROMO_MONTHS billing cycles. After that the standing order
-// reverts automatically to SUBSCRIPTION_REGULAR_PRICE — handled server-side by
+// reverts automatically to SUBSCRIPTION_REGULAR_PRICE - handled server-side by
 // the daily Sumit sync cron, which calls /billing/recurring/update.
 //
 // The opening window originally ran through 2026-07-01; it was extended by one
 // more week, to 2026-07-09 (end of day Israel). Once the deadline passes,
 // isPromoActive() flips to false and the whole site + billing revert to the
-// regular price for new subscribers automatically — no further code change.
+// regular price for new subscribers automatically - no further code change.
 
 const VAT_RATE = 0.18;
 

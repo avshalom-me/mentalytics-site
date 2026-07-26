@@ -102,7 +102,7 @@ async function getTherapistArticles(id: string): Promise<ArticleLink[]> {
     .eq("therapist_id", id)
     .eq("status", "approved")
     // House/editorial pieces (author_name set) are backed by a therapist_id for
-    // integrity but are NOT the therapist's own work — keep them off the profile.
+    // integrity but are NOT the therapist's own work - keep them off the profile.
     .is("author_name", null)
     .order("approved_at", { ascending: false })
     .limit(20);
@@ -158,7 +158,7 @@ export default async function TherapistProfilePage({
   const source: "match" | "directory" = sp.from === "match" ? "match" : "directory";
   // Where "back to the list" returns for a directory visitor: the listing page
   // they came from (region / city / online / center), passed as ?ret=. Only
-  // internal listing paths are honoured — never an arbitrary/attacker URL.
+  // internal listing paths are honoured - never an arbitrary/attacker URL.
   const directoryBack =
     typeof sp.ret === "string" && /^\/(therapists|centers)\/[^/]/.test(sp.ret) && !sp.ret.startsWith("//")
       ? sp.ret
@@ -184,7 +184,7 @@ export default async function TherapistProfilePage({
     const qs = new URLSearchParams();
     for (const [k, v] of Object.entries(sp)) if (typeof v === "string" && v) qs.set(k, v);
     const query = qs.toString();
-    // Encode the (Hebrew) slug — a redirect Location header must be ASCII.
+    // Encode the (Hebrew) slug - a redirect Location header must be ASCII.
     permanentRedirect(`/therapists/${encodeURIComponent(canonicalSeg)}${query ? `?${query}` : ""}`);
   }
 
@@ -197,7 +197,7 @@ export default async function TherapistProfilePage({
   const name = t.full_name ?? "מטפל";
   const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
-  // Stable public photo URL (indexable) — replaces the 24h signed URL for both
+  // Stable public photo URL (indexable) - replaces the 24h signed URL for both
   // display and structured data. Falls back to the gender avatar when no photo.
   const photoSrc = t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : avatarSrc;
   const waLink = t.phone
@@ -247,11 +247,11 @@ export default async function TherapistProfilePage({
 
       <ProfileBackLink source={source} fallbackHref={source === "match" ? (sp.a === "child" ? "/kids" : "/adults") : directoryBack} />
 
-      {/* Hero — warm teal band, large photo + identity + contact */}
+      {/* Hero - warm teal band, large photo + identity + contact */}
       <div className="rounded-3xl mb-8 p-6 sm:p-8" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
         <div className="flex flex-col sm:flex-row gap-6 items-start">
 
-          {/* Photo — larger, framed */}
+          {/* Photo - larger, framed */}
           <div className="w-full sm:w-56 flex-shrink-0 mx-auto sm:mx-0" style={{ maxWidth: "240px" }}>
             <div className="rounded-2xl overflow-hidden bg-white w-full aspect-[3/4]"
               style={{ border: "3px solid #fff", boxShadow: "0 6px 22px rgba(42,100,98,.22)" }}>
@@ -345,7 +345,7 @@ export default async function TherapistProfilePage({
         </section>
       )}
 
-      {/* Body — two columns on desktop */}
+      {/* Body - two columns on desktop */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
 
         {/* Main column */}
@@ -416,7 +416,7 @@ export default async function TherapistProfilePage({
 
         </div>
 
-        {/* Side column — professional details card */}
+        {/* Side column - professional details card */}
         {hasDetails && (
           <aside className="lg:sticky lg:top-6 self-start">
             <div className="rounded-2xl bg-white p-5 sm:p-6" style={{ border: "1px solid var(--line)", boxShadow: "0 2px 14px rgba(61,140,138,.06)" }}>
@@ -436,7 +436,7 @@ export default async function TherapistProfilePage({
       </div>
 
       {/* Internal linking (SEO M5): therapist profiles are the site's
-          strongest-ranking pages (name searches) — flow that equity to the
+          strongest-ranking pages (name searches) - flow that equity to the
           city / specialty / online landing pages with descriptive anchors. */}
       {(() => {
         const cityLinks = (t.regions ?? []).filter((c: string) => (CITY_SEO_LIST as readonly string[]).includes(c)).slice(0, 3);

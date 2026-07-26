@@ -14,7 +14,7 @@ export default async function QuizPaymentSuccessPage({
   const sp = await searchParams;
   const quizType = sp.type === "kids" ? "kids" : "adults";
   const quizPath = quizType === "kids" ? "/kids" : "/adults";
-  // Only fire the ₪30 GA4 conversion for a real, completed quiz payment — a
+  // Only fire the ₪30 GA4 conversion for a real, completed quiz payment - a
   // direct / bookmarked / refreshed visit must not fake one.
   const verified = await isCompletedPayment(sp.pid, "quiz");
 

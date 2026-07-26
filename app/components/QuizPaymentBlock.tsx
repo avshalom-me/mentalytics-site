@@ -131,7 +131,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
       <h2 className="text-2xl font-black text-stone-900 mb-3 text-center">הגעת למגבלת השימוש החינמי</h2>
       <p className="text-stone-600 leading-7 max-w-sm mb-6 text-center">
         ניתן למלא את השאלון עד 5 פעמים ללא תשלום.<br />
-        להמשך מילוי — תשלום חד־פעמי בסך ₪30 + מע&quot;מ.
+        להמשך מילוי - תשלום חד־פעמי בסך ₪30 + מע&quot;מ.
       </p>
 
       <form onSubmit={handlePay} className="w-full max-w-sm space-y-4">
@@ -307,7 +307,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
           {loading ? (
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
-            "חיוב מאובטח — ₪35.40"
+            "חיוב מאובטח - ₪35.40"
           )}
         </button>
 

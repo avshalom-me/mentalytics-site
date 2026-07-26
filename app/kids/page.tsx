@@ -418,7 +418,7 @@ function PageConsent({ onNext }: { onNext: () => void }) {
   return (
     <div>
       <div className="mb-4 rounded-xl p-4 text-sm font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
-        🔒 מילוי השאלון אנונימי לחלוטין — לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
+        🔒 מילוי השאלון אנונימי לחלוטין - לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
       </div>
       <div className="mb-6 rounded-xl p-6 leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
         <p className="mb-3 text-sm font-bold" style={{ color: "var(--text)" }}>📋 הצהרה והבהרה</p>
@@ -515,7 +515,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
         </div>
         {mismatch && (
           <div className="bg-yellow-50 border-r-4 border-yellow-500 rounded-lg px-4 py-2 text-xs font-semibold text-yellow-800 mb-3">
-            ⚠️ אי התאמה בין גיל וכיתה — נא לבדוק
+            ⚠️ אי התאמה בין גיל וכיתה - נא לבדוק
           </div>
         )}
         <div className="mb-5">
@@ -544,7 +544,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
           </div>
         </div>
         {bmi && (
-          <div className="text-xs text-gray-500 mb-4">BMI: <strong>{bmi.toFixed(1)}</strong> — {bmiLabel(bmi)}</div>
+          <div className="text-xs text-gray-500 mb-4">BMI: <strong>{bmi.toFixed(1)}</strong> - {bmiLabel(bmi)}</div>
         )}
 
         {/* שינה ואכילה */}
@@ -599,7 +599,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   const age   = parseInt(A._age) || 0;
   const grpV  = gg(A);
   const showDev = (age > 0 && age < 7) || grpV === "ga" || A.toilet === "כן";
-  // Ages 1–2: only developmental + behavioral domains are relevant — hide the
+  // Ages 1–2: only developmental + behavioral domains are relevant - hide the
   // emotional / learning / social options entirely.
   const onlyDevBeh = age >= 1 && age <= 2;
 
@@ -613,7 +613,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
       title: "בעיות רגשיות",
       desc: "חרדות, לחצים, דימוי עצמי, מצב רוח, התמכרות",
       detail:
-        "תחום שעוסק בעולם הפנימי של הילד/ה: חרדה, פחדים, דאגות חוזרות, קושי להירגע, מתח גופני; דימוי עצמי נמוך וביקורת עצמית; מצב רוח ירוד, חוסר עניין או הנאה, רגישות יתר וקושי בוויסות רגשי; מחשבות חודרניות או טקסים אובססיביים-קומפולסיביים; טראומה ואירועים מעוררי חרדה; וכן סוגי התמכרות (חומרים, מסכים, הימורים) ובעיות אכילה. אם בני הנוער או ילדכם מתמודדים עם תחושות פנימיות שמקשות עליהם בתפקוד היומיומי או בקשרים — סמנו כאן.",
+        "תחום שעוסק בעולם הפנימי של הילד/ה: חרדה, פחדים, דאגות חוזרות, קושי להירגע, מתח גופני; דימוי עצמי נמוך וביקורת עצמית; מצב רוח ירוד, חוסר עניין או הנאה, רגישות יתר וקושי בוויסות רגשי; מחשבות חודרניות או טקסים אובססיביים-קומפולסיביים; טראומה ואירועים מעוררי חרדה; וכן סוגי התמכרות (חומרים, מסכים, הימורים) ובעיות אכילה. אם בני הנוער או ילדכם מתמודדים עם תחושות פנימיות שמקשות עליהם בתפקוד היומיומי או בקשרים - סמנו כאן.",
     },
     ...(showDev
       ? [{
@@ -621,7 +621,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
           title: "בעיות התפתחותיות",
           desc: "גמילה, הרטבה, מוטוריקה, ויסות חושי",
           detail:
-            "תחום שעוסק באבני דרך התפתחותיות: גמילה מחיתולים (יום ולילה), הרטבה לאחר גיל הגמילה, עצירות או אנקופרזיס; מוטוריקה גסה (תיאום, שיווי משקל, חוסר בטחון בתנועה) ומוטוריקה עדינה (אחיזת עיפרון, גזירה, כתיבה, איכות ציור); ויסות חושי — תגובות מוגזמות לקולות, מגע, בדים, אורות, או דווקא חיפוש מוגבר של גירויים. בקשיים אלה מעורבים לעיתים רופא ילדים, מרפאה בעיסוק, פיזיותרפיסטית רצפת אגן או קלינאית תקשורת.",
+            "תחום שעוסק באבני דרך התפתחותיות: גמילה מחיתולים (יום ולילה), הרטבה לאחר גיל הגמילה, עצירות או אנקופרזיס; מוטוריקה גסה (תיאום, שיווי משקל, חוסר בטחון בתנועה) ומוטוריקה עדינה (אחיזת עיפרון, גזירה, כתיבה, איכות ציור); ויסות חושי - תגובות מוגזמות לקולות, מגע, בדים, אורות, או דווקא חיפוש מוגבר של גירויים. בקשיים אלה מעורבים לעיתים רופא ילדים, מרפאה בעיסוק, פיזיותרפיסטית רצפת אגן או קלינאית תקשורת.",
         }]
       : []),
     {
@@ -629,7 +629,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
       title: "בעיות לימודיות",
       desc: "קריאה, כתיבה, ריכוז, לקויות למידה",
       detail:
-        "תחום שעוסק בתפקוד הלימודי: קשיי קשב וריכוז (חוסר ריכוז, היסחות, היפראקטיביות, אימפולסיביות); לקויות למידה בקריאה (דיסלקציה), בכתיבה (דיסגרפיה), בחשבון (דיסקלקוליה) או באנגלית; קשיים בהבנת הנקרא, ברבי מלל ובהפקת טקסט כתוב; קשיים ארגוניים בלמידה — תכנון זמן, הכנת שיעורי בית, הכנה למבחנים. בתחום זה עשויות להידרש פניות לאבחון פסיכו-דידקטי, נוירו-פסיכולוגי, קלינאית תקשורת או הוראה מתקנת.",
+        "תחום שעוסק בתפקוד הלימודי: קשיי קשב וריכוז (חוסר ריכוז, היסחות, היפראקטיביות, אימפולסיביות); לקויות למידה בקריאה (דיסלקציה), בכתיבה (דיסגרפיה), בחשבון (דיסקלקוליה) או באנגלית; קשיים בהבנת הנקרא, ברבי מלל ובהפקת טקסט כתוב; קשיים ארגוניים בלמידה - תכנון זמן, הכנת שיעורי בית, הכנה למבחנים. בתחום זה עשויות להידרש פניות לאבחון פסיכו-דידקטי, נוירו-פסיכולוגי, קלינאית תקשורת או הוראה מתקנת.",
     },
     {
       key: "a_beh",
@@ -643,7 +643,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
       title: "בעיות חברתיות",
       desc: "קושי בחברה, ביישנות, דחייה חברתית",
       detail:
-        "תחום שעוסק בקשרים עם בני הגיל: קושי ליצור חברויות, להישאר בקבוצה ולשמור על קשרים לאורך זמן; ביישנות, הימנעות חברתית, חרדה חברתית ופחד מהערכה; דחייה, בריונות או חרם — בין אם בכיתה או ברשתות החברתיות; קשיים בקריאת רמזים חברתיים ובקבלת ביקורת. כאן רלוונטיים לעיתים קבוצות חברתיות, טיפול CBT לחרדה חברתית, וייעוץ עם יועצת בית הספר.",
+        "תחום שעוסק בקשרים עם בני הגיל: קושי ליצור חברויות, להישאר בקבוצה ולשמור על קשרים לאורך זמן; ביישנות, הימנעות חברתית, חרדה חברתית ופחד מהערכה; דחייה, בריונות או חרם - בין אם בכיתה או ברשתות החברתיות; קשיים בקריאת רמזים חברתיים ובקבלת ביקורת. כאן רלוונטיים לעיתים קבוצות חברתיות, טיפול CBT לחרדה חברתית, וייעוץ עם יועצת בית הספר.",
     },
   ];
 
@@ -699,7 +699,7 @@ const GA_INT_LIST = [
   { key:"ga_int_music",  label:"🎵 מוזיקה" },
   { key:"ga_int_move",   label:"🏃 תנועה" },
   { key:"ga_int_drama",  label:"🎭 דרמה" },
-  { key:"ga_int_biblio", label:"📖 ביבליותרפיה — סיפור" },
+  { key:"ga_int_biblio", label:"📖 ביבליותרפיה - סיפור" },
   { key:"ga_int_garden", label:"🌱 גינון" },
   { key:"ga_int_animal", label:"🐾 בע\"ח" },
 ];
@@ -761,7 +761,7 @@ function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={1}/>
-        <StepTag>שאלה 1 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 1 מתוך 10 - רגשי</StepTag>
         <StepQ>ילדך חש דאגות/לחצים מתמשכים</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
@@ -781,7 +781,7 @@ function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
   return (
     <div>
       <Card>
-        <StepTag>שאלה משלימה — חרדה וגוף</StepTag>
+        <StepTag>שאלה משלימה - חרדה וגוף</StepTag>
         <StepQ>האם הילד/ה סובל/ת מכאבים כרוניים?</StepQ>
         <StepHint>למשל: כאבי בטן או כאבי ראש חוזרים</StepHint>
         <YNRow val={A.q1_pain||""} onChange={v=>setA({...A,q1_pain:v})} />
@@ -804,7 +804,7 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>🔍 שאלות משלימות</StepTag>
-        <StepQ>10 סעיפים — 1 = כלל לא | 2 = לפעמים | 3 = לעיתים קרובות</StepQ>
+        <StepQ>10 סעיפים - 1 = כלל לא | 2 = לפעמים | 3 = לעיתים קרובות</StepQ>
         <SubCard>
           {aqItems.map(({key,label})=>(
             <div key={key}>
@@ -838,7 +838,7 @@ function PageAQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
   return (
     <div>
       <Card>
-        <StepTag>חרדה — שאלות לפי כיתה</StepTag>
+        <StepTag>חרדה - שאלות לפי כיתה</StepTag>
         <StepQ>שאלות משלימות</StepQ>
 
         {/* גן עד כיתה א׳ */}
@@ -922,7 +922,7 @@ function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNe
   return (
     <div>
       <Card>
-        <StepTag>שאלות לפי כיתה — גן עד כיתה א׳</StepTag>
+        <StepTag>שאלות לפי כיתה - גן עד כיתה א׳</StepTag>
         <StepQ>שאלות משלימות לגיל הצעיר</StepQ>
         <GaConsentBlock A={A} setA={setA} onDone={onNext} />
       </Card>
@@ -937,7 +937,7 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={2}/>
-        <StepTag>שאלה 2 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 2 מתוך 10 - רגשי</StepTag>
         <StepQ>הילד/ה חש/ה כי "אינו/ה שווה" או אינו/ה מוערך/ת</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
@@ -959,13 +959,13 @@ function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
   return (
     <div>
       <Card>
-        <StepTag>דימוי עצמי — שאלות לפי כיתה</StepTag>
+        <StepTag>דימוי עצמי - שאלות לפי כיתה</StepTag>
         <StepQ>שאלות משלימות</StepQ>
 
         {grp === "ga" && (
           <GradeBlock title="🏫 גן עד כיתה א׳">
             {gaAlreadyFilled
-              ? <p className="text-sm text-gray-500">פרטי ההסכמה כבר מולאו — ממשיכים לשאלה הבאה.</p>
+              ? <p className="text-sm text-gray-500">פרטי ההסכמה כבר מולאו - ממשיכים לשאלה הבאה.</p>
               : <GaConsentBlock A={A} setA={setA} onDone={onNext} />
             }
           </GradeBlock>
@@ -995,7 +995,7 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={3}/>
-        <StepTag>שאלה 3 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 3 מתוך 10 - רגשי</StepTag>
         <StepQ>מצב רוח ירוד או עצוב</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
@@ -1017,7 +1017,7 @@ function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>שאלון מצב רוח</StepTag>
-        <StepQ>שאלון מצב רוח — 9 סעיפים</StepQ>
+        <StepQ>שאלון מצב רוח - 9 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
           {mqItems.map(({key,label})=>(
@@ -1042,7 +1042,7 @@ function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onN
   return (
     <div>
       <Card>
-        <StepTag>מצב רוח — אובדנות</StepTag>
+        <StepTag>מצב רוח - אובדנות</StepTag>
         <StepQ>האם קיימות מחשבות אובדניות חוזרות?</StepQ>
         <StepHint>או ניסיונות אובדניים בעבר</StepHint>
         <YNRow val={A.q3_sui||""} onChange={v=>{ const nA={...A,q3_sui:v}; setA(nA); if (v !== "כן") onNext(nA); }} />
@@ -1059,7 +1059,7 @@ function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={4}/>
-        <StepTag>שאלה 4 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 4 מתוך 10 - רגשי</StepTag>
         <StepQ>סימנים להתמכרות לחומרים / התנהגויות</StepQ>
         <StepHint>משחקי מחשב, אלכוהול, סמים, הימורים, פורנו</StepHint>
         <YNRow val={A.q4||""} onChange={v=>{ const nA={...A,q4:v}; setA(nA); onNext(nA); }} />
@@ -1097,7 +1097,7 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
     <div>
       <Card>
         <StepTag>שאלון חומרים ממכרים</StepTag>
-        <StepQ>שאלון חומרים — 6 סעיפים</StepQ>
+        <StepQ>שאלון חומרים - 6 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
           {asItems.map(({key,label})=>(
@@ -1124,7 +1124,7 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
     <div>
       <Card>
         <StepTag>שאלון גיימינג</StepTag>
-        <StepQ>שאלון משחקי מחשב — 7 סעיפים</StepQ>
+        <StepQ>שאלון משחקי מחשב - 7 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
           {agItems.map(({key,label})=>(
@@ -1151,7 +1151,7 @@ function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
     <div>
       <Card>
         <StepTag>שאלון הימורים</StepTag>
-        <StepQ>שאלון הימורים — 7 סעיפים</StepQ>
+        <StepQ>שאלון הימורים - 7 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף</StepHint>
         <SubCard>
           {abItems.map(({key,label})=>(
@@ -1176,7 +1176,7 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
   return (
     <div>
       <Card>
-        <StepTag>התמכרות — שליטה</StepTag>
+        <StepTag>התמכרות - שליטה</StepTag>
         <StepQ>עד כמה הילד/ה בשליטה על ההתנהגות?</StepQ>
         <StepHint>1 = כלל לא בשליטה  |  5 = בשליטה מלאה</StepHint>
         <div className="flex gap-2 flex-wrap">
@@ -1197,7 +1197,7 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={5}/>
-        <StepTag>שאלה 5 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 5 מתוך 10 - רגשי</StepTag>
         <StepQ>מחשבות חוזרות שקשה לילד/ה להפסיק, או טקסים שחוזרים על עצמם?</StepQ>
         <StepHint>למשל: שטיפת ידיים מרובה, ספירה, צורך לסדר דברים בצורה מסוימת. ברוב הימים, שבועיים רצופים לפחות.</StepHint>
         <YNRow val={A.q5||""} onChange={v=>{ const nA={...A,q5:v}; setA(nA); onNext(nA); }} />
@@ -1214,7 +1214,7 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>שאלון</StepTag>
-        <StepQ>שאלון — 6 סעיפים</StepQ>
+        <StepQ>שאלון - 6 סעיפים</StepQ>
         <StepHint>1 = אף פעם  |  2 = לפעמים  |  3 = תמיד</StepHint>
         <SubCard>
           {oqItems.map(({key,label})=>(
@@ -1240,11 +1240,11 @@ function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
   return (
     <div>
       <Card>
-        <StepTag>מחשבות והתנהגויות חוזרות — שאלות לפי כיתה</StepTag>
+        <StepTag>מחשבות והתנהגויות חוזרות - שאלות לפי כיתה</StepTag>
         <StepQ>שאלות משלימות</StepQ>
         {grp === "ga" && (
           <GradeBlock title="🏫 גן עד כיתה א׳">
-            <p className="text-sm text-gray-500">המשך למילוי השאלון — הממצאים יוצגו בדוח הסופי.</p>
+            <p className="text-sm text-gray-500">המשך למילוי השאלון - הממצאים יוצגו בדוח הסופי.</p>
           </GradeBlock>
         )}
         {grp === "bv" && (
@@ -1260,7 +1260,7 @@ function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
         )}
         {grp === "zy" && (
           <GradeBlock title='🎓 כיתות ז׳–י"ב'>
-            <p className="text-sm text-gray-500">המשך למילוי השאלון — הממצאים יוצגו בדוח הסופי.</p>
+            <p className="text-sm text-gray-500">המשך למילוי השאלון - הממצאים יוצגו בדוח הסופי.</p>
           </GradeBlock>
         )}
       </Card>
@@ -1275,7 +1275,7 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={6}/>
-        <StepTag>שאלה 6 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 6 מתוך 10 - רגשי</StepTag>
         <StepQ>חווה אירוע טראומטי</StepQ>
         <StepHint>תאונה, פיגוע, שוד, רעידת אדמה וכד׳</StepHint>
         <YNRow val={A.q6||""} onChange={v=>{ const nA={...A,q6:v}; setA(nA); onNext(nA); }} />
@@ -1292,7 +1292,7 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>שאלון טראומה</StepTag>
-        <StepQ>שאלון טראומה — 10 סעיפים</StepQ>
+        <StepQ>שאלון טראומה - 10 סעיפים</StepQ>
         <p className="text-sm font-bold text-red-800 mb-1">ענו על השאלות הבאות בהתייחס לחודש האחרון:</p>
         <StepHint>0 = כלל לא  |  4 = כמעט תמיד (חודש אחרון)</StepHint>
         <SubCard>
@@ -1314,7 +1314,7 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-q7 ─────────────────────────────────────────────────────────────────────
-// שאלה 7 — הזיות (7א) ואמונות יוצאות דופן / חשדות (7ב), על אותו מסך
+// שאלה 7 - הזיות (7א) ואמונות יוצאות דופן / חשדות (7ב), על אותו מסך
 function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
   const canContinue = !!A.q7a && !!A.q7b;
   function setKey(k: "q7a" | "q7b", v: string) {
@@ -1325,9 +1325,9 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={7}/>
-        <StepTag>שאלה 7 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 7 מתוך 10 - רגשי</StepTag>
         <StepQ>חוויות פנימיות חריגות</StepQ>
-        <StepHint>שתי שאלות קצרות — נא לענות על שתיהן כדי להמשיך.</StepHint>
+        <StepHint>שתי שאלות קצרות - נא לענות על שתיהן כדי להמשיך.</StepHint>
         <div className="mb-5">
           <p className="text-sm font-semibold text-gray-800 mb-2">א. האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?</p>
           <YNRow val={A.q7a||""} onChange={v => setKey("q7a", v)} />
@@ -1346,7 +1346,7 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-pq ─────────────────────────────────────────────────────────────────────
-// Shortened prodromal questionnaire — 6 items (from PQ-16), yes/no
+// Shortened prodromal questionnaire - 6 items (from PQ-16), yes/no
 // Covers core CAARMS/PACE domains: auditory & visual hallucinations, paranoia,
 // thought disorder, reality testing confusion, thought broadcasting
 function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
@@ -1355,7 +1355,7 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
     <div>
       <Card>
         <StepTag>שאלון</StepTag>
-        <StepQ>שאלון — 6 סעיפים</StepQ>
+        <StepQ>שאלון - 6 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף, על סמך מה שהבחנתם</StepHint>
         <SubCard>
           {pqItems.map(({key,label})=>(
@@ -1381,7 +1381,7 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={8}/>
-        <StepTag>שאלה 8 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 8 מתוך 10 - רגשי</StepTag>
         <StepQ>דפוסי אכילה מדאיגים</StepQ>
         <StepHint>קשיים סביב אוכל, משקל או דימוי גוף</StepHint>
         <YNRow val={A.q8||""} onChange={v=>{ const nA={...A,q8:v}; setA(nA); onNext(nA); }} />
@@ -1404,7 +1404,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         {under12 ? (
           <>
             <SubCard>
-              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה — הגבלה (עד גיל 12)</div>
+              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה - הגבלה (עד גיל 12)</div>
               {[
                 {key:"ea1", label:"1. ירידה משמעותית במשקל"},
                 {key:"ea2", label:"2. סירוב לאכול / הגבלת אכילה"},
@@ -1422,7 +1422,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
               ))}
             </SubCard>
             <SubCard>
-              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה — אכילה מוגזמת (עד גיל 12)</div>
+              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה - אכילה מוגזמת (עד גיל 12)</div>
               {[
                 {key:"ea5", label:"1. אפיזודות חוזרות של אכילה מוגזמת"},
                 {key:"ea6", label:"2. התנהגויות מפצות (הקאה, משלשלים, צום)"},
@@ -1443,7 +1443,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         ) : (
           <>
             <SubCard>
-              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה — הגבלה (12+)</div>
+              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה - הגבלה (12+)</div>
               {[
                 {key:"eb1", label:"1. הגבלה חמורה בצריכת מזון → משקל נמוך"},
                 {key:"eb2", label:"2. פחד עז מעלייה במשקל"},
@@ -1460,7 +1460,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
               ))}
             </SubCard>
             <SubCard>
-              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה — אכילה מוגזמת (12+)</div>
+              <div className="text-sm font-semibold text-[#2a3a4a] mb-3">🍽️ קשיי אכילה - אכילה מוגזמת (12+)</div>
               {[
                 {key:"eb4", label:"1. אכילה מוגזמת חוזרת בפרק זמן קצר"},
                 {key:"eb5", label:"2. התנהגויות מפצות (הקאה, משלשלים)"},
@@ -1491,7 +1491,7 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <EqNum n={9}/>
-        <StepTag>שאלה 9 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 9 מתוך 10 - רגשי</StepTag>
         <StepQ>סימנים לחוסר יציבות ביחסים, קושי בוויסות רגשות ואימפולסיביות</StepQ>
         <YNRow val={A.q9||""} onChange={v=>{ const nA={...A,q9:v}; setA(nA); onNext(nA); }} />
       </Card>
@@ -1527,12 +1527,12 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
   );
 }
 
-// ── p-q9-adhd — Q9 re-route to the ADHD questionnaire for grades ב׳–ו׳ ────────
+// ── p-q9-adhd - Q9 re-route to the ADHD questionnaire for grades ב׳–ו׳ ────────
 function PageQ9Adhd({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
   return (
     <div>
       <Card>
-        <StepTag>שאלה 9 — קשב וריכוז</StepTag>
+        <StepTag>שאלה 9 - קשב וריכוז</StepTag>
         <StepQ>שאלון קשב (ADHD)</StepQ>
         <StepHint>בגיל זה, קושי בוויסות ובאימפולסיביות נבדק דרך שאלון הקשב</StepHint>
         <AcadAdhdBlock prefix="q9" A={A} setA={setA} items={items} />
@@ -1548,7 +1548,7 @@ function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
     <div>
       <Card>
         <EqNum n={10}/>
-        <StepTag>שאלה 10 מתוך 10 — רגשי</StepTag>
+        <StepTag>שאלה 10 מתוך 10 - רגשי</StepTag>
         <StepQ>קשיים רגשיים אחרים שלא עלו בשאלון</StepQ>
         <StepHint>ענה רק אם לא ענית חיובי באף שאלה קודמת</StepHint>
         <YNRow val={A.q10||""} onChange={v=>{ const nA={...A,q10:v}; setA(nA); onNext(nA); }} />
@@ -1581,7 +1581,7 @@ function PageQ10Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; 
   return (
     <div>
       <Card>
-        <StepTag>קשיים כלליים — לפי כיתה</StepTag>
+        <StepTag>קשיים כלליים - לפי כיתה</StepTag>
         <StepQ>שאלות משלימות</StepQ>
 
         {grp === "ga" && (
@@ -1642,7 +1642,7 @@ function PageGaTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; 
   return (
     <div>
       <Card>
-        <StepTag>שאלון מאפייני הילד — גן עד כיתה א׳</StepTag>
+        <StepTag>שאלון מאפייני הילד - גן עד כיתה א׳</StepTag>
         <StepQ>שאלות לצורך קביעת סוג הטיפול</StepQ>
 
         <div className="mb-5">
@@ -1666,7 +1666,7 @@ function PageGaTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; 
                 {key:"ga_int_music",  label:"🎵 מוזיקה"},
                 {key:"ga_int_move",   label:"🏃 תנועה"},
                 {key:"ga_int_drama",  label:"🎭 דרמה"},
-                {key:"ga_int_biblio", label:"📖 ביבליותרפיה — סיפור"},
+                {key:"ga_int_biblio", label:"📖 ביבליותרפיה - סיפור"},
                 {key:"ga_int_garden", label:"🌱 גינון"},
                 {key:"ga_int_animal", label:'🐾 בע"ח'},
               ].map(({key,label})=>(
@@ -1734,7 +1734,7 @@ function PageDevSensory({ A, setA, onNext, onBack, items }: PageProps) {
       <Card>
         <StepTag>🟣 קשיים התפתחותיים</StepTag>
         <StepQ>2. האם ישנם קשיים של ויסות חושי?</StepQ>
-        <StepHint>תגובות חריגות לגירויים יומיומיים — רתיעה קיצונית מרעשים/מגע (רגישות-יתר) או חיפוש מתמיד אחר תנועה ועוצמה (תת-רגישות)</StepHint>
+        <StepHint>תגובות חריגות לגירויים יומיומיים - רתיעה קיצונית מרעשים/מגע (רגישות-יתר) או חיפוש מתמיד אחר תנועה ועוצמה (תת-רגישות)</StepHint>
         <YNRow val={A.dev_sensory||""} onChange={v => setA({...A, dev_sensory:v})} />
 
         {showQs && (
@@ -1789,7 +1789,7 @@ function AcadAdhdBlock({ prefix, A, setA, items }: { prefix: string; A: Ans; set
   const adhdHyper = items?.adhdHyper ?? [];
   return (
     <SubCard>
-      <div className="text-sm font-bold text-amber-800 mb-2">📋 שאלון קשב (ADHD) — סמן את הסימנים הקיימים</div>
+      <div className="text-sm font-bold text-amber-800 mb-2">📋 שאלון קשב (ADHD) - סמן את הסימנים הקיימים</div>
       <div className="text-xs font-semibold text-amber-700 mb-1">קשב:</div>
       {adhdInatt.map((label, i) => {
         const k = `${prefix}_ad${i+1}`;
@@ -1976,7 +1976,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
                 </SubCard>
               )}
             </div>
-            {/* שאלה 2: קשב (עצמאית) — מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
+            {/* שאלה 2: קשב (עצמאית) - מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
             {!q9AdhdActive(A) && (
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם את/ה רואה סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
@@ -1999,7 +1999,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
@@ -2095,7 +2095,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
                 </SubCard>
               )}
             </div>
-            {/* שאלה 2: קשב עצמאי — מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
+            {/* שאלה 2: קשב עצמאי - מדולג לכיתות ב׳–ו׳ עם q9=כן (נאסף כבר ב-Q9) */}
             {!q9AdhdActive(A) && (
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">2. האם יש סימנים לקשיי קשב, ריכוז, היפראקטיביות או חולמנות?</p>
@@ -2118,7 +2118,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה — אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
@@ -2166,19 +2166,19 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
             <strong>איך לדרג כל מקצוע:</strong> דירוג ביחס לבני הכיתה.
             <br />• <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת).
             <br />• <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה).
-            <br />• <strong>20%</strong> = בקבוצה החלשה — לא הכי, אך מתקשה משמעותית.
+            <br />• <strong>20%</strong> = בקבוצה החלשה - לא הכי, אך מתקשה משמעותית.
             <br />• <strong>מעל 20%</strong> = קושי קל-בינוני.
           </div>
           <div className="mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-2">1. רבי מלל (קריאה והבנת הנקרא) — רמת ביצוע ביחס לכיתה</p>
+            <p className="text-sm font-semibold text-gray-800 mb-2">1. רבי מלל (קריאה והבנת הנקרא) - רמת ביצוע ביחס לכיתה</p>
             <div className="flex gap-2 flex-wrap">{verbalOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_verbal"]===val)} onClick={() => setA({...A, [p+"_verbal"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-2">2. מתמטיקה — רמת ביצוע ביחס לכיתה</p>
+            <p className="text-sm font-semibold text-gray-800 mb-2">2. מתמטיקה - רמת ביצוע ביחס לכיתה</p>
             <div className="flex gap-2 flex-wrap">{mathEngOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_math"]===val)} onClick={() => setA({...A, [p+"_math"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
-            <p className="text-sm font-semibold text-gray-800 mb-2">3. אנגלית — רמת ביצוע ביחס לכיתה</p>
+            <p className="text-sm font-semibold text-gray-800 mb-2">3. אנגלית - רמת ביצוע ביחס לכיתה</p>
             <div className="flex gap-2 flex-wrap">{mathEngOpts.map(([val, label]) => <button key={val} className={ob(A[p+"_eng"]===val)} onClick={() => setA({...A, [p+"_eng"]:val})}>{label}</button>)}</div>
           </div>
           <div className="mb-4">
@@ -2211,7 +2211,7 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
       <Card>
         <StepTag>🟠 קשיים התנהגותיים</StepTag>
         <StepQ>שאלות על קשיים התנהגותיים</StepQ>
-        <StepHint>ענה על 3 השאלות — הפלט יינתן לפי רמת הקושי הגבוהה ביותר שסומנה</StepHint>
+        <StepHint>ענה על 3 השאלות - הפלט יינתן לפי רמת הקושי הגבוהה ביותר שסומנה</StepHint>
         {[
           { key:"beh1", label:"1. חוסר רצון להשתתף בלמידה ו/או הפרעות ודיבורים בשיעור" },
           { key:"beh2", label:"2. חוצפה כלפי צוות ההוראה" },
@@ -2233,7 +2233,7 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 }
 
 // ── p-soc ─────────────────────────────────────────────────────────────────────
-// Shortened social anxiety screen — 8 items, single scale 0–3
+// Shortened social anxiety screen - 8 items, single scale 0–3
 // Items selected to cover key DSM-5 domains for childhood social anxiety
 
 function needsSocTherapyMotiv(A: Ans): boolean {
@@ -2262,9 +2262,9 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
       <Card>
         <StepTag>🟣 קשיים חברתיים</StepTag>
         <StepQ>שאלות על קשיים חברתיים</StepQ>
-        <StepHint>ענה על 3 השאלות — שאלות נוספות יפתחו לפי הצורך</StepHint>
+        <StepHint>ענה על 3 השאלות - שאלות נוספות יפתחו לפי הצורך</StepHint>
 
-        {/* soc1 — ביישנות / חרדה חברתית */}
+        {/* soc1 - ביישנות / חרדה חברתית */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">1. האם מגלה סימנים של ביישנות, הימנעות וחשש מאינטראקציות חברתיות?</p>
           <div className="flex gap-3">
@@ -2298,7 +2298,7 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           )}
         </div>
 
-        {/* soc2 — חיכוכים / מריבות */}
+        {/* soc2 - חיכוכים / מריבות */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">2. האם מגלה סימנים של חיכוכים ומריבות עם בני/בנות גילו?</p>
           <div className="flex gap-3">
@@ -2318,7 +2318,7 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           )}
         </div>
 
-        {/* soc3 — קשיי תקשורת */}
+        {/* soc3 - קשיי תקשורת */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">3. האם ישנם סימנים לקשיים בתקשורת בינו/ה לבין חבריו/הוריו?</p>
           <div className="flex gap-3">
@@ -2361,7 +2361,7 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
                   ))}
                   {allComm && (
                     <div className="border-t border-[#c084fc] pt-3">
-                      <p className="text-xs font-bold text-[#4a1a6a] mb-3">במידה וכל 3 הסימנים קיימים — בדוק גם:</p>
+                      <p className="text-xs font-bold text-[#4a1a6a] mb-3">במידה וכל 3 הסימנים קיימים - בדוק גם:</p>
                       {[
                         { key:"comm_rep",      label:"1. האם ישנה התנהגות חזרתית? (תנועות חוזרות, דיבור חזרתי)" },
                         { key:"comm_rigid",    label:"2. האם יש הצמדות לשגרה נוקשה וקושי להתמודד עם שינויים?" },
@@ -2539,7 +2539,7 @@ function KidsMatchSection({ A, score, selection }: {
     try {
       const referrer = document.referrer || "";
       const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
-      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי — לא הפרופיל —
+      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי - לא הפרופיל -
       // ולכן בודקים גם את סוג הניווט, אחרת המשתמש נזרק לתחילת השאלון.
       const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
       if (!cameFromProfile && navType !== "back_forward") return;
@@ -2667,7 +2667,7 @@ function KidsMatchSection({ A, score, selection }: {
   async function doMatch() {
     setLoading(true);
     setError("");
-    // Top of the kids match funnel — mirrors the adults' trackMatchingClick on
+    // Top of the kids match funnel - mirrors the adults' trackMatchingClick on
     // "מצא לי מטפל". Until now the kids flow emitted no matching_click at all.
     trackMatchingClick(
       "kids",
@@ -2711,7 +2711,7 @@ function KidsMatchSection({ A, score, selection }: {
 
   return (
     <div className="mt-8">
-      {/* "Back to recommendations" — visible whenever the match section is shown
+      {/* "Back to recommendations" - visible whenever the match section is shown
           (form or results), so the user never feels locked into one referral.
           Smooth-scrolls back to the start of the recommendation cards above. */}
       <button
@@ -2730,7 +2730,7 @@ function KidsMatchSection({ A, score, selection }: {
           className="w-full py-4 rounded-2xl text-white font-bold text-base shadow-md transition hover:opacity-90 active:scale-95"
           style={{ background: isAssessment ? "linear-gradient(135deg,#5a3e7a,#7a4a9a)" : "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
         >
-          {isAssessment ? "🔎" : "🔍"} מציאת {personLabel} מתאים/ה — {treatmentLabels.join(" + ")}
+          {isAssessment ? "🔎" : "🔍"} מציאת {personLabel} מתאים/ה - {treatmentLabels.join(" + ")}
         </button>
       ) : (
         <div className={`rounded-2xl border p-5 ${isAssessment ? "border-purple-200 bg-purple-50" : "border-[#c8d8f0] bg-[#f0f5ff]"}`}>
@@ -2859,7 +2859,7 @@ function KidsMatchSection({ A, score, selection }: {
                     params.set("a", "child");
                     const r = normalizeKidsRegionKey(region, online);
                     if (r) params.set("r", r);
-                    // Which treatment/assessment recommendation sent this visitor —
+                    // Which treatment/assessment recommendation sent this visitor -
                     // feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
                     if (treatmentLabels.length > 0) params.set("t", treatmentLabels.join(" + ").slice(0, 80));
                     if (t.entity_type === "center" && t.profile_slug) return `/centers/${t.profile_slug}`;
@@ -3007,7 +3007,7 @@ function GroupCard({
   group: KidsRecommendationGroup & { domainLabel: string };
   onSelect: (() => void) | null;
   selected: boolean;
-  // AI explanation hooks — when onExplain is omitted, the explain button is hidden
+  // AI explanation hooks - when onExplain is omitted, the explain button is hidden
   // (used for "informational" and "external" cards that don't have an actionable treatment).
   onExplain?: () => void;
   explanation?: { title: string; explanation: string; evidence_note: string } | null;
@@ -3098,7 +3098,7 @@ function GroupCard({
                     : "bg-[var(--teal-dark)]"
               }`}
             >
-              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {group.treatmentLabel} ←
+              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} - {group.treatmentLabel} ←
             </button>
           ) : (
             <div className="inline-block rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">
@@ -3119,7 +3119,7 @@ function GroupCard({
                   sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : "bg-[var(--teal-dark)]"
                 }`}
               >
-                {sAssessment ? "🔎 חיפוש מאבחן/ת" : sProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} — {s.treatmentLabel} ←
+                {sAssessment ? "🔎 חיפוש מאבחן/ת" : sProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} - {s.treatmentLabel} ←
               </button>
             );
           })}
@@ -3171,7 +3171,7 @@ function GroupCard({
       {allTools.length > 0 && (
         <details className="mt-3" open={group.urgent}>
           <summary className="cursor-pointer select-none list-none rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100">
-            🛠 {allTools.length} כלים מעשיים להתמודדות — אפשר להתחיל כבר עכשיו »
+            🛠 {allTools.length} כלים מעשיים להתמודדות - אפשר להתחיל כבר עכשיו »
           </summary>
           <div className="mt-2 space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
             {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
@@ -3193,7 +3193,7 @@ function GroupCard({
       {expandedNotes.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-bold text-gray-500 hover:text-[var(--teal-dark)] select-none">
-            📋 הסבר מורחב — לחץ להרחיב
+            📋 הסבר מורחב - לחץ להרחיב
           </summary>
           <div className="mt-3 space-y-3 rounded-xl bg-white/60 p-3 border border-gray-200">
             {expandedNotes.map((n, i) => (
@@ -3232,7 +3232,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     if (recExplainLoading[key] || recExplain[key]) return;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
 
-    // Fire-and-forget analytics event — admin sees who clicks and on what.
+    // Fire-and-forget analytics event - admin sees who clicks and on what.
     try {
       fetch("/api/track-explain", {
         method: "POST",
@@ -3422,7 +3422,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
   return (
     <div id="kids-results-card">
-      {/* Logo — included in the captured PDF report */}
+      {/* Logo - included in the captured PDF report */}
       <div className="mb-4 flex justify-center">
         <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
       </div>
@@ -3434,15 +3434,15 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         <div className="bg-gray-50 rounded-xl p-4 mb-4 text-sm space-y-1.5 text-[#2a3a4a]">
           <div className="flex justify-between">
             <span className="font-semibold">גיל:</span>
-            <span>{A._age || "—"}</span>
+            <span>{A._age || "-"}</span>
           </div>
           <div className="flex justify-between">
             <span className="font-semibold">כיתה:</span>
-            <span>{GRADE_LABELS[A._grade] || A._grade || "—"}</span>
+            <span>{GRADE_LABELS[A._grade] || A._grade || "-"}</span>
           </div>
           <div className="flex justify-between">
             <span className="font-semibold">מגדר:</span>
-            <span>{A.gender || "—"}</span>
+            <span>{A.gender || "-"}</span>
           </div>
           {bmiVal && (
             <div className="flex justify-between">
@@ -3475,11 +3475,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
             </div>
             <div className="flex items-start gap-2.5">
               <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">2</span>
-              <span>בכל ממצא — פתחו את <span className="font-semibold text-amber-700">🛠 הכלים המעשיים</span> שאפשר להתחיל ליישם כבר עכשיו</span>
+              <span>בכל ממצא - פתחו את <span className="font-semibold text-amber-700">🛠 הכלים המעשיים</span> שאפשר להתחיל ליישם כבר עכשיו</span>
             </div>
             <div className="flex items-start gap-2.5">
               <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
-              <span>כשמוכנים — לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן"</span> בממצא הרלוונטי ביותר עבורכם</span>
+              <span>כשמוכנים - לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן"</span> בממצא הרלוונטי ביותר עבורכם</span>
             </div>
           </div>
         </div>
@@ -3527,7 +3527,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
           const domainTreatmentKeys = uniq(b.treatments.map(g => g.treatmentKey));
           const domainAssessmentKeys = uniq(b.assessments.map(g => g.treatmentKey));
-          // Combined search is reserved for the emotional domain only — combining e.g. an
+          // Combined search is reserved for the emotional domain only - combining e.g. an
           // academic-LD treatment with a behavioral one doesn't map to a real-world practitioner.
           const showCombinedT = b.key === "emotional" && domainTreatmentKeys.length >= 2;
           const showCombinedA = b.key === "emotional" && domainAssessmentKeys.length >= 2;
@@ -3641,7 +3641,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                 </div>
               )}
 
-              {/* Professionals — hard-filtered search by therapist type */}
+              {/* Professionals - hard-filtered search by therapist type */}
               {b.professionals.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-emerald-600 mb-2 pr-1">👩‍⚕️ אנשי מקצוע מומלצים</div>
@@ -3669,11 +3669,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
                 </div>
               )}
 
-              {/* Externals — no search button */}
+              {/* Externals - no search button */}
               {b.externals.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2 pr-1">🩺 פניות נוספות</div>
-                  <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה — יש לפנות אליהם בנפרד.</p>
+                  <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה - יש לפנות אליהם בנפרד.</p>
                   {b.externals.map(g => (
                     <GroupCard
                       key={g.recs[0].id}
@@ -3715,7 +3715,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         )}
       </div>
 
-      {/* Matching — visible only after a selection. Excluded from the PDF capture. */}
+      {/* Matching - visible only after a selection. Excluded from the PDF capture. */}
       <div id="kids-match-section" data-html2canvas-ignore="true">
         {activeSelection && (
           <KidsMatchSection A={A} score={score} selection={activeSelection} />
@@ -3746,7 +3746,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         </button>
       </div>
 
-      {/* Anonymous feedback — why did you stop / what was unclear */}
+      {/* Anonymous feedback - why did you stop / what was unclear */}
       <div className="print:hidden" data-html2canvas-ignore="true">
         <QuizFeedbackBox quizType="kids" />
       </div>
@@ -3792,7 +3792,7 @@ export default function KidsPage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    // Staff bypass token — validated server-side; not shipped in the bundle.
+    // Staff bypass token - validated server-side; not shipped in the bundle.
     const staffParam = params.get("staff");
     if (staffParam) localStorage.setItem("staff_token", staffParam);
     if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
@@ -3809,7 +3809,7 @@ export default function KidsPage() {
     try {
       const referrer = document.referrer || "";
       const cameFromProfile = /\/therapists\/[^/]+/.test(referrer);
-      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי — לא הפרופיל —
+      // בניווט "אחורה" אמיתי (בלי bfcache) הרפרר נשאר המקורי - לא הפרופיל -
       // ולכן בודקים גם את סוג הניווט, אחרת המשתמש נזרק לתחילת השאלון.
       const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
       if (!cameFromProfile && navType !== "back_forward") return;
@@ -3839,7 +3839,7 @@ export default function KidsPage() {
 
   useEffect(() => {
     if (step === "p-result") {
-      // trackQuizComplete already reports quiz_complete to GA4 — the inline
+      // trackQuizComplete already reports quiz_complete to GA4 - the inline
       // "quiz_completed" duplicate (a second GA4 name for the same action) is gone.
       trackQuizComplete("kids");
       fetchScore(A);
@@ -3847,7 +3847,7 @@ export default function KidsPage() {
   }, [step]);
 
   // Scoring consumes one free-tier credit server-side and refuses (402) once
-  // the limit is reached, so the result itself is gated — not just the UI.
+  // the limit is reached, so the result itself is gated - not just the UI.
   async function fetchScore(answers: Ans) {
     setScoreError(false);
     setKidsScore(null);
@@ -3885,7 +3885,7 @@ export default function KidsPage() {
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
   const pageProps = { A, setA, onNext: goNext, onBack: goBack, items: kidsItems };
 
-  // paymentRequired is set when the server refused to score (limit reached) —
+  // paymentRequired is set when the server refused to score (limit reached) -
   // blocks the result too, unlike the pre-quiz usageAllowed gate below.
   if (paymentRequired || (usageAllowed === false && step !== "p-result")) return (
     <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">

@@ -7,7 +7,7 @@ const NEW_THERAPIST_BOOST_DAYS = 7;
 
 // A region/city landing page is only worth indexing once it has real content.
 // Below this many listed therapists it's near-empty (and near-duplicate of the
-// region/other cities), which Google flags as "thin" — so such pages are set to
+// region/other cities), which Google flags as "thin" - so such pages are set to
 // noindex and kept out of the sitemap until they fill up.
 export const MIN_LISTED_FOR_INDEX = 3;
 const PROFILE_PHOTOS_BUCKET =
@@ -39,10 +39,10 @@ function rowInRegion(regions: string[] | null, region: string): boolean {
 }
 
 // Directory ranking tier for the client-side per-visit shuffle:
-//   0 = paying  — real money on the table (individual "paid" + center-subscription)
-//   1 = gift    — manual / trial promotions (comped, no payment)
-//   2 = free    — approved, unpaid
-//   3 = not accepting new patients — still listed, always last
+//   0 = paying  - real money on the table (individual "paid" + center-subscription)
+//   1 = gift    - manual / trial promotions (comped, no payment)
+//   2 = free    - approved, unpaid
+//   3 = not accepting new patients - still listed, always last
 function tierOf(t: TherapistRow): number {
   if (t.accepting_new_patients === false) return 3;
   if (t.status === "paying" && (t.promotion_source === "paid" || t.promotion_source === "center")) return 0;
@@ -111,7 +111,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (error || !data) return [];
 
   let rows = data as TherapistRow[];
-  // A center's public page wants exactly its therapists — skip the main/para
+  // A center's public page wants exactly its therapists - skip the main/para
   // category filter there (a center may include para-medical therapists too).
   if (filter?.centerId) return rows.filter((t) => t.center_account_id === filter.centerId);
   // Default to the "main" directory (exclude para-only therapists); the
@@ -133,7 +133,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   return rows;
 }
 
-// Count listed therapists matching a filter — no photo signing, for deciding
+// Count listed therapists matching a filter - no photo signing, for deciding
 // whether a landing page is populated enough to index.
 export async function countListed(filter?: DirectoryFilter): Promise<number> {
   return (await loadFilteredRows(filter)).length;
@@ -165,7 +165,7 @@ export async function loadPublicTherapists(
 ): Promise<PublicTherapist[]> {
   const allRows = await loadFilteredRows(filter);
 
-  // Therapists not accepting new patients stay listed but always sort last —
+  // Therapists not accepting new patients stay listed but always sort last -
   // no point showcasing someone patients can't currently reach.
   const unavailable = allRows.filter((t) => t.accepting_new_patients === false);
   const rows = allRows.filter((t) => t.accepting_new_patients !== false);
@@ -175,10 +175,10 @@ export async function loadPublicTherapists(
     t.created_at != null && new Date(t.created_at).getTime() >= boostCutoff;
 
   // Promoted = status "paying". Tiers, highest first:
-  //   paid   — individual full-price subscribers (promotion_source="paid")
-  //   center — promoted via their center's subscription (promotion_source="center")
-  //   gift   — manual/trial gift promotions
-  //   free   — approved, unpaid
+  //   paid   - individual full-price subscribers (promotion_source="paid")
+  //   center - promoted via their center's subscription (promotion_source="center")
+  //   gift   - manual/trial gift promotions
+  //   free   - approved, unpaid
   // Center therapists rank as a distinct promoted tier (a paid-plan benefit:
   // "all center therapists appear at the top of their region"), above gift
   // promotions and above the free tier. The new-therapist boost is preserved

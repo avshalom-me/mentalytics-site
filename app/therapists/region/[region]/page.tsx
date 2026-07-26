@@ -47,8 +47,8 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
     ? "מטפלים ופסיכולוגים לטיפול אונליין | טיפול חכם"
     : `פסיכולוגים ומטפלים ב${label} | טיפול חכם`;
   const description = isOnline
-    ? "רשימת מטפלים ופסיכולוגים המציעים טיפול אונליין — מותאמת אישית דרך טיפול חכם."
-    : `מצאו פסיכולוגים ומטפלים מאומתים ב${label} — מותאם אישית דרך טיפול חכם.`;
+    ? "רשימת מטפלים ופסיכולוגים המציעים טיפול אונליין - מותאמת אישית דרך טיפול חכם."
+    : `מצאו פסיכולוגים ומטפלים מאומתים ב${label} - מותאם אישית דרך טיפול חכם.`;
   const url = `${BASE}/therapists/region/${regionParam}`;
   // Keep near-empty region pages out of the index until they have real content,
   // so Google doesn't flag them as thin / near-duplicate. The online page is a
@@ -129,7 +129,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         )}
       </div>
 
-      {/* Prominent quiz CTA — offer the matching quiz as an alternative to
+      {/* Prominent quiz CTA - offer the matching quiz as an alternative to
           browsing. The quiz ends in a personal match the visitor can take online. */}
       <div
         className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
@@ -164,7 +164,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </div>
       )}
 
-      {/* SEO content — below the listings (patients rarely scroll here; crawlers do) */}
+      {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
       <CitySeoSection
         placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
         kind={isOnline ? "online" : "region"}

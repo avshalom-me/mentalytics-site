@@ -6,7 +6,7 @@ import { CITY_TO_REGION } from "./regions";
 // "מאמרים ממטפלים ב{מקום}" section on city/region/online landing pages.
 // Matching: city page → author listed that city; region page → any of the
 // author's cities maps to the region; online page → author works online.
-// House/editorial pieces (author_name set) are excluded — they aren't a local
+// House/editorial pieces (author_name set) are excluded - they aren't a local
 // therapist's own writing.
 
 export type LocalArticle = {
@@ -23,7 +23,7 @@ type Row = {
   therapists: { full_name: string | null; regions: string[] | null; online: boolean | null } | null;
 };
 
-// Approved therapist articles matched by TOPIC (therapist_articles.topic) —
+// Approved therapist articles matched by TOPIC (therapist_articles.topic) -
 // for the specialty landing pages ("מאמרים בנושא" under טיפול זוגי etc.).
 export async function loadArticlesByTopics(topics: string[], limit = 4): Promise<LocalArticle[]> {
   if (topics.length === 0) return [];

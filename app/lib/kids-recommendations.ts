@@ -30,13 +30,13 @@ export interface KidsRecommendation {
 
 export interface KidsTool {
   text: string;                 // tool body (with 📌 prefix preserved)
-  sourceSymptom?: string;       // best-effort match — which symptom triggered this tool
+  sourceSymptom?: string;       // best-effort match - which symptom triggered this tool
 }
 
 export interface KidsDomainResult {
   groups: KidsRecommendationGroup[];     // recommendations bucketed by treatmentKey
   externalNotes: string[];               // cross-domain notes / counselor footer / multi-ref notice
-  standaloneWarnings: KidsWarning[];     // vision/hearing/etc. — no treatment, just info
+  standaloneWarnings: KidsWarning[];     // vision/hearing/etc. - no treatment, just info
 }
 
 export interface KidsRecommendationGroup {
@@ -91,14 +91,14 @@ const TREATMENT_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /טיפול באנקופרזיס/, key: "טיפול באנקופרזיס", label: "טיפול באנקופרזיס" },
 ];
 
-// Professional types — clinicians whose primary identifier is the professional
+// Professional types - clinicians whose primary identifier is the professional
 // type (matched against `therapist_types`), not a training area. These get a
 // hard-filter search button that returns ONLY therapists of this type.
 const PROFESSIONAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /דיאטנית קלינית|דיאטנ\/?ית קליני\/?ת/, key: "דיאטנ/ית קליני/ת", label: "דיאטנ/ית קליני/ת" },
 ];
 
-// External referrals — clinicians/doctors not in our DB (no search button)
+// External referrals - clinicians/doctors not in our DB (no search button)
 const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /נוירולוג|רופא ילדים המומחה בקשיי קשב/, key: "נוירולוג קשב", label: "פנייה לנוירולוג / רופא ילדים מומחה בקשיי קשב" },
   { rx: /אופטומטריסט|רופא עיניים/, key: "בדיקת ראייה", label: "בדיקת ראייה" },
@@ -262,7 +262,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
         urgent: pending.urgent,
       });
     }
-    // Symptoms with no ref (e.g. low-stress only) — emit as a "no-treatment" rec
+    // Symptoms with no ref (e.g. low-stress only) - emit as a "no-treatment" rec
     // so the UI can still show the symptoms.
     if (pending.symptoms.length && !pending.refs.length) {
       allRecs.push({
@@ -283,7 +283,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
   for (const box of boxes) {
     const txt = box.txt || "";
 
-    // Domain header (e.g. "📚 נמצאו קשיים לימודיים — כיתות ז-ח") — skip, the UI provides its own header
+    // Domain header (e.g. "📚 נמצאו קשיים לימודיים - כיתות ז-ח") - skip, the UI provides its own header
     if (box.cls === "purple" && txt.startsWith(READING_PREFIX) && !txt.includes(SYMPTOM_PREFIX) && !txt.includes(REF_PREFIX)) {
       flushPending();
       continue;
@@ -305,7 +305,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
       continue;
     }
 
-    // Reading link — keep with current group as a tool/note
+    // Reading link - keep with current group as a tool/note
     if (box.cls === "info" && txt.startsWith(READING_PREFIX)) {
       pending.tools.push(txt);
       continue;
@@ -324,9 +324,9 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
       continue;
     }
 
-    // Standalone urgent warning (no 📊) — danger or warn
+    // Standalone urgent warning (no 📊) - danger or warn
     if ((box.cls === "danger" || box.cls === "warn") && (txt.startsWith(WARN_PREFIX) || txt.startsWith(URGENT_PREFIX))) {
-      // 🚨 (URGENT_PREFIX) is ALWAYS standalone — flush any pending group first
+      // 🚨 (URGENT_PREFIX) is ALWAYS standalone - flush any pending group first
       // so the warning never gets glued to an unrelated treatment recommendation.
       // ⚠️ (WARN_PREFIX) attaches to the current pending group if one exists
       // (e.g. "⚠️ דווח על כאבים כרוניים" inside a current Q1 anxiety group).
@@ -369,7 +369,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
       continue;
     }
 
-    // Generic info — skip silently (rare)
+    // Generic info - skip silently (rare)
   }
 
   flushPending();

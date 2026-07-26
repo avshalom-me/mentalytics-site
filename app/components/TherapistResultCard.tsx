@@ -7,7 +7,7 @@ import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
 // Context-aware ordering for the card's city chip: on a city landing page the
 // page's own city shows first (a Kfar-Saba visitor seeing "📍 נתניה" on a
-// Kfar-Saba page read as a bug — regions[0] was just whatever city the
+// Kfar-Saba page read as a bug - regions[0] was just whatever city the
 // therapist typed first), then other cities in the page's region, then the
 // rest. All cities are shown (therapists list at most ~3), like the matching
 // results already do.

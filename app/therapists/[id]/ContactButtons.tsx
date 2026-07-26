@@ -30,7 +30,7 @@ function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", s
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // keepalive: on mobile the tap immediately jumps to WhatsApp / the dialer,
-    // backgrounding the page — without it the in-flight request can be killed
+    // backgrounding the page - without it the in-flight request can be killed
     // and the contact silently undercounted.
     keepalive: true,
     body: JSON.stringify({
@@ -41,7 +41,7 @@ function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", s
       ...attribution,
     }),
   }).catch(() => {});
-  // GA4 conversion: the patient reached out to a therapist — the key patient-side
+  // GA4 conversion: the patient reached out to a therapist - the key patient-side
   // lead. Mark it a Key Event + import to Google Ads so paid search optimizes to it.
   gaEvent("generate_lead", { method: clickType, source });
 }
@@ -94,7 +94,7 @@ export default function ContactButtons({
         </button>
       </div>
 
-      {/* Sticky mobile contact bar — always reachable while scrolling */}
+      {/* Sticky mobile contact bar - always reachable while scrolling */}
       {mobileSticky && (
         <div className="fixed inset-x-0 bottom-0 z-40 sm:hidden bg-white/95 backdrop-blur border-t border-[#DDE9E8] px-4 py-3"
           style={{ paddingBottom: "calc(0.75rem + env(safe-area-inset-bottom))" }}>

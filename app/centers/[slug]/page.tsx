@@ -11,8 +11,8 @@ import TrackView from "@/app/therapists/[id]/TrackView";
 import CenterMessageButton from "./CenterMessageButton";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
-// עמוד מרכז ציבורי (SEO). מסלול 1 — מציג את מטפלי המרכז. מסלול 2 (מרכז כישות)
-// — מציג את הפרופיל הויזואלי: לוגו, מה המרכז מציע (מתוך שורת הישות), וצוות/ראשי
+// עמוד מרכז ציבורי (SEO). מסלול 1 - מציג את מטפלי המרכז. מסלול 2 (מרכז כישות)
+// - מציג את הפרופיל הויזואלי: לוגו, מה המרכז מציע (מתוך שורת הישות), וצוות/ראשי
 // המרכז. גלוי רק למרכז פעיל (getPublicCenterBySlug אוכף).
 
 const BASE = "https://www.mentalytics.co.il";
@@ -54,7 +54,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!center) return { title: "מרכז לא נמצא", robots: { index: false, follow: false } };
 
   const cityPart = center.public_city ? ` ב${center.public_city}` : "";
-  // בלי "| טיפול חכם" — תבנית ה-layout כבר מוסיפה את המותג (אחרת הוא מוכפל).
+  // בלי "| טיפול חכם" - תבנית ה-layout כבר מוסיפה את המותג (אחרת הוא מוכפל).
   const title = `${center.name} - מרכז טיפולי${cityPart}`;
   const description =
     (center.public_description?.trim()?.slice(0, 155)) ||
@@ -92,7 +92,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
     isEntity ? Promise.resolve([]) : loadPublicTherapists({ centerId: center.id }),
   ]);
 
-  // צ'יפים של "מה המרכז מציע" — תחומי המומחיות + סוגי הטיפול של הישות.
+  // צ'יפים של "מה המרכז מציע" - תחומי המומחיות + סוגי הטיפול של הישות.
   const offerChips = Array.from(
     new Set([...(entity?.training_areas ?? []), ...(entity?.therapist_types ?? [])].map((s) => String(s).trim()).filter(Boolean)),
   );
@@ -102,13 +102,13 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
   const website = center.public_website?.trim();
   const websiteHref = website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : null;
 
-  // הודעה למרכז דרך מערכת ההודעות — רק כשהישות חיה (בהתאמות) ויש לה מייל.
+  // הודעה למרכז דרך מערכת ההודעות - רק כשהישות חיה (בהתאמות) ויש לה מייל.
   const canMessage = !!(
     entity && entity.email && ["approved", "paying"].includes(entity.status) && entity.accepting_new_patients !== false
   );
   const galleryPhotos = assets.gallery.filter((g) => g.url);
 
-  // פס עובדות-אמון — רק עובדות שמולאו, בלי המצאות.
+  // פס עובדות-אמון - רק עובדות שמולאו, בלי המצאות.
   const yearsActive = center.public_founded_year ? Math.max(0, new Date().getFullYear() - center.public_founded_year) : null;
   const locationsCount = Math.max(1, Math.floor(Number(center.num_locations) || 1));
   const facts: { value: string; label: string }[] = [
@@ -118,16 +118,16 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
     ...(offerChips.length >= 3 ? [{ value: String(offerChips.length), label: "תחומי טיפול" }] : []),
   ];
 
-  // דבר המנהל/ת — מוצג רק כשיש שם + טקסט.
+  // דבר המנהל/ת - מוצג רק כשיש שם + טקסט.
   const director = center.public_director;
   const showDirector = !!(director?.name?.trim() && director?.note?.trim());
 
-  // מילון הגישות — רק לצ'יפים שיש להם הסבר (תוכן פלטפורמה).
+  // מילון הגישות - רק לצ'יפים שיש להם הסבר (תוכן פלטפורמה).
   const explainedChips = offerChips
     .map((c) => ({ label: c, text: treatmentExplainer(c) }))
     .filter((c): c is { label: string; text: string } => !!c.text);
 
-  // מידע פרקטי — רק שורות עם תוכן.
+  // מידע פרקטי - רק שורות עם תוכן.
   const practicalRows = {
     address: center.public_address?.trim() || null,
     hours: center.public_hours?.trim() || null,
@@ -179,7 +179,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
           }).replace(/</g, "\\u003c"),
         }} />
       )}
-      {/* מסלול 2: צפייה בעמוד המרכז נספרת כצפייה בפרופיל הישות — מזינה את
+      {/* מסלול 2: צפייה בעמוד המרכז נספרת כצפייה בפרופיל הישות - מזינה את
           "צפיות בפרופיל" בפורטל המרכז (דה-דופ לפי session בצד השרת). */}
       {isEntity && entity && <TrackView therapistId={entity.id} source="directory" />}
 
@@ -228,7 +228,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </div>
       </header>
 
-      {/* פס עובדות-אמון — מספרים גדולים, רק עובדות שמולאו */}
+      {/* פס עובדות-אמון - מספרים גדולים, רק עובדות שמולאו */}
       {facts.length > 0 && (
         <section className="mt-10 rounded-[20px] border border-[var(--line)] bg-[var(--surface)] px-6 py-6">
           <div className={`grid gap-6 text-center ${facts.length === 2 ? "grid-cols-2" : facts.length === 3 ? "grid-cols-3" : "grid-cols-2 sm:grid-cols-4"}`}>
@@ -242,7 +242,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </section>
       )}
 
-      {/* דבר מנהל/ת המרכז — פנים ושם מאחורי המרכז */}
+      {/* דבר מנהל/ת המרכז - פנים ושם מאחורי המרכז */}
       {showDirector && (
         <section className="mt-10">
           <div className="rounded-[22px] border border-[var(--line)] bg-white p-7 shadow-sm md:p-9"
@@ -300,7 +300,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
             )}
           </div>
 
-          {/* מילון הגישות — הסבר בשפה פשוטה לכל גישה שהמרכז מציע (תוכן פלטפורמה) */}
+          {/* מילון הגישות - הסבר בשפה פשוטה לכל גישה שהמרכז מציע (תוכן פלטפורמה) */}
           {explainedChips.length > 0 && (
             <div className="mt-4 overflow-hidden rounded-[18px] border border-[var(--line)] bg-white">
               <p className="border-b border-[var(--line)] bg-[var(--surface)] px-5 py-3 text-[13px] font-extrabold text-[var(--text-2)]">
@@ -320,7 +320,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </section>
       )}
 
-      {/* גלריית המרכז — תמונות אמיתיות של המקום (הכניסה, חדרי הטיפול) */}
+      {/* גלריית המרכז - תמונות אמיתיות של המקום (הכניסה, חדרי הטיפול) */}
       {galleryPhotos.length > 0 && (
         <section className="mt-14">
           <h2 className="mb-1 flex items-center gap-2 text-[1.28rem] font-black tracking-tight text-[var(--text)]">
@@ -369,7 +369,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </section>
       )}
 
-      {/* מידע פרקטי — השאלות הקונקרטיות של פונה: איפה, מתי, איך */}
+      {/* מידע פרקטי - השאלות הקונקרטיות של פונה: איפה, מתי, איך */}
       {hasPractical && (
         <section className="mt-14">
           <h2 className="mb-1 flex items-center gap-2 text-[1.28rem] font-black tracking-tight text-[var(--text)]">
@@ -492,7 +492,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
           מתאימים לך את הטיפול הנכון ב{center.name}
         </h2>
         <p className="mx-auto mt-3 max-w-[52ch] text-[15px] leading-7 text-[var(--text-2)]">
-          מלאו שאלון קצר ומערכת ההתאמה החכמה תפנה אתכם ל{isEntity ? "מרכז" : "מטפל/ת המתאים/ה ביותר במרכז"} — לפי סוג הקושי, הגישה והאזור.
+          מלאו שאלון קצר ומערכת ההתאמה החכמה תפנה אתכם ל{isEntity ? "מרכז" : "מטפל/ת המתאים/ה ביותר במרכז"} - לפי סוג הקושי, הגישה והאזור.
         </p>
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Link href="/adults" className="inline-flex items-center gap-2 rounded-full px-7 py-3 text-base font-bold text-white transition hover:opacity-95"

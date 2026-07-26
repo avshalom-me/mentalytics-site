@@ -48,7 +48,7 @@ export function buildArticleInviteEmail(opts: {
 
   const subject = "הזמנה אישית: כתבו מאמר וקבלו חודשיים קידום במתנה 🎁";
 
-  // Free vs. promoted comparison — mirrors the /therapists/join pricing table.
+  // Free vs. promoted comparison - mirrors the /therapists/join pricing table.
   const comparisonTable = `
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 8px;font-size:13.5px;color:#1a4a5c;">
         <thead>
@@ -60,7 +60,7 @@ export function buildArticleInviteEmail(opts: {
         </thead>
         <tbody>
           <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">דף פרופיל אישי — תמונה, ביוגרפיה ותחומי התמחות</td>
+            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">דף פרופיל אישי - תמונה, ביוגרפיה ותחומי התמחות</td>
             ${yes()}${yes()}
           </tr>
           <tr>
@@ -72,7 +72,7 @@ export function buildArticleInviteEmail(opts: {
             ${no()}${yes()}
           </tr>
           <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">מערכת ההתאמה החכמה — פניות לפי גיל, אזור, שפה וסגנון טיפולי</td>
+            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">מערכת ההתאמה החכמה - פניות לפי גיל, אזור, שפה וסגנון טיפולי</td>
             ${no()}${yes()}
           </tr>
           <tr>
@@ -85,7 +85,7 @@ export function buildArticleInviteEmail(opts: {
           </tr>
         </tbody>
       </table>
-      <p style="margin:0 0 4px;font-size:12px;color:#6B807E;">המסלול המקודם ${regularPriceNote} — ואצלך הוא במתנה מלאה לחודשיים, ללא כרטיס אשראי וללא התחייבות.</p>`;
+      <p style="margin:0 0 4px;font-size:12px;color:#6B807E;">המסלול המקודם ${regularPriceNote} - ואצלך הוא במתנה מלאה לחודשיים, ללא כרטיס אשראי וללא התחייבות.</p>`;
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
@@ -100,29 +100,29 @@ export function buildArticleInviteEmail(opts: {
 
       <p style="margin:0 0 16px;font-size:15px;">
         כדי לעודד אותך לשתף מהידע שלך, אנחנו מציעים <strong>חודשיים קידום במתנה</strong> למי שישלח/תשלח מאמר לאתר.
-        המאמר יתפרסם <strong>תחת שמך בפרופיל</strong> ויסייע למטופלים פוטנציאליים להכיר אותך — את הגישה, הניסיון והקול המקצועי שלך.
+        המאמר יתפרסם <strong>תחת שמך בפרופיל</strong> ויסייע למטופלים פוטנציאליים להכיר אותך - את הגישה, הניסיון והקול המקצועי שלך.
       </p>
 
       <!-- Gift highlight -->
       <div style="background:#FDF6E3;border:1px solid #E9D6A6;border-radius:12px;padding:18px 20px;margin:0 0 22px;text-align:center;">
         <p style="margin:0 0 4px;font-size:20px;font-weight:900;color:#A87010;">🎁 חודשיים קידום במתנה</p>
-        <p style="margin:0;font-size:14px;color:#7a5a10;">על מאמר אחד שיתפרסם בשמך — בלי עלות, בלי כרטיס אשראי ובלי התחייבות</p>
+        <p style="margin:0;font-size:14px;color:#7a5a10;">על מאמר אחד שיתפרסם בשמך - בלי עלות, בלי כרטיס אשראי ובלי התחייבות</p>
       </div>
 
       <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">כמה זה פשוט:</p>
       <ul style="margin:0 0 20px;padding-inline-start:20px;font-size:14.5px;line-height:1.75;color:#3E5250;">
-        <li>המאמר יכול להיות <strong>קצר או ארוך</strong> — כמה שנוח לך. אין דרישת אורך.</li>
-        <li>אפשר בגוון <strong>מקצועי</strong> (לעמיתים ולמתעניינים בתחום) או <strong>אינפורמטיבי לציבור הרחב</strong> — מה שמתאים לך.</li>
-        <li>אפשר לשלוח <strong>יותר ממאמר אחד</strong> — המתנה ניתנת על המאמר הראשון, ואת/ה מוזמן/ת להמשיך ולפרסם עוד.</li>
+        <li>המאמר יכול להיות <strong>קצר או ארוך</strong> - כמה שנוח לך. אין דרישת אורך.</li>
+        <li>אפשר בגוון <strong>מקצועי</strong> (לעמיתים ולמתעניינים בתחום) או <strong>אינפורמטיבי לציבור הרחב</strong> - מה שמתאים לך.</li>
+        <li>אפשר לשלוח <strong>יותר ממאמר אחד</strong> - המתנה ניתנת על המאמר הראשון, ואת/ה מוזמן/ת להמשיך ולפרסם עוד.</li>
         <li>כותבים ושולחים ישירות מהאזור האישי שלך באתר, וצוות טיפול חכם עובר על המאמר לפני הפרסום.</li>
       </ul>
 
       <div style="text-align:center;margin:0 0 26px;">
         <a href="${writeUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">לכתיבת מאמר באזור האישי שלי ←</a>
-        <p style="margin:10px 0 0;font-size:12px;color:#6b7280;">הקישור מוביל לאזור האישי. ייתכן שתתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+        <p style="margin:10px 0 0;font-size:12px;color:#6b7280;">הקישור מוביל לאזור האישי. ייתכן שתתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       </div>
 
-      <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל הקידום שתקבל/י — לעומת המסלול החינמי</p>
+      <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל הקידום שתקבל/י - לעומת המסלול החינמי</p>
       ${comparisonTable}
 
       <div style="border:1px solid #E8E0D8;border-radius:12px;padding:16px 20px;margin:22px 0;background:#F7FAF9;">
@@ -135,7 +135,7 @@ export function buildArticleInviteEmail(opts: {
       </div>
 
       <p style="margin:0 0 6px;font-size:14.5px;">
-        רוצה לכתוב אבל מתלבט/ת בנושא, או צריך/ה עזרה בניסוח? נשמח לעזור —
+        רוצה לכתוב אבל מתלבט/ת בנושא, או צריך/ה עזרה בניסוח? נשמח לעזור -
         <a href="${helpMailto}" style="color:#D49018;font-weight:bold;text-decoration:none;">כתבו לנו ונחזור אליך להתייעצות</a>.
       </p>
 
@@ -143,7 +143,7 @@ export function buildArticleInviteEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com | 055-993-1403<br/>
         בברכה,<br/>
-        צוות טיפול חכם — Mentalytics
+        צוות טיפול חכם - Mentalytics
       </p>
     </div>
   </body>

@@ -90,7 +90,7 @@ export default function QuizFeedbackBox({ quizType }: { quizType: "adults" | "ki
             </button>
           </div>
           {state === "error" && (
-            <p className="mt-2 text-xs text-red-600">השליחה נכשלה — נסו שוב רגע.</p>
+            <p className="mt-2 text-xs text-red-600">השליחה נכשלה - נסו שוב רגע.</p>
           )}
         </div>
       )}

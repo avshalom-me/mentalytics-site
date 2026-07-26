@@ -20,7 +20,7 @@ export default function AuthCallbackPage() {
         }
       });
     } else if (hasHashToken) {
-      // Implicit flow — Supabase processes hash automatically, just wait for session
+      // Implicit flow - Supabase processes hash automatically, just wait for session
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session) {
           window.location.href = "/therapists/dashboard" + planParam;

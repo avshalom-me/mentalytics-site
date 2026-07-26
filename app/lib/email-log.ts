@@ -3,7 +3,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 
 // Best-effort record of an outbound email into crm_email_log so the 360°
 // timeline can show communication history. Logging must never break the
-// email path itself — failures are swallowed after a console.error.
+// email path itself - failures are swallowed after a console.error.
 
 export type EmailLogEntry = {
   recipient: string;

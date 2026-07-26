@@ -188,7 +188,7 @@ export function buildAdultFacts(
   // Trim empty arrays so JSON stays small
   if (facts.summary!.length === 0) delete facts.summary;
   if (facts.flags!.length === 0) delete facts.flags;
-  // Never send raw scores / measure names to the model — severity is conveyed
+  // Never send raw scores / measure names to the model - severity is conveyed
   // qualitatively in `summary`. Keeps numbers and instrument names out of the LLM.
   delete facts.scores;
 
@@ -204,7 +204,7 @@ type KidsAns = Record<string, unknown>;
 function kidsAgeBand(grade: string | undefined): string | undefined {
   // grade values are short codes like "ga" (גן), "ab" (א-ב), etc.
   if (!grade) return "child";
-  return "child"; // intentionally keep coarse — exact grade isn't sent.
+  return "child"; // intentionally keep coarse - exact grade isn't sent.
 }
 
 /**
@@ -275,7 +275,7 @@ export function buildKidsFacts(
 
   if (facts.summary!.length === 0) delete facts.summary;
   if (facts.flags!.length === 0) delete facts.flags;
-  // Never send raw scores / measure names to the model — severity is conveyed
+  // Never send raw scores / measure names to the model - severity is conveyed
   // qualitatively in `summary`. Keeps numbers and instrument names out of the LLM.
   delete facts.scores;
 

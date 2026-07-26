@@ -32,28 +32,28 @@ function escapeHtml(str: string): string {
 }
 
 // Concrete, rule-based gaps. Each entry is a short Hebrew phrase describing
-// what's missing and why it matters — used both as the AI's input and as the
+// what's missing and why it matters - used both as the AI's input and as the
 // no-AI fallback text. Order is by impact (photo and bio first).
 export function detectProfileGaps(t: ProfileForFeedback): string[] {
   const gaps: string[] = [];
 
   if (!t.profile_photo_path) {
-    gaps.push("אין תמונת פרופיל — תמונה מקצועית היא מהגורמים החזקים ביותר לאמון ולפנייה ראשונית.");
+    gaps.push("אין תמונת פרופיל - תמונה מקצועית היא מהגורמים החזקים ביותר לאמון ולפנייה ראשונית.");
   }
   if (!t.bio || t.bio.trim().length < BIO_MIN) {
-    gaps.push("הביוגרפיה קצרה או חסרה — תיאור אישי של הגישה הטיפולית שלך מגדיל משמעותית את מספר הפניות.");
+    gaps.push("הביוגרפיה קצרה או חסרה - תיאור אישי של הגישה הטיפולית שלך מגדיל משמעותית את מספר הפניות.");
   }
   if ((t.training_areas?.length ?? 0) <= 2) {
-    gaps.push("מעט תחומי טיפול מסומנים — הוספת תחומים שאת/ה מתמחה בהם תרחיב את החשיפה במערכת ההתאמה ובמאגר.");
+    gaps.push("מעט תחומי טיפול מסומנים - הוספת תחומים שאת/ה מתמחה בהם תרחיב את החשיפה במערכת ההתאמה ובמאגר.");
   }
   if (!t.education || t.education.trim().length < 10) {
-    gaps.push("חסרים פרטי השכלה והכשרה — מטופלים בודקים רקע מקצועי לפני שהם פונים.");
+    gaps.push("חסרים פרטי השכלה והכשרה - מטופלים בודקים רקע מקצועי לפני שהם פונים.");
   }
   if (!t.experience || t.experience.trim().length < 10) {
-    gaps.push("חסר תיאור ניסיון מקצועי — שנות ניסיון ומסגרות עבודה מחזקות אמון.");
+    gaps.push("חסר תיאור ניסיון מקצועי - שנות ניסיון ומסגרות עבודה מחזקות אמון.");
   }
   if ((t.regions?.length ?? 0) === 0) {
-    gaps.push("לא סומנו אזורי פעילות — בלי אזור קשה למטופלים למצוא אותך בחיפוש לפי מיקום.");
+    gaps.push("לא סומנו אזורי פעילות - בלי אזור קשה למטופלים למצוא אותך בחיפוש לפי מיקום.");
   }
 
   return gaps;
@@ -115,7 +115,7 @@ export async function buildProfileFeedbackHtml(t: ProfileForFeedback): Promise<s
     }
   }
 
-  // Neutral, practical lead-in only — no personal "I'm proud of your progress /
+  // Neutral, practical lead-in only - no personal "I'm proud of your progress /
   // I believe in you" style messaging (removed per product decision).
   const intro = "כדי שהפרופיל שלך יקבל יותר פניות, שמנו לב לכמה דברים שכדאי להשלים:";
 

@@ -23,7 +23,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const city = slugToCity(cityParam);
   if (!city) return { title: "עיר לא נמצאה" };
   const title = `פסיכולוגים ומטפלים ב${city} | טיפול חכם`;
-  const description = `מצאו פסיכולוגים ומטפלים מאומתים ב${city} — מותאם אישית דרך טיפול חכם.`;
+  const description = `מצאו פסיכולוגים ומטפלים מאומתים ב${city} - מותאם אישית דרך טיפול חכם.`;
   const url = `${BASE}/therapists/city/${cityParam}`;
   // A city page is unique/valuable only once it has real in-city therapists;
   // below the threshold it's near-empty (and near-duplicate of the region page),
@@ -95,7 +95,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         </p>
       </div>
 
-      {/* Prominent quiz CTA — same offer as the region/online pages, tailored to the city. */}
+      {/* Prominent quiz CTA - same offer as the region/online pages, tailored to the city. */}
       <div
         className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
         style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
@@ -126,7 +126,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {nearby.length > 0 && (
         <div className="mb-6">
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים נוספים באזור {region}</h2>
-          <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) — לרבים מהם נוחות גם לתושבי {city}.</p>
+          <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) - לרבים מהם נוחות גם לתושבי {city}.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {nearby.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextRegion={region ?? undefined} />)}
           </div>
@@ -139,7 +139,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         </div>
       )}
 
-      {/* SEO content — below the listings (patients rarely scroll here; crawlers do) */}
+      {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
       <CitySeoSection placeName={city} kind="city" therapists={inCity} onlineCount={onlineCount} regionName={region} articles={localArticles} />
 
       {/* Internal linking */}

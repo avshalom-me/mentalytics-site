@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 
 export const metadata: Metadata = {
   title: "תנאי שימוש",
-  description: "תנאי השימוש של טיפול חכם — אחריות, זכויות, הגבלות שימוש והצהרות חשובות לגבי מערכת ההכוונה הטיפולית.",
+  description: "תנאי השימוש של טיפול חכם - אחריות, זכויות, הגבלות שימוש והצהרות חשובות לגבי מערכת ההכוונה הטיפולית.",
 };
 
 export default function TermsPage() {
@@ -46,7 +46,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-stone-900 mb-2">4. מצב חירום</h2>
           <div className="rounded-xl bg-red-50 border border-red-200 p-4 text-red-900 text-sm">
-            <strong>חשוב:</strong> אם אתה או אדם קרוב נמצאים במצב של סכנת חיים מיידית — <strong>חייג 101 (מד"א) או 1201 (ער"ן)</strong> מיד. השירות אינו מתאים למצבי חירום נפשי חריפים.
+            <strong>חשוב:</strong> אם אתה או אדם קרוב נמצאים במצב של סכנת חיים מיידית - <strong>חייג 101 (מד"א) או 1201 (ער"ן)</strong> מיד. השירות אינו מתאים למצבי חירום נפשי חריפים.
           </div>
         </section>
 
@@ -89,7 +89,7 @@ export default function TermsPage() {
         <section>
           <h2 className="text-xl font-bold text-stone-900 mb-2">8. קניין רוחני</h2>
           <p>
-            כל התוכן באתר — טקסטים, עיצוב, שאלונים ואלגוריתמי ההתאמה — הוא רכושה של טיפול חכם ומוגן בזכויות יוצרים. אין להעתיק, לשכפל או להשתמש בתוכן ללא אישור מפורש בכתב.
+            כל התוכן באתר - טקסטים, עיצוב, שאלונים ואלגוריתמי ההתאמה - הוא רכושה של טיפול חכם ומוגן בזכויות יוצרים. אין להעתיק, לשכפל או להשתמש בתוכן ללא אישור מפורש בכתב.
           </p>
         </section>
 

@@ -4,7 +4,7 @@
 //
 // Price ranges are deliberately coarse ("לרוב"), anchored to the hebpsy.net
 // tariff surveys (national average ~395-400₪/session in 2025, Tel-Aviv area
-// averaging ~50₪ above the north) — center is higher, periphery lower.
+// averaging ~50₪ above the north) - center is higher, periphery lower.
 //
 // The services list is curated to major, stable, well-known institutions only
 // (YMYL: accuracy over completeness). Kupot clinics are covered by a generic
@@ -38,7 +38,7 @@ export const REGION_PUBLIC_SERVICES: Record<string, PublicService[]> = {
   "גוש דן": [
     { name: "גהה", city: "פתח תקווה", kind: "מרכז לבריאות הנפש", operator: "כללית" },
     { name: "אברבנאל", city: "בת ים", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
-    { name: "שיבא (תל השומר) — חטיבת בריאות הנפש", city: "רמת גן", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
+    { name: "שיבא (תל השומר) - חטיבת בריאות הנפש", city: "רמת גן", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
   ],
   "דרום השרון": [
     { name: "שלוותה", city: "הוד השרון", kind: "מרכז לבריאות הנפש", operator: "כללית" },
@@ -51,25 +51,25 @@ export const REGION_PUBLIC_SERVICES: Record<string, PublicService[]> = {
   "ירושלים והסביבה": [
     { name: "המרכז הירושלמי לבריאות הנפש (כפר שאול–איתנים)", city: "ירושלים", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
     { name: "הרצוג", city: "ירושלים", kind: "מרכז לבריאות הנפש", operator: "ציבורי (מלכ״ר)" },
-    { name: "הדסה עין כרם — המערך הפסיכיאטרי", city: "ירושלים", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ציבורי (מלכ״ר)" },
+    { name: "הדסה עין כרם - המערך הפסיכיאטרי", city: "ירושלים", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ציבורי (מלכ״ר)" },
   ],
   "השפלה והמרכז": [
     { name: "המרכז לבריאות הנפש באר יעקב–נס ציונה", city: "באר יעקב", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
   ],
   "חיפה והקריות": [
     { name: "מעלה הכרמל", city: "טירת כרמל", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
-    { name: "רמב״ם — המערך הפסיכיאטרי", city: "חיפה", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
+    { name: "רמב״ם - המערך הפסיכיאטרי", city: "חיפה", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
   ],
   "גליל וצפון": [
     { name: "מזור (לשעבר מזרע)", city: "עכו", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
-    { name: "זיו — המערך הפסיכיאטרי", city: "צפת", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
+    { name: "זיו - המערך הפסיכיאטרי", city: "צפת", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "ממשלתי" },
   ],
   "עמק יזרעאל ונצרת": [
-    { name: "העמק — המערך הפסיכיאטרי", city: "עפולה", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "כללית" },
+    { name: "העמק - המערך הפסיכיאטרי", city: "עפולה", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "כללית" },
   ],
   "דרום": [
     { name: "המרכז לבריאות הנפש באר שבע", city: "באר שבע", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
-    { name: "סורוקה — המערך הפסיכיאטרי", city: "באר שבע", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "כללית" },
+    { name: "סורוקה - המערך הפסיכיאטרי", city: "באר שבע", kind: "מחלקה פסיכיאטרית בבית חולים כללי", operator: "כללית" },
   ],
   "נגב ואילת": [
     { name: "המרכז לבריאות הנפש באר שבע", city: "באר שבע", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },

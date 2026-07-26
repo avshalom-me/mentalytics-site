@@ -5,7 +5,7 @@ import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { trackMatchSaved } from "@/app/lib/useTrack";
 
-// "שלח לעצמך את ההתאמות" — creates an anonymous permalink (POST /api/match-token,
+// "שלח לעצמך את ההתאמות" - creates an anonymous permalink (POST /api/match-token,
 // which stores the list + the ORIGINAL attribution) and opens WhatsApp with a
 // ready message the patient sends to themselves. We never see their number.
 // Solves the half-of-quiz-completers-never-contact leak: gives a durable,
@@ -24,7 +24,7 @@ export default function SaveMatchesButton({
 }) {
   const [state, setState] = useState<"idle" | "loading" | "copied" | "error">("idle");
 
-  // Centers live at a different URL shape and are rare in matches — the saved
+  // Centers live at a different URL shape and are rare in matches - the saved
   // page loads therapists only, so keep the token to real therapist ids.
   const therapistIds = matches.filter((m) => m.entity_type !== "center").map((m) => m.id);
   if (therapistIds.length === 0) return null;
@@ -116,7 +116,7 @@ export default function SaveMatchesButton({
       >
         {state === "copied" ? "✓ הועתק" : "העתקת קישור"}
       </button>
-      {state === "error" && <span className="text-xs text-red-600">משהו השתבש — נסו שוב</span>}
+      {state === "error" && <span className="text-xs text-red-600">משהו השתבש - נסו שוב</span>}
     </div>
   );
 }

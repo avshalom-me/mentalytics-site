@@ -8,13 +8,13 @@ import MatchReturnTracker from "../MatchReturnTracker";
 // Saved-match permalink (the "שלח לעצמך את ההתאמות" feature): anonymous token
 // → the matched therapist list. Restores the ORIGINAL campaign attribution on
 // visit (see MatchReturnTracker) so contacts made from here credit the ad that
-// actually produced the match — including cross-device.
+// actually produced the match - including cross-device.
 
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
   title: "ההתאמות השמורות שלי",
-  robots: { index: false, follow: false }, // private-ish permalinks — never index
+  robots: { index: false, follow: false }, // private-ish permalinks - never index
 };
 
 type TokenRow = {
@@ -37,7 +37,7 @@ function ExpiredView() {
       <div className="text-5xl mb-4">⏳</div>
       <h1 className="text-2xl font-black mb-3" style={{ color: "var(--text)" }}>הקישור הזה כבר לא פעיל</h1>
       <p className="text-stone-600 leading-8 mb-8" style={{ maxWidth: "44ch", marginInline: "auto" }}>
-        התאמות שמורות נשמרות למשך 90 יום. אפשר למלא שאלון קצר מחדש ולקבל התאמה עדכנית —
+        התאמות שמורות נשמרות למשך 90 יום. אפשר למלא שאלון קצר מחדש ולקבל התאמה עדכנית -
         ייתכן שהצטרפו מטפלים חדשים שמתאימים לך.
       </p>
       <Link

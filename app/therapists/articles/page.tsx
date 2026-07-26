@@ -72,7 +72,7 @@ export default function TherapistArticlesPage() {
     setMsg("");
     setErr("");
 
-    // Fresh token at submit — the one captured at load may have expired during
+    // Fresh token at submit - the one captured at load may have expired during
     // a long edit (Supabase JWTs last ~1h), which would surface as "Unauthorized".
     const { data: { session } } = await supabase.auth.getSession();
     const accessToken = session?.access_token;
@@ -116,7 +116,7 @@ export default function TherapistArticlesPage() {
         </Link>
       </div>
       <p className="text-sm text-stone-600 leading-6 mb-8">
-        כתיבת מידע מקצועי קצר מגבירה מאוד את הפנייה אליך. זה לא חייב להיות מאמר מדעי — מספיק מידע פשוט וברור שיעזור
+        כתיבת מידע מקצועי קצר מגבירה מאוד את הפנייה אליך. זה לא חייב להיות מאמר מדעי - מספיק מידע פשוט וברור שיעזור
         למטופלים פוטנציאליים להכיר אותך דרך הכתיבה. כל מאמר מאושר מתפרסם במאגר המאמרים של האתר עם שמך וקישור לפרופיל.
       </p>
 
@@ -158,7 +158,7 @@ export default function TherapistArticlesPage() {
 
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">
-              תקציר קצר <span className="text-stone-400 font-normal">(רשות — מוצג בכרטיס המאמר)</span>
+              תקציר קצר <span className="text-stone-400 font-normal">(רשות - מוצג בכרטיס המאמר)</span>
             </label>
             <textarea
               value={summary}

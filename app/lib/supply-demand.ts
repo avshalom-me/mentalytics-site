@@ -1,5 +1,5 @@
 /**
- * Shared supply/demand computation — the single source of truth for the
+ * Shared supply/demand computation - the single source of truth for the
  * Phase 1 dashboard (/api/admin-supply-demand) AND the Phase 2 recommendation
  * generator (/api/admin-recommendations). Pure function, no DB access.
  */
@@ -126,7 +126,7 @@ export function computeSupplyDemand(
       ];
       return {
         id: t.id,
-        full_name: t.full_name ?? "—",
+        full_name: t.full_name ?? "-",
         online: !!t.online,
         regionLabels: labels,
         profileViews: viewsByT[t.id] ?? 0,

@@ -22,7 +22,7 @@ export function gaEvent(name: string, params: Record<string, unknown> = {}): voi
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
   // Attach our normalized marketing channel so conversions can be segmented by
   // source inside GA4. (GA4 also auto-captures the gclid-based source that
-  // Google Ads needs for conversion import — this is an extra, friendly label.)
+  // Google Ads needs for conversion import - this is an extra, friendly label.)
   const channel = getAttribution()?.channel;
   window.gtag("event", name, channel ? { ...params, channel } : params);
 }
@@ -30,7 +30,7 @@ export function gaEvent(name: string, params: Record<string, unknown> = {}): voi
 /**
  * Fire a GA4 event exactly once per browser session, waiting briefly for gtag to
  * load. Use on post-action "thank you" pages (payment success), where the page
- * mounts on load — there gtag.js may still be loading, and a refresh would
+ * mounts on load - there gtag.js may still be loading, and a refresh would
  * otherwise double-count the conversion.
  */
 export function gaEventOnce(
@@ -44,7 +44,7 @@ export function gaEventOnce(
     try {
       return sessionStorage.getItem(dedupeKey) === "1";
     } catch {
-      return false; // sessionStorage blocked — fire anyway rather than lose the conversion
+      return false; // sessionStorage blocked - fire anyway rather than lose the conversion
     }
   };
   if (alreadyFired()) return;
@@ -56,7 +56,7 @@ export function gaEventOnce(
       try {
         sessionStorage.setItem(dedupeKey, "1");
       } catch {
-        /* ignore — best-effort dedupe */
+        /* ignore - best-effort dedupe */
       }
       gaEvent(name, params);
       return;

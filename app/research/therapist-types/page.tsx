@@ -6,7 +6,7 @@ import Link from "next/link";
 const TYPES = [
   {
     title: "פסיכולוג/ית קליני/ת",
-    license: "משרד הבריאות — רישיון פסיכולוג מומחה",
+    license: "משרד הבריאות - רישיון פסיכולוג מומחה",
     icon: "🎓",
     desc: null,
     suitable: "טיפול מעמיק, אבחון, מקרים מורכבים, הפרעות אישיות, טראומה",
@@ -22,7 +22,7 @@ const TYPES = [
   },
   {
     title: "פסיכולוג/ית התפתחותי/ת",
-    license: "משרד הבריאות — רישיון פסיכולוג מומחה (ענף התפתחותי)",
+    license: "משרד הבריאות - רישיון פסיכולוג מומחה (ענף התפתחותי)",
     icon: "🌱",
     desc: null,
     suitable: "לידה עד גיל 9, עיכובי התפתחות, קשיי ויסות, קשר הורה-ילד, קשיי שפה וקוגניציה",
@@ -30,7 +30,7 @@ const TYPES = [
   },
   {
     title: "פסיכולוג/ית תעסוקתי/ת",
-    license: "משרד הבריאות — רישיון פסיכולוג מומחה (ענף תעסוקתי)",
+    license: "משרד הבריאות - רישיון פסיכולוג מומחה (ענף תעסוקתי)",
     icon: "💼",
     desc: null,
     suitable: "בחירת קריירה, שינוי תעסוקתי, הערכת כישורים, ייעוץ ארגוני, שיקום תעסוקתי",
@@ -38,7 +38,7 @@ const TYPES = [
   },
   {
     title: "פסיכולוג/ית רפואי/ת",
-    license: "משרד הבריאות — רישיון פסיכולוג מומחה (ענף רפואי)",
+    license: "משרד הבריאות - רישיון פסיכולוג מומחה (ענף רפואי)",
     icon: "🏥",
     desc: null,
     suitable: "מחלה כרונית, כאב כרוני, אשפוז, אונקולוגיה, הסתגלות למצב רפואי, ליווי בני משפחה",
@@ -46,7 +46,7 @@ const TYPES = [
   },
   {
     title: "פסיכולוג/ית שיקומי/ת",
-    license: "משרד הבריאות — רישיון פסיכולוג מומחה (ענף שיקומי)",
+    license: "משרד הבריאות - רישיון פסיכולוג מומחה (ענף שיקומי)",
     icon: "♿",
     desc: null,
     suitable: "נכות גופנית, פגיעות ראש, שיקום לאחר מחלה, מוגבלות קוגניטיבית, שילוב חברתי ותעסוקתי",
@@ -54,7 +54,7 @@ const TYPES = [
   },
   {
     title: 'עו"ס קליני/ת (עובד/ת סוציאלי/ת קליני/ת)',
-    license: 'משרד הרווחה — פנקס העובדים הסוציאליים',
+    license: 'משרד הרווחה - פנקס העובדים הסוציאליים',
     icon: "🤝",
     desc: null,
     suitable: "טיפול פרטני, זוגי ומשפחתי, משברים, טראומה, חרדה, דיכאון, ילדים ומתבגרים",
@@ -62,7 +62,7 @@ const TYPES = [
   },
   {
     title: "מטפל/ת באמצעות הבעה ויצירה",
-    license: "הכשרה מוכרת — מעמד רגולטורי בהסדרה",
+    license: "הכשרה מוכרת - מעמד רגולטורי בהסדרה",
     icon: "🎨",
     desc: null,
     suitable: "ילדים, טראומה, ביטוי רגשי, אנשים שמתקשים בדיבור, בתי ספר, בריאות הנפש",
@@ -70,7 +70,7 @@ const TYPES = [
   },
   {
     title: "מרפא/ה בעיסוק",
-    license: "משרד הבריאות — תעודת מקצוע",
+    license: "משרד הבריאות - תעודת מקצוע",
     icon: "⚙️",
     desc: null,
     suitable: "ויסות חושי, מוטוריקה עדינה, כתיבה, התארגנות, ADHD, תפקוד בגן ובבית הספר",
@@ -78,7 +78,7 @@ const TYPES = [
   },
   {
     title: "קלינאי/ת תקשורת",
-    license: "משרד הבריאות — תעודת מקצוע",
+    license: "משרד הבריאות - תעודת מקצוע",
     icon: "🗣️",
     desc: null,
     suitable: "עיכוב שפתי, היגוי, גמגום, קשיי תקשורת, שמיעה, שיקום שפה אחרי אירוע נוירולוגי",
@@ -86,7 +86,7 @@ const TYPES = [
   },
   {
     title: "פסיכיאטר/ית",
-    license: "משרד הבריאות — רופא/ה מומחה/ית בפסיכיאטריה",
+    license: "משרד הבריאות - רופא/ה מומחה/ית בפסיכיאטריה",
     icon: "💊",
     desc: null,
     suitable: "אבחון נפשי, תרופות, דיכאון קשה, חרדה חמורה, פסיכוזה, הפרעה דו-קוטבית",
@@ -94,7 +94,7 @@ const TYPES = [
   },
   {
     title: "קרימינולוג/ית קליני/ת",
-    license: "משרד הבריאות — תעודת קרימינולוג קליני (חוק הסדרת העיסוק במקצועות הבריאות)",
+    license: "משרד הבריאות - תעודת קרימינולוג קליני (חוק הסדרת העיסוק במקצועות הבריאות)",
     icon: "⚖️",
     desc: null,
     suitable: "הערכת סיכון, התנהגות עברייניות, ממשק פסיכיאטרי-משפטי, שיקום, צוותים רב-מקצועיים",
@@ -102,7 +102,7 @@ const TYPES = [
   },
   {
     title: "יועץ/ת חינוכי/ת",
-    license: "משרד החינוך — תעודת יועץ חינוכי",
+    license: "משרד החינוך - תעודת יועץ חינוכי",
     icon: "🏫",
     desc: null,
     suitable: "ילדים ונוער בגיל בית-ספר, קשיים רגשיים והתנהגותיים, הפניות לטיפול, ייעוץ להורים ומורים",
@@ -113,7 +113,7 @@ const TYPES = [
     license: "אין רגולציה ממשלתית",
     icon: "🎯",
     desc: "אינו/ה מוסמך/ת לטיפול בהפרעות נפשיות. מתמקד/ת בהשגת מטרות, פיתוח עצמי וביצועים. חשוב להבחין בין קואוצ'ינג לטיפול נפשי.",
-    suitable: "פיתוח עצמי, ביצועים, מטרות חיים — לא להפרעות נפשיות",
+    suitable: "פיתוח עצמי, ביצועים, מטרות חיים - לא להפרעות נפשיות",
   },
 ];
 
@@ -128,13 +128,13 @@ export default function TherapistTypesPage() {
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">סוגי המטפלים בישראל</h1>
       <p className="text-stone-600 leading-7 mb-10">
-        בישראל פועלים סוגים שונים של אנשי טיפול ובריאות הנפש. ההבדלים ביניהם חשובים — הן מבחינת ההכשרה, הן מבחינת הסמכות המשפטית והן מבחינת ההתאמה לצורך.
+        בישראל פועלים סוגים שונים של אנשי טיפול ובריאות הנפש. ההבדלים ביניהם חשובים - הן מבחינת ההכשרה, הן מבחינת הסמכות המשפטית והן מבחינת ההתאמה לצורך.
       </p>
 
       <div className="space-y-3">
         {TYPES.map((t, i) => (
           <div key={i} className="rounded-2xl bg-white border border-[#E8E0D8] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(100,60,30,.05)" }}>
-            {/* Header — always visible, clickable */}
+            {/* Header - always visible, clickable */}
             <button
               className="w-full text-right px-5 py-4 flex items-center gap-4 hover:bg-stone-50 transition"
               onClick={() => setOpen(open === i ? null : i)}
@@ -166,16 +166,16 @@ export default function TherapistTypesPage() {
                 {t.richContent === "ot" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      מרפא/ה בעיסוק הוא/היא איש/אשת מקצוע בריאות בעל/ת תעודת מקצוע מטעם משרד הבריאות, שעוסק/ת בשיפור <strong>התפקוד היומיומי, העצמאות וההשתתפות</strong> של האדם — בבית, במסגרת החינוכית, בעבודה ובחיי היום-יום.
+                      מרפא/ה בעיסוק הוא/היא איש/אשת מקצוע בריאות בעל/ת תעודת מקצוע מטעם משרד הבריאות, שעוסק/ת בשיפור <strong>התפקוד היומיומי, העצמאות וההשתתפות</strong> של האדם - בבית, במסגרת החינוכית, בעבודה ובחיי היום-יום.
                     </p>
 
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
-                      <h3 className="font-bold text-[#2A6B50] mb-3">אצל ילדים — תחומי עיסוק עיקריים</h3>
+                      <h3 className="font-bold text-[#2A6B50] mb-3">אצל ילדים - תחומי עיסוק עיקריים</h3>
                       <div className="grid grid-cols-1 gap-1.5">
                         {[
-                          "מוטוריקה עדינה — אחיזת עיפרון, כתיבה, שימוש במספריים, תיאום עין-יד",
-                          "ויסות חושי — חיפוש תחושתי, הצפה חושית, רגישויות",
-                          "התארגנות למשימות — תכנון, התמדה, גמישות, יכולת להישאר בתוך משימה",
+                          "מוטוריקה עדינה - אחיזת עיפרון, כתיבה, שימוש במספריים, תיאום עין-יד",
+                          "ויסות חושי - חיפוש תחושתי, הצפה חושית, רגישויות",
+                          "התארגנות למשימות - תכנון, התמדה, גמישות, יכולת להישאר בתוך משימה",
                           "עצמאות בלבוש, אכילה ומשחק",
                           "קושי במעברים ופערים בין יכולת לביצוע בפועל",
                         ].map((item, idx) => (
@@ -186,8 +186,8 @@ export default function TherapistTypesPage() {
                     </div>
 
                     <div className="rounded-xl bg-[#F0F8FF] border border-[#B4D4F0] p-4">
-                      <h3 className="font-bold text-[#1A4A8A] mb-2">גישת Cog-Fun — התמחות ייעודית ל-ADHD</h3>
-                      <p className="mb-2">חלק מהמרפאות והמרפאים בעיסוק עברו הכשרה בגישת <strong>Cog-Fun</strong> — גישה קוגניטיבית-תפקודית שפותחה באוניברסיטה העברית עבור ילדים, מתבגרים ומבוגרים עם ADHD. הגישה מתמקדת בקשיים בתפקודים ניהוליים ובוויסות עצמי, ומסייעת לפתח אסטרטגיות שעוזרות לתפקד טוב יותר בבית, בלמידה וביחסים. מחקרים שפורסמו עליה מצאו שיפור בתפקוד היומיומי אצל ילדים עם ADHD.</p>
+                      <h3 className="font-bold text-[#1A4A8A] mb-2">גישת Cog-Fun - התמחות ייעודית ל-ADHD</h3>
+                      <p className="mb-2">חלק מהמרפאות והמרפאים בעיסוק עברו הכשרה בגישת <strong>Cog-Fun</strong> - גישה קוגניטיבית-תפקודית שפותחה באוניברסיטה העברית עבור ילדים, מתבגרים ומבוגרים עם ADHD. הגישה מתמקדת בקשיים בתפקודים ניהוליים ובוויסות עצמי, ומסייעת לפתח אסטרטגיות שעוזרות לתפקד טוב יותר בבית, בלמידה וביחסים. מחקרים שפורסמו עליה מצאו שיפור בתפקוד היומיומי אצל ילדים עם ADHD.</p>
                       <p className="text-xs text-stone-500">כדאי לשאול בעת בחירת מרפאה בעיסוק האם יש לה הכשרה ב-Cog-Fun, כשזה רלוונטי.</p>
                     </div>
                   </div>
@@ -200,10 +200,10 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">אצל ילדים</h3>
                       <ul className="space-y-1.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>עיכוב שפתי — אוצר מילים, הבנה, ביטוי.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיי היגוי — אי-בהירות בדיבור, הגייה לא תקינה.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיי תקשורת — כולל ילדים עם אוטיזם או עיכוב התפתחותי.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיים הקשורים לשמיעה — ילדים עם לקות שמיעה או התקנת שתל קוכלארי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>עיכוב שפתי - אוצר מילים, הבנה, ביטוי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיי היגוי - אי-בהירות בדיבור, הגייה לא תקינה.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיי תקשורת - כולל ילדים עם אוטיזם או עיכוב התפתחותי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span>קשיים הקשורים לשמיעה - ילדים עם לקות שמיעה או התקנת שתל קוכלארי.</span></li>
                       </ul>
                     </div>
 
@@ -212,14 +212,14 @@ export default function TherapistTypesPage() {
                       <ul className="space-y-1.5">
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>שיקום שפה ודיבור אחרי שבץ, פגיעת ראש או מחלה נוירולוגית.</span></li>
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>גמגום וקשיי שטף דיבור.</span></li>
-                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>קשיי בליעה (דיספאגיה) — לרוב בהקשר רפואי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>קשיי בליעה (דיספאגיה) - לרוב בהקשר רפואי.</span></li>
                       </ul>
                     </div>
                   </div>
                 ) : t.richContent === "arts" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      מטפל באמצעות הבעה ויצירה עוסק בטיפול נפשי דרך תהליכי יצירה והבעה. בניגוד לטיפול בשיחה, <strong>היצירה עצמה היא הכלי הטיפולי</strong> — לא רק ביטוי, אלא תהליך של עיבוד, חקירה ושינוי.
+                      מטפל באמצעות הבעה ויצירה עוסק בטיפול נפשי דרך תהליכי יצירה והבעה. בניגוד לטיפול בשיחה, <strong>היצירה עצמה היא הכלי הטיפולי</strong> - לא רק ביטוי, אלא תהליך של עיבוד, חקירה ושינוי.
                     </p>
 
                     <div className="rounded-xl bg-[#F5EEF8] border border-[#D4B4E8] p-4">
@@ -234,8 +234,8 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> בטיפול באמצעות אמנויות, במסלול ההתמחות הרלוונטי — כולל לימודים תיאורטיים, הכשרה קלינית מעשית וסופרוויז'ן.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>מעמד רגולטורי:</strong> התחום מוכר ופועל במערכות הציבוריות (חינוך, בריאות הנפש), אך עבר לאורך השנים שינויים והסדרה מורכבת — כדאי לבדוק את המצב העדכני מול הגוף המקצועי הרלוונטי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> בטיפול באמצעות אמנויות, במסלול ההתמחות הרלוונטי - כולל לימודים תיאורטיים, הכשרה קלינית מעשית וסופרוויז'ן.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>מעמד רגולטורי:</strong> התחום מוכר ופועל במערכות הציבוריות (חינוך, בריאות הנפש), אך עבר לאורך השנים שינויים והסדרה מורכבת - כדאי לבדוק את המצב העדכני מול הגוף המקצועי הרלוונטי.</span></li>
                       </ul>
                     </div>
 
@@ -243,7 +243,7 @@ export default function TherapistTypesPage() {
                       <h3 className="font-bold text-[#8B4A10] mb-3">למי מתאים?</h3>
                       <ul className="space-y-1.5">
                         <li className="flex gap-2"><span className="text-[#8B4A10] font-bold flex-shrink-0">•</span><span>ילדים ובני נוער שמתקשים בביטוי מילולי.</span></li>
-                        <li className="flex gap-2"><span className="text-[#8B4A10] font-bold flex-shrink-0">•</span><span>עיבוד טראומה — כשהמילים אינן מספיקות.</span></li>
+                        <li className="flex gap-2"><span className="text-[#8B4A10] font-bold flex-shrink-0">•</span><span>עיבוד טראומה - כשהמילים אינן מספיקות.</span></li>
                         <li className="flex gap-2"><span className="text-[#8B4A10] font-bold flex-shrink-0">•</span><span>אנשים עם מוגבלות שכלית או קוגניטיבית.</span></li>
                         <li className="flex gap-2"><span className="text-[#8B4A10] font-bold flex-shrink-0">•</span><span>כחלק ממערך טיפולי רחב יותר לצד טיפול שיחתי.</span></li>
                       </ul>
@@ -252,7 +252,7 @@ export default function TherapistTypesPage() {
                 ) : t.richContent === "criminology" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      קרימינולוג קליני הוא בעל מקצוע המוסדר בישראל במסגרת <strong>חוק הסדרת העיסוק במקצועות הבריאות</strong>. מי שעומד בדרישות החוק יכול לקבל תעודת קרימינולוג קליני מטעם משרד הבריאות. בתחום בריאות הנפש, הקרימינולוגיה הקלינית עוסקת באבחון, הערכה, טיפול, שיקום וייעוץ — במיוחד <strong>בממשק שבין מצוקה נפשית, התנהגות, סיכון ותפקוד חברתי</strong>.
+                      קרימינולוג קליני הוא בעל מקצוע המוסדר בישראל במסגרת <strong>חוק הסדרת העיסוק במקצועות הבריאות</strong>. מי שעומד בדרישות החוק יכול לקבל תעודת קרימינולוג קליני מטעם משרד הבריאות. בתחום בריאות הנפש, הקרימינולוגיה הקלינית עוסקת באבחון, הערכה, טיפול, שיקום וייעוץ - במיוחד <strong>בממשק שבין מצוקה נפשית, התנהגות, סיכון ותפקוד חברתי</strong>.
                     </p>
 
                     <div className="rounded-xl bg-[#F5EEF8] border border-[#D4B4E8] p-4">
@@ -283,10 +283,10 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
                       <h3 className="font-bold text-[#4A2A8A] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>לימודי רפואה (6 שנים):</strong> תואר M.D. — רפואה כללית, אנטומיה, פיזיולוגיה, פתולוגיה ועוד.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>לימודי רפואה (6 שנים):</strong> תואר M.D. - רפואה כללית, אנטומיה, פיזיולוגיה, פתולוגיה ועוד.</span></li>
                         <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>רישיון לעסוק ברפואה:</strong> לאחר סיום הלימודים ועמידה בדרישות משרד הבריאות.</span></li>
                         <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות בפסיכיאטריה:</strong> כולל עבודה במחלקות ובמרפאות פסיכיאטריות, רכיבי נוירולוגיה ורפואה כללית, לפי הסילבוס המוגדר.</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינות מומחיות:</strong> בסיום — בחינות תיאורטיות ומעשיות. עם המעבר — תואר "מומחה בפסיכיאטריה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינות מומחיות:</strong> בסיום - בחינות תיאורטיות ומעשיות. עם המעבר - תואר "מומחה בפסיכיאטריה".</span></li>
                       </ul>
                     </div>
 
@@ -301,28 +301,28 @@ export default function TherapistTypesPage() {
                     </div>
 
                     <p className="text-xs text-stone-500">
-                      פסיכיאטרים רבים אינם מעניקים טיפול פסיכותרפי שוטף — תפקידם מתמקד באבחון וניהול תרופתי. ישנם פסיכיאטרים שגם מטפלים בשיחות, אך זה פחות נפוץ בשל עומס ומגבלות מערכתיות.
+                      פסיכיאטרים רבים אינם מעניקים טיפול פסיכותרפי שוטף - תפקידם מתמקד באבחון וניהול תרופתי. ישנם פסיכיאטרים שגם מטפלים בשיחות, אך זה פחות נפוץ בשל עומס ומגבלות מערכתיות.
                     </p>
                   </div>
                 ) : t.richContent === "socialwork" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      עו״ס קליני הוא עובד סוציאלי שעוסק בעיקר בטיפול נפשי, אבחון פסיכו־סוציאלי, ליווי במצבי משבר, עבודה עם טראומה, חרדה, דיכאון וקשיים ביחסים — עם ילדים, מתבגרים, מבוגרים, זוגות ומשפחות. בניגוד לתפיסה הרווחת, <strong>התואר המוגן בחוק הוא "עובד סוציאלי"</strong> — הביטוי "קליני" מתאר אוריינטציה טיפולית-נפשית מובהקת.
+                      עו״ס קליני הוא עובד סוציאלי שעוסק בעיקר בטיפול נפשי, אבחון פסיכו־סוציאלי, ליווי במצבי משבר, עבודה עם טראומה, חרדה, דיכאון וקשיים ביחסים - עם ילדים, מתבגרים, מבוגרים, זוגות ומשפחות. בניגוד לתפיסה הרווחת, <strong>התואר המוגן בחוק הוא "עובד סוציאלי"</strong> - הביטוי "קליני" מתאר אוריינטציה טיפולית-נפשית מובהקת.
                     </p>
 
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון (BSW):</strong> בעבודה סוציאלית — כולל פרקטיקום בשטח. בסיום נרשמים בפנקס העובדים הסוציאליים של משרד הרווחה.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון (BSW):</strong> בעבודה סוציאלית - כולל פרקטיקום בשטח. בסיום נרשמים בפנקס העובדים הסוציאליים של משרד הרווחה.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>רישיון לטיפול:</strong> כבר מרגע הרישום, החוק מאפשר לעסוק בטיפול, ייעוץ, שיקום והדרכה של פרטים, משפחות וקהילות.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (MSW) — מקובל מאוד:</strong> רבים ממשיכים לתואר שני, לעיתים במסלול קליני ייעודי הכולל פרקטיקום מעמיק.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (MSW) - מקובל מאוד:</strong> רבים ממשיכים לתואר שני, לעיתים במסלול קליני ייעודי הכולל פרקטיקום מעמיק.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>הכשרות נוספות:</strong> לאחר מכן, רבים ממשיכים ללימודי פסיכותרפיה (CBT, דינאמי, EMDR וכו') כהכשרות ייעודיות.</span></li>
                       </ul>
                     </div>
 
                     <div className="rounded-xl bg-[#F0F8FF] border border-[#B4D4F0] p-4">
                       <h3 className="font-bold text-[#1A4A8A] mb-3">מה מייחד את הגישה?</h3>
-                      <p className="mb-2">העו״ס הקליני מביא <strong>ראייה מערכתית</strong> — מבין את האדם בתוך ההקשר של חייו: נפשי, משפחתי, חברתי, כלכלי ותרבותי. לכן לצד טיפול רגשי בשיחה:</p>
+                      <p className="mb-2">העו״ס הקליני מביא <strong>ראייה מערכתית</strong> - מבין את האדם בתוך ההקשר של חייו: נפשי, משפחתי, חברתי, כלכלי ותרבותי. לכן לצד טיפול רגשי בשיחה:</p>
                       <ul className="space-y-2">
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>עבודה עם בני משפחה, מסגרות חינוך וגורמי רווחה.</span></li>
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span>סיוע בסוגיות תפקוד, זכויות, משברים ומעברים בחיים.</span></li>
@@ -339,10 +339,10 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
                       <h3 className="font-bold text-[#4A2A8A] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים — תנאי קבלה לתואר השני.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים - תנאי קבלה לתואר השני.</span></li>
                         <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה קלינית או רפואית, כולל פרקטיקום בסביבה רפואית.</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> בבתי חולים כלליים או פסיכיאטריים, מרפאות כאב, מחלקות אונקולוגיה ומסגרות רפואיות מוכרות.</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג רפואי מומחה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים:</strong> בבתי חולים כלליים או פסיכיאטריים, מרפאות כאב, מחלקות אונקולוגיה ומסגרות רפואיות מוכרות.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום - בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג רפואי מומחה".</span></li>
                       </ul>
                     </div>
 
@@ -350,7 +350,7 @@ export default function TherapistTypesPage() {
                       <h3 className="font-bold text-[#1A4A8A] mb-3">תחומי עיסוק מרכזיים</h3>
                       <ul className="space-y-2">
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>מחלה כרונית וכאב:</strong> סיוע בהסתגלות, התמודדות עם הגבלות תפקודיות ושיפור איכות חיים.</span></li>
-                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>אונקולוגיה ומחלות קשות:</strong> ליווי נפשי בשלבי אבחנה, טיפול ושיקום — למטופל ולמשפחה.</span></li>
+                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>אונקולוגיה ומחלות קשות:</strong> ליווי נפשי בשלבי אבחנה, טיפול ושיקום - למטופל ולמשפחה.</span></li>
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>הכנה לניתוחים ופרוצדורות:</strong> הפחתת חרדה לפני פרוצדורות רפואיות ועידוד שיתוף פעולה עם הטיפול.</span></li>
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>ייעוץ לצוותים רפואיים:</strong> סיוע לצוות בהתמודדות עם מטופלים מורכבים ומניעת שחיקה מקצועית.</span></li>
                       </ul>
@@ -365,10 +365,10 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים — תנאי קבלה לתואר השני.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים - תנאי קבלה לתואר השני.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה התפתחותית, כולל פרקטיקום עם ילדים צעירים ומשפחותיהם.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במרכזי התפתחות הילד ובמסגרות מוכרות על ידי משרד הבריאות.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג התפתחותי מומחה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים:</strong> במרכזי התפתחות הילד ובמסגרות מוכרות על ידי משרד הבריאות.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום - בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג התפתחותי מומחה".</span></li>
                       </ul>
                       <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
@@ -386,16 +386,16 @@ export default function TherapistTypesPage() {
                 ) : t.richContent === "rehabilitation" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      הפסיכולוג השיקומי עוסק באבחון ובטיפול באנשים בכל גיל שחיים עם נכות או מוגבלות תפקודית — גופנית, קוגניטיבית או רגשית — בין אם היא מולדת, התפתחותית, נרכשה בעקבות מחלה או נגרמה מטראומה. המטרה המרכזית היא לסייע לאדם <strong>למצות את יכולותיו ולהשתלב בצורה מיטבית</strong> בחיים האישיים, המשפחתיים, החברתיים, הלימודיים והתעסוקתיים.
+                      הפסיכולוג השיקומי עוסק באבחון ובטיפול באנשים בכל גיל שחיים עם נכות או מוגבלות תפקודית - גופנית, קוגניטיבית או רגשית - בין אם היא מולדת, התפתחותית, נרכשה בעקבות מחלה או נגרמה מטראומה. המטרה המרכזית היא לסייע לאדם <strong>למצות את יכולותיו ולהשתלב בצורה מיטבית</strong> בחיים האישיים, המשפחתיים, החברתיים, הלימודיים והתעסוקתיים.
                     </p>
 
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים — תנאי קבלה לתואר השני.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים - תנאי קבלה לתואר השני.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה שיקומית או קלינית עם דגש שיקומי, כולל פרקטיקום בשטח.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות שיקומיים מוכרים על ידי משרד הבריאות (בתי חולים שיקומיים, מרכזי שיקום, מוסדות לטיפול באוכלוסיות מיוחדות).</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג שיקומי מומחה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים:</strong> במוסדות שיקומיים מוכרים על ידי משרד הבריאות (בתי חולים שיקומיים, מרכזי שיקום, מוסדות לטיפול באוכלוסיות מיוחדות).</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום - בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג שיקומי מומחה".</span></li>
                       </ul>
                       <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
@@ -413,16 +413,16 @@ export default function TherapistTypesPage() {
                 ) : t.richContent === "occupational" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      הפסיכולוגיה התעסוקתית עוסקת ב<strong>התאמה בין אדם לעולם העבודה</strong> — הערכה ומיון, ייעוץ קריירה, ייעוץ ארגוני, ופיתוח רווחה ותפקוד של עובדים, צוותים וארגונים.
+                      הפסיכולוגיה התעסוקתית עוסקת ב<strong>התאמה בין אדם לעולם העבודה</strong> - הערכה ומיון, ייעוץ קריירה, ייעוץ ארגוני, ופיתוח רווחה ותפקוד של עובדים, צוותים וארגונים.
                     </p>
 
                     <div className="rounded-xl bg-[#F5EEF8] border border-[#D4B4E8] p-4">
                       <h3 className="font-bold text-[#6A3A8A] mb-3">מסלול ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים — תנאי קבלה לתואר השני.</span></li>
+                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים - תנאי קבלה לתואר השני.</span></li>
                         <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה תעסוקתית-ארגונית, כולל פרקטיקום בשטח.</span></li>
-                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
-                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום — בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג תעסוקתי מומחה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
+                        <li className="flex gap-2"><span className="text-[#6A3A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום - בחינה מול ועדת בוחנים. עם המעבר מקבל תואר "פסיכולוג תעסוקתי מומחה".</span></li>
                       </ul>
                       <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>. ישנם מומחים שממשיכים לקבלת רישיון <strong>"מומחה-מדריך"</strong> מטעם משרד הבריאות.</p>
                     </div>
@@ -445,9 +445,9 @@ export default function TherapistTypesPage() {
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">שלבי ההכשרה</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים — תנאי קבלה לתואר השני.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה חינוכית (או מסלולים מוכרים כגון פסיכולוגיה של הילד), כולל פרקטיקום — התנסות מעשית בשטח עם הדרכה.</span></li>
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים בחצי משרה:</strong> לב ליבה של ההכשרה. מתבצעת לרוב במסגרת שפ"ח (שירות פסיכולוגי חינוכי) ברשויות המקומיות, המוכר על ידי משרד הבריאות כמוסד מאמן.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר ראשון:</strong> בפסיכולוגיה בציונים גבוהים - תנאי קבלה לתואר השני.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> במסלול פסיכולוגיה חינוכית (או מסלולים מוכרים כגון פסיכולוגיה של הילד), כולל פרקטיקום - התנסות מעשית בשטח עם הדרכה.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים בחצי משרה:</strong> לב ליבה של ההכשרה. מתבצעת לרוב במסגרת שפ"ח (שירות פסיכולוגי חינוכי) ברשויות המקומיות, המוכר על ידי משרד הבריאות כמוסד מאמן.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> רק לאחר מעבר בהצלחה מקבל הפסיכולוג את התואר "פסיכולוג חינוכי מומחה".</span></li>
                       </ul>
                       <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>.</p>
@@ -455,7 +455,7 @@ export default function TherapistTypesPage() {
 
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
                       <h3 className="font-bold text-[#4A2A8A] mb-2">פסיכולוג חינוכי מומחה-מדריך</h3>
-                      <p>ישנם פסיכולוגים חינוכיים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג חינוכי מומחה-מדריך"</strong> — המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
+                      <p>ישנם פסיכולוגים חינוכיים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג חינוכי מומחה-מדריך"</strong> - המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
                     </div>
 
                     <p>
@@ -465,13 +465,13 @@ export default function TherapistTypesPage() {
                 ) : t.richContent === "counselor" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      היועץ/ת החינוכי/ת עובד/ת במסגרת בית הספר ומהווה <strong>צומת מרכזית של הפניות טיפוליות</strong> — הדמות המקצועית הראשונה שילדים, הורים ומורים פונים אליה כאשר עולה קושי רגשי, חברתי או לימודי. תפקידו/ה מגשר בין הצרכים של התלמיד, המשפחה והמערכת החינוכית.
+                      היועץ/ת החינוכי/ת עובד/ת במסגרת בית הספר ומהווה <strong>צומת מרכזית של הפניות טיפוליות</strong> - הדמות המקצועית הראשונה שילדים, הורים ומורים פונים אליה כאשר עולה קושי רגשי, חברתי או לימודי. תפקידו/ה מגשר בין הצרכים של התלמיד, המשפחה והמערכת החינוכית.
                     </p>
 
                     <div className="rounded-xl bg-[#EBF5F1] border border-[#A8D4C0] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-3">תחומי עיסוק מרכזיים</h3>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>זיהוי והפניה:</strong> איתור תלמידים הזקוקים לסיוע והפניה לגורמי טיפול מתאימים — פסיכולוג חינוכי, מטפל, פסיכיאטר ילדים ועוד.</span></li>
+                        <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>זיהוי והפניה:</strong> איתור תלמידים הזקוקים לסיוע והפניה לגורמי טיפול מתאימים - פסיכולוג חינוכי, מטפל, פסיכיאטר ילדים ועוד.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>ייעוץ פרטני לתלמיד:</strong> שיחות תמיכה, ליווי רגשי, סיוע במשברים והתמודדות עם קשיים חברתיים.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>עבודה עם הורים:</strong> ייעוץ ותמיכה, גישור בין הבית לבית הספר, סיוע בהתמודדות עם קשיי ילדים.</span></li>
                         <li className="flex gap-2"><span className="text-[#2A6B50] font-bold flex-shrink-0">•</span><span><strong>עבודה עם צוות חינוכי:</strong> ייעוץ למורים, פיתוח תוכניות התערבות כיתתיות, טיפול באקלים כיתה.</span></li>
@@ -479,36 +479,36 @@ export default function TherapistTypesPage() {
                     </div>
 
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
-                      <h3 className="font-bold text-[#4A2A8A] mb-3">הכשרה נוספת — פסיכותרפיה</h3>
-                      <p>חלק מהיועצות והיועצים ממשיכים ללימודי <strong>פסיכותרפיה</strong> לאחר ההסמכה — הכשרה שנותנת להם כלים עמוקים ומקיפים יותר לטיפול רגשי ממוקד. הכשרה זו מחזקת את יכולת הטיפול בעיקר <strong>בילדים ובעבודת הורות</strong>, ומאפשרת לחלקם לפתוח מסגרת טיפולית פרטית לצד עבודתם בבית הספר.</p>
+                      <h3 className="font-bold text-[#4A2A8A] mb-3">הכשרה נוספת - פסיכותרפיה</h3>
+                      <p>חלק מהיועצות והיועצים ממשיכים ללימודי <strong>פסיכותרפיה</strong> לאחר ההסמכה - הכשרה שנותנת להם כלים עמוקים ומקיפים יותר לטיפול רגשי ממוקד. הכשרה זו מחזקת את יכולת הטיפול בעיקר <strong>בילדים ובעבודת הורות</strong>, ומאפשרת לחלקם לפתוח מסגרת טיפולית פרטית לצד עבודתם בבית הספר.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#FEF3EB] border border-[#F4C8A4] p-4">
                       <h3 className="font-bold text-[#8B4A10] mb-2">מסלול ההכשרה</h3>
-                      <p>תואר ראשון בפסיכולוגיה, חינוך או תחום סמוך — ולאחריו תואר שני בייעוץ חינוכי (M.Ed. או M.A.) הכולל פרקטיקום בבית ספר. הסמכה ניתנת מטעם משרד החינוך.</p>
+                      <p>תואר ראשון בפסיכולוגיה, חינוך או תחום סמוך - ולאחריו תואר שני בייעוץ חינוכי (M.Ed. או M.A.) הכולל פרקטיקום בבית ספר. הסמכה ניתנת מטעם משרד החינוך.</p>
                     </div>
                   </div>
                 ) : t.richContent === true ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
-                      הפסיכולוג הקליני עוסק בהבנת עולמו הפנימי של האדם, אבחון קשיים נפשיים ומתן טיפול נפשי (פסיכותרפיה). בנוסף, הוא מוסמך לערוך <strong>אבחון פסיכודיאגנוסטי למבוגרים</strong> — הערכה מקיפה של תפקוד נפשי, אישיות ומצב רגשי — כאשר ההכשרה הנרחבת שעבר מכשירה אותו לכך באופן ייחודי. בישראל, התואר <strong>"פסיכולוג קליני מומחה"</strong> מוגן על פי חוק הפסיכולוגים (1977), ורק מי שעמד בכל תנאי ההכשרה רשאי להשתמש בו.
+                      הפסיכולוג הקליני עוסק בהבנת עולמו הפנימי של האדם, אבחון קשיים נפשיים ומתן טיפול נפשי (פסיכותרפיה). בנוסף, הוא מוסמך לערוך <strong>אבחון פסיכודיאגנוסטי למבוגרים</strong> - הערכה מקיפה של תפקוד נפשי, אישיות ומצב רגשי - כאשר ההכשרה הנרחבת שעבר מכשירה אותו לכך באופן ייחודי. בישראל, התואר <strong>"פסיכולוג קליני מומחה"</strong> מוגן על פי חוק הפסיכולוגים (1977), ורק מי שעמד בכל תנאי ההכשרה רשאי להשתמש בו.
                     </p>
 
                     <div className="rounded-xl bg-[#F8F4FF] border border-[#D8C8F0] p-4">
                       <h3 className="font-bold text-[#4A2A8A] mb-3">1. מסלול ההכשרה</h3>
                       <p className="text-xs text-stone-500 mb-3">בישראל, המסלול נחשב לאחד התחרותיים ביותר באקדמיה:</p>
                       <ul className="space-y-2.5">
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> לאחר תואר ראשון בהצטיינות ומעבר מבחן המתא"ם — לימודי פסיכולוגיה קלינית הכוללים פרקטיקום.</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>רישום בפנקס הפסיכולוגים:</strong> עם סיום התואר השני, הבוגר נחשב "פסיכולוג" — אך עדיין לא "מומחה".</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות — 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
-                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום ההתמחות — בחינה בעל פה מול ועדת בוחנים בכירה. רק לאחר המעבר הופך לפסיכולוג קליני מומחה.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>תואר שני (M.A.):</strong> לאחר תואר ראשון בהצטיינות ומעבר מבחן המתא"ם - לימודי פסיכולוגיה קלינית הכוללים פרקטיקום.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>רישום בפנקס הפסיכולוגים:</strong> עם סיום התואר השני, הבוגר נחשב "פסיכולוג" - אך עדיין לא "מומחה".</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות - 4 שנים:</strong> במוסדות מוכרים על ידי משרד הבריאות.</span></li>
+                        <li className="flex gap-2"><span className="text-[#4A2A8A] font-bold flex-shrink-0">•</span><span><strong>בחינת המומחיות:</strong> בסיום ההתמחות - בחינה בעל פה מול ועדת בוחנים בכירה. רק לאחר המעבר הופך לפסיכולוג קליני מומחה.</span></li>
                       </ul>
                       <p className="mt-3 text-xs text-stone-500">סה"כ משך ההכשרה מתחילת הלימודים ועד לתואר מומחה: <strong>10–11 שנים</strong>.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#F0F9F4] border border-[#A8D8BC] p-4">
                       <h3 className="font-bold text-[#2A6B50] mb-2">פסיכולוג קליני מומחה-מדריך</h3>
-                      <p>ישנם פסיכולוגים קליניים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג קליני מומחה-מדריך"</strong> — המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
+                      <p>ישנם פסיכולוגים קליניים מומחים שממשיכים להכשרה נוספת בהדרכה של פסיכולוגים מתמחים. לאחר עמידה בדרישות משרד הבריאות הם מקבלים רישיון נוסף בשם <strong>"פסיכולוג קליני מומחה-מדריך"</strong> - המוסמך להדריך פסיכולוגים בתהליך ההתמחות שלהם.</p>
                     </div>
 
                     <div className="rounded-xl bg-[#F0F8FF] border border-[#B4D4F0] p-4">
@@ -516,7 +516,7 @@ export default function TherapistTypesPage() {
                       <p className="mb-3">משרד הבריאות מחייב עבודה בשני סוגי מרפאות:</p>
                       <ul className="space-y-2.5">
                         <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות מרפאתית (אמבולטורית):</strong> מרפאות בריאות הנפש או קופות חולים. דיכאון, חרדה, משברי חיים וקשיים בינאישיים.</span></li>
-                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות אשפוזית:</strong> מחלקות פסיכיאטריות. מצבים מורכבים — פסיכוזה, הפרעות אישיות קשות, מצבי חירום אובדניים — בצוות רב-מקצועי.</span></li>
+                        <li className="flex gap-2"><span className="text-[#1A4A8A] font-bold flex-shrink-0">•</span><span><strong>התמחות אשפוזית:</strong> מחלקות פסיכיאטריות. מצבים מורכבים - פסיכוזה, הפרעות אישיות קשות, מצבי חירום אובדניים - בצוות רב-מקצועי.</span></li>
                       </ul>
                     </div>
                   </div>

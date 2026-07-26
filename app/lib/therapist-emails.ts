@@ -14,7 +14,7 @@ const resendClient = new Resend(process.env.RESEND_API_KEY);
 
 // Every email in this file flows through this one wrapper, so each outbound
 // send lands in crm_email_log (the CRM timeline reads it) without touching
-// the individual sender functions. Keyed by recipient address — the timeline
+// the individual sender functions. Keyed by recipient address - the timeline
 // resolves therapist ↔ email by address, so no entity id is needed here.
 // Logging is fire-and-forget: it must never delay or fail a send.
 const resend = {
@@ -62,10 +62,10 @@ function escapeHtml(str: string): string {
 }
 
 // Reasons a therapist's promoted-tier access ends:
-//   - 'admin_demote'         — admin demoted a free (manual/trial) promotion
-//   - 'customer_cancellation'— paying customer asked us to cancel their sub
-//   - 'trial_expired'        — time-limited promotion reached its expiry
-//   - 'payment_failed'       — Sumit cancelled the standing order after retries
+//   - 'admin_demote'         - admin demoted a free (manual/trial) promotion
+//   - 'customer_cancellation'- paying customer asked us to cancel their sub
+//   - 'trial_expired'        - time-limited promotion reached its expiry
+//   - 'payment_failed'       - Sumit cancelled the standing order after retries
 export type PromotionEndedReason =
   | "admin_demote"
   | "customer_cancellation"
@@ -73,8 +73,8 @@ export type PromotionEndedReason =
   | "payment_failed";
 
 // Source of a new gift promotion (admin granted, no money changed hands):
-//   - 'manual' — no expiry, runs until admin demotes
-//   - 'trial'  — time-limited, expires at promoted_until
+//   - 'manual' - no expiry, runs until admin demotes
+//   - 'trial'  - time-limited, expires at promoted_until
 export type PromotionGrantedSource = "manual" | "trial";
 
 const REASON_TEXTS: Record<PromotionEndedReason, { subject: string; body: string }> = {
@@ -90,7 +90,7 @@ const REASON_TEXTS: Record<PromotionEndedReason, { subject: string; body: string
       "המנוי החודשי שלך באתר טיפול חכם בוטל בעקבות בקשתך." +
       " הוראת הקבע הופסקה ולא ייגבו ממך תשלומים נוספים." +
       " אנחנו מצטערים לראות אותך עוזב/ת, ותודה שהיית חלק מטיפול חכם 🙏" +
-      " כל שאלה, הערה או תלונה — אנחנו כאן וזה חשוב לנו. ואם בעתיד תרצה/י לחזור, ניתן להירשם מחדש מהאתר בכל עת.",
+      " כל שאלה, הערה או תלונה - אנחנו כאן וזה חשוב לנו. ואם בעתיד תרצה/י לחזור, ניתן להירשם מחדש מהאתר בכל עת.",
   },
   trial_expired: {
     subject: "תקופת הניסיון שלך באתר טיפול חכם הסתיימה",
@@ -127,7 +127,7 @@ export async function sendPromotionEndedEmail(opts: {
   // text) via a short on-site form. Not shown for payment-failure / gift-end.
   const feedbackHtml =
     opts.reason === "customer_cancellation"
-      ? `<p style="margin:0 0 12px;">אם יש דקה — נשמח מאוד לדעת מה גרם לך לעזוב, זה עוזר לנו להשתפר:</p>
+      ? `<p style="margin:0 0 12px;">אם יש דקה - נשמח מאוד לדעת מה גרם לך לעזוב, זה עוזר לנו להשתפר:</p>
       <p style="margin:0 0 24px;">
         <a href="${feedbackUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">שיתוף הסיבה לביטול</a>
       </p>`
@@ -154,7 +154,7 @@ export async function sendPromotionEndedEmail(opts: {
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -192,8 +192,8 @@ export async function sendCancellationFeedbackEmail(opts: {
     console.warn("sendCancellationFeedbackEmail: RESEND_API_KEY not configured, skipping");
     return { ok: false, error: "resend not configured" };
   }
-  const safeName = escapeHtml(opts.name?.trim() || "—");
-  const safeEmail = escapeHtml(opts.email?.trim() || "—");
+  const safeName = escapeHtml(opts.name?.trim() || "-");
+  const safeEmail = escapeHtml(opts.email?.trim() || "-");
   const reasonsHtml =
     opts.reasons.length > 0
       ? `<ul style="margin:0 0 12px;padding-inline-start:18px;">${opts.reasons
@@ -222,7 +222,7 @@ export async function sendCancellationFeedbackEmail(opts: {
     const { error } = await resend.emails.send({
       from: FROM,
       to: ADMIN_RECIPIENTS,
-      subject: `משוב ביטול ממטפל/ת — ${opts.name?.trim() || opts.email?.trim() || "ללא שם"}`,
+      subject: `משוב ביטול ממטפל/ת - ${opts.name?.trim() || opts.email?.trim() || "ללא שם"}`,
       html,
     });
     if (error) {
@@ -291,7 +291,7 @@ export async function sendPromotionGrantedEmail(opts: {
         <p style="margin:0 0 8px;font-weight:bold;color:#0F5468;">המסלול המקודם כולל:</p>
         <ul style="margin:0;padding-right:18px;font-size:14px;">
           <li>חשיפה מועדפת בתוצאות החיפוש</li>
-          <li>מערכת התאמה חכמה — פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+          <li>מערכת התאמה חכמה - פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
           <li>דו"ח צפיות, לחיצות ואחוזי המרה</li>
           <li>פילוח הפונים: אזור, קושי, גיל ומגדר</li>
           <li>השוואה לממוצע המטפלים באתר</li>
@@ -310,7 +310,7 @@ export async function sendPromotionGrantedEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         בהצלחה,<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -336,8 +336,8 @@ export async function sendPromotionGrantedEmail(opts: {
 }
 
 // Onboarding email sent once a therapist becomes active:
-//   tier 'paid' — they just subscribed (create-subscription)
-//   tier 'free' — admin approved their pending profile (admin-therapists)
+//   tier 'paid' - they just subscribed (create-subscription)
+//   tier 'free' - admin approved their pending profile (admin-therapists)
 // Includes a personalized profile-quality nudge (hybrid rules + AI) and an
 // invitation to write a short article. Best-effort: the caller must not let a
 // failure here block the underlying action (payment / approval).
@@ -370,35 +370,35 @@ export async function sendTherapistWelcomeEmail(opts: {
 
   const subject = isPaid
     ? "תודה על השדרוג למסלול המקודם של טיפול חכם 🎉"
-    : "הפרופיל שלך אושר — ברוך/ה הבא/ה לטיפול חכם 🎉";
+    : "הפרופיל שלך אושר - ברוך/ה הבא/ה לטיפול חכם 🎉";
 
   const confirmationHtml = isPaid
-    ? `<p style="margin:0 0 12px;">תודה ששדרגת ל<strong>מסלול המקודם</strong> של טיפול חכם! הפרופיל שלך יעלה למערכת ההתאמה החכמה ויקבל חשיפה מועדפת <strong>מיד לאחר שצוות טיפול חכם יאשר אותו</strong> — נעדכן אותך במייל ברגע שזה קורה.</p>
+    ? `<p style="margin:0 0 12px;">תודה ששדרגת ל<strong>מסלול המקודם</strong> של טיפול חכם! הפרופיל שלך יעלה למערכת ההתאמה החכמה ויקבל חשיפה מועדפת <strong>מיד לאחר שצוות טיפול חכם יאשר אותו</strong> - נעדכן אותך במייל ברגע שזה קורה.</p>
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:14px 0 18px;">
         <p style="margin:0 0 8px;font-weight:bold;color:#0F5468;">מה כולל המסלול שלך:</p>
         <ul style="margin:0;padding-inline-start:18px;font-size:14px;line-height:1.6;">
           <li>חשיפה מועדפת בתוצאות החיפוש</li>
-          <li>מערכת התאמה חכמה — פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
+          <li>מערכת התאמה חכמה - פניות לפי גיל, אזור, שפה, סגנון טיפולי ועוד</li>
           <li>דו"ח צפיות, לחיצות ואחוזי המרה</li>
           <li>פילוח הפונים: אזור, קושי, גיל ומגדר</li>
           <li>השוואה לממוצע המטפלים באתר</li>
         </ul>
       </div>
       <p style="margin:0 0 20px;font-size:13px;color:#666;">קבלה/חשבונית על התשלום תישלח אליך ישירות ממערכת הסליקה.</p>`
-    : `<p style="margin:0 0 20px;">הפרופיל שלך <strong>אושר ומקבל הופעה ראשונה במערכת המטפלים</strong> של טיפול חכם — כל מי שמחפש מטפל/ת באזור ובתחום שלך יכול/ה למצוא אותך.</p>`;
+    : `<p style="margin:0 0 20px;">הפרופיל שלך <strong>אושר ומקבל הופעה ראשונה במערכת המטפלים</strong> של טיפול חכם - כל מי שמחפש מטפל/ת באזור ובתחום שלך יכול/ה למצוא אותך.</p>`;
 
   const articleCtaHtml = `
       <div style="border:1px solid #E8E0D8;border-radius:10px;padding:16px 20px;margin:0 0 22px;">
         <p style="margin:0 0 8px;font-weight:bold;color:#0F5468;">כתיבה מקצועית = יותר פניות</p>
         <p style="margin:0 0 12px;font-size:14px;color:#3E5250;line-height:1.6;">
-          כתיבת מידע מקצועי קצר על תחום שקרוב לליבך מגבירה מאוד את הפנייה אליך. זה לא חייב להיות מאמר מדעי או מקצועי מדי —
+          כתיבת מידע מקצועי קצר על תחום שקרוב לליבך מגבירה מאוד את הפנייה אליך. זה לא חייב להיות מאמר מדעי או מקצועי מדי -
           מספיק מידע פשוט וברור שיעזור למטופלים פוטנציאליים להכיר אותך דרך הכתיבה שלך. נשמח לפרסם אותו במאגר המאמרים של האתר,
           עם שמך וקישור לפרופיל שלך.
         </p>
         <a href="${writeUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:10px 22px;border-radius:10px;font-size:14px;">לכתיבת מאמר קצר</a>
       </div>`;
 
-  // Paid-tier upsell — shown only to free therapists.
+  // Paid-tier upsell - shown only to free therapists.
   const upsellHtml = isPaid
     ? ""
     : `
@@ -406,12 +406,12 @@ export async function sendTherapistWelcomeEmail(opts: {
         <p style="margin:0 0 6px;font-weight:bold;font-size:15px;">רוצה להגיע ליותר מטופלים? שדרג/י למסלול המקודם</p>
         <p style="margin:0 0 12px;font-size:13px;color:rgba(255,255,255,.85);">${
           isPromoActive()
-            ? `מבצע פתיחה — ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ לחודש ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, אח"כ ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ`
+            ? `מבצע פתיחה - ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ לחודש ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, אח"כ ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ`
             : `₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ לחודש`
         } · ניתן לבטל בכל עת</p>
         <ul style="margin:0 0 14px;padding-inline-start:18px;font-size:13.5px;line-height:1.7;color:rgba(255,255,255,.95);">
-          <li>שילוב במערכת ההתאמה החכמה — הפניות מדויקות יותר לפי גיל, אזור, שפה, סוג הטיפול שבו את/ה מתמחה וסגנון טיפולי</li>
-          <li>סטטיסטיקות על הפונים — אילו סוגי מטופלים צופים בפרופיל שלך, אזורים ואחוזי המרה</li>
+          <li>שילוב במערכת ההתאמה החכמה - הפניות מדויקות יותר לפי גיל, אזור, שפה, סוג הטיפול שבו את/ה מתמחה וסגנון טיפולי</li>
+          <li>סטטיסטיקות על הפונים - אילו סוגי מטופלים צופים בפרופיל שלך, אזורים ואחוזי המרה</li>
           <li>אחריות: לא קיבלת מטופל שהגיע דרכנו תוך חודשיים? אפשר לקבל החזר כספי מלא</li>
         </ul>
         <a href="${checkoutUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:10px 22px;border-radius:10px;font-size:14px;">לשדרוג למסלול המקודם</a>
@@ -437,7 +437,7 @@ export async function sendTherapistWelcomeEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
         בהצלחה,<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -462,7 +462,7 @@ export async function sendTherapistWelcomeEmail(opts: {
   }
 }
 
-// Sent right after a therapist first submits their profile (status pending) —
+// Sent right after a therapist first submits their profile (status pending) -
 // confirms we received it and that the team will review it before publishing.
 export async function sendTherapistRegistrationReceivedEmail(opts: {
   to: string;
@@ -474,7 +474,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
   }
   const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
   const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
-  const subject = "תודה על ההצטרפות לטיפול חכם — הפרופיל בבדיקה 🎉";
+  const subject = "תודה על ההצטרפות לטיפול חכם - הפרופיל בבדיקה 🎉";
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
@@ -482,7 +482,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 👋</h1>
       <p style="margin:0 0 14px;">תודה שהצטרפת לטיפול חכם! 🎉</p>
-      <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר — לטובת המטופלים וגם לטובתך.</p>
+      <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר - לטובת המטופלים וגם לטובתך.</p>
       <p style="margin:0 0 18px;">נעדכן אותך במייל ברגע שהפרופיל יאושר. בינתיים אפשר להיכנס ללוח הבקרה לעדכן או להשלים פרטים.</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
@@ -491,7 +491,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com · 055-993-1403<br/>
         בברכה,<br/>
-        צוות טיפול חכם — Mentalytics
+        צוות טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -512,7 +512,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
 }
 
 // Sent when an admin approves a PAYING therapist's listing (admin_approved
-// false→true) — the joyful "you're live in the matching system" congrats.
+// false→true) - the joyful "you're live in the matching system" congrats.
 export async function sendPromotedApprovedEmail(opts: {
   to: string;
   name: string;
@@ -530,8 +530,8 @@ export async function sendPromotedApprovedEmail(opts: {
   <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 🎉</h1>
-      <p style="margin:0 0 14px;">שמחים לבשר — הפרופיל שלך אושר וכעת הוא חי במערכת ההתאמה החכמה של טיפול חכם!</p>
-      <p style="margin:0 0 18px;">מהרגע הזה מטופלים שמחפשים מטפל/ת שמתאים/ה בדיוק לפרופיל שלך (לפי תחום, גיל, אזור, שפה וסגנון טיפולי) יופנו אליך — ותוכל/י לעקוב אחרי הצפיות, הפניות ואחוזי ההמרה בלוח הבקרה.</p>
+      <p style="margin:0 0 14px;">שמחים לבשר - הפרופיל שלך אושר וכעת הוא חי במערכת ההתאמה החכמה של טיפול חכם!</p>
+      <p style="margin:0 0 18px;">מהרגע הזה מטופלים שמחפשים מטפל/ת שמתאים/ה בדיוק לפרופיל שלך (לפי תחום, גיל, אזור, שפה וסגנון טיפולי) יופנו אליך - ותוכל/י לעקוב אחרי הצפיות, הפניות ואחוזי ההמרה בלוח הבקרה.</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
       </p>
@@ -539,7 +539,7 @@ export async function sendPromotedApprovedEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com · 055-993-1403<br/>
         בהצלחה,<br/>
-        צוות טיפול חכם — Mentalytics
+        צוות טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -583,7 +583,7 @@ export async function sendArticleReviewedEmail(opts: {
     : "עדכון על המאמר ששלחת לטיפול חכם";
 
   const bodyHtml = opts.approved
-    ? `<p style="margin:0 0 16px;">המאמר שלך "<strong>${safeTitle}</strong>" אושר ופורסם במאגר המאמרים של טיפול חכם — עם שמך וקישור לפרופיל שלך. כתיבה כזו עוזרת למטופלים פוטנציאליים להכיר אותך.</p>
+    ? `<p style="margin:0 0 16px;">המאמר שלך "<strong>${safeTitle}</strong>" אושר ופורסם במאגר המאמרים של טיפול חכם - עם שמך וקישור לפרופיל שלך. כתיבה כזו עוזרת למטופלים פוטנציאליים להכיר אותך.</p>
        <p style="margin:0 0 16px;">
          <a href="${articleUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">צפייה במאמר</a>
        </p>
@@ -601,7 +601,7 @@ export async function sendArticleReviewedEmail(opts: {
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -623,7 +623,7 @@ export async function sendArticleReviewedEmail(opts: {
 
 // Sent when an admin rejects a therapist's registration (e.g. the uploaded
 // license certificate is unreadable or unacceptable). Explains the reason and
-// how to fix it — re-uploading a clear certificate and saving re-submits the
+// how to fix it - re-uploading a clear certificate and saving re-submits the
 // profile for review automatically.
 export async function sendTherapistRejectedEmail(opts: {
   to: string;
@@ -656,11 +656,11 @@ export async function sendTherapistRejectedEmail(opts: {
       <p style="margin:0 0 16px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
       </p>
-      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
@@ -680,7 +680,7 @@ export async function sendTherapistRejectedEmail(opts: {
   }
 }
 
-// Admin-triggered nudge for an incomplete (but not rejected) registration —
+// Admin-triggered nudge for an incomplete (but not rejected) registration -
 // lists exactly what's missing and links to the dashboard. A gentle "one step
 // left" framing; it does NOT change the profile's status.
 export async function sendTherapistCompletionRequestEmail(opts: {
@@ -712,17 +712,17 @@ export async function sendTherapistCompletionRequestEmail(opts: {
       <div style="text-align:center;margin:0 0 20px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">לעריכת הפרופיל שלי ←</a>
       </div>
-      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>
 </html>`;
 
-  // Completion reminders are the classic bulk burst — route them through the
+  // Completion reminders are the classic bulk burst - route them through the
   // daily bulk gate so a mass send can't blow Resend's daily quota (and starve
   // transactional mail). A deferred send returns ok:false with a clear message.
   const r = await sendBulkEmail({ from: FROM, to: opts.to, subject, html });
@@ -734,7 +734,7 @@ export async function sendTherapistCompletionRequestEmail(opts: {
 // exchange for two months of promoted-tier exposure, free. Explains the offer,
 // links to the article composer in the therapist's personal area, and includes
 // a free-vs-promoted comparison table. Routed through the daily bulk gate since
-// an admin may invite many "selected" therapists in one sitting — a deferred
+// an admin may invite many "selected" therapists in one sitting - a deferred
 // send returns ok:false with a clear message. The HTML itself lives in the
 // dependency-light builder module so it can be previewed in isolation.
 export async function sendArticleInviteEmail(opts: {
@@ -755,7 +755,7 @@ export async function sendArticleInviteEmail(opts: {
 
 // General admin → therapist message with a custom subject + free-text body and
 // a direct "edit profile" button. Unlike the completion request it makes no
-// claim about missing fields or review, so it fits any nudge — e.g. "you
+// claim about missing fields or review, so it fits any nudge - e.g. "you
 // uploaded a certificate into the photo slot, here's the link to fix it". Does
 // NOT change the profile's status.
 export async function sendTherapistAdminMessageEmail(opts: {
@@ -787,11 +787,11 @@ export async function sendTherapistAdminMessageEmail(opts: {
       <div style="text-align:center;margin:0 0 20px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">לעריכת הפרופיל שלי ←</a>
       </div>
-      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה — עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
-        טיפול חכם — Mentalytics
+        טיפול חכם - Mentalytics
       </p>
     </div>
   </body>

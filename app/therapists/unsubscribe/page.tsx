@@ -124,7 +124,7 @@ async function ConfirmView({
           type="submit"
           className="w-full rounded-xl bg-stone-800 text-white text-sm font-bold py-3 hover:bg-stone-700 transition-colors"
         >
-          {isNewsletter ? "אישור — הסר אותי מרשימת הדיוור" : "אישור — הסר אותי מהדוח החודשי"}
+          {isNewsletter ? "אישור - הסר אותי מרשימת הדיוור" : "אישור - הסר אותי מהדוח החודשי"}
         </button>
       </form>
 
@@ -132,7 +132,7 @@ async function ConfirmView({
         href="/therapists/dashboard"
         className="mt-3 block text-center text-xs text-stone-500 hover:text-stone-700 underline"
       >
-        ביטול — חזרה ללוח הבקרה
+        ביטול - חזרה ללוח הבקרה
       </Link>
     </>
   );

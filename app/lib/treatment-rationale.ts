@@ -3,14 +3,14 @@
 // curated, accurate content instead of being invented by the model.
 //
 // Keyed on the exact treatment identifier the questionnaire emits
-// (`Recommendation.treatment` — same Hebrew strings as treatment-articles.ts).
+// (`Recommendation.treatment` - same Hebrew strings as treatment-articles.ts).
 // The client may still pass a more specific `treatment_rationale` (e.g. the
 // couples-modality "why"), which OVERRIDES anything here.
 //
-// `why`              — why the approach helps, in lay terms (no efficacy stats).
-// `typical_duration` — qualitative shape/length of the work (never invent
+// `why`              - why the approach helps, in lay terms (no efficacy stats).
+// `typical_duration` - qualitative shape/length of the work (never invent
 //                      session counts in the model; supply them here if known).
-// `evidence_strength`— "high" | "moderate" | "low" — research backing.
+// `evidence_strength`- "high" | "moderate" | "low" - research backing.
 
 export type TreatmentRationale = {
   why?: string;
@@ -20,12 +20,12 @@ export type TreatmentRationale = {
 
 const CBT: TreatmentRationale = {
   why: "CBT עוזר לזהות את הקשר בין מחשבות, רגשות והתנהגות, ולתרגל דרכי חשיבה ופעולה חדשות שמקלות על המצוקה בחיי היומיום. העבודה ממוקדת בהווה, מעשית, וכוללת לרוב כלים ומשימות לתרגול בין הפגישות.",
-  typical_duration: "טיפול ממוקד, לרוב קצר עד בינוני בטווחו — סדרה של מפגשים שבועיים על פני כמה חודשים.",
+  typical_duration: "טיפול ממוקד, לרוב קצר עד בינוני בטווחו - סדרה של מפגשים שבועיים על פני כמה חודשים.",
   evidence_strength: "high",
 };
 
 const DYNAMIC: TreatmentRationale = {
-  why: "טיפול דינאמי מתמקד בהבנת השורשים של הקושי — חוויות עבר, רגשות עמוקים ודפוסים לא-מודעים שחוזרים על עצמם בקשרים ובחיים. דרך מערכת היחסים הטיפולית נוצר מרחב להבין ולשנות את הדפוסים האלה לעומק.",
+  why: "טיפול דינאמי מתמקד בהבנת השורשים של הקושי - חוויות עבר, רגשות עמוקים ודפוסים לא-מודעים שחוזרים על עצמם בקשרים ובחיים. דרך מערכת היחסים הטיפולית נוצר מרחב להבין ולשנות את הדפוסים האלה לעומק.",
   typical_duration: "תהליך פתוח ומתמשך, שמתפתח בהדרגה לאורך זמן.",
   evidence_strength: "moderate",
 };
@@ -37,13 +37,13 @@ const EMDR: TreatmentRationale = {
 };
 
 const DBT: TreatmentRationale = {
-  why: "DBT משלב קבלה ושינוי, ומלמד מיומנויות מעשיות לוויסות רגשי, התמודדות עם מצוקה חריפה, תשומת לב (מיינדפולנס) ושיפור קשרים בין-אישיים — במיוחד כשהרגשות עוצמתיים ומשתנים במהירות.",
+  why: "DBT משלב קבלה ושינוי, ומלמד מיומנויות מעשיות לוויסות רגשי, התמודדות עם מצוקה חריפה, תשומת לב (מיינדפולנס) ושיפור קשרים בין-אישיים - במיוחד כשהרגשות עוצמתיים ומשתנים במהירות.",
   typical_duration: "תהליך מובנה ויסודי יותר, לרוב על פני חודשים, לעיתים בשילוב קבוצת מיומנויות.",
   evidence_strength: "high",
 };
 
 const ACT: TreatmentRationale = {
-  why: "ACT עוזר לפתח גמישות נפשית — ללמוד לשאת מחשבות ורגשות קשים בלי שינהלו אותך, ובמקביל לפעול לפי הערכים והדברים שחשובים לך באמת.",
+  why: "ACT עוזר לפתח גמישות נפשית - ללמוד לשאת מחשבות ורגשות קשים בלי שינהלו אותך, ובמקביל לפעול לפי הערכים והדברים שחשובים לך באמת.",
   typical_duration: "טיפול ממוקד, לרוב קצר עד בינוני בטווחו.",
   evidence_strength: "moderate",
 };
@@ -73,7 +73,7 @@ const PARENT_GUIDANCE: TreatmentRationale = {
 };
 
 const EXPRESSIVE: TreatmentRationale = {
-  why: "טיפול בהבעה ויצירה משתמש באמנות, משחק או תנועה כשפה נוספת לביטוי — מתאים במיוחד לילדים ולמי שקשה לו לבטא רגשות במילים, ומאפשר לעבד חוויות דרך עשייה.",
+  why: "טיפול בהבעה ויצירה משתמש באמנות, משחק או תנועה כשפה נוספת לביטוי - מתאים במיוחד לילדים ולמי שקשה לו לבטא רגשות במילים, ומאפשר לעבד חוויות דרך עשייה.",
   typical_duration: "תהליך מתמשך שמתפתח בקצב של המטופל/ת.",
   evidence_strength: "moderate",
 };
@@ -103,7 +103,7 @@ const EATING: TreatmentRationale = {
 };
 
 const PSYCHIATRIST: TreatmentRationale = {
-  why: "פסיכיאטר/ית הוא/היא רופא/ה שיכול/ה להעריך את התמונה הרפואית, לסייע באבחנה ולהציע טיפול תרופתי כשהוא רלוונטי — לעיתים לצד טיפול רגשי, ולא במקומו.",
+  why: "פסיכיאטר/ית הוא/היא רופא/ה שיכול/ה להעריך את התמונה הרפואית, לסייע באבחנה ולהציע טיפול תרופתי כשהוא רלוונטי - לעיתים לצד טיפול רגשי, ולא במקומו.",
   typical_duration: "מתחיל בהערכה, ובהמשך מעקב לפי הצורך.",
   evidence_strength: "high",
 };
@@ -121,7 +121,7 @@ export const TREATMENT_RATIONALE: Record<string, TreatmentRationale> = {
   "טיפול בטראומה": TRAUMA,
   "טיפול זוגי": COUPLES,
   "טיפול משפחתי": FAMILY,
-  "טיפול דיאדי": { ...FAMILY, why: "טיפול דיאדי עובד עם ההורה והילד יחד, כדי לחזק את הקשר ביניהם ולעבד דרכו חוויות קשות — מתוך ההבנה שהקשר הבטוח הוא מנוע הריפוי המרכזי בגיל הצעיר." },
+  "טיפול דיאדי": { ...FAMILY, why: "טיפול דיאדי עובד עם ההורה והילד יחד, כדי לחזק את הקשר ביניהם ולעבד דרכו חוויות קשות - מתוך ההבנה שהקשר הבטוח הוא מנוע הריפוי המרכזי בגיל הצעיר." },
   "הדרכת הורים": PARENT_GUIDANCE,
   "טיפול בהבעה ויצירה": EXPRESSIVE,
   "טיפול COG-FUN לקשיי קשב וריכוז": COGFUN,
@@ -129,13 +129,13 @@ export const TREATMENT_RATIONALE: Record<string, TreatmentRationale> = {
   "טיפול מיני": SEXUAL,
   "טיפול בהפרעות אכילה": EATING,
   "פסיכיאטר": PSYCHIATRIST,
-  "פסיכיאטר ילדים": { ...PSYCHIATRIST, why: "פסיכיאטר/ית ילדים הוא/היא רופא/ה המתמחה בילדים ונוער, שיכול/ה להעריך את התמונה הרפואית, לסייע באבחנה ולשקול טיפול תרופתי כשהוא רלוונטי — לצד הטיפול הרגשי ולא במקומו." },
+  "פסיכיאטר ילדים": { ...PSYCHIATRIST, why: "פסיכיאטר/ית ילדים הוא/היא רופא/ה המתמחה בילדים ונוער, שיכול/ה להעריך את התמונה הרפואית, לסייע באבחנה ולשקול טיפול תרופתי כשהוא רלוונטי - לצד הטיפול הרגשי ולא במקומו." },
 };
 
 /**
  * Look up curated rationale for a treatment. Tries the exact treatment key
  * first, then the human-readable label as a fallback. Returns undefined when
- * nothing is curated (the caller then sends no rationale — current behaviour).
+ * nothing is curated (the caller then sends no rationale - current behaviour).
  */
 export function getTreatmentRationale(
   treatment?: string | null,

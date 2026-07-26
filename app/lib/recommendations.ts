@@ -1,5 +1,5 @@
 /**
- * Phase 2 — organic recommendation generator. Deterministic, pure.
+ * Phase 2 - organic recommendation generator. Deterministic, pure.
  * Turns the supply/demand picture into concrete, approvable actions that
  * DON'T depend on paid ad accounts (recruit therapists, fix low-converting
  * profiles, grow demand organically where supply is idle). Paid-ad
@@ -20,14 +20,14 @@ export type GeneratedRec = {
 };
 
 // Only flag a profile as low-converting once it has had a meaningful number of
-// views with still zero contacts — avoids noise from barely-seen profiles.
+// views with still zero contacts - avoids noise from barely-seen profiles.
 const MIN_VIEWS_FOR_CONVERSION_FLAG = 8;
 
 export function buildRecommendations(sd: SupplyDemand): GeneratedRec[] {
   const recs: GeneratedRec[] = [];
 
   for (const r of sd.regions) {
-    // "other" is an unclassifiable catch-all bucket — not a real recruitable
+    // "other" is an unclassifiable catch-all bucket - not a real recruitable
     // or promotable geography, so skip region-level recommendations for it.
     if (r.region === "other") continue;
 
@@ -37,7 +37,7 @@ export function buildRecommendations(sd: SupplyDemand): GeneratedRec[] {
         type: "recruit_therapists",
         target_key: `region:${r.region}`,
         title: `לגייס מטפלים באזור ${r.label}`,
-        rationale: `${r.demand} צפיות מטופלים מול ${r.therapists} מטפלים מקומיים — הביקוש עולה על ההיצע.`,
+        rationale: `${r.demand} צפיות מטופלים מול ${r.therapists} מטפלים מקומיים - הביקוש עולה על ההיצע.`,
         suggested_action: `פנייה יזומה למטפלים באזור ${r.label} (LinkedIn, קבוצות מקצועיות, המלצות עמיתים).`,
         priority: 100 + r.demand,
         metadata: { region: r.region, demand: r.demand, therapists: r.therapists },
@@ -49,7 +49,7 @@ export function buildRecommendations(sd: SupplyDemand): GeneratedRec[] {
         type: "promote_region_organic",
         target_key: `region:${r.region}`,
         title: `להגביר ביקוש מטופלים באזור ${r.label}`,
-        rationale: `${r.therapists} מטפלים מול ${r.demand} ביקוש בלבד — עודף היצע, חלק מהמטפלים עלולים לא לקבל פניות.`,
+        rationale: `${r.therapists} מטפלים מול ${r.demand} ביקוש בלבד - עודף היצע, חלק מהמטפלים עלולים לא לקבל פניות.`,
         suggested_action: `תוכן ו-SEO ממוקדי ${r.label}; בהמשך (אחרי חיבור חשבונות הפרסום) פרסום ממוקד אזור.`,
         priority: 50 + r.therapists,
         metadata: { region: r.region, demand: r.demand, therapists: r.therapists },
@@ -63,7 +63,7 @@ export function buildRecommendations(sd: SupplyDemand): GeneratedRec[] {
         type: "low_conversion_therapist",
         target_key: `therapist:${t.id}`,
         title: `פרופיל שלא ממיר: ${t.full_name}`,
-        rationale: `${t.profileViews} צפיות ו-0 פניות — מטופלים רואים את הפרופיל אך לא יוצרים קשר.`,
+        rationale: `${t.profileViews} צפיות ו-0 פניות - מטופלים רואים את הפרופיל אך לא יוצרים קשר.`,
         suggested_action: `לבדוק את הפרופיל (תמונה, טקסט פתיחה, כפתורי קשר/וואטסאפ) וליידע את המטפל/ת.`,
         priority: 100 + t.profileViews,
         metadata: { therapist_id: t.id, profileViews: t.profileViews },

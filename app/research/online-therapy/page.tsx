@@ -2,14 +2,14 @@ import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "טיפול אונליין — כן או לא?",
+  title: "טיפול אונליין - כן או לא?",
   description: "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
 };
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "טיפול אונליין — כן או לא?",
+  "headline": "טיפול אונליין - כן או לא?",
   "description": "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
@@ -25,7 +25,7 @@ export default function OnlineTherapyPage() {
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
-      <h1 className="text-3xl font-black text-stone-900 mb-3">טיפול אונליין — כן או לא?</h1>
+      <h1 className="text-3xl font-black text-stone-900 mb-3">טיפול אונליין - כן או לא?</h1>
 
       {/* Article */}
       <div className="mb-10 space-y-5 text-stone-700 leading-8 text-base">
@@ -51,9 +51,9 @@ export default function OnlineTherapyPage() {
         <h2 className="font-extrabold text-emerald-900 text-xl mb-4">✅ מה המחקר אומר לטובת אונליין</h2>
         <ul className="space-y-3 text-sm leading-7 text-emerald-900">
           <li>• <strong>יעילות שקולה:</strong> מטה-אנליזות מרובות מצאו אפקטיביות דומה ל-CBT, DBT ואינטרוונציות ממוקדות.</li>
-          <li>• <strong>נגישות גבוהה:</strong> אנשים מפריפריה, עם מוגבלויות ניידות, חרדה חברתית גבוהה — מגיעים לטיפול שאחרת לא היו מגיעים אליו.</li>
+          <li>• <strong>נגישות גבוהה:</strong> אנשים מפריפריה, עם מוגבלויות ניידות, חרדה חברתית גבוהה - מגיעים לטיפול שאחרת לא היו מגיעים אליו.</li>
           <li>• <strong>עלות נמוכה יותר:</strong> לרוב זול יותר כי המטפל חוסך בהוצאות מרפאה.</li>
-          <li>• <strong>גמישות:</strong> פגישה מהבית, מהעבודה, מכל מקום — פחות ביטולים.</li>
+          <li>• <strong>גמישות:</strong> פגישה מהבית, מהעבודה, מכל מקום - פחות ביטולים.</li>
           <li>• <strong>כלי דיגיטליים:</strong> אפשרות לשלב אפליקציות, הקלטות ומשימות בין הפגישות.</li>
         </ul>
       </div>
@@ -62,12 +62,12 @@ export default function OnlineTherapyPage() {
       <div className="rounded-2xl p-6 bg-red-50 border border-red-200 mb-6">
         <h2 className="font-extrabold text-red-900 text-xl mb-4">⚠️ מתי עדיף פנים מול פנים</h2>
         <ul className="space-y-3 text-sm leading-7 text-red-900">
-          <li>• <strong>מחשבות אובדניות פעילות</strong> — דורש הערכת סיכון ישירה.</li>
-          <li>• <strong>ילדים קטנים (מתחת לגיל 8)</strong> — הקשר הגופני חשוב יותר.</li>
-          <li>• <strong>טיפול בהבעה ויצירה</strong> — חלק מהשיטות דורשות נוכחות פיזית.</li>
-          <li>• <strong>ריפוי בעיסוק ופיזיותרפיה</strong> — לרוב לא ניתן לביצוע אונליין.</li>
-          <li>• <strong>סביבה ביתית לא בטוחה</strong> — אם אין פרטיות בבית.</li>
-          <li>• <strong>הפרעות פסיכוטיות חריפות</strong> — דורשות מגע ישיר.</li>
+          <li>• <strong>מחשבות אובדניות פעילות</strong> - דורש הערכת סיכון ישירה.</li>
+          <li>• <strong>ילדים קטנים (מתחת לגיל 8)</strong> - הקשר הגופני חשוב יותר.</li>
+          <li>• <strong>טיפול בהבעה ויצירה</strong> - חלק מהשיטות דורשות נוכחות פיזית.</li>
+          <li>• <strong>ריפוי בעיסוק ופיזיותרפיה</strong> - לרוב לא ניתן לביצוע אונליין.</li>
+          <li>• <strong>סביבה ביתית לא בטוחה</strong> - אם אין פרטיות בבית.</li>
+          <li>• <strong>הפרעות פסיכוטיות חריפות</strong> - דורשות מגע ישיר.</li>
         </ul>
       </div>
 
@@ -75,7 +75,7 @@ export default function OnlineTherapyPage() {
       <div className="rounded-2xl p-6 bg-blue-50 border border-blue-200 mb-6">
         <h2 className="font-extrabold text-blue-900 text-xl mb-4">💡 טיפים לטיפול אונליין מוצלח</h2>
         <ul className="space-y-3 text-sm leading-7 text-blue-900">
-          <li>• מצאו מקום שקט עם פרטיות — לא בסלון עם הילדים.</li>
+          <li>• מצאו מקום שקט עם פרטיות - לא בסלון עם הילדים.</li>
           <li>• השתמשו באוזניות לאיכות שמע טובה.</li>
           <li>• בדקו שהחיבור לאינטרנט יציב לפני הפגישה.</li>
           <li>• טיפול אונליין דורש אותה רמת מחויבות כמו פגישה פיזית.</li>

@@ -1,4 +1,4 @@
-// Sumit API client — credit card processing + automatic recurring billing.
+// Sumit API client - credit card processing + automatic recurring billing.
 //
 // Architecture:
 // - Frontend uses Sumit's Payments JS SDK with SUMIT_API_PUBLIC_KEY to
@@ -8,7 +8,7 @@
 //   SingleUseToken from the frontend, then calls /billing/recurring/charge
 //   for subscriptions or /billing/payments/charge for one-offs.
 // - Sumit creates the standing order automatically and charges the saved
-//   token every month on its own servers — there is no client-side cron
+//   token every month on its own servers - there is no client-side cron
 //   for renewals. We poll /billing/recurring/listforcustomer once a day
 //   to sync any status changes (failed charge, customer-initiated cancel
 //   from Sumit's portal, etc.).
@@ -70,13 +70,13 @@ async function api<T>(path: string, body: Record<string, unknown>): Promise<T> {
 
 // ---------- Charge validation ----------
 //
-// The envelope Status above only says the API call was PROCESSED — a card
+// The envelope Status above only says the API call was PROCESSED - a card
 // DECLINE still comes back with Status=0. The decline lives inside
 // Data.Payment: ValidPayment=false plus the Shva code in Payment.Status
 // (e.g. "004" = issuer refusal, "006" = wrong CVV/ID). Verified live
 // 2026-07-04 on two real declines that sailed through as "paid"
 // subscriptions. Money has actually moved only when the payment is
-// explicitly valid, or — for responses that omit the Payment object — when
+// explicitly valid, or - for responses that omit the Payment object - when
 // a document (invoice/receipt) was produced.
 
 export interface SumitPaymentInfo {
@@ -112,7 +112,7 @@ function assertChargeSucceeded(
   )}`;
   throw new SumitPaymentDeclinedError(
     code,
-    `Sumit ${context}: payment declined${code ? ` (code ${code})` : ""}${desc ? ` — ${desc}` : ""} [${ids}]`
+    `Sumit ${context}: payment declined${code ? ` (code ${code})` : ""}${desc ? ` - ${desc}` : ""} [${ids}]`
   );
 }
 
@@ -124,7 +124,7 @@ export interface OneOffChargeResult {
   CustomerID?: number;
   Payment?: SumitPaymentInfo | null;
   // Sumit returns more fields; we keep this loose because we don't depend
-  // on most of them downstream — the document/customer ids are what we
+  // on most of them downstream - the document/customer ids are what we
   // store for reconciliation.
   [k: string]: unknown;
 }
@@ -139,7 +139,7 @@ export async function chargeQuizPayment(opts: {
   const result = await api<OneOffChargeResult>("/billing/payments/charge/", {
     Customer: {
       ExternalIdentifier: `fp:${opts.fingerprint}`,
-      SearchMode: 0, // Automatic — find-or-create by ExternalIdentifier
+      SearchMode: 0, // Automatic - find-or-create by ExternalIdentifier
       Name: opts.customerName,
       EmailAddress: opts.customerEmail,
       Phone: opts.customerPhone,
@@ -172,7 +172,7 @@ export interface SubscriptionChargeResult {
   // send exactly one item, so this holds exactly one id on success).
   RecurringCustomerItemIDs?: number[] | null;
   Payment?: SumitPaymentInfo | null;
-  // Resolved standing-order id — NOT a wire field. Populated below from
+  // Resolved standing-order id - NOT a wire field. Populated below from
   // RecurringCustomerItemIDs (or the list-lookup fallback) for callers.
   RecurringItemID?: number;
   [k: string]: unknown;
@@ -201,7 +201,7 @@ export async function createSubscription(opts: {
     Items: [
       {
         Item: {
-          Name: "מנוי חודשי — מסלול מקודם | טיפול חכם",
+          Name: "מנוי חודשי - מסלול מקודם | טיפול חכם",
           SKU: "PROMOTED-MONTHLY",
           Duration_Months: 1,
         },
@@ -214,7 +214,7 @@ export async function createSubscription(opts: {
       },
     ],
     VATIncluded: false,
-    // Email the customer the receipt automatically on each charge — Sumit
+    // Email the customer the receipt automatically on each charge - Sumit
     // does NOT do this by default for /billing/recurring/charge (unlike
     // /billing/payments/charge which has SendDocumentByEmail). For recurring
     // the correct flag is UpdateCustomerByEmail + the attach toggle.
@@ -224,7 +224,7 @@ export async function createSubscription(opts: {
     PreventStandingOrder: false, // explicit: create the standing order
   });
 
-  // A declined card must stop the flow HERE — before this line the caller
+  // A declined card must stop the flow HERE - before this line the caller
   // used to record the decline as a paid subscription (payment "completed",
   // therapist promoted, welcome email). Sumit cancels the standing order it
   // just created on its own when the initial charge is declined (observed
@@ -233,7 +233,7 @@ export async function createSubscription(opts: {
   assertChargeSucceeded(charge, "subscription charge");
 
   // The standing-order id arrives in RecurringCustomerItemIDs. (An earlier
-  // version read a nonexistent `RecurringItemID` wire field — that's why
+  // version read a nonexistent `RecurringItemID` wire field - that's why
   // morning_token_id used to depend entirely on the list-lookup fallback
   // below, which stays as a safety net.)
   if (
@@ -265,7 +265,7 @@ export async function createSubscription(opts: {
 // ---------- Therapy-center subscription ----------
 //
 // Same recurring/charge endpoint as therapist subscriptions, with two
-// differences: a per-center negotiated price, and optional GIFT MONTHS —
+// differences: a per-center negotiated price, and optional GIFT MONTHS -
 // implemented with the documented `Date_Start` field on the recurring item
 // ("First payment date. Defaults to the current date."), so the card is
 // tokenized and the standing order created NOW, but the first charge happens
@@ -279,14 +279,14 @@ export async function createCenterSubscription(opts: {
   payerName: string;
   payerEmail: string;
   payerPhone?: string;
-  companyNumber?: string; // ח.פ / עוסק מורשה — מודפס על החשבונית
+  companyNumber?: string; // ח.פ / עוסק מורשה - מודפס על החשבונית
   singleUseToken: string;
   unitPrice: number;      // הסכום החודשי הכולל שסוכם, לפני מע"מ (לפי מסלול המרכז)
-  therapistCount?: number; // מספר המטפלים (מסלול 1) — מודפס בשם הפריט; 0/ריק במסלול 2 (מרכז כישות)
+  therapistCount?: number; // מספר המטפלים (מסלול 1) - מודפס בשם הפריט; 0/ריק במסלול 2 (מרכז כישות)
   firstChargeDate?: string; // "YYYY-MM-DD"; מוגדר רק כשיש חודשי מתנה
 }): Promise<SubscriptionChargeResult> {
   const externalId = `center:${opts.centerId}`;
-  // Quantity=1, UnitPrice=הסכום הכולל — כדי שעדכון מחיר/מספר-מטפלים בעתיד יעבור
+  // Quantity=1, UnitPrice=הסכום הכולל - כדי שעדכון מחיר/מספר-מטפלים בעתיד יעבור
   // דרך updateRecurringPrice (שמעדכן UnitPrice) בלי לגעת בכמות ב-Sumit.
   const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
     Customer: {
@@ -301,7 +301,7 @@ export async function createCenterSubscription(opts: {
     Items: [
       {
         Item: {
-          Name: `מנוי חודשי למרכז טיפולי${opts.therapistCount && opts.therapistCount > 0 ? ` — ${opts.therapistCount} מטפלים` : ""} | טיפול חכם`,
+          Name: `מנוי חודשי למרכז טיפולי${opts.therapistCount && opts.therapistCount > 0 ? ` - ${opts.therapistCount} מטפלים` : ""} | טיפול חכם`,
           SKU: "CENTER-MONTHLY",
           Duration_Months: 1,
         },
@@ -319,7 +319,7 @@ export async function createCenterSubscription(opts: {
   });
 
   if (!opts.firstChargeDate) {
-    // חיוב מיידי — אותה ולידציה כמו מנוי מטפל: דחיית כרטיס חייבת לעצור כאן.
+    // חיוב מיידי - אותה ולידציה כמו מנוי מטפל: דחיית כרטיס חייבת לעצור כאן.
     assertChargeSucceeded(charge, "center subscription charge");
   }
   // עם Date_Start עתידי אין תשלום מיידי לוודא; הצלחת המעטפת (Status=0)
@@ -355,7 +355,7 @@ export async function createCenterSubscription(opts: {
 // Sumit's /billing/recurring/cancel takes the customer (resolved by
 // ExternalIdentifier) plus the recurring-order id in the
 // `RecurringCustomerItemID` field. Passing the id in a generic `ID` field
-// returns "Customer item not found" — that was the long-standing F1 bug.
+// returns "Customer item not found" - that was the long-standing F1 bug.
 // Verified live against a real standing order on 2026-06-17.
 export async function cancelSubscription(opts: {
   recurringItemId: number;
@@ -367,8 +367,8 @@ export async function cancelSubscription(opts: {
   });
 
   // VERIFY the cancel actually took effect at Sumit. This is the crux of the
-  // fix: previously a request that returned without throwing — or a cancel
-  // that silently didn't apply — could leave the standing order ACTIVE at
+  // fix: previously a request that returned without throwing - or a cancel
+  // that silently didn't apply - could leave the standing order ACTIVE at
   // Sumit while the caller recorded it as cancelled locally, charging the
   // customer every month with nothing left to catch it. We re-read the item
   // and throw if it's still active, so a "successful" cancel always means the
@@ -389,11 +389,11 @@ export async function cancelSubscription(opts: {
 
 // ---------- Update the price of an existing standing order ----------
 //
-// Sumit endpoint POST /billing/recurring/update/ — identifies the order by
+// Sumit endpoint POST /billing/recurring/update/ - identifies the order by
 // RecurringCustomerItemID (same field as cancel) and sets a new UnitPrice.
 // Used to auto-revert the early-bird promo (₪90 → ₪140) after 3 cycles
 // without touching the customer's saved card. We re-read the item afterwards
-// and throw unless the new price actually applied — money-critical, so a
+// and throw unless the new price actually applied - money-critical, so a
 // "success" here must mean the next charge will be at the new amount.
 export async function updateRecurringPrice(opts: {
   recurringItemId: number;

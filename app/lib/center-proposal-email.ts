@@ -3,7 +3,7 @@
 // and previewed in isolation. center-emails.ts wraps this with the actual send
 // + CRM logging.
 //
-// המודל: מחיר-למטפל × מספר-מטפלים = סה"כ חודשי. אין "מסלולים" — המחיר וההיקף
+// המודל: מחיר-למטפל × מספר-מטפלים = סה"כ חודשי. אין "מסלולים" - המחיר וההיקף
 // נקבעים בשיחת ההתאמה, ומצוין זאת במפורש.
 import { centerMonthlyPricing, ilCurrency } from "./center-pricing";
 
@@ -40,9 +40,9 @@ export function buildCenterProposalEmail(opts: {
   const name = escapeHtml(rawName);
   const greetName = escapeHtml(opts.contactName?.trim() || rawName);
   const joinUrl = `${siteUrl}/centers/join/${opts.token}`;
-  // הנושא הוא טקסט רגיל (כותרת מייל) — בלי escape של HTML, אחרת "A & B"
+  // הנושא הוא טקסט רגיל (כותרת מייל) - בלי escape של HTML, אחרת "A & B"
   // יוצג כ-"A &amp; B" בתיבת הדואר.
-  const subject = `הצעה לשיתוף פעולה — טיפול חכם ל${rawName}`;
+  const subject = `הצעה לשיתוף פעולה - טיפול חכם ל${rawName}`;
 
   const isEntity = opts.billingTrack === "center_entity";
   const p = centerMonthlyPricing({
@@ -61,14 +61,14 @@ export function buildCenterProposalEmail(opts: {
         <p style="margin:0 0 4px;font-size:16px;font-weight:900;color:#A87010;">🎁 ${giftLabel(opts.giftMonths)} במתנה</p>
         <p style="margin:0;font-size:13px;color:#7a5a10;">פרטי התשלום נשמרים עכשיו, אך <strong>החיוב הראשון יתבצע רק בתום ${
           opts.giftMonths === 1 ? "חודש המתנה" : "חודשי המתנה"
-        }</strong> — ולא לפני כן.</p>
+        }</strong> - ולא לפני כן.</p>
       </div>`
       : "";
 
-  // תיבת התמחור — מאוחדת: שורות בסיס (לפי מסלול) + מיקומים + הנחה + סה"כ.
+  // תיבת התמחור - מאוחדת: שורות בסיס (לפי מסלול) + מיקומים + הנחה + סה"כ.
   const cell = "padding:12px 16px;border-bottom:1px solid #EAF0EE;";
   const baseRows = isEntity
-    ? `<tr><td style="${cell}">מחיר חודשי בסיס — מרכז טיפולי</td><td style="${cell}text-align:left;font-weight:bold;">₪${ilCurrency(baseUnit)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td></tr>`
+    ? `<tr><td style="${cell}">מחיר חודשי בסיס - מרכז טיפולי</td><td style="${cell}text-align:left;font-weight:bold;">₪${ilCurrency(baseUnit)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ</span></td></tr>`
     : `<tr><td style="${cell}">מחיר לכל מטפל</td><td style="${cell}text-align:left;font-weight:bold;">₪${ilCurrency(p.pricePerTherapist)} <span style="font-weight:normal;color:#6B807E;">+ מע&quot;מ / חודש</span></td></tr>
        <tr><td style="${cell}">מספר מטפלים</td><td style="${cell}text-align:left;font-weight:bold;">${p.therapistCount}</td></tr>`;
   const adjustRows =
@@ -94,7 +94,7 @@ export function buildCenterProposalEmail(opts: {
         <img src="${siteUrl}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
       </div>
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${greetName},</h1>
-      <p style="margin:0 0 14px;font-size:15px;">שמחים להציע ל<strong>${name}</strong> שיתוף פעולה עם טיפול חכם. המטפלים של המרכז ייכנסו למערכת ההתאמות החכמה שלנו, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות — עם דף פרופיל לכל מטפל, פורטל ניהול מרכזי, ודוח סטטיסטיקות חודשי.</p>
+      <p style="margin:0 0 14px;font-size:15px;">שמחים להציע ל<strong>${name}</strong> שיתוף פעולה עם טיפול חכם. המטפלים של המרכז ייכנסו למערכת ההתאמות החכמה שלנו, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות - עם דף פרופיל לכל מטפל, פורטל ניהול מרכזי, ודוח סטטיסטיקות חודשי.</p>
 
       ${giftBadge}
 
@@ -114,7 +114,7 @@ export function buildCenterProposalEmail(opts: {
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com | 055-993-1403<br/>
         בברכה,<br/>
-        צוות טיפול חכם — Mentalytics
+        צוות טיפול חכם - Mentalytics
       </p>
     </div>
   </body>

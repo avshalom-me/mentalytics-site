@@ -8,9 +8,9 @@ export const metadata: Metadata = {
   // absolute → avoids the layout's "%s | טיפול חכם" template double-branding.
   // Front-loads the high-intent phrases people actually search (מצאו פסיכולוג /
   // מטפל מתאים) while keeping the brand.
-  title: { absolute: "טיפול חכם — מצאו פסיכולוג ומטפל מתאים בהתאמה אישית" },
+  title: { absolute: "טיפול חכם - מצאו פסיכולוג ומטפל מתאים בהתאמה אישית" },
   description:
-    "רוצים למצוא פסיכולוג או מטפל מתאים? מלאו שאלון קצר וקבלו התאמה אישית למטפל הנכון — לפי סוג הקושי, הגישה הטיפולית, האזור והשפה. לילדים ולמבוגרים.",
+    "רוצים למצוא פסיכולוג או מטפל מתאים? מלאו שאלון קצר וקבלו התאמה אישית למטפל הנכון - לפי סוג הקושי, הגישה הטיפולית, האזור והשפה. לילדים ולמבוגרים.",
   keywords: [
     "מציאת מטפל",
     "מציאת פסיכולוג",
@@ -27,7 +27,7 @@ export const metadata: Metadata = {
 const faqs = [
   {
     q: 'מה זה "טיפול חכם"?',
-    a: 'מערכת שאלונים מודולרית שמסייעת למקד את הקושי ולהציע כיוון טיפולי מתאים, על בסיס מחקר וניסיון קליני. בנוסף, המערכת מציעה התאמת מטפל לפי צרכיכם — סוג הטיפול, אופי המטפל, מיקום, שפה, תרבות ועוד.',
+    a: 'מערכת שאלונים מודולרית שמסייעת למקד את הקושי ולהציע כיוון טיפולי מתאים, על בסיס מחקר וניסיון קליני. בנוסף, המערכת מציעה התאמת מטפל לפי צרכיכם - סוג הטיפול, אופי המטפל, מיקום, שפה, תרבות ועוד.',
   },
   {
     q: "האם צריך להזין פרטים מזהים?",
@@ -39,11 +39,11 @@ const faqs = [
   },
   {
     q: "כמה זמן זה לוקח?",
-    a: "בדרך כלל כמה דקות. השאלון מודולרי — רק שאלות רלוונטיות מופיעות בהתאם לתשובות.",
+    a: "בדרך כלל כמה דקות. השאלון מודולרי - רק שאלות רלוונטיות מופיעות בהתאם לתשובות.",
   },
   {
     q: "למה לא פשוט לקבל המלצה מחבר?",
-    a: "לעיתים זה כיוון טוב, אבל מטפל שמתאים לחבר לא תמיד מתאים גם לך — בגלל הבדלים בסיבת הפנייה, בסוג הטיפול, או באישיות המקצועית של המטפל.",
+    a: "לעיתים זה כיוון טוב, אבל מטפל שמתאים לחבר לא תמיד מתאים גם לך - בגלל הבדלים בסיבת הפנייה, בסוג הטיפול, או באישיות המקצועית של המטפל.",
   },
   {
     q: "מה עוד אני מקבל?",
@@ -67,7 +67,7 @@ const steps: {
   {
     n: "1",
     title: "מלאו את השאלון",
-    body: "השאלון מתעדכן בזמן אמת ומדייק את השאלות בהתאם לתשובות שתזינו — כך תוכלו למקד ולהבין את הקושי שאתם מתמודדים איתו.",
+    body: "השאלון מתעדכן בזמן אמת ומדייק את השאלות בהתאם לתשובות שתזינו - כך תוכלו למקד ולהבין את הקושי שאתם מתמודדים איתו.",
     numBg: "var(--teal)",
     numColor: "white",
     numBorder: "var(--teal)",
@@ -75,7 +75,7 @@ const steps: {
   {
     n: "2",
     title: "קבלו המלצה אישית",
-    body: "תקבלו פירוט של הקשיים הבולטים שעלו מהשאלון, ובהתאם להם — סוגי הטיפול והמטפלים המתאימים במיוחד לכם.",
+    body: "תקבלו פירוט של הקשיים הבולטים שעלו מהשאלון, ובהתאם להם - סוגי הטיפול והמטפלים המתאימים במיוחד לכם.",
     tag: "📄 ניתן לשמירה כ-PDF",
     numBg: "var(--gold)",
     numColor: "white",
@@ -99,14 +99,14 @@ export default function HomePage() {
     "@context": "https://schema.org",
     "@type": ["MedicalBusiness", "HealthAndBeautyBusiness"],
     name: "טיפול חכם",
-    // Latin-script brand name — anchors "Mentalytics" queries to THIS entity,
+    // Latin-script brand name - anchors "Mentalytics" queries to THIS entity,
     // disambiguating from the Swedish "Mentalytics AB", "mentalics", "Mentaily".
     alternateName: "Mentalytics",
     url: BASE_URL,
     logo: `${BASE_URL}/logo.svg.png`,
     image: `${BASE_URL}/logo.svg.png`,
     email: "admin@getmentalytics.com",
-    description: "מערכת הכוונה טיפולית חכמה — התאמת מטפלים ופסיכולוגים על בסיס שאלונים מבוססי מחקר",
+    description: "מערכת הכוונה טיפולית חכמה - התאמת מטפלים ופסיכולוגים על בסיס שאלונים מבוססי מחקר",
     areaServed: { "@type": "Country", name: "IL" },
     serviceType: "Therapist Matching",
     // sameAs: external profiles that confirm this is the same entity (the main
@@ -126,7 +126,7 @@ export default function HomePage() {
     })),
   };
 
-  // WebSite entity schema — helps Google resolve the site entity (name +
+  // WebSite entity schema - helps Google resolve the site entity (name +
   // language) and sitelinks eligibility. The Sitelinks Searchbox SearchAction
   // from the original draft was intentionally dropped: /therapists has no ?q=
   // search endpoint to honor it, and Google retired that feature in 2024.
@@ -136,7 +136,7 @@ export default function HomePage() {
     name: "טיפול חכם",
     url: BASE_URL,
     description:
-      "מערכת הכוונה טיפולית חכמה — מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
+      "מערכת הכוונה טיפולית חכמה - מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
     inLanguage: "he",
   };
 
@@ -251,7 +251,7 @@ export default function HomePage() {
             </Link>
           </div>
 
-          {/* Eyebrow — moved below CTAs */}
+          {/* Eyebrow - moved below CTAs */}
           <div style={{
             display: "inline-flex", alignItems: "center", gap: "8px",
             fontSize: "12.5px", fontWeight: 700, color: "var(--teal)",
@@ -318,7 +318,7 @@ export default function HomePage() {
             שלושה צעדים פשוטים
           </h2>
           <p style={{ fontSize: "16px", color: "var(--text-2)", lineHeight: 1.8, maxWidth: "50ch", marginBottom: "60px" }}>
-            השאלון מסתעף לפי תשובותיכם — רק שאלות רלוונטיות, בדיוק מה שצריך.
+            השאלון מסתעף לפי תשובותיכם - רק שאלות רלוונטיות, בדיוק מה שצריך.
           </p>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "32px", position: "relative" }} className="steps-grid-wrap">
@@ -476,7 +476,7 @@ export default function HomePage() {
           <p style={{ fontSize: "clamp(1.1rem, 2vw, 1.5rem)", fontWeight: 300, color: "var(--text)", lineHeight: 1.85, marginBottom: "28px" }}>
             מחקרים רבים מראים כי הצלחת טיפול נפשי תלויה מאוד בהתאמת{" "}
             <strong style={{ fontWeight: 700, color: "var(--teal)" }}>סוג הטיפול לצורך המטופל</strong>{" "}
-            — ובהתאמת אישיות המטפל לאישיות המטופל.
+            - ובהתאמת אישיות המטפל לאישיות המטופל.
           </p>
           <div style={{ width: "48px", height: "3px", borderRadius: "2px", background: "var(--gold)", margin: "0 auto 20px" }} />
           <cite style={{ fontSize: "12.5px", color: "var(--faint)", fontStyle: "normal", textTransform: "uppercase", letterSpacing: ".12em" }}>
@@ -529,7 +529,7 @@ export default function HomePage() {
           <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "10px" }}>צרו קשר</p>
           <h2 style={{ fontSize: "clamp(1.5rem, 2.5vw, 2rem)", fontWeight: 900, color: "var(--text)", marginBottom: "10px" }}>פנייה מהירה</h2>
           <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8, marginBottom: "32px" }}>
-            אנחנו כאן לענות על כל שאלה — לפני השאלון, אחריו, או אם סתם רוצים לדבר עם מישהו לפני שמתחילים.
+            אנחנו כאן לענות על כל שאלה - לפני השאלון, אחריו, או אם סתם רוצים לדבר עם מישהו לפני שמתחילים.
           </p>
           <ContactForm />
         </div>

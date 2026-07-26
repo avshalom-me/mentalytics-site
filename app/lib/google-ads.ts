@@ -1,8 +1,8 @@
 import "server-only"; // compile-time tripwire: this module holds API secrets and must never be pulled into a client bundle.
 
-// Read-only Google Ads API client — pulls per-campaign spend + performance so the
+// Read-only Google Ads API client - pulls per-campaign spend + performance so the
 // marketing dashboard can show real cost / CPC / CTR / CPL without manual entry.
-// Uses the REST API (searchStream) + a refresh-token OAuth flow — no new npm
+// Uses the REST API (searchStream) + a refresh-token OAuth flow - no new npm
 // dependency. All secrets come from env (set in Vercel); when they're absent the
 // dashboard degrades gracefully to a "not configured" state.
 
@@ -76,7 +76,7 @@ function parseUtmCampaign(suffix?: string | null): string | null {
 // Fallback for campaigns whose utm lives in the ad's Final URL rather than the
 // campaign's final_url_suffix (the API can only read the suffix): infer the
 // utm_campaign from the campaign name so CPL can still join to contacts. The
-// suffix (parseUtmCampaign) always takes precedence — add a Final URL suffix to
+// suffix (parseUtmCampaign) always takes precedence - add a Final URL suffix to
 // a campaign and this heuristic is bypassed. Name-based, so keep the campaign
 // names recognizable.
 function inferUtmFromName(name: string): string | null {
@@ -94,7 +94,7 @@ function inferUtmFromName(name: string): string | null {
 }
 
 function isoDate(d: Date): string {
-  // Format in the ad account's timezone (Asia/Jerusalem), NOT UTC — GAQL
+  // Format in the ad account's timezone (Asia/Jerusalem), NOT UTC - GAQL
   // segments.date is in the account TZ, so a UTC date would shift the window a
   // day and drop today's spend during the 00:00–03:00 UTC-vs-Israel gap.
   return new Intl.DateTimeFormat("en-CA", {
@@ -135,7 +135,7 @@ export async function fetchGoogleAdsCampaigns(days: number): Promise<AdsResult> 
   if (!res.ok) throw new Error(`Google Ads API error (${res.status}): ${text.slice(0, 500)}`);
 
   // searchStream returns an array of batches: [{ results: [...] }, ...]. Some
-  // zero-row ranges return an empty body — treat that as no results, not a parse error.
+  // zero-row ranges return an empty body - treat that as no results, not a parse error.
   const batches = text.trim() ? (JSON.parse(text) as { results?: GaqlRow[] }[]) : [];
   const rows: GaqlRow[] = Array.isArray(batches) ? batches.flatMap((b) => b.results ?? []) : [];
 

@@ -2,7 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
 
-// קידום/הורדה אוטומטיים של מטפלי מרכז — החוליה שמחברת את התשלום של המרכז
+// קידום/הורדה אוטומטיים של מטפלי מרכז - החוליה שמחברת את התשלום של המרכז
 // למאגר ההתאמות:
 //
 //   מטפל משויך למרכז פעיל (ששילם) ⇒ status='paying', promotion_source='center'
@@ -10,11 +10,11 @@ import { writeAudit } from "@/app/lib/audit";
 //
 // promotion_source='center' הוא ערך רביעי לצד 'paid'/'manual'/'trial', ובכוונה
 // אינו מטופל על-ידי ה-cron של Sumit (שמסנן על 'paid' ועל trial/manual עם
-// promoted_until) — מחזור החיים שלו מנוהל כולו כאן:
+// promoted_until) - מחזור החיים שלו מנוהל כולו כאן:
 //   קידום:  שיוך מטפל למרכז פעיל · תשלום מרכז · אישור אדמין למטפל משויך
 //   הורדה:  ניתוק מהמרכז · ביטול מנוי המרכז (אדמין/סנכרון Sumit)
 //
-// מטפל עם מנוי אישי (promotion_source='paid') לעולם לא נגרר לכאן — המנוי
+// מטפל עם מנוי אישי (promotion_source='paid') לעולם לא נגרר לכאן - המנוי
 // האישי שלו גובר, וה-cron של Sumit ממשיך לנהל אותו.
 
 // ── מסלול 2: שורת ישות-המרכז ───────────────────────────────────────────────
@@ -76,7 +76,7 @@ export async function removeCenterEntityRow(centerId: string): Promise<void> {
 
 // מקדם את כל המטפלים המשויכים למרכז שראויים לכך: סטטוס 'approved' (אושרו
 // על-ידי אדמין) שאינם כבר במסלול בתשלום/מתנה אחר. שקט אם המרכז אינו פעיל.
-// חל גם על שורת ישות-המרכז (מסלול 2) — היא center-linked כמו כל מטפל.
+// חל גם על שורת ישות-המרכז (מסלול 2) - היא center-linked כמו כל מטפל.
 export async function promoteCenterTherapists(centerId: string): Promise<number> {
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
@@ -124,8 +124,8 @@ export async function promoteCenterTherapists(centerId: string): Promise<number>
 }
 
 // מוריד מטפלים שקודמו דרך מרכז. שני מצבים:
-//   { centerId }     — כל מטפלי המרכז (ביטול מנוי המרכז)
-//   { therapistIds } — מטפלים ספציפיים (נותקו מהמרכז)
+//   { centerId }     - כל מטפלי המרכז (ביטול מנוי המרכז)
+//   { therapistIds } - מטפלים ספציפיים (נותקו מהמרכז)
 // נוגע אך ורק ב-promotion_source='center'.
 export async function demoteCenterTherapists(
   opts: { centerId: string; therapistIds?: never } | { therapistIds: string[]; centerId?: never },

@@ -11,10 +11,10 @@ import { logEmail } from "./email-log";
 // leads). This gate makes BULK sends (completion reminders, monthly reports)
 // claim a slot from a shared daily counter first; once the bulk ceiling is hit
 // they defer to the next day, leaving the rest of Resend's daily allowance for
-// critical transactional mail — which is NOT gated.
+// critical transactional mail - which is NOT gated.
 //
-// EMAIL_BULK_DAILY_CAP (env, default 60) is the bulk ceiling. Raise it — or set
-// it to 0 to disable gating — after upgrading the Resend plan.
+// EMAIL_BULK_DAILY_CAP (env, default 60) is the bulk ceiling. Raise it - or set
+// it to 0 to disable gating - after upgrading the Resend plan.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -64,12 +64,12 @@ export async function sendBulkEmail(payload: BulkEmailPayload): Promise<BulkEmai
   const allowed = await claimBulkSlot();
   if (!allowed) {
     console.warn(
-      `sendBulkEmail: daily bulk cap (${BULK_DAILY_CAP}) reached — deferring send to ${payload.to}`
+      `sendBulkEmail: daily bulk cap (${BULK_DAILY_CAP}) reached - deferring send to ${payload.to}`
     );
     return {
       ok: false,
       skipped: true,
-      error: `הגיעה תקרת המיילים ההמוניים היומית (${BULK_DAILY_CAP}). המייל לא נשלח — נסו שוב מחר.`,
+      error: `הגיעה תקרת המיילים ההמוניים היומית (${BULK_DAILY_CAP}). המייל לא נשלח - נסו שוב מחר.`,
     };
   }
   try {
@@ -80,7 +80,7 @@ export async function sendBulkEmail(payload: BulkEmailPayload): Promise<BulkEmai
       html: payload.html,
       ...(payload.replyTo ? { replyTo: payload.replyTo } : {}),
     });
-    // CRM email history — fire-and-forget, never blocks the send result.
+    // CRM email history - fire-and-forget, never blocks the send result.
     void logEmail({
       recipient: Array.isArray(payload.to) ? payload.to[0] : payload.to,
       subject: payload.subject,

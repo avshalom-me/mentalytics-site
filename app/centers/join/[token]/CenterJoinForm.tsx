@@ -4,8 +4,8 @@ import { useState } from "react";
 import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft, Sparkles, BarChart3, MapPin, Activity, Users, LayoutDashboard } from "lucide-react";
 
 // טופס הצטרפות ותשלום למרכז טיפולי. בחירת מסלול (אם הוצעו כמה) + פרטי
-// אשראי. הכרטיס עובר טוקניזציה בדפדפן ישירות מול Sumit — כמו בצ'קאאוט של
-// מטפלים (app/therapists/checkout) — ולשרת שלנו מגיע רק SingleUseToken.
+// אשראי. הכרטיס עובר טוקניזציה בדפדפן ישירות מול Sumit - כמו בצ'קאאוט של
+// מטפלים (app/therapists/checkout) - ולשרת שלנו מגיע רק SingleUseToken.
 
 export type CenterOffer = {
   token: string;
@@ -145,7 +145,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
             <>
               <br />
               <Gift size={14} className="inline ml-1 text-green-700" />
-              {giftLabel(offer.gift_months)} — החיוב הראשון יתבצע רק ב-
+              {giftLabel(offer.gift_months)} - החיוב הראשון יתבצע רק ב-
               <strong>{new Date(done.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}</strong>.
             </>
           ) : (
@@ -159,7 +159,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
             פורטל ניהול המרכז
           </p>
           <p className="mt-1 text-xs leading-6 text-stone-600">
-            להיכנס לפורטל, לצפות בפרופילי המטפלים ובסטטיסטיקות המרוכזות —{" "}
+            להיכנס לפורטל, לצפות בפרופילי המטפלים ובסטטיסטיקות המרוכזות -{" "}
             <a href="/centers/login?mode=register" className="font-bold underline">הירשמו כאן</a>{" "}
             עם המייל <span className="font-mono">{payerEmail}</span>.
           </p>
@@ -173,7 +173,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       {/* פתיח */}
       <div className="text-center mb-8">
         <p className="text-sm font-semibold tracking-widest uppercase mb-2" style={{ color: "var(--teal)" }}>
-          טיפול חכם — למרכזים טיפוליים
+          טיפול חכם - למרכזים טיפוליים
         </p>
         <h1 className="text-3xl font-black text-stone-900 leading-tight">
           הצעה עבור {offer.name}
@@ -190,16 +190,16 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
         )}
       </div>
 
-      {/* מה כלול בכל מנוי — קבוע לכל ההצעות */}
+      {/* מה כלול בכל מנוי - קבוע לכל ההצעות */}
       <StandardBenefits giftMonths={offer.gift_months} />
 
-      {/* פרטי ההצעה — מחיר לכל מטפל × מספר מטפלים = סה"כ */}
+      {/* פרטי ההצעה - מחיר לכל מטפל × מספר מטפלים = סה"כ */}
       <h2 className="text-lg font-black text-stone-900 mb-3">פרטי ההצעה</h2>
       <div className="rounded-3xl border-2 p-6 mb-8" style={{ borderColor: "var(--teal)", background: "var(--teal-pale)" }}>
         <div className="space-y-2.5 text-sm">
           {offer.billing_track === "center_entity" ? (
             <div className="flex items-center justify-between">
-              <span className="text-stone-700">מחיר חודשי בסיס — מרכז טיפולי</span>
+              <span className="text-stone-700">מחיר חודשי בסיס - מרכז טיפולי</span>
               <span className="font-bold text-stone-900">₪{(offer.num_locations > 0 ? offer.base_total / offer.num_locations : offer.base_total).toLocaleString("he-IL")} <span className="text-xs font-normal text-stone-500">+ מע&quot;מ</span></span>
             </div>
           ) : (
@@ -322,9 +322,9 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           {loading ? (
             <Loader2 size={18} className="inline animate-spin" />
           ) : offer.gift_months > 0 ? (
-            <>שמירת פרטי תשלום — ללא חיוב היום<ArrowLeft size={16} className="inline mr-2" /></>
+            <>שמירת פרטי תשלום - ללא חיוב היום<ArrowLeft size={16} className="inline mr-2" /></>
           ) : (
-            <>חיוב מאובטח — ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")}<ArrowLeft size={16} className="inline mr-2" /></>
+            <>חיוב מאובטח - ₪{offer.monthly_total_with_vat.toLocaleString("he-IL")}<ArrowLeft size={16} className="inline mr-2" /></>
           )}
         </button>
 
@@ -335,21 +335,21 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
         <ShieldCheck size={16} style={{ color: "var(--teal-dark)" }} className="mt-0.5 flex-shrink-0" />
         <p className="text-xs text-stone-600 leading-5">
           התשלום מעובד באופן מאובטח על ידי Sumit. פרטי כרטיס האשראי נשלחים ישירות אליהם דרך חיבור מוצפן
-          ואינם נשמרים באתר שלנו. ניתן לבטל את המנוי בכל עת — כולל במהלך חודשי המתנה.
+          ואינם נשמרים באתר שלנו. ניתן לבטל את המנוי בכל עת - כולל במהלך חודשי המתנה.
         </p>
       </div>
     </>
   );
 }
 
-// מה שכל מנוי מרכז כולל — תוכן קבוע (לא תלוי בהצעה הספציפית), כדי שכל מרכז
+// מה שכל מנוי מרכז כולל - תוכן קבוע (לא תלוי בהצעה הספציפית), כדי שכל מרכז
 // יראה את הערך המלא: כניסה למערכת ההתאמות, דוח סטטיסטיקות מפורט, וביטול חופשי.
 function StandardBenefits({ giftMonths }: { giftMonths: number }) {
   const statCards: { icon: typeof BarChart3; color: string; title: string; body: string }[] = [
-    { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אתכם — באמת", body: "סך צפיות בפרופילי המרכז, כמה אנשים שונים (לא חזרות), כמה פנו בפועל, ואחוז ההמרה מצפייה לפנייה." },
-    { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום או אונליין — היכן נמצא הביקוש האמיתי לשירותים שלכם." },
-    { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד — פילוח שמראה למה מחפשים דווקא אתכם." },
-    { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר — מי הקהל שלכם ואיך לפנות אליו נכון." },
+    { icon: BarChart3, color: "#0F5468", title: "כמה אנשים ראו אתכם - באמת", body: "סך צפיות בפרופילי המרכז, כמה אנשים שונים (לא חזרות), כמה פנו בפועל, ואחוז ההמרה מצפייה לפנייה." },
+    { icon: MapPin, color: "#1A7A96", title: "מאיזו גיאוגרפיה מגיעים", body: "מרכז, השרון, ירושלים, חיפה, צפון, דרום או אונליין - היכן נמצא הביקוש האמיתי לשירותים שלכם." },
+    { icon: Activity, color: "#8B2E0A", title: "עם איזה קשיים פונים", body: "רגשי, זוגי, התמכרות, תפקודי, התפתחות אישית, טיפול מיני, הדרכת הורים ועוד - פילוח שמראה למה מחפשים דווקא אתכם." },
+    { icon: Users, color: "#2A5C3A", title: "גילאים ומגדר של הפונים", body: "התפלגות לפי טווחי גיל (18-30, 31-45, 46-60, 60+) ומגדר - מי הקהל שלכם ואיך לפנות אליו נכון." },
   ];
   return (
     <div className="mb-8 space-y-4">
@@ -361,17 +361,17 @@ function StandardBenefits({ giftMonths }: { giftMonths: number }) {
           <BenefitRow
             icon={Users}
             title="כניסה מלאה למערכת ההתאמות החכמה"
-            body="מטופלים שממלאים את שאלון ההתאמה מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות — פניות מדויקות, לא סתם חשיפה."
+            body="מטופלים שממלאים את שאלון ההתאמה מופנים למטפלי המרכז לפי סוג הטיפול, אזור, גיל, שפה והעדפות - פניות מדויקות, לא סתם חשיפה."
           />
           <BenefitRow
             icon={LayoutDashboard}
             title="פורטל ניהול מרכזי משלכם"
-            body="חשבון כניסה משלכם עם גישה לכל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות של כל המרכז — לא צריך להיכנס לכל מטפל בנפרד."
+            body="חשבון כניסה משלכם עם גישה לכל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות של כל המרכז - לא צריך להיכנס לכל מטפל בנפרד."
           />
           <BenefitRow
             icon={ShieldCheck}
             title="אפשרות לסיים את ההתקשרות בכל עת"
-            body={`אין התחייבות לתקופה. אפשר לבטל את המנוי בכל שלב${giftMonths > 0 ? " — כולל במהלך חודשי המתנה" : ""}, בלי קנסות ובלי בירוקרטיה.`}
+            body={`אין התחייבות לתקופה. אפשר לבטל את המנוי בכל שלב${giftMonths > 0 ? " - כולל במהלך חודשי המתנה" : ""}, בלי קנסות ובלי בירוקרטיה.`}
           />
         </div>
       </div>
@@ -382,10 +382,10 @@ function StandardBenefits({ giftMonths }: { giftMonths: number }) {
           <BarChart3 size={12} /> דוח סטטיסטיקות חודשי
         </div>
         <h3 className="mb-2 text-base font-black text-stone-900">
-          איזה סוגי מטופלים מחפשים את המרכז שלכם — ובאזור שלכם
+          איזה סוגי מטופלים מחפשים את המרכז שלכם - ובאזור שלכם
         </h3>
         <p className="mb-5 text-sm leading-7 text-stone-600">
-          דוח חודשי שחושף מאיפה מגיעים הפונים, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר — תוך שמירה מוחלטת על אנונימיות המטופלים.
+          דוח חודשי שחושף מאיפה מגיעים הפונים, מה הם באמת מחפשים, ולמה חלק לא יוצרים קשר - תוך שמירה מוחלטת על אנונימיות המטופלים.
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
           {statCards.map(({ icon: Icon, color, title, body }, i) => (

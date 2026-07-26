@@ -4,7 +4,7 @@ import Link from "next/link";
 
 // Back link on the therapist profile. When the visitor arrived from the
 // matching results (source="match"), "back" should return them to that exact
-// results list — which lives as in-page state on /adults|/kids, not a URL.
+// results list - which lives as in-page state on /adults|/kids, not a URL.
 // So we use the browser's history back (restored from bfcache), with a sane
 // fallback to the relevant quiz when there's no history to go back to (e.g. a
 // shared/deep link).
@@ -19,7 +19,7 @@ export default function ProfileBackLink({
 
   if (source !== "match") {
     // Returns to the exact listing the visitor came from (region / city /
-    // online / center), or /therapists as a fallback. A real link — works
+    // online / center), or /therapists as a fallback. A real link - works
     // without JS and is crawlable.
     return <Link href={fallbackHref} className={cls}>← חזרה לרשימה</Link>;
   }

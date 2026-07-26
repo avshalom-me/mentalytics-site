@@ -10,7 +10,7 @@ import { ChevronDown, X } from "lucide-react";
  * - Region mode (maxRegions set): limit the number of distinct REGIONS with a
  *   selection to `maxRegions`, and cities within each region to
  *   `maxCitiesPerRegion` (default 4). Used for a therapy-center-as-entity whose
- *   branch count (num_locations) sets how many regions it may cover — e.g. one
+ *   branch count (num_locations) sets how many regions it may cover - e.g. one
  *   branch → 1 region + up to 4 cities in it, two branches → 2 regions, etc.
  * Pre-existing over-limit selections are always removable (never force-lost).
  */
@@ -108,7 +108,7 @@ export default function RegionCityPicker({
       ) : (
         selected.length >= maxCities && (
           <p className="mb-3 text-xs text-stone-600">
-            בחרת את מירב הערים האפשריות. כדי לבחור עיר אחרת — הסר/י אחת.
+            בחרת את מירב הערים האפשריות. כדי לבחור עיר אחרת - הסר/י אחת.
           </p>
         )
       )}

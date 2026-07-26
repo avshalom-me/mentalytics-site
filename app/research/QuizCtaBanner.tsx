@@ -1,12 +1,12 @@
 import Link from "next/link";
 
-// Conversion CTA for the /research content pages — funnels informational
+// Conversion CTA for the /research content pages - funnels informational
 // readers (incl. paid "how to find a psychologist" traffic) into the matching
 // quiz. Server component; inline color:#fff because a global `a` rule overrides
 // utility text-color classes on links.
 export default function QuizCtaBanner({
   heading = "לא בטוחים איפה להתחיל?",
-  sub = "שאלון קצר וחכם יתאים לכם את סוג הטיפול והמטפל/ת המתאימים ביותר לקושי שלכם — בחינם, בלי להתחייב.",
+  sub = "שאלון קצר וחכם יתאים לכם את סוג הטיפול והמטפל/ת המתאימים ביותר לקושי שלכם - בחינם, בלי להתחייב.",
 }: {
   heading?: string;
   sub?: string;

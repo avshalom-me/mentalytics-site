@@ -1,17 +1,17 @@
 import { ALL_REGIONS, CITY_TO_REGION } from "./regions";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// FREE_REGION_FALLBACK — פיצ'ר זמני.
+// FREE_REGION_FALLBACK - פיצ'ר זמני.
 //
 // מטפלים חינמיים מאושרים נכנסים למאגר ההתאמות כגיבוי, רק כשהמטופל לא ביקש
 // טיפול אונליין, ורק באחד משני מצבים באזור המבוקש (אזור שלם, לא רק עיר):
-//   1. region_empty — אין אף מטפל משלם/מקודם שמכסה את האזור.
-//   2. expertise_gap — יש משלמים באזור, אבל אף אחד מהם לא בתחום הטיפול
-//      שהמטופל הופנה אליו (או בסוג המטפל הנדרש) — ואז נכנסים רק חינמיים
+//   1. region_empty - אין אף מטפל משלם/מקודם שמכסה את האזור.
+//   2. expertise_gap - יש משלמים באזור, אבל אף אחד מהם לא בתחום הטיפול
+//      שהמטופל הופנה אליו (או בסוג המטפל הנדרש) - ואז נכנסים רק חינמיים
 //      מהאזור שכן בתחום.
 //
 // להסרה עתידית: לשנות ל-false (או למחוק את הקובץ ואת כל הבלוקים המסומנים
-// FREE_REGION_FALLBACK — חיפוש "FREE_REGION_FALLBACK" מוצא את כולם:
+// FREE_REGION_FALLBACK - חיפוש "FREE_REGION_FALLBACK" מוצא את כולם:
 // app/api/match/route.ts + app/admin/therapists/page.tsx).
 // ─────────────────────────────────────────────────────────────────────────────
 export const FREE_REGION_FALLBACK_ENABLED = true;
@@ -50,7 +50,7 @@ export function overlaps(a: string[], b: string[]): boolean {
 }
 
 /**
- * A therapist's effective expertise list — same synthesis the match scoring
+ * A therapist's effective expertise list - same synthesis the match scoring
  * uses: training areas + assessment types, plus "טיפול זוגי" when any couples
  * modality is declared. Returned normalized.
  */

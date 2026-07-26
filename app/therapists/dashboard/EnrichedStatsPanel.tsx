@@ -121,7 +121,7 @@ function DonutChart({ data }: { data: BucketRow[] }) {
   );
 }
 
-// Ranked list with proportional bars — for long labels (specific findings)
+// Ranked list with proportional bars - for long labels (specific findings)
 // that don't fit as chart axis text.
 function RankedList({ data, emptyMessage }: { data: BucketRow[]; emptyMessage: string }) {
   if (data.length === 0) return <EmptyState message={emptyMessage} />;
@@ -162,7 +162,7 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
           <h3 className="font-bold text-stone-900">ניתוח מעמיק של הפניות שלך</h3>
         </div>
         <p className="text-sm text-stone-600 leading-6 mt-3">
-          עדיין לא נאספו מספיק נתונים לניתוח מפורט. נציג פילוח מלא לפי איזור, סוג קושי, גילאים והמרה — כשתקבל לפחות <strong>20 צפיות</strong> בפרופיל בתקופה הנוכחית.
+          עדיין לא נאספו מספיק נתונים לניתוח מפורט. נציג פילוח מלא לפי איזור, סוג קושי, גילאים והמרה - כשתקבל לפחות <strong>20 צפיות</strong> בפרופיל בתקופה הנוכחית.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-center">
@@ -216,11 +216,11 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
         </SectionCard>
 
         <SectionCard icon={Stethoscope} title="איזה טיפול הוביל אותם אליך" subtitle="ההמלצה שקיבלו בשאלון לפני שנכנסו לפרופיל שלך" accentColor="#7C5CBF">
-          <RankedList data={by_treatment} emptyMessage="נאסף החל מ-19/7 — יוצג כשיצטברו מספיק כניסות מהשאלון" />
+          <RankedList data={by_treatment} emptyMessage="נאסף החל מ-19/7 - יוצג כשיצטברו מספיק כניסות מהשאלון" />
         </SectionCard>
 
         <SectionCard icon={ClipboardList} title="ואילו קשיים ספציפיים" subtitle="הממצא המדויק בשאלון שבגללו הופנו אליך" accentColor="#C96B55">
-          <RankedList data={by_symptom} emptyMessage="נאסף החל מ-19/7 — יוצג כשיצטברו מספיק כניסות מהשאלון" />
+          <RankedList data={by_symptom} emptyMessage="נאסף החל מ-19/7 - יוצג כשיצטברו מספיק כניסות מהשאלון" />
         </SectionCard>
 
         <SectionCard icon={Users} title="גילאים עיקריים" subtitle="התפלגות הגילאים של הפונים" accentColor="#2A5C3A">
@@ -233,7 +233,7 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
       </div>
 
       <p className="mt-4 text-xs text-stone-400 leading-5">
-        🔒 לשמירה על אנונימיות המטופלים — קבוצות עם פחות מ-3 צפיות מוצגות כ"אחר" או מוסתרות.
+        🔒 לשמירה על אנונימיות המטופלים - קבוצות עם פחות מ-3 צפיות מוצגות כ"אחר" או מוסתרות.
         הנתונים נאספים בצורה אנונימית מלאה ואינם כוללים פרטים מזהים.
       </p>
     </div>

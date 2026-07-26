@@ -5,7 +5,7 @@ import "server-only";
 // Safety model: IsDraft=true means the document lands in Sumit's drafts and
 // does NOT touch the books until a human approves it inside Sumit (the
 // accountant reads the books from there). A failure here never blocks the
-// local CRM row — the row keeps sumit_status='failed' and can be re-sent.
+// local CRM row - the row keeps sumit_status='failed' and can be re-sent.
 //
 // Amount semantics: we send the GROSS amount actually paid (net + VAT) as
 // the line amount, and spell the net/VAT breakdown in the description; the

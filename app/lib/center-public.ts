@@ -36,7 +36,7 @@ export type PublicCenter = {
 const PUBLIC_COLS =
   "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery";
 
-// slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר — מוסיפים
+// slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר - מוסיפים
 // סיומת מספרית. excludeId מאפשר לשמור על ה-slug של המרכז עצמו בעדכון.
 export async function ensureUniqueCenterSlug(name: string, excludeId?: string): Promise<string> {
   const base = slugify(name) || "center";
@@ -55,22 +55,22 @@ export async function ensureUniqueCenterSlug(name: string, excludeId?: string): 
   return `${base}-${Date.now()}`;
 }
 
-// טוען מרכז לעמוד הציבורי — רק אם פעיל, העמוד מודלק, ויש slug. cache() מדדד
+// טוען מרכז לעמוד הציבורי - רק אם פעיל, העמוד מודלק, ויש slug. cache() מדדד
 // בין generateMetadata לרינדור הדף באותה בקשה. מחזיר null אם אינו זמין לציבור.
 export const getPublicCenterBySlug = cache(async (slug: string): Promise<PublicCenter | null> => {
-  // ה-param מגיע percent-encoded עבור slug עברי (כמו slugToRegion) — לפענח לפני ההשוואה.
+  // ה-param מגיע percent-encoded עבור slug עברי (כמו slugToRegion) - לפענח לפני ההשוואה.
   let decoded: string;
   try {
     decoded = decodeURIComponent(slug);
   } catch {
-    return null; // קידוד שבור — לא נמצא
+    return null; // קידוד שבור - לא נמצא
   }
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
     .select(PUBLIC_COLS)
     .eq("slug", decoded)
     .eq("status", "active")
-    // מרכז מסלול-2 (כישות) גלוי כשהוא פעיל — הפרופיל הוא המוצר; מסלול 1 דורש הדלקה.
+    // מרכז מסלול-2 (כישות) גלוי כשהוא פעיל - הפרופיל הוא המוצר; מסלול 1 דורש הדלקה.
     .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
     .maybeSingle();
   if (!data) return null;
@@ -129,7 +129,7 @@ export async function signCenterAssets(
   };
 }
 
-// כל המרכזים שעמודם הציבורי פעיל — ל-sitemap. אותם תנאי גלוי כמו
+// כל המרכזים שעמודם הציבורי פעיל - ל-sitemap. אותם תנאי גלוי כמו
 // getPublicCenterBySlug: הדלקה מפורשת, או מרכז מסלול-2 (העמוד הוא המוצר).
 export async function listPublicCenters(): Promise<{ slug: string; updated_at: string | null }[]> {
   const { data } = await supabaseAdmin

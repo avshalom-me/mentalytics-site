@@ -37,7 +37,7 @@ export default function NavBar() {
 
       <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-3">
         {/* Logo */}
-        <Link href="/" onClick={() => setOpen(false)} aria-label="טיפול חכם — דף הבית">
+        <Link href="/" onClick={() => setOpen(false)} aria-label="טיפול חכם - דף הבית">
           <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto" }} />
         </Link>
 
