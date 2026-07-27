@@ -10,6 +10,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
+import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import {
   parseKidsBoxes,
   type KidsRecommendationGroup,
@@ -2924,6 +2925,7 @@ function KidsMatchSection({ A, score, selection }: {
                           >✦</span>
                           {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
                         </button>
+                        {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
                       </div>
                       {explainData[t.id] && (
                         <div

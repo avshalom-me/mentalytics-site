@@ -18,6 +18,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
+import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 
 // Anonymous viewer context derived from the questionnaire - used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -2949,6 +2950,7 @@ export default function AdultsPage() {
                   >✦</span>
                   {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
                 </button>
+                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
               </div>
               {explainData[t.id] && (
                 <div
