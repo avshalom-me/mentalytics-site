@@ -8,6 +8,7 @@ import {
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
+import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
@@ -297,6 +298,19 @@ export default function AdminTherapistsPage() {
   const [rejectNotify, setRejectNotify] = useState(true);
   const [rejectSaving, setRejectSaving] = useState(false);
 
+  // ביטול מנוי של מטפל משלם - מחליף את ה-window.confirm, כדי שאפשר יהיה
+  // לרשום באותה פעולה גם את ההחזר הכספי. הזיכוי עצמו נעשה ב-Sumit; כאן רק
+  // נרשמת שורת ההוצאה בספר, אחרת ההחזר לא מתועד בשום מקום.
+  const [cancelPayingFor, setCancelPayingFor] = useState<AdminTherapist | null>(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
+  const [refundChecked, setRefundChecked] = useState(false);
+  const [refundAmount, setRefundAmount] = useState("");
+  const [refundDate, setRefundDate] = useState("");
+  const [refundCategory, setRefundCategory] = useState("refund_guarantee");
+  const [refundDoc, setRefundDoc] = useState("");
+  const [refundNote, setRefundNote] = useState("");
+  const [refundResults, setRefundResults] = useState<Record<string, string>>({});
+
   // General "send a message" composer — available for ANY therapist, including
   // complete profiles (e.g. someone who uploaded a cert into the photo slot).
   const [messageFor, setMessageFor] = useState<AdminTherapist | null>(null);
@@ -479,7 +493,7 @@ export default function AdminTherapistsPage() {
     reason?: string,
     giftMonthsCount?: number | null,
     notifyRejection?: boolean
-  ) {
+  ): Promise<boolean> {
     try {
       setActionLoadingId(id);
       setError("");
@@ -522,10 +536,46 @@ export default function AdminTherapistsPage() {
           therapist.id === id ? { ...therapist, status, ...derived } : therapist
         )
       );
+      return true;
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
+      return false;
     } finally {
       setActionLoadingId(null);
+    }
+  }
+
+  // רישום החזר כספי שכבר בוצע (או עומד להתבצע) ידנית בדשבורד של Sumit.
+  // לא נוגע בכסף - רק כותב שורת הוצאה בספר + שורת audit, כדי שהמאזן החודשי
+  // ידע על הכסף שיצא. מוחזר טקסט לתצוגה, או null אם לא נרשם כלום.
+  async function recordRefund(id: string): Promise<string | null> {
+    const gross = Number(refundAmount);
+    if (!Number.isFinite(gross) || gross <= 0) {
+      setError("סכום ההחזר אינו תקין - ההחזר לא נרשם (הביטול עצמו בוצע).");
+      return null;
+    }
+    try {
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id,
+          action: "record_refund",
+          amount_gross: gross,
+          category: refundCategory,
+          ...(refundDate ? { refund_date: refundDate } : {}),
+          ...(refundDoc.trim() ? { sumit_doc_id: refundDoc.trim() } : {}),
+          ...(refundNote.trim() ? { note: refundNote.trim() } : {}),
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "רישום ההחזר נכשל");
+      return `💸 נרשם החזר של ₪${gross} (₪${json.net} + ₪${json.vat} מע"מ) בתאריך ${json.refund_date}. מופיע עכשיו כהוצאה במסך הכספים.`;
+    } catch (err) {
+      setError(
+        `הביטול בוצע, אך רישום ההחזר נכשל: ${err instanceof Error ? err.message : "שגיאה"}. אפשר להוסיף אותו ידנית במסך הכספים.`
+      );
+      return null;
     }
   }
 
@@ -1331,8 +1381,13 @@ export default function AdminTherapistsPage() {
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => {
-                    if (window.confirm("המטפל משלם דרך Sumit. הורדה תבטל את הוראת הקבע ותשלח לו מייל. להמשיך?"))
-                      updateStatus(therapist.id, "approved");
+                    setRefundChecked(false);
+                    setRefundAmount("");
+                    setRefundDate(new Date().toLocaleDateString("en-CA"));
+                    setRefundCategory("refund_guarantee");
+                    setRefundDoc("");
+                    setRefundNote("");
+                    setCancelPayingFor(therapist);
                   }}>
                   {isBusy ? "מעדכן..." : "בטל מנוי + הורד"}
                 </button>
@@ -1377,6 +1432,11 @@ export default function AdminTherapistsPage() {
             {reconcileResults[therapist.id] && (
               <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 whitespace-pre-line">
                 {reconcileResults[therapist.id]}
+              </div>
+            )}
+            {refundResults[therapist.id] && (
+              <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+                {refundResults[therapist.id]}
               </div>
             )}
           </div>
@@ -2171,6 +2231,137 @@ export default function AdminTherapistsPage() {
             >
               ביטול
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ביטול מנוי של מטפל משלם (+ רישום החזר אופציונלי) ── */}
+      {cancelPayingFor && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" dir="rtl"
+          onClick={() => { if (!cancelSaving) setCancelPayingFor(null); }}>
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="mb-1 text-lg font-bold text-stone-900">
+              ביטול מנוי - {cancelPayingFor.full_name?.trim() || cancelPayingFor.email || "מטפל/ת"}
+            </h3>
+            <p className="mb-4 text-sm text-stone-600">
+              הוראת הקבע ב-Sumit תבוטל, המטפל/ת ירד/תרד למסלול החינמי ויישלח מייל על סיום הקידום.
+            </p>
+
+            <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800">
+              <input
+                type="checkbox"
+                checked={refundChecked}
+                onChange={(e) => setRefundChecked(e.target.checked)}
+                disabled={cancelSaving}
+                className="mt-0.5 h-4 w-4 accent-amber-600"
+              />
+              <span>
+                <b>בוצע גם החזר כספי</b> - לרשום אותו בספר
+                <span className="mt-0.5 block text-xs text-stone-500">
+                  את הזיכוי עצמו יש לבצע בדשבורד של Sumit (מסמכים ← המסמך המקורי ← זיכוי). כאן רק
+                  רושמים אותו, כדי שההוצאה תופיע במסך הכספים ולא תיעלם.
+                </span>
+              </span>
+            </label>
+
+            {refundChecked && (
+              <div className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-stone-700">
+                      סכום שהוחזר בפועל (₪, כולל מע&quot;מ)
+                    </label>
+                    <input
+                      type="number" min="0" step="0.01" inputMode="decimal"
+                      value={refundAmount}
+                      onChange={(e) => setRefundAmount(e.target.value)}
+                      disabled={cancelSaving}
+                      placeholder="למשל 330.90"
+                      className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                    {Number(refundAmount) > 0 && (
+                      <p className="mt-1 text-[11px] text-stone-500">
+                        ייכתב בספר כ-₪{(Math.round((Number(refundAmount) / (1 + VAT_RATE)) * 100) / 100).toFixed(2)}
+                        {" "}לפני מע&quot;מ + ₪{(Number(refundAmount) - Math.round((Number(refundAmount) / (1 + VAT_RATE)) * 100) / 100).toFixed(2)} מע&quot;מ
+                      </p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-stone-700">תאריך ההחזר</label>
+                    <input
+                      type="date"
+                      value={refundDate}
+                      onChange={(e) => setRefundDate(e.target.value)}
+                      disabled={cancelSaving}
+                      className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-stone-700">סוג ההחזר</label>
+                    <select
+                      value={refundCategory}
+                      onChange={(e) => setRefundCategory(e.target.value)}
+                      disabled={cancelSaving}
+                      className="w-full rounded-xl border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    >
+                      {EXPENSE_CATEGORIES.filter((c) => REFUND_CATEGORIES.includes(c.value)).map((c) => (
+                        <option key={c.value} value={c.value}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-stone-700">
+                      מס&apos; מסמך הזיכוי ב-Sumit (רשות)
+                    </label>
+                    <input
+                      type="text"
+                      value={refundDoc}
+                      onChange={(e) => setRefundDoc(e.target.value)}
+                      disabled={cancelSaving}
+                      className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-stone-700">הערה (רשות)</label>
+                  <input
+                    type="text"
+                    value={refundNote}
+                    onChange={(e) => setRefundNote(e.target.value)}
+                    disabled={cancelSaving}
+                    placeholder="למשל: לא התקבלו פניות בחודשיים הראשונים"
+                    className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-amber-200"
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button type="button" onClick={() => setCancelPayingFor(null)} disabled={cancelSaving}
+                className="rounded-xl border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                ביטול
+              </button>
+              <button type="button" disabled={cancelSaving || (refundChecked && !(Number(refundAmount) > 0))}
+                className="rounded-xl bg-amber-600 px-5 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-50"
+                onClick={async () => {
+                  const target = cancelPayingFor;
+                  if (!target) return;
+                  setCancelSaving(true);
+                  // הביטול קודם. אם הוא נכשל (למשל Sumit לא זמין) לא נרשם שום
+                  // החזר - אחרת היה נשאר בספר החזר על מנוי שממשיך לחייב.
+                  const cancelled = await updateStatus(target.id, "approved");
+                  if (cancelled && refundChecked) {
+                    const note = await recordRefund(target.id);
+                    if (note) setRefundResults((prev) => ({ ...prev, [target.id]: note }));
+                  }
+                  setCancelSaving(false);
+                  if (cancelled) setCancelPayingFor(null);
+                }}>
+                {cancelSaving ? "מבטל..." : refundChecked ? "בטל מנוי ורשום החזר" : "בטל מנוי + הורד"}
+              </button>
+            </div>
           </div>
         </div>
       )}

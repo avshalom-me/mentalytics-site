@@ -15,6 +15,7 @@ import {
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
+import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 
 type TherapistRow = {
   id: string;
@@ -737,6 +738,121 @@ export async function PATCH(request: Request) {
       }
 
       return NextResponse.json({ ok: true, reconcile: result });
+    }
+
+    // ── רישום החזר כספי שבוצע ידנית ב-Sumit ─────────────────────────────────
+    // הזיכוי עצמו נעשה בדשבורד של Sumit (מסמכים → זיכוי) ולא כאן, בכוונה:
+    // חיובי החידוש החודשיים נגבים אצל Sumit ואינם נרשמים ב-payments, כך שאין
+    // לנו את הסכום שנגבה בפועל - רק המסמכים ב-Sumit יודעים אותו, ורק שם אפשר
+    // לזכות סכום חלקי נכון עם המע"מ שלו. מה שכן היה חסר הוא הרישום: בלעדיו
+    // ההחזר לא מופיע בשום מקום בספרים ואף אחד לא זוכר שהוא קרה.
+    //
+    // ההחזר נרשם כשורת הוצאה בלבד, לפי הארכיטקטורה של המודול הפיננסי: הכנסות
+    // נקראות חיות מ-payments (status='completed') והוצאות/החזרים מהספר הידני.
+    // בכוונה איננו מסמנים את התשלום המקורי כ-refunded - זה היה מפחית את הכסף
+    // פעמיים (גם מההכנסה וגם כהוצאה), וגם מוחק את המטפל מחישוב חודש הגיוס
+    // וה-CAC ב-admin-crm/finance, שסופר תשלומי subscription שסטטוסם completed.
+    if (body.action === "record_refund") {
+      const gross = Number(body.amount_gross);
+      if (!Number.isFinite(gross) || gross <= 0) {
+        return NextResponse.json({ ok: false, error: "סכום ההחזר אינו תקין" }, { status: 400 });
+      }
+
+      const category =
+        typeof body.category === "string" && REFUND_CATEGORIES.includes(body.category)
+          ? body.category
+          : "refund_guarantee";
+
+      // ברירת מחדל: היום לפי שעון ישראל. toISOString() היה נותן את אתמול
+      // בכל רישום שנעשה אחרי 21:00 מקומית.
+      const todayIL = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jerusalem" });
+      const refundDate =
+        typeof body.refund_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.refund_date)
+          ? body.refund_date
+          : todayIL;
+
+      const { data: refundTherapist } = await supabaseAdmin
+        .from("therapists")
+        .select("full_name, email")
+        .eq("id", id)
+        .maybeSingle();
+      if (!refundTherapist) {
+        return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
+      }
+      const therapistName =
+        (refundTherapist.full_name || refundTherapist.email || "מטפל/ת").trim();
+
+      // האדמין מקליד את מה שהלקוח רואה בכרטיס, כלומר כולל מע"מ. הספר שומר
+      // לפני מע"מ (כמו payments.amount), אז מפצלים באותה נוסחה שבטופס
+      // ההוצאות (splitVat במצב "כולל מע"מ").
+      const net = Math.round((gross / (1 + VAT_RATE)) * 100) / 100;
+      const vat = Math.round((gross - net) * 100) / 100;
+
+      // הגנה מפני לחיצה כפולה: אותו מטפל, אותו סכום, אותו יום.
+      const { data: dupe } = await supabaseAdmin
+        .from("expenses")
+        .select("id")
+        .eq("expense_date", refundDate)
+        .eq("vendor", therapistName)
+        .eq("amount", net)
+        .in("category", REFUND_CATEGORIES)
+        .limit(1)
+        .maybeSingle();
+      if (dupe) {
+        return NextResponse.json(
+          {
+            ok: false,
+            error: `החזר זהה (₪${gross}) כבר נרשם ל${therapistName} בתאריך ${refundDate}.`,
+          },
+          { status: 409 }
+        );
+      }
+
+      const adminNote = typeof body.note === "string" ? body.note.trim() : "";
+      const { data: expense, error: expenseErr } = await supabaseAdmin
+        .from("expenses")
+        .insert({
+          expense_date: refundDate,
+          category,
+          vendor: therapistName,
+          description: `החזר כספי למטפל/ת ${therapistName}`,
+          amount: net,
+          vat_amount: vat,
+          is_rnd: false,
+          receipt_ref: body.sumit_doc_id ? String(body.sumit_doc_id).slice(0, 120) : null,
+          // אין עמודת therapist_id בטבלת ההוצאות; המזהה נשמר כאן כדי שאפשר
+          // יהיה לחזור מהשורה בספר אל המטפל (ה-audit log הוא הקישור הרשמי).
+          note: [`therapist_id: ${id}`, adminNote].filter(Boolean).join(" | ").slice(0, 1000),
+          created_by: "admin",
+        })
+        .select("id")
+        .single();
+
+      if (expenseErr || !expense) {
+        return NextResponse.json(
+          { ok: false, error: expenseErr?.message || "רישום ההחזר נכשל" },
+          { status: 500 }
+        );
+      }
+
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "refund_recorded",
+        before: null,
+        after: {
+          expense_id: expense.id,
+          gross,
+          net,
+          vat,
+          category,
+          refund_date: refundDate,
+          sumit_doc_id: body.sumit_doc_id ?? null,
+        },
+        reason: adminNote || "manual refund recorded after a Sumit credit note",
+      });
+
+      return NextResponse.json({ ok: true, expense_id: expense.id, net, vat, refund_date: refundDate });
     }
 
     // עדכון שדות מלאים (עריכה)
