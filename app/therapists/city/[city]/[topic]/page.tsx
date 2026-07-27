@@ -42,7 +42,8 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const description = `${topic.name} ${inPhrase(city)}: מטפלים מאומתים עם הכשרה מתאימה, כולל אפשרות לפגישות אונליין. השוו, בחרו ופנו ישירות.`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
-  const robots = count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
+  const robots =
+    topic.adsOnly || count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 

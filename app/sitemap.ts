@@ -104,6 +104,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // real supply enter the sitemap (the anti-doorway discipline).
   const topicPages: MetadataRoute.Sitemap = [];
   for (const topic of TOPICS) {
+    if (topic.adsOnly) continue;
     const count = await countListed(topic.filter);
     if (count >= MIN_LISTED_FOR_INDEX) {
       topicPages.push({
@@ -119,7 +120,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
   for (const slug of cityTopicSlugs) {
     const topic = slugToCityTopic(slug);
-    if (!topic) continue;
+    if (!topic || topic.adsOnly) continue;
     for (const city of PILOT_CITIES) {
       const count = await countListed({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) {

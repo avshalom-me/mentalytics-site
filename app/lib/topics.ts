@@ -23,6 +23,18 @@ export type Topic = {
   /** How the supply line explains WHO is listed (honesty line). */
   supplyNote: string;
   related: { href: string; label: string }[];
+  /**
+   * Paid-landing only: noindex + kept out of the sitemap.
+   *
+   * For topics that deliberately overlap an existing indexed topic. Nobody
+   * searches "פסיכולוג ילדים ונוער" as a phrase - they search one or the
+   * other - so indexing a union page buys no organic traffic while handing
+   * Google a third near-identical therapist list per city. That is the
+   * scaled-content pattern the roadmap's anti-doorway rules exist to avoid.
+   * It still works perfectly as an ad destination: noindex has no effect on
+   * paid serving.
+   */
+  adsOnly?: boolean;
 };
 
 export const TOPICS: Topic[] = [
@@ -113,6 +125,22 @@ export const TOPICS: Topic[] = [
     ],
   },
   {
+    slug: "פסיכולוג-ילדים-ונוער",
+    name: "פסיכולוג לילדים ולנוער",
+    searchTitle: "פסיכולוג לילדים ולנוער - מטפלים רגשיים לילדים ומתבגרים",
+    kind: "audience",
+    adsOnly: true,
+    intro:
+      "טיפול רגשי בילדים עובד אחרת מטיפול במבוגרים: דרך משחק, יצירה והקשר הטיפולי, ולרוב בשילוב הדרכת הורים שפעמים רבות היא המנוף המרכזי. הסימנים שמצדיקים התייעצות בגיל הזה הם שינוי התנהגותי מתמשך, קשיי שינה או אכילה, הסתגרות, התפרצויות חוזרות או קושי חברתי. בגיל ההתבגרות התמונה משתנה: עולות שאלות של זהות עצמית, דילמות חברתיות ולחצים לימודיים, והכל בגיל שבו עדיין אין עוגנים נפשיים חזקים, ולכן הוא משופע בקשיים שקשורים לחרדה, דכדוך או פגיעה עצמית. מתבגרים זקוקים למטפל שמדבר בגובה העיניים ויודע לבנות אמון הדרגתי גם עם מי שאינו מעוניין בטיפול בשלב ההתחלתי. גם כאן נמשכת העבודה עם ההורים, אך במינון מותאם: ככל שגיל המתבגר/ת עולה, כך כדאי יותר להתייעץ איתו/ה על מידת השילוב של ההורים בטיפול. שאלון הילדים והנוער שלנו ממפה את הקושי, מתחשב בגיל, וממליץ על סוג הטיפול המתאים.",
+    filter: { ageGroupsAny: ["ילדים", "גיל הרך", "נוער"] },
+    supplyNote: "מוצגים מטפלים שמטפלים בילדים ובבני נוער (כולל הגיל הרך)",
+    related: [
+      { href: "/kids", label: "✦ שאלון התאמה לילדים ונוער" },
+      { href: "/research/therapy-for-child", label: "מתי ילד או נער צריך טיפול?" },
+      { href: "/therapists/specialty/הדרכת-הורים", label: "מדריכי הורים" },
+    ],
+  },
+  {
     slug: "פסיכולוג-לגיל-השלישי",
     name: "פסיכולוג לגיל השלישי",
     searchTitle: "פסיכולוג לגיל השלישי - טיפול רגשי למבוגרים ותיקים",
@@ -154,6 +182,7 @@ export const MIN_CITY_TOPIC = 5;
 export const CITY_TOPIC_SLUGS = [
   "פסיכולוג-ילדים",
   "פסיכולוג-לנוער",
+  "פסיכולוג-ילדים-ונוער",
   "טיפול-בחרדה",
   "טיפול-בדיכאון",
 ] as const;

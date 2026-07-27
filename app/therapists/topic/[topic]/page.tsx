@@ -30,7 +30,8 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   const description = `${topic.intro.slice(0, 130)}… מטפלים מאומתים בטיפול חכם.`;
   const url = `${BASE}/therapists/topic/${topic.slug}`;
   const count = await countListed(topic.filter);
-  const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
+  const robots =
+    topic.adsOnly || count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return { title: topic.searchTitle, description, alternates: { canonical: url }, robots, openGraph: { title: topic.searchTitle, description, url } };
 }
 
