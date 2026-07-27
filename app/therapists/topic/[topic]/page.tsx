@@ -89,7 +89,6 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
           {topic.kind === "audience" ? "לפי קהל" : "לפי קושי"}
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{topic.searchTitle}</h1>
-        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "68ch" }}>{topic.intro}</p>
         {list.length >= MIN_LISTED_FOR_INDEX && (
           <p className="mt-2 text-sm text-stone-500">
             {topic.supplyNote} - {list.length} מטפלים מאומתים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
@@ -129,8 +128,18 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
         </div>
       )}
 
+      {/* Explanatory prose lives BELOW the listings: a visitor who came to find
+          a therapist sees therapists first; the reading material is for those
+          who scroll (and for crawlers). */}
+      <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
+          על {topic.name} - מה חשוב לדעת
+        </h2>
+        <p className="text-[15px] leading-8 text-stone-600">{topic.intro}</p>
+      </section>
+
       {topic.related.length > 0 && (
-        <div className="mt-12 pt-8 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <div className="mt-8 pt-6 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-base font-extrabold text-stone-800 mb-3">להעמקה באתר</h2>
           <ul className="space-y-2">
             {topic.related.map((r) => (

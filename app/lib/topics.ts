@@ -1,4 +1,5 @@
 import { TRAINING_AREAS } from "./therapist-options";
+import { specialtyIntro } from "./specialties";
 
 // "Topic" landing pages - the two keyword layers the specialty pages don't
 // cover (see docs/seo-roadmap.md):
@@ -175,7 +176,9 @@ export function approachAsTopic(name: string): Topic | null {
     name,
     searchTitle: `${name} - מטפלים מוסמכים`,
     kind: "condition",
-    intro: "",
+    // Reuse the specialty page's prose so an approach-based city page
+    // ("CBT בירושלים") also carries real content below its listing.
+    intro: specialtyIntro(name),
     filter: { trainingAreasAny: [name] },
     supplyNote: `מוצגים מטפלים בעלי הכשרת ${name}`,
     related: [],

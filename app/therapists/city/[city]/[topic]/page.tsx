@@ -100,7 +100,6 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר ותחום</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        {topic.intro && <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "68ch" }}>{topic.intro}</p>}
         <p className="mt-2 text-sm text-stone-500">
           {topic.supplyNote}, הפועלים {inPhrase(city)} - {list.length} מטפלים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
         </p>
@@ -138,7 +137,17 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
         </div>
       )}
 
-      <div className="mt-12 pt-8 border-t border-[var(--line)]">
+      {/* Prose below the listings (see the topic page for the rationale). */}
+      {topic.intro && (
+        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
+            על {topic.name} - מה חשוב לדעת
+          </h2>
+          <p className="text-[15px] leading-8 text-stone-600">{topic.intro}</p>
+        </section>
+      )}
+
+      <div className="mt-8 pt-6 border-t border-[var(--line)]">
         <h2 className="text-base font-extrabold text-stone-800 mb-3">המשך עיון</h2>
         <div className="flex flex-wrap gap-2">
           {isNamedTopic && (

@@ -122,11 +122,6 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
             ? "כל המטפלים והפסיכולוגים שמציעים טיפול אונליין דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית."
             : `כל המטפלים והפסיכולוגים המאומתים ב${label} דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית לפי הצורך, הגישה והאזור.`}
         </p>
-        {!isOnline && REGION_INTRO[r.region] && (
-          <p className="mt-4 text-stone-600 leading-8" style={{ maxWidth: "64ch" }}>
-            {REGION_INTRO[r.region]}
-          </p>
-        )}
       </div>
 
       {/* Prominent quiz CTA - offer the matching quiz as an alternative to
@@ -165,6 +160,13 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       )}
 
       {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
+      {!isOnline && REGION_INTRO[r.region] && (
+        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>על אזור {r.region}</h2>
+          <p className="text-[15px] leading-8 text-stone-600">{REGION_INTRO[r.region]}</p>
+        </section>
+      )}
+
       <CitySeoSection
         placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
         kind={isOnline ? "online" : "region"}

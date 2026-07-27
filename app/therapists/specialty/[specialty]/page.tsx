@@ -80,12 +80,11 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי התמחות</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "62ch" }}>
-          {specialtyIntro(specialty)}
-          {list.length >= 3 && (
-            <> {` בטיפול חכם ${list.length} מטפלים מאומתים בתחום${onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.`}</>
-          )}
-        </p>
+        {list.length >= 3 && (
+          <p className="mt-2 text-sm text-stone-500">
+            {`בטיפול חכם ${list.length} מטפלים מאומתים בתחום${onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.`}
+          </p>
+        )}
       </div>
 
       {/* Quiz CTA - same offer as the city/region pages */}
@@ -122,16 +121,20 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
 
       {/* Treatment deep-dive - below the listings (the city-pages pattern):
           prose distilled from our own editorial articles + links into them. */}
+      <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
+          על {specialty} - מה חשוב לדעת
+        </h2>
+        <div className="space-y-4">
+          <p className="text-[15px] leading-8 text-stone-600">{specialtyIntro(specialty)}</p>
+          {content?.paragraphs.map((p, i) => (
+            <p key={i} className="text-[15px] leading-8 text-stone-600">{p}</p>
+          ))}
+        </div>
+      </section>
+
       {content && (
-        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
-          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
-            על {specialty} - מה חשוב לדעת
-          </h2>
-          <div className="space-y-4">
-            {content.paragraphs.map((p, i) => (
-              <p key={i} className="text-[15px] leading-8 text-stone-600">{p}</p>
-            ))}
-          </div>
+        <section className="mt-8 pt-6 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
 
           {/* Expert deep-dive (theory, techniques, structure) - technique lists
               collapsed so the page stays calm; fully server-rendered for SEO. */}
