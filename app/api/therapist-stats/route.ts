@@ -62,7 +62,11 @@ function buildMonthlyTrends(rows: ClickRow[]) {
       label,
       total: monthRows.length,
       match: monthRows.filter(r => r.source === "match").length,
-      directory: monthRows.filter(r => r.source === "directory").length,
+      // Everything that isn't a match-flow contact: directory cards, profile
+      // page buttons, and legacy rows with no source. An exact === "directory"
+      // here would silently drop profile-page contacts from the therapist's own
+      // dashboard the moment that source started being recorded.
+      directory: monthRows.filter(r => r.source !== "match").length,
     });
   }
   return months;

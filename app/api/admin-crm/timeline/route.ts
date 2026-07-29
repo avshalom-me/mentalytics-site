@@ -156,7 +156,14 @@ export async function GET(req: NextRequest) {
       kind: "click",
       ts: c.clicked_at,
       title: CLICK_LABELS[c.click_type] ?? `לחיצה (${c.click_type})`,
-      detail: c.source === "match" ? "מתוך התאמה" : c.source === "directory" ? "מהמאגר" : c.source,
+      detail:
+        c.source === "match"
+          ? "מתוך התאמה"
+          : c.source === "directory"
+            ? "מהמאגר"
+            : c.source === "profile"
+              ? "מדף הפרופיל"
+              : c.source,
       actor: null,
     });
   }

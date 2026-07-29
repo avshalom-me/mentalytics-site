@@ -24,7 +24,11 @@ const messagesvg = (
   </svg>
 );
 
-function track(therapistId: string, clickType: "whatsapp" | "phone" | "email", source: "match" | "directory") {
+function track(
+  therapistId: string,
+  clickType: "whatsapp" | "phone" | "email",
+  source: "match" | "profile",
+) {
   const attribution = getAttribution() ?? {};
   fetch("/api/track-click", {
     method: "POST",
@@ -65,7 +69,12 @@ export default function ContactButtons({
   mobileSticky?: boolean;
 }) {
   const [messageOpen, setMessageOpen] = useState(false);
-  const messageSource = source === "match" ? "match" : "profile";
+  // These buttons only ever render on the profile page, so a non-match visitor
+  // clicking here is a "profile" contact - not a "directory" one. Match-origin
+  // visitors stay "match" so the matching system keeps its attribution (every
+  // report here splits on source === "match").
+  const clickSource: "match" | "profile" = source === "match" ? "match" : "profile";
+  const messageSource = clickSource;
   const hasDirect = Boolean(waLink || phone);
 
   return (
@@ -74,14 +83,14 @@ export default function ContactButtons({
       <div className="mt-6 flex flex-wrap gap-3">
         {waLink && (
           <a href={waLink} target="_blank" rel="noopener noreferrer"
-            onClick={() => track(therapistId, "whatsapp", source)}
+            onClick={() => track(therapistId, "whatsapp", clickSource)}
             className={`${pill} bg-green-500 text-white hover:bg-green-600`}>
             {wasvg} שליחת וואטסאפ
           </a>
         )}
         {phone && (
           <a href={`tel:${phone}`}
-            onClick={() => track(therapistId, "phone", source)}
+            onClick={() => track(therapistId, "phone", clickSource)}
             className={`${pill} bg-[#3D8C8A] text-white hover:bg-[#2A6462]`}>
             {phonesvg} חיוג
           </a>
@@ -101,14 +110,14 @@ export default function ContactButtons({
           <div className="flex gap-2">
             {waLink ? (
               <a href={waLink} target="_blank" rel="noopener noreferrer"
-                onClick={() => track(therapistId, "whatsapp", source)}
+                onClick={() => track(therapistId, "whatsapp", clickSource)}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-green-500 text-white py-3 text-[15px] font-extrabold">
                 {wasvg} וואטסאפ
               </a>
             ) : null}
             {phone ? (
               <a href={`tel:${phone}`}
-                onClick={() => track(therapistId, "phone", source)}
+                onClick={() => track(therapistId, "phone", clickSource)}
                 className={`${waLink ? "" : "flex-1 "}inline-flex items-center justify-center gap-2 rounded-full bg-[#3D8C8A] text-white px-5 py-3 text-[15px] font-extrabold`}>
                 {phonesvg} חיוג
               </a>

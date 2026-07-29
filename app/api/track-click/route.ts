@@ -3,7 +3,12 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
-const VALID_SOURCES = ["match", "directory"] as const;
+// Surfaces a contact can be initiated from. "profile" was allowed by the DB
+// CHECK constraint from the start but was missing here, so profile-page
+// whatsapp/phone clicks were silently coerced to "directory" below and became
+// indistinguishable from directory-card clicks. Keep this list in sync with
+// therapist_contact_clicks_source_check.
+const VALID_SOURCES = ["match", "directory", "profile"] as const;
 type ClickType = (typeof VALID_TYPES)[number];
 type Source = (typeof VALID_SOURCES)[number];
 
