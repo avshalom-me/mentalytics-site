@@ -10,6 +10,7 @@ import SiteMessageModal from "./SiteMessageModal";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { bioSnippet } from "@/app/lib/bio-snippet";
 
 // Card-level contact buttons - the one surface where a contact click happens
 // WITHOUT a profile view. Attribution must ride along here exactly like on the
@@ -100,7 +101,7 @@ function TherapistCard({
   const imgRef = useRef<HTMLImageElement>(null);
   const [messageOpen, setMessageOpen] = useState(false);
   const showImage = t.profile_photo_url && !brokenImages[t.id];
-  const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
+  const snippet = bioSnippet(t.bio);
   const unavailable = t.accepting_new_patients === false;
 
   const handleImageError = () => {
@@ -143,8 +144,8 @@ function TherapistCard({
           {t.therapist_types.length > 0 && (
             <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{genderTitle(t.therapist_types[0], t.gender)}</div>
           )}
-          {bioSnippet && (
-            <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{bioSnippet}</p>
+          {snippet && (
+            <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{snippet}</p>
           )}
           <div className="mt-3 flex flex-wrap gap-1.5">
             {t.online && (

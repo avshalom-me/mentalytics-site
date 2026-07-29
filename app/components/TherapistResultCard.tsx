@@ -4,6 +4,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { CITY_TO_REGION } from "@/app/lib/regions";
 import CardImpression from "@/app/components/CardImpression";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
+import { bioSnippet } from "@/app/lib/bio-snippet";
 
 // Context-aware ordering for the card's city chip: on a city landing page the
 // page's own city shows first (a Kfar-Saba visitor seeing "📍 נתניה" on a
@@ -35,7 +36,7 @@ export default function TherapistResultCard({
 }) {
   const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
-  const bioSnippet = t.bio ? t.bio.split(/[.\n]/)[0].trim() : "";
+  const snippet = bioSnippet(t.bio);
   // "ret" lets the profile's back link return to THIS listing page (region /
   // city / online / center) rather than the generic /therapists directory.
   const profileHref = backHref
@@ -53,7 +54,7 @@ export default function TherapistResultCard({
       <div style={{ padding: "16px 18px" }}>
         <h2 className="text-lg font-black text-stone-900 leading-tight group-hover:underline">{t.full_name}</h2>
         {type && <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{type}</div>}
-        {bioSnippet && <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{bioSnippet}</p>}
+        {snippet && <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{snippet}</p>}
         <div className="mt-3 flex flex-wrap gap-1.5">
           {t.online && (
             <span className="rounded-full px-3 py-1 text-[13px] font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>🌐 אונליין</span>
