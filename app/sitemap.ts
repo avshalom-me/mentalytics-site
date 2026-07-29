@@ -2,7 +2,7 @@ import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
+import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic } from "@/app/lib/topics";
 import { countListed } from "@/app/lib/therapist-directory";
@@ -77,7 +77,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // near-empty ones are noindex, so listing them here would only produce
   // "submitted URL marked noindex" warnings and waste crawl budget. They rejoin
   // the sitemap automatically once they fill up (regenerated per request).
-  const { regions: regionCounts, cities: cityCounts, specialties: specialtyCounts } = await countListedByRegionAndCity();
+  const { regions: regionCounts, cities: cityCounts, cityPools, specialties: specialtyCounts } = await countListedByRegionAndCity();
   const regionPages: MetadataRoute.Sitemap = [
     { url: `${BASE}/therapists/para-medical`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
@@ -87,7 +87,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
       changeFrequency: "weekly" as const,
     })),
-    ...CITY_SEO_LIST.filter((city) => (cityCounts[city] ?? 0) >= MIN_LISTED_FOR_INDEX).map((city) => ({
+    ...CITY_SEO_LIST.filter((city) => cityIsIndexable(city, cityCounts[city] ?? 0, cityPools[city] ?? 0)).map((city) => ({
       url: `${BASE}/therapists/city/${regionToSlug(city)}`,
       priority: 0.6,
       changeFrequency: "weekly" as const,

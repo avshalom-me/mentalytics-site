@@ -42,6 +42,20 @@ export async function loadArticlesByTopics(topics: string[], limit = 4): Promise
     .map((r) => ({ slug: r.slug, title: r.title, summary: r.summary, author: r.therapists!.full_name! }));
 }
 
+// City pages: prefer an article by a therapist who listed THIS city; if there
+// is none (the usual case for a small city - the pool of therapist articles is
+// still tiny), widen to the surrounding region and say so in the heading, so
+// the attribution stays honest. Returns the scope actually used.
+export async function loadCityArticles(
+  city: string,
+  region: string | null,
+  limit = 4
+): Promise<{ articles: LocalArticle[]; scope: "city" | "region" }> {
+  const exact = await loadLocalArticles({ city }, limit);
+  if (exact.length > 0 || !region) return { articles: exact, scope: "city" };
+  return { articles: await loadLocalArticles({ region }, limit), scope: "region" };
+}
+
 export async function loadLocalArticles(
   place: { city: string } | { region: string } | { online: true },
   limit = 6

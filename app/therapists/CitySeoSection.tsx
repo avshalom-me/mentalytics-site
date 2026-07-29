@@ -49,6 +49,9 @@ export default function CitySeoSection({
   onlineCount,
   regionName,
   articles = [],
+  articlesScope = "place",
+  nearby = [],
+  nearbyPlaces = [],
 }: {
   placeName: string;
   kind: Kind;
@@ -57,14 +60,24 @@ export default function CitySeoSection({
   /** Canonical region this place belongs to (the region itself on region pages) - keys price + public-services data. */
   regionName?: string | null;
   articles?: LocalArticle[];
+  /** "region" when a city page fell back to region-wide articles - the heading must say so. */
+  articlesScope?: "place" | "region";
+  /** Therapists shown from ADJACENT cities (small-city pages) - counted separately, never as in-city. */
+  nearby?: PublicTherapist[];
+  /** The adjacent cities those therapists actually work in, for naming them in the text. */
+  nearbyPlaces?: string[];
 }) {
   const h = hashPlace(placeName);
   const total = therapists.length;
-  const types = typeBreakdown(therapists);
-  const specialties = topSpecialties(therapists);
-  const onlineHere = therapists.filter((t) => t.online).length;
-  const women = therapists.filter((t) => t.gender === "נקבה").length;
-  const men = total - women;
+  // When the city itself is thin, the breakdown describes what the page ACTUALLY
+  // lists (in-city + adjacent) - otherwise the text would claim "no supply" under
+  // a grid of 25 cards. The two groups stay counted separately in the wording.
+  const pooled = total >= 3 ? therapists : [...therapists, ...nearby];
+  const types = typeBreakdown(pooled);
+  const specialties = topSpecialties(pooled);
+  const onlineHere = pooled.filter((t) => t.online).length;
+  const women = pooled.filter((t) => t.gender === "נקבה").length;
+  const men = pooled.length - women;
 
   const inPlace = kind === "online" ? "בטיפול אונליין" : `ב${placeName}`;
 
@@ -92,8 +105,26 @@ export default function CitySeoSection({
     statsBits.push(
       `${inPlace} מוצגים כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
     );
-    if (regionName && kind === "city") statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
+    if (nearby.length > 0) {
+      statsBits.push(
+        nearbyPlaces.length > 0
+          ? `ועוד ${nearby.length} מטפלים בערים הצמודות (${nearbyPlaces.join(", ")})`
+          : `ועוד ${nearby.length} מטפלים בערים הצמודות`
+      );
+      if (typesText) statsBits.push(`לפי הכשרה, בשתי הקבוצות יחד: ${typesText}`);
+      if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
+    } else if (regionName && kind === "city") {
+      statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
+    }
     statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
+  } else if (nearby.length > 0) {
+    statsBits.push(
+      `${inPlace} עצמה טרם נרשמו מטפלים במאגר, אך בערים הצמודות${nearbyPlaces.length > 0 ? ` (${nearbyPlaces.join(", ")})` : ""} מוצגים כרגע ${nearby.length} מטפלים מאומתים`
+    );
+    if (typesText) statsBits.push(`לפי הכשרה: ${typesText}`);
+    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${women} נשים, ${men} גברים)`);
+    if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
+    statsBits.push(`ובנוסף ${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else {
     statsBits.push(`ההיצע ${inPlace} מתעדכן - בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
     if (regionName) statsBits.push(`ומטפלים נוספים באזור ${regionName}`);
@@ -207,9 +238,13 @@ export default function CitySeoSection({
       {articles.length > 0 && (
         <div className="mb-8">
           <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>
-            מאמרים ממטפלים {kind === "online" ? "שמטפלים אונליין" : inPlace}
+            {kind === "online"
+              ? "מאמרים ממטפלים שמטפלים אונליין"
+              : articlesScope === "region" && regionName
+                ? `מאמרים ממטפלים באזור ${regionName}`
+                : `מאמרים ממטפלים ${inPlace}`}
           </h3>
-          <ul className="space-y-2">
+          <ul className="space-y-3.5">
             {articles.map((a) => (
               <li key={a.slug} className="text-sm leading-7">
                 <Link
@@ -220,6 +255,11 @@ export default function CitySeoSection({
                   {a.title}
                 </Link>
                 <span className="text-stone-500"> - מאת {a.author}</span>
+                {a.summary && (
+                  <span className="block text-stone-500">
+                    {a.summary.length > 180 ? `${a.summary.slice(0, 180).trimEnd()}...` : a.summary}
+                  </span>
+                )}
               </li>
             ))}
           </ul>

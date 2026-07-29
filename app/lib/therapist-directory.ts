@@ -1,5 +1,5 @@
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { CITY_TO_REGION, ALL_REGIONS } from "@/app/lib/regions";
+import { CITY_TO_REGION, ALL_REGIONS, CITY_SEO_LIST, neighborsOf, CITY_POOL_EXCLUDED } from "@/app/lib/regions";
 import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
@@ -10,6 +10,12 @@ const NEW_THERAPIST_BOOST_DAYS = 7;
 // region/other cities), which Google flags as "thin" - so such pages are set to
 // noindex and kept out of the sitemap until they fill up.
 export const MIN_LISTED_FOR_INDEX = 3;
+// A small city can also earn indexing on its ADJACENT-city pool: someone in
+// גני תקווה genuinely drives 7 minutes to קריית אונו, so a page listing those
+// therapists answers the query rather than dodging it. The bar is higher than
+// the in-city one (5 vs 3) because pooled supply is a weaker promise, and the
+// pool only counts cities in CITY_NEIGHBORS (10-20 min), never a whole region.
+export const MIN_POOL_FOR_INDEX = 5;
 const PROFILE_PHOTOS_BUCKET =
   process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 
@@ -86,6 +92,8 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
 type DirectoryFilter = {
   region?: string;
   city?: string;
+  /** Any of these cities (used for the adjacent-city pool on small-city pages). */
+  citiesAny?: string[];
   online?: boolean;
   specialty?: string;
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
@@ -123,6 +131,10 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
+  if (filter?.citiesAny?.length) {
+    const wanted = new Set(filter.citiesAny);
+    rows = rows.filter((t) => (t.regions ?? []).some((c) => wanted.has(c)));
+  }
   if (filter?.specialty) rows = rows.filter((t) => (t.training_areas ?? []).includes(filter.specialty!));
   if (filter?.trainingAreasAny?.length) {
     rows = rows.filter((t) => filter.trainingAreasAny!.some((a) => (t.training_areas ?? []).includes(a)));
@@ -144,6 +156,8 @@ export async function countListed(filter?: DirectoryFilter): Promise<number> {
 export async function countListedByRegionAndCity(): Promise<{
   regions: Record<string, number>;
   cities: Record<string, number>;
+  /** City + its adjacent cities, counting each therapist ONCE (they overlap heavily). */
+  cityPools: Record<string, number>;
   specialties: Record<string, number>;
 }> {
   const rows = await loadFilteredRows();
@@ -157,7 +171,25 @@ export async function countListedByRegionAndCity(): Promise<{
     for (const c of t.regions ?? []) cities[c] = (cities[c] ?? 0) + 1;
     for (const a of t.training_areas ?? []) specialties[a] = (specialties[a] ?? 0) + 1;
   }
-  return { regions, cities, specialties };
+  // Distinct-therapist pool per city. Summing cities[] would double-count anyone
+  // who lists two neighbouring cities, which is common and would inflate every
+  // small city over the threshold.
+  const cityPools: Record<string, number> = {};
+  for (const city of CITY_SEO_LIST) {
+    const wanted = new Set([city, ...neighborsOf(city)]);
+    cityPools[city] = rows.filter((t) => (t.regions ?? []).some((c) => wanted.has(c))).length;
+  }
+  return { regions, cities, cityPools, specialties };
+}
+
+/**
+ * Is this city page worth indexing: real in-city supply, or a real adjacent-city
+ * pool. Real in-city supply always wins, including for cities we deliberately
+ * keep out of the pooled route (see CITY_POOL_EXCLUDED).
+ */
+export function cityIsIndexable(city: string, inCity: number, pool: number): boolean {
+  if (inCity >= MIN_LISTED_FOR_INDEX) return true;
+  return pool >= MIN_POOL_FOR_INDEX && !(city in CITY_POOL_EXCLUDED);
 }
 
 export async function loadPublicTherapists(
