@@ -190,6 +190,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         therapists={inCity}
         nearby={nearbyCities}
         nearbyPlaces={nearbyCityNames}
+        regionNearby={nearbyRegion}
         onlineCount={onlineCount}
         regionName={region}
         articles={localArticles}

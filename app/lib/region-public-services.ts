@@ -43,9 +43,12 @@ export const REGION_PUBLIC_SERVICES: Record<string, PublicService[]> = {
   "דרום השרון": [
     { name: "שלוותה", city: "הוד השרון", kind: "מרכז לבריאות הנפש", operator: "כללית" },
     { name: "גהה", city: "פתח תקווה", kind: "מרכז לבריאות הנפש", operator: "כללית" },
+    // Serves the northern edge of this region (כפר יונה, תל מונד), which the
+    // city intros name - without this the FAQ below the intro contradicted it.
+    { name: "לב השרון", city: "בין צור משה לפרדסיה", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
   ],
   "צפון השרון": [
-    { name: "לב השרון", city: "ליד נתניה (צור משה)", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
+    { name: "לב השרון", city: "בין צור משה לפרדסיה", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
     { name: "שער מנשה", city: "ליד פרדס חנה-כרכור", kind: "מרכז לבריאות הנפש", operator: "ממשלתי" },
   ],
   "ירושלים והסביבה": [

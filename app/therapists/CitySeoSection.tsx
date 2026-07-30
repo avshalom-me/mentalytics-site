@@ -22,6 +22,19 @@ function hashPlace(name: string): number {
   return h;
 }
 
+/** Hebrew has no "1 גברים" - a count of one takes the singular form, no numeral. */
+function countLabel(n: number, one: string, plural: string): string {
+  return n === 1 ? one : `${n} ${plural}`;
+}
+
+// Truncate by CODE POINT, not by UTF-16 unit: slice() can cut an emoji in half
+// and leave a lone surrogate, which the response encoder then serves as "�".
+function truncateChars(text: string, max: number): string {
+  const chars = [...text];
+  if (chars.length <= max) return text;
+  return `${chars.slice(0, max).join("").trimEnd()}...`;
+}
+
 function typeBreakdown(therapists: PublicTherapist[]): { label: string; count: number }[] {
   const counts = new Map<string, number>();
   for (const t of therapists) {
@@ -52,6 +65,7 @@ export default function CitySeoSection({
   articlesScope = "place",
   nearby = [],
   nearbyPlaces = [],
+  regionNearby = [],
 }: {
   placeName: string;
   kind: Kind;
@@ -66,13 +80,19 @@ export default function CitySeoSection({
   nearby?: PublicTherapist[];
   /** The adjacent cities those therapists actually work in, for naming them in the text. */
   nearbyPlaces?: string[];
+  /** Therapists shown from the wider region (the last-resort fallback on very thin pages). */
+  regionNearby?: PublicTherapist[];
 }) {
   const h = hashPlace(placeName);
   const total = therapists.length;
-  // When the city itself is thin, the breakdown describes what the page ACTUALLY
-  // lists (in-city + adjacent) - otherwise the text would claim "no supply" under
-  // a grid of 25 cards. The two groups stay counted separately in the wording.
-  const pooled = total >= 3 ? therapists : [...therapists, ...nearby];
+  // The breakdown must describe what the page ACTUALLY lists, otherwise the text
+  // undercounts the grid above it. An earlier version gated this on `total >= 3`
+  // while the page renders adjacent-city cards whenever in-city < 6, so a city
+  // with 3 of its own and 20 neighbours printed "3 מטפלים" above 23 cards.
+  // No threshold here at all now: whatever is rendered is what gets counted,
+  // and the wording below keeps the groups separate.
+  const alsoShown = [...nearby, ...regionNearby];
+  const pooled = alsoShown.length > 0 ? [...therapists, ...alsoShown] : therapists;
   const types = typeBreakdown(pooled);
   const specialties = topSpecialties(pooled);
   const onlineHere = pooled.filter((t) => t.online).length;
@@ -90,39 +110,44 @@ export default function CitySeoSection({
   // Live-data supply paragraph - this is what makes each page genuinely unique.
   const typesText = types.map((t) => `${t.label} (${t.count})`).join(" · ");
   const statsBits: string[] = [];
-  if (total >= 3) {
+  // Where the extra cards came from, named. Adjacent cities are listed by name;
+  // the wider-region fallback can only be described by its region.
+  const alsoBits: string[] = [];
+  if (nearby.length > 0) {
+    alsoBits.push(
+      nearbyPlaces.length > 0
+        ? `ועוד ${nearby.length} מטפלים בערים הצמודות (${nearbyPlaces.join(", ")})`
+        : `ועוד ${nearby.length} מטפלים בערים הצמודות`
+    );
+  }
+  if (regionNearby.length > 0) {
+    alsoBits.push(`ועוד ${regionNearby.length} מטפלים באזור ${regionName ?? ""}`.trim());
+  }
+
+  if (total > 0) {
     statsBits.push(
-      h % 2 === 0
+      total >= 3 && h % 2 === 0
         ? `${inPlace === "בטיפול אונליין" ? "באונליין" : inPlace} מוצגים כרגע ${total} מטפלים מאומתים דרך טיפול חכם`
-        : `דרך טיפול חכם מוצגים כרגע ${total} מטפלים מאומתים ${inPlace}`
+        : total >= 3
+          ? `דרך טיפול חכם מוצגים כרגע ${total} מטפלים מאומתים ${inPlace}`
+          : `${inPlace} מוצג כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
     );
-    if (typesText) statsBits.push(`לפי הכשרה: ${typesText}`);
-    if (kind !== "online" && onlineHere > 0)
-      statsBits.push(`${onlineHere} מתוכם מטפלים גם אונליין`);
-    if (women > 0 && men > 0) statsBits.push(`במאגר מטפלות ומטפלים (${women} נשים, ${men} גברים)`);
+    statsBits.push(...alsoBits);
+    if (typesText) statsBits.push(alsoBits.length > 0 ? `לפי הכשרה, בכל הרשימה יחד: ${typesText}` : `לפי הכשרה: ${typesText}`);
+    if (kind !== "online" && onlineHere > 0) statsBits.push(`${onlineHere} מתוכם מטפלים גם אונליין`);
+    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
     if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-  } else if (total > 0) {
-    statsBits.push(
-      `${inPlace} מוצגים כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
-    );
-    if (nearby.length > 0) {
-      statsBits.push(
-        nearbyPlaces.length > 0
-          ? `ועוד ${nearby.length} מטפלים בערים הצמודות (${nearbyPlaces.join(", ")})`
-          : `ועוד ${nearby.length} מטפלים בערים הצמודות`
-      );
-      if (typesText) statsBits.push(`לפי הכשרה, בשתי הקבוצות יחד: ${typesText}`);
-      if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-    } else if (regionName && kind === "city") {
-      statsBits.push(`בנוסף פעילים מטפלים נוספים באזור ${regionName}`);
-    }
     statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
-  } else if (nearby.length > 0) {
+  } else if (alsoShown.length > 0) {
+    const where =
+      nearby.length > 0
+        ? `בערים הצמודות${nearbyPlaces.length > 0 ? ` (${nearbyPlaces.join(", ")})` : ""}`
+        : `באזור ${regionName ?? ""}`.trim();
     statsBits.push(
-      `${inPlace} עצמה טרם נרשמו מטפלים במאגר, אך בערים הצמודות${nearbyPlaces.length > 0 ? ` (${nearbyPlaces.join(", ")})` : ""} מוצגים כרגע ${nearby.length} מטפלים מאומתים`
+      `${inPlace} עצמה טרם נרשמו מטפלים במאגר, אך ${where} מוצגים כרגע ${alsoShown.length} מטפלים מאומתים`
     );
     if (typesText) statsBits.push(`לפי הכשרה: ${typesText}`);
-    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${women} נשים, ${men} גברים)`);
+    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
     if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
     statsBits.push(`ובנוסף ${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else {
@@ -256,9 +281,7 @@ export default function CitySeoSection({
                 </Link>
                 <span className="text-stone-500"> - מאת {a.author}</span>
                 {a.summary && (
-                  <span className="block text-stone-500">
-                    {a.summary.length > 180 ? `${a.summary.slice(0, 180).trimEnd()}...` : a.summary}
-                  </span>
+                  <span className="block text-stone-500">{truncateChars(a.summary, 180)}</span>
                 )}
               </li>
             ))}
