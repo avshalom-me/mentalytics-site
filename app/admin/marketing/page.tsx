@@ -557,6 +557,8 @@ type CampaignFunnelRow = {
   site_message: number;
   from_match: number;
   from_directory: number;
+  /** Contacts clicked on the therapist's profile page (source added 29/7/26). */
+  from_profile?: number;
 };
 type RecruitRow = { campaign: string; signups: number };
 
@@ -775,6 +777,7 @@ function FunnelsCampaigns() {
                             {r.contacts > 0 && (
                               <div className="text-[10px] text-stone-400">
                                 {r.contacts} לחיצות · 🎯 {r.from_match} · 📁 {r.from_directory}
+                                {(r.from_profile ?? 0) > 0 && <> · 👤 {r.from_profile}</>}
                               </div>
                             )}
                           </td>
@@ -788,7 +791,7 @@ function FunnelsCampaigns() {
                 </tbody>
               </table>
               <p className="mt-2 text-[11px] leading-5 text-stone-400">
-                💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר · 🎯 מהתאמות · 📁 ממאגר המטפלים.{" "}
+                💬 וואטסאפ · 📞 טלפון · ✉️ מייל · 📝 טופס-אתר · 🎯 מהתאמות · 📁 ממאגר המטפלים · 👤 מדף הפרופיל.{" "}
                 <span className="font-semibold text-stone-500">פנו (אנשים)</span> = בני אדם ייחודיים שיצרו קשר — מבקר
                 שלחץ וואטסאפ+טלפון כמה פעמים נספר פעם אחת (מספר הלחיצות מוצג מתחת).{" "}
                 <span className="font-semibold text-stone-500">קליקים (גוגל)</span> = לחיצות בתשלום בפועל — המספר האמיתי.{" "}
