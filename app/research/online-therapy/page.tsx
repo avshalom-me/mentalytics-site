@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 export const metadata: Metadata = {
   title: "טיפול אונליין - כן או לא?",
@@ -20,6 +21,7 @@ const jsonLd = {
 export default function OnlineTherapyPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <ResearchBreadcrumbLd slug="online-therapy" title="טיפול אונליין - כן או לא?" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 

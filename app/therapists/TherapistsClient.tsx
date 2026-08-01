@@ -399,6 +399,31 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
           />
         ))}
       </div>
+
+      {/* Entry points to the three directory hubs. They existed only in the
+          sitemap - nothing on the site linked to them, so a crawler arriving at
+          /therapists had no path into the region/specialty/topic families. */}
+      <nav aria-label="עיון במאגר לפי קטגוריה" className="mt-12 pt-8" style={{ borderTop: "1px solid var(--line)" }}>
+        <h2 className="text-base font-black text-stone-900 mb-3">עיון לפי קטגוריה</h2>
+        <div className="flex flex-wrap gap-2">
+          {[
+            { href: "/therapists/region", label: "לפי אזור" },
+            { href: "/therapists/specialty", label: "לפי גישה טיפולית" },
+            { href: "/therapists/topic", label: "לפי סוג קושי וגיל" },
+            { href: "/therapists/region/אונליין", label: "טיפול אונליין" },
+            { href: "/research", label: "מאמרים ומידע" },
+          ].map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className="rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80"
+              style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)", textDecoration: "none" }}
+            >
+              {label}
+            </Link>
+          ))}
+        </div>
+      </nav>
     </main>
   );
 }

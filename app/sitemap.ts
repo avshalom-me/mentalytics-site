@@ -17,8 +17,10 @@ export const dynamic = "force-dynamic";
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
-    { url: `${BASE}/adults`, priority: 0.9, changeFrequency: "monthly" },
-    { url: `${BASE}/kids`, priority: 0.9, changeFrequency: "monthly" },
+    // /adults and /kids are deliberately absent: both are noindex (they are the
+    // quiz flow, not landing pages - see app/adults/layout.tsx). Listing a
+    // noindex URL here only earns "submitted URL marked noindex" in Search
+    // Console and wastes crawl budget.
     { url: `${BASE}/therapists`, priority: 0.8, changeFrequency: "weekly" },
     { url: `${BASE}/research`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/therapist-patient-match`, priority: 0.7, changeFrequency: "monthly" },
@@ -35,6 +37,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/research/faq`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/assessments`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/psychodiagnostic`, priority: 0.6, changeFrequency: "monthly" },
+    // Deep guide - targets "אבחון פסיכודידקטי מחיר" and its long tail, a niche
+    // where no large portal ranks (see docs/seo-week-plan-2026-08.md, day 4).
+    { url: `${BASE}/research/psychodidactic`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/autism-assessment`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/child-emotional-developmental`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/academic`, priority: 0.5, changeFrequency: "monthly" },
@@ -81,6 +86,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const regionPages: MetadataRoute.Sitemap = [
     { url: `${BASE}/therapists/para-medical`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
+    // Hubs for the specialty/topic families - previously only the individual
+    // pages existed, so there was no crawl path into them from the site.
+    { url: `${BASE}/therapists/specialty`, priority: 0.7, changeFrequency: "weekly" as const },
+    { url: `${BASE}/therapists/topic`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region/${ONLINE_SLUG}`, priority: 0.7, changeFrequency: "weekly" as const },
     ...ALL_REGIONS.filter((region) => (regionCounts[region] ?? 0) >= MIN_LISTED_FOR_INDEX).map((region) => ({
       url: `${BASE}/therapists/region/${regionToSlug(region)}`,

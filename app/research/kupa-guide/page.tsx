@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 // M6 (docs/seo-roadmap.md): the kupot layer - real demand at low competition
 // ("פסיכולוג ילדים מכבי" 390/mo, "טיפול זוגי מכבי/כללית" 140/mo each). Honest
@@ -67,6 +68,7 @@ function H2({ children }: { children: React.ReactNode }) {
 export default function KupaGuidePage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-8" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <ResearchBreadcrumbLd slug="kupa-guide" title="טיפול פסיכולוגי דרך קופת החולים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
 

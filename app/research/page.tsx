@@ -2,9 +2,21 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
+const BASE_URL = "https://www.mentalytics.co.il";
+
+const HUB_DESCRIPTION =
+  "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחון ADHD, טיפול אונליין ועוד - מותאם לישראל ולמערכת הבריאות הישראלית.";
+
 export const metadata: Metadata = {
   title: "מאמרים ומידע על טיפול נפשי",
-  description: "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחון ADHD, טיפול אונליין ועוד - מותאם לישראל ולמערכת הבריאות הישראלית.",
+  description: HUB_DESCRIPTION,
+  alternates: { canonical: `${BASE_URL}/research` },
+  openGraph: {
+    title: "מאמרים ומידע על טיפול נפשי",
+    description: HUB_DESCRIPTION,
+    url: `${BASE_URL}/research`,
+    type: "website",
+  },
 };
 
 // Refresh the hub periodically so newly-approved community articles appear.
@@ -48,6 +60,7 @@ const TOPICS = [
   { href: "/research/therapist-types",  icon: "👨‍⚕️", title: "סוגי המטפלים בישראל",              desc: 'פסיכולוג קליני, עו"ס קליני, מטפל בהבעה ויצירה - מה ההבדל ומי מתאים למה?', img: "https://images.unsplash.com/photo-1758273241078-8eec353836be?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/assessments",      icon: "📋", title: "סוגי אבחונים והערכות",              desc: "פסיכודידקטי, פסיכודיאגנוסטי, נוירופסיכולוגי - מתי כל אחד רלוונטי ומה מקבלים בסוף?", img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/psychodiagnostic", icon: "🔬", title: "אבחון פסיכודיאגנוסטי",              desc: "לראות את התמונה המלאה: מהו האבחון המעמיק ביותר שיש, מה הוא כולל ומתי הוא חיוני.", img: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=260&fit=crop&auto=format&q=75" },
+  { href: "/research/psychodidactic",   icon: "🎓", title: "אבחון פסיכודידקטי - המדריך המלא",   desc: "מי מוסמך לבצע, לכמה זמן זה תקף, כמה זה עולה - ולמה לתוספת זמן של 25% בכלל לא צריך אבחון.", img: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/autism-assessment", icon: "🗣️", title: "אבחון תקשורת ואוטיזם",             desc: "מהו אבחון תקשורת, כיצד הוא מתבצע, ומדוע אבחון כפול ומקצועי הוא קריטי.", img: "https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&h=260&fit=crop&auto=format&q=75" },
   { href: "/research/online-therapy",   icon: "💻", title: "טיפול אונליין - כן או לא?",          desc: "מחקרים, יתרונות, חסרונות, ומתי טיפול פנים מול פנים הכרחי.",              img: "https://images.unsplash.com/photo-1587614382346-4ec70e388b28?w=600&h=260&fit=crop&auto=format&q=75", imgPosition: "center top" },
   { href: "/research/choosing-therapist",icon: "🤝", title: "איך מוצאים פסיכולוג שמתאים?",       desc: "מה לשאול בשיחת היכרות, אילו פרמטרים חשובים, ומה המחקר אומר על ברית טיפולית.", img: "https://images.unsplash.com/photo-1776886099265-6366478b341b?w=600&h=260&fit=crop&auto=format&q=75" },
@@ -114,8 +127,43 @@ function CommunityCard({ slug, title, summary, topic, author, img, imgAlt }: Com
 
 export default async function ResearchHubPage() {
   const community = await getCommunityArticles();
+
+  // The hub had no structured data at all. CollectionPage + the article list
+  // tells Google this is an index of articles (not one more article), and the
+  // breadcrumb gives the /research/* children a parent to hang from.
+  const collectionLd = {
+    "@context": "https://schema.org",
+    "@type": "CollectionPage",
+    name: "מאמרים ומידע שימושי",
+    description: HUB_DESCRIPTION,
+    url: `${BASE_URL}/research`,
+    inLanguage: "he",
+    isPartOf: { "@type": "WebSite", name: "טיפול חכם", url: BASE_URL },
+    hasPart: [
+      ...TOPICS.map((t) => ({ "@type": "Article" as const, headline: t.title, url: `${BASE_URL}${t.href}` })),
+      ...QUESTIONS.map((t) => ({ "@type": "Article" as const, headline: t.title, url: `${BASE_URL}${t.href}` })),
+      ...community.map((c) => ({
+        "@type": "Article" as const,
+        headline: c.title,
+        url: `${BASE_URL}/research/community/${encodeURIComponent(c.slug)}`,
+        author: { "@type": "Person" as const, name: c.author },
+      })),
+    ],
+  };
+
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "בית", item: BASE_URL },
+      { "@type": "ListItem", position: 2, name: "מאמרים ומידע שימושי", item: `${BASE_URL}/research` },
+    ],
+  };
+
   return (
     <main className="mx-auto max-w-4xl px-5 py-14 pb-20" dir="rtl">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
 
       {/* Header */}
       <div className="mb-12 text-center">

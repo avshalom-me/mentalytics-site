@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 const ASSESSMENTS = [
   {
@@ -23,6 +24,11 @@ const ASSESSMENTS = [
         </p>
         <p>
           אבחון פסיכודידקטי גם משמש כמסמך קביל עבור ועדות זכאות ואפיון, ועדות התאמות לבגרויות (רק אבחון שנערך לאחר כיתה ו') ועבור ועדות שילוב.
+        </p>
+        <p>
+          <Link href="/research/psychodidactic" style={{ color: "var(--teal)", fontWeight: 600 }}>
+            למדריך המלא: מי מוסמך לבצע, לכמה זמן האבחון תקף, ולמה לתוספת זמן של 25% לא צריך אבחון ←
+          </Link>
         </p>
       </div>
     ),
@@ -131,6 +137,7 @@ export default function AssessmentsPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <ResearchBreadcrumbLd slug="assessments" title="סוגי אבחונים והערכות" />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>

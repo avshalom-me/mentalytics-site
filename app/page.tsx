@@ -109,10 +109,22 @@ export default function HomePage() {
     description: "מערכת הכוונה טיפולית חכמה - התאמת מטפלים ופסיכולוגים על בסיס שאלונים מבוססי מחקר",
     areaServed: { "@type": "Country", name: "IL" },
     serviceType: "Therapist Matching",
-    // sameAs: external profiles that confirm this is the same entity (the main
-    // brand-disambiguation signal). Fill with the real Facebook/Instagram/
-    // LinkedIn/Google-Business URLs when available.
+    // sameAs: external *profiles* of this same entity (Facebook/Instagram/
+    // LinkedIn/Google-Business). Still empty - we have none yet. A press
+    // article is not a profile, so it belongs in subjectOf, not here.
     sameAs: [] as string[],
+    // subjectOf: independent coverage *about* the platform. Corroborates that
+    // the entity is real and distinct from the Swedish "Mentalytics AB".
+    subjectOf: [
+      {
+        "@type": "NewsArticle",
+        headline:
+          '"טיפול חכם" הפלטפורמה הישראלית החדשנית שמתאימה טיפול פסיכולוגי למטופלים',
+        url: "https://tlvtimes.co.il/%D7%9E%D7%93%D7%99%D7%A0%D7%AA-%D7%AA%D7%9C-%D7%90%D7%91%D7%99%D7%91/%D7%98%D7%99%D7%A4%D7%95%D7%9C-%D7%97%D7%9B%D7%9D-%D7%94%D7%A4%D7%9C%D7%98%D7%A4%D7%95%D7%A8%D7%9E%D7%94-%D7%94%D7%99%D7%A9%D7%A8%D7%90%D7%9C%D7%99%D7%AA-%D7%94%D7%97%D7%93%D7%A9%D7%A0%D7%99-2/",
+        datePublished: "2026-07-28",
+        publisher: { "@type": "Organization", name: "TLV Times" },
+      },
+    ],
   };
 
   // FAQ rich-result + AI-answer eligibility for the homepage FAQ block.

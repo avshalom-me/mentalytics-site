@@ -214,7 +214,10 @@ export default async function TherapistProfilePage({
     "description": t.bio ?? undefined,
     "jobTitle": type || undefined,
     "image": t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : undefined,
-    "url": `${BASE_URL}/therapists/${id}`,
+    // Must match alternates.canonical (the name-slug path). The bare-UUID form
+    // used to be emitted here, which 308-redirects - so the structured data
+    // pointed at a URL that is not the canonical one.
+    "url": `${BASE_URL}${therapistPath(id, t.full_name)}`,
     "worksFor": { "@type": "Organization", "name": "טיפול חכם", "url": BASE_URL },
   };
 

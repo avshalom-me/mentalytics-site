@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ArticleBody } from "@/app/components/ArticleBody";
 import { therapistTypeLabel } from "@/app/lib/therapist-options";
+import { therapistPath } from "@/app/lib/therapist-url";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -134,9 +135,27 @@ export default async function CommunityArticlePage({ params }: { params: Promise
     ...(a.image_url ? { image: a.image_url } : {}),
   };
 
+  // Breadcrumb trail for the search result. The static /research/* articles
+  // already carry one; the DB-driven ones did not, so community articles
+  // showed a bare URL instead of "בית › מאמרים › ...".
+  const breadcrumbLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "בית", item: BASE_URL },
+      { "@type": "ListItem", position: 2, name: "מאמרים ומידע שימושי", item: `${BASE_URL}/research` },
+      { "@type": "ListItem", position: 3, name: a.title, item: `${BASE_URL}/research/community/${a.slug}` },
+    ],
+  };
+
+  // The canonical profile path (name-slug + UUID). Linking the bare UUID meant
+  // every byline click ate a 308 redirect.
+  const authorHref = therapistPath(a.therapist_id, authorName(a));
+
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">
@@ -171,7 +190,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
         {house ? (
           <span className="font-semibold text-[#2e7d8c]">{author}</span>
         ) : (
-          <Link href={`/therapists/${a.therapist_id}`} className="font-semibold text-[#2e7d8c] hover:underline">
+          <Link href={authorHref} className="font-semibold text-[#2e7d8c] hover:underline">
             {author}
           </Link>
         )}
@@ -203,7 +222,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
           </>
         ) : (
           <>
-            <Link href={`/therapists/${a.therapist_id}`} className="text-lg font-black text-[#2e7d8c] hover:underline">
+            <Link href={authorHref} className="text-lg font-black text-[#2e7d8c] hover:underline">
               {author}
             </Link>
             {role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
@@ -211,7 +230,7 @@ export default async function CommunityArticlePage({ params }: { params: Promise
               מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, {authorNoun} באתר טיפול חכם.
             </p>
             <Link
-              href={`/therapists/${a.therapist_id}`}
+              href={authorHref}
               className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline"
             >
               לצפייה בפרופיל המלא ←

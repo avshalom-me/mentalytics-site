@@ -3,12 +3,14 @@
 import { useState } from "react";
 import Link from "next/link";
 import { FAQS } from "./faqs";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 export default function FAQPage() {
   const [open, setOpen] = useState<number | null>(null);
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <ResearchBreadcrumbLd slug="faq" title="שאלות נפוצות" />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>

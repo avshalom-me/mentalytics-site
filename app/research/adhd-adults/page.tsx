@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 export const metadata: Metadata = {
   title: "אבחון ADHD למבוגרים",
@@ -20,6 +21,7 @@ const jsonLd = {
 export default function AdhdAdultsPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון ADHD למבוגרים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 

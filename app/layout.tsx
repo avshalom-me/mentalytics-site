@@ -71,6 +71,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם - Mentalytics</span>
               <ul className="flex flex-wrap gap-5 list-none">
                 {[
+                  { href: "/therapists", label: "מאגר המטפלים" },
+                  { href: "/research", label: "מאמרים ומידע" },
                   { href: "/centers", label: "למרכזים טיפוליים" },
                   { href: "/privacy", label: "מדיניות פרטיות" },
                   { href: "/terms", label: "תנאי שימוש" },

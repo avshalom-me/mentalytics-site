@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 
 export const metadata: Metadata = {
   title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר | טיפול חכם",
@@ -99,6 +100,7 @@ export default function WhichTherapyPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      <ResearchBreadcrumbLd slug="which-therapy" title="איזה טיפול פסיכולוגי מתאים לי?" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
       <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
