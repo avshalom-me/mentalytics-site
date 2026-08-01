@@ -48,12 +48,21 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 
         <div id="main-content">{children}</div>
         <Analytics />
+        {/*
+          One gtag.js load feeds two destinations: GA4 (G-V3QQRXSQ0T) for
+          analytics, and Google Ads (AW-18223934468) for conversion measurement.
+          The Ads line was missing, so the account's Google tag sat at "URGENT /
+          No data has been received" and its only conversion action ("Page view")
+          read Misconfigured with 0 results - which is also why the conversion
+          setup wizard refused to advance past "Google Tag: not installed yet".
+        */}
         <Script src="https://www.googletagmanager.com/gtag/js?id=G-V3QQRXSQ0T" strategy="afterInteractive" />
         <Script id="google-analytics" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
           gtag('js', new Date());
           gtag('config', 'G-V3QQRXSQ0T');
+          gtag('config', 'AW-18223934468');
         `}</Script>
 
         <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
