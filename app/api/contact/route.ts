@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Every submission sends a real email, and Resend's free tier gives the whole
+// site 100 a day. 5/hour is far above what a genuine visitor needs (the busiest
+// real day in the last three weeks saw 15 transactional sends across ALL
+// sources) and far below what it takes to drain the allowance.
+const CONTACT_LIMIT = 5;
+const CONTACT_WINDOW_MS = 60 * 60_000;
 
 function escapeHtml(str: string): string {
   return str
@@ -15,10 +23,20 @@ function escapeHtml(str: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const gate = rateLimit("contact", clientIp(req), CONTACT_LIMIT, CONTACT_WINDOW_MS);
+    if (!gate.ok) {
+      return tooManyRequests(gate.retryAfterSeconds, "נשלחו יותר מדי פניות. נסו שוב בעוד שעה.");
+    }
+
     const { name, email, subject, message } = await req.json();
 
     if (!name || !email || !message) {
       return NextResponse.json({ ok: false, error: "שדות חסרים" }, { status: 400 });
+    }
+    // A malformed address makes Resend reject the send anyway; catching it here
+    // also keeps it out of the replyTo header.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email).trim())) {
+      return NextResponse.json({ ok: false, error: "כתובת מייל לא תקינה" }, { status: 400 });
     }
 
     const safeName    = escapeHtml(String(name));
@@ -37,7 +55,7 @@ export async function POST(req: NextRequest) {
           <table style="width: 100%; border-collapse: collapse;">
             <tr><td style="padding: 8px; font-weight: bold; width: 120px;">שם:</td><td style="padding: 8px;">${safeName}</td></tr>
             <tr style="background: #f9f9f9;"><td style="padding: 8px; font-weight: bold;">מייל:</td><td style="padding: 8px;"><a href="mailto:${safeEmail}">${safeEmail}</a></td></tr>
-            <tr><td style="padding: 8px; font-weight: bold;">נושא:</td><td style="padding: 8px;">${safeSubject || "—"}</td></tr>
+            <tr><td style="padding: 8px; font-weight: bold;">נושא:</td><td style="padding: 8px;">${safeSubject || "ללא נושא"}</td></tr>
           </table>
           <div style="margin-top: 16px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
             <strong>הודעה:</strong>

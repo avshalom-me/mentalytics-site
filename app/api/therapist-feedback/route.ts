@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendCancellationFeedbackEmail } from "@/app/lib/therapist-emails";
+import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,13 @@ const ALLOWED_REASONS = [
 ];
 
 export async function POST(req: NextRequest) {
+  // Also sends mail on every call, so it shares the Resend allowance the
+  // contact form is gated for. Cancellation feedback is submitted once.
+  const gate = rateLimit("therapist-feedback", clientIp(req), 3, 60 * 60_000);
+  if (!gate.ok) {
+    return tooManyRequests(gate.retryAfterSeconds, "נשלחו יותר מדי בקשות. נסו שוב מאוחר יותר.");
+  }
+
   let body: { name?: unknown; email?: unknown; reasons?: unknown; message?: unknown };
   try {
     body = await req.json();
