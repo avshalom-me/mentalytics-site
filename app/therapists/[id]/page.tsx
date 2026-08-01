@@ -10,6 +10,7 @@ import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/ther
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
+import { waLinkFor, telHref } from "@/app/lib/phone";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -200,9 +201,11 @@ export default async function TherapistProfilePage({
   // Stable public photo URL (indexable) - replaces the 24h signed URL for both
   // display and structured data. Falls back to the gender avatar when no photo.
   const photoSrc = t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : avatarSrc;
-  const waLink = t.phone
-    ? `https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`
-    : null;
+  // Validated: a `phone` holding something that is not a number (one paying
+  // therapist has an email address there) yields null, so the button is hidden
+  // rather than linking to wa.me/972ZJOURY@GMAIL.COM.
+  const waLink = waLinkFor(t.phone);
+  const telLink = telHref(t.phone);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -302,7 +305,7 @@ export default async function TherapistProfilePage({
                 therapistId={id}
                 therapistName={t.full_name ?? ""}
                 waLink={waLink}
-                phone={t.phone}
+                telLink={telLink}
                 source={source}
                 mobileSticky
               />

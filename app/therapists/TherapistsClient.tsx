@@ -11,6 +11,7 @@ import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { bioSnippet } from "@/app/lib/bio-snippet";
+import { waLinkFor, telHref } from "@/app/lib/phone";
 
 // Card-level contact buttons - the one surface where a contact click happens
 // WITHOUT a profile view. Attribution must ride along here exactly like on the
@@ -169,8 +170,8 @@ function TherapistCard({
             ⏸ {t.gender === "נקבה" ? "לא זמינה כרגע למטופלים חדשים" : "לא זמין כרגע למטופלים חדשים"}
           </span>
         )}
-        {!unavailable && t.phone && (
-          <a href={`https://wa.me/972${t.phone.replace(/^0/, "").replace(/[-\s]/g, "")}?text=${encodeURIComponent('שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול')}`}
+        {!unavailable && waLinkFor(t.phone) && (
+          <a href={waLinkFor(t.phone)!}
             target="_blank" rel="noopener noreferrer"
             onClick={() => trackClick(t.id, "whatsapp")}
             className="inline-flex items-center gap-1.5 rounded-full bg-green-500 px-4 py-2 text-[13px] font-bold text-white hover:bg-green-600">
@@ -178,8 +179,8 @@ function TherapistCard({
             וואטסאפ
           </a>
         )}
-        {!unavailable && t.phone && (
-          <a href={`tel:${t.phone}`}
+        {!unavailable && telHref(t.phone) && (
+          <a href={telHref(t.phone)!}
             onClick={() => trackClick(t.id, "phone")}
             className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-[13px] font-bold text-stone-700 hover:bg-stone-200">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 9.91a16 16 0 0 0 6.06 6.06l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>

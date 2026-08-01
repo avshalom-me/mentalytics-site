@@ -57,14 +57,14 @@ export default function ContactButtons({
   therapistId,
   therapistName,
   waLink,
-  phone,
+  telLink,
   source = "directory",
   mobileSticky = false,
 }: {
   therapistId: string;
   therapistName: string;
   waLink: string | null;
-  phone: string | null;
+  telLink: string | null;
   source?: "match" | "directory";
   mobileSticky?: boolean;
 }) {
@@ -75,7 +75,7 @@ export default function ContactButtons({
   // report here splits on source === "match").
   const clickSource: "match" | "profile" = source === "match" ? "match" : "profile";
   const messageSource = clickSource;
-  const hasDirect = Boolean(waLink || phone);
+  const hasDirect = Boolean(waLink || telLink);
 
   return (
     <>
@@ -88,8 +88,8 @@ export default function ContactButtons({
             {wasvg} שליחת וואטסאפ
           </a>
         )}
-        {phone && (
-          <a href={`tel:${phone}`}
+        {telLink && (
+          <a href={telLink}
             onClick={() => track(therapistId, "phone", clickSource)}
             className={`${pill} bg-[#3D8C8A] text-white hover:bg-[#2A6462]`}>
             {phonesvg} חיוג
@@ -115,8 +115,8 @@ export default function ContactButtons({
                 {wasvg} וואטסאפ
               </a>
             ) : null}
-            {phone ? (
-              <a href={`tel:${phone}`}
+            {telLink ? (
+              <a href={telLink}
                 onClick={() => track(therapistId, "phone", clickSource)}
                 className={`${waLink ? "" : "flex-1 "}inline-flex items-center justify-center gap-2 rounded-full bg-[#3D8C8A] text-white px-5 py-3 text-[15px] font-extrabold`}>
                 {phonesvg} חיוג

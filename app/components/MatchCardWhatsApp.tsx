@@ -3,6 +3,7 @@
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
+import { waLinkFor } from "@/app/lib/phone";
 
 // WhatsApp-only contact straight from the match card.
 //
@@ -23,14 +24,7 @@ const waIcon = (
   </svg>
 );
 
-const MESSAGE = 'שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול';
-
-export function waLinkFor(phone: string | null | undefined): string | null {
-  if (!phone) return null;
-  const digits = String(phone).replace(/^0/, "").replace(/[-\s]/g, "");
-  if (digits.length < 8) return null;
-  return `https://wa.me/972${digits}?text=${encodeURIComponent(MESSAGE)}`;
-}
+export { waLinkFor };
 
 export default function MatchCardWhatsApp({
   therapistId,
