@@ -2711,20 +2711,10 @@ function KidsMatchSection({ A, score, selection }: {
   }
 
   return (
-    <div className="mt-8">
-      {/* "Back to recommendations" - visible whenever the match section is shown
-          (form or results), so the user never feels locked into one referral.
-          Smooth-scrolls back to the start of the recommendation cards above. */}
-      <button
-        type="button"
-        onClick={() => {
-          if (typeof window === "undefined") return;
-          document.getElementById("kids-recommendations-top")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        }}
-        className="mb-3 inline-flex items-center gap-1.5 rounded-full border border-stone-300 bg-white px-3 py-1.5 text-xs font-semibold text-stone-700 hover:border-[#1a3a5c] hover:text-[#1a3a5c] shadow-sm"
-      >
-        ↑ חזרה לכל ההמלצות
-      </button>
+    <div>
+      {/* The way back and the switch between recommendations both live in
+          KidsRecommendationsStrip above this component now, so the old
+          scroll-up button here would be a second, weaker copy. */}
       {!open ? (
         <button
           onClick={() => setOpen(true)}
@@ -3218,8 +3208,121 @@ const DOMAIN_LABELS: Record<string, string> = {
   social: "🤝 תחום חברתי",
 };
 
+/**
+ * The strip that sits above the kids match screen, mirroring the adults'
+ * RecommendationsStrip: a way back to the full report plus one-tap switching
+ * between every recommendation, so a parent is never locked into the referral
+ * they happened to tap first.
+ *
+ * Kids differ from adults in one way that matters here: recommendations are
+ * spread across up to five domains (emotional / academic / developmental /
+ * behavioural / social), so the chips are grouped under their domain label
+ * instead of listed flat. A parent who marked several areas sees which domain
+ * each option belongs to rather than an undifferentiated row of treatments.
+ */
+function KidsRecommendationsStrip({
+  options,
+  activeKey,
+  onSelect,
+  onBack,
+}: {
+  options: { key: string; label: string; domainLabel: string; urgent: boolean; combined: boolean }[];
+  activeKey: string | null;
+  onSelect: (key: string) => void;
+  onBack: () => void;
+}) {
+  const byDomainLabel: { domainLabel: string; items: typeof options }[] = [];
+  for (const o of options) {
+    const bucket = byDomainLabel.find(b => b.domainLabel === o.domainLabel);
+    if (bucket) bucket.items.push(o);
+    else byDomainLabel.push({ domainLabel: o.domainLabel, items: [o] });
+  }
+
+  return (
+    <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 shadow-sm">
+      <button
+        type="button"
+        onClick={onBack}
+        className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--teal-dark)] hover:underline"
+      >
+        ◂ חזרה לדוח הממצאים
+      </button>
+      {options.length > 1 && (
+        <>
+          <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-stone-400">מעבר בין ההמלצות שלך</p>
+          <div className="space-y-2">
+            {byDomainLabel.map(b => (
+              <div key={b.domainLabel}>
+                <div className="mb-1 text-[10px] font-semibold text-stone-400">{b.domainLabel}</div>
+                <div className="flex flex-wrap gap-2">
+                  {b.items.map(o => {
+                    const isActive = activeKey === o.key;
+                    return (
+                      <button
+                        key={o.key}
+                        type="button"
+                        onClick={() => onSelect(o.key)}
+                        className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          isActive
+                            ? "bg-[var(--teal-dark)] text-white shadow-sm"
+                            : o.combined
+                              ? "border border-[var(--teal)] bg-[var(--teal-pale)] text-[var(--teal-dark)] hover:bg-white"
+                              : o.urgent
+                                ? "border border-red-300 bg-red-50 text-red-800 hover:bg-red-100"
+                                : "border border-stone-300 bg-white text-stone-700 hover:border-[var(--teal-dark)] hover:text-[var(--teal-dark)]"
+                        }`}
+                      >
+                        {o.urgent && "⚠️ "}{o.combined && "✦ "}{o.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // "report" = the findings report; "match" = the therapist search, on its own
+  // screen. Mirrors the adults flow, where picking a recommendation swaps the
+  // whole screen (results → match-form) instead of revealing a panel further
+  // down a long document. Measured: 70% of adults completers reach a therapist
+  // card against 44% on kids.
+  const [view, setView] = useState<"report" | "match">("report");
+
+  // Coming back from a therapist profile should return to the match screen the
+  // parent left, not to the top of the report. Same gate the page-level restore
+  // uses. KidsMatchSection then restores its own form and results off the
+  // matching selectionKey, so the screen comes back whole.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const cameFromProfile = /\/therapists\/[^/]+/.test(document.referrer || "");
+      const navType = (performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming | undefined)?.type;
+      if (!cameFromProfile && navType !== "back_forward") return;
+      const raw = sessionStorage.getItem("kids_view_v1");
+      if (!raw) return;
+      const saved = JSON.parse(raw);
+      if (!saved || typeof saved.ts !== "number") return;
+      if (Date.now() - saved.ts > 60 * 60_000) return;
+      if (saved.view === "match" && typeof saved.selectedKey === "string") {
+        setSelectedKey(saved.selectedKey);
+        setView("match");
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      sessionStorage.setItem("kids_view_v1", JSON.stringify({ ts: Date.now(), view, selectedKey }));
+    } catch {}
+  }, [view, selectedKey]);
   // Per-recommendation AI explanation state. Keyed on `${domainKey}::${treatmentKey}`
   // so two cards for the same treatment in different domains don't collide.
   const [recExplain, setRecExplain] = useState<Record<string, { title: string; explanation: string; evidence_note: string } | null>>({});
@@ -3332,6 +3435,37 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
   );
 
+  /**
+   * Every selectable referral, flattened for the match-screen strip. Keys are
+   * built with the exact same grammar activeSelection parses, so a chip and the
+   * card it came from resolve to one selection.
+   *
+   * Externals and _no_action are excluded: they have no search button on the
+   * card either (there is no practitioner to look up).
+   */
+  const stripOptions = useMemo(() => {
+    const out: { key: string; label: string; domainLabel: string; urgent: boolean; combined: boolean }[] = [];
+    for (const b of byDomain) {
+      const seen = new Set<string>();
+      for (const g of [...b.treatments, ...b.assessments, ...b.professionals]) {
+        const key = `${b.key}::${g.kind}::${g.treatmentKey}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        out.push({ key, label: g.treatmentLabel, domainLabel: b.label, urgent: g.urgent, combined: false });
+      }
+      // Combined search exists for the emotional domain only - see showCombinedT.
+      const tKeys = uniq(b.treatments.map(g => g.treatmentKey));
+      const aKeys = uniq(b.assessments.map(g => g.treatmentKey));
+      if (b.key === "emotional" && tKeys.length >= 2) {
+        out.push({ key: `${b.key}::__combined::treatment`, label: "מטפל/ת שמשלב כמה גישות", domainLabel: b.label, urgent: false, combined: true });
+      }
+      if (b.key === "emotional" && aKeys.length >= 2) {
+        out.push({ key: `${b.key}::__combined::assessment`, label: "אבחון משולב", domainLabel: b.label, urgent: false, combined: true });
+      }
+    }
+    return out;
+  }, [byDomain]);
+
   // Active selection for the matching panel.
   //  selectedKey format:
   //    "{domainKey}::{kind}::{treatmentKey}"      for individual group
@@ -3378,26 +3512,36 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     return null;
   }, [selectedKey, byDomain]);
 
-  function scrollToMatch() {
+  /** Opens the match screen. Jumps to the top because it is a new screen, not
+   *  a panel appended to the report the parent was already reading. */
+  function openMatch(key: string) {
+    setSelectedKey(key);
+    setView("match");
+    if (typeof window !== "undefined") {
+      setTimeout(() => window.scrollTo({ top: 0, behavior: "auto" }), 0);
+    }
+  }
+
+  function backToReport() {
+    setView("report");
     if (typeof window === "undefined") return;
     setTimeout(() => {
-      document.getElementById("kids-match-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 50);
+      const el = document.getElementById("kids-recommendations-top");
+      if (el) el.scrollIntoView({ behavior: "auto", block: "start" });
+      else window.scrollTo({ top: 0, behavior: "auto" });
+    }, 0);
   }
 
   function selectGroup(domainKey: string, g: KidsRecommendationGroup) {
-    setSelectedKey(`${domainKey}::${g.kind}::${g.treatmentKey}`);
-    scrollToMatch();
+    openMatch(`${domainKey}::${g.kind}::${g.treatmentKey}`);
   }
 
   function selectCombined(domainKey: string, kind: "treatment" | "assessment") {
-    setSelectedKey(`${domainKey}::__combined::${kind}`);
-    scrollToMatch();
+    openMatch(`${domainKey}::__combined::${kind}`);
   }
 
   function selectDynamicFallback() {
-    setSelectedKey("_dynamic_fallback_");
-    scrollToMatch();
+    openMatch("_dynamic_fallback_");
   }
 
   const bmiNum = A._bmi ? Number(A._bmi) : null;
@@ -3421,6 +3565,26 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
   );
 
   const allExternalNotes = uniq(byDomain.flatMap(b => b.externalNotes));
+
+  // Match screen - a full screen swap, not a panel below the report. The report
+  // is unmounted, so the parent has one thing in front of them and a labelled
+  // way back, exactly like the adults match-form.
+  if (view === "match" && activeSelection) {
+    return (
+      <div>
+        <div className="mb-4 flex justify-center">
+          <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
+        </div>
+        <KidsRecommendationsStrip
+          options={stripOptions}
+          activeKey={selectedKey}
+          onSelect={openMatch}
+          onBack={backToReport}
+        />
+        <KidsMatchSection A={A} score={score} selection={activeSelection} />
+      </div>
+    );
+  }
 
   return (
     <div id="kids-results-card">
@@ -3738,12 +3902,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         )}
       </div>
 
-      {/* Matching - visible only after a selection. Excluded from the PDF capture. */}
-      <div id="kids-match-section" data-html2canvas-ignore="true">
-        {activeSelection && (
-          <KidsMatchSection A={A} score={score} selection={activeSelection} />
-        )}
-      </div>
+      {/* Matching now lives on its own screen (view === "match"), so nothing is
+          appended here. Keeping it out of the report also keeps the PDF capture
+          to the findings, which is what parents actually save. */}
 
       {/* Disclaimer */}
       <div className="mt-6 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-xs leading-6 text-stone-500">
