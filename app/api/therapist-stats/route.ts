@@ -131,21 +131,33 @@ export async function GET(req: NextRequest) {
         if (matchOnly) q = q.eq("source", "match");
         return q;
       };
-      const [entries, impressions, contactsTotal, contactsMatch] = await Promise.all([
+      // הודעות שנשלחו דרך טופס האתר — הערוץ היחיד שאנחנו יודעים בוודאות
+      // שהגיע ליעד (נשלח מייל). שאר הסוגים הם לחיצות: המטופל לחץ על
+      // וואטסאפ/חיוג/מייל, ואין לנו דרך לדעת אם השלים. הדשבורד מציג את
+      // ההפרדה כדי שמטפל לא יצפה להודעה שמעולם לא נשלחה.
+      const countMessages = () =>
+        supabaseAdmin
+          .from("therapist_contact_clicks")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .eq("click_type", "site_message");
+      const [entries, impressions, contactsTotal, contactsMatch, contactsMessages] = await Promise.all([
         countViews(["match", "directory"]),
         countViews(["match_card"]),
         countClicks(false),
         countClicks(true),
+        countMessages(),
       ]);
       const total = contactsTotal.count ?? 0;
       const match = contactsMatch.count ?? 0;
+      const messages = contactsMessages.count ?? 0;
       result.profile_views = { all_time: entries.count ?? 0 };
       result.match_impressions = { all_time: impressions.count ?? 0 };
-      result.all_time_contacts = { total, match, directory: total - match };
+      result.all_time_contacts = { total, match, directory: total - match, messages, clicks: total - messages };
     } catch {
       result.profile_views = { all_time: 0 };
       result.match_impressions = { all_time: 0 };
-      result.all_time_contacts = { total: 0, match: 0, directory: 0 };
+      result.all_time_contacts = { total: 0, match: 0, directory: 0, messages: 0, clicks: 0 };
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)

@@ -163,8 +163,8 @@ export default function CenterDashboardPage() {
           <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
         )}
         <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="30 יום" color="#1A7A96" />
-        <StatCard icon={MessageCircle} label="פניות מטופלים" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
-        <StatCard icon={Activity} label="פניות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
+        <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
+        <StatCard icon={Activity} label="לחיצות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
       </div>
 
       {/* מסלול 2 - הפרופיל של המרכז: סטטוס + כניסה לאזור העריכה */}
@@ -236,7 +236,7 @@ export default function CenterDashboardPage() {
                   <th className="py-2 font-semibold">מטפל/ת</th>
                   <th className="py-2 font-semibold text-center">סטטוס</th>
                   <th className="py-2 font-semibold text-center">צפיות (חודש)</th>
-                  <th className="py-2 font-semibold text-center">פניות (חודש)</th>
+                  <th className="py-2 font-semibold text-center">לחיצות ליצירת קשר (חודש)</th>
                   <th className="py-2 font-semibold text-left">פעולות</th>
                 </tr>
               </thead>
@@ -336,12 +336,20 @@ export default function CenterDashboardPage() {
               <Channel label="טלפון" value={stats.clicks_month.phone} total={stats.clicks_month.total} color="#57534e" />
               <Channel label="מייל" value={stats.clicks_month.email} total={stats.clicks_month.total} color="#3b82f6" />
             </div>
+            <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+              <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>
+              <p className="text-[13px] leading-6 text-stone-700">
+                המספרים סופרים כל פעם שמטופל <strong>לחץ</strong> על הוואטסאפ, הטלפון או המייל שבפרופיל, כלומר ביקש ליצור קשר.
+                חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליכם בפועל.
+                הודעות שנשלחו דרך טופס האתר הן היחידות שמגיעות תמיד, ישירות למייל.
+              </p>
+            </div>
           </div>
 
           {/* מגמה */}
           {stats.trend.some((m) => m.clicks > 0) && (
             <div className="mt-6 border-t border-stone-100 pt-5">
-              <h3 className="mb-3 text-sm font-black text-stone-700">מגמת פניות - 6 חודשים</h3>
+              <h3 className="mb-3 text-sm font-black text-stone-700">מגמת לחיצות ליצירת קשר - 6 חודשים</h3>
               <TrendBars trend={stats.trend} />
             </div>
           )}

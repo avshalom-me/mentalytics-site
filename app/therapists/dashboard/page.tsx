@@ -45,9 +45,34 @@ type StatsResponse = {
   month: StatsBucket;
   profile_views?: { all_time: number };
   match_impressions?: { all_time: number };
-  all_time_contacts?: { total: number; match: number; directory: number };
+  all_time_contacts?: { total: number; match: number; directory: number; messages: number; clicks: number };
   enriched?: EnrichedStatsData;
 };
+
+// הסבר מודגש למונח "לחיצות ליצירת קשר". קודם ישב ב-11px אפור בתחתית הכרטיס
+// ואיש לא קרא אותו: מטפלים ראו "פניות" וציפו להודעה או לשיחה שלא תמיד הגיעו.
+// המונח והקופסה הזו מבהירים שהיחידה הנמדדת היא לחיצה, לא שיחה שהתקיימה.
+function ContactExplainer() {
+  return (
+    <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+      <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>
+        ⓘ מה נספר כאן, ולמה לא שמעתי מכולם?
+      </h4>
+      <p className="text-[13px] leading-6 text-stone-700">
+        המספר סופר כל פעם שמטופל <strong>לחץ</strong> על הוואטסאפ, הטלפון או המייל שלך בפרופיל, כלומר ביקש ליצור איתך קשר.
+        חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליכם בפועל.
+      </p>
+      <p className="mt-2 text-[13px] leading-6 text-stone-700">
+        <strong>📝 הודעות שנשלחו דרך טופס האתר</strong> הן היחידות שמגיעות אליכם תמיד, ישירות למייל.
+        הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר טיפול חכם&quot;, ושיחות טלפון מגיעות ללא זיהוי.
+      </p>
+      <p className="mt-2 text-[13px] leading-6 text-stone-700">
+        ולצד זה: לא מעט מטופלים רואים אתכם בהתאמה, מחפשים את שמכם בגוגל ופונים אליכם <strong>ישירות</strong>.
+        פניות כאלה הגיעו מאיתנו אך אינן נספרות כאן, כך שייתכן מאוד שאתם מקבלים <strong>יותר</strong> ממה שמוצג.
+      </p>
+    </div>
+  );
+}
 
 function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse | null; loadingStats: boolean; isPaying: boolean }) {
   // Free-tier toggle only; the paying view is cumulative with no period splits.
@@ -96,34 +121,43 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
               </div>
             )}
 
-            {/* Total contacts - cumulative, with source split */}
+            {/* יצירת קשר - מצטבר. התווית מציינת את הפעולה הנמדדת (לחיצה) ולא
+                שיחה שהתקיימה, והפיצול מפריד בין מה שהגיע בוודאות לבין כוונה. */}
+            <h3 className="mt-5 text-sm font-bold text-stone-800 mb-1">יצירת קשר</h3>
+            <p className="text-[11px] text-stone-500 mb-3">כמה מטופלים ביקשו ליצור איתך קשר מתוך הפרופיל</p>
             <div className="rounded-xl bg-[#f0ece4] px-4 py-3 flex items-center justify-between">
-              <span className="text-sm text-stone-600">סה"כ פניות דרך האתר</span>
+              <span className="text-sm text-stone-600">לחיצות ליצירת קשר</span>
               <span className="text-xl font-black text-[#0F5468]">{contacts.total.toLocaleString("he-IL")}</span>
             </div>
             {contacts.total > 0 && (
-              <div className="mt-2 flex items-center justify-center gap-4 text-xs text-stone-500">
-                <span>🎯 {contacts.match} ממערכת ההתאמה</span>
-                <span>🔍 {contacts.directory} ממאגר המטפלים</span>
-              </div>
+              <>
+                <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                  {/* ?? 0 — הגנה על חלון הפריסה: קליינט חדש מול תשובת שרת ישנה
+                      בלי השדות האלה היה מקריס את כל הדשבורד. */}
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
+                    <div className="text-lg font-black text-amber-800">{(contacts.messages ?? 0).toLocaleString("he-IL")}</div>
+                    <div className="text-[11px] font-bold text-amber-700">📝 הודעות שנשלחו אליך דרך האתר</div>
+                    <div className="text-[10px] text-amber-600 mt-0.5">הגיעו למייל שלך בוודאות</div>
+                  </div>
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
+                    <div className="text-lg font-black text-stone-700">{(contacts.clicks ?? contacts.total).toLocaleString("he-IL")}</div>
+                    <div className="text-[11px] font-bold text-stone-600">💬 📞 ✉️ לחיצות על וואטסאפ / חיוג / מייל</div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">המטופל ביקש ליצור קשר, לא בהכרח השלים</div>
+                  </div>
+                </div>
+                <div className="mt-2 flex items-center justify-center gap-4 text-xs text-stone-500">
+                  <span>🎯 {contacts.match} ממערכת ההתאמה</span>
+                  <span>🔍 {contacts.directory} ממאגר המטפלים</span>
+                </div>
+              </>
             )}
             {contacts.total === 0 && viewsValue > 0 && (
               <div className="mt-3 rounded-xl bg-stone-50 border border-stone-200 px-4 py-3 text-center text-xs text-stone-600">
-                עדיין אין פניות - אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
+                עדיין אין לחיצות ליצירת קשר - אבל {viewsValue} {viewsValue === 1 ? "אדם כבר נכנס" : "אנשים כבר נכנסו"} לפרופיל שלך 🌱
               </div>
             )}
 
-            <p className="mt-3 text-[11px] leading-5 text-stone-500">
-              💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
-              טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי - מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
-              שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
-            </p>
-            <p className="mt-2 text-[11px] leading-5 text-stone-500">
-              ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
-              אליכם <strong>ישירות</strong> - דרך האתר הפרטי שלכם, הטלפון או המייל - בלי לחזור ללחוץ כאן.
-              פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
-              מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
-            </p>
+            <ContactExplainer />
           </>
         )}
       </div>
@@ -134,7 +168,7 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   return (
     <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-extrabold text-stone-900">פניות מהפרופיל שלך</h2>
+        <h2 className="text-lg font-extrabold text-stone-900">לחיצות ליצירת קשר</h2>
         <div className="flex rounded-xl border border-stone-200 overflow-hidden text-xs font-semibold">
           <button
             onClick={() => setPeriod("week")}
@@ -157,52 +191,46 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
         <div className="text-sm text-stone-400 py-4 text-center">לא ניתן לטעון נתונים</div>
       ) : (
         <>
-          <p className="text-xs text-stone-500 mb-4">{periodLabel}</p>
+          <p className="text-xs text-stone-500 mb-4">{periodLabel} · כמה מטופלים ביקשו ליצור איתך קשר מתוך הפרופיל</p>
           {data.total === 0 ? (
-            <div className="text-sm text-stone-400 py-2 text-center">לא היו פניות בתקופה זו</div>
+            <div className="text-sm text-stone-400 py-2 text-center">לא היו לחיצות ליצירת קשר בתקופה זו</div>
           ) : (
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
               {data.whatsapp > 0 && (
                 <div className="rounded-xl bg-green-50 border border-green-100 p-4 text-center">
                   <div className="text-2xl font-black text-green-700">{data.whatsapp}</div>
                   <div className="text-xs text-green-600 mt-1 font-semibold">💬 וואטסאפ</div>
+                  <div className="text-[10px] text-green-600/70 mt-0.5">לחיצות</div>
                 </div>
               )}
               {data.phone > 0 && (
                 <div className="rounded-xl bg-stone-50 border border-stone-200 p-4 text-center">
                   <div className="text-2xl font-black text-stone-700">{data.phone}</div>
-                  <div className="text-xs text-stone-500 mt-1 font-semibold">📞 שיחות</div>
+                  <div className="text-xs text-stone-500 mt-1 font-semibold">📞 חיוג</div>
+                  <div className="text-[10px] text-stone-400 mt-0.5">לחיצות</div>
                 </div>
               )}
               {data.email > 0 && (
                 <div className="rounded-xl bg-blue-50 border border-blue-100 p-4 text-center">
                   <div className="text-2xl font-black text-blue-700">{data.email}</div>
                   <div className="text-xs text-blue-500 mt-1 font-semibold">✉️ מייל</div>
+                  <div className="text-[10px] text-blue-400 mt-0.5">לחיצות</div>
                 </div>
               )}
               {data.site_message > 0 && (
-                <div className="rounded-xl bg-amber-50 border border-amber-100 p-4 text-center">
+                <div className="rounded-xl bg-amber-50 border border-amber-200 p-4 text-center">
                   <div className="text-2xl font-black text-amber-700">{data.site_message}</div>
                   <div className="text-xs text-amber-600 mt-1 font-semibold">📝 הודעה מהאתר</div>
+                  <div className="text-[10px] font-bold text-amber-600 mt-0.5">הגיעה למייל שלך</div>
                 </div>
               )}
             </div>
           )}
           <div className="mt-4 rounded-xl bg-[#f0ece4] px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-stone-600">סה"כ פניות</span>
+            <span className="text-sm text-stone-600">סה"כ לחיצות ליצירת קשר</span>
             <span className="text-xl font-black text-[#0F5468]">{data.total}</span>
           </div>
-          <p className="mt-3 text-[11px] leading-5 text-stone-500">
-            💡 איך תזהו פנייה שהגיעה מכאן? הודעות וואטסאפ מהאתר נפתחות בנוסח &quot;הגעתי אלייך דרך אתר
-            טיפול חכם&quot;. שיחות טלפון מגיעות ללא זיהוי - מתקשר חדש ששואל על טיפול הגיע כנראה מהפרופיל שלכם כאן.
-            שימו לב: &quot;פנייה&quot; נספרת ברגע הלחיצה על וואטסאפ/חיוג, וחלק מהפונים לא משלימים את ההודעה בסוף.
-          </p>
-          <p className="mt-2 text-[11px] leading-5 text-stone-500">
-            ועוד דבר חשוב: לא מעט מטופלים מקבלים אתכם ב<strong>התאמה</strong>, מחפשים את שמכם בגוגל, ופונים
-            אליכם <strong>ישירות</strong> - דרך האתר הפרטי שלכם, הטלפון או המייל - בלי לחזור ללחוץ כאן.
-            פניות כאלה <strong>הגיעו מאיתנו</strong> אך אינן נספרות במספר למעלה. כלומר בפועל ייתכן מאוד שאתם
-            מקבלים <span className="font-semibold text-[#0F5468]">יותר</span> פניות דרכנו ממה שמוצג.
-          </p>
+          <ContactExplainer />
         </>
       )}
     </div>

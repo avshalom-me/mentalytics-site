@@ -65,11 +65,11 @@ function buildTips(t: Therapist, stats: { views: number; clicks: number; wa: num
   }
 
   if (stats.clicks < avgClicks && stats.clicks > 0) {
-    tips.push("מספר הפניות אליך נמוך מהממוצע. ייתכן שהוספת הסדרי ביטוח או הרחבת אזורי הפעילות יעזרו.");
+    tips.push("מספר הלחיצות ליצירת קשר אצלך נמוך מהממוצע. ייתכן שהוספת הסדרי ביטוח או הרחבת אזורי הפעילות יעזרו.");
   }
 
   if (stats.clicks >= avgClicks && avgClicks > 0) {
-    tips.push("אתה מעל הממוצע בפניות — כל הכבוד! המשך/י לעדכן את הפרופיל כדי לשמור על החשיפה.");
+    tips.push("אתה מעל הממוצע בלחיצות ליצירת קשר — כל הכבוד! המשך/י לעדכן את הפרופיל כדי לשמור על החשיפה.");
   }
 
   if (stats.wa === 0 && stats.phone === 0 && stats.email === 0 && stats.views > 0) {
@@ -108,7 +108,7 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">וואטסאפ</td>
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">טלפון</td>
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">מייל</td>
-            <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">סה"כ פניות</td>
+            <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">סה"כ לחיצות</td>
           </tr>
         </table>
 
@@ -116,6 +116,15 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
           <span style="font-size: 13px; color: #666;">
             מתוכן: <strong>${stats.matchClicks}</strong> ממערכת ההתאמות | <strong>${stats.directoryClicks}</strong> ממאגר המטפלים
           </span>
+        </div>
+
+        <div style="margin-bottom: 16px; padding: 14px 16px; background: #EAF4F3; border-radius: 8px; border: 1px solid #C2DFDE;">
+          <div style="font-size: 14px; font-weight: bold; color: #2A6462; margin-bottom: 6px;">ⓘ מה נספר כאן, ולמה לא שמעת מכולם?</div>
+          <div style="font-size: 13px; line-height: 1.7; color: #3E5250;">
+            המספרים סופרים כל פעם שמטופל <strong>לחץ</strong> על הוואטסאפ, הטלפון או המייל שלך בפרופיל, כלומר ביקש ליצור איתך קשר.
+            חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליך בפועל.
+            הודעות שנשלחו דרך טופס האתר הן היחידות שמגיעות אליך תמיד, ישירות למייל.
+          </div>
         </div>
 
         <h2 style="font-size: 16px; color: #0F5468; margin: 24px 0 12px;">המלצות לשיפור</h2>
