@@ -3516,6 +3516,27 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
         {/* Anchor target for the "back to recommendations" button in the match section. */}
         <div id="kids-recommendations-top" className="scroll-mt-4" />
 
+        {/*
+          Signposts the hidden next step. The matching panel renders only once a
+          recommendation is picked (activeSelection), and nothing on the page said
+          so - measured over 60 days, only 44% of kids-quiz completers ever reached
+          a therapist card, against 70% on the adults flow, whose match form is a
+          separate full screen and therefore impossible to miss. One traced parent
+          read the recommendation, then navigated BACK to the city directory to
+          browse manually rather than clicking a card.
+        */}
+        {hasAnyFindings && !selectedKey && (
+          <div
+            className="mb-4 flex items-start gap-2 rounded-xl p-3 text-sm leading-relaxed"
+            style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}
+          >
+            <span aria-hidden="true">👇</span>
+            <span>
+              <b>השלב הבא:</b> בחרו סוג טיפול מהמלצות שלמטה, ונציג לכם מטפלים מתאימים באזורכם.
+            </span>
+          </div>
+        )}
+
         {/* Per-domain sections */}
         {byDomain.map(b => {
           const hasAny =
