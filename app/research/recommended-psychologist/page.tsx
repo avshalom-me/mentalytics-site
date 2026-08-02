@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import QuizCtaBanner from "../QuizCtaBanner";
+import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 const URL = "https://www.mentalytics.co.il/research/recommended-psychologist";
 
@@ -63,11 +64,7 @@ const jsonLd = {
   inLanguage: "he",
   datePublished: "2026-07-08",
   dateModified: "2026-07-08",
-  author: {
-    "@type": "Person",
-    name: 'ד"ר אבשלום גליל',
-    jobTitle: "פסיכולוג קליני וחינוכי מומחה-מדריך",
-  },
+  author: siteAuthorRef(),
   publisher: { "@type": "Organization", name: "טיפול חכם", url: "https://www.mentalytics.co.il" },
   url: URL,
   articleSection: "מידע מקצועי",
@@ -224,7 +221,7 @@ export default function RecommendedPsychologistPage() {
         </div>
         <div>
           <p style={{ fontWeight: 800, fontSize: "15px", marginBottom: "4px" }}>
-            <Link href="/therapists/906837b9-dda5-49ad-995f-e6cc41d77aa5" className="hover:underline" style={{ color: "var(--teal-dark)" }}>{`ד"ר אבשלום גליל`}</Link>
+            <Link href={SITE_AUTHOR_PATH} className="hover:underline" style={{ color: "var(--teal-dark)" }}>{`ד"ר אבשלום גליל`}</Link>
           </p>
           <p style={{ fontSize: "13px", color: "var(--teal)", fontWeight: 600, marginBottom: "8px" }}>פסיכולוג קליני וחינוכי מומחה-מדריך</p>
           <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>

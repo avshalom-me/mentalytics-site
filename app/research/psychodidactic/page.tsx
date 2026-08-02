@@ -1,6 +1,8 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import { AuthorByline } from "@/app/components/AuthorByline";
+import { siteAuthorRef, SITE_AUTHOR } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 const URL = `${BASE_URL}/research/psychodidactic`;
@@ -43,7 +45,7 @@ const articleLd = {
   inLanguage: "he",
   datePublished: "2026-08-02",
   dateModified: "2026-08-02",
-  author: { "@type": "Organization", name: "צוות טיפול חכם", url: BASE_URL },
+  author: siteAuthorRef(),
   publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
   url: URL,
   image: HERO,
@@ -581,20 +583,9 @@ export default function PsychodidacticPage() {
           </ul>
         </section>
 
-        {/* Byline */}
-        <div
-          style={{
-            borderTop: "1px solid var(--line)",
-            paddingTop: "28px",
-            marginTop: "8px",
-          }}
-        >
-          <p style={{ fontWeight: 700, color: "var(--text)", fontSize: "14px" }}>צוות טיפול חכם</p>
-          <p style={{ fontSize: "13px", color: "var(--muted)", marginTop: "4px", lineHeight: 1.7 }}>
-            מדריך זה נכתב ונערך על ידי צוות טיפול חכם על בסיס חוזרי משרד החינוך, פרסומי מאל&quot;ו ומשרד הבריאות.
-            הוא מידע כללי ואינו תחליף לייעוץ מקצועי פרטני. עודכן באוגוסט 2026.
-          </p>
-        </div>
+        <AuthorByline
+          note={`מדריך זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם", המרצה לאבחון והערכה במוסדות אקדמאיים. המדריך מתבסס על חוזרי משרד החינוך, פרסומי מאל"ו ומשרד הבריאות, והוא מידע כללי שאינו תחליף לייעוץ מקצועי פרטני. עודכן באוגוסט 2026.`}
+        />
       </article>
     </main>
   );

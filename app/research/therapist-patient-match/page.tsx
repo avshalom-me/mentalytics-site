@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 const IMG = "https://images.unsplash.com/photo-1604881991720-f91add269bed";
 
@@ -42,11 +43,7 @@ const jsonLd = {
   "inLanguage": "he",
   "datePublished": "2026-06-22",
   "dateModified": "2026-06-22",
-  "author": {
-    "@type": "Person",
-    "name": "ד\"ר אבשלום גליל",
-    "jobTitle": "פסיכולוג קליני וחינוכי מומחה-מדריך",
-  },
+  "author": siteAuthorRef(),
   "publisher": {
     "@type": "Organization",
     "name": "טיפול חכם",
@@ -228,7 +225,7 @@ export default function TherapistPatientMatchPage() {
         </div>
         <div>
           <p style={{ fontWeight: 800, fontSize: "15px", marginBottom: "4px" }}>
-            <Link href="/therapists/906837b9-dda5-49ad-995f-e6cc41d77aa5" className="hover:underline" style={{ color: "var(--teal-dark)" }}>{`ד"ר אבשלום גליל`}</Link>
+            <Link href={SITE_AUTHOR_PATH} className="hover:underline" style={{ color: "var(--teal-dark)" }}>{`ד"ר אבשלום גליל`}</Link>
           </p>
           <p style={{ fontSize: "13px", color: "var(--teal)", fontWeight: 600, marginBottom: "8px" }}>פסיכולוג קליני וחינוכי מומחה-מדריך</p>
           <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>

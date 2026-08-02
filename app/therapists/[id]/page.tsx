@@ -210,6 +210,10 @@ export default async function TherapistProfilePage({
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Person",
+    // Stable entity id. Articles elsewhere on the site reference this exact @id
+    // as their author (see app/lib/author.ts), which is what tells Google the
+    // byline and this profile are one person rather than a coincidence of name.
+    "@id": `${BASE_URL}${therapistPath(id, t.full_name)}#person`,
     "name": name,
     "description": t.bio ?? undefined,
     "jobTitle": type || undefined,

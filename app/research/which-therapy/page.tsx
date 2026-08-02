@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 export const metadata: Metadata = {
   title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר | טיפול חכם",
@@ -26,7 +27,7 @@ const jsonLd = {
   inLanguage: "he",
   datePublished: "2025-01-01",
   dateModified: "2026-04-22",
-  author: { "@type": "Organization", name: "טיפול חכם", url: "https://www.mentalytics.co.il" },
+  author: siteAuthorRef(),
   publisher: {
     "@type": "Organization",
     name: "טיפול חכם",
@@ -252,7 +253,7 @@ export default function WhichTherapyPage() {
         </p>
 
         <p className="signature">
-          <Link href="/therapists/906837b9-dda5-49ad-995f-e6cc41d77aa5" className="hover:underline" style={{ color: "var(--teal-dark)" }}>ד"ר אבשלום גליל</Link>, פסיכולוג קליני וחינוכי מדריך
+          <Link href={SITE_AUTHOR_PATH} className="hover:underline" style={{ color: "var(--teal-dark)" }}>ד"ר אבשלום גליל</Link>, פסיכולוג קליני וחינוכי מדריך
         </p>
 
         <hr className="my-10 border-stone-200" />
