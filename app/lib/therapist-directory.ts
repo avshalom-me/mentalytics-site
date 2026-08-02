@@ -99,6 +99,8 @@ type DirectoryFilter = {
   specialty?: string;
   /** Exact value from ASSESSMENT_TYPES - powers /therapists/assessment/[type]. */
   assessmentType?: string;
+  /** Exact value from ARRANGEMENTS - powers /therapists/arrangement/[slug]. */
+  arrangement?: string;
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
   trainingAreasAny?: string[];
   ageGroupsAny?: string[];
@@ -141,6 +143,9 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   if (filter?.specialty) rows = rows.filter((t) => (t.training_areas ?? []).includes(filter.specialty!));
   if (filter?.assessmentType) {
     rows = rows.filter((t) => (t.assessment_types ?? []).includes(filter.assessmentType!));
+  }
+  if (filter?.arrangement) {
+    rows = rows.filter((t) => (t.arrangements ?? []).includes(filter.arrangement!));
   }
   if (filter?.trainingAreasAny?.length) {
     rows = rows.filter((t) => filter.trainingAreasAny!.some((a) => (t.training_areas ?? []).includes(a)));

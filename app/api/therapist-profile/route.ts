@@ -237,6 +237,14 @@ export async function PATCH(req: NextRequest) {
     update.publication_links = clean;
   }
 
+  // The form sends price as a string; the column is numeric. Empty means "not
+  // stated" rather than zero, and an out-of-range value is dropped rather than
+  // saved - a 5-digit typo would poison the aggregate this field exists for.
+  if ("price" in update) {
+    const n = Number(update.price);
+    update.price = Number.isFinite(n) && n >= 50 && n <= 5000 ? Math.round(n) : null;
+  }
+
   if ("license_number" in update) {
     const v = update.license_number;
     update.license_number = typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : null;

@@ -98,6 +98,7 @@ export default function TherapistProfileEditPage() {
     experience: "",
     license_number: "",
     publication_links: [] as string[],
+    price: "" as string,
   });
 
   useEffect(() => {
@@ -145,6 +146,7 @@ export default function TherapistProfileEditPage() {
           experience: json.therapist.experience ?? "",
           license_number: json.therapist.license_number ?? "",
           publication_links: json.therapist.publication_links ?? [],
+          price: json.therapist.price != null ? String(json.therapist.price) : "",
           activity_level: json.therapist.activity_level ?? null,
         });
       } else {
@@ -509,6 +511,19 @@ export default function TherapistProfileEditPage() {
             <textarea value={form.experience} onChange={e => setForm({...form, experience: e.target.value})}
               rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="תפקידים, מסגרות עבודה, שנות ניסיון..." />
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-semibold text-stone-700">
+              מחיר למפגש <span className="font-normal text-stone-400">(לא חובה, בשקלים)</span>
+            </label>
+            <input value={form.price} onChange={e => setForm({...form, price: e.target.value.replace(/[^0-9]/g, "")})}
+              inputMode="numeric" className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+              placeholder="450" />
+            <p className="mt-1 text-xs text-stone-500">
+              המחיר אינו מוצג בפרופיל. הוא משמש להתאמה טובה יותר למטופלים לפי תקציב, ולסטטיסטיקה מצרפית
+              ואנונימית על מחירי טיפול בישראל.
+            </p>
           </div>
 
           <div className="mt-4">

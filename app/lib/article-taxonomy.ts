@@ -123,8 +123,9 @@ export const SECTIONS: Section[] = [
     blurb: "כמה עולה טיפול, מה מכסות קופות החולים, האם טיפול אונליין עובד, ולאילו החזרים אתם זכאים.",
     articleTopics: [],
     directory: [
+      { href: "/therapists/arrangement", label: "מי מממן טיפול נפשי" },
+      { href: "/therapists/arrangement/קופות-חולים", label: "מטפלים בהסדר עם הקופות" },
       { href: "/therapists/region/אונליין", label: "מטפלים אונליין" },
-      { href: "/therapists", label: "מאגר המטפלים" },
     ],
   },
   {

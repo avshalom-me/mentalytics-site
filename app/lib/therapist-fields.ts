@@ -10,7 +10,7 @@ export const THERAPIST_EDIT_FIELDS = [
   "regions", "cultural_prefs", "arrangements", "age_groups", "languages",
   "style_q1", "style_q2", "activity_level",
   "education", "experience",
-  "license_number", "publication_links",
+  "license_number", "publication_links", "price",
   "accepting_new_patients",
 ] as const;
 
