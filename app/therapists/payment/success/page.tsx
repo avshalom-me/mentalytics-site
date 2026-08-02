@@ -23,7 +23,6 @@ export default async function PaymentSuccessPage({
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
 
       {paidAmount != null && (
         <GaConversion

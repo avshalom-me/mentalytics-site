@@ -11,7 +11,6 @@ export default function PaymentFailurePage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@400;700;800&display=swap');`}</style>
 
       <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-red-100">
         <XCircle size={40} className="text-red-500" />

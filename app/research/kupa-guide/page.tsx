@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 
 // M6 (docs/seo-roadmap.md): the kupot layer - real demand at low competition
 // ("פסיכולוג ילדים מכבי" 390/mo, "טיפול זוגי מכבי/כללית" 140/mo each). Honest
@@ -67,12 +68,14 @@ function H2({ children }: { children: React.ReactNode }) {
 
 export default function KupaGuidePage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-8" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/kupa-guide"
+      title="טיפול דרך הקופה"
+      sectionSlug="מסגרת-עלות-וזכויות"
+    >
       <ResearchBreadcrumbLd slug="kupa-guide" title="טיפול פסיכולוגי דרך קופת החולים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">{TITLE}</h1>
       <p className="text-stone-600 leading-8 mb-8">
@@ -186,6 +189,6 @@ export default function KupaGuidePage() {
         המידע כללי ונכון למועד הכתיבה; תנאי הסל והביטוחים המשלימים משתנים מעת לעת - הנתונים
         המחייבים הם אלה שבאתרי הקופות ובמוקדיהן. אין באמור ייעוץ רפואי או ביטוחי.
       </p>
-    </main>
+    </ArticleShell>
   );
 }

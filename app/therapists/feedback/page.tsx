@@ -57,7 +57,6 @@ function FeedbackForm() {
 
   return (
     <main className="mx-auto max-w-lg px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       {done ? (
         <div className="rounded-3xl border border-green-200 bg-green-50 px-8 py-12 text-center">

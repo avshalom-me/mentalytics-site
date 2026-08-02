@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   title: "אבחון ADHD למבוגרים",
@@ -20,12 +21,13 @@ const jsonLd = {
 
 export default function AdhdAdultsPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/adhd-adults"
+      title="אבחון ADHD למבוגרים"
+      sectionSlug="אבחונים-והערכות"
+    >
       <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון ADHD למבוגרים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">אבחון ADHD למבוגרים</h1>
       <p className="text-stone-600 leading-7 mb-8">
@@ -94,6 +96,6 @@ export default function AdhdAdultsPage() {
           <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
         </ul>
       </div>
-    </main>
+    </ArticleShell>
   );
 }

@@ -32,7 +32,6 @@ export default async function UnsubscribePage({
       className="min-h-screen flex items-center justify-center px-4 py-10 bg-stone-50"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <div className="max-w-md w-full rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
         {done ? (

@@ -357,7 +357,6 @@ export default function TherapistProfileEditPage() {
   if (showPlanChoice) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 rounded-full bg-green-100 text-green-800 px-4 py-1.5 text-sm font-bold mb-4">
@@ -426,7 +425,6 @@ export default function TherapistProfileEditPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       {/* Header */}
       <div className="mb-6">

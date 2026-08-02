@@ -51,7 +51,6 @@ export default function TherapistJoinPage() {
           undercount in /admin/recruitment). */}
       <RecruitPageTracker page="therapists-join" />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         details summary::-webkit-details-marker { display: none; }
         details[open] .rotate-plus { transform: rotate(45deg); }
         .rotate-plus { transition: transform .25s ease; display:inline-block; }

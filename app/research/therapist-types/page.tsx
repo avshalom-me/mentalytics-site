@@ -124,7 +124,6 @@ export default function TherapistTypesPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <ResearchBreadcrumbLd slug="therapist-types" title="סוגי המטפלים בישראל" />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 

@@ -381,7 +381,6 @@ function TherapistDashboard() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">

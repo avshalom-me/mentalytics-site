@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   title: "איך לבחור פסיכולוג לילד?",
@@ -20,12 +21,13 @@ const jsonLd = {
 
 export default function TherapyForChildPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/therapy-for-child"
+      title="פסיכולוג לילד"
+      sectionSlug="ילדים-ונוער"
+    >
       <ResearchBreadcrumbLd slug="therapy-for-child" title="איך לבחור פסיכולוג לילד?" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">איך לבחור פסיכולוג לילד?</h1>
       <p className="text-stone-600 leading-7 mb-8">
@@ -92,6 +94,6 @@ export default function TherapyForChildPage() {
           <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
         </ul>
       </div>
-    </main>
+    </ArticleShell>
   );
 }

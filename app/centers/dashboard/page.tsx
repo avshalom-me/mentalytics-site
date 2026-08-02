@@ -109,7 +109,6 @@ export default function CenterDashboardPage() {
   if (error) {
     return (
       <main className="mx-auto max-w-md px-5 py-20 text-center" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
         <div className="rounded-3xl border border-stone-200 bg-white p-8">
           <p className="text-sm leading-7 text-stone-700">{error}</p>
           <div className="mt-5 flex flex-col gap-2">
@@ -127,7 +126,6 @@ export default function CenterDashboardPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
 
       {/* Header */}
       <div className="mb-8 flex flex-wrap items-center justify-between gap-4">

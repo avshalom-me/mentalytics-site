@@ -66,7 +66,6 @@ export default function AboutPage() {
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(22px); }

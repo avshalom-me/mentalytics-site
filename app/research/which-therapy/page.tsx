@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר | טיפול חכם",
@@ -96,19 +97,14 @@ const faqJsonLd = {
 
 export default function WhichTherapyPage() {
   return (
-    <main
-      className="mx-auto max-w-2xl px-5 py-12 pb-20"
-      dir="rtl"
-      style={{ fontFamily: "'Heebo', sans-serif" }}
+    <ArticleShell
+      href="/research/which-therapy"
+      title="איזה טיפול מתאים לי"
+      sectionSlug="בחירת-טיפול-ומטפל"
     >
       <ResearchBreadcrumbLd slug="which-therapy" title="איזה טיפול פסיכולוגי מתאים לי?" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">
-        ← חזרה למאמרים ומידע שימושי
-      </Link>
 
       <article className="article-body">
         <header className="mb-10 pb-6 border-b border-stone-200">
@@ -415,6 +411,6 @@ export default function WhichTherapyPage() {
           color: #1c1917;
         }
       `}</style>
-    </main>
+    </ArticleShell>
   );
 }

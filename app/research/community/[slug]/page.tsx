@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ArticleBody } from "@/app/components/ArticleBody";
 import { therapistTypeLabel } from "@/app/lib/therapist-options";
 import { therapistPath } from "@/app/lib/therapist-url";
+import ArticleShell from "@/app/components/ArticleShell";
+import { sectionForTopic } from "@/app/lib/article-taxonomy";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -153,14 +155,14 @@ export default async function CommunityArticlePage({ params }: { params: Promise
   const authorHref = therapistPath(a.therapist_id, authorName(a));
 
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href={`/research/community/${a.slug}`}
+      title={a.title}
+      sectionSlug={sectionForTopic(a.topic)?.slug ?? null}
+      author={{ name: author, role: role || undefined, href: house ? undefined : authorHref }}
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">
-        ← חזרה למאמרים ומידע שימושי
-      </Link>
 
       {a.image_url && (
         <figure className="mb-8">
@@ -238,6 +240,6 @@ export default async function CommunityArticlePage({ params }: { params: Promise
           </>
         )}
       </div>
-    </main>
+    </ArticleShell>
   );
 }

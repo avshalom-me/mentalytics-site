@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   title: "סוגי הטיפולים השונים - CBT, דינמי, DBT, EMDR ועוד",
@@ -124,12 +125,13 @@ const THERAPIES = [
 
 export default function TherapyTypesPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/therapy-types"
+      title="סוגי הטיפולים"
+      sectionSlug="בחירת-טיפול-ומטפל"
+    >
       <ResearchBreadcrumbLd slug="therapy-types" title="סוגי הטיפולים השונים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">סוגי הטיפולים השונים</h1>
       <p className="text-stone-600 leading-7 mb-10">
@@ -185,6 +187,6 @@ export default function TherapyTypesPage() {
           <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
         </ul>
       </div>
-    </main>
+    </ArticleShell>
   );
 }

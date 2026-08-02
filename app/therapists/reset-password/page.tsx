@@ -68,7 +68,6 @@ export default function ResetPasswordPage() {
     <main className="min-h-screen flex items-center justify-center px-6 py-12" dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif", background: "var(--surface)" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         .pro-input:focus { outline: none; border-color: #3D8C8A; box-shadow: 0 0 0 3px rgba(61,140,138,.12); }
       `}</style>
 

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   title: "אבחון תקשורת ואוטיזם - מה הוא כולל ומתי לפנות",
@@ -69,12 +70,13 @@ const breadcrumbLd = {
 
 export default function AutismAssessmentPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/autism-assessment"
+      title="אבחון תקשורת ואוטיזם"
+      sectionSlug="אבחונים-והערכות"
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       {/* Header */}
       <div className="mb-10">
@@ -228,6 +230,6 @@ export default function AutismAssessmentPage() {
         </div>
 
       </article>
-    </main>
+    </ArticleShell>
   );
 }

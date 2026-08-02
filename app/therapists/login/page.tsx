@@ -125,7 +125,6 @@ function TherapistLoginContent() {
     return (
       <main className="min-h-screen flex items-center justify-center px-6 py-12" dir="rtl"
         style={{ fontFamily: "'Heebo', sans-serif", background: "var(--surface)" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
         <div className="w-full max-w-md rounded-3xl border border-[#E8E0D8] bg-white p-10 text-center shadow-sm">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-full" style={{ background: "var(--teal-pale)" }}>
             <MailCheck size={30} style={{ color: "var(--teal)" }} />
@@ -153,7 +152,6 @@ function TherapistLoginContent() {
   return (
     <main className="min-h-screen flex" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         .pro-input:focus { outline: none; border-color: #3D8C8A; box-shadow: 0 0 0 3px rgba(61,140,138,.12); }
         .google-btn:hover { background: #f8f8f8; }
       `}</style>

@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import QuizCtaBanner from "../QuizCtaBanner";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
+import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   // "פסיכולוג" leads the title: GSC (20/7/26) shows 87 distinct "פסיכולוג"
@@ -77,12 +78,13 @@ const listStyle = { listStyle: "disc", paddingInlineStart: "22px" } as const;
 
 export default function ChoosingTherapistPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/choosing-therapist"
+      title="איך בוחרים מטפל"
+      sectionSlug="בחירת-טיפול-ומטפל"
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       {/* Header */}
       <div className="mb-10">
@@ -274,6 +276,6 @@ export default function ChoosingTherapistPage() {
           <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
         </ul>
       </div>
-    </main>
+    </ArticleShell>
   );
 }

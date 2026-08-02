@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import QuizCtaBanner from "../QuizCtaBanner";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
+import ArticleShell from "@/app/components/ArticleShell";
 
 const URL = "https://www.mentalytics.co.il/research/recommended-psychologist";
 
@@ -103,13 +104,14 @@ const listStyle = { listStyle: "disc", paddingInlineStart: "22px" } as const;
 
 export default function RecommendedPsychologistPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/recommended-psychologist"
+      title="פסיכולוג מומלץ"
+      sectionSlug="בחירת-טיפול-ומטפל"
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd) }} />
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
-
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
       <div className="mb-10">
         <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: "10px" }}>
@@ -239,6 +241,6 @@ export default function RecommendedPsychologistPage() {
           <li><Link href="/research/faq" className="text-[#2e7d8c] hover:underline">← שאלות נפוצות על טיפול נפשי</Link></li>
         </ul>
       </div>
-    </main>
+    </ArticleShell>
   );
 }

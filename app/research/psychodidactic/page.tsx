@@ -1,8 +1,9 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 import { AuthorByline } from "@/app/components/AuthorByline";
-import { siteAuthorRef, SITE_AUTHOR } from "@/app/lib/author";
+import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 const URL = `${BASE_URL}/research/psychodidactic`;
@@ -139,14 +140,16 @@ const h3 = { fontSize: "16px", fontWeight: 800, color: "var(--teal-dark)", margi
 
 export default function PsychodidacticPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/psychodidactic"
+      title="אבחון פסיכודידקטי"
+      sectionSlug="אבחונים-והערכות"
+      author={{ name: SITE_AUTHOR.name, role: SITE_AUTHOR.jobTitle, href: SITE_AUTHOR_PATH }}
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
       <ResearchBreadcrumbLd slug="psychodidactic" title="אבחון פסיכודידקטי" />
 
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">
-        ← חזרה למאמרים ומידע שימושי
-      </Link>
 
       {/* Header */}
       <div className="mb-10">
@@ -587,6 +590,6 @@ export default function PsychodidacticPage() {
           note={`מדריך זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם", המרצה לאבחון והערכה במוסדות אקדמאיים. המדריך מתבסס על חוזרי משרד החינוך, פרסומי מאל"ו ומשרד הבריאות, והוא מידע כללי שאינו תחליף לייעוץ מקצועי פרטני. עודכן באוגוסט 2026.`}
         />
       </article>
-    </main>
+    </ArticleShell>
   );
 }

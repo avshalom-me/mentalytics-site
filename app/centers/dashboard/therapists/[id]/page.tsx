@@ -244,7 +244,6 @@ export default function CenterTherapistFormPage() {
   if (loadErr) {
     return (
       <main className="mx-auto max-w-md px-5 py-20 text-center" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
         <div className="rounded-3xl border border-stone-200 bg-white p-8">
           <p className="text-sm leading-7 text-stone-700">{loadErr}</p>
           <Link href="/centers/dashboard" className="mt-4 inline-block text-sm font-bold underline" style={{ color: "var(--teal)" }}>← חזרה לפורטל</Link>
@@ -255,7 +254,6 @@ export default function CenterTherapistFormPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-8 pb-24" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
 
       <div className="mb-6 flex items-center justify-between gap-3">
         <div>

@@ -61,7 +61,6 @@ export default function CentersInfoPage() {
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         @media print {
           @page { size: A4; margin: 12mm; }
           .print\\:hidden { display: none !important; }

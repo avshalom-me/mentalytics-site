@@ -2,8 +2,9 @@ import Link from "next/link";
 import Image from "next/image";
 import type { Metadata } from "next";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import ArticleShell from "@/app/components/ArticleShell";
 import { AuthorByline } from "@/app/components/AuthorByline";
-import { siteAuthorRef, SITE_AUTHOR } from "@/app/lib/author";
+import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 const URL = `${BASE_URL}/research/social-anxiety`;
@@ -159,14 +160,16 @@ function Figure({ n, alt, caption, w, h, priority }: { n: number; alt: string; c
 
 export default function SocialAnxietyPage() {
   return (
-    <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <ArticleShell
+      href="/research/social-anxiety"
+      title="חרדה חברתית"
+      sectionSlug="חרדה-ולחץ"
+      author={{ name: SITE_AUTHOR.name, role: SITE_AUTHOR.jobTitle, href: SITE_AUTHOR_PATH }}
+    >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
       <ResearchBreadcrumbLd slug="social-anxiety" title="חרדה חברתית" />
 
-      <Link href="/research" className="text-sm text-stone-500 hover:underline mb-8 inline-block">
-        ← חזרה למאמרים ומידע שימושי
-      </Link>
 
       <div className="mb-8">
         <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".14em", marginBottom: "10px" }}>
@@ -632,6 +635,6 @@ export default function SocialAnxietyPage() {
           note={`מאמר זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם". המאמר מסכם ספרות מחקרית עדכנית ואינו תחליף לאבחון או לייעוץ מקצועי פרטני. עודכן באוגוסט 2026.`}
         />
       </article>
-    </main>
+    </ArticleShell>
   );
 }

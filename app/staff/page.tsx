@@ -96,7 +96,6 @@ export default function StaffHoursPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');`}</style>
 
       <div className="text-center mb-8">
         <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-full" style={{ background: "var(--teal-pale)" }}>

@@ -111,7 +111,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       {/* Desktop sidebar — fixed at the inline-start (right in RTL). */}
       <aside className="fixed inset-y-0 right-0 z-40 hidden w-52 flex-col overflow-y-auto border-e border-stone-200 bg-white px-3 py-4 lg:flex">

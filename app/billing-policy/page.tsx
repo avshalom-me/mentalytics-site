@@ -13,7 +13,6 @@ export default function BillingPolicyPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
-      <style>{`@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');`}</style>
 
       <Link href="/therapists/register" className="text-sm text-stone-500 hover:text-[#0F5468] hover:underline">
         ← חזרה לדף ההרשמה

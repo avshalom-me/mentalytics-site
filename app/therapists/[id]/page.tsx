@@ -248,7 +248,6 @@ export default async function TherapistProfilePage({
       <TrackView therapistId={id} source={source} context={viewerContext} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap');
         details summary { list-style: none; }
         details summary::-webkit-details-marker { display: none; }
         details[open] .chevron { transform: rotate(180deg); }
