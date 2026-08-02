@@ -34,6 +34,8 @@ type TherapistRow = {
   profile_photo_path: string | null;
   education: string | null;
   experience: string | null;
+  license_number: string | null;
+  publication_links: string[] | null;
   accepting_new_patients: boolean | null;
 };
 
@@ -45,6 +47,7 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
       therapist_types, training_areas, assessment_types,
       regions, cultural_prefs, arrangements, languages, age_groups,
       phone, email, profile_photo_path, education, experience,
+      license_number, publication_links,
       accepting_new_patients
     `)
     .eq("id", id)
@@ -406,6 +409,46 @@ export default async function TherapistProfilePage({
           {t.experience && (
             <Accordion title="ניסיון מקצועי">
               <p className="text-[15px] leading-8 text-stone-700 whitespace-pre-line">{t.experience}</p>
+            </Accordion>
+          )}
+
+          {/* Verifiable credentials. Worded as self-declared, because the site
+              does not check the number against the registry - it just makes the
+              claim checkable by anyone who wants to. */}
+          {t.license_number && (
+            <section className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-5 py-4">
+              <p className="text-sm font-bold text-stone-800">מספר רישום בפנקס</p>
+              <p className="mt-1 text-[15px] text-stone-700" dir="ltr" style={{ textAlign: "start" }}>
+                {t.license_number}
+              </p>
+              <p className="mt-1 text-xs text-stone-500">
+                כפי שנמסר על ידי המטפל/ת. ניתן לאמת מול הפנקס הציבורי של משרד הבריאות.
+              </p>
+            </section>
+          )}
+
+          {(t.publication_links?.length ?? 0) > 0 && (
+            <Accordion title="פרסומים מקצועיים">
+              <ul className="list-none space-y-2 p-0">
+                {t.publication_links!.map((u) => {
+                  let host = u;
+                  try { host = new URL(u).hostname.replace(/^www\./, ""); } catch { /* show raw */ }
+                  return (
+                    <li key={u}>
+                      <a
+                        href={u}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[15px] font-semibold hover:underline"
+                        style={{ color: "var(--teal-dark)" }}
+                        dir="ltr"
+                      >
+                        {host}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
             </Accordion>
           )}
 

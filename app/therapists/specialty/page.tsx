@@ -108,11 +108,25 @@ export default async function SpecialtyHubPage() {
           לא בטוחים איזו גישה מתאימה לכם?
         </p>
         <p className="text-sm mt-1 leading-7" style={{ color: "var(--teal-dark)" }}>
-          זו השאלה הכי נפוצה, ואין עליה תשובה אחת. השאלון שלנו ממפה את הקושי וממליץ על סוג הטיפול המתאים.
+          זו השאלה הכי נפוצה, ואין עליה תשובה אחת. השאלון שלנו ממפה את הקושי וממליץ על סוג הטיפול המתאים -
+          בחינם, אנונימי וללא התחייבות.
         </p>
-        <Link href="/adults" className="mt-3 inline-block text-sm font-bold" style={{ color: "var(--teal-dark)" }}>
-          למילוי השאלון ←
-        </Link>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Link
+            href="/adults"
+            className="rounded-full px-4 py-2 text-sm font-bold"
+            style={{ background: "var(--teal)", color: "#fff", textDecoration: "none" }}
+          >
+            לשאלון למבוגרים ←
+          </Link>
+          <Link
+            href="/kids"
+            className="rounded-full px-4 py-2 text-sm font-bold"
+            style={{ background: "var(--bg)", color: "var(--teal-dark)", border: "1px solid var(--teal-mid)", textDecoration: "none" }}
+          >
+            לשאלון לילדים ונוער ←
+          </Link>
+        </div>
       </div>
     </main>
   );

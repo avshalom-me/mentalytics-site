@@ -208,6 +208,39 @@ export async function PATCH(req: NextRequest) {
   for (const key of THERAPIST_EDIT_FIELDS) {
     if (key in body) update[key] = body[key];
   }
+
+  // publication_links is therapist-supplied and rendered as real anchors on a
+  // public page, so it is sanitised here rather than trusted: http/https only
+  // (blocks javascript: and data:), blanks dropped, deduped, and capped at the
+  // same 10 the DB constraint enforces. A bad URL should silently not be saved
+  // rather than 500 on the constraint.
+  if ("publication_links" in update) {
+    const raw = Array.isArray(update.publication_links) ? update.publication_links : [];
+    const seen = new Set<string>();
+    const clean: string[] = [];
+    for (const item of raw) {
+      if (typeof item !== "string") continue;
+      const trimmed = item.trim();
+      if (!trimmed) continue;
+      let parsed: URL;
+      try {
+        parsed = new URL(trimmed);
+      } catch {
+        continue;
+      }
+      if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+      if (seen.has(parsed.href)) continue;
+      seen.add(parsed.href);
+      clean.push(parsed.href);
+      if (clean.length >= 10) break;
+    }
+    update.publication_links = clean;
+  }
+
+  if ("license_number" in update) {
+    const v = update.license_number;
+    update.license_number = typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : null;
+  }
   // Stamp therapist-initiated edits so the admin can see the profile changed.
   update.profile_updated_at = new Date().toISOString();
 

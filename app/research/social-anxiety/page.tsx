@@ -599,11 +599,13 @@ export default function SocialAnxietyPage() {
           </h2>
           <p className="text-sm leading-7">
             הגישה עם הביסוס המחקרי החזק ביותר היא CBT ייעודי. אפשר להתחיל מהשאלון שלנו, שממפה את הקושי
-            וממליץ על סוג הטיפול המתאים, או לעבור ישירות לרשימת המטפלים הרלוונטיים.
+            וממליץ על סוג הטיפול המתאים, או לעבור ישירות לרשימת המטפלים הרלוונטיים. בחינם, אנונימי וללא
+            התחייבות. גיל ההתחלה החציוני הוא 13, ולכן יש גם שאלון ייעודי לילדים ולנוער.
           </p>
           <div className="flex flex-wrap gap-2 mt-4">
             {[
-              { href: "/adults", label: "לשאלון ההכוונה" },
+              { href: "/adults", label: "לשאלון למבוגרים" },
+              { href: "/kids", label: "לשאלון לילדים ונוער" },
               { href: "/therapists/topic/טיפול-בחרדה", label: "מטפלים בחרדה" },
               { href: "/therapists/specialty/CBT", label: "מטפלי CBT" },
               { href: "/therapists/region/אונליין", label: "טיפול אונליין" },

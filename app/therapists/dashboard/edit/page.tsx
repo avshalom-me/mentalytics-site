@@ -96,6 +96,8 @@ export default function TherapistProfileEditPage() {
     activity_level: null as number | null,
     education: "",
     experience: "",
+    license_number: "",
+    publication_links: [] as string[],
   });
 
   useEffect(() => {
@@ -141,6 +143,8 @@ export default function TherapistProfileEditPage() {
           style_q2: json.therapist.style_q2 ?? null,
           education: json.therapist.education ?? "",
           experience: json.therapist.experience ?? "",
+          license_number: json.therapist.license_number ?? "",
+          publication_links: json.therapist.publication_links ?? [],
           activity_level: json.therapist.activity_level ?? null,
         });
       } else {
@@ -505,6 +509,61 @@ export default function TherapistProfileEditPage() {
             <textarea value={form.experience} onChange={e => setForm({...form, experience: e.target.value})}
               rows={3} className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="תפקידים, מסגרות עבודה, שנות ניסיון..." />
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-semibold text-stone-700">
+              מספר רישום בפנקס <span className="font-normal text-stone-400">(לא חובה)</span>
+            </label>
+            <input value={form.license_number} onChange={e => setForm({...form, license_number: e.target.value})}
+              dir="ltr" className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+              placeholder="27-131094" />
+            <p className="mt-1 text-xs text-stone-500">
+              מוצג בפרופיל ומאפשר למטופלים לאמת אותך מול הפנקס הציבורי. זה אחד מסימני האמון החזקים
+              שיש, ומטופלים רבים בודקים.
+            </p>
+          </div>
+
+          <div className="mt-4">
+            <label className="mb-1 block text-sm font-semibold text-stone-700">
+              קישורים לפרסומים שכתבת <span className="font-normal text-stone-400">(לא חובה, עד 10)</span>
+            </label>
+            <p className="mb-2 text-xs text-stone-500">
+              מאמרים אקדמיים, פרסומים מקצועיים או כתבות שכתבת. מוצגים בפרופיל ומחזקים את המקצועיות שלך
+              גם מול מטופלים וגם מול גוגל.
+            </p>
+            {form.publication_links.map((link, i) => (
+              <div key={i} className="mb-2 flex gap-2">
+                <input
+                  value={link}
+                  onChange={e => {
+                    const next = [...form.publication_links];
+                    next[i] = e.target.value;
+                    setForm({ ...form, publication_links: next });
+                  }}
+                  dir="ltr"
+                  className="flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+                  placeholder="https://..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, publication_links: form.publication_links.filter((_, j) => j !== i) })}
+                  className="rounded-xl border border-stone-200 px-3 text-sm text-stone-500 hover:bg-stone-50"
+                  aria-label={`הסרת קישור ${i + 1}`}
+                >
+                  הסרה
+                </button>
+              </div>
+            ))}
+            {form.publication_links.length < 10 && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, publication_links: [...form.publication_links, ""] })}
+                className="rounded-xl border border-dashed border-stone-300 px-4 py-2 text-sm font-semibold text-[#2e7d8c] hover:bg-stone-50"
+              >
+                + הוספת קישור
+              </button>
+            )}
           </div>
         </div>
 

@@ -547,11 +547,12 @@ export default function PsychodidacticPage() {
           </h2>
           <p className="text-sm leading-7">
             אם אחרי הקריאה ברור לכם שאתם צריכים אבחון, או שהתמונה עדיין לא ברורה ואתם רוצים להתייעץ - אפשר
-            להתחיל מהשאלון שלנו, שממפה את הקושי וממליץ על הכיוון המתאים.
+            להתחיל מהשאלון שלנו, שממפה את הקושי וממליץ על הכיוון המתאים. בחינם, אנונימי וללא התחייבות.
           </p>
           <div className="flex flex-wrap gap-2 mt-4">
             {[
-              { href: "/adults", label: "לשאלון ההכוונה" },
+              { href: "/adults", label: "לשאלון למבוגרים" },
+              { href: "/kids", label: "לשאלון לילדים ונוער" },
               { href: "/therapists", label: "מאגר המטפלים" },
               { href: "/research/adhd-adults", label: "אבחון ADHD למבוגרים" },
               { href: "/research/assessments", label: "כל סוגי האבחונים" },

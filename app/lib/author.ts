@@ -17,17 +17,18 @@ const BASE_URL = "https://www.mentalytics.co.il";
  * article list, and minting a second URL for the same human would split the
  * very entity we are trying to consolidate.
  *
- * Still to fill once supplied (never invent these - a wrong identifier or a
- * profile URL that is not his is a false identity claim):
- *   - `identifier`: his Ministry of Health psychologist registry number
- *     (the site already shows these for other therapists, e.g. "מ.ר. 27-148029")
- *   - `sameAs`: real Google Scholar / ResearchGate / ORCID / LinkedIn URLs
+ * `sameAs` is still empty on purpose. It is for *profile* pages of the same
+ * person (Google Scholar, ORCID, ResearchGate, LinkedIn) - not for the papers
+ * themselves, which are works he authored and live under PUBLICATIONS below.
+ * A Scholar or ORCID profile URL would be the single most useful addition here.
  */
 export const SITE_AUTHOR = {
   therapistId: "906837b9-dda5-49ad-995f-e6cc41d77aa5",
   name: 'ד"ר אבשלום גליל',
   alternateName: "Dr. Avshalom Galil",
   jobTitle: "פסיכולוג קליני וחינוכי מומחה-מדריך",
+  /** Ministry of Health psychologist registry number. */
+  licenseNumber: "27-131094",
   /** Verified against app/about/page.tsx and his own profile record. */
   credentials: [
     "פסיכולוג קליני וחינוכי - מומחה מדריך",
@@ -36,6 +37,39 @@ export const SITE_AUTHOR = {
     "מרצה לאבחון והערכה במוסדות אקדמאיים",
   ],
 } as const;
+
+/**
+ * Peer-reviewed publications. Metadata verified against CrossRef by DOI, not
+ * transcribed from the links - a citation that misstates the journal or year is
+ * worse than no citation on a YMYL page.
+ *
+ * These are the strongest expertise signal the site has: a clinical psychologist
+ * with first-author papers in indexed journals is exactly the "who wrote this"
+ * that Google's raters look for, and no Israeli competitor shows it.
+ */
+export const SITE_AUTHOR_PUBLICATIONS = [
+  {
+    title: "Cheating behavior in children: Integrating gaze allocation and social awareness",
+    journal: "Journal of Experimental Child Psychology",
+    year: 2019,
+    doi: "10.1016/j.jecp.2018.08.013",
+    url: "https://www.sciencedirect.com/science/article/abs/pii/S0022096518301474",
+  },
+  {
+    title: "Cognitive strategies for managing cheating: The roles of cognitive abilities in managing moral transgressions",
+    journal: "Psychonomic Bulletin & Review",
+    year: 2021,
+    doi: "10.3758/s13423-021-01936-7",
+    url: "https://link.springer.com/article/10.3758/s13423-021-01936-7",
+  },
+  {
+    title: "Encountering Bias: Examining Biases and Stereotypes in the Evaluation Process Among Experts",
+    journal: "Psychological Reports",
+    year: 2024,
+    doi: "10.1177/00332941241269485",
+    url: "https://journals.sagepub.com/doi/abs/10.1177/00332941241269485",
+  },
+] as const;
 
 export const SITE_AUTHOR_PATH = therapistPath(SITE_AUTHOR.therapistId, SITE_AUTHOR.name);
 export const SITE_AUTHOR_URL = `${BASE_URL}${SITE_AUTHOR_PATH}`;
@@ -61,6 +95,26 @@ export function siteAuthorProfileFields(therapistId: string) {
   return {
     alternateName: SITE_AUTHOR.alternateName,
     alumniOf: { "@type": "CollegeOrUniversity", name: "אוניברסיטת בר-אילן" },
+    // The registry number as a typed identifier rather than loose text, so the
+    // claim "licensed psychologist" is machine-checkable against the registry.
+    identifier: {
+      "@type": "PropertyValue",
+      propertyID: "מספר רישום בפנקס הפסיכולוגים",
+      value: SITE_AUTHOR.licenseNumber,
+    },
+    // The papers as works authored by this entity. Not sameAs: a journal article
+    // is something he wrote, not another page that *is* him.
+    "@reverse": {
+      author: SITE_AUTHOR_PUBLICATIONS.map((p) => ({
+        "@type": "ScholarlyArticle",
+        headline: p.title,
+        name: p.title,
+        datePublished: String(p.year),
+        isPartOf: { "@type": "Periodical", name: p.journal },
+        identifier: { "@type": "PropertyValue", propertyID: "DOI", value: p.doi },
+        url: p.url,
+      })),
+    },
   };
 }
 

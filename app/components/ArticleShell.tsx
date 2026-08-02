@@ -128,15 +128,27 @@ export default async function ArticleShell({ href, title, sectionSlug, author, c
                 לא בטוחים מה מתאים לכם?
               </p>
               <p style={{ fontSize: "13px", color: "var(--teal-dark)", lineHeight: 1.7, marginBottom: "10px" }}>
-                שאלון קצר ואנונימי שממפה את הקושי וממליץ על סוג הטיפול והמטפל המתאימים.
+                שאלון קצר שממפה את הקושי וממליץ על סוג הטיפול והמטפל המתאימים.
               </p>
-              <Link
-                href="/adults"
-                className="inline-block rounded-full px-4 py-2 text-sm font-bold"
-                style={{ background: "var(--teal)", color: "#fff", textDecoration: "none" }}
-              >
-                למילוי השאלון ←
-              </Link>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                <Link
+                  href="/adults"
+                  className="rounded-full px-4 py-2 text-sm font-bold text-center"
+                  style={{ background: "var(--teal)", color: "#fff", textDecoration: "none" }}
+                >
+                  לשאלון למבוגרים ←
+                </Link>
+                <Link
+                  href="/kids"
+                  className="rounded-full px-4 py-2 text-sm font-bold text-center"
+                  style={{ background: "var(--bg)", color: "var(--teal-dark)", border: "1px solid var(--teal-mid)", textDecoration: "none" }}
+                >
+                  לשאלון לילדים ונוער ←
+                </Link>
+              </div>
+              <p style={{ fontSize: "11.5px", fontWeight: 600, color: "var(--teal)", marginTop: "10px", textAlign: "center" }}>
+                בחינם · אנונימי · ללא התחייבות
+              </p>
             </div>
 
             {related.length > 0 && (
