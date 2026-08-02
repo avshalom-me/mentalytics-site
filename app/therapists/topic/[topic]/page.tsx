@@ -9,6 +9,8 @@ import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { sectionForDirectoryHref, editorialBySection } from "@/app/lib/article-taxonomy";
+import { loadArticlesByTopics } from "@/app/lib/local-articles";
 
 // Condition/audience landing pages ("טיפול בחרדה", "פסיכולוג ילדים") - the
 // missing keyword layers (docs/seo-roadmap.md M3). Conditions list therapists
@@ -42,6 +44,23 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
 
   const list = await loadPublicTherapists(topic.filter);
   const onlineHere = list.filter((t) => t.online).length;
+
+  // Articles for this topic, resolved through the shared taxonomy (a section
+  // declares which directory pages it serves, so this stays in one place).
+  const articleSection = sectionForDirectoryHref(`/therapists/topic/${topic.slug}`);
+  const sectionArticles: { href: string; title: string; byline?: string }[] = articleSection
+    ? [
+        ...editorialBySection(articleSection.slug).map((a) => ({
+          href: `/research/${a.slug}`,
+          title: a.title,
+        })),
+        ...(await loadArticlesByTopics(articleSection.articleTopics as unknown as string[], 4)).map((a) => ({
+          href: `/research/community/${encodeURIComponent(a.slug)}`,
+          title: a.title,
+          byline: a.author,
+        })),
+      ].slice(0, 6)
+    : [];
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -161,6 +180,33 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
                 style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{topic.name} - {city}</Link>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* Reading list for this condition/audience. The specialty pages already
+          did this; the topic pages did not, so the informational half of the
+          query had no path in from the commercial half. */}
+      {articleSection && sectionArticles.length > 0 && (
+        <div className="mt-8 pt-6 border-t border-[var(--line)]">
+          <h2 className="text-base font-extrabold text-stone-800 mb-1">מאמרים בנושא {topic.name}</h2>
+          <p className="text-sm text-stone-500 mb-3">רקע מקצועי שכדאי לקרוא לפני שפונים לטיפול.</p>
+          <ul className="space-y-2 list-none p-0">
+            {sectionArticles.map((a) => (
+              <li key={a.href}>
+                <Link href={a.href} className="text-sm font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+                  {a.title}
+                </Link>
+                {a.byline && <span className="text-xs" style={{ color: "var(--faint)" }}> · מאת {a.byline}</span>}
+              </li>
+            ))}
+          </ul>
+          <Link
+            href={`/research/topic/${articleSection.slug}`}
+            className="mt-3 inline-block text-sm font-bold"
+            style={{ color: "var(--teal)" }}
+          >
+            כל המאמרים בנושא {articleSection.name} ←
+          </Link>
         </div>
       )}
 

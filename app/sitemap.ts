@@ -7,6 +7,7 @@ import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic } from "@/app/lib/topics";
 import { countListed } from "@/app/lib/therapist-directory";
 import { listPublicCenters } from "@/app/lib/center-public";
+import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -40,6 +41,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Deep guide - targets "אבחון פסיכודידקטי מחיר" and its long tail, a niche
     // where no large portal ranks (see docs/seo-week-plan-2026-08.md, day 4).
     { url: `${BASE}/research/psychodidactic`, priority: 0.7, changeFrequency: "monthly" },
+    { url: `${BASE}/research/social-anxiety`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/autism-assessment`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/child-emotional-developmental`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/academic`, priority: 0.5, changeFrequency: "monthly" },
@@ -67,7 +69,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const { data: articles } = await supabaseAdmin
     .from("therapist_articles")
-    .select("slug, updated_at")
+    .select("slug, updated_at, topic")
     .eq("status", "approved");
 
   const articlePages: MetadataRoute.Sitemap = (articles ?? []).map((a) => ({
@@ -75,6 +77,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.6,
     changeFrequency: "monthly" as const,
     lastModified: a.updated_at ? new Date(a.updated_at) : undefined,
+  }));
+
+  // Article-section hubs. Same thin gate the pages themselves apply: a section
+  // holding fewer than MIN_ARTICLES_FOR_SECTION_INDEX items is noindex, so
+  // listing it here would only produce "submitted URL marked noindex".
+  const communityBySection = new Map<string, number>();
+  for (const a of (articles ?? []) as { topic?: string | null }[]) {
+    const s = sectionForTopic(a.topic ?? null);
+    if (s) communityBySection.set(s.slug, (communityBySection.get(s.slug) ?? 0) + 1);
+  }
+  const sectionPages: MetadataRoute.Sitemap = SECTIONS.filter(
+    (s) => editorialBySection(s.slug).length + (communityBySection.get(s.slug) ?? 0) >= MIN_ARTICLES_FOR_SECTION_INDEX
+  ).map((s) => ({
+    url: `${BASE}/research/topic/${s.slug}`,
+    priority: 0.6,
+    changeFrequency: "weekly" as const,
   }));
 
   // Region + online landing pages (and the region hub) + the para-medical rubric.
@@ -152,5 +170,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
   }));
 
-  return [...staticPages, ...therapistPages, ...articlePages, ...regionPages, ...topicPages, ...centerPages];
+  return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...regionPages, ...topicPages, ...centerPages];
 }

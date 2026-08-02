@@ -1,11 +1,17 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import {
+  SECTIONS,
+  EDITORIAL_ARTICLES,
+  sectionForTopic,
+  type EditorialArticle,
+} from "@/app/lib/article-taxonomy";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
 const HUB_DESCRIPTION =
-  "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחון ADHD, טיפול אונליין ועוד - מותאם לישראל ולמערכת הבריאות הישראלית.";
+  "מידע מקצועי בעברית על סוגי טיפולים נפשיים, איך לבחור מטפל, אבחונים, חרדה, טראומה, טיפול אונליין ועוד - מותאם לישראל ולמערכת הבריאות הישראלית.";
 
 export const metadata: Metadata = {
   title: "מאמרים ומידע על טיפול נפשי",
@@ -22,7 +28,15 @@ export const metadata: Metadata = {
 // Refresh the hub periodically so newly-approved community articles appear.
 export const revalidate = 300;
 
-type CommunityItem = { slug: string; title: string; summary: string; topic: string | null; author: string; img: string | null; imgAlt: string };
+type CommunityItem = {
+  slug: string;
+  title: string;
+  summary: string;
+  topic: string | null;
+  author: string;
+  img: string | null;
+  imgAlt: string;
+};
 
 async function getCommunityArticles(): Promise<CommunityItem[]> {
   const { data } = await supabaseAdmin
@@ -30,7 +44,7 @@ async function getCommunityArticles(): Promise<CommunityItem[]> {
     .select("slug, title, summary, topic, image_url, image_alt, author_name, therapists(full_name)")
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
-    .limit(40);
+    .limit(60);
   return (data ?? []).map((r) => {
     const t = Array.isArray(r.therapists) ? r.therapists[0] : r.therapists;
     return {
@@ -45,81 +59,61 @@ async function getCommunityArticles(): Promise<CommunityItem[]> {
   });
 }
 
-const QUESTIONS = [
-  { href: "/research/recommended-psychologist", icon: "⭐", title: "פסיכולוג מומלץ - איך מוצאים פסיכולוג טוב?", desc: "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לכם.", img: "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/kupa-guide",       icon: "🏥", title: "טיפול פסיכולוגי דרך הקופה - המדריך", desc: "מרפאות, מטפלים בהסדר והחזרי הביטוח המשלים בכללית, מכבי, מאוחדת ולאומית - ומתי עדיף פרטי.", img: "https://images.unsplash.com/photo-1538108149393-fbbd81895907?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/which-therapy",    icon: "🔍", title: "איזה טיפול פסיכולוגי מתאים לי?",    desc: "מדריך מעשי לבחירת סוג הטיפול הנכון לפי הצורך, האישיות וסגנון החיים.",   img: "https://images.unsplash.com/photo-1508214751196-bcfd4ca60f91?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/therapy-for-child", icon: "👧", title: "איך לבחור פסיכולוג לילד?",           desc: "מה חשוב לבדוק, מה לשאול, ואיך יודעים שמצאתם את האיש הנכון לילד שלכם.",  img: "https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/cbt-vs-dynamic",   icon: "⚖️", title: "הבדל בין CBT לטיפול דינמי",          desc: "שתי הגישות הנפוצות ביותר - מה ההבדל בפועל, ומי מתאים לאיזה מטופל?",    img: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/adhd-adults",      icon: "🧩", title: "אבחון ADHD למבוגרים",               desc: "מה כולל האבחון, איפה עושים אותו, כמה עולה, ומה עושים עם התוצאות.",       img: "https://images.unsplash.com/photo-1517842645767-c639042777db?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/faq",              icon: "❓", title: "שאלות נפוצות",                       desc: "כמה עולה טיפול, כמה זמן לוקח, האם קופות חולים מכסות - ותשובות לשאלות נוספות.", img: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?w=600&h=260&fit=crop&auto=format&q=75" },
-];
-
-const TOPICS = [
-  { href: "/research/therapist-patient-match", icon: "🔗", title: '"זכו – שכינה ביניהם": על הקושי בהתאמה טיפולית ואישיותית בין מטפל ומטופל', desc: "מה המחקר אומר על התאמה אישיותית בין מטפל למטופל - גישת ההשלמה מול גישת הדמיון, ולמה זה כל כך משפיע על הצלחת הטיפול.", img: "https://images.unsplash.com/photo-1604881991720-f91add269bed?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/therapist-types",  icon: "👨‍⚕️", title: "סוגי המטפלים בישראל",              desc: 'פסיכולוג קליני, עו"ס קליני, מטפל בהבעה ויצירה - מה ההבדל ומי מתאים למה?', img: "https://images.unsplash.com/photo-1758273241078-8eec353836be?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/assessments",      icon: "📋", title: "סוגי אבחונים והערכות",              desc: "פסיכודידקטי, פסיכודיאגנוסטי, נוירופסיכולוגי - מתי כל אחד רלוונטי ומה מקבלים בסוף?", img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/psychodiagnostic", icon: "🔬", title: "אבחון פסיכודיאגנוסטי",              desc: "לראות את התמונה המלאה: מהו האבחון המעמיק ביותר שיש, מה הוא כולל ומתי הוא חיוני.", img: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/psychodidactic",   icon: "🎓", title: "אבחון פסיכודידקטי - המדריך המלא",   desc: "מי מוסמך לבצע, לכמה זמן זה תקף, כמה זה עולה - ולמה לתוספת זמן של 25% בכלל לא צריך אבחון.", img: "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/autism-assessment", icon: "🗣️", title: "אבחון תקשורת ואוטיזם",             desc: "מהו אבחון תקשורת, כיצד הוא מתבצע, ומדוע אבחון כפול ומקצועי הוא קריטי.", img: "https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/online-therapy",   icon: "💻", title: "טיפול אונליין - כן או לא?",          desc: "מחקרים, יתרונות, חסרונות, ומתי טיפול פנים מול פנים הכרחי.",              img: "https://images.unsplash.com/photo-1587614382346-4ec70e388b28?w=600&h=260&fit=crop&auto=format&q=75", imgPosition: "center top" },
-  { href: "/research/choosing-therapist",icon: "🤝", title: "איך מוצאים פסיכולוג שמתאים?",       desc: "מה לשאול בשיחת היכרות, אילו פרמטרים חשובים, ומה המחקר אומר על ברית טיפולית.", img: "https://images.unsplash.com/photo-1776886099265-6366478b341b?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/therapy-types",    icon: "🧠", title: "סוגי הטיפולים השונים",               desc: "CBT, דינאמי, EMDR, DBT, ACT ועוד - הסבר נגיש על כל גישה טיפולית ומה מתאים למי.", img: "https://images.unsplash.com/photo-1637245048732-adf1a547835e?w=600&h=260&fit=crop&auto=format&q=75" },
-  { href: "/research/child-emotional-developmental", icon: "🧒", title: "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה", desc: "כיצד קשיים פיזיולוגיים - עצירות תפקודית, עיבוד חושי, עיכוב שפתי ואתגרים מוטוריים - מקבלים ביטוי כקושי רגשי לכאורה.", img: "https://images.unsplash.com/photo-1576765608622-067973a79f53?w=600&h=260&fit=crop&auto=format&q=75" },
-];
-
-function ArticleCard({ href, title, desc, img, imgPosition = "center" }: { href: string; title: string; desc: string; img: string; imgPosition?: string }) {
+function Card({
+  href,
+  title,
+  desc,
+  img,
+  imgPosition = "center",
+  byline,
+}: {
+  href: string;
+  title: string;
+  desc: string;
+  img: string | null;
+  imgPosition?: string;
+  byline?: string;
+}) {
   return (
-    <Link href={href} className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
-      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", overflow: "hidden" }}>
-
-      {/* Image */}
-      <div style={{ height: "168px", overflow: "hidden", background: "var(--surface)" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={img}
-          alt={title}
-          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: imgPosition, transition: "transform .45s ease", display: "block" }}
-          className="group-hover:scale-105"
-          loading="lazy"
-        />
-      </div>
-
-      {/* Content */}
-      <div style={{ padding: "20px 22px 22px" }}>
-        <h2 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
-          className="group-hover:underline">{title}</h2>
-        <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{desc}</p>
-        <div style={{
-          marginTop: "14px", display: "inline-flex", alignItems: "center", gap: "4px",
-          fontSize: "12px", fontWeight: 600, color: "var(--teal)",
-          background: "var(--teal-pale)", borderRadius: "50px", padding: "4px 12px",
-        }}>קריאה ←</div>
-      </div>
-    </Link>
-  );
-}
-
-function CommunityCard({ slug, title, summary, topic, author, img, imgAlt }: CommunityItem) {
-  return (
-    <Link href={`/research/community/${slug}`} className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
-      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.05)", textDecoration: "none", overflow: "hidden" }}>
+    <Link
+      href={href}
+      className="group block rounded-2xl bg-white transition hover:shadow-md hover:-translate-y-0.5"
+      style={{
+        border: "1px solid var(--line)",
+        boxShadow: "0 2px 10px rgba(61,140,138,.05)",
+        textDecoration: "none",
+        overflow: "hidden",
+      }}
+    >
       {img && (
         <div style={{ height: "168px", overflow: "hidden", background: "var(--surface)" }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={img} alt={imgAlt}
-            style={{ width: "100%", height: "100%", objectFit: "cover", transition: "transform .45s ease", display: "block" }}
-            className="group-hover:scale-105" loading="lazy" />
+          <img
+            src={img}
+            alt={title}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              objectPosition: imgPosition,
+              transition: "transform .45s ease",
+              display: "block",
+            }}
+            className="group-hover:scale-105"
+            loading="lazy"
+          />
         </div>
       )}
       <div style={{ padding: "20px 22px" }}>
-        {topic && (
-          <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".06em", marginBottom: "8px" }}>{topic}</div>
-        )}
-        <h3 style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
-          className="group-hover:underline">{title}</h3>
-        {summary && <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{summary}</p>}
-        <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--faint)" }}>מאת {author}</div>
+        <h3
+          style={{ fontSize: "15.5px", fontWeight: 800, color: "var(--text)", marginBottom: "7px" }}
+          className="group-hover:underline"
+        >
+          {title}
+        </h3>
+        {desc && <p style={{ fontSize: "13px", color: "var(--muted)", lineHeight: 1.75 }}>{desc}</p>}
+        {/* A therapist byline is an E-E-A-T signal, so it stays visible on the card. */}
+        {byline && <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--faint)" }}>מאת {byline}</div>}
       </div>
     </Link>
   );
@@ -128,9 +122,22 @@ function CommunityCard({ slug, title, summary, topic, author, img, imgAlt }: Com
 export default async function ResearchHubPage() {
   const community = await getCommunityArticles();
 
-  // The hub had no structured data at all. CollectionPage + the article list
-  // tells Google this is an index of articles (not one more article), and the
-  // breadcrumb gives the /research/* children a parent to hang from.
+  // Group both article kinds into the same sections. A community article whose
+  // topic is unset (or maps nowhere) falls back to the general adult section
+  // rather than vanishing from the hub.
+  const FALLBACK = "טיפול-במבוגרים";
+  const bySection = new Map<string, { editorial: EditorialArticle[]; community: CommunityItem[] }>();
+  for (const s of SECTIONS) bySection.set(s.slug, { editorial: [], community: [] });
+  for (const a of EDITORIAL_ARTICLES) bySection.get(a.section)?.editorial.push(a);
+  for (const c of community) {
+    const slug = sectionForTopic(c.topic)?.slug ?? FALLBACK;
+    (bySection.get(slug) ?? bySection.get(FALLBACK))!.community.push(c);
+  }
+
+  const populated = SECTIONS.map((s) => ({ section: s, ...bySection.get(s.slug)! })).filter(
+    (g) => g.editorial.length + g.community.length > 0
+  );
+
   const collectionLd = {
     "@context": "https://schema.org",
     "@type": "CollectionPage",
@@ -140,8 +147,11 @@ export default async function ResearchHubPage() {
     inLanguage: "he",
     isPartOf: { "@type": "WebSite", name: "טיפול חכם", url: BASE_URL },
     hasPart: [
-      ...TOPICS.map((t) => ({ "@type": "Article" as const, headline: t.title, url: `${BASE_URL}${t.href}` })),
-      ...QUESTIONS.map((t) => ({ "@type": "Article" as const, headline: t.title, url: `${BASE_URL}${t.href}` })),
+      ...EDITORIAL_ARTICLES.map((a) => ({
+        "@type": "Article" as const,
+        headline: a.title,
+        url: `${BASE_URL}/research/${a.slug}`,
+      })),
       ...community.map((c) => ({
         "@type": "Article" as const,
         headline: c.title,
@@ -166,7 +176,7 @@ export default async function ResearchHubPage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
 
       {/* Header */}
-      <div className="mb-12 text-center">
+      <div className="mb-10 text-center">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "10px" }}>
           ידע מקצועי
         </p>
@@ -178,42 +188,90 @@ export default async function ResearchHubPage() {
         </p>
       </div>
 
-      {/* Topic cards */}
-      <div className="mb-5">
-        <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text)", marginBottom: "4px" }}>מידע מקצועי</h2>
-        <p style={{ fontSize: "13px", color: "var(--muted)" }}>על סוגי הטיפולים, המטפלים והאבחונים</p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 mb-12">
-        {TOPICS.map((t) => <ArticleCard key={t.href} {...t} />)}
-      </div>
+      {/* Jump links: the whole taxonomy visible at a glance, and a crawl path to
+          every section hub from the top of the page. */}
+      <nav aria-label="נושאים" className="mb-12 flex flex-wrap justify-center gap-2">
+        {populated.map(({ section }) => (
+          <Link
+            key={section.slug}
+            href={`/research/topic/${section.slug}`}
+            className="rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80"
+            style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)", textDecoration: "none" }}
+          >
+            {section.name}
+          </Link>
+        ))}
+      </nav>
 
-      {/* Important questions */}
-      <div className="mb-5">
-        <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text)", marginBottom: "4px" }}>שאלות חשובות</h2>
-        <p style={{ fontSize: "13px", color: "var(--muted)" }}>תשובות לשאלות שמטופלים שואלים הכי הרבה</p>
-      </div>
-      <div className="grid gap-4 md:grid-cols-2 mb-12">
-        {QUESTIONS.map((t) => <ArticleCard key={t.href} {...t} />)}
-      </div>
+      {populated.map(({ section, editorial, community: items }) => {
+        // Featured guides first, then the rest, then therapist-written pieces.
+        const ordered = [...editorial].sort((a, b) => Number(!!b.featured) - Number(!!a.featured));
+        return (
+          <section key={section.slug} className="mb-14">
+            <div className="mb-5 flex items-end justify-between gap-4 flex-wrap">
+              <div>
+                <h2 style={{ fontSize: "19px", fontWeight: 800, color: "var(--text)", marginBottom: "4px" }}>
+                  {section.name}
+                </h2>
+                <p style={{ fontSize: "13px", color: "var(--muted)", maxWidth: "62ch", lineHeight: 1.7 }}>
+                  {section.blurb}
+                </p>
+              </div>
+              {editorial.length + items.length > 2 && (
+                <Link
+                  href={`/research/topic/${section.slug}`}
+                  style={{ fontSize: "13px", fontWeight: 700, color: "var(--teal)", whiteSpace: "nowrap" }}
+                >
+                  כל המאמרים בנושא ←
+                </Link>
+              )}
+            </div>
 
-      {/* Community articles - written by site therapists */}
-      {community.length > 0 && (
-        <>
-          <div className="mb-5">
-            <h2 style={{ fontSize: "18px", fontWeight: 800, color: "var(--text)", marginBottom: "4px" }}>מאמרים מאת מטפלי האתר</h2>
-            <p style={{ fontSize: "13px", color: "var(--muted)" }}>מידע, תובנות וכלים מאת המטפלים הרשומים בטיפול חכם</p>
-          </div>
-          <div className="grid gap-4 md:grid-cols-2 mb-12">
-            {community.map((c) => <CommunityCard key={c.slug} {...c} />)}
-          </div>
-        </>
-      )}
+            <div className="grid gap-4 md:grid-cols-2">
+              {ordered.map((a) => (
+                <Card
+                  key={a.slug}
+                  href={`/research/${a.slug}`}
+                  title={a.title}
+                  desc={a.desc}
+                  img={a.img}
+                  imgPosition={a.imgPosition}
+                />
+              ))}
+              {items.map((c) => (
+                <Card
+                  key={c.slug}
+                  href={`/research/community/${c.slug}`}
+                  title={c.title}
+                  desc={c.summary}
+                  img={c.img}
+                  byline={c.author}
+                />
+              ))}
+            </div>
 
-      {/* Academic articles */}
-      <div style={{
-        background: "var(--surface)", borderRadius: "var(--radius)",
-        border: "1px solid var(--line)", padding: "24px 28px",
-      }}>
+            {/* The commercial half of the same intent. */}
+            {section.directory.length > 0 && (
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                <span style={{ fontSize: "12.5px", color: "var(--faint)" }}>מחפשים מטפל?</span>
+                {section.directory.map((d) => (
+                  <Link
+                    key={d.href}
+                    href={d.href}
+                    className="rounded-full px-3 py-1.5 text-xs font-semibold transition hover:opacity-80"
+                    style={{ background: "var(--teal-pale)", color: "var(--teal-dark)", textDecoration: "none" }}
+                  >
+                    {d.label}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+        );
+      })}
+
+      {/* Academic sources */}
+      <div style={{ background: "var(--surface)", borderRadius: "var(--radius)", border: "1px solid var(--line)", padding: "24px 28px" }}>
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h3 style={{ fontWeight: 800, color: "var(--text)", fontSize: "16px" }}>מאמרים אקדמאיים</h3>
@@ -221,17 +279,26 @@ export default async function ResearchHubPage() {
               השאלונים מבוססים על מאות מחקרים - הנה המקורות המלאים.
             </p>
           </div>
-          <Link href="/research/academic" style={{
-            display: "inline-flex", alignItems: "center", gap: "6px",
-            background: "var(--teal)", color: "white",
-            borderRadius: "50px", padding: "10px 22px",
-            fontSize: "14px", fontWeight: 700, transition: "background .2s",
-          }} className="hover:bg-[var(--teal-dark)]">
+          <Link
+            href="/research/academic"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "6px",
+              background: "var(--teal)",
+              color: "white",
+              borderRadius: "50px",
+              padding: "10px 22px",
+              fontSize: "14px",
+              fontWeight: 700,
+              transition: "background .2s",
+            }}
+            className="hover:bg-[var(--teal-dark)]"
+          >
             לרשימת המאמרים ←
           </Link>
         </div>
       </div>
-
     </main>
   );
 }
