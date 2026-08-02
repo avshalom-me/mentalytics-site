@@ -47,6 +47,23 @@ export const SITE_AUTHOR_ID = `${SITE_AUTHOR_URL}#person`;
  * The `author` value for an Article. A reference by `@id` - the full Person
  * node lives on the profile page itself, so the description is stated once.
  */
+/**
+ * Extra Person fields for the profile page when the profile IS the site author.
+ *
+ * The Latin-script name matters more here than anywhere else: this is the node
+ * the `@id` resolves to, so it is where Google reads the entity's identity.
+ * Without it the graph knew "Dr. Avshalom Galil" only from the article
+ * references and never from the entity itself - and academic profiles (Scholar,
+ * ORCID, ResearchGate) are all indexed under the Latin spelling.
+ */
+export function siteAuthorProfileFields(therapistId: string) {
+  if (therapistId !== SITE_AUTHOR.therapistId) return {};
+  return {
+    alternateName: SITE_AUTHOR.alternateName,
+    alumniOf: { "@type": "CollegeOrUniversity", name: "אוניברסיטת בר-אילן" },
+  };
+}
+
 export function siteAuthorRef() {
   return {
     "@type": "Person",

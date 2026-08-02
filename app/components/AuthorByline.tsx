@@ -46,6 +46,18 @@ export function AuthorByline({ note }: { note?: string }) {
           <Link href={SITE_AUTHOR_PATH} className="hover:underline" style={{ color: "var(--teal-dark)" }}>
             {SITE_AUTHOR.name}
           </Link>
+          {/* The Latin spelling, visible and not only in the structured data:
+              it is how the academic profiles (Scholar, ORCID, ResearchGate) and
+              any English-language citation spell him, and it is the string a
+              reader would paste into a search to check him out. Same exception
+              the brand already makes for "Mentalytics" on the homepage. */}
+          <span
+            dir="ltr"
+            lang="en"
+            style={{ fontWeight: 500, fontSize: "13px", color: "var(--muted)", marginInlineStart: "8px" }}
+          >
+            {SITE_AUTHOR.alternateName}
+          </span>
         </p>
         <p style={{ fontSize: "13px", color: "var(--teal)", fontWeight: 600, marginBottom: "8px" }}>
           {SITE_AUTHOR.jobTitle}

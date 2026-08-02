@@ -11,6 +11,7 @@ import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
 import { waLinkFor, telHref } from "@/app/lib/phone";
+import { siteAuthorProfileFields } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -215,6 +216,8 @@ export default async function TherapistProfilePage({
     // byline and this profile are one person rather than a coincidence of name.
     "@id": `${BASE_URL}${therapistPath(id, t.full_name)}#person`,
     "name": name,
+    // Latin-script name + alma mater, for the one profile we hold them for.
+    ...siteAuthorProfileFields(id),
     "description": t.bio ?? undefined,
     "jobTitle": type || undefined,
     "image": t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : undefined,
