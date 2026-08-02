@@ -57,8 +57,9 @@ export const SECTIONS: Section[] = [
     blurb: "פסיכודידקטי, פסיכודיאגנוסטי, נוירופסיכולוגי ואבחון קשב: מה כל אחד בודק, מי מוסמך לבצע ומה עולה.",
     articleTopics: ["אבחון והערכה"],
     directory: [
+      { href: "/therapists/assessment", label: "כל המאבחנים לפי סוג אבחון" },
+      { href: "/therapists/assessment/פסיכודידקטי", label: "מאבחנים פסיכודידקטי" },
       { href: "/therapists/topic/טיפול-בקשיי-קשב", label: "מטפלים בקשיי קשב" },
-      { href: "/therapists", label: "מאגר המטפלים והמאבחנים" },
     ],
   },
   {

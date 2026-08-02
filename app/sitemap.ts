@@ -8,6 +8,7 @@ import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPR
 import { countListed } from "@/app/lib/therapist-directory";
 import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
+import { ASSESSMENTS } from "@/app/lib/assessments";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -108,6 +109,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // pages existed, so there was no crawl path into them from the site.
     { url: `${BASE}/therapists/specialty`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/topic`, priority: 0.7, changeFrequency: "weekly" as const },
+    { url: `${BASE}/therapists/assessment`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region/${ONLINE_SLUG}`, priority: 0.7, changeFrequency: "weekly" as const },
     ...ALL_REGIONS.filter((region) => (regionCounts[region] ?? 0) >= MIN_LISTED_FOR_INDEX).map((region) => ({
       url: `${BASE}/therapists/region/${regionToSlug(region)}`,
@@ -141,6 +143,18 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     }
   }
+  // Assessment landing pages - same supply gate.
+  for (const a of ASSESSMENTS) {
+    const count = await countListed({ assessmentType: a.value });
+    if (count >= MIN_LISTED_FOR_INDEX) {
+      topicPages.push({
+        url: `${BASE}/therapists/assessment/${a.slug}`,
+        priority: 0.6,
+        changeFrequency: "weekly" as const,
+      });
+    }
+  }
+
   const cityTopicSlugs = [
     ...CITY_TOPIC_SLUGS,
     ...CITY_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-")),

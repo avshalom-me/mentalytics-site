@@ -28,6 +28,7 @@ type TherapistRow = {
   online: boolean | null;
   therapist_types: string[] | null;
   training_areas: string[] | null;
+  assessment_types: string[] | null;
   regions: string[] | null;
   cultural_prefs: string[] | null;
   arrangements: string[] | null;
@@ -96,6 +97,8 @@ type DirectoryFilter = {
   citiesAny?: string[];
   online?: boolean;
   specialty?: string;
+  /** Exact value from ASSESSMENT_TYPES - powers /therapists/assessment/[type]. */
+  assessmentType?: string;
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
   trainingAreasAny?: string[];
   ageGroupsAny?: string[];
@@ -109,7 +112,7 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, regions, cultural_prefs, arrangements, age_groups, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, assessment_types, regions, cultural_prefs, arrangements, age_groups, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
@@ -136,6 +139,9 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
     rows = rows.filter((t) => (t.regions ?? []).some((c) => wanted.has(c)));
   }
   if (filter?.specialty) rows = rows.filter((t) => (t.training_areas ?? []).includes(filter.specialty!));
+  if (filter?.assessmentType) {
+    rows = rows.filter((t) => (t.assessment_types ?? []).includes(filter.assessmentType!));
+  }
   if (filter?.trainingAreasAny?.length) {
     rows = rows.filter((t) => filter.trainingAreasAny!.some((a) => (t.training_areas ?? []).includes(a)));
   }

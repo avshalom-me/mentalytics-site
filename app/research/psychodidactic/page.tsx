@@ -553,7 +553,8 @@ export default function PsychodidacticPage() {
             {[
               { href: "/adults", label: "לשאלון למבוגרים" },
               { href: "/kids", label: "לשאלון לילדים ונוער" },
-              { href: "/therapists", label: "מאגר המטפלים" },
+              { href: "/therapists/assessment/פסיכודידקטי", label: "מאבחנים פסיכודידקטי" },
+              { href: "/therapists/assessment", label: "כל סוגי המאבחנים" },
               { href: "/research/adhd-adults", label: "אבחון ADHD למבוגרים" },
               { href: "/research/assessments", label: "כל סוגי האבחונים" },
             ].map(({ href, label }) => (

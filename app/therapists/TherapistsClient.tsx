@@ -410,6 +410,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
             { href: "/therapists/region", label: "לפי אזור" },
             { href: "/therapists/specialty", label: "לפי גישה טיפולית" },
             { href: "/therapists/topic", label: "לפי סוג קושי וגיל" },
+            { href: "/therapists/assessment", label: "אבחונים והערכות" },
             { href: "/therapists/region/אונליין", label: "טיפול אונליין" },
             { href: "/research", label: "מאמרים ומידע" },
           ].map(({ href, label }) => (
