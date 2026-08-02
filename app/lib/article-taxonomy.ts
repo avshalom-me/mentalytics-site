@@ -275,7 +275,12 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
     slug: "social-anxiety",
     title: "חרדה חברתית - מה עובד בטיפול",
     desc: "מתחילה בגיל 13 בממוצע, ורוב האנשים פונים אחרי 15 עד 20 שנה. מה המחקר אומר על כל מסלול טיפול.",
-    img: "/articles/social-anxiety/fig1.png",
+    // A social scene rather than one of the article's charts: a chart cropped to
+    // a 600x260 card loses its axes and title and reads as a stray graphic. A
+    // distressed-person stock photo was the other obvious option and is worse -
+    // the article's whole argument is that this is common and treatable, not a
+    // defect, and it says most people never seek help because of the shame.
+    img: "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&h=260&fit=crop&auto=format&q=75",
     section: "חרדה-ולחץ",
     featured: true,
   },

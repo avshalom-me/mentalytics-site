@@ -11,7 +11,10 @@ const URL = `${BASE_URL}/research/social-anxiety`;
 const TITLE = "חרדה חברתית - מה עובד בטיפול, ומה אומר המחקר";
 const DESCRIPTION =
   "חרדה חברתית מתחילה בגיל 13 בממוצע, ורוב האנשים פונים לטיפול אחרי 15 עד 20 שנה. מה מבדיל אותה מביישנות, למה היא לא חולפת מעצמה, ומה גדלי האפקט של כל מסלול טיפול.";
-const HERO = `${BASE_URL}/articles/social-anxiety/fig1.png`;
+// Social preview image. Not one of the charts: they are 1.5:1 and lose their
+// axes when cropped to the 1.91:1 that link previews use.
+const HERO =
+  "https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=1200&h=630&fit=crop&auto=format&q=80";
 
 export const metadata: Metadata = {
   title: TITLE,
@@ -34,7 +37,7 @@ export const metadata: Metadata = {
     type: "article",
     locale: "he_IL",
     siteName: "טיפול חכם",
-    images: [{ url: HERO, width: 1428, height: 960, alt: "שכיחות חרדה חברתית" }],
+    images: [{ url: HERO, width: 1200, height: 630, alt: "מפגש חברתי - חרדה חברתית" }],
   },
 };
 
