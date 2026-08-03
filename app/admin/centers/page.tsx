@@ -346,6 +346,42 @@ export default function AdminCentersPage() {
         </div>
       )}
 
+      {/* פס סיכום עסקי: MRR מהפעילים, מי בחודשי מתנה ומתי החיוב הקרוב, ופוטנציאל במשפך */}
+      {!loading && centers.length > 0 && (() => {
+        const active = centers.filter((c) => c.status === "active");
+        const sent = centers.filter((c) => c.status === "sent");
+        const mrr = active.reduce((s, c) => s + centerMonthlyPricing(c).monthlyTotal, 0);
+        const sentPotential = sent.reduce((s, c) => s + centerMonthlyPricing(c).monthlyTotal, 0);
+        const today = new Date().toISOString().slice(0, 10);
+        const inGift = active.filter((c) => c.billing_starts_at && c.billing_starts_at > today);
+        const nextCharge = inGift.map((c) => c.billing_starts_at as string).sort()[0] ?? null;
+        const paidNow = mrr - inGift.reduce((s, c) => s + centerMonthlyPricing(c).monthlyTotal, 0);
+        return (
+          <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
+              <div className="text-2xl font-black text-[#0F5468]">₪{ils(mrr)}</div>
+              <div className="text-xs font-bold text-stone-600">MRR ממרכזים פעילים</div>
+              <div className="text-[11px] text-stone-400">לפני מע"מ · {active.length} מרכזים</div>
+            </div>
+            <div className="rounded-2xl border border-stone-200 bg-white p-4">
+              <div className="text-2xl font-black text-stone-800">₪{ils(paidNow)}</div>
+              <div className="text-xs font-bold text-stone-600">מחויב בפועל החודש</div>
+              <div className="text-[11px] text-stone-400">{inGift.length > 0 ? `${inGift.length} עדיין בחודשי מתנה` : "אין מרכזים במתנה"}</div>
+            </div>
+            <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+              <div className="text-2xl font-black text-amber-800">{nextCharge ? fmtDate(nextCharge) : "—"}</div>
+              <div className="text-xs font-bold text-stone-600">החיוב הקרוב ממתנה</div>
+              <div className="text-[11px] text-stone-400">{inGift.length > 0 ? "סוף תקופת המתנה הקרובה" : "כולם כבר מחויבים"}</div>
+            </div>
+            <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+              <div className="text-2xl font-black text-blue-800">₪{ils(sentPotential)}</div>
+              <div className="text-xs font-bold text-stone-600">פוטנציאל במשפך</div>
+              <div className="text-[11px] text-stone-400">{sent.length} הצעות ממתינות לתשלום</div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
       {([

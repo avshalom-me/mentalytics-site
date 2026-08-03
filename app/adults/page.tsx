@@ -2895,7 +2895,11 @@ export default function AdultsPage() {
                 <img
                   src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
                   alt={t.full_name ?? ""}
-                  className="h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl object-cover"
+                  className={`h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl ${
+                    t.entity_type === "center"
+                      ? "border border-[var(--line)] bg-white object-contain p-1" // לוגו מרכז - לא לחתוך
+                      : "object-cover"
+                  }`}
                 />
                 <div className="min-w-0 flex-1 text-right">
                   <div className="flex flex-wrap items-center gap-2">

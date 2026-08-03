@@ -686,14 +686,26 @@ export async function POST(req: NextRequest) {
     // מסלול 2: כרטיס מרכז מקשר לעמוד הפרופיל הציבורי /centers/<slug> (לא לעמוד
     // מטפל שנחסם). שולפים את ה-slug של המרכזים שהופיעו בתוצאות בבת-אחת.
     const centerSlugById = new Map<string, string>();
+    const centerLogoById = new Map<string, string>();
     const entityCenterIds = top
       .filter((x) => x.therapist.entity_type === "center" && x.therapist.center_account_id)
       .map((x) => x.therapist.center_account_id as string);
     if (entityCenterIds.length > 0) {
       const { data: slugRows } = await supabaseAdmin
         .from("therapy_center_accounts")
-        .select("id, slug")
+        .select("id, slug, logo_path")
         .in("id", entityCenterIds);
+      // הלוגו נכנס לחריץ התמונה של הכרטיס (אחרת מרכז מקבל אווטאר מגדרי).
+      const logoRows = (slugRows ?? []).filter((r) => r.logo_path);
+      if (logoRows.length > 0) {
+        const paths = logoRows.map((r) => r.logo_path as string);
+        const { data: signed } = await supabaseAdmin.storage
+          .from("therapist-certificates")
+          .createSignedUrls(paths, 60 * 60);
+        (signed ?? []).forEach((s, i) => {
+          if (s.signedUrl) centerLogoById.set(logoRows[i].id as string, s.signedUrl);
+        });
+      }
       for (const r of slugRows ?? []) if (r.slug) centerSlugById.set(r.id as string, r.slug as string);
     }
 
@@ -713,7 +725,10 @@ export async function POST(req: NextRequest) {
           arrangements: therapist.arrangements,
           bio: therapist.bio,
           phone: therapist.phone,
-          profile_photo_url: photoUrl,
+          // ישות-מרכז: הלוגו של המרכז בחריץ התמונה (אין לה תמונת פרופיל משלה)
+          profile_photo_url: therapist.entity_type === "center" && therapist.center_account_id
+            ? (centerLogoById.get(therapist.center_account_id) ?? null)
+            : photoUrl,
           status: therapist.status,
           entity_type: therapist.entity_type, // 'center' → כרטיס מוצג כ"מרכז טיפולי"
           profile_slug: therapist.entity_type === "center" && therapist.center_account_id
