@@ -5,6 +5,7 @@ import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
 import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
+import InvitePanel from "./InvitePanel";
 
 // דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד - כל השינויים
 // והעריכות מרוכזים באזור עריכה נפרד (/centers/dashboard/profile), כמו אצל
@@ -195,6 +196,11 @@ export default function CenterDashboardPage() {
             ))}
           </div>
         </section>
+      )}
+
+      {/* הזמנת מטפלים במייל (מסלול 1) - כל מטפל ממלא את הפרופיל שלו בעצמו */}
+      {!isEntity && center.status === "active" && (
+        <InvitePanel quota={center.therapist_quota} linkedCount={center.linked_count} />
       )}
 
       {/* רשימת המטפלים (מסלול 1) */}
