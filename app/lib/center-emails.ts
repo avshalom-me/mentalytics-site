@@ -187,3 +187,66 @@ export async function sendCenterWelcomeEmail(opts: {
     return { ok: false, error: msg };
   }
 }
+
+/**
+ * מייל הזמנה למטפל/ת של מרכז (מסלול 1) — קישור אישי למילוי הפרופיל.
+ * הפרופיל שנוצר שייך למרכז; למטפל אין חשבון, רק הקישור החד-פעמי.
+ */
+export async function sendCenterTherapistInviteEmail(opts: {
+  to: string;
+  centerName: string;
+  token: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendCenterTherapistInviteEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  const name = escapeHtml((opts.centerName || "המרכז").trim());
+  const fillUrl = `${SITE_URL}/centers/fill/${opts.token}`;
+  const subject = `${(opts.centerName || "המרכז").trim()} מזמין אותך למלא פרופיל בטיפול חכם`;
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
+      <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
+        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+      </div>
+      <h1 style="color:#0F5468;font-size:20px;margin:0 0 14px;">שלום! ${name} הצטרף לטיפול חכם 🎉</h1>
+      <p style="margin:0 0 12px;">המרכז שבו את/ה עובד/ת הצטרף לפלטפורמת ההתאמות של טיפול חכם, ומזמין אותך למלא פרופיל מקצועי. מטופלים מתאימים יופנו אליך דרך המרכז לפי תחומי הטיפול, האזור, הגיל והשפה.</p>
+      <p style="margin:0 0 16px;">המילוי אורך כ-5 דקות — תחומי טיפול, אזורים, כמה מילים עליך ותמונה:</p>
+      <p style="margin:0 0 16px;">
+        <a href="${fillUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">מילוי הפרופיל שלי</a>
+      </p>
+      <p style="margin:0 0 4px;font-size:13px;color:#3E5250;">הקישור אישי — אין להעביר אותו הלאה. הפרופיל יעלה לאוויר אחרי אישור קצר של צוות טיפול חכם.</p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">
+        שאלות? admin@getmentalytics.com<br/>
+        צוות טיפול חכם - Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resendClient.emails.send({ from: FROM, to: opts.to, subject, html });
+    void logEmail({
+      recipient: opts.to,
+      recipientType: "therapist",
+      subject,
+      template: "center_therapist_invite",
+      sentBy: "system",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    if (error) {
+      console.error("sendCenterTherapistInviteEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendCenterTherapistInviteEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
