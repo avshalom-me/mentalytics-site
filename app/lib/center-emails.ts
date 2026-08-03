@@ -250,3 +250,106 @@ export async function sendCenterTherapistInviteEmail(opts: {
     return { ok: false, error: msg };
   }
 }
+
+/**
+ * תזכורת שלמות פרופיל — נשלחת פעם אחת למרכז פעיל שבוע+ אחרי התשלום כשהפרופיל
+ * הציבורי עדיין חסר. מפרטת בדיוק מה חסר ומקשרת להקמה/עריכה.
+ */
+export async function sendCenterCompletenessNudgeEmail(opts: {
+  to: string;
+  centerName: string;
+  pct: number;
+  missing: string[];
+  token?: string | null;   // בלי חשבון מקושר — קישור ההקמה; אחרת הפורטל
+  hasAccount: boolean;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
+  const name = escapeHtml((opts.centerName || "המרכז").trim());
+  const url = opts.hasAccount || !opts.token
+    ? `${SITE_URL}/centers/dashboard/profile`
+    : `${SITE_URL}/centers/join/${opts.token}`;
+  const subject = `הפרופיל של ${(opts.centerName || "המרכז").trim()} מלא ב-${opts.pct}% - הנה מה שחסר`;
+  const missingHtml = opts.missing.slice(0, 10).map((m) => `<li style="margin-bottom:6px;">${escapeHtml(m)}</li>`).join("");
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
+      <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
+        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+      </div>
+      <h1 style="color:#0F5468;font-size:20px;margin:0 0 14px;">הפרופיל של ${name} כמעט מוכן</h1>
+      <p style="margin:0 0 14px;">העמוד הציבורי שלכם הוא מה שמטופלים רואים רגע לפני שהם פונים - פרופיל מלא מעורר אמון ומקבל יותר פניות. כרגע הוא מלא ב-<strong>${opts.pct}%</strong>. מה שחסר:</p>
+      <ul style="margin:0 0 18px;padding-right:20px;font-size:14px;">
+        ${missingHtml}
+      </ul>
+      <p style="margin:0 0 16px;">
+        <a href="${url}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">השלמת הפרופיל (כ-10 דקות)</a>
+      </p>
+      <p style="margin:0;font-size:13px;color:#3E5250;">צריכים עזרה? השיבו למייל הזה או כתבו ל-admin@getmentalytics.com</p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">צוות טיפול חכם - Mentalytics</p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resendClient.emails.send({ from: FROM, to: opts.to, subject, html });
+    void logEmail({
+      recipient: opts.to, recipientType: "organization", subject,
+      template: "center_completeness_nudge", sentBy: "system",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    return error ? { ok: false, error: String(error) } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
+/**
+ * תזכורת למטפל/ת שקיבל/ה הזמנת-מילוי מהמרכז ולא השלים/ה — נשלחת פעם אחת.
+ */
+export async function sendCenterInviteReminderEmail(opts: {
+  to: string;
+  centerName: string;
+  token: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
+  const name = escapeHtml((opts.centerName || "המרכז").trim());
+  const fillUrl = `${SITE_URL}/centers/fill/${opts.token}`;
+  const subject = `תזכורת: הפרופיל שלך ב${(opts.centerName || "המרכז").trim()} מחכה למילוי`;
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
+      <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
+        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+      </div>
+      <h1 style="color:#0F5468;font-size:20px;margin:0 0 14px;">תזכורת קטנה 👋</h1>
+      <p style="margin:0 0 14px;">${name} הזמין אותך למלא פרופיל מקצועי בטיפול חכם, ועדיין לא השלמת אותו. ברגע שתמלא/י - מטופלים מתאימים יוכלו להגיע אליך דרך מערכת ההתאמות.</p>
+      <p style="margin:0 0 16px;">זה לוקח כ-5 דקות:</p>
+      <p style="margin:0 0 16px;">
+        <a href="${fillUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">מילוי הפרופיל שלי</a>
+      </p>
+      <p style="margin:0;font-size:13px;color:#3E5250;">אם זו טעות או שאינך חלק מהמרכז - אפשר להתעלם מהמייל.</p>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">צוות טיפול חכם - Mentalytics</p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resendClient.emails.send({ from: FROM, to: opts.to, subject, html });
+    void logEmail({
+      recipient: opts.to, recipientType: "therapist", subject,
+      template: "center_invite_reminder", sentBy: "system",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    return error ? { ok: false, error: String(error) } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
