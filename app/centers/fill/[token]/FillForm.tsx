@@ -82,6 +82,8 @@ export default function FillForm({ token, centerName, inviteEmail }: {
     activity_level: null as number | null,
     education: "",
     experience: "",
+    license_number: "",
+    price: "",
   });
 
   async function uploadFile(file: File, type: "photo" | "certificate"): Promise<string | null> {
@@ -104,11 +106,12 @@ export default function FillForm({ token, centerName, inviteEmail }: {
     setSaving(true);
     setSaveErr("");
 
-    const { play_therapy_modalities, cogfun_age_groups, ...rest } = form;
+    const { play_therapy_modalities, cogfun_age_groups, price, ...rest } = form;
     const fields = {
       ...rest,
       training_areas: [...form.training_areas, ...play_therapy_modalities],
       cogfun_age_groups,
+      price: price.trim() ? Number(price) : null, // עמודה מספרית - "" נכשל בהכנסה
     };
 
     try {
@@ -239,6 +242,19 @@ export default function FillForm({ token, centerName, inviteEmail }: {
               <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setCertFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-xs" />
               <p className="mt-1 text-[11px] text-stone-400">נדרשת לאישור הפרופיל ואינה מוצגת באתר.</p>
+            </div>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-stone-700">מספר רישיון <span className="font-normal text-stone-400">(לא חובה)</span></label>
+              <input value={form.license_number} onChange={e => setForm({...form, license_number: e.target.value})}
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" />
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-semibold text-stone-700">מחיר למפגש <span className="font-normal text-stone-400">(לא חובה, בשקלים)</span></label>
+              <input value={form.price} onChange={e => setForm({...form, price: e.target.value.replace(/[^0-9]/g, "")})}
+                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" inputMode="numeric" />
+              <p className="mt-1 text-[11px] text-stone-400">אינו מוצג בפרופיל - משמש להתאמה לפי תקציב ולסטטיסטיקה אנונימית.</p>
             </div>
           </div>
         </div>

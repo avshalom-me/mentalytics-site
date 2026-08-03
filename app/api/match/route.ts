@@ -519,9 +519,13 @@ function scoreTherapist(
     const davg = (Math.abs(styleP1 - t1Raw) + Math.abs(styleP2 - t2) + Math.abs(styleP3 - t3)) / 3;
     personality_score = Math.round(40 + 60 * Math.pow(1 - davg / 6, 0.65));
   }
-  // מרכז כישות (entity_type='center') מנוקד לפי התאמה מקצועית בלבד — הציון הסופי
-  // מורכב רק מההתאמה המקצועית (combinedScore מחזיר את המקצועי כשאישיות null).
-  if (therapist.entity_type === "center") personality_score = null;
+  // מרכז כישות (entity_type='center'): אין "סגנון" אחד למרכז — הצוות רחב
+  // ומתאים למטופל מטפל/ת אישיותית בתוך המרכז. לכן כשההתאמה האישיותית נמדדת
+  // בכלל (המשתמש ענה על שאלון הסגנון), המרכז מקבל ציון קבוע גבוה (95) שמוצג
+  // בכרטיס עם כוכבית הסבר; כשאין מענה אישיותי — null, כמו אצל כולם.
+  if (therapist.entity_type === "center") {
+    personality_score = styleP1 != null && styleP2 != null && styleP3 != null ? 95 : null;
+  }
 
   return {
     score,

@@ -2930,12 +2930,17 @@ export default function AdultsPage() {
                       <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
                       <div className="flex flex-col gap-0.5">
                         <span className="text-[10.5px] text-[var(--muted)]">מקצועי <b className="font-extrabold text-[var(--teal-dark)]">{t.match_score}%</b></span>
-                        <span className="text-[10.5px] text-[var(--muted)]">אישיותי <b className="font-extrabold text-[var(--teal-dark)]">{t.personality_score}%</b></span>
+                        <span className="text-[10.5px] text-[var(--muted)]">אישיותי <b className="font-extrabold text-[var(--teal-dark)]">{t.personality_score}%{t.entity_type === "center" && "*"}</b></span>
                       </div>
                     </>
                   )}
                 </div>
               </div>
+              {t.entity_type === "center" && t.personality_score != null && (
+                <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
+                  * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית.
+                </p>
+              )}
               <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                 <a
                   href={profileHrefForMatch(t)}

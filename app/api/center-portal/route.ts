@@ -66,15 +66,25 @@ export async function GET(req: NextRequest) {
     // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים — היא
     // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
     const isEntity = (center.billing_track as string) === "center_entity";
-    let entity: { id: string; status: string; admin_approved: boolean } | null = null;
+    let entity: { id: string; status: string; admin_approved: boolean; matching_filled: boolean } | null = null;
     if (isEntity) {
       const { data: e } = await supabaseAdmin
         .from("therapists")
-        .select("id, status, admin_approved")
+        .select("id, status, admin_approved, training_areas, therapist_types, age_groups, regions, online")
         .eq("center_account_id", center.id)
         .eq("entity_type", "center")
         .maybeSingle();
-      if (e) entity = { id: e.id as string, status: e.status as string, admin_approved: !!e.admin_approved };
+      if (e) {
+        // "מולא להתאמות" = יש לפחות תחום/סוג טיפול + קהל (גילאים) + כיסוי
+        // (אזור או אונליין). בלי אלה המרכז לא ייתפס באף שאלון — הדשבורד
+        // מציג אזהרה בולטת עד שימולאו.
+        const arr = (v: unknown) => (Array.isArray(v) ? v : []);
+        const matchingFilled =
+          (arr(e.training_areas).length > 0 || arr(e.therapist_types).length > 0) &&
+          arr(e.age_groups).length > 0 &&
+          (arr(e.regions).length > 0 || !!e.online);
+        entity = { id: e.id as string, status: e.status as string, admin_approved: !!e.admin_approved, matching_filled: matchingFilled };
+      }
     }
 
     const { data: therapistsData } = await supabaseAdmin

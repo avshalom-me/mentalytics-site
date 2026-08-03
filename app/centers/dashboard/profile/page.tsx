@@ -16,7 +16,7 @@ type ProfileData = {
     name: string;
     status: string;
     billing_track?: string | null;
-    entity?: { id: string; status: string; admin_approved: boolean } | null;
+    entity?: { id: string; status: string; admin_approved: boolean; matching_filled?: boolean } | null;
     public_page: PublicPage;
   };
 };
@@ -87,8 +87,13 @@ export default function CenterProfileEditPage() {
 
       {/* מסלול 2 - פרופיל ההתאמות של המרכז */}
       {isEntity && (
-        <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
-          <h2 className="mb-1 text-base font-black text-stone-800">🎯 פרופיל ההתאמות</h2>
+        <section className={`mb-6 rounded-2xl border p-5 ${center.entity?.matching_filled === false ? "border-2 border-amber-300 bg-amber-50" : "border-stone-200 bg-white"}`}>
+          <h2 className="mb-1 text-base font-black text-stone-800">🎯 פרופיל ההתאמות - סוגי הטיפול של המרכז</h2>
+          {center.entity?.matching_filled === false && (
+            <p className="mb-2 rounded-xl border border-amber-200 bg-white px-3 py-2 text-sm font-bold text-amber-900">
+              ⚠️ עדיין לא סומנו סוגי טיפול - המרכז לא יופיע בהתאמות עד שימולאו.
+            </p>
+          )}
           <p className="mb-4 text-sm leading-6 text-stone-600">
             תחומי הטיפול, קבוצות הגיל, השפות והאזורים שלפיהם המרכז מוצג למטופלים במערכת ההתאמות.
           </p>

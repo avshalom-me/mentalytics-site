@@ -44,7 +44,7 @@ type PortalData = {
     name: string;
     status: string;
     billing_track?: string | null;
-    entity?: { id: string; status: string; admin_approved: boolean } | null;
+    entity?: { id: string; status: string; admin_approved: boolean; matching_filled?: boolean } | null;
     plan_title: string | null;
     billing_starts_at: string | null;
     therapist_quota: number;
@@ -167,6 +167,22 @@ export default function CenterDashboardPage() {
         <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
         <StatCard icon={Activity} label="לחיצות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
       </div>
+
+      {/* מסלול 2: הצעד הקריטי — בלי סוגי טיפול המרכז לא קיים בהתאמות */}
+      {isEntity && center.entity && center.entity.matching_filled === false && (
+        <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
+          <h2 className="mb-1 text-base font-black text-amber-900">⚠️ צעד חיוני: סימון סוגי הטיפול של המרכז</h2>
+          <p className="mb-3 text-sm leading-6 text-amber-900">
+            המרכז עדיין <strong>לא יופיע בהתאמות</strong> - מערכת ההתאמות משדכת מטופלים לפי
+            תחומי הטיפול, קבוצות הגיל, השפות והאזורים שתסמנו. זה לוקח כ-3 דקות.
+          </p>
+          <Link href={`/centers/dashboard/therapists/${center.entity.id}`}
+            className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
+            style={{ background: "linear-gradient(135deg,#b45309,#d97706)" }}>
+            ✏️ לסימון סוגי הטיפול עכשיו
+          </Link>
+        </section>
+      )}
 
       {/* מסלול 2 - הפרופיל של המרכז: סטטוס + כניסה לאזור העריכה */}
       {isEntity && (
