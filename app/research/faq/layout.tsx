@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { FAQS } from "./faqs";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://www.mentalytics.co.il/research/faq" },
   title: "שאלות נפוצות על טיפול נפשי",
   description: "תשובות לשאלות הנפוצות ביותר על טיפול פסיכולוגי - עלות, קופות חולים, משך טיפול, הבדל בין פסיכולוג לפסיכיאטר, חיסיון ועוד.",
 };

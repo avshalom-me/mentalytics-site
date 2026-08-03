@@ -190,9 +190,9 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         {assets.logoUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={assets.logoUrl} alt={`הלוגו של ${center.name}`}
-            className="h-[104px] w-[104px] flex-shrink-0 rounded-3xl border border-[var(--line)] bg-white object-contain p-2 shadow-sm" />
+            className="h-[120px] w-[120px] flex-shrink-0 rounded-3xl border border-[var(--line)] bg-white object-contain p-2.5 shadow-sm md:h-[150px] md:w-[150px]" />
         ) : (
-          <div className="flex h-[104px] w-[104px] flex-shrink-0 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-sm"
+          <div className="flex h-[120px] w-[120px] flex-shrink-0 items-center justify-center rounded-3xl text-4xl font-black text-white shadow-sm md:h-[150px] md:w-[150px]"
             style={{ background: "linear-gradient(140deg,var(--teal),var(--teal-dark))" }}>
             {initials(center.name)}
           </div>
@@ -242,17 +242,20 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
         </section>
       )}
 
-      {/* דבר מנהל/ת המרכז - פנים ושם מאחורי המרכז */}
+      {/* דבר מנהל/ת המרכז - ה"אני מאמין": פנים ושם מאחורי המרכז */}
       {showDirector && (
         <section className="mt-10">
+          <p className="mb-3 text-xs font-extrabold uppercase tracking-[.16em]" style={{ color: "var(--gold-dark)" }}>
+            ה"אני מאמין" של המרכז
+          </p>
           <div className="rounded-[22px] border border-[var(--line)] bg-white p-7 shadow-sm md:p-9"
             style={{ borderInlineStart: "4px solid var(--gold)" }}>
             <div className="flex flex-wrap items-start gap-5">
               {assets.directorPhotoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={assets.directorPhotoUrl} alt={director.name ?? ""} className="h-[76px] w-[76px] flex-shrink-0 rounded-full object-cover" />
+                <img src={assets.directorPhotoUrl} alt={director.name ?? ""} className="h-[96px] w-[96px] flex-shrink-0 rounded-full object-cover shadow-sm" />
               ) : (
-                <div className="flex h-[76px] w-[76px] flex-shrink-0 items-center justify-center rounded-full text-2xl font-extrabold text-white"
+                <div className="flex h-[96px] w-[96px] flex-shrink-0 items-center justify-center rounded-full text-2xl font-extrabold text-white"
                   style={{ background: "linear-gradient(140deg,var(--teal),var(--teal-dark))" }}>
                   {initials(director.name ?? "")}
                 </div>

@@ -4,6 +4,7 @@ import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://www.mentalytics.co.il/research/therapy-types" },
   title: "סוגי הטיפולים השונים - CBT, דינמי, DBT, EMDR ועוד",
   description: "מדריך מקיף לסוגי הטיפולים הנפשיים - CBT, דינמי, DBT, EMDR, ACT ועוד. מה ההבדל, למי מתאים כל טיפול, וכמה זמן לוקח.",
 };

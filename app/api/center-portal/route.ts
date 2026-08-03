@@ -196,13 +196,15 @@ export async function GET(req: NextRequest) {
 
     const clicksMonth = clicks.filter((c) => c.clicked_at >= mAgo);
     const clicksWeek = clicks.filter((c) => c.clicked_at >= wAgo);
-    // צפיות אמיתיות בפרופיל (לא חשיפת כרטיס במאטצ'ינג).
+    // צפיות אמיתיות בפרופיל (לא חשיפת כרטיס במאטצ'ינג) + הופעות במאטצ'ינג בנפרד.
     const realViews = views.filter((v) => v.source !== "match_card");
+    const matchImpressions = views.length - realViews.length;
 
     const clicksByType = (rows: { click_type: string }[]) => ({
       whatsapp: rows.filter((r) => r.click_type === "whatsapp").length,
       phone: rows.filter((r) => r.click_type === "phone").length,
       email: rows.filter((r) => r.click_type === "email").length,
+      site_message: rows.filter((r) => r.click_type === "site_message").length,
       total: rows.length,
     });
 
@@ -256,6 +258,7 @@ export async function GET(req: NextRequest) {
         // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
         listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,
         views_month: realViews.length,
+        impressions_month: matchImpressions,
         clicks_week: clicksByType(clicksWeek),
         clicks_month: clicksByType(clicksMonth),
         by_region: tallyBy(realViews, (v) => v.viewer_region),

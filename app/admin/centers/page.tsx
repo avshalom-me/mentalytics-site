@@ -346,7 +346,21 @@ export default function AdminCentersPage() {
         </div>
       )}
 
-      {centers.map((c) => {
+      {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
+          כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
+      {([
+        { key: "active2", title: "🏢 מנויים פעילים — מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && c.billing_track === "center_entity") },
+        { key: "active1", title: "👥 מנויים פעילים — מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && c.billing_track !== "center_entity") },
+        { key: "sent", title: "✉️ הצעות שנשלחו — ממתינות לתשלום", items: centers.filter((c) => c.status === "sent") },
+        { key: "draft", title: "📝 טיוטות — טרם נשלחו", items: centers.filter((c) => c.status === "draft") },
+        { key: "cancelled", title: "⏸️ בוטלו", items: centers.filter((c) => c.status === "cancelled") },
+      ] as const).map((group) => group.items.length > 0 && (
+      <section key={group.key} className="mb-8">
+        <div className="mb-3 flex items-center gap-2 border-b border-stone-200 pb-2">
+          <h2 className="text-base font-black text-stone-700">{group.title}</h2>
+          <span className="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-xs font-bold text-stone-500">{group.items.length}</span>
+        </div>
+      {group.items.map((c) => {
         const st = STATUS_LABELS[c.status];
         const isEntity = c.billing_track === "center_entity";
         const p = centerMonthlyPricing(c);
@@ -480,6 +494,8 @@ export default function AdminCentersPage() {
           </div>
         );
       })}
+      </section>
+      ))}
 
       {/* מודל יצירה/עריכה. הכרטיס זורם בגובה טבעי (בלי max-h ובלי גלילה פנימית)
           בתוך שכבה שכולה גוללת (overflow-y-auto). items-start + my-auto ממרכז את

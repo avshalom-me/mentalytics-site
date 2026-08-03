@@ -240,6 +240,7 @@ export async function POST(req: NextRequest) {
         numLocations: center.num_locations as number | null,
         giftMonths,
         billingStartsAt: firstChargeDate ?? now.toISOString().slice(0, 10),
+        token: center.token as string, // קישור הקמה עצמית של חשבון הניהול
       });
     } catch (mailErr) {
       console.error("centers/subscribe: welcome email failed:", mailErr instanceof Error ? mailErr.message : mailErr);

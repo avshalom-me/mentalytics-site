@@ -4,6 +4,7 @@ import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://www.mentalytics.co.il/research/online-therapy" },
   title: "טיפול אונליין - כן או לא?",
   description: "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
 };

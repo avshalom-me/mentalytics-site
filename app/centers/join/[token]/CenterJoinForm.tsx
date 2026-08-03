@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2, ShieldCheck, Gift, CheckCircle2, ArrowLeft, Sparkles, BarChart3, MapPin, Activity, Users, LayoutDashboard } from "lucide-react";
+import CenterAccountSetup from "./CenterAccountSetup";
 
 // טופס הצטרפות ותשלום למרכז טיפולי. בחירת מסלול (אם הוצעו כמה) + פרטי
 // אשראי. הכרטיס עובר טוקניזציה בדפדפן ישירות מול Sumit - כמו בצ'קאאוט של
@@ -151,19 +152,9 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           ) : (
             <><br />קבלה על החיוב הראשון נשלחה למייל שהזנתם.</>
           )}
-          <br />ניצור אתכם קשר להשלמת קליטת המטפלים של המרכז.
         </p>
-        <div className="mx-auto mt-6 max-w-md rounded-2xl border border-[#D8E4E8] bg-[#F0F7FA] p-4 text-right">
-          <p className="text-sm font-bold text-stone-800">
-            <LayoutDashboard size={15} className="ml-1 inline" style={{ color: "var(--teal)" }} />
-            פורטל ניהול המרכז
-          </p>
-          <p className="mt-1 text-xs leading-6 text-stone-600">
-            להיכנס לפורטל, לצפות בפרופילי המטפלים ובסטטיסטיקות המרוכזות -{" "}
-            <a href="/centers/login?mode=register" className="font-bold underline">הירשמו כאן</a>{" "}
-            עם המייל <span className="font-mono">{payerEmail}</span>.
-          </p>
-        </div>
+        {/* הקמת חשבון מיידית — קישור לפי הטוקן הסודי, בלי המתנה לקישור ידני */}
+        <CenterAccountSetup token={offer.token} centerName={offer.name} defaultEmail={payerEmail.trim()} />
       </div>
     );
   }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import CenterJoinForm, { type CenterOffer } from "./CenterJoinForm";
+import CenterAccountSetup from "./CenterAccountSetup";
 
 // דף הצטרפות למרכז טיפולי - נפתח מהקישור הסודי שהאדמין שולח עם הצעת המחיר.
 // server component: טוען את ההצעה לפי ה-token בצד השרת בלבד (הטבלה סגורה
@@ -20,7 +21,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
 
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, discount_amount, num_locations, gift_months, billing_starts_at")
+    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, discount_amount, num_locations, gift_months, billing_starts_at, user_id, payer_email")
     .eq("token", token)
     .maybeSingle();
 
@@ -47,8 +48,17 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
           <h1 className="text-xl font-black text-stone-900 mb-2">המנוי של {center.name} פעיל</h1>
           <p className="text-sm leading-6 text-stone-600">
             פרטי התשלום נקלטו בהצלחה{center.billing_starts_at ? ` - החיוב הראשון ב-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}` : ""}.
-            <br />לשאלות: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
           </p>
+          {center.user_id ? (
+            <p className="mt-3 text-sm leading-6 text-stone-600">
+              חשבון הניהול כבר מקושר -{" "}
+              <a href="/centers/dashboard" className="font-bold underline" style={{ color: "var(--teal-dark)" }}>כניסה לפורטל</a>
+              <br />לשאלות: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
+            </p>
+          ) : (
+            // שולם אך טרם הוקם חשבון ניהול - הקמה עצמית לפי הטוקן (הגעה מהמייל)
+            <CenterAccountSetup token={token} centerName={center.name} defaultEmail={center.payer_email ?? undefined} />
+          )}
         </div>
       </Shell>
     );

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
-import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2 } from "lucide-react";
+import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 
 // דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד - כל השינויים
@@ -22,12 +22,13 @@ type TherapistItem = {
   month_clicks: number;
 };
 
-type Clicks = { whatsapp: number; phone: number; email: number; total: number };
+type Clicks = { whatsapp: number; phone: number; email: number; site_message?: number; total: number };
 type Bar = { name: string; count: number };
 
 type Stats = {
   listed_count: number;
   views_month: number;
+  impressions_month?: number;
   clicks_week: Clicks;
   clicks_month: Clicks;
   by_region: Bar[];
@@ -83,7 +84,7 @@ export default function CenterDashboardPage() {
         const res = await fetch("/api/center-portal", { headers: { Authorization: `Bearer ${session.access_token}` } });
         const json = await res.json();
         if (res.status === 401) {
-          setError("החשבון שלכם עדיין לא מקושר למרכז. נחבר אתכם ידנית - פנו אלינו עם שם המרכז והמייל שאיתו נרשמתם, ונשלים את הקישור תוך יום עסקים.");
+          setError("החשבון שלכם עדיין לא מקושר למרכז. פתחו את הקישור שבמייל \"ברוכים הבאים\" שקיבלתם אחרי התשלום - הוא מקשר את החשבון אוטומטית תוך דקה. לא מוצאים את המייל? כתבו לנו עם שם המרכז ונקשר ידנית תוך יום עסקים.");
         } else if (!json.ok) {
           setError(json.error ?? "שגיאה בטעינת הנתונים");
         } else {
@@ -156,10 +157,11 @@ export default function CenterDashboardPage() {
       )}
 
       {/* מדדים מרכזיים */}
-      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-3" : "md:grid-cols-4"}`}>
+      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
         {!isEntity && (
           <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
         )}
+        <StatCard icon={Sparkles} label="הופעות בהתאמות" value={stats?.impressions_month ?? 0} sub="30 יום · הופעה ברשימת ההמלצות" color="#7c3aed" />
         <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="30 יום" color="#1A7A96" />
         <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
         <StatCard icon={Activity} label="לחיצות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
@@ -333,6 +335,7 @@ export default function CenterDashboardPage() {
               <Channel label="וואטסאפ" value={stats.clicks_month.whatsapp} total={stats.clicks_month.total} color="#22c55e" />
               <Channel label="טלפון" value={stats.clicks_month.phone} total={stats.clicks_month.total} color="#57534e" />
               <Channel label="מייל" value={stats.clicks_month.email} total={stats.clicks_month.total} color="#3b82f6" />
+              <Channel label="📝 הודעות מהאתר" value={stats.clicks_month.site_message ?? 0} total={stats.clicks_month.total} color="#d97706" />
             </div>
             <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
               <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>

@@ -4,6 +4,7 @@ import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://www.mentalytics.co.il/research/adhd-adults" },
   title: "אבחון ADHD למבוגרים",
   description: "מה כולל אבחון ADHD למבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות - מדריך מקיף ופשוט.",
 };

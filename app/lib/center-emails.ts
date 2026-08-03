@@ -104,6 +104,7 @@ export async function sendCenterWelcomeEmail(opts: {
   numLocations?: number | null;
   giftMonths: number;
   billingStartsAt: string | null;
+  token?: string | null; // קישור הקמה עצמית של חשבון הניהול (claim-by-token)
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendCenterWelcomeEmail: RESEND_API_KEY not configured, skipping");
@@ -127,7 +128,11 @@ export async function sendCenterWelcomeEmail(opts: {
   const priceLine = opts.billingTrack === "center_entity"
     ? `מנוי חודשי - מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`
     : `${pr.therapistCount} מטפלים · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`;
-  const portalUrl = `${SITE_URL}/centers/login?mode=register`;
+  // עם טוקן — קישור ההקמה העצמית (נרשמים ומקושרים למרכז אוטומטית);
+  // בלעדיו — עמוד ההרשמה הרגיל (מרכזים ותיקים שקושרו ידנית).
+  const portalUrl = opts.token
+    ? `${SITE_URL}/centers/join/${opts.token}`
+    : `${SITE_URL}/centers/login?mode=register`;
   const to = escapeHtml(opts.to);
   // נושא = טקסט רגיל, בלי HTML entities.
   const subject = `ברוכים הבאים לטיפול חכם - ${rawName} 🎉`;
@@ -146,11 +151,11 @@ export async function sendCenterWelcomeEmail(opts: {
         <p style="margin:0;font-size:13px;color:#3E5250;">${giftLine(opts.giftMonths, opts.billingStartsAt)}</p>
       </div>
       <p style="margin:0 0 10px;font-weight:bold;">פורטל ניהול המרכז</p>
-      <p style="margin:0 0 16px;">בפורטל תראו את כל פרופילי המטפלים של המרכז במקום אחד, וסטטיסטיקות מרוכזות - כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים. להתחברות, הירשמו עם כתובת המייל הזו (${to}):</p>
+      <p style="margin:0 0 16px;">בקישור למטה תקימו את חשבון הניהול בדקה (מייל + סיסמה, מומלץ עם ${to}) ותוכלו מיד למלא את פרופיל המרכז - לוגו, צוות, תמונות ותחומי טיפול - ולראות סטטיסטיקות מרוכזות: כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים.</p>
       <p style="margin:0 0 16px;">
-        <a href="${portalUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">כניסה לפורטל המרכז</a>
+        <a href="${portalUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">הקמת חשבון הניהול ומילוי הפרופיל</a>
       </p>
-      <p style="margin:0 0 4px;font-size:13px;color:#3E5250;">נציג שלנו ייצור אתכם קשר להשלמת קליטת המטפלים של המרכז.</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#3E5250;">צריכים עזרה במילוי? אנחנו כאן - admin@getmentalytics.com</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         לכל שאלה אנחנו כאן: admin@getmentalytics.com<br/>

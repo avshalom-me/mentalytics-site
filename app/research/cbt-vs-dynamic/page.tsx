@@ -4,6 +4,7 @@ import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
+  alternates: { canonical: "https://www.mentalytics.co.il/research/cbt-vs-dynamic" },
   title: "הבדל בין CBT לטיפול דינמי - מה ההבדל ומה מתאים לך?",
   description: "CBT מול טיפול דינמי - מה ההבדל בין הגישות, כמה זמן לוקח כל טיפול, ואיך יודעים מה מתאים לך? מדריך מקיף ופשוט.",
 };

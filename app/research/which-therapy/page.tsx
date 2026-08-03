@@ -5,7 +5,10 @@ import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
-  title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר | טיפול חכם",
+  alternates: { canonical: "https://www.mentalytics.co.il/research/which-therapy" },
+  // Bare title: the root layout template appends " | טיפול חכם", so carrying
+  // the suffix here too rendered it twice.
+  title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר",
   description:
     "CBT, דינמי, DBT, ACT, EMDR, EFT - מה ההבדל ואיזה מתאים לך? מדריך מקיף מבוסס מחקרים עדכניים על בחירת טיפול פסיכולוגי והתאמה בין מטפל למטופל.",
   openGraph: {
