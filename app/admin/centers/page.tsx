@@ -249,6 +249,12 @@ export default function AdminCentersPage() {
     if (j.ok) alert(`ההצעה נשלחה ל${c.email}.`);
   }
 
+  async function regenToken(c: Center) {
+    if (!confirm(`לחדש את קישור ההצטרפות של "${c.name}"?\n\nהקישור הישן יפסיק לעבוד מיד. התמחור וכל פרטי ההצעה נשמרים - רק הכתובת משתנה, ותצטרכו לשלוח את החדשה.`)) return;
+    const j = await post({ action: "regenerate_token", id: c.id });
+    if (j.ok) alert("הקישור חודש. השתמשו ב\"העתקת קישור למרכז\" כדי להעתיק את החדש - הישן כבר לא תקף.");
+  }
+
   async function del(c: Center) {
     if (c.status === "active") {
       setError("אי אפשר למחוק מרכז פעיל - בטלו קודם את המנוי");
@@ -493,6 +499,11 @@ export default function AdminCentersPage() {
                   <button onClick={() => post({ action: "mark_sent", id: c.id })} disabled={busy}
                     className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     {c.status === "sent" ? "החזרה לטיוטה" : "סימון כנשלחה ידנית"}
+                  </button>
+                  <button onClick={() => regenToken(c)} disabled={busy}
+                    title="מנפיק קישור חדש ומבטל את הישן. התמחור וכל פרטי ההצעה נשמרים."
+                    className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
+                    🔄 חידוש קישור
                   </button>
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכה

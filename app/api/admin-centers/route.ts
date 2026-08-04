@@ -458,6 +458,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, status: next });
     }
 
+    // חידוש קישור ההצטרפות: מנפיק טוקן חדש ומבטל את הישן, בלי לגעת בתמחור
+    // שנסגר בשיחת המכירה. שימושי כשקישור דלף/הועבר הלאה, או כשרוצים לשלוח
+    // הצעה "נקייה" אחרי תקלה. חסום למרכז פעיל - שם הטוקן הוא גם קישור הקמת
+    // חשבון הניהול, וחידושו ינתק את המרכז מהמייל שכבר נשלח אליו.
+    if (action === "regenerate_token") {
+      if (center.status !== "draft" && center.status !== "sent") {
+        return NextResponse.json(
+          { ok: false, error: "אפשר לחדש קישור רק להצעה שטרם שולמה" },
+          { status: 400 },
+        );
+      }
+      const { randomBytes } = await import("crypto");
+      const newToken = randomBytes(24).toString("hex");
+      await supabaseAdmin
+        .from("therapy_center_accounts")
+        .update({ token: newToken, updated_at: new Date().toISOString() })
+        .eq("id", id)
+        .throwOnError();
+      console.log(`admin-centers: token regenerated for center=${id} (${center.name}) - old link revoked`);
+      return NextResponse.json({ ok: true, token: newToken });
+    }
+
     if (action === "cancel_subscription") {
       if (center.status !== "active" || !center.sumit_recurring_id) {
         return NextResponse.json({ ok: false, error: "אין מנוי פעיל לביטול" }, { status: 400 });
