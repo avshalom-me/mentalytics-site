@@ -36,7 +36,8 @@ const articleLd = {
   inLanguage: "he",
   datePublished: "2026-08-04",
   dateModified: "2026-08-04",
-  author: siteAuthorRef(),
+  // Both, to match the visible byline.
+  author: [siteAuthorRef(), { "@type": "Organization", name: "צוות טיפול חכם", url: BASE_URL }],
   publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
   url: URL,
   articleSection: "מסגרת, עלות וזכויות",
@@ -89,6 +90,7 @@ const h2 = {
   marginBottom: "14px",
   borderBottom: "2px solid var(--teal-mid)",
   paddingBottom: "8px",
+  scrollMarginTop: "90px",
 } as const;
 
 const TRIGGERS: Record<string, string> = {
@@ -123,11 +125,52 @@ export default function BtlHubPage() {
         </p>
       </div>
 
+      {/* Jump links - see the note on the same nav in [track]/page.tsx. */}
+      <nav
+        aria-label="תוכן העמוד"
+        className="mb-10 rounded-2xl"
+        style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "20px 22px" }}
+      >
+        <p style={{ fontSize: "12px", fontWeight: 800, color: "var(--muted)", letterSpacing: ".1em", marginBottom: "12px" }}>
+          מה יש בעמוד הזה
+        </p>
+        <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "2px" }}>
+          {[
+            { id: "why", label: "למה לא לחכות", hint: "החלק הנפשי" },
+            { id: "tracks", label: "לאיזה מסלול אתם שייכים", hint: "בחירה מודרכת" },
+            { id: "rehab", label: "שיקום מקצועי", hint: "המסלול שחוצה את כולם" },
+            { id: "summary", label: "סיכום קצר", hint: "מה לעשות, לפי סדר" },
+            { id: "sources", label: "מקורות", hint: "ביטוח לאומי ומחקרים" },
+          ].map((c, i) => (
+            <li key={c.id}>
+              <a
+                href={`#${c.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "10px",
+                  padding: "8px 10px",
+                  borderRadius: "10px",
+                  textDecoration: "none",
+                  color: "var(--text)",
+                }}
+              >
+                <span aria-hidden style={{ fontSize: "12px", fontWeight: 800, color: "var(--teal)", minWidth: "16px" }}>
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: "15px", fontWeight: 700 }}>{c.label}</span>
+                <span style={{ fontSize: "13px", color: "var(--muted)" }}>· {c.hint}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
       <article className="space-y-10 text-stone-700 leading-8 text-base">
 
         {/* ── Part 3 (intro): why early matters ───────────────────────────── */}
         <section>
-          <h2 style={h2}>למה לא לחכות</h2>
+          <h2 id="why" style={h2}>למה לא לחכות</h2>
           <p>
             התהליך הבירוקרטי שמתואר כאן לוקח זמן, ולכן מתעורר פיתוי טבעי לחכות: קודם שההכרה תסתדר, קודם
             שהוועדה תתכנס, קודם שיהיה ברור מה מגיע. המחקר אומר שזו הבחירה היקרה ביותר - ולא רק מבחינת סבל,
@@ -194,7 +237,7 @@ export default function BtlHubPage() {
 
         {/* ── The map ─────────────────────────────────────────────────────── */}
         <section>
-          <h2 style={h2}>לאיזה מסלול אתם שייכים</h2>
+          <h2 id="tracks" style={h2}>לאיזה מסלול אתם שייכים</h2>
           <p className="mb-5">
             זו השאלה הראשונה, והאתר הרשמי עונה עליה הכי פחות טוב - כל זכאות יושבת בעמוד נפרד בלי מפה
             שמחברת ביניהן. שימו לב להבחנה שבתחתית כל כרטיס: <strong>רק שני מסלולים מממנים טיפול נפשי
@@ -212,7 +255,7 @@ export default function BtlHubPage() {
 
         {/* ── Cross-cutting: vocational rehab ─────────────────────────────── */}
         <section>
-          <h2 style={h2}>שיקום מקצועי - מסלול שחוצה את כולם</h2>
+          <h2 id="rehab" style={h2}>שיקום מקצועי - מסלול שחוצה את כולם</h2>
           <p>
             שיקום מקצועי אינו מסלול נפרד אלא זכאות שנפתחת מתוך כמה מהמסלולים למעלה, והוא מוכרע על ידי
             <strong> עובד/ת שיקום ולא על ידי ועדה רפואית</strong> - הבדל שמקצר משמעותית את התהליך. מגישים
@@ -226,16 +269,52 @@ export default function BtlHubPage() {
           </p>
         </section>
 
+        <section>
+          <h2 id="summary" style={h2}>סיכום קצר</h2>
+          <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "12px" }}>
+            {[
+              "לזהות לאיזה מסלול אתם שייכים - זו השאלה שקובעת הכל, ואפשר להשתייך ליותר מאחד.",
+              "לא לחכות להכרה כדי להתחיל טיפול. טיפול דרך הקופה זמין עכשיו, במקביל לתביעה.",
+              "לשים לב לחלונות הזמן: התביעה מוגבלת בדרך כלל לשנה, והערר לוועדה - לשבועות.",
+              "לבדוק שיקום מקצועי בנפרד מהקצבה. הסף נמוך יותר וההחלטה אינה של ועדה רפואית.",
+              "לתעד הכל מוקדם. תיעוד סמוך לאירוע הוא הראיה החזקה ביותר, וגם הטיפול היעיל ביותר.",
+            ].map((x, i) => (
+              <li key={x} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <span
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: "26px",
+                    height: "26px",
+                    borderRadius: "50px",
+                    background: "var(--teal-pale)",
+                    color: "var(--teal-dark)",
+                    fontSize: "13px",
+                    fontWeight: 900,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: "15.5px", lineHeight: 1.8, color: "var(--text-2)" }}>{x}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         {/* ── Route to supply ─────────────────────────────────────────────── */}
         <section
           style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", borderRadius: "16px", padding: "24px 26px" }}
         >
           <h2 style={{ fontSize: "17px", fontWeight: 900, color: "var(--teal-dark)", marginBottom: "10px" }}>
-            מחפשים מטפל/ת שעובדים מול ביטוח לאומי?
+            לא בטוחים לאן להתקדם?
           </h2>
           <p className="text-sm leading-7">
-            אפשר להתחיל מהשאלון, שממפה את הקושי וממליץ על סוג הטיפול - בחינם, אנונימי וללא התחייבות - או
-            לעבור ישירות לרשימת המטפלים שהצהירו שהם עובדים מול ביטוח לאומי.
+            אם אתם יודעים שמשהו לא בסדר אבל לא יודעים איזה טיפול מתאים או למי לפנות, השאלון ממפה את
+            הקושי ומציע בסופו התאמה אישית. הוא בחינם, אנונימי וללא התחייבות. ואם כבר ברור לכם מה אתם
+            מחפשים, אפשר לעבור ישירות לרשימת המטפלים שעובדים מול ביטוח לאומי.
           </p>
           <div className="flex flex-wrap gap-2 mt-4">
             {[
@@ -257,7 +336,7 @@ export default function BtlHubPage() {
         </section>
 
         <section>
-          <h2 style={h2}>מקורות</h2>
+          <h2 id="sources" style={h2}>מקורות</h2>
           <ul className="space-y-2 text-sm">
             {[
               { l: "המוסד לביטוח לאומי - טיפול פסיכולוגי לנפגעי פעולות איבה", h: "https://www.btl.gov.il/benefits/Victims_of_Hostilities/Casualties_benefits/Pages/%D7%98%D7%99%D7%A4%D7%95%D7%9C%20%D7%A4%D7%A1%D7%99%D7%9B%D7%95%D7%9C%D7%95%D7%92%D7%99.aspx" },
@@ -282,7 +361,8 @@ export default function BtlHubPage() {
         </section>
 
         <AuthorByline
-          note={`מדריך זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם". תנאי הזכאות והסכומים משתנים מעת לעת, והפרטים המחייבים הם תמיד של המוסד לביטוח לאומי עצמו. אין באמור ייעוץ משפטי. עודכן באוגוסט 2026.`}
+          coAuthor="צוות טיפול חכם"
+          note={`מדריך זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם", יחד עם צוות טיפול חכם. תנאי הזכאות והסכומים משתנים מעת לעת, והפרטים המחייבים הם תמיד של המוסד לביטוח לאומי עצמו. אין באמור ייעוץ משפטי. עודכן באוגוסט 2026.`}
         />
       </article>
     </ArticleShell>

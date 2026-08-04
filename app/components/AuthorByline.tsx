@@ -11,8 +11,14 @@ import { SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
  *
  * `note` states why this author is qualified *for this particular article* -
  * a generic bio says less than "he teaches assessment" on an assessment guide.
+ *
+ * `coAuthor` credits the editorial team alongside the named author, for guides
+ * that were genuinely produced that way. It is deliberately additive rather
+ * than a replacement: the credentialed human stays the visible author, because
+ * a house byline alone on a YMYL page is exactly what quality raters treat as
+ * unattributed.
  */
-export function AuthorByline({ note }: { note?: string }) {
+export function AuthorByline({ note, coAuthor }: { note?: string; coAuthor?: string }) {
   return (
     <div
       style={{
@@ -46,6 +52,7 @@ export function AuthorByline({ note }: { note?: string }) {
           <Link href={SITE_AUTHOR_PATH} className="hover:underline" style={{ color: "var(--teal-dark)" }}>
             {SITE_AUTHOR.name}
           </Link>
+          {coAuthor && <span style={{ fontWeight: 600, color: "var(--text-2)" }}> ו{coAuthor}</span>}
           {/* The Latin spelling, visible and not only in the structured data:
               it is how the academic profiles (Scholar, ORCID, ResearchGate) and
               any English-language citation spell him, and it is the string a

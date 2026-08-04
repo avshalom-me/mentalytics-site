@@ -6,8 +6,12 @@ import { AuthorByline } from "@/app/components/AuthorByline";
 import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import { BTL_TRACKS, btlTrackBySlug } from "@/app/lib/btl-tracks";
 import BtlProcessFlow from "@/app/components/BtlProcessFlow";
+import BtlDeadlines from "@/app/components/BtlDeadlines";
 
 const BASE_URL = "https://www.mentalytics.co.il";
+
+/** Landing page listing therapists who work through National Insurance. */
+const BTL_THERAPISTS = "/therapists/arrangement/%D7%91%D7%99%D7%98%D7%95%D7%97-%D7%9C%D7%90%D7%95%D7%9E%D7%99";
 
 export function generateStaticParams() {
   return BTL_TRACKS.map((t) => ({ track: t.slug }));
@@ -26,6 +30,11 @@ export async function generateMetadata({ params }: { params: Promise<{ track: st
   };
 }
 
+/**
+ * scrollMarginTop keeps a heading clear of the sticky header when the reader
+ * arrives from the contents list - without it the anchor lands with the title
+ * hidden behind the nav, which reads as a broken link.
+ */
 const h2 = {
   fontSize: "21px",
   fontWeight: 800,
@@ -33,6 +42,14 @@ const h2 = {
   marginBottom: "14px",
   borderBottom: "2px solid var(--teal-mid)",
   paddingBottom: "8px",
+  scrollMarginTop: "90px",
+} as const;
+
+const h3 = {
+  fontSize: "16.5px",
+  fontWeight: 800,
+  color: "var(--text)",
+  marginBottom: "10px",
 } as const;
 
 export default async function BtlTrackPage({ params }: { params: Promise<{ track: string }> }) {
@@ -43,6 +60,14 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
   const url = `${BASE_URL}/research/btl/${t.slug}`;
   const others = BTL_TRACKS.filter((x) => x.slug !== t.slug);
 
+  const contents = [
+    { id: "why", label: "למה כדאי לקבל עזרה", hint: "החלק הנפשי" },
+    { id: "process", label: "ההליך הבירוקרטי", hint: "שלבים, טפסים ומה משתבש" },
+    { id: "official", label: "קישורים רשמיים", hint: "ישירות לביטוח לאומי" },
+    { id: "visual", label: "לוחות הזמנים בתמונה", hint: "מה דחוף ומה לא" },
+    { id: "summary", label: "סיכום קצר", hint: "מה לעשות, לפי סדר" },
+  ];
+
   const articleLd = {
     "@context": "https://schema.org",
     "@type": "Article",
@@ -51,7 +76,9 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
     inLanguage: "he",
     datePublished: "2026-08-04",
     dateModified: "2026-08-04",
-    author: siteAuthorRef(),
+    // Both, because the visible byline credits both - structured data that
+    // disagrees with the rendered page is worse than none.
+    author: [siteAuthorRef(), { "@type": "Organization", name: "צוות טיפול חכם", url: BASE_URL }],
     publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
     url,
     articleSection: "מסגרת, עלות וזכויות",
@@ -135,15 +162,84 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
         <p style={{ fontSize: "14.5px", lineHeight: 1.8, color: "var(--text-2)" }}>{t.covered}</p>
       </div>
 
+      {/* ── Contents ────────────────────────────────────────────────────────
+          Readers arrive here from very different places: some want the form
+          number and nothing else, some are trying to decide whether what they
+          feel warrants help at all. Jump links let both get where they are
+          going without scrolling past the other's section. */}
+      <nav
+        aria-label="תוכן העמוד"
+        className="mb-10 rounded-2xl"
+        style={{ background: "var(--surface)", border: "1px solid var(--line)", padding: "20px 22px" }}
+      >
+        <p style={{ fontSize: "12px", fontWeight: 800, color: "var(--muted)", letterSpacing: ".1em", marginBottom: "12px" }}>
+          מה יש בעמוד הזה
+        </p>
+        <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "2px" }}>
+          {contents.map((c, i) => (
+            <li key={c.id}>
+              <a
+                href={`#${c.id}`}
+                style={{
+                  display: "flex",
+                  alignItems: "baseline",
+                  gap: "10px",
+                  padding: "8px 10px",
+                  borderRadius: "10px",
+                  textDecoration: "none",
+                  color: "var(--text)",
+                }}
+              >
+                <span
+                  aria-hidden
+                  style={{ fontSize: "12px", fontWeight: 800, color: "var(--teal)", minWidth: "16px" }}
+                >
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: "15px", fontWeight: 700 }}>{c.label}</span>
+                <span style={{ fontSize: "13px", color: "var(--muted)" }}>· {c.hint}</span>
+              </a>
+            </li>
+          ))}
+        </ol>
+      </nav>
+
       <article className="space-y-10 text-stone-700 leading-8 text-base">
 
+        {/* ── 1. The clinical half ─────────────────────────────────────────── */}
         <section>
-          <h2 style={h2}>ההליך, שלב אחר שלב</h2>
+          <h2 id="why" style={h2}>{t.whyHelp.heading}</h2>
+          {t.whyHelp.paragraphs.map((p) => (
+            <p key={p.slice(0, 40)} className="mb-4">{p}</p>
+          ))}
+
+          <div className="rounded-2xl p-5 mt-6" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
+            <p style={{ fontWeight: 800, fontSize: "15px", color: "var(--teal-dark)", marginBottom: "10px" }}>
+              מתי זה סימן לפנות לעזרה
+            </p>
+            <ul className="space-y-2" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+              {t.whyHelp.signs.map((s) => (
+                <li key={s} style={{ fontSize: "14.5px", lineHeight: 1.75, color: "var(--text-2)", display: "flex", gap: "9px" }}>
+                  <span aria-hidden style={{ color: "var(--teal)", fontWeight: 900 }}>·</span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ul>
+            <p style={{ fontSize: "13.5px", color: "var(--muted)", marginTop: "12px", lineHeight: 1.7 }}>
+              אף אחד מהסימנים האלה אינו אבחנה, ואין צורך בכולם. אם משהו כאן מוכר לכם ונמשך - זו סיבה
+              מספקת לפנות, גם בלי לדעת אם זה חמור מספיק.
+            </p>
+          </div>
+        </section>
+
+        {/* ── 2. The bureaucratic half ─────────────────────────────────────── */}
+        <section>
+          <h2 id="process" style={h2}>ההליך הבירוקרטי, שלב אחר שלב</h2>
           <BtlProcessFlow steps={t.steps} />
         </section>
 
         <section>
-          <h2 style={h2}>הטפסים</h2>
+          <h3 style={h3}>הטפסים</h3>
           <ul className="space-y-2">
             {t.forms.map((f) => (
               <li key={f.number} className="flex items-start gap-3">
@@ -173,7 +269,7 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
         </section>
 
         <section>
-          <h2 style={h2}>כמה מפגשים מכוסים</h2>
+          <h3 style={h3}>כמה מפגשים מכוסים</h3>
           <p>{t.sessionsNote}</p>
           <p className="mt-3 text-sm" style={{ color: "var(--muted)" }}>
             שימו לב: באתר הרשמי אין מספר מפגשים אחיד שמפורסם מראש לרוב המסלולים, ומי שמבטיח לכם מספר
@@ -181,9 +277,8 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
           </p>
         </section>
 
-        {/* ── Part 2: what goes wrong ─────────────────────────────────────── */}
         <section>
-          <h2 style={h2}>מה משתבש, ומה עושים</h2>
+          <h3 style={h3}>מה משתבש, ומה עושים</h3>
           <div className="space-y-5">
             {t.issues.map((i) => (
               <div key={i.problem} className="rounded-2xl p-5" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
@@ -197,7 +292,7 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
         </section>
 
         <section>
-          <h2 style={h2}>ערעורים - ולוחות הזמנים שאסור לפספס</h2>
+          <h3 style={h3}>ערעורים - ולוחות הזמנים שאסור לפספס</h3>
           <p className="mb-4">
             זה החלק הכי תלוי-זמן בכל התהליך. חלון ערר שחלף סוגר את התיק, ולכן כדאי להגיש ערר גם אם עדיין
             אוספים מסמכים, ולציין שנימוקים משלימים יישלחו בהמשך.
@@ -233,18 +328,122 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
           </p>
         </section>
 
+        {/* ── 3. Official sources, inside the bureaucratic half ─────────────── */}
+        <section>
+          <h3 id="official" style={{ ...h3, scrollMarginTop: "90px" }}>הקישורים הרשמיים</h3>
+          <p className="mb-4 text-sm" style={{ color: "var(--muted)" }}>
+            העמוד הזה מסביר ומסדר, אבל הגורם המחייב הוא תמיד ביטוח לאומי עצמו. אלה העמודים שמהם נלקחו
+            הפרטים כאן, וכדאי לוודא בהם לפני הגשה - התנאים והסכומים משתנים.
+          </p>
+          <ul className="space-y-2" style={{ listStyle: "none", padding: 0, margin: 0 }}>
+            {t.officialLinks.map((l) => (
+              <li key={l.href}>
+                <a
+                  href={l.href}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  className="rounded-xl"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "12px 14px",
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    color: "var(--teal-dark)",
+                    fontSize: "14.5px",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    lineHeight: 1.6,
+                  }}
+                >
+                  <span aria-hidden style={{ color: "var(--teal)", flexShrink: 0 }}>↗</span>
+                  <span>{l.label}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        {/* ── 4. Visualisation ─────────────────────────────────────────────── */}
+        <section>
+          <h2 id="visual" style={h2}>לוחות הזמנים בתמונה אחת</h2>
+          <p className="mb-5">
+            רוב מי שמפספס זכאות לא מפספס אותה בגלל שהתנאים לא התקיימו, אלא בגלל שחלון זמן נסגר. זהו
+            אותו מידע שבטבלה למעלה, בקנה מידה - כדי שיהיה ברור מה נשרף תוך שבועות ומה יש עליו שנה.
+          </p>
+          <BtlDeadlines appeals={t.appeals} />
+        </section>
+
+        {/* ── 5. Recap ─────────────────────────────────────────────────────── */}
+        <section>
+          <h2 id="summary" style={h2}>סיכום קצר</h2>
+          <ol style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: "12px" }}>
+            {t.summary.map((s, i) => (
+              <li key={s} style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+                <span
+                  aria-hidden
+                  style={{
+                    flexShrink: 0,
+                    width: "26px",
+                    height: "26px",
+                    borderRadius: "50px",
+                    background: "var(--teal-pale)",
+                    color: "var(--teal-dark)",
+                    fontSize: "13px",
+                    fontWeight: 900,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  {i + 1}
+                </span>
+                <span style={{ fontSize: "15.5px", lineHeight: 1.8, color: "var(--text-2)" }}>{s}</span>
+              </li>
+            ))}
+          </ol>
+        </section>
+
         {/* ── Route to supply ─────────────────────────────────────────────── */}
         <section style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", borderRadius: "16px", padding: "24px 26px" }}>
           <h2 style={{ fontSize: "17px", fontWeight: 900, color: "var(--teal-dark)", marginBottom: "10px" }}>
-            מחפשים מטפל/ת?
+            לא בטוחים לאן להתקדם?
           </h2>
           <p className="text-sm leading-7">
-            אפשר להתחיל מהשאלון שממפה את הקושי וממליץ על סוג הטיפול, או לעבור ישירות לרשימות הרלוונטיות.
-            בחינם, אנונימי וללא התחייבות.
+            אם אתם יודעים שמשהו לא בסדר אבל לא יודעים איזה טיפול מתאים או למי לפנות, השאלון ממפה את
+            הקושי ומציע בסופו התאמה אישית - סוג הטיפול ומטפלים שמתאימים לו. הוא <strong>בחינם, אנונימי
+            וללא התחייבות</strong>, ולוקח כמה דקות.
           </p>
           <div className="flex flex-wrap gap-2 mt-4">
-            {[{ href: "/adults", label: "לשאלון למבוגרים" }, { href: "/kids", label: "לשאלון לילדים ונוער" }, ...t.directory].map(
-              ({ href, label }) => (
+            {[
+              { href: "/adults", label: "לשאלון למבוגרים" },
+              { href: "/kids", label: "לשאלון לילדים ונוער" },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="rounded-full px-5 py-2.5 text-sm font-bold"
+                style={{ background: "var(--teal)", color: "#fff", textDecoration: "none" }}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--teal-mid)", marginTop: "20px", paddingTop: "18px" }}>
+            <p className="text-sm leading-7" style={{ marginBottom: "12px" }}>
+              ואם אתם כבר יודעים מה אתם מחפשים - כאן מרוכזים המטפלים שעובדים דרך ביטוח לאומי:
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Link
+                href={BTL_THERAPISTS}
+                className="rounded-full px-4 py-2 text-sm font-semibold"
+                style={{ background: "var(--bg)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)", textDecoration: "none" }}
+              >
+                מטפלים דרך ביטוח לאומי
+              </Link>
+              {t.directory.map(({ href, label }) => (
                 <Link
                   key={href}
                   href={href}
@@ -253,8 +452,8 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
                 >
                   {label}
                 </Link>
-              )
-            )}
+              ))}
+            </div>
           </div>
         </section>
 
@@ -285,7 +484,8 @@ export default async function BtlTrackPage({ params }: { params: Promise<{ track
         </section>
 
         <AuthorByline
-          note={`מדריך זה נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם". תנאי הזכאות, הסכומים ומספרי הטפסים משתנים מעת לעת, והפרטים המחייבים הם תמיד של המוסד לביטוח לאומי עצמו. אין באמור ייעוץ משפטי. עודכן באוגוסט 2026.`}
+          coAuthor="צוות טיפול חכם"
+          note={`נכתב על ידי ${SITE_AUTHOR.name}, ${SITE_AUTHOR.jobTitle} וממייסדי "טיפול חכם", יחד עם צוות טיפול חכם. תנאי הזכאות, הסכומים ומספרי הטפסים משתנים מעת לעת, והפרטים המחייבים הם תמיד של המוסד לביטוח לאומי עצמו. אין באמור ייעוץ משפטי. עודכן באוגוסט 2026.`}
         />
       </article>
     </ArticleShell>
