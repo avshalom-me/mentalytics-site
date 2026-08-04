@@ -39,6 +39,8 @@ const BodySchema = z.object({
     gender: z.string().nullable().optional(),
     cultural_prefs: z.array(z.string()).optional(),
     bio: z.string().nullable().optional(),
+    // 'center' = מרכז טיפולי (מסלול 2) ולא אדם - משנה כותרת, גוף ולשון.
+    entity_type: z.string().nullable().optional(),
   }),
 
   match_result: z.object({
@@ -70,6 +72,10 @@ const TONE_NOTE =
 function buildTitle(body: Body): string {
   const isAssessment = (body.user_summary?.recommended_assessment_types?.length ?? 0) > 0;
   const gender = body.therapist.gender;
+  // מרכז טיפולי אינו אדם - כותרת בלשון מוסד, בלי מגדר.
+  if (body.therapist.entity_type === "center") {
+    return body.questionnaire_type === "child" ? "למה המרכז הזה הוצע לילדכם" : "למה המרכז הזה הוצע לך";
+  }
   // Child questionnaires are filled by parents — the match is for their child.
   const forWhom = body.questionnaire_type === "child" ? "לילדכם" : "לך";
   if (isAssessment) {
@@ -93,18 +99,26 @@ function buildMockExplanation(body: Body): ExplainResponse {
   const matchedTreatments = treatments.filter(t => therapistAreas.includes(t));
   const unmatchedTreatments = treatments.filter(t => !therapistAreas.includes(t));
 
+  // מסלול הגיבוי (בלי LLM) חייב גם הוא לדעת שמרכז אינו אדם.
+  const isCenter = therapist.entity_type === "center";
+  const subject = isCenter ? "המרכז" : "המטפל";
+  const pool = isCenter ? "המרכזים והמטפלים הזמינים" : "המטפלים הזמינים";
   let explanation = "בהתבסס על תשובות השאלון, ";
 
   if (matchedTreatments.length > 0) {
-    explanation += `המטפל מתמחה ב${matchedTreatments.join(", ")} שמתאים לצרכים שעלו. `;
+    explanation += `${subject} מציע ${matchedTreatments.join(", ")} שמתאים לצרכים שעלו. `;
   } else if (reasons.length > 0) {
     explanation += `נמצאה התאמה על בסיס ${reasons[0]}. `;
   }
 
   if (unmatchedTreatments.length > 0) {
-    explanation += `חלק מהצרכים שעלו (${unmatchedTreatments.join(", ")}) אינם בדיוק בתחום ההתמחות, אך מבין המטפלים הזמינים זוהי ההתאמה הקרובה ביותר לפרופיל שלך.`;
+    explanation += `חלק מהצרכים שעלו (${unmatchedTreatments.join(", ")}) אינם בדיוק בתחום ההתמחות, אך מבין ${pool} זוהי ההתאמה הקרובה ביותר לפרופיל שלך. `;
   } else {
-    explanation += "זוהי ההתאמה הטובה ביותר שנמצאה מבין המטפלים הזמינים.";
+    explanation += `זוהי ההתאמה הקרובה ביותר שנמצאה מבין ${pool}. `;
+  }
+
+  if (isCenter) {
+    explanation += "הפנייה מגיעה למרכז, ובמרכז עצמו משבצים את המטפל/ת שמתאים/ה גם מבחינת סגנון העבודה.";
   }
 
   return {
@@ -154,10 +168,13 @@ function onlineRelevant(body: Body): boolean {
 }
 
 function buildPrompt(body: Body): string {
+  const isCenter = body.therapist.entity_type === "center";
   return JSON.stringify({
     addressing: addressingInstruction(body),
     questionnaire_type: body.questionnaire_type,
     search_mode: body.search_mode ?? "single",
+    // מרכז טיפולי: ישות ולא אדם. הכללים בפרומפט מותנים בדגל הזה.
+    subject_kind: isCenter ? "center" : "therapist",
     user_summary: body.user_summary ?? {},
     therapist: {
       full_name: body.therapist.full_name,
@@ -165,12 +182,17 @@ function buildPrompt(body: Body): string {
       training_areas: body.therapist.training_areas ?? [],
       couples_modalities: body.therapist.couples_modalities ?? [],
       regions: body.therapist.regions ?? [],
-      gender: body.therapist.gender ?? null,
+      gender: isCenter ? null : (body.therapist.gender ?? null),
       online: onlineRelevant(body) ? (body.therapist.online ?? false) : undefined,
       bio: body.therapist.bio ?? null,
     },
     match_result: {
-      personality_fit: personalityFitLabel(body.match_result.personality_score),
+      // למרכז אין סגנון אישי אחד - ה-95 הוא ערך קבוע ולא מדידה, ולכן אסור
+      // להציג אותו כ"נמצאה התאמה סגנונית". במקומו: הסבר על צוות רחב.
+      personality_fit: isCenter ? null : personalityFitLabel(body.match_result.personality_score),
+      center_personality_note: isCenter
+        ? "במרכז פועלים כמה מטפלים, ולכן ההתאמה האישיותית נעשית בתוך המרכז - הצוות משבץ את המטפל/ת שמתאים/ה גם בסגנון."
+        : undefined,
       match_reasons: body.match_result.match_reasons,
     },
     addiction_cbt_fallback: body.addiction_cbt_fallback ?? false,
@@ -247,6 +269,12 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
 - אם יש פער אמיתי (צורך שעלה ואינו בתחום ההתמחות) — ציין אותו בכנות ובעדינות, והסבר למה בכל זאת זו ההתאמה הקרובה ביותר שנמצאה מבין הזמינים. אם אין פער משמעותי — אל תמציא אחד.
 - אם search_mode הוא "combined" — הדגש אילו צרכים מכוסים ואילו פחות.
 - סיים בעובדה מעשית מקורקעת — למשל נקודה אחת ששווה לברר בשיחת ההיכרות (עדיף כזו שנוגעת לפער, אם קיים) — ולא בשבח מסכם או בהבטחה כללית ("תהליך שיכול להועיל לך").
+
+**כשה-subject_kind הוא "center" (מרכז טיפולי, לא אדם) — הכללים האלה גוברים:**
+- מדובר ב**מרכז** ולא באדם: כתוב "המרכז" בלשון זכר יחיד ("המרכז מציע", "במרכז עובדים"). אסור לחלוטין "המטפל/ת", "היא", "הוא" בהתייחסות למרכז, ואסור להתייחס למגדר.
+- אל תייחס למרכז ביוגרפיה אישית, ותק אישי או סגנון טיפולי אישי - התייחס למה שהמרכז מציע (תחומי טיפול, אזורים, שפות).
+- אל תכתוב על "התאמה סגנונית" או "התאמה אישיותית" שנמצאה - במרכז אין סגנון אחד. אם match_result.center_personality_note קיים, שלב את התוכן שלו במילים שלך: במרכז יש כמה מטפלים, והשיבוץ למטפל/ת שמתאים/ה גם בסגנון נעשה בתוך המרכז.
+- ציין שהפנייה מגיעה למרכז, ושהמרכז עושה את ההתאמה הפנימית - זו נקודת חוזק (מגוון) ולא חיסרון.
 
 **כללים:**
 - כתוב על המטפל/ת בגוף שלישי לפי therapist.gender: "זכר" → לשון זכר; "נקבה" → לשון נקבה; אחר → ניטרלי.

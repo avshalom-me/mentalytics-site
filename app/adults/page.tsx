@@ -824,6 +824,7 @@ export default function AdultsPage() {
             online: t.online ?? false,
             gender: t.gender ?? null,
             bio: t.bio ?? null,
+            entity_type: t.entity_type ?? null,
           },
           match_result: {
             match_score: t.match_score,
