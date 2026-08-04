@@ -6,7 +6,7 @@ import ArticleShell from "@/app/components/ArticleShell";
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/online-therapy" },
   title: "טיפול אונליין - כן או לא?",
-  description: "האם טיפול פסיכולוגי אונליין עובד? מה המחקר אומר, מתי עדיף פנים מול פנים, ואיך בוחרים מטפל לטיפול מרחוק.",
+  description: "האם טיפול פסיכולוגי אונליין באמת עובד? מה מראים המחקרים על יעילותו לעומת טיפול פנים מול פנים, למי הוא פחות מתאים, ואיך בוחרים מטפל לטיפול מרחוק.",
 };
 
 const jsonLd = {

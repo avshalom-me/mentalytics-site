@@ -2,7 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { XCircle } from "lucide-react";
 
-export const metadata: Metadata = { title: "התשלום נכשל | טיפול חכם" };
+export const metadata: Metadata = { title: "התשלום נכשל" };
 
 export default function QuizPaymentFailurePage() {
   return (

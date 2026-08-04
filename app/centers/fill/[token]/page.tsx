@@ -8,7 +8,7 @@ import FillForm from "./FillForm";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "מילוי פרופיל מטפל/ת | טיפול חכם",
+  title: "מילוי פרופיל מטפל/ת",
   robots: { index: false, follow: false }, // קישור אישי - לא לאינדוקס
 };
 

@@ -6,7 +6,7 @@ import ArticleShell from "@/app/components/ArticleShell";
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/therapy-for-child" },
   title: "איך לבחור פסיכולוג לילד?",
-  description: "מה חשוב לבדוק כשבוחרים מטפל לילד - הכשרה, גישה להורים, גיל הילד, ומה לשאול בשיחת ההיכרות.",
+  description: "מה חשוב לבדוק כשבוחרים פסיכולוג או מטפל לילד: הכשרה והתמחות, מידת השיתוף של ההורים, התאמה לגיל הילד, ואילו שאלות כדאי לשאול כבר בשיחת ההיכרות.",
 };
 
 const jsonLd = {

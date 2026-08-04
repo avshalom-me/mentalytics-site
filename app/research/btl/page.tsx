@@ -83,6 +83,17 @@ const faqLd = {
   ],
 };
 
+// The track pages carry one; the hub was the only page in the cluster without.
+const breadcrumbLd = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: [
+    { "@type": "ListItem", position: 1, name: "בית", item: BASE_URL },
+    { "@type": "ListItem", position: 2, name: "מאמרים ומידע שימושי", item: `${BASE_URL}/research` },
+    { "@type": "ListItem", position: 3, name: "טיפול נפשי דרך ביטוח לאומי", item: URL },
+  ],
+};
+
 const h2 = {
   fontSize: "21px",
   fontWeight: 800,
@@ -110,6 +121,7 @@ export default function BtlHubPage() {
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(articleLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
 
       <div className="mb-8">
         <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", letterSpacing: ".14em", marginBottom: "10px" }}>

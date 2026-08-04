@@ -11,7 +11,7 @@ import CenterAccountSetup from "./CenterAccountSetup";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
-  title: "הצטרפות מרכז טיפולי | טיפול חכם",
+  title: "הצטרפות מרכז טיפולי",
   description: "הצטרפות מרכזים טיפוליים לפלטפורמת טיפול חכם",
   robots: { index: false, follow: false }, // קישור פרטי - לא לאינדוקס
 };

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "תקנון רכישה - חיוב, ביטול והחזרים | טיפול חכם",
+  title: "תקנון רכישה - חיוב, ביטול והחזרים",
   description: "תקנון רכישה, מדיניות חיוב, ביטול מנוי והחזרים כספיים עבור מטפלים ומשתמשים בפלטפורמת טיפול חכם.",
 };
 

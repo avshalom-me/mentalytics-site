@@ -6,7 +6,7 @@ import ArticleShell from "@/app/components/ArticleShell";
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/adhd-adults" },
   title: "אבחון ADHD למבוגרים",
-  description: "מה כולל אבחון ADHD למבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות - מדריך מקיף ופשוט.",
+  description: "מה כולל אבחון ADHD למבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
 };
 
 const jsonLd = {

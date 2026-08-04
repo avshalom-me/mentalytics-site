@@ -6,7 +6,7 @@ import ArticleShell from "@/app/components/ArticleShell";
 const IMG = "https://images.unsplash.com/photo-1604881991720-f91add269bed";
 
 export const metadata: Metadata = {
-  title: "הקושי בהתאמה הטיפולית בין מטפל למטופל - מה אומר המחקר?",
+  title: "התאמה טיפולית בין מטפל למטופל - מה אומר המחקר",
   description:
     "סקירה מחקרית על התאמה אישיותית בין מטפל למטופל: גישת ההשלמה מול גישת הדמיון, צירי השליטה והקרבה, סגנונות התקשרות, וכיצד ההתאמה משפיעה על הצלחת הטיפול.",
   keywords: [

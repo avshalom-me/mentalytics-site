@@ -4,7 +4,7 @@ import { CheckCircle2 } from "lucide-react";
 import GaConversion from "@/app/components/GaConversion";
 import { isCompletedPayment } from "@/app/lib/verify-payment";
 
-export const metadata: Metadata = { title: "התשלום התקבל | טיפול חכם" };
+export const metadata: Metadata = { title: "התשלום התקבל" };
 
 export default async function QuizPaymentSuccessPage({
   searchParams,

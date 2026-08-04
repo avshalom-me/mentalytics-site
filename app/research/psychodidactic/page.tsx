@@ -7,7 +7,7 @@ import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 const URL = `${BASE_URL}/research/psychodidactic`;
-const TITLE = "אבחון פסיכודידקטי - מדריך מלא: מה זה, מי מוסמך, כמה זה עולה";
+const TITLE = "אבחון פסיכודידקטי - מה זה, מי מוסמך וכמה זה עולה";
 const DESCRIPTION =
   "מה בודק אבחון פסיכודידקטי, במה הוא נבדל מאבחון דידקטי ופסיכולוגי, מי מוסמך לבצע אותו, לכמה זמן הוא תקף, כמה הוא עולה - ולמה לתוספת זמן של 25% בכלל לא צריך אבחון.";
 const HERO =
