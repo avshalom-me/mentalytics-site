@@ -508,7 +508,29 @@ export async function GET(req: NextRequest) {
         includeInactive: true,
       });
       const ours = items.find((i) => Number(i.ID) === Number(c.sumit_recurring_id));
-      if (!ours || ours.Status === 0) continue; // פעיל, או קריאה עמומה — לא נוגעים.
+      // סטטוסים (נמדדו מול הוראות אמיתיות, ראו SUMIT_RECURRING_ACTIVE_STATUSES):
+      // 0=פעילה, 12=מתוזמנת (חודשי מתנה) — חיות, לא נוגעים. 1=בוטלה — מבטלים
+      // גם אצלנו. סטטוס אחר/לא מוכר: לא מבטלים אוטומטית (הלקח מ-12: הוראת
+      // מתנה נקראה "מבוטלת" והמרכז בוטל בטעות) — רק מתריעים לאדמין לבדוק.
+      if (!ours || ours.Status === 0 || ours.Status === 12) continue;
+      if (ours.Status !== 1) {
+        console.warn(`center sync: unknown Sumit status ${ours.Status} for center ${c.id} — not touching, alerting admin`);
+        try {
+          await resend.emails.send({
+            from: "טיפול חכם <noreply@mentalytics.co.il>",
+            to: ALERT_TO,
+            subject: `🔎 סטטוס Sumit לא מוכר (${ours.Status}) למרכז "${c.name}"`,
+            html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+              <p>הסנכרון היומי מצא להוראת הקבע של המרכז <strong>${String(c.name).replace(/</g, "&lt;")}</strong> סטטוס לא מוכר: <strong>${ours.Status}</strong>.</p>
+              <p>לא בוצע ביטול אוטומטי. מומלץ לבדוק בממשק Sumit (0=פעילה, 12=מתוזמנת/מתנה, 1=מבוטלת).</p>
+              <p><strong>center_id:</strong> ${c.id}<br/><strong>מזהה הוראת קבע:</strong> ${c.sumit_recurring_id}</p>
+            </div>`,
+          });
+        } catch (mailErr) {
+          console.error("center unknown-status alert email failed:", mailErr);
+        }
+        continue;
+      }
 
       await supabase
         .from("therapy_center_accounts")

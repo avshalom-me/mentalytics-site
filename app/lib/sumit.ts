@@ -377,12 +377,13 @@ export async function cancelSubscription(opts: {
     externalIdentifier: opts.customerExternalId,
     includeInactive: true,
   });
+  // "עדיין חיה" = פעילה (0) או מתוזמנת לעתיד (12) — שתיהן יחייבו את הכרטיס.
   const stillActive = after.find(
-    (i) => Number(i.ID) === opts.recurringItemId && i.Status === 0
+    (i) => Number(i.ID) === opts.recurringItemId && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status))
   );
   if (stillActive) {
     throw new Error(
-      `Sumit cancel did not take effect: recurring item ${opts.recurringItemId} is still active`
+      `Sumit cancel did not take effect: recurring item ${opts.recurringItemId} is still active (status=${stillActive.Status})`
     );
   }
 }
@@ -411,9 +412,11 @@ export async function updateRecurringPrice(opts: {
     includeInactive: true,
   });
   const item = after.find((i) => Number(i.ID) === opts.recurringItemId);
-  if (!item || item.Status !== 0) {
+  // 12 = מתוזמנת (חודשי מתנה) — עדכון מחיר עליה תקין; לדרוש דווקא 0 היה
+  // מפיל עריכת מחיר של מרכז בתקופת מתנה למרות שהעדכון הצליח ב-Sumit.
+  if (!item || !SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
     throw new Error(
-      `Sumit update did not take effect: recurring item ${opts.recurringItemId} not active after update`
+      `Sumit update did not take effect: recurring item ${opts.recurringItemId} not active after update (status=${item?.Status ?? "missing"})`
     );
   }
   if (typeof item.UnitPrice === "number" && Math.round(item.UnitPrice) !== Math.round(opts.unitPrice)) {
@@ -437,6 +440,15 @@ export interface RecurringItem {
   UnitPrice?: number;
   [k: string]: unknown;
 }
+
+// סטטוסי הוראת קבע ב-Sumit — נמדדו אמפירית מול הוראות אמיתיות (4/8/26):
+//   0  = פעילה ומחייבת
+//   12 = מתוזמנת (Date_Start עתידי — חודשי מתנה): חיה, החיוב הראשון בעתיד
+//   1  = מבוטלת
+// כל בדיקת "פעילה?" חייבת לקבל גם 12 — אחרת מרכז בחודשי מתנה נקרא בטעות
+// "מבוטל" (ה-cron ביטל מנוי אמיתי בגלל זה). ביטול-אוטומטי מותר רק על 1.
+export const SUMIT_RECURRING_ACTIVE_STATUSES: readonly number[] = [0, 12];
+export const SUMIT_RECURRING_CANCELLED_STATUS = 1;
 
 export async function listRecurringForCustomer(opts: {
   externalIdentifier: string;

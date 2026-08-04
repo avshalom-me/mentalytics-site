@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 
-// מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
+// מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
 // את הקישור ושולחים למרכז ← המרכז ממלא אשראי בדף ההצטרפות ← המנוי מופיע
 // כאן כפעיל, עם ביטול וסנכרון מול Sumit.
@@ -44,7 +44,7 @@ type Center = {
   num_locations: number | null;
 };
 
-// חישובי הכסף מגיעים ממקור האמת המשותף (center-pricing) — לא לשכפל כאן.
+// חישובי הכסף מגיעים ממקור האמת המשותף (center-pricing) - לא לשכפל כאן.
 
 type TherapistPoolItem = {
   id: string;
@@ -63,7 +63,7 @@ const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = 
 };
 
 function fmtDate(iso: string | null): string {
-  if (!iso) return "—";
+  if (!iso) return "-";
   return new Date(iso.includes("T") ? iso : iso + "T00:00:00").toLocaleDateString("he-IL");
 }
 
@@ -104,7 +104,7 @@ export default function AdminCentersPage() {
   const [poolSearch, setPoolSearch] = useState("");
   const [selectedTx, setSelectedTx] = useState<Set<string>>(new Set());
 
-  // נועל את גלילת העמוד שמאחורי המודל — בלעדיו, גלילה עם העכבר מעל הרקע
+  // נועל את גלילת העמוד שמאחורי המודל - בלעדיו, גלילה עם העכבר מעל הרקע
   // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
   useEffect(() => {
     if (!editing && !manageFor) return;
@@ -195,7 +195,7 @@ export default function AdminCentersPage() {
         ? { fixed_monthly_price: Number(fFixedPrice) }
         : { price_per_therapist: Number(fPricePerTherapist), therapist_count: Number(fTherapistCount) }),
     };
-    // שדות העמוד הציבורי — רק בעריכה (למרכז קיים עם slug), לא ביצירה.
+    // שדות העמוד הציבורי - רק בעריכה (למרכז קיים עם slug), לא ביצירה.
     if (editing !== "new" && editing !== null) {
       payload.public_page_enabled = fPubEnabled;
       payload.public_description = fPubDesc;
@@ -205,7 +205,7 @@ export default function AdminCentersPage() {
       payload.public_phone = fPubPhone;
     }
     // חודשי מתנה נעולים אחרי תשלום; מחיר/מספר-מטפלים ניתנים לעריכה תמיד
-    // (במרכז פעיל השרת מפרסם את השינוי ל-Sumit). מרכז מבוטל — עריכת קשר בלבד.
+    // (במרכז פעיל השרת מפרסם את השינוי ל-Sumit). מרכז מבוטל - עריכת קשר בלבד.
     if (editing !== "new" && editing !== null) {
       if (editing.status === "active") {
         delete payload.gift_months;
@@ -241,7 +241,7 @@ export default function AdminCentersPage() {
 
   async function sendProposal(c: Center) {
     if (!c.email) {
-      setError("למרכז אין אימייל — הוסיפו בעריכת ההצעה");
+      setError("למרכז אין אימייל - הוסיפו בעריכת ההצעה");
       return;
     }
     if (!confirm(`לשלוח את ההצעה במייל אל ${c.email}? המרכז יקבל את המחיר לכל מטפל, מספר המטפלים, הסכום הכולל, המתנה וקישור ההצטרפות.`)) return;
@@ -251,7 +251,7 @@ export default function AdminCentersPage() {
 
   async function del(c: Center) {
     if (c.status === "active") {
-      setError("אי אפשר למחוק מרכז פעיל — בטלו קודם את המנוי");
+      setError("אי אפשר למחוק מרכז פעיל - בטלו קודם את המנוי");
       return;
     }
     if (!confirm(`למחוק לצמיתות את "${c.name}"? הטיוטה, קישור ההצטרפות והפרופיל (אם נוצר) יימחקו. פעולה בלתי הפיכה.`)) return;
@@ -262,10 +262,12 @@ export default function AdminCentersPage() {
     const j = await post({ action: "sync_sumit", id: c.id });
     if (j.ok) {
       const s = j.sumit as { status: number; next_billing: string | null; unit_price: number | null } | null;
+      // 0=פעילה · 12=מתוזמנת (חודשי מתנה, טרם חויב) · 1=מבוטלת · אחר=לבדוק
+      const statusLabel = s?.status === 0 ? "פעיל" : s?.status === 12 ? "מתוזמן (בתקופת מתנה)" : s?.status === 1 ? "מבוטל" : `סטטוס ${s?.status} - לבדוק`;
       setSumitInfo((prev) => ({
         ...prev,
         [c.id]: s
-          ? `Sumit: ${s.status === 0 ? "פעיל" : "לא פעיל"}${s.next_billing ? ` · חיוב הבא ${fmtDate(s.next_billing)}` : ""}${s.unit_price != null ? ` · ₪${s.unit_price}` : ""}`
+          ? `Sumit: ${statusLabel}${s.next_billing ? ` · חיוב הבא ${fmtDate(s.next_billing)}` : ""}${s.unit_price != null ? ` · ₪${s.unit_price}` : ""}`
           : "לא נמצאה הוראת קבע ב-Sumit",
       }));
     }
@@ -304,7 +306,7 @@ export default function AdminCentersPage() {
   }
 
   // חודשי מתנה נעולים אחרי תשלום (active/cancelled). מחיר/מספר-מטפלים ננעלים
-  // רק כשההצעה בוטלה — במרכז פעיל אפשר לעדכן (מתפרסם ל-Sumit בשמירה).
+  // רק כשההצעה בוטלה - במרכז פעיל אפשר לעדכן (מתפרסם ל-Sumit בשמירה).
   const isLockedEditing = editing !== "new" && editing !== null && (editing.status === "active" || editing.status === "cancelled");
   const pricingLocked = editing !== "new" && editing !== null && editing.status === "cancelled";
   const isActiveEditing = editing !== "new" && editing !== null && editing.status === "active";
@@ -328,13 +330,13 @@ export default function AdminCentersPage() {
       </div>
       <p className="mb-3 text-sm text-stone-500 max-w-3xl">
         יוצרים הצעה עם המחיר לכל מטפל ומספר המטפלים שסגרתם בשיחת ההתאמה, שולחים למרכז במייל (או מעתיקים את הקישור).
-        המרכז רואה את הסכום החודשי הכולל וממלא פרטי אשראי. אפשר להגדיר חודשי מתנה —
+        המרכז רואה את הסכום החודשי הכולל וממלא פרטי אשראי. אפשר להגדיר חודשי מתנה -
         הכרטיס נשמר מיד והחיוב הראשון יוצא רק בתום המתנה.
       </p>
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
         <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
         <a href="/centers" target="_blank" className="font-bold text-[#0F5468] underline">🔗 עמוד ההסבר למרכזים</a>
-        <a href="/api/admin-sales-sheet" target="_blank" className="font-bold text-red-700 underline" title="מסמך פנימי לצוות המכירות — מוגש רק דרך האדמין, לא לשליחה ללקוח">🔒 דף הכנה לשיחת מכירה (פנימי — לא לשליחה)</a>
+        <a href="/api/admin-sales-sheet" target="_blank" className="font-bold text-red-700 underline" title="מסמך פנימי לצוות המכירות - מוגש רק דרך האדמין, לא לשליחה ללקוח">🔒 דף הכנה לשיחת מכירה (פנימי - לא לשליחה)</a>
       </div>
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
@@ -342,7 +344,7 @@ export default function AdminCentersPage() {
 
       {!loading && centers.length === 0 && (
         <div className="rounded-2xl border border-stone-200 bg-white p-10 text-center text-sm text-stone-400">
-          אין עדיין מרכזים — צרו הצעה ראשונה
+          אין עדיין מרכזים - צרו הצעה ראשונה
         </div>
       )}
 
@@ -369,7 +371,7 @@ export default function AdminCentersPage() {
               <div className="text-[11px] text-stone-400">{inGift.length > 0 ? `${inGift.length} עדיין בחודשי מתנה` : "אין מרכזים במתנה"}</div>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
-              <div className="text-2xl font-black text-amber-800">{nextCharge ? fmtDate(nextCharge) : "—"}</div>
+              <div className="text-2xl font-black text-amber-800">{nextCharge ? fmtDate(nextCharge) : "-"}</div>
               <div className="text-xs font-bold text-stone-600">החיוב הקרוב ממתנה</div>
               <div className="text-[11px] text-stone-400">{inGift.length > 0 ? "סוף תקופת המתנה הקרובה" : "כולם כבר מחויבים"}</div>
             </div>
@@ -385,10 +387,10 @@ export default function AdminCentersPage() {
       {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
       {([
-        { key: "active2", title: "🏢 מנויים פעילים — מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && c.billing_track === "center_entity") },
-        { key: "active1", title: "👥 מנויים פעילים — מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && c.billing_track !== "center_entity") },
-        { key: "sent", title: "✉️ הצעות שנשלחו — ממתינות לתשלום", items: centers.filter((c) => c.status === "sent") },
-        { key: "draft", title: "📝 טיוטות — טרם נשלחו", items: centers.filter((c) => c.status === "draft") },
+        { key: "active2", title: "🏢 מנויים פעילים - מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && c.billing_track === "center_entity") },
+        { key: "active1", title: "👥 מנויים פעילים - מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && c.billing_track !== "center_entity") },
+        { key: "sent", title: "✉️ הצעות שנשלחו - ממתינות לתשלום", items: centers.filter((c) => c.status === "sent") },
+        { key: "draft", title: "📝 טיוטות - טרם נשלחו", items: centers.filter((c) => c.status === "draft") },
         { key: "cancelled", title: "⏸️ בוטלו", items: centers.filter((c) => c.status === "cancelled") },
       ] as const).map((group) => group.items.length > 0 && (
       <section key={group.key} className="mb-8">
@@ -450,8 +452,8 @@ export default function AdminCentersPage() {
                 משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
                 {c.user_id
                   ? <strong className="text-green-700"> · ✓ נכנסו לפורטל</strong>
-                  : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "—"})</span>}
-                {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע — ביטול רק דרך ממשק Sumit</strong>}
+                  : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "-"})</span>}
+                {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - ביטול רק דרך ממשק Sumit</strong>}
               </p>
             )}
             {c.notes && <p className="mt-2 text-xs text-stone-500 whitespace-pre-wrap">📝 {c.notes}</p>}
@@ -468,7 +470,7 @@ export default function AdminCentersPage() {
                   👥 שיוך מטפלים ({c.linked_therapist_count})
                 </button>
               )}
-              {/* כל ניהול הפרופילים של המרכז נעשה מכאן — הם מוסתרים מ"ניהול מטפלים" הכללי */}
+              {/* כל ניהול הפרופילים של המרכז נעשה מכאן - הם מוסתרים מ"ניהול מטפלים" הכללי */}
               {(isEntity || c.linked_therapist_count > 0) && (
                 <a href={`/admin/therapists?center=${c.id}`}
                   className="rounded-full border border-indigo-300 bg-white px-3 py-1 font-bold text-indigo-800 hover:bg-indigo-50">
@@ -484,7 +486,7 @@ export default function AdminCentersPage() {
               {(c.status === "draft" || c.status === "sent") && (
                 <>
                   <button onClick={() => sendProposal(c)} disabled={busy || !c.email}
-                    title={c.email ? "שליחת ההצעה במייל למרכז + קישור הצטרפות" : "אין אימייל למרכז — הוסיפו בעריכה"}
+                    title={c.email ? "שליחת ההצעה במייל למרכז + קישור הצטרפות" : "אין אימייל למרכז - הוסיפו בעריכה"}
                     className="rounded-full border border-teal-400 bg-teal-600 px-3 py-1 font-bold text-white hover:bg-teal-700 disabled:opacity-40">
                     ✉️ שלח הצעה במייל
                   </button>
@@ -536,7 +538,7 @@ export default function AdminCentersPage() {
       {/* מודל יצירה/עריכה. הכרטיס זורם בגובה טבעי (בלי max-h ובלי גלילה פנימית)
           בתוך שכבה שכולה גוללת (overflow-y-auto). items-start + my-auto ממרכז את
           הכרטיס כשהוא נמוך מהמסך, וכשהוא גבוה יותר (זום/מסך קצר) השכבה פשוט גוללת
-          אותו במלואו — כך כל התוכן, מהכותרת ועד כפתור השמירה, תמיד נגיש ואף פרוסה
+          אותו במלואו - כך כל התוכן, מהכותרת ועד כפתור השמירה, תמיד נגיש ואף פרוסה
           לא נחתכת. (הדפוס ההיברידי הקודם עם max-h-[90vh]+גלילה פנימית חתך תוכן
           בזומים מסוימים.) */}
       {editing && (
@@ -549,7 +551,7 @@ export default function AdminCentersPage() {
           >
             <div className="flex items-center justify-between rounded-t-2xl border-b border-stone-100 px-6 py-4">
               <h3 className="text-lg font-black text-stone-800">
-                {editing === "new" ? "הצעה למרכז חדש" : `עריכה — ${(editing as Center).name}`}
+                {editing === "new" ? "הצעה למרכז חדש" : `עריכה - ${(editing as Center).name}`}
               </h3>
               <button onClick={() => setEditing(null)} className="text-stone-400 hover:text-stone-600">✕</button>
             </div>
@@ -582,18 +584,18 @@ export default function AdminCentersPage() {
                 <div className="mt-2 mb-1">
                   <span className="text-xs font-black text-stone-700">מסלול ומחיר (כפי שנקבעו בשיחת ההתאמה)</span>
                 </div>
-                {/* בורר מסלול חיוב — לא ניתן להחליף במרכז פעיל */}
+                {/* בורר מסלול חיוב - לא ניתן להחליף במרכז פעיל */}
                 <div className="mb-2 grid grid-cols-2 gap-2">
                   <button type="button" disabled={isActiveEditing}
                     onClick={() => setFBillingTrack("per_therapist")}
                     className={`rounded-lg border px-3 py-2 text-right text-xs disabled:opacity-50 ${fBillingTrack === "per_therapist" ? "border-teal-500 bg-teal-50 font-bold text-teal-800" : "border-stone-300 text-stone-600"}`}>
-                    מסלול 1 — מחיר לכל מטפל
+                    מסלול 1 - מחיר לכל מטפל
                     <span className="block text-[10px] font-normal text-stone-500">פרופיל לכל מטפל · מחיר × מספר</span>
                   </button>
                   <button type="button" disabled={isActiveEditing}
                     onClick={() => setFBillingTrack("center_entity")}
                     className={`rounded-lg border px-3 py-2 text-right text-xs disabled:opacity-50 ${fBillingTrack === "center_entity" ? "border-teal-500 bg-teal-50 font-bold text-teal-800" : "border-stone-300 text-stone-600"}`}>
-                    מסלול 2 — מרכז כישות אחת
+                    מסלול 2 - מרכז כישות אחת
                     <span className="block text-[10px] font-normal text-stone-500">רובריקה אחת בהתאמות · מחיר חודשי קבוע</span>
                   </button>
                 </div>
@@ -611,7 +613,7 @@ export default function AdminCentersPage() {
                 ) : (
                   <>
                     <p className="mb-2 text-[11px] leading-4 text-stone-400">
-                      כל מנוי כולל אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי, וביטול בכל עת (כולל בחודשי המתנה) — מוצג למרכז בדף ההצטרפות. כאן מגדירים רק את המחיר לכל מטפל ואת מספר המטפלים.
+                      כל מנוי כולל אוטומטית: כניסה למערכת ההתאמות, דוח סטטיסטיקות חודשי, וביטול בכל עת (כולל בחודשי המתנה) - מוצג למרכז בדף ההצטרפות. כאן מגדירים רק את המחיר לכל מטפל ואת מספר המטפלים.
                     </p>
                     <div className="grid gap-3 sm:grid-cols-2">
                       <Field label="מחיר לכל מטפל (₪ לחודש, לפני מע&quot;מ) *">
@@ -627,7 +629,7 @@ export default function AdminCentersPage() {
                     </div>
                   </>
                 )}
-                {/* מיקומים והנחה — חלים על שני המסלולים */}
+                {/* מיקומים והנחה - חלים על שני המסלולים */}
                 <div className="mt-1 grid gap-3 sm:grid-cols-2">
                   <Field label="מספר מיקומים / סניפים (מכפיל את המחיר)">
                     <input value={fLocations} inputMode="numeric" placeholder="1"
@@ -669,7 +671,7 @@ export default function AdminCentersPage() {
                 className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
             </Field>
 
-            {/* עמוד המרכז הציבורי (SEO) — רק למרכז קיים */}
+            {/* עמוד המרכז הציבורי (SEO) - רק למרכז קיים */}
             {editing !== "new" && editing !== null && (
               <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
@@ -736,7 +738,7 @@ export default function AdminCentersPage() {
                 <h3 className="text-lg font-black text-stone-800">מטפלי {manageFor.name}</h3>
                 <button onClick={() => setManageFor(null)} className="text-stone-400 hover:text-stone-600">✕</button>
               </div>
-              <p className="mt-1 text-xs text-stone-500">סמנו את המטפלים ששייכים למרכז — הם יופיעו בפורטל המרכז ובסטטיסטיקות המרוכזות. מטפל משויך למרכז אחד בלבד.</p>
+              <p className="mt-1 text-xs text-stone-500">סמנו את המטפלים ששייכים למרכז - הם יופיעו בפורטל המרכז ובסטטיסטיקות המרוכזות. מטפל משויך למרכז אחד בלבד.</p>
               <input
                 value={poolSearch}
                 onChange={(e) => setPoolSearch(e.target.value)}
@@ -774,7 +776,7 @@ export default function AdminCentersPage() {
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-semibold text-stone-800">{t.full_name}</div>
                             <div className="truncate text-xs text-stone-400">
-                              {t.email ?? "—"}
+                              {t.email ?? "-"}
                               {otherCenter && <span className="text-amber-600"> · משויך כרגע ל{otherCenter}</span>}
                             </div>
                           </div>
