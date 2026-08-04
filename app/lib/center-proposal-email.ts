@@ -55,6 +55,13 @@ export function buildCenterProposalEmail(opts: {
   });
   const baseUnit = isEntity ? (p.numLocations > 0 ? p.baseTotal / p.numLocations : p.baseTotal) : p.pricePerTherapist;
 
+  // פסקת הפתיחה חייבת להתאים למסלול: מסלול 2 מקבל רובריקה אחת ואין בו
+  // "דף פרופיל לכל מטפל" - הבטחה כזו במייל ההצעה היא בדיוק מה שהלקוח
+  // מצפה לקבל אחרי התשלום.
+  const introParagraph = isEntity
+    ? `שמחים להציע ל<strong>${name}</strong> שיתוף פעולה עם טיפול חכם. המרכז ייכנס למערכת ההתאמות החכמה שלנו <strong>כרובריקה אחת</strong> - "מרכז טיפולי" - ומטופלים מתאימים יופנו אליכם לפי סוגי הטיפול שאתם מציעים, אזור, גיל ושפה. האינטייק והשיבוץ למטפל/ת המתאים/ה נעשים אצלכם. כולל עמוד מרכז ציבורי מקודם בגוגל (לוגו, צוות, תמונות) ופורטל ניהול עם סטטיסטיקות.`
+    : `שמחים להציע ל<strong>${name}</strong> שיתוף פעולה עם טיפול חכם. המטפלים של המרכז ייכנסו למערכת ההתאמות החכמה שלנו, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות - עם דף פרופיל לכל מטפל, פורטל ניהול מרכזי, ודוח סטטיסטיקות חודשי.`;
+
   const giftBadge =
     opts.giftMonths > 0
       ? `<div style="background:#FDF6E3;border:1px solid #E9D6A6;border-radius:10px;padding:14px 16px;margin:0 0 18px;text-align:center;">
@@ -94,7 +101,7 @@ export function buildCenterProposalEmail(opts: {
         <img src="${siteUrl}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
       </div>
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום ${greetName},</h1>
-      <p style="margin:0 0 14px;font-size:15px;">שמחים להציע ל<strong>${name}</strong> שיתוף פעולה עם טיפול חכם. המטפלים של המרכז ייכנסו למערכת ההתאמות החכמה שלנו, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות - עם דף פרופיל לכל מטפל, פורטל ניהול מרכזי, ודוח סטטיסטיקות חודשי.</p>
+      <p style="margin:0 0 14px;font-size:15px;">${introParagraph}</p>
 
       ${giftBadge}
 
@@ -102,7 +109,7 @@ export function buildCenterProposalEmail(opts: {
       ${pricingBox}
 
       <p style="margin:0 0 20px;font-size:13.5px;color:#3E5250;background:#F7FAF9;border:1px solid #E8E0D8;border-radius:10px;padding:12px 16px;">
-        המחיר והיקף ההתקשרות נקבעו יחד איתך בשיחת ההתאמה, בהתאם לצרכי המרכז. ניתן לעדכן את מספר המטפלים בהמשך.
+        המחיר והיקף ההתקשרות נקבעו יחד איתך בשיחת ההתאמה, בהתאם לצרכי המרכז.${isEntity ? "" : " ניתן לעדכן את מספר המטפלים בהמשך."}
       </p>
 
       <div style="text-align:center;margin:22px 0 8px;">

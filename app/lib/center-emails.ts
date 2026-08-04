@@ -137,6 +137,16 @@ export async function sendCenterWelcomeEmail(opts: {
   // נושא = טקסט רגיל, בלי HTML entities.
   const subject = `ברוכים הבאים לטיפול חכם - ${rawName} 🎉`;
 
+  // התוכן חייב לתאום את המסלול שנרכש: במסלול 2 אין פרופיל לכל מטפל, והצעד
+  // הראשון הוא סימון סוגי הטיפול (בלעדיו המרכז לא ייתפס באף שאלון).
+  const isEntityWelcome = opts.billingTrack === "center_entity";
+  const welcomeIntro = isEntityWelcome
+    ? "המנוי של המרכז לטיפול חכם פעיל. המרכז ייכנס למערכת ההתאמות כרובריקה אחת - \"מרכז טיפולי\" - ומטופלים מתאימים יופנו אליכם לפי סוגי הטיפול, האזורים, הגילאים והשפות שתסמנו. האינטייק והשיבוץ למטפל/ת המתאים/ה נעשים אצלכם."
+    : "המנוי של המרכז לטיפול חכם פעיל. מטפלי המרכז ייכנסו למערכת ההתאמות החכמה, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות.";
+  const nextStepParagraph = isEntityWelcome
+    ? `בקישור למטה תקימו את חשבון הניהול בדקה (מייל + סיסמה, מומלץ עם ${to}). <strong>הצעד החשוב ביותר: סימון סוגי הטיפול של המרכז</strong> - בלעדיו המרכז לא יופיע בהתאמות. אחר כך אפשר למלא לוגו, צוות ותמונות לעמוד הציבורי, ולראות סטטיסטיקות: כמה ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים.`
+    : `בקישור למטה תקימו את חשבון הניהול בדקה (מייל + סיסמה, מומלץ עם ${to}). משם תוכלו להזמין את מטפלי המרכז במייל - כל אחד/ת ממלא/ת פרופיל בעצמו/ה - למלא את עמוד המרכז הציבורי (לוגו, צוות, תמונות), ולראות סטטיסטיקות מרוכזות: כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים.`;
+
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
   <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
@@ -145,13 +155,13 @@ export async function sendCenterWelcomeEmail(opts: {
         <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
       </div>
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">ברוכים הבאים, ${name} 🎉</h1>
-      <p style="margin:0 0 14px;">המנוי של המרכז לטיפול חכם פעיל. מטפלי המרכז ייכנסו למערכת ההתאמות החכמה, ומטופלים יופנו אליהם לפי סוג הטיפול, אזור, גיל, שפה והעדפות.</p>
+      <p style="margin:0 0 14px;">${welcomeIntro}</p>
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 16px;margin:0 0 18px;">
         <p style="margin:0 0 6px;font-weight:bold;">${priceLine}</p>
         <p style="margin:0;font-size:13px;color:#3E5250;">${giftLine(opts.giftMonths, opts.billingStartsAt)}</p>
       </div>
-      <p style="margin:0 0 10px;font-weight:bold;">פורטל ניהול המרכז</p>
-      <p style="margin:0 0 16px;">בקישור למטה תקימו את חשבון הניהול בדקה (מייל + סיסמה, מומלץ עם ${to}) ותוכלו מיד למלא את פרופיל המרכז - לוגו, צוות, תמונות ותחומי טיפול - ולראות סטטיסטיקות מרוכזות: כמה אנשים ראו אתכם, מאיפה הם מגיעים ועם אילו קשיים.</p>
+      <p style="margin:0 0 10px;font-weight:bold;">${isEntityWelcome ? "הצעד הראשון - פרופיל המרכז" : "פורטל ניהול המרכז"}</p>
+      <p style="margin:0 0 16px;">${nextStepParagraph}</p>
       <p style="margin:0 0 16px;">
         <a href="${portalUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">הקמת חשבון הניהול ומילוי הפרופיל</a>
       </p>
