@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
-import { REGION_CITIES } from "@/app/lib/regions";
+import { REGION_CITIES, ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app/lib/match-fallback";
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
@@ -260,6 +260,7 @@ export default function AdminTherapistsPage() {
   const [filterAgeGroup, setFilterAgeGroup] = useState("");
   const [filterPromotion, setFilterPromotion] = useState("");
   const [filterAvailability, setFilterAvailability] = useState("");
+  const [filterRegion, setFilterRegion] = useState(""); // אזור גיאוגרפי או "__online__"
   const [showFilters, setShowFilters] = useState(false);
 
   // ── Tabbed workspace ──
@@ -954,7 +955,7 @@ export default function AdminTherapistsPage() {
   if (error) return <div className="p-6 text-center text-red-600">שגיאה: {error}</div>;
   if (therapists.length === 0) return <div className="p-6 text-center">לא נמצאו מטפלים.</div>;
 
-  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup || filterPromotion || filterAvailability;
+  const hasActiveFilter = filterName || filterGender || filterTherapistType || filterTrainingArea || filterCultural || filterAgeGroup || filterPromotion || filterAvailability || filterRegion;
 
   function matchesFilters(t: AdminTherapist) {
     if (filterName && !t.full_name.toLowerCase().includes(filterName.toLowerCase())) return false;
@@ -972,6 +973,15 @@ export default function AdminTherapistsPage() {
     }
     if (filterAvailability === "unavailable" && t.accepting_new_patients !== false) return false;
     if (filterAvailability === "available" && t.accepting_new_patients === false) return false;
+    if (filterRegion) {
+      if (filterRegion === "__online__") {
+        if (!t.online) return false;
+      } else {
+        // regions מכיל שמות ערים (וברשומות ותיקות לעיתים שם אזור ישירות).
+        const inRegion = (t.regions ?? []).some((r) => CITY_TO_REGION[r] === filterRegion || r === filterRegion);
+        if (!inRegion) return false;
+      }
+    }
     return true;
   }
 
@@ -1516,7 +1526,7 @@ export default function AdminTherapistsPage() {
             {showFilters ? "▾ סגור מסננים" : "▸ פתח מסננים"}
           </button>
           {hasActiveFilter && (
-            <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); setFilterPromotion(""); }}
+            <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); setFilterPromotion(""); setFilterAvailability(""); setFilterRegion(""); }}
               className="text-xs text-red-500 hover:underline">נקה הכל</button>
           )}
         </div>
@@ -1589,6 +1599,15 @@ export default function AdminTherapistsPage() {
                 <option value="">הכל</option>
                 <option value="unavailable">⏸ לא זמינים למטופלים חדשים</option>
                 <option value="available">זמינים בלבד</option>
+              </select>
+            </div>
+            <div>
+              <label className="mb-1 block text-xs font-semibold text-stone-600">אזור</label>
+              <select value={filterRegion} onChange={(e) => setFilterRegion(e.target.value)}
+                className="w-full rounded-lg border border-stone-200 px-3 py-1.5 text-sm">
+                <option value="">הכל</option>
+                {ALL_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
+                <option value="__online__">💻 אונליין</option>
               </select>
             </div>
           </div>
