@@ -10,6 +10,7 @@ import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
 import { ASSESSMENTS } from "@/app/lib/assessments";
 import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
+import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -44,6 +45,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // where no large portal ranks (see docs/seo-week-plan-2026-08.md, day 4).
     { url: `${BASE}/research/psychodidactic`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/social-anxiety`, priority: 0.7, changeFrequency: "monthly" },
+    // National-insurance entitlement cluster: hub + one page per track.
+    { url: `${BASE}/research/btl`, priority: 0.7, changeFrequency: "monthly" },
+    ...BTL_TRACKS.map((t) => ({
+      url: `${BASE}/research/btl/${t.slug}`,
+      priority: 0.6,
+      changeFrequency: "monthly" as const,
+    })),
     { url: `${BASE}/research/autism-assessment`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/child-emotional-developmental`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/academic`, priority: 0.5, changeFrequency: "monthly" },
