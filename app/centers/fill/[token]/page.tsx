@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import FillForm from "./FillForm";
 
-// מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) — נפתח מהקישור האישי שנשלח
+// מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) - נפתח מהקישור האישי שנשלח
 // למטפל במייל. server component: טוען את ההזמנה לפי הטוקן בצד השרת בלבד.
 
 export const dynamic = "force-dynamic";

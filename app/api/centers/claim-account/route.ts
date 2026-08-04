@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
-// קישור חשבון Supabase Auth למרכז ששילם — לפי הטוקן הסודי של ההצעה.
+// קישור חשבון Supabase Auth למרכז ששילם - לפי הטוקן הסודי של ההצעה.
 //
 // למה זה בטוח (בניגוד ל-claim-by-email שנחסם ב-2/7): הטוקן הוא הסוד שגם
-// מאפשר את התשלום עצמו — מי שמחזיק בו הוא מי שקיבל את ההצעה ושילם. המייל
+// מאפשר את התשלום עצמו - מי שמחזיק בו הוא מי שקיבל את ההצעה ושילם. המייל
 // אינו מאומת בהרשמה ולכן אינו הוכחה; הטוקן כן. הקישור חד-פעמי: ברגע
 // ש-user_id מוגדר, כל claim נוסף נדחה ושינוי בעלות נעשה ידנית בלבד.
 
@@ -26,7 +26,7 @@ function checkRateLimit(ip: string): boolean {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות — נסו שוב בעוד דקה" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות - נסו שוב בעוד דקה" }, { status: 429 });
   }
 
   let body: Record<string, unknown>;
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
   const token = typeof body.token === "string" ? body.token.trim() : "";
   if (!token) return NextResponse.json({ ok: false, error: "חסר טוקן" }, { status: 400 });
 
-  // המשתמש המחובר — מזוהה מהטוקן של Supabase Auth (כמו resolveCenter).
+  // המשתמש המחובר - מזוהה מהטוקן של Supabase Auth (כמו resolveCenter).
   const accessToken = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!accessToken) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
   const { createClient } = await import("@supabase/supabase-js");
@@ -60,15 +60,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "הקישור אינו תקף" }, { status: 404 });
     }
     if (center.status !== "active") {
-      // הקישור נפתח רק אחרי תשלום — לפני כן אין מה לנהל בפורטל.
-      return NextResponse.json({ ok: false, error: "המנוי עדיין לא הופעל — השלימו קודם את שמירת פרטי התשלום" }, { status: 400 });
+      // הקישור נפתח רק אחרי תשלום - לפני כן אין מה לנהל בפורטל.
+      return NextResponse.json({ ok: false, error: "המנוי עדיין לא הופעל - השלימו קודם את שמירת פרטי התשלום" }, { status: 400 });
     }
     if (center.user_id === user.id) {
-      return NextResponse.json({ ok: true, already: true }); // אידמפוטנטי — רענון/לחיצה כפולה
+      return NextResponse.json({ ok: true, already: true }); // אידמפוטנטי - רענון/לחיצה כפולה
     }
     if (center.user_id) {
       return NextResponse.json(
-        { ok: false, error: "המרכז כבר מקושר לחשבון אחר. אם זו טעות — כתבו לנו: admin@getmentalytics.com" },
+        { ok: false, error: "המרכז כבר מקושר לחשבון אחר. אם זו טעות - כתבו לנו: admin@getmentalytics.com" },
         { status: 409 },
       );
     }
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       .from("therapy_center_accounts")
       .update({ user_id: user.id, updated_at: new Date().toISOString() })
       .eq("id", center.id)
-      .is("user_id", null); // הגנת מרוץ — לא דורסים קישור שנוצר במקביל
+      .is("user_id", null); // הגנת מרוץ - לא דורסים קישור שנוצר במקביל
     if (updErr) throw updErr;
 
     console.log(`centers/claim-account: center=${center.id} (${center.name}) linked to user=${user.id} (${user.email})`);

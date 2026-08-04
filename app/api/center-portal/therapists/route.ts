@@ -6,9 +6,9 @@ import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 import { CENTER_THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 
 // ניהול פרופילי מטפלים על-ידי המרכז, מתוך הפורטל. פרופיל שנוצר כאן שייך
-// למרכז (center_account_id מוגדר, user_id ריק) — רק מנהלי המרכז עורכים אותו,
+// למרכז (center_account_id מוגדר, user_id ריק) - רק מנהלי המרכז עורכים אותו,
 // למטפל הבודד אין חשבון ואין גישה. הפרופיל נכנס לתור האישורים הרגיל של
-// האדמין (status='pending'), ועם האישור — אם מנוי המרכז פעיל — הוא מקודם
+// האדמין (status='pending'), ועם האישור - אם מנוי המרכז פעיל - הוא מקודם
 // אוטומטית למערכת ההתאמות (promotion_source='center').
 
 export const dynamic = "force-dynamic";
@@ -37,7 +37,7 @@ function pickAllowed(body: Record<string, unknown>): Record<string, unknown> {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות - נסו שוב בעוד רגע" }, { status: 429 });
   }
 
   const center = await resolveCenter(req);
@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 
   try {
     if (action === "create") {
-      // מסלול 2 (מרכז כישות) — אין הוספת מטפלים בודדים; המרכז הוא רובריקה אחת.
+      // מסלול 2 (מרכז כישות) - אין הוספת מטפלים בודדים; המרכז הוא רובריקה אחת.
       if ((center.billing_track as string) === "center_entity") {
         return NextResponse.json({ ok: false, error: "מרכז במסלול 'מרכז כישות אחת' מיוצג כרובריקה אחת ואינו מוסיף מטפלים בודדים." }, { status: 400 });
       }
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
         .neq("entity_type", "center");
       if (quota > 0 && (linkedNow ?? 0) >= quota) {
         return NextResponse.json(
-          { ok: false, error: `המנוי שלכם כולל ${quota} מטפלים וכולם בשימוש. להוספת מטפל/ת נוסף/ת פנו אלינו — admin@getmentalytics.com` },
+          { ok: false, error: `המנוי שלכם כולל ${quota} מטפלים וכולם בשימוש. להוספת מטפל/ת נוסף/ת פנו אלינו - admin@getmentalytics.com` },
           { status: 400 },
         );
       }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
           full_name: fullName,
           gender: typeof fields.gender === "string" ? fields.gender : "", // NOT NULL בסכימה
           center_account_id: center.id,
-          user_id: null, // פרופיל בבעלות המרכז — אין חשבון למטפל הבודד
+          user_id: null, // פרופיל בבעלות המרכז - אין חשבון למטפל הבודד
           status: "pending", // תור האישורים הרגיל של האדמין
           tier: "free",
           profile_updated_at: new Date().toISOString(),
@@ -159,7 +159,7 @@ export async function POST(req: NextRequest) {
         reason: `profile updated from center portal (${center.name})`,
       });
 
-      // אם הפרופיל כבר מאושר והמרכז פעיל — לוודא שהקידום במקום (למשל אחרי
+      // אם הפרופיל כבר מאושר והמרכז פעיל - לוודא שהקידום במקום (למשל אחרי
       // שנדחה, תוקן ואושר מחדש בינתיים). שקט כשאין מה לעשות.
       await promoteCenterTherapists(center.id);
 
@@ -214,7 +214,7 @@ export async function GET(req: NextRequest) {
     }),
   );
 
-  // מסלול 2 — מרכז כישות אחת: מספר המיקומים/סניפים קובע כמה אזורים מותר לסמן
+  // מסלול 2 - מרכז כישות אחת: מספר המיקומים/סניפים קובע כמה אזורים מותר לסמן
   // בטופס (אזור אחד לכל מיקום, עד 4 ערים באזור). הטופס מסתמך על זה + על
   // entity_type=center כדי להסתיר תעודות/שאלות סגנון.
   const numLocations = Math.max(1, Math.floor(Number(center.num_locations) || 1));

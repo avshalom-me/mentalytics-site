@@ -4,11 +4,11 @@ import { cronAuthorized } from "@/app/lib/cron-auth";
 import { centerProfileCompleteness } from "@/app/lib/center-completeness";
 import { sendCenterCompletenessNudgeEmail, sendCenterInviteReminderEmail } from "@/app/lib/center-emails";
 
-// דחיפות עדינות למרכזים — רץ יומית:
-//   1. מרכז פעיל ששילם לפני 7+ ימים והפרופיל הציבורי שלו עדיין חסר —
+// דחיפות עדינות למרכזים - רץ יומית:
+//   1. מרכז פעיל ששילם לפני 7+ ימים והפרופיל הציבורי שלו עדיין חסר -
 //      מייל חד-פעמי "הפרופיל שלכם X% מלא" עם רשימת מה שחסר (החד-פעמיות
 //      נאכפת דרך crm_email_log: template=center_completeness_nudge לנמען).
-//   2. הזמנת מטפל (מסלול 1) שנשלחה לפני 5+ ימים ולא מולאה — תזכורת
+//   2. הזמנת מטפל (מסלול 1) שנשלחה לפני 5+ ימים ולא מולאה - תזכורת
 //      חד-פעמית למטפל (reminded_at על ההזמנה).
 
 export const dynamic = "force-dynamic";
@@ -31,7 +31,7 @@ async function runCenterNudges() {
   const nudgeSkips: string[] = [];
   for (const c of centers ?? []) {
     const paidAgo = now - new Date(c.paid_at as string).getTime();
-    if (paidAgo < WEEK_MS) continue; // עדיין טרי — נותנים שבוע להתארגן
+    if (paidAgo < WEEK_MS) continue; // עדיין טרי - נותנים שבוע להתארגן
 
     const { pct, missing } = centerProfileCompleteness(c);
     if (missing.length === 0) continue;
@@ -39,7 +39,7 @@ async function runCenterNudges() {
     const to = (c.payer_email as string | null) ?? (c.email as string | null);
     if (!to) { nudgeSkips.push(`${c.name}: אין מייל`); continue; }
 
-    // חד-פעמי: אם כבר נשלחה תזכורת כזו לנמען הזה — מדלגים.
+    // חד-פעמי: אם כבר נשלחה תזכורת כזו לנמען הזה - מדלגים.
     const { count: alreadySent } = await supabaseAdmin
       .from("crm_email_log")
       .select("id", { count: "exact", head: true })
@@ -72,10 +72,10 @@ async function runCenterNudges() {
   let remindersSent = 0;
   const reminderSkips: string[] = [];
   for (const inv of staleInvites ?? []) {
-    // supabase מטפוס join של FK כמערך — בפועל שורה אחת (FK יחיד).
+    // supabase מטפוס join של FK כמערך - בפועל שורה אחת (FK יחיד).
     const rawCenter = (inv as Record<string, unknown>).therapy_center_accounts;
     const center = (Array.isArray(rawCenter) ? rawCenter[0] : rawCenter) as { name: string; status: string } | undefined;
-    if (!center || center.status !== "active") continue; // מרכז שבוטל — לא מטרידים
+    if (!center || center.status !== "active") continue; // מרכז שבוטל - לא מטרידים
 
     const r = await sendCenterInviteReminderEmail({
       to: inv.email as string,

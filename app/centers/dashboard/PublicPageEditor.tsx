@@ -60,14 +60,14 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
   const [profileCopied, setProfileCopied] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  // העתקת קישור הפרופיל הציבורי — להטמעה באתר של המרכז (backlink).
+  // העתקת קישור הפרופיל הציבורי - להטמעה באתר של המרכז (backlink).
   async function copyProfileUrl() {
     if (!slug) return;
     const url = `https://www.mentalytics.co.il/centers/${slug}`;
     try {
       await navigator.clipboard.writeText(url);
     } catch {
-      // דפדפן בלי clipboard API (או בלי הרשאה) — נפילה לשיטה הישנה.
+      // דפדפן בלי clipboard API (או בלי הרשאה) - נפילה לשיטה הישנה.
       const ta = document.createElement("textarea");
       ta.value = url;
       document.body.appendChild(ta);
@@ -388,7 +388,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
       <input value={website} onChange={(e) => setWebsite(e.target.value)} dir="ltr" placeholder="https://…"
         className="mb-3 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
 
-      {/* קישור הפרופיל אצלנו — להטמעה באתר של המרכז (עוזר למטופלים + מחזק בגוגל) */}
+      {/* קישור הפרופיל אצלנו - להטמעה באתר של המרכז (עוזר למטופלים + מחזק בגוגל) */}
       {slug && (
         <div className="mb-4 rounded-xl border border-[var(--teal-mid)] bg-white p-3.5">
           <p className="text-sm font-bold text-stone-800">🔗 הקישור לפרופיל שלכם בטיפול חכם</p>

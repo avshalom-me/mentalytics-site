@@ -3,7 +3,7 @@ import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { resolveCenter } from "@/app/lib/center-auth";
 
-// העלאת קבצים מפורטל המרכז — תמונת פרופיל / תעודה עבור מטפל של המרכז.
+// העלאת קבצים מפורטל המרכז - תמונת פרופיל / תעודה עבור מטפל של המרכז.
 // שיקוף של /api/therapist-upload (כיווץ תמונות, ולידציית תעודות), עם אימות
 // מרכז במקום אימות מטפל: מותר להעלות רק למטפל שמשויך למרכז המחובר.
 
@@ -25,10 +25,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
   }
 
-  // תמונת מרכז — מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל דרך update_public_page.
-  // אין צורך ב-therapist_id — התמונה משויכת למרכז.
-  //   center_image   — לוגו / תמונת חבר צוות (קטן, 512).
-  //   center_gallery — תמונת גלריה של המרכז (הכניסה/חדרים) — רזולוציה גבוהה יותר.
+  // תמונת מרכז - מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל דרך update_public_page.
+  // אין צורך ב-therapist_id - התמונה משויכת למרכז.
+  //   center_image   - לוגו / תמונת חבר צוות (קטן, 512).
+  //   center_gallery - תמונת גלריה של המרכז (הכניסה/חדרים) - רזולוציה גבוהה יותר.
   if (type === "center_image" || type === "center_gallery") {
     const isGallery = type === "center_gallery";
     const inputBuffer = Buffer.from(await file.arrayBuffer());
@@ -74,7 +74,7 @@ export async function POST(req: NextRequest) {
   let uploadExt: string;
 
   if (type === "photo") {
-    // כיווץ אוטומטי — כמו בהעלאת מטפל: 600x600 WebP.
+    // כיווץ אוטומטי - כמו בהעלאת מטפל: 600x600 WebP.
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     try {
       uploadBody = await sharp(inputBuffer)
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest) {
     }
     const ext = (file.name.split(".").pop() ?? "").toLowerCase();
     if ((file.type && !ALLOWED_TYPES.includes(file.type)) || !ALLOWED_EXT.includes(ext)) {
-      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך - יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
     }
     uploadBody = await file.arrayBuffer();
     uploadContentType = file.type || "application/octet-stream";

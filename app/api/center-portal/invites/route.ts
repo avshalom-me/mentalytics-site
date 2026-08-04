@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות - נסו שוב בעוד רגע" }, { status: 429 });
   }
 
   const center = await resolveCenter(req);
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       if (quota > 0 && (linked ?? 0) + openInvites.length + fresh.length > quota) {
         const room = Math.max(0, quota - (linked ?? 0) - openInvites.length);
         return NextResponse.json(
-          { ok: false, error: `המנוי כולל ${quota} מטפלים — נותר מקום ל-${room} הזמנות. להרחבה: admin@getmentalytics.com` },
+          { ok: false, error: `המנוי כולל ${quota} מטפלים - נותר מקום ל-${room} הזמנות. להרחבה: admin@getmentalytics.com` },
           { status: 400 },
         );
       }
@@ -101,7 +101,7 @@ export async function POST(req: NextRequest) {
         .select("id, email, token");
       if (insErr || !created) throw insErr ?? new Error("insert failed");
 
-      // שליחה סדרתית — כשל במייל בודד לא מפיל את השאר.
+      // שליחה סדרתית - כשל במייל בודד לא מפיל את השאר.
       const failures: string[] = [];
       for (const inv of created) {
         const r = await sendCenterTherapistInviteEmail({ to: inv.email, centerName: center.name, token: inv.token });
@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
       const r = await sendCenterTherapistInviteEmail({ to: invite.email, centerName: center.name, token: invite.token });
       return r.ok
         ? NextResponse.json({ ok: true })
-        : NextResponse.json({ ok: false, error: "שליחת המייל נכשלה — נסו שוב" }, { status: 502 });
+        : NextResponse.json({ ok: false, error: "שליחת המייל נכשלה - נסו שוב" }, { status: 502 });
     }
 
     return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });

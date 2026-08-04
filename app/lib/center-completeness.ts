@@ -1,9 +1,9 @@
 import "server-only";
 import type { CenterDirector, CenterFaqItem, CenterGalleryPhoto, CenterTeamMember } from "./center-public";
 
-// חישוב שלמות הפרופיל הציבורי של מרכז מנתוני ה-DB — צד-שרת (מייל התזכורת).
+// חישוב שלמות הפרופיל הציבורי של מרכז מנתוני ה-DB - צד-שרת (מייל התזכורת).
 // אותם 10 פריטים כמו מד-השלמות החי בעורך הפורטל (PublicPageEditor); אם
-// משנים שם — לעדכן גם כאן.
+// משנים שם - לעדכן גם כאן.
 
 export type CenterRowForCompleteness = {
   logo_path: string | null;

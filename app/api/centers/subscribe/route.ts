@@ -5,12 +5,12 @@ import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 
-// הרשמת מרכז טיפולי למנוי — נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
+// הרשמת מרכז טיפולי למנוי - נקרא מדף ההצטרפות הציבורי /centers/join/<token>.
 // אימות: הטוקן הסודי מהקישור שהאדמין שלח (אין חשבון משתמש). הכרטיס עובר
 // טוקניזציה בדפדפן ישירות מול Sumit; לכאן מגיע רק SingleUseToken.
 //
-// חודשי מתנה: הוראת הקבע נוצרת מיד עם Date_Start עתידי — הכרטיס נשמר,
-// החיוב הראשון יוצא רק בתום המתנה. בלי מתנה — החיוב הראשון מיידי.
+// חודשי מתנה: הוראת הקבע נוצרת מיד עם Date_Start עתידי - הכרטיס נשמר,
+// החיוב הראשון יוצא רק בתום המתנה. בלי מתנה - החיוב הראשון מיידי.
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ function sanitizeName(raw: string): string {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות — נסו שוב בעוד דקה" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות - נסו שוב בעוד דקה" }, { status: 429 });
   }
 
   let body: Record<string, unknown>;
@@ -66,13 +66,13 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (!center) {
-      return NextResponse.json({ ok: false, error: "הקישור אינו תקף — פנו אלינו לקבלת קישור חדש" }, { status: 404 });
+      return NextResponse.json({ ok: false, error: "הקישור אינו תקף - פנו אלינו לקבלת קישור חדש" }, { status: 404 });
     }
     if (center.status === "active") {
       return NextResponse.json({ ok: false, error: "המנוי של המרכז כבר פעיל" }, { status: 400 });
     }
     if (center.status === "cancelled") {
-      return NextResponse.json({ ok: false, error: "ההצעה הזו כבר לא בתוקף — פנו אלינו לקבלת הצעה חדשה" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "ההצעה הזו כבר לא בתוקף - פנו אלינו לקבלת הצעה חדשה" }, { status: 400 });
     }
 
     // סכום חודשי לפי מסלול המרכז: מסלול 1 (מחיר×מספר) / מסלול 2 (מחיר קבוע).
@@ -88,11 +88,11 @@ export async function POST(req: NextRequest) {
       discount_amount: center.discount_amount as number | null,
     }).monthlyTotal;
     if (monthlyTotal <= 0) {
-      return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר — פנו אלינו" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "ההצעה עדיין לא כוללת מחיר - פנו אלינו" }, { status: 400 });
     }
 
     // מנעול כפילות אטומי: שורת payment במצב pending. אינדקס ייחודי
-    // (reference_id, payment_type) WHERE pending חוסם הגשה כפולה מקבילה —
+    // (reference_id, payment_type) WHERE pending חוסם הגשה כפולה מקבילה -
     // אותו מנגנון בדיוק כמו מנויי מטפלים (create-subscription).
     const sixtySecondsAgo = new Date(Date.now() - 60_000).toISOString();
     await supabaseAdmin
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
 
     if (paymentErr || !payment) {
       if (paymentErr?.code === "23505") {
-        return NextResponse.json({ ok: false, error: "תשלום כבר בתהליך — המתינו רגע" }, { status: 409 });
+        return NextResponse.json({ ok: false, error: "תשלום כבר בתהליך - המתינו רגע" }, { status: 409 });
       }
       return NextResponse.json({ ok: false, error: "שגיאה פנימית" }, { status: 500 });
     }
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // מכאן ההוראה קיימת ב-Sumit — כשל DB לא יוחזר כשגיאה שמזמינה הגשה חוזרת.
+    // מכאן ההוראה קיימת ב-Sumit - כשל DB לא יוחזר כשגיאה שמזמינה הגשה חוזרת.
     const now = new Date();
     try {
       await supabaseAdmin
@@ -195,7 +195,7 @@ export async function POST(req: NextRequest) {
         .throwOnError();
 
       if (giftMonths > 0) {
-        // לא עבר כסף עכשיו — שורת ה-pending שימשה רק כמנעול כפילות.
+        // לא עבר כסף עכשיו - שורת ה-pending שימשה רק כמנעול כפילות.
         await supabaseAdmin.from("payments").delete().eq("id", payment.id).throwOnError();
       } else {
         await supabaseAdmin
@@ -209,7 +209,7 @@ export async function POST(req: NextRequest) {
       }
     } catch (dbErr) {
       console.error(
-        `CRITICAL centers/subscribe: Sumit order created but local DB write failed — ` +
+        `CRITICAL centers/subscribe: Sumit order created but local DB write failed - ` +
           `center=${center.id} payment=${payment.id} sumitRecurringId=${sumitRecurringId} ` +
           `err=${dbErr instanceof Error ? dbErr.message : dbErr}`
       );
@@ -218,7 +218,7 @@ export async function POST(req: NextRequest) {
 
     console.log(`Center subscription completed: center=${center.id} gift=${giftMonths} therapists=${therapistCount} total=${monthlyTotal}`);
 
-    // המרכז פעיל — מטפלים משויכים ומאושרים נכנסים למערכת ההתאמות מיד.
+    // המרכז פעיל - מטפלים משויכים ומאושרים נכנסים למערכת ההתאמות מיד.
     // best-effort: כשל כאן לא מכשיל תשלום שהושלם (השיוך יסונכרן בפעולת אדמין הבאה).
     try {
       const promoted = await promoteCenterTherapists(center.id);
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
       console.error("centers/subscribe: promote linked therapists failed:", promoteErr instanceof Error ? promoteErr.message : promoteErr);
     }
 
-    // מייל ברוכים-הבאים עם קישור לפורטל — best-effort, לעולם לא מכשיל תשלום שהושלם.
+    // מייל ברוכים-הבאים עם קישור לפורטל - best-effort, לעולם לא מכשיל תשלום שהושלם.
     try {
       await sendCenterWelcomeEmail({
         to: payerEmail,

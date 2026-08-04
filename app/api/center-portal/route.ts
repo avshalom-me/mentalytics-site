@@ -5,12 +5,12 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { resolveCenter } from "@/app/lib/center-auth";
 import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type CenterDirector, type CenterFaqItem } from "@/app/lib/center-public";
 
-// פורטל המרכז הטיפולי — API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
+// פורטל המרכז הטיפולי - API מאומת שמחזיר את מטפלי המרכז + סטטיסטיקות
 // מצטברות לכל המרכז. הכניסה היא בחשבון Supabase Auth של המרכז (מקביל למטפל).
 
 export const dynamic = "force-dynamic";
 
-// הגבלת קצב לפי IP — הנתיב מאומת בטוקן, אבל זה חוסם ניסיונות claim חוזרים
+// הגבלת קצב לפי IP - הנתיב מאומת בטוקן, אבל זה חוסם ניסיונות claim חוזרים
 // וקריאות מוגזמות. in-memory, מתאפס ב-cold start.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 function checkRateLimit(ip: string): boolean {
@@ -25,7 +25,7 @@ function checkRateLimit(ip: string): boolean {
   return true;
 }
 
-// אימות משותף לכל נתיבי הפורטל — resolveCenter ב-app/lib/center-auth.ts.
+// אימות משותף לכל נתיבי הפורטל - resolveCenter ב-app/lib/center-auth.ts.
 
 type TherapistRow = {
   id: string;
@@ -54,7 +54,7 @@ function tallyBy<T>(rows: T[], key: (r: T) => string | null | undefined) {
 export async function GET(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות - נסו שוב בעוד רגע" }, { status: 429 });
   }
 
   const center = await resolveCenter(req);
@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים — היא
+    // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים - היא
     // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
     const isEntity = (center.billing_track as string) === "center_entity";
     let entity: { id: string; status: string; admin_approved: boolean; matching_filled: boolean } | null = null;
@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
         .maybeSingle();
       if (e) {
         // "מולא להתאמות" = יש לפחות תחום/סוג טיפול + קהל (גילאים) + כיסוי
-        // (אזור או אונליין). בלי אלה המרכז לא ייתפס באף שאלון — הדשבורד
+        // (אזור או אונליין). בלי אלה המרכז לא ייתפס באף שאלון - הדשבורד
         // מציג אזהרה בולטת עד שימולאו.
         const arr = (v: unknown) => (Array.isArray(v) ? v : []);
         const matchingFilled =
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest) {
       ? "מרכז כישות אחת"
       : (Number(center.therapist_count) > 0 ? `מנוי ל-${center.therapist_count} מטפלים` : null);
 
-    // מידע העמוד הציבורי — משותף לשני מסלולי המענה (עם/בלי מטפלים).
+    // מידע העמוד הציבורי - משותף לשני מסלולי המענה (עם/בלי מטפלים).
     const teamRaw: CenterTeamMember[] = Array.isArray(center.team_members)
       ? (center.team_members as CenterTeamMember[])
       : [];
@@ -160,7 +160,7 @@ export async function GET(req: NextRequest) {
       gallery: galleryRaw.map((g, i) => ({ path: g.path, caption: g.caption ?? null, url: signedAssets.gallery[i]?.url ?? null })),
     };
 
-    // אין נתונים להצגה — מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
+    // אין נתונים להצגה - מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
     // שטרם נכנסה להתאמות).
     if (statIds.length === 0) {
       return NextResponse.json({
@@ -186,7 +186,7 @@ export async function GET(req: NextRequest) {
     const wAgo = weekAgo().toISOString();
     const sixMonthsAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).toISOString();
 
-    // קליקים ליצירת קשר (6 חודשים — למגמה), וצפיות בפרופיל (חודש — לפילוח).
+    // קליקים ליצירת קשר (6 חודשים - למגמה), וצפיות בפרופיל (חודש - לפילוח).
     const [clicks, views] = await Promise.all([
       fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string }>(() =>
         supabaseAdmin
@@ -232,7 +232,7 @@ export async function GET(req: NextRequest) {
       trend.push({ label, clicks: n });
     }
 
-    // פניות פר-מטפל (חודש) — לטבלת המטפלים.
+    // פניות פר-מטפל (חודש) - לטבלת המטפלים.
     const clicksPerTherapist = new Map<string, number>();
     for (const c of clicksMonth) clicksPerTherapist.set(c.therapist_id, (clicksPerTherapist.get(c.therapist_id) ?? 0) + 1);
     const viewsPerTherapist = new Map<string, number>();
@@ -240,7 +240,7 @@ export async function GET(req: NextRequest) {
 
     const therapistList = therapists.map((t) => ({
       id: t.id,
-      name: t.full_name || "—",
+      name: t.full_name || "-",
       status: t.status,
       approved: Boolean(t.admin_approved),
       online: Boolean(t.online),
@@ -292,7 +292,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות - נסו שוב בעוד רגע" }, { status: 429 });
   }
   const center = await resolveCenter(req);
   if (!center) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
   if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
   if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
   if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
-  // פרופיל ויזואלי: לוגו + צוות/ראשי-המרכז + גלריית המרכז — self-serve מהפורטל.
+  // פרופיל ויזואלי: לוגו + צוות/ראשי-המרכז + גלריית המרכז - self-serve מהפורטל.
   if (body.logo_path !== undefined) update.logo_path = assetPath(body.logo_path);
   if (body.team_members !== undefined) {
     const raw = Array.isArray(body.team_members) ? body.team_members : [];
@@ -361,7 +361,7 @@ export async function POST(req: NextRequest) {
       ? { name, role: str(d.role, 120), note: str(d.note, 600), photo_path: assetPath(d.photo_path) }
       : {};
   }
-  // שאלות נפוצות: עד 6 זוגות {q, a} — נשמרות רק שורות מלאות.
+  // שאלות נפוצות: עד 6 זוגות {q, a} - נשמרות רק שורות מלאות.
   if (body.faq !== undefined) {
     const raw = Array.isArray(body.faq) ? body.faq : [];
     update.public_faq = raw.slice(0, 6).map((f) => {

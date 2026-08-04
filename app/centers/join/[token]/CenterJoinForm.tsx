@@ -153,7 +153,7 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
             <><br />קבלה על החיוב הראשון נשלחה למייל שהזנתם.</>
           )}
         </p>
-        {/* הקמת חשבון מיידית — קישור לפי הטוקן הסודי, בלי המתנה לקישור ידני */}
+        {/* הקמת חשבון מיידית - קישור לפי הטוקן הסודי, בלי המתנה לקישור ידני */}
         <CenterAccountSetup token={offer.token} centerName={offer.name} defaultEmail={payerEmail.trim()} />
       </div>
     );

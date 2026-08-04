@@ -168,7 +168,7 @@ export default function CenterDashboardPage() {
         <StatCard icon={Activity} label="לחיצות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
       </div>
 
-      {/* מסלול 2: הצעד הקריטי — בלי סוגי טיפול המרכז לא קיים בהתאמות */}
+      {/* מסלול 2: הצעד הקריטי - בלי סוגי טיפול המרכז לא קיים בהתאמות */}
       {isEntity && center.entity && center.entity.matching_filled === false && (
         <section className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-5">
           <h2 className="mb-1 text-base font-black text-amber-900">⚠️ צעד חיוני: סימון סוגי הטיפול של המרכז</h2>

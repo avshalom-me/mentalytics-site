@@ -4,11 +4,11 @@ import { useState } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
 import { KeyRound, Loader2 } from "lucide-react";
 
-// הקמת חשבון ניהול מיד אחרי התשלום — בלי להמתין לקישור ידני של אדמין.
+// הקמת חשבון ניהול מיד אחרי התשלום - בלי להמתין לקישור ידני של אדמין.
 // ההוכחה היא הטוקן הסודי של ההצעה (שדרכו גם שולם): נרשמים/מתחברים, ואז
 // /api/centers/claim-account מקשר את החשבון למרכז ומעביר ישר לפורטל.
 //
-// שני מצבים: "new" (ברירת מחדל — בוחרים סיסמה חדשה) ו-"existing" — כשמתברר
+// שני מצבים: "new" (ברירת מחדל - בוחרים סיסמה חדשה) ו-"existing" - כשמתברר
 // שהמייל כבר רשום (למשל בעל מרכז שנרשם בעבר כמטפל): המסך מסביר שצריך את
 // הסיסמה הקיימת ומציע איפוס במקום, בלי "הסיסמה שגויה" מבלבל.
 
@@ -35,7 +35,7 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
 
     try {
       // מצב "new": ניסיון הרשמה; מייל שכבר רשום מחזיר בכוונה משתמש בלי session
-      // (הגנת מניית-מיילים של Supabase) — ואז מנסים התחברות עם הסיסמה שהוזנה.
+      // (הגנת מניית-מיילים של Supabase) - ואז מנסים התחברות עם הסיסמה שהוזנה.
       let session = mode === "new"
         ? (await supabase.auth.signUp({ email: mail, password })).data.session
         : null;
@@ -45,12 +45,12 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
       }
       if (!session) {
         if (mode === "new") {
-          // המייל קיים והסיסמה שהוקלדה היא לא הסיסמה שלו — מעבר למצב "חשבון קיים".
+          // המייל קיים והסיסמה שהוקלדה היא לא הסיסמה שלו - מעבר למצב "חשבון קיים".
           setMode("existing");
           setPassword("");
           setError("");
         } else {
-          setError("הסיסמה שגויה — נסו שוב, או שלחו קישור איפוס למטה.");
+          setError("הסיסמה שגויה - נסו שוב, או שלחו קישור איפוס למטה.");
         }
         setLoading(false);
         return;
@@ -63,13 +63,13 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
       });
       const json = await res.json();
       if (!json.ok) {
-        setError(json.error ?? "הקישור נכשל — פנו אלינו: admin@getmentalytics.com");
+        setError(json.error ?? "הקישור נכשל - פנו אלינו: admin@getmentalytics.com");
         setLoading(false);
         return;
       }
       window.location.href = "/centers/dashboard/profile";
     } catch {
-      setError("שגיאת רשת — נסו שוב");
+      setError("שגיאת רשת - נסו שוב");
       setLoading(false);
     }
   }
@@ -82,7 +82,7 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
     const { error: resetErr } = await supabase.auth.resetPasswordForEmail(mail, {
       redirectTo: `${window.location.origin}/therapists/reset-password?ctx=center`,
     });
-    if (resetErr) setError("שליחת קישור האיפוס נכשלה — נסו שוב בעוד רגע");
+    if (resetErr) setError("שליחת קישור האיפוס נכשלה - נסו שוב בעוד רגע");
     else setResetSent(true);
   }
 
@@ -90,16 +90,16 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
     <form onSubmit={submit} className="mx-auto mt-6 max-w-md rounded-2xl border border-[#D8E4E8] bg-white p-5 text-right shadow-sm">
       <p className="text-sm font-black text-stone-900">
         <KeyRound size={15} className="ml-1 inline" style={{ color: "var(--teal)" }} />
-        {mode === "new" ? `עוד צעד אחד — חשבון הניהול של ${centerName}` : "נמצא חשבון קיים — נתחבר אליו"}
+        {mode === "new" ? `עוד צעד אחד - חשבון הניהול של ${centerName}` : "נמצא חשבון קיים - נתחבר אליו"}
       </p>
       {mode === "new" ? (
         <p className="mt-1 mb-4 text-xs leading-6 text-stone-600">
-          בחרו סיסמה וייכנסו ישר לפורטל: מילוי פרופיל המרכז, לוגו, צוות ותמונות — והכל עולה לאוויר אחרי אישור קצר שלנו.
+          בחרו סיסמה וייכנסו ישר לפורטל: מילוי פרופיל המרכז, לוגו, צוות ותמונות - והכל עולה לאוויר אחרי אישור קצר שלנו.
         </p>
       ) : (
         <p className="mt-1 mb-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-6 text-amber-900">
           לכתובת <span className="font-mono font-bold" dir="ltr">{email.trim()}</span> כבר קיים חשבון בטיפול חכם
-          (למשל אם נרשמתם בעבר כמטפל/ת). הזינו את <strong>הסיסמה הקיימת</strong> של החשבון —
+          (למשל אם נרשמתם בעבר כמטפל/ת). הזינו את <strong>הסיסמה הקיימת</strong> של החשבון -
           או שלחו קישור איפוס למטה. אפשר גם להזין למעלה כתובת מייל אחרת לחשבון חדש.
         </p>
       )}
@@ -120,12 +120,12 @@ export default function CenterAccountSetup({ token, centerName, defaultEmail }: 
       {mode === "existing" && !resetSent && (
         <button type="button" onClick={sendReset}
           className="mt-2 w-full rounded-full border border-stone-300 py-2 text-xs font-bold text-stone-600 hover:bg-stone-50">
-          שכחתי סיסמה — שלחו לי קישור איפוס למייל
+          שכחתי סיסמה - שלחו לי קישור איפוס למייל
         </button>
       )}
       {resetSent && (
         <p className="mt-2 rounded-xl border border-green-200 bg-green-50 px-3 py-2 text-center text-xs leading-5 text-green-800">
-          ✓ קישור איפוס נשלח למייל (בדקו גם בספאם). אחרי קביעת הסיסמה החדשה —
+          ✓ קישור איפוס נשלח למייל (בדקו גם בספאם). אחרי קביעת הסיסמה החדשה -
           חזרו לעמוד הזה (הקישור שבמייל &quot;ברוכים הבאים&quot;) כדי להשלים את חיבור החשבון למרכז.
         </p>
       )}

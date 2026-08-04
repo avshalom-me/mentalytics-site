@@ -128,8 +128,8 @@ export async function sendCenterWelcomeEmail(opts: {
   const priceLine = opts.billingTrack === "center_entity"
     ? `מנוי חודשי - מרכז טיפולי · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`
     : `${pr.therapistCount} מטפלים · ₪${ilCurrency(pr.monthlyTotal)} + מע"מ לחודש${extra ? ` (${extra})` : ""}`;
-  // עם טוקן — קישור ההקמה העצמית (נרשמים ומקושרים למרכז אוטומטית);
-  // בלעדיו — עמוד ההרשמה הרגיל (מרכזים ותיקים שקושרו ידנית).
+  // עם טוקן - קישור ההקמה העצמית (נרשמים ומקושרים למרכז אוטומטית);
+  // בלעדיו - עמוד ההרשמה הרגיל (מרכזים ותיקים שקושרו ידנית).
   const portalUrl = opts.token
     ? `${SITE_URL}/centers/join/${opts.token}`
     : `${SITE_URL}/centers/login?mode=register`;
@@ -189,7 +189,7 @@ export async function sendCenterWelcomeEmail(opts: {
 }
 
 /**
- * מייל הזמנה למטפל/ת של מרכז (מסלול 1) — קישור אישי למילוי הפרופיל.
+ * מייל הזמנה למטפל/ת של מרכז (מסלול 1) - קישור אישי למילוי הפרופיל.
  * הפרופיל שנוצר שייך למרכז; למטפל אין חשבון, רק הקישור החד-פעמי.
  */
 export async function sendCenterTherapistInviteEmail(opts: {
@@ -214,11 +214,11 @@ export async function sendCenterTherapistInviteEmail(opts: {
       </div>
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 14px;">שלום! ${name} הצטרף לטיפול חכם 🎉</h1>
       <p style="margin:0 0 12px;">המרכז שבו את/ה עובד/ת הצטרף לפלטפורמת ההתאמות של טיפול חכם, ומזמין אותך למלא פרופיל מקצועי. מטופלים מתאימים יופנו אליך דרך המרכז לפי תחומי הטיפול, האזור, הגיל והשפה.</p>
-      <p style="margin:0 0 16px;">המילוי אורך כ-5 דקות — תחומי טיפול, אזורים, כמה מילים עליך ותמונה:</p>
+      <p style="margin:0 0 16px;">המילוי אורך כ-5 דקות - תחומי טיפול, אזורים, כמה מילים עליך ותמונה:</p>
       <p style="margin:0 0 16px;">
         <a href="${fillUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">מילוי הפרופיל שלי</a>
       </p>
-      <p style="margin:0 0 4px;font-size:13px;color:#3E5250;">הקישור אישי — אין להעביר אותו הלאה. הפרופיל יעלה לאוויר אחרי אישור קצר של צוות טיפול חכם.</p>
+      <p style="margin:0 0 4px;font-size:13px;color:#3E5250;">הקישור אישי - אין להעביר אותו הלאה. הפרופיל יעלה לאוויר אחרי אישור קצר של צוות טיפול חכם.</p>
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;">
         שאלות? admin@getmentalytics.com<br/>
@@ -252,7 +252,7 @@ export async function sendCenterTherapistInviteEmail(opts: {
 }
 
 /**
- * תזכורת שלמות פרופיל — נשלחת פעם אחת למרכז פעיל שבוע+ אחרי התשלום כשהפרופיל
+ * תזכורת שלמות פרופיל - נשלחת פעם אחת למרכז פעיל שבוע+ אחרי התשלום כשהפרופיל
  * הציבורי עדיין חסר. מפרטת בדיוק מה חסר ומקשרת להקמה/עריכה.
  */
 export async function sendCenterCompletenessNudgeEmail(opts: {
@@ -260,7 +260,7 @@ export async function sendCenterCompletenessNudgeEmail(opts: {
   centerName: string;
   pct: number;
   missing: string[];
-  token?: string | null;   // בלי חשבון מקושר — קישור ההקמה; אחרת הפורטל
+  token?: string | null;   // בלי חשבון מקושר - קישור ההקמה; אחרת הפורטל
   hasAccount: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
@@ -308,7 +308,7 @@ export async function sendCenterCompletenessNudgeEmail(opts: {
 }
 
 /**
- * תזכורת למטפל/ת שקיבל/ה הזמנת-מילוי מהמרכז ולא השלים/ה — נשלחת פעם אחת.
+ * תזכורת למטפל/ת שקיבל/ה הזמנת-מילוי מהמרכז ולא השלים/ה - נשלחת פעם אחת.
  */
 export async function sendCenterInviteReminderEmail(opts: {
   to: string;

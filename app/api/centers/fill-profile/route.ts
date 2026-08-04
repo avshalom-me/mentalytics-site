@@ -4,7 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
 import { CENTER_THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 
-// מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) — אימות בטוקן ההזמנה האישי,
+// מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) - אימות בטוקן ההזמנה האישי,
 // בלי חשבון. JSON = יצירת הפרופיל (חד-פעמי); multipart = העלאת תמונה/תעודה
 // לפרופיל שנוצר מאותה הזמנה. הפרופיל שייך למרכז (user_id ריק) ונכנס לתור
 // האישורים הרגיל של האדמין.
@@ -40,7 +40,7 @@ async function loadInvite(token: string): Promise<Invite | null> {
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי בקשות — נסו שוב בעוד רגע" }, { status: 429 });
+    return NextResponse.json({ ok: false, error: "יותר מדי בקשות - נסו שוב בעוד רגע" }, { status: 429 });
   }
 
   const contentType = req.headers.get("content-type") ?? "";
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
       const ext = (file.name.split(".").pop() ?? "").toLowerCase();
       if (file.size > 10 * 1024 * 1024) return NextResponse.json({ ok: false, error: "הקובץ גדול מ-10MB" }, { status: 400 });
       if ((file.type && !ALLOWED_TYPES.includes(file.type)) || !["pdf", "jpg", "jpeg", "png"].includes(ext)) {
-        return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — PDF / JPG / PNG בלבד" }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך - PDF / JPG / PNG בלבד" }, { status: 400 });
       }
       const path = `certificates/invite-${invite.therapist_id}-${Date.now()}.${ext}`;
       const { error } = await supabaseAdmin.storage.from("therapist-certificates")
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
     const body = (await req.json()) as Record<string, unknown>;
     const token = typeof body.token === "string" ? body.token.trim() : "";
     const invite = await loadInvite(token);
-    if (!invite) return NextResponse.json({ ok: false, error: "הקישור אינו תקף — בקשו מהמרכז הזמנה חדשה" }, { status: 404 });
+    if (!invite) return NextResponse.json({ ok: false, error: "הקישור אינו תקף - בקשו מהמרכז הזמנה חדשה" }, { status: 404 });
     if (invite.used_at) {
       return NextResponse.json({ ok: false, error: "הפרופיל מהקישור הזה כבר מולא. לעדכונים פנו למנהל/ת המרכז." }, { status: 409 });
     }
@@ -114,10 +114,10 @@ export async function POST(req: NextRequest) {
       .eq("id", invite.center_account_id)
       .maybeSingle();
     if (!center || center.status !== "active") {
-      return NextResponse.json({ ok: false, error: "המנוי של המרכז אינו פעיל — פנו למנהל/ת המרכז" }, { status: 403 });
+      return NextResponse.json({ ok: false, error: "המנוי של המרכז אינו פעיל - פנו למנהל/ת המרכז" }, { status: 403 });
     }
 
-    // אותה רשימת שדות מותרת כמו בעריכת מטפל ע"י המרכז — מקור אמת אחד.
+    // אותה רשימת שדות מותרת כמו בעריכת מטפל ע"י המרכז - מקור אמת אחד.
     const fields: Record<string, unknown> = {};
     for (const key of CENTER_THERAPIST_EDIT_FIELDS) {
       if (key in body) fields[key] = body[key];
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         email: (typeof fields.email === "string" && fields.email.trim()) || invite.email,
         gender: typeof fields.gender === "string" ? fields.gender : "",
         center_account_id: invite.center_account_id,
-        user_id: null, // בבעלות המרכז — למטפל אין חשבון
+        user_id: null, // בבעלות המרכז - למטפל אין חשבון
         status: "pending",
         tier: "free",
         profile_updated_at: new Date().toISOString(),
@@ -142,10 +142,10 @@ export async function POST(req: NextRequest) {
       .single();
     if (insErr || !created) {
       console.error(`centers/fill-profile insert failed (invite=${invite.id}):`, insErr?.message);
-      return NextResponse.json({ ok: false, error: "שמירת הפרופיל נכשלה — נסו שוב" }, { status: 500 });
+      return NextResponse.json({ ok: false, error: "שמירת הפרופיל נכשלה - נסו שוב" }, { status: 500 });
     }
 
-    // סימון ההזמנה כמומשה — מגן מרוץ: רק אם עדיין לא מומשה.
+    // סימון ההזמנה כמומשה - מגן מרוץ: רק אם עדיין לא מומשה.
     const { data: marked } = await supabaseAdmin
       .from("center_therapist_invites")
       .update({ used_at: new Date().toISOString(), therapist_id: created.id })
@@ -154,7 +154,7 @@ export async function POST(req: NextRequest) {
       .select("id")
       .maybeSingle();
     if (!marked) {
-      // מרוץ נדיר: מילוי כפול במקביל — מוחקים את הפרופיל השני.
+      // מרוץ נדיר: מילוי כפול במקביל - מוחקים את הפרופיל השני.
       await supabaseAdmin.from("therapists").delete().eq("id", created.id);
       return NextResponse.json({ ok: false, error: "הפרופיל מהקישור הזה כבר מולא" }, { status: 409 });
     }
