@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { createCenterSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
+import { createCenterSubscription, SumitPaymentDeclinedError, listRecurringForCustomer, SUMIT_RECURRING_ACTIVE_STATUSES } from "@/app/lib/sumit";
 import { sendCenterWelcomeEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
@@ -138,6 +138,31 @@ export async function POST(req: NextRequest) {
       const d = new Date();
       d.setMonth(d.getMonth() + giftMonths);
       firstChargeDate = d.toISOString().slice(0, 10);
+    }
+
+    // הגנה מפני הוראת קבע כפולה: אם ל-Sumit כבר יש הוראה חיה למרכז הזה,
+    // הגשה חוזרת (כשל כתיבת DB אחרי חיוב מוצלח, או ריענון בזמן קריאה תקועה)
+    // הייתה יוצרת הוראה שנייה שמחייבת את הכרטיס פעמיים - ואף מסלול לא היה
+    // מזהה אותה. במקרה כזה עוצרים ומפנים אלינו במקום לחייב שוב.
+    try {
+      const existingItems = await listRecurringForCustomer({
+        externalIdentifier: `center:${center.id}`,
+        includeInactive: true,
+      });
+      const live = existingItems.filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)));
+      if (live.length > 0) {
+        await supabaseAdmin.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        console.error(
+          `centers/subscribe: center=${center.id} already has a live Sumit order (${live.map((i) => i.ID).join(", ")}) - refusing to create a second one`,
+        );
+        return NextResponse.json(
+          { ok: false, error: "כבר קיימת הוראת קבע פעילה למרכז הזה. אל תשלמו שוב - כתבו לנו ונשלים את ההפעלה: admin@getmentalytics.com" },
+          { status: 409 },
+        );
+      }
+    } catch (e) {
+      // קריאה ל-Sumit נכשלה: לא חוסמים תשלום לגיטימי בגלל תקלת רשת.
+      console.error("centers/subscribe: pre-check for existing order failed, continuing:", e instanceof Error ? e.message : e);
     }
 
     let result;

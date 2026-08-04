@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice } from "@/app/lib/sumit";
+import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
@@ -301,6 +301,14 @@ export async function POST(req: NextRequest) {
 
         if (center.status === "active") {
           const oldTotal = Number(center.agreed_monthly_price) || 0;
+          // רצפת מחיר: בלעדיה הנחה שגויה (או גדולה מהבסיס) דוחפת UnitPrice=0
+          // ל-Sumit, השירות ממשיך והגבייה נעצרת בשקט. subscribe כבר חוסם ≤0.
+          if (newTotal <= 0) {
+            return NextResponse.json(
+              { ok: false, error: "הסכום החודשי לאחר ההנחה יוצא 0 או פחות. לעצירת גבייה יש לבטל את המנוי, לא לאפס את המחיר." },
+              { status: 400 },
+            );
+          }
           if (Math.round(newTotal * 100) !== Math.round(oldTotal * 100)) {
             if (!center.sumit_recurring_id) {
               return NextResponse.json({ ok: false, error: "לא ניתן לעדכן חיוב — חסר מזהה הוראת קבע ב-Sumit. עדכנו ידנית בממשק Sumit." }, { status: 400 });
@@ -479,12 +487,18 @@ export async function POST(req: NextRequest) {
       const ours = center.sumit_recurring_id
         ? items.find((i) => Number(i.ID) === Number(center.sumit_recurring_id))
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
-      if (ours && ours.Status !== 0 && center.status === "active") {
+      // מבטלים אצלנו רק כשההוראה באמת בוטלה ב-Sumit (Status=1). 0=פעילה
+      // ו-12=מתוזמנת (חודשי מתנה) הן חיות. הבדיקה הישנה (Status !== 0) ביטלה
+      // מרכז בתקופת מתנה בכל לחיצה על "סטטוס מ-Sumit" - אותו באג שהיה ב-cron.
+      const isLive = ours ? SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(ours.Status)) : false;
+      if (ours && ours.Status === SUMIT_RECURRING_CANCELLED_STATUS && center.status === "active") {
         await supabaseAdmin
           .from("therapy_center_accounts")
           .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
           .eq("id", id);
         await demoteCenterTherapists({ centerId: id }, "center standing order cancelled at Sumit (sync)");
+      } else if (ours && !isLive && ours.Status !== SUMIT_RECURRING_CANCELLED_STATUS) {
+        console.warn(`admin-centers sync_sumit: unknown Sumit status ${ours.Status} for center ${id} - not cancelling`);
       }
       return NextResponse.json({
         ok: true,

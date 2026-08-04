@@ -491,12 +491,15 @@ export async function GET(req: NextRequest) {
   // עד שאדמין לוחץ ידנית "סטטוס מ-Sumit". כמו בסעיף (1): מורידים רק כש-Sumit
   // מחזיר סטטוס לא-פעיל מפורשות; פריט שלא נמצא = קריאה עמומה, מדלגים ומנסים
   // בריצה הבאה (מספר המרכזים קטן, העיכוב זניח).
+  const CENTER_MISS_THRESHOLD = 2; // כמו אצל מטפלים - קריאה עמומה אחת לא מבטלת
   let centersChecked = 0;
   let centersCancelled = 0;
   let centerTherapistsDemoted = 0;
+  let centerChargesRecorded = 0;
+  let centerOrphansFound = 0;
   const { data: activeCenters } = await supabase
     .from("therapy_center_accounts")
-    .select("id, name, sumit_recurring_id")
+    .select("id, name, sumit_recurring_id, sumit_miss_count, last_billed_on, agreed_monthly_price, billing_track, payer_email")
     .eq("status", "active")
     .not("sumit_recurring_id", "is", null);
 
@@ -508,12 +511,88 @@ export async function GET(req: NextRequest) {
         includeInactive: true,
       });
       const ours = items.find((i) => Number(i.ID) === Number(c.sumit_recurring_id));
+
+      // (א) מראה מקומית לחיובים החוזרים. ל-Sumit אין webhooks, ולכן בלי זה
+      // מרכז שמשלם כל חודש מופיע אצלנו כשורת תשלום אחת לכל היותר - וההכנסה
+      // נעלמת מכל דוח. משקפים כל תאריך-חיוב חדש שראינו כשורת payments.
+      const prevBilling = ours?.Date_PreviousBilling ? String(ours.Date_PreviousBilling).slice(0, 10) : null;
+      if (prevBilling && prevBilling !== c.last_billed_on) {
+        const amount = Number(c.agreed_monthly_price) || Number(ours?.UnitPrice) || 0;
+        if (amount > 0) {
+          const { error: payErr } = await supabase.from("payments").insert({
+            payment_type: "center_subscription",
+            reference_id: c.id,
+            amount,
+            status: "completed",
+            metadata: {
+              center_name: c.name,
+              billing_track: c.billing_track,
+              sumit_billing_date: prevBilling,
+              sumit_recurring_id: String(c.sumit_recurring_id),
+              recorded_by: "sumit-status-sync",
+              payer_email: c.payer_email,
+            },
+          });
+          if (payErr) {
+            console.error(`center billing mirror failed (center=${c.id}, date=${prevBilling}):`, payErr.message);
+          } else {
+            centerChargesRecorded++;
+            await supabase
+              .from("therapy_center_accounts")
+              .update({ last_billed_on: prevBilling, updated_at: new Date().toISOString() })
+              .eq("id", c.id);
+          }
+        }
+      }
+
+      // (ב) סריקת יתומים: הוראת קבע *נוספת* חיה תחת אותו לקוח = חיוב כפול
+      // שאף מסלול קיים לא מזהה (הביטול נוגע רק ל-ID הרשום). לא מבטלים
+      // אוטומטית - מתריעים, כדי לא לגעת בטעות בהוראה הנכונה.
+      const otherLive = items.filter(
+        (i) => Number(i.ID) !== Number(c.sumit_recurring_id) && (i.Status === 0 || i.Status === 12),
+      );
+      if (otherLive.length > 0) {
+        centerOrphansFound += otherLive.length;
+        console.error(`CENTER ORPHAN: center=${c.id} has ${otherLive.length} extra live Sumit item(s): ${otherLive.map((i) => i.ID).join(", ")}`);
+        try {
+          await resend.emails.send({
+            from: "טיפול חכם <noreply@mentalytics.co.il>",
+            to: ALERT_TO,
+            subject: `⚠️ הוראת קבע כפולה למרכז "${c.name}"`,
+            html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+              <p>למרכז <strong>${String(c.name).replace(/</g, "&lt;")}</strong> יש ב-Sumit יותר מהוראת קבע חיה אחת - כלומר הכרטיס עלול להיות מחויב פעמיים.</p>
+              <p><strong>ההוראה הרשומה אצלנו:</strong> ${c.sumit_recurring_id}<br/>
+                 <strong>הוראות נוספות חיות:</strong> ${otherLive.map((i) => `${i.ID} (status ${i.Status})`).join(", ")}</p>
+              <p>יש לבטל ידנית בממשק Sumit את ההוראות המיותרות. center_id: ${c.id}</p>
+            </div>`,
+          });
+        } catch (mailErr) {
+          console.error("center orphan alert email failed:", mailErr);
+        }
+      }
+
+      // (ג) פריט שלא נמצא = קריאה עמומה. כמו אצל מטפלים - מורידים רק אחרי
+      // 2 החמצות רצופות, כדי שהוראה שנמחקה ב-Sumit לא תשאיר שירות חינם לנצח.
+      if (!ours) {
+        const misses = (Number(c.sumit_miss_count) || 0) + 1;
+        if (misses < CENTER_MISS_THRESHOLD) {
+          await supabase
+            .from("therapy_center_accounts")
+            .update({ sumit_miss_count: misses, updated_at: new Date().toISOString() })
+            .eq("id", c.id);
+          console.warn(`center sync: item ${c.sumit_recurring_id} not found for center ${c.id} (miss ${misses}/${CENTER_MISS_THRESHOLD})`);
+          continue;
+        }
+        console.error(`center sync: item ${c.sumit_recurring_id} missing ${misses}x for center ${c.id} - treating as cancelled`);
+      } else if ((Number(c.sumit_miss_count) || 0) > 0) {
+        await supabase.from("therapy_center_accounts").update({ sumit_miss_count: 0 }).eq("id", c.id);
+      }
       // סטטוסים (נמדדו מול הוראות אמיתיות, ראו SUMIT_RECURRING_ACTIVE_STATUSES):
       // 0=פעילה, 12=מתוזמנת (חודשי מתנה) — חיות, לא נוגעים. 1=בוטלה — מבטלים
       // גם אצלנו. סטטוס אחר/לא מוכר: לא מבטלים אוטומטית (הלקח מ-12: הוראת
       // מתנה נקראה "מבוטלת" והמרכז בוטל בטעות) — רק מתריעים לאדמין לבדוק.
-      if (!ours || ours.Status === 0 || ours.Status === 12) continue;
-      if (ours.Status !== 1) {
+      if (ours && (ours.Status === 0 || ours.Status === 12)) continue;
+      if (ours && ours.Status !== 1) {
         console.warn(`center sync: unknown Sumit status ${ours.Status} for center ${c.id} — not touching, alerting admin`);
         try {
           await resend.emails.send({
@@ -584,6 +663,8 @@ export async function GET(req: NextRequest) {
     centersChecked,
     centersCancelled,
     centerTherapistsDemoted,
+    centerChargesRecorded,
+    centerOrphansFound,
     errors,
   });
 }
