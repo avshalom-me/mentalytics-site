@@ -106,6 +106,11 @@ export async function GET(req: NextRequest) {
       const incomeQuiz = monthPayments
         .filter((p) => p.payment_type === "quiz")
         .reduce((s, p) => s + Number(p.amount), 0);
+      // מנויי מרכזים טיפוליים - היו נשלפים אך לא נספרים באף קטגוריה, כך
+      // שהכנסה אמיתית נעלמה מ"הכנסות החודש" ומהרווח המצטבר.
+      const incomeCenters = monthPayments
+        .filter((p) => p.payment_type === "center_subscription")
+        .reduce((s, p) => s + Number(p.amount), 0);
 
       const monthExpenses = expenses.filter((e) => monthKey(e.expense_date) === m);
       const refunds = monthExpenses
@@ -122,12 +127,13 @@ export async function GET(req: NextRequest) {
         .reduce((s, e) => s + Number(e.amount), 0);
 
       const newPaying = newPayingByMonth.get(m) ?? 0;
-      const income = incomeSubs + incomeQuiz;
+      const income = incomeSubs + incomeQuiz + incomeCenters;
 
       return {
         month: m,
         income_subscriptions: incomeSubs,
         income_quiz: incomeQuiz,
+        income_centers: incomeCenters,
         income_total: income,
         expenses_total: expensesTotal,
         refunds_total: refunds,

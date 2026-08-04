@@ -120,7 +120,7 @@ export default function CenterProfileEditPage() {
 
       {/* העמוד הציבורי - לוגו, צוות, גלריה ופרטי המרכז */}
       {center.status === "active" ? (
-        <PublicPageEditor initial={center.public_page} />
+        <PublicPageEditor initial={center.public_page} isEntity={isEntity} />
       ) : (
         <section className="rounded-2xl border border-stone-200 bg-stone-50 p-5 text-sm leading-6 text-stone-600">
           עריכת העמוד הציבורי (לוגו, צוות, גלריה ותיאור) תיפתח עם הפעלת המנוי.

@@ -548,7 +548,7 @@ export default function AdultsPage() {
   }, [screen, matchResults, selectedRec, matchPrefs, combinedTreatments, combinedLabels, combinedCouplesModality, combinedNeedsSexualTherapy, addictionCbtFallback, scoring, answers]);
 
   // Build the profile-page link for a given therapist with match-attribution params.
-  function profileHrefForMatch(t: any): string {
+  function profileHrefForMatch(t: any): string | null {
     const params = new URLSearchParams({ from: "match" });
     const score = t.combined_score ?? t.match_score;
     if (typeof score === "number") params.set("s", String(score));
@@ -566,7 +566,10 @@ export default function AdultsPage() {
     const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
     if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
     if (selectedRec?.symptomText) params.set("sy", selectedRec.symptomText.slice(0, 160));
-    if (t.entity_type === "center" && t.profile_slug) return `/centers/${t.profile_slug}`;
+    // מרכז (מסלול 2): לעמוד המרכז, עם from=match כדי שהצפייה תיוחס להתאמות.
+    // בלי slug אין עמוד — מחזירים null והכרטיס מסתיר את כפתור הפרופיל
+    // (עמוד-מטפל חוסם ישויות ב-404, אסור ליפול אליו).
+    if (t.entity_type === "center") return t.profile_slug ? `/centers/${t.profile_slug}?from=match` : null;
     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
   }
 
@@ -2892,15 +2895,22 @@ export default function AdultsPage() {
               className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="flex items-stretch gap-4">
-                <img
-                  src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                  alt={t.full_name ?? ""}
-                  className={`h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl ${
-                    t.entity_type === "center"
-                      ? "border border-[var(--line)] bg-white object-contain p-1" // לוגו מרכז - לא לחתוך
-                      : "object-cover"
-                  }`}
-                />
+                {t.entity_type === "center" && !t.profile_photo_url ? (
+                  // מרכז בלי לוגו - סמל ניטרלי (לא אווטאר מגדרי; gender של ישות ריק)
+                  <div className="flex h-[78px] w-[78px] flex-shrink-0 items-center justify-center self-start rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] text-3xl" aria-hidden>
+                    🏢
+                  </div>
+                ) : (
+                  <img
+                    src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                    alt={t.full_name ?? ""}
+                    className={`h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl ${
+                      t.entity_type === "center"
+                        ? "border border-[var(--line)] bg-white object-contain p-1" // לוגו מרכז - לא לחתוך
+                        : "object-cover"
+                    }`}
+                  />
+                )}
                 <div className="min-w-0 flex-1 text-right">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="text-lg font-extrabold text-[var(--text)]">{t.full_name || "ללא שם"}</h3>
@@ -2942,12 +2952,14 @@ export default function AdultsPage() {
                 </p>
               )}
               <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                <a
-                  href={profileHrefForMatch(t)}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
-                >
-                  פרופיל מלא ←
-                </a>
+                {profileHrefForMatch(t) && (
+                  <a
+                    href={profileHrefForMatch(t)!}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
+                  >
+                    פרופיל מלא ←
+                  </a>
+                )}
                 <button
                   onClick={() => fetchExplanation(t)}
                   disabled={explainLoading[t.id]}

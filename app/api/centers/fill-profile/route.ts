@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
-import { CENTER_THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
+import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
 
 // מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) - אימות בטוקן ההזמנה האישי,
 // בלי חשבון. JSON = יצירת הפרופיל (חד-פעמי); multipart = העלאת תמונה/תעודה
@@ -55,8 +55,17 @@ export async function POST(req: NextRequest) {
       const invite = await loadInvite(token);
       if (!invite) return NextResponse.json({ ok: false, error: "הקישור אינו תקף" }, { status: 404 });
       if (!invite.therapist_id) return NextResponse.json({ ok: false, error: "יש לשמור קודם את הפרופיל" }, { status: 400 });
+      // ההעלאות קורות מיד אחרי שמירת הטופס (שמסמנת used_at) - חלון של שעה
+      // מספיק לזרימה האמיתית, וסוגר שימוש-חוזר בקישור שהועבר הלאה חודשים
+      // אחרי (החלפת תמונה של פרופיל חי בלי אישור מחדש).
+      if (invite.used_at && Date.now() - new Date(invite.used_at).getTime() > 60 * 60_000) {
+        return NextResponse.json({ ok: false, error: "חלון ההעלאה מהקישור הזה נסגר - לעדכונים פנו למנהל/ת המרכז" }, { status: 403 });
+      }
       if (!file || (type !== "photo" && type !== "certificate")) {
         return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
+      }
+      if (file.size > 10 * 1024 * 1024) {
+        return NextResponse.json({ ok: false, error: "הקובץ גדול מ-10MB" }, { status: 400 });
       }
 
       if (type === "photo") {
@@ -122,6 +131,9 @@ export async function POST(req: NextRequest) {
     for (const key of CENTER_THERAPIST_EDIT_FIELDS) {
       if (key in body) fields[key] = body[key];
     }
+    // סניטציה כמו בכל נתיבי הכתיבה - הקישורים מרונדרים כעוגנים בעמוד הציבורי.
+    if ("publication_links" in fields) fields.publication_links = sanitizePublicationLinks(fields.publication_links);
+    if (Array.isArray(fields.regions) && fields.regions.length > 15) fields.regions = (fields.regions as unknown[]).slice(0, 15);
     const fullName = typeof fields.full_name === "string" ? fields.full_name.trim() : "";
     if (!fullName) return NextResponse.json({ ok: false, error: "חסר שם מלא" }, { status: 400 });
 

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { resolveCenter } from "@/app/lib/center-auth";
 import { writeAudit } from "@/app/lib/audit";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
-import { CENTER_THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
+import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
 
 // ניהול פרופילי מטפלים על-ידי המרכז, מתוך הפורטל. פרופיל שנוצר כאן שייך
 // למרכז (center_account_id מוגדר, user_id ריק) - רק מנהלי המרכז עורכים אותו,
@@ -30,6 +30,12 @@ function pickAllowed(body: Record<string, unknown>): Record<string, unknown> {
   const update: Record<string, unknown> = {};
   for (const key of CENTER_THERAPIST_EDIT_FIELDS) {
     if (key in body) update[key] = body[key];
+  }
+  // אותה סניטציה כמו בנתיב העצמי - הקישורים מרונדרים כעוגנים בעמוד הציבורי.
+  if ("publication_links" in update) update.publication_links = sanitizePublicationLinks(update.publication_links);
+  // גבול שפיות לאזורים - ה-UI מגביל (3 ערים / אזורים×4), אבל POST ישיר לא.
+  if (Array.isArray(update.regions) && update.regions.length > 15) {
+    update.regions = (update.regions as unknown[]).slice(0, 15);
   }
   return update;
 }
@@ -67,9 +73,18 @@ export async function POST(req: NextRequest) {
       if (!fullName) {
         return NextResponse.json({ ok: false, error: "חסר שם המטפל/ת" }, { status: 400 });
       }
+      // פרופיל חי בלי שום ערוץ קשר = לידים לריק - דורשים מייל או טלפון.
+      const hasContact = (typeof fields.email === "string" && fields.email.trim()) || (typeof fields.phone === "string" && fields.phone.trim());
+      if (!hasContact) {
+        return NextResponse.json({ ok: false, error: "יש למלא מייל או טלפון לפניות מטופלים" }, { status: 400 });
+      }
 
       // אכיפת המכסה: המרכז משלם לפי therapist_count (לא כולל שורת ישות-המרכז).
+      // מכסה לא מוגדרת (0/null) אינה "בלתי מוגבל" - חוסמים עד שהאדמין יגדיר.
       const quota = Math.floor(Number(center.therapist_count) || 0);
+      if (quota <= 0) {
+        return NextResponse.json({ ok: false, error: "מכסת המטפלים של המנוי לא מוגדרת - פנו אלינו: admin@getmentalytics.com" }, { status: 400 });
+      }
       const { count: linkedNow } = await supabaseAdmin
         .from("therapists")
         .select("id", { count: "exact", head: true })
@@ -121,7 +136,7 @@ export async function POST(req: NextRequest) {
       // בעלות: מותר לערוך רק מטפל שמשויך למרכז הזה.
       const { data: existing } = await supabaseAdmin
         .from("therapists")
-        .select("id, status, center_account_id")
+        .select("id, status, center_account_id, user_id")
         .eq("id", id)
         .maybeSingle();
       if (!existing || existing.center_account_id !== center.id) {
@@ -129,6 +144,9 @@ export async function POST(req: NextRequest) {
       }
 
       const update = pickAllowed(body);
+      // מטפל עם חשבון עצמאי שקושר למרכז: המייל שלו כבול לחשבון ה-Auth שלו
+      // ומודר מהעריכה העצמית - מרכז שמשכתב אותו מסיט לידים בלי יכולת שחזור.
+      if (existing.user_id) delete update.email;
       if (Object.keys(update).length === 0) {
         return NextResponse.json({ ok: false, error: "אין שדות לעדכון" }, { status: 400 });
       }

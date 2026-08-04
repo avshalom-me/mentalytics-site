@@ -9,6 +9,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import TrackView from "@/app/therapists/[id]/TrackView";
 import CenterMessageButton from "./CenterMessageButton";
+import CenterPhoneLink from "./CenterPhoneLink";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 // עמוד מרכז ציבורי (SEO). מסלול 1 - מציג את מטפלי המרכז. מסלול 2 (מרכז כישות)
@@ -80,10 +81,15 @@ const AV_GRADIENTS = [
   "linear-gradient(140deg,#4E9C93,#2A6462)",
 ];
 
-export default async function CenterPublicPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function CenterPublicPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { slug } = await params;
   const center = await getPublicCenterBySlug(slug);
   if (!center) notFound();
+
+  // הגעה מתוצאות ההתאמות (?from=match) - הצפייה נרשמת כ-match ולא directory,
+  // כדי שמשפך המרכז בפורטל (הופעה→כניסה) יהיה קוהרנטי.
+  const sp = searchParams ? await searchParams : undefined;
+  const viewSource: "match" | "directory" = sp?.from === "match" ? "match" : "directory";
 
   const isEntity = center.billing_track === "center_entity";
   const [assets, entity, therapists] = await Promise.all([
@@ -149,14 +155,14 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
     name: center.name,
     inLanguage: "he",
     url: `${BASE}/centers/${center.slug}`,
-    ...(assets.logoUrl ? { logo: assets.logoUrl } : {}),
+    // בלי logo: ה-URL חתום ל-24 שעות - קישור מת בקאש של הקרולרים + churn בתוכן
     ...(center.public_description ? { description: center.public_description } : {}),
     ...(center.public_founded_year ? { foundingDate: String(center.public_founded_year) } : {}),
     ...(center.public_team_size ? { numberOfEmployees: { "@type": "QuantitativeValue", value: center.public_team_size } } : {}),
     ...(center.public_city || center.public_address
       ? { address: { "@type": "PostalAddress", ...(center.public_address ? { streetAddress: center.public_address } : {}), ...(center.public_city ? { addressLocality: center.public_city } : {}), addressCountry: "IL" } }
       : {}),
-    ...(center.public_website ? { sameAs: [center.public_website] } : {}),
+    ...(websiteHref ? { sameAs: [websiteHref] } : {}), // מנורמל עם https - "example.com" גולמי אינו URL תקין בסכמה
     ...(center.public_phone ? { telephone: center.public_phone } : {}),
     ...(therapists.length > 0
       ? { employee: therapists.map((t) => ({ "@type": "Person", name: t.full_name, url: `${BASE}${therapistPath(t.id, t.full_name)}` })) }
@@ -181,7 +187,7 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
       )}
       {/* מסלול 2: צפייה בעמוד המרכז נספרת כצפייה בפרופיל הישות - מזינה את
           "צפיות בפרופיל" בפורטל המרכז (דה-דופ לפי session בצד השרת). */}
-      {isEntity && entity && <TrackView therapistId={entity.id} source="directory" />}
+      {isEntity && entity && <TrackView therapistId={entity.id} source={viewSource} />}
 
       <Link href="/therapists" className="mb-6 inline-block text-sm text-[var(--muted)] hover:underline">← כל המטפלים</Link>
 
@@ -209,11 +215,17 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
                 <Globe size={15} style={{ color: "var(--teal)" }} /> אתר המרכז
               </a>
             )}
-            {center.public_phone && (
+            {center.public_phone && (isEntity && entity ? (
+              // לחיצת טלפון על מרכז-ישות נספרת בפורטל כלחיצת-קשר (כמו אצל מטפל)
+              <CenterPhoneLink entityId={entity.id} phone={center.public_phone}
+                className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
+                <Phone size={15} style={{ color: "var(--teal)" }} /> {center.public_phone}
+              </CenterPhoneLink>
+            ) : (
               <a href={`tel:${center.public_phone.replace(/[^\d+]/g, "")}`} className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
                 <Phone size={15} style={{ color: "var(--teal)" }} /> {center.public_phone}
               </a>
-            )}
+            ))}
             <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E9D6A6] px-3 py-1 text-xs font-extrabold"
               style={{ background: "var(--gold-pale)", color: "var(--gold-dark)" }}>
               <BadgeCheck size={14} /> מרכז מאומת
@@ -505,13 +517,19 @@ export default async function CenterPublicPage({ params }: { params: Promise<{ s
           {canMessage && entity && (
             <CenterMessageButton entityId={entity.id} centerName={center.name} />
           )}
-          {center.public_phone && (
+          {center.public_phone && (isEntity && entity ? (
+            <CenterPhoneLink entityId={entity.id} phone={center.public_phone}
+              className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-7 py-3 text-base font-bold transition hover:bg-[var(--teal-pale)]"
+              style={{ color: "var(--teal-dark)" }}>
+              <Phone size={16} /> יצירת קשר ישירה
+            </CenterPhoneLink>
+          ) : (
             <a href={`tel:${center.public_phone.replace(/[^\d+]/g, "")}`}
               className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-7 py-3 text-base font-bold transition hover:bg-[var(--teal-pale)]"
               style={{ color: "var(--teal-dark)" }}>
               <Phone size={16} /> יצירת קשר ישירה
             </a>
-          )}
+          ))}
         </div>
       </section>
     </main>

@@ -31,7 +31,7 @@ type TeamRow = { name: string; role: string; photo_path: string | null; photo_ur
 type GalleryRow = { path: string; caption: string; url: string | null };
 type FaqRow = { q: string; a: string };
 
-export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
+export default function PublicPageEditor({ initial, isEntity = false }: { initial: PublicPage; isEntity?: boolean }) {
   const [enabled, setEnabled] = useState(initial.enabled);
   const [description, setDescription] = useState(initial.description ?? "");
   const [managers, setManagers] = useState(initial.managers ?? "");
@@ -193,10 +193,18 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
     <section className="mb-8 rounded-2xl border border-teal-200 bg-teal-50/40 p-5">
       <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-base font-black text-stone-800">🌐 עמוד המרכז הציבורי</h2>
-        <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
-          <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
-          פרסום העמוד באתר
-        </label>
+        {/* מסלול 2: העמוד הוא המוצר (כרטיס ההתאמה מקשר אליו) ולכן תמיד מפורסם -
+            אין להציג מתג שלא משפיע. מסלול 1: העמוד אופציונלי, המתג אמיתי. */}
+        {isEntity ? (
+          <span className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-bold text-green-800">
+            ✓ מפורסם - חלק מהמנוי
+          </span>
+        ) : (
+          <label className="flex items-center gap-2 text-sm font-semibold text-stone-700">
+            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} className="h-4 w-4 accent-[var(--teal)]" />
+            פרסום העמוד באתר
+          </label>
+        )}
       </div>
       <p className="mb-4 text-xs text-stone-500">
         עמוד ציבורי מקודם בגוגל עם הלוגו, המידע על המרכז והצוות המוביל.

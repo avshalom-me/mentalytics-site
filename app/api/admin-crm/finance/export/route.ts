@@ -76,7 +76,12 @@ export async function GET(req: NextRequest) {
       lines.push(
         [
           p.created_at.slice(0, 10),
-          p.payment_type === "subscription" ? "מנוי מטפל" : "שאלון מטופל",
+          // סיווג מפורש לכל סוג - center_subscription נפל קודם ל"שאלון מטופל"
+          // (סכום של אלפי ₪ שהוצג לרו"ח כמכירת שאלון אנונימית).
+          p.payment_type === "subscription" ? "מנוי מטפל"
+            : p.payment_type === "center_subscription" ? "מנוי מרכז טיפולי"
+            : p.payment_type === "subscription_renewal" ? "חידוש מנוי"
+            : "שאלון מטופל",
           csvEscape(p.payment_type === "subscription" ? nameById.get(p.reference_id) ?? "" : ""),
           net,
           vat,

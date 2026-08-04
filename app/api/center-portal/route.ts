@@ -313,8 +313,12 @@ export async function POST(req: NextRequest) {
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
   // נתיב תמונת-מרכז חוקי: רק מתוך תיקיית center-assets. חוסם שתילת נתיב שרירותי
   // מה-bucket (למשל תעודה של מטפל) שהיה נחתם ומוצג בעמוד הציבורי.
+  // חייב להתחיל ב-center-assets/ *ובלי* קטעי .. - אחרת נתיב כמו
+  // "center-assets/../certificates/x.pdf" היה נחתם ומוצג בעמוד הציבורי.
   const assetPath = (v: unknown): string | null =>
-    typeof v === "string" && v.startsWith("center-assets/") && v.length <= 300 ? v : null;
+    typeof v === "string" && v.startsWith("center-assets/") && v.length <= 300 && !v.split("/").includes("..")
+      ? v
+      : null;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (body.public_description !== undefined) update.public_description = str(body.public_description, 5000) || null;
   if (body.public_managers !== undefined) update.public_managers = str(body.public_managers, 500) || null;
@@ -344,6 +348,9 @@ export async function POST(req: NextRequest) {
   }
   // עובדות-אמון: שנת ייסוד + גודל צוות (מוצגים רק כשמולאו).
   const intOrNull = (v: unknown, min: number, max: number): number | null => {
+    // null/"" → null (ולא 0: Number(null)===0 היה הופך שדה שנוקה ל-0, ומד
+    // השלמות בשרת היה סופר אותו כ"מולא" בעוד הפורטל מציג אותו כחסר).
+    if (v === null || v === undefined || (typeof v === "string" && v.trim() === "")) return null;
     const n = Math.floor(Number(v));
     return Number.isFinite(n) && n >= min && n <= max ? n : null;
   };

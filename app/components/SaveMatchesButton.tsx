@@ -51,7 +51,10 @@ export default function SaveMatchesButton({
   }
 
   function buildMessage(url: string): string {
+    // ישויות-מרכז מסוננות: הן אינן בעמוד הטוקן (loadPublicTherapists מחריג
+    // אותן), ושם שמופיע בהודעה אך לא בדף נקרא כ"מטפל שהוסר".
     const names = matches
+      .filter((m) => (m as { entity_type?: string }).entity_type !== "center")
       .slice(0, 6)
       .map((m, i) => `${i + 1}. ${m.full_name ?? ""}`.trim())
       .filter((s) => s.length > 2)

@@ -728,7 +728,8 @@ export async function POST(req: NextRequest) {
           cultural_prefs: therapist.cultural_prefs,
           arrangements: therapist.arrangements,
           bio: therapist.bio,
-          phone: therapist.phone,
+          // לישות אין כפתורי קשר בכרטיס — הטלפון הפנימי של המרכז לא משודר
+          phone: therapist.entity_type === "center" ? null : therapist.phone,
           // ישות-מרכז: הלוגו של המרכז בחריץ התמונה (אין לה תמונת פרופיל משלה)
           profile_photo_url: therapist.entity_type === "center" && therapist.center_account_id
             ? (centerLogoById.get(therapist.center_account_id) ?? null)

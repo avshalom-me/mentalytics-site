@@ -71,8 +71,12 @@ export async function POST(req: NextRequest) {
       }
 
       // מכסה: פרופילים מקושרים (ללא ישות) + הזמנות פתוחות + החדשות ≤ המנוי.
+      // מכסה לא מוגדרת (0/null) אינה "בלתי מוגבל" - חוסמים עד שתוגדר.
       const quota = Math.floor(Number(center.therapist_count) || 0);
-      const [{ count: linked }, { data: existing }] = await Promise.all([
+      if (quota <= 0) {
+        return NextResponse.json({ ok: false, error: "מכסת המטפלים של המנוי לא מוגדרת - פנו אלינו: admin@getmentalytics.com" }, { status: 400 });
+      }
+      const [{ count: linked }, { data: existing }, { data: linkedRows }] = await Promise.all([
         supabaseAdmin.from("therapists")
           .select("id", { count: "exact", head: true })
           .eq("center_account_id", center.id)
@@ -80,14 +84,20 @@ export async function POST(req: NextRequest) {
         supabaseAdmin.from("center_therapist_invites")
           .select("id, email, used_at")
           .eq("center_account_id", center.id),
+        supabaseAdmin.from("therapists").select("email").eq("center_account_id", center.id),
       ]);
       const openInvites = (existing ?? []).filter((i) => !i.used_at);
-      const alreadyInvited = new Set(openInvites.map((i) => i.email.toLowerCase()));
-      const fresh = emails.filter((e) => !alreadyInvited.has(e));
+      // חוסמים גם כתובות שכבר מומשו וגם כתובות שכבר יש להן פרופיל במרכז -
+      // אחרת נוצר פרופיל כפול לאותו אדם שגם צורך מקום במכסה.
+      const taken = new Set<string>([
+        ...(existing ?? []).map((i) => i.email.toLowerCase()),
+        ...(linkedRows ?? []).map((t) => String(t.email ?? "").toLowerCase()).filter(Boolean),
+      ]);
+      const fresh = emails.filter((e) => !taken.has(e));
       if (fresh.length === 0) {
-        return NextResponse.json({ ok: false, error: "כל הכתובות האלה כבר הוזמנו וממתינות למילוי" }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "כל הכתובות האלה כבר הוזמנו או שכבר יש להן פרופיל במרכז" }, { status: 400 });
       }
-      if (quota > 0 && (linked ?? 0) + openInvites.length + fresh.length > quota) {
+      if ((linked ?? 0) + openInvites.length + fresh.length > quota) {
         const room = Math.max(0, quota - (linked ?? 0) - openInvites.length);
         return NextResponse.json(
           { ok: false, error: `המנוי כולל ${quota} מטפלים - נותר מקום ל-${room} הזמנות. להרחבה: admin@getmentalytics.com` },

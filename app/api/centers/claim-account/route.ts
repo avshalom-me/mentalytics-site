@@ -73,12 +73,30 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { error: updErr } = await supabaseAdmin
+    const { data: linked, error: updErr } = await supabaseAdmin
       .from("therapy_center_accounts")
       .update({ user_id: user.id, updated_at: new Date().toISOString() })
       .eq("id", center.id)
-      .is("user_id", null); // הגנת מרוץ - לא דורסים קישור שנוצר במקביל
-    if (updErr) throw updErr;
+      .is("user_id", null) // הגנת מרוץ - לא דורסים קישור שנוצר במקביל
+      .select("id")
+      .maybeSingle();
+    if (updErr) {
+      // אינדקס ייחודי על user_id: אותו חשבון לא יכול להחזיק שני מרכזים.
+      if ((updErr as { code?: string }).code === "23505") {
+        return NextResponse.json(
+          { ok: false, error: "החשבון הזה כבר מנהל מרכז אחר. הזינו למעלה כתובת מייל אחרת לחשבון נפרד עבור המרכז הזה." },
+          { status: 409 },
+        );
+      }
+      throw updErr;
+    }
+    if (!linked) {
+      // מרוץ: מישהו קישר בינתיים - לא מדווחים הצלחה כוזבת.
+      return NextResponse.json(
+        { ok: false, error: "המרכז קושר הרגע לחשבון אחר. אם זה החשבון שלכם - היכנסו דרך /centers/login; אחרת כתבו לנו." },
+        { status: 409 },
+      );
+    }
 
     console.log(`centers/claim-account: center=${center.id} (${center.name}) linked to user=${user.id} (${user.email})`);
     return NextResponse.json({ ok: true });

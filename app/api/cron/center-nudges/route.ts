@@ -16,6 +16,10 @@ export const maxDuration = 120;
 
 const WEEK_MS = 7 * 86_400_000;
 const INVITE_REMINDER_DAYS = 5;
+// תקרות בטיחות לריצה אחת - הריצה היומית לא אמורה לשרוף את מכסת Resend
+// (100/יום בתוכנית החינמית) על גל תזכורות; מה שנשאר יטופל מחר.
+const MAX_NUDGES_PER_RUN = 15;
+const MAX_REMINDERS_PER_RUN = 25;
 
 async function runCenterNudges() {
   const now = Date.now();
@@ -30,6 +34,7 @@ async function runCenterNudges() {
   let nudgesSent = 0;
   const nudgeSkips: string[] = [];
   for (const c of centers ?? []) {
+    if (nudgesSent >= MAX_NUDGES_PER_RUN) { nudgeSkips.push("הגיעה תקרת התזכורות לריצה - יימשך מחר"); break; }
     const paidAgo = now - new Date(c.paid_at as string).getTime();
     if (paidAgo < WEEK_MS) continue; // עדיין טרי - נותנים שבוע להתארגן
 
@@ -39,14 +44,16 @@ async function runCenterNudges() {
     const to = (c.payer_email as string | null) ?? (c.email as string | null);
     if (!to) { nudgeSkips.push(`${c.name}: אין מייל`); continue; }
 
-    // חד-פעמי: אם כבר נשלחה תזכורת כזו לנמען הזה - מדלגים.
-    const { count: alreadySent } = await supabaseAdmin
+    // חד-פעמי לכל מרכז. המפתח כולל את שם המרכז בנושא כי שני מרכזים של אותו
+    // בעלים חולקים payer_email - בדיקה לפי נמען בלבד הייתה משתיקה את השני.
+    const subjectForCenter = `הפרופיל של ${(c.name as string).trim()} מלא ב-`;
+    const { data: prior } = await supabaseAdmin
       .from("crm_email_log")
-      .select("id", { count: "exact", head: true })
+      .select("id, subject")
       .eq("recipient", to)
       .eq("template", "center_completeness_nudge")
       .eq("status", "sent");
-    if ((alreadySent ?? 0) > 0) continue;
+    if ((prior ?? []).some((r) => String(r.subject ?? "").startsWith(subjectForCenter))) continue;
 
     const r = await sendCenterCompletenessNudgeEmail({
       to,
@@ -72,6 +79,7 @@ async function runCenterNudges() {
   let remindersSent = 0;
   const reminderSkips: string[] = [];
   for (const inv of staleInvites ?? []) {
+    if (remindersSent >= MAX_REMINDERS_PER_RUN) { reminderSkips.push("הגיעה תקרת התזכורות לריצה - יימשך מחר"); break; }
     // supabase מטפוס join של FK כמערך - בפועל שורה אחת (FK יחיד).
     const rawCenter = (inv as Record<string, unknown>).therapy_center_accounts;
     const center = (Array.isArray(rawCenter) ? rawCenter[0] : rawCenter) as { name: string; status: string } | undefined;
