@@ -403,7 +403,7 @@ export default function PublicPageEditor({ initial }: { initial: PublicPage }) {
           </div>
           <p className="mt-2 text-xs leading-5 text-stone-600">
             <strong>יש להזין את הלינק באתר האינטרנט של המרכז הטיפולי</strong> - קישור מהאתר שלכם
-            עוזר למטופלים להגיע לפרופיל, ומחזק את מיקום העמוד בגוגל.
+            עוזר למטופלים להגיע לפרופיל, ומחזק את מיקום העמוד שלכם בגוגל.
           </p>
         </div>
       )}
