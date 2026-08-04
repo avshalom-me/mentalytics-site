@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { compressProfilePhoto } from "@/app/lib/profile-photo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,15 +33,11 @@ export async function POST(req: NextRequest) {
     .single();
   if (!therapist) return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
 
-  // Compress to a square WebP thumbnail, same as the therapist upload path.
+  // Compress to a square WebP thumbnail, same as the therapist upload path
+  // (top-biased crop so a portrait headshot doesn't lose the top of the head).
   let body: Buffer;
   try {
-    const inputBuffer = Buffer.from(await file.arrayBuffer());
-    body = await sharp(inputBuffer)
-      .rotate()
-      .resize(600, 600, { fit: "cover", position: "center" })
-      .webp({ quality: 80 })
-      .toBuffer();
+    body = await compressProfilePhoto(Buffer.from(await file.arrayBuffer()));
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
   }

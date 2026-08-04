@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
+import { compressProfilePhoto } from "@/app/lib/profile-photo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,11 +43,9 @@ export async function POST(req: NextRequest) {
     // thumbnail (~40-80KB) without touching the UX on their end.
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     try {
-      uploadBody = await sharp(inputBuffer)
-        .rotate() // respect EXIF orientation
-        .resize(600, 600, { fit: "cover", position: "center" })
-        .webp({ quality: 80 })
-        .toBuffer();
+      // Top-biased square crop — a plain center crop cut the top of the head
+      // off portrait headshots. See app/lib/profile-photo.ts.
+      uploadBody = await compressProfilePhoto(inputBuffer);
       uploadContentType = "image/webp";
       uploadExt = "webp";
     } catch {

@@ -130,7 +130,7 @@ function TherapistCard({
             ref={imgRef}
             src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
             alt={t.full_name}
-            className="h-full w-full object-cover object-center"
+            className="h-full w-full object-cover object-top"
             loading={eager ? "eager" : "lazy"}
             decoding="async"
             onError={handleImageError}
