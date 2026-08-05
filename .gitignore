@@ -50,3 +50,7 @@ next-env.d.ts
 # Keep these files locally to regenerate/re-upload; never commit them.
 docs/sales-centers.html
 docs/sales-centers.pdf
+
+# GSC service-account key - must never enter the (public) repo
+gsc-sa*.json
+*-service-account*.json
