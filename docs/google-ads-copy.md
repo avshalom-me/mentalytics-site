@@ -370,7 +370,7 @@ utm_source=google&utm_medium=cpc&utm_campaign=g-kids-center
 |---|---|
 | מטרה | **Create a campaign without a goal's guidance** |
 | סוג | Search |
-| שם | g-sharon |
+| שם | g-sharon1 (ראו הערה למטה) |
 | רשתות | לבטל Display Network, לבטל Search Partners |
 | תקציב | ₪27 ליום (תקציב יומי) |
 | ביד | Maximize clicks עם תקרת CPC של ₪7 |
@@ -408,7 +408,7 @@ https://www.mentalytics.co.il/therapists/region/%D7%93%D7%A8%D7%95%D7%9D-%D7%94%
 ### Final URL suffix
 
 ```
-utm_source=google&utm_medium=cpc&utm_campaign=g-sharon
+utm_source=google&utm_medium=cpc&utm_campaign=g-sharon1
 ```
 
 ### מילות מפתח (התאמת ביטוי - עם מרכאות)
@@ -572,3 +572,30 @@ CBT · טיפול דינמי · טיפול זוגי · הדרכת הורים · 
   כי מדיניות התמחור היא 6 שימושים חינם ואז ₪30, ו"חינמי" עלול להיקרא כהבטחה שהדף
   לא מקיים. גוגל בודקת התאמה בין הבטחת המודעה לדף הנחיתה.
 - אין מקף ארוך באף אחד מהטקסטים כאן.
+
+### הערת שם (4/8/26)
+
+הקמפיין נוצר בפועל בשם **`g-sharon1`** ולא `g-sharon`, כי טיוטה נטושה תפסה את השם
+המקורי. הטיוטה עצמה הייתה בלתי נראית בלשונית Drafts בגלל פילטר שמור בחשבון
+(`Keyword text contains אינדקס`) שסינן בשקט כל טבלה - כולל דוח מונחי החיפוש והמילים.
+
+**ההחלטה: להשאיר `g-sharon1` ולהתאים אליו את ה-utm**, במקום למחוק טיוטה ולשנות שם.
+כך שם הקמפיין בגוגל אדס וערך `utm_campaign` במסד זהים בדיוק, ואין פער שיבלבל
+בעתיד. השם פחות יפה, אבל חד-משמעי.
+
+### סטטוס ההקמה (נבדק בחשבון 4/8/26)
+
+| הגדרה | ערך בפועל | |
+|---|---|---|
+| סטטוס | Enabled | ✅ |
+| רשתות | Google Search Network בלבד | ✅ |
+| יעדי המרה | Campaign-specific: Contacts | ✅ |
+| מיקומים | 6 ערים | ✅ |
+| תאריך סיום | Not set | ✅ |
+| Automatically created assets | Off | ✅ |
+| AI Max / Final URL expansion | Off | ✅ |
+| Broad match | Off | ✅ |
+| **Final URL suffix** | **חסר - No options set** | 🔴 |
+| שפות | English and Hebrew | 🟡 עדיף עברית בלבד |
+| תקציב | ₪20/יום (התוכנית: ₪27) | 🟡 |
+
