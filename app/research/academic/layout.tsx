@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 
-// A client component cannot export `metadata`, so /research/academic had none:
-// no description, no canonical, and a <title> that fell back to the bare site
-// default - the same string the homepage uses. That is very likely the page
-// Search Console reports as "duplicate without a user-selected canonical".
+// Originally added because a client component cannot export `metadata`, and
+// /research/academic had none: no description, no canonical, and a <title> that
+// fell back to the bare site default. The page is a server component now and
+// could hold its own metadata, but keeping it here costs nothing and keeps the
+// route's metadata in one place.
 export const metadata: Metadata = {
   title: "מאמרים אקדמאיים - המקורות שמאחורי השאלונים",
   description:
-    "רשימת המחקרים והמקורות האקדמיים שעליהם מבוססים שאלוני ההכוונה של טיפול חכם - ניתן לחיפוש, לסינון ולמיון.",
+    "מאות המחקרים והמקורות האקדמיים שעליהם מבוססים שאלוני ההכוונה של טיפול חכם, עם סטטוס אימות לכל מקור וקישור ל-DOI. ניתן לחיפוש, לסינון לפי נושא ולמיון לפי שנה.",
   alternates: { canonical: "https://www.mentalytics.co.il/research/academic" },
   openGraph: {
     title: "מאמרים אקדמאיים - המקורות שמאחורי השאלונים",

@@ -59,3 +59,14 @@ a { text-decoration: none; color: inherit; }
 
   body { background: white !important; }
 }
+
+/* DetailsCard (app/components/DetailsCard.tsx): the "+" becomes an "×" when the
+   card opens. Written as a plain rule rather than Tailwind's group-open variant,
+   which silently produced no CSS here on Tailwind v4 - a visual regression that
+   type-checks and renders fine, so only looking at it catches it. */
+.details-card > summary .details-card-toggle {
+  transition: transform 0.25s ease;
+}
+.details-card[open] > summary .details-card-toggle {
+  transform: rotate(45deg);
+}

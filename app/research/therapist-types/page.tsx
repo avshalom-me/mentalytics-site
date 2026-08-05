@@ -1,8 +1,11 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
+import { ResearchArticleLd } from "@/app/components/ResearchArticleLd";
+import { DetailsCard } from "@/app/components/DetailsCard";
+
+// Server component. Previously "use client" with a useState accordion, which
+// kept every profile below out of the HTML - the page served 466 words against
+// 500+ lines of source. See the note in DetailsCard.
 
 const TYPES = [
   {
@@ -119,11 +122,15 @@ const TYPES = [
 ];
 
 export default function TherapistTypesPage() {
-  const [open, setOpen] = useState<number | null>(null);
-
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <ResearchBreadcrumbLd slug="therapist-types" title="סוגי המטפלים בישראל" />
+      <ResearchArticleLd
+        slug="therapist-types"
+        headline="סוגי המטפלים בישראל - מי מוסמך למה"
+        description="פסיכולוג, פסיכיאטר, עובד סוציאלי, מרפא בעיסוק, קלינאי תקשורת ועוד: מה ההבדל בהכשרה, בסמכות החוקית ובהתאמה לצורך."
+        section="בחירת מטפל"
+      />
 
       <Link href="/research" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← חזרה למאמרים ומידע שימושי</Link>
 
@@ -134,36 +141,14 @@ export default function TherapistTypesPage() {
 
       <div className="space-y-3">
         {TYPES.map((t, i) => (
-          <div key={i} className="rounded-2xl bg-white border border-[#E8E0D8] overflow-hidden" style={{ boxShadow: "0 2px 8px rgba(100,60,30,.05)" }}>
-            {/* Header - always visible, clickable */}
-            <button
-              className="w-full text-right px-5 py-4 flex items-center gap-4 hover:bg-stone-50 transition"
-              onClick={() => setOpen(open === i ? null : i)}
-            >
-              <span className="text-2xl flex-shrink-0">{t.icon}</span>
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="font-extrabold text-stone-900 text-base">{t.title}</span>
-                  <span className="text-xs rounded-full px-2 py-0.5 bg-stone-100 text-stone-500 border border-stone-200">{t.license}</span>
-                </div>
-                <p className="text-xs text-stone-500 truncate">{t.suitable}</p>
-              </div>
-              <span
-                className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center text-lg transition-transform"
-                style={{
-                  background: "#F4E8DC",
-                  color: "#8B2E0A",
-                  transform: open === i ? "rotate(45deg)" : "rotate(0deg)",
-                  fontWeight: 300,
-                }}
-              >
-                +
-              </span>
-            </button>
-
-            {/* Expanded content */}
-            {open === i && (
-              <div className="px-5 pb-6 pt-3 border-t border-[#EAE0D5]">
+          <DetailsCard
+            key={t.title}
+            summary={t.title}
+            icon={t.icon}
+            badge={t.license}
+            meta={t.suitable}
+            defaultOpen={i === 0}
+          >
                 {t.richContent === "ot" ? (
                   <div className="text-sm leading-7 text-stone-700 space-y-4">
                     <p>
@@ -524,23 +509,21 @@ export default function TherapistTypesPage() {
                 ) : (
                   <p className="text-sm leading-6 text-stone-700">{t.desc}</p>
                 )}
-              </div>
-            )}
-          </div>
+          </DetailsCard>
         ))}
       </div>
 
-      <div className="mt-10 rounded-2xl p-5 bg-amber-50 border border-amber-200 text-sm text-amber-900 leading-7">
+      <div className="mt-10 rounded-2xl p-5 text-sm leading-7" style={{ background: "var(--gold-pale)", border: "1px solid var(--gold)", color: "var(--text-2)" }}>
         <strong>חשוב לדעת:</strong> כותרת כמו "מטפל/ת" או "יועץ/ת" אינה מוגנת בחוק. לפני שמתחילים טיפול, מומלץ לוודא שיש למטפל/ת רישיון ממשלתי מוכר.
       </div>
 
-      <div className="mt-6 rounded-2xl border border-[#E8E0D8] bg-[#f8f5f0] p-6">
-        <h2 className="mb-4 text-base font-extrabold text-stone-800">קריאה נוספת</h2>
+      <div className="mt-6 rounded-2xl p-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+        <h2 className="mb-4 text-base font-extrabold" style={{ color: "var(--text)" }}>קריאה נוספת</h2>
         <ul className="space-y-2 text-sm">
-          <li><Link href="/research/which-therapy" className="text-[#2e7d8c] hover:underline">← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
-          <li><Link href="/research/choosing-therapist" className="text-[#2e7d8c] hover:underline">← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
-          <li><Link href="/research/assessments" className="text-[#2e7d8c] hover:underline">← סוגי אבחונים והערכות</Link></li>
-          <li><Link href="/research/cbt-vs-dynamic" className="text-[#2e7d8c] hover:underline">← הבדל בין CBT לטיפול דינמי</Link></li>
+          <li><Link href="/research/which-therapy" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← איזה טיפול פסיכולוגי מתאים לי?</Link></li>
+          <li><Link href="/research/choosing-therapist" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← מה חשוב לבדוק כשבוחרים מטפל?</Link></li>
+          <li><Link href="/research/assessments" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← סוגי אבחונים והערכות</Link></li>
+          <li><Link href="/research/cbt-vs-dynamic" className="hover:underline" style={{ color: "var(--teal-dark)" }}>← הבדל בין CBT לטיפול דינמי</Link></li>
         </ul>
       </div>
     </main>
