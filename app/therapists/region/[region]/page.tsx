@@ -43,11 +43,19 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   if (!r) return { title: "אזור לא נמצא" };
   const isOnline = r.kind === "online";
   const label = isOnline ? "טיפול אונליין" : r.region;
+  // The head phrase of the whole cluster ("טיפול פסיכולוגי אונליין") belongs in
+  // the title - a 3-model SERP panel (5/8/26) found every ranking competitor
+  // carries it, and we carried neither it nor "פסיכולוג אונליין" anywhere.
+  // The live count is a CTR differentiator no static competitor title has;
+  // guarded so a supply dip can never publish "3 מטפלים" as our storefront.
+  const onlineCount = isOnline ? await countListed({ online: true }) : 0;
   const title = isOnline
-    ? "מטפלים ופסיכולוגים לטיפול אונליין | טיפול חכם"
+    ? onlineCount >= 20
+      ? `טיפול פסיכולוגי אונליין: ${onlineCount} מטפלים ופסיכולוגים | טיפול חכם`
+      : "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים | טיפול חכם"
     : `פסיכולוגים ומטפלים ב${label} | טיפול חכם`;
   const description = isOnline
-    ? "רשימת מטפלים ופסיכולוגים המציעים טיפול אונליין - מותאמת אישית דרך טיפול חכם."
+    ? "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? כל המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם התאמה אישית בחינם דרך טיפול חכם."
     : `מצאו פסיכולוגים ומטפלים מאומתים ב${label} - מותאם אישית דרך טיפול חכם.`;
   const url = `${BASE}/therapists/region/${regionParam}`;
   // Keep near-empty region pages out of the index until they have real content,
@@ -71,7 +79,12 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   const onlineCount = isOnline ? list.length : await countListed({ online: true });
   const localArticles = await loadLocalArticles(isOnline ? { online: true } : { region: r.region });
   const label = isOnline ? "טיפול אונליין" : r.region;
-  const heading = isOnline ? "מטפלים ופסיכולוגים לטיפול אונליין" : `פסיכולוגים ומטפלים ב${label}`;
+  // Same guard as the metadata title: the count sells, a near-empty count warns.
+  const heading = isOnline
+    ? list.length >= 20
+      ? `טיפול פסיכולוגי אונליין: ${list.length} מטפלים ופסיכולוגים`
+      : "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים"
+    : `פסיכולוגים ומטפלים ב${label}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -118,9 +131,18 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-          {isOnline
-            ? "כל המטפלים והפסיכולוגים שמציעים טיפול אונליין דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית."
-            : `כל המטפלים והפסיכולוגים המאומתים ב${label} דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית לפי הצורך, הגישה והאזור.`}
+          {isOnline ? (
+            <>
+              כל הפסיכולוגים והמטפלים שמציעים טיפול נפשי אונליין דרך טיפול חכם - בזום או בשיחת וידאו,
+              מכל מקום בארץ או בחו"ל. מתלבטים אם טיפול מרחוק בכלל מתאים לכם?{" "}
+              <Link href="/research/online-therapy" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+                כתבנו על מה שהמחקר אומר ולמי זה מתאים
+              </Link>
+              , ואפשר גם למלא שאלון קצר ולקבל התאמה אישית.
+            </>
+          ) : (
+            `כל המטפלים והפסיכולוגים המאומתים ב${label} דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית לפי הצורך, הגישה והאזור.`
+          )}
         </p>
       </div>
 
