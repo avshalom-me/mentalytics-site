@@ -5,6 +5,7 @@ import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/l
 import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
+import { onlineTopicSlugs, slugToCityTopic, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
@@ -110,6 +111,19 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
     ],
   };
 
+  // Online×topic children (online hub only) - the crawl path into the phase-3
+  // pages, gated exactly like their own indexability so we never link a
+  // noindex child from here.
+  const onlineTopics: { slug: string; name: string }[] = [];
+  if (isOnline) {
+    for (const slug of onlineTopicSlugs()) {
+      const t = slugToCityTopic(slug);
+      if (!t || t.adsOnly) continue;
+      const n = await countListed({ ...t.filter, online: true });
+      if (n >= MIN_ONLINE_TOPIC) onlineTopics.push({ slug: t.slug, name: t.name });
+    }
+  }
+
   // Other regions for internal linking.
   const otherRegions = ALL_REGIONS.filter((reg) => !(r.kind === "region" && reg === r.region));
   const regionCities = r.kind === "region"
@@ -178,6 +192,25 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/region/${regionParam}`} contextRegion={isOnline ? undefined : r.region} />)}
+        </div>
+      )}
+
+      {/* Online×topic children - "טיפול בחרדה אונליין" etc. */}
+      {onlineTopics.length > 0 && (
+        <div className="mt-12 pt-8 border-t border-[var(--line)]">
+          <h2 className="text-base font-extrabold text-stone-800 mb-3">טיפול אונליין לפי נושא</h2>
+          <div className="flex flex-wrap gap-2">
+            {onlineTopics.map((t) => (
+              <Link
+                key={t.slug}
+                href={`/therapists/online/${t.slug}`}
+                className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}
+              >
+                {t.name} אונליין
+              </Link>
+            ))}
+          </div>
         </div>
       )}
 

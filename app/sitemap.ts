@@ -4,7 +4,7 @@ import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib
 import { therapistPath } from "@/app/lib/therapist-url";
 import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
-import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic } from "@/app/lib/topics";
+import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import { countListed } from "@/app/lib/therapist-directory";
 import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
@@ -171,6 +171,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (count >= MIN_LISTED_FOR_INDEX) {
       topicPages.push({
         url: `${BASE}/therapists/arrangement/${a.slug}`,
+        priority: 0.6,
+        changeFrequency: "weekly" as const,
+      });
+    }
+  }
+
+  // Online×topic pages - same supply gate as city×topic (anti-doorway).
+  for (const slug of onlineTopicSlugs()) {
+    const topic = slugToCityTopic(slug);
+    if (!topic || topic.adsOnly) continue;
+    const count = await countListed({ ...topic.filter, online: true });
+    if (count >= MIN_ONLINE_TOPIC) {
+      topicPages.push({
+        url: `${BASE}/therapists/online/${topic.slug}`,
         priority: 0.6,
         changeFrequency: "weekly" as const,
       });

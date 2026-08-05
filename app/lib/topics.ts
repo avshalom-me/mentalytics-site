@@ -213,6 +213,39 @@ export function isCityTopicAllowed(topic: Topic): boolean {
   );
 }
 
+// ── Online×topic (phase 3 of the online cluster, 5/8/26) ─────────────────────
+// Mirrors the city×topic pilot exactly - same allow-list, same supply gate,
+// same expansion rule (GSC proves the pattern first). A 3-model SERP panel
+// found competitors hold dedicated pages for these combos ("טיפול אונליין
+// בחרדה", "טיפול זוגי אונליין") while our online hub is one generic page.
+// Supply verified per combo on 5/8/26 (23-105 online therapists each); the
+// gate below is what keeps a future supply dip from publishing a thin page.
+export const ONLINE_TOPIC_SLUGS = [
+  "טיפול-בחרדה",
+  "טיפול-בדיכאון",
+  "פסיכולוג-ילדים",
+  "פסיכולוג-לנוער",
+] as const;
+
+export const ONLINE_TOPIC_APPROACHES = ["CBT", "טיפול זוגי"] as const;
+
+export const MIN_ONLINE_TOPIC = MIN_CITY_TOPIC;
+
+export function isOnlineTopicAllowed(topic: Topic): boolean {
+  return (
+    (ONLINE_TOPIC_SLUGS as readonly string[]).includes(topic.slug) ||
+    (ONLINE_TOPIC_APPROACHES as readonly string[]).includes(topic.name)
+  );
+}
+
+/** Every online×topic slug, for static params and the sitemap. */
+export function onlineTopicSlugs(): string[] {
+  return [
+    ...ONLINE_TOPIC_SLUGS,
+    ...ONLINE_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-")),
+  ];
+}
+
 // Approach-based city pages ride the same route via a synthetic topic.
 export function approachAsTopic(name: string): Topic | null {
   if (!(TRAINING_AREAS as readonly string[]).includes(name)) return null;
