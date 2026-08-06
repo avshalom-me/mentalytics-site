@@ -30,6 +30,10 @@ type SeoData = {
 
 const KIND_LABELS: Record<string, string> = {
   home: "עמוד הבית",
+  about: "מי אנחנו",
+  developers: "בית למפתחים",
+  centers_info: "מידע למרכזים",
+  hub: "עמודי רכזת (אינדקס נושאים/גישות)",
   profile: "פרופיל מטפל (חיפוש שם)",
   quiz: "שאלון התאמה",
   directory: "מאגר המטפלים",
@@ -58,6 +62,9 @@ function pageLabel(page: string): string {
     arrangement: "הסדר", research: "מאמר",
   };
   if (page === "directory") return "מאגר המטפלים";
+  if (page === "home") return "עמוד הבית";
+  if (prefix === "research") return "מאמר: " + val.replace(/^community\//, "").replace(/-/g, " ");
+  if (prefix === "hub") return "רכזת: " + val;
   if (page === "para-medical") return "מאגר פארא-רפואי";
   if (page === "region:online") return "עמוד אונליין";
   return map[prefix] ? `${map[prefix]}: ${val.replace(/-/g, " ")}` : page;

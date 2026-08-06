@@ -8,6 +8,7 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import DevelopersForm from "./DevelopersForm";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 export const metadata: Metadata = {
   title: "בית למפתחים בתחום בריאות הנפש והלמידה",
@@ -30,6 +31,7 @@ const BENEFITS = [
 export default function DevelopersPage() {
   return (
     <main dir="rtl" className="dev-root relative min-h-screen overflow-hidden">
+      <PageViewTracker page="developers" source="developers" />
       <style>{`
         .dev-root {
           background: #ffffff;

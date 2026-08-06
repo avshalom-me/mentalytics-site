@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Sparkles, Users, LayoutDashboard, BarChart3, MapPin, Activity, ShieldCheck, Brain, ArrowLeft, FileDown, Globe, TrendingUp } from "lucide-react";
 import PrintButton from "./PrintButton";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 // עמוד הסבר ציבורי למרכזים טיפוליים - משמש גם כפרוספקט להדפסה/שמירה כ-PDF
 // (עמוד אחד, ידידותי להדפסה) לשליחה אחרי שיחת מכירה. אין תמחור מספרי כאן -
@@ -60,6 +61,7 @@ export default function CentersInfoPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      <PageViewTracker page="centers-info" source="centers" />
       <style>{`
         @media print {
           @page { size: A4; margin: 12mm; }

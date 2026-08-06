@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { ASSESSMENTS } from "@/app/lib/assessments";
 import { countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -52,6 +53,7 @@ export default async function AssessmentHubPage() {
 
   return (
     <main className="mx-auto max-w-4xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <PageViewTracker page="hub:assessment" source="hub" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
 

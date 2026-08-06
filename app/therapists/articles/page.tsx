@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
 import { ARTICLE_LIMITS, ARTICLE_TOPICS } from "@/app/lib/articles";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 type MyArticle = {
   id: string;
@@ -107,6 +108,7 @@ export default function TherapistArticlesPage() {
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <PageViewTracker page="hub:articles" source="hub" />
 
       <div className="mb-2 flex items-center justify-between">
         <h1 className="text-2xl font-black text-stone-900">המאמרים שלי</h1>

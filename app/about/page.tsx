@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { Metadata } from "next";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 export const metadata: Metadata = {
   title: "מי אנחנו",
@@ -65,6 +66,7 @@ export default function AboutPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      <PageViewTracker page="about" source="about" />
       <style>{`
 
         @keyframes fadeUp {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { Metadata } from "next";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import PageViewTracker from "@/app/components/PageViewTracker";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 export default function RegionHubPage() {
   return (
     <main className="mx-auto max-w-4xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <PageViewTracker page="hub:region" source="hub" />
       <Link href="/therapists" className="text-sm text-stone-500 hover:underline mb-6 inline-block">← כל המטפלים</Link>
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי אזור</p>
