@@ -53,6 +53,7 @@ type TherapistRow = {
   center_account_id: string | null;
   accepting_new_patients: boolean | null;
   accepting_new_changed_at: string | null;
+  user_id: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -315,6 +316,9 @@ async function buildTherapistsResponse(onlyId?: string) {
         activity_level: t.activity_level ?? null,
         profile_photo_path: t.profile_photo_path ?? null,
         profile_photo_url,
+        // בלי המיפוי המפורש הזה הכפתור "🔗 קשר חשבון" הופיע אצל כולם -
+        // undefined בצד הלקוח נראה בדיוק כמו "לא מקושר".
+        user_id: t.user_id ?? null,
         certificates: certsByTherapist[t.id] ?? [],
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,
