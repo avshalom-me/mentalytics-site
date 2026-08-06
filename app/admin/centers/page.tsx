@@ -28,6 +28,7 @@ type Center = {
   paid_at: string | null;
   cancelled_at: string | null;
   created_at: string;
+  updated_at: string | null;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   pending_therapist_count: number; // כמה מהם ממתינים לאישור (כולל ישות-המרכז)
   user_id: string | null;
@@ -67,6 +68,59 @@ function fmtDate(iso: string | null): string {
   return new Date(iso.includes("T") ? iso : iso + "T00:00:00").toLocaleDateString("he-IL");
 }
 
+// billing_track ישן/ריק = מסלול 1 (ברירת המחדל ההיסטורית).
+const trackOf = (c: Center) => (c.billing_track === "center_entity" ? "center_entity" : "per_therapist");
+
+function daysSince(iso: string | null): number | null {
+  if (!iso) return null;
+  const t = new Date(iso).getTime();
+  if (isNaN(t)) return null;
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000));
+}
+
+// "מה עכשיו?" - השורה שהופכת את הכרטיס מרשימת שדות לסיפור: איפה המרכז עומד
+// במשפך ומה הפעולה שמקדמת אותו. הטון קובע את הצבע (act = דורש פעולה שלך).
+type Hint = { tone: "ok" | "act" | "info" | "warn"; text: string };
+const HINT_CLS: Record<Hint["tone"], string> = {
+  ok: "border-green-200 bg-green-50/70 text-green-900",
+  act: "border-amber-300 bg-amber-50 text-amber-900 font-semibold",
+  info: "border-stone-200 bg-stone-50 text-stone-600",
+  warn: "border-red-200 bg-red-50 text-red-800 font-semibold",
+};
+function nextStepHint(c: Center): Hint | null {
+  const isEntity = trackOf(c) === "center_entity";
+  const priced = isEntity
+    ? centerMonthlyPricing(c).monthlyTotal > 0
+    : Number(c.price_per_therapist) > 0 && Number(c.therapist_count) > 0;
+  if (c.status === "draft") {
+    if (!priced) return { tone: "warn", text: "💳 טרם התקבל תשלום · חסר תמחור - הקישור מציג למרכז \"ההצעה בהכנה\". השלימו מחיר בעריכה." };
+    if (!c.email) return { tone: "act", text: "💳 טרם התקבל תשלום · ההצעה מוכנה: העתיקו קישור ושלחו בוואטסאפ (ואז \"סימון כנשלחה\"), או הוסיפו אימייל בעריכה כדי לשלוח מכאן." };
+    return { tone: "act", text: "💳 טרם התקבל תשלום · ההצעה מוכנה - שלחו במייל, או העתיקו קישור לוואטסאפ וסמנו כנשלחה." };
+  }
+  if (c.status === "sent") {
+    const d = daysSince(c.updated_at ?? c.created_at);
+    const ago = d == null || d === 0 ? "" : d === 1 ? " · עדכון אחרון אתמול" : ` · עדכון אחרון לפני ${d} ימים`;
+    if (d != null && d >= 7) return { tone: "act", text: `💳 טרם התקבל תשלום - הכרטיס לא נמסר${ago} · שווה פולו-אפ למרכז.` };
+    return { tone: "info", text: `💳 טרם התקבל תשלום - הכרטיס לא נמסר · הקישור אצל המרכז${ago}.` };
+  }
+  if (c.status === "active") {
+    if (!c.user_id) return { tone: "act", text: "שולם ✓ אך טרם הוקם חשבון הניהול - שלחו למרכז שוב את קישור ההצטרפות (משמש גם להקמת החשבון)." };
+    if (c.pending_therapist_count > 0)
+      return {
+        tone: "act",
+        text: isEntity
+          ? "פרופיל המרכז מולא וממתין לאישור שלך (🛠 בכפתור למטה)."
+          : `${c.pending_therapist_count} פרופילי מטפלים ממתינים לאישור שלך.`,
+      };
+    if (!isEntity && c.linked_therapist_count === 0)
+      return { tone: "info", text: "אין עדיין פרופילי מטפלים - המרכז מזמין מטפלים מהפורטל, או שייכו כאן ידנית." };
+    const today = new Date().toISOString().slice(0, 10);
+    const inGift = c.billing_starts_at && c.billing_starts_at > today;
+    return { tone: "ok", text: inGift ? `✓ באוויר · בתקופת מתנה - חיוב ראשון ${fmtDate(c.billing_starts_at)}.` : "✓ באוויר · חיוב חודשי פעיל." };
+  }
+  return null;
+}
+
 export default function AdminCentersPage() {
   const [centers, setCenters] = useState<Center[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,6 +128,9 @@ export default function AdminCentersPage() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [sumitInfo, setSumitInfo] = useState<Record<string, string>>({});
+  // תפריט הסינון העליון: שלב במשפך + מסלול חיוב.
+  const [stageFilter, setStageFilter] = useState<"all" | Center["status"]>("all");
+  const [trackFilter, setTrackFilter] = useState<"all" | "per_therapist" | "center_entity">("all");
 
   // טופס יצירה/עריכה
   const [editing, setEditing] = useState<Center | "new" | null>(null);
@@ -390,15 +447,63 @@ export default function AdminCentersPage() {
         );
       })()}
 
+      {/* תפריט סינון עליון: שלב במשפך + מסלול. דביק, כדי שהמעבר בין תצוגות
+          יישאר בהישג יד גם כשהרשימה מתארכת. */}
+      {!loading && centers.length > 0 && (() => {
+        const stages: { key: "all" | Center["status"]; label: string }[] = [
+          { key: "all", label: "הכל" },
+          { key: "active", label: "✅ פעילים" },
+          { key: "sent", label: "✉️ ממתינות לתשלום" },
+          { key: "draft", label: "📝 טיוטות" },
+          { key: "cancelled", label: "⏸️ בוטלו" },
+        ];
+        const tracks: { key: "all" | "per_therapist" | "center_entity"; label: string }[] = [
+          { key: "all", label: "כל המסלולים" },
+          { key: "center_entity", label: "🏢 מסלול 2 - מרכז כישות" },
+          { key: "per_therapist", label: "👥 מסלול 1 - מטפלים בנפרד" },
+        ];
+        const stageCount = (k: "all" | Center["status"]) => (k === "all" ? centers.length : centers.filter((c) => c.status === k).length);
+        const trackCount = (k: "all" | "per_therapist" | "center_entity") => (k === "all" ? centers.length : centers.filter((c) => trackOf(c) === k).length);
+        return (
+          <div className="sticky top-0 z-40 mb-6 rounded-2xl border border-stone-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur">
+            <div className="flex flex-wrap items-center gap-1.5">
+              {stages.map((s) => (
+                <button key={s.key} onClick={() => setStageFilter(s.key)}
+                  className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                    stageFilter === s.key ? "bg-stone-800 text-white" : "border border-stone-300 text-stone-600 hover:bg-stone-50"}`}>
+                  {s.label} <span className={stageFilter === s.key ? "opacity-70" : "text-stone-400"}>({stageCount(s.key)})</span>
+                </button>
+              ))}
+            </div>
+            <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+              {tracks.map((t) => (
+                <button key={t.key} onClick={() => setTrackFilter(t.key)}
+                  className={`rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                    trackFilter === t.key ? "bg-teal-700 text-white" : "border border-teal-200 bg-teal-50/50 text-teal-800 hover:bg-teal-50"}`}>
+                  {t.label} <span className={trackFilter === t.key ? "opacity-70" : "text-teal-600/60"}>({trackCount(t.key)})</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
-      {([
-        { key: "active2", title: "🏢 מנויים פעילים - מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && c.billing_track === "center_entity") },
-        { key: "active1", title: "👥 מנויים פעילים - מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && c.billing_track !== "center_entity") },
-        { key: "sent", title: "✉️ הצעות שנשלחו - ממתינות לתשלום", items: centers.filter((c) => c.status === "sent") },
-        { key: "draft", title: "📝 טיוטות - טרם נשלחו", items: centers.filter((c) => c.status === "draft") },
-        { key: "cancelled", title: "⏸️ בוטלו", items: centers.filter((c) => c.status === "cancelled") },
-      ] as const).map((group) => group.items.length > 0 && (
+      {!loading && (() => {
+        const match = (c: Center) => trackFilter === "all" || trackOf(c) === trackFilter;
+        const allGroups: { key: string; stage: Center["status"]; title: string; items: Center[] }[] = [
+          { key: "active2", stage: "active", title: "🏢 מנויים פעילים - מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && trackOf(c) === "center_entity" && match(c)) },
+          { key: "active1", stage: "active", title: "👥 מנויים פעילים - מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && trackOf(c) === "per_therapist" && match(c)) },
+          { key: "sent", stage: "sent", title: "✉️ הצעות שנשלחו - ממתינות לתשלום", items: centers.filter((c) => c.status === "sent" && match(c)) },
+          { key: "draft", stage: "draft", title: "📝 טיוטות - טרם נשלחו", items: centers.filter((c) => c.status === "draft" && match(c)) },
+          { key: "cancelled", stage: "cancelled", title: "⏸️ בוטלו", items: centers.filter((c) => c.status === "cancelled" && match(c)) },
+        ];
+        const groups = allGroups.filter((g) => (stageFilter === "all" || g.stage === stageFilter) && g.items.length > 0);
+        if (groups.length === 0 && centers.length > 0) {
+          return <p className="rounded-2xl border border-stone-200 bg-white p-8 text-center text-sm text-stone-400">אין מרכזים בסינון שנבחר</p>;
+        }
+        return groups.map((group) => (
       <section key={group.key} className="mb-8">
         <div className="mb-3 flex items-center gap-2 border-b border-stone-200 pb-2">
           <h2 className="text-base font-black text-stone-700">{group.title}</h2>
@@ -417,8 +522,11 @@ export default function AdminCentersPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h2 className="text-lg font-black text-stone-800">{c.name}</h2>
                   <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${st.cls}`}>{st.label}</span>
-                  {isEntity && (
-                    <span className="rounded-full bg-teal-50 border border-teal-300 px-2.5 py-0.5 text-xs font-bold text-teal-800">🏢 מרכז כישות</span>
+                  {/* כל כרטיס מצהיר על המסלול שלו - לא רק מסלול 2 */}
+                  {isEntity ? (
+                    <span className="rounded-full bg-teal-50 border border-teal-300 px-2.5 py-0.5 text-xs font-bold text-teal-800">🏢 מסלול 2 · מרכז כישות</span>
+                  ) : (
+                    <span className="rounded-full bg-indigo-50 border border-indigo-300 px-2.5 py-0.5 text-xs font-bold text-indigo-800">👥 מסלול 1 · מטפלים בנפרד</span>
                   )}
                   {c.gift_months > 0 && (
                     <span className="rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800">
@@ -453,6 +561,9 @@ export default function AdminCentersPage() {
               </div>
             </div>
 
+            {/* ציר המסע: איפה המרכז עומד בחמשת שלבי המשפך */}
+            {c.status !== "cancelled" && <Journey c={c} />}
+
             {c.status === "active" && c.payer_name && (
               <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
                 משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
@@ -463,13 +574,12 @@ export default function AdminCentersPage() {
               </p>
             )}
 
-            {/* חיווי תשלום מפורש. בלעדיו היה צריך להסיק מהסטטוס, ושורת-הישות
-                שנוצרת אוטומטית במסלול 2 יצרה רושם הפוך ("ממתין לאישור"). */}
-            {(c.status === "draft" || c.status === "sent") && (
-              <p className="mt-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-1.5 text-xs text-stone-500">
-                💳 טרם התקבל תשלום - הכרטיס לא נמסר{c.status === "sent" ? " (ההצעה סומנה כנשלחה)" : ""}
-              </p>
-            )}
+            {/* "מה עכשיו?" - כולל את חיווי התשלום המפורש (בלעדיו היה צריך
+                להסיק מהסטטוס, ושורת-הישות של מסלול 2 יצרה רושם הפוך). */}
+            {(() => {
+              const h = nextStepHint(c);
+              return h && <p className={`mt-2 rounded-lg border px-3 py-1.5 text-xs ${HINT_CLS[h.tone]}`}>{h.text}</p>;
+            })()}
             {c.notes && <p className="mt-2 text-xs text-stone-500 whitespace-pre-wrap">📝 {c.notes}</p>}
             {sumitInfo[c.id] && <p className="mt-2 text-xs font-bold text-[#0F5468]">{sumitInfo[c.id]}</p>}
 
@@ -556,7 +666,8 @@ export default function AdminCentersPage() {
         );
       })}
       </section>
-      ))}
+        ));
+      })()}
 
       {/* מודל יצירה/עריכה. הכרטיס זורם בגובה טבעי (בלי max-h ובלי גלילה פנימית)
           בתוך שכבה שכולה גוללת (overflow-y-auto). items-start + my-auto ממרכז את
@@ -823,6 +934,42 @@ export default function AdminCentersPage() {
         </div>
       )}
     </main>
+  );
+}
+
+// ציר המסע של מרכז: חמשת שלבי המשפך במבט אחד. ✓ ירקרק = הושלם, ● ענברי =
+// השלב הנוכחי, ○ אפור = עוד לא. hover על שלב שהושלם מציג תאריך כשידוע.
+function Journey({ c }: { c: Center }) {
+  const isEntity = trackOf(c) === "center_entity";
+  const steps: { label: string; done: boolean; title?: string }[] = [
+    { label: "הצעה", done: true, title: `נוצרה ${fmtDate(c.created_at)}` },
+    { label: "נשלחה", done: c.status !== "draft" },
+    { label: "תשלום", done: !!c.paid_at, title: c.paid_at ? `שולם ${fmtDate(c.paid_at)}` : undefined },
+    { label: "חשבון פורטל", done: !!c.user_id },
+    {
+      label: isEntity ? "פרופיל מאושר" : "מטפלים באוויר",
+      done: c.status === "active" && c.pending_therapist_count === 0 && (isEntity || c.linked_therapist_count > 0),
+    },
+  ];
+  const current = steps.findIndex((s) => !s.done);
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-y-1">
+      {steps.map((s, i) => (
+        <span key={s.label} className="flex items-center">
+          {i > 0 && <span className={`inline-block h-px w-3 sm:w-6 ${steps[i - 1].done ? "bg-teal-300" : "bg-stone-200"}`} />}
+          <span title={s.title}
+            className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] ${
+              s.done
+                ? "border-teal-300 bg-teal-50 font-bold text-teal-800"
+                : i === current
+                  ? "border-amber-300 bg-amber-50 font-bold text-amber-800"
+                  : "border-stone-200 bg-white text-stone-400"
+            }`}>
+            {s.done ? "✓" : i === current ? "●" : "○"} {s.label}
+          </span>
+        </span>
+      ))}
+    </div>
   );
 }
 
