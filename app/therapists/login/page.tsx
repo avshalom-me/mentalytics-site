@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useState, useEffect } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
 import Link from "next/link";
 import { BarChart2, ShieldCheck, Users, LogIn, UserPlus, MailCheck } from "lucide-react";
@@ -9,11 +8,17 @@ import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/c
 
 type Mode = "login" | "register" | "reset";
 
+// עמודה אחת ממורכזת: הבחירה "כבר רשומ/ה? / חדש/ה כאן?" יושבת ישירות מעל
+// הטופס, באותו כרטיס. (בפריסה הקודמת - שני פאנלים זה לצד זה - לחיצה על
+// הבחירה בפאנל הימני החליפה טאב בפאנל השמאלי, ואנשים לא שמו לב שמשהו השתנה.)
+//
+// פרמטרי ה-URL נקראים מ-window אחרי mount (ולא דרך useSearchParams) - כך אין
+// צורך בגבול Suspense סביב העמוד כולו, שנצפה נתקע על ה-fallback הריק.
+
 function TherapistLoginContent() {
-  const searchParams = useSearchParams();
-  const initialMode: Mode = searchParams.get("mode") === "register" ? "register" : "login";
-  const plan = searchParams.get("plan");
-  const [mode, setMode] = useState<Mode>(initialMode);
+  const [mode, setMode] = useState<Mode>("login");
+  const [plan, setPlan] = useState<string | null>(null);
+  const [resetDone, setResetDone] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -27,14 +32,14 @@ function TherapistLoginContent() {
   const [newsletterConsent, setNewsletterConsent] = useState(false);
 
   useEffect(() => {
-    const q = searchParams.get("mode");
-    if (q === "register" || q === "login") setMode(q);
-  }, [searchParams]);
+    const sp = new URLSearchParams(window.location.search);
+    if (sp.get("mode") === "register") setMode("register");
+    setPlan(sp.get("plan"));
+    // Arriving from a completed password reset (all sessions were revoked there).
+    setResetDone(sp.get("reset") === "success");
+  }, []);
 
-  // Arriving from a completed password reset (all sessions were revoked there).
-  // Derived straight from the URL - not via state - so it can't be lost to
-  // remounts during hydration.
-  const resetSuccess = searchParams.get("reset") === "success" && mode === "login";
+  const resetSuccess = resetDone && mode === "login";
 
   function switchMode(next: Mode) {
     setMode(next);
@@ -150,173 +155,71 @@ function TherapistLoginContent() {
   }
 
   return (
-    <main className="min-h-screen flex" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    <main className="min-h-screen flex items-center justify-center px-5 py-10" dir="rtl"
+      style={{ fontFamily: "'Heebo', sans-serif", background: "linear-gradient(155deg, #0D3836 0%, #1B5A56 55%, #2A7470 100%)" }}>
       <style>{`
         .pro-input:focus { outline: none; border-color: #3D8C8A; box-shadow: 0 0 0 3px rgba(61,140,138,.12); }
         .google-btn:hover { background: #f8f8f8; }
+        .choice-btn:hover { border-color: #C2DFDE !important; }
       `}</style>
 
-      {/* ─── RIGHT: Brand panel with a clear registered / new split ─── */}
-      <div
-        className="hidden lg:flex flex-col justify-between flex-1 p-12 relative overflow-hidden"
-        style={{ background: "linear-gradient(155deg, #0D3836 0%, #1B5A56 55%, #2A7470 100%)" }}
-      >
-        {/* Decorative arcs */}
-        <svg
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%", pointerEvents: "none", opacity: 0.07 }}
-          viewBox="0 0 600 800" fill="none" preserveAspectRatio="xMidYMid slice"
-        >
-          <circle cx="500" cy="100" r="280" stroke="white" strokeWidth="60" />
-          <circle cx="80" cy="700" r="200" stroke="white" strokeWidth="40" />
-        </svg>
-        <div style={{ position: "absolute", top: 0, right: 0, left: 0, height: "3px", background: "linear-gradient(90deg, transparent, #D49018, transparent)" }} />
-
-        {/* Logo */}
-        <div>
+      <div style={{ width: "100%", maxWidth: "440px" }}>
+        {/* לוגו מעל הכרטיס */}
+        <div style={{ textAlign: "center", marginBottom: "18px" }}>
           <Link href="/">
             <div style={{ display: "inline-block", background: "rgba(255,255,255,.12)", backdropFilter: "blur(8px)", borderRadius: "14px", padding: "8px 14px", border: "1px solid rgba(255,255,255,.18)" }}>
-              <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "44px", width: "auto", display: "block" }} />
+              <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "40px", width: "auto", display: "block" }} />
             </div>
           </Link>
         </div>
 
-        {/* Center: two clear entry paths */}
-        <div>
-          <div style={{
-            display: "inline-flex", alignItems: "center", gap: "8px",
-            background: "rgba(212,144,24,.18)", border: "1px solid rgba(212,144,24,.35)",
-            borderRadius: "50px", padding: "5px 14px", marginBottom: "24px",
-          }}>
-            <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: "#D49018", display: "inline-block", flexShrink: 0 }} />
-            <span style={{ fontSize: "11.5px", fontWeight: 700, color: "#F4C96A", textTransform: "uppercase", letterSpacing: ".14em" }}>
-              פאנל מקצועי
-            </span>
-          </div>
+        <div style={{ background: "white", borderRadius: "22px", padding: "28px 26px", boxShadow: "0 24px 70px rgba(0,0,0,.28)" }}>
+          <h1 style={{ fontSize: "21px", fontWeight: 900, color: "var(--text)", textAlign: "center", marginBottom: "4px" }}>
+            ברוכים הבאים, אנשי המקצוע
+          </h1>
+          <p style={{ fontSize: "13.5px", color: "var(--muted)", textAlign: "center", marginBottom: "20px" }}>
+            {mode === "reset" ? "נשלח אליך קישור לקביעת סיסמא חדשה" : "פאנל הניהול המקצועי של טיפול חכם"}
+          </p>
 
-          <h2 style={{ fontSize: "clamp(1.5rem, 2.3vw, 2.2rem)", fontWeight: 900, color: "white", lineHeight: 1.2, letterSpacing: "-.02em", marginBottom: "28px" }}>
-            ברוכים הבאים,<br />
-            <span style={{ color: "#7DD4CE" }}>אנשי המקצוע</span>
-          </h2>
-
-          {/* Registered users card */}
-          <button
-            onClick={() => switchMode("login")}
-            className="w-full text-right transition"
-            style={{
-              borderRadius: "16px", padding: "18px 20px", marginBottom: "14px", cursor: "pointer",
-              background: mode === "login" ? "rgba(255,255,255,.16)" : "rgba(255,255,255,.06)",
-              border: mode === "login" ? "1.5px solid rgba(125,212,206,.7)" : "1px solid rgba(255,255,255,.14)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ width: "40px", height: "40px", borderRadius: "11px", background: "rgba(125,212,206,.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <LogIn size={19} style={{ color: "#7DD4CE" }} />
-              </div>
-              <div>
-                <div style={{ fontSize: "15.5px", fontWeight: 800, color: "white" }}>כבר רשומ/ה?</div>
-                <div style={{ fontSize: "13px", color: "rgba(255,255,255,.65)", marginTop: "2px" }}>כניסה לפאנל הניהול שלך ←</div>
-              </div>
-            </div>
-          </button>
-
-          {/* New users card */}
-          <button
-            onClick={() => switchMode("register")}
-            className="w-full text-right transition"
-            style={{
-              borderRadius: "16px", padding: "18px 20px", cursor: "pointer",
-              background: mode === "register" ? "rgba(255,255,255,.16)" : "rgba(255,255,255,.06)",
-              border: mode === "register" ? "1.5px solid rgba(244,201,106,.7)" : "1px solid rgba(255,255,255,.14)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <div style={{ width: "40px", height: "40px", borderRadius: "11px", background: "rgba(244,201,106,.15)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-                <UserPlus size={19} style={{ color: "#F4C96A" }} />
-              </div>
-              <div>
-                <div style={{ fontSize: "15.5px", fontWeight: 800, color: "white" }}>חדש/ה כאן?</div>
-                <div style={{ fontSize: "13px", color: "rgba(255,255,255,.65)", marginTop: "2px" }}>פתיחת חשבון והצטרפות - ללא עלות ←</div>
-              </div>
-            </div>
-          </button>
-
-          <Link href="/therapists/join" style={{ display: "inline-block", marginTop: "20px", fontSize: "13px", color: "rgba(255,255,255,.55)" }}
-            className="hover:text-white">
-            לפרטים מלאים על ההצטרפות והמסלולים ←
-          </Link>
-        </div>
-
-        {/* Bottom: trust strip */}
-        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {[
-            { Icon: Users, text: "מטופלים מופנים אליך על בסיס התאמה מדויקת" },
-            { Icon: BarChart2, text: "אנליטיקות מתקדמות על פרופיל הפונים באזורך" },
-            { Icon: ShieldCheck, text: "פלטפורמה בנויה על ידי פסיכולוגים קליניים" },
-          ].map(({ Icon, text }, i) => (
-            <div key={i} style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <Icon size={15} style={{ color: "#7DD4CE", flexShrink: 0 }} />
-              <p style={{ fontSize: "12.5px", color: "rgba(255,255,255,.6)" }}>{text}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* ─── LEFT: Form panel ─── */}
-      <div className="w-full lg:w-[440px] flex flex-col justify-center px-8 py-12" style={{ background: "white", minHeight: "100vh" }}>
-        {/* Mobile logo */}
-        <div className="lg:hidden mb-8 text-center">
-          <Link href="/">
-            <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "44px", width: "auto", margin: "0 auto" }} />
-          </Link>
-        </div>
-
-        <div style={{ maxWidth: "360px", width: "100%", margin: "0 auto" }}>
-
-          {/* Segmented toggle: clear login / register split */}
+          {/* הבחירה והטופס באותו כרטיס - הבחירה מחליפה את הטופס שמתחתיה ממש */}
           {mode !== "reset" && (
-            <div style={{ display: "flex", background: "var(--surface-2)", borderRadius: "14px", padding: "5px", marginBottom: "26px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "22px" }}>
               <button
                 type="button"
                 onClick={() => switchMode("login")}
+                className="choice-btn"
                 style={{
-                  flex: 1, borderRadius: "10px", padding: "10px", fontSize: "14.5px", fontWeight: 800,
-                  border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all .18s",
-                  background: mode === "login" ? "white" : "transparent",
-                  color: mode === "login" ? "var(--teal-dark)" : "var(--muted)",
-                  boxShadow: mode === "login" ? "0 1px 4px rgba(0,0,0,.08)" : "none",
+                  borderRadius: "14px", padding: "14px 12px", cursor: "pointer", textAlign: "center",
+                  fontFamily: "inherit", transition: "all .15s",
+                  background: mode === "login" ? "var(--teal-pale)" : "white",
+                  border: mode === "login" ? "2px solid var(--teal)" : "2px solid #E5E7EB",
                 }}
               >
-                כניסה
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginBottom: "3px" }}>
+                  <LogIn size={16} style={{ color: mode === "login" ? "var(--teal-dark)" : "#9CA3AF" }} />
+                  <span style={{ fontSize: "14.5px", fontWeight: 800, color: mode === "login" ? "var(--teal-dark)" : "var(--text-2)" }}>כבר רשומ/ה?</span>
+                </div>
+                <div style={{ fontSize: "12px", color: mode === "login" ? "var(--teal-dark)" : "var(--muted)" }}>כניסה לפאנל שלך</div>
               </button>
               <button
                 type="button"
                 onClick={() => switchMode("register")}
+                className="choice-btn"
                 style={{
-                  flex: 1, borderRadius: "10px", padding: "10px", fontSize: "14.5px", fontWeight: 800,
-                  border: "none", cursor: "pointer", fontFamily: "inherit", transition: "all .18s",
-                  background: mode === "register" ? "white" : "transparent",
-                  color: mode === "register" ? "var(--teal-dark)" : "var(--muted)",
-                  boxShadow: mode === "register" ? "0 1px 4px rgba(0,0,0,.08)" : "none",
+                  borderRadius: "14px", padding: "14px 12px", cursor: "pointer", textAlign: "center",
+                  fontFamily: "inherit", transition: "all .15s",
+                  background: mode === "register" ? "var(--gold-pale)" : "white",
+                  border: mode === "register" ? "2px solid var(--gold)" : "2px solid #E5E7EB",
                 }}
               >
-                הרשמה
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "7px", marginBottom: "3px" }}>
+                  <UserPlus size={16} style={{ color: mode === "register" ? "var(--gold-dark)" : "#9CA3AF" }} />
+                  <span style={{ fontSize: "14.5px", fontWeight: 800, color: mode === "register" ? "var(--gold-dark)" : "var(--text-2)" }}>חדש/ה כאן?</span>
+                </div>
+                <div style={{ fontSize: "12px", color: mode === "register" ? "var(--gold-dark)" : "var(--muted)" }}>הצטרפות ללא עלות</div>
               </button>
             </div>
           )}
-
-          {/* Title */}
-          <div style={{ marginBottom: "24px" }}>
-            <h1 style={{ fontSize: "24px", fontWeight: 900, color: "var(--text)", marginBottom: "5px" }}>
-              {mode === "register" ? "יצירת חשבון חדש" : mode === "reset" ? "איפוס סיסמא" : "שלום, מטפל/ת"}
-            </h1>
-            <p style={{ fontSize: "14px", color: "var(--muted)" }}>
-              {mode === "register"
-                ? "הצטרפות ללא עלות - תוך דקות"
-                : mode === "reset"
-                ? "נשלח אליך קישור לקביעת סיסמא חדשה"
-                : "כניסה לפאנל הניהול המקצועי"}
-            </p>
-          </div>
 
           {mode !== "reset" && (
             <>
@@ -329,7 +232,7 @@ function TherapistLoginContent() {
                   width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
                   borderRadius: "12px", border: "1px solid #E5E7EB", background: "white",
                   padding: "11px 16px", fontSize: "14px", fontWeight: 600, color: "#374151",
-                  cursor: "pointer", transition: "background .15s", marginBottom: "20px", fontFamily: "inherit",
+                  cursor: "pointer", transition: "background .15s", marginBottom: "18px", fontFamily: "inherit",
                 }}
               >
                 <svg style={{ width: "20px", height: "20px" }} viewBox="0 0 24 24">
@@ -338,11 +241,11 @@ function TherapistLoginContent() {
                   <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
                   <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
                 </svg>
-                המשך עם Google
+                {mode === "register" ? "הרשמה עם Google" : "כניסה עם Google"}
               </button>
 
               {/* Divider */}
-              <div style={{ position: "relative", marginBottom: "20px" }}>
+              <div style={{ position: "relative", marginBottom: "18px" }}>
                 <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center" }}>
                   <div style={{ width: "100%", borderTop: "1px solid #E5E7EB" }} />
                 </div>
@@ -393,7 +296,7 @@ function TherapistLoginContent() {
                   minLength={6}
                   className="pro-input"
                   style={{ width: "100%", borderRadius: "10px", border: "1px solid #E5E7EB", padding: "10px 14px", fontSize: "14px", fontFamily: "inherit", boxSizing: "border-box", transition: "border-color .15s" }}
-                  placeholder="לפחות 6 תווים"
+                  placeholder={mode === "register" ? "בחרו סיסמא - לפחות 6 תווים" : "הסיסמא שלך"}
                 />
               </div>
             )}
@@ -461,23 +364,36 @@ function TherapistLoginContent() {
               </button>
             </p>
           )}
-
-          {/* Back link */}
-          <p style={{ marginTop: "32px", textAlign: "center" }}>
-            <Link href="/" style={{ fontSize: "12.5px", color: "var(--faint)", transition: "color .18s" }} className="hover:text-[var(--muted)]">
-              ← חזרה לדף הבית
-            </Link>
-          </p>
         </div>
+
+        {/* פס אמון על הרקע הכהה */}
+        <div style={{ marginTop: "22px", display: "flex", flexDirection: "column", gap: "10px" }}>
+          {[
+            { Icon: Users, text: "מטופלים מופנים אליך על בסיס התאמה מדויקת" },
+            { Icon: BarChart2, text: "אנליטיקות מתקדמות על פרופיל הפונים באזורך" },
+            { Icon: ShieldCheck, text: "פלטפורמה בנויה על ידי פסיכולוגים קליניים" },
+          ].map(({ Icon, text }, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "9px" }}>
+              <Icon size={14} style={{ color: "#7DD4CE", flexShrink: 0 }} />
+              <p style={{ fontSize: "12.5px", color: "rgba(255,255,255,.65)" }}>{text}</p>
+            </div>
+          ))}
+        </div>
+
+        <p style={{ marginTop: "18px", textAlign: "center" }}>
+          <Link href="/therapists/join" style={{ fontSize: "12.5px", color: "rgba(255,255,255,.55)" }} className="hover:text-white">
+            לפרטים מלאים על ההצטרפות והמסלולים ←
+          </Link>
+          <span style={{ color: "rgba(255,255,255,.3)", margin: "0 10px" }}>·</span>
+          <Link href="/" style={{ fontSize: "12.5px", color: "rgba(255,255,255,.55)" }} className="hover:text-white">
+            ← חזרה לדף הבית
+          </Link>
+        </p>
       </div>
     </main>
   );
 }
 
 export default function TherapistLoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen" style={{ background: "white" }} />}>
-      <TherapistLoginContent />
-    </Suspense>
-  );
+  return <TherapistLoginContent />;
 }
