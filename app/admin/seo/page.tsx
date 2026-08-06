@@ -8,21 +8,22 @@ import { useCallback, useEffect, useState } from "react";
 // המספר הכולל של "אורגני" מטעה - הוא נשלט ע"י חיפושי שם.
 
 type WeekRow = { week: string; demand: number; name: number; recruit: number; other: number };
-type KindRow = { kind: string; sessions: number; contacts: number };
-type PageRow = { page: string; sessions: number };
+type KindRow = { kind: string; sessions: number; viewed: number; quiz: number; contacts: number; certain: number };
+type PageRow = { page: string; sessions: number; quiz: number; contacts: number };
 type NameRow = { name: string; status: string; sessions: number };
-type ConvRow = { grp: string; sessions: number; contacts: number };
+type FunnelRow = { grp: string; sessions: number; viewed: number; quiz: number; contacts: number; certain: number };
 
 type SeoData = {
   since: string;
   window_days: number;
+  contacts_since: string;
   weekly: WeekRow[];
   totals: { sessions: number; demand: number; name: number; recruit: number; other: number };
   kinds: KindRow[];
   demand_pages: PageRow[];
   name_top: NameRow[];
   name_breadth: { therapists: number; sessions: number };
-  conv: ConvRow[];
+  funnel: FunnelRow[];
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -85,8 +86,8 @@ export default function AdminSeoPage() {
 
   const t = data?.totals;
   const patientSessions = t ? t.sessions - t.recruit - t.other : 0; // מטופלים בלבד
-  const demandConv = data?.conv.find((c) => c.grp === "demand");
-  const nameConv = data?.conv.find((c) => c.grp === "name");
+  const demandConv = data?.funnel.find((c) => c.grp === "demand");
+  const nameConv = data?.funnel.find((c) => c.grp === "name");
   const maxWeek = Math.max(1, ...(data?.weekly ?? []).map((w) => w.demand + w.name + w.recruit + w.other));
 
   return (
@@ -119,12 +120,12 @@ export default function AdminSeoPage() {
             <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
               <div className="text-2xl font-black text-[#0F5468]">{t.demand}</div>
               <div className="text-xs font-bold text-stone-600">ביקוש אמיתי</div>
-              <div className="text-[11px] text-stone-400">{pct(t.demand, patientSessions)}% מסשני מטופלים · {demandConv ? `${rate(demandConv.contacts, demandConv.sessions)}% המרה` : ""}</div>
+              <div className="text-[11px] text-stone-400">{pct(t.demand, patientSessions)}% מסשני מטופלים · {demandConv ? `${rate(demandConv.quiz, demandConv.sessions)}% מילאו שאלון` : ""}</div>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
               <div className="text-2xl font-black text-amber-800">{t.name}</div>
               <div className="text-xs font-bold text-stone-600">חיפוש שם מטפל</div>
-              <div className="text-[11px] text-stone-400">{pct(t.name, patientSessions)}% מסשני מטופלים · {nameConv ? `${rate(nameConv.contacts, nameConv.sessions)}% המרה` : ""}</div>
+              <div className="text-[11px] text-stone-400">{pct(t.name, patientSessions)}% מסשני מטופלים · {nameConv ? `${rate(nameConv.contacts, nameConv.sessions)}% לחצו ליצירת קשר` : ""}</div>
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <div className="text-2xl font-black text-stone-800">{data.name_breadth.therapists}</div>
@@ -168,6 +169,59 @@ export default function AdminSeoPage() {
             </p>
           </section>
 
+          {/* המשפך המלא - שתי הקבוצות ממירות בערוצים שונים */}
+          <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+            <h2 className="mb-1 text-base font-black text-stone-700">המשפך עד הפנייה למטפל ({days} יום)</h2>
+            <p className="mb-4 text-xs leading-5 text-stone-500">
+              שתי הקבוצות ממירות אחרת: מי שהגיע מ<strong>ביקוש</strong> ("פסיכולוג בחיפה") לרוב ממלא קודם שאלון,
+              ולעיתים חוזר ליצור קשר רק בביקור אחר. מי שחיפש <strong>שם</strong> מדלג על השאלון ולוחץ ישירות.
+              לכן מדידה לפי לחיצת-קשר בלבד מציגה את הביקוש כחלש ממה שהוא.
+            </p>
+            <div className="space-y-4">
+              {(["demand", "name"] as const).map((grp) => {
+                const f = data.funnel.find((x) => x.grp === grp);
+                if (!f) return null;
+                const isDemand = grp === "demand";
+                const color = isDemand ? "#3D8C8A" : "#D49018";
+                const steps = [
+                  { label: "כניסות", n: f.sessions },
+                  { label: "צפו בפרופיל מטפל", n: f.viewed },
+                  { label: "השלימו שאלון התאמה", n: f.quiz },
+                  { label: "לחצו ליצירת קשר", n: f.contacts },
+                ];
+                return (
+                  <div key={grp}>
+                    <div className="mb-1.5 text-sm font-black" style={{ color: isDemand ? "#0F5468" : "#A87010" }}>
+                      {isDemand ? "🌱 ביקוש (עיר / גישה / נושא / מאגר / שאלון)" : "🔎 חיפוש שם מטפל"}
+                    </div>
+                    <div className="flex flex-wrap items-stretch gap-1.5">
+                      {steps.map((s, i) => (
+                        <div key={s.label} className="flex items-center gap-1.5">
+                          {i > 0 && <span className="text-stone-300">←</span>}
+                          <div className="rounded-xl border px-3 py-2 text-center"
+                            style={{ borderColor: color + "55", background: color + "0F", minWidth: "104px" }}>
+                            <div className="text-lg font-black" style={{ color: isDemand ? "#0F5468" : "#A87010" }}>{s.n}</div>
+                            <div className="text-[11px] text-stone-500">{s.label}</div>
+                            {i > 0 && <div className="text-[10px] text-stone-400">{rate(s.n, f.sessions)}% מהכניסות</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="mt-1 text-[11px] text-stone-400">
+                      מתוך {f.contacts} לחיצות הקשר: <strong>{f.certain}</strong> הודעות שנשלחו בפועל דרך האתר (פנייה ודאית),
+                      {" "}{f.contacts - f.certain} טלפון/וואטסאפ (כוונה - לא ידוע אם התקיימה שיחה).
+                    </p>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] leading-5 text-amber-900">
+              ⚠️ שיוך לחיצות-קשר לסשן קיים רק מ-{new Date(data.contacts_since + "T00:00:00").toLocaleDateString("he-IL")}.
+              לחיצות שקדמו לתאריך הזה לא ניתנות לשיוך, ולכן בחלון של 90 יום שיעורי הלחיצות נמוכים מהאמת.
+              לתמונה מדויקת - בחרו 30 יום.
+            </p>
+          </section>
+
           <div className="mb-8 grid gap-4 lg:grid-cols-2">
             {/* סוגי נחיתה */}
             <section className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -177,8 +231,8 @@ export default function AdminSeoPage() {
                   <tr className="border-b border-stone-200 text-xs text-stone-400">
                     <th className="pb-2 text-right font-semibold">סוג</th>
                     <th className="pb-2 text-left font-semibold">סשנים</th>
-                    <th className="pb-2 text-left font-semibold">לחיצות קשר</th>
-                    <th className="pb-2 text-left font-semibold">המרה</th>
+                    <th className="pb-2 text-left font-semibold" title="השלימו שאלון התאמה">שאלון</th>
+                    <th className="pb-2 text-left font-semibold" title="סשנים עם לחיצת יצירת קשר">קשר</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -188,8 +242,8 @@ export default function AdminSeoPage() {
                         {k.kind === "profile" ? <strong>{KIND_LABELS[k.kind]}</strong> : KIND_LABELS[k.kind] ?? k.kind}
                       </td>
                       <td className="py-1.5 text-left font-bold text-stone-800">{k.sessions}</td>
-                      <td className="py-1.5 text-left text-stone-600">{k.contacts}</td>
-                      <td className="py-1.5 text-left text-stone-600">{rate(k.contacts, k.sessions)}%</td>
+                      <td className="py-1.5 text-left text-stone-600">{k.quiz > 0 ? `${k.quiz} (${rate(k.quiz, k.sessions)}%)` : "-"}</td>
+                      <td className="py-1.5 text-left text-stone-600">{k.contacts > 0 ? `${k.contacts} (${rate(k.contacts, k.sessions)}%)` : "-"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -206,12 +260,17 @@ export default function AdminSeoPage() {
                   {data.demand_pages.map((p) => {
                     const max = data.demand_pages[0]?.sessions ?? 1;
                     return (
-                      <div key={p.page} className="flex items-center gap-2 text-sm">
-                        <div className="w-44 truncate text-stone-700" title={p.page}>{pageLabel(p.page)}</div>
+                      <div key={p.page} className="flex items-center gap-2 text-sm"
+                        title={`${p.page} · ${p.quiz} השלימו שאלון · ${p.contacts} לחצו ליצירת קשר`}>
+                        <div className="w-40 truncate text-stone-700">{pageLabel(p.page)}</div>
                         <div className="h-3.5 flex-1 overflow-hidden rounded-full bg-stone-100">
                           <div className="h-full rounded-full bg-[#3D8C8A]" style={{ width: `${(100 * p.sessions) / max}%` }} />
                         </div>
                         <div className="w-7 text-left text-xs font-bold text-stone-600">{p.sessions}</div>
+                        <div className="w-12 text-left text-[11px] text-stone-400">
+                          {p.quiz > 0 && <span title="השלימו שאלון">✎{p.quiz}</span>}
+                          {p.contacts > 0 && <span className="ms-1 text-teal-700" title="לחצו ליצירת קשר">✆{p.contacts}</span>}
+                        </div>
                       </div>
                     );
                   })}
@@ -246,6 +305,8 @@ export default function AdminSeoPage() {
             <h2 className="mb-1 text-sm font-black text-stone-700">מה חשוב לדעת על המדידה</h2>
             <ul className="list-inside list-disc space-y-1">
               <li><strong>מילות החיפוש עצמן</strong> נמצאות רק ב-Google Search Console (ביצועים ← שאילתות) - שם רואים במפורש אם "פסיכולוג בחיפה" מביא הקלקות. העמוד הזה מסיק מהתנהגות, לא מהשאילתה.</li>
+              <li><strong>&quot;פנייה&quot; מול &quot;לחיצה&quot;:</strong> רק הודעה שנשלחה דרך האתר היא פנייה ודאית. טלפון ווואטסאפ הם לחיצות - מדד כוונה שאינו מוכיח ששיחה התקיימה. שני המספרים מוצגים בנפרד במשפך.</li>
+              <li><strong>המרה מאוחרת אינה נספרת:</strong> מי שמילא שאלון, יצא, וחזר כעבור יומיים ליצור קשר - נספר כשני סשנים נפרדים, והפנייה תיוחס לביקור השני (לרוב &quot;ישיר&quot;). לכן שיעור לחיצות-הקשר של הביקוש הוא רצפה, לא תקרה.</li>
               <li><strong>הטיה אפשרית:</strong> מבקר חוזר שנכנס ישירות לפרופיל אחרי שפג הסשן ייספר כחיפוש שם. ההיקף מוגבל (98% מהסשנים האלה חד-מטפליים).</li>
               <li><strong>מאמרים:</strong> מעקב הכניסות למאמרים נוסף ב-6/8/26 - נתוני "מאמרים" נצברים מהתאריך הזה בלבד.</li>
               <li><strong>עמודים שלא באינדקס:</strong> חלק גדול מעמודי העיר/נושא עדיין "נסרק ולא נכלל באינדקס" בגוגל (מגבלת גיל+סמכות דומיין) - לכן פס הביקוש נמוך. קישורים נכנסים הם החסם, לא התוכן.</li>
