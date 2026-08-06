@@ -462,6 +462,14 @@ export default function AdminCentersPage() {
                 {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - ביטול רק דרך ממשק Sumit</strong>}
               </p>
             )}
+
+            {/* חיווי תשלום מפורש. בלעדיו היה צריך להסיק מהסטטוס, ושורת-הישות
+                שנוצרת אוטומטית במסלול 2 יצרה רושם הפוך ("ממתין לאישור"). */}
+            {(c.status === "draft" || c.status === "sent") && (
+              <p className="mt-2 rounded-lg bg-stone-50 border border-stone-200 px-3 py-1.5 text-xs text-stone-500">
+                💳 טרם התקבל תשלום - הכרטיס לא נמסר{c.status === "sent" ? " (ההצעה סומנה כנשלחה)" : ""}
+              </p>
+            )}
             {c.notes && <p className="mt-2 text-xs text-stone-500 whitespace-pre-wrap">📝 {c.notes}</p>}
             {sumitInfo[c.id] && <p className="mt-2 text-xs font-bold text-[#0F5468]">{sumitInfo[c.id]}</p>}
 
@@ -483,7 +491,11 @@ export default function AdminCentersPage() {
                   🛠 {isEntity ? "פרופיל המרכז (עריכה ואישור)" : "הפרופילים באדמין"}
                 </a>
               )}
-              {c.pending_therapist_count > 0 && (
+              {/* רק במרכז ששילם. בטיוטה שורת-הישות נוצרת אוטומטית עם הבחירה
+                  במסלול 2 ותמיד pending - התג שם נראה כאילו המרכז הגיש משהו
+                  וממתין לך, בזמן שאיש לא נגע. אישור לפני תשלום ממילא לא מקדם
+                  (promoteCenterTherapists דורש מנוי פעיל). */}
+              {c.status === "active" && c.pending_therapist_count > 0 && (
                 <a href={`/admin/therapists?center=${c.id}`}
                   className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-bold text-amber-800 hover:bg-amber-100">
                   ⏳ ממתינים לאישור: {c.pending_therapist_count}
