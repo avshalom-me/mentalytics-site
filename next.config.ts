@@ -35,6 +35,29 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async redirects() {
+    return [
+      {
+        // The disabled-child track was withdrawn on 6/8/2026. It was live,
+        // in the sitemap, and had been submitted for indexing two days
+        // earlier, so the URL is out there - a permanent redirect to the hub
+        // sends anyone who arrives (and any equity the URL earned) to the
+        // closest relevant page instead of a dead end.
+        source: "/research/btl/disabled-child",
+        destination: "/research/btl",
+        permanent: true,
+      },
+      {
+        // Same day, same reasoning: the youth online page was withdrawn. It
+        // goes to the online hub, which still lists every therapist that page
+        // filtered. Encoded because a redirect destination is an HTTP header
+        // and Hebrew there throws ERR_INVALID_CHAR.
+        source: "/therapists/online/:path(%D7%A4%D7%A1%D7%99%D7%9B%D7%95%D7%9C%D7%95%D7%92-%D7%9C%D7%A0%D7%95%D7%A2%D7%A8)",
+        destination: "/therapists/region/%D7%90%D7%95%D7%A0%D7%9C%D7%99%D7%99%D7%9F",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

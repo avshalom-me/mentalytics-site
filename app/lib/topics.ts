@@ -224,7 +224,6 @@ export const ONLINE_TOPIC_SLUGS = [
   "טיפול-בחרדה",
   "טיפול-בדיכאון",
   "פסיכולוג-ילדים",
-  "פסיכולוג-לנוער",
 ] as const;
 
 export const ONLINE_TOPIC_APPROACHES = ["CBT", "טיפול זוגי"] as const;
