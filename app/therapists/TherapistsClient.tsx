@@ -12,12 +12,14 @@ import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { bioSnippet } from "@/app/lib/bio-snippet";
 import { waLinkFor, telHref } from "@/app/lib/phone";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 // Card-level contact buttons - the one surface where a contact click happens
 // WITHOUT a profile view. Attribution must ride along here exactly like on the
 // profile page's ContactButtons: without it these clicks landed as
 // channel=NULL / utm=NULL and vanished from the per-campaign funnel.
 function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "email") {
+  if (trackingOptedOut()) return; // מכשיר של הצוות
   fetch("/api/track-click", {
     method: "POST",
     headers: { "Content-Type": "application/json" },

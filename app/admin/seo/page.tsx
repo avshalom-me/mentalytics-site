@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import OptOutToggle from "./OptOutToggle";
 
 // SEO אורגני - פילוח "ביקוש מול חיפוש-שם". השאלה שהעמוד עונה עליה: כמה
 // מהתנועה האורגנית היא אנשים שחיפשו *טיפול* (עיר/גישה/נושא - הנכס שה-SEO
@@ -108,9 +109,15 @@ export default function AdminSeoPage() {
       </div>
       <p className="mb-6 max-w-3xl text-sm leading-6 text-stone-500">
         כניסה אורגנית שנחתה <strong>ישר על פרופיל מטפל</strong> (בלי עמוד רשימה לפניה) היא כמעט תמיד חיפוש
-        של שם המטפל - 98% מהסשנים האלה צופים במטפל אחד בלבד. כניסה שנחתה על עמוד עיר/גישה/מאגר/שאלון היא
-        <strong> ביקוש אמיתי לטיפול</strong> - הנכס שה-SEO אמור לייצר. הסיווג לפי הנגיעה הראשונה בכל סשן.
+        של שם המטפל - 98% מהמבקרים האלה צופים במטפל אחד בלבד. כניסה שנחתה על עמוד עיר/גישה/מאגר/שאלון היא
+        <strong> ביקוש אמיתי לטיפול</strong> - הנכס שה-SEO אמור לייצר. הסיווג לפי הנגיעה הראשונה של כל מבקר.
       </p>
+      <p className="mb-4 max-w-3xl rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
+        <strong>&quot;מבקר&quot; = דפדפן, לא ביקור.</strong> המזהה נשמר בדפדפן ללא תפוגה, ולכן מי שנכנס
+        עשרות פעמים נספר <strong>פעם אחת</strong> - בשבוע שבו נכנס לראשונה דרך גוגל. לכן המספרים כאן
+        הם &quot;מבקרים אורגניים חדשים&quot;, לא כניסות, והם אינם מנופחים ע&quot;י כניסות חוזרות שלך.
+      </p>
+      <div className="mb-6"><OptOutToggle /></div>
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
       {loading && <p className="text-sm text-stone-400 animate-pulse">טוען…</p>}
@@ -122,12 +129,12 @@ export default function AdminSeoPage() {
             <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
               <div className="text-2xl font-black text-[#0F5468]">{t.demand}</div>
               <div className="text-xs font-bold text-stone-600">ביקוש אמיתי</div>
-              <div className="text-[11px] text-stone-400">{pct(t.demand, patientSessions)}% מסשני מטופלים · {demandConv ? `${rate(demandConv.quiz, demandConv.sessions)}% מילאו שאלון` : ""}</div>
+              <div className="text-[11px] text-stone-400">{pct(t.demand, patientSessions)}% ממבקרי מטופלים · {demandConv ? `${rate(demandConv.quiz, demandConv.sessions)}% מילאו שאלון` : ""}</div>
             </div>
             <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
               <div className="text-2xl font-black text-amber-800">{t.name}</div>
               <div className="text-xs font-bold text-stone-600">חיפוש שם מטפל</div>
-              <div className="text-[11px] text-stone-400">{pct(t.name, patientSessions)}% מסשני מטופלים · {nameConv ? `${rate(nameConv.contacts, nameConv.sessions)}% לחצו ליצירת קשר` : ""}</div>
+              <div className="text-[11px] text-stone-400">{pct(t.name, patientSessions)}% ממבקרי מטופלים · {nameConv ? `${rate(nameConv.contacts, nameConv.sessions)}% לחצו ליצירת קשר` : ""}</div>
             </div>
             <div className="rounded-2xl border border-sky-200 bg-sky-50/60 p-4">
               <div className="text-2xl font-black text-sky-800">{data.home_since ? t.home : "—"}</div>
@@ -240,9 +247,9 @@ export default function AdminSeoPage() {
                 <thead>
                   <tr className="border-b border-stone-200 text-xs text-stone-400">
                     <th className="pb-2 text-right font-semibold">סוג</th>
-                    <th className="pb-2 text-left font-semibold">סשנים</th>
+                    <th className="pb-2 text-left font-semibold">מבקרים</th>
                     <th className="pb-2 text-left font-semibold" title="השלימו שאלון התאמה">שאלון</th>
-                    <th className="pb-2 text-left font-semibold" title="סשנים עם לחיצת יצירת קשר">קשר</th>
+                    <th className="pb-2 text-left font-semibold" title="מבקרים עם לחיצת יצירת קשר">קשר</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -296,7 +303,7 @@ export default function AdminSeoPage() {
           <section className="mb-8 rounded-2xl border border-amber-200 bg-amber-50/40 p-5">
             <h2 className="mb-1 text-base font-black text-stone-700">חיפושי שם - מי מחפשים ({days} יום)</h2>
             <p className="mb-3 text-xs leading-5 text-stone-500">
-              {data.name_breadth.sessions} סשנים נחתו ישר על פרופיל, על פני {data.name_breadth.therapists} מטפלים שונים.
+              {data.name_breadth.sessions} מבקרים נחתו ישר על פרופיל, על פני {data.name_breadth.therapists} מטפלים שונים.
               המרה: {nameConv ? rate(nameConv.contacts, nameConv.sessions) : 0}% (גבוהה מביקוש - הם כבר החליטו).
               זה ערך אמיתי למטפל המשלם, אבל הוא לא מעיד על דירוג עמודי הביקוש.
             </p>
@@ -316,9 +323,10 @@ export default function AdminSeoPage() {
             <ul className="list-inside list-disc space-y-1">
               <li><strong>מילות החיפוש עצמן</strong> נמצאות רק ב-Google Search Console (ביצועים ← שאילתות) - שם רואים במפורש אם "פסיכולוג בחיפה" מביא הקלקות. העמוד הזה מסיק מהתנהגות, לא מהשאילתה.</li>
               <li><strong>&quot;פנייה&quot; מול &quot;לחיצה&quot;:</strong> רק הודעה שנשלחה דרך האתר היא פנייה ודאית. טלפון ווואטסאפ הם לחיצות - מדד כוונה שאינו מוכיח ששיחה התקיימה. שני המספרים מוצגים בנפרד במשפך.</li>
-              <li><strong>המרה מאוחרת אינה נספרת:</strong> מי שמילא שאלון, יצא, וחזר כעבור יומיים ליצור קשר - נספר כשני סשנים נפרדים, והפנייה תיוחס לביקור השני (לרוב &quot;ישיר&quot;). לכן שיעור לחיצות-הקשר של הביקוש הוא רצפה, לא תקרה.</li>
-              <li><strong>הטיה אפשרית:</strong> מבקר חוזר שנכנס ישירות לפרופיל אחרי שפג הסשן ייספר כחיפוש שם. ההיקף מוגבל (98% מהסשנים האלה חד-מטפליים).</li>
+              <li><strong>המרה מאוחרת אינה נספרת:</strong> מי שמילא שאלון, יצא, וחזר כעבור יומיים ליצור קשר - נספר כשני מבקרים נפרדים, והפנייה תיוחס לביקור השני (לרוב &quot;ישיר&quot;). לכן שיעור לחיצות-הקשר של הביקוש הוא רצפה, לא תקרה.</li>
+              <li><strong>הטיה אפשרית:</strong> מבקר חוזר שנכנס ישירות לפרופיל אחרי שפג הסשן ייספר כחיפוש שם. ההיקף מוגבל (98% מהמבקרים האלה חד-מטפליים).</li>
               <li><strong>מאמרים:</strong> מעקב הכניסות למאמרים נוסף ב-6/8/26 - נתוני "מאמרים" נצברים מהתאריך הזה בלבד.</li>
+              <li><strong>גלישה פרטית שוברת את הספירה-פעם-אחת:</strong> חלון אנונימי מקבל מזהה חדש בכל פתיחה, ולכן בדיקות שלך במצב פרטי כן נספרות כמבקרים חדשים. הכפתור &quot;אל תספור אותי&quot; למעלה לא שורד מצב פרטי - שם עדיף פשוט לא להיכנס מגוגל.</li>
               <li><strong>עמוד הבית נמדד רק מ-6/8/26.</strong> עד אז הוא לא שלח שום אירוע - מי שנחת בו מחיפוש מותג (&quot;טיפול חכם&quot;) או כללי (&quot;פסיכולוג&quot;) ואז לחץ בתפריט, נספר כאילו נחת על היעד שלחץ עליו. זו הסיבה ש&quot;מאגר המטפלים&quot; נראה גדול בנתונים ההיסטוריים. הוא גם מופרד מ&quot;ביקוש&quot; במכוון: הוא מערבב חיפושי מותג עם חיפושים כלליים, וההפרדה ביניהם אפשרית רק ב-GSC.</li>
               <li><strong>עמודים שלא באינדקס:</strong> חלק גדול מעמודי העיר/נושא עדיין "נסרק ולא נכלל באינדקס" בגוגל (מגבלת גיל+סמכות דומיין) - לכן פס הביקוש נמוך. קישורים נכנסים הם החסם, לא התוכן.</li>
               <li>נתוני ערוץ קיימים מאז 22/6/26. גיוס מטפלים מוצג בנפרד כי זה קהל אחר.</li>

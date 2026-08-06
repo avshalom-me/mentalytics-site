@@ -19,6 +19,7 @@ import {
 import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 function getOrCreateSessionId(): string | null {
   try {
@@ -2595,6 +2596,7 @@ function KidsMatchSection({ A, score, selection }: {
     // "unknown" channel in the attribution report (they carried no channel/utm).
     const attribution = getAttribution() ?? {};
     for (const t of results) {
+      if (trackingOptedOut()) return;
       fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3360,6 +3362,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
 
     // Fire-and-forget analytics event - admin sees who clicks and on what.
     try {
+      if (trackingOptedOut()) return;
       fetch("/api/track-explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

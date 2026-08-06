@@ -19,6 +19,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 // Anonymous viewer context derived from the questionnaire - used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -512,6 +513,7 @@ export default function AdultsPage() {
     // "unknown" channel in the attribution report (they carried no channel/utm).
     const attribution = getAttribution() ?? {};
     for (const t of matchResults) {
+      if (trackingOptedOut()) return;
       fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -866,6 +868,7 @@ export default function AdultsPage() {
 
     // Fire-and-forget analytics event - captures who clicks and on what.
     try {
+      if (trackingOptedOut()) return;
       fetch("/api/track-explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

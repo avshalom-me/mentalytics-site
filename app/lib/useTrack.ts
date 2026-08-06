@@ -3,11 +3,13 @@
 import { useEffect, useRef, useCallback } from "react";
 import { getOrCreateSessionId } from "./session";
 import { captureAttribution, getAttribution } from "./attribution";
+import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
 
 type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_saved";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
+  if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים את הנתונים
   const session_id = getOrCreateSessionId();
   const attribution = getAttribution() ?? {};
   fetch("/api/track", {

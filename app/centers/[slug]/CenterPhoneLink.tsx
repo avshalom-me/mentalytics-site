@@ -3,6 +3,7 @@
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { getAttribution } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 // קישור טלפון בעמוד מרכז (מסלול 2) - נרשם כלחיצת-קשר על ישות-המרכז, בדיוק
 // כמו בפרופיל מטפל: בלעדיו ערוץ הטלפון (הדומיננטי) נעלם מ"לחיצות ליצירת
@@ -16,6 +17,7 @@ export default function CenterPhoneLink({ entityId, phone, className, style, chi
   children: React.ReactNode;
 }) {
   function track() {
+    if (trackingOptedOut()) return; // מכשיר של הצוות
     try {
       fetch("/api/track-click", {
         method: "POST",

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { getAttribution } from "@/app/lib/attribution";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 export interface ViewerContext {
   region?: string;
@@ -24,6 +25,7 @@ export default function TrackView({
   context?: ViewerContext;
 }) {
   useEffect(() => {
+    if (trackingOptedOut()) return; // מכשיר של הצוות
     const session_id = getOrCreateSessionId();
     const attribution = getAttribution() ?? {};
     fetch("/api/track-view", {

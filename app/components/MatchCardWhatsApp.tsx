@@ -4,6 +4,7 @@ import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
 import { waLinkFor } from "@/app/lib/phone";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 // WhatsApp-only contact straight from the match card.
 //
@@ -39,6 +40,7 @@ export default function MatchCardWhatsApp({
   function onClick(e: React.MouseEvent) {
     // The card itself is often wrapped in a link - don't open the profile too.
     e.stopPropagation();
+    if (trackingOptedOut()) { return; }
     const attribution = getAttribution() ?? {};
     fetch("/api/track-click", {
       method: "POST",

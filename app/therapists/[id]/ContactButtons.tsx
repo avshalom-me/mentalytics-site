@@ -5,6 +5,7 @@ import SiteMessageModal from "../SiteMessageModal";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 
 const wasvg = (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -29,6 +30,7 @@ function track(
   clickType: "whatsapp" | "phone" | "email",
   source: "match" | "profile",
 ) {
+  if (trackingOptedOut()) return; // מכשיר של הצוות
   const attribution = getAttribution() ?? {};
   fetch("/api/track-click", {
     method: "POST",
