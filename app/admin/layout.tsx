@@ -48,6 +48,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     label: "אנליטיקה",
     items: [
       { href: "/admin/analytics", label: "אנליטיקס", icon: "📈" },
+      { href: "/admin/seo", label: "SEO אורגני", icon: "🌱" },
       { href: "/admin/stats", label: "לחיצות", icon: "📊" },
       { href: "/admin/supply-demand", label: "היצע/ביקוש", icon: "⚖️" },
     ],

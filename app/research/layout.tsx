@@ -1,4 +1,5 @@
 import Link from "next/link";
+import ResearchViewTracker from "./ResearchViewTracker";
 
 // Shared layout for ALL /research pages (editorial articles + community
 // therapist articles): appends a "מחפשים מטפל?" internal-links block after
@@ -22,6 +23,7 @@ const LINKS: { href: string; label: string }[] = [
 export default function ResearchLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
+      <ResearchViewTracker />
       {children}
       <aside dir="rtl" className="mx-auto max-w-3xl px-5 pb-16" style={{ fontFamily: "'Heebo', sans-serif" }}>
         <div className="rounded-2xl p-6" style={{ background: "var(--surface, #F7FAF9)", border: "1px solid var(--line, #DDE9E8)" }}>
