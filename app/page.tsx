@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import PageViewTracker from "./components/PageViewTracker";
 import ContactForm from "./components/ContactForm";
 import TooltipAsterisk from "./components/TooltipAsterisk";
 import OutputShowcase from "./components/OutputShowcase";
@@ -154,6 +155,9 @@ export default function HomePage() {
 
   return (
     <>
+      {/* עמוד הבית הוא שער הכניסה האורגני הגדול ביותר, ועד 6/8/26 לא נמדד
+          כלל - מי שנחת כאן ולחץ למאגר נספר כאילו נחת על המאגר. */}
+      <PageViewTracker page="home" source="home" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(businessJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
