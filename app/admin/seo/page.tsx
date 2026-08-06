@@ -20,7 +20,7 @@ type SeoData = {
   contacts_since: string;
   home_since: string | null;
   weekly: WeekRow[];
-  totals: { sessions: number; demand: number; home: number; name: number; recruit: number; other: number };
+  totals: { sessions: number; demand: number; home: number; name: number; recruit: number; info: number; other: number };
   kinds: KindRow[];
   demand_pages: PageRow[];
   name_top: NameRow[];
@@ -95,7 +95,9 @@ export default function AdminSeoPage() {
   useEffect(() => load(days), [load, days]);
 
   const t = data?.totals;
-  const patientSessions = t ? t.sessions - t.recruit - t.other : 0; // מטופלים בלבד
+  // מכנה האחוזים: מבקרים שהם מטופלים פוטנציאליים בלבד - בלי גיוס, בלי עמודי
+  // תדמית (מי אנחנו/מפתחים/מרכזים) ובלי "אחר".
+  const patientSessions = t ? t.sessions - t.recruit - (t.info ?? 0) - t.other : 0;
   const demandConv = data?.funnel.find((c) => c.grp === "demand");
   const nameConv = data?.funnel.find((c) => c.grp === "name");
   const maxWeek = Math.max(1, ...(data?.weekly ?? []).map((w) => w.demand + w.home + w.name + w.recruit + w.other));
@@ -330,7 +332,8 @@ export default function AdminSeoPage() {
             <ul className="list-inside list-disc space-y-1">
               <li><strong>מילות החיפוש עצמן</strong> נמצאות רק ב-Google Search Console (ביצועים ← שאילתות) - שם רואים במפורש אם "פסיכולוג בחיפה" מביא הקלקות. העמוד הזה מסיק מהתנהגות, לא מהשאילתה.</li>
               <li><strong>&quot;פנייה&quot; מול &quot;לחיצה&quot;:</strong> רק הודעה שנשלחה דרך האתר היא פנייה ודאית. טלפון ווואטסאפ הם לחיצות - מדד כוונה שאינו מוכיח ששיחה התקיימה. שני המספרים מוצגים בנפרד במשפך.</li>
-              <li><strong>המרה מאוחרת אינה נספרת:</strong> מי שמילא שאלון, יצא, וחזר כעבור יומיים ליצור קשר - נספר כשני מבקרים נפרדים, והפנייה תיוחס לביקור השני (לרוב &quot;ישיר&quot;). לכן שיעור לחיצות-הקשר של הביקוש הוא רצפה, לא תקרה.</li>
+              <li><strong>המרה מאוחרת באותו דפדפן כן נספרת:</strong> המזהה והערוץ נשמרים בדפדפן, ולכן מי שמילא שאלון היום ולחץ ליצירת קשר בביקור אחר בעוד יומיים - נספר כהמרה של אותו מבקר אורגני. מה שאינו נתפס: המשך מ<strong>מכשיר אחר</strong> (שאלון בנייד, פנייה מהמחשב) - שם ההמרה תיזקף למכשיר השני.</li>
+              <li><strong>&quot;ערוץ&quot; = ערוץ הגיוס של הדפדפן, לא של הביקור:</strong> דפדפן שהגיע לראשונה ישירות ורק אחר כך דרך גוגל נשאר &quot;ישיר&quot; (רק תיוג קמפיין מפורש דורס את הערוץ). המשמעות: המספרים האורגניים כאן מוטים כלפי מטה - ספירה שמרנית.</li>
               <li><strong>הטיה אפשרית:</strong> מבקר חוזר שנכנס ישירות לפרופיל אחרי שפג הסשן ייספר כחיפוש שם. ההיקף מוגבל (98% מהמבקרים האלה חד-מטפליים).</li>
               <li><strong>מאמרים:</strong> מעקב הכניסות למאמרים נוסף ב-6/8/26 - נתוני "מאמרים" נצברים מהתאריך הזה בלבד.</li>
               <li><strong>גלישה פרטית שוברת את הספירה-פעם-אחת:</strong> חלון אנונימי מקבל מזהה חדש בכל פתיחה, ולכן בדיקות שלך במצב פרטי כן נספרות כמבקרים חדשים. הכפתור &quot;אל תספור אותי&quot; למעלה לא שורד מצב פרטי - שם עדיף פשוט לא להיכנס מגוגל.</li>
