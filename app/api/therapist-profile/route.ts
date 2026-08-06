@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
+import { logEmail } from "@/app/lib/email-log";
 import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 import { THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
@@ -129,6 +131,53 @@ export async function GET(req: NextRequest) {
         .update({ user_id: user.id })
         .eq("id", byEmail.id as string);
       therapist = { ...byEmail, user_id: user.id };
+    }
+  }
+
+  // A LIVE profile (approved/paying/admin-approved) with this email exists but
+  // is deliberately NOT auto-claimable — signup emails aren't verified, so
+  // auto-linking would let whoever registers first seize a live paying profile
+  // (the account-takeover fix). Without this branch we'd fall through and
+  // create an empty stub, and the real therapist would see a BLANK form
+  // instead of their profile (the "דניאל היימן" case). Return an explicit
+  // pending-link state and alert the admin once, so the manual link happens.
+  if (!therapist && user.email) {
+    const { data: liveRow } = await supabaseAdmin
+      .from("therapists")
+      .select("id, full_name")
+      .eq("email", user.email)
+      .is("user_id", null)
+      .is("center_account_id", null)
+      .or("admin_approved.eq.true,status.in.(approved,paying)")
+      .maybeSingle();
+    if (liveRow) {
+      // התראה אחת לפרופיל - לא בכל טעינה של הדשבורד.
+      const { data: alreadyAlerted } = await supabaseAdmin
+        .from("crm_email_log")
+        .select("id")
+        .eq("template", "therapist_link_request")
+        .eq("entity_id", liveRow.id as string)
+        .limit(1);
+      if (!alreadyAlerted?.length) {
+        const alertTo = (process.env.WEEKLY_REPORT_TO ?? "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com")
+          .split(",").map((s) => s.trim()).filter(Boolean);
+        try {
+          await new Resend(process.env.RESEND_API_KEY).emails.send({
+            from: "טיפול חכם <noreply@mentalytics.co.il>",
+            to: alertTo,
+            subject: `🔗 ${liveRow.full_name} מנסה להתחבר לפרופיל - נדרש קישור חשבון`,
+            html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+              <p><strong>${String(liveRow.full_name).replace(/</g, "&lt;")}</strong> נרשמו עכשיו עם הכתובת <strong>${String(user.email).replace(/</g, "&lt;")}</strong> ומנסים להיכנס לפרופיל שלהם.</p>
+              <p>הפרופיל חי (משלם/מאושר) ולכן לא קושר אוטומטית - מטעמי אבטחה. המטפל/ת רואים כרגע מסך "ממתין לקישור".</p>
+              <p><strong>מה לעשות:</strong> באדמין ← מטפלים ← בכרטיס של ${String(liveRow.full_name).replace(/</g, "&lt;")} ← כפתור "🔗 קשר חשבון כניסה". הקישור מתבצע בלחיצה אחת אם המייל תואם.</p>
+            </div>`,
+          });
+          await logEmail({ recipient: alertTo.join(","), recipientType: "other", entityId: liveRow.id as string, subject: `קישור חשבון - ${liveRow.full_name}`, template: "therapist_link_request", sentBy: "system" });
+        } catch (e) {
+          console.error("therapist link-request alert failed:", e);
+        }
+      }
+      return NextResponse.json({ ok: true, pending_link: { name: liveRow.full_name } });
     }
   }
 

@@ -123,7 +123,8 @@ async function buildTherapistsResponse(onlyId?: string) {
       article_invite_sent_at,
       center_account_id,
       accepting_new_patients,
-      accepting_new_changed_at
+      accepting_new_changed_at,
+      user_id
       `
     )
     .order("full_name", { ascending: true });
@@ -383,6 +384,72 @@ export async function PATCH(request: Request) {
     // therapist who paid during signup becomes visible: only after the admin
     // has vetted them. (Pending/free therapists are approved via the normal
     // status='approved' path, which also sets admin_approved.)
+    // קישור חשבון כניסה לפרופיל חי. פרופילים משלמים/מאושרים מוחרגים בכוונה
+    // מקישור אוטומטי (מייל ההרשמה אינו מאומת - הגנת השתלטות חשבון), ולכן
+    // כשבעל פרופיל אמיתי נרשם הוא נתקע על מסך "ממתין לקישור" עד שהאדמין
+    // מקשר כאן. מאתר את חשבון ה-Auth לפי המייל המדויק של הפרופיל, מוחק
+    // כרטיס-רפאים ריק שנוצר מהכניסות שלו, ומקשר.
+    if (body.action === "link_account") {
+      const { data: t } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, email, user_id")
+        .eq("id", id)
+        .single();
+      if (!t) return NextResponse.json({ ok: false, error: "מטפל לא נמצא" }, { status: 404 });
+      if (t.user_id) return NextResponse.json({ ok: false, error: "הפרופיל כבר מקושר לחשבון" }, { status: 400 });
+      if (!t.email) return NextResponse.json({ ok: false, error: "לפרופיל אין כתובת מייל - הוסיפו קודם" }, { status: 400 });
+
+      // איתור חשבון Auth לפי מייל (התאמה מדויקת, case-insensitive).
+      const wanted = String(t.email).trim().toLowerCase();
+      let authUser: { id: string; email?: string } | null = null;
+      for (let page = 1; page <= 5 && !authUser; page++) {
+        const { data: pageData, error: listErr } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+        if (listErr) return NextResponse.json({ ok: false, error: "שליפת חשבונות נכשלה - נסו שוב" }, { status: 502 });
+        authUser = (pageData?.users ?? []).find((u) => (u.email ?? "").toLowerCase() === wanted) ?? null;
+        if ((pageData?.users?.length ?? 0) < 1000) break;
+      }
+      if (!authUser) {
+        return NextResponse.json(
+          { ok: false, error: `אין חשבון רשום עם ${t.email} - המטפל/ת צריכים קודם להירשם בעמוד הכניסה (עם המייל הזה בדיוק)` },
+          { status: 404 },
+        );
+      }
+
+      // כרטיס-רפאים: שורה שנוצרה אוטומטית מהכניסות של אותו חשבון. מוחקים רק
+      // אם ריקה לחלוטין - אם המטפל התחיל למלא בה תוכן, עוצרים ולא דורסים.
+      const { data: ghost } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, bio, profile_photo_path")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+      if (ghost) {
+        const ghostEmpty = !String(ghost.full_name ?? "").trim() && !String(ghost.bio ?? "").trim() && !ghost.profile_photo_path;
+        if (!ghostEmpty) {
+          return NextResponse.json(
+            { ok: false, error: `לחשבון הזה כבר יש כרטיס עם תוכן ("${ghost.full_name}") - מיזוג ידני נדרש כדי לא לאבד נתונים` },
+            { status: 409 },
+          );
+        }
+        await supabaseAdmin.from("therapists").delete().eq("id", ghost.id);
+      }
+
+      const { error: linkErr } = await supabaseAdmin
+        .from("therapists")
+        .update({ user_id: authUser.id })
+        .eq("id", id)
+        .is("user_id", null);
+      if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 500 });
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "link_account",
+        before: { user_id: null },
+        after: { user_id: authUser.id },
+        reason: `admin linked auth account ${authUser.email} to live profile${ghost ? " (empty ghost row removed)" : ""}`,
+      });
+      return NextResponse.json({ ok: true, id, linked_email: authUser.email, ghost_removed: !!ghost });
+    }
+
     if (body.action === "approve_listing") {
       const { data: beforeListing } = await supabaseAdmin
         .from("therapists")

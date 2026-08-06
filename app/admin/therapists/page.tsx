@@ -61,6 +61,7 @@ type AdminTherapist = {
   article_invite_sent_at: string | null;
   accepting_new_patients: boolean;
   accepting_new_changed_at: string | null;
+  user_id: string | null;
 };
 
 type EditForm = {
@@ -617,6 +618,29 @@ export default function AdminTherapistsPage() {
       }));
     } finally {
       setReconcilingId(null);
+    }
+  }
+
+  // קישור חשבון כניסה לפרופיל חי שלא קושר אוטומטית (הגנת השתלטות חשבון).
+  // מופיע רק כשהפרופיל חי (משלם/מאושר) ובלי user_id - המקרה של "דניאל היימן".
+  async function linkAccount(t: AdminTherapist) {
+    if (!window.confirm(`לקשר את חשבון הכניסה של ${t.email} לפרופיל של ${t.full_name}?\n\nודאו שזה באמת בעל/ת הפרופיל (למשל פנייה שהגיעה מהמייל הזה).`)) return;
+    try {
+      setActionLoadingId(t.id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, action: "link_account" }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "הקישור נכשל");
+      setTherapists((prev) => prev.map((x) => (x.id === t.id ? { ...x, user_id: "linked" } : x)));
+      alert(`✓ החשבון קושר. ${t.full_name} ייכנסו מעכשיו ישר לפרופיל שלהם.${json.ghost_removed ? "\n(כרטיס ריק שנוצר מהכניסות הקודמות נמחק.)" : ""}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
     }
   }
 
@@ -1363,6 +1387,17 @@ export default function AdminTherapistsPage() {
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                   onClick={() => approveListing(therapist.id)}>
                   {isBusy ? "מאשר..." : "✓ אשר להצגה"}
+                </button>
+              )}
+              {/* פרופיל חי בלי חשבון כניסה: המטפל שנרשם רואה "ממתין לקישור"
+                  עד הלחיצה כאן (קישור אוטומטי חסום - הגנת השתלטות חשבון). */}
+              {!therapist.user_id && !therapist.center_account_id && therapist.email &&
+                (therapist.admin_approved || therapist.status === "approved" || therapist.status === "paying") && (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-bold text-purple-800 disabled:opacity-50"
+                  onClick={() => linkAccount(therapist)}
+                  title="לפרופיל אין חשבון כניסה מקושר. אם בעל/ת הפרופיל נרשמו עם המייל הזה - לחיצה תקשר אותם ותפתח להם את הפרופיל.">
+                  🔗 קשר חשבון כניסה
                 </button>
               )}
               {therapist.status !== "approved" && therapist.status !== "paying" && (

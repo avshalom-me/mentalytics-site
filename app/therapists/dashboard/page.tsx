@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 import ProfileLinkPromo from "./ProfileLinkPromo";
+import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
@@ -248,6 +249,8 @@ export default function TherapistDashboardPage() {
 function TherapistDashboard() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<Profile | null>(null);
+  // שם הפרופיל החי שממתין לקישור חשבון ידני (ראו PendingLinkNotice).
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
@@ -299,6 +302,13 @@ function TherapistDashboard() {
       });
       const json = await res.json();
 
+      // פרופיל חי שממתין לקישור ידני (מטעמי אבטחה) - מסך הסבר במקום טופס ריק.
+      if (json.pending_link) {
+        setPendingLink(String(json.pending_link.name ?? ""));
+        setLoading(false);
+        return;
+      }
+
       // A brand-new registrant has a STUB row (auto-created on first login,
       // empty name) rather than no row - GET always returns one now. Sending
       // them to the dashboard (pricing banner, plan table, "what to improve")
@@ -343,6 +353,7 @@ function TherapistDashboard() {
     window.location.href = "/therapists/login";
   }
 
+  if (pendingLink !== null) return <PendingLinkNotice name={pendingLink} />;
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   const statusLabel = profile?.status === "paying" && !profile?.admin_approved

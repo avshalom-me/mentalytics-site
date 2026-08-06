@@ -13,6 +13,7 @@ import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
+import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
 
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
@@ -68,6 +69,8 @@ function StyleQuestion({ name, question, hint, value, onChange }: {
 
 export default function TherapistProfileEditPage() {
   const [loading, setLoading] = useState(true);
+  // שם הפרופיל החי שממתין לקישור חשבון ידני (ראו PendingLinkNotice).
+  const [pendingLink, setPendingLink] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -114,6 +117,13 @@ export default function TherapistProfileEditPage() {
         },
       });
       const json = await res.json();
+
+      // פרופיל חי שממתין לקישור ידני (מטעמי אבטחה) - מסך הסבר במקום טופס ריק.
+      if (json.pending_link) {
+        setPendingLink(String(json.pending_link.name ?? ""));
+        setLoading(false);
+        return;
+      }
 
       if (json.therapist) {
         setProfile(json.therapist);
@@ -357,6 +367,7 @@ export default function TherapistProfileEditPage() {
 
   const promo = isPromoActive();
 
+  if (pendingLink !== null) return <PendingLinkNotice name={pendingLink} />;
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   // ── Plan choice - shown right after the first profile submission ──
