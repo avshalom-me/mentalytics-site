@@ -21,9 +21,52 @@ export function trackQuizStep(quizType: "adults" | "kids", step: string, progres
   sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress } });
 }
 
-export function trackQuizComplete(quizType: "adults" | "kids") {
-  sendTrack("quiz_complete", { metadata: { quiz_type: quizType } });
-  gaEvent("quiz_complete", { quiz_type: quizType });
+/**
+ * Anonymous, coarse profile of a completed questionnaire.
+ *
+ * Every field is a bucketed category already stored at the same granularity on
+ * therapist_profile_views - no free text, no answers, nothing that identifies a
+ * person. This is what makes the aggregate publishable: "of the people who
+ * arrived with X, the system matched Y" is a statement about counts, and the
+ * underlying rows cannot be walked back to anyone.
+ */
+export type QuizCompleteFacts = {
+  /** Analytics-issue taxonomy: emotional | functional | relationship | addiction | personal | child */
+  issue?: string | null;
+  /** Recommended treatment labels, in rank order. */
+  treatments?: string[];
+  age_band?: string | null;
+  region?: string | null;
+  gender?: string | null;
+};
+
+/**
+ * Schema version of the quiz_complete metadata.
+ *
+ * Bumped to 2 on 6/8/2026 when the facts above were added; version 1 rows
+ * carry only `quiz_type`. This exists so analysis never has to guess a cutoff
+ * date: `metadata->>'v' = '2'` selects exactly the rows that have the new
+ * fields, and rows without it are unambiguously the old shape. Filtering by
+ * created_at would be wrong the moment a deploy is rolled back or a client
+ * keeps an old bundle cached and keeps sending v1 events for hours.
+ */
+const QUIZ_COMPLETE_SCHEMA = 2;
+
+export function trackQuizComplete(quizType: "adults" | "kids", facts?: QuizCompleteFacts) {
+  sendTrack("quiz_complete", {
+    metadata: {
+      v: QUIZ_COMPLETE_SCHEMA,
+      quiz_type: quizType,
+      ...(facts?.issue ? { issue: facts.issue } : {}),
+      ...(facts?.treatments?.length ? { treatments: facts.treatments.slice(0, 5) } : {}),
+      ...(facts?.age_band ? { age_band: facts.age_band } : {}),
+      ...(facts?.region ? { region: facts.region } : {}),
+      ...(facts?.gender ? { gender: facts.gender } : {}),
+    },
+  });
+  // GA4 gets the low-cardinality fields only - treatments is an array, which GA4
+  // cannot aggregate as a custom dimension.
+  gaEvent("quiz_complete", { quiz_type: quizType, issue: facts?.issue ?? undefined });
 }
 
 /**

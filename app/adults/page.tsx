@@ -730,7 +730,17 @@ export default function AdultsPage() {
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations });
       setScreen("results");
-      trackQuizComplete("adults");
+      // Coarse, anonymous facts alongside the completion - without these the
+      // event recorded only quiz_type, so "what did the system recommend, and
+      // to whom" was not recoverable from the data at all.
+      const a = ao ?? answers;
+      const firstDomain = a.domains?.[0];
+      trackQuizComplete("adults", {
+        issue: firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] ?? null : null,
+        treatments: (json.recommendations ?? []).map((r: { treatment: string }) => r.treatment),
+        age_band: normalizeAgeBand(a.age),
+        gender: normalizeGenderKey(a.gender),
+      });
     } catch (e) {
       // Scoring failed - the user sees an error, not results, so this is NOT a
       // completion. Firing quiz_complete here inflated the funnel top on every

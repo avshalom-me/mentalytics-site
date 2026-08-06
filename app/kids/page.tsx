@@ -4046,7 +4046,19 @@ export default function KidsPage() {
     if (step === "p-result") {
       // trackQuizComplete already reports quiz_complete to GA4 - the inline
       // "quiz_completed" duplicate (a second GA4 name for the same action) is gone.
-      trackQuizComplete("kids");
+      //
+      // Fires here, before scoring, deliberately: the kids funnel has always
+      // counted "reached the result screen" as a completion, and moving it into
+      // the success path would silently redefine the metric mid-series and put
+      // a step in the admin's monthly chart that no one could explain later.
+      // The cost is that the domain profile is not available yet, so kids
+      // events carry the demographic facts only - the treatment side of the
+      // question is answered by the adults flow, which scores before it fires.
+      trackQuizComplete("kids", {
+        issue: "child",
+        age_band: "child",
+        gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
+      });
       fetchScore(A);
     }
   }, [step]);
