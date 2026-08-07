@@ -22,8 +22,12 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const { city: cityParam } = await params;
   const city = slugToCity(cityParam);
   if (!city) return { title: "עיר לא נמצאה" };
-  const title = `פסיכולוגים ומטפלים ב${city} | טיפול חכם`;
-  const description = `מצאו פסיכולוגים ומטפלים מאומתים ב${city} - מותאם אישית דרך טיפול חכם.`;
+  // "טיפול פסיכולוגי ב{עיר}" is a query family of its own, and a SERP check
+  // (6/8/26) found every ranking competitor carries the exact phrase in its
+  // title - while we carried it nowhere and were absent from that SERP
+  // entirely, despite ranking for "פסיכולוג ב{עיר}". The person-phrase stays
+  // first so the ranking we do have keeps its exact-match prefix.
+  const title = `פסיכולוגים ומטפלים ב${city} - טיפול פסיכולוגי | טיפול חכם`;
   const url = `${BASE}/therapists/city/${cityParam}`;
   // A city page earns indexing either on real in-city supply, or on a real
   // pool of therapists in ADJACENT cities (a 10-20 minute drive, per
@@ -34,6 +38,14 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
     countListed({ city }),
     neighbors.length ? countListed({ citiesAny: [city, ...neighbors] }) : Promise.resolve(0),
   ]);
+  // The old one-liner ("מצאו פסיכולוגים ומטפלים מאומתים...") was short enough
+  // that Google discarded it and pulled the dry stats line from the page body
+  // instead. This one says what the page IS - a therapist list plus a matching
+  // quiz - which is exactly what the ranking competitors' snippets say.
+  const description =
+    count >= 3
+      ? `טיפול פסיכולוגי ונפשי ב${city}: רשימת ${count} פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`
+      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: רשימת פסיכולוגים ומטפלים מאומתים בטווח נסיעה קצר, או שאלון קצר לקבלת התאמה אישית. בחינם וללא התחייבות.`;
   const robots = cityIsIndexable(city, count, pool) ? undefined : { index: false, follow: true };
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -110,11 +122,14 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>פסיכולוגים ומטפלים ב{city}</h1>
+        {/* The first body paragraph doubles as Google's fallback snippet, so it
+            leads with what the page is (a list + a quiz) and carries the
+            treatment phrasing, not just the person phrasing. */}
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
           {inCity.length > 0
-            ? `מטפלים ופסיכולוגים מאומתים ב${city}`
-            : `מטפלים ופסיכולוגים מאומתים בטווח נסיעה קצר מ${city}`}
-          {nearbyCityNames.length > 0 ? ` ובערים הצמודות (${nearbyCityNames.slice(0, 3).join(", ")})` : region ? ` ובאזור ${region}` : ""}. אפשר גם למלא שאלון קצר ולקבל התאמה אישית, או לבחור טיפול אונליין.
+            ? `רשימת מטפלים לטיפול פסיכולוגי ונפשי ב${city}: פסיכולוגים ומטפלים מאומתים להשוואה ולפנייה ישירה`
+            : `רשימת מטפלים לטיפול פסיכולוגי ונפשי בטווח נסיעה קצר מ${city}`}
+          {nearbyCityNames.length > 0 ? `, וגם בערים הצמודות (${nearbyCityNames.slice(0, 3).join(", ")})` : region ? `, וגם באזור ${region}` : ""}. מי שמעדיף התאמה אישית יכול למלא שאלון קצר - בחינם וללא התחייבות - או לבחור טיפול אונליין.
         </p>
       </div>
 
@@ -179,7 +194,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
       {CITY_INTRO[city] && (
         <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
-          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>טיפול נפשי ב{city}</h2>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>טיפול פסיכולוגי ונפשי ב{city}</h2>
           <p className="text-[15px] leading-8 text-stone-600">{CITY_INTRO[city]}</p>
         </section>
       )}

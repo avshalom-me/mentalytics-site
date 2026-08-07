@@ -54,10 +54,13 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
     ? onlineCount >= 20
       ? `טיפול פסיכולוגי אונליין: ${onlineCount} מטפלים ופסיכולוגים | טיפול חכם`
       : "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים | טיפול חכם"
-    : `פסיכולוגים ומטפלים ב${label} | טיפול חכם`;
+    : // Same reasoning as the city pages (6/8/26): the treatment phrase is a
+      // query family of its own and every competitor ranking for it carries it
+      // in the title; the person-phrase prefix stays for the rankings we have.
+      `פסיכולוגים ומטפלים ב${label} - טיפול פסיכולוגי | טיפול חכם`;
   const description = isOnline
     ? "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? כל המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם התאמה אישית בחינם דרך טיפול חכם."
-    : `מצאו פסיכולוגים ומטפלים מאומתים ב${label} - מותאם אישית דרך טיפול חכם.`;
+    : `טיפול פסיכולוגי ונפשי ב${label}: רשימת פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`;
   const url = `${BASE}/therapists/region/${regionParam}`;
   // Keep near-empty region pages out of the index until they have real content,
   // so Google doesn't flag them as thin / near-duplicate. The online page is a
@@ -155,7 +158,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
               , ואפשר גם למלא שאלון קצר ולקבל התאמה אישית.
             </>
           ) : (
-            `כל המטפלים והפסיכולוגים המאומתים ב${label} דרך טיפול חכם. אפשר גם למלא שאלון קצר ולקבל התאמה אישית לפי הצורך, הגישה והאזור.`
+            `רשימת מטפלים לטיפול פסיכולוגי ונפשי ב${label}: כל הפסיכולוגים והמטפלים המאומתים דרך טיפול חכם, להשוואה ולפנייה ישירה. אפשר גם למלא שאלון קצר ולקבל התאמה אישית - בחינם וללא התחייבות.`
           )}
         </p>
       </div>

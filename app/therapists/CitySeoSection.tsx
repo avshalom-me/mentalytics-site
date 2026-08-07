@@ -125,12 +125,21 @@ export default function CitySeoSection({
   }
 
   if (total > 0) {
+    // Google pulled this exact sentence as the SERP snippet for city pages
+    // (screenshot, 6/8/26) because the meta description was too short to use.
+    // So the line has to work as ad copy, not only as data: say it is a list
+    // for psychological care, then the count. Online keeps its own phrasing -
+    // "רשימת מטפלים לטיפול פסיכולוגי ונפשי בטיפול אונליין" reads broken.
     statsBits.push(
-      total >= 3 && h % 2 === 0
-        ? `${inPlace === "בטיפול אונליין" ? "באונליין" : inPlace} מוצגים כרגע ${total} מטפלים מאומתים דרך טיפול חכם`
-        : total >= 3
-          ? `דרך טיפול חכם מוצגים כרגע ${total} מטפלים מאומתים ${inPlace}`
-          : `${inPlace} מוצג כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
+      kind === "online"
+        ? total >= 3 && h % 2 === 0
+          ? `באונליין מוצגים כרגע ${total} מטפלים מאומתים דרך טיפול חכם`
+          : `דרך טיפול חכם מוצגים כרגע ${total} מטפלים מאומתים בטיפול אונליין`
+        : total >= 3 && h % 2 === 0
+          ? `רשימת המטפלים לטיפול פסיכולוגי ונפשי ${inPlace} כוללת כרגע ${total} פסיכולוגים ומטפלים מאומתים, לצד שאלון התאמה אישי`
+          : total >= 3
+            ? `דרך טיפול חכם מוצגת ${inPlace} רשימת ${total} מטפלים מאומתים לטיפול פסיכולוגי ונפשי, ולצדה שאלון למציאת מטפל מותאם`
+            : `${inPlace} מוצג כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
     );
     statsBits.push(...alsoBits);
     if (typesText) statsBits.push(alsoBits.length > 0 ? `לפי הכשרה, בכל הרשימה יחד: ${typesText}` : `לפי הכשרה: ${typesText}`);
