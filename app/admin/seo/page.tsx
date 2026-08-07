@@ -73,6 +73,75 @@ function pageLabel(page: string): string {
 const pct = (part: number, whole: number) => (whole > 0 ? Math.round((100 * part) / whole) : 0);
 const rate = (part: number, whole: number) => (whole > 0 ? (100 * part / whole).toFixed(1) : "0");
 
+// גרף קווים שבועי - SVG טהור, בלי ספריות. ציר הזמן LTR (ישן משמאל, חדש מימין)
+// כמקובל בגרפי זמן גם בעברית - ה-RTL של העמוד היה הופך את כיוון הזמן.
+// (הגרסה הקודמת - עמודות מוערמות - גם קרסה ויזואלית: גובה באחוזים מול הורה
+// בלי גובה מוגדר מתאפס, וכל העמודות נראו שטוחות.)
+type ChartPt = { week: string; demand: number; name: number; home: number; rest: number };
+
+function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
+  if (weeks.length === 0) return null;
+  const pts: ChartPt[] = weeks.map((w) => ({
+    week: w.week, demand: w.demand, name: w.name, home: w.home, rest: w.recruit + w.other,
+  }));
+  const W = 720, H = 210, padL = 30, padR = 16, padT = 16, padB = 32;
+  const innerW = W - padL - padR, innerH = H - padT - padB;
+  const maxY = Math.max(5, ...pts.flatMap((p) => [p.demand, p.name, p.home, p.rest]));
+  const x = (i: number) => padL + (pts.length === 1 ? innerW / 2 : (i * innerW) / (pts.length - 1));
+  const y = (v: number) => padT + innerH * (1 - v / maxY);
+  const line = (get: (p: ChartPt) => number) =>
+    pts.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(get(p)).toFixed(1)}`).join(" ");
+  const area = `${line((p) => p.demand)} L${x(pts.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
+  const fmt = (w: string) => new Date(w + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+  // תווית מתחת לנקודה, אלא אם היא קרובה לתחתית - אז מעליה (שלא תדרוס את ציר התאריכים)
+  const labelY = (v: number, below: boolean) => {
+    const py = y(v);
+    if (below) return py > padT + innerH * 0.82 ? py - 8 : py + 16;
+    return py < padT + 12 ? py + 16 : py - 8;
+  };
+  const series: { get: (p: ChartPt) => number; color: string; width: number; dash?: string }[] = [
+    { get: (p) => p.rest, color: "#A8A29E", width: 1.4, dash: "4 3" },
+    { get: (p) => p.home, color: "#0284C7", width: 1.8 },
+    { get: (p) => p.name, color: "#D49018", width: 2 },
+    { get: (p) => p.demand, color: "#3D8C8A", width: 2.6 },
+  ];
+  return (
+    <div dir="ltr">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="מגמה שבועית של מבקרים אורגניים">
+        {[0, Math.round(maxY / 2), maxY].map((g) => (
+          <g key={g}>
+            <line x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} stroke="#E7E5E4" strokeWidth={1} />
+            <text x={padL - 6} y={y(g) + 3.5} textAnchor="end" fontSize={10} fill="#A8A29E">{g}</text>
+          </g>
+        ))}
+        <path d={area} fill="#3D8C8A" opacity={0.07} />
+        {series.map((s, si) => (
+          <path key={si} d={line(s.get)} fill="none" stroke={s.color} strokeWidth={s.width}
+            strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+        {pts.map((p, i) => (
+          <g key={p.week}>
+            <circle cx={x(i)} cy={y(p.name)} r={3} fill="#D49018">
+              <title>{`שבוע ${fmt(p.week)}: חיפוש שם ${p.name}`}</title>
+            </circle>
+            <text x={x(i)} y={labelY(p.name, false)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#A87010">{p.name}</text>
+            <circle cx={x(i)} cy={y(p.demand)} r={3.2} fill="#3D8C8A">
+              <title>{`שבוע ${fmt(p.week)}: ביקוש ${p.demand}`}</title>
+            </circle>
+            <text x={x(i)} y={labelY(p.demand, true)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#0F5468">{p.demand}</text>
+            {p.home > 0 && (
+              <circle cx={x(i)} cy={y(p.home)} r={2.6} fill="#0284C7">
+                <title>{`שבוע ${fmt(p.week)}: עמוד הבית ${p.home}`}</title>
+              </circle>
+            )}
+            <text x={x(i)} y={H - 10} textAnchor="middle" fontSize={10} fill="#A8A29E">{fmt(p.week)}</text>
+          </g>
+        ))}
+      </svg>
+    </div>
+  );
+}
+
 export default function AdminSeoPage() {
   const [days, setDays] = useState(90);
   const [data, setData] = useState<SeoData | null>(null);
@@ -100,7 +169,6 @@ export default function AdminSeoPage() {
   const patientSessions = t ? t.sessions - t.recruit - (t.info ?? 0) - t.other : 0;
   const demandConv = data?.funnel.find((c) => c.grp === "demand");
   const nameConv = data?.funnel.find((c) => c.grp === "name");
-  const maxWeek = Math.max(1, ...(data?.weekly ?? []).map((w) => w.demand + w.home + w.name + w.recruit + w.other));
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -170,26 +238,10 @@ export default function AdminSeoPage() {
               <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400" /> חיפוש שם</span>
               <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-stone-300" /> גיוס/אחר</span>
             </p>
-            <div className="flex items-end gap-2" style={{ height: "150px" }}>
-              {data.weekly.map((w) => {
-                const total = w.demand + w.home + w.name + w.recruit + w.other;
-                return (
-                  <div key={w.week} className="flex flex-1 flex-col items-center justify-end gap-1" title={`שבוע ${new Date(w.week + "T00:00:00").toLocaleDateString("he-IL")}: ביקוש ${w.demand} · עמוד הבית ${w.home} · שם ${w.name} · גיוס ${w.recruit}`}>
-                    <div className="text-[10px] font-bold text-stone-500">{total}</div>
-                    <div className="flex w-full max-w-[46px] flex-col overflow-hidden rounded-t-md" style={{ height: `${(100 * total) / maxWeek}%`, minHeight: total > 0 ? "6px" : "0" }}>
-                      <div className="w-full bg-stone-300" style={{ flexGrow: w.recruit + w.other }} />
-                      <div className="w-full bg-amber-400" style={{ flexGrow: w.name }} />
-                      <div className="w-full bg-sky-400" style={{ flexGrow: w.home }} />
-                      <div className="w-full bg-[#3D8C8A]" style={{ flexGrow: w.demand }} />
-                    </div>
-                    <div className="text-[10px] text-stone-400">{new Date(w.week + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" })}</div>
-                  </div>
-                );
-              })}
-            </div>
+            <WeeklyLineChart weeks={data.weekly} />
             <p className="mt-3 text-[11px] leading-5 text-stone-400">
-              הפס הירקרק (ביקוש) הוא המדד היחיד שאומר אם ה-SEO עובד. הפס הענברי (חיפושי שם) יגדל עם כל מטפל
-              שמצטרף - גם בלי שום שיפור בדירוג.
+              הקו הירקרק (ביקוש) הוא המדד היחיד שאומר אם ה-SEO עובד. הקו הענברי (חיפושי שם) יגדל עם כל מטפל
+              שמצטרף - גם בלי שום שיפור בדירוג. הזמן זורם משמאל לימין; השבוע האחרון חלקי.
             </p>
           </section>
 
