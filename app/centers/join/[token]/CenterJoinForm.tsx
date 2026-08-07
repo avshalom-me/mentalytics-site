@@ -62,16 +62,47 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
   const [done, setDone] = useState<{ billing_starts_at: string | null } | null>(null);
 
   const cardDigits = cardNumber.replace(/\s/g, "");
+  // תוקף: מקבלים גם "8" (חודש) וגם "28" (שנה) - מנרמלים בשליחה. הדרישה
+  // הקודמת ל-2+4 ספרות בדיוק השאירה את הכפתור מושבת בלי שום הסבר למי
+  // שהקליד שנה דו-ספרתית - וזה נראה ללקוח כמו "תקלה".
+  const expMonthOk = /^\d{1,2}$/.test(expMonth) && Number(expMonth) >= 1 && Number(expMonth) <= 12;
+  const expYearOk = /^\d{2}$/.test(expYear) || /^\d{4}$/.test(expYear);
   const canSubmit =
     payerName.trim() &&
     payerEmail.trim() &&
     payerPhone.trim() &&
     cardDigits.length >= 13 &&
-    expMonth.length === 2 &&
-    expYear.length === 4 &&
+    expMonthOk &&
+    expYearOk &&
     cvv.length >= 3 &&
     citizenId.length >= 5 &&
     agreed;
+
+  // מה חסר כדי לשלוח - מוצג מתחת לכפתור המושבת במקום להשאיר אותו אילם.
+  const missing: string[] = [];
+  if (!payerName.trim()) missing.push("שם");
+  if (!payerEmail.trim()) missing.push("אימייל");
+  if (!payerPhone.trim()) missing.push("טלפון");
+  if (cardDigits.length < 13) missing.push("מספר כרטיס");
+  if (!expMonthOk || !expYearOk) missing.push("תוקף");
+  if (cvv.length < 3) missing.push("CVV");
+  if (citizenId.length < 5) missing.push('ת"ז');
+  if (!agreed) missing.push("אישור התקנון");
+
+  // דיווח תקלה לצוות - fire-and-forget. בלי זה, כשל בדפדפן (חוסם פרסומות,
+  // רשת, דפדפן ישן) לא משאיר שום עקבות בשרת ואי אפשר לאבחן מרחוק.
+  function reportFailure(stage: "config" | "tokenize" | "subscribe" | "exception", message: string) {
+    try {
+      fetch("/api/payment-client-error", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({ source: "center_join", stage, message: message.slice(0, 300), ref: offer.token }),
+      }).catch(() => {});
+    } catch {
+      /* noop */
+    }
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -83,13 +114,15 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       // 1) מפתחות ציבוריים של Sumit
       const cfgRes = await fetch("/api/payments/sumit-config");
       if (!cfgRes.ok) {
-        setError("שגיאה בטעינת מערכת התשלום. נסו שוב בעוד מספר רגעים.");
+        reportFailure("config", `HTTP ${cfgRes.status}`);
+        setError("שגיאה בטעינת מערכת התשלום. נסו שוב בעוד מספר רגעים. (קוד: config)");
         setLoading(false);
         return;
       }
       const cfg: { companyId: number; publicKey: string } = await cfgRes.json();
 
-      // 2) טוקניזציה של הכרטיס ישירות מול Sumit
+      // 2) טוקניזציה של הכרטיס ישירות מול Sumit. שנה דו-ספרתית → 20XX.
+      const normYear = expYear.length === 2 ? `20${expYear}` : expYear;
       const tokRes = await fetch(SUMIT_TOKENIZE_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -97,14 +130,15 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           Credentials: { CompanyID: cfg.companyId, APIPublicKey: cfg.publicKey },
           CardNumber: cardDigits,
           ExpirationMonth: parseInt(expMonth, 10),
-          ExpirationYear: parseInt(expYear, 10),
+          ExpirationYear: parseInt(normYear, 10),
           CVV: cvv,
           CitizenID: citizenId,
         }),
       });
       const tok = (await tokRes.json()) as SumitTokenizeResponse;
       if (tok.Status !== 0 || !tok.Data?.SingleUseToken) {
-        setError(tok.UserErrorMessage || "פרטי הכרטיס לא תקינים. בדקו את המספר, התוקף וה-CVV ונסו שוב.");
+        reportFailure("tokenize", tok.UserErrorMessage || `Status ${tok.Status}`);
+        setError(tok.UserErrorMessage || "פרטי הכרטיס לא תקינים. בדקו את המספר, התוקף וה-CVV ונסו שוב. (קוד: tokenize)");
         setLoading(false);
         return;
       }
@@ -124,13 +158,17 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
       });
       const data = await res.json();
       if (!data.ok) {
-        setError(data.error ?? "שגיאה בעיבוד התשלום. נסו שוב.");
+        reportFailure("subscribe", `HTTP ${res.status}: ${data.error ?? ""}`);
+        setError(data.error ?? "שגיאה בעיבוד התשלום. נסו שוב. (קוד: subscribe)");
         setLoading(false);
         return;
       }
       setDone({ billing_starts_at: data.billing_starts_at ?? null });
-    } catch {
-      setError("שגיאה בלתי צפויה. בדקו את החיבור לאינטרנט ונסו שוב.");
+    } catch (err) {
+      // הגעה לכאן = כשל רשת/דפדפן (חוסם פרסומות שחוסם את Sumit, רשת ארגונית,
+      // דפדפן ישן) - השרת שלנו לא יודע על זה כלום בלי הדיווח.
+      reportFailure("exception", String(err).slice(0, 200));
+      setError("שגיאה בלתי צפויה - ייתכן שחוסם פרסומות או רשת ארגונית חוסמים את מערכת התשלום. נסו בדפדפן אחר או ברשת אחרת, ואם זה חוזר כתבו לנו: admin@getmentalytics.com (קוד: exception)");
       setLoading(false);
     }
   }
@@ -273,11 +311,13 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           <Field label="חודש *">
             <input type="text" inputMode="numeric" autoComplete="cc-exp-month" required maxLength={2} value={expMonth}
               onChange={(e) => setExpMonth(e.target.value.replace(/\D/g, "").slice(0, 2))}
+              onBlur={() => { if (/^[1-9]$/.test(expMonth)) setExpMonth("0" + expMonth); }}
               className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[var(--teal)] outline-none" dir="ltr" placeholder="MM" />
           </Field>
           <Field label="שנה *">
             <input type="text" inputMode="numeric" autoComplete="cc-exp-year" required maxLength={4} value={expYear}
               onChange={(e) => setExpYear(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              onBlur={() => { if (/^\d{2}$/.test(expYear)) setExpYear("20" + expYear); }}
               className="w-full rounded-lg border border-stone-300 px-3 py-2.5 text-sm focus:border-[var(--teal)] outline-none" dir="ltr" placeholder="YYYY" />
           </Field>
           <Field label="CVV *">
@@ -319,6 +359,9 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
           )}
         </button>
 
+        {!loading && !error && missing.length > 0 && (cardDigits.length > 0 || payerName.trim()) && (
+          <p className="text-xs text-stone-400 text-center">כדי לשלוח נותר להשלים: {missing.join(" · ")}</p>
+        )}
         {error && <p className="text-sm text-red-600 text-center">{error}</p>}
       </form>
 
