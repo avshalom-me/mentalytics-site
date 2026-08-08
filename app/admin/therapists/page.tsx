@@ -51,7 +51,11 @@ type AdminTherapist = {
   admin_approved: boolean;
   created_at: string | null;
   views_30d: number;
+  views_60d: number;
+  views_total: number;
   contacts_30d: number;
+  contacts_60d: number;
+  contacts_total: number;
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
   center_account_id: string | null;
   center_name: string | null;
@@ -250,6 +254,8 @@ export default function AdminTherapistsPage() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
+  // חלון מדדי הצפיות/פניות על הכרטיסים: 30 יום / 60 יום / סה"כ מאז ההרשמה.
+  const [engWindow, setEngWindow] = useState<"30" | "60" | "total">("30");
   const [reconcilingId, setReconcilingId] = useState<string | null>(null);
   const [reconcileResults, setReconcileResults] = useState<Record<string, string>>({});
   const [brokenImages, setBrokenImages] = useState<Record<string, boolean>>({});
@@ -620,6 +626,14 @@ export default function AdminTherapistsPage() {
       setReconcilingId(null);
     }
   }
+
+  // ערכי הצפיות/פניות של מטפל בחלון הנבחר.
+  function engValues(t: AdminTherapist): { views: number; contacts: number } {
+    if (engWindow === "60") return { views: t.views_60d ?? 0, contacts: t.contacts_60d ?? 0 };
+    if (engWindow === "total") return { views: t.views_total ?? 0, contacts: t.contacts_total ?? 0 };
+    return { views: t.views_30d ?? 0, contacts: t.contacts_30d ?? 0 };
+  }
+  const ENG_LABEL = engWindow === "30" ? "30 ימים אחרונים" : engWindow === "60" ? "60 ימים אחרונים" : 'סה"כ מאז ההרשמה';
 
   // קישור חשבון כניסה לפרופיל חי שלא קושר אוטומטית (הגנת השתלטות חשבון).
   // מופיע רק כשהפרופיל חי (משלם/מאושר) ובלי user_id - המקרה של "דניאל היימן".
@@ -1225,17 +1239,19 @@ export default function AdminTherapistsPage() {
               </div>
             </div>
 
-            {/* Engagement (30d) + account/billing health */}
+            {/* Engagement (חלון נבחר) + account/billing health */}
             <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
-              <span className="font-semibold text-stone-500">📊 30 ימים אחרונים:</span>
-              <span><b className="text-stone-900">{therapist.views_30d}</b> כניסות לפרופיל</span>
-              <span><b className="text-stone-900">{therapist.contacts_30d}</b> פניות</span>
+              <span className="font-semibold text-stone-500">📊 {ENG_LABEL}:</span>
+              {(() => { const e = engValues(therapist); return (<>
+              <span><b className="text-stone-900">{e.views}</b> כניסות לפרופיל</span>
+              <span><b className="text-stone-900">{e.contacts}</b> פניות</span>
               <span>
                 המרה:{" "}
                 <b className="text-stone-900">
-                  {therapist.views_30d > 0 ? Math.round((therapist.contacts_30d / therapist.views_30d) * 100) : 0}%
+                  {e.views > 0 ? Math.round((e.contacts / e.views) * 100) : 0}%
                 </b>
               </span>
+              </>); })()}
               {therapist.created_at && (
                 <span className="text-stone-500">
                   · נרשם/ה לפני {Math.max(0, Math.floor((Date.now() - new Date(therapist.created_at).getTime()) / 86400000))} ימים
@@ -1556,10 +1572,23 @@ export default function AdminTherapistsPage() {
 
       {/* ── סינון וחיפוש ── */}
       <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <button onClick={() => setShowFilters(!showFilters)} className="text-sm font-bold text-stone-700 hover:text-stone-900">
-            {showFilters ? "▾ סגור מסננים" : "▸ פתח מסננים"}
-          </button>
+        <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowFilters(!showFilters)} className="text-sm font-bold text-stone-700 hover:text-stone-900">
+              {showFilters ? "▾ סגור מסננים" : "▸ פתח מסננים"}
+            </button>
+            {/* חלון מדדי הצפיות/פניות - משפיע על כל הכרטיסים והטבלאות בעמוד */}
+            <div className="flex items-center gap-1 text-xs">
+              <span className="text-stone-400">📊 מדדים:</span>
+              {([["30", "30 יום"], ["60", "60 יום"], ["total", 'סה"כ']] as const).map(([k, label]) => (
+                <button key={k} onClick={() => setEngWindow(k)}
+                  className={`rounded-full px-2.5 py-0.5 font-bold transition ${
+                    engWindow === k ? "bg-stone-800 text-white" : "border border-stone-300 text-stone-500 hover:bg-stone-50"}`}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
           {hasActiveFilter && (
             <button onClick={() => { setFilterName(""); setFilterGender(""); setFilterTherapistType(""); setFilterTrainingArea(""); setFilterCultural(""); setFilterAgeGroup(""); setFilterPromotion(""); setFilterAvailability(""); setFilterRegion(""); }}
               className="text-xs text-red-500 hover:underline">נקה הכל</button>
@@ -1720,7 +1749,7 @@ export default function AdminTherapistsPage() {
                       <th className="px-3 py-2.5">מטפל/ת</th>
                       <th className="px-3 py-2.5">סטטוס</th>
                       <th className="px-3 py-2.5">אזורים</th>
-                      <th className="whitespace-nowrap px-3 py-2.5">צפיות / פניות (30 י׳)</th>
+                      <th className="whitespace-nowrap px-3 py-2.5">צפיות / פניות ({engWindow === "30" ? "30 י׳" : engWindow === "60" ? "60 י׳" : 'סה"כ'})</th>
                       <th className="px-3 py-2.5">נרשם/ה</th>
                     </tr>
                   </thead>
@@ -1805,7 +1834,7 @@ export default function AdminTherapistsPage() {
                               {(t.regions ?? []).join(", ") || "—"}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
-                              {t.views_30d} / {t.contacts_30d}
+                              {engValues(t).views} / {engValues(t).contacts}
                             </td>
                             <td className="whitespace-nowrap px-3 py-2.5 text-stone-600">
                               {t.created_at ? new Date(t.created_at).toLocaleDateString("he-IL") : "—"}

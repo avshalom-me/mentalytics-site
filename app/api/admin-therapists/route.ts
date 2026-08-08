@@ -193,11 +193,12 @@ async function buildTherapistsResponse(onlyId?: string) {
   for (const c of certRows) pathsToSign.push(normalizeStoragePath(c.file_path));
 
   // Second (and last) network hop: URL signing + engagement aggregate together.
-  const monthAgoIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+  // Engagement arrives in THREE windows at once (30d / 60d / all-time) from a
+  // single grouped pass per table - the admin toggles between them client-side.
   const [signedByPath, engagement] = await Promise.all([
     batchSignUrls(pathsToSign, SIGN_TTL),
     therapistIds.length > 0
-      ? supabaseAdmin.rpc("admin_engagement_counts", { ids: therapistIds, since: monthAgoIso })
+      ? supabaseAdmin.rpc("admin_engagement_windows", { ids: therapistIds })
       : Promise.resolve({ data: [], error: null } as { data: unknown[]; error: null }),
   ]);
 
@@ -215,8 +216,9 @@ async function buildTherapistsResponse(onlyId?: string) {
   // parallel with URL signing) instead of pulling every row and counting in
   // memory — the views table grows fast during campaigns and blew past the
   // 1000-row cap. Falls back to the row-pull method if the RPC isn't deployed.
-  const viewsByTherapist: Record<string, number> = {};
-  const contactsByTherapist: Record<string, number> = {};
+  type Eng = { v30: number; v60: number; vt: number; c30: number; c60: number; ct: number };
+  const engByTherapist: Record<string, Eng> = {};
+  const engOf = (id: string): Eng => (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0 });
   const subByTherapist: Record<
     string,
     { status: string; current_period_end: string | null; promo_reverts_at: string | null }
@@ -227,35 +229,54 @@ async function buildTherapistsResponse(onlyId?: string) {
       for (const row of engagement.data as Array<{
         therapist_id: string;
         views_30d: number | string;
+        views_60d: number | string;
+        views_total: number | string;
         contacts_30d: number | string;
+        contacts_60d: number | string;
+        contacts_total: number | string;
       }>) {
-        viewsByTherapist[row.therapist_id] = Number(row.views_30d) || 0;
-        contactsByTherapist[row.therapist_id] = Number(row.contacts_30d) || 0;
+        engByTherapist[row.therapist_id] = {
+          v30: Number(row.views_30d) || 0,
+          v60: Number(row.views_60d) || 0,
+          vt: Number(row.views_total) || 0,
+          c30: Number(row.contacts_30d) || 0,
+          c60: Number(row.contacts_60d) || 0,
+          ct: Number(row.contacts_total) || 0,
+        };
       }
     } else {
-      // Fallback: RPC not available — page past the 1000-row cap and count in memory.
+      // Fallback: RPC not available — page past the 1000-row cap and count all
+      // three windows in memory (full history pull; rare path).
+      const cut30 = Date.now() - 30 * 24 * 60 * 60 * 1000;
+      const cut60 = Date.now() - 60 * 24 * 60 * 60 * 1000;
       const [views, clicks] = await Promise.all([
-        fetchAllRows<{ therapist_id: string }>(() =>
+        fetchAllRows<{ therapist_id: string; viewed_at: string }>(() =>
           supabaseAdmin
             .from("therapist_profile_views")
-            .select("therapist_id")
+            .select("therapist_id, viewed_at")
             .in("therapist_id", therapistIds)
-            .in("source", ["match", "directory"])
-            .gte("viewed_at", monthAgoIso),
+            .in("source", ["match", "directory"]),
         ),
-        fetchAllRows<{ therapist_id: string }>(() =>
+        fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
           supabaseAdmin
             .from("therapist_contact_clicks")
-            .select("therapist_id")
-            .in("therapist_id", therapistIds)
-            .gte("clicked_at", monthAgoIso),
+            .select("therapist_id, clicked_at")
+            .in("therapist_id", therapistIds),
         ),
       ]);
       for (const v of views) {
-        viewsByTherapist[v.therapist_id] = (viewsByTherapist[v.therapist_id] ?? 0) + 1;
+        const e = engOf(v.therapist_id);
+        const ts = new Date(v.viewed_at).getTime();
+        e.vt++;
+        if (ts >= cut60) e.v60++;
+        if (ts >= cut30) e.v30++;
       }
       for (const c of clicks) {
-        contactsByTherapist[c.therapist_id] = (contactsByTherapist[c.therapist_id] ?? 0) + 1;
+        const e = engOf(c.therapist_id);
+        const ts = new Date(c.clicked_at).getTime();
+        e.ct++;
+        if (ts >= cut60) e.c60++;
+        if (ts >= cut30) e.c30++;
       }
     }
 
@@ -331,8 +352,12 @@ async function buildTherapistsResponse(onlyId?: string) {
         article_invite_sent_at: t.article_invite_sent_at ?? null,
         accepting_new_patients: t.accepting_new_patients !== false,
         accepting_new_changed_at: t.accepting_new_changed_at ?? null,
-        views_30d: viewsByTherapist[t.id] ?? 0,
-        contacts_30d: contactsByTherapist[t.id] ?? 0,
+        views_30d: engByTherapist[t.id]?.v30 ?? 0,
+        views_60d: engByTherapist[t.id]?.v60 ?? 0,
+        views_total: engByTherapist[t.id]?.vt ?? 0,
+        contacts_30d: engByTherapist[t.id]?.c30 ?? 0,
+        contacts_60d: engByTherapist[t.id]?.c60 ?? 0,
+        contacts_total: engByTherapist[t.id]?.ct ?? 0,
         subscription: subByTherapist[t.id] ?? null,
         center_account_id: t.center_account_id ?? null,
         center_name: t.center_account_id ? centerNameById.get(t.center_account_id) ?? null : null,
