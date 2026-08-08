@@ -41,10 +41,37 @@ export async function GET(req: NextRequest) {
 
     const result = computeAttributionFromCounts(agg.channels ?? [], agg.campaigns ?? []);
 
+    // Which referring SITE sent them - the question the channel breakdown
+    // cannot answer and the backlink campaign needs. Non-fatal: this shipped
+    // after the main report, so a failure here must not blank the page.
+    let referrers: {
+      host: string;
+      sessions: number;
+      pageViews: number;
+      profileViews: number;
+      contactClicks: number;
+    }[] = [];
+    try {
+      const { data: refData } = await supabaseAdmin.rpc("admin_referrer_report", { p_since: since });
+      referrers = ((refData ?? []) as Record<string, unknown>[])
+        .map((r) => ({
+          host: String(r.host ?? ""),
+          sessions: Number(r.sessions) || 0,
+          pageViews: Number(r.page_views) || 0,
+          profileViews: Number(r.profile_views) || 0,
+          contactClicks: Number(r.contact_clicks) || 0,
+        }))
+        .filter((r) => r.host)
+        .slice(0, 30);
+    } catch {
+      referrers = [];
+    }
+
     return NextResponse.json({
       ok: true,
       period: safePeriod,
       ...result,
+      referrers,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

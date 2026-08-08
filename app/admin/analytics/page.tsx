@@ -246,7 +246,7 @@ function CTRTable({ rows }: { rows: CTRRow[] }) {
         </div>
         <div className="mt-3">
           <Info>
-            <p>טבלה לכל מטפל — כמה נחשף, נצפה, ונוצר איתו קשר. ניתן לפצל לפי מקור (מאגר / התאמה):</p>
+            <p>טבלה לכל מטפל — כמה נחשף, נצפה, ונוצר איתו קשר. ניתן לפצל לפי מסלול באתר (מאגר / התאמה):</p>
             <Term k="חשיפות">כמה פעמים הכרטיס שלו הוצג למשתמשים.</Term>
             <Term k="צפיות">כמה נכנסו לעמוד הפרופיל שלו.</Term>
             <Term k="קליקים">כמה לחצו ליצירת קשר (וואטסאפ/טלפון/מייל).</Term>
@@ -334,9 +334,9 @@ function ConversionBySource({ fbs, clickTypes }: { fbs: FunnelBySource; clickTyp
   ];
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
-      <h2 className="text-base font-black text-stone-800 mb-1">יחסי המרה לפי מקור</h2>
+      <h2 className="text-base font-black text-stone-800 mb-1">יחסי המרה לפי מסלול באתר</h2>
       <Info>
-        <p>אחוז המעבר בין שלבי המשפך בכל מסלול — להשוות איזה מקור ממיר טוב יותר.</p>
+        <p>אחוז המעבר בין שלבי המשפך בכל מסלול — להשוות איזה <b>מסלול באתר</b> ממיר טוב יותר (מאגר מול התאמה). זה אינו ערוץ הרכישה: מאיפה הגיעו לאתר נמצא ב<a href="/admin/attribution" className="text-blue-700 underline">מקורות תנועה</a>.</p>
         <Term k="חשיפה→צפייה">כמה מהחשיפות הפכו לכניסה לפרופיל.</Term>
         <Term k="צפייה→פנייה">כמה מהצפיות בפרופיל הפכו ליצירת קשר.</Term>
         <Term k="חשיפה→פנייה">אחוז ההמרה הכולל — מחשיפה ועד פנייה.</Term>

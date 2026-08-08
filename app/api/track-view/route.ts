@@ -118,6 +118,24 @@ export async function POST(req: NextRequest) {
       }
     }
 
+
+    // The referring host only exists on the LANDING event - document.referrer
+    // is our own domain (or empty) once the visitor navigates internally, so
+    // without this every conversion event would record null and the backlink
+    // report would show visits but never contacts. Take it from the earliest
+    // event of this session that carried one.
+    if (!attribution.referrer_host && safeSessionId) {
+      const { data: landed } = await supabaseAdmin
+        .from("analytics_events")
+        .select("referrer_host")
+        .eq("session_id", safeSessionId)
+        .not("referrer_host", "is", null)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (landed?.referrer_host) attribution.referrer_host = landed.referrer_host;
+    }
+
     await supabaseAdmin
       .from("therapist_profile_views")
       .insert({

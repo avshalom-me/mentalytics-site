@@ -29,6 +29,16 @@ export type Attribution = {
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
+  /**
+   * Referring HOST only - "betipulnet.co.il", never a path or query.
+   *
+   * The channel alone answers "how many came from referrals"; the backlink
+   * campaign needs "from WHICH site", which was unanswerable before. Host-only
+   * is deliberate: a full referrer URL can carry someone else's query string
+   * (search terms, ids), and we do not need it to know a link is working.
+   * Null for direct traffic and for same-site navigation.
+   */
+  referrer_host: string | null;
 };
 
 const STORAGE_KEY = "mnt_attribution";
@@ -122,6 +132,28 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   return "referral";
 }
 
+const HOST_MAX = 120;
+
+/**
+ * The referring host, stripped of "www." and of our own domain.
+ *
+ * Same-site navigation is not a referral - counting it would make every
+ * internal click look like an inbound link.
+ */
+export function referrerHost(referrer: string, selfHost?: string): string | null {
+  const raw = (referrer || "").trim();
+  if (!raw) return null;
+  try {
+    const h = new URL(raw).hostname.toLowerCase().replace(/^www\./, "");
+    if (!h) return null;
+    const self = (selfHost || "").toLowerCase().replace(/^www\./, "");
+    if (self && (h === self || h.endsWith("." + self))) return null;
+    return h.slice(0, HOST_MAX);
+  } catch {
+    return null; // malformed referrer - not worth guessing at
+  }
+}
+
 function buildAttribution(params: URLSearchParams, referrer: string): Attribution {
   const cap = (v: string | null) => (v && v.length > 0 ? v.slice(0, UTM_MAX) : null);
   return {
@@ -129,6 +161,10 @@ function buildAttribution(params: URLSearchParams, referrer: string): Attributio
     utm_source: cap(params.get("utm_source")),
     utm_medium: cap(params.get("utm_medium")),
     utm_campaign: cap(params.get("utm_campaign")),
+    referrer_host: referrerHost(
+      referrer,
+      typeof window !== "undefined" ? window.location.hostname : undefined
+    ),
   };
 }
 
@@ -205,6 +241,8 @@ export function seedAttribution(seed: Partial<Attribution>): void {
       utm_source: cap(seed.utm_source),
       utm_medium: cap(seed.utm_medium),
       utm_campaign: cap(seed.utm_campaign),
+      // A saved-match token carries the campaign, not the original referrer.
+      referrer_host: null,
     };
     if (!next.utm_campaign && next.channel === "other") return; // nothing worth seeding
 
@@ -239,6 +277,8 @@ export function getAttribution(): Attribution | null {
       utm_source: parsed.utm_source ?? null,
       utm_medium: parsed.utm_medium ?? null,
       utm_campaign: parsed.utm_campaign ?? null,
+      // Absent on values stored before this field existed - null, not a guess.
+      referrer_host: parsed.referrer_host ?? null,
     };
   } catch {
     return null;
@@ -251,15 +291,22 @@ export function sanitizeAttribution(body: unknown): {
   utm_source: string | null;
   utm_medium: string | null;
   utm_campaign: string | null;
+  referrer_host: string | null;
 } {
   const b = (body ?? {}) as Record<string, unknown>;
   const cap = (v: unknown) =>
     typeof v === "string" && v.length > 0 ? v.slice(0, UTM_MAX) : null;
+  // Re-validate the host server-side rather than trusting the client: the
+  // field is rendered in the admin, and a hostile payload could otherwise put
+  // arbitrary text there. Anything that is not a plausible hostname is dropped.
+  const rawHost = typeof b.referrer_host === "string" ? b.referrer_host.toLowerCase().slice(0, HOST_MAX) : "";
+  const referrer_host = /^[a-z0-9.-]+\.[a-z]{2,}$/.test(rawHost) ? rawHost : null;
   return {
     channel: isValidChannel(b.channel) ? b.channel : null,
     utm_source: cap(b.utm_source),
     utm_medium: cap(b.utm_medium),
     utm_campaign: cap(b.utm_campaign),
+    referrer_host,
   };
 }
 

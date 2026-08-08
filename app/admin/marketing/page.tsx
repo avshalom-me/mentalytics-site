@@ -375,6 +375,15 @@ function currentTargets(targets: Target[]): Target[] {
 type FunnelSrc = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
 type TierExposure = { therapists: number; impressions: number; profileViews: number; contactClicks: number };
 type ExposureByTier = { paying: TierExposure; free: TierExposure };
+type AcqRow = {
+  key: string;
+  label: string;
+  pageViews: number;
+  contactClicks: number;
+  viewToClick: number;
+  shareOfClicks: number;
+};
+
 type AttrChannel = {
   channel: string;
   profileViews: number;
@@ -565,6 +574,7 @@ type RecruitRow = { campaign: string; signups: number };
 function FunnelsCampaigns() {
   const [period, setPeriod] = useState<"week" | "month" | "all">("month");
   const [channels, setChannels] = useState<AttrChannel[] | null>(null);
+  const [acquisition, setAcquisition] = useState<AcqRow[] | null>(null);
   const [totalContacts, setTotalContacts] = useState(0);
   const [campaigns, setCampaigns] = useState<{ campaign: string; contactClicks: number }[] | null>(null);
   const [funnel, setFunnel] = useState<{ directory: FunnelSrc; match: FunnelSrc } | null>(null);
@@ -604,6 +614,7 @@ function FunnelsCampaigns() {
           return;
         }
         setChannels(a.channels ?? []);
+        setAcquisition(a.acquisition ?? []);
         setTotalContacts(a.totals?.contactClicks ?? 0);
         setCampaigns(a.topCampaigns ?? []);
         setFunnel(an.funnelBySource ?? null);
@@ -805,35 +816,32 @@ function FunnelsCampaigns() {
           <div className="mb-5 grid gap-3 lg:grid-cols-3">
             <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5 lg:col-span-2">
               <div className="mb-3 flex items-baseline justify-between gap-2">
-                <h3 className="text-base font-black text-stone-800">פניות לפי ערוץ</h3>
+                <h3 className="text-base font-black text-stone-800">פניות לפי מנוע רכישה</h3>
                 <a href="/admin/attribution" className="text-xs font-semibold text-[#3D8C8A] hover:underline">
                   ניתוח מלא ←
                 </a>
               </div>
-              {/* Contacts + share only. Per-channel view→contact from attribution is
-                  unreliable here (match_card impressions land under "unknown" as
-                  profile views), so efficiency lives on /admin/attribution. */}
-              {channels && channels.some((c) => c.contactClicks > 0) ? (
+              {/* Summary only, in the same three-lever vocabulary the canonical
+                  page uses - the per-channel breakdown, referring sites and
+                  efficiency all live on /admin/attribution. Keeping the tables
+                  identical in two places is what made the admin confusing. */}
+              {acquisition && acquisition.some((a) => a.contactClicks > 0) ? (
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-stone-200 text-xs text-stone-500">
-                      <th className="px-2 py-2 text-right font-semibold">ערוץ</th>
+                      <th className="px-2 py-2 text-right font-semibold">מנוע</th>
                       <th className="px-2 py-2 text-center font-semibold">פניות</th>
-                      <th className="px-2 py-2 text-center font-semibold">חלק</th>
+                      <th className="px-2 py-2 text-center font-semibold">תרומה</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {channels
-                      .filter((c) => c.contactClicks > 0)
-                      .map((c) => (
-                        <tr key={c.channel} className="border-b border-stone-100">
-                          <td className="px-2 py-2 font-semibold text-stone-700">
-                            {CHANNEL_LABELS[c.channel as keyof typeof CHANNEL_LABELS] ?? c.channel}
-                          </td>
-                          <td className="px-2 text-center font-bold text-stone-900">{num(c.contactClicks)}</td>
-                          <td className="px-2 text-center text-stone-500">
-                            {totalContacts > 0 ? `${Math.round((c.contactClicks / totalContacts) * 100)}%` : "—"}
-                          </td>
+                    {acquisition
+                      .filter((a) => a.contactClicks > 0)
+                      .map((a) => (
+                        <tr key={a.key} className="border-b border-stone-100">
+                          <td className="px-2 py-2 font-semibold text-stone-700">{a.label}</td>
+                          <td className="px-2 text-center font-bold text-stone-900">{num(a.contactClicks)}</td>
+                          <td className="px-2 text-center text-stone-500">{a.shareOfClicks}%</td>
                         </tr>
                       ))}
                   </tbody>

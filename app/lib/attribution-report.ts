@@ -23,7 +23,61 @@ export type AttributionResult = {
   channels: ChannelFunnel[];
   totals: { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
   topCampaigns: { campaign: string; contactClicks: number }[];
+  /** The three acquisition buckets - see ACQUISITION_BUCKETS. */
+  acquisition: AcquisitionRow[];
 };
+
+/**
+ * The three levers the business actually decides between: money, SEO, and
+ * links. Ten channels are the right storage granularity but the wrong
+ * decision granularity - nobody chooses between "meta_organic" and
+ * "tiktok_organic", they choose whether to spend on ads or invest in links.
+ *
+ * Direct/other/unknown are deliberately NOT a fourth lever: you cannot buy
+ * more of them, and folding them into any bucket would flatter it.
+ */
+export const ACQUISITION_BUCKETS = {
+  paid: { label: "בתשלום", channels: ["google_paid", "meta_paid", "tiktok_paid"] },
+  organic: { label: "אורגני (SEO)", channels: ["google_organic"] },
+  referral: { label: "קישורים והפניות", channels: ["referral", "whatsapp", "meta_organic", "tiktok_organic"] },
+  unattributed: { label: "ישיר / לא מזוהה", channels: ["direct", "other", "unknown"] },
+} as const;
+
+export type AcquisitionKey = keyof typeof ACQUISITION_BUCKETS;
+
+export type AcquisitionRow = {
+  key: AcquisitionKey;
+  label: string;
+  pageViews: number;
+  profileViews: number;
+  contactClicks: number;
+  /** % of this bucket's profile-viewers who went on to contact a therapist. */
+  viewToClick: number;
+  /** This bucket's share of ALL contact clicks - the "how much does it contribute" number. */
+  shareOfClicks: number;
+};
+
+function toAcquisition(channels: ChannelFunnel[]): AcquisitionRow[] {
+  const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : 0);
+  const totalClicks = channels.reduce((n, c) => n + c.contactClicks, 0);
+
+  return (Object.keys(ACQUISITION_BUCKETS) as AcquisitionKey[]).map((key) => {
+    const def = ACQUISITION_BUCKETS[key];
+    const members = channels.filter((c) => (def.channels as readonly string[]).includes(c.channel));
+    const sum = (f: (c: ChannelFunnel) => number) => members.reduce((n, c) => n + f(c), 0);
+    const profileViews = sum((c) => c.profileViews);
+    const contactClicks = sum((c) => c.contactClicks);
+    return {
+      key,
+      label: def.label,
+      pageViews: sum((c) => c.pageViews),
+      profileViews,
+      contactClicks,
+      viewToClick: pct(contactClicks, profileViews),
+      shareOfClicks: pct(contactClicks, totalClicks),
+    };
+  });
+}
 
 const ALL_BUCKETS: Bucket[] = [...CHANNELS, "unknown"];
 
@@ -71,7 +125,7 @@ function finalize(
     .sort((a, b) => b.contactClicks - a.contactClicks)
     .slice(0, 15);
 
-  return { channels, totals, topCampaigns };
+  return { channels, totals, topCampaigns, acquisition: toAcquisition(channels) };
 }
 
 /**

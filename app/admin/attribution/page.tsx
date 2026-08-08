@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
+import type { AcquisitionRow } from "@/app/lib/attribution-report";
 
 type Period = "week" | "month" | "all";
 
@@ -18,11 +19,21 @@ type ChannelRow = {
 type Totals = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
 type CampaignRow = { campaign: string; contactClicks: number };
 
+type ReferrerRow = {
+  host: string;
+  sessions: number;
+  pageViews: number;
+  profileViews: number;
+  contactClicks: number;
+};
+
 type Data = {
   period: Period;
   totals: Totals;
   channels: ChannelRow[];
   topCampaigns: CampaignRow[];
+  acquisition?: AcquisitionRow[];
+  referrers?: ReferrerRow[];
   generated_at: string;
 };
 
@@ -72,7 +83,7 @@ export default function AttributionPage() {
     <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <div className="mx-auto max-w-6xl px-6 py-8">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-2">
-          <h1 className="text-2xl font-black text-stone-900">מקורות לידים</h1>
+          <h1 className="text-2xl font-black text-stone-900">מקורות תנועה</h1>
           <div className="flex rounded-lg border border-stone-200 overflow-hidden bg-white">
             {PERIODS.map((p) => (
               <button
@@ -88,7 +99,11 @@ export default function AttributionPage() {
           </div>
         </div>
         <p className="text-sm text-stone-500 mb-6">
-          מאיפה מגיעים המבקרים, וכמה מהם מגיעים עד יצירת קשר עם מטפל (=ההמרה).
+          מאיפה מגיעים המבקרים, וכמה מהם מגיעים עד יצירת קשר עם מטפל (=ההמרה). זהו העמוד
+          הקנוני לשאלת <strong>ערוץ הרכישה</strong>. לאיכות התנועה האורגנית יש{" "}
+          <a href="/admin/seo" className="text-blue-700 underline">עמוד SEO</a> נפרד, ולהתנהגות
+          בתוך האתר{" "}
+          <a href="/admin/analytics" className="text-blue-700 underline">עמוד אנליטיקה</a>.
         </p>
 
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
@@ -98,6 +113,45 @@ export default function AttributionPage() {
 
         {data && !loading && (
           <>
+            {/* The three levers - the decision-level view */}
+            {data.acquisition && data.acquisition.some((a) => a.pageViews || a.contactClicks) && (
+              <div className="mb-8">
+                <h2 className="text-base font-black text-stone-800 mb-1">שלושת המנועים</h2>
+                <p className="text-xs text-stone-500 mb-3">
+                  הרמה שבה מחליטים: כסף, SEO, קישורים. &quot;תרומה&quot; = חלקו של המנוע מכלל יצירות הקשר.
+                </p>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {data.acquisition.map((a) => (
+                    <div
+                      key={a.key}
+                      className={`rounded-2xl border p-4 ${
+                        a.key === "unattributed" ? "border-stone-200 bg-stone-50" : "border-stone-200 bg-white"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-stone-500 mb-2">{a.label}</div>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl font-black text-stone-900">{num(a.contactClicks)}</span>
+                        <span className="text-xs text-stone-500">יצירות קשר</span>
+                      </div>
+                      <div className="mt-2 h-1.5 w-full rounded-full bg-stone-100">
+                        <div
+                          className="h-1.5 rounded-full bg-stone-700"
+                          style={{ width: `${Math.min(a.shareOfClicks, 100)}%` }}
+                        />
+                      </div>
+                      <div className="mt-2 flex justify-between text-[11px] text-stone-500">
+                        <span>תרומה {a.shareOfClicks}%</span>
+                        <span>{num(a.pageViews)} כניסות</span>
+                      </div>
+                      <div className="mt-1 text-[11px] text-stone-500">
+                        צפייה→קשר {a.viewToClick}%
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Totals funnel */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
               {[
@@ -153,6 +207,46 @@ export default function AttributionPage() {
                           <span className={`font-bold ${c.viewToClick >= 20 ? "text-green-700" : c.viewToClick > 0 ? "text-amber-700" : "text-stone-300"}`}>
                             {c.profileViews > 0 ? `${c.viewToClick}%` : "—"}
                           </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Referring sites - which backlink actually works */}
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6 overflow-x-auto">
+              <h2 className="text-base font-black text-stone-800 mb-1">אתרים מפנים</h2>
+              <p className="text-xs text-stone-500 mb-4">
+                מאילו אתרים הגיעו בפועל - הנתון שמראה איזה קישור עובד. נאסף מ-6/8/2026;
+                ביקורים קודמים אינם כלולים.
+              </p>
+              {!data.referrers || data.referrers.length === 0 ? (
+                <p className="text-sm text-stone-400">
+                  עדיין אין הפניות מתועדות בטווח הזה. השדה נוסף ב-6/8/2026 והוא מתמלא רק מכניסות
+                  חדשות, כך שריק כאן בימים הראשונים הוא צפוי ואינו תקלה.
+                </p>
+              ) : (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-stone-500 text-xs border-b border-stone-200">
+                      <th className="text-right font-semibold py-2 px-2">אתר מפנה</th>
+                      <th className="text-center font-semibold py-2 px-2">ביקורים</th>
+                      <th className="text-center font-semibold py-2 px-2">צפיות פרופיל</th>
+                      <th className="text-center font-semibold py-2 px-2">יצירת קשר</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.referrers.map((r) => (
+                      <tr key={r.host} className="border-b border-stone-100">
+                        <td className="py-2.5 px-2 font-semibold text-stone-700" dir="ltr">
+                          {r.host}
+                        </td>
+                        <td className="text-center py-2.5 px-2">{num(r.sessions || r.pageViews)}</td>
+                        <td className="text-center py-2.5 px-2">{num(r.profileViews)}</td>
+                        <td className="text-center py-2.5 px-2 font-bold text-stone-900">
+                          {num(r.contactClicks)}
                         </td>
                       </tr>
                     ))}
