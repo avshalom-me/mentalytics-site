@@ -106,10 +106,13 @@ function q9AdhdPositive(A: Ans): boolean {
 }
 
 // ── Page order ───────────────────────────────────────────────────────────────
+// p-aq-grade, p-q1-ga, p-q2-grade, p-q10-grade and p-ga-traits are gone; between
+// them they asked the same four things over and over (see traitNeeds below) and
+// p-traits now asks each once, at the end.
 const PAGES = [
   "p-consent","p-demo","p-areas",
-  "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q1-ga",
-  "p-q2","p-q2-grade",
+  "p-q1","p-q1-pain","p-aq",
+  "p-q2",
   "p-q3","p-mq","p-mq-sui",
   "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
   "p-q5","p-oq",
@@ -117,33 +120,99 @@ const PAGES = [
   "p-q7","p-pq",
   "p-q8","p-eq",
   "p-q9","p-bq","p-q9-adhd",
-  "p-q10","p-q10-par","p-q10-grade",
-  "p-ga-traits",
+  "p-q10","p-q10-par",
   "p-acad",
   "p-dev-toilet",
   "p-dev-sensory",
   "p-beh",
   "p-soc",
+  "p-traits",
   "p-result",
 ] as const;
 type PageId = (typeof PAGES)[number];
+
+// ── Child characteristics ────────────────────────────────────────────────────
+// Motivation for therapy, verbality, willingness to practise between sessions
+// and areas of interest are not findings - they shape which treatment fits a
+// finding. Each was collected on whichever screen happened to need it first:
+// motivation on four separate screens, verbality on three, interests on two,
+// every one of them guarded by an "unless it was already answered somewhere
+// else" check. Skipping the first occurrence left it to be answered later into a
+// different variable, and the branches that only read the first one carried on
+// seeing 0 - so the anxiety section could conclude low motivation and recommend
+// expressive arts in the same report where the self-esteem section read the same
+// parent's 7 and recommended psychodynamic therapy. One step, one field each,
+// every branch reading the same answer. The thresholds themselves are untouched.
+
+function socDetailsShown(A: Ans): boolean {
+  return A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && gg(A) !== "ga";
+}
+
+/** The conditions under which p-aq-grade used to carry the trait questions. */
+function anxietyGradeActive(A: Ans): boolean {
+  return ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "")
+    && (A.q1 || 0) >= 3
+    && (A.aq_tot || 0) >= 16;
+}
+
+/** GA-track children reach the consent question only on a positive finding. */
+function hasGaPositive(A: Ans): boolean {
+  return (A.q1||0) >= 3 || (A.q2||0) >= 3
+    || ((A.q3||0) >= 3 && (A.mq_tot||0) >= 4)
+    || (A.q5 === "כן" && (A.oq_tot||0) >= 10)
+    || (A.q9 === "כן" && (A.bq_tot||0) >= 4)
+    || (A.q10 === "כן" && A.q10_par === "כן");
+}
+
+type TraitNeeds = { motiv: boolean; verbal: boolean; prac: boolean; interests: boolean; gaConsent: boolean };
+
+/**
+ * Which characteristics the scoring will actually read for this child.
+ *
+ * Mirrors the read sites in kids-score.server.ts one for one, so nothing is
+ * asked that will be discarded and nothing the scoring needs goes uncollected.
+ * verbal and prac depend on the motivation answer, so they appear inside the
+ * step once motivation is given rather than gating whether the step shows.
+ */
+function traitNeeds(A: Ans): TraitNeeds {
+  const grp = gg(A);
+  const emoOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "");
+  const aqTot = A.aq_tot || 0;
+  const anx = anxietyGradeActive(A);
+  const q10On = A.q10_par === "כן";
+  const socOn = socDetailsShown(A);
+  const m = A.t_motiv || 0;
+
+  return {
+    motiv:
+      (grp === "bv" && (anx || (emoOn && (A.q2 || 0) >= 3) || q10On || socOn)) ||
+      (grp === "zy" && anx),
+    // The bv scoring returns early at motivation 1 and 2 and never reads these
+    // two, so asking below 3 collected answers straight into the bin.
+    verbal:
+      (grp === "bv" && anx && aqTot <= 20 && m >= 3) ||
+      (grp === "zy" && (q10On || socOn)),
+    prac:
+      (grp === "bv" && anx && aqTot > 20 && m >= 3) ||
+      (grp === "zy" && anx && m >= 2),
+    interests: grp === "zy" && (q10On || socOn),
+    gaConsent: grp === "ga" && hasGaPositive(A),
+  };
+}
 
 // ── Skip logic ───────────────────────────────────────────────────────────────
 function skipPage(pid: string, A: Ans): boolean {
   const emoOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "");
   const emoPages = [
-    "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
+    "p-q1","p-q1-pain","p-aq","p-q2","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
     "p-q5","p-oq","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
-    "p-q9","p-bq","p-q9-adhd","p-q10","p-q10-par","p-q10-grade",
+    "p-q9","p-bq","p-q9-adhd","p-q10","p-q10-par",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
 
   if (pid === "p-q1-pain")    return (A.q1 || 0) < 3;
   if (pid === "p-aq")         return (A.q1 || 0) < 3;
-  if (pid === "p-aq-grade")   return (A.aq_tot || 0) < 16;
-  if (pid === "p-q1-ga")      return gg(A) !== "ga" || (A.q1 || 0) < 3;
-  if (pid === "p-q2-grade")   return (A.q2 || 0) < 3 || gg(A) === "zy" || (gg(A) === "bv" && (A.aq_mot_bv || 0) > 0);
   if (pid === "p-mq")         return (A.q3 || 0) < 3;
   if (pid === "p-mq-sui")     return (A.mq_tot || 0) < 4;
   if (pid === "p-q4-types")   return A.q4 !== "כן";
@@ -176,7 +245,6 @@ function skipPage(pid: string, A: Ans): boolean {
     return anyPositive;
   }
   if (pid === "p-q10-par")   return A.q10 !== "כן";
-  if (pid === "p-q10-grade") return A.q10_par !== "כן" || (gg(A) === "bv" && ((A.aq_mot_bv || 0) > 0 || (A.q2_mot || 0) > 0));
 
   if (pid === "p-acad") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_aca || "");
 
@@ -190,17 +258,15 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-beh") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_beh || "");
   if (pid === "p-soc") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_soc || "");
 
-  if (pid === "p-ga-traits") {
-    if (gg(A) !== "ga") return true;
-    if (A.ga_consent !== undefined) return true;
-    const hasGaPositive =
-      (A.q1||0)>=3 || (A.q2||0)>=3 ||
-      ((A.q3||0)>=3 && (A.mq_tot||0)>=4) ||
-      (A.q5==="כן" && (A.oq_tot||0)>=10) ||
-      (A.q9==="כן" && (A.bq_tot||0)>=4) ||
-      (A.q10==="כן" && A.q10_par==="כן");
-    return !hasGaPositive;
+  if (pid === "p-traits") {
+    const n = traitNeeds(A);
+    // verbal and prac are left out of this test on purpose: both depend on the
+    // motivation answer, which is given on this very screen, so they are always
+    // false while deciding whether to show it. Every case that reaches them has
+    // motiv true as well - except the zy verbal path, which stands on its own.
+    return !n.motiv && !n.verbal && !n.interests && !n.gaConsent;
   }
+
   return false;
 }
 
@@ -733,9 +799,12 @@ const GA_INT_LIST = [
   { key:"ga_int_animal", label:"🐾 בע\"ח" },
 ];
 
-// Block used in p-q1-ga, p-q2-grade (ga), p-ga-traits
+// Used once, inside p-traits. It used to appear on three screens with two
+// separate implementations, kept from firing twice by three different guards.
+// onDone is optional now: inside a step that has its own Continue button there
+// is nothing to auto-advance to.
 function GaConsentBlock({ A, setA, onDone }: {
-  A: Ans; setA:(a:Ans)=>void; onDone:(a:Ans)=>void;
+  A: Ans; setA:(a:Ans)=>void; onDone?:(a:Ans)=>void;
 }) {
   const emoLvl = A.a_emo || "";
   const veryHigh = emoLvl === "הרבה מאוד";
@@ -745,7 +814,7 @@ function GaConsentBlock({ A, setA, onDone }: {
       <p className="text-base font-bold text-[#1a2a3a] mb-3">האם הילד מסכים לטיפול?</p>
       <div className="flex gap-3 mb-4">
         <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="כן"?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
-          onClick={() => { const n=pick("ga_consent","כן"); if(veryHigh) onDone(n); }}>כן</button>
+          onClick={() => { const n=pick("ga_consent","כן"); if(veryHigh) onDone?.(n); }}>כן</button>
         <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="לא"?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
           onClick={() => pick("ga_consent","לא")}>לא</button>
       </div>
@@ -756,7 +825,7 @@ function GaConsentBlock({ A, setA, onDone }: {
           <div className="flex gap-3">
             {["כן","לא"].map(v=>(
               <button key={v} className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent_parent===v?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
-                onClick={() => { const n={...A,ga_consent_parent:v}; setA(n); onDone(n); }}>{v}</button>
+                onClick={() => { const n={...A,ga_consent_parent:v}; setA(n); onDone?.(n); }}>{v}</button>
             ))}
           </div>
         </div>
@@ -771,8 +840,6 @@ function GaConsentBlock({ A, setA, onDone }: {
                 onClick={()=>setA({...A,[key]:A[key]?undefined:true})}>{label}</button>
             ))}
           </div>
-          <button onClick={()=>onDone(A)}
-            className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90">המשך ←</button>
         </div>
       )}
     </div>
@@ -852,114 +919,6 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
   );
 }
 
-// ── p-aq-grade ────────────────────────────────────────────────────────────────
-function PageAQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const grp = gg(A);
-  const aqTot = A.aq_tot || 0;
-
-  // BV: after selecting motivation
-  function bvMotPick(m: number) {
-    const n = {...A, aq_mot_bv: m};
-    setA(n);
-    if (m === 1) onNext(n); // auto-advance when motivation=1
-  }
-
-  return (
-    <div>
-      <Card>
-        <StepTag>חרדה - שאלות לפי כיתה</StepTag>
-        <StepQ>שאלות משלימות</StepQ>
-
-        {/* גן עד כיתה א׳ */}
-        {grp === "ga" && (
-          <GradeBlock title="🏫 גן עד כיתה א׳">
-            <p className="text-sm text-gray-500">הממצאים יוצגו בדוח הסופי. ניתן להמשיך.</p>
-          </GradeBlock>
-        )}
-
-        {/* כיתות ב׳–ו׳ */}
-        {grp === "bv" && (
-          <GradeBlock title="📚 כיתות ב׳–ו׳">
-            <p className="text-sm text-gray-500 mb-2">מה רמת המוטיבציה של הילד לטיפול? [1–7]</p>
-            <div className="flex gap-1.5 flex-wrap mb-3">
-              {[1,2,3,4,5,6,7].map(n=>(
-                <button key={n} className={sb(A.aq_mot_bv===n)} onClick={()=>bvMotPick(n)}>{n}</button>
-              ))}
-            </div>
-            {/* מוטיבציה 3-7 + חרדה נמוכה (עד 20): שאל ורבאליות */}
-            {(A.aq_mot_bv||0) >= 2 && aqTot <= 20 && (
-              <div className="mt-3">
-                <p className="text-sm text-gray-500 mb-2">עד כמה ילדך הינו וורבאלי ויודע לשתף אחרים בשיחה ביחס לבני גילו? [1–5]</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[1,2,3,4,5].map(n=>(
-                    <button key={n} className={sb(A.aq_verbal_bv===n)}
-                      onClick={()=>{ const nA={...A,aq_verbal_bv:n}; setA(nA); onNext(nA); }}>{n}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* מוטיבציה 3-7 + חרדה גבוהה (21+): שאל תרגול */}
-            {(A.aq_mot_bv||0) >= 2 && aqTot > 20 && (
-              <div className="mt-3">
-                <p className="text-sm text-gray-500 mb-2">עד כמה יש לילד יכולת ומוטיבציה לתרגל כלים בזמן הפנוי? [1–7]</p>
-                <div className="flex gap-1.5 flex-wrap">
-                  {[1,2,3,4,5,6,7].map(n=>(
-                    <button key={n} className={sb(A.aq_prac_bv===n)}
-                      onClick={()=>{ const nA={...A,aq_prac_bv:n}; setA(nA); onNext(nA); }}>{n}</button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </GradeBlock>
-        )}
-
-        {/* כיתות ז׳–י"ב */}
-        {grp === "zy" && (
-          <GradeBlock title='🎓 כיתות ז׳–י"ב'>
-            {aqTot > 13 && (
-              <div>
-                <p className="text-sm text-gray-500 mb-2">מה רמת המוטיבציה של הילד לטיפול? [1–7]</p>
-                <div className="flex gap-1.5 flex-wrap mb-3">
-                  {[1,2,3,4,5,6,7].map(n=>(
-                    <button key={n} className={sb(A.aq_mot_zy===n)}
-                      onClick={()=>{ const nA={...A,aq_mot_zy:n}; setA(nA); if(n===1) onNext(nA); }}>{n}</button>
-                  ))}
-                </div>
-                {(A.aq_mot_zy||0) >= 2 && (
-                  <div>
-                    <p className="text-sm text-gray-500 mb-2">עד כמה יש לילד יכולת ומוטיבציה לתרגל כלים בזמן הפנוי? [1–7]</p>
-                    <div className="flex gap-1.5 flex-wrap">
-                      {[1,2,3,4,5,6,7].map(n=>(
-                        <button key={n} className={sb(A.aq_prac===n)}
-                          onClick={()=>{ const nA={...A,aq_prac:n}; setA(nA); onNext(nA); }}>{n}</button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-          </GradeBlock>
-        )}
-      </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
-    </div>
-  );
-}
-
-// ── p-q1-ga ───────────────────────────────────────────────────────────────────
-function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  return (
-    <div>
-      <Card>
-        <StepTag>שאלות לפי כיתה - גן עד כיתה א׳</StepTag>
-        <StepQ>שאלות משלימות לגיל הצעיר</StepQ>
-        <GaConsentBlock A={A} setA={setA} onDone={onNext} />
-      </Card>
-      <NavRow onBack={onBack} />
-    </div>
-  );
-}
-
 // ── p-q2 ─────────────────────────────────────────────────────────────────────
 function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
@@ -975,43 +934,6 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
             <button key={n} className={sb(A.q2===n)} onClick={()=>{ const nA={...A,q2:n}; setA(nA); onNext(nA); }}>{n}</button>
           ))}
         </div>
-      </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
-    </div>
-  );
-}
-
-// ── p-q2-grade ────────────────────────────────────────────────────────────────
-function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const grp = gg(A);
-  const gaAlreadyFilled = A.ga_consent !== undefined;
-  return (
-    <div>
-      <Card>
-        <StepTag>דימוי עצמי - שאלות לפי כיתה</StepTag>
-        <StepQ>שאלות משלימות</StepQ>
-
-        {grp === "ga" && (
-          <GradeBlock title="🏫 גן עד כיתה א׳">
-            {gaAlreadyFilled
-              ? <p className="text-sm text-gray-500">פרטי ההסכמה כבר מולאו - ממשיכים לשאלה הבאה.</p>
-              : <GaConsentBlock A={A} setA={setA} onDone={onNext} />
-            }
-          </GradeBlock>
-        )}
-
-        {grp === "bv" && (
-          <GradeBlock title="📚 כיתות ב׳–ו׳">
-            <p className="text-sm text-gray-500 mb-2">מה רמת המוטיבציה לטיפול? [1–7]</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[1,2,3,4,5,6,7].map(n=>(
-                <button key={n} className={sb(A.q2_mot===n)}
-                  onClick={()=>{ const nA={...A,q2_mot:n}; setA(nA); onNext(nA); }}>{n}</button>
-              ))}
-            </div>
-          </GradeBlock>
-        )}
-
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
     </div>
@@ -1608,115 +1530,6 @@ function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
   );
 }
 
-// ── p-q10-grade ──────────────────────────────────────────────────────────────
-function PageQ10Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const grp = gg(A);
-  function toggleInt(key: string) {
-    setA({ ...A, [key]: !A[key] });
-  }
-  return (
-    <div>
-      <Card>
-        <StepTag>קשיים כלליים - לפי כיתה</StepTag>
-        <StepQ>שאלות משלימות</StepQ>
-
-        {grp === "ga" && (
-          <GradeBlock title="🏫 גן עד כיתה א׳">
-            <AlertBox cls="info" txt="📋 פנייה לטיפול דיאדי" />
-          </GradeBlock>
-        )}
-
-        {grp === "bv" && (
-          <GradeBlock title="📚 כיתות ב׳–ו׳">
-            <p className="text-sm text-gray-500 mb-2">מה רמת המוטיבציה לטיפול? [1–7]</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[1,2,3,4,5,6,7].map(n=>(
-                <button key={n} className={sb(A.q10_mot===n)}
-                  onClick={()=>{ const nA={...A,q10_mot:n}; setA(nA); onNext(nA); }}>{n}</button>
-              ))}
-            </div>
-          </GradeBlock>
-        )}
-
-        {grp === "zy" && (
-          <GradeBlock title='🎓 כיתות ז׳–י"ב'>
-            <p className="text-sm text-gray-500 mb-2">עד כמה ילדך ורבאלי/ת? [1–5]</p>
-            <div className="flex gap-1.5 flex-wrap mb-4">
-              {[1,2,3,4,5].map(n=>(
-                <button key={n} className={sb(A.q10_verbal===n)}
-                  onClick={()=>{ const nA={...A,q10_verbal:n}; setA(nA); onNext(nA); }}>{n}</button>
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 mb-2">תחומי עניין לטיפול (ניתן לבחור כמה):</p>
-            <div className="flex gap-2 flex-wrap">
-              {[
-                {key:"int_art",    label:"אומנות"},
-                {key:"int_music",  label:"מוזיקה"},
-                {key:"int_move",   label:"תנועה"},
-                {key:"int_drama",  label:"פסיכודרמה"},
-                {key:"int_biblio", label:"ביבליותרפיה"},
-                {key:"int_animal", label:'טיפול בבע"ח'},
-              ].map(({key,label})=>(
-                <button key={key} className={cb(!!A[key])} onClick={()=>toggleInt(key)}>{label}</button>
-              ))}
-            </div>
-          </GradeBlock>
-        )}
-      </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
-    </div>
-  );
-}
-
-// ── p-ga-traits ───────────────────────────────────────────────────────────────
-function PageGaTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const showNoPath  = A.ga_consent === "לא";
-  const showYesPath = A.ga_consent === "כן";
-  function toggleInt(key: string) {
-    setA({ ...A, [key]: !A[key] });
-  }
-  return (
-    <div>
-      <Card>
-        <StepTag>שאלון מאפייני הילד - גן עד כיתה א׳</StepTag>
-        <StepQ>שאלות לצורך קביעת סוג הטיפול</StepQ>
-
-        <div className="mb-5">
-          <p className="text-sm font-bold text-[#1a2a3a] mb-3">האם הילד מסכים לטיפול?</p>
-          <YNRow val={A.ga_consent||""} onChange={v=>setA({...A, ga_consent:v, ga_consent_parent:undefined})} />
-        </div>
-
-        {showNoPath && (
-          <div className="mb-5">
-            <p className="text-sm font-semibold text-[#1a2a3a] mb-3">האם הילד יסכים לטיפול יחד עם אחד ההורים?</p>
-            <YNRow val={A.ga_consent_parent||""} onChange={v=>setA({...A, ga_consent_parent:v})} />
-          </div>
-        )}
-
-        {showYesPath && (
-          <div>
-            <p className="text-sm font-semibold text-[#1a2a3a] mb-3">סמן את כל התחומים בהם ייתכן שילדך יתעניין:</p>
-            <div className="flex gap-2 flex-wrap">
-              {[
-                {key:"ga_int_art",    label:"🎨 אומנות"},
-                {key:"ga_int_music",  label:"🎵 מוזיקה"},
-                {key:"ga_int_move",   label:"🏃 תנועה"},
-                {key:"ga_int_drama",  label:"🎭 דרמה"},
-                {key:"ga_int_biblio", label:"📖 ביבליותרפיה - סיפור"},
-                {key:"ga_int_garden", label:"🌱 גינון"},
-                {key:"ga_int_animal", label:'🐾 בע"ח'},
-              ].map(({key,label})=>(
-                <button key={key} className={cb(!!A[key])} onClick={()=>toggleInt(key)}>{label}</button>
-              ))}
-            </div>
-          </div>
-        )}
-      </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
-    </div>
-  );
-}
-
 // ── p-dev-toilet ──────────────────────────────────────────────────────────────
 function PageDevToilet({ A, setA, onNext, onBack }: PageProps) {
   const ttype   = A.dev_toilet_type || "";
@@ -2272,26 +2085,11 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 // Shortened social anxiety screen - 8 items, single scale 0–3
 // Items selected to cover key DSM-5 domains for childhood social anxiety
 
-function needsSocTherapyMotiv(A: Ans): boolean {
-  if ((A.aq_mot_bv || 0) > 0 || (A.aq_mot_zy || 0) > 0) return false;
-  if (A.soc1 === "כן") return true;
-  if (A.soc2 === "כן" && (A.soc2_sev || 0) >= 5) return true;
-  if (A.soc3 === "כן") {
-    const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
-    const hasExtra = A.comm_rep === "כן" || A.comm_rigid === "כן" || A.comm_interest === "כן" || A.comm_sens === "כן";
-    if (allComm && !hasExtra) return true;
-    if (A.soc3_early === "לא") return true;
-  }
-  return false;
-}
-
 function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const soc3Early = A.soc3_early || "";
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
   const lsasItems = (items?.lsas ?? []) as string[];
-  const motBvAlreadySet = (A.aq_mot_bv || 0) > 0 || (A.q2_mot || 0) > 0 || (A.q10_mot || 0) > 0;
-  const verbalZyAlreadySet = (A.q10_verbal || 0) > 0;
   const showSocDetails = A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && grp !== "ga";
   return (
     <div>
@@ -2421,36 +2219,73 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           )}
         </div>
 
-        {/* grade-aware therapy details for soc1 */}
-        {showSocDetails && grp === "bv" && !motBvAlreadySet && (
-          <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
-            <p className="text-sm font-bold text-[#4a1a6a] mb-3">מה רמת המוטיבציה של הילד/ה לטיפול? [1–7]</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[1,2,3,4,5,6,7].map(n => (
-                <button key={n} className={sb(A.soc_motiv_therapy===n)} onClick={() => setA({...A, soc_motiv_therapy:n})}>{n}</button>
-              ))}
-            </div>
+      </Card>
+      <NavRow onBack={onBack} onNext={() => onNext(A)} />
+    </div>
+  );
+}
+
+// ── p-traits ──────────────────────────────────────────────────────────────────
+// The single "child characteristics" step. Replaces p-aq-grade, p-q1-ga,
+// p-q2-grade, p-q10-grade and p-ga-traits, which between them asked motivation
+// four times, verbality three and interests twice. See traitNeeds for which
+// sub-questions apply to a given child.
+function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
+  const needs = traitNeeds(A);
+  const set = (k: string, v: any) => setA({ ...A, [k]: v });
+
+  const INTERESTS = [
+    { key:"int_art",    label:"אומנות" },
+    { key:"int_music",  label:"מוזיקה" },
+    { key:"int_move",   label:"תנועה" },
+    { key:"int_drama",  label:"פסיכודרמה" },
+    { key:"int_biblio", label:"ביבליותרפיה" },
+    { key:"int_animal", label:'טיפול בבע"ח' },
+  ];
+
+  return (
+    <div>
+      <Card>
+        <StepTag>מאפייני הילד/ה</StepTag>
+        <StepQ>כמה שאלות אחרונות</StepQ>
+        <StepHint>אלה לא שאלות על הקושי אלא על מה שיעזור להתאים את סוג הטיפול.</StepHint>
+
+        {needs.gaConsent && (
+          <div className="mb-4">
+            <GaConsentBlock A={A} setA={setA} />
           </div>
         )}
-        {showSocDetails && grp === "zy" && !verbalZyAlreadySet && (
-          <div className="mb-2 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
-            <p className="text-sm font-bold text-[#4a1a6a] mb-3">עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה? [1–5]</p>
-            <div className="flex gap-1.5 flex-wrap mb-4">
-              {[1,2,3,4,5].map(n => (
-                <button key={n} className={sb(A.soc_verbal===n)} onClick={() => setA({...A, soc_verbal:n})}>{n}</button>
-              ))}
-            </div>
-            <p className="text-sm text-gray-500 mb-2">תחומי עניין לטיפול (ניתן לבחור כמה):</p>
+
+        {needs.motiv && (
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-700 mb-2">מה רמת המוטיבציה של הילד/ה לטיפול?</p>
+            <p className="text-xs text-gray-400 mb-2">1 = כלל לא &nbsp;·&nbsp; 7 = מוטיבציה גבוהה מאוד</p>
+            <ScaleRow max={7} val={A.t_motiv || 0} onChange={(v) => set("t_motiv", v)} />
+          </div>
+        )}
+
+        {needs.verbal && (
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-700 mb-2">עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה, ביחס לבני גילו/ה?</p>
+            <p className="text-xs text-gray-400 mb-2">1 = מעט מאוד &nbsp;·&nbsp; 5 = הרבה מאוד</p>
+            <ScaleRow max={5} val={A.t_verbal || 0} onChange={(v) => set("t_verbal", v)} />
+          </div>
+        )}
+
+        {needs.prac && (
+          <div className="mb-5">
+            <p className="text-sm font-semibold text-gray-700 mb-2">עד כמה יש לילד/ה יכולת ומוטיבציה לתרגל כלים בזמן הפנוי?</p>
+            <p className="text-xs text-gray-400 mb-2">1 = כלל לא &nbsp;·&nbsp; 7 = הרבה מאוד</p>
+            <ScaleRow max={7} val={A.t_prac || 0} onChange={(v) => set("t_prac", v)} />
+          </div>
+        )}
+
+        {needs.interests && (
+          <div className="mb-2">
+            <p className="text-sm font-semibold text-gray-700 mb-2">תחומי עניין לטיפול (ניתן לבחור כמה):</p>
             <div className="flex gap-2 flex-wrap">
-              {([
-                {key:"int_art",    label:"אומנות"},
-                {key:"int_music",  label:"מוזיקה"},
-                {key:"int_move",   label:"תנועה"},
-                {key:"int_drama",  label:"פסיכודרמה"},
-                {key:"int_biblio", label:"ביבליותרפיה"},
-                {key:"int_animal", label:'טיפול בבע"ח'},
-              ] as {key:string,label:string}[]).map(({key,label}) => (
-                <button key={key} className={cb(!!A[key])} onClick={() => setA({...A, [key]: !A[key]})}>{label}</button>
+              {INTERESTS.map(({key,label}) => (
+                <button key={key} className={cb(!!A[key])} onClick={() => set(key, !A[key])}>{label}</button>
               ))}
             </div>
           </div>
@@ -4217,10 +4052,7 @@ export default function KidsPage() {
       {step === "p-q1"        && <PageQ1      {...pageProps} />}
       {step === "p-q1-pain"   && <PageQ1Pain  {...pageProps} />}
       {step === "p-aq"        && <PageAQ      {...pageProps} />}
-      {step === "p-aq-grade"  && <PageAQGrade {...pageProps} />}
-      {step === "p-q1-ga"     && <PageQ1GA    {...pageProps} />}
       {step === "p-q2"        && <PageQ2      {...pageProps} />}
-      {step === "p-q2-grade"  && <PageQ2Grade {...pageProps} />}
       {step === "p-q3"        && <PageQ3      {...pageProps} />}
       {step === "p-mq"        && <PageMQ      {...pageProps} />}
       {step === "p-mq-sui"    && <PageMQSui   {...pageProps} />}
@@ -4243,13 +4075,12 @@ export default function KidsPage() {
       {step === "p-q9-adhd"     && <PageQ9Adhd   {...pageProps} />}
       {step === "p-q10"         && <PageQ10      {...pageProps} />}
       {step === "p-q10-par"     && <PageQ10Par   {...pageProps} />}
-      {step === "p-q10-grade"   && <PageQ10Grade {...pageProps} />}
-      {step === "p-ga-traits"    && <PageGaTraits   {...pageProps} />}
       {step === "p-acad"         && <PageAcad      {...pageProps} />}
       {step === "p-dev-toilet"   && <PageDevToilet  {...pageProps} />}
       {step === "p-dev-sensory"  && <PageDevSensory {...pageProps} />}
       {step === "p-beh"          && <PageBeh        {...pageProps} />}
       {step === "p-soc"          && <PageSoc        {...pageProps} />}
+      {step === "p-traits"       && <PageTraits     {...pageProps} />}
 
       {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); }} />}
     </main>

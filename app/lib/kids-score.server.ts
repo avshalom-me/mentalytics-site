@@ -78,13 +78,13 @@ function buildQ10StyleRef(A: Ans): string {
   const grp = gg(A);
   if (grp === "ga") return buildGaRef(A);
   if (grp === "bv") {
-    const m = A.soc_motiv_therapy || A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
+    const m = A.t_motiv || 0;
     return m <= 2
       ? "✅ הפנייה: הדרכת הורים"
       : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
   }
   // zy
-  const v2 = A.soc_verbal || A.q10_verbal || 0;
+  const v2 = A.t_verbal || 0;
   let txt = v2 <= 2
     ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
     : "✅ הפנייה: טיפול פסיכודינאמי";
@@ -150,17 +150,17 @@ function computeResults(A: Ans): KidsBox[] {
       if (grp === "ga") {
         ref = getGaRef();
       } else if (grp === "bv") {
-        const m = A.aq_mot_bv || 0;
+        const m = A.t_motiv || 0;
         if (m === 1) ref = "✅ הפנייה: הדרכת הורים טיפולית";
         else if (m === 2) ref = "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה";
         else {
           if (aqTot <= 20) {
-            const v = A.aq_verbal_bv || 0;
+            const v = A.t_verbal || 0;
             ref = v <= 2
               ? "✅ הפנייה: הדרכת הורים טיפולית יחד עם תרפיה בהבעה ויצירה"
               : "✅ הפנייה: טיפול CBT לטיפול בחרדה בשילוב הדרכת הורים";
           } else {
-            const p = A.aq_prac_bv || 0;
+            const p = A.t_prac || 0;
             ref = p <= 2
               ? "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים"
               : "✅ הפנייה: טיפול CBT לטיפול בחרדה בשילוב הדרכת הורים";
@@ -168,7 +168,7 @@ function computeResults(A: Ans): KidsBox[] {
         }
       } else {
         if (aqTot > 13) {
-          const m = A.aq_mot_zy || 0, p = A.aq_prac || 0;
+          const m = A.t_motiv || 0, p = A.t_prac || 0;
           ref = m === 1
             ? "✅ הפנייה: הדרכת הורים טיפולית"
             : p <= 2
@@ -209,7 +209,7 @@ function computeResults(A: Ans): KidsBox[] {
     let ref = "";
     if (grp === "ga") ref = getGaRef();
     else if (grp === "bv") {
-      const m = A.q2_mot || A.aq_mot_bv || 0;
+      const m = A.t_motiv || 0;
       ref = m <= 1
         ? "✅ הפנייה: הדרכת הורים טיפולית"
         : "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
@@ -347,10 +347,10 @@ function computeResults(A: Ans): KidsBox[] {
     if (grp === "ga") {
       ref = getGaRef();
     } else if (grp === "bv") {
-      const m = A.q10_mot || A.q2_mot || A.aq_mot_bv || 0;
+      const m = A.t_motiv || 0;
       ref = m <= 2 ? "✅ הפנייה: הדרכת הורים" : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
     } else {
-      const v2 = A.q10_verbal || 0;
+      const v2 = A.t_verbal || 0;
       let txt2 = v2 <= 2
         ? "✅ הפנייה: טיפול פסיכודינאמי + הדרכת הורים"
         : "✅ הפנייה: טיפול פסיכודינאמי";
@@ -1176,9 +1176,13 @@ function computeSocResults(A: Ans): KidsBox[] {
   }
   socNonTherapyRefs.forEach(r => box("info", "✅ " + r));
   if (socTherapyRefs.length > 0 && !hasEmoTherapyRef) {
-    const emoMotVal = (A.aq_mot_bv || 0) + (A.aq_mot_zy || 0);
-    const socMotVal = A.soc_motiv_therapy || 0;
-    const motVal = emoMotVal > 0 ? emoMotVal : socMotVal;
+    // Was (aq_mot_bv + aq_mot_zy) or else soc_motiv_therapy - an addition, not a
+    // choice, so two separate "low motivation" answers summed to 3 and read as
+    // high. It also could not see q2_mot or q10_mot, while the screen that
+    // collected soc_motiv_therapy suppressed itself when either of those was
+    // answered: a parent who had answered motivation was then told to go and
+    // answer it. One field, read once.
+    const motVal = A.t_motiv || 0;
     if (motVal >= 1) {
       const refTxt = motVal <= 2
         ? "יש להפנות לטיפול פסיכודינאמי + הדרכת הורים והתערבות במסגרת החינוכית"
