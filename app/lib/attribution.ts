@@ -44,6 +44,21 @@ export type Attribution = {
 const STORAGE_KEY = "mnt_attribution";
 const UTM_MAX = 120;
 
+/**
+ * How long a touch keeps the credit.
+ *
+ * Attribution used to be stored with no expiry at all, so a visitor who once
+ * clicked an ad carried that channel forever. Measured 8/8/2026: every August
+ * visit tagged "meta_paid" came from two returning browsers still holding a
+ * July recruitment-campaign tag - on an ad account blocked for a month. Paid
+ * looked alive; organic was quietly robbed of the same visits.
+ *
+ * 30 days matches the conversion window Google Ads and Meta both use, so our
+ * numbers stay comparable to the platforms' own reporting.
+ */
+const ATTRIBUTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const CAPTURED_AT_KEY = "capturedAt";
+
 // Raw ad-platform click ids are stored separately from the normalized
 // attribution: they are only needed at conversion time (to upload the
 // conversion back to Google Ads / Meta with exact click attribution), so they
@@ -169,6 +184,29 @@ function buildAttribution(params: URLSearchParams, referrer: string): Attributio
 }
 
 /**
+ * The stored touch, or null if it is missing, corrupt, or older than the TTL.
+ *
+ * A value written before the TTL shipped has no timestamp. Those are treated
+ * as expired rather than as fresh: they are by definition at least as old as
+ * the deploy, and the whole point of this change is to stop crediting them.
+ */
+function storedIfFresh(): (Partial<Attribution> & { capturedAt?: number }) | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<Attribution> & { capturedAt?: number };
+    const at = typeof parsed.capturedAt === "number" ? parsed.capturedAt : 0;
+    if (!at || Date.now() - at > ATTRIBUTION_TTL_MS) {
+      localStorage.removeItem(STORAGE_KEY);
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Capture attribution from the current page. Call once early on each landing.
  * "Last meaningful touch": overwrite the stored value whenever a new explicit
  * campaign signal is present (so the ad that drove THIS visit gets credited);
@@ -187,7 +225,9 @@ export function captureAttribution(): void {
       params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
       params.has("utm_source");
 
-    const existing = localStorage.getItem(STORAGE_KEY);
+    // An expired touch is treated as if it were never there, so this landing
+    // gets classified on its own merits instead of inheriting an old campaign.
+    const existing = storedIfFresh();
     if (existing && !hasCampaignSignal) return; // keep the prior touch
 
     const next = buildAttribution(params, referrer);
@@ -197,7 +237,7 @@ export function captureAttribution(): void {
     // their campaign (seen live 16/7, g-online). Keep the richer prior tag.
     if (existing && !next.utm_campaign) {
       try {
-        const prev = JSON.parse(existing) as Partial<Attribution>;
+        const prev = existing as Partial<Attribution>;
         if (prev.utm_campaign && prev.channel === next.channel) {
           next.utm_source = next.utm_source ?? prev.utm_source ?? null;
           next.utm_medium = next.utm_medium ?? prev.utm_medium ?? null;
@@ -207,7 +247,7 @@ export function captureAttribution(): void {
         /* corrupt stored value - fall through with the fresh capture */
       }
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...next, [CAPTURED_AT_KEY]: Date.now() }));
 
     // Persist the raw ad click ids (last-touch) so a later conversion can be
     // uploaded to the ad platform with exact click attribution. Only overwrite
@@ -255,7 +295,7 @@ export function seedAttribution(seed: Partial<Attribution>): void {
         /* corrupt - overwrite below */
       }
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...next, [CAPTURED_AT_KEY]: Date.now() }));
   } catch {
     /* localStorage blocked */
   }
@@ -265,13 +305,12 @@ export function seedAttribution(seed: Partial<Attribution>): void {
 export function getAttribution(): Attribution | null {
   if (typeof window === "undefined") return null;
   try {
-    let raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) {
+    let parsed = storedIfFresh();
+    if (!parsed) {
       captureAttribution();
-      raw = localStorage.getItem(STORAGE_KEY);
+      parsed = storedIfFresh();
     }
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as Partial<Attribution>;
+    if (!parsed) return null;
     return {
       channel: isValidChannel(parsed.channel) ? parsed.channel : "direct",
       utm_source: parsed.utm_source ?? null,

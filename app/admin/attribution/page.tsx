@@ -106,6 +106,17 @@ export default function AttributionPage() {
           <a href="/admin/analytics" className="text-blue-700 underline">עמוד אנליטיקה</a>.
         </p>
 
+        {/* Data-quality break. Without this the reader compares numbers across
+            8/8/2026 as if they were measured the same way - they were not. */}
+        <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+          <strong>שינוי מדידה, 8/8/2026.</strong> עד לתאריך הזה מזהה הסשן והייחוס לא פגו לעולם, כך
+          שדפדפן שנגע פעם בקמפיין נספר כמגיע ממנו לתמיד, ו&quot;סשן&quot; אחד יכול היה להימשך שבועות.
+          התוצאה: ערוצים שהצוות עצמו גולש מהם נופחו - ב&quot;מטא ממומן&quot; 97% מהאירועים הגיעו
+          מארבעה דפדפנים תקועים, ובאורגני של גוגל 53%. מהיום: סשן פג אחרי 30 דקות חוסר פעילות,
+          וייחוס פג אחרי 30 יום. <strong>אין להשוות מספרים מלפני התאריך למספרים שאחריו</strong> -
+          הישנים מנופחים, ובעיקר לא באופן אחיד בין הערוצים.
+        </div>
+
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
         {error && (
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
