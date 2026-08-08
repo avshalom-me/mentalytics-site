@@ -52,7 +52,13 @@ export default function TherapistResultCard({
           style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} loading="lazy" />
       </div>
       <div style={{ padding: "16px 18px" }}>
-        <h2 className="text-lg font-black text-stone-900 leading-tight group-hover:underline">{t.full_name}</h2>
+        {/* A listing card is an item, not a section of the page. This was an
+            <h2>, which meant the online page told Google it had 118 sections,
+            111 of them a person's name - the heading outline is supposed to be
+            the page's table of contents, and it was almost entirely noise.
+            Rendered appearance is unchanged: size and weight come from the
+            classes, not from the tag. */}
+        <p className="text-lg font-black text-stone-900 leading-tight group-hover:underline">{t.full_name}</p>
         {type && <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{type}</div>}
         {snippet && <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{snippet}</p>}
         <div className="mt-3 flex flex-wrap gap-1.5">
