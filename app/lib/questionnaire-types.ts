@@ -4,8 +4,9 @@ export type QuestionnaireAnswers = {
   // --- אינטייק ---
   age: number;
   gender: string;
-  vision?: boolean;
-  hearing?: boolean;
+  // vision / hearing lived here for the f-vision screen, two required questions
+  // whose answers no scoring path ever read while the screen told the user they
+  // would appear in the final output. Screen and fields removed 2026-08-08.
   bmiAbnormal?: boolean;
   bmi?: number; // raw BMI (computed in the eating-disorder section); drives nuanced output + scoring
 
@@ -46,7 +47,6 @@ export type QuestionnaireAnswers = {
     e7?: boolean;                    // שינה
     sleepItems?: boolean[];          // 6 פריטים
     e8?: boolean;                    // סומטי
-    e8b?: boolean;                   // דיסוציאציה
     tics?: boolean;
     tinnitus?: boolean;
     e9?: boolean;                    // טראומה

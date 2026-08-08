@@ -8,6 +8,7 @@ import type {
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
@@ -143,13 +144,13 @@ function orderDomains<T extends string>(ds: readonly T[]): T[] {
 // so progress only ever moves forward. therapist-style closes the emotional block.
 const ADULTS_SCREENS_ORDER = [
   "disclaimer","domains","intake",
-  "e1","e1-q","e2","e2-q","e3","e3-q",
+  "e1","e1-q","e2","e2-q","e3",
   "e4","e4-contexts","e4-q","e4-social","e4-social-sev",
   "e5","e5-q","e6","e6-q","e7-q","e8c","e9-q",
   "e10","e10a","e10b","e10c",
   "therapist-style",
   "r-intake","r-single","r-single-no-detail","r1","r-abuse","r1-scale","r2-q","r3-conflict","r3-child","r3-child-type",
-  "f-vision","f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
+  "f1","f1-adhd","f1-ld","f1-ld-q","f2","f2-q","f3","f3-type","f3-a","f3-b","f3-disability",
   "a-types","a-substances","a-gaming","a-porn-type","a-porn-q","a-sex-q","a-gambling","a-phone",
   "scoring",
 ];
@@ -160,7 +161,7 @@ const ADULTS_CORE_SCREENS = ["disclaimer", "domains", "intake", "therapist-style
 // Map of which domain each screen belongs to. Screens not listed are core.
 function screenDomain(s: string): string | null {
   if (s.startsWith("e")) return "emotional";
-  if (s.startsWith("f") || s === "f-vision") return "functional";
+  if (s.startsWith("f")) return "functional";
   if (s.startsWith("r")) return "relationship";
   if (s.startsWith("a")) return "addiction";
   return null;
@@ -606,7 +607,7 @@ export default function AdultsPage() {
   const [qItemsError, setQItemsError] = useState(false);
   function fetchQItems() {
     setQItemsError(false);
-    fetch("/api/questionnaire/adults/questions")
+    fetch(`/api/questionnaire/adults/questions?v=${QUESTIONNAIRE_ITEMS_VERSION}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(setQItems)
       .catch(() => setQItemsError(true));
@@ -620,8 +621,6 @@ export default function AdultsPage() {
   // screen (e6-q), where it's clinically relevant.
   const [bmiH, setBmiH] = useState<number>(0);
   const [bmiW, setBmiW] = useState<number>(0);
-  const [visionAns, setVisionAns] = useState<boolean | null>(null);
-  const [hearingAns, setHearingAns] = useState<boolean | null>(null);
 
   // local form state (committed to answers on next)
   const [moodChecked, setMoodChecked] = useState<number[]>([]);
@@ -710,7 +709,7 @@ export default function AdultsPage() {
 
   function firstScreenForDomain(d: string): Screen {
     if (d === "emotional") return "e1";
-    if (d === "functional") return "f-vision";
+    if (d === "functional") return "f1";
     if (d === "relationship") return "r-intake";
     if (d === "addiction") return "a-types";
     if (d === "personal_development") return "therapist-style";
@@ -1250,52 +1249,59 @@ export default function AdultsPage() {
               </label>
             </li>
           </ul>
+
+          {/* Follow-up, revealed in place. It used to be a screen of its own
+              (e3-q) whose first three items repeated the two gates above.
+              The thought-disturbance items only appear on the beliefs-only path,
+              because reporting hallucinations already carries the referral on its
+              own - see the threshold note in questionnaire-score.ts. */}
+          {(e3a || e3b) && (
+            <div className="mt-4 rounded-xl border-2 border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4">
+              {e3b && !e3a && (
+                <>
+                  <p className="mb-3 text-sm font-semibold text-[var(--teal-dark)]">סמן/י את ההצהרות המתאימות לך:</p>
+                  <CheckList items={qItems.prodrome} checked={prodromeChecked}
+                    onChange={(i, v) => setProdromeChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
+                </>
+              )}
+              <label className="mt-3 flex min-h-[44px] cursor-pointer items-center gap-2 text-sm">
+                <input type="checkbox" checked={prodromeSuicidal} onChange={(e) => setProdromeSuicidal(e.target.checked)} className="h-5 w-5 accent-[var(--teal)]" />
+                קיימות מחשבות אובדניות
+              </label>
+              {prodromeSuicidal && <CrisisResources className="mt-4" />}
+            </div>
+          )}
+
           <button
             type="button"
-            onClick={() => { updE({ e3a: false, e3b: false, e8: false, e3: false }); setScreen("e4"); }}
-            className="mt-3 w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
+            onClick={() => {
+              updE({ e3a: false, e3b: false, e8: false, e3: false, prodromeItems: [], prodromeSuicidal: false });
+              setProdromeChecked([]);
+              setProdromeSuicidal(false);
+              setScreen("e4");
+            }}
+            className="mt-3 min-h-[44px] w-full rounded-xl border-2 border-[#ddd6c8] bg-white px-4 py-2.5 text-sm font-semibold text-[#6b7280] transition-all hover:border-[var(--teal)] hover:text-[var(--teal-dark)]"
           >
             לא - אף אחד מהמשפטים אינו מתאר אותי (דלג/י)
           </button>
           <NavRow
             onNext={() => {
-              const cur = answers.emotional ?? {};
-              const ce3a = cur.e3a ?? false;
-              const ce3b = cur.e3b ?? false;
+              // Only the beliefs-only path shows the items; on the hallucination
+              // path they stay empty and the threshold of 0 covers it.
+              updE({
+                prodromeItems: (e3b && !e3a) ? prodromeChecked : [],
+                prodromeSuicidal: (e3a || e3b) ? prodromeSuicidal : false,
+              });
               // The tics/tinnitus follow-up for the somatic checkbox runs at the
               // original e8 position (after the sleep/eating sub-questionnaires),
               // not here - so continue linearly even when e8 was checked.
-              if (ce3a || ce3b) setScreen("e3-q");
-              else setScreen("e4");
+              setScreen("e4");
             }}
           />
         </Card>
       </Layout>
     );
   }
-
-  if (screen === "e3-q") return (
-    <Layout screen={screen} domains={answers.domains} onBack={goBack}>
-      <Card badgeColor="green">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את ההצהרות המתאימות לך:</p>
-        <CheckList items={qItems.prodrome} checked={prodromeChecked}
-          onChange={(i, v) => setProdromeChecked((p) => v ? [...p, i] : p.filter((x) => x !== i))} />
-        <div className="mt-3">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={prodromeSuicidal} onChange={(e) => setProdromeSuicidal(e.target.checked)} className="accent-[var(--teal)]" />
-            קיימות מחשבות אובדניות
-          </label>
-        </div>
-        {prodromeSuicidal && <CrisisResources className="mt-4" />}
-        <NavRow onNext={() => {
-          updE({ prodromeItems: prodromeChecked, prodromeSuicidal });
-          // Tics/tinnitus follow-up runs at the original e8 position (after
-          // eating/sleep). Don't branch on e8 here.
-          setScreen("e4");
-        }} />
-      </Card>
-    </Layout>
-  );
 
   if (screen === "e4") return (
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
@@ -1820,42 +1826,6 @@ export default function AdultsPage() {
   // ═══════════════════════════════════════════════════════
   // FUNCTIONAL DOMAIN
   // ═══════════════════════════════════════════════════════
-
-  if (screen === "f-vision") return (
-    <Layout screen={screen} domains={answers.domains} onBack={goBack}>
-      <Card badge="תחום תפקודי">
-        <p className="mb-4 font-semibold text-[#1a3a5c]">לפני השאלות על תפקוד אקדמאי ותעסוקתי:</p>
-        <div className="mb-5">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי ראייה?</p>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setVisionAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === true ? "border-[var(--teal)] bg-[var(--teal)] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
-            <button type="button" onClick={() => setVisionAns(false)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${visionAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
-          </div>
-          {visionAns === true && (
-            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת ראייה (תוצאה זו תיכלל בפלט הסופי)</p>
-          )}
-        </div>
-        <div className="mb-2">
-          <p className="mb-2 text-sm font-semibold text-[#1a3a5c]">האם ישנם סימנים או רמזים לקשיי שמיעה?</p>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => setHearingAns(true)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === true ? "border-[var(--teal)] bg-[var(--teal)] text-white" : "border-[#ddd6c8] bg-white hover:border-[#2e7d8c]"}`}>כן</button>
-            <button type="button" onClick={() => setHearingAns(false)}
-              className={`flex-1 rounded-xl border-2 py-2 text-sm font-bold transition-all ${hearingAns === false ? "border-[#1a3a5c] bg-[#1a3a5c] text-white" : "border-[#ddd6c8] bg-white hover:border-[#1a3a5c]"}`}>לא</button>
-          </div>
-          {hearingAns === true && (
-            <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">📌 הפנייה לבדיקת שמיעה (תוצאה זו תיכלל בפלט הסופי)</p>
-          )}
-        </div>
-        <NavRow onNext={() => {
-          upd({ vision: visionAns ?? undefined, hearing: hearingAns ?? undefined });
-          setScreen("f1");
-        }} nextDisabled={visionAns === null || hearingAns === null} />
-      </Card>
-    </Layout>
-  );
 
   // f1 gate + sub-type picker merged into one screen. Selecting either checkbox
   // implicitly sets f1=true; unchecking both means no learning difficulties and

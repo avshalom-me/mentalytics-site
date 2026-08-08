@@ -44,10 +44,13 @@ export const MANIA_ITEMS = [
   "פעולות המהוות סיכון (נהיגה פרועה, הימורים גדולים וכד')",
 ];
 
+// Three items, not six. The first three used to be "שמעתי קולות/לחישות שאחרים לא
+// שמעו", "ראיתי דברים שאנשים אחרים לא ראו" and "אני מרגיש/ה שלאחרים יש משהו נגדי"
+// - word-for-word restatements of the two gate questions on the e3 screen, so the
+// follow-up was largely asking people to confirm what they had just said. What
+// remains is the part the gates do not cover: thought disturbance.
+// The scoring thresholds moved with it, see questionnaire-score.ts.
 export const PRODROME_ITEMS = [
-  "שמעתי קולות/לחישות שאחרים לא שמעו",
-  "ראיתי דברים שאנשים אחרים לא ראו",
-  "אני מרגיש/ה שלאחרים יש משהו נגדי",
   "הייתי מבולבל/ת אם חוויה הייתה אמיתית או דמיונית",
   "המחשבות שלי כל כך חזקות שאני כמעט שומע/ת אותן",
   "אני מרגיש/ה שאיני שולט/ת במחשבותיי",
@@ -264,13 +267,15 @@ export const KIDS_TQ_ITEMS = [
   { key: "tq10", label: "10. מאוד זהיר / נשמר מפני סכנות" },
 ];
 
+// Three items, not six. pq5 and pq16 (heard voices / saw things) restated gate
+// 7א, and pq7 (feels others are against them) restated gate 7ב, so a parent was
+// asked to confirm in detail what they had just answered on the screen before.
+// What is left is thought disturbance, which the gates do not ask about.
+// Thresholds moved with it, in kids-score.server.ts and in skipPage.
 export const KIDS_PQ_ITEMS = [
-  { key: "pq5",  label: "1. האם הילד/ה דיווח/ה ששמע/ה קולות, לחישות או דיבורים כשאחרים אמרו שלא שומעים כלום?" },
-  { key: "pq16", label: "2. האם הילד/ה דיווח/ה שראה/תה דברים שאחרים לא יכלו לראות?" },
-  { key: "pq7",  label: "3. האם הילד/ה מרגיש/ה לעיתים שלאחרים יש משהו נגדו/ה?" },
-  { key: "pq11", label: "4. האם הילד/ה היה/הייתה מבולבל/ת או לא בטוח/ה האם משהו שחווה/חוותה היה אמיתי או דמיוני?" },
-  { key: "pq13", label: "5. האם המחשבות של הילד/ה כל כך חזקות לעיתים שהוא/היא כמעט שומע/ת אותן?" },
-  { key: "pq8",  label: "6. האם הילד/ה מרגיש/ה לפעמים שאינו/ה שולט/ת על הרעיונות והמחשבות שלו/ה?" },
+  { key: "pq11", label: "1. האם הילד/ה היה/הייתה מבולבל/ת או לא בטוח/ה האם משהו שחווה/חוותה היה אמיתי או דמיוני?" },
+  { key: "pq13", label: "2. האם המחשבות של הילד/ה כל כך חזקות לעיתים שהוא/היא כמעט שומע/ת אותן?" },
+  { key: "pq8",  label: "3. האם הילד/ה מרגיש/ה לפעמים שאינו/ה שולט/ת על הרעיונות והמחשבות שלו/ה?" },
 ];
 
 export const KIDS_BQ_ITEMS = [

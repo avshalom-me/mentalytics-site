@@ -287,11 +287,18 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // Q7 - פרודרום
-  // q7a = הזיות (חזותיות/שמיעתיות) → דגל אדום, סף נמוך (פריט אחד מספיק)
-  // q7b = אמונות יוצאות דופן בלבד → סף גבוה יותר (3 פריטים)
+  // q7a = הזיות (חזותיות/שמיעתיות) → דגל אדום; ההפניה יוצאת על סמך השער עצמו
+  // q7b = אמונות יוצאות דופן בלבד → 2 מתוך 3 פריטי הפרעת החשיבה
+  //
+  // Recalibrated 2026-08-08 with the follow-up cut from six items to three. Two
+  // of the removed three restated gate 7א and one restated 7ב, so the old 1-of-6
+  // was cleared as a matter of course by anyone endorsing 7א - the referral
+  // already fired on the gate in practice. Holding 1-of-3 against the reduced
+  // list would have made the most serious presentation harder to flag. Keep this
+  // identical to pqThresholdFor() in app/kids/page.tsx.
   const q7Hall = A.q7a === "כן";
   const q7Bel = A.q7b === "כן";
-  const pqThreshold = q7Hall ? 1 : (q7Bel ? 3 : Infinity);
+  const pqThreshold = q7Hall ? 0 : (q7Bel ? 2 : Infinity);
   if ((A.pq_tot || 0) >= pqThreshold) {
     emoStandalones.push({ cls: "warn", txt: "📊 דווחו חוויות חושיות או קוגניטיביות החורגות מהרגיל - מומלץ להעריך" });
     emoStandalones.push({ cls: "info", txt: "✅ הפנייה לפסיכולוג קליני או פסיכיאטר להערכה" });
@@ -1068,7 +1075,13 @@ function computeBehResults(A: Ans): KidsBox[] {
   } else if (finalPlan === "חיובי_שלילי") {
     box("info", "✅ הפנייה: תוכנית התנהגותית ממוקדת מרכיבים חיוביים ושליליים, בשיתוף המורים וההורים");
   } else if (finalPlan === "חיובי_שלילי_פסיכולוגי") {
-    box("info", "✅ הפנייה: תוכנית התנהגותית עם מרכיבים חיוביים ושליליים, בשיתוף המורים וההורים - יחד עם טיפול פסיכולוגי");
+    box("info", "✅ הפנייה: תוכנית התנהגותית עם מרכיבים חיוביים ושליליים, בשיתוף המורים וההורים");
+    // The severity that already called for psychological treatment said so only
+    // in prose, and "טיפול פסיכולוגי" matches no treatment key - so the parent of
+    // the child with the worst behavioural difficulty in the questionnaire was
+    // the one parent who got no therapist to search for. Emitted as its own
+    // referral, CBT is a real key and comes with a search button.
+    box("info", "✅ הפנייה: טיפול CBT להתנהגות, במקביל לתוכנית ההתנהגותית במסגרת");
   }
   let planTxt = "📌 תוכנית התנהגותית מפורטת:\n\n";
   planTxt += "🟢 תוכנית התנהגותית ממוקדת מרכיבים חיוביים\n";

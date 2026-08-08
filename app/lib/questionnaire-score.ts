@@ -136,10 +136,19 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E3: Prodrome ---
-    // הזיות (e3a) = סימן חמור גם בעוצמה נמוכה → סף 1 פריט
-    // אמונות יוצאות דופן בלבד (e3b ללא e3a) = סף גבוה יותר → 3 פריטים
+    // הזיות (e3a) = סימן חמור גם בעוצמה נמוכה → ההפניה יוצאת על סמך השער עצמו
+    // אמונות יוצאות דופן בלבד (e3b ללא e3a) → 2 מתוך 3 פריטי הפרעת החשיבה
+    //
+    // Recalibrated 2026-08-08 when the follow-up dropped from six items to three.
+    // The old thresholds were 1-of-6 for e3a and 3-of-6 for e3b, but three of
+    // those six restated the gates: someone endorsing e3a would tick "I heard
+    // voices others did not" and clear a threshold of 1 as a matter of course, so
+    // in practice the referral already fired on the gate alone. Keeping 1-of-3
+    // against the reduced list would have made the most serious presentation
+    // harder to flag, not easier. Gate a therefore needs no confirming item, and
+    // gate b needs two of the three that carry information the gates do not.
     const prodromeCount = e.prodromeItems?.length ?? 0;
-    const prodromeThreshold = e.e3a ? 1 : (e.e3b ? 3 : Infinity);
+    const prodromeThreshold = e.e3a ? 0 : (e.e3b ? 2 : Infinity);
     if (prodromeCount >= prodromeThreshold) {
       if (e.prodromeSuicidal) {
         recs.push({
@@ -196,6 +205,9 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // 9 פריטים × סקאלת 1-3 (טווח 9-27)
     // > 15 = חרדה כללית מובהקת | > 12 = סימני מתח קלים
     const gad7Total = sum(e.gad7Scores);
+    // Every item carries 1-3 once answered, so a complete questionnaire has no
+    // zeros in it. Anything with a zero left is a partly or wholly skipped screen.
+    const gad7Complete = (e.gad7Scores?.length ?? 0) > 0 && (e.gad7Scores ?? []).every((v) => v > 0);
     if (gad7Total > 15) {
       recs.push({
         id: uid("gad7-severe"),
@@ -213,6 +225,21 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         treatmentLabel: emotLabel,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
+      });
+    } else if (e.e4 && !gad7Complete) {
+      // The user told us they have anxiety and then left the nine items blank.
+      // Unanswered items are 0, so the total lands under every threshold and the
+      // whole section used to vanish without a word - on the clinical screen more
+      // people see than any other. Rather than force the questionnaire, report
+      // honestly what we do and don't know, and still route them somewhere.
+      recs.push({
+        id: uid("gad7-unspecified"),
+        symptomText: "סימנים של חרדה ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
+        treatment: "CBT",
+        treatmentLabel: "CBT",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "מומלץ המשך בירור פסיכולוגי לאפיון סוג החרדה ועוצמתה.",
       });
     }
 
@@ -392,12 +419,9 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         "הפניה לטיפול CBT או היפנוזה. עדיפות על ידי פסיכולוג רפואי."
       );
     }
-    if (e.e8b) {
-      addOrMergeCBT(EMO,
-        "נמצאו תסמינים דיסוציאטיביים.",
-        "היפנוזה או טיפול התנהגותי על-ידי פסיכולוג רפואי."
-      );
-    }
+    // A dissociation branch (e.e8b) sat here, unreachable: no screen has ever
+    // asked the question that would set it. Removed 2026-08-08 along with the
+    // field. If dissociation should be screened for, it needs a question first.
     if (e.tics) {
       addOrMergeCBT(EMO,
         "מתוארים טיקים.",

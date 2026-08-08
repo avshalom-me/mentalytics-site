@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
@@ -111,7 +112,7 @@ const PAGES = [
   "p-q2","p-q2-grade",
   "p-q3","p-mq","p-mq-sui",
   "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
-  "p-q5","p-oq","p-oq-grade",
+  "p-q5","p-oq",
   "p-q6","p-tq",
   "p-q7","p-pq",
   "p-q8","p-eq",
@@ -133,7 +134,7 @@ function skipPage(pid: string, A: Ans): boolean {
   const emoPages = [
     "p-q1","p-q1-pain","p-aq","p-aq-grade","p-q2","p-q2-grade","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
-    "p-q5","p-oq","p-oq-grade","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
+    "p-q5","p-oq","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
     "p-q9","p-bq","p-q9-adhd","p-q10","p-q10-par","p-q10-grade",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
@@ -151,15 +152,16 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-q4-b")       return !A.ad_b;
   if (pid === "p-q4-ctrl")    return A.q4 !== "כן";
   if (pid === "p-oq")         return A.q5 !== "כן";
-  if (pid === "p-oq-grade")   return (A.oq_tot || 0) < 10;
   if (pid === "p-tq")         return A.q6 !== "כן";
-  if (pid === "p-pq")         return A.q7a !== "כן" && A.q7b !== "כן";
+  // Only the beliefs-only path still needs the follow-up items: reporting
+  // hallucinations carries the referral on its own (pqThresholdFor).
+  if (pid === "p-pq")         return A.q7b !== "כן" || A.q7a === "כן";
   if (pid === "p-eq")         return A.q8 !== "כן";
   if (pid === "p-bq")         return A.q9 !== "כן" || gg(A) === "bv";
   if (pid === "p-q9-adhd")    return !q9AdhdActive(A);
 
   if (pid === "p-q10") {
-    const pqThr = A.q7a === "כן" ? 1 : (A.q7b === "כן" ? 3 : Infinity);
+    const pqThr = pqThresholdFor(A);
     const anyPositive =
       (A.q1 || 0) >= 3 ||
       (A.q2 || 0) >= 3 ||
@@ -241,9 +243,27 @@ function updTQ(A: Ans, k: string, v: number): Ans {
 }
 function updPQ(A: Ans, k: string, v: string): Ans {
   const n = { ...A, [k]: v };
-  n.pq_tot = ["pq5","pq16","pq7","pq11","pq13","pq8"]
+  // pq5 / pq16 / pq7 dropped with the gate-restating items - see KIDS_PQ_ITEMS.
+  n.pq_tot = ["pq11","pq13","pq8"]
     .filter(x => n[x] === "כן").length;
   return n;
+}
+
+/**
+ * Threshold the thought-disturbance items must clear for a psychosis referral.
+ *
+ * Gate 7א (the child reported seeing or hearing things that were not there) is
+ * the serious sign, and the two items that used to confirm it were restatements
+ * of it, so in practice it always cleared the old 1-of-6 on its own: it now
+ * needs no confirming item at all. Gate 7ב alone used to need 3 of 6, one of
+ * which restated the gate, leaving two informative ones - so 2 of 3 now.
+ * Infinity when neither gate was endorsed, so an untouched section never counts
+ * as positive. Must stay identical to the copy in kids-score.server.ts.
+ */
+function pqThresholdFor(A: Ans): number {
+  if (A.q7a === "כן") return 0;
+  if (A.q7b === "כן") return 2;
+  return Infinity;
 }
 function updEQ(A: Ans, k: string, v: string): Ans {
   const n = { ...A, [k]: v };
@@ -1243,41 +1263,6 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
   );
 }
 
-// ── p-oq-grade ────────────────────────────────────────────────────────────────
-function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const grp = gg(A);
-  return (
-    <div>
-      <Card>
-        <StepTag>מחשבות והתנהגויות חוזרות - שאלות לפי כיתה</StepTag>
-        <StepQ>שאלות משלימות</StepQ>
-        {grp === "ga" && (
-          <GradeBlock title="🏫 גן עד כיתה א׳">
-            <p className="text-sm text-gray-500">המשך למילוי השאלון - הממצאים יוצגו בדוח הסופי.</p>
-          </GradeBlock>
-        )}
-        {grp === "bv" && (
-          <GradeBlock title="📚 כיתות ב׳–ו׳">
-            <p className="text-sm text-gray-500 mb-2">עד כמה יש יכולת לתרגל כלים? [1–7]</p>
-            <div className="flex gap-1.5 flex-wrap">
-              {[1,2,3,4,5,6,7].map(n=>(
-                <button key={n} className={sb(A.oq_prac===n)}
-                  onClick={()=>{ const nA={...A,oq_prac:n}; setA(nA); onNext(nA); }}>{n}</button>
-              ))}
-            </div>
-          </GradeBlock>
-        )}
-        {grp === "zy" && (
-          <GradeBlock title='🎓 כיתות ז׳–י"ב'>
-            <p className="text-sm text-gray-500">המשך למילוי השאלון - הממצאים יוצגו בדוח הסופי.</p>
-          </GradeBlock>
-        )}
-      </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
-    </div>
-  );
-}
-
 // ── p-q6 ─────────────────────────────────────────────────────────────────────
 function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
@@ -1355,16 +1340,17 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-pq ─────────────────────────────────────────────────────────────────────
-// Shortened prodromal questionnaire - 6 items (from PQ-16), yes/no
-// Covers core CAARMS/PACE domains: auditory & visual hallucinations, paranoia,
-// thought disorder, reality testing confusion, thought broadcasting
+// Shortened prodromal questionnaire - 3 items (from PQ-16), yes/no. Covers the
+// CAARMS/PACE domains the two gate questions on p-q7 do not: reality-testing
+// confusion, thought broadcasting and loss of control over thoughts. Reached
+// only on the beliefs-only path; reporting hallucinations skips straight past.
 function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const pqItems = (items?.pq ?? []) as {key: string; label: string}[];
   return (
     <div>
       <Card>
         <StepTag>שאלון</StepTag>
-        <StepQ>שאלון - 6 סעיפים</StepQ>
+        <StepQ>שאלון - 3 סעיפים</StepQ>
         <StepHint>כן / לא לכל סעיף, על סמך מה שהבחנתם</StepHint>
         <SubCard>
           {pqItems.map(({key,label})=>(
@@ -4038,7 +4024,7 @@ export default function KidsPage() {
 
   function fetchKidsItems() {
     setItemsError(false);
-    fetch("/api/questionnaire/kids/questions")
+    fetch(`/api/questionnaire/kids/questions?v=${QUESTIONNAIRE_ITEMS_VERSION}`)
       .then(r => { if (!r.ok) throw new Error(); return r.json(); })
       .then(setKidsItems)
       .catch(() => setItemsError(true));
@@ -4246,7 +4232,6 @@ export default function KidsPage() {
       {step === "p-q4-ctrl"   && <PageQ4Ctrl  {...pageProps} />}
       {step === "p-q5"         && <PageQ5       {...pageProps} />}
       {step === "p-oq"          && <PageOQ       {...pageProps} />}
-      {step === "p-oq-grade"    && <PageOQGrade  {...pageProps} />}
       {step === "p-q6"          && <PageQ6       {...pageProps} />}
       {step === "p-tq"          && <PageTQ       {...pageProps} />}
       {step === "p-q7"          && <PageQ7       {...pageProps} />}
