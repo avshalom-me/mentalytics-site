@@ -481,10 +481,16 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // --- E10: Personality ---
     const persMainSum = sum(e.persMainScores);
     if (persMainSum >= 5) {
+      const disAnswers = e.disQAnswers ?? [];
       const disTotal = sum(e.disQAnswers);
       // 1=כן, 2=לא × 4 פריטים: 4=כל "כן", 8=כל "לא".
       // disTotal <= 5 (לפחות 3 "כן") → סימני אוטיזם נוכחים → אבחון תקשורת.
-      if (disTotal <= 5) {
+      //
+      // An unanswered item is 0, so a skipped screen also lands at or under 5 and
+      // used to produce the autism-communication referral out of nothing. The
+      // referral is only justified when all four items actually carry an answer.
+      const disComplete = disAnswers.length === 4 && disAnswers.every((v) => v === 1 || v === 2);
+      if (disComplete && disTotal <= 5) {
         recs.push({
           id: uid("comm-diagnosis"),
           symptomText: "נמצאו סימנים לקשיים בתקשורת הבינאישית.",

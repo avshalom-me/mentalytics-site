@@ -60,6 +60,48 @@ a { text-decoration: none; color: inherit; }
   body { background: white !important; }
 }
 
+/* ── Questionnaire readability (.quiz-shell wraps both /adults and /kids) ─────
+   Both questionnaires are built almost entirely out of Tailwind's text-xs and
+   text-sm, which are 12px and 14px on every viewport - the size users complained
+   about on phones, and below the 16px threshold under which iOS Safari zooms the
+   whole page whenever an input gets focus. Bumping the utilities inside the quiz
+   shell fixes every screen at once; doing it per element would mean editing some
+   600 class strings across two files and would drift the day a screen is added.
+   Rules sit outside @layer on purpose so they win over Tailwind's utilities. */
+@media (max-width: 640px) {
+  .quiz-shell .text-xs   { font-size: 0.875rem;  line-height: 1.45; }
+  .quiz-shell .text-sm   { font-size: 1rem;      line-height: 1.55; }
+  .quiz-shell .text-base { font-size: 1.0625rem; }
+  .quiz-shell .text-lg   { font-size: 1.1875rem; }
+  .quiz-shell .text-xl   { font-size: 1.3125rem; }
+  /* Arbitrary sizes hand-written into the results cards */
+  .quiz-shell .text-\[9\.5px\]  { font-size: 11px; }
+  .quiz-shell .text-\[10px\],
+  .quiz-shell .text-\[10\.5px\] { font-size: 12px; }
+  .quiz-shell .text-\[12\.5px\],
+  .quiz-shell .text-\[13px\]    { font-size: 14px; }
+}
+
+/* Never below 16px: smaller text in a focused field makes iOS Safari zoom in,
+   and the user has to pinch back out before the next question. */
+.quiz-shell input,
+.quiz-shell select,
+.quiz-shell textarea { font-size: 16px; }
+
+/* Rating scales. A 7-point scale as flex+wrap measures 304px against the 295px
+   a 375px phone actually leaves inside the card, so every such row silently
+   broke into two lines. A grid divides the available width instead of
+   overflowing it, and 44px keeps each button at the minimum touch target. */
+.scale-grid {
+  display: grid;
+  grid-template-columns: repeat(var(--scale-cols, 5), minmax(0, 1fr));
+  gap: 6px;
+}
+.scale-grid > button {
+  width: 100%;
+  min-height: 44px;
+}
+
 /* DetailsCard (app/components/DetailsCard.tsx): the "+" becomes an "×" when the
    card opens. Written as a plain rule rather than Tailwind's group-open variant,
    which silently produced no CSS here on Tailwind v4 - a visual regression that

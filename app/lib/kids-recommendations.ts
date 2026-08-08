@@ -26,6 +26,15 @@ export interface KidsRecommendation {
   notes?: string;               // extra context appended to the referral (e.g. "בעדיפות ל…")
   tools: KidsTool[];            // tools tied to this group
   urgent: boolean;
+  /**
+   * Treatment keys named by the same referral beyond the one that became
+   * treatmentKey. A referral often prescribes a combination ("הדרכת הורים
+   * טיפולית יחד עם תרפיה בהבעה ויצירה"), and classifyReferral can only return
+   * the first pattern that matches - the rest used to be dropped, so therapists
+   * qualified for them never showed up in the match. Display still uses the
+   * single primary key; only aggregateForMatch reads these.
+   */
+  extraTreatmentKeys?: string[];
 }
 
 export interface KidsTool {
@@ -80,7 +89,9 @@ const TREATMENT_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /הדרכת הורים טיפולית/, key: "הדרכת הורים טיפולית", label: "הדרכת הורים טיפולית" },
   { rx: /הדרכת הורים/, key: "הדרכת הורים", label: "הדרכת הורים" },
   { rx: /טיפול דיאדי/, key: "טיפול דיאדי", label: "טיפול דיאדי" },
-  { rx: /טיפול בהבעה ויצירה/, key: "טיפול בהבעה ויצירה", label: "טיפול בהבעה ויצירה" },
+  // The scoring writes "תרפיה בהבעה ויצירה" in some branches and "טיפול בהבעה
+  // ויצירה" in others; matching only the second spelling lost half of them.
+  { rx: /(טיפול|תרפיה) בהבעה ויצירה/, key: "טיפול בהבעה ויצירה", label: "טיפול בהבעה ויצירה" },
   { rx: /קבוצה חברתית/, key: "קבוצה חברתית", label: "קבוצה חברתית" },
   { rx: /טיפול ויסות חושי|ריפוי בעיסוק|מרפאה בעיסוק/, key: "ריפוי בעיסוק", label: "ריפוי בעיסוק" },
   { rx: /קלינאית תקשורת|קלינאי תקשורת/, key: "קלינאית תקשורת", label: "קלינאית תקשורת" },
@@ -117,6 +128,29 @@ const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /התאמות.*בגרויות|התאמות במבחנים|התאמות בבחינות/, key: "התאמות בחינה", label: "בדיקת התאמות בבחינות" },
   { rx: /הערכת סיכון/, key: "הערכת סיכון", label: "הערכת סיכון דחופה" },
 ];
+
+/**
+ * Every treatment key the referral text names apart from `primaryKey`.
+ *
+ * classifyReferral stops at the first pattern that hits, which is right for the
+ * card's own label but wrong for matching: "הפנייה לקבוצה חברתית + כלים לעבודה
+ * בכיתה + טיפול פסיכודינאמי" classified as dynamic therapy and quietly dropped
+ * the social group, and every "X יחד עם Y" referral lost Y the same way.
+ */
+function extraTreatmentKeys(text: string, primaryKey: string): string[] {
+  const primaryMatch = TREATMENT_PATTERNS.find(p => p.key === primaryKey && p.rx.test(text))?.rx.exec(text)?.[0] ?? "";
+  const keys = new Set<string>();
+  for (const p of TREATMENT_PATTERNS) {
+    if (p.key === primaryKey) continue;
+    const m = p.rx.exec(text);
+    if (!m) continue;
+    // A looser spelling of the phrase already claimed ("הדרכת הורים" inside
+    // "הדרכת הורים טיפולית") is the same recommendation, not a second one.
+    if (primaryMatch && primaryMatch.includes(m[0])) continue;
+    keys.add(p.key);
+  }
+  return Array.from(keys);
+}
 
 // Heuristic: classify a referral text into kind + key + label
 function classifyReferral(text: string): { kind: RecKind; key: string; label: string } {
@@ -174,7 +208,7 @@ function stripPrefix(line: string, prefix: string): string {
 interface PendingGroup {
   symptoms: string[];
   symptomCls: BoxCls;
-  refs: { kind: RecKind; key: string; label: string; text: string; notes?: string }[];
+  refs: { kind: RecKind; key: string; label: string; text: string; notes?: string; extraKeys?: string[] }[];
   tools: string[];
   urgent: boolean;
 }
@@ -260,6 +294,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
         notes: ref.notes,
         tools,
         urgent: pending.urgent,
+        extraTreatmentKeys: ref.extraKeys,
       });
     }
     // Symptoms with no ref (e.g. low-stress only) - emit as a "no-treatment" rec
@@ -350,6 +385,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
         for (let i = 0; i < splits.length; i++) {
           const text = splits[i];
           const cls = classifyReferral(text);
+          const extras = extraTreatmentKeys(text, cls.key);
           // Notes only attach to the first ref (they describe the original referral context)
           pending.refs.push({
             kind: cls.kind,
@@ -357,6 +393,7 @@ export function parseKidsBoxes(boxes: KidsBox[], domain: string): KidsDomainResu
             label: cls.label,
             text,
             notes: i === 0 ? r.notes : undefined,
+            extraKeys: extras.length ? extras : undefined,
           });
         }
       }
@@ -422,6 +459,14 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
 
   for (const d of domains) {
     for (const g of d.groups) {
+      // Combination referrals name more than one treatment; the card shows the
+      // primary one, but the search has no reason to ignore the others.
+      for (const rec of g.recs) {
+        for (const k of rec.extraTreatmentKeys ?? []) {
+          treatmentKeys.add(k);
+          if (!treatmentLabels.has(k)) treatmentLabels.set(k, k);
+        }
+      }
       if (g.kind === "treatment" && g.treatmentKey !== "_no_action") {
         treatmentKeys.add(g.treatmentKey);
         treatmentLabels.set(g.treatmentKey, g.treatmentLabel);

@@ -19,8 +19,25 @@ function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   }).catch(() => {});
 }
 
+/**
+ * Coarse viewport bucket, three values, recomputed per event.
+ *
+ * Quiz dropout could be read per step but not per device, so "the text is too
+ * small on a phone" could never be confirmed or measured against the funnel.
+ * Width buckets are the whole story here - no user agent, no screen dimensions,
+ * nothing that narrows a visitor down.
+ */
+function deviceBucket(): "mobile" | "tablet" | "desktop" | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window.innerWidth;
+  if (!w) return undefined;
+  if (w < 640) return "mobile";
+  if (w < 1024) return "tablet";
+  return "desktop";
+}
+
 export function trackQuizStep(quizType: "adults" | "kids", step: string, progress: number) {
-  sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress } });
+  sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress, device: deviceBucket() } });
 }
 
 /**

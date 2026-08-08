@@ -968,10 +968,12 @@ function computeDevResults(A: Ans): KidsBox[] {
   function box(cls: BoxCls, txt: string) { boxes.push({ cls, txt }); }
   const age = parseInt(A._age) || 0;
   const ageOk = devAgeOk(A);
-  const toiletShow = ageOk || A.toilet === "כן";
 
   // גמילה
-  if (toiletShow && A.dev_toilet === "כן") {
+  // No age gate here any more: the screen that collects dev_toilet is itself
+  // shown only when the parent flagged the developmental area, and the old gate
+  // depended on A.toilet, a duplicate question removed from the opening screen.
+  if (A.dev_toilet === "כן") {
     const ttype = A.dev_toilet_type || "";
     const past  = A.dev_toilet_past || "";
     box("purple", "📊 נמצאו קשיים בגמילה / התרוקנות");
@@ -1006,10 +1008,20 @@ function computeDevResults(A: Ans): KidsBox[] {
 
   // ויסות חושי
   if (ageOk && A.dev_sensory === "כן") {
-    const overTot  = ["so1", "so2", "so3", "so4", "so5", "so6", "so7", "so8", "so9", "so10"].reduce((s, k) => s + (A[k] || 0), 0);
-    const underTot = ["su1", "su2", "su3", "su4", "su5", "su6", "su7", "su8"].reduce((s, k) => s + (A[k] || 0), 0);
-    const hasOver  = overTot  > 0;
-    const hasUnder = underTot > 0;
+    const overKeys  = ["so1", "so2", "so3", "so4", "so5", "so6", "so7", "so8", "so9", "so10"];
+    const underKeys = ["su1", "su2", "su3", "su4", "su5", "su6", "su7", "su8"];
+    // The scale runs 1 = always (most severe) to 3 = never, so a low total means
+    // trouble. Unanswered items are 0, and summing them as zeros scored them as
+    // worse than "always": a parent who ticked yes and skipped the items landed
+    // on "ציון: 0" and a clear suspicion of over-responsivity out of thin air.
+    // Unanswered now counts as 3, the benign end, so a partly filled
+    // questionnaire can only under-report and never invent a finding.
+    const total    = (keys: string[]) => keys.reduce((s, k) => s + (A[k] || 3), 0);
+    const answered = (keys: string[]) => keys.filter(k => (A[k] || 0) > 0).length;
+    const overTot  = total(overKeys);
+    const underTot = total(underKeys);
+    const hasOver  = answered(overKeys)  > 0;
+    const hasUnder = answered(underKeys) > 0;
 
     if (!hasOver && !hasUnder) {
       box("purple", "📊 ישנם תסמינים כלליים לקשיי ויסות חושי");

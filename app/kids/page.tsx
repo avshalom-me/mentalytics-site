@@ -179,7 +179,10 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-acad") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_aca || "");
 
   const devOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_dev || "");
-  if (pid === "p-dev-toilet")  return !devOn || (!devAgeOk(A) && A.toilet !== "כן");
+  // The opening screen used to ask about toilet difficulties purely as a gate for
+  // this screen, duplicating the question it gates. Flagging the developmental
+  // area on p-areas is the gate now; the question itself is asked once, here.
+  if (pid === "p-dev-toilet")  return !devOn;
   if (pid === "p-dev-sensory") return !devOn || !devAgeOk(A);
 
   if (pid === "p-beh") return !["מעט","הרבה","הרבה מאוד"].includes(A.a_beh || "");
@@ -288,16 +291,25 @@ function updAddict(A: Ans, k: string, v: string, type: "s"|"g"|"b"): Ans {
 
 
 // ── Shared UI helpers ─────────────────────────────────────────────────────────
-const BTN_BASE  = "px-5 py-2 border-2 rounded-full font-medium text-sm transition-all cursor-pointer";
+// min-h-[44px] on every tappable control: the option pills were 27-32px tall,
+// well under the 44px minimum touch target, which is a big part of why the quiz
+// felt fiddly on a phone.
+const BTN_BASE  = "px-5 py-2 min-h-[44px] border-2 rounded-full font-medium text-sm transition-all cursor-pointer";
 const BTN_SEL   = "bg-[var(--teal)] text-white border-[var(--teal)]";
 const BTN_DEF   = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
-const SB_BASE   = "min-w-[40px] h-10 border-2 rounded-lg font-semibold text-sm transition-all cursor-pointer flex-1";
+// min-w-0 instead of min-w-[40px]: the fixed floor meant a 7-point scale needed
+// 316px and only 282px were available inside a card on a 375px phone, so every
+// one of them wrapped onto a second line. flex-1 alone divides the row evenly.
+const SB_BASE   = "min-w-0 h-11 border-2 rounded-lg font-semibold text-sm transition-all cursor-pointer flex-1";
 const SB_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
 const SB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
-const SO_BASE   = "px-3 py-1.5 border-2 rounded-2xl text-xs font-medium transition-all cursor-pointer";
+// flex-1 + min-w-0: these pills sit in plain `flex gap-2` rows with no wrap, so a
+// 7-point scale used to run off the side of a phone. Sharing the row width keeps
+// every scale on one line at any width instead of overflowing or breaking in two.
+const SO_BASE   = "flex-1 min-w-0 px-2 py-1.5 min-h-[44px] border-2 rounded-2xl text-sm font-medium transition-all cursor-pointer";
 const SO_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
 const SO_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
-const CB_BASE   = "px-4 py-2 border-2 rounded-full text-sm font-medium transition-all cursor-pointer";
+const CB_BASE   = "px-4 py-2 min-h-[44px] border-2 rounded-full text-sm font-medium transition-all cursor-pointer";
 const CB_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
 const CB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 
@@ -322,7 +334,7 @@ function AlertBox({ cls, txt }: Box) {
 }
 
 function Card({ children }: { children: React.ReactNode }) {
-  return <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">{children}</div>;
+  return <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100">{children}</div>;
 }
 function StepTag({ children }: { children: React.ReactNode }) {
   return <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">{children}</div>;
@@ -336,26 +348,29 @@ function StepHint({ children }: { children: React.ReactNode }) {
 function EqNum({ n }: { n: number }) {
   return <div className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-[var(--teal)] text-white text-sm font-bold mb-3">{n}</div>;
 }
-function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = false }: {
+// showBack defaults to true now: the parent passes onBack only while a step back
+// is actually available (see pageProps), so the presence of the handler is the
+// switch. It used to be wired up at every call site and rendered at none.
+function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = true }: {
   onBack?: () => void; onNext?: () => void; backLabel?: string; nextLabel?: string; showBack?: boolean;
 }) {
   return (
     <div className="flex gap-3 mt-7 flex-wrap">
-      {showBack && onBack && (
-        <button onClick={onBack} className="px-6 py-3 border-2 border-[var(--teal)] text-[var(--teal)] rounded-full font-semibold text-sm hover:bg-blue-50 transition-all">{backLabel}</button>
-      )}
       {onNext && (
         <button onClick={onNext} className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90 transition-all">{nextLabel}</button>
+      )}
+      {showBack && onBack && (
+        <button onClick={onBack} className="px-6 py-3 border-2 border-[var(--teal)] text-[var(--teal)] rounded-full font-semibold text-sm hover:bg-blue-50 transition-all">{backLabel}</button>
       )}
     </div>
   );
 }
 function SubCard({ children }: { children: React.ReactNode }) {
-  return <div className="bg-[var(--surface)] rounded-xl p-5 mt-2 border border-[var(--line)] space-y-4">{children}</div>;
+  return <div className="bg-[var(--surface)] rounded-xl p-3 sm:p-5 mt-2 border border-[var(--line)] space-y-4">{children}</div>;
 }
 function GradeBlock({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[#fdf8ff] border-2 border-purple-300 rounded-xl p-4 mt-3">
+    <div className="bg-[#fdf8ff] border-2 border-purple-300 rounded-xl p-3 sm:p-4 mt-3">
       <div className="text-sm font-bold text-purple-700 mb-3">{title}</div>
       {children}
     </div>
@@ -365,7 +380,7 @@ function GradeBlock({ title, children }: { title: string; children: React.ReactN
 // Scale 1–N (auto-advance on click)
 function ScaleRow({ max, val, onChange }: { max: number; val: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex gap-1.5 flex-wrap mt-1">
+    <div className="scale-grid mt-1" style={{ ["--scale-cols" as string]: max }}>
       {Array.from({length: max}, (_, i) => i + 1).map(n => (
         <button key={n} className={sb(val === n)} onClick={() => onChange(n)}>{n}</button>
       ))}
@@ -375,7 +390,7 @@ function ScaleRow({ max, val, onChange }: { max: number; val: number; onChange: 
 // Scale 0–4
 function Scale04Row({ val, onChange }: { val: number; onChange: (v: number) => void }) {
   return (
-    <div className="flex gap-1.5 flex-wrap mt-1">
+    <div className="scale-grid mt-1" style={{ ["--scale-cols" as string]: 5 }}>
       {[0,1,2,3,4].map(n => (
         <button key={n} className={so(val === n)} onClick={() => onChange(n)}>{n}</button>
       ))}
@@ -398,10 +413,55 @@ const GRADE_AGE: Record<string, [number, number]> = {
   "א":[6,7],"ב":[7,8],"ג":[8,9],"ד":[9,10],"ה":[10,11],"ו":[11,12],
   "ז":[12,13],"ח":[13,14],"ט":[14,15],"י":[15,16],"יא":[16,17],"יב":[17,18],
 };
-function ageMismatch(age: number, grade: string): boolean {
-  const r = GRADE_AGE[grade];
-  if (!r || !age || !grade) return false;
-  return age < r[0] || age > r[1] + 1;
+// ── Grade derived from age ────────────────────────────────────────────────────
+// The grade used to be a 16-option dropdown on the opening screen, which a third
+// of parents never got past. It is still needed - two separate groupings branch
+// on it - but the age almost always settles which grouping the child falls in,
+// so it is derived, and the parent is only asked when it genuinely doesn't.
+
+const GRADE_LABEL: Record<string, string> = {
+  "פעוט": "פעוט", "גן3": "גן גיל 3", "גן-טרום": "גן טרום חובה", "גן": "גן חובה",
+  "א": "כיתה א׳", "ב": "כיתה ב׳", "ג": "כיתה ג׳", "ד": "כיתה ד׳", "ה": "כיתה ה׳", "ו": "כיתה ו׳",
+  "ז": "כיתה ז׳", "ח": "כיתה ח׳", "ט": "כיתה ט׳", "י": "כיתה י׳", "יא": 'כיתה י"א', "יב": 'כיתה י"ב',
+};
+
+function gradesForAge(age: number): string[] {
+  return Object.keys(GRADE_AGE).filter(g => age >= GRADE_AGE[g][0] && age <= GRADE_AGE[g][1]);
+}
+function ggOfGrade(g: string): string {
+  if (GA_GRADES.includes(g)) return "ga";
+  if (BV_GRADES.includes(g)) return "bv";
+  if (ZY_GRADES.includes(g)) return "zy";
+  return "";
+}
+function acadGgOfGrade(g: string): string {
+  if (["פעוט","גן3","גן-טרום","גן"].includes(g)) return "gan";
+  if (["א","ב","ג"].includes(g)) return "ag";
+  if (["ד","ה","ו"].includes(g)) return "dv";
+  if (["ז","ח"].includes(g)) return "zh";
+  return "tyb";
+}
+
+/**
+ * The grades a child of this age could be in, but only when the choice between
+ * them changes which question track they get - i.e. the candidates disagree on
+ * gg() or on acadGg(). Returns null when the age is enough on its own, which is
+ * every age except 6, 7, 9, 12 and 14.
+ */
+function ambiguousGrades(age: number): string[] | null {
+  const cands = gradesForAge(age);
+  if (cands.length < 2) return null;
+  const sameTrack =
+    new Set(cands.map(ggOfGrade)).size === 1 &&
+    new Set(cands.map(acadGgOfGrade)).size === 1;
+  return sameTrack ? null : cands;
+}
+
+/** Grade to store for an age that needs no question; "" when the parent must pick. */
+function derivedGrade(age: number): string {
+  if (age <= 0) return "";
+  if (ambiguousGrades(age)) return "";
+  return gradesForAge(age)[0] || "";
 }
 function calcBMI(h: number, w: number): number | null {
   if (!h || !w) return null;
@@ -419,27 +479,50 @@ function PageConsent({ onNext }: { onNext: () => void }) {
   const [agreed, setAgreed] = useState(false);
   return (
     <div>
-      <div className="mb-4 rounded-xl p-4 text-sm font-semibold" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
-        🔒 מילוי השאלון אנונימי לחלוטין - לא נשמר שום מידע, ואין למלא שם או פרטים מזהים.
-      </div>
-      <div className="mb-6 rounded-xl p-6 leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
-        <p className="mb-3 text-sm font-bold" style={{ color: "var(--text)" }}>📋 הצהרה והבהרה</p>
-        <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
-        <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
-        <p className="text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
-      </div>
-      <label className="flex cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
+      <h1 className="mb-2 text-xl font-black leading-snug" style={{ color: "var(--text)" }}>נעזור לכם להבין מה יעזור לילד/ה שלכם</h1>
+      <p className="mb-5 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
+        כמה שאלות על מה שקורה אצלכם בבית, ובסוף תקבלו המלצה על סוג הטיפול המתאים ורשימת מטפלים שעובדים עם ילדים בדיוק בתחום הזה.
+      </p>
+      <ul className="mb-5 flex flex-col gap-2">
+        {[
+          ["🔒", "אנונימי לחלוטין", "בלי שם, בלי פרטים מזהים, בלי הרשמה"],
+          ["⏱️", "כ-6 דקות", "זה הזמן שלוקח לרוב ההורים"],
+          ["↩️", "עונים רק על מה שרלוונטי", "כל תחום שלא נוגע לילד/ה פשוט מדלגים עליו"],
+        ].map(([icon, title, desc]) => (
+          <li key={title} className="flex items-start gap-3 rounded-xl p-3 text-sm" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
+            <span aria-hidden className="text-base leading-none">{icon}</span>
+            <span>
+              <strong style={{ color: "var(--teal-dark)" }}>{title}</strong>
+              <span className="block text-xs" style={{ color: "var(--text-2)" }}>{desc}</span>
+            </span>
+          </li>
+        ))}
+      </ul>
+      <p className="mb-3 text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>
+        חשוב שנאמר את זה מראש: השאלון עוזר להתאים סוג טיפול, אבל הוא <strong>אינו אבחון</strong> פסיכולוגי, פסיכיאטרי או רפואי, ואינו מחליף בדיקה של איש מקצוע.
+      </p>
+      <details className="mb-5 rounded-xl p-4" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+        <summary className="cursor-pointer select-none text-sm font-bold" style={{ color: "var(--teal-dark)" }}>
+          לנוסח המשפטי המלא
+        </summary>
+        <div className="mt-3 leading-relaxed" style={{ color: "var(--text-2)" }}>
+          <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
+          <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
+          <p className="text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+        </div>
+      </details>
+      <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
         <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)}
-          className="mt-0.5 h-4 w-4 flex-shrink-0 accent-[#2e7d8c]" />
-        <span>קראתי את ההצהרה לעיל, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
+          className="mt-0.5 h-5 w-5 flex-shrink-0 accent-[#2e7d8c]" />
+        <span>קראתי את ההצהרה, הבנתי את תנאיה ואני מסכים/ה להמשיך</span>
       </label>
       <div className="mt-5">
         <button
           disabled={!agreed}
           onClick={onNext}
-          className="w-full rounded-xl bg-[var(--teal-dark)] py-3 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
+          className="w-full rounded-xl bg-[var(--teal-dark)] py-4 text-base font-bold text-white disabled:opacity-40 hover:bg-[#0f2540]"
         >
-          קראתי והסכמתי – נמשיך ←
+          מתחילים ←
         </button>
       </div>
     </div>
@@ -447,29 +530,23 @@ function PageConsent({ onNext }: { onNext: () => void }) {
 }
 
 // ── p-demo ────────────────────────────────────────────────────────────────────
-function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack: () => void }) {
+function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void }) {
   const [showErr, setShowErr] = useState(false);
 
-  const age   = parseInt(A._age)  || 0;
-  const grade = A._grade || "";
-  const h     = parseFloat(A._h)  || 0;
-  const w     = parseFloat(A._w)  || 0;
-  const bmi   = calcBMI(h, w);
-  const mismatch = ageMismatch(age, grade);
+  const age = parseInt(A._age) || 0;
+  // Only surfaced for the five ages where the grade actually changes the track.
+  const gradeChoices = age > 0 ? ambiguousGrades(age) : null;
 
   function upd(key: string, val: any) {
     const next = { ...A, [key]: val };
-    if (key === "_h" || key === "_w") {
-      const hv = key === "_h" ? parseFloat(val)||0 : h;
-      const wv = key === "_w" ? parseFloat(val)||0 : w;
-      const b  = calcBMI(hv, wv);
-      if (b) next._bmi = b;
-    }
+    // Keep the derived grade in step with the age: settled ages get one silently,
+    // ambiguous ages get it cleared so the follow-up below is answered afresh.
+    if (key === "_age") next._grade = derivedGrade(parseInt(val) || 0);
     setA(next);
   }
 
   function handleNext() {
-    if (!A._age || !A._grade || !A.gender) { setShowErr(true); return; }
+    if (!A._age || !A.gender || (gradeChoices && !A._grade)) { setShowErr(true); return; }
     setShowErr(false);
     onNext(A);
   }
@@ -478,118 +555,45 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
     <div>
       <Card>
         <StepTag>שלב 1 מתוך 3</StepTag>
-        <StepQ>פרטי הילד/ה</StepQ>
-        <StepHint>שדות עם <span className="text-red-500">*</span> הם חובה</StepHint>
+        <StepQ>קצת על הילד/ה</StepQ>
+        <StepHint>שתי שאלות קצרות, ומתחילים</StepHint>
 
-        {/* פרטים בסיסיים */}
-        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">🧒 פרטים בסיסיים</div>
-        <div className="flex gap-4 flex-wrap mb-4">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-gray-500">גיל <span className="text-red-500">*</span></label>
-            <input type="number" min={1} max={18} placeholder="גיל"
-              value={A._age || ""}
-              onChange={e => upd("_age", e.target.value)}
-              className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 text-sm w-24 focus:border-[#4a6fa5] outline-none" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-gray-500">שכבת גיל <span className="text-red-500">*</span></label>
-            <select value={A._grade || ""} onChange={e => upd("_grade", e.target.value)}
-              className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 text-sm w-52 focus:border-[#4a6fa5] outline-none bg-white">
-              <option value="">-- בחר/י --</option>
-              <option value="פעוט">פעוט (גיל 1–2)</option>
-              <option value="גן3">גן גיל 3</option>
-              <option value="גן-טרום">גן טרום חובה (גיל 4)</option>
-              <option value="גן">גן חובה (גיל 5–6)</option>
-              <option value="א">כיתה א׳</option>
-              <option value="ב">כיתה ב׳</option>
-              <option value="ג">כיתה ג׳</option>
-              <option value="ד">כיתה ד׳</option>
-              <option value="ה">כיתה ה׳</option>
-              <option value="ו">כיתה ו׳</option>
-              <option value="ז">כיתה ז׳</option>
-              <option value="ח">כיתה ח׳</option>
-              <option value="ט">כיתה ט׳</option>
-              <option value="י">כיתה י׳</option>
-              <option value="יא">כיתה י"א</option>
-              <option value="יב">כיתה י"ב</option>
-            </select>
-          </div>
+        <div className="mb-5">
+          <label className="text-sm font-semibold text-gray-600 block mb-2">בן/בת כמה?</label>
+          <input type="number" min={1} max={18} placeholder="גיל"
+            value={A._age || ""}
+            onChange={e => upd("_age", e.target.value)}
+            className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 w-24 focus:border-[#4a6fa5] outline-none" />
         </div>
-        {mismatch && (
-          <div className="bg-yellow-50 border-r-4 border-yellow-500 rounded-lg px-4 py-2 text-xs font-semibold text-yellow-800 mb-3">
-            ⚠️ אי התאמה בין גיל וכיתה - נא לבדוק
+
+        {gradeChoices && (
+          <div className="mb-5">
+            <label className="text-sm font-semibold text-gray-600 block mb-2">באיזו כיתה?</label>
+            <div className="flex gap-2 flex-wrap">
+              {gradeChoices.map(g => (
+                <button key={g} className={ob(A._grade === g)} onClick={() => upd("_grade", g)}>{GRADE_LABEL[g]}</button>
+              ))}
+            </div>
+            <p className="text-xs text-gray-400 mt-2">בגיל הזה שתי האפשרויות שכיחות, וזה משנה אילו שאלות נשאל בהמשך.</p>
           </div>
         )}
-        <div className="mb-5">
-          <label className="text-xs font-semibold text-gray-500 block mb-2">מין <span className="text-red-500">*</span></label>
+
+        <div>
+          <label className="text-sm font-semibold text-gray-600 block mb-2">מין</label>
           <div className="flex gap-2 flex-wrap">
             {["זכר","נקבה"].map(g => (
               <button key={g} className={ob(A.gender === g)} onClick={() => upd("gender", g)}>{g}</button>
             ))}
           </div>
         </div>
-
-        {/* גובה ומשקל */}
-        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">📏 גובה ומשקל (אופציונלי)</div>
-        <div className="flex gap-4 flex-wrap mb-2">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-gray-500">גובה (ס"מ)</label>
-            <input type="number" placeholder='ס"מ' value={A._h || ""}
-              onChange={e => upd("_h", e.target.value)}
-              className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 text-sm w-28 focus:border-[#4a6fa5] outline-none" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-semibold text-gray-500">משקל (ק"ג)</label>
-            <input type="number" placeholder='ק"ג' value={A._w || ""}
-              onChange={e => upd("_w", e.target.value)}
-              className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 text-sm w-28 focus:border-[#4a6fa5] outline-none" />
-          </div>
-        </div>
-        {bmi && (
-          <div className="text-xs text-gray-500 mb-4">BMI: <strong>{bmi.toFixed(1)}</strong> - {bmiLabel(bmi)}</div>
-        )}
-
-        {/* שינה ואכילה */}
-        <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">😴 שינה ואכילה</div>
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">האם יש קשיי שינה?</p>
-          <div className="flex gap-2 mb-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.sleep === v)} onClick={() => upd("sleep", v)}>{v}</button>)}
-          </div>
-          {A.sleep === "כן" && (
-            <div className="pr-4 border-r-2 border-blue-200 mt-2 space-y-3">
-              <div>
-                <p className="text-sm text-gray-500 mb-2">קושי בהירדמות?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v => <button key={v} className={ob(A.sleep_fall === v)} onClick={() => upd("sleep_fall", v)}>{v}</button>)}
-                </div>
-              </div>
-              <div>
-                <p className="text-sm text-gray-500 mb-2">קושי באיכות השינה?</p>
-                <div className="flex gap-2">
-                  {["כן","לא"].map(v => <button key={v} className={ob(A.sleep_qual === v)} onClick={() => upd("sleep_qual", v)}>{v}</button>)}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-        <div className="mb-4">
-          <p className="text-sm text-gray-500 mb-2">האם יש קשיי גמילה / התרוקנות?</p>
-          <div className="flex gap-2">
-            {["כן","לא"].map(v => <button key={v} className={ob(A.toilet === v)} onClick={() => upd("toilet", v)}>{v}</button>)}
-          </div>
-        </div>
       </Card>
 
-      <div className="mt-4">
-        <button onClick={handleNext}
-          className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90 transition-all">
-          המשך ←
-        </button>
-        {showErr && (
-          <p className="text-red-500 text-sm font-semibold mt-3">⛔ יש למלא גיל, כיתה ומגדר לפני המשך</p>
-        )}
-      </div>
+      <NavRow onBack={onBack} onNext={handleNext} />
+      {showErr && (
+        <p className="text-red-500 text-sm font-semibold mt-3">
+          {gradeChoices && !A._grade ? "⛔ יש לבחור גיל, כיתה ומין לפני המשך" : "⛔ יש למלא גיל ומין לפני המשך"}
+        </p>
+      )}
     </div>
   );
 }
@@ -597,10 +601,13 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
 // ── p-areas ───────────────────────────────────────────────────────────────────
 const AREA_OPTS = ["כלל לא","מעט","הרבה","הרבה מאוד"];
 
-function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack: () => void }) {
+function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void }) {
   const age   = parseInt(A._age) || 0;
   const grpV  = gg(A);
-  const showDev = (age > 0 && age < 7) || grpV === "ga" || A.toilet === "כן";
+  // Was also unlocked by the toilet question on the opening screen, which is gone.
+  // The window widens to 12 instead: bed-wetting and encopresis referrals stay
+  // clinically relevant well past 7, and that gate was the only way to reach them.
+  const showDev = (age > 0 && age < 12) || grpV === "ga";
   // Ages 1–2: only developmental + behavioral domains are relevant - hide the
   // emotional / learning / social options entirely.
   const onlyDevBeh = age >= 1 && age <= 2;
@@ -678,7 +685,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
               <div className="flex gap-1.5 flex-wrap">
                 {AREA_OPTS.map(opt => (
                   <button key={opt}
-                    className={`px-2.5 py-1 border-[1.5px] rounded-2xl text-xs font-medium transition-all cursor-pointer ${A[key] === opt ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]"}`}
+                    className={`flex-1 min-w-[68px] min-h-[44px] px-2 py-1 border-[1.5px] rounded-2xl text-sm font-medium transition-all cursor-pointer ${A[key] === opt ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]"}`}
                     onClick={() => selArea(key, opt)}>{opt}</button>
                 ))}
               </div>
@@ -753,7 +760,7 @@ function GaConsentBlock({ A, setA, onDone }: {
 }
 
 // ── p-q1 ─────────────────────────────────────────────────────────────────────
-function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   function pickScale(v: number) {
     const n = {...A, q1:v};
     setA(n);
@@ -779,7 +786,7 @@ function PageQ1({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-q1-pain ────────────────────────────────────────────────────────────────
-function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -800,7 +807,7 @@ function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 }
 
 // ── p-aq ─────────────────────────────────────────────────────────────────────
-function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const aqItems = (items?.aq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -826,7 +833,7 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-aq-grade ────────────────────────────────────────────────────────────────
-function PageAQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageAQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const grp = gg(A);
   const aqTot = A.aq_tot || 0;
 
@@ -920,7 +927,7 @@ function PageAQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 }
 
 // ── p-q1-ga ───────────────────────────────────────────────────────────────────
-function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -934,7 +941,7 @@ function PageQ1GA({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNe
 }
 
 // ── p-q2 ─────────────────────────────────────────────────────────────────────
-function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -955,7 +962,7 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-q2-grade ────────────────────────────────────────────────────────────────
-function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const grp = gg(A);
   const gaAlreadyFilled = A.ga_consent !== undefined;
   return (
@@ -992,7 +999,7 @@ function PageQ2Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 }
 
 // ── p-q3 ─────────────────────────────────────────────────────────────────────
-function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1013,7 +1020,7 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-mq ─────────────────────────────────────────────────────────────────────
-function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const mqItems = (items?.mq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1040,7 +1047,7 @@ function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-mq-sui ─────────────────────────────────────────────────────────────────
-function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1056,7 +1063,7 @@ function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onN
 }
 
 // ── p-q4 ─────────────────────────────────────────────────────────────────────
-function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1072,7 +1079,7 @@ function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-q4-types ────────────────────────────────────────────────────────────────
-function PageQ4Types({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4Types({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   function toggle(key: string) { setA({...A,[key]:A[key]?undefined:true}); }
   return (
     <div>
@@ -1093,7 +1100,7 @@ function PageQ4Types({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 }
 
 // ── p-q4-s ────────────────────────────────────────────────────────────────────
-function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const asItems = (items?.as ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1120,7 +1127,7 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
 }
 
 // ── p-q4-g ────────────────────────────────────────────────────────────────────
-function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const agItems = (items?.ag ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1147,7 +1154,7 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
 }
 
 // ── p-q4-b ────────────────────────────────────────────────────────────────────
-function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const abItems = (items?.ab ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1174,7 +1181,7 @@ function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
 }
 
 // ── p-q4-ctrl ─────────────────────────────────────────────────────────────────
-function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1194,7 +1201,7 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 }
 
 // ── p-q5 ─────────────────────────────────────────────────────────────────────
-function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1210,7 +1217,7 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-oq ─────────────────────────────────────────────────────────────────────
-function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const oqItems = (items?.oq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1237,7 +1244,7 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-oq-grade ────────────────────────────────────────────────────────────────
-function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const grp = gg(A);
   return (
     <div>
@@ -1272,7 +1279,7 @@ function PageOQGrade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 }
 
 // ── p-q6 ─────────────────────────────────────────────────────────────────────
-function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1288,7 +1295,7 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-tq ─────────────────────────────────────────────────────────────────────
-function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const tqItems = (items?.tq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1317,7 +1324,7 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 
 // ── p-q7 ─────────────────────────────────────────────────────────────────────
 // שאלה 7 - הזיות (7א) ואמונות יוצאות דופן / חשדות (7ב), על אותו מסך
-function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const canContinue = !!A.q7a && !!A.q7b;
   function setKey(k: "q7a" | "q7b", v: string) {
     const nA = { ...A, [k]: v };
@@ -1351,7 +1358,7 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // Shortened prodromal questionnaire - 6 items (from PQ-16), yes/no
 // Covers core CAARMS/PACE domains: auditory & visual hallucinations, paranoia,
 // thought disorder, reality testing confusion, thought broadcasting
-function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const pqItems = (items?.pq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1378,7 +1385,7 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-q8 ─────────────────────────────────────────────────────────────────────
-function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1394,14 +1401,55 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-eq ─────────────────────────────────────────────────────────────────────
-function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const age = parseInt(A._age) || 0;
   const under12 = age === 0 || age < 12;
+  const bmi = calcBMI(parseFloat(A._h) || 0, parseFloat(A._w) || 0);
+
+  // Height and weight moved here from the opening screen. BMI is only ever read
+  // by the eating-disorder scoring, so asking every parent for it up front cost
+  // two fields on the screen with the worst dropout in the questionnaire and
+  // bought nothing for the ones who never reach this branch.
+  function updMeasure(key: "_h" | "_w", val: string) {
+    const next = { ...A, [key]: val };
+    const b = calcBMI(
+      parseFloat(key === "_h" ? val : A._h) || 0,
+      parseFloat(key === "_w" ? val : A._w) || 0,
+    );
+    // Assign unconditionally: keeping the previous value when the new one is
+    // incomplete left a stale BMI behind after clearing the height field, and
+    // the scoring went on referring the child to a dietitian over it.
+    next._bmi = b ?? undefined;
+    setA(next);
+  }
+
   return (
     <div>
       <Card>
         <StepTag>🍽️ שאלות על הרגלי אכילה</StepTag>
         <StepHint>לפי גיל הילד/ה</StepHint>
+
+        <div className="bg-[var(--surface)] rounded-xl p-3 sm:p-4 mb-4 border border-[var(--line)]">
+          <div className="text-sm font-semibold text-[#2a3a4a] mb-1">📏 גובה ומשקל</div>
+          <p className="text-xs text-gray-400 mb-3">לא חובה, אבל עוזר לדייק את ההמלצה בתחום האכילה.</p>
+          <div className="flex gap-4 flex-wrap">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">גובה (ס"מ)</label>
+              <input type="number" placeholder='ס"מ' value={A._h || ""}
+                onChange={e => updMeasure("_h", e.target.value)}
+                className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 w-28 focus:border-[#4a6fa5] outline-none" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-semibold text-gray-500">משקל (ק"ג)</label>
+              <input type="number" placeholder='ק"ג' value={A._w || ""}
+                onChange={e => updMeasure("_w", e.target.value)}
+                className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 w-28 focus:border-[#4a6fa5] outline-none" />
+            </div>
+          </div>
+          {bmi && (
+            <div className="text-xs text-gray-500 mt-2">BMI: <strong>{bmi.toFixed(1)}</strong> - {bmiLabel(bmi)}</div>
+          )}
+        </div>
 
         {under12 ? (
           <>
@@ -1488,7 +1536,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-q9 ─────────────────────────────────────────────────────────────────────
-function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1503,7 +1551,7 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 }
 
 // ── p-bq ─────────────────────────────────────────────────────────────────────
-function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const bqItems = (items?.bq ?? []) as {key: string; label: string}[];
   return (
     <div>
@@ -1530,7 +1578,7 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 }
 
 // ── p-q9-adhd - Q9 re-route to the ADHD questionnaire for grades ב׳–ו׳ ────────
-function PageQ9Adhd({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageQ9Adhd({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   return (
     <div>
       <Card>
@@ -1545,7 +1593,7 @@ function PageQ9Adhd({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>v
 }
 
 // ── p-q10 ────────────────────────────────────────────────────────────────────
-function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1561,7 +1609,7 @@ function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
 }
 
 // ── p-q10-par ────────────────────────────────────────────────────────────────
-function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   return (
     <div>
       <Card>
@@ -1575,7 +1623,7 @@ function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 }
 
 // ── p-q10-grade ──────────────────────────────────────────────────────────────
-function PageQ10Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageQ10Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const grp = gg(A);
   function toggleInt(key: string) {
     setA({ ...A, [key]: !A[key] });
@@ -1635,7 +1683,7 @@ function PageQ10Grade({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; 
 }
 
 // ── p-ga-traits ───────────────────────────────────────────────────────────────
-function PageGaTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageGaTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const showNoPath  = A.ga_consent === "לא";
   const showYesPath = A.ga_consent === "כן";
   function toggleInt(key: string) {
@@ -1782,7 +1830,7 @@ function PageDevSensory({ A, setA, onNext, onBack, items }: PageProps) {
 }
 
 // ── p-acad ────────────────────────────────────────────────────────────────────
-type PageProps = { A: Ans; setA: (a: Ans) => void; onNext: (a?: Ans) => void; onBack: () => void; items?: Record<string, any[]> | null };
+type PageProps = { A: Ans; setA: (a: Ans) => void; onNext: (a?: Ans) => void; onBack?: () => void; items?: Record<string, any[]> | null };
 
 
 function AcadAdhdBlock({ prefix, A, setA, items }: { prefix: string; A: Ans; setA: (a: Ans) => void; items?: Record<string, any[]> | null }) {
@@ -2205,7 +2253,7 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
 }
 
 // ── p-beh ─────────────────────────────────────────────────────────────────────
-function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void }) {
+function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   function behSet(key: string, val: string) { setA(computeBehPlan({ ...A, [key]: val })); }
   const opts = ["לא","מעט","הרבה"];
   return (
@@ -2251,7 +2299,7 @@ function needsSocTherapyMotiv(A: Ans): boolean {
   return false;
 }
 
-function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack:()=>void; items?: Record<string, any[]> | null }) {
+function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const soc3Early = A.soc3_early || "";
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
@@ -3252,7 +3300,7 @@ function KidsRecommendationsStrip({
   options: { key: string; label: string; domainLabel: string; urgent: boolean; combined: boolean }[];
   activeKey: string | null;
   onSelect: (key: string) => void;
-  onBack: () => void;
+  onBack?: () => void;
 }) {
   const byDomainLabel: { domainLabel: string; items: typeof options }[] = [];
   for (const o of options) {
@@ -4094,27 +4142,34 @@ export default function KidsPage() {
     }
   }
 
+  // One step of history, deliberately not a stack: going back consumes it, so
+  // the trail can never be replayed past a branch whose answers have since
+  // changed. canGoBack also hides the control on the first screen.
+  const [canGoBack, setCanGoBack] = useState(false);
+
   function goNext(newA: Ans = A) {
     setA(newA);
     setStep(s => nextPid(s, newA));
+    setCanGoBack(true);
   }
   function goBack() {
     setStep(s => prevPid(s, A));
+    setCanGoBack(false);
   }
 
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
-  const pageProps = { A, setA, onNext: goNext, onBack: goBack, items: kidsItems };
+  const pageProps = { A, setA, onNext: goNext, onBack: canGoBack ? goBack : undefined, items: kidsItems };
 
   // paymentRequired is set when the server refused to score (limit reached) -
   // blocks the result too, unlike the pre-quiz usageAllowed gate below.
   if (paymentRequired || (usageAllowed === false && step !== "p-result")) return (
-    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
+    <main className="quiz-shell min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       <QuizPaymentBlock quizType="kids" />
     </main>
   );
 
   if (itemsError) return (
-    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
+    <main className="quiz-shell min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       <div className="flex flex-col items-center justify-center min-h-[60vh] text-center px-6">
         <div className="text-4xl mb-4">⚠️</div>
         <h2 className="text-xl font-bold mb-3" style={{ color: "var(--text)" }}>לא ניתן לטעון את השאלון</h2>
@@ -4128,7 +4183,7 @@ export default function KidsPage() {
   );
 
   return (
-    <main className="min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
+    <main className="quiz-shell min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       {/* Header */}
       <header className="mb-6">
         <div className="flex items-center justify-between mb-2">
