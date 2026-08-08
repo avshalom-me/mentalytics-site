@@ -210,7 +210,13 @@ function traitNeeds(A: Ans): TraitNeeds {
       (grp === "bv" && anx && aqTot > 20 && m >= 3) ||
       (grp === "zy" && anx && m >= 2),
     interests: grp === "zy" && (q10On || socOn),
-    gaConsent: grp === "ga" && hasGaPositive(A),
+    // The social branch routes ga children through buildGaRef too, off soc1 plus
+    // an LSAS of 8, which hasGaPositive knows nothing about. An unanswered
+    // ga_consent there is not blank - buildGaRef has a default that looks exactly
+    // like a real answer. Reachable before this refactor as well, but p-traits
+    // runs after p-soc, so now there is somewhere to ask it.
+    gaConsent: grp === "ga" &&
+      (hasGaPositive(A) || (A.soc1 === "כן" && (A.lsas_tot || 0) >= 8)),
   };
 }
 
@@ -436,13 +442,17 @@ function EqNum({ n }: { n: number }) {
 // showBack defaults to true now: the parent passes onBack only while a step back
 // is actually available (see pageProps), so the presence of the handler is the
 // switch. It used to be wired up at every call site and rendered at none.
-function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = true }: {
-  onBack?: () => void; onNext?: () => void; backLabel?: string; nextLabel?: string; showBack?: boolean;
+// nextDisabled greys the button out; passing onNext={undefined} removes it
+// entirely. On a screen with unanswered required questions the second reads as
+// "the questionnaire ended here" - especially on the last screen - so anything
+// waiting for an answer should stay visible and disabled.
+function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המשך ←", showBack = true, nextDisabled = false }: {
+  onBack?: () => void; onNext?: () => void; backLabel?: string; nextLabel?: string; showBack?: boolean; nextDisabled?: boolean;
 }) {
   return (
     <div className="flex gap-3 mt-7 flex-wrap">
       {onNext && (
-        <button onClick={onNext} className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90 transition-all">{nextLabel}</button>
+        <button onClick={onNext} disabled={nextDisabled} className="px-8 py-3 bg-gradient-to-r from-[#2c3e7a] to-[#4a6fa5] text-white rounded-full font-bold text-sm shadow-md hover:opacity-90 transition-all disabled:opacity-40 disabled:cursor-not-allowed">{nextLabel}</button>
       )}
       {showBack && onBack && (
         <button onClick={onBack} className="px-6 py-3 border-2 border-[var(--teal)] text-[var(--teal)] rounded-full font-semibold text-sm hover:bg-blue-50 transition-all">{backLabel}</button>
@@ -611,6 +621,12 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
   const age = parseInt(A._age) || 0;
   // Only surfaced for the five ages where the grade actually changes the track.
   const gradeChoices = age > 0 ? ambiguousGrades(age) : null;
+  // min/max on the input are not enforced outside a form submit, and the grade
+  // dropdown that used to catch a nonsense age is gone. An out-of-range age
+  // leaves _grade empty, and every grp === "ga" | "bv" | "zy" chain in the
+  // scoring then falls through to its else - the adolescent track - so a typo
+  // silently routes a toddler through teenage questions.
+  const ageValid = age >= 1 && age <= 18;
 
   function upd(key: string, val: any) {
     const next = { ...A, [key]: val };
@@ -621,7 +637,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
   }
 
   function handleNext() {
-    if (!A._age || !A.gender || (gradeChoices && !A._grade)) { setShowErr(true); return; }
+    if (!ageValid || !A.gender || (gradeChoices && !A._grade)) { setShowErr(true); return; }
     setShowErr(false);
     onNext(A);
   }
@@ -631,7 +647,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
       <Card>
         <StepTag>שלב 1 מתוך 3</StepTag>
         <StepQ>קצת על הילד/ה</StepQ>
-        <StepHint>שתי שאלות קצרות, ומתחילים</StepHint>
+        <StepHint>{gradeChoices ? "שלוש שאלות קצרות, ומתחילים" : "שתי שאלות קצרות, ומתחילים"}</StepHint>
 
         <div className="mb-5">
           <label className="text-sm font-semibold text-gray-600 block mb-2">בן/בת כמה?</label>
@@ -666,7 +682,9 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
       <NavRow onBack={onBack} onNext={handleNext} />
       {showErr && (
         <p className="text-red-500 text-sm font-semibold mt-3">
-          {gradeChoices && !A._grade ? "⛔ יש לבחור גיל, כיתה ומין לפני המשך" : "⛔ יש למלא גיל ומין לפני המשך"}
+          {!ageValid ? "⛔ יש למלא גיל בין 1 ל-18"
+            : gradeChoices && !A._grade ? "⛔ יש לבחור כיתה ומין לפני המשך"
+            : "⛔ יש למלא גיל ומין לפני המשך"}
         </p>
       )}
     </div>
@@ -699,14 +717,27 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
       detail:
         "תחום שעוסק בעולם הפנימי של הילד/ה: חרדה, פחדים, דאגות חוזרות, קושי להירגע, מתח גופני; דימוי עצמי נמוך וביקורת עצמית; מצב רוח ירוד, חוסר עניין או הנאה, רגישות יתר וקושי בוויסות רגשי; מחשבות חודרניות או טקסים אובססיביים-קומפולסיביים; טראומה ואירועים מעוררי חרדה; וכן סוגי התמכרות (חומרים, מסכים, הימורים) ובעיות אכילה. אם בני הנוער או ילדכם מתמודדים עם תחושות פנימיות שמקשות עליהם בתפקוד היומיומי או בקשרים - סמנו כאן.",
     },
+    // Two descriptions, because the questions behind them differ by age. The
+    // sensory screen is gated on devAgeOk (under 7, or the gan/א track), so for
+    // 7-11 the only developmental question actually asked is toilet difficulty.
+    // Promising motor skills and sensory regulation to those parents and then
+    // asking about neither is how a domain ends up feeling broken.
     ...(showDev
-      ? [{
-          key: "a_dev",
-          title: "בעיות התפתחותיות",
-          desc: "גמילה, הרטבה, מוטוריקה, ויסות חושי",
-          detail:
-            "תחום שעוסק באבני דרך התפתחותיות: גמילה מחיתולים (יום ולילה), הרטבה לאחר גיל הגמילה, עצירות או אנקופרזיס; מוטוריקה גסה (תיאום, שיווי משקל, חוסר בטחון בתנועה) ומוטוריקה עדינה (אחיזת עיפרון, גזירה, כתיבה, איכות ציור); ויסות חושי - תגובות מוגזמות לקולות, מגע, בדים, אורות, או דווקא חיפוש מוגבר של גירויים. בקשיים אלה מעורבים לעיתים רופא ילדים, מרפאה בעיסוק, פיזיותרפיסטית רצפת אגן או קלינאית תקשורת.",
-        }]
+      ? [devAgeOk(A)
+        ? {
+            key: "a_dev",
+            title: "בעיות התפתחותיות",
+            desc: "גמילה, הרטבה, מוטוריקה, ויסות חושי",
+            detail:
+              "תחום שעוסק באבני דרך התפתחותיות: גמילה מחיתולים (יום ולילה), הרטבה לאחר גיל הגמילה, עצירות או אנקופרזיס; מוטוריקה גסה (תיאום, שיווי משקל, חוסר בטחון בתנועה) ומוטוריקה עדינה (אחיזת עיפרון, גזירה, כתיבה, איכות ציור); ויסות חושי - תגובות מוגזמות לקולות, מגע, בדים, אורות, או דווקא חיפוש מוגבר של גירויים. בקשיים אלה מעורבים לעיתים רופא ילדים, מרפאה בעיסוק, פיזיותרפיסטית רצפת אגן או קלינאית תקשורת.",
+          }
+        : {
+            key: "a_dev",
+            title: "גמילה והרטבה",
+            desc: "הרטבת לילה או יום, עצירות, בריחת צואה",
+            detail:
+              "תחום שעוסק בשליטה על הסוגרים בגיל שבו כבר מצופה שליטה מלאה: הרטבת לילה או יום, עצירות כרונית, ובריחת צואה (אנקופרזיס). ברוב המקרים הגורם הראשוני הוא דווקא עצירות, וניתן לטפל בכך. בקשיים אלה מעורבים לעיתים רופא ילדים, אורולוג או גסטרואנטרולוג ילדים, ופיזיותרפיסטית רצפת אגן לילדים.",
+          }]
       : []),
     {
       key: "a_aca",
@@ -1245,7 +1276,8 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
           <p className="text-xs text-amber-700 mt-3">יש לענות על שתי השאלות.</p>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={canContinue ? () => onNext(A) : undefined} />
+      {/* Disabled rather than absent - a missing Continue reads as a dead end. */}
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={!canContinue} />
     </div>
   );
 }
@@ -1307,6 +1339,11 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
   // by the eating-disorder scoring, so asking every parent for it up front cost
   // two fields on the screen with the worst dropout in the questionnaire and
   // bought nothing for the ones who never reach this branch.
+  //
+  // This does narrow the BMI screening, deliberately: the out-of-range-BMI
+  // warning and its dietitian and GP referrals now only reach parents who
+  // flagged an eating concern. Before, any parent who happened to fill in height
+  // and weight could get them. Widen it again by asking here and on p-demo both.
   function updMeasure(key: "_h" | "_w", val: string) {
     const next = { ...A, [key]: val };
     const b = calcBMI(
@@ -2079,7 +2116,6 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
   const lsasItems = (items?.lsas ?? []) as string[];
-  const showSocDetails = A.soc1 === "כן" && (A.lsas_tot || 0) >= 8 && grp !== "ga";
   return (
     <div>
       <Card>
@@ -2232,7 +2268,10 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
     (!needs.motiv  || (A.t_motiv  || 0) > 0) &&
     (!needs.verbal || (A.t_verbal || 0) > 0) &&
     (!needs.prac   || (A.t_prac   || 0) > 0) &&
-    (!needs.gaConsent || A.ga_consent !== undefined);
+    // "לא" opens a follow-up about attending with a parent, and leaving that one
+    // blank is not neutral: buildGaRef reads a missing answer the same as "כן"
+    // and hands back a dyadic-therapy referral nobody asked for.
+    (!needs.gaConsent || (A.ga_consent !== undefined && (A.ga_consent !== "לא" || A.ga_consent_parent !== undefined)));
 
   const INTERESTS = [
     { key:"int_art",    label:"אומנות" },
@@ -2294,7 +2333,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           <p className="text-xs text-amber-700 mt-4">יש לענות על השאלות שלמעלה כדי להמשיך.</p>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={ready ? () => onNext(A) : undefined} />
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={!ready} />
     </div>
   );
 }

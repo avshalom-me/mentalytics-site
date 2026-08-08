@@ -45,7 +45,7 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
   "e3-q": { group: "E3 - פסיכוזה/סומטי", desc: "צ'קליסט היגדים פרודרומליים + מחשבות אובדניות - מוזג לתוך e3 ב-8/8/26", input: "checklist", items: 8, sensitive: true, legacy: true },
   e4: { group: "E4 - חרדה", desc: "שאלת שער: דאגות מתמשכות / חרדה / פחד (כן/לא)", input: "gate" },
   "e4-contexts": { group: "E4 - חרדה", desc: "הקשרי חרדה: כאב כרוני (+שאלת המשך רפואית), טיסות, חרדה רפואית, תסמינים גופניים", input: "checklist", items: 4 },
-  "e4-q": { group: "E4 - חרדה", desc: "שאלון חרדה בסגנון GAD-7: 7 סולמות 1-3, כולם נדרשים", input: "scales", items: 7, heavy: true },
+  "e4-q": { group: "E4 - חרדה", desc: "שאלון חרדה בסגנון GAD-7: 9 סולמות 1-3, אף אחד אינו חובה - דילוג מפיק המלצת \"חרדה ללא הגדרה ספציפית\" + CBT", input: "scales", items: 9, heavy: true },
   "e4-social": { group: "E4 - חרדה", desc: "שאלת שער: חרדה חברתית (כן/לא)", input: "gate" },
   "e4-social-sev": { group: "E4 - חרדה", desc: "סולם יחיד 1-7: עד כמה החרדה החברתית פוגעת בתפקוד", input: "scales", items: 1 },
   "e4-chronic": { group: "E4 - חרדה", desc: "כאבים כרוניים (מוזג ל-e4-contexts)", input: "gate", legacy: true },
@@ -115,8 +115,8 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
 
 export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-consent": { group: "פתיחה", desc: "הצהרה משפטית + הסכמה (ההורה הממלא)", input: "gate" },
-  "p-demo": { group: "פתיחה", desc: "פרטי הילד: גיל, שכבה ומין (חובה) + גובה/משקל, שאלות שינה ואכילה מקוננות - טופס ארוך", input: "form", items: 6, heavy: true },
-  "p-areas": { group: "פתיחה", desc: "תחומי הקושי העיקריים + האם הילד מסכים לטיפול (שאלות מקוננות)", input: "choice", items: 2 },
+  "p-demo": { group: "פתיחה", desc: "גיל ומין בלבד (חובה); הכיתה נגזרת מהגיל ונשאלת רק בגילאי 6/7/9/12/14. קוצר מ-9 שדות ב-8/8/26", input: "form", items: 2 },
+  "p-areas": { group: "פתיחה", desc: "דירוג תחומי הקושי העיקריים (4-5 תחומים, סולם כלל-לא/מעט/הרבה/הרבה-מאוד)", input: "choice", items: 1 },
 
   "p-q1": { group: "חרדה", desc: "שאלת שער: דאגות/לחצים מתמשכים אצל הילד (כן/לא)", input: "gate" },
   "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא)", input: "gate" },
@@ -145,10 +145,10 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-tq": { group: "טראומה", desc: "שאלון טראומה: 10 סעיפים", input: "scales", items: 10, heavy: true, sensitive: true },
 
   "p-q7": { group: "פסיכוזה", desc: "שער חוויות פנימיות חריגות: ראה/שמע דברים שאינם קיימים (כן/לא)", input: "gate", sensitive: true },
-  "p-pq": { group: "פסיכוזה", desc: "שאלון חוויות חריגות: 6 סעיפים", input: "scales", items: 6, sensitive: true },
+  "p-pq": { group: "פסיכוזה", desc: "שאלון הפרעת חשיבה: 3 סעיפים כן/לא. מוצג רק במסלול אמונות-בלבד; דיווח הזיות מדלג עליו", input: "scales", items: 3, sensitive: true },
 
   "p-q8": { group: "אכילה", desc: "שאלת שער: דפוסי אכילה מדאיגים (כן/לא)", input: "gate" },
-  "p-eq": { group: "אכילה", desc: "שאלון אכילה מפורט", input: "scales", items: 6, sensitive: true },
+  "p-eq": { group: "אכילה", desc: "שאלון אכילה מפורט (2 בלוקים לפי גיל) + גובה ומשקל אופציונליים ל-BMI, שעברו לכאן מהמסך הדמוגרפי", input: "scales", items: 8, sensitive: true },
 
   "p-q9": { group: "התנהגות/ויסות", desc: "שער: חוסר יציבות ביחסים, קושי בוויסות רגשות ואימפולסיביות (כן/לא)", input: "gate" },
   "p-bq": { group: "התנהגות/ויסות", desc: "שאלון ויסות רגשות ויחסים בינאישיים", input: "scales", items: 6 },

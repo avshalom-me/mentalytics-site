@@ -167,14 +167,16 @@ function computeResults(A: Ans): KidsBox[] {
           }
         }
       } else {
-        if (aqTot > 13) {
-          const m = A.t_motiv || 0, p = A.t_prac || 0;
-          ref = m === 1
-            ? "✅ הפנייה: הדרכת הורים טיפולית"
-            : p <= 2
-              ? "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים"
-              : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
-        }
+        // The inner `if (aqTot > 13)` that used to wrap this is gone: it sits
+        // inside `aqTot >= 16`, so it was always true, and had it ever been
+        // false `ref` would have stayed empty and addToGroup below would have
+        // emitted a finding card with no referral under it.
+        const m = A.t_motiv || 0, p = A.t_prac || 0;
+        ref = m === 1
+          ? "✅ הפנייה: הדרכת הורים טיפולית"
+          : p <= 2
+            ? "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים"
+            : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
       }
       addToGroup("📊 נמצאו סימנים לחרדה", ref, []);
     } else {
