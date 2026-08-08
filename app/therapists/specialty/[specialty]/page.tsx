@@ -8,6 +8,7 @@ import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import CouplesDepthSection from "@/app/therapists/CouplesDepthSection";
 import PageViewTracker from "@/app/components/PageViewTracker";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -118,6 +119,11 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
           {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/specialty/${slug}`} />)}
         </div>
       )}
+
+      {/* Couples is 63% of all measured demand in the field (Keyword Planner,
+          8/8/26) and this page carried none of its big phrases, so it gets a
+          depth section of its own rather than a new competing page. */}
+      {specialty === "טיפול זוגי" && <CouplesDepthSection />}
 
       {/* Treatment deep-dive - below the listings (the city-pages pattern):
           prose distilled from our own editorial articles + links into them. */}
