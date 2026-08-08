@@ -121,11 +121,11 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-q1": { group: "חרדה", desc: "שאלת שער: דאגות/לחצים מתמשכים אצל הילד (כן/לא)", input: "gate" },
   "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא)", input: "gate" },
   "p-aq": { group: "חרדה", desc: "שאלון חרדה: 10 סעיפים בסולם 1-3", input: "scales", items: 10, heavy: true },
-  "p-aq-grade": { group: "חרדה", desc: "שאלות משלימות לפי שכבת גיל", input: "scales", items: 3 },
-  "p-q1-ga": { group: "חרדה", desc: "שאלות משלימות לגיל הצעיר", input: "scales", items: 3 },
+  "p-aq-grade": { group: "חרדה", desc: "שאלות משלימות לפי שכבת גיל - מוזג ל-p-traits ב-8/8/26", input: "scales", items: 3, legacy: true },
+  "p-q1-ga": { group: "חרדה", desc: "הסכמת הילד לטיפול (גיל רך) - מוזג ל-p-traits ב-8/8/26", input: "gate", items: 1, legacy: true },
 
   "p-q2": { group: "מצב רוח", desc: "שאלת שער: הילד חש שאינו שווה / אינו מוערך (כן/לא)", input: "gate" },
-  "p-q2-grade": { group: "מצב רוח", desc: "שאלות משלימות לפי גיל", input: "scales", items: 3 },
+  "p-q2-grade": { group: "מצב רוח", desc: "שאלות משלימות לפי גיל - מוזג ל-p-traits ב-8/8/26", input: "scales", items: 3, legacy: true },
   "p-q3": { group: "מאניה/דיכאון", desc: "שאלת שער: מצב רוח ירוד או עצוב (כן/לא)", input: "gate" },
   "p-mq": { group: "מאניה/דיכאון", desc: "שאלון מצב רוח: 9 סעיפים", input: "scales", items: 9, heavy: true },
   "p-mq-sui": { group: "מאניה/דיכאון", desc: "שאלה ישירה: האם קיימות מחשבות אובדניות חוזרות אצל הילד", input: "gate", sensitive: true },
@@ -139,7 +139,7 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
 
   "p-q5": { group: "OCD", desc: "שאלת שער: מחשבות חוזרות / טקסים (כן/לא)", input: "gate" },
   "p-oq": { group: "OCD", desc: "שאלון OCD: 6 סעיפים", input: "scales", items: 6 },
-  "p-oq-grade": { group: "OCD", desc: "שאלות משלימות לפי גיל", input: "scales", items: 3 },
+  "p-oq-grade": { group: "OCD", desc: "מסך טקסט סטטי + שדה שלא נקרא - נמחק 8/8/26", input: "scales", items: 3, legacy: true },
 
   "p-q6": { group: "טראומה", desc: "שאלת שער: הילד חווה אירוע טראומטי (כן/לא)", input: "gate", sensitive: true },
   "p-tq": { group: "טראומה", desc: "שאלון טראומה: 10 סעיפים", input: "scales", items: 10, heavy: true, sensitive: true },
@@ -156,14 +156,15 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
 
   "p-q10": { group: "מצוקה כללית", desc: "קשיים רגשיים אחרים שלא עלו בשאלון (כן/לא)", input: "gate" },
   "p-q10-par": { group: "מצוקה כללית", desc: "האם הקושי קשור לקשר עם אחד ההורים (כן/לא)", input: "gate", sensitive: true },
-  "p-q10-grade": { group: "מצוקה כללית", desc: "שאלות משלימות לפי גיל", input: "scales", items: 3 },
+  "p-q10-grade": { group: "מצוקה כללית", desc: "שאלות משלימות לפי גיל - מוזג ל-p-traits ב-8/8/26", input: "scales", items: 3, legacy: true },
 
-  "p-ga-traits": { group: "התפתחות ותפקוד", desc: "שאלות לצורך קביעת סוג הטיפול (הסכמת הילד וכו')", input: "choice", items: 2 },
+  "p-ga-traits": { group: "התפתחות ותפקוד", desc: "הסכמת הילד ותחומי עניין - מוזג ל-p-traits ב-8/8/26", input: "choice", items: 2, legacy: true },
   "p-acad": { group: "התפתחות ותפקוד", desc: "תפקוד לימודי בגן/בבית הספר - מסך ארוך התלוי בשכבת הגיל", input: "form", items: 8, heavy: true },
   "p-dev-toilet": { group: "התפתחות ותפקוד", desc: "קשיי גמילה / התרוקנות (כן/לא + פירוט)", input: "gate", sensitive: true },
   "p-dev-sensory": { group: "התפתחות ותפקוד", desc: "קשיי ויסות חושי (כן/לא + פירוט)", input: "gate" },
   "p-beh": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים התנהגותיים", input: "scales", items: 5 },
   "p-soc": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים חברתיים", input: "scales", items: 5 },
+  "p-traits": { group: "מאפייני הילד", desc: "צעד מאוחד בסוף השאלון: מוטיבציה לטיפול, ורבליות, יכולת תרגול, תחומי עניין והסכמת הילד - לפי מה שהניקוד באמת קורא עבור הילד הזה", input: "scales", items: 3 },
 
   "p-result": { group: "תוצאות", desc: "עמוד התוצאות (השלמת השאלון)", input: "system" },
 };

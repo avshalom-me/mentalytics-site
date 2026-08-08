@@ -177,16 +177,30 @@ type TraitNeeds = { motiv: boolean; verbal: boolean; prac: boolean; interests: b
 function traitNeeds(A: Ans): TraitNeeds {
   const grp = gg(A);
   const emoOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "");
+  const socDomainOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_soc || "");
   const aqTot = A.aq_tot || 0;
   const anx = anxietyGradeActive(A);
   const q10On = A.q10_par === "כן";
   const socOn = socDetailsShown(A);
   const m = A.t_motiv || 0;
 
+  // A second social path reads motivation, and it is NOT the one socDetailsShown
+  // describes: the block that turns social therapy referrals into a
+  // recommendation fires off soc2 severity or soc3 alone, with no soc1/LSAS gate
+  // and no age-group gate. Leaving it out meant a parent whose child had social
+  // findings but no social-anxiety score was never asked, scored 0, and was told
+  // "please answer the motivation question in the questionnaire" about a
+  // question they had never been shown. Deliberately over-inclusive: it covers
+  // soc3 as a whole rather than its three sub-branches, and asks in the ga track
+  // too, where the same block could otherwise print that same dead-end message.
+  const socTherapyPossible = socDomainOn &&
+    ((A.soc2 === "כן" && (A.soc2_sev || 0) >= 5) || A.soc3 === "כן");
+
   return {
     motiv:
       (grp === "bv" && (anx || (emoOn && (A.q2 || 0) >= 3) || q10On || socOn)) ||
-      (grp === "zy" && anx),
+      (grp === "zy" && anx) ||
+      socTherapyPossible,
     // The bv scoring returns early at motivation 1 and 2 and never reads these
     // two, so asking below 3 collected answers straight into the bin.
     verbal:
@@ -404,21 +418,6 @@ function sb(selected: boolean) { return `${SB_BASE} ${selected ? SB_SEL : SB_DEF
 function so(selected: boolean) { return `${SO_BASE} ${selected ? SO_SEL : SO_DEF}`; }
 function cb(selected: boolean) { return `${CB_BASE} ${selected ? CB_SEL : CB_DEF}`; }
 
-function AlertBox({ cls, txt }: Box) {
-  const style: Record<string, string> = {
-    info:   "bg-blue-50 border-r-4 border-blue-500 text-blue-900",
-    warn:   "bg-yellow-50 border-r-4 border-yellow-600 text-yellow-900",
-    danger: "bg-red-50 border-r-4 border-red-600 text-red-900",
-    purple: "bg-purple-50 border-r-4 border-purple-500 text-purple-900",
-    ok:     "bg-green-50 border-r-4 border-green-600 text-green-900",
-  };
-  return (
-    <div className={`rounded-xl p-4 mb-3 text-sm font-semibold leading-relaxed whitespace-pre-line ${style[cls] || style.info}`}>
-      {txt}
-    </div>
-  );
-}
-
 function Card({ children }: { children: React.ReactNode }) {
   return <div className="bg-white rounded-2xl p-4 sm:p-6 shadow-sm border border-gray-100">{children}</div>;
 }
@@ -469,16 +468,6 @@ function ScaleRow({ max, val, onChange }: { max: number; val: number; onChange: 
     <div className="scale-grid mt-1" style={{ ["--scale-cols" as string]: max }}>
       {Array.from({length: max}, (_, i) => i + 1).map(n => (
         <button key={n} className={sb(val === n)} onClick={() => onChange(n)}>{n}</button>
-      ))}
-    </div>
-  );
-}
-// Scale 0–4
-function Scale04Row({ val, onChange }: { val: number; onChange: (v: number) => void }) {
-  return (
-    <div className="scale-grid mt-1" style={{ ["--scale-cols" as string]: 5 }}>
-      {[0,1,2,3,4].map(n => (
-        <button key={n} className={so(val === n)} onClick={() => onChange(n)}>{n}</button>
       ))}
     </div>
   );
@@ -2234,6 +2223,17 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
   const needs = traitNeeds(A);
   const set = (k: string, v: any) => setA({ ...A, [k]: v });
 
+  // Whatever is on screen has to be answered before continuing. Skipping leaves
+  // the field at 0, and 0 is not treated as "unknown" downstream - the anxiety
+  // branch reads it as "motivation of 3 or more" and goes on to read verbality,
+  // also 0, and lands on a specific recommendation nobody asked for. Interests
+  // stay optional; they only add a preference line when ticked.
+  const ready =
+    (!needs.motiv  || (A.t_motiv  || 0) > 0) &&
+    (!needs.verbal || (A.t_verbal || 0) > 0) &&
+    (!needs.prac   || (A.t_prac   || 0) > 0) &&
+    (!needs.gaConsent || A.ga_consent !== undefined);
+
   const INTERESTS = [
     { key:"int_art",    label:"אומנות" },
     { key:"int_music",  label:"מוזיקה" },
@@ -2290,8 +2290,11 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
             </div>
           </div>
         )}
+        {!ready && (
+          <p className="text-xs text-amber-700 mt-4">יש לענות על השאלות שלמעלה כדי להמשיך.</p>
+        )}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} />
+      <NavRow onBack={onBack} onNext={ready ? () => onNext(A) : undefined} />
     </div>
   );
 }

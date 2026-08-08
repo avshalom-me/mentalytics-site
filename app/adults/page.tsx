@@ -1730,6 +1730,9 @@ export default function AdultsPage() {
         {/* Both scales are required: an unanswered pair sums to 0, which reads as
             "below threshold" and silently drops the entire personality block for
             someone who just told us they do have a recurring difficulty. */}
+        {persMain.some((v) => !v) && (
+          <p className="mt-2 text-xs text-amber-700">יש לדרג את שתי השאלות כדי להמשיך.</p>
+        )}
         <NavRow onBack={() => setScreen("e10")}
           nextDisabled={persMain.some((v) => !v)}
           onNext={() => {
@@ -1768,6 +1771,9 @@ export default function AdultsPage() {
             handed the user an autism-communication referral they never answered
             for. Blocking Continue is the cheap half of the fix; the scoring side
             refuses to act on a partial set as well. */}
+        {disQ.some((v) => !v) && (
+          <p className="mt-2 text-xs text-amber-700">יש לענות על כל ארבע השאלות כדי להמשיך.</p>
+        )}
         <NavRow
           nextDisabled={disQ.some((v) => !v)}
           onNext={() => {

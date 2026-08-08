@@ -428,6 +428,9 @@ const KIDS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   behav:   { label: "התנהגות",    steps: ["p-q9", "p-bq", "p-q9-adhd"] },
   distress:{ label: "מצוקה כללית", steps: ["p-q10", "p-q10-par", "p-q10-grade"] },
   extra:   { label: "התפתחות",    steps: ["p-ga-traits", "p-acad", "p-dev-toilet", "p-dev-sensory", "p-beh", "p-soc"] },
+  // The retired per-domain trait screens stay listed in the groups above so
+  // historical events keep landing somewhere; p-traits is where they went.
+  traits:  { label: "מאפייני הילד", steps: ["p-traits"] },
   end:     { label: "תוצאות",     steps: ["p-result"] },
 };
 
