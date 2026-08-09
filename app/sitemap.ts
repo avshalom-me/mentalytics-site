@@ -45,6 +45,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // where no large portal ranks (see docs/seo-week-plan-2026-08.md, day 4).
     { url: `${BASE}/research/psychodidactic`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/social-anxiety`, priority: 0.7, changeFrequency: "monthly" },
+    // Guest article by Dr Daniel Heiman, from his doctoral research.
+    { url: `${BASE}/research/jealousy-polyamory`, priority: 0.7, changeFrequency: "monthly" },
     // National-insurance entitlement cluster: hub + one page per track.
     { url: `${BASE}/research/btl`, priority: 0.7, changeFrequency: "monthly" },
     ...BTL_TRACKS.map((t) => ({

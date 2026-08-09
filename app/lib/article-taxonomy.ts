@@ -164,6 +164,25 @@ export function sectionForDirectoryHref(href: string): Section | null {
   return SECTIONS.find((s) => s.directory.some((d) => d.href === href)) ?? null;
 }
 
+/**
+ * Editorial guest articles written by a listed therapist, keyed by therapist id.
+ *
+ * These live as code pages under /research/, not as rows in therapist_articles,
+ * so the profile page cannot find them the way it finds community pieces. This
+ * map is the bridge - deliberately a map and not a second DB row, because a row
+ * would mint a /research/community/ URL for an article that already has one.
+ */
+export const GUEST_ARTICLES_BY_THERAPIST: Record<string, { href: string; title: string; desc: string }[]> = {
+  // ד"ר דניאל היימן
+  "d4954f74-8361-424c-bcd7-a490cfc427ba": [
+    {
+      href: "/research/jealousy-polyamory",
+      title: "מה שקנאה מלמדת על כל זוגיות",
+      desc: "גרסה מקוצרת של פרק ממחקר הדוקטורט על פוליאמוריה: למה חוקים לא מחליפים הקשבה.",
+    },
+  ],
+};
+
 export type EditorialArticle = {
   /** Path segment under /research/. */
   slug: string;
@@ -182,6 +201,14 @@ export type EditorialArticle = {
  * was which heading they sat under.
  */
 export const EDITORIAL_ARTICLES: EditorialArticle[] = [
+  {
+    slug: "jealousy-polyamory",
+    title: "מה שקנאה מלמדת על כל זוגיות",
+    desc: "מתוך מחקר דוקטורט על פוליאמוריה: למה חוקים לא מחליפים הקשבה, ומה מסתתר מאחורי \"אני לא חשוב לך\". מאת ד\"ר דניאל היימן.",
+    img: "https://images.unsplash.com/photo-1543269865-cbf427effbad?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "זוגיות-ומשפחה",
+    featured: true,
+  },
   // ── בחירת טיפול ומטפל ──────────────────────────────────────────────────────
   {
     slug: "recommended-psychologist",

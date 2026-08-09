@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
 import { specialtyToSlug } from "@/app/lib/specialties";
@@ -450,6 +451,23 @@ export default async function TherapistProfilePage({
                 })}
               </ul>
             </Accordion>
+          )}
+
+          {/* Guest articles this therapist wrote that live as editorial pages
+              (not therapist_articles rows) - see GUEST_ARTICLES_BY_THERAPIST. */}
+          {(GUEST_ARTICLES_BY_THERAPIST[id] ?? []).length > 0 && (
+            <section>
+              <SectionTitle>מאמרים מאת {name}</SectionTitle>
+              <div className="space-y-3">
+                {(GUEST_ARTICLES_BY_THERAPIST[id] ?? []).map((art) => (
+                  <Link key={art.href} href={art.href}
+                    className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
+                    <h3 className="font-bold text-stone-900 text-[15px]">{art.title}</h3>
+                    <p className="mt-1 text-sm text-stone-500 leading-6">{art.desc}</p>
+                  </Link>
+                ))}
+              </div>
+            </section>
           )}
 
           {/* Articles written by / attributed to this therapist */}
