@@ -41,3 +41,29 @@ export function promoRevertDate(signupAt: Date = new Date()): Date {
   d.setDate(d.getDate() - 3);
   return d;
 }
+
+// ── מבצע שדרוג מסיום תקופת מתנה ──────────────────────────────────────────
+// הצעה *אישית* (לא חלון גלובלי כמו ה-early-bird): מטפל שתקופת המתנה שלו
+// מסתיימת מקבל מייל עם סיכום התקופה והצעה לשדרג במחיר מוזל לחודשיים
+// הראשונים, ואז המחיר הרגיל. הזכאות נשמרת על שורת המטפל
+// (therapists.upgrade_offer_until) ונבדקת ב-checkout, כדי שההצעה לא תדלוף
+// למי שלא קיבל אותה - ולא תישאר פתוחה לנצח.
+export const TRIAL_UPGRADE_PRICE = 60;
+export const TRIAL_UPGRADE_MONTHS = 2;
+export const TRIAL_UPGRADE_TOTAL = +(TRIAL_UPGRADE_PRICE * (1 + VAT_RATE)).toFixed(2); // 70.80
+// כמה ימים ההצעה תקפה מרגע שליחת המייל (3 לפני הסיום + חלון חסד אחרי).
+export const TRIAL_UPGRADE_OFFER_DAYS = 10;
+
+/** ההצעה האישית פעילה עבור המטפל/ת הזה/ו כרגע? */
+export function trialUpgradeActive(upgradeOfferUntil: string | null | undefined, at: Date = new Date()): boolean {
+  if (!upgradeOfferUntil) return false;
+  return at.getTime() <= Date.parse(upgradeOfferUntil);
+}
+
+/** מתי הוראת הקבע חוזרת למחיר המלא - כמה ימים לפני החיוב ה-3. */
+export function trialUpgradeRevertDate(signupAt: Date = new Date()): Date {
+  const d = new Date(signupAt);
+  d.setMonth(d.getMonth() + TRIAL_UPGRADE_MONTHS);
+  d.setDate(d.getDate() - 3);
+  return d;
+}

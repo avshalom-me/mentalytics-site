@@ -5,7 +5,10 @@ import {
   SumitPaymentDeclinedError,
   SUBSCRIPTION_BASE_PRICE,
 } from "@/app/lib/sumit";
-import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, promoRevertDate } from "@/app/lib/promo";
+import {
+  isPromoActive, SUBSCRIPTION_PROMO_PRICE, promoRevertDate,
+  TRIAL_UPGRADE_PRICE, trialUpgradeActive, trialUpgradeRevertDate,
+} from "@/app/lib/promo";
 import { writeAudit } from "@/app/lib/audit";
 import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
 import { sanitizeClickIds } from "@/app/lib/attribution";
@@ -61,7 +64,7 @@ export async function POST(req: NextRequest) {
     const { data: therapist } = await supabase
       .from("therapists")
       .select(
-        "id, full_name, email, status, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages"
+        "id, full_name, email, status, bio, profile_photo_path, training_areas, therapist_types, regions, education, experience, languages, upgrade_offer_until"
       )
       .eq("user_id", user.id)
       .single();
@@ -147,8 +150,16 @@ export async function POST(req: NextRequest) {
     // who subscribe before the deadline. The standing order is created at this
     // price; the daily cron reverts it to the regular price after the promo
     // window (see promoRevertDate + sumit-status-sync).
-    const promoActive = isPromoActive();
-    const unitPrice = promoActive ? SUBSCRIPTION_PROMO_PRICE : SUBSCRIPTION_BASE_PRICE;
+    // הצעת שדרוג אישית לסיום תקופת מתנה (מייל "התקופה נגמרת"): מחיר מוזל
+    // לחודשיים ואז המחיר המלא. נבדקת מול השדה שנשמר על המטפל/ת, כדי שההצעה
+    // לא תדלוף למי שלא קיבל אותה. גוברת על ה-early-bird אם שניהם פעילים.
+    const upgradeOffer = trialUpgradeActive(therapist.upgrade_offer_until as string | null);
+    const promoActive = !upgradeOffer && isPromoActive();
+    const unitPrice = upgradeOffer
+      ? TRIAL_UPGRADE_PRICE
+      : promoActive
+        ? SUBSCRIPTION_PROMO_PRICE
+        : SUBSCRIPTION_BASE_PRICE;
 
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
@@ -240,7 +251,11 @@ export async function POST(req: NextRequest) {
             morning_token_id: sumitRecurringId ? String(sumitRecurringId) : null,
             // When to auto-revert the promo price to the regular price. null for
             // non-promo subscriptions (they're already at the regular price).
-            promo_reverts_at: promoActive ? promoRevertDate(now).toISOString() : null,
+            promo_reverts_at: upgradeOffer
+              ? trialUpgradeRevertDate(now).toISOString()
+              : promoActive
+                ? promoRevertDate(now).toISOString()
+                : null,
             updated_at: now.toISOString(),
           },
           { onConflict: "therapist_id" }

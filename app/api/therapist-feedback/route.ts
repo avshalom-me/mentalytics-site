@@ -1,15 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { sendCancellationFeedbackEmail } from "@/app/lib/therapist-emails";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 export const dynamic = "force-dynamic";
 
 // Known cancellation reasons — the form sends these exact strings. Validating
 // against the allow-list keeps the public endpoint from being used to inject
 // arbitrary content into the admin email.
+// "מצאתי מספיק מטופלים" נוסף 10/8/26: זו עזיבה מהצלחה, ובלעדיה היא נפלה
+// תחת "אחר" ונקראה בנתונים כמו כישלון של המוצר.
 const ALLOWED_REASONS = [
   "המחיר",
   "מעט פניות",
+  "מצאתי מספיק מטופלים",
   "לא התאים לי כרגע",
   "חוויית השימוש באתר",
   "אחר",
@@ -39,6 +43,25 @@ export async function POST(req: NextRequest) {
 
   if (reasons.length === 0 && !message) {
     return NextResponse.json({ ok: false, error: "empty feedback" }, { status: 400 });
+  }
+
+  // נשמר לפני השליחה: המייל לאדמין עלול להיכשל (מכסה/רשת), והמשוב עצמו הוא
+  // הנכס - בלעדיו אי אפשר לענות על "מה הסיבה הנפוצה לעזיבה" לאורך זמן.
+  // כשל בשמירה לא מפיל את הבקשה: עדיף משוב שנשלח ולא נשמר מאשר משוב שאבד.
+  try {
+    const { data: t } = email
+      ? await supabaseAdmin.from("therapists").select("id").ilike("email", email).maybeSingle()
+      : { data: null };
+    const { error: insErr } = await supabaseAdmin.from("therapist_cancellation_feedback").insert({
+      therapist_id: t?.id ?? null,
+      name: name || null,
+      email: email || null,
+      reasons,
+      message: message || null,
+    });
+    if (insErr) console.error("therapist-feedback: insert failed:", insErr.message);
+  } catch (e) {
+    console.error("therapist-feedback: insert threw:", e);
   }
 
   const sent = await sendCancellationFeedbackEmail({ name, email, reasons, message });

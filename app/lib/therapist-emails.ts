@@ -123,15 +123,23 @@ export async function sendPromotionEndedEmail(opts: {
   const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
   const feedbackUrl = `${SITE_URL}/therapists/feedback?email=${encodeURIComponent(opts.to)}&name=${encodeURIComponent(opts.name || "")}`;
 
-  // For a deliberate cancellation, invite quick exit feedback (reasons + free
-  // text) via a short on-site form. Not shown for payment-failure / gift-end.
-  const feedbackHtml =
+  // משוב יציאה: נשאל גם כשתקופת מתנה/הטבה הסתיימה ולא שודרגה - שם הלמידה
+  // חשובה לא פחות ("למה לא המשכת בתשלום"). לא נשאל על כשל חיוב: שם אין
+  // החלטה של המטפל/ת, וזה היה נקרא כמו האשמה.
+  const asksFeedback =
+    opts.reason === "customer_cancellation" ||
+    opts.reason === "trial_expired" ||
+    opts.reason === "admin_demote";
+  const feedbackPrompt =
     opts.reason === "customer_cancellation"
-      ? `<p style="margin:0 0 12px;">אם יש דקה - נשמח מאוד לדעת מה גרם לך לעזוב, זה עוזר לנו להשתפר:</p>
+      ? { intro: "אם יש דקה - נשמח מאוד לדעת מה גרם לך לעזוב, זה עוזר לנו להשתפר:", cta: "שיתוף הסיבה לביטול" }
+      : { intro: "אם יש דקה - נשמח לדעת מה חסר כדי שתמשיך/י איתנו. זה עוזר לנו להשתפר:", cta: "שיתוף משוב קצר" };
+  const feedbackHtml = asksFeedback
+    ? `<p style="margin:0 0 12px;">${feedbackPrompt.intro}</p>
       <p style="margin:0 0 24px;">
-        <a href="${feedbackUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">שיתוף הסיבה לביטול</a>
+        <a href="${feedbackUrl}" style="display:inline-block;background:#D49018;color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">${feedbackPrompt.cta}</a>
       </p>`
-      : "";
+    : "";
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
