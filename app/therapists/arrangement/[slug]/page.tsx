@@ -8,6 +8,7 @@ import { ARRANGEMENT_PAGES, arrangementBySlug } from "@/app/lib/arrangements";
 import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { introPlusOffer } from "@/app/lib/meta-description";
 
 // Funding-route landing pages. See app/lib/arrangements.ts for why this family
 // exists and why it carries editorial content rather than only a filtered list.
@@ -24,9 +25,14 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const { slug } = await params;
   const a = arrangementBySlug(slug);
   if (!a) return { title: "מסלול לא נמצא" };
-  const description = `${a.intro.slice(0, 130)}… מטפלים מאומתים בטיפול חכם.`;
   const url = `${BASE}/therapists/arrangement/${encodeURIComponent(a.slug)}`;
   const count = await countListed({ arrangement: a.value });
+  const who = count >= MIN_LISTED_FOR_INDEX ? `${count} מטפלים` : "המטפלים";
+  const description = introPlusOffer(
+    a.intro,
+    `רשימת ${who} שעובדים מול ${a.name}, ומה כדאי לברר לפני שקובעים.`,
+    `רשימת ${who} שעובדים מול ${a.name}.`
+  );
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return {
     title: a.searchTitle,

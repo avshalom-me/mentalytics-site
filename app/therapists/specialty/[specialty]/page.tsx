@@ -10,6 +10,7 @@ import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import CouplesDepthSection from "@/app/therapists/CouplesDepthSection";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { introPlusOffer, therapistOffers } from "@/app/lib/meta-description";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -24,11 +25,11 @@ export async function generateMetadata({ params }: { params: Promise<{ specialty
   const specialty = slugToSpecialty(slug);
   if (!specialty) return { title: "התמחות לא נמצאה" };
   const title = specialtyTitle(specialty);
-  const description = `${specialtyIntro(specialty)} רשימת מטפלים מאומתים בטיפול חכם.`.slice(0, 155);
   const url = `${BASE}/therapists/specialty/${slug}`;
   // Same thin-page gate as the city pages: no index until there are real
   // therapists to show.
   const count = await countListed({ specialty });
+  const description = introPlusOffer(specialtyIntro(specialty), ...therapistOffers(count, MIN_LISTED_FOR_INDEX));
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }

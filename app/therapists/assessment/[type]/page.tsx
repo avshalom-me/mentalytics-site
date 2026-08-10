@@ -8,6 +8,7 @@ import { ASSESSMENTS, assessmentBySlug } from "@/app/lib/assessments";
 import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { introPlusOffer } from "@/app/lib/meta-description";
 
 // Assessment landing pages. See app/lib/assessments.ts for why this family
 // exists and why each page carries editorial content rather than only a list.
@@ -24,11 +25,20 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
   const { type } = await params;
   const a = assessmentBySlug(type);
   if (!a) return { title: "אבחון לא נמצא" };
-  const description = `${a.intro.slice(0, 130)}… מאבחנים מאומתים בטיפול חכם.`;
   const url = `${BASE}/therapists/assessment/${encodeURIComponent(a.slug)}`;
   // Same thin-page gate as cities, specialties and topics: no page without real
   // supply behind it.
   const count = await countListed({ assessmentType: a.value });
+  // No quiz offer here on purpose - the matching quiz routes to therapists, not
+  // to diagnosticians, so promising it on an assessment page would mislead.
+  // What the page really does carry is intro / whoFor / performedBy, so the
+  // richest tier promises exactly those three.
+  const who = count >= MIN_LISTED_FOR_INDEX ? `${count} מאבחנים מוסמכים` : "מאבחנים מוסמכים";
+  const description = introPlusOffer(
+    a.intro,
+    `רשימת ${who} - מה האבחון בודק, מי מוסמך לבצע אותו ולמי הוא מתאים.`,
+    `רשימת ${who} לפנייה ישירה.`
+  );
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return {
     title: a.searchTitle,

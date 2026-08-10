@@ -11,6 +11,7 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { sectionForDirectoryHref, editorialBySection } from "@/app/lib/article-taxonomy";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
+import { introPlusOffer, therapistOffers } from "@/app/lib/meta-description";
 
 // Condition/audience landing pages ("טיפול בחרדה", "פסיכולוג ילדים") - the
 // missing keyword layers (docs/seo-roadmap.md M3). Conditions list therapists
@@ -29,9 +30,9 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   const { topic: slug } = await params;
   const topic = slugToTopic(slug);
   if (!topic) return { title: "נושא לא נמצא" };
-  const description = `${topic.intro.slice(0, 130)}… מטפלים מאומתים בטיפול חכם.`;
   const url = `${BASE}/therapists/topic/${topic.slug}`;
   const count = await countListed(topic.filter);
+  const description = introPlusOffer(topic.intro, ...therapistOffers(count, MIN_LISTED_FOR_INDEX));
   const robots =
     topic.adsOnly || count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return { title: topic.searchTitle, description, alternates: { canonical: url }, robots, openGraph: { title: topic.searchTitle, description, url } };

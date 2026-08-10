@@ -39,9 +39,14 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   if (!r) return { title: "עמוד לא נמצא" };
   const { city, topic } = r;
   const title = `${topic.name} ${inPhrase(city)} - מטפלים מאומתים`;
-  const description = `${topic.name} ${inPhrase(city)}: מטפלים מאומתים עם הכשרה מתאימה, כולל אפשרות לפגישות אונליין. השוו, בחרו ופנו ישירות.`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
+  // Same shape as the city pages: what the page is, how many, and the quiz for
+  // people who don't want to choose alone. The old line said none of the three.
+  const description =
+    count >= MIN_CITY_TOPIC
+      ? `${topic.name} ${inPhrase(city)}: רשימת ${count} מטפלים מאומתים עם הכשרה מתאימה - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`
+      : `${topic.name} ${inPhrase(city)}: מטפלים מאומתים עם הכשרה מתאימה, כולל פגישות אונליין - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית.`;
   const robots =
     topic.adsOnly || count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };

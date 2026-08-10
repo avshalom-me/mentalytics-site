@@ -59,17 +59,19 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
       // query family of its own and every competitor ranking for it carries it
       // in the title; the person-phrase prefix stays for the rankings we have.
       `פסיכולוגים ומטפלים ב${label} - טיפול פסיכולוגי | טיפול חכם`;
-  const description = isOnline
-    ? "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? כל המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם התאמה אישית בחינם דרך טיפול חכם."
-    : `טיפול פסיכולוגי ונפשי ב${label}: רשימת פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`;
   const url = `${BASE}/therapists/region/${regionParam}`;
   // Keep near-empty region pages out of the index until they have real content,
   // so Google doesn't flag them as thin / near-duplicate. The online page is a
   // distinct, always-valuable page and is never gated.
+  const regionCount = isOnline ? 0 : await countListed({ region: r.region });
   const robots =
-    !isOnline && (await countListed({ region: r.region })) < MIN_LISTED_FOR_INDEX
-      ? { index: false as const, follow: true }
-      : undefined;
+    !isOnline && regionCount < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
+  // The count was already being fetched for the robots gate; putting it in the
+  // description too is the one thing our snippet can say that a static
+  // competitor's cannot, and it is what the city pages already do.
+  const description = isOnline
+    ? "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? כל המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם התאמה אישית בחינם דרך טיפול חכם."
+    : `טיפול פסיכולוגי ונפשי ב${label}: רשימת ${regionCount} פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 

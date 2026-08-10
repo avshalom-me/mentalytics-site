@@ -18,6 +18,22 @@ const BASE = "https://www.mentalytics.co.il";
 // waiting for a redeploy.
 export const dynamic = "force-dynamic";
 
+/**
+ * When the copy on the directory landing pages (city / region / topic /
+ * specialty / assessment / arrangement / online) last changed.
+ *
+ * Therapist profiles and community articles carry a real per-row timestamp;
+ * these pages are generated from code, so until now half the sitemap went out
+ * with no <lastmod> at all - and Google had no reason to re-crawl after a copy
+ * fix. That is exactly what happened to the city descriptions rewritten on
+ * 6/8/2026: four days later the Haifa SERP snippet was still the pre-fix text.
+ *
+ * BUMP THIS when the landing-page copy or template actually changes. Do not
+ * wire it to `new Date()` - a lastmod that is always "today" is the pattern
+ * Google learns to ignore, and then it is worth nothing when it matters.
+ */
+const LANDING_COPY_REVISED = new Date("2026-08-10");
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
@@ -222,5 +238,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
   }));
 
-  return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...regionPages, ...topicPages, ...centerPages];
+  // The code-generated landing families all share one copy revision - see
+  // LANDING_COPY_REVISED above for why they get a lastmod at all.
+  const landingPages: MetadataRoute.Sitemap = [...regionPages, ...topicPages].map((p) => ({
+    ...p,
+    lastModified: LANDING_COPY_REVISED,
+  }));
+
+  return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...landingPages, ...centerPages];
 }
