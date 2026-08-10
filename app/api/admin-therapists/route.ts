@@ -54,6 +54,7 @@ type TherapistRow = {
   accepting_new_patients: boolean | null;
   accepting_new_changed_at: string | null;
   user_id: string | null;
+  match_paused_until: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -125,7 +126,8 @@ async function buildTherapistsResponse(onlyId?: string) {
       center_account_id,
       accepting_new_patients,
       accepting_new_changed_at,
-      user_id
+      user_id,
+      match_paused_until
       `
     )
     .order("full_name", { ascending: true });
@@ -340,6 +342,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         // בלי המיפוי המפורש הזה הכפתור "🔗 קשר חשבון" הופיע אצל כולם -
         // undefined בצד הלקוח נראה בדיוק כמו "לא מקושר".
         user_id: t.user_id ?? null,
+        match_paused_until: t.match_paused_until ?? null,
         certificates: certsByTherapist[t.id] ?? [],
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,
@@ -418,6 +421,40 @@ export async function PATCH(request: Request) {
     // כשבעל פרופיל אמיתי נרשם הוא נתקע על מסך "ממתין לקישור" עד שהאדמין
     // מקשר כאן. מאתר את חשבון ה-Auth לפי המייל המדויק של הפרופיל, מוחק
     // כרטיס-רפאים ריק שנוצר מהכניסות שלו, ומקשר.
+    // הקפאה/שחרור זמני ממערכת ההתאמות בלבד. days=0 משחרר.
+    // מכוון: אין מייל, אין שינוי בדגלים הציבוריים, ואין השפעה על המאגר -
+    // המטפל/ת ממשיך/ה להופיע ולהיות מדורג/ת שם כרגיל. ההקפאה פגה מעצמה.
+    if (body.action === "set_match_pause") {
+      const rawDays = Number(body.days);
+      const days = Number.isFinite(rawDays) ? Math.max(0, Math.min(90, Math.floor(rawDays))) : 0;
+      const until = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
+      const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 200) : null;
+
+      const { data: before } = await supabaseAdmin
+        .from("therapists")
+        .select("match_paused_until")
+        .eq("id", id)
+        .single();
+
+      const { error } = await supabaseAdmin
+        .from("therapists")
+        .update({ match_paused_until: until, match_paused_reason: until ? reason : null })
+        .eq("id", id);
+      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+
+      await writeAudit(supabaseAdmin, {
+        therapistId: id,
+        actorType: "admin",
+        action: "set_match_pause",
+        before: { match_paused_until: before?.match_paused_until ?? null },
+        after: { match_paused_until: until },
+        reason: until
+          ? `admin paused from matching for ${days}d${reason ? `: ${reason}` : ""}`
+          : "admin resumed matching",
+      });
+      return NextResponse.json({ ok: true, id, match_paused_until: until });
+    }
+
     if (body.action === "link_account") {
       const { data: t } = await supabaseAdmin
         .from("therapists")

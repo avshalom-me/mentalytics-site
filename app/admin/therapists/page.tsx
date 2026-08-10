@@ -66,6 +66,7 @@ type AdminTherapist = {
   accepting_new_patients: boolean;
   accepting_new_changed_at: string | null;
   user_id: string | null;
+  match_paused_until: string | null;
 };
 
 type EditForm = {
@@ -634,6 +635,32 @@ export default function AdminTherapistsPage() {
     return { views: t.views_30d ?? 0, contacts: t.contacts_30d ?? 0 };
   }
   const ENG_LABEL = engWindow === "30" ? "30 ימים אחרונים" : engWindow === "60" ? "60 ימים אחרונים" : 'סה"כ מאז ההרשמה';
+
+  // הקפאה זמנית מההתאמות. שקטה לחלוטין: אין מייל, והמאגר הציבורי לא מושפע.
+  async function setMatchPause(t: AdminTherapist, days: number) {
+    const label = days === 0 ? `לשחרר את ${t.full_name} להתאמות?` :
+      `להקפיא את ${t.full_name} מההתאמות ל-${days} ימים?\n\nהמטפל/ת ימשיך/תמשיך להופיע במאגר הציבורי כרגיל ולא יקבל/תקבל שום הודעה. ההקפאה תפוג מעצמה.`;
+    if (!window.confirm(label)) return;
+    try {
+      setActionLoadingId(t.id);
+      setError("");
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, action: "set_match_pause", days }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "הפעולה נכשלה");
+      setTherapists((prev) => prev.map((x) => (x.id === t.id ? { ...x, match_paused_until: json.match_paused_until } : x)));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unknown error");
+    } finally {
+      setActionLoadingId(null);
+    }
+  }
+
+  const pauseActive = (t: AdminTherapist) =>
+    !!t.match_paused_until && new Date(t.match_paused_until).getTime() > Date.now();
 
   // קישור חשבון כניסה לפרופיל חי שלא קושר אוטומטית (הגנת השתלטות חשבון).
   // מופיע רק כשהפרופיל חי (משלם/מאושר) ובלי user_id - המקרה של "דניאל היימן".
@@ -1239,6 +1266,13 @@ export default function AdminTherapistsPage() {
               </div>
             </div>
 
+            {pauseActive(therapist) && (
+              <div className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
+                ❄️ <strong>מוקפא/ת ממערכת ההתאמות</strong> עד {new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} -
+                לא מופיע/ה בתוצאות השאלון. במאגר הציבורי מופיע/ה ומדורג/ת כרגיל, ולא נשלחה הודעה.
+              </div>
+            )}
+
             {/* Engagement (חלון נבחר) + account/billing health */}
             <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs text-stone-700">
               <span className="font-semibold text-stone-500">📊 {ENG_LABEL}:</span>
@@ -1397,6 +1431,32 @@ export default function AdminTherapistsPage() {
                     : "הזמן לכתוב מאמר בתמורה לחודשיים קידום במתנה"}>
                   {therapist.article_invite_sent_at ? "🎁 שלח שוב הצעת מאמר" : "🎁 הזמן לכתוב מאמר"}
                 </button>
+              )}
+              {/* הקפאה מההתאמות - שקטה, ופגה מעצמה. רק למי שכבר בהתאמות. */}
+              {therapist.status === "paying" && (
+                pauseActive(therapist) ? (
+                  <button type="button" disabled={isBusy}
+                    className="rounded-xl border border-sky-400 bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 disabled:opacity-50"
+                    onClick={() => setMatchPause(therapist, 0)}
+                    title={`מוקפא/ת מההתאמות עד ${new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} - לחיצה משחררת מיד`}>
+                    ❄️ מוקפא/ת עד {new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} · שחרר
+                  </button>
+                ) : (
+                  <>
+                    <button type="button" disabled={isBusy}
+                      className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
+                      onClick={() => setMatchPause(therapist, 7)}
+                      title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
+                      ❄️ הקפא שבוע
+                    </button>
+                    <button type="button" disabled={isBusy}
+                      className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
+                      onClick={() => setMatchPause(therapist, 14)}
+                      title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
+                      ❄️ שבועיים
+                    </button>
+                  </>
+                )
               )}
               {therapist.status === "paying" && !therapist.admin_approved && (
                 <button type="button" disabled={isBusy}

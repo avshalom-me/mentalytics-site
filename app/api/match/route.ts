@@ -42,6 +42,7 @@ type TherapistRow = {
   profile_photo_path: string | null;
   status: string | null;
   promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | null (חינמי)
+  match_paused_until: string | null; // הקפאה זמנית מההתאמות בלבד (ראו migration)
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -566,7 +567,7 @@ export async function POST(req: NextRequest) {
     const input = normalizeInput(body);
 
     const MATCH_COLUMNS =
-      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, promotion_source, style_q1, style_q2, activity_level, entity_type, center_account_id";
+      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, promotion_source, match_paused_until, style_q1, style_q2, activity_level, entity_type, center_account_id";
 
     const { data, error } = await supabaseAdmin
       .from("therapists")
@@ -671,6 +672,32 @@ export async function POST(req: NextRequest) {
         return { therapist, result };
       })
       .filter((x): x is { therapist: TherapistRow; result: NonNullable<ReturnType<typeof scoreTherapist>> } => x !== null);
+
+    // ── הקפאה זמנית מההתאמות ─────────────────────────────────────────────
+    // מטפל/ת שנמצא/ת בהקפאה (match_paused_until בעתיד) יוצא/ת מהתוצאות, כדי
+    // לפנות מקום לאחרים. משפיע על השאלון בלבד - במאגר הציבורי ובדירוג שלו
+    // אין שינוי, ולא נשלחת שום התראה.
+    //
+    // רשת ביטחון: אם ההקפאה מותירה תוצאות דלות מדי, מחזירים את כולם. מטופל
+    // שרואה 1-2 תוצאות חווה את זה כתקלה, וזה גם מכסה את המקרה שבו המוקפא/ת
+    // הוא/היא היחיד/ה שמכסה נישה מסוימת (שם גם מנגנון הגיבוי החינמי לא היה
+    // נכנס, כי הוא נבדק לפני הניקוד ולפי מטפלים משלמים שקיימים).
+    const MIN_RESULTS_BEFORE_RESTORING_PAUSED = 3;
+    const nowMs = Date.now();
+    const isPaused = (t: TherapistRow) =>
+      t.match_paused_until != null && new Date(t.match_paused_until).getTime() > nowMs;
+
+    const pausedCount = scored.filter((x) => isPaused(x.therapist)).length;
+    if (pausedCount > 0) {
+      const active = scored.filter((x) => !isPaused(x.therapist));
+      // הסף מתחשב גם במקרה שבו ממילא אין הרבה מועמדים בכלל.
+      const needed = Math.min(MIN_RESULTS_BEFORE_RESTORING_PAUSED, scored.length);
+      if (active.length >= needed) {
+        scored.length = 0;
+        scored.push(...active);
+      }
+      // אחרת: משאירים את הרשימה המלאה - עדיף מוקפא/ת מאשר מסך כמעט ריק.
+    }
 
     // Randomize BEFORE the stable sort below, so any group that ends up tied
     // (equal score, and equal or absent personality) inherits this random
