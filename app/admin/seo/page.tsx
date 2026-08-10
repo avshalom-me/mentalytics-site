@@ -89,9 +89,19 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
   const maxY = Math.max(5, ...pts.flatMap((p) => [p.demand, p.name, p.home, p.rest]));
   const x = (i: number) => padL + (pts.length === 1 ? innerW / 2 : (i * innerW) / (pts.length - 1));
   const y = (v: number) => padT + innerH * (1 - v / maxY);
-  const line = (get: (p: ChartPt) => number) =>
-    pts.map((p, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(get(p)).toFixed(1)}`).join(" ");
-  const area = `${line((p) => p.demand)} L${x(pts.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
+  // הנקודה האחרונה היא תמיד שבוע שעדיין רץ, וקו שצולל לשבריר משבוע מלא נקרא
+  // כמו קריסה. ב-10/8/26 זה קרה בפועל: יום שני, יום אחד מתוך שבעה, נראה כמו
+  // ירידה דרסטית. לכן הקטע האחרון מקווקו, הסמן חלול, והתווית אומרת כמה ימים
+  // באמת נספרו.
+  const last = pts.length - 1;
+  const daysIn = Math.min(7, Math.max(1, Math.ceil((Date.now() - new Date(pts[last].week + "T00:00:00").getTime()) / 86_400_000)));
+  const partial = pts.length > 1 && daysIn < 7;
+  const solidEnd = partial ? last - 1 : last;
+  const seg = (get: (p: ChartPt) => number, from: number, to: number) =>
+    pts.slice(from, to + 1).map((p, k) => `${k === 0 ? "M" : "L"}${x(from + k).toFixed(1)},${y(get(p)).toFixed(1)}`).join(" ");
+  // השטח נעצר בשבוע המלא האחרון - אחרת הוא מצייר את אותה "מצוק" בעצמו.
+  const area = `${seg((p) => p.demand, 0, solidEnd)} L${x(solidEnd).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z`;
+  const partialNote = partial ? ` (חלקי - ${daysIn} מתוך 7 ימים)` : "";
   const fmt = (w: string) => new Date(w + "T00:00:00").toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
   // תווית מתחת לנקודה, אלא אם היא קרובה לתחתית - אז מעליה (שלא תדרוס את ציר התאריכים)
   const labelY = (v: number, below: boolean) => {
@@ -116,27 +126,42 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
         ))}
         <path d={area} fill="#3D8C8A" opacity={0.07} />
         {series.map((s, si) => (
-          <path key={si} d={line(s.get)} fill="none" stroke={s.color} strokeWidth={s.width}
-            strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />
-        ))}
-        {pts.map((p, i) => (
-          <g key={p.week}>
-            <circle cx={x(i)} cy={y(p.name)} r={3} fill="#D49018">
-              <title>{`שבוע ${fmt(p.week)}: חיפוש שם ${p.name}`}</title>
-            </circle>
-            <text x={x(i)} y={labelY(p.name, false)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#A87010">{p.name}</text>
-            <circle cx={x(i)} cy={y(p.demand)} r={3.2} fill="#3D8C8A">
-              <title>{`שבוע ${fmt(p.week)}: ביקוש ${p.demand}`}</title>
-            </circle>
-            <text x={x(i)} y={labelY(p.demand, true)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#0F5468">{p.demand}</text>
-            {p.home > 0 && (
-              <circle cx={x(i)} cy={y(p.home)} r={2.6} fill="#0284C7">
-                <title>{`שבוע ${fmt(p.week)}: עמוד הבית ${p.home}`}</title>
-              </circle>
+          <g key={si}>
+            <path d={seg(s.get, 0, solidEnd)} fill="none" stroke={s.color} strokeWidth={s.width}
+              strokeDasharray={s.dash} strokeLinejoin="round" strokeLinecap="round" />
+            {partial && (
+              <path d={seg(s.get, solidEnd, last)} fill="none" stroke={s.color} strokeWidth={s.width}
+                strokeDasharray="3 4" opacity={0.5} strokeLinecap="round" />
             )}
-            <text x={x(i)} y={H - 10} textAnchor="middle" fontSize={10} fill="#A8A29E">{fmt(p.week)}</text>
           </g>
         ))}
+        {pts.map((p, i) => {
+          const open = partial && i === last; // שבוע שעדיין רץ - סמן חלול
+          const dot = (cy: number, r: number, color: string) => ({
+            cx: x(i), cy, r, fill: open ? "#fff" : color,
+            stroke: open ? color : undefined, strokeWidth: open ? 1.6 : undefined,
+          });
+          return (
+            <g key={p.week} opacity={open ? 0.72 : 1}>
+              <circle {...dot(y(p.name), 3, "#D49018")}>
+                <title>{`שבוע ${fmt(p.week)}: חיפוש שם ${p.name}${open ? partialNote : ""}`}</title>
+              </circle>
+              <text x={x(i)} y={labelY(p.name, false)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#A87010">{p.name}</text>
+              <circle {...dot(y(p.demand), 3.2, "#3D8C8A")}>
+                <title>{`שבוע ${fmt(p.week)}: ביקוש ${p.demand}${open ? partialNote : ""}`}</title>
+              </circle>
+              <text x={x(i)} y={labelY(p.demand, true)} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#0F5468">{p.demand}</text>
+              {p.home > 0 && (
+                <circle {...dot(y(p.home), 2.6, "#0284C7")}>
+                  <title>{`שבוע ${fmt(p.week)}: עמוד הבית ${p.home}${open ? partialNote : ""}`}</title>
+                </circle>
+              )}
+              <text x={x(i)} y={H - 10} textAnchor="middle" fontSize={10} fill="#A8A29E">
+                {open ? `${fmt(p.week)} · ${daysIn}/7` : fmt(p.week)}
+              </text>
+            </g>
+          );
+        })}
       </svg>
     </div>
   );
@@ -241,7 +266,9 @@ export default function AdminSeoPage() {
             <WeeklyLineChart weeks={data.weekly} />
             <p className="mt-3 text-[11px] leading-5 text-stone-400">
               הקו הירקרק (ביקוש) הוא המדד היחיד שאומר אם ה-SEO עובד. הקו הענברי (חיפושי שם) יגדל עם כל מטפל
-              שמצטרף - גם בלי שום שיפור בדירוג. הזמן זורם משמאל לימין; השבוע האחרון חלקי.
+              שמצטרף - גם בלי שום שיפור בדירוג. הזמן זורם משמאל לימין. הנקודה האחרונה היא שבוע שעדיין
+              רץ: היא מצוירת מקווקו וחלול, והתווית שמתחתיה אומרת כמה ימים מתוך שבעה כבר נספרו - אל
+              תשוו אותה לשבועות המלאים שלפניה.
             </p>
           </section>
 
