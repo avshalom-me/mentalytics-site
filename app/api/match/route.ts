@@ -41,6 +41,7 @@ type TherapistRow = {
   phone: string | null;
   profile_photo_path: string | null;
   status: string | null;
+  promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | null (חינמי)
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -49,6 +50,17 @@ type TherapistRow = {
   entity_type: string | null; // 'center' = שורת ישות-מרכז (מסלול 2); אחרת מטפל רגיל
   center_account_id: string | null;
 };
+
+// דירוג מסחרי לשבירת תיקו. status='paying' מקבץ יחד שתי אוכלוסיות שונות
+// לגמרי - מי שמשלם בפועל ומי שקודם במתנה - וכשהציונים שווים אין שום סיבה
+// שמקודם-חינם יעקוף לקוח משלם. סדר: משלם ← מרכז משלם ← מתנה ← חינמי.
+// (זהה להיררכיה במאגר הציבורי, app/lib/therapist-directory.ts)
+function commercialRank(t: TherapistRow): number {
+  if (t.status !== "paying") return 3; // FREE_REGION_FALLBACK - גיבוי חינמי
+  if (t.promotion_source === "paid") return 0;
+  if (t.promotion_source === "center") return 1;
+  return 2; // manual / trial - קידום מתנה
+}
 
 type NormalizedMatchInput = {
   treatmentTypes: string[];
@@ -554,7 +566,7 @@ export async function POST(req: NextRequest) {
     const input = normalizeInput(body);
 
     const MATCH_COLUMNS =
-      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, style_q1, style_q2, activity_level, entity_type, center_account_id";
+      "id, full_name, gender, online, therapist_types, training_areas, assessment_types, couples_modalities, cogfun_age_groups, age_groups, regions, cultural_prefs, arrangements, languages, bio, phone, profile_photo_path, status, promotion_source, style_q1, style_q2, activity_level, entity_type, center_account_id";
 
     const { data, error } = await supabaseAdmin
       .from("therapists")
@@ -689,11 +701,17 @@ export async function POST(req: NextRequest) {
       // Personality can only affect ranking when professional scores are within 8 points
       if (Math.abs(profDiff) > 8) return profDiff;
       // Tiebreaker within close range: combined score (personality can tip).
-      // Still-equal combined scores fall through to the shuffle above (sort
-      // is stable) instead of the original DB order.
       const ca = combinedScore(a.result.score, a.result.personality_score);
       const cb = combinedScore(b.result.score, b.result.personality_score);
-      return cb - ca;
+      if (cb !== ca) return cb - ca;
+      // Genuinely tied on match quality → paying customers come first.
+      // Deliberately AFTER the quality scores: a paying therapist never
+      // outranks a demonstrably better fit, but among equals the money wins.
+      const rankDiff = commercialRank(a.therapist) - commercialRank(b.therapist);
+      if (rankDiff !== 0) return rankDiff;
+      // Still identical → the shuffle above decides (sort is stable), so
+      // rotation is fair instead of frozen to the DB's row order.
+      return 0;
     });
 
     const top = scored.slice(0, input.limit);
