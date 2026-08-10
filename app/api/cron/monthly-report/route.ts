@@ -50,7 +50,7 @@ function escapeHtml(str: string): string {
     .replace(/"/g, "&quot;");
 }
 
-function buildTips(t: Therapist, stats: { views: number; clicks: number; wa: number; phone: number; email: number }, avgClicks: number): string[] {
+function buildTips(t: Therapist, stats: { views: number; clicks: number; wa: number; phone: number; email: number; message: number }, avgClicks: number): string[] {
   const tips: string[] = [];
 
   if (!t.bio || t.bio.length < 80) {
@@ -73,14 +73,14 @@ function buildTips(t: Therapist, stats: { views: number; clicks: number; wa: num
     tips.push("אתה מעל הממוצע בלחיצות ליצירת קשר — כל הכבוד! המשך/י לעדכן את הפרופיל כדי לשמור על החשיפה.");
   }
 
-  if (stats.wa === 0 && stats.phone === 0 && stats.email === 0 && stats.views > 0) {
+  if (stats.clicks === 0 && stats.views > 0) {
     tips.push("אף אחד עדיין לא לחץ על כפתורי יצירת הקשר. ודא/י שפרטי הטלפון והמייל מעודכנים ונכונים.");
   }
 
   return tips;
 }
 
-function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa: number; phone: number; email: number; matchClicks: number; directoryClicks: number }, tips: string[]): string {
+function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa: number; phone: number; email: number; message: number; matchClicks: number; directoryClicks: number }, tips: string[]): string {
   const name = escapeHtml(t.full_name ?? "מטפל/ת");
   const tipsHtml = tips.length > 0
     ? tips.map(tip => `<li style="margin-bottom: 8px;">${escapeHtml(tip)}</li>`).join("")
@@ -102,6 +102,7 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
             <td style="padding: 12px 16px; border: 1px solid #e8e0d8; font-weight: bold; text-align: center;">${stats.wa}</td>
             <td style="padding: 12px 16px; border: 1px solid #e8e0d8; font-weight: bold; text-align: center;">${stats.phone}</td>
             <td style="padding: 12px 16px; border: 1px solid #e8e0d8; font-weight: bold; text-align: center;">${stats.email}</td>
+            <td style="padding: 12px 16px; border: 1px solid #e8e0d8; font-weight: bold; text-align: center;">${stats.message}</td>
             <td style="padding: 12px 16px; border: 1px solid #e8e0d8; font-weight: bold; text-align: center; background: #0F5468; color: white;">${stats.clicks}</td>
           </tr>
           <tr>
@@ -109,7 +110,8 @@ function buildEmailHtml(t: Therapist, stats: { views: number; clicks: number; wa
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">וואטסאפ</td>
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">טלפון</td>
             <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">מייל</td>
-            <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">סה"כ לחיצות</td>
+            <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">הודעות מהאתר</td>
+            <td style="padding: 8px 16px; border: 1px solid #e8e0d8; text-align: center; font-size: 12px; color: #888;">סה"כ פניות</td>
           </tr>
         </table>
 
@@ -285,13 +287,18 @@ export async function GET(req: NextRequest) {
   );
 
   // Aggregate clicks per therapist
-  const clickMap: Record<string, { wa: number; phone: number; email: number; match: number; directory: number }> = {};
+  // site_message נספר ככל פנייה אחרת. עד 10/8/26 הוא נשמט מכאן לגמרי, ולכן
+  // מטפל שקיבל *הודעה אמיתית* דרך טופס האתר - סוג הפנייה הוודאי היחיד -
+  // נספר כ"אפס פניות" וקיבל מייל שמסביר לו איך להשיג פניות. קרה בפועל
+  // לאמיר ירצקי (הודעה ב-26/7 שלא נספרה).
+  const clickMap: Record<string, { wa: number; phone: number; email: number; message: number; match: number; directory: number }> = {};
   for (const row of clicks) {
-    if (!clickMap[row.therapist_id]) clickMap[row.therapist_id] = { wa: 0, phone: 0, email: 0, match: 0, directory: 0 };
+    if (!clickMap[row.therapist_id]) clickMap[row.therapist_id] = { wa: 0, phone: 0, email: 0, message: 0, match: 0, directory: 0 };
     const c = clickMap[row.therapist_id];
     if (row.click_type === "whatsapp") c.wa++;
     else if (row.click_type === "phone") c.phone++;
     else if (row.click_type === "email") c.email++;
+    else if (row.click_type === "site_message") c.message++;
     if (row.source === "match") c.match++;
     else c.directory++;
   }
@@ -305,7 +312,7 @@ export async function GET(req: NextRequest) {
   // Calculate average clicks across all paying therapists
   const allTotals = therapists.map(t => {
     const c = clickMap[t.id];
-    return c ? c.wa + c.phone + c.email : 0;
+    return c ? c.wa + c.phone + c.email + c.message : 0;
   });
   const avgClicks = allTotals.length > 0 ? allTotals.reduce((a, b) => a + b, 0) / allTotals.length : 0;
 
@@ -328,14 +335,15 @@ export async function GET(req: NextRequest) {
       continue;
     }
 
-    const c = clickMap[t.id] ?? { wa: 0, phone: 0, email: 0, match: 0, directory: 0 };
-    const totalClicks = c.wa + c.phone + c.email;
+    const c = clickMap[t.id] ?? { wa: 0, phone: 0, email: 0, message: 0, match: 0, directory: 0 };
+    const totalClicks = c.wa + c.phone + c.email + c.message;
     const stats = {
       views: viewMap[t.id] ?? 0,
       clicks: totalClicks,
       wa: c.wa,
       phone: c.phone,
       email: c.email,
+      message: c.message,
       matchClicks: c.match,
       directoryClicks: c.directory,
     };
