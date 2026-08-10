@@ -70,9 +70,15 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   if (!r) return { title: "עמוד לא נמצא" };
   const { topic } = r;
   const title = `${onlineHeading(topic.name)} - מטפלים מאומתים בווידאו`;
-  const description = `${onlineHeading(topic.name)}: מטפלים ופסיכולוגים מאומתים שמטפלים בשיחת וידאו, מכל מקום בארץ. השוו, בחרו ופנו ישירות - או קבלו התאמה אישית בחינם.`;
   const url = `${BASE}/therapists/online/${topic.slug}`;
   const count = await countListed({ ...topic.filter, online: true });
+  // Same shape as the city and topic pages: what the page is, how many, and
+  // the quiz. The old line said "מטפלים מאומתים" without ever saying it was a
+  // list you can browse, which is the half that earns the click.
+  const description =
+    count >= MIN_ONLINE_TOPIC
+      ? `${onlineHeading(topic.name)}: רשימת ${count} מטפלים ופסיכולוגים מאומתים שמטפלים בשיחת וידאו, מכל מקום בארץ - או מלאו שאלון קצר וקבלו התאמה אישית.`
+      : `${onlineHeading(topic.name)}: מטפלים ופסיכולוגים מאומתים שמטפלים בשיחת וידאו, מכל מקום בארץ - או מלאו שאלון קצר וקבלו התאמה אישית.`;
   const robots =
     topic.adsOnly || count < MIN_ONLINE_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };

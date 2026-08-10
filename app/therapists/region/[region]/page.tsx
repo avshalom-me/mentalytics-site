@@ -70,7 +70,11 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   // description too is the one thing our snippet can say that a static
   // competitor's cannot, and it is what the city pages already do.
   const description = isOnline
-    ? "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? כל המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם התאמה אישית בחינם דרך טיפול חכם."
+    ? // Guarded on the same threshold as the title: a supply dip must never
+      // publish "רשימת 3 מטפלים" as our storefront.
+      onlineCount >= 20
+      ? `מחפשים פסיכולוג אונליין? רשימת ${onlineCount} מטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו - השוו ופנו ישירות, או מלאו שאלון קצר להתאמה אישית.`
+      : "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? רשימת המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם שאלון קצר להתאמה אישית בחינם."
     : `טיפול פסיכולוגי ונפשי ב${label}: רשימת ${regionCount} פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
