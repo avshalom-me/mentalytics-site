@@ -1432,8 +1432,10 @@ export default function AdminTherapistsPage() {
                   {therapist.article_invite_sent_at ? "🎁 שלח שוב הצעת מאמר" : "🎁 הזמן לכתוב מאמר"}
                 </button>
               )}
-              {/* הקפאה מההתאמות - שקטה, ופגה מעצמה. רק למי שכבר בהתאמות. */}
-              {therapist.status === "paying" && (
+              {/* הקפאה מההתאמות - שקטה ופגה מעצמה. אך ורק למקודמי-מתנה:
+                  מי ששילם רכש את החשיפה (וגם מכוסה בערבות הפניות). */}
+              {therapist.status === "paying" &&
+               (therapist.promotion_source === "trial" || therapist.promotion_source === "manual") && (
                 pauseActive(therapist) ? (
                   <button type="button" disabled={isBusy}
                     className="rounded-xl border border-sky-400 bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 disabled:opacity-50"
