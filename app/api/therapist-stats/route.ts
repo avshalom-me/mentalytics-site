@@ -4,7 +4,9 @@ import { computeEnrichedStats } from "@/app/lib/therapist-stats";
 
 export const dynamic = "force-dynamic";
 
-async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status: string } | null> {
+async function getTherapistInfo(
+  req: NextRequest,
+): Promise<{ id: string; status: string; created_at: string | null } | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
 
@@ -23,11 +25,11 @@ async function getTherapistInfo(req: NextRequest): Promise<{ id: string; status:
   // email match without that link proves nothing (emails are not verified).
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, status")
+    .select("id, status, created_at")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return data ? { id: data.id, status: data.status } : null;
+  return data ? { id: data.id, status: data.status, created_at: data.created_at as string | null } : null;
 }
 
 type ClickRow = { click_type: string; source: string; clicked_at: string };
@@ -141,9 +143,20 @@ export async function GET(req: NextRequest) {
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
           .eq("click_type", "site_message");
-      const [entries, impressions, contactsTotal, contactsMatch, contactsMessages] = await Promise.all([
+      // הופעות במאגר המטפלים נרשמות כאירוע analytics ולא כ-profile_view -
+      // הכרטיס נראה ברשימה אך לא נפתח. בלעדיהן הדשבורד הראה רק את חשיפת
+      // ההתאמות, שהיא מיעוט מהחשיפה בפועל.
+      const countDirectoryImpressions = () =>
+        supabaseAdmin
+          .from("analytics_events")
+          .select("*", { count: "exact", head: true })
+          .eq("therapist_id", info.id)
+          .eq("event_type", "profile_impression");
+
+      const [entries, impressions, dirImpressions, contactsTotal, contactsMatch, contactsMessages] = await Promise.all([
         countViews(["match", "directory"]),
         countViews(["match_card"]),
+        countDirectoryImpressions(),
         countClicks(false),
         countClicks(true),
         countMessages(),
@@ -153,16 +166,25 @@ export async function GET(req: NextRequest) {
       const messages = contactsMessages.count ?? 0;
       result.profile_views = { all_time: entries.count ?? 0 };
       result.match_impressions = { all_time: impressions.count ?? 0 };
+      result.directory_impressions = { all_time: dirImpressions.count ?? 0 };
       result.all_time_contacts = { total, match, directory: total - match, messages, clicks: total - messages };
     } catch {
       result.profile_views = { all_time: 0 };
       result.match_impressions = { all_time: 0 };
+      result.directory_impressions = { all_time: 0 };
       result.all_time_contacts = { total: 0, match: 0, directory: 0, messages: 0, clicks: 0 };
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)
     try {
-      result.enriched = await computeEnrichedStats(info.id, monthAgo);
+      // מצטבר מאז ההצטרפות, לא 30 יום. חלון קצר גם סתר את החלק העליון של
+      // הדשבורד (שמצטבר מאז ההצטרפות) - אותה תווית הראתה שני מספרים שונים -
+      // וגם חסם את הניתוח המעמיק מאחורי סף של 20 צפיות שמעט מטפלים עוברים
+      // בחודש בודד, בזמן שמצטבר יש להם מספיק נתונים.
+      result.enriched = await computeEnrichedStats(
+        info.id,
+        info.created_at ? new Date(info.created_at) : new Date(0),
+      );
     } catch {
       // Non-critical — dashboard shows a placeholder if this is absent
     }

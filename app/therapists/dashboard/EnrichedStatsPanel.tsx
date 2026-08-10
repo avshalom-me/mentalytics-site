@@ -162,12 +162,12 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
           <h3 className="font-bold text-stone-900">ניתוח מעמיק של יצירות הקשר שלך</h3>
         </div>
         <p className="text-sm text-stone-600 leading-6 mt-3">
-          עדיין לא נאספו מספיק נתונים לניתוח מפורט. נציג פילוח מלא לפי איזור, סוג קושי, גילאים והמרה - כשתקבל לפחות <strong>20 צפיות</strong> בפרופיל בתקופה הנוכחית.
+          עדיין לא נאספו מספיק נתונים לניתוח מפורט. נציג פילוח מלא לפי איזור, סוג קושי, גילאים והמרה - כשיצטברו לפחות <strong>20 צפיות</strong> בפרופיל.
         </p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-center">
             <div className="text-2xl font-black text-stone-900">{conversion.total_views}</div>
-            <div className="text-[11px] text-stone-500">צפיות עד כה</div>
+            <div className="text-[11px] text-stone-500">צפיות בפרופיל (מצטבר)</div>
           </div>
           <div className="rounded-xl bg-stone-50 border border-stone-200 p-3 text-center">
             <div className="text-2xl font-black text-stone-900">{conversion.contacted}</div>
@@ -182,7 +182,7 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
     <div className="mb-8">
       <div className="flex items-center gap-2 mb-4">
         <h2 className="text-lg font-extrabold text-stone-900">ניתוח מעמיק של יצירות הקשר שלך</h2>
-        <span className="text-xs text-stone-500">ב-{data_quality.period_days} הימים האחרונים</span>
+        <span className="text-xs text-stone-500">מאז ההצטרפות ({data_quality.period_days} ימים)</span>
       </div>
 
       {/* Conversion summary */}

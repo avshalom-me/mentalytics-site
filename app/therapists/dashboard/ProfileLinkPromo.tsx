@@ -55,8 +55,8 @@ export default function ProfileLinkPromo({ therapistId, fullName }: { therapistI
       <h2 className="text-lg font-extrabold text-stone-900">קדמו את הפרופיל שלכם בגוגל 🔗</h2>
       <p className="mt-2 text-sm leading-7 text-stone-600">
         יש לכם אתר אישי? הוסיפו בו קישור לפרופיל שלכם בטיפול חכם. זה מחזק את הדירוג של הפרופיל
-        בגוגל - כך שמטופלים שמחפשים את <strong>השם שלכם</strong> מגיעים לעמוד מקצועי ומעודכן עם
-        כפתורי יצירת קשר. <span className="text-stone-500">(קישור מאתר אישי עוזר לקידום; שיתוף בפייסבוק/אינסטגרם מוסיף חשיפה, אך לא משפיע על גוגל.)</span>
+        בגוגל - כך שמטופלים שמחפשים את <strong>האזור וההתמחות שלכם</strong> מגיעים לעמוד מקצועי
+        ומעודכן עם כפתורי יצירת קשר. <span className="text-stone-500">(קישור מאתר אישי עוזר לקידום; שיתוף בפייסבוק/אינסטגרם מוסיף חשיפה, אך לא משפיע על גוגל.)</span>
       </p>
 
       <div className="mt-4 space-y-3">

@@ -46,6 +46,7 @@ type StatsResponse = {
   month: StatsBucket;
   profile_views?: { all_time: number };
   match_impressions?: { all_time: number };
+  directory_impressions?: { all_time: number };
   all_time_contacts?: { total: number; match: number; directory: number; messages: number; clicks: number };
   enriched?: EnrichedStatsData;
 };
@@ -83,7 +84,11 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   const periodLabel = period === "week" ? "7 הימים האחרונים" : "30 הימים האחרונים";
   const viewsValue = stats?.profile_views?.all_time ?? 0;
   const impressionsValue = stats?.match_impressions?.all_time ?? 0;
-  const conversionPct = impressionsValue > 0 ? Math.round((viewsValue / impressionsValue) * 100) : null;
+  const dirImpressionsValue = stats?.directory_impressions?.all_time ?? 0;
+  // יחס ההמרה נמדד מול *כלל* החשיפה (התאמות + מאגר), אחרת הוא מחלק בחלק
+  // קטן מהחשיפה בפועל ויוצא מנופח.
+  const totalImpressions = impressionsValue + dirImpressionsValue;
+  const conversionPct = totalImpressions > 0 ? Math.round((viewsValue / totalImpressions) * 100) : null;
   const contacts = stats?.all_time_contacts;
 
   // ── Paying/promoted: cumulative numbers since joining - no period splits
@@ -104,21 +109,26 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
             {/* Exposure → interest */}
             <h3 className="text-sm font-bold text-stone-800 mb-1">חשיפה ועניין</h3>
             <p className="text-[11px] text-stone-500 mb-3">כמה אנשים ראו אותך ונכנסו לפרופיל - לפני שלב יצירת הקשר</p>
-            <div className="grid grid-cols-2 gap-3 mb-2">
+            <div className="grid grid-cols-3 gap-2 mb-2">
               <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-3 text-center">
                 <div className="text-lg font-black text-indigo-700">{impressionsValue.toLocaleString("he-IL")}</div>
-                <div className="text-xs text-indigo-600 font-semibold mt-1">✨ הופעות במאטצ'ינג</div>
-                <div className="text-[10px] text-indigo-500 mt-0.5">פעמים שהופעת ברשימת ההמלצות</div>
+                <div className="text-xs text-indigo-600 font-semibold mt-1">✨ הופעות במאטצ&apos;ינג</div>
+                <div className="text-[10px] text-indigo-500 mt-0.5">ברשימת ההמלצות אחרי שאלון</div>
+              </div>
+              <div className="rounded-xl border border-teal-200 bg-teal-50 p-3 text-center">
+                <div className="text-lg font-black text-teal-700">{dirImpressionsValue.toLocaleString("he-IL")}</div>
+                <div className="text-xs text-teal-600 font-semibold mt-1">🔎 הופעות במאגר</div>
+                <div className="text-[10px] text-teal-500 mt-0.5">בגלישה במאגר המטפלים</div>
               </div>
               <div className="rounded-xl border border-purple-200 bg-purple-50 p-3 text-center">
                 <div className="text-lg font-black text-purple-700">{viewsValue.toLocaleString("he-IL")}</div>
                 <div className="text-xs text-purple-600 font-semibold mt-1">👁 כניסות לפרופיל</div>
-                <div className="text-[10px] text-purple-500 mt-0.5">לחיצות שהובילו לעמוד שלך</div>
+                <div className="text-[10px] text-purple-500 mt-0.5">נכנסו לעמוד שלך</div>
               </div>
             </div>
             {conversionPct !== null && (
               <div className="text-xs text-stone-500 text-center mb-4">
-                יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מהמופיעים נכנסו לפרופיל
+                יחס המרה: <span className="font-bold text-stone-700">{conversionPct}%</span> מסך החשיפות נכנסו לפרופיל
               </div>
             )}
 
