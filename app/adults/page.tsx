@@ -2826,6 +2826,14 @@ export default function AdultsPage() {
               </select>
             </>
           )}
+          {/* Leaving both blank isn't "flexible about distance" - the scorer skips the
+              whole location block (app/api/match/route.ts), so near and far rank alike.
+              Say so, rather than guessing a region for them. */}
+          {!matchPrefs.region && !matchPrefs.online && (
+            <p className="mt-2 rounded-lg bg-[var(--teal-pale)] px-3 py-2 text-xs leading-relaxed text-[#3E5250]">
+              בלי אזור וללא סימון אונליין, ההתאמה מתבצעת לפי התאמה מקצועית בלבד - יוצגו מטפלים מכל הארץ, ללא התחשבות במרחק.
+            </p>
+          )}
         </div>
 
         <label className="mb-3 flex items-center gap-2 text-sm">

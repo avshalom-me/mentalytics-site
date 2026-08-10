@@ -2678,6 +2678,13 @@ function KidsMatchSection({ A, score, selection }: {
                 </select>
               </>
             )}
+            {/* Same disclosure as the adults flow: with no region and no online box the
+                scorer skips the location block entirely, so distance stops counting. */}
+            {!region && !online && (
+              <p className="mt-2 rounded-xl bg-[var(--teal-pale)] px-3 py-2 text-xs leading-relaxed text-[#3E5250]">
+                בלי אזור וללא סימון אונליין, ההתאמה מתבצעת לפי התאמה מקצועית בלבד - יוצגו מטפלים מכל הארץ, ללא התחשבות במרחק.
+              </p>
+            )}
           </div>
 
           {/* Language */}
