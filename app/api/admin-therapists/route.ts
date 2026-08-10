@@ -15,7 +15,7 @@ import {
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
-import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
+import { REFUND_CATEGORIES, VAT_RATE, GUARANTEE_DAYS } from "@/app/lib/crm";
 
 type TherapistRow = {
   id: string;
@@ -432,9 +432,27 @@ export async function PATCH(request: Request) {
 
       const { data: before } = await supabaseAdmin
         .from("therapists")
-        .select("match_paused_until")
+        .select("match_paused_until, promotion_source, promoted_since, created_at")
         .eq("id", id)
         .single();
+
+      // ערבות ההחזר: מטפל ששילם זכאי להחזר מלא אם לא הגיעה אליו אף פנייה
+      // תוך GUARANTEE_DAYS. הקפאה שלו בתוך החלון הזה מדכאת בדיוק את החשיפה
+      // שהובטחה לו - כלומר אנחנו מייצרים לעצמנו את חבות ההחזר. חוסמים.
+      // (מקודמי-מתנה אינם בערבות ולכן אינם מושפעים - הם היעד של הפיצ'ר.)
+      if (until && before?.promotion_source === "paid") {
+        const windowStart = new Date((before.promoted_since ?? before.created_at) as string).getTime();
+        const daysLeft = Math.ceil((windowStart + GUARANTEE_DAYS * 86400000 - Date.now()) / 86400000);
+        if (daysLeft > 0) {
+          return NextResponse.json(
+            {
+              ok: false,
+              error: `לא ניתן להקפיא מטפל/ת שמשלם/ת בתוך תקופת ערבות ההחזר (נותרו ${daysLeft} ימים). ההקפאה מדכאת את החשיפה שהובטחה בערבות, ועלולה ליצור עילה להחזר כספי.`,
+            },
+            { status: 409 },
+          );
+        }
+      }
 
       const { error } = await supabaseAdmin
         .from("therapists")

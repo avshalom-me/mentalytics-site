@@ -22,6 +22,7 @@ type Therapist = {
   training_areas: string[] | null;
   regions: string[] | null;
   status: string;
+  match_paused_until: string | null;
 };
 
 type EmailCategory = "engaged" | "viewed_only" | "incomplete_profile" | "skip";
@@ -249,7 +250,7 @@ export async function GET(req: NextRequest) {
 
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status")
+    .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status, match_paused_until")
     .eq("status", "paying")
     .neq("entity_type", "center") // הישות אינה מטפל — לא לשלוח לה דוח ביצועים חודשי
     .eq("unsubscribed_from_stats", false);
@@ -308,6 +309,15 @@ export async function GET(req: NextRequest) {
 
   for (const t of therapists as Therapist[]) {
     if (!t.email) continue;
+
+    // מוקפא/ת מההתאמות: המספרים שלו/ה ירדו *בגללנו*. הדוח הזה מסביר ירידה
+    // בתור בעיה של המטפל/ת ("הפרופיל שלך לא משדר במלוא הכוח", "איך הופכים
+    // צפייה לפנייה") - כלומר לא רק שהוא מפר את השקט שההקפאה אמורה לשמור,
+    // הוא גם מאשים אותם במשהו שאנחנו עשינו. מדלגים לגמרי.
+    if (t.match_paused_until && new Date(t.match_paused_until).getTime() > Date.now()) {
+      skipped++;
+      continue;
+    }
 
     const c = clickMap[t.id] ?? { wa: 0, phone: 0, email: 0, match: 0, directory: 0 };
     const totalClicks = c.wa + c.phone + c.email;

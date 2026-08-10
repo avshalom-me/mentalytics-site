@@ -78,6 +78,7 @@ type Flagged = {
   clicks: number;
   views: number;
   daysPromoted: number | null;
+  paused: boolean; // מוקפא/ת מההתאמות - הירידה מכוונת, לא בעיה לחקור
 };
 
 function escapeHtml(s: string): string {
@@ -91,8 +92,9 @@ function escapeHtml(s: string): string {
 function buildEmailHtml(flagged: Flagged[], totalPromoted: number, monthLabel: string): string {
   const rows = flagged
     .map((t) => {
-      const flag =
-        t.views === 0
+      const flag = t.paused
+        ? '<span style="color:#0284c7;">❄️ מוקפא/ת מההתאמות - צפוי</span>'
+        : t.views === 0
           ? '<span style="color:#dc2626;">🔇 לא נצפה כלל</span>'
           : '<span style="color:#d97706;">👁️ נצפה — בלי פנייה</span>';
       const days =
@@ -177,7 +179,7 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
   try {
     const { data: therapists, error: tErr } = await supabaseAdmin
       .from("therapists")
-      .select("id, full_name, promoted_since")
+      .select("id, full_name, promoted_since, match_paused_until")
       .eq("status", "paying")
       .neq("entity_type", "center"); // הישות אינה מטפל — לא לשלוח לה מייל "מעורבות נמוכה"
 
@@ -185,7 +187,9 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
       return { ok: false, month: label, flagged: 0, totalPromoted: 0, error: tErr.message, status: 500 };
     }
 
-    const paying = (therapists ?? []) as { id: string; full_name: string | null; promoted_since: string | null }[];
+    const paying = (therapists ?? []) as {
+      id: string; full_name: string | null; promoted_since: string | null; match_paused_until: string | null;
+    }[];
     // Only evaluate therapists who were actually promoted during (or before) the
     // reported month — someone promoted AFTER it ended barely appeared in it, so
     // flagging them for "0 clicks last month" would be noise. promoted_since=null
@@ -232,6 +236,7 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
         daysPromoted: t.promoted_since
           ? Math.floor((nowMs - new Date(t.promoted_since).getTime()) / 86_400_000)
           : null,
+        paused: !!t.match_paused_until && new Date(t.match_paused_until).getTime() > nowMs,
       }))
       .filter((t) => t.clicks < CLICK_THRESHOLD)
       // Fewest clicks first; within that, longest-promoted-still-quiet first.
