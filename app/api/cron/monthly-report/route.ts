@@ -248,6 +248,13 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
+  // ⚠️ מדיניות: דוחות למטפלים לא נשלחים אוטומטית. המסלול הזה אינו רשום
+  // ב-vercel.json ולכן אינו רץ מעצמו - אבל קריאה ידנית אליו שלחה בעבר 42
+  // מיילים אמיתיים בטעות, וזו פעולה בלתי הפיכה. לכן ברירת המחדל היא
+  // *תצוגה מקדימה בלבד*: מחזירה למי היה נשלח ומה, בלי לשלוח דבר.
+  // שליחה בפועל מחייבת ?send=confirm במפורש.
+  const sendForReal = req.nextUrl.searchParams.get("send") === "confirm";
+
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
     .select("id, full_name, email, gender, bio, profile_photo_path, therapist_types, training_areas, regions, status, match_paused_until")
@@ -306,6 +313,8 @@ export async function GET(req: NextRequest) {
   let skipped = 0;
   const byCategory: Record<EmailCategory, number> = { engaged: 0, viewed_only: 0, incomplete_profile: 0, skip: 0 };
   const errors: string[] = [];
+  // תצוגה מקדימה: מי היה מקבל ומה, כשלא ביקשו שליחה בפועל.
+  const preview: { to: string; subject: string }[] = [];
 
   for (const t of therapists as Therapist[]) {
     if (!t.email) continue;
@@ -354,6 +363,12 @@ export async function GET(req: NextRequest) {
       subject = `הפרופיל שלך לא משדר במלוא הכוח — 5 דקות לתקן`;
     }
 
+    // ברירת מחדל - תצוגה מקדימה בלבד. שום מייל לא יוצא בלי ?send=confirm.
+    if (!sendForReal) {
+      preview.push({ to: t.email, subject });
+      continue;
+    }
+
     // Monthly reports go to every paying therapist at once — route through the
     // daily bulk gate so the report run can't blow the Resend daily quota.
     const r = await sendBulkEmail({
@@ -374,7 +389,14 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     ok: true,
-    sent,
+    mode: sendForReal ? "SENT" : "preview_only",
+    ...(sendForReal
+      ? { sent }
+      : {
+          would_send: preview.length,
+          note: "לא נשלח דבר. להוספת שליחה בפועל: ?send=confirm",
+          preview,
+        }),
     skipped,
     total: therapists.length,
     byCategory,
