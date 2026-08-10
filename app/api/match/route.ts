@@ -660,6 +660,21 @@ export async function POST(req: NextRequest) {
       })
       .filter((x): x is { therapist: TherapistRow; result: NonNullable<ReturnType<typeof scoreTherapist>> } => x !== null);
 
+    // Randomize BEFORE the stable sort below, so any group that ends up tied
+    // (equal score, and equal or absent personality) inherits this random
+    // order instead of the DB's fixed row order. Without this, the base query
+    // has no ORDER BY, so ties resolved to the SAME therapist every single
+    // time — confirmed live: identical top-10 across repeated identical
+    // requests, and one therapist landing #1 across three unrelated
+    // treatment searches purely by DB position. Personality data (sent only
+    // when the patient's chosen domain includes the style questions) is a
+    // MINORITY of requests, so most ties had zero tiebreaker at all and this
+    // was silently burying some paying therapists from every search forever.
+    for (let i = scored.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [scored[i], scored[j]] = [scored[j], scored[i]];
+    }
+
     const WEIGHT_PROFESSIONAL = 0.65;
     const WEIGHT_PERSONALITY  = 0.35;
 
@@ -673,7 +688,9 @@ export async function POST(req: NextRequest) {
       // Primary: professional score — expertise/location/etc.
       // Personality can only affect ranking when professional scores are within 8 points
       if (Math.abs(profDiff) > 8) return profDiff;
-      // Tiebreaker within close range: combined score (personality can tip)
+      // Tiebreaker within close range: combined score (personality can tip).
+      // Still-equal combined scores fall through to the shuffle above (sort
+      // is stable) instead of the original DB order.
       const ca = combinedScore(a.result.score, a.result.personality_score);
       const cb = combinedScore(b.result.score, b.result.personality_score);
       return cb - ca;
