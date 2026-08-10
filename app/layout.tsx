@@ -74,6 +74,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   { href: "/therapists", label: "מאגר המטפלים" },
                   { href: "/research", label: "מאמרים ומידע" },
                   { href: "/centers", label: "למרכזים טיפוליים" },
+                  { href: "/centers/login", label: "כניסה למרכזים" },
                   { href: "/privacy", label: "מדיניות פרטיות" },
                   { href: "/terms", label: "תנאי שימוש" },
                   { href: "/billing-policy", label: "תקנון רכישה" },
