@@ -205,13 +205,12 @@ export async function GET(req: NextRequest) {
       ),
       // הופעות במאגר המטפלים - נרשמות כאירוע analytics ולא כ-profile_view,
       // ולכן נעדרו מהפורטל לגמרי. זו החשיפה הגדולה מבין השתיים.
-      fetchAllRows<{ therapist_id: string }>(() =>
-        supabaseAdmin
-          .from("analytics_events")
-          .select("therapist_id")
-          .eq("event_type", "profile_impression")
-          .in("therapist_id", statIds),
-      ),
+      // count בלבד: הטבלה גדולה (42K+ שורות) ואנחנו צריכים רק מספר.
+      supabaseAdmin
+        .from("analytics_events")
+        .select("*", { count: "exact", head: true })
+        .eq("event_type", "profile_impression")
+        .in("therapist_id", statIds),
     ]);
 
     const clicksMonth = clicks.filter((c) => c.clicked_at >= mAgo);
@@ -282,7 +281,7 @@ export async function GET(req: NextRequest) {
         // המשמעות היא all-time - התוויות בממשק עודכנו בהתאם.
         views_month: realViews.length,
         impressions_month: matchImpressions,
-        directory_impressions: dirImpressions.length,
+        directory_impressions: dirImpressions.count ?? 0,
         clicks_total: clicksByType(clicks),
         clicks_week: clicksByType(clicksWeek),
         clicks_month: clicksByType(clicksMonth),

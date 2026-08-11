@@ -189,7 +189,7 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
       <div className="mb-5 grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-2xl p-4 text-center" style={{ background: "linear-gradient(135deg,#F0F7FA,#E6F4F7)", border: "1px solid #D8E4E8" }}>
           <div className="text-3xl font-black text-[#0F5468]">{conversion.total_views.toLocaleString("he-IL")}</div>
-          <div className="text-xs text-stone-600 mt-1">סה"כ צפיות</div>
+          <div className="text-xs text-stone-600 mt-1">כניסות לפרופיל</div>
         </div>
         <div className="rounded-2xl p-4 text-center" style={{ background: "linear-gradient(135deg,#FDF6EE,#F5E8DC)", border: "1px solid #E8DCC8" }}>
           <div className="text-3xl font-black text-[#8B2E0A]">{conversion.unique_sessions.toLocaleString("he-IL")}</div>
@@ -201,7 +201,10 @@ export default function EnrichedStatsPanel({ data }: { data: EnrichedStatsData }
         </div>
         <div className="rounded-2xl p-4 text-center" style={{ background: "linear-gradient(135deg,#F8F0F4,#F0EBF8)", border: "1px solid #D4C4DC" }}>
           <div className="text-3xl font-black text-[#6B4080]">{contactRate}%</div>
-          <div className="text-xs text-stone-600 mt-1">אחוז המרה</div>
+          {/* "המרה" מופיע גם למעלה בדשבורד, שם היא חשיפה←כניסה. כאן זה שלב
+              אחר במשפך (כניסה←פנייה), ובלי ההבחנה שני מספרים שונים נראים
+              כמו סתירה - בדיוק הבלבול שדווח על הפרופיל האישי. */}
+          <div className="text-xs text-stone-600 mt-1">מצפייה לפנייה</div>
         </div>
       </div>
 
