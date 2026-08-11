@@ -12,7 +12,12 @@ type Tab = "funnel" | "quiz" | "stats" | "explain" | "therapists";
 type Funnel = { pageViews: number; impressions: number; profileViews: number; contactClicks: number };
 type FunnelBySource = { directory: Funnel; match: Funnel };
 type FilterEntry = { name: string; count: number };
-type TrendEntry = { week: string; page_view: number; profile_impression: number; profile_view: number; contact_click: number };
+type TrendEntry = {
+  week: string;
+  page_view: number; profile_impression: number; profile_view: number; contact_click: number;
+  /** השבוע הנוכחי - דלי שעדיין מתמלא; מצויר כנקודות מנותקות ולא כהמשך הקו */
+  partial?: boolean; partial_days?: number;
+};
 type CTRCell = { impressions: number; profile_views: number; clicks: number; ctr: number };
 type CTRRow = { id: string; full_name: string; status: string; all: CTRCell; directory: CTRCell; match: CTRCell };
 type QuizStepRow = { step: string; count: number };
@@ -199,13 +204,38 @@ function PopularFilters({ filters }: { filters: FilterEntry[] }) {
   );
 }
 
+const TREND_METRICS = [
+  { key: "page_view", name: "כניסות למאגר", color: "#3b82f6" },
+  { key: "profile_impression", name: "חשיפות", color: "#9333ea" },
+  { key: "profile_view", name: "צפיות", color: "#f59e0b" },
+  { key: "contact_click", name: "קשר", color: "#22c55e" },
+] as const;
+
 function TrendChart({ trends }: { trends: TrendEntry[] }) {
   if (trends.length === 0) return null;
-  const data = trends.map(t => ({ ...t, week: t.week.slice(5) }));
+  const partialEntry = trends.find(t => t.partial);
+  // השבוע החלקי יורד מהקו הרציף ומצויר כנקודות חלולות מנותקות: קו שיורד אליו
+  // נקרא כקריסה ("2000 חשיפות וכמעט אפס פניות"), כשבפועל אלה יומיים של נתונים
+  // ליד שבועות מלאים. filterNull של ה-Tooltip מציג בכל נקודה רק את הסדרה החיה.
+  const data = trends.map(t => {
+    const row: Record<string, string | number | null> = {
+      week: t.week.slice(5) + (t.partial ? ` (${t.partial_days ?? 1} ימים)` : ""),
+    };
+    for (const m of TREND_METRICS) {
+      row[m.key] = t.partial ? null : t[m.key];
+      row[`${m.key}_p`] = t.partial ? t[m.key] : null;
+    }
+    return row;
+  });
   return (
     <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6">
       <h2 className="text-base font-black text-stone-800 mb-4">טרנד שבועי</h2>
-      <Info>אותם מדדי משפך (כניסות, חשיפות, צפיות, קשר) לאורך הזמן — כל נקודה היא שבוע. עוזר לראות מגמות: עלייה/ירידה בתנועה ובפניות לאורך השבועות.</Info>
+      <Info>אותם מדדי משפך (כניסות למאגר, חשיפות, צפיות, קשר) לאורך הזמן — כל נקודה היא שבוע מלא (שני עד ראשון). השבוע הנוכחי מוצג כנקודות חלולות עם מספר הימים שנצברו — אין להשוות אותו לשבועות שלמים.</Info>
+      {partialEntry && (
+        <p className="mb-3 -mt-1 text-xs text-stone-500">
+          ◌ הנקודות החלולות מימין = השבוע הנוכחי, {partialEntry.partial_days ?? 1} ימים בלבד.
+        </p>
+      )}
       <ResponsiveContainer width="100%" height={280}>
         <LineChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e7e5e4" />
@@ -213,10 +243,14 @@ function TrendChart({ trends }: { trends: TrendEntry[] }) {
           <YAxis tick={{ fontSize: 11, fill: "#78716c" }} />
           <Tooltip contentStyle={{ fontFamily: "Heebo", fontSize: 12, direction: "rtl" }} />
           <Legend wrapperStyle={{ fontSize: 12, fontFamily: "Heebo" }} />
-          <Line type="monotone" dataKey="page_view" stroke="#3b82f6" name="כניסות" strokeWidth={2} />
-          <Line type="monotone" dataKey="profile_impression" stroke="#9333ea" name="חשיפות" strokeWidth={2} />
-          <Line type="monotone" dataKey="profile_view" stroke="#f59e0b" name="צפיות" strokeWidth={2} />
-          <Line type="monotone" dataKey="contact_click" stroke="#22c55e" name="קשר" strokeWidth={2} />
+          {TREND_METRICS.map(m => (
+            <Line key={m.key} type="monotone" dataKey={m.key} stroke={m.color} name={m.name} strokeWidth={2} />
+          ))}
+          {TREND_METRICS.map(m => (
+            <Line key={`${m.key}_p`} type="monotone" dataKey={`${m.key}_p`} stroke={m.color} name={m.name}
+              strokeWidth={0} legendType="none"
+              dot={{ r: 4, strokeWidth: 2, stroke: m.color, fill: "#fff" }} />
+          ))}
         </LineChart>
       </ResponsiveContainer>
     </div>
@@ -363,8 +397,17 @@ function FunnelTab({ data }: { data: AnalyticsData }) {
   const [view, setView] = useState<FunnelView>("all");
   return (
     <>
+      {/* שינוי מדידה - בלי זה משווים מספרים שנמדדו אחרת ומסיקים "קריסה". */}
+      <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-6 text-amber-900">
+        <strong>שינוי מדידה, 12/8/2026.</strong> (1) &quot;כניסות למאגר&quot; סופרות מעכשיו רק עמודים
+        שמציגים מטפלים (מאגר, עיר, אזור, התמחות...) - עמודי תוכן (בית, מאמרים, אודות) שהצטרפו
+        למדידה ב-6/8 ניפחו את ראש המשפך; התיקון חל גם אחורה, כך שהגרף אחיד. (2) תנועת
+        בוטים וסורקים מסוננת מהרישום מהיום והלאה - חשיפות, צפיות וסשנים צפויים
+        לרדת ביחס לשבועות קודמים. הירידה היא ניקוי, לא אובדן: ב-8/8 סורק אחד ייצר
+        462 &quot;צפיות פרופיל&quot; ביום.
+      </div>
       <Info title="מה זה אומר? משפך החשיפה→פנייה">
-        <Term k="מאגר המטפלים">המסלול של מי שמגיע דרך עמוד מאגר המטפלים: כניסה לעמוד ← חשיפת כרטיס ← צפייה בפרופיל ← יצירת קשר.</Term>
+        <Term k="מאגר המטפלים">המסלול של מי שמגיע דרך עמוד מאגר המטפלים: כניסה לעמוד ← חשיפת כרטיס ← צפייה בפרופיל ← יצירת קשר. נספרות רק כניסות לעמודים שמציגים מטפלים.</Term>
         <Term k="מערכת ההתאמה">המסלול של מי שמילא/ה שאלון וקיבל/ה המלצות: השלמת שאלון ← חשיפת כרטיס בתוצאות ← צפייה בפרופיל ← יצירת קשר.</Term>
         <Term k="חשיפות כרטיס">כמה פעמים כרטיס של מטפל הוצג (לא בהכרח נלחץ).</Term>
         <Term k="צפיות בפרופיל">כניסות בפועל לעמוד הפרופיל המלא.</Term>

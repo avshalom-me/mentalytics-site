@@ -85,8 +85,19 @@ export async function GET(req: NextRequest) {
     //   profile view (source=directory) → contact (source=directory).
     // Matching: quiz completion (reaching results) → card impression
     //   (source=match_card) → profile view (source=match) → contact (source=match).
-    // page_view / profile_impression are emitted only on the directory.
-    const dirEntries = events.filter(e => e.event_type === "page_view").length;
+    //
+    // מ-6/8/2026 page_view נפלט גם מעמודי תוכן (בית, מאמרים, אודות...) לטובת
+    // ה-SEO אדמין. עמוד תוכן אינו כניסה למשפך - אין בו כרטיסי מטפלים ואין ממנו
+    // לחיצת קשר - וספירתו כאן ניפחה את ראש המשפך בן-לילה ושברה כל השוואה בין
+    // שבועות. לכן "כניסות" סופרות רק עמודים שמציגים מטפלים. שורה ותיקה בלי שם
+    // עמוד נספרת (מהתקופה שבה רק עמודי מאגר נמדדו).
+    const DIRECTORY_PAGE_RE = /^(directory|para-medical|city:|city_topic:|region:|specialty:|topic:|online_topic:|arrangement:|assessment:)/;
+    const isDirEntry = (e: { event_type: string; metadata: Record<string, string> }) => {
+      if (e.event_type !== "page_view") return false;
+      const page = typeof e.metadata?.page === "string" ? e.metadata.page : "";
+      return page === "" || DIRECTORY_PAGE_RE.test(page);
+    };
+    const dirEntries = events.filter(isDirEntry).length;
     const dirImpressions = events.filter(e => e.event_type === "profile_impression").length;
     const quizCompleted = events.filter(e => e.event_type === "quiz_complete").length;
     const dirViews = views.filter(v => v.source === "directory").length;
@@ -124,22 +135,31 @@ export async function GET(req: NextRequest) {
 
     // --- Weekly trends ---
     const weekBuckets: Record<string, { page_view: number; profile_impression: number; profile_view: number; contact_click: number }> = {};
+    // עוגן שבועי ליום שני, מחושב כולו ב-UTC. הגרסה הקודמת ערבבה זמן מקומי
+    // (getDay/setDate) עם toISOString (UTC): על שרת שאינו UTC, אירועים בשעות
+    // הראשונות של יום שני התפצלו לדלי "יום ראשון" נפרד, ודגל השבוע הנוכחי
+    // יכול היה לנחות על הפרגמנט. ב-UTC טהור ההתנהגות זהה בפרודקשן ובפיתוח.
     function getWeek(dateStr: string) {
       const d = new Date(dateStr);
-      const day = d.getDay();
-      const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-      const monday = new Date(d.setDate(diff));
-      return monday.toISOString().slice(0, 10);
+      const day = d.getUTCDay();
+      const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+      d.setUTCDate(diff);
+      return d.toISOString().slice(0, 10);
     }
     function ensureBucket(week: string) {
       if (!weekBuckets[week]) weekBuckets[week] = { page_view: 0, profile_impression: 0, profile_view: 0, contact_click: 0 };
     }
 
     for (const e of events) {
-      if (e.event_type === "page_view" || e.event_type === "profile_impression") {
+      // אותה הגדרת "כניסות" כמו במשפך - עמודי מאגר בלבד.
+      if (e.event_type === "profile_impression") {
         const w = getWeek(e.created_at);
         ensureBucket(w);
-        weekBuckets[w][e.event_type]++;
+        weekBuckets[w].profile_impression++;
+      } else if (isDirEntry(e)) {
+        const w = getWeek(e.created_at);
+        ensureBucket(w);
+        weekBuckets[w].page_view++;
       }
     }
     for (const v of views) {
@@ -156,8 +176,20 @@ export async function GET(req: NextRequest) {
       weekBuckets[w].contact_click++;
     }
 
+    // השבוע הנוכחי הוא תמיד דלי חלקי (שבועות מעוגנים ליום שני), והצגתו כנקודה
+    // רגילה על הגרף נראית כקריסה: יומיים של פניות מול שבועות מלאים. הדגל נותן
+    // ל-UI לצייר אותו אחרת ולציין כמה ימים הוא באמת מכסה.
+    const currentWeek = getWeek(new Date().toISOString());
+    const daysIntoWeek = Math.min(
+      7,
+      Math.floor((Date.now() - new Date(currentWeek).getTime()) / 86_400_000) + 1,
+    );
     const trends = Object.entries(weekBuckets)
-      .map(([week, counts]) => ({ week, ...counts }))
+      .map(([week, counts]) => ({
+        week,
+        ...counts,
+        ...(week === currentWeek ? { partial: true, partial_days: daysIntoWeek } : {}),
+      }))
       .sort((a, b) => a.week.localeCompare(b.week))
       .slice(-12);
 

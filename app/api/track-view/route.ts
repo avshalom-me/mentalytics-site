@@ -7,6 +7,7 @@ import {
   isValidGender,
 } from "@/app/lib/stats-categories";
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
+import { isBotRequest } from "@/app/lib/bot-detect";
 
 // "match_card"   = impression in the match-results list
 // "match"        = entry into the full profile page coming from match results
@@ -53,6 +54,12 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ ok: false }, { status: 429 });
+  }
+
+  // סורק שמריץ JS נרשם כאן כצפיות פרופיל אמיתיות (8/8/2026: 462 צפיות על 143
+  // מטפלים ביום). זיהוי לפי UA בזמן הבקשה - ראו app/lib/bot-detect.ts.
+  if (isBotRequest(req)) {
+    return NextResponse.json({ ok: true, bot: true });
   }
 
   try {

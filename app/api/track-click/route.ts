@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
+import { isBotRequest } from "@/app/lib/bot-detect";
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 // Surfaces a contact can be initiated from. "profile" was allowed by the DB
@@ -30,6 +31,12 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ ok: false, error: "Too many requests" }, { status: 429 });
+  }
+
+  // עקביות עם track/track-view: לחיצת קשר של בוט היא ליד מזויף - שלא ייספר
+  // לא במשפך ולא בערבות ההחזר של מטפלים משלמים.
+  if (isBotRequest(req)) {
+    return NextResponse.json({ ok: true, bot: true });
   }
 
   try {

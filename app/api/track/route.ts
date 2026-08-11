@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
+import { isBotRequest } from "@/app/lib/bot-detect";
 
 const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete", "recruit_page_view", "therapist_explain_click", "matching_click", "match_saved"] as const;
 type EventType = (typeof VALID_EVENTS)[number];
@@ -22,6 +23,13 @@ export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
   if (!checkRateLimit(ip)) {
     return NextResponse.json({ ok: false }, { status: 429 });
+  }
+
+  // בוטים שמריצים JS (סורקי SEO, בוטים של AI, headless) נרשמו כאן כסשנים
+  // וכחשיפות אמיתיות - ב-8/8/2026 סורק אחד ייצר יום שלם של "תנועה". מוחזר
+  // ok כדי לא לאותת על החסימה; פשוט לא נרשם כלום. (שינוי מדידה, 12/8/2026.)
+  if (isBotRequest(req)) {
+    return NextResponse.json({ ok: true, bot: true });
   }
 
   try {
