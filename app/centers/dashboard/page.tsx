@@ -37,7 +37,7 @@ type Stats = {
   clicks_total?: Clicks;
   by_source?: { match: SourceFunnel; directory: SourceFunnel; direct_contacts: number };
   benchmark?: {
-    days: number;
+    days: number; peers: number;
     per_therapist_views: number; per_therapist_contacts: number;
     free_avg_views: number; free_avg_contacts: number;
   } | null;
@@ -381,9 +381,10 @@ export default function CenterDashboardPage() {
       {stats?.benchmark && (stats.benchmark.free_avg_views > 0 || stats.benchmark.free_avg_contacts > 0) && (
         <section className="mb-6 rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
           <h2 className="mb-1 text-base font-black" style={{ color: "var(--teal-dark)" }}>מה המנוי מייצר</h2>
-          <p className="mb-4 text-xs text-stone-500">
-            {isEntity ? "המרכז שלכם" : "ממוצע למטפל במרכז"} מול הממוצע של מטפל/ת ללא קידום,
-            לאותה תקופה ({stats.benchmark.days} ימים)
+          <p className="mb-4 text-xs leading-5 text-stone-500">
+            {isEntity ? "המרכז שלכם" : "ממוצע למטפל במרכז"} מול {stats.benchmark.peers} מטפלים
+            ללא קידום, <strong>באותם {stats.benchmark.days} הימים בדיוק</strong> - כך שגודל
+            התקופה ונפח התנועה באתר זהים לשני הצדדים.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <CompareRow

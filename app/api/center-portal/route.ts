@@ -68,11 +68,11 @@ export async function GET(req: NextRequest) {
     // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים - היא
     // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
     const isEntity = (center.billing_track as string) === "center_entity";
-    let entity: { id: string; status: string; admin_approved: boolean; matching_filled: boolean } | null = null;
+    let entity: { id: string; status: string; admin_approved: boolean; matching_filled: boolean; since: string | null } | null = null;
     if (isEntity) {
       const { data: e } = await supabaseAdmin
         .from("therapists")
-        .select("id, status, admin_approved, training_areas, therapist_types, age_groups, regions, online")
+        .select("id, status, admin_approved, training_areas, therapist_types, age_groups, regions, online, promoted_since, created_at")
         .eq("center_account_id", center.id)
         .eq("entity_type", "center")
         .maybeSingle();
@@ -85,7 +85,15 @@ export async function GET(req: NextRequest) {
           (arr(e.training_areas).length > 0 || arr(e.therapist_types).length > 0) &&
           arr(e.age_groups).length > 0 &&
           (arr(e.regions).length > 0 || !!e.online);
-        entity = { id: e.id as string, status: e.status as string, admin_approved: !!e.admin_approved, matching_filled: matchingFilled };
+        entity = {
+          id: e.id as string,
+          status: e.status as string,
+          admin_approved: !!e.admin_approved,
+          matching_filled: matchingFilled,
+          // עוגן תקופת ההשוואה למסלול 2: שורת הישות לא נכללת ברשימת המטפלים
+          // למטה, ובלי השדה הזה העוגן היה נופל על תאריך הפעילות המוקדם ביותר.
+          since: ((e.promoted_since ?? e.created_at) as string | null) ?? null,
+        };
       }
     }
 
@@ -254,61 +262,110 @@ export async function GET(req: NextRequest) {
     });
 
     // ── השוואה לממוצע מטפל ללא קידום ────────────────────────────────────
-    // מה המנוי באמת קונה. מנורמל לפי ימים: הממוצע החינמי מחושב כתנועה-ליום
-    // על פני כלל המטפלים החינמיים, ומוכפל במספר הימים שמטפלי המרכז מקודמים -
-    // אחרת היינו משווים תקופות באורך שונה. count בלבד, בלי לשלוף שורות.
+    // ההשוואה נעשית על *אותו חלון תאריכים* לשני הצדדים, ולא כממוצע-ליום על
+    // פני כל ההיסטוריה. שתי סיבות, שתיהן נמדדו בנתונים:
+    //
+    // 1) התנועה באתר גדלה - מ-24 צפיות ליום ביולי ל-100 בתחילת אוגוסט.
+    //    ממוצע-ליום היסטורי היה מייצר בנצ'מרק נמוך מלאכותית, כלומר מנפח את
+    //    היתרון שאנחנו מציגים למרכז. זה בדיוק סוג ההטעיה שאסור למכור בה.
+    // 2) מטפל חינמי ותיק צבר חשיפה בתקופות אחרות. לכן נכללים רק חינמיים
+    //    שהיו רשומים כבר בתחילת החלון - כך לכולם אותו פרק זמן בדיוק.
+    //
+    // שערי איכות: לפחות 14 ימי חשיפה למרכז, ולפחות BENCH_MIN_PEERS חינמיים
+    // ותיקים להשוואה. מתחת לזה לא מציגים כלום - השוואה על בסיס דל גרועה מכלום.
+    //
+    // החלון נבחר בנסיגה: הכי ארוך שעדיין עומד בסף העמיתים. המאגר החינמי
+    // התחיל להתמלא ב-23/6, ולכן חלון של 60 יום מוצא כמעט אף עמית ותיק -
+    // בלי הנסיגה דווקא המרכזים הוותיקים היו נשארים בלי השוואה בכלל.
+    const BENCH_WINDOWS = [60, 45, 30, 21, 14];
+    const BENCH_MIN_PEERS = 20;
+
     let benchmark: {
-      days: number;
+      days: number; peers: number;
       per_therapist_views: number; per_therapist_contacts: number;
       free_avg_views: number; free_avg_contacts: number;
     } | null = null;
     try {
       // עוגן התקופה: מתי המרכז התחיל לצבור חשיפה בפועל. מסלול 1 - התאריך
-      // המוקדם מבין מטפלי המרכז; מסלול 2 - הפעילות המוקדמת ביותר של שורת
-      // הישות (אין לה שורת therapists משלה כאן).
-      const therapistAnchor = therapists
-        .map((t) => t.promoted_since ?? t.created_at)
-        .filter((d): d is string => !!d)
-        .sort()[0];
-      const activityAnchor = [
-        ...views.map((v) => v.viewed_at),
-        ...clicks.map((c) => c.clicked_at),
-      ].sort()[0];
-      const startIso = therapistAnchor ?? activityAnchor ?? null;
-      const periodDays = startIso
-        ? Math.max(1, Math.floor((Date.now() - new Date(startIso).getTime()) / 86_400_000))
+      // המוקדם מבין מטפלי המרכז; מסלול 2 - שורת הישות עצמה. לא נופלים על
+      // תאריך הפעילות המוקדם ביותר: פרופיל שהיה במאגר לפני שהמרכז הצטרף
+      // גורר את העוגן אחורה ומייצר חלון השוואה ארוך מגיל המנוי.
+      const therapistAnchor = isEntity
+        ? entity?.since ?? null
+        : therapists
+            .map((t) => t.promoted_since ?? t.created_at)
+            .filter((d): d is string => !!d)
+            .sort()[0] ?? null;
+      const startIso = therapistAnchor ?? center.billing_starts_at ?? null;
+      const rawDays = startIso
+        ? Math.floor((Date.now() - new Date(startIso).getTime()) / 86_400_000)
         : 0;
 
-      if (periodDays > 0) {
-        const { data: freeRows } = await supabaseAdmin
-          .from("therapists")
-          .select("id, created_at")
-          .eq("status", "approved")
-          .eq("admin_approved", true)
-          .eq("accepting_new_patients", true)
-          .neq("entity_type", "center");
-        const freeIds = (freeRows ?? []).map((r) => r.id as string);
-        if (freeIds.length > 0) {
+      // שליפה אחת של כל החינמיים עם תאריך ההצטרפות; ממנה נגזרות כל הבדיקות.
+      const { data: freeRows } = await supabaseAdmin
+        .from("therapists")
+        .select("id, created_at")
+        .eq("status", "approved")
+        .eq("admin_approved", true)
+        .eq("accepting_new_patients", true)
+        .neq("entity_type", "center");
+      const freePeers = (freeRows ?? []).map((r) => ({
+        id: r.id as string,
+        joined: new Date(r.created_at as string).getTime(),
+      }));
+
+      // המועמד הראשון הוא גיל המרכז עצמו (עד 60 יום) - כך מרכז בן 20 יום
+      // נמדד על 20 יום מלאים ולא נופל לשלב הבא בסולם.
+      const candidates = [Math.min(rawDays, BENCH_WINDOWS[0]), ...BENCH_WINDOWS]
+        .filter((d, i, a) => d <= rawDays && d >= BENCH_WINDOWS[BENCH_WINDOWS.length - 1] && a.indexOf(d) === i)
+        .sort((a, b) => b - a);
+
+      let windowDays = 0;
+      let freeIds: string[] = [];
+      for (const days of candidates) {
+        const cutoff = Date.now() - days * 86_400_000;
+        const eligible = freePeers.filter((p) => p.joined <= cutoff);
+        if (eligible.length >= BENCH_MIN_PEERS) {
+          windowDays = days;
+          freeIds = eligible.map((p) => p.id);
+          break;
+        }
+      }
+
+      if (windowDays > 0) {
+        const windowStart = new Date(Date.now() - windowDays * 86_400_000).toISOString();
+        // ספירה במנות: רשימת מזהים ב-in() נכנסת ל-URL, וכשהמאגר החינמי יגדל
+        // רשימה אחת תחרוג ממגבלת אורך הבקשה ותפיל את הבנצ'מרק בשקט.
+        const CHUNK = 80;
+        const chunks: string[][] = [];
+        for (let i = 0; i < freeIds.length; i += CHUNK) chunks.push(freeIds.slice(i, i + CHUNK));
+        const sumCounts = async (
+          build: (ids: string[]) => PromiseLike<{ count: number | null }>,
+        ) => (await Promise.all(chunks.map(build))).reduce((s, r) => s + (r.count ?? 0), 0);
+        {
           const [fv, fc] = await Promise.all([
-            supabaseAdmin.from("therapist_profile_views").select("*", { count: "exact", head: true })
-              .in("therapist_id", freeIds).in("source", ["match", "directory"]),
-            supabaseAdmin.from("therapist_contact_clicks").select("*", { count: "exact", head: true })
-              .in("therapist_id", freeIds),
+            sumCounts((ids) =>
+              supabaseAdmin.from("therapist_profile_views").select("*", { count: "exact", head: true })
+                .in("therapist_id", ids).in("source", ["match", "directory"])
+                .gte("viewed_at", windowStart),
+            ).then((count) => ({ count })),
+            sumCounts((ids) =>
+              supabaseAdmin.from("therapist_contact_clicks").select("*", { count: "exact", head: true })
+                .in("therapist_id", ids).gte("clicked_at", windowStart),
+            ).then((count) => ({ count })),
           ]);
-          const freeDays = (freeRows ?? []).reduce((sum, r) => {
-            const d = Math.max(1, Math.floor((Date.now() - new Date(r.created_at as string).getTime()) / 86_400_000));
-            return sum + d;
-          }, 0);
-          if (freeDays > 0) {
-            const unitCount = isEntity ? 1 : Math.max(1, statIds.length);
-            benchmark = {
-              days: periodDays,
-              per_therapist_views: Math.round((realViews.length / unitCount) * 10) / 10,
-              per_therapist_contacts: Math.round((clicks.length / unitCount) * 10) / 10,
-              free_avg_views: Math.round(((fv.count ?? 0) / freeDays) * periodDays * 10) / 10,
-              free_avg_contacts: Math.round(((fc.count ?? 0) / freeDays) * periodDays * 10) / 10,
-            };
-          }
+          // צד המרכז נמדד על אותו חלון בדיוק.
+          const mineViews = realViews.filter((v) => v.viewed_at >= windowStart).length;
+          const mineClicks = clicks.filter((c) => c.clicked_at >= windowStart).length;
+          const unitCount = isEntity ? 1 : Math.max(1, statIds.length);
+          benchmark = {
+            days: windowDays,
+            peers: freeIds.length,
+            per_therapist_views: Math.round((mineViews / unitCount) * 10) / 10,
+            per_therapist_contacts: Math.round((mineClicks / unitCount) * 10) / 10,
+            free_avg_views: Math.round(((fv.count ?? 0) / freeIds.length) * 10) / 10,
+            free_avg_contacts: Math.round(((fc.count ?? 0) / freeIds.length) * 10) / 10,
+          };
         }
       }
     } catch {
