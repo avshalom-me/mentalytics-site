@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
-import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles } from "lucide-react";
+import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 import InvitePanel from "./InvitePanel";
 
@@ -28,8 +28,10 @@ type Bar = { name: string; count: number };
 
 type Stats = {
   listed_count: number;
-  views_month: number;
-  impressions_month?: number;
+  views_month: number;         // מצטבר (השם נשמר לתאימות)
+  impressions_month?: number;  // מצטבר
+  directory_impressions?: number;
+  clicks_total?: Clicks;
   clicks_week: Clicks;
   clicks_month: Clicks;
   by_region: Bar[];
@@ -158,14 +160,15 @@ export default function CenterDashboardPage() {
       )}
 
       {/* מדדים מרכזיים */}
-      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
+      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-5" : "md:grid-cols-3"}`}>
         {!isEntity && (
           <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
         )}
-        <StatCard icon={Sparkles} label="הופעות בהתאמות" value={stats?.impressions_month ?? 0} sub="30 יום · הופעה ברשימת ההמלצות" color="#7c3aed" />
-        <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="30 יום" color="#1A7A96" />
-        <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#2A5C3A" />
-        <StatCard icon={Activity} label="לחיצות השבוע" value={stats?.clicks_week.total ?? 0} sub="7 ימים" color="#8B2E0A" />
+        <StatCard icon={Sparkles} label="הופעות בהתאמות" value={stats?.impressions_month ?? 0} sub="מצטבר · ברשימת ההמלצות" color="#7c3aed" />
+        <StatCard icon={Search} label="הופעות במאגר" value={stats?.directory_impressions ?? 0} sub="מצטבר · בגלישה במאגר" color="#0F766E" />
+        <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="מצטבר" color="#1A7A96" />
+        <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? stats?.clicks_month.total ?? 0} sub="מצטבר" color="#2A5C3A" />
+        <StatCard icon={Activity} label="לחיצות החודש" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#8B2E0A" />
       </div>
 
       {/* מסלול 2: הצעד הקריטי - בלי סוגי טיפול המרכז לא קיים בהתאמות */}
@@ -257,8 +260,8 @@ export default function CenterDashboardPage() {
                 <tr className="border-b border-stone-200 text-xs text-stone-500">
                   <th className="py-2 font-semibold">מטפל/ת</th>
                   <th className="py-2 font-semibold text-center">סטטוס</th>
-                  <th className="py-2 font-semibold text-center">צפיות (חודש)</th>
-                  <th className="py-2 font-semibold text-center">לחיצות ליצירת קשר (חודש)</th>
+                  <th className="py-2 font-semibold text-center">צפיות (מצטבר)</th>
+                  <th className="py-2 font-semibold text-center">לחיצות ליצירת קשר (מצטבר)</th>
                   <th className="py-2 font-semibold text-left">פעולות</th>
                 </tr>
               </thead>
@@ -341,7 +344,7 @@ export default function CenterDashboardPage() {
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || stats.clicks_month.total > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
           <h2 className="mb-1 text-base font-black text-stone-800">מי מחפש את המרכז שלכם</h2>
-          <p className="mb-5 text-xs text-stone-400">פילוח מצטבר של כלל הפונים למטפלי המרכז (30 יום) - נתונים אנונימיים לחלוטין</p>
+          <p className="mb-5 text-xs text-stone-400">פילוח מצטבר של כלל הפונים למטפלי המרכז, מאז ההצטרפות - נתונים אנונימיים לחלוטין</p>
 
           <div className="grid gap-6 md:grid-cols-2">
             <Bars title="לפי אזור" icon={MapPin} data={stats.by_region.map((b) => ({ name: REGION_LABELS[b.name] ?? b.name, count: b.count }))} color="#0F5468" />
@@ -352,12 +355,12 @@ export default function CenterDashboardPage() {
 
           {/* ערוצי פנייה */}
           <div className="mt-6 border-t border-stone-100 pt-5">
-            <h3 className="mb-3 text-sm font-black text-stone-700">איך פונים (30 יום)</h3>
+            <h3 className="mb-3 text-sm font-black text-stone-700">איך פונים (מצטבר)</h3>
             <div className="flex flex-wrap gap-3">
-              <Channel label="וואטסאפ" value={stats.clicks_month.whatsapp} total={stats.clicks_month.total} color="#22c55e" />
-              <Channel label="טלפון" value={stats.clicks_month.phone} total={stats.clicks_month.total} color="#57534e" />
-              <Channel label="מייל" value={stats.clicks_month.email} total={stats.clicks_month.total} color="#3b82f6" />
-              <Channel label="📝 הודעות מהאתר" value={stats.clicks_month.site_message ?? 0} total={stats.clicks_month.total} color="#d97706" />
+              <Channel label="וואטסאפ" value={(stats.clicks_total ?? stats.clicks_month).whatsapp} total={(stats.clicks_total ?? stats.clicks_month).total} color="#22c55e" />
+              <Channel label="טלפון" value={(stats.clicks_total ?? stats.clicks_month).phone} total={(stats.clicks_total ?? stats.clicks_month).total} color="#57534e" />
+              <Channel label="מייל" value={(stats.clicks_total ?? stats.clicks_month).email} total={(stats.clicks_total ?? stats.clicks_month).total} color="#3b82f6" />
+              <Channel label="📝 הודעות מהאתר" value={(stats.clicks_total ?? stats.clicks_month).site_message ?? 0} total={(stats.clicks_total ?? stats.clicks_month).total} color="#d97706" />
             </div>
             <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
               <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>

@@ -186,21 +186,31 @@ export async function GET(req: NextRequest) {
     const wAgo = weekAgo().toISOString();
     const sixMonthsAgo = new Date(new Date().getFullYear(), new Date().getMonth() - 5, 1).toISOString();
 
-    // קליקים ליצירת קשר (6 חודשים - למגמה), וצפיות בפרופיל (חודש - לפילוח).
-    const [clicks, views] = await Promise.all([
+    // מצטבר, בלי חלון של 30 יום (יושר עם דשבורד המטפל, 10/8/26): הפילוחים
+    // לפי אזור/קושי/גיל היו נחתכים לחודש האחרון בזמן שהחלק העליון הראה
+    // מספרים מצטברים - אותה סתירה שדווחה בפרופיל האישי. הקליקים כבר נשלפו
+    // ל-6 חודשים לצורך המגמה; עכשיו גם הם ללא חסם, והמגמה עדיין חותכת ל-6.
+    const [clicks, views, dirImpressions] = await Promise.all([
       fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string }>(() =>
         supabaseAdmin
           .from("therapist_contact_clicks")
           .select("therapist_id, click_type, clicked_at")
-          .in("therapist_id", statIds)
-          .gte("clicked_at", sixMonthsAgo),
+          .in("therapist_id", statIds),
       ),
       fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null; viewer_region: string | null; viewer_issue: string | null; viewer_age_band: string | null; viewer_gender: string | null }>(() =>
         supabaseAdmin
           .from("therapist_profile_views")
           .select("therapist_id, viewed_at, source, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
-          .in("therapist_id", statIds)
-          .gte("viewed_at", mAgo),
+          .in("therapist_id", statIds),
+      ),
+      // הופעות במאגר המטפלים - נרשמות כאירוע analytics ולא כ-profile_view,
+      // ולכן נעדרו מהפורטל לגמרי. זו החשיפה הגדולה מבין השתיים.
+      fetchAllRows<{ therapist_id: string }>(() =>
+        supabaseAdmin
+          .from("analytics_events")
+          .select("therapist_id")
+          .eq("event_type", "profile_impression")
+          .in("therapist_id", statIds),
       ),
     ]);
 
@@ -232,9 +242,10 @@ export async function GET(req: NextRequest) {
       trend.push({ label, clicks: n });
     }
 
-    // פניות פר-מטפל (חודש) - לטבלת המטפלים.
+    // פניות פר-מטפל לטבלת המטפלים - מצטבר, כדי שיתאים לעמודת הצפיות שלצידו
+    // ולכרטיסים שלמעלה.
     const clicksPerTherapist = new Map<string, number>();
-    for (const c of clicksMonth) clicksPerTherapist.set(c.therapist_id, (clicksPerTherapist.get(c.therapist_id) ?? 0) + 1);
+    for (const c of clicks) clicksPerTherapist.set(c.therapist_id, (clicksPerTherapist.get(c.therapist_id) ?? 0) + 1);
     const viewsPerTherapist = new Map<string, number>();
     for (const v of realViews) viewsPerTherapist.set(v.therapist_id, (viewsPerTherapist.get(v.therapist_id) ?? 0) + 1);
 
@@ -267,8 +278,12 @@ export async function GET(req: NextRequest) {
       stats: {
         // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
         listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,
+        // מצטבר מאז ההצטרפות. השמות נשמרו לתאימות לאחור עם הלקוח, אך
+        // המשמעות היא all-time - התוויות בממשק עודכנו בהתאם.
         views_month: realViews.length,
         impressions_month: matchImpressions,
+        directory_impressions: dirImpressions.length,
+        clicks_total: clicksByType(clicks),
         clicks_week: clicksByType(clicksWeek),
         clicks_month: clicksByType(clicksMonth),
         by_region: tallyBy(realViews, (v) => v.viewer_region),
