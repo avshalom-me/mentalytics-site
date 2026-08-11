@@ -25,6 +25,9 @@ type TherapistItem = {
 
 type Clicks = { whatsapp: number; phone: number; email: number; site_message?: number; total: number };
 type Bar = { name: string; count: number };
+const EMPTY_CLICKS: Clicks = { whatsapp: 0, phone: 0, email: 0, site_message: 0, total: 0 };
+
+type SourceFunnel = { impressions: number; entries: number; contacts: number; entry_rate: number; contact_rate: number };
 
 type Stats = {
   listed_count: number;
@@ -32,6 +35,12 @@ type Stats = {
   impressions_month?: number;  // מצטבר
   directory_impressions?: number;
   clicks_total?: Clicks;
+  by_source?: { match: SourceFunnel; directory: SourceFunnel; direct_contacts: number };
+  benchmark?: {
+    days: number;
+    per_therapist_views: number; per_therapist_contacts: number;
+    free_avg_views: number; free_avg_contacts: number;
+  } | null;
   clicks_week: Clicks;
   clicks_month: Clicks;
   by_region: Bar[];
@@ -160,15 +169,14 @@ export default function CenterDashboardPage() {
       )}
 
       {/* מדדים מרכזיים */}
-      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-5" : "md:grid-cols-3"}`}>
+      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
         {!isEntity && (
           <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
         )}
         <StatCard icon={Sparkles} label="הופעות בהתאמות" value={stats?.impressions_month ?? 0} sub="מצטבר · ברשימת ההמלצות" color="#7c3aed" />
         <StatCard icon={Search} label="הופעות במאגר" value={stats?.directory_impressions ?? 0} sub="מצטבר · בגלישה במאגר" color="#0F766E" />
         <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="מצטבר" color="#1A7A96" />
-        <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? stats?.clicks_month.total ?? 0} sub="מצטבר" color="#2A5C3A" />
-        <StatCard icon={Activity} label="לחיצות החודש" value={stats?.clicks_month.total ?? 0} sub="30 יום" color="#8B2E0A" />
+        <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? 0} sub="מצטבר" color="#2A5C3A" />
       </div>
 
       {/* מסלול 2: הצעד הקריטי - בלי סוגי טיפול המרכז לא קיים בהתאמות */}
@@ -340,8 +348,60 @@ export default function CenterDashboardPage() {
         </section>
       )}
 
+      {/* מאיפה מגיעות הפניות - משפך לכל מקור בנפרד */}
+      {stats?.by_source && (stats.by_source.match.impressions > 0 || stats.by_source.directory.impressions > 0) && (
+        <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
+          <h2 className="mb-1 text-base font-black text-stone-800">מאיפה מגיעות הפניות</h2>
+          <p className="mb-5 text-xs text-stone-400">
+            שני מקורות חשיפה נפרדים - שאלון ההתאמה וגלישה במאגר. הפילוח מראה איפה החשיפה
+            באמת הופכת לפנייה, וממילא איפה כדאי להשקיע.
+          </p>
+          <div className="grid gap-3 md:grid-cols-2">
+            <SourceFunnelCard
+              title="✨ שאלון ההתאמה" color="#7c3aed"
+              hint={isEntity ? "לפי סוגי הטיפול שסימנתם" : "לפי הפרופילים של מטפלי המרכז"}
+              f={stats.by_source.match}
+            />
+            <SourceFunnelCard
+              title="🔎 מאגר המטפלים" color="#0F766E"
+              hint="גלישה חופשית ועמודי עיר/גישה בגוגל"
+              f={stats.by_source.directory}
+            />
+          </div>
+          {stats.by_source.direct_contacts > 0 && (
+            <p className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+              בנוסף: <strong>{stats.by_source.direct_contacts}</strong> לחיצות ליצירת קשר הגיעו מכניסה
+              ישירה לעמוד הפרופיל (קישור שנשלח, חיפוש בגוגל) - בלי מעבר דרך ההתאמות או המאגר.
+            </p>
+          )}
+        </section>
+      )}
+
+      {/* מה המנוי מייצר מול מטפל ללא קידום */}
+      {stats?.benchmark && (stats.benchmark.free_avg_views > 0 || stats.benchmark.free_avg_contacts > 0) && (
+        <section className="mb-6 rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+          <h2 className="mb-1 text-base font-black" style={{ color: "var(--teal-dark)" }}>מה המנוי מייצר</h2>
+          <p className="mb-4 text-xs text-stone-500">
+            {isEntity ? "המרכז שלכם" : "ממוצע למטפל במרכז"} מול הממוצע של מטפל/ת ללא קידום,
+            לאותה תקופה ({stats.benchmark.days} ימים)
+          </p>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <CompareRow
+              label="צפיות בפרופיל"
+              mine={stats.benchmark.per_therapist_views}
+              theirs={stats.benchmark.free_avg_views}
+            />
+            <CompareRow
+              label="לחיצות ליצירת קשר"
+              mine={stats.benchmark.per_therapist_contacts}
+              theirs={stats.benchmark.free_avg_contacts}
+            />
+          </div>
+        </section>
+      )}
+
       {/* סטטיסטיקות מרוכזות - פילוח הפונים */}
-      {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || stats.clicks_month.total > 0) && (
+      {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || (stats.clicks_total?.total ?? 0) > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
           <h2 className="mb-1 text-base font-black text-stone-800">מי מחפש את המרכז שלכם</h2>
           <p className="mb-5 text-xs text-stone-400">פילוח מצטבר של כלל הפונים למטפלי המרכז, מאז ההצטרפות - נתונים אנונימיים לחלוטין</p>
@@ -357,10 +417,10 @@ export default function CenterDashboardPage() {
           <div className="mt-6 border-t border-stone-100 pt-5">
             <h3 className="mb-3 text-sm font-black text-stone-700">איך פונים (מצטבר)</h3>
             <div className="flex flex-wrap gap-3">
-              <Channel label="וואטסאפ" value={(stats.clicks_total ?? stats.clicks_month).whatsapp} total={(stats.clicks_total ?? stats.clicks_month).total} color="#22c55e" />
-              <Channel label="טלפון" value={(stats.clicks_total ?? stats.clicks_month).phone} total={(stats.clicks_total ?? stats.clicks_month).total} color="#57534e" />
-              <Channel label="מייל" value={(stats.clicks_total ?? stats.clicks_month).email} total={(stats.clicks_total ?? stats.clicks_month).total} color="#3b82f6" />
-              <Channel label="📝 הודעות מהאתר" value={(stats.clicks_total ?? stats.clicks_month).site_message ?? 0} total={(stats.clicks_total ?? stats.clicks_month).total} color="#d97706" />
+              <Channel label="וואטסאפ" value={(stats.clicks_total ?? EMPTY_CLICKS).whatsapp} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#22c55e" />
+              <Channel label="טלפון" value={(stats.clicks_total ?? EMPTY_CLICKS).phone} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#57534e" />
+              <Channel label="מייל" value={(stats.clicks_total ?? EMPTY_CLICKS).email} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#3b82f6" />
+              <Channel label="📝 הודעות מהאתר" value={(stats.clicks_total ?? EMPTY_CLICKS).site_message ?? 0} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#d97706" />
             </div>
             <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
               <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>
@@ -382,6 +442,76 @@ export default function CenterDashboardPage() {
         </section>
       )}
     </main>
+  );
+}
+
+// משפך של מקור חשיפה אחד: הופעות ← כניסות ← פניות, עם שיעורי המעבר.
+function SourceFunnelCard({ title, hint, color, f }: {
+  title: string; hint: string; color: string; f: SourceFunnel;
+}) {
+  const Step = ({ n, label }: { n: number; label: string }) => (
+    <div className="flex-1 text-center">
+      <div className="text-xl font-black" style={{ color }}>{n.toLocaleString("he-IL")}</div>
+      <div className="text-[10px] leading-tight text-stone-500">{label}</div>
+    </div>
+  );
+  return (
+    <div className="rounded-xl border border-stone-200 p-4">
+      <div className="mb-0.5 text-sm font-black text-stone-800">{title}</div>
+      <div className="mb-3 text-[11px] text-stone-400">{hint}</div>
+      <div className="flex items-center gap-1">
+        <Step n={f.impressions} label="הופעות" />
+        <span className="text-stone-300">←</span>
+        <Step n={f.entries} label="כניסות" />
+        <span className="text-stone-300">←</span>
+        <Step n={f.contacts} label="פניות" />
+      </div>
+      {f.impressions > 0 && (
+        <div className="mt-3 border-t border-stone-100 pt-2 text-[11px] text-stone-500">
+          {f.entry_rate}% מההופעות נכנסו לפרופיל
+          {f.entries > 0 && <> · {f.contact_rate}% מהנכנסים פנו</>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// השוואה למטפל ללא קידום. מציג "פי X" רק כשההפרש משמעותי - אחרת זה נשמע
+// כמו הבטחה שלא עומדים מאחוריה.
+function CompareRow({ label, mine, theirs }: { label: string; mine: number; theirs: number }) {
+  const x = theirs > 0 ? mine / theirs : 0;
+  const showX = theirs > 0 && x >= 1.3;
+  const max = Math.max(mine, theirs, 1);
+  const Bar = ({ v, c }: { v: number; c: string }) => (
+    <div className="h-2 rounded-full bg-white/70">
+      <div className="h-full rounded-full" style={{ width: `${(100 * v) / max}%`, background: c }} />
+    </div>
+  );
+  return (
+    <div className="rounded-xl bg-white/70 p-3">
+      <div className="mb-2 flex items-baseline justify-between">
+        <span className="text-xs font-bold text-stone-700">{label}</span>
+        {showX && (
+          <span className="text-xs font-black" style={{ color: "var(--teal-dark)" }}>
+            פי {x >= 10 ? Math.round(x) : x.toFixed(1)}
+          </span>
+        )}
+      </div>
+      <div className="space-y-1.5">
+        <div>
+          <div className="mb-0.5 flex justify-between text-[11px] text-stone-600">
+            <span>אצלכם</span><span className="font-bold">{mine.toLocaleString("he-IL")}</span>
+          </div>
+          <Bar v={mine} c="var(--teal)" />
+        </div>
+        <div>
+          <div className="mb-0.5 flex justify-between text-[11px] text-stone-400">
+            <span>ללא קידום</span><span>{theirs.toLocaleString("he-IL")}</span>
+          </div>
+          <Bar v={theirs} c="#d6d3d1" />
+        </div>
+      </div>
+    </div>
   );
 }
 

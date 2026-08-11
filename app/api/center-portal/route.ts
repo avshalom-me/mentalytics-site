@@ -35,6 +35,8 @@ type TherapistRow = {
   profile_photo_path: string | null;
   regions: string[] | null;
   online: boolean | null;
+  promoted_since: string | null;
+  created_at: string | null;
 };
 
 const monthAgo = () => new Date(Date.now() - 30 * 86_400_000);
@@ -89,7 +91,7 @@ export async function GET(req: NextRequest) {
 
     const { data: therapistsData } = await supabaseAdmin
       .from("therapists")
-      .select("id, full_name, status, admin_approved, profile_photo_path, regions, online")
+      .select("id, full_name, status, admin_approved, profile_photo_path, regions, online, promoted_since, created_at")
       .eq("center_account_id", center.id)
       .neq("entity_type", "center")
       .order("full_name", { ascending: true });
@@ -191,10 +193,10 @@ export async function GET(req: NextRequest) {
     // מספרים מצטברים - אותה סתירה שדווחה בפרופיל האישי. הקליקים כבר נשלפו
     // ל-6 חודשים לצורך המגמה; עכשיו גם הם ללא חסם, והמגמה עדיין חותכת ל-6.
     const [clicks, views, dirImpressions] = await Promise.all([
-      fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string }>(() =>
+      fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source: string | null }>(() =>
         supabaseAdmin
           .from("therapist_contact_clicks")
-          .select("therapist_id, click_type, clicked_at")
+          .select("therapist_id, click_type, clicked_at, source")
           .in("therapist_id", statIds),
       ),
       fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null; viewer_region: string | null; viewer_issue: string | null; viewer_age_band: string | null; viewer_gender: string | null }>(() =>
@@ -219,6 +221,30 @@ export async function GET(req: NextRequest) {
     const realViews = views.filter((v) => v.source !== "match_card");
     const matchImpressions = views.length - realViews.length;
 
+    // ── משפך לפי מקור החשיפה ────────────────────────────────────────────
+    // "7 הופעות מאגר, 3 מאטצ'ינג" לא אומר כלום בלי לדעת מה קרה אחר כך.
+    // הפילוח הזה עונה על השאלה המעשית: מאיזה מקור באמת מגיעות הפניות -
+    // ולכן איפה כדאי למרכז להשקיע (פרופיל ציבורי מול סימון תחומי הטיפול).
+    // הערה: לחיצות עם source='profile' נעשו בעמוד הפרופיל עצמו, כשהמבקר
+    // הגיע לשם ישירות (גוגל/קישור) - הן נספרות בנפרד ולא מיוחסות לאף מקור.
+    const funnelFor = (viewSource: string, impressions: number) => {
+      const entries = realViews.filter((v) => v.source === viewSource).length;
+      const contacts = clicks.filter((c) => c.source === viewSource).length;
+      return {
+        impressions,
+        entries,
+        contacts,
+        entry_rate: impressions > 0 ? Math.round((entries / impressions) * 1000) / 10 : 0,
+        contact_rate: entries > 0 ? Math.round((contacts / entries) * 1000) / 10 : 0,
+      };
+    };
+    const bySource = {
+      match: funnelFor("match", matchImpressions),
+      directory: funnelFor("directory", dirImpressions.count ?? 0),
+      // פניות ישירות מעמוד הפרופיל - בלי מקור פנימי מזוהה.
+      direct_contacts: clicks.filter((c) => c.source === "profile").length,
+    };
+
     const clicksByType = (rows: { click_type: string }[]) => ({
       whatsapp: rows.filter((r) => r.click_type === "whatsapp").length,
       phone: rows.filter((r) => r.click_type === "phone").length,
@@ -226,6 +252,68 @@ export async function GET(req: NextRequest) {
       site_message: rows.filter((r) => r.click_type === "site_message").length,
       total: rows.length,
     });
+
+    // ── השוואה לממוצע מטפל ללא קידום ────────────────────────────────────
+    // מה המנוי באמת קונה. מנורמל לפי ימים: הממוצע החינמי מחושב כתנועה-ליום
+    // על פני כלל המטפלים החינמיים, ומוכפל במספר הימים שמטפלי המרכז מקודמים -
+    // אחרת היינו משווים תקופות באורך שונה. count בלבד, בלי לשלוף שורות.
+    let benchmark: {
+      days: number;
+      per_therapist_views: number; per_therapist_contacts: number;
+      free_avg_views: number; free_avg_contacts: number;
+    } | null = null;
+    try {
+      // עוגן התקופה: מתי המרכז התחיל לצבור חשיפה בפועל. מסלול 1 - התאריך
+      // המוקדם מבין מטפלי המרכז; מסלול 2 - הפעילות המוקדמת ביותר של שורת
+      // הישות (אין לה שורת therapists משלה כאן).
+      const therapistAnchor = therapists
+        .map((t) => t.promoted_since ?? t.created_at)
+        .filter((d): d is string => !!d)
+        .sort()[0];
+      const activityAnchor = [
+        ...views.map((v) => v.viewed_at),
+        ...clicks.map((c) => c.clicked_at),
+      ].sort()[0];
+      const startIso = therapistAnchor ?? activityAnchor ?? null;
+      const periodDays = startIso
+        ? Math.max(1, Math.floor((Date.now() - new Date(startIso).getTime()) / 86_400_000))
+        : 0;
+
+      if (periodDays > 0) {
+        const { data: freeRows } = await supabaseAdmin
+          .from("therapists")
+          .select("id, created_at")
+          .eq("status", "approved")
+          .eq("admin_approved", true)
+          .eq("accepting_new_patients", true)
+          .neq("entity_type", "center");
+        const freeIds = (freeRows ?? []).map((r) => r.id as string);
+        if (freeIds.length > 0) {
+          const [fv, fc] = await Promise.all([
+            supabaseAdmin.from("therapist_profile_views").select("*", { count: "exact", head: true })
+              .in("therapist_id", freeIds).in("source", ["match", "directory"]),
+            supabaseAdmin.from("therapist_contact_clicks").select("*", { count: "exact", head: true })
+              .in("therapist_id", freeIds),
+          ]);
+          const freeDays = (freeRows ?? []).reduce((sum, r) => {
+            const d = Math.max(1, Math.floor((Date.now() - new Date(r.created_at as string).getTime()) / 86_400_000));
+            return sum + d;
+          }, 0);
+          if (freeDays > 0) {
+            const unitCount = isEntity ? 1 : Math.max(1, statIds.length);
+            benchmark = {
+              days: periodDays,
+              per_therapist_views: Math.round((realViews.length / unitCount) * 10) / 10,
+              per_therapist_contacts: Math.round((clicks.length / unitCount) * 10) / 10,
+              free_avg_views: Math.round(((fv.count ?? 0) / freeDays) * periodDays * 10) / 10,
+              free_avg_contacts: Math.round(((fc.count ?? 0) / freeDays) * periodDays * 10) / 10,
+            };
+          }
+        }
+      }
+    } catch {
+      benchmark = null; // לא קריטי - הפורטל עובד גם בלעדיו
+    }
 
     // מגמה חודשית (6 חודשים) של פניות.
     const now = new Date();
@@ -283,6 +371,9 @@ export async function GET(req: NextRequest) {
         impressions_month: matchImpressions,
         directory_impressions: dirImpressions.count ?? 0,
         clicks_total: clicksByType(clicks),
+        by_source: bySource,
+        benchmark,
+        // נשמרים לתאימות לאחור בלבד - הממשק אינו מציג עוד חלונות של 30/7 יום.
         clicks_week: clicksByType(clicksWeek),
         clicks_month: clicksByType(clicksMonth),
         by_region: tallyBy(realViews, (v) => v.viewer_region),
