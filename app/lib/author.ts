@@ -17,10 +17,9 @@ const BASE_URL = "https://www.mentalytics.co.il";
  * article list, and minting a second URL for the same human would split the
  * very entity we are trying to consolidate.
  *
- * `sameAs` is still empty on purpose. It is for *profile* pages of the same
- * person (Google Scholar, ORCID, ResearchGate, LinkedIn) - not for the papers
- * themselves, which are works he authored and live under PUBLICATIONS below.
- * A Scholar or ORCID profile URL would be the single most useful addition here.
+ * `sameAs` is populated from SITE_AUTHOR_PROFILES below - profile pages of the
+ * same person, not the papers themselves (those are works he authored and live
+ * under PUBLICATIONS).
  */
 export const SITE_AUTHOR = {
   therapistId: "906837b9-dda5-49ad-995f-e6cc41d77aa5",
@@ -37,6 +36,54 @@ export const SITE_AUTHOR = {
     "מרצה לאבחון והערכה במוסדות אקדמאיים",
   ],
 } as const;
+
+/**
+ * Other pages on the web that ARE this same person - the `sameAs` set.
+ *
+ * This is entity resolution, not link building: it tells Google that the byline
+ * here, the licensed psychologist in the Ministry of Health registry, and the
+ * first author of the papers below are one human. For YMYL health content that
+ * corroboration is worth more than any link, and it is the gap the entity work
+ * left open.
+ *
+ * Every URL was opened and verified to be him before being listed here - a
+ * sameAs pointing at a namesake actively merges two people into one wrong
+ * entity, which is worse than an empty array. Verified 12/8/2026:
+ *   - ORCID: record name reads "Avshalom Galil", and it surfaced attached to
+ *     the Psychological Reports paper below (same DOI, same co-authors).
+ *   - psychologists.org.il: shows licence 131094, matching SITE_AUTHOR.
+ *   - betipulnet / alhasapa / hebpsy: his own maintained profiles; the first
+ *     two already carry real links back to this site.
+ *   - sites.google.com/view/avshalomgalil: his personal site, published and
+ *     public. Listing it here is also how a page with zero inbound links
+ *     becomes discoverable at all.
+ *
+ * Hebrew paths are percent-encoded: a raw Hebrew URL is not a valid IRI for
+ * every consumer of the JSON-LD, and a sameAs that fails to resolve is ignored.
+ */
+export const SITE_AUTHOR_PROFILES = [
+  "https://orcid.org/0009-0003-8286-9294",
+  "https://www.betipulnet.co.il/profile/%D7%90%D7%91%D7%A9%D7%9C%D7%95%D7%9D-%D7%92%D7%9C%D7%99%D7%9C",
+  "https://www.alhasapa.co.il/%D7%93%D7%A8_%D7%90%D7%91%D7%A9%D7%9C%D7%95%D7%9D_%D7%92%D7%9C%D7%99%D7%9C",
+  "https://www.hebpsy.net/showprofile.asp?id=42542",
+  "https://psychologists.org.il/psychologist/%D7%92%D7%9C%D7%99%D7%9C-%D7%90%D7%91%D7%A9%D7%9C%D7%95%D7%9D/",
+  "https://sites.google.com/view/avshalomgalil",
+] as const;
+
+/**
+ * Subject-matter expertise, as `knowsAbout`. Drawn from the research areas his
+ * university and directory profiles state and the papers below demonstrate -
+ * claimed expertise that the publication list actually backs.
+ */
+export const SITE_AUTHOR_EXPERTISE = [
+  "אבחון פסיכודיאגנוסטי",
+  "קשב, ריכוז והיפראקטיביות (ADHD)",
+  "נוירופסיכולוגיה",
+  "הטיות קוגניטיביות בשיפוט ובהערכה",
+  "פסיכותרפיה דינאמית",
+  "טיפול קוגניטיבי-התנהגותי (CBT)",
+  "טיפול מרחוק",
+] as const;
 
 /**
  * Peer-reviewed publications. Metadata verified against CrossRef by DOI, not
@@ -95,6 +142,17 @@ export function siteAuthorProfileFields(therapistId: string) {
   return {
     alternateName: SITE_AUTHOR.alternateName,
     alumniOf: { "@type": "CollegeOrUniversity", name: "אוניברסיטת בר-אילן" },
+    // Same person, elsewhere on the web. See SITE_AUTHOR_PROFILES.
+    sameAs: [...SITE_AUTHOR_PROFILES],
+    knowsAbout: [...SITE_AUTHOR_EXPERTISE],
+    // `affiliation`, not `worksFor`: the caller already sets worksFor to טיפול
+    // חכם, and the academic post is a second, parallel affiliation - overwriting
+    // one with the other would drop a real signal either way.
+    affiliation: {
+      "@type": "CollegeOrUniversity",
+      name: "אוניברסיטת אריאל",
+      url: "https://www.ariel.ac.il/",
+    },
     // The registry number as a typed identifier rather than loose text, so the
     // claim "licensed psychologist" is machine-checkable against the registry.
     identifier: {
