@@ -52,8 +52,16 @@ export const SITE_AUTHOR = {
  *   - ORCID: record name reads "Avshalom Galil", and it surfaced attached to
  *     the Psychological Reports paper below (same DOI, same co-authors).
  *   - psychologists.org.il: shows licence 131094, matching SITE_AUTHOR.
- *   - betipulnet / alhasapa / hebpsy: his own maintained profiles; the first
- *     two already carry real links back to this site.
+ *   - betipulnet / alhasapa / hebpsy: his own maintained profiles.
+ *   - psychologists.org.il additionally carries the one real inbound <a> any
+ *     of these directories gives us (dofollow, anchor "אתר האינטרנט שלי").
+ *
+ * Checked against raw HTML on 12/8/2026 - do not re-derive this from a page
+ * summary. betipulnet, alhasapa and hebpsy all PRINT the mentalytics URL as
+ * plain text with zero <a> tags, so none of them is a backlink no matter how a
+ * reader-view rendering makes it look. An earlier note here claimed the first
+ * two were our only two referring domains; they are not, and never were.
+ * (The two real referring domains are PR placements in local newspapers.)
  *   - sites.google.com/view/avshalomgalil: his personal site, published and
  *     public. Listing it here is also how a page with zero inbound links
  *     becomes discoverable at all.
