@@ -210,8 +210,11 @@ function traitNeeds(A: Ans): TraitNeeds {
       socTherapyPossible,
     // The bv scoring returns early at motivation 1 and 2 and never reads these
     // two, so asking below 3 collected answers straight into the bin.
+    // bv verbality also serves the general-distress and social branches since
+    // 13/8/2026, when their "לטיפול ע\"פ מאפייני הילד" placeholder became a real
+    // verbality-based decision (expressive arts vs psychodynamic).
     verbal:
-      (grp === "bv" && anx && aqTot <= 20 && m >= 3) ||
+      (grp === "bv" && m >= 3 && ((anx && aqTot <= 20) || q10On || socOn)) ||
       (grp === "zy" && (q10On || socOn)),
     prac:
       (grp === "bv" && anx && aqTot > 20 && m >= 3) ||
@@ -4039,6 +4042,20 @@ export default function KidsPage() {
   // the trail can never be replayed past a branch whose answers have since
   // changed. canGoBack also hides the control on the first screen.
   const [canGoBack, setCanGoBack] = useState(false);
+
+  // Refresh/close guard for the question screens. Answers deliberately live in
+  // memory only - nothing mid-quiz is persisted, so the branching and scoring
+  // cannot be replayed step by step from a saved state - which means leaving
+  // the page really does discard everything. The browser's native confirm is
+  // the whole protection. Off at the consent screen and at the report, whose
+  // own back-from-profile restore is handled separately.
+  useEffect(() => {
+    const guarded = step !== "p-consent" && step !== "p-result";
+    if (!guarded) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [step]);
 
   function goNext(newA: Ans = A) {
     setA(newA);

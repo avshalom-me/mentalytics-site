@@ -80,7 +80,7 @@ type NormalizedMatchInput = {
   styleP3: number | null;
   ageGroups: string[];
   languages: string[];
-  couplesModality: string | null;
+  couplesModality: string[];
   needsSexualTherapy: boolean;
   expressiveModalities: string[];
 };
@@ -256,7 +256,14 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   const ageGroups = mergeArrays(body.ageGroups, body.age_groups);
   const city = firstNonEmptyString(body.city, body.city_name);
   const languages = mergeArrays(body.languages);
-  const couplesModality = firstNonEmptyString(body.couplesModality, body.couples_modality);
+  // A tied couples questionnaire names two approaches; both should earn the
+  // bonus, so the preference is a list. The single-string field stays accepted
+  // for cached bundles that still send it.
+  const couplesModalityList = mergeArrays(body.couplesModalities, body.couples_modalities);
+  const couplesModalitySingle = firstNonEmptyString(body.couplesModality, body.couples_modality);
+  const couplesModality = couplesModalityList.length > 0
+    ? couplesModalityList
+    : couplesModalitySingle ? [couplesModalitySingle] : [];
   const needsSexualTherapy = parseBoolean(body.needsSexualTherapy ?? body.needs_sexual_therapy);
   const expressiveModalities = mergeArrays(body.expressiveModalities, body.expressive_modalities);
 
@@ -363,12 +370,16 @@ function scoreTherapist(
     }
   }
 
-  // Bonus: exact couples modality match (e.g. patient needs EFT and therapist does EFT)
-  if (input.couplesModality) {
+  // Bonus: couples modality match. The preference may name two tied approaches;
+  // a therapist working in either one earns the same full bonus.
+  if (input.couplesModality.length > 0) {
     possible += WEIGHTS.couplesBonus;
-    if (couplesModalities.some((m) => normalizeText(m) === normalizeText(input.couplesModality!))) {
+    const matched = input.couplesModality.filter((want) =>
+      couplesModalities.some((m) => normalizeText(m) === normalizeText(want))
+    );
+    if (matched.length > 0) {
       earned += WEIGHTS.couplesBonus;
-      reasons.push(`התאמה בגישה הזוגית: ${input.couplesModality}`);
+      reasons.push(`התאמה בגישה הזוגית: ${matched.join(" / ")}`);
     }
   }
 

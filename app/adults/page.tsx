@@ -416,6 +416,20 @@ export default function AdultsPage() {
     trackQuizStep("adults", screen, pct);
   }, [screen, answers.domains]);
 
+  // Refresh/close guard for the question screens. Answers deliberately live in
+  // memory only - nothing mid-quiz is persisted, so the branching and scoring
+  // cannot be replayed step by step from a saved state - which means leaving
+  // the page really does discard everything. The browser's native confirm is
+  // the whole protection. Off at the door and from the results onward, where
+  // back-navigation is separately covered by the match-results restore.
+  useEffect(() => {
+    const guarded = screen !== "disclaimer" && !["results", "match-form", "match-results"].includes(screen);
+    if (!guarded) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [screen]);
+
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [matchPrefs, setMatchPrefs] = useState<MatchPrefs>({ region: "", city: "", online: false, genderPref: "", culturalPrefs: [], language: "עברית", arrangements: [] });
@@ -655,16 +669,24 @@ export default function AdultsPage() {
   const [ldScores, setLdScores] = useState<number[]>(Array(5).fill(0));
   const [execScores, setExecScores] = useState<number[]>(Array(6).fill(0));
   const [empAChecked, setEmpAChecked] = useState<boolean[]>([false, false, false, false, false]);
-  const [empBChecked, setEmpBChecked] = useState<boolean[]>([false, false, false, false]);
+  // Item 5 (index 4) is the executive-function bridge - not part of scoreB,
+  // which reads indexes 0-3 only. Ticking it routes into the executive
+  // questionnaire after this screen.
+  const [empBChecked, setEmpBChecked] = useState<boolean[]>([false, false, false, false, false]);
+  // Where the executive questionnaire returns to. Its Continue normally goes to
+  // f3 (the occupational gate comes after it in the domain), but when reached
+  // FROM the occupational screen that would loop the user backwards - so the
+  // bridge flips this and the handler advances to the next domain instead.
+  const [execReturnsToNextDomain, setExecReturnsToNextDomain] = useState(false);
   const [inRelationship, setInRelationship] = useState(false);
   const [hasChildren, setHasChildren] = useState(false);
   const [noRelationship, setNoRelationship] = useState(false);
   const [coupleScale, setCoupleScale] = useState(0);
   const [rSingleCBTScale, setRSingleCBTScale] = useState(0);
   const [rSingleDynScale, setRSingleDynScale] = useState(0);
-  const [eftScores, setEftScores] = useState<number[]>(Array(7).fill(0));
-  const [dynScores, setDynScores] = useState<number[]>(Array(7).fill(0));
-  const [structScores, setStructScores] = useState<number[]>(Array(7).fill(0));
+  const [eftScores, setEftScores] = useState<number[]>(Array(4).fill(0));
+  const [dynScores, setDynScores] = useState<number[]>(Array(4).fill(0));
+  const [structScores, setStructScores] = useState<number[]>(Array(4).fill(0));
   const [substanceChecked, setSubstanceChecked] = useState<number[]>([]);
   const [gamingChecked, setGamingChecked] = useState<number[]>([]);
   const [pornScores, setPornScores] = useState<number[]>(Array(18).fill(1));
@@ -714,6 +736,22 @@ export default function AdultsPage() {
     if (d === "addiction") return "a-types";
     if (d === "personal_development") return "therapist-style";
     return "scoring";
+  }
+
+  // Where the learning-difficulties branch continues. A positive attention
+  // block (f2 was set true at f1-adhd) goes straight into the executive
+  // questionnaire - COG-FUN's actual target population - instead of the
+  // "קשיי התארגנות?" gate, which people with those exact difficulties
+  // routinely answered no to.
+  function afterLearningScreen(): Screen {
+    return (answers.functional?.adhd1Count ?? 0) >= 3 ? "f2-q" : "f2";
+  }
+
+  // True when the executive questionnaire was already answered in this pass -
+  // the occupational bridge must not send someone back into a screen they
+  // completed minutes earlier.
+  function allExecAnswered(): boolean {
+    return execScores.length > 0 && execScores.every((v) => v > 0);
   }
 
   function nextDomain(ao?: QuestionnaireAnswers) {
@@ -806,6 +844,7 @@ export default function AdultsPage() {
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
         couplesModality: selectedRec?.couplesModality ?? (!selectedRec && combinedTreatments ? combinedCouplesModality : undefined),
+        couplesModalities: selectedRec?.couplesModalities ?? (selectedRec?.couplesModality ? [selectedRec.couplesModality] : (!selectedRec && combinedTreatments && combinedCouplesModality ? [combinedCouplesModality] : undefined)),
         needsSexualTherapy: selectedRec?.needsSexualTherapy ?? (!selectedRec && combinedTreatments ? combinedNeedsSexualTherapy : false),
         limit: 10,
       };
@@ -1879,15 +1918,28 @@ export default function AdultsPage() {
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="שאלון ADHD">
-          <p className="mb-1 text-xs text-[#6b7280]">סמן/י את הרלוונטי (3 מתוך 6 בכל בלוק = סף)</p>
+          {/* No threshold in the copy: telling people "3 of 6 = the bar" invites
+              tailoring answers to the outcome, and goes stale when the bar moves. */}
+          <p className="mb-1 text-xs text-[#6b7280]">סמן/י את כל מה שמתאר אותך</p>
           <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א – חוסר קשב:</p>
           <CheckList items={ADHD1} checked={adhd1Checked} onChange={(i,v) => setAdhd1Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב – היפראקטיביות:</p>
           <CheckList items={ADHD2} checked={adhd2Checked} onChange={(i,v) => setAdhd2Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <NavRow onBack={() => setScreen("f1")}
             onNext={() => {
-              updF({ adhd1Count: adhd1Checked.length, adhd2Count: adhd2Checked.length });
-              setScreen(answers.functional?.f1Processing ? "f1-ld" : "f2");
+              // Items 2/3/5 of block A (indexes 1/2/4) are the executive-function
+              // items; their count decides whether attention-positive earns a
+              // COG-FUN recommendation. See adhdEfCount in questionnaire-types.
+              updF({
+                adhd1Count: adhd1Checked.length,
+                adhd2Count: adhd2Checked.length,
+                adhdEfCount: [1, 2, 4].filter((i) => adhd1Checked.includes(i)).length,
+                // A positive attention block routes straight into the executive
+                // questionnaire: those are the people COG-FUN exists for, and
+                // the "קשיי התארגנות?" gate let them wave it off unseen.
+                ...(adhd1Checked.length >= 3 ? { f2: true } : {}),
+              });
+              setScreen(answers.functional?.f1Processing ? "f1-ld" : (adhd1Checked.length >= 3 ? "f2-q" : "f2"));
             }} />
         </Card>
       </Layout>
@@ -1899,7 +1951,7 @@ export default function AdultsPage() {
       <Card badge="שאלון קשיי למידה">
         <p className="mb-2 font-semibold text-[#1a3a5c]">האם בילדותך היה קושי ברכישת הקריאה?</p>
         <YesNo onYes={() => { updF({ ldReading: true }); setScreen("f1-ld-q"); }}
-          onNo={() => { updF({ ldReading: false }); setScreen("f2"); }} />
+          onNo={() => { updF({ ldReading: false }); setScreen(afterLearningScreen()); }} />
       </Card>
     </Layout>
   );
@@ -1913,7 +1965,7 @@ export default function AdultsPage() {
             onChange={(v) => setLdScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <NavRow onBack={() => setScreen("f1-ld")}
-          onNext={() => { updF({ ldScores }); setScreen("f2"); }} />
+          onNext={() => { updF({ ldScores }); setScreen(afterLearningScreen()); }} />
       </Card>
     </Layout>
   );
@@ -1937,7 +1989,15 @@ export default function AdultsPage() {
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <NavRow onBack={() => setScreen("f2")}
-          onNext={() => { updF({ execScores }); setScreen("f3"); }} />
+          onNext={() => {
+            const a = updF({ execScores });
+            if (execReturnsToNextDomain) {
+              setExecReturnsToNextDomain(false);
+              nextDomain(a);
+            } else {
+              setScreen("f3");
+            }
+          }} />
       </Card>
     </Layout>
   );
@@ -2004,10 +2064,23 @@ export default function AdultsPage() {
           "האם יש תחושה של שחיקה בעבודה, רצון לשינוי, אבל לא ברור מה הבעיה או מה הכיוון?",
           "האם יש ענין לבחון כיוונים תעסוקתיים חדשים שלא חשבת עליהם, או שיש קושי להבין מה הכישורים הנוספים שיש לך?",
           "האם את/ה מעוניין/ת במידע אובייקטיבי ומבוסס מבחנים לגבי התאמה מקצועית?",
+          "האם הקושי מתבטא בעיקר בתכנון, ניהול זמן, עמידה בזמנים או דחיינות?",
         ]} checked={empBChecked.map((v, i) => v ? i : -1).filter(i => i >= 0)}
           onChange={(i, v) => setEmpBChecked((p) => { const n = [...p]; n[i] = v; return n; })} />
         <NavRow onBack={() => setScreen("f3-type")}
-          onNext={() => { nextDomain(updF({ empBItems: empBChecked })); }} />
+          onNext={() => {
+            // Burnout with a planning/deadlines flavour is executive-function
+            // territory the occupational questions never probed. The bridge item
+            // routes into the existing executive questionnaire - once - and its
+            // Continue advances to the next domain rather than looping back here.
+            const a = updF({ empBItems: empBChecked, ...(empBChecked[4] ? { f2: true } : {}) });
+            if (empBChecked[4] && !allExecAnswered()) {
+              setExecReturnsToNextDomain(true);
+              setScreen("f2-q");
+            } else {
+              nextDomain(a);
+            }
+          }} />
       </Card>
     </Layout>
   );
@@ -2944,9 +3017,11 @@ export default function AdultsPage() {
       <div className="space-y-4">
         {(matchResults ?? []).map((t: any) => {
           const overall = t.combined_score ?? t.match_score;
-          const pref = selectedRec?.couplesModality ?? combinedCouplesModality;
+          const prefList = selectedRec?.couplesModalities
+            ?? (selectedRec?.couplesModality ? [selectedRec.couplesModality] : (combinedCouplesModality ? [combinedCouplesModality] : []));
           const tMods = Array.isArray(t.couples_modalities) ? t.couples_modalities : [];
-          const matchesPref = pref && tMods.some((m: string) => String(m).trim().toLowerCase() === String(pref).trim().toLowerCase());
+          const matchesPref = prefList.length > 0 && tMods.some((m: string) =>
+            prefList.some(p => String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
           return (
             <div
               key={t.id}
@@ -2984,7 +3059,7 @@ export default function AdultsPage() {
                   )}
                   {matchesPref && (
                     <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
-                      ✓ עובד/ת בגישת {pref} שהותאמה לך
+                      ✓ עובד/ת בגישת {prefList.join(" / ")} שהותאמה לך
                     </div>
                   )}
                 </div>

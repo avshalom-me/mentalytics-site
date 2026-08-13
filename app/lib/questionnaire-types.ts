@@ -73,6 +73,14 @@ export type QuestionnaireAnswers = {
     f1Processing?: boolean;
     adhd1Count?: number;             // מספר פריטים שסומנו בבלוק א
     adhd2Count?: number;             // מספר פריטים שסומנו בבלוק ב
+    /**
+     * How many of block A's three executive-function items were ticked
+     * (ארגון, איבוד חפצים, שכחה - items 2/3/5). COG-FUN targets executive
+     * functions, so since 13/8/2026 the attention block recommends it only when
+     * at least 2 of these carry the signal - mirroring the kids rule - instead
+     * of any 3 attention items.
+     */
+    adhdEfCount?: number;
     ldReading?: boolean;
     ldScores?: number[];             // 5 פריטים, 1-3
     f2?: boolean;
@@ -128,7 +136,14 @@ export type Recommendation = {
   urgent: boolean;
   notes?: string;                   // הערות נוספות
   tools?: string;                   // כלים להתמודדות עצמית
-  couplesModality?: string;         // EFT / דינאמי / מבני
+  couplesModality?: string;         // EFT / דינאמי / מבני (הגבוהה ביותר; ריק בתיקו)
+  /**
+   * All approaches that tied for the highest block sum, when more than one did.
+   * The tie rule (13/8/2026): both tied approaches earn the full couples bonus
+   * in matching, rather than the first-in-order silently winning. A three-way
+   * tie carries no preference at all, so neither field is set.
+   */
+  couplesModalities?: string[];
   needsSexualTherapy?: boolean;     // שילוב טיפול מיני
   professionalType?: string;        // אם מוגדר - חיפוש קשיח לפי therapist_types (למשל דיאטנית קלינית)
 };

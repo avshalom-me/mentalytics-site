@@ -79,9 +79,17 @@ function buildQ10StyleRef(A: Ans): string {
   if (grp === "ga") return buildGaRef(A);
   if (grp === "bv") {
     const m = A.t_motiv || 0;
-    return m <= 2
-      ? "✅ הפנייה: הדרכת הורים"
-      : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
+    if (m <= 2) return "✅ הפנייה: הדרכת הורים";
+    // Used to end in "לטיפול ע\"פ מאפייני הילד" - a placeholder, not a
+    // treatment: it matched no key, was displayed under external referrals with
+    // no search button, and contributed nothing to matching. The characteristic
+    // it deferred to is now actually collected (p-traits), so decide with it,
+    // mirroring the zy branch one age-band down: a less verbal child does the
+    // work through creation, a verbal one through conversation.
+    const v = A.t_verbal || 0;
+    return v > 0 && v <= 2
+      ? "✅ הפנייה: טיפול בהבעה ויצירה בשילוב הדרכת הורים"
+      : "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
   }
   // zy
   const v2 = A.t_verbal || 0;
@@ -349,8 +357,15 @@ function computeResults(A: Ans): KidsBox[] {
     if (grp === "ga") {
       ref = getGaRef();
     } else if (grp === "bv") {
+      // Same decision as buildQ10StyleRef's bv branch - see the note there.
       const m = A.t_motiv || 0;
-      ref = m <= 2 ? "✅ הפנייה: הדרכת הורים" : "✅ הפנייה לטיפול ע\"פ מאפייני הילד";
+      if (m <= 2) ref = "✅ הפנייה: הדרכת הורים";
+      else {
+        const v = A.t_verbal || 0;
+        ref = v > 0 && v <= 2
+          ? "✅ הפנייה: טיפול בהבעה ויצירה בשילוב הדרכת הורים"
+          : "✅ הפנייה: טיפול פסיכודינאמי בשילוב הדרכת הורים";
+      }
     } else {
       const v2 = A.t_verbal || 0;
       let txt2 = v2 <= 2

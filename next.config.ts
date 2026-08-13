@@ -30,6 +30,12 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
+  // Parallel Claude/dev sessions share this folder, and .next is stateful:
+  // a build while another session's dev server runs reuses that server's
+  // turbopack cache (stale modules in the output) and can corrupt it right
+  // back. Sessions that need their own build set NEXT_DIST_DIR to an
+  // isolated directory; default behaviour is unchanged.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
   images: { remotePatterns },
   async headers() {

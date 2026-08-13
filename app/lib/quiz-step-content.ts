@@ -89,7 +89,7 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
   r1: { group: "זוגיות / משפחה", desc: "שאלת שער: קשיים בתפקוד המיני (כן/לא)", input: "gate", sensitive: true },
   "r-abuse": { group: "זוגיות / משפחה", desc: "שאלת שער: אלימות / הפחדות / שליטה מצד בן/בת הזוג (כן/לא)", input: "gate", sensitive: true },
   "r1-scale": { group: "זוגיות / משפחה", desc: "סולם חובה 1-7: עוצמת הקושי בזוגיות", input: "scales", items: 1 },
-  "r2-q": { group: "זוגיות / משפחה", desc: "שאלון זוגי משולש: סולמות 1-7 בשלוש קבוצות (EFT / דינאמי / מבני), נדרשת תשובה בכל קבוצה", input: "scales", items: 9, heavy: true },
+  "r2-q": { group: "זוגיות / משפחה", desc: "שאלון זוגי משולש: 12 סולמות 1-7 בשלוש קבוצות של 4 (EFT / דינאמי / מבני), נדרשת תשובה בכל קבוצה. קוצר מ-21 סולמות ב-13/8/26", input: "scales", items: 12, heavy: true },
   "r3-conflict": { group: "זוגיות / משפחה", desc: "קונפליקטים משפחתיים: עד 3 שאלות כן/לא בחשיפה הדרגתית", input: "gate", items: 3 },
   "r3-child": { group: "זוגיות / משפחה", desc: "שאלת שער: קשיים רגשיים/התנהגותיים אצל הילדים (כן/לא)", input: "gate" },
   "r3-child-type": { group: "זוגיות / משפחה", desc: "בחירה: הקושי אצל הילד עצמו / בדינמיקה המשפחתית", input: "choice", items: 1 },

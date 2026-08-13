@@ -13,4 +13,4 @@
  *
  * Bump it in the same commit as any change to app/lib/questionnaire-items.server.ts.
  */
-export const QUESTIONNAIRE_ITEMS_VERSION = "2026-08-08";
+export const QUESTIONNAIRE_ITEMS_VERSION = "2026-08-13";

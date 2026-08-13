@@ -660,19 +660,32 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     const f = answers.functional;
 
     // --- F1: ADHD ---
+    // COG-FUN is an executive-function intervention, so it is recommended only
+    // when the executive items inside the attention block carry the signal
+    // (>=2 of ארגון/איבוד חפצים/שכחה) - the same rule the kids questionnaire
+    // uses. It used to go out on any 3 attention items and even on pure
+    // hyperactivity, neither of which is what the treatment addresses. The
+    // neurologist/psychiatrist referral must survive every configuration, so
+    // when no COG-FUN card carries it, it rides on the neurofeedback card.
     if (f.f1 && f.f1Attention) {
       const adhd1 = f.adhd1Count ?? 0;
       const adhd2 = f.adhd2Count ?? 0;
-      if (adhd1 >= 3) {
+      const efCount = f.adhdEfCount ?? 0;
+      const NEUROLOGIST_NOTE = "יש לפנות לנוירולוג או פסיכיאטר המומחים בקשיי קשב לאבחון ובחינת טיפול תרופתי.";
+      const NF_NOTE = "נוירופידבק הוא טיפול מבוסס-ביופידבק של גלי מוח שנמצא יעיל לקשיי קשב במחקרים מבוקרים, כחלופה או כתוספת לטיפול תרופתי.";
+      const cogfunFromAttention = adhd1 >= 3 && efCount >= 2;
+      if (cogfunFromAttention) {
         recs.push({
           id: uid("adhd-att"),
-          symptomText: "ישנם סימנים לקשיי ריכוז וקשב.",
+          symptomText: "ישנם סימנים לקשיי ריכוז וקשב, כולל קשיים בתפקודים הניהוליים (ארגון, שכחה).",
           treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "יש לפנות לנוירולוג או פסיכיאטר המומחים בקשיי קשב לאבחון ובחינת טיפול תרופתי.",
+          notes: NEUROLOGIST_NOTE,
         });
+      }
+      if (adhd1 >= 3) {
         recs.push({
           id: uid("adhd-att-nf"),
           symptomText: "טיפול בנוירופידבק לקשיי קשב וריכוז.",
@@ -680,27 +693,18 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "נוירופידבק",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "נוירופידבק הוא טיפול מבוסס-ביופידבק של גלי מוח שנמצא יעיל לקשיי קשב במחקרים מבוקרים, כחלופה או כתוספת לטיפול תרופתי.",
+          notes: cogfunFromAttention ? NF_NOTE : `${NEUROLOGIST_NOTE} ${NF_NOTE}`,
         });
       }
       if (adhd2 >= 3) {
         recs.push({
-          id: uid("adhd-hyp"),
-          symptomText: "ישנם סימנים לקשיי ריכוז וקשב עם היפראקטיביות.",
-          treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
-          treatmentLabel: "COG-FUN",
-          domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
-          urgent: false,
-          notes: "יש לפנות לנוירולוג או פסיכיאטר המומחים בקשיי קשב לאבחון ובחינת טיפול תרופתי.",
-        });
-        recs.push({
           id: uid("adhd-hyp-nf"),
-          symptomText: "טיפול בנוירופידבק לקשיי קשב, ריכוז והיפראקטיביות.",
+          symptomText: "ישנם סימנים לקשיים בתחום ההיפראקטיביות/אימפולסיביות.",
           treatment: "נוירופידבק",
           treatmentLabel: "נוירופידבק",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "נוירופידבק הוא טיפול מבוסס-ביופידבק של גלי מוח שנמצא יעיל לקשיי קשב במחקרים מבוקרים, כחלופה או כתוספת לטיפול תרופתי.",
+          notes: adhd1 >= 3 ? NF_NOTE : `${NEUROLOGIST_NOTE} ${NF_NOTE}`,
         });
       }
     }
@@ -766,7 +770,11 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "דווח על קשיי התארגנות, אך שאלון האפיון לא מולא. מומלץ המשך בירור לאפיון הקושי ועוצמתו.",
+          // "קשב או התארגנות": since 13/8/2026 this screen is also reached
+          // automatically after a positive attention block and from the
+          // occupational planning/deadlines item, not only by answering yes to
+          // the organisation gate.
+          notes: "דווחו קשיי קשב או התארגנות, אך שאלון האפיון לא מולא. מומלץ המשך בירור לאפיון הקושי ועוצמתו.",
         });
       }
     }
@@ -939,23 +947,27 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         const struSum = sum(r.structScores);
         const maxSum = Math.max(eftSum, dynSum, struSum);
 
-        let modality: string | undefined;
-        let modalityName: string | undefined; // text that follows "בהעדפה ל"
-        if (maxSum > 0 && maxSum === eftSum) { modality = "EFT"; modalityName = "גישת EFT הממוקדת ברגש"; }
-        else if (maxSum > 0 && maxSum === dynSum) { modality = "דינאמי"; modalityName = "גישה דינמית"; }
-        else if (maxSum > 0) { modality = "מבני"; modalityName = "גישה מבנית"; }
-
-        // Soft preference: couples therapy, with a preferred approach when one stands out.
-        const approachLabel = modalityName ? `טיפול זוגי (בהעדפה ל${modalityName})` : "טיפול זוגי";
+        // Every approach that reached the top sum. With the blocks cut to four
+        // items (13/8/2026) ties stopped being rare, and the old if/else-if
+        // resolved them by list order - EFT always beat דינאמי on equal footing,
+        // silently. A two-way tie now names both approaches and both earn the
+        // matching bonus; a three-way tie is no preference at all.
+        const winners: { modality: string; name: string }[] = [];
+        if (maxSum > 0 && eftSum === maxSum)  winners.push({ modality: "EFT",   name: "גישת EFT הממוקדת ברגש" });
+        if (maxSum > 0 && dynSum === maxSum)  winners.push({ modality: "דינאמי", name: "גישה דינמית" });
+        if (maxSum > 0 && struSum === maxSum) winners.push({ modality: "מבני",  name: "גישה מבנית" });
+        const hasPreference = winners.length >= 1 && winners.length <= 2;
+        const prefText = hasPreference ? winners.map(w => w.name).join(" או ל") : undefined;
 
         recs.push({
           id: uid("couple-therapy"),
-          symptomText: `נמצא קושי בקשר הזוגי. מומלץ טיפול זוגי${modalityName ? `, בהעדפה ל${modalityName}` : ""}.`,
+          symptomText: `נמצא קושי בקשר הזוגי. מומלץ טיפול זוגי${prefText ? `, בהעדפה ל${prefText}` : ""}.`,
           treatment: "טיפול זוגי",
-          treatmentLabel: approachLabel,
+          treatmentLabel: prefText ? `טיפול זוגי (בהעדפה ל${prefText})` : "טיפול זוגי",
           domain: "זוגיות ומשפחה",
           urgent: false,
-          couplesModality: modality,
+          couplesModality: winners.length === 1 ? winners[0].modality : undefined,
+          couplesModalities: hasPreference ? winners.map(w => w.modality) : undefined,
           needsSexualTherapy: hasSexualNeed,
         });
       }
