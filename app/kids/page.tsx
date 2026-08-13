@@ -5,7 +5,7 @@ import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -14,6 +14,7 @@ import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import {
   parseKidsBoxes,
+  aggregateForMatch,
   type KidsRecommendationGroup,
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
@@ -99,10 +100,16 @@ function devAgeOk(A: Ans): boolean {
 // Q9 (regulation/impulsivity) for grades ב׳–ו׳ is re-routed to the ADHD
 // questionnaire (prefix "q9") instead of BQ. Kept in sync with kids-score.server.ts.
 function q9AdhdActive(A: Ans): boolean { return A.q9 === "כן" && gg(A) === "bv"; }
+// Must stay equal to ADHD_BLOCK_THRESHOLD in kids-score.server.ts. This copy
+// only decides whether the general-distress screen is shown; if the two drift,
+// a child flagged positive by the scoring is still asked "is there anything
+// else?", or the reverse - asked nothing while the report says ADHD.
+const ADHD_BLOCK_THRESHOLD = 3;
+
 function q9AdhdPositive(A: Ans): boolean {
   const inatt = ["q9_ad1","q9_ad2","q9_ad3","q9_ad4","q9_ad5","q9_ad6"].filter(k => A[k]).length;
   const hyper = ["q9_ah1","q9_ah2","q9_ah3","q9_ah4","q9_ah5","q9_ah6"].filter(k => A[k]).length;
-  return inatt >= 4 || hyper >= 4;
+  return inatt >= ADHD_BLOCK_THRESHOLD || hyper >= ADHD_BLOCK_THRESHOLD;
 }
 
 // ── Page order ───────────────────────────────────────────────────────────────
@@ -3342,6 +3349,22 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       { key: "social", label: DOMAIN_LABELS.social, result: parseKidsBoxes(score.social, "social") },
     ];
   }, [score]);
+
+  // Reported once per scored questionnaire, from the same aggregate the search
+  // uses - so the analytics answer the question the search would answer, not a
+  // parallel derivation of it. See trackQuizTreatments for why this is not part
+  // of quiz_complete on the kids side.
+  const treatmentsReported = useRef(false);
+  useEffect(() => {
+    if (!score || treatmentsReported.current) return;
+    treatmentsReported.current = true;
+    const agg = aggregateForMatch(domainResults.map(d => d.result));
+    trackQuizTreatments("kids", {
+      treatments: agg.treatmentKeys,
+      assessments: agg.assessmentKeys,
+      professionals: agg.professionalKeys,
+    });
+  }, [score, domainResults]);
 
   type DomainGroup = KidsRecommendationGroup & { domainLabel: string; domainKey: string };
   type DomainBucket = {

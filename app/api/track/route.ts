@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
 
-const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete", "recruit_page_view", "therapist_explain_click", "matching_click", "match_saved"] as const;
+const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete", "quiz_treatments", "recruit_page_view", "therapist_explain_click", "matching_click", "match_saved"] as const;
 type EventType = (typeof VALID_EVENTS)[number];
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();

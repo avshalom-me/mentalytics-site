@@ -615,6 +615,15 @@ interface AdhdEmitter {
 // boxes, reused by the academic flow and by the Q9 (emotional) re-route for
 // grades ב׳–ו׳. inatt items 2,3,5 (1-indexed) are executive functions
 // (organisation, losing items, forgetfulness).
+/**
+ * Items in either block that make the screen positive.
+ *
+ * Was 4 of 6, lowered to 3 on 13/8/2026. Both blocks and the COG-FUN sub-finding
+ * read this one constant, so the screen cannot drift into flagging ADHD at one
+ * threshold while deciding on the treatment at another.
+ */
+const ADHD_BLOCK_THRESHOLD = 3;
+
 function adhdCount(A: Ans, prefix: string) {
   const inatt = ["_ad1", "_ad2", "_ad3", "_ad4", "_ad5", "_ad6"].filter(k => A[prefix + k]).length;
   const hyper = ["_ah1", "_ah2", "_ah3", "_ah4", "_ah5", "_ah6"].filter(k => A[prefix + k]).length;
@@ -623,11 +632,11 @@ function adhdCount(A: Ans, prefix: string) {
 }
 function adhdPositive(A: Ans, prefix: string): boolean {
   const c = adhdCount(A, prefix);
-  return c.inatt >= 4 || c.hyper >= 4;
+  return c.inatt >= ADHD_BLOCK_THRESHOLD || c.hyper >= ADHD_BLOCK_THRESHOLD;
 }
 function buildAdhdBoxes(A: Ans, prefix: string): KidsBox[] {
   const { inatt, hyper, efCount } = adhdCount(A, prefix);
-  const pi = inatt >= 4, ph = hyper >= 4;
+  const pi = inatt >= ADHD_BLOCK_THRESHOLD, ph = hyper >= ADHD_BLOCK_THRESHOLD;
   if (!(pi || ph)) return [];
   const out: KidsBox[] = [];
   const syms: string[] = [];

@@ -6,7 +6,7 @@ import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_saved";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_saved";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים את הנתונים
@@ -86,6 +86,34 @@ export function trackQuizComplete(quizType: "adults" | "kids", facts?: QuizCompl
   // GA4 gets the low-cardinality fields only - treatments is an array, which GA4
   // cannot aggregate as a custom dimension.
   gaEvent("quiz_complete", { quiz_type: quizType, issue: facts?.issue ?? undefined });
+}
+
+/**
+ * What a finished questionnaire actually recommended.
+ *
+ * Separate from quiz_complete because the kids flow fires that one on reaching
+ * the result screen, before scoring has run - so its completion events have
+ * never carried a treatment list, and there was no way to ask what the child
+ * questionnaire recommends. Moving quiz_complete after scoring would have fixed
+ * the data by redefining "completion" mid-series; this leaves that metric alone
+ * and reports the treatments on their own event, once per scored questionnaire.
+ *
+ * Keys, not display labels - the same strings the matching searches on.
+ */
+export function trackQuizTreatments(
+  quizType: "adults" | "kids",
+  keys: { treatments?: string[]; assessments?: string[]; professionals?: string[] },
+) {
+  const { treatments = [], assessments = [], professionals = [] } = keys;
+  if (!treatments.length && !assessments.length && !professionals.length) return;
+  sendTrack("quiz_treatments", {
+    metadata: {
+      quiz_type: quizType,
+      ...(treatments.length ? { treatments: treatments.slice(0, 10) } : {}),
+      ...(assessments.length ? { assessments: assessments.slice(0, 10) } : {}),
+      ...(professionals.length ? { professionals: professionals.slice(0, 10) } : {}),
+    },
+  });
 }
 
 /**

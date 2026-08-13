@@ -15,6 +15,20 @@ function sum(arr: number[] | undefined): number {
   return (arr ?? []).reduce((a, b) => a + b, 0);
 }
 
+/**
+ * True when every item on a rating screen carries an answer.
+ *
+ * Unanswered scale items are 0, and every scale in this questionnaire starts at
+ * 1, so a zero anywhere means the screen was skipped in whole or in part. That
+ * matters because a skipped screen sums below every threshold and therefore
+ * looks exactly like "screened and found nothing" - the user says yes at the
+ * gate, leaves the detail blank, and the section vanishes from their results
+ * without a word. Each caller uses this to tell the two apart and say so.
+ */
+function allAnswered(arr: number[] | undefined): boolean {
+  return (arr?.length ?? 0) > 0 && (arr ?? []).every((v) => v > 0);
+}
+
 // ===== EMOTIONAL TREATMENT RESOLVER =====
 // Based on combined therapistStyleQ1 + therapistStyleQ2 (2-14 range)
 // >= 12 → CBT, 7-11 → mixed (returns CBT as primary), 2-6 → dynamic
@@ -205,9 +219,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // 9 פריטים × סקאלת 1-3 (טווח 9-27)
     // > 15 = חרדה כללית מובהקת | > 12 = סימני מתח קלים
     const gad7Total = sum(e.gad7Scores);
-    // Every item carries 1-3 once answered, so a complete questionnaire has no
-    // zeros in it. Anything with a zero left is a partly or wholly skipped screen.
-    const gad7Complete = (e.gad7Scores?.length ?? 0) > 0 && (e.gad7Scores ?? []).every((v) => v > 0);
+    const gad7Complete = allAnswered(e.gad7Scores);
     if (gad7Total > 15) {
       recs.push({
         id: uid("gad7-severe"),
@@ -326,6 +338,16 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         treatmentLabel: "CBT",
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
+      });
+    } else if (e.e5 && !allAnswered(e.ocdScores)) {
+      recs.push({
+        id: uid("ocd-unspecified"),
+        symptomText: "סימנים של מחשבות או פעולות חוזרות ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
+        treatment: "CBT",
+        treatmentLabel: "CBT",
+        domain: "מורכבויות בתחום הרגשי/האישי",
+        urgent: false,
+        notes: "מומלץ המשך בירור פסיכולוגי לאפיון הקושי ועוצמתו. בטיפול ב-OCD נהוג לשלב חשיפה ומניעת תגובה (ERP).",
       });
     }
 
@@ -710,6 +732,17 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           notes: "יש לפנות לאבחון דידקטי או לאבחון נוירופסיכולוגי.",
         });
       }
+      if (ld14 < 7 && ld5v < 2 && !allAnswered(f.ldScores)) {
+        recs.push({
+          id: uid("ld-unspecified"),
+          symptomText: "סימנים של קשיי למידה ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
+          treatment: "טיפול תעסוקתי",
+          treatmentLabel: "טיפול תעסוקתי",
+          domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
+          urgent: false,
+          notes: "דווח על קושי ברכישת הקריאה בילדות, אך שאלון האפיון לא מולא. מומלץ אבחון דידקטי או נוירופסיכולוגי לאפיון סוג הקושי.",
+        });
+      }
     }
 
     // --- F2: Executive Functions ---
@@ -724,6 +757,16 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
           notes: "כדאי לפנות גם לרופא נוירולוג.",
+        });
+      } else if (!allAnswered(f.execScores)) {
+        recs.push({
+          id: uid("exec-unspecified"),
+          symptomText: "סימנים של קשיים בתפקודים הניהוליים ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
+          treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
+          treatmentLabel: "COG-FUN",
+          domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
+          urgent: false,
+          notes: "דווח על קשיי התארגנות, אך שאלון האפיון לא מולא. מומלץ המשך בירור לאפיון הקושי ועוצמתו.",
         });
       }
     }
