@@ -405,8 +405,23 @@ export async function GET(req: NextRequest) {
       month_clicks: clicksPerTherapist.get(t.id) ?? 0,
     }));
 
+    // אותו חשבון מחזיק גם פרופיל מטפל אישי (מנהל/ת שגם מטפל/ת). מוחזר כדי
+    // שהפורטל יציע מעבר לפרופיל - הכיוון ההפוך לשורה שבדשבורד המטפל. שורת
+    // ישות-המרכז אינה פרופיל אישי ולכן מוחרגת.
+    let ownTherapist: { id: string; full_name: string } | null = null;
+    if (center.user_id) {
+      const { data: mine } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name")
+        .eq("user_id", center.user_id)
+        .neq("entity_type", "center")
+        .maybeSingle();
+      if (mine) ownTherapist = { id: mine.id as string, full_name: (mine.full_name as string) ?? "" };
+    }
+
     return NextResponse.json({
       ok: true,
+      own_therapist: ownTherapist,
       center: {
         name: center.name,
         status: center.status,

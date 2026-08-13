@@ -51,6 +51,8 @@ type Stats = {
 };
 
 type PortalData = {
+  /** פרופיל מטפל אישי שמוחזק באותו חשבון (מנהל/ת שגם מטפל/ת). */
+  own_therapist?: { id: string; full_name: string } | null;
   center: {
     name: string;
     status: string;
@@ -161,6 +163,23 @@ export default function CenterDashboardPage() {
           <LogOut size={15} /> התנתקות
         </button>
       </div>
+
+      {/* הכיוון ההפוך לשורה שבדשבורד המטפל: אותו חשבון מחזיק גם פרופיל אישי,
+          וללא זה אין באתר מעבר בין שני האזורים. */}
+      {data.own_therapist && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-3"
+          style={{ background: "var(--gold-pale)", borderColor: "#f0e0b8" }}>
+          <span className="text-sm" style={{ color: "var(--gold-dark)" }}>
+            👤 לחשבון הזה יש גם פרופיל מטפל/ת אישי
+            {data.own_therapist.full_name ? <> - <strong>{data.own_therapist.full_name}</strong></> : null}
+          </span>
+          <a href="/therapists/dashboard"
+            className="rounded-full bg-white px-4 py-1.5 text-xs font-bold hover:opacity-90"
+            style={{ border: "1.5px solid var(--gold)", color: "var(--gold-dark)" }}>
+            לפרופיל האישי ←
+          </a>
+        </div>
+      )}
 
       {justCreated && (
         <div className="mb-6 rounded-2xl border border-green-200 bg-green-50 px-5 py-3 text-sm font-semibold text-green-800">

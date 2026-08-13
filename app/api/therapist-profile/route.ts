@@ -191,18 +191,22 @@ export async function GET(req: NextRequest) {
   // מנהל מרכז שרוצה גם פרופיל מטפל אישי מקבל אותו דרך הפורטל (הזמנה
   // ב-/centers/fill), שמשייכת אותו למרכז ומדלגת על בחירת המסלול. לכן כאן לא
   // נוצרת שורה, ומוחזר מצב מפורש שהעמוד יודע להציג.
-  if (!therapist) {
-    const { data: ownedCenter } = await supabaseAdmin
-      .from("therapy_center_accounts")
-      .select("id, name, status")
-      .eq("user_id", user.id)
-      .maybeSingle();
-    if (ownedCenter) {
-      return NextResponse.json({
-        ok: true,
-        center_owner: { name: ownedCenter.name, status: ownedCenter.status },
-      });
-    }
+  // נבדק תמיד, לא רק כשאין פרופיל: מנהל שכן יש לו פרופיל מטפל צריך לדעת
+  // ששני האזורים פתוחים לו מאותו חשבון (owns_center למטה), אחרת אין באתר שום
+  // דרך לעבור ביניהם והוא מקליד כתובות ידנית.
+  const { data: ownedCenter } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("id, name, status")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  // אין פרופיל + מנהל מרכז = מסך הפניה, ובלי ליצור שורה. עם פרופיל קיים
+  // ממשיכים כרגיל - חסימה כאן הייתה נועלת מנהל מחוץ לפרופיל הלגיטימי שלו.
+  if (!therapist && ownedCenter) {
+    return NextResponse.json({
+      ok: true,
+      center_owner: { name: ownedCenter.name, status: ownedCenter.status },
+    });
   }
 
   // Still nothing — a freshly registered account. Create a stub row NOW so
@@ -267,7 +271,16 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  return NextResponse.json({ ok: true, therapist: therapist ?? null, photoUrl, certificates, user_id: user.id, email: user.email });
+  return NextResponse.json({
+    ok: true,
+    therapist: therapist ?? null,
+    photoUrl,
+    certificates,
+    user_id: user.id,
+    email: user.email,
+    // אותו חשבון מנהל גם מרכז - הדשבורד מציג מעבר לפורטל.
+    owns_center: ownedCenter ? { id: ownedCenter.id, name: ownedCenter.name } : null,
+  });
 }
 
 // PATCH — update the therapist profile

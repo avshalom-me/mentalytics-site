@@ -266,6 +266,8 @@ function TherapistDashboard() {
   const [pendingLink, setPendingLink] = useState<string | null>(null);
   // חשבון שמנהל מרכז טיפולי הגיע לאזור המטפלים (ראו CenterOwnerNotice).
   const [centerOwner, setCenterOwner] = useState<string | null>(null);
+  // אותו חשבון מנהל גם מרכז *וגם* מחזיק פרופיל מטפל - שורת מעבר בין האזורים.
+  const [ownsCenter, setOwnsCenter] = useState<{ name: string } | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
@@ -330,6 +332,7 @@ function TherapistDashboard() {
         setLoading(false);
         return;
       }
+      if (json.owns_center?.name) setOwnsCenter({ name: String(json.owns_center.name) });
 
       // A brand-new registrant has a STUB row (auto-created on first login,
       // empty name) rather than no row - GET always returns one now. Sending
@@ -435,6 +438,22 @@ function TherapistDashboard() {
           </button>
         </div>
       </div>
+
+      {/* אותו חשבון מחזיק שני אזורים - פרופיל מטפל אישי ופורטל מרכז. בלי
+          השורה הזו אין באתר שום מעבר ביניהם והמנהל/ת מקליד/ה כתובת ידנית. */}
+      {ownsCenter && (
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border px-5 py-3"
+          style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+          <span className="text-sm" style={{ color: "var(--teal-dark)" }}>
+            🏢 החשבון הזה מנהל גם את <strong>{ownsCenter.name}</strong>
+          </span>
+          <Link href="/centers/dashboard"
+            className="rounded-full bg-white px-4 py-1.5 text-xs font-bold hover:opacity-90"
+            style={{ border: "1.5px solid var(--teal)", color: "var(--teal-dark)" }}>
+            לפורטל המרכזים ←
+          </Link>
+        </div>
+      )}
 
       {/* Rejection notice - reason + how to re-submit */}
       {profile?.status === "rejected" && (
