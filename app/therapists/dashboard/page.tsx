@@ -7,6 +7,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import EnrichedStatsPanel, { type EnrichedStatsData } from "./EnrichedStatsPanel";
 import ProfileLinkPromo from "./ProfileLinkPromo";
 import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
+import CenterOwnerNotice from "@/app/therapists/CenterOwnerNotice";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
@@ -32,6 +33,8 @@ type Profile = {
   activity_level: number | null;
   status: string;
   admin_approved?: boolean;
+  /** משויכ/ת למרכז טיפולי - המנוי של המרכז מכסה אותו/ה, אין מה למכור לו/ה. */
+  center_account_id?: string | null;
   tier: string;
   profile_photo_path?: string;
   education?: string;
@@ -261,6 +264,8 @@ function TherapistDashboard() {
   const [profile, setProfile] = useState<Profile | null>(null);
   // שם הפרופיל החי שממתין לקישור חשבון ידני (ראו PendingLinkNotice).
   const [pendingLink, setPendingLink] = useState<string | null>(null);
+  // חשבון שמנהל מרכז טיפולי הגיע לאזור המטפלים (ראו CenterOwnerNotice).
+  const [centerOwner, setCenterOwner] = useState<string | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
@@ -319,6 +324,13 @@ function TherapistDashboard() {
         return;
       }
 
+      // חשבון שמנהל מרכז טיפולי - לפורטל המרכזים, לא לטופס מטפל עצמאי.
+      if (json.center_owner) {
+        setCenterOwner(String(json.center_owner.name ?? ""));
+        setLoading(false);
+        return;
+      }
+
       // A brand-new registrant has a STUB row (auto-created on first login,
       // empty name) rather than no row - GET always returns one now. Sending
       // them to the dashboard (pricing banner, plan table, "what to improve")
@@ -364,6 +376,7 @@ function TherapistDashboard() {
   }
 
   if (pendingLink !== null) return <PendingLinkNotice name={pendingLink} />;
+  if (centerOwner !== null) return <CenterOwnerNotice name={centerOwner} />;
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   const statusLabel = profile?.status === "paying" && !profile?.admin_approved
@@ -448,8 +461,11 @@ function TherapistDashboard() {
         </div>
       )}
 
+      {/* מטפל/ת של מרכז טיפולי: המרכז כבר משלם עליו/ה, ועד האישור הסטטוס
+          עדיין אינו paying - כך שבלי התנאי הזה הוצע לו/ה לשלם שוב על מה
+          שכבר נרכש, ובאותו מסך גם הוצגה ערבות שאינה חלה עליו/ה. */}
       {/* Pricing banner - only for non-paying therapists */}
-      {profile && profile.status !== "paying" && (
+      {profile && profile.status !== "paying" && !profile.center_account_id && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
             <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">

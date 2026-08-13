@@ -181,6 +181,30 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // ── חשבון של מנהל/ת מרכז טיפולי ─────────────────────────────────────────
+  // אותו חשבון Supabase משמש להתחברות לפורטל המרכזים ולאזור המטפלים. מנהל
+  // מרכז שהגיע לכאן (למשל דרך "כניסה למטפלים" בתפריט) קיבל שורת מטפל חדשה
+  // שנוצרה אוטומטית למטה, מילא אותה, ובסוף הוצע לו לבחור מסלול ולשלם - על
+  // מנוי שהמרכז שלו כבר שילם עליו. כך נוצר "שמעון ערנרייך" כמטפל עצמאי
+  // במקביל למכון הכרה, עם אותו user_id בדיוק (10/8/2026).
+  //
+  // מנהל מרכז שרוצה גם פרופיל מטפל אישי מקבל אותו דרך הפורטל (הזמנה
+  // ב-/centers/fill), שמשייכת אותו למרכז ומדלגת על בחירת המסלול. לכן כאן לא
+  // נוצרת שורה, ומוחזר מצב מפורש שהעמוד יודע להציג.
+  if (!therapist) {
+    const { data: ownedCenter } = await supabaseAdmin
+      .from("therapy_center_accounts")
+      .select("id, name, status")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (ownedCenter) {
+      return NextResponse.json({
+        ok: true,
+        center_owner: { name: ownedCenter.name, status: ownedCenter.status },
+      });
+    }
+  }
+
   // Still nothing — a freshly registered account. Create a stub row NOW so
   // every registrant is visible in the admin from the moment they sign up
   // (before this, whoever abandoned the profile form simply didn't exist for
@@ -319,6 +343,21 @@ export async function PATCH(req: NextRequest) {
   }
 
   if (!existing) {
+    // אותה הגנה כמו ב-GET: חשבון שמנהל מרכז טיפולי לא הופך למטפל עצמאי דרך
+    // הדלת האחורית של שמירת טופס. בלי זה, ה-GET מחזיר center_owner אבל PATCH
+    // ישיר עדיין יוצר את השורה.
+    const { data: ownedCenter } = await supabaseAdmin
+      .from("therapy_center_accounts")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (ownedCenter) {
+      return NextResponse.json(
+        { ok: false, error: "החשבון הזה מנהל מרכז טיפולי. פרופיל מטפל אישי נוצר דרך פורטל המרכזים." },
+        { status: 409 },
+      );
+    }
+
     // Create new therapist record
     update.user_id = user.id;
     update.email = user.email;

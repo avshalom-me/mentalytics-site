@@ -14,6 +14,7 @@ import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUB
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
 import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
+import CenterOwnerNotice from "@/app/therapists/CenterOwnerNotice";
 
 const PLAY_MODALITIES_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
@@ -23,6 +24,8 @@ type Profile = {
   status: string;
   rejection_reason?: string | null;
   profile_photo_path?: string;
+  /** מטפל/ת שמשויכ/ת למרכז טיפולי - המנוי של המרכז מכסה אותו/ה. */
+  center_account_id?: string | null;
 };
 
 function CheckboxGroup({ label, options, selected, onChange }: {
@@ -71,6 +74,7 @@ export default function TherapistProfileEditPage() {
   const [loading, setLoading] = useState(true);
   // שם הפרופיל החי שממתין לקישור חשבון ידני (ראו PendingLinkNotice).
   const [pendingLink, setPendingLink] = useState<string | null>(null);
+  const [centerOwner, setCenterOwner] = useState<string | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isNew, setIsNew] = useState(false);
   const [token, setToken] = useState<string | null>(null);
@@ -121,6 +125,13 @@ export default function TherapistProfileEditPage() {
       // פרופיל חי שממתין לקישור ידני (מטעמי אבטחה) - מסך הסבר במקום טופס ריק.
       if (json.pending_link) {
         setPendingLink(String(json.pending_link.name ?? ""));
+        setLoading(false);
+        return;
+      }
+
+      // חשבון שמנהל מרכז טיפולי - הפנייה לפורטל במקום טופס מטפל עצמאי.
+      if (json.center_owner) {
+        setCenterOwner(String(json.center_owner.name ?? ""));
         setLoading(false);
         return;
       }
@@ -339,6 +350,16 @@ export default function TherapistProfileEditPage() {
       setSaveMsg(base);
     }
 
+    // מטפל/ת של מרכז טיפולי לא בוחר/ת מסלול: המנוי של המרכז מכסה אותו/ה,
+    // והפרופיל נכנס ישירות לתור האישור שלנו. המסלול הרגיל הוא הזמנה מהפורטל
+    // (/centers/fill/<token>), שאינה עוברת כאן כלל - אבל פרופיל שקושר למרכז
+    // ידנית באדמין כן מגיע לעמוד הזה, וקודם לכן היה מוצג לו "בחרו מסלול"
+    // ואפילו מוצע לו לשלם על מה שכבר שולם.
+    if (json.created && profile?.center_account_id) {
+      window.location.href = "/therapists/dashboard";
+      return;
+    }
+
     // First-time registration: let the therapist pick a plan before finishing -
     // even if a file upload failed, since the profile was created.
     if (json.created) {
@@ -368,10 +389,13 @@ export default function TherapistProfileEditPage() {
   const promo = isPromoActive();
 
   if (pendingLink !== null) return <PendingLinkNotice name={pendingLink} />;
+  if (centerOwner !== null) return <CenterOwnerNotice name={centerOwner} />;
   if (loading) return <div className="p-10 text-center">טוען...</div>;
 
   // ── Plan choice - shown right after the first profile submission ──
-  if (showPlanChoice) {
+  // רשת ביטחון שנייה: גם אם משהו הדליק את הדגל, מטפל/ת של מרכז לעולם לא
+  // רואה בחירת מסלול.
+  if (showPlanChoice && !profile?.center_account_id) {
     return (
       <main className="mx-auto max-w-3xl px-5 py-12 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
 
