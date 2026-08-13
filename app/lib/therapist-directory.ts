@@ -39,7 +39,12 @@ type TherapistRow = {
   center_account_id: string | null;
   created_at: string | null;
   accepting_new_patients: boolean | null;
+  /** 'center' = שורת ישות-מרכז (מסלול 2). מוצגת ככרטיס מרכז, לא כמטפל. */
+  entity_type: string | null;
 };
+
+/** slug + לוגו של מרכז, לכרטיס ישות במאגר. */
+type CenterCard = { slug: string | null; logoUrl: string | null };
 
 function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
@@ -57,9 +62,16 @@ function tierOf(t: TherapistRow): number {
   return 2; // approved free
 }
 
-async function signRow(t: TherapistRow): Promise<PublicTherapist> {
+async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): Promise<PublicTherapist> {
+  const isEntity = t.entity_type === "center";
+  const card = isEntity && t.center_account_id ? centerCards?.get(t.center_account_id) : undefined;
+
   let profile_photo_url: string | null = null;
-  if (t.profile_photo_path) {
+  if (isEntity) {
+    // למרכז אין תמונת פרופיל - הלוגו נכנס לחריץ התמונה. בלעדיו הכרטיס היה
+    // מקבל אווטאר מגדרי, כלומר פרצוף של אדם על ישות עסקית.
+    profile_photo_url = card?.logoUrl ?? null;
+  } else if (t.profile_photo_path) {
     const { data: signed, error: signedError } = await supabaseAdmin.storage
       .from(PROFILE_PHOTOS_BUCKET)
       .createSignedUrl(t.profile_photo_path, 60 * 60 * 24);
@@ -67,8 +79,10 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
   }
   return {
     id: t.id,
-    full_name: t.full_name ?? "",
-    phone: t.phone ?? "",
+    full_name: (t.full_name ?? "").trim(),
+    // הטלפון בשורת הישות הוא הקו הפנימי של המרכז ואינו לפרסום - אותה הכרעה
+    // כמו בכרטיס ההתאמות. הפנייה נעשית מעמוד המרכז.
+    phone: isEntity ? "" : t.phone ?? "",
     bio: t.bio ?? "",
     gender: t.gender ?? "",
     online: t.online ?? false,
@@ -81,7 +95,40 @@ async function signRow(t: TherapistRow): Promise<PublicTherapist> {
     profile_photo_url,
     tier: tierOf(t),
     accepting_new_patients: t.accepting_new_patients !== false,
+    is_center: isEntity,
+    center_slug: card?.slug ?? null,
   };
+}
+
+/** slug ולוגו חתום לכל מרכז שמופיע ברשימה כישות. */
+async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, CenterCard>> {
+  const ids = [...new Set(
+    rows.filter((t) => t.entity_type === "center" && t.center_account_id)
+      .map((t) => t.center_account_id as string),
+  )];
+  const map = new Map<string, CenterCard>();
+  if (ids.length === 0) return map;
+
+  const { data } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("id, slug, logo_path")
+    .in("id", ids);
+  const withLogo = (data ?? []).filter((c) => c.logo_path);
+  const signedByPath = new Map<string, string>();
+  if (withLogo.length > 0) {
+    const paths = withLogo.map((c) => c.logo_path as string);
+    const { data: signed } = await supabaseAdmin.storage
+      .from(PROFILE_PHOTOS_BUCKET)
+      .createSignedUrls(paths, 60 * 60 * 24);
+    (signed ?? []).forEach((s, i) => { if (s.signedUrl) signedByPath.set(paths[i], s.signedUrl); });
+  }
+  for (const c of data ?? []) {
+    map.set(c.id as string, {
+      slug: (c.slug as string) ?? null,
+      logoUrl: c.logo_path ? signedByPath.get(c.logo_path as string) ?? null : null,
+    });
+  }
+  return map;
 }
 
 // Loads publicly-listed therapists (paying + approved, admin-vetted), ordered
@@ -114,11 +161,14 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
-      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, assessment_types, regions, cultural_prefs, arrangements, age_groups, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients`
+      `id, full_name, phone, bio, gender, online, therapist_types, training_areas, assessment_types, regions, cultural_prefs, arrangements, age_groups, profile_photo_path, status, promotion_source, center_account_id, created_at, accepting_new_patients, entity_type`
     )
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
-    .neq("entity_type", "center") // ישות-מרכז מופיעה רק בהתאמות החידון, לא במאגר/עמודים הציבוריים
+    // ישות-מרכז (מסלול 2) נכללת במאגר ובעמודי האזור/עיר. עד 12/8/2026 היא
+    // הוסננה החוצה והופיעה רק בהתאמות החידון - מרכז ששילם לא נמצא בחיפוש
+    // "מטפלים בחיפה". הכרטיס מסומן כמרכז ומקשר ל-/centers/<slug>, כי עמוד
+    // המטפל שלה מחזיר 404 במכוון (app/therapists/[id]/page.tsx).
     .order("full_name", { ascending: true });
 
   if (error || !data) return [];
@@ -126,7 +176,10 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   let rows = data as TherapistRow[];
   // A center's public page wants exactly its therapists - skip the main/para
   // category filter there (a center may include para-medical therapists too).
-  if (filter?.centerId) return rows.filter((t) => t.center_account_id === filter.centerId);
+  // שורת הישות עצמה מוחרגת: העמוד לא מציג את המרכז כחבר בצוות של עצמו.
+  if (filter?.centerId) {
+    return rows.filter((t) => t.center_account_id === filter.centerId && t.entity_type !== "center");
+  }
   // Default to the "main" directory (exclude para-only therapists); the
   // para-medical rubric explicitly asks for "para".
   const category = filter?.category ?? "main";
@@ -226,8 +279,15 @@ export async function loadPublicTherapists(
   // "all center therapists appear at the top of their region"), above gift
   // promotions and above the free tier. The new-therapist boost is preserved
   // WITHIN each class.
-  const isPaid = (t: TherapistRow) => t.status === "paying" && t.promotion_source === "paid";
-  const isCenter = (t: TherapistRow) => t.status === "paying" && t.promotion_source === "center";
+  // ישות-מרכז נכנסת לקבוצת הרוטציה העליונה יחד עם המנויים הפרטיים, ולא
+  // לדרגת "מטפלי מרכז" שמתחתיה: המרכז הוא הלקוח המשלם עצמו (כאן ₪80×3
+  // לחודש), וכרטיס אחד מייצג מרפאה שלמה. הדרגה שמתחת נשארת למטפלים בודדים
+  // שמקודמים דרך מנוי המרכז - הטבה, לא לקוח.
+  const isEntity = (t: TherapistRow) => t.entity_type === "center";
+  const isPaid = (t: TherapistRow) =>
+    t.status === "paying" && (t.promotion_source === "paid" || isEntity(t));
+  const isCenter = (t: TherapistRow) =>
+    t.status === "paying" && t.promotion_source === "center" && !isEntity(t);
   const isGift = (t: TherapistRow) =>
     t.status === "paying" && t.promotion_source !== "paid" && t.promotion_source !== "center";
 
@@ -258,5 +318,9 @@ export async function loadPublicTherapists(
     ...approvedOld,
     ...rotate(unavailable),
   ];
-  return Promise.all(ordered.map(signRow));
+  // ישות-מרכז נופלת מעצמה לדרגת centerNew/centerOld שכבר קיימת כאן (status
+  // 'paying' + promotion_source 'center'), כלומר מיד אחרי המנויים הפרטיים
+  // ובתוך אותה רוטציה יומית - בדיוק "אחד המקומות הראשונים בתורנות".
+  const centerCards = await loadCenterCards(ordered);
+  return Promise.all(ordered.map((t) => signRow(t, centerCards)));
 }

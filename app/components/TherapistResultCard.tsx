@@ -34,22 +34,41 @@ export default function TherapistResultCard({
   contextCity?: string;
   contextRegion?: string;
 }) {
-  const type = t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
+  // ישות-מרכז: עמוד המטפל שלה מחזיר 404 במכוון, אין לה מגדר ולרוב אין תמונה.
+  const isCenter = t.is_center === true;
+  const type = isCenter
+    ? t.therapist_types.slice(0, 2).join(" · ")
+    : t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const snippet = bioSnippet(t.bio);
   // "ret" lets the profile's back link return to THIS listing page (region /
   // city / online / center) rather than the generic /therapists directory.
-  const profileHref = backHref
-    ? `${therapistPath(t.id, t.full_name)}?ret=${encodeURIComponent(backHref)}`
-    : therapistPath(t.id, t.full_name);
-  return (
-    <CardImpression therapistId={t.id}>
-    <Link href={profileHref} className="group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
-      style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" }}>
-      <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)" }}>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={t.profile_photo_url ?? avatar} alt={t.full_name}
-          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }} loading="lazy" />
+  const profileHref = isCenter
+    ? (t.center_slug ? `/centers/${t.center_slug}` : null)
+    : backHref
+      ? `${therapistPath(t.id, t.full_name)}?ret=${encodeURIComponent(backHref)}`
+      : therapistPath(t.id, t.full_name);
+  const cardClass = "group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5";
+  const cardStyle = { border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" } as const;
+  const Body = (
+    <>
+      <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)", position: "relative" }}>
+        {isCenter && !t.profile_photo_url ? (
+          // אווטאר מגדרי על ישות עסקית הוא פשוט שגוי - סמל ניטרלי במקומו.
+          <div className="flex h-full w-full items-center justify-center" style={{ background: "var(--teal-pale)" }}>
+            <span style={{ fontSize: "56px" }} aria-hidden>🏢</span>
+          </div>
+        ) : (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={t.profile_photo_url ?? avatar} alt={t.full_name}
+            style={{ width: "100%", height: "100%", objectFit: isCenter ? "contain" : "cover", objectPosition: "center", display: "block", padding: isCenter ? "24px" : 0 }} loading="lazy" />
+        )}
+        {isCenter && (
+          <span className="absolute top-3 rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold"
+            style={{ insetInlineStart: "12px", color: "var(--teal-dark)", boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>
+            🏢 מרכז טיפולי
+          </span>
+        )}
       </div>
       <div style={{ padding: "16px 18px" }}>
         {/* A listing card is an item, not a section of the page. This was an
@@ -72,7 +91,16 @@ export default function TherapistResultCard({
           )}
         </div>
       </div>
-    </Link>
+    </>
+  );
+  return (
+    <CardImpression therapistId={t.id}>
+      {profileHref ? (
+        <Link href={profileHref} className={cardClass} style={cardStyle}>{Body}</Link>
+      ) : (
+        // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
+        <div className={cardClass} style={cardStyle}>{Body}</div>
+      )}
     </CardImpression>
   );
 }

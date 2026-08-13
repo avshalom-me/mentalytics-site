@@ -1,13 +1,12 @@
 import { notFound } from "next/navigation";
+import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { onlineTopicSlugs, slugToCityTopic, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import OnlineEvidenceSection from "@/app/therapists/OnlineEvidenceSection";
-import { genderTitle } from "@/app/lib/gender-text";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
@@ -103,12 +102,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
     name: heading,
     inLanguage: "he",
     url: `${BASE}/therapists/region/${regionParam}`,
-    hasPart: list.slice(0, 50).map((t) => ({
-      "@type": "Person",
-      name: t.full_name,
-      jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
-      url: `${BASE}${therapistPath(t.id, t.full_name)}`,
-    })),
+    hasPart: list.slice(0, 50).map(listingItemSchema),
   };
 
   const breadcrumbLd = {

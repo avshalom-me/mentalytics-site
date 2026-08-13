@@ -61,6 +61,9 @@ export type PublicTherapist = {
   // false = "כעת לא זמין/ה לקבלת מטופלים חדשים": card shows a note instead of
   // contact buttons (the server also rejects site messages for them).
   accepting_new_patients: boolean;
+  /** ישות-מרכז (מסלול 2): כרטיס מרכז, לא מטפל - מקשר ל-/centers/<slug>. */
+  is_center?: boolean;
+  center_slug?: string | null;
 };
 
 // Fisher-Yates shuffle within each tier, preserving tier order (paying → gift →
@@ -86,6 +89,13 @@ function shuffleWithinTiers(list: PublicTherapist[]): PublicTherapist[] {
   return out;
 }
 
+// עוטף את גוף הכרטיס בקישור כשיש יעד. ישות-מרכז בלי slug היא היחידה שאין לה
+// יעד תקף - ואז עדיף כרטיס לא-לחיץ מאשר קישור שמוביל ל-404.
+function CardLink({ href, className, children }: { href: string | null; className?: string; children: React.ReactNode }) {
+  if (!href) return <div className={className}>{children}</div>;
+  return <Link href={href} className={className}>{children}</Link>;
+}
+
 function TherapistCard({
   t,
   position,
@@ -106,6 +116,10 @@ function TherapistCard({
   const showImage = t.profile_photo_url && !brokenImages[t.id];
   const snippet = bioSnippet(t.bio);
   const unavailable = t.accepting_new_patients === false;
+  // ישות-מרכז: עמוד המטפל שלה מחזיר 404 במכוון, והיעד הוא עמוד המרכז.
+  // בלי slug אין לאן לקשר, ואז הכרטיס נשאר ללא קישור במקום להוביל לשגיאה.
+  const isCenter = t.is_center === true;
+  const cardHref = isCenter ? (t.center_slug ? `/centers/${t.center_slug}` : null) : therapistPath(t.id, t.full_name);
 
   const handleImageError = () => {
     if (retryCount.current < 2 && imgRef.current && t.profile_photo_url) {
@@ -126,26 +140,41 @@ function TherapistCard({
       className="rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)" }}
     >
-      <Link href={therapistPath(t.id, t.full_name)} className="block">
+      <CardLink href={cardHref} className="block">
         <div className="relative h-80 w-full overflow-hidden bg-gray-100">
-          <img
-            ref={imgRef}
-            src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-            alt={t.full_name}
-            className="h-full w-full object-cover object-top"
-            loading={eager ? "eager" : "lazy"}
-            decoding="async"
-            onError={handleImageError}
-          />
+          {isCenter && !showImage ? (
+            // מרכז בלי לוגו: סמל ניטרלי. אווטאר מגדרי כאן היה מדביק פרצוף של
+            // אדם על ישות עסקית.
+            <div className="flex h-full w-full items-center justify-center" style={{ background: "var(--teal-pale)" }}>
+              <span className="text-6xl" aria-hidden>🏢</span>
+            </div>
+          ) : (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img
+              ref={imgRef}
+              src={showImage ? t.profile_photo_url! : (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+              alt={t.full_name}
+              className={`h-full w-full ${isCenter ? "object-contain p-6" : "object-cover object-top"}`}
+              loading={eager ? "eager" : "lazy"}
+              decoding="async"
+              onError={handleImageError}
+            />
+          )}
           <span className="absolute top-3 inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[12px] font-bold"
-            style={{ insetInlineStart: "12px", color: "var(--teal-dark)", boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>✓ מאומת</span>
+            style={{ insetInlineStart: "12px", color: "var(--teal-dark)", boxShadow: "0 1px 4px rgba(0,0,0,.12)" }}>
+            {isCenter ? "🏢 מרכז טיפולי" : "✓ מאומת"}
+          </span>
         </div>
         <div className="px-5 pt-4 pb-3">
           <div className="flex items-baseline justify-between gap-2">
             <div className="font-black text-stone-900 text-lg leading-tight truncate">{t.full_name}</div>
           </div>
           {t.therapist_types.length > 0 && (
-            <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{genderTitle(t.therapist_types[0], t.gender)}</div>
+            <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>
+              {/* למרכז אין מגדר - הטיה מגדרית של התואר ("פסיכולוגית קלינית")
+                  על שם של מוסד היא פשוט שגויה. */}
+              {isCenter ? t.therapist_types.slice(0, 2).join(" · ") : genderTitle(t.therapist_types[0], t.gender)}
+            </div>
           )}
           {snippet && (
             <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{snippet}</p>
@@ -164,15 +193,24 @@ function TherapistCard({
             )}
           </div>
         </div>
-      </Link>
+      </CardLink>
       <div className="px-5 pb-5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
-        {unavailable && (
+        {/* מרכז: אין וואטסאפ/חיוג בכרטיס - הטלפון בשורת הישות הוא הקו הפנימי
+            ואינו לפרסום (אותה הכרעה כמו בכרטיס ההתאמות). הפנייה מעמוד המרכז. */}
+        {isCenter && cardHref && (
+          <Link href={cardHref}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90"
+            style={{ background: "var(--teal)" }}>
+            🏢 לעמוד המרכז
+          </Link>
+        )}
+        {!isCenter && unavailable && (
           <span className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold"
             style={{ background: "var(--surface-2)", border: "1px solid var(--line)", color: "var(--muted)" }}>
             ⏸ {t.gender === "נקבה" ? "לא זמינה כרגע למטופלים חדשים" : "לא זמין כרגע למטופלים חדשים"}
           </span>
         )}
-        {!unavailable && waLinkFor(t.phone) && (
+        {!isCenter && !unavailable && waLinkFor(t.phone) && (
           <a href={waLinkFor(t.phone)!}
             target="_blank" rel="noopener noreferrer"
             onClick={() => trackClick(t.id, "whatsapp")}
@@ -181,7 +219,7 @@ function TherapistCard({
             וואטסאפ
           </a>
         )}
-        {!unavailable && telHref(t.phone) && (
+        {!isCenter && !unavailable && telHref(t.phone) && (
           <a href={telHref(t.phone)!}
             onClick={() => trackClick(t.id, "phone")}
             className="inline-flex items-center gap-1.5 rounded-full bg-stone-100 px-4 py-2 text-[13px] font-bold text-stone-700 hover:bg-stone-200">
@@ -189,7 +227,7 @@ function TherapistCard({
             חיוג
           </a>
         )}
-        {!unavailable && (
+        {!isCenter && !unavailable && (
           <button
             type="button"
             onClick={() => setMessageOpen(true)}
@@ -199,9 +237,13 @@ function TherapistCard({
             הודעה
           </button>
         )}
-        <Link href={therapistPath(t.id, t.full_name)} className="text-[13px] font-bold hover:underline" style={{ color: "var(--teal)", marginInlineStart: "auto" }}>
-          פרופיל מלא ←
-        </Link>
+        {/* למרכז כבר יש "לעמוד המרכז" למעלה; קישור נוסף כאן הצביע על עמוד
+            המטפל של הישות, שמחזיר 404. */}
+        {!isCenter && (
+          <Link href={therapistPath(t.id, t.full_name)} className="text-[13px] font-bold hover:underline" style={{ color: "var(--teal)", marginInlineStart: "auto" }}>
+            פרופיל מלא ←
+          </Link>
+        )}
       </div>
       <SiteMessageModal
         therapistId={t.id}

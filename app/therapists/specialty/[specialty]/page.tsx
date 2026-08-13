@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
+import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { therapistPath } from "@/app/lib/therapist-url";
-import { genderTitle } from "@/app/lib/gender-text";
 import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
@@ -52,12 +51,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
     name: heading,
     inLanguage: "he",
     url: `${BASE}/therapists/specialty/${slug}`,
-    hasPart: list.slice(0, 50).map((t) => ({
-      "@type": "Person",
-      name: t.full_name,
-      jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
-      url: `${BASE}${therapistPath(t.id, t.full_name)}`,
-    })),
+    hasPart: list.slice(0, 50).map(listingItemSchema),
   };
   const breadcrumbLd = {
     "@context": "https://schema.org",

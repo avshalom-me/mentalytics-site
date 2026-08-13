@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
+import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { therapistPath } from "@/app/lib/therapist-url";
-import { genderTitle } from "@/app/lib/gender-text";
 import { ARRANGEMENT_PAGES, arrangementBySlug } from "@/app/lib/arrangements";
 import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -59,12 +58,7 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
     description: a.intro.slice(0, 200),
     inLanguage: "he",
     url,
-    hasPart: list.slice(0, 50).map((t) => ({
-      "@type": "Person",
-      name: t.full_name,
-      jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
-      url: `${BASE}${therapistPath(t.id, t.full_name)}`,
-    })),
+    hasPart: list.slice(0, 50).map(listingItemSchema),
   };
   const breadcrumbLd = {
     "@context": "https://schema.org",

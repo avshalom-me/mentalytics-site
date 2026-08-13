@@ -601,6 +601,15 @@ export default function AdminCentersPage() {
                   🛠 {isEntity ? "פרופיל המרכז (עריכה ואישור)" : "הפרופילים באדמין"}
                 </a>
               )}
+              {/* קישור ישיר לעמוד החי. התנאי זהה ל-listPublicCenters: במסלול 2
+                  העמוד הציבורי הוא כל המוצר ולכן הוא פעיל גם בלי הדגל - בלי
+                  הקישור הזה נראה באדמין כאילו העמוד כבוי בזמן שהוא באוויר. */}
+              {c.slug && c.status === "active" && (isEntity || c.public_page_enabled) && (
+                <a href={`/centers/${c.slug}`} target="_blank" rel="noopener noreferrer"
+                  className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
+                  🌐 לעמוד הציבורי ↗
+                </a>
+              )}
               {/* רק במרכז ששילם. בטיוטה שורת-הישות נוצרת אוטומטית עם הבחירה
                   במסלול 2 ותמיד pending - התג שם נראה כאילו המרכז הגיש משהו
                   וממתין לך, בזמן שאיש לא נגע. אישור לפני תשלום ממילא לא מקדם
@@ -810,10 +819,19 @@ export default function AdminCentersPage() {
               <div className="rounded-xl border border-teal-200 bg-teal-50/40 p-4">
                 <div className="mb-3 flex items-center justify-between gap-2">
                   <h4 className="text-sm font-black text-teal-900">🌐 עמוד המרכז הציבורי (SEO)</h4>
-                  <label className="flex items-center gap-2 text-xs font-semibold text-stone-700">
-                    <input type="checkbox" checked={fPubEnabled} onChange={(e) => setFPubEnabled(e.target.checked)} />
-                    עמוד פעיל וגלוי לציבור
-                  </label>
+                  {/* במסלול 2 העמוד הציבורי הוא כל המוצר, ולכן listPublicCenters
+                      מפרסם אותו גם כשהדגל כבוי. הצגת תיבה לא-מסומנת שם קראה
+                      כאילו העמוד לא באוויר - וזו בדיוק הטעות שדווחה. */}
+                  {fBillingTrack === "center_entity" ? (
+                    <span className="rounded-full bg-teal-100 px-3 py-1 text-xs font-bold text-teal-800">
+                      תמיד גלוי (מסלול 2)
+                    </span>
+                  ) : (
+                    <label className="flex items-center gap-2 text-xs font-semibold text-stone-700">
+                      <input type="checkbox" checked={fPubEnabled} onChange={(e) => setFPubEnabled(e.target.checked)} />
+                      עמוד פעיל וגלוי לציבור
+                    </label>
+                  )}
                 </div>
                 {editing.slug && (
                   <p className="mb-3 text-xs text-stone-500">

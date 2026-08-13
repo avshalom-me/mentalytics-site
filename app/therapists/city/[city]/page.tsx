@@ -1,9 +1,8 @@
 import { notFound } from "next/navigation";
+import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, cityIsIndexable } from "@/app/lib/therapist-directory";
-import { genderTitle } from "@/app/lib/gender-text";
-import { therapistPath } from "@/app/lib/therapist-url";
 import { slugToCity, regionToSlug, CITY_SEO_LIST, CITY_TO_REGION, REGION_CITIES, ONLINE_SLUG, neighborsOf, CITY_INTRO } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
@@ -85,12 +84,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
     name: `פסיכולוגים ומטפלים ב${city}`,
     inLanguage: "he",
     url: `${BASE}/therapists/city/${cityParam}`,
-    hasPart: inCity.slice(0, 50).map((t) => ({
-      "@type": "Person",
-      name: t.full_name,
-      jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
-      url: `${BASE}${therapistPath(t.id, t.full_name)}`,
-    })),
+    hasPart: inCity.slice(0, 50).map(listingItemSchema),
   };
 
   const breadcrumbLd = {
