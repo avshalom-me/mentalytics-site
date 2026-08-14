@@ -918,8 +918,16 @@ function computeZHTYBAcad(A: Ans, ga: "zh" | "tyb", boxes: KidsBox[], adhd: Adhd
   // קשיים במתמטיקה / אנגלית בלבד אינם מצריכים אבחון פסיכודידקטי כשלעצמם.
   // אבחון מומלץ רק אם הם מלווים בקשיים ברבי מלל, בקשב, או ברגשי-לימודי.
   const verbalPos = verbal !== "לא";
-  const mathSevere = math === "20%" || math === "מעל 20%";
-  const engSevere = eng === "20%" || eng === "מעל 20%";
+  // mathEngOpts on the screen runs worst-to-mildest: "10%" = קושי משמעותי,
+  // "20%" = בינוני, "מעל 20%" = קל. The old test listed "20%" / "מעל 20%",
+  // which are values from the VERBAL question (5% / 20% / מעל 20%) - a copy of
+  // the wrong option list. Against the maths values that excluded the WORST
+  // tier and included the MILDEST: a child with a significant maths difficulty
+  // got no psychodidactic referral, while the same child reporting a mild one
+  // did. Severe here means "anything but the mildest tier".
+  const SEVERE_MATH_ENG = ["10%", "20%"];
+  const mathSevere = SEVERE_MATH_ENG.includes(math);
+  const engSevere = SEVERE_MATH_ENG.includes(eng);
   if (math !== "לא") {
     addSym(f, "נמצאו סימנים לקשיים במתמטיקה");
     if (mathSevere && (verbalPos || adhdPos)) addRef(f, "הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");

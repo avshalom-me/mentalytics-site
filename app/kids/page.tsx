@@ -1773,7 +1773,11 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const histYes = ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].filter(k => A[k]==="כן").length;
     const showReadFlow = read !== "" && read !== "לא";
     const showHist0 = showReadFlow && histYes === 0 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
-    const showHist12 = showReadFlow && histYes >= 1 && histYes <= 2 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
+    // 1-3, matching the scoring band. At exactly 3 the screen used to stop
+    // asking while the scorer still expected an answer, so neither the "כן" nor
+    // the "לא" arm could fire and the reading difficulty was reported with no
+    // referral under it at all - 4+ (which does refer) was never reached either.
+    const showHist12 = showReadFlow && histYes >= 1 && histYes <= 3 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
     const showMotivRg = showHist0 && A.ag_read_motiv === "לא";
     const agMotTot = (A.ag_mot1||1)+(A.ag_mot2||1)+(A.ag_mot3||1);
     const showAgAdhd = showMotivRg && agMotTot <= 5 && !q9AdhdActive(A);
@@ -1909,7 +1913,8 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const showReadFlow = A.dv_read === "כן";
     const histAllAnswered = showReadFlow && ["dv_h1","dv_h2","dv_h3","dv_h4","dv_h5"].every(k => A[k] !== undefined);
     const showHist0 = histAllAnswered && histYes === 0;
-    const showHist12 = histAllAnswered && histYes >= 1 && histYes <= 2;
+    // 1-3, matching the scoring band - see the same fix in the א-ג block above.
+    const showHist12 = histAllAnswered && histYes >= 1 && histYes <= 3;
     const showMotivRg = showHist0 && A.dv_read_motiv === "לא";
     const dvMotTot = (A.dv_mot1||1)+(A.dv_mot2||1)+(A.dv_mot3||1);
     const showDvReadAdhd = showMotivRg && dvMotTot <= 5 && !q9AdhdActive(A);
