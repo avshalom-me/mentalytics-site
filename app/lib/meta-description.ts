@@ -11,10 +11,9 @@
  *  1. Never cut mid-word, and never exceed the budget. Google truncates a long
  *     description cleanly by itself; a broken cut baked into the tag is ours
  *     forever.
- *  2. Say what the page offers - how many therapists are listed, and the quiz
- *     for people who don't want to choose alone. That is what the city pages
- *     do and what every competitor ranking above us on "טיפול פסיכולוגי ב..."
- *     does.
+ *  2. Say what the page offers - credentials that were checked, and a quiz
+ *     built by clinicians for people who don't want to choose alone. Never a
+ *     supply count: see CREDENTIALS/QUIZ below for why.
  *  3. Keep the page's own editorial opening, because 27 specialty pages that
  *     all open with the same sentence is a duplicate-description smell.
  *
@@ -69,9 +68,9 @@ export function introPlusOffer(intro: string, ...offers: string[]): string {
   if (best) return best;
   // A handful of intros open with a single sentence longer than the budget
   // itself. Keep the offer and cut the opening at a word boundary instead of
-  // dropping the offer: a searcher who reads "...רשימת 62 מטפלים מאומתים"
-  // learns what the page is, which a truncated definition alone never tells
-  // them - and that is the whole complaint this file exists to answer.
+  // dropping the offer: a searcher who reads "...שתעודותיהם אומתו" learns what
+  // the page is, which a truncated definition alone never tells them - and that
+  // is the whole complaint this file exists to answer.
   const shortest = offers[offers.length - 1].trim();
   return `${clampWords(intro, META_MAX - [...shortest].length - 1)} ${shortest}`;
 }
