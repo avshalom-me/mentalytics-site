@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: { params: Promise<{ specialty
   // Same thin-page gate as the city pages: no index until there are real
   // therapists to show.
   const count = await countListed({ specialty });
-  const description = introPlusOffer(specialtyIntro(specialty), ...therapistOffers(count, MIN_LISTED_FOR_INDEX));
+  const description = introPlusOffer(specialtyIntro(specialty), ...therapistOffers());
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -78,7 +78,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
         {list.length >= 3 && (
           <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם ${list.length} מטפלים מאומתים בתחום${onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.`}
+            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו בתחום${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
           </p>
         )}
       </div>

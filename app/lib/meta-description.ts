@@ -77,15 +77,22 @@ export function introPlusOffer(intro: string, ...offers: string[]): string {
 }
 
 /**
- * Offer tiers for a therapist listing page, richest first.
+ * The two things the shop window says, per the owner's decision on 14/8/2026:
+ * not how many therapists we hold, but that their credentials were checked and
+ * that the matching quiz was built by clinicians. Supply counts are gone from
+ * every SERP-facing string - they read as inventory data, and on a thin city
+ * page a small number argues against us.
  *
- * The count is dropped below the page's own index gate: "רשימת 2 מטפלים"
- * undersells a page that is noindex anyway, and Hebrew has no "1 מטפלים".
+ * The wording is deliberate. The site verifies certificates and training
+ * ("עברו אימות תעודות והכשרה"), which is not the same as holding a licence:
+ * psychologists and clinical social workers are licensed, but several of the
+ * professions listed here have no licence at all, so "מטפלים מורשים" would
+ * overclaim. "שתעודותיהם אומתו" says exactly what we actually do.
  */
-export function therapistOffers(count: number, gate: number): string[] {
-  const who = count >= gate ? `${count} מטפלים מאומתים` : "מטפלים מאומתים";
-  return [
-    `רשימת ${who} לפנייה ישירה, ושאלון קצר להתאמה אישית.`,
-    `רשימת ${who} ושאלון התאמה אישי.`,
-  ];
+export const CREDENTIALS = "מטפלים ופסיכולוגים שתעודותיהם אומתו";
+export const QUIZ = "שאלון שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר";
+
+/** Offer tiers for a therapist listing page, richest first. */
+export function therapistOffers(): string[] {
+  return [`${CREDENTIALS}, ו${QUIZ} להתאמה אישית.`, `${CREDENTIALS}, ו${QUIZ}.`];
 }

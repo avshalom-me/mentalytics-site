@@ -31,7 +31,7 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   if (!topic) return { title: "נושא לא נמצא" };
   const url = `${BASE}/therapists/topic/${topic.slug}`;
   const count = await countListed(topic.filter);
-  const description = introPlusOffer(topic.intro, ...therapistOffers(count, MIN_LISTED_FOR_INDEX));
+  const description = introPlusOffer(topic.intro, ...therapistOffers());
   const robots =
     topic.adsOnly || count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return { title: topic.searchTitle, description, alternates: { canonical: url }, robots, openGraph: { title: topic.searchTitle, description, url } };
@@ -106,7 +106,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{topic.searchTitle}</h1>
         {list.length >= MIN_LISTED_FOR_INDEX && (
           <p className="mt-2 text-sm text-stone-500">
-            {topic.supplyNote} - {list.length} מטפלים מאומתים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
+            {topic.supplyNote}, שתעודותיהם אומתו{onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.
           </p>
         )}
       </div>

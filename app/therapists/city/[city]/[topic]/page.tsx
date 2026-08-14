@@ -8,6 +8,7 @@ import { regionToSlug } from "@/app/lib/regions";
 import { slugToCityTopic, isCityTopicAllowed, PILOT_CITIES, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 // City×topic PILOT (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב",
 // "CBT בירושלים". Deliberately narrow - 3 pilot cities, allow-listed topics,
@@ -40,12 +41,8 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const title = `${topic.name} ${inPhrase(city)} - מטפלים מאומתים`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
-  // Same shape as the city pages: what the page is, how many, and the quiz for
-  // people who don't want to choose alone. The old line said none of the three.
-  const description =
-    count >= MIN_CITY_TOPIC
-      ? `${topic.name} ${inPhrase(city)}: רשימת ${count} מטפלים מאומתים עם הכשרה מתאימה - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`
-      : `${topic.name} ${inPhrase(city)}: מטפלים מאומתים עם הכשרה מתאימה, כולל פגישות אונליין - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית.`;
+  // Same shape as the city pages, and count-free for the same reason.
+  const description = `${topic.name} ${inPhrase(city)}: ${CREDENTIALS} ובעלי הכשרה בתחום, ו${QUIZ}. בחינם וללא התחייבות.`;
   const robots =
     topic.adsOnly || count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
@@ -101,7 +98,7 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר ותחום</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
         <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, הפועלים {inPhrase(city)} - {list.length} מטפלים{onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.
+          {topic.supplyNote}, הפועלים {inPhrase(city)} ושתעודותיהם אומתו{onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.
         </p>
       </div>
 

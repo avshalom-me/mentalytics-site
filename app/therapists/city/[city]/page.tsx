@@ -8,6 +8,7 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
 import { loadCityArticles } from "@/app/lib/local-articles";
+import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -37,14 +38,12 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
     countListed({ city }),
     neighbors.length ? countListed({ citiesAny: [city, ...neighbors] }) : Promise.resolve(0),
   ]);
-  // The old one-liner ("מצאו פסיכולוגים ומטפלים מאומתים...") was short enough
-  // that Google discarded it and pulled the dry stats line from the page body
-  // instead. This one says what the page IS - a therapist list plus a matching
-  // quiz - which is exactly what the ranking competitors' snippets say.
+  // No supply count here (owner's call, 14/8/26 - see app/lib/meta-description.ts):
+  // the snippet sells credentials and the clinician-built quiz, not inventory.
   const description =
     count >= 3
-      ? `טיפול פסיכולוגי ונפשי ב${city}: רשימת ${count} פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`
-      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: רשימת פסיכולוגים ומטפלים מאומתים בטווח נסיעה קצר, או שאלון קצר לקבלת התאמה אישית. בחינם וללא התחייבות.`;
+      ? `טיפול פסיכולוגי ונפשי ב${city}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`
+      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: ${CREDENTIALS} בטווח נסיעה קצר, ו${QUIZ}. בחינם וללא התחייבות.`;
   const robots = cityIsIndexable(city, count, pool) ? undefined : { index: false, follow: true };
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -200,7 +199,6 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         nearby={nearbyCities}
         nearbyPlaces={nearbyCityNames}
         regionNearby={nearbyRegion}
-        onlineCount={onlineCount}
         regionName={region}
         articles={localArticles}
         articlesScope={articlesScope === "region" ? "region" : "place"}
