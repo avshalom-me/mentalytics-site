@@ -4049,13 +4049,17 @@ export default function KidsPage() {
   // the page really does discard everything. The browser's native confirm is
   // the whole protection. Off at the consent screen and at the report, whose
   // own back-from-profile restore is handled separately.
+  // The payment block replaces the whole page while `step` still names a
+  // question screen, so the guard has to know about it too - otherwise someone
+  // who hit the paywall gets warned about losing answers they cannot submit.
   useEffect(() => {
-    const guarded = step !== "p-consent" && step !== "p-result";
+    const onPaywall = paymentRequired || (usageAllowed === false && step !== "p-result");
+    const guarded = !onPaywall && step !== "p-consent" && step !== "p-result";
     if (!guarded) return;
     const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
-  }, [step]);
+  }, [step, paymentRequired, usageAllowed]);
 
   function goNext(newA: Ans = A) {
     setA(newA);
