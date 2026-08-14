@@ -472,13 +472,37 @@ function scoreTherapist(
       earned += WEIGHTS.locationOnline; // 100% — אותה עיר
       reasons.push("התאמה מלאה באזור");
     } else if (inSameRegion) {
-      earned += Math.round(WEIGHTS.locationOnline * 0.6); // 60% — אותו אזור
-      reasons.push("התאמה באזור");
+      // The 60% tier exists to rank "your region" below "your city" - but only
+      // when the patient named a city. Leaving the city on its "כל האזור"
+      // default made 100% unreachable, so the whole location signal collapsed
+      // to 6-vs-3 between the requested region and an adjacent one: less than a
+      // single cultural checkbox (5). A centre in the requested city therefore
+      // ranked below therapists an hour away. When no city was named, matching
+      // the region IS the exact answer to what was asked, and scores as such.
+      const regionIsTheAsk = !input.city;
+      earned += regionIsTheAsk
+        ? WEIGHTS.locationOnline
+        : Math.round(WEIGHTS.locationOnline * 0.6);
+      reasons.push(regionIsTheAsk ? "התאמה מלאה באזור" : "התאמה באזור");
     } else if (inAdjacentRegion) {
-      earned += Math.round(WEIGHTS.locationOnline * 0.3); // 30% — אזור סמוך
+      // 15%, halved from 30% on 14/8/2026. Measured over 2,607 match-card
+      // impressions: out-of-area therapists are opened 2.8x less often and
+      // contacted 4.2x less often than in-area ones. A neighbouring region can
+      // be an hour's drive for a weekly session, so it stays in the results as
+      // a fallback but should not compete with someone local.
+      earned += Math.round(WEIGHTS.locationOnline * 0.15);
       reasons.push("מטפל/ת מאזור סמוך");
     } else if (onlineMatch) {
-      earned += Math.round(WEIGHTS.locationOnline * 0.4); // 40% — אונליין בלבד
+      // An online-only request (no city, no region) has no geography to match
+      // against: the hard filter above already dropped everyone who does not
+      // work online, so every remaining therapist answers the request in full.
+      // Scoring them at 40% docked the whole result set for a preference they
+      // all satisfied. Asking for a region AND ticking online is different -
+      // there, being reachable online but not nearby is a partial answer.
+      const onlineIsTheWholeAsk = !input.city && !input.region;
+      earned += onlineIsTheWholeAsk
+        ? WEIGHTS.locationOnline
+        : Math.round(WEIGHTS.locationOnline * 0.4);
       reasons.push("מציע טיפול אונליין");
     } else if (patientRegion) {
       // Hard filter: no geographic match and user didn't request online → exclude

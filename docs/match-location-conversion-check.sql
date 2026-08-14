@@ -1,0 +1,139 @@
+-- Match-location conversion check
+-- =================================
+-- Re-runnable measurement of whether the location fixes deployed on 13-14/8/2026
+-- actually moved conversion. Run the four queries in order against the production
+-- Supabase project (xwbpfycslunuqjdashsf) and compare to the BASELINE below.
+--
+-- WHAT WAS BROKEN, and what each query tests
+-- ------------------------------------------
+-- The 100% location tier required an exact CITY match, but the city selector
+-- defaults to "כל האזור". Anyone who left it there could not reach 100%: the
+-- requested region scored 6/10 and a neighbouring region 3/10, so the whole
+-- geographic signal was a 3-point spread - less than one cultural checkbox (5).
+-- Therapists an hour away routinely outranked local ones.
+--
+-- Three changes shipped:
+--   b88321e (13/8)  region-only search: same region now scores 10/10, not 6/10
+--   2796b17 (14/8)  adjacent region 30% -> 15% of the location weight
+--   2796b17 (14/8)  online-only request: online therapists score 10/10, not 4/10
+--
+-- BASELINE, measured 14/8/2026 over 23/6-14/8 (2,607 match-card impressions,
+-- 260 sessions, both quizzes) - i.e. almost entirely PRE-fix:
+--   Q1 share of impressions out-of-area ....... 48.4%  (1,173 of 2,426)
+--   Q2 profile-open rate  in-area / out ....... 13.8% / 5.0%   (2.8x)
+--   Q2 contact rate       in-area / out .......  3.1% / 0.7%   (4.2x)
+--   Q3 sessions where an out-of-area therapist
+--      scored >= the best local one ........... 52 of 253 mixed sessions (20.6%)
+--      (local supply was absent in only 7 of 268 sessions overall)
+--   Q4 worst regions: center 21/107, jerusalem 15/68, sharon 9/52
+--
+-- WHAT "IT WORKED" LOOKS LIKE
+-- ---------------------------
+-- Q1 and Q3 should fall - fewer out-of-area therapists shown, and far fewer
+-- ranking at or above a local one. Q2's ratio should NOT be expected to close:
+-- people avoid travelling regardless of ranking, and that gap is the reason the
+-- fix matters, not a symptom of it. If Q3 has barely moved, check first that the
+-- deploys are live before concluding the fix failed.
+--
+-- CAVEAT ON READING THE POST-FIX WINDOW
+-- The baseline spans seven weeks; two weeks of post-fix data is a much smaller
+-- sample, and contact counts are low in absolute terms (42 contacts total in the
+-- baseline). Treat direction as the signal and resist precise deltas.
+--
+-- viewer_region is a coarse bucket written by normalizeRegionKey (adults) and
+-- normalizeKidsRegionKey (kids); the city_map below mirrors REGION_CITIES in
+-- app/lib/regions.ts collapsed onto those same buckets. If a city is added
+-- there, add it here too or its therapists silently drop out of the analysis.
+
+-- Shared prelude: paste this CTE at the top of each query below.
+-- WITH city_map(city, bucket) AS (VALUES
+--   ('תל אביב','center'),('רמת גן','center'),('גבעתיים','center'),('בני ברק','center'),
+--   ('פתח תקווה','center'),('הרצליה','center'),('רמת השרון','center'),('בת ים','center'),
+--   ('חולון','center'),('אור יהודה','center'),('קרית אונו','center'),('גבעת שמואל','center'),
+--   ('יהוד','center'),('גני תקווה','center'),('אלעד','center'),('שוהם','center'),
+--   ('ראשון לציון','center'),('רחובות','center'),('נס ציונה','center'),('מודיעין','center'),
+--   ('לוד','center'),('רמלה','center'),('יבנה','center'),('גדרה','center'),('קרית עקרון','center'),
+--   ('ירושלים','jerusalem'),('בית שמש','jerusalem'),('מבשרת ציון','jerusalem'),
+--   ('מעלה אדומים','jerusalem'),('אבו גוש','jerusalem'),
+--   ('כפר סבא','sharon'),('רעננה','sharon'),('הוד השרון','sharon'),('ראש העין','sharon'),
+--   ('כפר יונה','sharon'),('טייבה','sharon'),('קלנסווה','sharon'),('תל מונד','sharon'),
+--   ('נתניה','sharon'),('חדרה','sharon'),('פרדס חנה-כרכור','sharon'),('בנימינה','sharon'),
+--   ('זיכרון יעקב','sharon'),('עמק חפר','sharon'),('חריש','sharon'),('אור עקיבא','sharon'),
+--   ('קדימה-צורן','sharon'),('אבן יהודה','sharon'),
+--   ('חיפה','haifa'),('קריית אתא','haifa'),('קריית ביאליק','haifa'),('קריית מוצקין','haifa'),
+--   ('קריית ים','haifa'),('נשר','haifa'),('טירת כרמל','haifa'),
+--   ('עכו','north'),('נהריה','north'),('כרמיאל','north'),('צפת','north'),
+--   ('מעלות-תרשיחא','north'),('קריית שמונה','north'),('שלומי','north'),('כפר ורדים','north'),
+--   ('עפולה','north'),('נצרת','north'),('מגדל העמק','north'),('טבריה','north'),
+--   ('אום אל-פחם','north'),('בית שאן','north'),('יוקנעם','north'),('קריית טבעון','north'),
+--   ('באר שבע','south'),('אשדוד','south'),('אשקלון','south'),('קריית גת','south'),
+--   ('נתיבות','south'),('שדרות','south'),('קריית מלאכי','south'),('אופקים','south'),
+--   ('דימונה','south'),('אילת','south'),('ערד','south'),('מצפה רמון','south'),
+--   ('ירוחם','south'),('רהט','south'),
+--   ('אריאל','other'),('גוש עציון','other'),('ביתר עילית','other'),
+--   ('מודיעין עילית','other'),('אלפי מנשה','other')
+-- ),
+-- th AS (
+--   SELECT t.id, array_agg(DISTINCT cm.bucket) FILTER (WHERE cm.bucket IS NOT NULL) AS buckets
+--   FROM therapists t
+--   LEFT JOIN LATERAL unnest(t.regions) AS r(city) ON TRUE
+--   LEFT JOIN city_map cm ON cm.city = r.city
+--   GROUP BY t.id
+-- ),
+-- imp AS (
+--   SELECT v.session_id, v.therapist_id, v.viewer_region, v.match_score, v.viewed_at,
+--          (th.buckets @> ARRAY[v.viewer_region]) AS in_area
+--   FROM therapist_profile_views v
+--   JOIN th ON th.id = v.therapist_id
+--   WHERE v.source = 'match_card'
+--     AND v.viewer_region IS NOT NULL
+--     AND v.viewer_region NOT IN ('online','other')   -- no geography to compare
+--     AND th.buckets IS NOT NULL
+--     AND v.session_id IS NOT NULL
+--     -- POST-FIX WINDOW: uncomment to isolate it
+--     -- AND v.viewed_at >= '2026-08-14'
+-- )
+
+-- Q1 — Share of impressions that went to an out-of-area therapist.
+-- Baseline: 48.4% out-of-area.
+--   SELECT in_area, count(*) AS impressions, round(avg(match_score),1) AS avg_score,
+--          round(100.0*count(*)/sum(count(*)) OVER (),1) AS pct
+--   FROM imp GROUP BY 1 ORDER BY 1 DESC;
+
+-- Q2 — Does distance still cost conversion? (expected: yes, unchanged)
+-- Baseline: opens 13.8% vs 5.0%; contacts 3.1% vs 0.7%.
+--   SELECT i.in_area, count(*) AS shown_pairs,
+--          count(*) FILTER (WHERE EXISTS (SELECT 1 FROM therapist_profile_views p
+--            WHERE p.session_id=i.session_id AND p.therapist_id=i.therapist_id
+--              AND p.source='match')) AS opened_profile,
+--          count(*) FILTER (WHERE EXISTS (SELECT 1 FROM therapist_contact_clicks c
+--            WHERE c.session_id=i.session_id AND c.therapist_id=i.therapist_id)) AS contacted
+--   FROM (SELECT DISTINCT session_id, therapist_id, in_area FROM imp) i
+--   GROUP BY 1 ORDER BY 1 DESC;
+
+-- Q3 — THE HEADLINE. How often did a distant therapist outrank the best local one?
+-- Baseline: 52 of 253 mixed sessions (20.6%); only 7 of 268 sessions had no local
+-- supply, so a high number here is a ranking failure and not a shortage.
+--   , ps AS (
+--     SELECT session_id, viewer_region,
+--            max(match_score) FILTER (WHERE in_area) AS best_in,
+--            max(match_score) FILTER (WHERE NOT in_area) AS best_out,
+--            count(*) FILTER (WHERE in_area) AS n_in,
+--            count(*) FILTER (WHERE NOT in_area) AS n_out
+--     FROM imp GROUP BY 1,2
+--   )
+--   SELECT count(*) AS sessions,
+--          count(*) FILTER (WHERE n_in = 0) AS no_local_supply,
+--          count(*) FILTER (WHERE n_in > 0 AND n_out > 0) AS mixed_sessions,
+--          count(*) FILTER (WHERE n_in > 0 AND n_out > 0 AND best_out > best_in) AS out_ranked_first,
+--          count(*) FILTER (WHERE n_in > 0 AND n_out > 0 AND best_out = best_in) AS tied
+--   FROM ps;
+
+-- Q4 — Same, split by region, to see which areas still hurt.
+-- Baseline (out >= local / sessions): center 21/107, jerusalem 15/68,
+-- sharon 9/52, north 3/18, haifa 2/12, south 2/11.
+--   , ps AS ( ... same as Q3 ... )
+--   SELECT viewer_region, count(*) AS sessions,
+--          count(*) FILTER (WHERE best_in IS NOT NULL AND best_out IS NOT NULL
+--                             AND best_out >= best_in) AS out_at_or_above_local
+--   FROM ps GROUP BY 1 ORDER BY sessions DESC;
