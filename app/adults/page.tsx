@@ -422,13 +422,6 @@ export default function AdultsPage() {
   // the page really does discard everything. The browser's native confirm is
   // the whole protection. Off at the door and from the results onward, where
   // back-navigation is separately covered by the match-results restore.
-  useEffect(() => {
-    const guarded = screen !== "disclaimer" && !["results", "match-form", "match-results"].includes(screen);
-    if (!guarded) return;
-    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [screen]);
 
   const [scoring, setScoring] = useState<ScoringResult | null>(null);
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
@@ -449,6 +442,19 @@ export default function AdultsPage() {
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
+
+  // usageAllowed === false replaces the whole page with the payment block, so
+  // `screen` still says "e4" while the user is looking at a paywall. Warning
+  // them about losing answers they can no longer submit is just a nuisance.
+  useEffect(() => {
+    const guarded = usageAllowed !== false
+      && screen !== "disclaimer"
+      && !["results", "match-form", "match-results"].includes(screen);
+    if (!guarded) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [screen, usageAllowed]);
 
   // Build the recommendation groups once and share between the results screen,
   // the match-form/match-results strip, and any other consumer. Same grouping
