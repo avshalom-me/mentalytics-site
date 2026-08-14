@@ -219,7 +219,8 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
 
           {/* זהות המרכז */}
           <header className="pt-9 text-center">
-            <Link href="/centers" className="mb-7 inline-block text-[13.5px] text-[var(--muted)] hover:underline">← לכל המרכזים הטיפוליים</Link>
+            {/* /therapists ולא /centers - זה האינדקס למטופלים; /centers הוא עמוד שיווקי למרכזים */}
+            <Link href="/therapists" className="mb-7 inline-block text-[13.5px] text-[var(--muted)] hover:underline">← כל המטפלים</Link>
             {/* במובייל הלוגו כאן; בדסקטופ הוא גדול ודביק בעמודת הצד */}
             <div className="mb-6 flex justify-center lg:hidden">
               {assets.logoUrl ? (
