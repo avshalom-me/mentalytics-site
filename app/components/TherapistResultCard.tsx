@@ -79,6 +79,13 @@ export default function TherapistResultCard({
             classes, not from the tag. */}
         <p className="text-lg font-black text-stone-900 leading-tight group-hover:underline">{t.full_name}</p>
         {type && <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>{type}</div>}
+        {/* שיוך למרכז - טקסט בלבד ולא קישור: הכרטיס כולו עטוף ב-Link, ועוגן
+            בתוך עוגן אינו HTML תקין. הקישור לעמוד המרכז מופיע בפרופיל עצמו. */}
+        {!isCenter && t.center_name && (
+          <div className="mt-1.5 inline-flex items-center gap-1 text-[12.5px] font-semibold" style={{ color: "var(--muted)" }}>
+            <span aria-hidden>🏢</span> מצוות {t.center_name}
+          </div>
+        )}
         {snippet && <p className="mt-2 text-sm text-stone-600 leading-relaxed line-clamp-2">{snippet}</p>}
         <div className="mt-3 flex flex-wrap gap-1.5">
           {t.online && (
@@ -93,14 +100,13 @@ export default function TherapistResultCard({
       </div>
     </>
   );
-  return (
-    <CardImpression therapistId={t.id}>
-      {profileHref ? (
-        <Link href={profileHref} className={cardClass} style={cardStyle}>{Body}</Link>
-      ) : (
-        // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
-        <div className={cardClass} style={cardStyle}>{Body}</div>
-      )}
-    </CardImpression>
+  const card = profileHref ? (
+    <Link href={profileHref} className={cardClass} style={cardStyle}>{Body}</Link>
+  ) : (
+    // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
+    <div className={cardClass} style={cardStyle}>{Body}</div>
   );
+  // כרטיס מרכז מסלול-1 מסונתז מחשבון המרכז ואין לו שורת מטפל - דיווח חשיפה
+  // עליו היה נכשל על ה-FK של analytics_events.
+  return t.trackable === false ? card : <CardImpression therapistId={t.id}>{card}</CardImpression>;
 }

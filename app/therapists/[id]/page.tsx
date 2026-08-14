@@ -38,7 +38,25 @@ type TherapistRow = {
   license_number: string | null;
   publication_links: string[] | null;
   accepting_new_patients: boolean | null;
+  center_account_id: string | null;
 };
+
+/**
+ * המרכז שהמטפל/ת שייך/ת אליו - רק כשהעמוד הציבורי שלו חי (אותם תנאים
+ * שאוכף getPublicCenterBySlug), אחרת הקישור היה מוביל ל-404.
+ */
+async function getAffiliatedCenter(centerId: string | null): Promise<{ name: string; slug: string } | null> {
+  if (!centerId) return null;
+  const { data } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("name, slug")
+    .eq("id", centerId)
+    .eq("status", "active")
+    .not("slug", "is", null)
+    .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
+    .maybeSingle();
+  return data ? { name: data.name as string, slug: data.slug as string } : null;
+}
 
 async function getTherapist(id: string): Promise<TherapistRow | null> {
   const { data, error } = await supabaseAdmin
@@ -49,7 +67,7 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
       regions, cultural_prefs, arrangements, languages, age_groups,
       phone, email, profile_photo_path, education, experience,
       license_number, publication_links,
-      accepting_new_patients
+      accepting_new_patients, center_account_id
     `)
     .eq("id", id)
     .in("status", ["approved", "paying"])
@@ -195,9 +213,10 @@ export default async function TherapistProfilePage({
   }
 
   const unavailable = therapistRow.accepting_new_patients === false;
-  const [articles, similar] = await Promise.all([
+  const [articles, similar, affiliatedCenter] = await Promise.all([
     getTherapistArticles(id),
     unavailable ? getSimilarTherapists(therapistRow) : Promise.resolve([]),
+    getAffiliatedCenter(therapistRow.center_account_id),
   ]);
   const t = therapistRow;
   const name = t.full_name ?? "מטפל";
@@ -283,6 +302,17 @@ export default async function TherapistProfilePage({
                 style={{ border: "1px solid var(--teal)", color: "var(--teal-dark)" }}>✓ מאומת</span>
             </div>
             {type && <p className="mt-1.5" style={{ fontSize: "clamp(1.05rem,2.5vw,1.35rem)", fontWeight: 700, color: "var(--gold-dark)" }}>{type}</p>}
+            {/* שיוך למרכז - שער דו-כיווני: מעמוד המרכז מגיעים למטפל/ת, ומכאן
+                חזרה למרכז ולשאר הצוות. מוצג רק כשלמרכז יש עמוד ציבורי חי. */}
+            {affiliatedCenter && (
+              <p className="mt-2.5">
+                <Link href={`/centers/${affiliatedCenter.slug}`}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3.5 py-1.5 text-[13.5px] font-bold transition hover:bg-[var(--teal-pale)]"
+                  style={{ border: "1px solid var(--line)", color: "var(--teal-dark)" }}>
+                  <span aria-hidden>🏢</span> מצוות {affiliatedCenter.name}
+                </Link>
+              </p>
+            )}
 
             {quickFacts.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">

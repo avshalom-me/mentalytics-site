@@ -41,10 +41,18 @@ type TherapistRow = {
   accepting_new_patients: boolean | null;
   /** 'center' = שורת ישות-מרכז (מסלול 2). מוצגת ככרטיס מרכז, לא כמטפל. */
   entity_type: string | null;
+  /**
+   * כרטיס מרכז מסלול-1: שורה מסונתזת מחשבון המרכז, לא שורה אמיתית בטבלת
+   * therapists (למסלול הזה אין ישות - כל מטפל עומד בפני עצמו). מסומנת כדי
+   * שתדורג בשכבת "מטפלי מרכז" ולא בשכבת המנויים הפרטיים, ושלא ידווחו עליה
+   * חשיפות (ל-analytics_events יש FK ל-therapists - מזהה שאינו קיים שם היה
+   * מפיל כל insert בשקט).
+   */
+  synthetic_center?: boolean;
 };
 
-/** slug + לוגו של מרכז, לכרטיס ישות במאגר. */
-type CenterCard = { slug: string | null; logoUrl: string | null };
+/** slug, שם ולוגו של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
+type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null };
 
 function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
@@ -64,7 +72,8 @@ function tierOf(t: TherapistRow): number {
 
 async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): Promise<PublicTherapist> {
   const isEntity = t.entity_type === "center";
-  const card = isEntity && t.center_account_id ? centerCards?.get(t.center_account_id) : undefined;
+  // גם למטפל בודד - שם ה-slug של המרכז מזינים את השיוך "מצוות X".
+  const card = t.center_account_id ? centerCards?.get(t.center_account_id) : undefined;
 
   let profile_photo_url: string | null = null;
   if (isEntity) {
@@ -96,23 +105,34 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     tier: tierOf(t),
     accepting_new_patients: t.accepting_new_patients !== false,
     is_center: isEntity,
+    // ה-slug משמש לשני דברים: יעד הקישור של כרטיס מרכז, והשיוך הגלוי על כרטיס
+    // מטפל ("מצוות X"). בשני המקרים הוא נשלף רק כשלמרכז יש עמוד ציבורי חי.
     center_slug: card?.slug ?? null,
+    ...(!isEntity && card?.name ? { center_name: card.name } : {}),
+    // כרטיס מסלול-1 מסונתז: אין לו שורת מטפל, ולכן אסור לדווח עליו חשיפה.
+    ...(t.synthetic_center ? { trackable: false as const } : {}),
   };
 }
 
-/** slug ולוגו חתום לכל מרכז שמופיע ברשימה כישות. */
+/**
+ * נתוני המרכז לכל שורה שמשויכת למרכז - גם ישות (הכרטיס עצמו) וגם מטפל בודד
+ * (השיוך "מצוות X"). נטענים רק מרכזים שהעמוד הציבורי שלהם חי, באותם תנאים
+ * שאוכף getPublicCenterBySlug: אחרת היה נוצר קישור ל-404.
+ */
 async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, CenterCard>> {
   const ids = [...new Set(
-    rows.filter((t) => t.entity_type === "center" && t.center_account_id)
-      .map((t) => t.center_account_id as string),
+    rows.filter((t) => t.center_account_id).map((t) => t.center_account_id as string),
   )];
   const map = new Map<string, CenterCard>();
   if (ids.length === 0) return map;
 
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, slug, logo_path")
-    .in("id", ids);
+    .select("id, name, slug, logo_path")
+    .in("id", ids)
+    .eq("status", "active")
+    .not("slug", "is", null)
+    .or("public_page_enabled.eq.true,billing_track.eq.center_entity");
   const withLogo = (data ?? []).filter((c) => c.logo_path);
   const signedByPath = new Map<string, string>();
   if (withLogo.length > 0) {
@@ -125,10 +145,83 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
   for (const c of data ?? []) {
     map.set(c.id as string, {
       slug: (c.slug as string) ?? null,
+      name: (c.name as string) ?? null,
       logoUrl: c.logo_path ? signedByPath.get(c.logo_path as string) ?? null : null,
     });
   }
   return map;
+}
+
+/**
+ * כרטיסי מרכז למסלול 1 (מטפלים בנפרד). למסלול הזה אין שורת ישות ב-therapists,
+ * ולכן עד כה המרכז עצמו נעדר לגמרי מהמאגר ומעמודי האזור - רק המטפלים שלו הופיעו,
+ * בלי שום דרך להגיע ממנו לעמוד המרכז. כאן נבנית שורה מסונתזת לכל מרכז כזה
+ * שהעמוד הציבורי שלו חי ויש לו לפחות מטפל אחד מוצג.
+ *
+ * האזורים והמקצועות נגזרים מהמטפלים המוצגים של המרכז בלבד - עובדה, לא הצהרה
+ * שיווקית של המרכז על עצמו. הדירוג נעשה בשכבת "מטפלי מרכז" (ולא בשכבת המנויים
+ * הפרטיים כמו ישות מסלול-2): במסלול 1 המרכז כבר מיוצג ברשימה דרך המטפלים שלו,
+ * וכרטיס נוסף מעל מנוי פרטי מלא היה מטה את ההוגנות.
+ */
+async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
+  const { data: centers } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("id, name, slug, public_description")
+    .eq("status", "active")
+    .eq("public_page_enabled", true)
+    .neq("billing_track", "center_entity")
+    .not("slug", "is", null);
+  if (!centers || centers.length === 0) return [];
+
+  const { data: members } = await supabaseAdmin
+    .from("therapists")
+    .select("center_account_id, regions, online, therapist_types")
+    .in("center_account_id", centers.map((c) => c.id as string))
+    .in("status", ["approved", "paying"])
+    .eq("admin_approved", true)
+    .neq("entity_type", "center");
+
+  const byCenter = new Map<string, { regions: Set<string>; types: Set<string>; online: boolean; count: number }>();
+  for (const m of members ?? []) {
+    const key = m.center_account_id as string;
+    const agg = byCenter.get(key) ?? { regions: new Set<string>(), types: new Set<string>(), online: false, count: 0 };
+    for (const r of (m.regions as string[] | null) ?? []) if (r) agg.regions.add(r);
+    for (const t of (m.therapist_types as string[] | null) ?? []) if (t) agg.types.add(t);
+    agg.online = agg.online || m.online === true;
+    agg.count++;
+    byCenter.set(key, agg);
+  }
+
+  return centers.flatMap((c) => {
+    const agg = byCenter.get(c.id as string);
+    // בלי מטפלים מוצגים אין למרכז נוכחות אמיתית במאגר - ולא נגזרים לו אזורים.
+    if (!agg || agg.count === 0 || agg.regions.size === 0) return [];
+    return [{
+      // תחילית "center:" - מזהה שאינו UUID של מטפל, כדי שלא יתנגש ולא ידלוף
+      // לשום נתיב שמצפה למזהה מטפל אמיתי. ראו synthetic_center.
+      id: `center:${c.id as string}`,
+      full_name: (c.name as string) ?? "",
+      phone: null,
+      bio: (c.public_description as string) ?? null,
+      gender: null,
+      online: agg.online,
+      therapist_types: [...agg.types],
+      training_areas: null,
+      assessment_types: null,
+      regions: [...agg.regions],
+      cultural_prefs: null,
+      arrangements: null,
+      age_groups: null,
+      profile_photo_path: null,
+      status: "paying",
+      promotion_source: "center",
+      center_account_id: c.id as string,
+      created_at: null,
+      accepting_new_patients: true,
+      entity_type: "center",
+      synthetic_center: true,
+    } satisfies TherapistRow];
+  });
 }
 
 // Loads publicly-listed therapists (paying + approved, admin-vetted), ordered
@@ -256,10 +349,45 @@ export function cityIsIndexable(city: string, inCity: number, pool: number): boo
   return pool >= MIN_POOL_FOR_INDEX && !(city in CITY_POOL_EXCLUDED);
 }
 
+/**
+ * האם לצרף לתצוגה הזו כרטיסי מרכז של מסלול 1. רק במאגר הכללי ובעמודי
+ * אזור/עיר/אונליין - העמודים שבהם השאלה היא "מי נותן טיפול כאן".
+ *
+ * לא בעמודי גישה/אבחון/הסדר/נושא: לכרטיס המרכז אין הצהרה משלו על גישות
+ * טיפול (במסלול 1 המרכז אינו נרשם להתאמות), וגזירה מהמטפלים הייתה מייצרת
+ * הבטחה שהמרכז לא נתן. גם לא בעמוד מרכז (centerId) - מרכז אינו חבר בצוות
+ * של עצמו, ולא ברשימת הפרה-רפואיים.
+ */
+function centerCardsAllowed(filter?: DirectoryFilter): boolean {
+  if (!filter) return true;
+  if (filter.centerId || filter.category === "para") return false;
+  return !filter.specialty && !filter.assessmentType && !filter.arrangement
+    && !filter.trainingAreasAny?.length && !filter.ageGroupsAny?.length;
+}
+
+/** סינון כרטיס מרכז מסלול-1 לפי הכיסוי שנגזר ממטפליו. */
+function centerRowMatches(row: TherapistRow, filter?: DirectoryFilter): boolean {
+  if (filter?.online && row.online !== true) return false;
+  if (filter?.region && !rowInRegion(row.regions, filter.region)) return false;
+  if (filter?.city && !(row.regions ?? []).includes(filter.city)) return false;
+  if (filter?.citiesAny?.length) {
+    const wanted = new Set(filter.citiesAny);
+    if (!(row.regions ?? []).some((c) => wanted.has(c))) return false;
+  }
+  return true;
+}
+
 export async function loadPublicTherapists(
   filter?: DirectoryFilter
 ): Promise<PublicTherapist[]> {
-  const allRows = await loadFilteredRows(filter);
+  const [therapistRows, centerRows] = await Promise.all([
+    loadFilteredRows(filter),
+    centerCardsAllowed(filter) ? loadTrack1CenterRows() : Promise.resolve([]),
+  ]);
+  // ההזרקה כאן ולא ב-loadFilteredRows במכוון: אותה פונקציה מזינה גם את מוני
+  // countListed*, שמהם נגזר שער האינדוקס של עמודי הערים. כרטיס מרכז אינו
+  // מטפל, ולא צריך לפתוח עמוד עיר לאינדוקס בזכות עצמו.
+  const allRows = [...therapistRows, ...centerRows.filter((r) => centerRowMatches(r, filter))];
 
   // Therapists not accepting new patients stay listed but always sort last -
   // no point showcasing someone patients can't currently reach.
@@ -283,7 +411,9 @@ export async function loadPublicTherapists(
   // לדרגת "מטפלי מרכז" שמתחתיה: המרכז הוא הלקוח המשלם עצמו (כאן ₪80×3
   // לחודש), וכרטיס אחד מייצג מרפאה שלמה. הדרגה שמתחת נשארת למטפלים בודדים
   // שמקודמים דרך מנוי המרכז - הטבה, לא לקוח.
-  const isEntity = (t: TherapistRow) => t.entity_type === "center";
+  // ישות מסלול-2 בלבד. כרטיס מסלול-1 המסונתז נשאר בשכבת "מטפלי מרכז" שמתחת -
+  // שם ממילא יושבים המטפלים שלו, ולכן הוא אינו דוחק מנוי פרטי מלא למטה.
+  const isEntity = (t: TherapistRow) => t.entity_type === "center" && !t.synthetic_center;
   const isPaid = (t: TherapistRow) =>
     t.status === "paying" && (t.promotion_source === "paid" || isEntity(t));
   const isCenter = (t: TherapistRow) =>
@@ -322,5 +452,10 @@ export async function loadPublicTherapists(
   // 'paying' + promotion_source 'center'), כלומר מיד אחרי המנויים הפרטיים
   // ובתוך אותה רוטציה יומית - בדיוק "אחד המקומות הראשונים בתורנות".
   const centerCards = await loadCenterCards(ordered);
-  return Promise.all(ordered.map((t) => signRow(t, centerCards)));
+  const signed = await Promise.all(ordered.map((t) => signRow(t, centerCards)));
+  // בעמוד המרכז עצמו השיוך מיותר: כל כרטיס היה אומר "מצוות X" בזמן שהמבקר
+  // כבר נמצא בעמוד של X, וגם מקשר חזרה לעמוד שהוא עומד בו.
+  return filter?.centerId
+    ? signed.map(({ center_name: _omit, ...rest }) => rest)
+    : signed;
 }

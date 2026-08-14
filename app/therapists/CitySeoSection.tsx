@@ -58,7 +58,7 @@ function topSpecialties(therapists: PublicTherapist[]): string[] {
 export default function CitySeoSection({
   placeName,
   kind,
-  therapists,
+  therapists: therapistsProp,
   onlineCount,
   regionName,
   articles = [],
@@ -84,6 +84,10 @@ export default function CitySeoSection({
   regionNearby?: PublicTherapist[];
 }) {
   const h = hashPlace(placeName);
+  // כרטיסי מרכז אינם מטפלים: הם מוצגים ברשימה, אבל "רשימת N מטפלים מאומתים",
+  // פילוח ההכשרות ופילוח המגדר מתארים בני אדם. ספירתם שם הייתה מנפחת את
+  // המספר שאנחנו מפרסמים ומכניסה למניין המגדרי ישות חסרת מגדר.
+  const therapists = therapistsProp.filter((t) => !t.is_center);
   const total = therapists.length;
   // The breakdown must describe what the page ACTUALLY lists, otherwise the text
   // undercounts the grid above it. An earlier version gated this on `total >= 3`

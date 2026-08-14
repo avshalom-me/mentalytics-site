@@ -176,13 +176,18 @@ export function useFilterTrack() {
 
 const impressedThisSession = new Set<string>();
 
-export function useImpressionTrack(therapistId: string, position?: number) {
+/**
+ * therapistId = null משבית את המעקב: כרטיס מרכז של מסלול 1 מסונתז מחשבון
+ * המרכז ואין לו שורה ב-therapists, ול-analytics_events יש FK לטבלה הזו -
+ * דיווח עליו היה נדחה בשקט בכל גלילה.
+ */
+export function useImpressionTrack(therapistId: string | null, position?: number) {
   const ref = useRef<HTMLDivElement>(null);
   const tracked = useRef(false);
 
   useEffect(() => {
     const el = ref.current;
-    if (!el || tracked.current || impressedThisSession.has(therapistId)) return;
+    if (!therapistId || !el || tracked.current || impressedThisSession.has(therapistId)) return;
 
     const observer = new IntersectionObserver(
       ([entry]) => {

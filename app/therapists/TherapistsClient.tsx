@@ -63,7 +63,16 @@ export type PublicTherapist = {
   accepting_new_patients: boolean;
   /** ישות-מרכז (מסלול 2): כרטיס מרכז, לא מטפל - מקשר ל-/centers/<slug>. */
   is_center?: boolean;
+  /** יעד הקישור של כרטיס מרכז, וגם יעד השיוך על כרטיס מטפל. מלא רק כשהעמוד חי. */
   center_slug?: string | null;
+  /** שם המרכז שהמטפל/ת שייך/ת אליו - מוצג כשיוך ("מצוות X") על כרטיס מטפל. */
+  center_name?: string | null;
+  /**
+   * false = לכרטיס אין שורת מטפל אמיתית (כרטיס מרכז מסלול-1) ולכן אין לדווח
+   * עליו חשיפה: ל-analytics_events יש FK ל-therapists, ומזהה מסונתז היה מפיל
+   * כל insert בשקט.
+   */
+  trackable?: boolean;
 };
 
 // Fisher-Yates shuffle within each tier, preserving tier order (paying → gift →
@@ -109,7 +118,7 @@ function TherapistCard({
   brokenImages: Record<string, boolean>;
   setBrokenImages: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
 }) {
-  const impressionRef = useImpressionTrack(t.id, position);
+  const impressionRef = useImpressionTrack(t.trackable === false ? null : t.id, position);
   const retryCount = useRef(0);
   const imgRef = useRef<HTMLImageElement>(null);
   const [messageOpen, setMessageOpen] = useState(false);
@@ -174,6 +183,13 @@ function TherapistCard({
               {/* למרכז אין מגדר - הטיה מגדרית של התואר ("פסיכולוגית קלינית")
                   על שם של מוסד היא פשוט שגויה. */}
               {isCenter ? t.therapist_types.slice(0, 2).join(" · ") : genderTitle(t.therapist_types[0], t.gender)}
+            </div>
+          )}
+          {/* שיוך למרכז - טקסט בלבד: הכרטיס עטוף בקישור, ועוגן בתוך עוגן אינו
+              HTML תקין. הקישור עצמו לעמוד המרכז נמצא בפרופיל המטפל/ת. */}
+          {!isCenter && t.center_name && (
+            <div className="mt-1 text-[12.5px] font-semibold" style={{ color: "var(--muted)" }}>
+              🏢 מצוות {t.center_name}
             </div>
           )}
           {snippet && (
