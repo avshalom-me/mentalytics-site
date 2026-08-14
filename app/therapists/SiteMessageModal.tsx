@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
@@ -82,7 +83,9 @@ export default function SiteMessageModal({
 
   if (!open) return null;
 
-  return (
+  // portal ל-body: בלעדיו, אב עם backdrop-filter/transform (למשל פס הקשר
+  // הדביק בעמוד מרכז) הופך ל-containing block של ה-fixed והמודאל נחתך בתוכו.
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
@@ -186,6 +189,7 @@ export default function SiteMessageModal({
           </>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
