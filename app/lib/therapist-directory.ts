@@ -158,10 +158,12 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
  * בלי שום דרך להגיע ממנו לעמוד המרכז. כאן נבנית שורה מסונתזת לכל מרכז כזה
  * שהעמוד הציבורי שלו חי ויש לו לפחות מטפל אחד מוצג.
  *
- * האזורים והמקצועות נגזרים מהמטפלים המוצגים של המרכז בלבד - עובדה, לא הצהרה
- * שיווקית של המרכז על עצמו. הדירוג נעשה בשכבת "מטפלי מרכז" (ולא בשכבת המנויים
- * הפרטיים כמו ישות מסלול-2): במסלול 1 המרכז כבר מיוצג ברשימה דרך המטפלים שלו,
- * וכרטיס נוסף מעל מנוי פרטי מלא היה מטה את ההוגנות.
+ * האזורים נגזרים מהמטפלים המוצגים של המרכז - עובדה, לא הצהרה שיווקית של המרכז
+ * על עצמו. מקצוע *לא* נגזר: תואר כמו "עו"ס קליני" מתאר אדם, והדבקתו מתחת לשם
+ * של מוסד פשוט שגויה (מכון אינו עו"ס). תג "מרכז טיפולי" על התמונה כבר אומר
+ * מה זה. הדירוג נעשה בשכבת "מטפלי מרכז" (ולא בשכבת המנויים הפרטיים כמו ישות
+ * מסלול-2): במסלול 1 המרכז כבר מיוצג ברשימה דרך המטפלים שלו, וכרטיס נוסף מעל
+ * מנוי פרטי מלא היה מטה את ההוגנות.
  */
 async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
   const { data: centers } = await supabaseAdmin
@@ -175,18 +177,17 @@ async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
 
   const { data: members } = await supabaseAdmin
     .from("therapists")
-    .select("center_account_id, regions, online, therapist_types")
+    .select("center_account_id, regions, online")
     .in("center_account_id", centers.map((c) => c.id as string))
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .neq("entity_type", "center");
 
-  const byCenter = new Map<string, { regions: Set<string>; types: Set<string>; online: boolean; count: number }>();
+  const byCenter = new Map<string, { regions: Set<string>; online: boolean; count: number }>();
   for (const m of members ?? []) {
     const key = m.center_account_id as string;
-    const agg = byCenter.get(key) ?? { regions: new Set<string>(), types: new Set<string>(), online: false, count: 0 };
+    const agg = byCenter.get(key) ?? { regions: new Set<string>(), online: false, count: 0 };
     for (const r of (m.regions as string[] | null) ?? []) if (r) agg.regions.add(r);
-    for (const t of (m.therapist_types as string[] | null) ?? []) if (t) agg.types.add(t);
     agg.online = agg.online || m.online === true;
     agg.count++;
     byCenter.set(key, agg);
@@ -205,7 +206,7 @@ async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
       bio: (c.public_description as string) ?? null,
       gender: null,
       online: agg.online,
-      therapist_types: [...agg.types],
+      therapist_types: [],
       training_areas: null,
       assessment_types: null,
       regions: [...agg.regions],
