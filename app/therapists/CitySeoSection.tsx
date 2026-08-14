@@ -113,7 +113,15 @@ export default function CitySeoSection({
 
   // Live-data supply paragraph - this is what makes each page genuinely unique.
   const typesText = types.map((t) => `${t.label} (${t.count})`).join(" · ");
+  // Two sentences, deliberately. Google quotes roughly the first 160 characters
+  // of whichever passage it picks, and for "פסיכולוג מומלץ ב..." queries it
+  // picks THIS paragraph over the meta description. So the opening sentence has
+  // to be prose a person would want to click, and everything that reads like a
+  // spreadsheet - the credential breakdown with its "(9) · (8) ·" - moves to the
+  // second sentence, past the cut. (12/8/26: the Jerusalem SERP was quoting
+  // "לפי הכשרה: מטפל/ת בהבעה ויצירה (9) · עו״ס קליני (8)" as our shop window.)
   const statsBits: string[] = [];
+  const detailBits: string[] = [];
   // Where the extra cards came from, named. Adjacent cities are listed by name;
   // the wider-region fallback can only be described by its region.
   const alsoBits: string[] = [];
@@ -146,11 +154,11 @@ export default function CitySeoSection({
             : `${inPlace} מוצג כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
     );
     statsBits.push(...alsoBits);
-    if (typesText) statsBits.push(alsoBits.length > 0 ? `לפי הכשרה, בכל הרשימה יחד: ${typesText}` : `לפי הכשרה: ${typesText}`);
     if (kind !== "online" && onlineHere > 0) statsBits.push(`${onlineHere} מתוכם מטפלים גם אונליין`);
-    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
-    if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-    statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
+    if (typesText) detailBits.push(alsoBits.length > 0 ? `לפי הכשרה, בכל הרשימה יחד: ${typesText}` : `לפי הכשרה: ${typesText}`);
+    if (women > 0 && men > 0) detailBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
+    if (specialties.length >= 2) detailBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
+    detailBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else if (alsoShown.length > 0) {
     const where =
       nearby.length > 0
@@ -159,15 +167,21 @@ export default function CitySeoSection({
     statsBits.push(
       `${inPlace} עצמה טרם נרשמו מטפלים במאגר, אך ${where} מוצגים כרגע ${alsoShown.length} מטפלים מאומתים`
     );
-    if (typesText) statsBits.push(`לפי הכשרה: ${typesText}`);
-    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
-    if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-    statsBits.push(`ובנוסף ${onlineCount} מטפלים זמינים אונליין מכל מקום`);
+    if (typesText) detailBits.push(`לפי הכשרה: ${typesText}`);
+    if (women > 0 && men > 0) detailBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
+    if (specialties.length >= 2) detailBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
+    detailBits.push(`ובנוסף ${onlineCount} מטפלים זמינים אונליין מכל מקום`);
   } else {
     statsBits.push(`ההיצע ${inPlace} מתעדכן - בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
     if (regionName) statsBits.push(`ומטפלים נוספים באזור ${regionName}`);
   }
-  const statsParagraph = `${statsBits.join(", ")}. הרשימה מתעדכנת באופן שוטף.`;
+  const statsParagraph = [
+    `${statsBits.join(", ")}.`,
+    detailBits.length > 0 ? `${detailBits.join(", ")}.` : "",
+    "הרשימה מתעדכנת באופן שוטף.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   // FAQ - phrasing varies by place hash; the content stays honest and generic-
   // free (no invented city facts, no fake price differences between cities).
