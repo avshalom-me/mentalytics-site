@@ -488,12 +488,12 @@ export async function POST(req: NextRequest) {
   }
 
   const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice(0, max) : "");
-  // נתיב תמונת-מרכז חוקי: רק מתוך תיקיית center-assets. חוסם שתילת נתיב שרירותי
-  // מה-bucket (למשל תעודה של מטפל) שהיה נחתם ומוצג בעמוד הציבורי.
-  // חייב להתחיל ב-center-assets/ *ובלי* קטעי .. - אחרת נתיב כמו
-  // "center-assets/../certificates/x.pdf" היה נחתם ומוצג בעמוד הציבורי.
+  // נתיב תמונת-מרכז חוקי: רק קבצים שהמרכז הזה עצמו העלה (ההעלאה שומרת תמיד
+  // בפורמט center-assets/<center.id>-...). חוסם גם שתילת נתיב שרירותי מה-bucket
+  // (תעודה של מטפל) וגם הפניה לתמונות של מרכז אחר. בדיקת ה-.. נשארת בנפרד -
+  // "center-assets/<id>-x/../../certificates/y" עובר את בדיקת הקידומת לבדה.
   const assetPath = (v: unknown): string | null =>
-    typeof v === "string" && v.startsWith("center-assets/") && v.length <= 300 && !v.split("/").includes("..")
+    typeof v === "string" && v.startsWith(`center-assets/${center.id}-`) && v.length <= 300 && !v.split("/").includes("..")
       ? v
       : null;
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
