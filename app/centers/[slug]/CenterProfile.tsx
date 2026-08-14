@@ -1,19 +1,26 @@
 import Link from "next/link";
-import { MapPin, Globe, Phone, BadgeCheck, Clock, Accessibility, Languages, Handshake, Navigation } from "lucide-react";
+import { MapPin, Globe, Phone, BadgeCheck, Clock, Accessibility, Languages, Handshake, Navigation, ArrowLeft } from "lucide-react";
 import { treatmentExplainer } from "@/app/lib/treatment-explainers";
 import type { PublicCenter } from "@/app/lib/center-public";
 import { telHref as telHrefFor, phoneNationalDigits } from "@/app/lib/phone";
+import { therapistPath } from "@/app/lib/therapist-url";
+import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
+import TherapistResultCard from "@/app/components/TherapistResultCard";
 import TrackView from "@/app/therapists/[id]/TrackView";
 import CenterMessageButton from "./CenterMessageButton";
 import CenterPhoneLink from "./CenterPhoneLink";
 import CenterWhatsAppLink from "./CenterWhatsAppLink";
 
-// עמוד ציבורי למרכז מסלול-2 (מרכז כישות) - עיצוב "הקשתות": המנהלים למעלה
-// בפורטרטים גדולים בצורת קשת (מוטיב ה-ח' מהלוגו), פס אנשים עם כיפה מעוגלת,
-// פס עובדות "גשר", עמודת צד דביקה בדסקטופ (לוגו גדול, יצירת קשר ומידע
-// פרקטי), CTA כהה ופס קשר דביק במובייל. אין כאן שאלון התאמה - הפנייה למרכז
-// ישירה (וואטסאפ / הודעה / טלפון). כל סקציה נעלמת בשקט כשהשדות שלה לא מולאו
-// בעורך הפרופיל - אין תוכן מומצא.
+// העמוד הציבורי של מרכז טיפולי, בעיצוב "הקשתות": המנהלים למעלה בפורטרטים
+// גדולים בצורת קשת (מוטיב ה-ח' מהלוגו), פס אנשים עם כיפה מעוגלת, פס עובדות
+// "גשר", עמודת צד דביקה בדסקטופ (לוגו גדול, יצירת קשר ומידע פרקטי), CTA כהה
+// ופס קשר דביק במובייל. משרת את שני המסלולים, עם הבדל מהותי אחד:
+//   מסלול 2 (מרכז כישות)  - הפנייה ישירה למרכז (וואטסאפ/הודעה/טלפון עם מעקב
+//                            על ישות-המרכז), בלי שאלון התאמה ובלי רשימת מטפלים.
+//   מסלול 1 (מטפלים בנפרד) - רשימת המטפלים עם קישור לעמוד האישי היא הלב;
+//                            שאלון ההתאמה נשאר (ההתאמות מגיעות למטפלים), אין
+//                            הודעה/מעקב ברמת המרכז (אין שורת ישות).
+// כל סקציה נעלמת בשקט כשהשדות שלה לא מולאו בעורך הפרופיל - אין תוכן מומצא.
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -78,12 +85,14 @@ function ArcTitle({ title, sub, arcColor = "var(--gold)" }: { title: string; sub
   );
 }
 
-export default function EntityProfile({ center, entity, assets, viewSource }: {
+export default function CenterProfile({ center, entity, assets, viewSource, therapists }: {
   center: PublicCenter;
   entity: EntityRow | null;
   assets: Assets;
   viewSource: "match" | "directory";
+  therapists: PublicTherapist[];
 }) {
+  const isEntity = center.billing_track === "center_entity";
   const offerChips = Array.from(
     new Set([...(entity?.training_areas ?? []), ...(entity?.therapist_types ?? [])].map((s) => String(s).trim()).filter(Boolean)),
   );
@@ -165,6 +174,9 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
       : {}),
     ...(websiteHref ? { sameAs: [websiteHref] } : {}),
     ...(center.public_phone ? { telephone: center.public_phone } : {}),
+    ...(therapists.length > 0
+      ? { employee: therapists.map((t) => ({ "@type": "Person", name: t.full_name, url: `${BASE}${therapistPath(t.id, t.full_name)}` })) }
+      : {}),
   };
 
   const phone = center.public_phone?.trim() || null;
@@ -336,6 +348,23 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
             </section>
           )}
 
+          {/* המטפלים של המרכז (מסלול 1) - הלב של העמוד: לכל מטפל/ת עמוד אישי */}
+          {!isEntity && (
+            <section id="therapists" className="pt-20" style={{ scrollMarginTop: "90px" }}>
+              <ArcTitle title={`המטפלים של ${center.name}`} sub="לכל מטפל/ת עמוד אישי עם פרטים מלאים ויצירת קשר ישירה." />
+              {therapists.length === 0 ? (
+                <div className="mx-auto max-w-[680px] rounded-2xl border border-[var(--line)] bg-white p-6 text-center text-[15.5px] leading-8 text-[var(--text-2)]">
+                  רשימת המטפלים של המרכז תתעדכן בקרוב. בינתיים אפשר למלא{" "}
+                  <Link href="/adults" className="font-semibold text-[var(--teal-dark)] hover:underline">שאלון התאמה</Link> ולקבל התאמה אישית.
+                </div>
+              ) : (
+                <div className={`grid gap-4 ${therapists.length === 1 ? "mx-auto max-w-[380px]" : "sm:grid-cols-2 xl:grid-cols-3"}`}>
+                  {therapists.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/centers/${center.slug}`} />)}
+                </div>
+              )}
+            </section>
+          )}
+
           {/* מה המרכז מציע */}
           {showOffer && (
             <section className="pt-20">
@@ -481,6 +510,21 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
               </div>
             )}
 
+            {/* המטפלים במרכז (מסלול 1) - מונה + קפיצה לרשימה; עזר ניווט לדסקטופ */}
+            {!isEntity && therapists.length > 0 && (
+              <div className="hidden rounded-[24px] border border-[var(--line)] bg-white p-6 text-center shadow-[0_14px_36px_rgba(42,100,98,.09)] lg:block">
+                <p className="text-[13px] font-extrabold uppercase tracking-[.14em] text-[var(--muted)]">המטפלים במרכז</p>
+                <p className="mt-3 text-[2.2rem] font-black leading-none text-[var(--teal)]">{therapists.length}</p>
+                <p className="mt-1.5 text-[13px] font-semibold text-[var(--text-2)]">
+                  {therapists.length === 1 ? "מטפל/ת עם עמוד אישי באתר" : "מטפלים עם עמוד אישי באתר"}
+                </p>
+                <a href="#therapists"
+                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-5 py-2.5 text-[14px] font-extrabold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)]">
+                  לרשימת המטפלים ↓
+                </a>
+              </div>
+            )}
+
             {/* מידע פרקטי - בדסקטופ בצד; במובייל בסוף העמוד */}
             {hasPractical && (
               <div className="rounded-[24px] border border-[var(--line)] bg-white p-6 shadow-[0_14px_36px_rgba(42,100,98,.09)]">
@@ -551,8 +595,9 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
         </aside>
       </div>
 
-      {/* CTA כהה - הסגירה, ברוחב מלא */}
-      {hasAnyContact && (
+      {/* CTA כהה - הסגירה, ברוחב מלא. מסלול 2: פנייה ישירה; מסלול 1: שאלון
+          ההתאמה (ההתאמות מגיעות למטפלי המרכז) לצד ערוצי הקשר של המרכז */}
+      {(isEntity ? hasAnyContact : true) && (
         <section className="relative mt-24 overflow-hidden px-5 py-24 text-center"
           style={{ background: "linear-gradient(135deg,#245654 0%,var(--teal-dark) 55%,#31716F 100%)", borderRadius: "50% 50% 0 0 / 58px 58px 0 0" }}>
           <svg className="pointer-events-none absolute inset-0 h-full w-full opacity-50" viewBox="0 0 1400 400" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
@@ -561,15 +606,23 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
           </svg>
           <div className="relative mx-auto max-w-[760px]">
             <span className="mb-6 inline-flex items-center gap-2 rounded-full border border-[rgba(243,201,107,.4)] px-4 py-1.5 text-[12px] font-extrabold uppercase tracking-[.18em] text-[#F3C96B]">
-              ✦ פנייה למרכז
+              ✦ {isEntity ? "פנייה למרכז" : "הצעד הבא"}
             </span>
             <h2 className="text-[clamp(1.8rem,3vw,2.5rem)] font-black tracking-tight text-white">
-              יצירת קשר עם {center.name}
+              {isEntity ? `יצירת קשר עם ${center.name}` : `מתאימים לך את הטיפול הנכון ב${center.name}`}
             </h2>
             <p className="mx-auto mt-4 max-w-[54ch] text-[16.5px] leading-[1.9] text-[#CFE5E3]">
-              אפשר לכתוב בוואטסאפ, לשלוח הודעה דרך האתר או להתקשר - והצוות יחזור אליכם לתיאום.
+              {isEntity
+                ? "אפשר לכתוב בוואטסאפ, לשלוח הודעה דרך האתר או להתקשר - והצוות יחזור אליכם לתיאום."
+                : "מלאו שאלון קצר ומערכת ההתאמה החכמה תפנה אתכם למטפל/ת המתאים/ה ביותר במרכז - לפי סוג הקושי, הגישה והאזור."}
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
+              {!isEntity && (
+                <Link href="/adults"
+                  className="inline-flex items-center gap-2 rounded-full bg-[var(--gold)] px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-[#C4850F]">
+                  למילוי שאלון התאמה <ArrowLeft size={16} />
+                </Link>
+              )}
               {waHref && (entity ? (
                 <CenterWhatsAppLink entityId={entity.id} href={waHref}
                   className="inline-flex items-center gap-2 rounded-full bg-green-500 px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-green-600">
@@ -600,11 +653,19 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
         </section>
       )}
 
-      {/* פס קשר דביק - מובייל בלבד (בדסקטופ עמודת הצד הדביקה ממלאת את התפקיד) */}
-      {hasAnyContact && (
+      {/* פס קשר דביק - מובייל בלבד (בדסקטופ עמודת הצד הדביקה ממלאת את התפקיד).
+          מסלול 1 מקבל גם את שאלון ההתאמה כפעולה הראשית */}
+      {(isEntity ? hasAnyContact : true) && (
         <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--line)] bg-white/95 backdrop-blur lg:hidden"
           style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
           <div className="mx-auto flex max-w-[720px] items-center justify-center gap-2 px-4 py-2.5">
+            {!isEntity && (
+              <Link href="/adults"
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:opacity-95"
+                style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+                לשאלון התאמה
+              </Link>
+            )}
             {waHref && (entity ? (
               <CenterWhatsAppLink entityId={entity.id} href={waHref}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600">
@@ -612,7 +673,7 @@ export default function EntityProfile({ center, entity, assets, viewSource }: {
               </CenterWhatsAppLink>
             ) : (
               <a href={waHref} target="_blank" rel="noopener noreferrer"
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600">
+                className={`inline-flex ${isEntity ? "flex-1" : ""} items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600`}>
                 {WA_SVG} וואטסאפ
               </a>
             ))}
