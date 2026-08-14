@@ -73,7 +73,7 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   const url = `${BASE}/therapists/online/${topic.slug}`;
   const count = await countListed({ ...topic.filter, online: true });
   // Count-free, like the city and topic pages (owner's call, 14/8/26).
-  const description = `${onlineHeading(topic.name)}: ${CREDENTIALS} ומטפלים בשיחת וידאו מכל מקום בארץ, ו${QUIZ}. בחינם וללא התחייבות.`;
+  const description = `${onlineHeading(topic.name)}: ${CREDENTIALS} ומטפלים בשיחת וידאו מכל מקום בארץ, ו${QUIZ}.`;
   const robots =
     topic.adsOnly || count < MIN_ONLINE_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };

@@ -63,7 +63,7 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
     !isOnline && regionCount < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   // Count-free, like the city pages (owner's call, 14/8/26).
   const description = isOnline
-    ? `מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? ${CREDENTIALS} שמטפלים בזום או בווידאו, ו${QUIZ}. בחינם וללא התחייבות.`
+    ? `פסיכולוג אונליין או מטפל רגשי מרחוק: ${CREDENTIALS} שמטפלים בזום או בווידאו, ו${QUIZ}.`
     : `טיפול פסיכולוגי ונפשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }

@@ -89,9 +89,9 @@ export function introPlusOffer(intro: string, ...offers: string[]): string {
  * overclaim. "שתעודותיהם אומתו" says exactly what we actually do.
  */
 export const CREDENTIALS = "מטפלים ופסיכולוגים שתעודותיהם אומתו";
-export const QUIZ = "שאלון שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר";
+export const QUIZ = "שאלון מבוסס-מחקר שנבנה על ידי פסיכולוגים";
 
 /** Offer tiers for a therapist listing page, richest first. */
 export function therapistOffers(): string[] {
-  return [`${CREDENTIALS}, ו${QUIZ} להתאמה אישית.`, `${CREDENTIALS}, ו${QUIZ}.`];
+  return [`${CREDENTIALS}, ו${QUIZ}.`, "מטפלים שתעודותיהם אומתו, ושאלון התאמה מבוסס-מחקר."];
 }

@@ -43,7 +43,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const description =
     count >= 3
       ? `טיפול פסיכולוגי ונפשי ב${city}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`
-      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: ${CREDENTIALS} בטווח נסיעה קצר, ו${QUIZ}. בחינם וללא התחייבות.`;
+      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   const robots = cityIsIndexable(city, count, pool) ? undefined : { index: false, follow: true };
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }

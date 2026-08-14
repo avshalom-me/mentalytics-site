@@ -42,7 +42,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
   // Same shape as the city pages, and count-free for the same reason.
-  const description = `${topic.name} ${inPhrase(city)}: ${CREDENTIALS} ובעלי הכשרה בתחום, ו${QUIZ}. בחינם וללא התחייבות.`;
+  const description = `${topic.name} ${inPhrase(city)}: ${CREDENTIALS} ובעלי הכשרה בתחום, ו${QUIZ}.`;
   const robots =
     topic.adsOnly || count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
