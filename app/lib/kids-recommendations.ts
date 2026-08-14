@@ -124,6 +124,11 @@ const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /פסיכולוג קליני/, key: "פסיכולוג קליני", label: "פנייה לפסיכולוג קליני" },
   { rx: /תוכנית התנהגותית/, key: "תוכנית התנהגותית", label: "תוכנית התנהגותית במסגרת החינוכית" },
   { rx: /תוכנית חיזוקים/, key: "תוכנית חיזוקים", label: "תוכנית חיזוקים בית-ספרית" },
+  // External for now: remedial teaching is delivered through the school or a
+  // private tutor, and there are no remedial teachers in the directory yet.
+  // When that supply exists this moves to PROFESSIONAL_PATTERNS so the card can
+  // search for one.
+  { rx: /הוראה מתקנת/, key: "הוראה מתקנת", label: "הוראה מתקנת" },
   { rx: /שעות שילוב/, key: "שעות שילוב", label: "בדיקת זכאות לשעות שילוב" },
   { rx: /התאמות.*בגרויות|התאמות במבחנים|התאמות בבחינות/, key: "התאמות בחינה", label: "בדיקת התאמות בבחינות" },
   { rx: /הערכת סיכון/, key: "הערכת סיכון", label: "הערכת סיכון דחופה" },

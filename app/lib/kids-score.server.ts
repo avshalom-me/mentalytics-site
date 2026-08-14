@@ -695,30 +695,65 @@ function makeAdhdEmitter(
 
 // ── Math grading helpers ──────────────────────────────────────────────────────
 
+/**
+ * The percentage token at the head of an academic severity answer.
+ *
+ * The screens store human labels - "5% הכי מתקשה בכיתה" in grades א-ג and
+ * "5% הכי נמוכים בכיתה" in ד-ו - while the scoring only cares about the
+ * percentage that opens them. Comparing whole labels is what made every maths
+ * referral in grades א-ו dead code: the branches were written against "5%" and
+ * never updated when the labels grew, so the child got a symptom and no
+ * recommendation at all. Reading the leading token survives the next rewording.
+ *
+ * Deliberately NOT used for grades ז-יב, whose options are bare values and
+ * include "מעל 20%" - splitting that on whitespace would yield "מעל".
+ */
+function pctTier(v: string | undefined): string {
+  return (v || "").trim().split(/\s+/)[0];
+}
+
+// Maths difficulty on its own is not an assessment finding. The route is
+// remedial teaching, and a psychodidactic assessment only if about six months
+// of it has produced no meaningful change.
+//
+// The escalation has to sit on a NOTES line, never on the first one:
+// parseRefBox classifies the first line only, and ASSESSMENT_PATTERNS matches
+// any text containing "פסיכודידקטי", so naming it up front would headline the
+// card as exactly the assessment we are declining to recommend.
+const MATH_REMEDIAL_REVIEW =
+  "\nאם לאחר כחצי שנה של הוראה מתקנת סדירה לא נראה שיפור משמעותי - יש לשקול אבחון פסיכודידקטי.";
+
 function gradeMathAG(math: string, f: Findings) {
-  if (math === "לא") return;
+  const tier = pctTier(math);
+  if (tier === "לא" || tier === "") return;
   addSym(f, "נמצאו סימנים לקשיי חשבון");
-  if (math === "5%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nא. יש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי - הפנייה לאבחון פסיכודידקטי " + PSYCHODIDACTIC_NOTE_AG);
-  } else if (math === "10%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nיש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.");
-  } else if (math === "30%") {
-    addRef(f, "נמצאו קשיים בחשבון: יש לשקול מתן סיוע פרטני.");
+  if (tier === "5%") {
+    addRef(f, "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." +
+      MATH_REMEDIAL_REVIEW + " " + PSYCHODIDACTIC_NOTE_AG);
+  } else if (tier === "10%") {
+    addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." +
+      MATH_REMEDIAL_REVIEW + " " + PSYCHODIDACTIC_NOTE_AG);
+  } else if (tier === "30%") {
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_AG);
 }
 
 function gradeMathDV(math: string, hasReadingOrAdhd: boolean, f: Findings) {
-  if (math === "לא") return;
+  const tier = pctTier(math);
+  if (tier === "לא" || tier === "") return;
   addSym(f, "נמצאו סימנים לקשיי חשבון");
-  if (math === "5%") {
+  if (tier === "5%") {
+    // Maths alongside a reading or attention difficulty is a different finding:
+    // there the assessment is warranted on the combination, not on the maths,
+    // so it leads and the remedial teaching rides along as a note.
     addRef(f, hasReadingOrAdhd
-      ? "נמצאו קשיים משמעותיים בחשבון בשילוב קשיים נוספים:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי."
-      : "נמצאו קשיים משמעותיים בחשבון:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי.");
-  } else if (math === "10%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nיש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.");
-  } else if (math === "30%") {
-    addRef(f, "נמצאו קשיים קלים בחשבון - יש לשקול סיוע פרטני.");
+      ? "הפנייה לאבחון פסיכודידקטי לבירור קשיי החשבון בשילוב הקשיים הנוספים.\nלצד האבחון מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי."
+      : "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+  } else if (tier === "10%") {
+    addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+  } else if (tier === "30%") {
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_DV);
 }
