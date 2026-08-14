@@ -10,6 +10,7 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import TrackView from "@/app/therapists/[id]/TrackView";
 import CenterMessageButton from "./CenterMessageButton";
 import CenterPhoneLink from "./CenterPhoneLink";
+import EntityProfile from "./EntityProfile";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
 // עמוד מרכז ציבורי (SEO). מסלול 1 - מציג את מטפלי המרכז. מסלול 2 (מרכז כישות)
@@ -97,6 +98,12 @@ export default async function CenterPublicPage({ params, searchParams }: { param
     isEntity ? getCenterEntity(center.id) : Promise.resolve(null),
     isEntity ? Promise.resolve([]) : loadPublicTherapists({ centerId: center.id }),
   ]);
+
+  // מרכז מסלול-2 (ישות אחת) מקבל את עיצוב "הקשתות"; מסלול 1 (פרופילים
+  // מרובים) נשאר בפריסה הישנה - הפנייה אליו נעשית ממילא דרך המטפלים.
+  if (isEntity) {
+    return <EntityProfile center={center} entity={entity} assets={assets} viewSource={viewSource} />;
+  }
 
   // צ'יפים של "מה המרכז מציע" - תחומי המומחיות + סוגי הטיפול של הישות.
   const offerChips = Array.from(
