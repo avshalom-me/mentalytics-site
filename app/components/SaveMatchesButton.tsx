@@ -24,9 +24,13 @@ export default function SaveMatchesButton({
 }) {
   const [state, setState] = useState<"idle" | "loading" | "copied" | "error">("idle");
 
-  // Centers live at a different URL shape and are rare in matches - the saved
-  // page loads therapists only, so keep the token to real therapist ids.
-  const therapistIds = matches.filter((m) => m.entity_type !== "center").map((m) => m.id);
+  // Centers used to be stripped here, because the saved page could not render
+  // them. That stopped being true on 12/8/2026, when centre entities joined the
+  // public directory - loadPublicTherapists returns them and TherapistResultCard
+  // already links them to /centers/<slug>. The filter outlived its reason and
+  // quietly dropped a paying centre out of the list a patient sent themselves,
+  // promoting whoever ranked below it. Saved lists now mirror what was on screen.
+  const therapistIds = matches.map((m) => m.id);
   if (therapistIds.length === 0) return null;
 
   async function createToken(): Promise<string | null> {
@@ -51,10 +55,10 @@ export default function SaveMatchesButton({
   }
 
   function buildMessage(url: string): string {
-    // ישויות-מרכז מסוננות: הן אינן בעמוד הטוקן (loadPublicTherapists מחריג
-    // אותן), ושם שמופיע בהודעה אך לא בדף נקרא כ"מטפל שהוסר".
+    // Same list as the token, centres included - a name in the message that is
+    // missing from the page reads as "that therapist was removed", so the two
+    // must not diverge.
     const names = matches
-      .filter((m) => (m as { entity_type?: string }).entity_type !== "center")
       .slice(0, 6)
       .map((m, i) => `${i + 1}. ${m.full_name ?? ""}`.trim())
       .filter((s) => s.length > 2)
