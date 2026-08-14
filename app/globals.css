@@ -74,10 +74,16 @@ a { text-decoration: none; color: inherit; }
   .quiz-shell .text-base { font-size: 1.0625rem; }
   .quiz-shell .text-lg   { font-size: 1.1875rem; }
   .quiz-shell .text-xl   { font-size: 1.3125rem; }
-  /* Arbitrary sizes hand-written into the results cards */
+  /* Arbitrary sizes hand-written into the results cards. Every size used in
+     those cards has to appear here: the match card mixes 10.5px labels with
+     11px body text, so bumping only the first inverted them and the caption
+     came out larger than the paragraph it captions. The mapping must stay
+     monotonic for the same reason. */
   .quiz-shell .text-\[9\.5px\]  { font-size: 11px; }
   .quiz-shell .text-\[10px\],
   .quiz-shell .text-\[10\.5px\] { font-size: 12px; }
+  .quiz-shell .text-\[11px\]    { font-size: 13px; }
+  .quiz-shell .text-\[12px\],
   .quiz-shell .text-\[12\.5px\],
   .quiz-shell .text-\[13px\]    { font-size: 14px; }
 }

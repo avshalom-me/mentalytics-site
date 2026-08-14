@@ -484,15 +484,23 @@ function scoreTherapist(
         ? WEIGHTS.locationOnline
         : Math.round(WEIGHTS.locationOnline * 0.6);
       reasons.push(regionIsTheAsk ? "התאמה מלאה באזור" : "התאמה באזור");
-    } else if (inAdjacentRegion) {
-      // 15%, halved from 30% on 14/8/2026. Measured over 2,607 match-card
-      // impressions: out-of-area therapists are opened 2.8x less often and
-      // contacted 4.2x less often than in-area ones. A neighbouring region can
-      // be an hour's drive for a weekly session, so it stays in the results as
-      // a fallback but should not compete with someone local.
-      earned += Math.round(WEIGHTS.locationOnline * 0.15);
-      reasons.push("מטפל/ת מאזור סמוך");
-    } else if (onlineMatch) {
+    } else if (inAdjacentRegion || onlineMatch) {
+      // Adjacent region and "works online" are independent partial answers and
+      // one therapist can satisfy both, so these are scored as the better of
+      // the two rather than as a first-match chain. Testing adjacency first and
+      // returning let the weaker tier mask the stronger one: someone in a
+      // neighbouring region who ALSO works online scored 2, below the 4 earned
+      // by someone at the other end of the country who works online - the
+      // strictly better candidate lost.
+      //
+      // Adjacent is 15% of the weight, halved from 30% on 14/8/2026. Measured
+      // over 2,607 match-card impressions: out-of-area therapists are opened
+      // 2.8x less often and contacted 4.2x less often than in-area ones. A
+      // neighbouring region can be an hour's drive for a weekly session, so it
+      // stays in the results as a fallback but must not compete with someone
+      // local. (At a weight of 10 the tier rounds to 2 points, i.e. 20% - the
+      // scale has no finer resolution.)
+      const adjacentPts = inAdjacentRegion ? Math.round(WEIGHTS.locationOnline * 0.15) : 0;
       // An online-only request (no city, no region) has no geography to match
       // against: the hard filter above already dropped everyone who does not
       // work online, so every remaining therapist answers the request in full.
@@ -500,10 +508,12 @@ function scoreTherapist(
       // all satisfied. Asking for a region AND ticking online is different -
       // there, being reachable online but not nearby is a partial answer.
       const onlineIsTheWholeAsk = !input.city && !input.region;
-      earned += onlineIsTheWholeAsk
-        ? WEIGHTS.locationOnline
-        : Math.round(WEIGHTS.locationOnline * 0.4);
-      reasons.push("מציע טיפול אונליין");
+      const onlinePts = onlineMatch
+        ? (onlineIsTheWholeAsk ? WEIGHTS.locationOnline : Math.round(WEIGHTS.locationOnline * 0.4))
+        : 0;
+      earned += Math.max(adjacentPts, onlinePts);
+      if (inAdjacentRegion) reasons.push("מטפל/ת מאזור סמוך");
+      if (onlineMatch) reasons.push("מציע טיפול אונליין");
     } else if (patientRegion) {
       // Hard filter: no geographic match and user didn't request online → exclude
       // (applies whether or not therapist declared regions)
