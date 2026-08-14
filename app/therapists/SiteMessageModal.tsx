@@ -7,11 +7,17 @@ import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
 
 type Props = {
+  /** מזהה המטפל/ת, או מזהה חשבון המרכז כש-target="center". */
   therapistId: string;
   therapistName: string;
   source: "directory" | "match" | "profile";
   open: boolean;
   onClose: () => void;
+  /**
+   * "center" = פנייה למרכז מסלול-1, שאין לו שורת מטפל ולכן גם לא נתיב
+   * contact-therapist. אותו טופס בדיוק, נתיב אחר.
+   */
+  target?: "therapist" | "center";
 };
 
 export default function SiteMessageModal({
@@ -20,7 +26,9 @@ export default function SiteMessageModal({
   source,
   open,
   onClose,
+  target = "therapist",
 }: Props) {
+  const toCenter = target === "center";
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
@@ -53,11 +61,11 @@ export default function SiteMessageModal({
     setError("");
     setSubmitting(true);
     try {
-      const res = await fetch("/api/contact-therapist", {
+      const res = await fetch(toCenter ? "/api/contact-center" : "/api/contact-therapist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          therapist_id: therapistId,
+          ...(toCenter ? { center_id: therapistId } : { therapist_id: therapistId }),
           sender_name: name,
           sender_contact: contact,
           message,
@@ -183,7 +191,9 @@ export default function SiteMessageModal({
               </button>
 
               <p className="text-xs text-stone-500 leading-5 mt-2">
-                ההודעה תישלח ישירות למטפל/ת. פרטי הקשר שלך יימסרו אליו/אליה כדי שיוכל/תוכל לחזור אלייך.
+                {toCenter
+                  ? "ההודעה תישלח ישירות למרכז. פרטי הקשר שלך יימסרו לצוות המרכז כדי שיוכלו לחזור אלייך."
+                  : "ההודעה תישלח ישירות למטפל/ת. פרטי הקשר שלך יימסרו אליו/אליה כדי שיוכל/תוכל לחזור אלייך."}
               </p>
             </form>
           </>

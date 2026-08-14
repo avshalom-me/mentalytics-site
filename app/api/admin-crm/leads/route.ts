@@ -45,9 +45,26 @@ export async function GET(req: NextRequest) {
     names = Object.fromEntries((therapists ?? []).map((t) => [t.id, t.full_name ?? ""]));
   }
 
+  // פנייה שהופנתה למרכז (ולא למטפל/ת בודד/ת) - בלי זה הליד מוצג בלי נמען.
+  const centerIds = Array.from(
+    new Set((leads ?? []).map((l) => l.center_account_id).filter(Boolean))
+  ) as string[];
+  let centerNames: Record<string, string> = {};
+  if (centerIds.length > 0) {
+    const { data: centers } = await supabaseAdmin
+      .from("therapy_center_accounts")
+      .select("id, name")
+      .in("id", centerIds);
+    centerNames = Object.fromEntries((centers ?? []).map((c) => [c.id, c.name ?? ""]));
+  }
+
   const withNames = (leads ?? []).map((l) => ({
     ...l,
-    therapist_name: l.therapist_id ? names[l.therapist_id] ?? null : null,
+    therapist_name: l.therapist_id
+      ? names[l.therapist_id] ?? null
+      : l.center_account_id
+        ? centerNames[l.center_account_id] ?? null
+        : null,
   }));
 
   return NextResponse.json({ ok: true, leads: withNames });

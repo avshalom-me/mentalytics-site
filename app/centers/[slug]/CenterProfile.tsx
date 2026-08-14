@@ -102,9 +102,16 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
   const website = center.public_website?.trim();
   const websiteHref = website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : null;
 
-  const canMessage = !!(
+  // הודעה דרך האתר, בשני המסלולים:
+  //   מסלול 2 - דרך שורת הישות, כך שהפנייה נספרת גם בסטטיסטיקות הפורטל.
+  //   מסלול 1 - אין שורת ישות; הפנייה נשלחת למייל המרכז דרך /api/contact-center.
+  const canMessageEntity = !!(
     entity && entity.email && ["approved", "paying"].includes(entity.status) && entity.accepting_new_patients !== false
   );
+  const canMessageCenter = !isEntity && center.has_contact_email;
+  const canMessage = canMessageEntity || canMessageCenter;
+  // ה-props שכפתור ההודעה מקבל - ישות אם יש, אחרת חשבון המרכז.
+  const messageTarget = canMessageEntity && entity ? { entityId: entity.id } : { centerId: center.id };
   const galleryPhotos = assets.gallery.filter((g) => g.url);
 
   const yearsActive = center.public_founded_year ? Math.max(0, new Date().getFullYear() - center.public_founded_year) : null;
@@ -486,8 +493,8 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                       {WA_SVG} שליחת וואטסאפ
                     </a>
                   ))}
-                  {canMessage && entity && (
-                    <CenterMessageButton entityId={entity.id} centerName={center.name} label="הודעה דרך האתר"
+                  {canMessage && (
+                    <CenterMessageButton {...messageTarget} centerName={center.name} label="הודעה דרך האתר"
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-5 py-3 text-[15px] font-extrabold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)]" />
                   )}
                   {telHref && (entity ? (
@@ -635,8 +642,8 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                   {WA_SVG} שליחת וואטסאפ
                 </a>
               ))}
-              {canMessage && entity && (
-                <CenterMessageButton entityId={entity.id} centerName={center.name}
+              {canMessage && (
+                <CenterMessageButton {...messageTarget} centerName={center.name}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-base font-extrabold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)]" />
               )}
               {phone && telHref && (entity ? (
@@ -688,8 +695,8 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                 <Phone size={15} /> חיוג
               </a>
             ))}
-            {canMessage && entity && (
-              <CenterMessageButton entityId={entity.id} centerName={center.name} label="הודעה"
+            {canMessage && (
+              <CenterMessageButton {...messageTarget} centerName={center.name} label="הודעה"
                 className={`inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2.5 text-[14px] font-bold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)] ${waHref || telHref ? "" : "flex-1"}`} />
             )}
           </div>

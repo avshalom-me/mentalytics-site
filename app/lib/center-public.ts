@@ -31,10 +31,18 @@ export type PublicCenter = {
   logo_path: string | null;
   team_members: CenterTeamMember[];
   gallery: CenterGalleryPhoto[];
+  /**
+   * האם יש למרכז כתובת מייל שאליה אפשר לשלוח פנייה. דגל בלבד - הכתובת עצמה
+   * לעולם אינה יוצאת מכאן אל העמוד הציבורי; מי ששולח הודעה שולח מזהה מרכז,
+   * ו-/api/contact-center מוצא את היעד בצד השרת.
+   */
+  has_contact_email: boolean;
 };
 
+// email/payer_email נשלפים רק כדי לגזור מהם has_contact_email - הם מוסרים
+// מהאובייקט המוחזר ולא מגיעים לעמוד.
 const PUBLIC_COLS =
-  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery";
+  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery, email, payer_email";
 
 // slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר - מוסיפים
 // סיומת מספרית. excludeId מאפשר לשמור על ה-slug של המרכז עצמו בעדכון.
@@ -74,9 +82,13 @@ export const getPublicCenterBySlug = cache(async (slug: string): Promise<PublicC
     .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
     .maybeSingle();
   if (!data) return null;
-  const c = data as Record<string, unknown>;
+  const { email, payer_email, ...rest } = data as Record<string, unknown>;
+  const c = rest;
   return {
     ...(c as unknown as PublicCenter),
+    has_contact_email: !!(
+      (typeof email === "string" && email.trim()) || (typeof payer_email === "string" && payer_email.trim())
+    ),
     team_members: Array.isArray(c.team_members) ? (c.team_members as CenterTeamMember[]) : [],
     gallery: Array.isArray(c.gallery) ? (c.gallery as CenterGalleryPhoto[]) : [],
     public_director: (c.public_director && typeof c.public_director === "object" && !Array.isArray(c.public_director)
