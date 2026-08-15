@@ -51,8 +51,23 @@ type DigestPreview = {
   recipients: string[];
 };
 
+type WatchdogCheck = {
+  key: string;
+  label: string;
+  ok: boolean;
+  skipped?: boolean;
+  detail: string;
+  ms: number;
+};
+
+type WatchdogRun = {
+  checks: WatchdogCheck[];
+  failures: number;
+};
+
 const AGENT_LABELS: Record<string, string> = {
   daily_digest: "בקר הבוקר",
+  watchdog: "שומר הלילה",
 };
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
@@ -88,6 +103,10 @@ export default function AgentsPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
   const [previewError, setPreviewError] = useState("");
+
+  const [watchdogLoading, setWatchdogLoading] = useState(false);
+  const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
+  const [watchdogError, setWatchdogError] = useState("");
 
   function load() {
     setLoading(true);
@@ -127,6 +146,27 @@ export default function AgentsPage() {
       setPreviewError("שגיאה בהפקת התצוגה המקדימה");
     } finally {
       setPreviewLoading(false);
+    }
+  }
+
+  async function runWatchdogNow() {
+    setWatchdogLoading(true);
+    setWatchdogError("");
+    setWatchdog(null);
+    try {
+      const res = await fetch("/api/admin-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "watchdog_run" }),
+      });
+      const j = await res.json();
+      if (j.ok) setWatchdog(j);
+      else setWatchdogError(j.error || "שגיאה בהרצת הבדיקות");
+      load();
+    } catch {
+      setWatchdogError("שגיאה בהרצת הבדיקות");
+    } finally {
+      setWatchdogLoading(false);
     }
   }
 
@@ -215,6 +255,51 @@ export default function AgentsPage() {
               <p className="text-xs text-stone-400">
                 כשיחומש, המייל יישלח אל: {preview.recipients.join(", ")}
               </p>
+            </div>
+          )}
+        </section>
+
+        {/* שומר הלילה */}
+        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 className="font-black text-stone-900">🌙 שומר הלילה</h2>
+            <button
+              onClick={runWatchdogNow}
+              disabled={watchdogLoading}
+              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {watchdogLoading ? "בודק..." : "הרץ בדיקות עכשיו"}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500 mb-4">
+            בדיקות תקינות ליליות של האתר החי: שאלונים, ניקוד, התאמה, עמודי מפתח, אנליטיקה
+            וטריות הקרונים. כישלון נכנס לתור ההצעות; מייל התראה מיידי יחומש יחד עם דוח הבוקר.
+          </p>
+
+          {watchdogError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">
+              {watchdogError}
+            </div>
+          )}
+
+          {watchdog && (
+            <div className="overflow-x-auto rounded-xl border border-stone-200">
+              <table className="w-full text-sm" dir="rtl">
+                <tbody>
+                  {watchdog.checks.map((c) => (
+                    <tr key={c.key} className="border-b border-stone-100 last:border-0">
+                      <td className="px-3 py-1.5 whitespace-nowrap">
+                        {c.skipped ? "⏭️" : c.ok ? "✅" : "❌"}
+                      </td>
+                      <td className="px-3 py-1.5 font-bold text-stone-700 whitespace-nowrap">{c.label}</td>
+                      <td className="px-3 py-1.5 text-stone-500">{c.detail}</td>
+                      <td className="px-3 py-1.5 text-stone-400 text-xs whitespace-nowrap">
+                        {c.ms > 0 ? `${(c.ms / 1000).toFixed(1)}s` : ""}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </section>

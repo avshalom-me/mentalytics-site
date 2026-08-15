@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { runDailyDigest } from "@/app/lib/daily-digest";
+import { runWatchdog } from "@/app/lib/watchdog";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -47,19 +48,28 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    if (body?.action !== "digest_preview") {
-      return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });
+    if (body?.action === "digest_preview") {
+      const result = await runDailyDigest({ send: false });
+      return NextResponse.json({
+        ok: result.ok,
+        empty: result.empty,
+        sections: result.sections,
+        ai_summary: result.aiSummary,
+        html: result.html,
+        recipients: result.recipients,
+        error: result.error,
+      });
     }
-    const result = await runDailyDigest({ send: false });
-    return NextResponse.json({
-      ok: result.ok,
-      empty: result.empty,
-      sections: result.sections,
-      ai_summary: result.aiSummary,
-      html: result.html,
-      recipients: result.recipients,
-      error: result.error,
-    });
+    if (body?.action === "watchdog_run") {
+      const result = await runWatchdog({ send: false });
+      return NextResponse.json({
+        ok: result.ok,
+        checks: result.checks,
+        failures: result.failures.length,
+        error: result.error,
+      });
+    }
+    return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";
     return NextResponse.json({ ok: false, error: msg }, { status: 500 });

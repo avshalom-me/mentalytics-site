@@ -31,6 +31,10 @@
     {
       "path": "/api/cron/agent-daily-digest",
       "schedule": "0 5 * * *"
+    },
+    {
+      "path": "/api/cron/agent-watchdog",
+      "schedule": "30 2 * * *"
     }
   ]
 }
