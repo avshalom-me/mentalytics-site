@@ -2,10 +2,9 @@ import { MetadataRoute } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { countListedByRegionAndCity, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
+import { loadListedCounts, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
-import { countListed } from "@/app/lib/therapist-directory";
 import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
 import { ASSESSMENTS } from "@/app/lib/assessments";
@@ -14,9 +13,14 @@ import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 
 const BASE = "https://www.mentalytics.co.il";
 
-// Regenerate per request so newly-approved therapists enter the sitemap without
-// waiting for a redeploy.
-export const dynamic = "force-dynamic";
+// Served from cache, regenerated at most hourly (ISR). Newly-approved
+// therapists still enter without a redeploy - just within the hour instead of
+// instantly, which no crawler can tell apart. The previous force-dynamic
+// version recomputed everything per request and took 26+ seconds in production
+// (caught by the night watchdog on 15/8/2026) - long enough for Googlebot to
+// abandon the fetch, which is the worst possible trade for one-second
+// freshness nobody observes.
+export const revalidate = 3600;
 
 /**
  * When the copy on the directory landing pages (city / region / topic /
@@ -81,12 +85,23 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/accessibility`, priority: 0.3, changeFrequency: "yearly" },
   ];
 
-  const { data } = await supabaseAdmin
-    .from("therapists")
-    .select("id, created_at, full_name")
-    .in("status", ["approved", "paying"])
-    .eq("admin_approved", true)
-    .neq("entity_type", "center"); // ישות-מרכז אינה עמוד מטפל ציבורי
+  // Four independent data sources, fetched concurrently. Every indexability
+  // count below comes from the ONE query inside loadListedCounts() - the
+  // sitemap makes 4 DB round-trips total, not one per landing page.
+  const [{ data }, { data: articles }, counts, centers] = await Promise.all([
+    supabaseAdmin
+      .from("therapists")
+      .select("id, created_at, full_name")
+      .in("status", ["approved", "paying"])
+      .eq("admin_approved", true)
+      .neq("entity_type", "center"), // ישות-מרכז אינה עמוד מטפל ציבורי
+    supabaseAdmin
+      .from("therapist_articles")
+      .select("slug, updated_at, topic")
+      .eq("status", "approved"),
+    loadListedCounts(),
+    listPublicCenters(),
+  ]);
 
   const therapistPages: MetadataRoute.Sitemap = (data ?? []).map((t) => ({
     url: `${BASE}${therapistPath(t.id, t.full_name)}`,
@@ -94,11 +109,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     changeFrequency: "monthly" as const,
     lastModified: t.created_at ? new Date(t.created_at) : undefined,
   }));
-
-  const { data: articles } = await supabaseAdmin
-    .from("therapist_articles")
-    .select("slug, updated_at, topic")
-    .eq("status", "approved");
 
   const articlePages: MetadataRoute.Sitemap = (articles ?? []).map((a) => ({
     url: `${BASE}/research/community/${a.slug}`,
@@ -127,8 +137,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // Only region/city pages that have enough listed therapists are included -
   // near-empty ones are noindex, so listing them here would only produce
   // "submitted URL marked noindex" warnings and waste crawl budget. They rejoin
-  // the sitemap automatically once they fill up (regenerated per request).
-  const { regions: regionCounts, cities: cityCounts, cityPools, specialties: specialtyCounts } = await countListedByRegionAndCity();
+  // the sitemap automatically once they fill up (regenerated hourly).
+  const { regions: regionCounts, cities: cityCounts, cityPools, specialties: specialtyCounts } = counts;
   const regionPages: MetadataRoute.Sitemap = [
     { url: `${BASE}/therapists/para-medical`, priority: 0.7, changeFrequency: "weekly" as const },
     { url: `${BASE}/therapists/region`, priority: 0.7, changeFrequency: "weekly" as const },
@@ -162,7 +172,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const topicPages: MetadataRoute.Sitemap = [];
   for (const topic of TOPICS) {
     if (topic.adsOnly) continue;
-    const count = await countListed(topic.filter);
+    const count = counts.count(topic.filter);
     if (count >= MIN_LISTED_FOR_INDEX) {
       topicPages.push({
         url: `${BASE}/therapists/topic/${topic.slug}`,
@@ -173,7 +183,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   }
   // Assessment landing pages - same supply gate.
   for (const a of ASSESSMENTS) {
-    const count = await countListed({ assessmentType: a.value });
+    const count = counts.count({ assessmentType: a.value });
     if (count >= MIN_LISTED_FOR_INDEX) {
       topicPages.push({
         url: `${BASE}/therapists/assessment/${a.slug}`,
@@ -185,7 +195,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Funding-route pages - same supply gate.
   for (const a of ARRANGEMENT_PAGES) {
-    const count = await countListed({ arrangement: a.value });
+    const count = counts.count({ arrangement: a.value });
     if (count >= MIN_LISTED_FOR_INDEX) {
       topicPages.push({
         url: `${BASE}/therapists/arrangement/${a.slug}`,
@@ -199,7 +209,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const slug of onlineTopicSlugs()) {
     const topic = slugToCityTopic(slug);
     if (!topic || topic.adsOnly) continue;
-    const count = await countListed({ ...topic.filter, online: true });
+    const count = counts.count({ ...topic.filter, online: true });
     if (count >= MIN_ONLINE_TOPIC) {
       topicPages.push({
         url: `${BASE}/therapists/online/${topic.slug}`,
@@ -217,7 +227,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const topic = slugToCityTopic(slug);
     if (!topic || topic.adsOnly) continue;
     for (const city of PILOT_CITIES) {
-      const count = await countListed({ ...topic.filter, city });
+      const count = counts.count({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) {
         topicPages.push({
           url: `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`,
@@ -230,7 +240,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   // Public center pages (paid-plan benefit) - only active centers whose public
   // page is enabled.
-  const centers = await listPublicCenters();
   const centerPages: MetadataRoute.Sitemap = centers.map((c) => ({
     url: `${BASE}/centers/${c.slug}`,
     priority: 0.6,
