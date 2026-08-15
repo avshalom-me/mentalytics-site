@@ -54,6 +54,7 @@ export type DashboardData = {
       contact: string | null;
       message: string | null;
       therapist_id: string | null;
+      source: string | null;
       created_at: string | null;
     }[];
     failed_payments: {
@@ -119,7 +120,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
       .gte("clicked_at", daysAgoIso(7)),
     supabaseAdmin
       .from("crm_leads")
-      .select("id, lead_type, name, contact, message, therapist_id, created_at")
+      .select("id, lead_type, name, contact, message, therapist_id, source, created_at")
       .eq("status", "new")
       .order("created_at", { ascending: false })
       .limit(50),

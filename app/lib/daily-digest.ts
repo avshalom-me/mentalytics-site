@@ -87,14 +87,17 @@ async function gatherSections(): Promise<DigestSection[]> {
   const q = dash.queue;
   const sections: DigestSection[] = [];
 
-  // לידים שממתינים בסטטוס "חדשה" - הפער שהמיפוי מצא: אף אחד לא מתריע עליהם.
-  if (q.new_leads.length > 0) {
+  // לידים שממתינים בסטטוס "חדשה" - רק פניות שמופנות אלינו. החלטת מדיניות
+  // (15/8/26): הודעת מטופל למטפל/מרכז דרך האתר (source='site_message') היא
+  // עניינו של המטפל שקיבל אותה במייל - לא עבודת אדמין, ולא מופיעה בדוח.
+  const adminLeads = q.new_leads.filter((l) => l.source !== "site_message");
+  if (adminLeads.length > 0) {
     sections.push({
       key: "leads",
-      label: "לידים ממתינים",
-      count: dash.kpis.new_leads_count,
-      urgent: q.new_leads.some((l) => daysAgo(l.created_at) >= 2),
-      lines: q.new_leads
+      label: "פניות ממתינות לחברה",
+      count: adminLeads.length,
+      urgent: adminLeads.some((l) => daysAgo(l.created_at) >= 2),
+      lines: adminLeads
         .slice(0, MAX_LINES_PER_SECTION)
         .map(
           (l) =>
