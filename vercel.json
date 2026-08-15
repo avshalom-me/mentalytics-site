@@ -27,6 +27,10 @@
     {
       "path": "/api/cron/trial-ending?send=confirm",
       "schedule": "0 8 * * *"
+    },
+    {
+      "path": "/api/cron/agent-daily-digest",
+      "schedule": "0 5 * * *"
     }
   ]
 }
