@@ -250,12 +250,29 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // ⚠️ מדיניות: דוחות למטפלים לא נשלחים אוטומטית. המסלול הזה אינו רשום
-  // ב-vercel.json ולכן אינו רץ מעצמו - אבל קריאה ידנית אליו שלחה בעבר 42
-  // מיילים אמיתיים בטעות, וזו פעולה בלתי הפיכה. לכן ברירת המחדל היא
-  // *תצוגה מקדימה בלבד*: מחזירה למי היה נשלח ומה, בלי לשלוח דבר.
-  // שליחה בפועל מחייבת ?send=confirm במפורש.
-  const sendForReal = req.nextUrl.searchParams.get("send") === "confirm";
+  // ⛔ החלטה עסקית (אבשלום, 15/8/26): מטפלים משלמים לא מקבלים מאיתנו מיילים
+  // של סיכום ביצועים חודשי בכלל. מטפל שמקבל למייל "היו לך X פניות החודש"
+  // כשהמספר נמוך - נזכר לבטל את המנוי. הנתונים זמינים לו ממילא בדשבורד,
+  // במשיכה, כשהוא בוחר להסתכל. אין לתזמן את המסלול הזה ב-vercel.json,
+  // ואין להסיר את הנעילה שלמטה בלי החלטה מפורשת חדשה של אבשלום.
+  //
+  // הנעילה כפולה: שליחה בפועל מחייבת גם ?send=confirm וגם את משתנה הסביבה
+  // THERAPIST_STATS_EMAILS_ENABLED=1 (לא מוגדר בפרודקשן). בלעדיהם המסלול
+  // מחזיר תצוגה מקדימה בלבד - שימושית לבדיקה, לא שולחת דבר.
+  // (רקע: קריאה ידנית שלחה בעבר 42 מיילים אמיתיים בטעות.)
+  const confirmParam = req.nextUrl.searchParams.get("send") === "confirm";
+  const policyUnlocked = process.env.THERAPIST_STATS_EMAILS_ENABLED === "1";
+  if (confirmParam && !policyUnlocked) {
+    return NextResponse.json(
+      {
+        ok: false,
+        error:
+          "שליחת סיכומים חודשיים למטפלים חסומה בהחלטה עסקית (15/8/26). ראה הערת המדיניות בקובץ זה.",
+      },
+      { status: 403 }
+    );
+  }
+  const sendForReal = confirmParam && policyUnlocked;
 
   const { data: therapists } = await supabaseAdmin
     .from("therapists")
