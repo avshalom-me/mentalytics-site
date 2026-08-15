@@ -83,7 +83,19 @@ export type QuestionnaireAnswers = {
     adhdEfCount?: number;
     ldReading?: boolean;
     ldScores?: number[];             // 5 פריטים, 1-3
+    /**
+     * "The executive questionnaire applies" - the OR of two independent
+     * triggers, kept as separate fields because they can be withdrawn
+     * independently. f2 alone could only ever be turned on: unticking the
+     * occupational bridge item after it had set f2 left the flag standing, and
+     * the report then reported executive difficulties for someone who had taken
+     * the trigger back.
+     */
     f2?: boolean;
+    /** Trigger 1: the התארגנות gate, or a positive attention block (adhd1Count >= 3). */
+    f2Gate?: boolean;
+    /** Trigger 2: the planning/deadlines item on the occupational checklist. */
+    f2Bridge?: boolean;
     execScores?: number[];           // 6 פריטים, 1-3
     f3?: boolean;
     employmentType?: string;

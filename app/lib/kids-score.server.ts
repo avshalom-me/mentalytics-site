@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  KIDS_AQ_ITEMS, KIDS_MQ_ITEMS, KIDS_OQ_ITEMS, KIDS_TQ_ITEMS, KIDS_PQ_ITEMS,
+  KIDS_BQ_ITEMS, KIDS_LSAS_ITEMS, KIDS_AS_ITEMS, KIDS_AG_ITEMS, KIDS_AB_ITEMS,
+  KIDS_EA_RESTRICT, KIDS_EA_BINGE_UNDER12, KIDS_EB_RESTRICT, KIDS_EB_BINGE_OVER12,
+} from "./questionnaire-items.server";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -187,6 +192,20 @@ function computeResults(A: Ans): KidsBox[] {
             : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
       }
       addToGroup("📊 נמצאו סימנים לחרדה", ref, []);
+    } else if (KIDS_AQ_ITEMS.some(it => A[it.key] === undefined)) {
+      // A skipped questionnaire scores 0, and 0 used to fall straight into the
+      // "low stress" branch below - stating an all-clear about a child whose
+      // parent had just rated the anxiety gate at 3 or more, and adding a
+      // referral on the strength of it. The screen now blocks Continue until
+      // every item is answered, so this is the second line: it fires only if a
+      // client malfunctions, and it says what is actually known.
+      addToGroup(
+        "📊 סימנים של חרדה ללא הגדרה ספציפית (שאלון האפיון לא מולא)",
+        grp === "ga"
+          ? getGaRef()
+          : "✅ הפנייה: המשך בירור פסיכולוגי לאפיון הקושי ועוצמתו, ובמקביל טיפול CBT לחרדה",
+        [],
+      );
     } else {
       emoStandalones.push({ cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true });
     }
@@ -1277,7 +1296,64 @@ export interface KidsScoreResult {
   social:       KidsBox[];
 }
 
-export function scoreKidsQuestionnaire(answers: Record<string, any>): KidsScoreResult {
+/**
+ * Recompute every derived total from the raw items the client sent.
+ *
+ * The browser computes aq_tot, mq_tot and the rest inside the upd* helpers and
+ * posts them alongside the answers; nothing here ever checked them. A client
+ * that failed to update one total - a helper not called on some code path, a
+ * stale render, a future refactor that renames an item - would score that whole
+ * section 0, and 0 is indistinguishable from "no difficulty". The section then
+ * vanishes from the report in silence, which is the same class of defect the
+ * questionnaires were just cleaned of, one layer down.
+ *
+ * The raw items are always in the payload (the page posts the entire answers
+ * object), so the server never has to trust the arithmetic. Every list below is
+ * the shared item definition rather than a second hand-written copy of the
+ * keys, so a renamed item breaks both sides together instead of silently
+ * zeroing one. The rules must stay identical to the upd* helpers in
+ * app/kids/page.tsx - they are the same formulas, read from the same lists.
+ */
+function normaliseTotals(A: Record<string, any>): Record<string, any> {
+  const n = { ...A };
+  const keysOf = (items: readonly { key: string }[]) => items.map(i => i.key);
+  const sumNum = (keys: string[]) => keys.reduce((s, k) => s + (Number(n[k]) || 0), 0);
+  const countYes = (keys: string[]) => keys.filter(k => n[k] === "כן").length;
+
+  n.aq_tot = sumNum(keysOf(KIDS_AQ_ITEMS));
+  n.oq_tot = sumNum(keysOf(KIDS_OQ_ITEMS));
+  n.tq_tot = sumNum(keysOf(KIDS_TQ_ITEMS));
+  n.mq_tot = countYes(keysOf(KIDS_MQ_ITEMS));
+  n.pq_tot = countYes(keysOf(KIDS_PQ_ITEMS));
+  n.bq_tot = countYes(keysOf(KIDS_BQ_ITEMS));
+  n.add_s_tot = countYes(keysOf(KIDS_AS_ITEMS));
+  n.add_g_tot = countYes(keysOf(KIDS_AG_ITEMS));
+  n.add_b_tot = countYes(keysOf(KIDS_AB_ITEMS));
+  // LSAS items are plain strings; the answer keys are positional.
+  n.lsas_tot = sumNum(KIDS_LSAS_ITEMS.map((_, i) => `lsas_a${i + 1}`));
+
+  // Eating blocks are age-split, and the "age 0" case follows the client: an
+  // unparseable age is treated as under 12.
+  const age = parseInt(n._age) || 0;
+  const under12 = age === 0 || age < 12;
+  n.eq_ano = countYes(under12 ? keysOf(KIDS_EA_RESTRICT) : keysOf(KIDS_EB_RESTRICT));
+  n.eq_bul = countYes(under12 ? keysOf(KIDS_EA_BINGE_UNDER12) : keysOf(KIDS_EB_BINGE_OVER12));
+
+  // Behaviour plan: same ladder as computeBehPlan, highest severity wins.
+  const sev = (v: string) => (v === "הרבה" ? 2 : v === "מעט" ? 1 : 0);
+  const s1 = sev(n.beh1 || ""), s2 = sev(n.beh2 || ""), s3 = sev(n.beh3 || "");
+  let ml = 0;
+  if (s1 === 1) ml = Math.max(ml, 1); if (s1 === 2) ml = Math.max(ml, 2);
+  if (s2 === 1) ml = Math.max(ml, 3); if (s2 === 2) ml = Math.max(ml, 4);
+  if (s3 === 1) ml = Math.max(ml, 5); if (s3 === 2) ml = Math.max(ml, 6);
+  n.beh_max_level = ml;
+  n.beh_plan = ml === 0 ? "" : ml <= 3 ? "חיובי" : ml <= 5 ? "חיובי_שלילי" : "חיובי_שלילי_פסיכולוגי";
+
+  return n;
+}
+
+export function scoreKidsQuestionnaire(raw: Record<string, any>): KidsScoreResult {
+  const answers = normaliseTotals(raw);
   return {
     emotional:    computeResults(answers),
     academic:     computeAcadResults(answers),

@@ -116,10 +116,10 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
 export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-consent": { group: "פתיחה", desc: "הצהרה משפטית + הסכמה (ההורה הממלא)", input: "gate" },
   "p-demo": { group: "פתיחה", desc: "גיל ומין בלבד (חובה); הכיתה נגזרת מהגיל ונשאלת רק בגילאי 6/7/9/12/14. קוצר מ-9 שדות ב-8/8/26", input: "form", items: 2 },
-  "p-areas": { group: "פתיחה", desc: "דירוג תחומי הקושי העיקריים (4-5 תחומים, סולם כלל-לא/מעט/הרבה/הרבה-מאוד)", input: "choice", items: 1 },
+  "p-areas": { group: "פתיחה", desc: "דירוג תחומי הקושי העיקריים (4-5 תחומים, סולם כלל-לא/מעט/הרבה/הרבה-מאוד; בגילאי 1-2 מוצגים רק שניים - התפתחותי והתנהגותי)", input: "choice", items: 1 },
 
   "p-q1": { group: "חרדה", desc: "שאלת שער: דאגות/לחצים מתמשכים אצל הילד (כן/לא)", input: "gate" },
-  "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא)", input: "gate" },
+  "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא); תשובה חיובית פותחת שאלת המשך על שלילת גורם רפואי", input: "gate" },
   "p-aq": { group: "חרדה", desc: "שאלון חרדה: 10 סעיפים בסולם 1-3", input: "scales", items: 10, heavy: true },
   "p-aq-grade": { group: "חרדה", desc: "שאלות משלימות לפי שכבת גיל - מוזג ל-p-traits ב-8/8/26", input: "scales", items: 3, legacy: true },
   "p-q1-ga": { group: "חרדה", desc: "הסכמת הילד לטיפול (גיל רך) - מוזג ל-p-traits ב-8/8/26", input: "gate", items: 1, legacy: true },

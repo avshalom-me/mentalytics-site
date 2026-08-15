@@ -306,13 +306,16 @@ function Layout({ screen, domains, onBack, positionAs, children }: { screen: str
         {screen !== "results" && (
           <div className="mb-5 text-center">
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-            <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – מבוגרים</p>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול - מבוגרים</p>
           </div>
         )}
         {showBar && <ProgressBar pct={pct} />}
         {showBack && (
           <button type="button" onClick={onBack!} className="mb-3 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[var(--teal-dark)] hover:underline">
-            → חזרה לשאלה הקודמת
+            {/* The domains and intake screens step back to the opening, not to
+                a question, so the specific label would be describing the wrong
+                destination. */}
+            {screen === "domains" || screen === "intake" ? "→ חזרה" : "→ חזרה לשאלה הקודמת"}
           </button>
         )}
         {children}
@@ -1634,7 +1637,7 @@ export default function AdultsPage() {
           </div>
           {bmiH > 0 && bmiW > 0 && (() => { const bmi = bmiW / Math.pow(bmiH / 100, 2); const ok = bmi >= 18.5 && bmi <= 24.9; return (
             <p className={`mt-2 rounded-lg p-2 text-xs ${ok ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
-              BMI: {bmi.toFixed(1)} – {ok ? "תקין ✓" : "אינו תקין – הפנייה לרופא משפחה"}
+              BMI: {bmi.toFixed(1)} - {ok ? "תקין ✓" : "אינו תקין - הפנייה לרופא משפחה"}
             </p>
           ); })()}
         </div>
@@ -1754,7 +1757,7 @@ export default function AdultsPage() {
                     className={`flex-1 rounded-lg border-2 py-2 text-xs font-semibold ${traumaFreq === v ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white"}`}>{l}</button>
                 ))}
               </div>
-              <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' – ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
+              <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' - ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
               {qItems.trauma.map((item, i) => (
                 <ScaleRow key={i} label={item} group={`trauma-${i}`} values={[0,1,2,3,4]} value={traumaScores[i]}
                   onChange={(v) => setTraumaScores((p) => { const n = [...p]; n[i] = v; return n; })} />
@@ -1834,7 +1837,7 @@ export default function AdultsPage() {
   if (screen === "e10b") return (
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="שאלון אישיות" badgeColor="green">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">ענה/י על כל שאלה: 1=כן, 2=לא</p>
+        <p className="mb-3 font-semibold text-[#1a3a5c]">ענה/י על כל השאלות</p>
         {[
           "קושי בהבנת כוונות חברתיות/רמזים לא-מילוליים?",
           "העדפה חזקה לשגרה וקושי עם שינויים?",
@@ -1902,9 +1905,9 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="סגנון טיפול מועדף" badgeColor="teal">
         <p className="mb-3 font-semibold text-[#1a3a5c]">שלוש שאלות על סגנון הטיפול המועדף עליך:</p>
-        <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד – מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
-        <ScaleRow label="בבואי לפתור קושי רגשי, אני מעדיף/ה שהמטפל יספק לי תוכנית עבודה מוגדרת, כלים פרקטיים ומשימות לתרגול בין הפגישות." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מרחב פתוח וחופשי  |  7 = מסכים/ה מאוד – זקוק/ה למסגרת ברורה, כלים ומשימות" group="ts-q2" values={[1,2,3,4,5,6,7]} value={styleQ2} onChange={setStyleQ2} />
-        <ScaleRow label="בטיפול רגשי, נוח לי יותר עם מטפל שמגיב באופן פעיל, שואל, מכוון, מסכם ומביע את עמדתו, מאשר עם מטפל שמכיל יותר, שוהה ומתבונן." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מטפל מכיל, שקט ומתבונן  |  7 = מסכים/ה מאוד – מעדיף/ה מטפל פעיל, מכוון ומעורב מילולית" group="ts-q3" values={[1,2,3,4,5,6,7]} value={styleQ3} onChange={setStyleQ3} />
+        <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד - מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
+        <ScaleRow label="בבואי לפתור קושי רגשי, אני מעדיף/ה שהמטפל יספק לי תוכנית עבודה מוגדרת, כלים פרקטיים ומשימות לתרגול בין הפגישות." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה מרחב פתוח וחופשי  |  7 = מסכים/ה מאוד - זקוק/ה למסגרת ברורה, כלים ומשימות" group="ts-q2" values={[1,2,3,4,5,6,7]} value={styleQ2} onChange={setStyleQ2} />
+        <ScaleRow label="בטיפול רגשי, נוח לי יותר עם מטפל שמגיב באופן פעיל, שואל, מכוון, מסכם ומביע את עמדתו, מאשר עם מטפל שמכיל יותר, שוהה ומתבונן." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה מטפל מכיל, שקט ומתבונן  |  7 = מסכים/ה מאוד - מעדיף/ה מטפל פעיל, מכוון ומעורב מילולית" group="ts-q3" values={[1,2,3,4,5,6,7]} value={styleQ3} onChange={setStyleQ3} />
         <NavRow onBack={() => {
             const onlyPD = answers.domains.length === 1 && answers.domains[0] === "personal_development";
             setScreen(onlyPD ? "domains" : "e10");
@@ -1969,9 +1972,9 @@ export default function AdultsPage() {
           {/* No threshold in the copy: telling people "3 of 6 = the bar" invites
               tailoring answers to the outcome, and goes stale when the bar moves. */}
           <p className="mb-1 text-xs text-[#6b7280]">סמן/י את כל מה שמתאר אותך</p>
-          <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א – חוסר קשב:</p>
+          <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א - חוסר קשב:</p>
           <CheckList items={ADHD1} checked={adhd1Checked} onChange={(i,v) => setAdhd1Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב – היפראקטיביות:</p>
+          <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב - היפראקטיביות:</p>
           <CheckList items={ADHD2} checked={adhd2Checked} onChange={(i,v) => setAdhd2Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <NavRow onBack={() => setScreen("f1")}
             onNext={() => {
@@ -1985,7 +1988,8 @@ export default function AdultsPage() {
                 // A positive attention block routes straight into the executive
                 // questionnaire: those are the people COG-FUN exists for, and
                 // the "קשיי התארגנות?" gate let them wave it off unseen.
-                ...(adhd1Checked.length >= 3 ? { f2: true } : {}),
+                f2Gate: adhd1Checked.length >= 3,
+                f2: adhd1Checked.length >= 3 || (answers.functional?.f2Bridge ?? false),
               });
               setScreen(answers.functional?.f1Processing ? "f1-ld" : (adhd1Checked.length >= 3 ? "f2-q" : "f2"));
             }} />
@@ -2022,8 +2026,8 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם יש לך <strong>קשיי התארגנות</strong> (תכנון, ניהול זמן, ניהול משימות)?</p>
-        <YesNo onYes={() => { updF({ f2: true }); setScreen("f2-q"); }}
-          onNo={() => { updF({ f2: false }); setScreen("f3"); }} />
+        <YesNo onYes={() => { updF({ f2Gate: true, f2: true }); setScreen("f2-q"); }}
+          onNo={() => { updF({ f2Gate: false, f2: answers.functional?.f2Bridge ?? false }); setScreen("f3"); }} />
       </Card>
     </Layout>
   );
@@ -2037,7 +2041,8 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={item} group={`exec-${i}`} values={[1,2,3]} value={execScores[i]}
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        <NavRow onBack={() => setScreen("f2")}
+        <NavRow
+          nextDisabled={!allExecAnswered()}
           onNext={() => {
             const a = updF({ execScores });
             if (execReturnsToNextDomain) {
@@ -2047,6 +2052,14 @@ export default function AdultsPage() {
               setScreen("f3");
             }
           }} />
+        {/* Required, for two reasons. A partial set still cleared the >= 12
+            threshold off four items and produced a COG-FUN recommendation; and
+            the occupational bridge decides whether to route here by asking
+            allExecAnswered(), so a screen left half-filled was offered again to
+            someone who had already worked through it. */}
+        {!allExecAnswered() && (
+          <p className="mt-3 text-sm font-semibold text-amber-700">יש לדרג את כל הפריטים כדי להמשיך</p>
+        )}
       </Card>
     </Layout>
   );
@@ -2122,7 +2135,13 @@ export default function AdultsPage() {
             // territory the occupational questions never probed. The bridge item
             // routes into the existing executive questionnaire - once - and its
             // Continue advances to the next domain rather than looping back here.
-            const a = updF({ empBItems: empBChecked, ...(empBChecked[4] ? { f2: true } : {}) });
+            // Recorded as this trigger's own flag, so stepping back and
+            // unticking the item withdraws it instead of leaving f2 latched on.
+            const a = updF({
+              empBItems: empBChecked,
+              f2Bridge: empBChecked[4],
+              f2: empBChecked[4] || (answers.functional?.f2Gate ?? false),
+            });
             if (empBChecked[4] && !allExecAnswered()) {
               setExecReturnsToNextDomain(true);
               setScreen("f2-q");
@@ -2524,15 +2543,15 @@ export default function AdultsPage() {
 
   if (screen === "a-gambling") {
     const GAMBLE_ITEMS = [
-      "עיסוק יתר בהימורים – מחשבות מתמשכות על הימורים (למשל, תכנון הימורים עתידיים, חשיבה על דרכים להשיג כסף להימורים).",
+      "עיסוק יתר בהימורים - מחשבות מתמשכות על הימורים (למשל, תכנון הימורים עתידיים, חשיבה על דרכים להשיג כסף להימורים).",
       "צורך להמר בסכומים הולכים וגדלים כדי להשיג את אותו ריגוש.",
-      "ניסיונות כושלים לחתוך או להפסיק את ההימורים – חוסר יכולת לשלוט בהרגלי ההימורים למרות ניסיונות חוזרים להפסיק.",
+      "ניסיונות כושלים לחתוך או להפסיק את ההימורים - חוסר יכולת לשלוט בהרגלי ההימורים למרות ניסיונות חוזרים להפסיק.",
       "תחושת אי-שקט או עצבנות כשמנסים לצמצם את ההימורים.",
       "הימור כדרך לברוח מבעיות או כדי להקל על מצב רגשי שלילי (כגון תחושת אשמה, חרדה, דיכאון).",
-      'חזרה להמר אחרי הפסדים – ניסיון "להחזיר" את הכסף שאבד באמצעות הימורים נוספים (תופעה שמכונה "ריצה אחרי הפסדים").',
-      "שקרים על מידת ההימורים – שקרים לבני משפחה, חברים או מטפלים כדי להסתיר את היקף ההימורים.",
-      "סיכון בקשרים אישיים, עבודה או לימודים – פגיעה במערכות יחסים, תעסוקה או הזדמנויות לימודיות כתוצאה מהימורים.",
-      "הסתמכות על אחרים לסיוע כלכלי – פנייה לאנשים אחרים כדי להשיג כסף ולחלץ את עצמך ממצב כלכלי שנגרם כתוצאה מההימורים.",
+      'חזרה להמר אחרי הפסדים - ניסיון "להחזיר" את הכסף שאבד באמצעות הימורים נוספים (תופעה שמכונה "ריצה אחרי הפסדים").',
+      "שקרים על מידת ההימורים - שקרים לבני משפחה, חברים או מטפלים כדי להסתיר את היקף ההימורים.",
+      "סיכון בקשרים אישיים, עבודה או לימודים - פגיעה במערכות יחסים, תעסוקה או הזדמנויות לימודיות כתוצאה מהימורים.",
+      "הסתמכות על אחרים לסיוע כלכלי - פנייה לאנשים אחרים כדי להשיג כסף ולחלץ את עצמך ממצב כלכלי שנגרם כתוצאה מההימורים.",
     ];
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
@@ -3054,7 +3073,7 @@ export default function AdultsPage() {
           setCombinedLabels(null);
         }}
       />
-      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים – {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
+      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים - {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
       {(matchResults ?? []).length > 0 && (
         <SaveMatchesButton
