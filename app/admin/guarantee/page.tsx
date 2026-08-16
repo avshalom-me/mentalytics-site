@@ -12,8 +12,28 @@ type GuaranteeRow = {
   window_end: string;
   days_left: number;
   contacts_in_window: number;
+  contacts_certain: number;
+  contacts_by_type: Record<string, number>;
   risk: "expired_no_contact" | "at_risk" | "watch" | "ok";
 };
+
+// שמות סוגי הפנייה כפי שהם מוצגים למטפל עצמו בדשבורד שלו - כדי ששתי
+// הצדדים של שיחת ההחזר ידברו באותם מונחים.
+const CLICK_TYPE_LABELS: Record<string, string> = {
+  site_message: "הודעה באתר",
+  whatsapp: "וואטסאפ",
+  phone: "טלפון",
+  email: "מייל",
+  other: "אחר",
+};
+
+function breakdownText(byType: Record<string, number>): string {
+  const order = ["site_message", "whatsapp", "phone", "email", "other"];
+  return Object.entries(byType)
+    .sort((a, b) => order.indexOf(a[0]) - order.indexOf(b[0]))
+    .map(([type, n]) => `${n} ${CLICK_TYPE_LABELS[type] ?? type}`)
+    .join(" · ");
+}
 
 const RISK_META: Record<GuaranteeRow["risk"], { label: string; cls: string }> = {
   expired_no_contact: { label: "חלון נסגר ללא פנייה", cls: "bg-red-50 border-red-200 text-red-700" },
@@ -60,7 +80,7 @@ export default function GuaranteePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: `ביטחון: לפעול עבור ${r.full_name} (${r.contacts_in_window} פניות, ${r.days_left} ימים)`,
+          title: `ביטחון: לפעול עבור ${r.full_name} (${r.contacts_in_window} פניות, מתוכן ${r.contacts_certain} הודעות ודאיות, ${r.days_left} ימים)`,
           entity_type: "therapist",
           entity_id: r.therapist_id,
           entity_label: r.full_name,
@@ -83,10 +103,14 @@ export default function GuaranteePage() {
           <h1 className="text-2xl font-black text-stone-900">מעקב תקופת ביטחון</h1>
           <HelpTip id="guarantee" />
         </div>
-        <p className="mb-5 text-sm text-stone-500">
+        <p className="mb-2 text-sm text-stone-500">
           התחייבות החזר: פנייה אחת לפחות בתוך {days} יום מתחילת המנוי. {attention.length > 0 && (
             <span className="font-bold text-amber-700">{attention.length} מטפלים דורשים תשומת לב.</span>
           )}
+        </p>
+        <p className="mb-5 text-xs text-stone-400">
+          הפילוח מתחת למספר מפריד בין <strong>הודעה באתר</strong> - פנייה ודאית שהטקסט שלה שמור
+          אצלנו - לבין לחיצת וואטסאפ/טלפון/מייל, שהיא מדד כוונה ואינה מוכיחה ששיחה התקיימה.
         </p>
 
         {error && (
@@ -124,8 +148,18 @@ export default function GuaranteePage() {
                           {meta.label}
                         </span>
                       </td>
-                      <td className={`px-4 py-3 font-black ${r.contacts_in_window === 0 ? "text-red-600" : "text-emerald-600"}`}>
-                        {r.contacts_in_window}
+                      <td className="px-4 py-3">
+                        <div className={`font-black ${r.contacts_in_window === 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          {r.contacts_in_window}
+                        </div>
+                        {r.contacts_in_window > 0 && (
+                          <div className="mt-0.5 text-[11px] leading-4 text-stone-400">
+                            {breakdownText(r.contacts_by_type)}
+                            {r.contacts_certain === 0 && (
+                              <span className="block font-bold text-amber-700">אין הודעה ודאית</span>
+                            )}
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3 font-bold text-stone-700">
                         {r.days_left >= 0 ? r.days_left : "נסגר"}

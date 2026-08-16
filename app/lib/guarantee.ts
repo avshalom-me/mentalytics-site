@@ -26,6 +26,13 @@ export type GuaranteeRow = {
   window_end: string;
   days_left: number; // negative → window already closed
   contacts_in_window: number;
+  // פילוח סוג הפנייה בתוך החלון. ההבחנה העסקית (כמו במשפך ה-SEO): הודעה
+  // שנשלחה דרך האתר היא פנייה *ודאית* - הטקסט שמור אצלנו; לחיצת
+  // וואטסאפ/טלפון/מייל היא *כוונה* בלבד ואינה מוכיחה ששיחה התקיימה.
+  // נחוץ בדיוק בשיחת ההחזר, שבה המטפל טוען "לא קיבלתי כלום" מול מונה
+  // שסופר לחיצות (16/8/26 - החזרת יכולת שאבדה עם עמוד "לחיצות").
+  contacts_certain: number; // site_message בלבד
+  contacts_by_type: Record<string, number>;
   risk: GuaranteeRisk;
 };
 
@@ -68,22 +75,38 @@ export async function computeGuarantee(): Promise<GuaranteeRow[]> {
     windows[0].start
   );
 
-  const clicks = await fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
+  const clicks = await fetchAllRows<{
+    therapist_id: string;
+    clicked_at: string;
+    click_type: string | null;
+  }>(() =>
     supabaseAdmin
       .from("therapist_contact_clicks")
-      .select("therapist_id, clicked_at")
+      .select("therapist_id, clicked_at, click_type")
       .in("therapist_id", ids)
       .gte("clicked_at", minStart.toISOString())
   );
 
+  // דלי אחד לכל מטפל, עם פענוח תאריך יחיד לכל לחיצה - במקום סריקה מלאה
+  // של כל הלחיצות עבור כל מטפל (הטבלה גדלה, החלון לא חסום מלמטה).
+  const clicksByTherapist = new Map<string, { at: number; type: string }[]>();
+  for (const c of clicks) {
+    const entry = { at: new Date(c.clicked_at).getTime(), type: c.click_type ?? "other" };
+    const arr = clicksByTherapist.get(c.therapist_id);
+    if (arr) arr.push(entry);
+    else clicksByTherapist.set(c.therapist_id, [entry]);
+  }
+
   const now = new Date();
   const rows: GuaranteeRow[] = windows.map(({ t, start, end }) => {
-    const contacts = clicks.filter(
-      (c) =>
-        c.therapist_id === t.id &&
-        new Date(c.clicked_at) >= start &&
-        new Date(c.clicked_at) <= end
-    ).length;
+    const startMs = start.getTime();
+    const endMs = end.getTime();
+    const inWindow = (clicksByTherapist.get(t.id) ?? []).filter(
+      (c) => c.at >= startMs && c.at <= endMs
+    );
+    const byType: Record<string, number> = {};
+    for (const c of inWindow) byType[c.type] = (byType[c.type] ?? 0) + 1;
+    const contacts = inWindow.length;
     const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 
     let risk: GuaranteeRisk;
@@ -100,6 +123,8 @@ export async function computeGuarantee(): Promise<GuaranteeRow[]> {
       window_end: end.toISOString(),
       days_left: daysLeft,
       contacts_in_window: contacts,
+      contacts_certain: byType["site_message"] ?? 0,
+      contacts_by_type: byType,
       risk,
     };
   });
