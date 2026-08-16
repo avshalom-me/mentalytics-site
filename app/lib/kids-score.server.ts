@@ -277,7 +277,15 @@ function computeResults(A: Ans): KidsBox[] {
     if (b >= 4) { const sv = b >= 7 ? "חמורה" : b >= 6 ? "בינונית" : "קלה"; addSyms.push("📊 נמצאו סימנים להתמכרות להימורים - " + sv); }
     if (A.ad_o) addSyms.push("📊 דווח על התמכרות אחרת - יש לפרט");
     if (addSyms.length) {
-      const ctrl = A.q4_ctrl || 5;
+      // Read only by the ב-ו branch below, and that screen now both requires an
+      // answer and is shown only to ב-ו, so an absent value means a client
+      // malfunction rather than a parent who skipped. It falls to the standard
+      // treatment for the finding; the parent-guidance branch is the
+      // modification for a child with no self-control at all, which is
+      // precisely what an absent answer cannot establish. Named rather than a
+      // bare `|| 5`, which read like a real reply at the end of the scale.
+      const CTRL_UNKNOWN = 5;
+      const ctrl = A.q4_ctrl || CTRL_UNKNOWN;
       const ref = grp === "ga"
         ? "✅ הפנייה: הדרכת הורים טיפולית"
         : grp === "bv"
@@ -367,6 +375,30 @@ function computeResults(A: Ans): KidsBox[] {
     if (bqTot >= 5) {
       const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
       addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
+    } else if (bqTot === 4) {
+      // Sub-clinical, but not nothing - and until now it produced nothing at
+      // all. Worse, two places on the screen already count 4 as a positive
+      // finding (hasGaPositive, and the anyPositive test that decides whether
+      // to ask the p-q10 catch-all), so a parent who flagged the regulation
+      // gate and answered 4 of 7 got an empty section AND lost the question
+      // that exists to catch exactly that. The old threshold was set by supply
+      // - there is no "פסיכולוג ילדים" therapist type - not by the clinical
+      // picture, which is the same reasoning that kept maths referrals silent
+      // in the academic block.
+      //
+      // The referral follows the child's own characteristics, in the same
+      // three-way this file already uses for the zy anxiety branch: a child
+      // with no motivation of their own is reached through the parents, one
+      // unlikely to practise between sessions does the work in a dynamic
+      // frame, and one who will practise gets CBT. traitNeeds collects both
+      // fields for this path - see regModerate there.
+      const m = A.t_motiv || 0, p = A.t_prac || 0;
+      const ref = grp === "ga"
+        ? getGaRef()
+        : m === 1 ? "✅ הפנייה: הדרכת הורים טיפולית"
+        : p <= 2  ? "✅ הפנייה: טיפול פסיכודינאמי"
+        :           "✅ הפנייה: טיפול CBT";
+      addToGroup("📊 נמצאו סימנים מתונים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
     }
   }
 
@@ -404,13 +436,31 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // BV merge: Q1+Q2+Q3 all positive → combined referral
+  //
+  // The test is whether those three findings were actually emitted, not a second
+  // copy of their thresholds. Recomputing them had drifted twice over:
+  //
+  //   - anxiety was tested at aq_tot >= 14 while the finding itself needs 16, so
+  //     between 14 and 15 the merge fired with no anxiety group to merge. The
+  //     combined referral was printed anyway, and its CBT component answered an
+  //     anxiety finding the report never made - next to a "מתח ברמה נמוכה" line
+  //     saying the opposite.
+  //   - the mood label list held only the non-severe wording, so a child whose
+  //     mood finding was severe (mq_tot >= 6, a different string) triggered the
+  //     merge and was then left out of it.
+  //
+  // Reading the emitted groups makes both impossible: a finding cannot be
+  // merged unless it exists, and it cannot be missed once it does.
   if (grp === "bv") {
-    const q1p = (A.q1 || 0) >= 3 && (A.aq_tot || 0) >= 14;
-    const q2p = (A.q2 || 0) >= 3;
-    const q3p = (A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4;
-    if (q1p && q2p && q3p) {
+    // Deliberately not the "ללא הגדרה ספציפית" fallback: it states that the
+    // anxiety was never characterised, which is not a basis for prescribing CBT.
+    const ANXIETY    = ["📊 נמצאו סימנים לחרדה"];
+    const SELF_IMAGE = ["📊 נמצאו סימנים לדימוי עצמי נמוך"];
+    const MOOD       = ["📊 נמצאו סימנים למצב רוח ירוד", "📊 נמצאו סימנים מובהקים של מצב רוח ירוד"];
+    const has = (labels: string[]) => emoGroups.some(g => g.symptoms.some(s => labels.includes(s)));
+    if (has(ANXIETY) && has(SELF_IMAGE) && has(MOOD)) {
       const combinedRef = "✅ הפנייה: טיפול פסיכודינאמי בשילוב CBT בשילוב הדרכת הורים";
-      const bvLabels = ["📊 נמצאו סימנים לחרדה", "📊 נמצאו סימנים לדימוי עצמי נמוך", "📊 נמצאו סימנים למצב רוח ירוד"];
+      const bvLabels = [...ANXIETY, ...SELF_IMAGE, ...MOOD];
       const mergedExtras: KidsBox[] = [];
       const mergedSymptoms: string[] = [];
       for (let i = emoGroups.length - 1; i >= 0; i--) {

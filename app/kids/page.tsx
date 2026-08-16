@@ -203,10 +203,17 @@ function traitNeeds(A: Ans): TraitNeeds {
   const socTherapyPossible = socDomainOn &&
     ((A.soc2 === "כן" && (A.soc2_sev || 0) >= 5) || A.soc3 === "כן");
 
+  // The sub-clinical regulation finding (q9 positive, bq_tot exactly 4) picks
+  // its referral from motivation and practice ability. It is emitted for ga and
+  // zy only - ב-ו routes to the attention questionnaire instead - and ga is
+  // already covered through gaConsent, since hasGaPositive counts bq_tot >= 4.
+  const regModerate = grp === "zy" && A.q9 === "כן" && (A.bq_tot || 0) === 4;
+
   return {
     motiv:
       (grp === "bv" && (anx || (emoOn && (A.q2 || 0) >= 3) || q10On || socOn)) ||
       (grp === "zy" && anx) ||
+      regModerate ||
       socTherapyPossible,
     // The bv scoring returns early at motivation 1 and 2 and never reads these
     // two, so asking below 3 collected answers straight into the bin.
@@ -218,7 +225,10 @@ function traitNeeds(A: Ans): TraitNeeds {
       (grp === "zy" && (q10On || socOn)),
     prac:
       (grp === "bv" && anx && aqTot > 20 && m >= 3) ||
-      (grp === "zy" && anx && m >= 2),
+      (grp === "zy" && anx && m >= 2) ||
+      // Same shape as the zy anxiety branch: practice ability is only consulted
+      // once motivation is above the "reach them through the parents" answer.
+      (regModerate && m >= 2),
     interests: grp === "zy" && (q10On || socOn),
     // The social branch routes ga children through buildGaRef too, off soc1 plus
     // an LSAS of 8, which hasGaPositive knows nothing about. An unanswered
@@ -249,7 +259,11 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-q4-s")       return !A.ad_s;
   if (pid === "p-q4-g")       return !A.ad_g;
   if (pid === "p-q4-b")       return !A.ad_b;
-  if (pid === "p-q4-ctrl")    return A.q4 !== "כן";
+  // Only ב-ו branch on this answer; gan-א always goes to therapeutic parent
+  // guidance and ז-יב always to specialist CBT, so asking them was collecting a
+  // reply straight into the bin - on the questionnaire whose main problem is
+  // its length.
+  if (pid === "p-q4-ctrl")    return A.q4 !== "כן" || gg(A) !== "bv";
   if (pid === "p-oq")         return A.q5 !== "כן";
   if (pid === "p-tq")         return A.q6 !== "כן";
   // Only the beliefs-only path still needs the follow-up items: reporting
@@ -1213,7 +1227,12 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           ))}
         </div>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      {/* Required: this single answer decides between parent guidance and CBT
+          for addictions, and skipping it used to fall through to a default of 5
+          - the far end of the scale, indistinguishable from a parent who chose
+          it deliberately. */}
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={!A.q4_ctrl} />
+      <IncompleteHint missing={A.q4_ctrl ? 0 : 1} />
     </div>
   );
 }
