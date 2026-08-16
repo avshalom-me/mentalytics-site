@@ -50,7 +50,6 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin/analytics", label: "אנליטיקס", icon: "📈" },
       { href: "/admin/seo", label: "SEO אורגני", icon: "🌱" },
-      { href: "/admin/stats", label: "לחיצות", icon: "📊" },
       { href: "/admin/supply-demand", label: "היצע/ביקוש", icon: "⚖️" },
     ],
   },
@@ -58,8 +57,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     label: "תוכן ודוחות",
     items: [
       { href: "/admin/articles", label: "מאמרים", icon: "📝" },
-      { href: "/admin/weekly-reports", label: "דוח שבועי", icon: "📬" },
-      { href: "/admin/monthly-reports", label: "דוח חודשי", icon: "🗓️" },
+      { href: "/admin/reports", label: "דוחות", icon: "📬" },
     ],
   },
 ];
