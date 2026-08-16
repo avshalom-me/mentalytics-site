@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
-import { startAgentRun, finishAgentRun, createAgentAction, agentEnabled } from "./agent-infra";
+import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
 import { ANALYTICS_EVENT_TYPES } from "./analytics-event-types";
 
@@ -316,44 +316,20 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
     const checks = await runChecks();
     const failures = checks.filter((c) => !c.ok);
 
-    // כל כישלון נכנס לתור ההצעות כהתראה - אחת פתוחה לכל בדיקה (dedupe),
-    // כך שדוח הבוקר מציג אותה גם אם מייל ההתראה עוד לא חמוש. במקביל -
-    // ל-createAgentAction אין מצב זריקה והמפתחות שונים זה מזה.
-    await Promise.all(
-      failures.map((f) =>
-        createAgentAction({
-          agent: "watchdog",
-          actionType: "alert",
-          title: `בדיקה לילית נכשלה: ${f.label}`,
-          body: f.detail,
-          dedupeKey: `watchdog:${f.key}`,
-        })
-      )
+    // כישלונות לתור + החלמה אוטומטית, דרך המנגנון המשותף: בדיקה שחזרה
+    // לעבור סוגרת את ההתראה שלה. בדיקות שדולגו אינן במפתחות המנוהלים,
+    // כדי שדילוג לא ייראה כהחלמה.
+    const managedKeys = checks.filter((c) => !c.skipped).map((c) => `watchdog:${c.key}`);
+    const { recovered } = await syncAgentAlerts(
+      "watchdog",
+      failures.map((f) => ({
+        actionType: "alert",
+        title: `בדיקה לילית נכשלה: ${f.label}`,
+        body: f.detail,
+        dedupeKey: `watchdog:${f.key}`,
+      })),
+      { managedKeys, recoveryNote: "הבדיקה חזרה לעבור - נסגר אוטומטית" }
     );
-
-    // החלמה אוטומטית: בדיקה שחזרה לעבור סוגרת בעצמה את ההתראה הממתינה
-    // שלה, עם הערה - כדי שהתור יציג רק את מה שעדיין שבור באמת.
-    let recovered = 0;
-    const passedKeys = checks.filter((c) => c.ok && !c.skipped).map((c) => `watchdog:${c.key}`);
-    if (passedKeys.length > 0) {
-      try {
-        const { data } = await supabaseAdmin
-          .from("agent_actions")
-          .update({
-            status: "dismissed",
-            status_changed_at: new Date().toISOString(),
-            resolved_by: "watchdog",
-            resolution_note: "הבדיקה חזרה לעבור - נסגר אוטומטית",
-          })
-          .eq("agent", "watchdog")
-          .eq("status", "pending")
-          .in("dedupe_key", passedKeys)
-          .select("id");
-        recovered = data?.length ?? 0;
-      } catch (e) {
-        console.error("watchdog auto-recovery failed:", e);
-      }
-    }
 
     let emailStatus: "sent" | "failed" | "skipped" = "skipped";
     let sendError = "";

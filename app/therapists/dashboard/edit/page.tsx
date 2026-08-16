@@ -442,7 +442,7 @@ export default function TherapistProfileEditPage() {
             )}
             <div className="mb-4 rounded-lg bg-[#0F5468]/8 border border-[#0F5468]/15 px-3 py-2">
               <p className="text-sm font-black text-[#0F5468] leading-6">
-                ללא סיכון - החזר כספי מלא אם לא תקבל/י פנייה<sup className="font-black">*</sup> בחודשיים הקרובים
+                ללא סיכון - החזר כספי מלא אם לא תקבל/י לחיצה על פנייה<sup className="font-black">*</sup> בחודשיים הקרובים
               </p>
               <p className="mt-1 text-[11px] text-[#0F5468]/70 leading-5">
                 <span className="font-bold">* פנייה</span> = קבלת מטופל בקליניקה. מבוסס על אמון מול המטפל.

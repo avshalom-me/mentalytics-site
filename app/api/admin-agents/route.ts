@@ -4,6 +4,7 @@ import { runDailyDigest } from "@/app/lib/daily-digest";
 import { runWatchdog } from "@/app/lib/watchdog";
 import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
 import { googleAdsConfigured } from "@/app/lib/google-ads";
+import { runAdsMonitor } from "@/app/lib/ads-monitor";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -94,6 +95,18 @@ export async function POST(req: NextRequest) {
         ok: result.ok,
         checks: result.checks,
         failures: result.failures.length,
+        error: result.error,
+      });
+    }
+    if (body?.action === "ads_run") {
+      const result = await runAdsMonitor();
+      return NextResponse.json({
+        ok: result.ok,
+        configured: result.configured,
+        findings: result.findings,
+        campaigns: result.campaigns,
+        spend_mtd: result.spendMtd,
+        budget_pace: result.budgetPace,
         error: result.error,
       });
     }

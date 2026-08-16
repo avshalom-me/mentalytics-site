@@ -36,10 +36,10 @@ function breakdownText(byType: Record<string, number>): string {
 }
 
 const RISK_META: Record<GuaranteeRow["risk"], { label: string; cls: string }> = {
-  expired_no_contact: { label: "חלון נסגר ללא פנייה", cls: "bg-red-50 border-red-200 text-red-700" },
+  expired_no_contact: { label: "חלון נסגר ללא לחיצה", cls: "bg-red-50 border-red-200 text-red-700" },
   at_risk: { label: "בסיכון", cls: "bg-amber-50 border-amber-200 text-amber-700" },
   watch: { label: "במעקב", cls: "bg-blue-50 border-blue-200 text-blue-700" },
-  ok: { label: "יש פנייה ✓", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
+  ok: { label: "יש לחיצה ✓", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
 };
 
 function fmtDate(iso: string): string {
@@ -80,7 +80,7 @@ export default function GuaranteePage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          title: `ביטחון: לפעול עבור ${r.full_name} (${r.contacts_in_window} פניות, מתוכן ${r.contacts_certain} הודעות ודאיות, ${r.days_left} ימים)`,
+          title: `ביטחון: לפעול עבור ${r.full_name} (${r.contacts_in_window} לחיצות, מתוכן ${r.contacts_certain} הודעות ודאיות, ${r.days_left} ימים)`,
           entity_type: "therapist",
           entity_id: r.therapist_id,
           entity_label: r.full_name,
@@ -104,12 +104,12 @@ export default function GuaranteePage() {
           <HelpTip id="guarantee" />
         </div>
         <p className="mb-2 text-sm text-stone-500">
-          התחייבות החזר: פנייה אחת לפחות בתוך {days} יום מתחילת המנוי. {attention.length > 0 && (
+          התחייבות החזר: לחיצה אחת על פנייה לפחות בתוך {days} יום מתחילת המנוי. {attention.length > 0 && (
             <span className="font-bold text-amber-700">{attention.length} מטפלים דורשים תשומת לב.</span>
           )}
         </p>
         <p className="mb-5 text-xs text-stone-400">
-          הפילוח מתחת למספר מפריד בין <strong>הודעה באתר</strong> - פנייה ודאית שהטקסט שלה שמור
+          הפילוח מתחת למספר מפריד בין <strong>הודעה באתר</strong> - הודעה ודאית שהטקסט שלה שמור
           אצלנו - לבין לחיצת וואטסאפ/טלפון/מייל, שהיא מדד כוונה ואינה מוכיחה ששיחה התקיימה.
         </p>
 
@@ -131,7 +131,7 @@ export default function GuaranteePage() {
                 <tr className="border-b border-stone-200 text-start text-xs text-stone-400">
                   <th className="px-4 py-2.5 text-start font-bold">מטפל/ת</th>
                   <th className="px-4 py-2.5 text-start font-bold">סטטוס</th>
-                  <th className="px-4 py-2.5 text-start font-bold">פניות בחלון</th>
+                  <th className="px-4 py-2.5 text-start font-bold">לחיצות בחלון</th>
                   <th className="px-4 py-2.5 text-start font-bold">ימים שנותרו</th>
                   <th className="px-4 py-2.5 text-start font-bold">חלון האחריות</th>
                   <th className="px-4 py-2.5 text-start font-bold">פעולות</th>

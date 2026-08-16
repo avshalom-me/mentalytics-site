@@ -101,10 +101,19 @@ type ConversionsPreview = {
   pending: PendingConversion[];
 };
 
+type AdsRun = {
+  configured: boolean;
+  findings: { key: string; severity: string; title: string; detail: string }[];
+  campaigns: { name: string; utm: string | null; cost: number; clicks: number; contacts: number; cpl: number | null }[];
+  spend_mtd: number;
+  budget_pace: { expected: number; actual: number } | null;
+};
+
 const AGENT_LABELS: Record<string, string> = {
   daily_digest: "בקר הבוקר",
   watchdog: "שומר הלילה",
   conversions: "המרות לגוגל",
+  ads: "סוכן הפרסום",
 };
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
@@ -146,6 +155,10 @@ export default function AgentsPage() {
   const [watchdogLoading, setWatchdogLoading] = useState(false);
   const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
   const [watchdogError, setWatchdogError] = useState("");
+
+  const [adsLoading, setAdsLoading] = useState(false);
+  const [ads, setAds] = useState<AdsRun | null>(null);
+  const [adsError, setAdsError] = useState("");
 
   const [convLoading, setConvLoading] = useState(false);
   const [conv, setConv] = useState<ConversionsPreview | null>(null);
@@ -200,6 +213,21 @@ export default function AgentsPage() {
       setWatchdogError(e instanceof Error ? e.message : "שגיאה בהרצת הבדיקות");
     } finally {
       setWatchdogLoading(false);
+    }
+  }
+
+  async function runAdsNow() {
+    setAdsLoading(true);
+    setAdsError("");
+    setAds(null);
+    try {
+      const j = await postAgents("ads_run");
+      setAds(j as unknown as AdsRun);
+      load();
+    } catch (e) {
+      setAdsError(e instanceof Error ? e.message : "שגיאה בניטור הפרסום");
+    } finally {
+      setAdsLoading(false);
     }
   }
 
@@ -406,6 +434,90 @@ export default function AgentsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        {/* סוכן הפרסום */}
+        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 className="font-black text-stone-900">📣 סוכן הפרסום</h2>
+            <button
+              onClick={runAdsNow}
+              disabled={adsLoading}
+              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {adsLoading ? "בודק..." : "הרץ ניטור עכשיו"}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500 mb-4">
+            מצליב כל בוקר את ההוצאה בגוגל מול המשפך הפנימי: קמפיין ששורף כסף בלי לחיצות פנייה,
+            עלות מעל היעד, חריגה מקצב התקציב, וקמפיין בלי utm שאי אפשר למדוד. קריאה בלבד -
+            הסוכן לא נוגע בקמפיינים, רק מציע.
+          </p>
+
+          {adsError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{adsError}</div>
+          )}
+
+          {ads && !ads.configured && (
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+              חיבור Google Ads לא מוגדר בסביבה הזו.
+            </div>
+          )}
+
+          {ads && ads.configured && (
+            <div className="space-y-3">
+              {ads.budget_pace && (
+                <div className="text-xs text-stone-500">
+                  הוצאה החודש: <strong>₪{ads.spend_mtd.toLocaleString("he-IL")}</strong> · לפי הקצב המתוכנן:
+                  ₪{ads.budget_pace.expected.toLocaleString("he-IL")}
+                </div>
+              )}
+              {ads.findings.length === 0 ? (
+                <p className="text-sm text-stone-500">אין ממצאים - הקמפיינים בטווח הנורמה.</p>
+              ) : (
+                ads.findings.map((f) => (
+                  <div
+                    key={f.key}
+                    className={`rounded-xl border p-4 ${f.severity === "high" ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}
+                  >
+                    <div className="font-bold text-sm text-stone-900 mb-1">{f.title}</div>
+                    <div className="text-sm text-stone-600 leading-6">{f.detail}</div>
+                  </div>
+                ))
+              )}
+              {ads.campaigns.length > 0 && (
+                <div className="overflow-x-auto rounded-xl border border-stone-200">
+                  <table className="w-full text-sm" dir="rtl">
+                    <thead>
+                      <tr className="border-b border-stone-200 bg-stone-50 text-right text-xs text-stone-500">
+                        <th className="px-3 py-2 font-bold">קמפיין</th>
+                        <th className="px-3 py-2 font-bold">הוצאה (7 ימים)</th>
+                        <th className="px-3 py-2 font-bold">קליקים</th>
+                        <th className="px-3 py-2 font-bold">לחיצות פנייה</th>
+                        <th className="px-3 py-2 font-bold">עלות ללחיצה</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ads.campaigns.map((c) => (
+                        <tr key={c.name} className="border-b border-stone-100 last:border-0">
+                          <td className="px-3 py-1.5 font-bold text-stone-700">
+                            {c.name}
+                            {!c.utm && <span className="text-red-600 text-xs"> (בלי utm)</span>}
+                          </td>
+                          <td className="px-3 py-1.5 text-stone-600">₪{c.cost.toLocaleString("he-IL")}</td>
+                          <td className="px-3 py-1.5 text-stone-500">{c.clicks}</td>
+                          <td className={`px-3 py-1.5 font-bold ${c.contacts === 0 ? "text-red-600" : "text-emerald-600"}`}>
+                            {c.contacts}
+                          </td>
+                          <td className="px-3 py-1.5 text-stone-600">{c.cpl != null ? `₪${c.cpl}` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </section>

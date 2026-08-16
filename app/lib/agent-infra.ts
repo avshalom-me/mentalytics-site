@@ -58,6 +58,63 @@ export async function finishAgentRun(
   }
 }
 
+// סנכרון התראות סוכן: יוצר את מה שפעיל עכשיו, וסוגר אוטומטית התראות
+// ממתינות שהמצב שלהן כבר לא מתקיים ("החלימו"). מנגנון משותף - שומר הלילה
+// וסוכן הפרסום משתמשים בו, וכל סוכן עתידי יקבל אותו בחינם.
+//
+// managedKeys = כל המפתחות שהריצה הזו באמת בדקה. מפתח שממתין בתור אך לא
+// נבדק בריצה (למשל בדיקה שדולגה) לא ייסגר בטעות.
+export async function syncAgentAlerts(
+  agent: string,
+  active: Omit<NewAgentAction, "agent">[],
+  opts?: { managedKeys?: string[]; recoveryNote?: string }
+): Promise<{ created: number; recovered: number }> {
+  const results = await Promise.all(
+    active.map((a) => createAgentAction({ agent, ...a }))
+  );
+  const created = results.filter((r) => r.created).length;
+
+  const activeKeys = new Set(
+    active.map((a) => a.dedupeKey).filter((k): k is string => Boolean(k))
+  );
+  const managed = opts?.managedKeys;
+  let recovered = 0;
+  try {
+    const { data: pendingRows } = await supabaseAdmin
+      .from("agent_actions")
+      .select("id, dedupe_key")
+      .eq("agent", agent)
+      .eq("status", "pending")
+      .not("dedupe_key", "is", null);
+
+    const staleIds = (pendingRows ?? [])
+      .filter((r) => {
+        const key = r.dedupe_key as string;
+        if (activeKeys.has(key)) return false; // עדיין פעיל
+        return managed ? managed.includes(key) : true; // רק מה שנבדק בפועל
+      })
+      .map((r) => r.id as string);
+
+    if (staleIds.length > 0) {
+      const { data } = await supabaseAdmin
+        .from("agent_actions")
+        .update({
+          status: "dismissed",
+          status_changed_at: new Date().toISOString(),
+          resolved_by: agent,
+          resolution_note: opts?.recoveryNote ?? "המצב חזר לתקין - נסגר אוטומטית",
+        })
+        .in("id", staleIds)
+        .select("id");
+      recovered = data?.length ?? 0;
+    }
+  } catch (e) {
+    console.error(`syncAgentAlerts(${agent}) recovery failed:`, e);
+  }
+
+  return { created, recovered };
+}
+
 export type NewAgentAction = {
   agent: string;
   actionType: string;

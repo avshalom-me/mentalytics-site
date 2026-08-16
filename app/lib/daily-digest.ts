@@ -128,8 +128,8 @@ async function gatherSections(): Promise<DigestSection[]> {
         .slice(0, MAX_LINES_PER_SECTION)
         .map((g) =>
           g.risk === "expired_no_contact"
-            ? `${g.full_name} · החלון נסגר בלי פניות`
-            : `${g.full_name} · ${g.days_left} ימים נותרו · ${g.contacts_in_window} פניות`
+            ? `${g.full_name} · החלון נסגר בלי אף לחיצה`
+            : `${g.full_name} · ${g.days_left} ימים נותרו · ${g.contacts_in_window} לחיצות`
         ),
       link: "/admin/guarantee",
     });
