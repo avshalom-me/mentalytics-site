@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { runDailyDigest } from "@/app/lib/daily-digest";
 import { runWatchdog } from "@/app/lib/watchdog";
+import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -67,6 +68,27 @@ export async function POST(req: NextRequest) {
         checks: result.checks,
         failures: result.failures.length,
         error: result.error,
+      });
+    }
+    if (body?.action === "conversions_preview") {
+      const result = await runConversionsSync({ send: false });
+      return NextResponse.json({
+        ok: result.ok,
+        configured: result.configured,
+        actions: result.actions,
+        actions_ready: result.actionsReady,
+        pending: result.pending,
+        error: result.error,
+      });
+    }
+    // הקמה חד-פעמית של פעולות ההמרה בחשבון גוגל - כתיבה יחידה, מופעלת רק
+    // מקליק מפורש בכפתור ייעודי (עם אישור) בעמוד הסוכנים.
+    if (body?.action === "conversions_setup") {
+      const actions = await setupConversionActions();
+      return NextResponse.json({
+        ok: true,
+        actions,
+        actions_ready: Boolean(actions.quiz && actions.subscription),
       });
     }
     return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });

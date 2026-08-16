@@ -373,6 +373,30 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
       });
     }
 
+    // החלמה אוטומטית: בדיקה שחזרה לעבור סוגרת בעצמה את ההתראה הממתינה
+    // שלה, עם הערה - כדי שהתור יציג רק את מה שעדיין שבור באמת.
+    let recovered = 0;
+    const passedKeys = checks.filter((c) => c.ok && !c.skipped).map((c) => `watchdog:${c.key}`);
+    if (passedKeys.length > 0) {
+      try {
+        const { data } = await supabaseAdmin
+          .from("agent_actions")
+          .update({
+            status: "dismissed",
+            status_changed_at: new Date().toISOString(),
+            resolved_by: "watchdog",
+            resolution_note: "הבדיקה חזרה לעבור - נסגר אוטומטית",
+          })
+          .eq("agent", "watchdog")
+          .eq("status", "pending")
+          .in("dedupe_key", passedKeys)
+          .select("id");
+        recovered = data?.length ?? 0;
+      } catch (e) {
+        console.error("watchdog auto-recovery failed:", e);
+      }
+    }
+
     let emailStatus: "sent" | "failed" | "skipped" = "skipped";
     let sendError = "";
     if (failures.length > 0 && opts.send && process.env.RESEND_API_KEY) {
@@ -417,13 +441,15 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
     await finishAgentRun(runId, {
       status: failures.length > 0 ? "error" : "ok",
       summary:
-        failures.length > 0
+        (failures.length > 0
           ? `⚠️ נכשלו ${failures.length} מתוך ${checks.length} בדיקות: ${failures.map((f) => f.label).join(", ")}`
-          : `כל ${passed} הבדיקות עברו${skipped > 0 ? ` (${skipped} דולגו)` : ""}`,
+          : `כל ${passed} הבדיקות עברו${skipped > 0 ? ` (${skipped} דולגו)` : ""}`) +
+        (recovered > 0 ? ` · ${recovered} התראות נסגרו אוטומטית (החלימו)` : ""),
       details: {
         mode,
         checks: checks.map((c) => ({ key: c.key, ok: c.ok, skipped: c.skipped ?? false, detail: c.detail, ms: c.ms })),
         email_status: emailStatus,
+        recovered_alerts: recovered,
       },
       error: failures.length > 0 ? failures.map((f) => `${f.key}: ${f.detail}`).join(" | ") : undefined,
     });

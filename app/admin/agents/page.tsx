@@ -65,9 +65,24 @@ type WatchdogRun = {
   failures: number;
 };
 
+type PendingConversion = {
+  payment_id: string;
+  payment_type: string;
+  value_ils: number;
+  paid_at: string;
+  click_id_kind: string;
+};
+
+type ConversionsPreview = {
+  configured: boolean;
+  actions_ready: boolean;
+  pending: PendingConversion[];
+};
+
 const AGENT_LABELS: Record<string, string> = {
   daily_digest: "בקר הבוקר",
   watchdog: "שומר הלילה",
+  conversions: "המרות לגוגל",
 };
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
@@ -107,6 +122,11 @@ export default function AgentsPage() {
   const [watchdogLoading, setWatchdogLoading] = useState(false);
   const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
   const [watchdogError, setWatchdogError] = useState("");
+
+  const [convLoading, setConvLoading] = useState(false);
+  const [conv, setConv] = useState<ConversionsPreview | null>(null);
+  const [convError, setConvError] = useState("");
+  const [convMsg, setConvMsg] = useState("");
 
   function load() {
     setLoading(true);
@@ -167,6 +187,49 @@ export default function AgentsPage() {
       setWatchdogError("שגיאה בהרצת הבדיקות");
     } finally {
       setWatchdogLoading(false);
+    }
+  }
+
+  async function conversionsPreview() {
+    setConvLoading(true);
+    setConvError("");
+    setConvMsg("");
+    try {
+      const res = await fetch("/api/admin-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "conversions_preview" }),
+      });
+      const j = await res.json();
+      if (j.ok) setConv(j);
+      else setConvError(j.error || "שגיאה בתצוגה המקדימה");
+      load();
+    } catch {
+      setConvError("שגיאה בתצוגה המקדימה");
+    } finally {
+      setConvLoading(false);
+    }
+  }
+
+  async function conversionsSetup() {
+    if (!window.confirm("להקים בחשבון Google Ads שתי פעולות המרה (רכישת שאלון, מנוי מטפל)? זו פעולה חד-פעמית בחשבון הפרסום.")) return;
+    setConvLoading(true);
+    setConvError("");
+    try {
+      const res = await fetch("/api/admin-agents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "conversions_setup" }),
+      });
+      const j = await res.json();
+      if (j.ok) {
+        setConvMsg("פעולות ההמרה קיימות בחשבון ✓");
+        setConv(conv ? { ...conv, actions_ready: j.actions_ready } : conv);
+      } else setConvError(j.error || "שגיאה בהקמה");
+    } catch {
+      setConvError("שגיאה בהקמה");
+    } finally {
+      setConvLoading(false);
     }
   }
 
@@ -300,6 +363,86 @@ export default function AgentsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        {/* המרות לגוגל */}
+        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 className="font-black text-stone-900">📈 המרות אמת לגוגל</h2>
+            <button
+              onClick={conversionsPreview}
+              disabled={convLoading}
+              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {convLoading ? "בודק..." : "תצוגה מקדימה"}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500 mb-4">
+            מדווח לגוגל על תשלומים אמיתיים שהגיעו מקליק ממומן (דרך מזהה הקליק בלבד - בלי שום פרט
+            אישי), כדי שהאופטימיזציה תרדוף לקוחות משלמים. רץ יומית בתצוגה מקדימה; העלאה אמיתית רק
+            אחרי הקמת פעולות ההמרה וחימוש.
+          </p>
+
+          {convError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{convError}</div>
+          )}
+          {convMsg && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">{convMsg}</div>
+          )}
+
+          {conv && !conv.configured && (
+            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+              חיבור Google Ads לא מוגדר בסביבה הזו.
+            </div>
+          )}
+
+          {conv && conv.configured && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 text-sm">
+                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${conv.actions_ready ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
+                  {conv.actions_ready ? "פעולות ההמרה קיימות בחשבון ✓" : "פעולות ההמרה טרם הוקמו"}
+                </span>
+                {!conv.actions_ready && (
+                  <button
+                    onClick={conversionsSetup}
+                    disabled={convLoading}
+                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    הקם פעולות המרה בגוגל
+                  </button>
+                )}
+              </div>
+              {conv.pending.length === 0 ? (
+                <p className="text-sm text-stone-500">
+                  אין כרגע תשלומים עם מזהה קליק שממתינים להעלאה - הצינור מוכן וימלא את עצמו ברגע
+                  שלקוח משלם יגיע מקליק ממומן.
+                </p>
+              ) : (
+                <div className="overflow-x-auto rounded-xl border border-stone-200">
+                  <table className="w-full text-sm" dir="rtl">
+                    <thead>
+                      <tr className="border-b border-stone-200 bg-stone-50 text-right text-xs text-stone-500">
+                        <th className="px-3 py-2 font-bold">סוג</th>
+                        <th className="px-3 py-2 font-bold">סכום</th>
+                        <th className="px-3 py-2 font-bold">תאריך תשלום</th>
+                        <th className="px-3 py-2 font-bold">מזהה קליק</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {conv.pending.map((p) => (
+                        <tr key={p.payment_id} className="border-b border-stone-100 last:border-0">
+                          <td className="px-3 py-1.5 font-bold text-stone-700">{p.payment_type === "quiz" ? "שאלון" : "מנוי מטפל"}</td>
+                          <td className="px-3 py-1.5 text-stone-600">₪{p.value_ils}</td>
+                          <td className="px-3 py-1.5 text-stone-500">{fmtDateTime(p.paid_at)}</td>
+                          <td className="px-3 py-1.5 text-stone-400 text-xs">{p.click_id_kind}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </section>
