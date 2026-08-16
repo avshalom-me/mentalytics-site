@@ -47,6 +47,10 @@ export type DashboardData = {
       priority: string | null;
       snoozed_until: string | null;
     }[];
+    // פניות שמופנות לחברה בלבד. החלטת מדיניות (15/8/26): הודעת מטופל
+    // למטפל/מרכז דרך האתר (source='site_message') היא עניינו של המטפל
+    // שקיבל אותה במייל - לא עבודת אדמין. הפיצול חי כאן, פעם אחת, כדי
+    // שהדשבורד ודוח הבוקר יסכימו מבנייה (ולא כל צרכן יסנן לבד).
     new_leads: {
       id: string;
       lead_type: string | null;
@@ -57,6 +61,9 @@ export type DashboardData = {
       source: string | null;
       created_at: string | null;
     }[];
+    new_leads_total: number; // כלל פניות-החברה הממתינות (לפני חיתוך התצוגה)
+    new_leads_oldest_at: string | null; // הוותיקה ביותר - למדד "ממתין מעל X ימים"
+    therapist_messages_count: number; // הודעות מטופל→מטפל בסטטוס חדשה (מידע, לא עבודה)
     failed_payments: {
       therapist_id: string;
       full_name: string;
@@ -177,6 +184,16 @@ export async function buildDashboardData(): Promise<DashboardData> {
     (t) => !t.snoozed_until || t.snoozed_until <= todayIso
   );
 
+  // פיצול הלידים לפי מדיניות 15/8: פניות לחברה = עבודת אדמין; הודעות
+  // מטופל→מטפל (site_message) נספרות בנפרד ואינן "עבודה". הפיצול נעשה על
+  // הרשימה המלאה (עד 50), לפני כל חיתוך תצוגה.
+  const allNewLeads = newLeadsRes.data ?? [];
+  const adminLeads = allNewLeads.filter((l) => l.source !== "site_message");
+  const therapistMessagesCount = allNewLeads.length - adminLeads.length;
+  // הרשימה ממוינת מהחדש לישן - הוותיקה ביותר היא האחרונה.
+  const oldestAdminLeadAt =
+    adminLeads.length > 0 ? adminLeads[adminLeads.length - 1].created_at : null;
+
   const failedPayments = failedPaymentsRes.data ?? [];
   const failedNames: Record<string, string> = {};
   if (failedPayments.length > 0) {
@@ -194,7 +211,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
       paying_count: paying.length,
       listed_count: paying.filter((t) => t.admin_approved).length + approvedFree.length,
       contacts_7d: contacts7dRes.count ?? 0,
-      new_leads_count: (newLeadsRes.data ?? []).length,
+      new_leads_count: adminLeads.length,
       open_tasks_count: openTasksCountRes.count ?? 0,
       quiz_completes_month: quizCompleteMonthRes.count ?? 0,
     },
@@ -207,7 +224,10 @@ export async function buildDashboardData(): Promise<DashboardData> {
       guarantee_attention: guaranteeAttention.slice(0, 10),
       guarantee_attention_count: guaranteeAttention.length,
       due_tasks: dueTasks,
-      new_leads: (newLeadsRes.data ?? []).slice(0, 10),
+      new_leads: adminLeads.slice(0, 10),
+      new_leads_total: adminLeads.length,
+      new_leads_oldest_at: oldestAdminLeadAt,
+      therapist_messages_count: therapistMessagesCount,
       failed_payments: failedPayments.map((p) => ({
         therapist_id: p.reference_id,
         full_name: failedNames[p.reference_id] ?? "",

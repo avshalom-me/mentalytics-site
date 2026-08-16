@@ -51,6 +51,28 @@ type DigestPreview = {
   recipients: string[];
 };
 
+type LatestDigest = {
+  started_at: string;
+  status: string;
+  sections: DigestSection[];
+  ai_summary: string | null;
+};
+
+// POST אחיד מול ה-API - בודק גם HTTP וגם ok, ומחזיר שגיאה קריאה אחת
+// (ממצא ביקורת: ההנדלרים הועתקו ארבע פעמים וכשל PATCH נבלע בשקט).
+async function postAgents(action: string, extra?: Record<string, unknown>): Promise<Record<string, unknown>> {
+  const res = await fetch("/api/admin-agents", {
+    method: action === "resolve" ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(action === "resolve" ? extra : { action, ...extra }),
+  });
+  const j = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+  if (!res.ok || j.ok !== true) {
+    throw new Error(String(j.error ?? `שגיאה (${res.status})`));
+  }
+  return j;
+}
+
 type WatchdogCheck = {
   key: string;
   label: string;
@@ -111,9 +133,11 @@ export default function AgentsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [pending, setPending] = useState<PendingAction[]>([]);
   const [resolved, setResolved] = useState<ResolvedAction[]>([]);
+  const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [actionError, setActionError] = useState("");
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
@@ -138,6 +162,7 @@ export default function AgentsPage() {
           setRuns(j.runs ?? []);
           setPending(j.pending_actions ?? []);
           setResolved(j.resolved_actions ?? []);
+          setLatestDigest(j.latest_digest ?? null);
         } else setError(j.error || "שגיאה בטעינה");
       })
       .catch(() => setError("שגיאה בטעינה"))
@@ -153,17 +178,11 @@ export default function AgentsPage() {
     setPreviewError("");
     setPreview(null);
     try {
-      const res = await fetch("/api/admin-agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "digest_preview" }),
-      });
-      const j = await res.json();
-      if (j.ok) setPreview(j);
-      else setPreviewError(j.error || "שגיאה בהפקת התצוגה המקדימה");
+      const j = await postAgents("digest_preview");
+      setPreview(j as unknown as DigestPreview);
       load(); // הריצה נרשמת ביומן
-    } catch {
-      setPreviewError("שגיאה בהפקת התצוגה המקדימה");
+    } catch (e) {
+      setPreviewError(e instanceof Error ? e.message : "שגיאה בהפקת התצוגה המקדימה");
     } finally {
       setPreviewLoading(false);
     }
@@ -174,17 +193,11 @@ export default function AgentsPage() {
     setWatchdogError("");
     setWatchdog(null);
     try {
-      const res = await fetch("/api/admin-agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "watchdog_run" }),
-      });
-      const j = await res.json();
-      if (j.ok) setWatchdog(j);
-      else setWatchdogError(j.error || "שגיאה בהרצת הבדיקות");
+      const j = await postAgents("watchdog_run");
+      setWatchdog(j as unknown as WatchdogRun);
       load();
-    } catch {
-      setWatchdogError("שגיאה בהרצת הבדיקות");
+    } catch (e) {
+      setWatchdogError(e instanceof Error ? e.message : "שגיאה בהרצת הבדיקות");
     } finally {
       setWatchdogLoading(false);
     }
@@ -195,17 +208,11 @@ export default function AgentsPage() {
     setConvError("");
     setConvMsg("");
     try {
-      const res = await fetch("/api/admin-agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "conversions_preview" }),
-      });
-      const j = await res.json();
-      if (j.ok) setConv(j);
-      else setConvError(j.error || "שגיאה בתצוגה המקדימה");
+      const j = await postAgents("conversions_preview");
+      setConv(j as unknown as ConversionsPreview);
       load();
-    } catch {
-      setConvError("שגיאה בתצוגה המקדימה");
+    } catch (e) {
+      setConvError(e instanceof Error ? e.message : "שגיאה בתצוגה המקדימה");
     } finally {
       setConvLoading(false);
     }
@@ -215,19 +222,14 @@ export default function AgentsPage() {
     if (!window.confirm("להקים בחשבון Google Ads שתי פעולות המרה (רכישת שאלון, מנוי מטפל)? זו פעולה חד-פעמית בחשבון הפרסום.")) return;
     setConvLoading(true);
     setConvError("");
+    setConvMsg("");
     try {
-      const res = await fetch("/api/admin-agents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "conversions_setup" }),
-      });
-      const j = await res.json();
-      if (j.ok) {
-        setConvMsg("פעולות ההמרה קיימות בחשבון ✓");
-        setConv(conv ? { ...conv, actions_ready: j.actions_ready } : conv);
-      } else setConvError(j.error || "שגיאה בהקמה");
-    } catch {
-      setConvError("שגיאה בהקמה");
+      const j = await postAgents("conversions_setup");
+      setConvMsg("פעולות ההמרה קיימות בחשבון ✓");
+      setConv(conv ? { ...conv, actions_ready: Boolean(j.actions_ready) } : conv);
+      load();
+    } catch (e) {
+      setConvError(e instanceof Error ? e.message : "שגיאה בהקמה");
     } finally {
       setConvLoading(false);
     }
@@ -235,12 +237,13 @@ export default function AgentsPage() {
 
   async function resolveAction(id: string, status: "approved" | "dismissed" | "pending") {
     setBusyId(id);
+    setActionError("");
     try {
-      await fetch("/api/admin-agents", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, status }),
-      });
+      await postAgents("resolve", { id, status });
+      load();
+    } catch (e) {
+      // כשל מוצג במקום להיבלע - למשל "החזר" כשכבר קיימת הצעה זהה ממתינה.
+      setActionError(e instanceof Error ? e.message : "הפעולה נכשלה");
       load();
     } finally {
       setBusyId(null);
@@ -273,9 +276,49 @@ export default function AgentsPage() {
             </button>
           </div>
           <p className="text-xs text-stone-500 mb-4">
-            רץ כל בוקר במצב תצוגה מקדימה (לא שולח מייל). אחרי שתבחן כאן את התוכן ותאשר,
-            נחמש את השליחה היומית.
+            רץ כל בוקר ושומר את הדוח כאן בעמוד. המיילים כבויים בכוונה (החלטה 16/8) - הכול
+            נצפה ישירות למטה. הכפתור מפיק דוח טרי ברגע זה.
           </p>
+
+          {latestDigest && !preview && (
+            <div className="mb-4">
+              <div className="text-xs font-bold text-stone-400 mb-2">
+                הדוח האחרון · {fmtDateTime(latestDigest.started_at)}
+              </div>
+              {latestDigest.status === "empty" || latestDigest.sections.length === 0 ? (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
+                  בריצה האחרונה לא היה אף פריט שדורש תשומת לב.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {latestDigest.ai_summary && (
+                    <div className="rounded-xl bg-[#EAF4F3] p-4 text-sm text-[#2A6462] leading-7 whitespace-pre-line">
+                      {latestDigest.ai_summary}
+                    </div>
+                  )}
+                  {latestDigest.sections.map((s) => (
+                    <div key={s.key} className="rounded-xl border border-stone-200 p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="font-bold text-stone-900 text-sm">
+                          {s.label} ({s.count})
+                        </span>
+                        {s.urgent && (
+                          <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
+                            דורש טיפול
+                          </span>
+                        )}
+                      </div>
+                      <ul className="list-disc ps-5 text-sm text-stone-600 leading-6">
+                        {s.lines.map((l, i) => (
+                          <li key={i}>{l}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
           {previewError && (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">
@@ -452,6 +495,11 @@ export default function AgentsPage() {
           <h2 className="text-sm font-black text-stone-500 mb-3">
             הצעות ממתינות לאישור ({pending.length})
           </h2>
+          {actionError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
+              {actionError}
+            </div>
+          )}
           {loading && <p className="text-sm text-stone-400">טוען...</p>}
           {!loading && pending.length === 0 && (
             <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400">

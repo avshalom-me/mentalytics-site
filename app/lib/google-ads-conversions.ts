@@ -90,7 +90,10 @@ function actionNameFor(paymentType: string): string {
   return paymentType === "quiz" ? CONV_ACTION_QUIZ : CONV_ACTION_SUBSCRIPTION;
 }
 
-async function fetchPendingRows(): Promise<PendingConversion[]> {
+// שליפה אחת שמשרתת גם את התצוגה המקדימה וגם את ההעלאה: מזהי הקליק נשארים
+// בשורות הגולמיות (לא נשלחים לדפדפן), והתקדימות gclid→gbraid→wbraid מחושבת
+// פעם אחת (ממצא ביקורת: שתי שליפות + תקדימות כפולה = מרווח לסטייה).
+async function fetchPendingRows(): Promise<{ preview: PendingConversion[]; rows: PaymentRow[] }> {
   const sinceIso = new Date(Date.now() - MAX_AGE_DAYS * 86_400_000).toISOString();
   const { data, error } = await supabaseAdmin
     .from("payments")
@@ -104,14 +107,16 @@ async function fetchPendingRows(): Promise<PendingConversion[]> {
     .limit(MAX_BATCH);
   if (error) throw new Error(`payments query failed: ${error.message}`);
 
-  return ((data ?? []) as PaymentRow[]).map((p) => ({
+  const rows = (data ?? []) as PaymentRow[];
+  const preview = rows.map((p) => ({
     payment_id: p.id,
     payment_type: p.payment_type,
     action_name: actionNameFor(p.payment_type),
     value_ils: Number(p.amount ?? 0),
     paid_at: p.created_at,
-    click_id_kind: p.gclid ? "gclid" : p.gbraid ? "gbraid" : "wbraid",
+    click_id_kind: (p.gclid ? "gclid" : p.gbraid ? "gbraid" : "wbraid") as PendingConversion["click_id_kind"],
   }));
+  return { preview, rows };
 }
 
 type GaqlConvRow = { conversionAction?: { resourceName?: string; name?: string } };
@@ -173,22 +178,32 @@ export async function setupConversionActions(): Promise<ConversionActionsStatus>
   return lookupConversionActions();
 }
 
-// חילוץ אינדקסים שנכשלו מתשובת partialFailure של גוגל.
-function failedIndices(partialFailureError: unknown): Set<number> {
-  const failed = new Set<number>();
+// חילוץ כשלים מתשובת partialFailure של גוגל: אינדקס + קוד שגיאה. שגיאות
+// "כבר קיים/כפול" הן הצלחה בפועל (ההמרה כבר אצל גוגל) - נחתום אותן כדי
+// שלא יחזרו לתור כל יום לנצח (ממצא ביקורת: לולאת ניסיון אינסופית).
+function extractFailures(partialFailureError: unknown): Map<number, string> {
+  const failed = new Map<number, string>();
   const details = (partialFailureError as { details?: unknown[] } | null)?.details ?? [];
   for (const d of details) {
     const errors = (d as { errors?: unknown[] }).errors ?? [];
     for (const e of errors) {
-      const elements =
-        ((e as { location?: { fieldPathElements?: { fieldName?: string; index?: number }[] } })
-          .location?.fieldPathElements) ?? [];
-      for (const el of elements) {
-        if (el.fieldName === "conversions" && typeof el.index === "number") failed.add(el.index);
+      const err = e as {
+        errorCode?: Record<string, string>;
+        location?: { fieldPathElements?: { fieldName?: string; index?: number }[] };
+      };
+      const code = Object.values(err.errorCode ?? {}).join(",") || "unknown";
+      for (const el of err.location?.fieldPathElements ?? []) {
+        if (el.fieldName === "conversions" && typeof el.index === "number") {
+          failed.set(el.index, code);
+        }
       }
     }
   }
   return failed;
+}
+
+function isDuplicateErrorCode(code: string): boolean {
+  return code.includes("ALREADY_EXISTS") || code.includes("DUPLICATE");
 }
 
 export async function runConversionsSync(opts: { send: boolean }): Promise<ConversionsResult> {
@@ -212,7 +227,10 @@ export async function runConversionsSync(opts: { send: boolean }): Promise<Conve
       return base;
     }
 
-    const [pending, actions] = await Promise.all([fetchPendingRows(), lookupConversionActions()]);
+    const [{ preview: pending, rows: pendingRows }, actions] = await Promise.all([
+      fetchPendingRows(),
+      lookupConversionActions(),
+    ]);
     base.pending = pending;
     base.actions = actions;
     base.actionsReady = Boolean(actions.quiz && actions.subscription);
@@ -242,26 +260,15 @@ export async function runConversionsSync(opts: { send: boolean }): Promise<Conve
     }
 
     // העלאה בפועל. שולחים רק: מזהה קליק, פעולה, זמן, סכום, מזהה-שורה לדדופ.
-    const { data: rows } = await supabaseAdmin
-      .from("payments")
-      .select("id, gclid, gbraid, wbraid")
-      .in("id", pending.map((p) => p.payment_id));
-    const clickById = new Map((rows ?? []).map((r) => [r.id, r]));
-
-    const conversions = pending.map((p) => {
-      const click = clickById.get(p.payment_id);
-      const resource = p.action_name === CONV_ACTION_QUIZ ? base.actions.quiz : base.actions.subscription;
+    const conversions = pendingRows.map((p) => {
+      const resource = p.payment_type === "quiz" ? base.actions.quiz : base.actions.subscription;
       return {
-        ...(click?.gclid
-          ? { gclid: click.gclid }
-          : click?.gbraid
-            ? { gbraid: click.gbraid }
-            : { wbraid: click?.wbraid }),
+        ...(p.gclid ? { gclid: p.gclid } : p.gbraid ? { gbraid: p.gbraid } : { wbraid: p.wbraid }),
         conversionAction: resource,
-        conversionDateTime: toAdsDateTime(p.paid_at),
-        conversionValue: p.value_ils,
+        conversionDateTime: toAdsDateTime(p.created_at),
+        conversionValue: Number(p.amount ?? 0),
         currencyCode: "ILS",
-        orderId: p.payment_id,
+        orderId: p.id,
       };
     });
 
@@ -272,23 +279,40 @@ export async function runConversionsSync(opts: { send: boolean }): Promise<Conve
     if (status !== 200) throw new Error(`uploadClickConversions failed (${status}): ${text.slice(0, 400)}`);
 
     const body = JSON.parse(text) as { partialFailureError?: unknown };
-    const failed = failedIndices(body.partialFailureError ?? null);
-    const succeededIds = pending.filter((_, i) => !failed.has(i)).map((p) => p.payment_id);
+    const failures = extractFailures(body.partialFailureError ?? null);
+    // "כפול/כבר קיים" = ההמרה כבר רשומה בגוגל - נחשבת שהועלתה ונחתמת,
+    // כדי שלא תנסה שוב מחר לנצח. כשלים אחרים נשארים לא חתומים לניסיון חוזר.
+    const stampIds = pendingRows
+      .filter((_, i) => !failures.has(i) || isDuplicateErrorCode(failures.get(i) ?? ""))
+      .map((p) => p.id);
+    const realFailures = [...failures.entries()].filter(([, code]) => !isDuplicateErrorCode(code));
 
-    if (succeededIds.length > 0) {
-      await supabaseAdmin
+    if (stampIds.length > 0) {
+      const { error: stampErr } = await supabaseAdmin
         .from("payments")
         .update({ conversion_uploaded_at: new Date().toISOString() })
-        .in("id", succeededIds);
+        .in("id", stampIds);
+      if (stampErr) {
+        // חתימה שנכשלה = הסכנה של העלאה כפולה מחר; חייבת להיראות כשגיאה.
+        throw new Error(`ההעלאה הצליחה אך רישום ההחתמה נכשל: ${stampErr.message}`);
+      }
     }
 
-    base.uploaded = succeededIds.length;
-    base.failed = failed.size;
+    base.uploaded = stampIds.length;
+    base.failed = realFailures.length;
     await finishAgentRun(runId, {
-      status: failed.size > 0 ? "error" : "ok",
-      summary: `הועלו ${base.uploaded} המרות לגוגל${failed.size > 0 ? `, ${failed.size} נכשלו` : ""}`,
-      details: { mode, uploaded: base.uploaded, failed: base.failed },
-      error: failed.size > 0 ? `partial failure: ${String(body.partialFailureError).slice(0, 300)}` : undefined,
+      status: realFailures.length > 0 ? "error" : "ok",
+      summary: `הועלו ${base.uploaded} המרות לגוגל${realFailures.length > 0 ? `, ${realFailures.length} נכשלו` : ""}`,
+      details: {
+        mode,
+        uploaded: base.uploaded,
+        failed: base.failed,
+        failure_codes: realFailures.map(([i, code]) => ({ index: i, code })),
+      },
+      error:
+        realFailures.length > 0
+          ? `כשלי העלאה: ${realFailures.map(([i, code]) => `#${i}:${code}`).join(", ")}`
+          : undefined,
     });
     return base;
   } catch (e) {

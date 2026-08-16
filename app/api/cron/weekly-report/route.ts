@@ -6,6 +6,7 @@ import { computeAttribution, type AttributionResult } from "@/app/lib/attributio
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cronAuthorized } from "@/app/lib/cron-auth";
+import { alertRecipients } from "@/app/lib/alert-recipients";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300; // reasoning models need more headroom (Vercel caps to plan max)
@@ -17,10 +18,7 @@ const CRON_SECRET = process.env.CRON_SECRET;
 // strongest reasoning model here. Isolated via env from the per-user agents.
 const REPORT_LLM_MODEL = process.env.REPORT_LLM_MODEL ?? "gpt-5.5";
 const REPORT_LLM_EFFORT = process.env.REPORT_LLM_EFFORT ?? "high";
-const REPORT_TO = (process.env.WEEKLY_REPORT_TO ?? "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com")
-  .split(",")
-  .map(s => s.trim())
-  .filter(Boolean);
+const REPORT_TO = alertRecipients();
 
 type Period = { since: string; until: string };
 export type ReportType = "weekly" | "monthly";

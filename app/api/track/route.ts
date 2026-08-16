@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
+import { CLIENT_ANALYTICS_EVENT_TYPES } from "@/app/lib/analytics-event-types";
 
-const VALID_EVENTS = ["page_view", "profile_impression", "filter_used", "quiz_step", "quiz_complete", "quiz_treatments", "recruit_page_view", "therapist_explain_click", "matching_click", "match_saved"] as const;
+// הרשימה הקנונית חיה ב-app/lib/analytics-event-types.ts (מקור אמת אחד,
+// ששומר הלילה משווה כל לילה מול ה-CHECK בבסיס הנתונים); כאן רק תת-הקבוצה
+// שמותרת מהלקוח. אירוע חדש = עדכון שם + מיגרציה, לא כאן.
+const VALID_EVENTS = CLIENT_ANALYTICS_EVENT_TYPES;
 type EventType = (typeof VALID_EVENTS)[number];
 
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();

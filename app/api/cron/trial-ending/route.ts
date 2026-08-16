@@ -5,6 +5,7 @@ import { cronAuthorized } from "@/app/lib/cron-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { sendTrialEndingEmail, trialEndingVariant, type TrialStats } from "@/app/lib/trial-ending-email";
 import { TRIAL_UPGRADE_OFFER_DAYS } from "@/app/lib/promo";
+import { alertRecipients } from "@/app/lib/alert-recipients";
 
 // סיום תקופת מתנה: דוח כל-התקופה + הצעת שדרוג אישית.
 //   3 ימים לפני הסיום  → המייל המרכזי (trial_ending_notified_at)
@@ -21,8 +22,10 @@ export const maxDuration = 120;
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 const CRON_SECRET = process.env.CRON_SECRET;
-const ADMIN_TO = (process.env.WEEKLY_REPORT_TO ?? "admin@getmentalytics.com,avshalom@getmentalytics.com")
-  .split(",").map((s) => s.trim()).filter(Boolean);
+// אוחד ל-alertRecipients (ביקורת 16/8). שים לב: ברירת המחדל הישנה כאן
+// הכילה רק 2 כתובות (בלי omer@) - כנראה שריד מלפני פתיחת התיבה שלה;
+// מהיום ההתנהגות אחידה עם כל שאר ההתראות.
+const ADMIN_TO = alertRecipients();
 
 const NOTICE_DAYS = 3;   // המייל המרכזי
 const REMINDER_DAYS = 1; // התזכורת

@@ -1,24 +1,30 @@
 import "server-only";
 import OpenAI from "openai";
-import { Resend } from "resend";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { buildDashboardData } from "./work-queue";
-import { alertRecipients } from "./alert-recipients";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
-import { logEmail } from "./email-log";
-import { LEAD_TYPES, DEAL_STAGES } from "./crm";
+import { sendOpsEmail, escapeHtml } from "./ops-email";
+import { LEAD_TYPES, DEAL_STAGES, labelOf } from "./crm";
 
-// בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב
-// ושולח מייל אחד מרוכז. מקור הנתונים הוא אותו תור עבודה של לוח הבקרה
-// (work-queue.ts) + תורי ההצעות, כך שהמייל והמסך לעולם לא סותרים זה את זה.
+// בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב.
+// מקור הנתונים הוא אותו תור עבודה של לוח הבקרה (work-queue.ts) + תורי
+// ההצעות, כך שהמייל, העמוד והמסך לעולם לא סותרים זה את זה.
 //
-// בטיחות: ברירת המחדל היא תצוגה מקדימה בלבד (אותו דפוס ?send=confirm של
-// trial-ending והדוח החודשי). שליחה אמיתית רק כשה-cron נקרא עם send=confirm.
+// בטיחות: ברירת המחדל היא תצוגה מקדימה בלבד (דפוס ?send=confirm). כל ריצה
+// שומרת את התוכן המלא ב-agent_runs.details, כך שהדוח נצפה ישירות בעמוד
+// הסוכנים גם כשהמייל כבוי (החלטת המשתמש 16/8: בלי מיילים בשלב זה).
+//
+// פרטיות: סיכום ה-AI מקבל תוויות/מונים/דחיפות בלבד - אף שם של פונה או
+// מטפל לא נשלח למודל (ממצא ביקורת 16/8).
 
-const FROM = "טיפול חכם <noreply@mentalytics.co.il>";
 const DIGEST_LLM_MODEL = process.env.AGENT_DIGEST_LLM_MODEL ?? "gpt-4o-mini";
 // מעל כמה שורות בסקציה קוטמים (המייל חייב להישאר קריא בדקה).
 const MAX_LINES_PER_SECTION = 6;
+
+// שלבי עסקה פתוחים - נגזר מאוצר המילים המשותף, לא רשימה קשיחה (ביקורת).
+const OPEN_DEAL_STAGES = DEAL_STAGES.filter(
+  (s) => s.value !== "won" && s.value !== "lost"
+).map((s) => s.value);
 
 export type DigestSection = {
   key: string;
@@ -40,14 +46,6 @@ export type DigestResult = {
   emailStatus?: "sent" | "failed" | "skipped";
   error?: string;
 };
-
-function labelOfLeadType(value: string | null): string {
-  return LEAD_TYPES.find((t) => t.value === value)?.label ?? "כללי";
-}
-
-function stageLabel(value: string | null): string {
-  return DEAL_STAGES.find((s) => s.value === value)?.label ?? value ?? "";
-}
 
 function daysAgo(iso: string | null): number {
   if (!iso) return 0;
@@ -81,27 +79,25 @@ async function gatherSections(): Promise<DigestSection[]> {
     supabaseAdmin
       .from("crm_deals")
       .select("id, title, stage, next_step, next_step_due")
-      .in("stage", ["inquiry", "meeting", "pilot", "proposal", "contract"]),
+      .in("stage", OPEN_DEAL_STAGES),
   ]);
 
   const q = dash.queue;
   const sections: DigestSection[] = [];
 
-  // לידים שממתינים בסטטוס "חדשה" - רק פניות שמופנות אלינו. החלטת מדיניות
-  // (15/8/26): הודעת מטופל למטפל/מרכז דרך האתר (source='site_message') היא
-  // עניינו של המטפל שקיבל אותה במייל - לא עבודת אדמין, ולא מופיעה בדוח.
-  const adminLeads = q.new_leads.filter((l) => l.source !== "site_message");
-  if (adminLeads.length > 0) {
+  // פניות לחברה בלבד - הפיצול ממדיניות 15/8 חי ב-work-queue, פעם אחת,
+  // והספירה/הדחיפות מחושבות שם על הרשימה המלאה (לא על חיתוך תצוגה).
+  if (q.new_leads_total > 0) {
     sections.push({
       key: "leads",
       label: "פניות ממתינות לחברה",
-      count: adminLeads.length,
-      urgent: adminLeads.some((l) => daysAgo(l.created_at) >= 2),
-      lines: adminLeads
+      count: q.new_leads_total,
+      urgent: daysAgo(q.new_leads_oldest_at) >= 2,
+      lines: q.new_leads
         .slice(0, MAX_LINES_PER_SECTION)
         .map(
           (l) =>
-            `${l.name || "ללא שם"} (${labelOfLeadType(l.lead_type)}) · ${ageText(l.created_at)}`
+            `${l.name || "ללא שם"} (${labelOf(LEAD_TYPES, l.lead_type ?? "") || "כללי"}) · ${ageText(l.created_at)}`
         ),
       link: "/admin/leads",
     });
@@ -170,37 +166,48 @@ async function gatherSections(): Promise<DigestSection[]> {
         .slice(0, MAX_LINES_PER_SECTION)
         .map((d) =>
           !d.next_step
-            ? `${d.title} (${stageLabel(d.stage)}) · אין צעד הבא`
-            : `${d.title} (${stageLabel(d.stage)}) · צעד באיחור מ-${d.next_step_due}`
+            ? `${d.title} (${labelOf(DEAL_STAGES, d.stage ?? "")}) · אין צעד הבא`
+            : `${d.title} (${labelOf(DEAL_STAGES, d.stage ?? "")}) · צעד באיחור מ-${d.next_step_due}`
         ),
       link: "/admin/deals",
     });
   }
 
-  // ממתינים לאישור שלך - מטפלים, מאמרים, המלצות והצעות סוכנים.
+  // ממתינים לאישור שלך - הספירה היא סכום הפריטים האמיתיים, לא מספר השורות.
   const approvalLines: string[] = [];
-  if (q.paying_unapproved.length > 0)
+  let approvalItems = 0;
+  if (q.paying_unapproved.length > 0) {
+    approvalItems += q.paying_unapproved.length;
     approvalLines.push(
       `${q.paying_unapproved.length} מטפלים משלמים שעדיין לא מוצגים באתר (דחוף): ${q.paying_unapproved
         .slice(0, 3)
         .map((t) => t.full_name || "?")
         .join(", ")}`
     );
-  if (q.pending_review_count > 0)
+  }
+  if (q.pending_review_count > 0) {
+    approvalItems += q.pending_review_count;
     approvalLines.push(`${q.pending_review_count} פרופילים חדשים ממתינים לבדיקה`);
-  if (q.pending_articles_count > 0)
+  }
+  if (q.pending_articles_count > 0) {
+    approvalItems += q.pending_articles_count;
     approvalLines.push(`${q.pending_articles_count} מאמרים ממתינים לאישור`);
+  }
   const pendingRecs = pendingRecsRes.data ?? [];
-  if (pendingRecs.length > 0)
+  if (pendingRecs.length > 0) {
+    approvalItems += pendingRecs.length;
     approvalLines.push(`${pendingRecs.length} המלצות שיווק ממתינות`);
+  }
   const pendingActions = pendingActionsRes.data ?? [];
-  if (pendingActions.length > 0)
+  if (pendingActions.length > 0) {
+    approvalItems += pendingActions.length;
     approvalLines.push(`${pendingActions.length} הצעות סוכנים ממתינות`);
+  }
   if (approvalLines.length > 0) {
     sections.push({
       key: "approvals",
       label: "ממתין לאישור שלך",
-      count: approvalLines.length,
+      count: approvalItems,
       urgent: q.paying_unapproved.length > 0,
       lines: approvalLines,
       link: "/admin/agents",
@@ -210,7 +217,8 @@ async function gatherSections(): Promise<DigestSection[]> {
   return sections;
 }
 
-// סיכום קצר של מודל קטן: שלוש שורות "הכי חשוב היום". נכשל בשקט - המייל
+// סיכום קצר של מודל קטן: שלוש שורות "הכי חשוב היום". פרטיות: המודל מקבל
+// תוויות, מונים ודחיפות בלבד - שום שם, שום תוכן פנייה. נכשל בשקט - הדוח
 // שלם גם בלעדיו.
 async function buildAiSummary(sections: DigestSection[]): Promise<string | null> {
   if (!process.env.OPENAI_API_KEY) return null;
@@ -220,7 +228,6 @@ async function buildAiSummary(sections: DigestSection[]): Promise<string | null>
       label: s.label,
       count: s.count,
       urgent: s.urgent,
-      lines: s.lines,
     }));
     const res = await openai.chat.completions.create(
       {
@@ -231,7 +238,7 @@ async function buildAiSummary(sections: DigestSection[]): Promise<string | null>
           {
             role: "system",
             content:
-              "אתה עוזר תפעול של פלטפורמת טיפול חכם. קבל נתוני בוקר וכתוב עד 3 שורות קצרות בעברית: מה הדבר הכי חשוב לטפל בו היום ולמה. עובדתי ותמציתי, בלי פתיחות, בלי סופרלטיבים, בלי להמציא נתונים שלא קיבלת. אסור להשתמש בקו מפריד ארוך; השתמש ב' - ' במקום.",
+              "אתה עוזר תפעול של פלטפורמת טיפול חכם. קבל רשימת קטגוריות של עבודה ממתינה (שם קטגוריה, כמות, דחיפות) וכתוב עד 3 שורות קצרות בעברית: במה לטפל קודם ולמה. עובדתי ותמציתי, בלי פתיחות, בלי סופרלטיבים, בלי להמציא פרטים שלא קיבלת. אסור להשתמש בקו מפריד ארוך; השתמש ב' - ' במקום.",
           },
           { role: "user", content: JSON.stringify(payload) },
         ],
@@ -268,10 +275,10 @@ function buildDigestHtml(sections: DigestSection[], aiSummary: string | null): s
       return `
       <div style="margin-bottom:20px">
         <div style="font-weight:800;font-size:15px;color:#131F1E;margin-bottom:6px">
-          ${s.label} (${s.count})${urgentBadge}
+          ${escapeHtml(s.label)} (${s.count})${urgentBadge}
         </div>
         <ul style="margin:0;padding-inline-start:18px;color:#3E5250;font-size:13.5px;line-height:1.7">
-          ${s.lines.map((l) => `<li>${l}</li>`).join("")}
+          ${s.lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}
         </ul>
         ${more}
         <a href="${SITE}${s.link}" style="font-size:12px;color:#3D8C8A">לטיפול באדמין ←</a>
@@ -280,13 +287,13 @@ function buildDigestHtml(sections: DigestSection[], aiSummary: string | null): s
     .join("");
 
   const aiHtml = aiSummary
-    ? `<div style="background:#EAF4F3;border-radius:12px;padding:14px 18px;margin-bottom:22px;color:#2A6462;font-size:14px;line-height:1.7;white-space:pre-line">${aiSummary}</div>`
+    ? `<div style="background:#EAF4F3;border-radius:12px;padding:14px 18px;margin-bottom:22px;color:#2A6462;font-size:14px;line-height:1.7;white-space:pre-line">${escapeHtml(aiSummary)}</div>`
     : "";
 
   return `
   <div dir="rtl" style="font-family:'Heebo','Segoe UI',Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;color:#131F1E">
     <div style="font-size:20px;font-weight:900;margin-bottom:2px">דוח בוקר · טיפול חכם</div>
-    <div style="font-size:13px;color:#6B807E;margin-bottom:18px">${dateStr}</div>
+    <div style="font-size:13px;color:#6B807E;margin-bottom:18px">${escapeHtml(dateStr)}</div>
     ${aiHtml}
     ${sectionHtml}
     <div style="border-top:1px solid #DDE9E8;margin-top:24px;padding-top:12px;font-size:11.5px;color:#A2B5B4">
@@ -298,7 +305,6 @@ function buildDigestHtml(sections: DigestSection[], aiSummary: string | null): s
 export async function runDailyDigest(opts: { send: boolean }): Promise<DigestResult> {
   const mode = opts.send ? "send" : "preview";
   const runId = await startAgentRun("daily_digest", mode);
-  const recipients = alertRecipients();
 
   try {
     const sections = await gatherSections();
@@ -307,7 +313,8 @@ export async function runDailyDigest(opts: { send: boolean }): Promise<DigestRes
     if (sections.length === 0) {
       await finishAgentRun(runId, {
         status: "empty",
-        summary: "אין פריטים שדורשים תשומת לב - לא נשלח מייל",
+        summary: "אין פריטים שדורשים תשומת לב",
+        details: { mode, sections: [], ai_summary: null },
       });
       return {
         ok: true,
@@ -316,7 +323,7 @@ export async function runDailyDigest(opts: { send: boolean }): Promise<DigestRes
         sections: [],
         aiSummary: null,
         html: null,
-        recipients,
+        recipients: [],
         emailStatus: "skipped",
       };
     }
@@ -328,53 +335,27 @@ export async function runDailyDigest(opts: { send: boolean }): Promise<DigestRes
 
     let emailStatus: "sent" | "failed" | "skipped" = "skipped";
     let sendError = "";
+    let recipients: string[] = [];
 
     if (opts.send) {
-      if (!process.env.RESEND_API_KEY) {
-        emailStatus = "failed";
-        sendError = "RESEND_API_KEY unset";
-      } else {
-        try {
-          const resend = new Resend(process.env.RESEND_API_KEY);
-          const { error } = await resend.emails.send({
-            from: FROM,
-            to: recipients,
-            subject,
-            html,
-          });
-          if (error) {
-            emailStatus = "failed";
-            sendError = error.message;
-          } else {
-            emailStatus = "sent";
-          }
-        } catch (e) {
-          emailStatus = "failed";
-          sendError = e instanceof Error ? e.message : String(e);
-        }
-        void logEmail({
-          recipient: recipients.join(","),
-          recipientType: "other",
-          subject,
-          template: "agent_daily_digest",
-          sentBy: "cron",
-          status: emailStatus === "sent" ? "sent" : "failed",
-          error: sendError || undefined,
-        });
-      }
+      const sent = await sendOpsEmail({ subject, html, template: "agent_daily_digest" });
+      emailStatus = sent.status;
+      sendError = sent.error ?? "";
+      recipients = sent.recipients;
     }
 
+    // התוכן המלא נשמר בריצה - זה מה שעמוד הסוכנים מציג ישירות, בלי מייל.
     await finishAgentRun(runId, {
       status: "ok",
       summary:
         mode === "send"
           ? `נשלח דוח עם ${sections.length} סקציות (${totalItems} פריטים) · מייל: ${emailStatus}`
-          : `תצוגה מקדימה: ${sections.length} סקציות (${totalItems} פריטים)`,
+          : `${sections.length} סקציות, ${totalItems} פריטים ממתינים`,
       details: {
         mode,
-        sections: sections.map((s) => ({ key: s.key, count: s.count })),
+        sections,
+        ai_summary: aiSummary,
         email_status: emailStatus,
-        ai_summary_included: aiSummary !== null,
       },
       error: sendError || undefined,
     });
@@ -400,7 +381,7 @@ export async function runDailyDigest(opts: { send: boolean }): Promise<DigestRes
       sections: [],
       aiSummary: null,
       html: null,
-      recipients,
+      recipients: [],
       error: msg,
     };
   }

@@ -3,6 +3,7 @@ import { sendBulkEmail } from "./email-quota";
 import { logEmail } from "./email-log";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
 import { buildArticleInviteEmail } from "./article-invite-email";
+import { alertRecipients } from "./alert-recipients";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -37,13 +38,7 @@ const resend = {
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 const FROM = "טיפול חכם <noreply@mentalytics.co.il>";
-const ADMIN_RECIPIENTS = (
-  process.env.WEEKLY_REPORT_TO ??
-  "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com"
-)
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const ADMIN_RECIPIENTS = alertRecipients();
 
 // Centered brand logo header for the top of the email card. Uses the hosted
 // PNG wordmark (email clients strip SVG). Kept as a plain string so any email

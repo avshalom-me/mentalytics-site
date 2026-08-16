@@ -168,16 +168,11 @@ type TherapistData = {
   decliners?: TherapistTrendRow[];
 };
 
-// שורות הדוח מגיעות עם week_start/week_end (שבועי) או month_start/month_end
-// (חודשי) - מנורמלות אחרי הטעינה ל-period_start/period_end.
-type Report = {
+// צורת השורה על החוט: week_start/week_end (שבועי) או month_start/month_end
+// (חודשי). מנורמלת מיד אחרי הטעינה - הקומפוננטות רואות רק period_start/end,
+// כך שאי אפשר לקרוא בטעות שדה שקיים רק במצב אחד (ממצא ביקורת).
+type ReportShared = {
   id: string;
-  week_start?: string;
-  week_end?: string;
-  month_start?: string;
-  month_end?: string;
-  period_start: string;
-  period_end: string;
   patient_data: PatientData;
   therapist_data: TherapistData;
   ai_summary: string | null;
@@ -188,6 +183,27 @@ type Report = {
   email_status: string | null;
   created_at: string;
 };
+
+type RawReport = ReportShared & {
+  week_start?: string;
+  week_end?: string;
+  month_start?: string;
+  month_end?: string;
+};
+
+type Report = ReportShared & {
+  period_start: string;
+  period_end: string;
+};
+
+function normalizeReport(r: RawReport): Report {
+  const { week_start, week_end, month_start, month_end, ...shared } = r;
+  return {
+    ...shared,
+    period_start: week_start ?? month_start ?? "",
+    period_end: week_end ?? month_end ?? "",
+  };
+}
 
 function MarketingSection({ marketing, advice }: { marketing?: MarketingData; advice?: string | null }) {
   const channels = marketing?.channels ?? [];
@@ -594,58 +610,74 @@ function Stat({ label, value, highlight }: { label: string; value: number; highl
 }
 
 export default function ReportsPage() {
-  const [mode, setMode] = useState<ReportMode>("weekly");
-  const [reports, setReports] = useState<Report[] | null>(null);
+  // מצב מתחיל null עד שקוראים את ה-URL - כך יש בדיוק טעינה אחת ואין מרוץ
+  // בין שתי בקשות במקביל (ממצא ביקורת: קישור ?type=monthly הציג שורות
+  // שבועיות תחת תוויות חודשיות כשהתשובה השבועית הגיעה אחרונה).
+  const [mode, setMode] = useState<ReportMode | null>(null);
+  // מטמון לכל מצב: מעבר טאב חוזר לא מוריד מחדש חצי מגה של דוחות.
+  const [cache, setCache] = useState<Record<ReportMode, Report[] | null>>({
+    weekly: null,
+    monthly: null,
+  });
   const [error, setError] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
   const [running, setRunning] = useState(false);
   const [runMsg, setRunMsg] = useState("");
-  // מונה רענון: הפקת דוח מעלה אותו כדי שהאפקט יטען מחדש בלי טריק החלפת מצב.
+  // מונה רענון: הפקת דוח מאלצת טעינה מחדש של המצב הנוכחי.
   const [reloadKey, setReloadKey] = useState(0);
 
-  const cfg = MODE_CONFIG[mode];
+  const cfg = mode ? MODE_CONFIG[mode] : MODE_CONFIG.weekly;
+  const reports = mode ? cache[mode] : null;
 
-  // ?type=monthly מהכתובות הישנות/מועדפים - נקרא פעם אחת אחרי טעינה
-  // (בלי useSearchParams כדי לא לחייב Suspense על כל העמוד).
+  // קריאת ?type מהכתובות הישנות - פעם אחת, לפני כל טעינה.
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("type");
-    if (t === "monthly") setMode("monthly");
+    setMode(t === "monthly" ? "monthly" : "weekly");
   }, []);
 
   useEffect(() => {
-    setReports(null);
+    if (mode === null) return;
+    // יש מטמון - אין בקשה נוספת. רענון (runNow) מאפס את המטמון של המצב
+    // הנוכחי לפני העלאת reloadKey, ולכן עובר את השער הזה.
+    if (cache[mode] !== null) return;
+    let ignore = false; // שומר תשובה מאוחרת של מצב קודם מלדרוס את הנוכחי
     setError("");
-    setRunMsg("");
-    setExpanded(null);
-    const c = MODE_CONFIG[mode];
-    fetch(c.listApi, { cache: "no-store" })
+    fetch(MODE_CONFIG[mode].listApi, { cache: "no-store" })
       .then(r => r.json())
       .then(json => {
+        if (ignore) return;
         if (json.ok) {
-          const normalized: Report[] = (json.reports as Report[]).map(r => ({
-            ...r,
-            period_start: r.week_start ?? r.month_start ?? "",
-            period_end: r.week_end ?? r.month_end ?? "",
-          }));
-          setReports(normalized);
-          if (normalized.length > 0) setExpanded(normalized[0].id);
+          const normalized: Report[] = (json.reports as RawReport[]).map(normalizeReport);
+          setCache(prev => ({ ...prev, [mode]: normalized }));
+          setExpanded(prev => prev ?? normalized[0]?.id ?? null);
         } else setError(json.error ?? "שגיאה");
       })
-      .catch(() => setError("שגיאת רשת"));
+      .catch(() => {
+        if (!ignore) setError("שגיאת רשת");
+      });
+    return () => {
+      ignore = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, reloadKey]);
 
   function switchMode(m: ReportMode) {
     if (m === mode) return;
     setMode(m);
+    setExpanded(null);
+    setRunMsg("");
     window.history.replaceState(null, "", `/admin/reports${m === "monthly" ? "?type=monthly" : ""}`);
   }
 
   async function runNow() {
+    if (mode === null) return;
     setRunning(true);
     setRunMsg("מפיק דוח — כולל ניתוח AI, עשוי לקחת 2-3 דקות…");
     const json = await triggerReport(cfg.triggerApi);
     if (json.ok) {
+      // הבאנר נשאר על המסך; רק הרשימה של המצב הנוכחי נטענת מחדש.
       setRunMsg(`${cfg.runMsgPrefix} ${json.period_start} (${json.emailStatus})`);
+      setCache(prev => ({ ...prev, [mode]: null }));
       setReloadKey(k => k + 1);
     } else {
       setRunMsg(`שגיאה: ${json.error}`);

@@ -3,16 +3,20 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { runDailyDigest } from "@/app/lib/daily-digest";
 import { runWatchdog } from "@/app/lib/watchdog";
 import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
+import { googleAdsConfigured } from "@/app/lib/google-ads";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// 300 ולא 120: הרצת שומר הלילה הידנית יכולה להימשך עד ~35 שניות בריצה
+// מקבילה, אבל בתרחיש תקלה כוללת עם ניסיונות חוזרים אסור שוורסל יהרוג את
+// הפונקציה לפני שהריצה נרשמת (ממצא ביקורת: ריצה שנהרגה נשארת "רץ..." לנצח).
+export const maxDuration = 300;
 
 export async function GET() {
   try {
-    const [runsRes, pendingRes, resolvedRes] = await Promise.all([
+    const [runsRes, pendingRes, resolvedRes, latestDigestRes] = await Promise.all([
       supabaseAdmin
         .from("agent_runs")
         .select("id, agent, started_at, finished_at, status, mode, summary, error")
@@ -30,13 +34,36 @@ export async function GET() {
         .neq("status", "pending")
         .order("status_changed_at", { ascending: false })
         .limit(10),
+      // הדוח האחרון של בקר הבוקר, כולל תוכנו המלא (details) - כך העמוד מציג
+      // אותו ישירות בלי מייל ובלי להריץ מחדש (החלטת המשתמש 16/8).
+      supabaseAdmin
+        .from("agent_runs")
+        .select("started_at, mode, status, details")
+        .eq("agent", "daily_digest")
+        .in("status", ["ok", "empty"])
+        .order("started_at", { ascending: false })
+        .limit(1),
     ]);
+
+    const latestDigestRun = latestDigestRes.data?.[0] ?? null;
+    const digestDetails = (latestDigestRun?.details ?? null) as {
+      sections?: unknown[];
+      ai_summary?: string | null;
+    } | null;
 
     return NextResponse.json({
       ok: true,
       runs: runsRes.data ?? [],
       pending_actions: pendingRes.data ?? [],
       resolved_actions: resolvedRes.data ?? [],
+      latest_digest: latestDigestRun
+        ? {
+            started_at: latestDigestRun.started_at,
+            status: latestDigestRun.status,
+            sections: digestDetails?.sections ?? [],
+            ai_summary: digestDetails?.ai_summary ?? null,
+          }
+        : null,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";
@@ -84,6 +111,12 @@ export async function POST(req: NextRequest) {
     // הקמה חד-פעמית של פעולות ההמרה בחשבון גוגל - כתיבה יחידה, מופעלת רק
     // מקליק מפורש בכפתור ייעודי (עם אישור) בעמוד הסוכנים.
     if (body?.action === "conversions_setup") {
+      if (!googleAdsConfigured()) {
+        return NextResponse.json(
+          { ok: false, error: "חיבור Google Ads לא מוגדר בסביבה הזו" },
+          { status: 400 }
+        );
+      }
       const actions = await setupConversionActions();
       return NextResponse.json({
         ok: true,
@@ -115,7 +148,17 @@ export async function PATCH(req: NextRequest) {
         resolution_note: body?.note ? String(body.note) : null,
       })
       .eq("id", id);
-    if (error) throw new Error(error.message);
+    if (error) {
+      // "החזר" על התראה שהסוכן כבר פתח מחדש נתקל באינדקס הייחודי - זו לא
+      // תקלה אלא מצב צפוי, עם הסבר במקום כישלון שקט (ממצא ביקורת).
+      if (error.code === "23505") {
+        return NextResponse.json(
+          { ok: false, error: "כבר קיימת הצעה זהה ממתינה בתור - אין צורך להחזיר את הישנה" },
+          { status: 409 }
+        );
+      }
+      throw new Error(error.message);
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";
