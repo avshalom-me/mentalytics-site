@@ -114,7 +114,19 @@ const AGENT_LABELS: Record<string, string> = {
   watchdog: "שומר הלילה",
   conversions: "המרות לגוגל",
   ads: "סוכן הפרסום",
+  supply_gaps: "פערי היצע",
 };
+
+type SupplyGap = {
+  key: string;
+  region: string;
+  treatment: string;
+  events: number;
+  candidates: { therapist_id: string; full_name: string; email: string }[];
+  draftEmail: string | null;
+};
+
+type GapsRun = { gift_gaps: SupplyGap[]; recruit_gaps: SupplyGap[] };
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   ok: { label: "תקין", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
@@ -155,6 +167,10 @@ export default function AgentsPage() {
   const [watchdogLoading, setWatchdogLoading] = useState(false);
   const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
   const [watchdogError, setWatchdogError] = useState("");
+
+  const [gapsLoading, setGapsLoading] = useState(false);
+  const [gaps, setGaps] = useState<GapsRun | null>(null);
+  const [gapsError, setGapsError] = useState("");
 
   const [adsLoading, setAdsLoading] = useState(false);
   const [ads, setAds] = useState<AdsRun | null>(null);
@@ -213,6 +229,21 @@ export default function AgentsPage() {
       setWatchdogError(e instanceof Error ? e.message : "שגיאה בהרצת הבדיקות");
     } finally {
       setWatchdogLoading(false);
+    }
+  }
+
+  async function runGapsNow() {
+    setGapsLoading(true);
+    setGapsError("");
+    setGaps(null);
+    try {
+      const j = await postAgents("supply_gaps_run");
+      setGaps(j as unknown as GapsRun);
+      load();
+    } catch (e) {
+      setGapsError(e instanceof Error ? e.message : "שגיאה בניתוח הפערים");
+    } finally {
+      setGapsLoading(false);
     }
   }
 
@@ -434,6 +465,82 @@ export default function AgentsPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </section>
+
+        {/* פערי היצע */}
+        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 className="font-black text-stone-900">⚖️ פערי היצע וקידום מתנה</h2>
+            <button
+              onClick={runGapsNow}
+              disabled={gapsLoading}
+              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {gapsLoading ? "מנתח..." : "נתח פערים עכשיו"}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500 mb-4">
+            מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים חיפשו ולא היה מטפל משלם להציע.
+            כשיש מטפל חינמי מתאים - מנסח הצעת קידום מתנה לחודשיים; כשאין אף מטפל - זה פער גיוס
+            לפרסום. שום מייל לא נשלח ואף קידום לא ניתן בלי אישור שלך.
+          </p>
+
+          {gapsError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{gapsError}</div>
+          )}
+
+          {gaps && (
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-xs font-black text-stone-400 mb-2">
+                  להצעת קידום מתנה ({gaps.gift_gaps.length})
+                </h3>
+                {gaps.gift_gaps.length === 0 ? (
+                  <p className="text-sm text-stone-400">אין פערים שיש להם מועמד מתאים במאגר.</p>
+                ) : (
+                  gaps.gift_gaps.map((g) => (
+                    <div key={g.key} className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-2">
+                      <div className="font-bold text-sm text-stone-900">
+                        {g.treatment} · {g.region}
+                        <span className="mr-2 text-xs font-normal text-stone-500">
+                          {g.events} מטופלים חיפשו ולא קיבלו
+                        </span>
+                      </div>
+                      <div className="text-xs text-stone-600 mt-1">
+                        מועמדים: {g.candidates.map((c) => c.full_name).join(", ")}
+                      </div>
+                      {g.draftEmail && (
+                        <details className="mt-2">
+                          <summary className="cursor-pointer text-xs font-bold text-stone-500">
+                            טיוטת המייל
+                          </summary>
+                          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-3 text-xs leading-6 text-stone-700">
+                            {g.draftEmail}
+                          </pre>
+                        </details>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+              <div>
+                <h3 className="text-xs font-black text-stone-400 mb-2">
+                  פערי גיוס - אין אף מטפל מתאים ({gaps.recruit_gaps.length})
+                </h3>
+                {gaps.recruit_gaps.length === 0 ? (
+                  <p className="text-sm text-stone-400">אין פערי גיוס פתוחים.</p>
+                ) : (
+                  <ul className="list-disc ps-5 text-sm text-stone-600 leading-6">
+                    {gaps.recruit_gaps.map((g) => (
+                      <li key={g.key}>
+                        <strong>{g.treatment}</strong> · {g.region} · {g.events} מטופלים חיפשו
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           )}
         </section>
