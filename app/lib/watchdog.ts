@@ -173,6 +173,31 @@ async function freshnessCheck(
   }
 }
 
+// טריות של סוכן: מתי רץ לאחרונה. בלי זה, קרון שהפסיק לרוץ (תקלה בוורסל,
+// מתג שנכבה בטעות, מסלול שנמחק) הוא כשל שקט - הפס באדמין פשוט מציג תאריך
+// ישן, ואף אחד לא מתריע. סוכן שכובה במתג מדלג ולא נכשל, כדי ששני מנגנוני
+// הבטיחות לא יתנגשו.
+function agentFreshnessCheck(agent: string, label: string, maxHours: number): Promise<WatchdogCheck> {
+  const key = `cron_${agent}`;
+  if (!agentEnabled(agent)) {
+    return Promise.resolve(skippedCheck(key, label, "דולג - הסוכן כבוי במתג"));
+  }
+  return freshnessCheck(key, label, async () => {
+    const { data } = await supabaseAdmin
+      .from("agent_runs")
+      .select("started_at")
+      .eq("agent", agent)
+      .order("started_at", { ascending: false })
+      .limit(1);
+    const last = data?.[0]?.started_at;
+    if (!last) return { ok: false, detail: "אין אף ריצה ביומן" };
+    const hours = (Date.now() - new Date(last).getTime()) / 3_600_000;
+    return hours <= maxHours
+      ? { ok: true, detail: "תקין" }
+      : { ok: false, detail: `הריצה האחרונה לפני ${Math.round(hours)} שעות` };
+  });
+}
+
 async function runChecks(): Promise<WatchdogCheck[]> {
   const staffToken = process.env.STAFF_BYPASS_TOKEN ?? "";
 
@@ -259,24 +284,14 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     eventConstraintCheck(),
     // טריות קרונים. בקר הבוקר: אם כובה במתג - הבדיקה מדלגת במקום להתריע
     // על כיבוי מכוון (ממצא ביקורת: שני מנגנוני הבטיחות התנגשו).
-    agentEnabled("daily_digest")
-      ? freshnessCheck("cron_daily_digest", "בקר הבוקר רץ ביממה האחרונה", async () => {
-          const { data } = await supabaseAdmin
-            .from("agent_runs")
-            .select("started_at")
-            .eq("agent", "daily_digest")
-            .order("started_at", { ascending: false })
-            .limit(1);
-          const last = data?.[0]?.started_at;
-          if (!last) return { ok: false, detail: "אין אף ריצה ביומן" };
-          const hours = (Date.now() - new Date(last).getTime()) / 3_600_000;
-          return hours <= 26
-            ? { ok: true, detail: "תקין" }
-            : { ok: false, detail: `הריצה האחרונה לפני ${Math.round(hours)} שעות` };
-        })
-      : Promise.resolve(
-          skippedCheck("cron_daily_digest", "בקר הבוקר רץ ביממה האחרונה", "דולג - בקר הבוקר כבוי במתג")
-        ),
+    // הסוכנים שומרים זה על זה: כל סוכן יומי נבדק ל-26 שעות, ופערי ההיצע
+    // (שרץ שבועית) ל-8 ימים. השומר עצמו לא מופיע כאן - סוכן לא יכול
+    // להתריע על היעדרות של עצמו, וזה פער מודע.
+    agentFreshnessCheck("daily_digest", "בקר הבוקר רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("ads", "סוכן הפרסום רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("conversions", "סוכן ההמרות רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("finance", "סוכן הכספים רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
     freshnessCheck("cron_weekly_report", "דוח שבועי נוצר בשבוע האחרון", async () => {
       const { data } = await supabaseAdmin
         .from("weekly_reports")

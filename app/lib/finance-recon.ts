@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
 import { fetchAllRows } from "./fetch-all-rows";
+import { computeGuarantee } from "./guarantee";
 
 // סוכן הכספים: משווה בין מי שמקבל שירות בפועל לבין מי שמשלם עליו.
 //
@@ -272,6 +273,44 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
       }
     }
 
+    // --- ערבות ההחזר ---
+    // חלון שנסגר בלי אף פנייה הוא התחייבות כספית שלנו, ולכן כל מקרה כזה
+    // מדווח בנפרד. השאר מרוכז לשורה אחת: 17 שורות "בסכנה" הן רעש, מספר
+    // אחד עם קישור הוא מידע.
+    const guarantee = await computeGuarantee();
+    const owed = guarantee.filter((g) => g.risk === "expired_no_contact");
+    const atRisk = guarantee.filter((g) => g.risk === "at_risk");
+    // "קיבל פניות" שנשען על לחיצות בלבד: לחיצת וואטסאפ או טלפון אינה
+    // הוכחה שנוצר קשר, ובשיחת החזר היא לא תחזיק. בדיוק הפער שנמצא
+    // בביקורת - רוב מי שנחשב מרוצה מעולם לא קיבל הודעה שמורה.
+    const clicksOnly = guarantee.filter((g) => g.contacts_in_window > 0 && g.contacts_certain === 0);
+
+    for (const g of owed) {
+      findings.push({
+        key: `fin:guarantee_owed:${g.therapist_id}`,
+        severity: "high",
+        title: `ערבות ההחזר של ${g.full_name} לא קוימה`,
+        detail: `חלון הערבות נסגר ב-${g.window_end.slice(0, 10)} בלי אף פנייה. זו התחייבות להחזר, ועדיף ליזום מול המטפל/ת לפני שהוא/היא יוזם/ת.`,
+      });
+    }
+    if (atRisk.length > 0) {
+      findings.push({
+        key: "fin:guarantee_at_risk",
+        severity: "medium",
+        title: `${atRisk.length} מטפלים מתקרבים לסוף חלון הערבות בלי אף פנייה`,
+        detail: `הרשימה המלאה בעמוד תקופת הביטחון. כל אחד מהם הופך להתחייבות להחזר אם החלון ייסגר ריק.`,
+      });
+    }
+    if (clicksOnly.length > 0) {
+      findings.push({
+        key: "fin:guarantee_clicks_only",
+        severity: "medium",
+        title: `${clicksOnly.length} מטפלים נחשבים כמי שקיבלו פניות על סמך לחיצות בלבד`,
+        detail:
+          "אצלם נספרו לחיצות ליצירת קשר אבל אף הודעה דרך האתר. לחיצה אינה הוכחה שנוצר קשר, ולכן הערבות שלהם עלולה להיחשב לא מקוימת בשיחת החזר.",
+      });
+    }
+
     // מפתחות שהריצה הזו באמת בדקה - כדי שממצא ייסגר רק כשהמצב נפתר, ולא
     // כשהשורה פשוט לא נטענה.
     const managedKeys = [
@@ -288,6 +327,9 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
         `fin:center_sync_miss:${c.id}`,
         `fin:center_no_price:${c.id}`,
       ]),
+      ...guarantee.map((g) => `fin:guarantee_owed:${g.therapist_id}`),
+      "fin:guarantee_at_risk",
+      "fin:guarantee_clicks_only",
     ];
 
     const { recovered } = await syncAgentAlerts(
