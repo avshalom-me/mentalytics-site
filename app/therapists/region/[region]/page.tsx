@@ -11,6 +11,7 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
 import { loadLocalArticles } from "@/app/lib/local-articles";
+import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -47,13 +48,8 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   // The head phrase of the whole cluster ("טיפול פסיכולוגי אונליין") belongs in
   // the title - a 3-model SERP panel (5/8/26) found every ranking competitor
   // carries it, and we carried neither it nor "פסיכולוג אונליין" anywhere.
-  // The live count is a CTR differentiator no static competitor title has;
-  // guarded so a supply dip can never publish "3 מטפלים" as our storefront.
-  const onlineCount = isOnline ? await countListed({ online: true }) : 0;
   const title = isOnline
-    ? onlineCount >= 20
-      ? `טיפול פסיכולוגי אונליין: ${onlineCount} מטפלים ופסיכולוגים | טיפול חכם`
-      : "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים | טיפול חכם"
+    ? "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים מאומתים | טיפול חכם"
     : // Same reasoning as the city pages (6/8/26): the treatment phrase is a
       // query family of its own and every competitor ranking for it carries it
       // in the title; the person-phrase prefix stays for the rankings we have.
@@ -65,16 +61,10 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   const regionCount = isOnline ? 0 : await countListed({ region: r.region });
   const robots =
     !isOnline && regionCount < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
-  // The count was already being fetched for the robots gate; putting it in the
-  // description too is the one thing our snippet can say that a static
-  // competitor's cannot, and it is what the city pages already do.
+  // Count-free, like the city pages (owner's call, 14/8/26).
   const description = isOnline
-    ? // Guarded on the same threshold as the title: a supply dip must never
-      // publish "רשימת 3 מטפלים" as our storefront.
-      onlineCount >= 20
-      ? `מחפשים פסיכולוג אונליין? רשימת ${onlineCount} מטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו - השוו ופנו ישירות, או מלאו שאלון קצר להתאמה אישית.`
-      : "מחפשים פסיכולוג אונליין או מטפל רגשי מרחוק? רשימת המטפלים שמציעים טיפול פסיכולוגי אונליין בזום או בווידאו, עם שאלון קצר להתאמה אישית בחינם."
-    : `טיפול פסיכולוגי ונפשי ב${label}: רשימת ${regionCount} פסיכולוגים ומטפלים מאומתים - השוו ופנו ישירות, או מלאו שאלון קצר וקבלו התאמה אישית. בחינם וללא התחייבות.`;
+    ? `פסיכולוג אונליין או מטפל רגשי מרחוק: ${CREDENTIALS} שמטפלים בזום או בווידאו, ו${QUIZ}.`
+    : `טיפול פסיכולוגי ונפשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 
@@ -89,11 +79,8 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   const onlineCount = isOnline ? list.length : await countListed({ online: true });
   const localArticles = await loadLocalArticles(isOnline ? { online: true } : { region: r.region });
   const label = isOnline ? "טיפול אונליין" : r.region;
-  // Same guard as the metadata title: the count sells, a near-empty count warns.
   const heading = isOnline
-    ? list.length >= 20
-      ? `טיפול פסיכולוגי אונליין: ${list.length} מטפלים ופסיכולוגים`
-      : "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים"
+    ? "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים מאומתים"
     : `פסיכולוגים ומטפלים ב${label}`;
 
   const jsonLd = {
@@ -230,7 +217,6 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
         kind={isOnline ? "online" : "region"}
         therapists={list}
-        onlineCount={onlineCount}
         regionName={isOnline ? null : r.region}
         articles={localArticles}
       />

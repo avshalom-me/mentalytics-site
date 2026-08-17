@@ -4,6 +4,12 @@ import type {
   ScoringResult,
 } from "./questionnaire-types";
 
+// The matching engine searches on this exact string, and three separate
+// branches can emit it - the attention block, the executive questionnaire and
+// its not-characterised fallback. Named so a branch can ask whether one of the
+// others already fired.
+const COGFUN = "טיפול COG-FUN לקשיי קשב וריכוז";
+
 // ===== HELPERS =====
 
 let _idCounter = 0;
@@ -678,7 +684,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("adhd-att"),
           symptomText: "ישנם סימנים לקשיי ריכוז וקשב, כולל קשיים בתפקודים הניהוליים (ארגון, שכחה).",
-          treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
+          treatment: COGFUN,
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
@@ -756,17 +762,23 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("exec-func"),
           symptomText: "נמצאו סימנים של קשיים בתפקודים הניהוליים.",
-          treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
+          treatment: COGFUN,
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
           notes: "כדאי לפנות גם לרופא נוירולוג.",
         });
-      } else if (!allAnswered(f.execScores)) {
+      } else if (!allAnswered(f.execScores) && !recs.some((r) => r.treatment === COGFUN)) {
+        // Not when the attention block already produced a COG-FUN card. Since
+        // 13/8/2026 a positive attention block sets f2 and routes into this
+        // questionnaire, so skipping it used to emit both "כולל קשיים
+        // בתפקודים הניהוליים" and "ללא הגדרה ספציפית" - which the UI groups by
+        // treatment into one card holding two statements that contradict each
+        // other.
         recs.push({
           id: uid("exec-unspecified"),
           symptomText: "סימנים של קשיים בתפקודים הניהוליים ללא הגדרה ספציפית (אי מילוי שאלון מפרט).",
-          treatment: "טיפול COG-FUN לקשיי קשב וריכוז",
+          treatment: COGFUN,
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,

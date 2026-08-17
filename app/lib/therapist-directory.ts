@@ -231,7 +231,7 @@ async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
 // rank above GIFT promotions (manual/trial), which in turn rank above the free
 // approved tier. An optional filter (region / online) narrows the set BEFORE
 // signing photo URLs, so region landing pages only pay for their own subset.
-type DirectoryFilter = {
+export type DirectoryFilter = {
   region?: string;
   city?: string;
   /** Any of these cities (used for the adjacent-city pool on small-city pages). */
@@ -249,9 +249,9 @@ type DirectoryFilter = {
   centerId?: string;
 };
 
-// Shared query + in-memory filtering (no photo signing). Used both by the full
-// loader and by the lightweight count helpers below.
-async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[]> {
+// The single directory query (no photo signing). Every loader and counter in
+// this file starts from this fetch; the filters are applied in memory.
+async function fetchListedRows(): Promise<TherapistRow[]> {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
@@ -266,8 +266,14 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
     .order("full_name", { ascending: true });
 
   if (error || !data) return [];
+  return data as TherapistRow[];
+}
 
-  let rows = data as TherapistRow[];
+// The pure in-memory half of the query above. Split out so callers that need
+// MANY counts (the sitemap needs ~40) can fetch once and count repeatedly,
+// instead of one full round-trip per count.
+function applyDirectoryFilter(data: TherapistRow[], filter?: DirectoryFilter): TherapistRow[] {
+  let rows = data;
   // A center's public page wants exactly its therapists - skip the main/para
   // category filter there (a center may include para-medical therapists too).
   // שורת הישות עצמה מוחרגת: העמוד לא מציג את המרכז כחבר בצוות של עצמו.
@@ -303,22 +309,39 @@ async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[
   return rows;
 }
 
+// Shared query + in-memory filtering (no photo signing). Used both by the full
+// loader and by the lightweight count helpers below.
+async function loadFilteredRows(filter?: DirectoryFilter): Promise<TherapistRow[]> {
+  return applyDirectoryFilter(await fetchListedRows(), filter);
+}
+
 // Count listed therapists matching a filter - no photo signing, for deciding
 // whether a landing page is populated enough to index.
 export async function countListed(filter?: DirectoryFilter): Promise<number> {
   return (await loadFilteredRows(filter)).length;
 }
 
-// One-query counts for every region, city and specialty string, so the sitemap
-// can decide which landing pages to include without 30+ round-trips.
-export async function countListedByRegionAndCity(): Promise<{
+export type ListedCounts = {
   regions: Record<string, number>;
   cities: Record<string, number>;
   /** City + its adjacent cities, counting each therapist ONCE (they overlap heavily). */
   cityPools: Record<string, number>;
   specialties: Record<string, number>;
-}> {
-  const rows = await loadFilteredRows();
+  /** Count listed therapists matching any directory filter - in memory, no extra queries. */
+  count: (filter?: DirectoryFilter) => number;
+};
+
+// ALL the counts a caller could need, from ONE query. The sitemap decides
+// indexability for ~40 landing-page families (regions, cities, specialties,
+// topics, assessments, arrangements, online×topic, city×topic); until
+// 15/8/2026 each decision re-fetched the entire therapists table in its own
+// serial round-trip, which took the production sitemap past 26 seconds - long
+// enough for Googlebot to give up. Fetch once, count in memory.
+export async function loadListedCounts(): Promise<ListedCounts> {
+  const all = await fetchListedRows();
+  // The aggregate maps count the default "main" directory - the same subset
+  // countListed() sees with no explicit category.
+  const rows = applyDirectoryFilter(all);
   const regions: Record<string, number> = {};
   const cities: Record<string, number> = {};
   const specialties: Record<string, number> = {};
@@ -337,6 +360,25 @@ export async function countListedByRegionAndCity(): Promise<{
     const wanted = new Set([city, ...neighborsOf(city)]);
     cityPools[city] = rows.filter((t) => (t.regions ?? []).some((c) => wanted.has(c))).length;
   }
+  return {
+    regions,
+    cities,
+    cityPools,
+    specialties,
+    count: (filter?: DirectoryFilter) => applyDirectoryFilter(all, filter).length,
+  };
+}
+
+// One-query counts for every region, city and specialty string, for callers
+// that only need the aggregate maps.
+export async function countListedByRegionAndCity(): Promise<{
+  regions: Record<string, number>;
+  cities: Record<string, number>;
+  /** City + its adjacent cities, counting each therapist ONCE (they overlap heavily). */
+  cityPools: Record<string, number>;
+  specialties: Record<string, number>;
+}> {
+  const { regions, cities, cityPools, specialties } = await loadListedCounts();
   return { regions, cities, cityPools, specialties };
 }
 

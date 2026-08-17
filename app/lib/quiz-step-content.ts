@@ -76,11 +76,11 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
   "f1-ld": { group: "תפקוד", desc: "שאלת שער: קושי ברכישת קריאה בילדות (כן/לא)", input: "gate" },
   "f1-ld-q": { group: "תפקוד", desc: "סולמות לקויות למידה 1-3", input: "scales", items: 5 },
   f2: { group: "תפקוד", desc: "שאלת שער: קשיי התארגנות (כן/לא)", input: "gate" },
-  "f2-q": { group: "תפקוד", desc: "סולמות תפקודים ניהוליים 1-3", input: "scales", items: 5 },
+  "f2-q": { group: "תפקוד", desc: "סולמות תפקודים ניהוליים 1-3", input: "scales", items: 6 },
   f3: { group: "תפקוד", desc: "שאלת שער: קושי/שחיקה תעסוקתית (כן/לא)", input: "gate" },
   "f3-type": { group: "תפקוד", desc: "בחירת סטטוס תעסוקתי: צעיר / שינוי קריירה / מוגבלות / שחיקה / אחר", input: "choice", items: 1 },
   "f3-a": { group: "תפקוד", desc: "צ'קליסט תעסוקתי לצעירים (5 פריטים)", input: "checklist", items: 5 },
-  "f3-b": { group: "תפקוד", desc: "צ'קליסט תעסוקתי לבוגרים/שחיקה (4 פריטים)", input: "checklist", items: 4 },
+  "f3-b": { group: "תפקוד", desc: "צ'קליסט תעסוקתי לבוגרים/שחיקה (5 פריטים, החמישי מנתב לשאלון התפקודים הניהוליים ואינו נספר בציון)", input: "checklist", items: 5 },
   "f3-disability": { group: "תפקוד", desc: "שאלה: האם פנית לביטוח לאומי (כן/לא)", input: "gate" },
 
   "r-intake": { group: "זוגיות / משפחה", desc: "סטטוס: בזוגיות / יש ילדים / ללא זוגיות (צ'קבוקסים)", input: "form", items: 1 },
@@ -100,10 +100,10 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
   "a-substances": { group: "התמכרויות", desc: "צ'קליסט 11 קריטריונים לשימוש בחומרים (DSM)", input: "checklist", items: 11, heavy: true, sensitive: true },
   "a-gaming": { group: "התמכרויות", desc: "צ'קליסט 9 פריטים על התמכרות למשחקים", input: "checklist", items: 9, heavy: true },
   "a-porn-type": { group: "התמכרויות", desc: "בחירה: הקושי בפורנוגרפיה או במין", input: "choice", items: 1, sensitive: true },
-  "a-porn-q": { group: "התמכרויות", desc: "סולמות 1-7 על צריכת פורנוגרפיה", input: "scales", items: 5, sensitive: true },
+  "a-porn-q": { group: "התמכרויות", desc: "סולמות 1-7 על צריכת פורנוגרפיה", input: "scales", items: 18, heavy: true, sensitive: true },
   "a-sex-q": { group: "התמכרויות", desc: "צ'קליסט SAST: 9 היגדים אינטימיים מאוד על התנהגות מינית (כולל פריט על חוקיות)", input: "checklist", items: 9, heavy: true, sensitive: true },
   "a-gambling": { group: "התמכרויות", desc: "צ'קליסט 9 פריטים על הימורים", input: "checklist", items: 9, heavy: true },
-  "a-phone": { group: "התמכרויות", desc: "סולמות 1-6 על שימוש בטלפון/רשתות", input: "scales", items: 6 },
+  "a-phone": { group: "התמכרויות", desc: "סולמות 1-6 על שימוש בטלפון/רשתות", input: "scales", items: 10 },
 
   scoring: { group: "סיום", desc: "מסך עיבוד אוטומטי ('מעבד תשובות...') - המשתמש לא נדרש לכלום; נטישה כאן מרמזת על תקלה טכנית או זמן עיבוד ארוך", input: "system" },
   results: { group: "אחרי השאלון", desc: "עמוד התוצאות וההמלצות (אחרי השלמת השאלון)", input: "system" },
@@ -116,10 +116,10 @@ export const ADULTS_STEP_INFO: Record<string, QuizStepInfo> = {
 export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-consent": { group: "פתיחה", desc: "הצהרה משפטית + הסכמה (ההורה הממלא)", input: "gate" },
   "p-demo": { group: "פתיחה", desc: "גיל ומין בלבד (חובה); הכיתה נגזרת מהגיל ונשאלת רק בגילאי 6/7/9/12/14. קוצר מ-9 שדות ב-8/8/26", input: "form", items: 2 },
-  "p-areas": { group: "פתיחה", desc: "דירוג תחומי הקושי העיקריים (4-5 תחומים, סולם כלל-לא/מעט/הרבה/הרבה-מאוד)", input: "choice", items: 1 },
+  "p-areas": { group: "פתיחה", desc: "דירוג תחומי הקושי העיקריים (4-5 תחומים, סולם כלל-לא/מעט/הרבה/הרבה-מאוד; בגילאי 1-2 מוצגים רק שניים - התפתחותי והתנהגותי)", input: "choice", items: 1 },
 
   "p-q1": { group: "חרדה", desc: "שאלת שער: דאגות/לחצים מתמשכים אצל הילד (כן/לא)", input: "gate" },
-  "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא)", input: "gate" },
+  "p-q1-pain": { group: "חרדה", desc: "שאלת שער: כאבים כרוניים (כן/לא); תשובה חיובית פותחת שאלת המשך על שלילת גורם רפואי", input: "gate" },
   "p-aq": { group: "חרדה", desc: "שאלון חרדה: 10 סעיפים בסולם 1-3", input: "scales", items: 10, heavy: true },
   "p-aq-grade": { group: "חרדה", desc: "שאלות משלימות לפי שכבת גיל - מוזג ל-p-traits ב-8/8/26", input: "scales", items: 3, legacy: true },
   "p-q1-ga": { group: "חרדה", desc: "הסכמת הילד לטיפול (גיל רך) - מוזג ל-p-traits ב-8/8/26", input: "gate", items: 1, legacy: true },
@@ -151,8 +151,8 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-eq": { group: "אכילה", desc: "שאלון אכילה מפורט (2 בלוקים לפי גיל) + גובה ומשקל אופציונליים ל-BMI, שעברו לכאן מהמסך הדמוגרפי", input: "scales", items: 8, sensitive: true },
 
   "p-q9": { group: "התנהגות/ויסות", desc: "שער: חוסר יציבות ביחסים, קושי בוויסות רגשות ואימפולסיביות (כן/לא)", input: "gate" },
-  "p-bq": { group: "התנהגות/ויסות", desc: "שאלון ויסות רגשות ויחסים בינאישיים", input: "scales", items: 6 },
-  "p-q9-adhd": { group: "התנהגות/ויסות", desc: "שאלון קשב (ADHD)", input: "checklist", items: 8, heavy: true },
+  "p-bq": { group: "התנהגות/ויסות", desc: "שאלון ויסות רגשות ויחסים בינאישיים", input: "scales", items: 7 },
+  "p-q9-adhd": { group: "התנהגות/ויסות", desc: "שאלון קשב (ADHD): 6 פריטי קשב + 6 פריטי היפראקטיביות", input: "checklist", items: 12, heavy: true },
 
   "p-q10": { group: "מצוקה כללית", desc: "קשיים רגשיים אחרים שלא עלו בשאלון (כן/לא)", input: "gate" },
   "p-q10-par": { group: "מצוקה כללית", desc: "האם הקושי קשור לקשר עם אחד ההורים (כן/לא)", input: "gate", sensitive: true },
@@ -162,8 +162,8 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-acad": { group: "התפתחות ותפקוד", desc: "תפקוד לימודי בגן/בבית הספר - מסך ארוך התלוי בשכבת הגיל", input: "form", items: 8, heavy: true },
   "p-dev-toilet": { group: "התפתחות ותפקוד", desc: "קשיי גמילה / התרוקנות (כן/לא + פירוט)", input: "gate", sensitive: true },
   "p-dev-sensory": { group: "התפתחות ותפקוד", desc: "קשיי ויסות חושי (כן/לא + פירוט)", input: "gate" },
-  "p-beh": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים התנהגותיים", input: "scales", items: 5 },
-  "p-soc": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים חברתיים", input: "scales", items: 5 },
+  "p-beh": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים התנהגותיים", input: "scales", items: 3 },
+  "p-soc": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים חברתיים: 3 שאלות פתיחה, ולאחריהן בלוק LSAS לפי שכבת הגיל", input: "scales", items: 3 },
   "p-traits": { group: "מאפייני הילד", desc: "צעד מאוחד בסוף השאלון: מוטיבציה לטיפול, ורבליות, יכולת תרגול, תחומי עניין והסכמת הילד - לפי מה שהניקוד באמת קורא עבור הילד הזה", input: "scales", items: 3 },
 
   "p-result": { group: "תוצאות", desc: "עמוד התוצאות (השלמת השאלון)", input: "system" },

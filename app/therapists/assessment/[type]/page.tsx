@@ -32,11 +32,10 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
   // to diagnosticians, so promising it on an assessment page would mislead.
   // What the page really does carry is intro / whoFor / performedBy, so the
   // richest tier promises exactly those three.
-  const who = count >= MIN_LISTED_FOR_INDEX ? `${count} מאבחנים מוסמכים` : "מאבחנים מוסמכים";
   const description = introPlusOffer(
     a.intro,
-    `רשימת ${who} - מה האבחון בודק, מי מוסמך לבצע אותו ולמי הוא מתאים.`,
-    `רשימת ${who} לפנייה ישירה.`
+    "מאבחנים מוסמכים שתעודותיהם אומתו - מה האבחון בודק, מי מוסמך לבצע אותו ולמי הוא מתאים.",
+    "מאבחנים מוסמכים שתעודותיהם אומתו, לפנייה ישירה."
   );
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return {
@@ -98,7 +97,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ typ
         </h1>
         {list.length >= MIN_LISTED_FOR_INDEX && (
           <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם ${list.length} מאבחנים מאומתים${onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.`}
+            {`בטיפול חכם מוצגים מאבחנים שתעודותיהם אומתו${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
           </p>
         )}
       </div>

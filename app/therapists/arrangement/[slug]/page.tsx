@@ -26,11 +26,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   if (!a) return { title: "מסלול לא נמצא" };
   const url = `${BASE}/therapists/arrangement/${encodeURIComponent(a.slug)}`;
   const count = await countListed({ arrangement: a.value });
-  const who = count >= MIN_LISTED_FOR_INDEX ? `${count} מטפלים` : "המטפלים";
   const description = introPlusOffer(
     a.intro,
-    `רשימת ${who} שעובדים מול ${a.name}, ומה כדאי לברר לפני שקובעים.`,
-    `רשימת ${who} שעובדים מול ${a.name}.`
+    `מטפלים שתעודותיהם אומתו ועובדים מול ${a.name}, ומה כדאי לברר לפני שקובעים.`,
+    `מטפלים שתעודותיהם אומתו ועובדים מול ${a.name}.`
   );
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return {
@@ -92,7 +91,7 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
         </h1>
         {list.length >= MIN_LISTED_FOR_INDEX && (
           <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם ${list.length} מטפלים שציינו שהם עובדים מול ${a.name}${onlineHere > 0 ? `, ${onlineHere} מהם זמינים גם אונליין` : ""}.`}
+            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו ושציינו שהם עובדים מול ${a.name}${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
           </p>
         )}
       </div>

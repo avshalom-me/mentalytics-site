@@ -6,8 +6,10 @@ import type { LocalArticle } from "@/app/lib/local-articles";
 // SEO content block for city/region landing pages, rendered BELOW the
 // therapist listings (patients rarely scroll past the cards; crawlers read it
 // all - the alhasapa/betipulnet pattern). Three anti-"doorway page" measures:
-//  1. The stats are DERIVED FROM LIVE DATA, so every city's text is genuinely
-//     different (and self-updates as supply changes).
+//  1. The prose is DERIVED FROM LIVE DATA - which professions and specialties
+//     this place actually has, named - so every city's text is genuinely
+//     different and self-updates as supply changes. Names, never counts: see
+//     the paragraph builder below for why.
 //  2. Headings/phrasings rotate deterministically per place name.
 //  3. Small-supply places get adapted wording instead of boilerplate.
 // Native <details> accordions - no JS, SSR-rendered, fully indexable.
@@ -20,11 +22,6 @@ function hashPlace(name: string): number {
   let h = 0;
   for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) % 997;
   return h;
-}
-
-/** Hebrew has no "1 גברים" - a count of one takes the singular form, no numeral. */
-function countLabel(n: number, one: string, plural: string): string {
-  return n === 1 ? one : `${n} ${plural}`;
 }
 
 // Truncate by CODE POINT, not by UTF-16 unit: slice() can cut an emoji in half
@@ -59,7 +56,6 @@ export default function CitySeoSection({
   placeName,
   kind,
   therapists: therapistsProp,
-  onlineCount,
   regionName,
   articles = [],
   articlesScope = "place",
@@ -70,7 +66,6 @@ export default function CitySeoSection({
   placeName: string;
   kind: Kind;
   therapists: PublicTherapist[];
-  onlineCount: number;
   /** Canonical region this place belongs to (the region itself on region pages) - keys price + public-services data. */
   regionName?: string | null;
   articles?: LocalArticle[];
@@ -84,17 +79,13 @@ export default function CitySeoSection({
   regionNearby?: PublicTherapist[];
 }) {
   const h = hashPlace(placeName);
-  // כרטיסי מרכז אינם מטפלים: הם מוצגים ברשימה, אבל "רשימת N מטפלים מאומתים",
-  // פילוח ההכשרות ופילוח המגדר מתארים בני אדם. ספירתם שם הייתה מנפחת את
-  // המספר שאנחנו מפרסמים ומכניסה למניין המגדרי ישות חסרת מגדר.
+  // כרטיסי מרכז אינם מטפלים: הם מוצגים ברשימה, אבל פילוח ההכשרות ופילוח
+  // המגדר מתארים בני אדם, וישות-מרכז הייתה נכנסת למניין המגדרי בלי מגדר.
   const therapists = therapistsProp.filter((t) => !t.is_center);
   const total = therapists.length;
-  // The breakdown must describe what the page ACTUALLY lists, otherwise the text
-  // undercounts the grid above it. An earlier version gated this on `total >= 3`
-  // while the page renders adjacent-city cards whenever in-city < 6, so a city
-  // with 3 of its own and 20 neighbours printed "3 מטפלים" above 23 cards.
-  // No threshold here at all now: whatever is rendered is what gets counted,
-  // and the wording below keeps the groups separate.
+  // The breakdown must describe what the page ACTUALLY lists, adjacent-city
+  // cards included - otherwise the professions named below would not match the
+  // grid above them.
   const alsoShown = [...nearby, ...regionNearby];
   const pooled = alsoShown.length > 0 ? [...therapists, ...alsoShown] : therapists;
   const types = typeBreakdown(pooled);
@@ -111,63 +102,55 @@ export default function CitySeoSection({
     `פסיכולוגים ומטפלים ${inPlace} - שאלות ותשובות`,
   ];
 
-  // Live-data supply paragraph - this is what makes each page genuinely unique.
-  const typesText = types.map((t) => `${t.label} (${t.count})`).join(" · ");
+  // No supply counts anywhere in this paragraph (owner's call, 14/8/2026).
+  //
+  // Google quotes roughly the first 160 characters of whichever passage it
+  // picks, and for "פסיכולוג מומלץ ב..." it picks THIS paragraph over the meta
+  // description - on 14/8 the Jerusalem SERP was showing "לפי הכשרה: מטפל/ת
+  // בהבעה ויצירה (9) · עו״ס קליני (8)" as our shop window. Numbers read as
+  // inventory data, and on a thin city page a small one argues against us.
+  //
+  // The anti-doorway requirement that the counts used to satisfy still holds:
+  // every place needs genuinely different text. It now comes from the NAMES
+  // this place actually has - which professions are represented, which
+  // specialties, which adjacent towns - all derived from live data, all unique
+  // per place, and none of them a number.
+  const typesText = types.map((t) => t.label).join(", ");
   const statsBits: string[] = [];
-  // Where the extra cards came from, named. Adjacent cities are listed by name;
-  // the wider-region fallback can only be described by its region.
+  const detailBits: string[] = [];
+  // Which adjacent places contribute, named.
   const alsoBits: string[] = [];
-  if (nearby.length > 0) {
-    alsoBits.push(
-      nearbyPlaces.length > 0
-        ? `ועוד ${nearby.length} מטפלים בערים הצמודות (${nearbyPlaces.join(", ")})`
-        : `ועוד ${nearby.length} מטפלים בערים הצמודות`
-    );
-  }
-  if (regionNearby.length > 0) {
-    alsoBits.push(`ועוד ${regionNearby.length} מטפלים באזור ${regionName ?? ""}`.trim());
-  }
+  if (nearby.length > 0 && nearbyPlaces.length > 0) alsoBits.push(`וגם בערים הצמודות (${nearbyPlaces.join(", ")})`);
+  else if (nearby.length > 0) alsoBits.push("וגם בערים הצמודות");
+  if (regionNearby.length > 0) alsoBits.push(`וגם באזור ${regionName ?? ""}`.trim());
 
-  if (total > 0) {
-    // Google pulled this exact sentence as the SERP snippet for city pages
-    // (screenshot, 6/8/26) because the meta description was too short to use.
-    // So the line has to work as ad copy, not only as data: say it is a list
-    // for psychological care, then the count. Online keeps its own phrasing -
-    // "רשימת מטפלים לטיפול פסיכולוגי ונפשי בטיפול אונליין" reads broken.
+  if (total > 0 || alsoShown.length > 0) {
+    const here = total > 0 ? inPlace : `בטווח נסיעה קצר ${inPlace}`;
     statsBits.push(
       kind === "online"
-        ? total >= 3 && h % 2 === 0
-          ? `באונליין מוצגים כרגע ${total} מטפלים מאומתים דרך טיפול חכם`
-          : `דרך טיפול חכם מוצגים כרגע ${total} מטפלים מאומתים בטיפול אונליין`
-        : total >= 3 && h % 2 === 0
-          ? `רשימת המטפלים לטיפול פסיכולוגי ונפשי ${inPlace} כוללת כרגע ${total} פסיכולוגים ומטפלים מאומתים, לצד שאלון התאמה אישי`
-          : total >= 3
-            ? `דרך טיפול חכם מוצגת ${inPlace} רשימת ${total} מטפלים מאומתים לטיפול פסיכולוגי ונפשי, ולצדה שאלון למציאת מטפל מותאם`
-            : `${inPlace} מוצג כרגע ${total === 1 ? "מטפל/ת מאומת/ת אחד/ת" : `${total} מטפלים מאומתים`} דרך טיפול חכם`
+        ? h % 2 === 0
+          ? "בטיפול חכם אפשר לעבור על המטפלים והפסיכולוגים שתעודותיהם אומתו ולפנות ישירות למי שנראה מתאים, או למלא שאלון שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר"
+          : "דרך טיפול חכם אפשר לפנות ישירות למטפלים ולפסיכולוגים שתעודותיהם אומתו, או למלא שאלון קצר שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר"
+        : h % 2 === 0
+          ? `${here} אפשר לעבור על המטפלים והפסיכולוגים שתעודות ההכשרה שלהם אומתו ולפנות ישירות, או למלא שאלון שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר`
+          : `דרך טיפול חכם אפשר לפנות ישירות למטפלים ולפסיכולוגים ${here} שתעודותיהם אומתו, או למלא שאלון קצר שנבנה על ידי פסיכולוגים קליניים ומבוסס מחקר`
     );
     statsBits.push(...alsoBits);
-    if (typesText) statsBits.push(alsoBits.length > 0 ? `לפי הכשרה, בכל הרשימה יחד: ${typesText}` : `לפי הכשרה: ${typesText}`);
-    if (kind !== "online" && onlineHere > 0) statsBits.push(`${onlineHere} מתוכם מטפלים גם אונליין`);
-    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
-    if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-    statsBits.push(`ו-${onlineCount} מטפלים זמינים אונליין מכל מקום`);
-  } else if (alsoShown.length > 0) {
-    const where =
-      nearby.length > 0
-        ? `בערים הצמודות${nearbyPlaces.length > 0 ? ` (${nearbyPlaces.join(", ")})` : ""}`
-        : `באזור ${regionName ?? ""}`.trim();
-    statsBits.push(
-      `${inPlace} עצמה טרם נרשמו מטפלים במאגר, אך ${where} מוצגים כרגע ${alsoShown.length} מטפלים מאומתים`
-    );
-    if (typesText) statsBits.push(`לפי הכשרה: ${typesText}`);
-    if (women > 0 && men > 0) statsBits.push(`מטפלות ומטפלים כאחד (${countLabel(women, "אישה אחת", "נשים")}, ${countLabel(men, "גבר אחד", "גברים")})`);
-    if (specialties.length >= 2) statsBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
-    statsBits.push(`ובנוסף ${onlineCount} מטפלים זמינים אונליין מכל מקום`);
+    if (kind !== "online" && onlineHere > 0) detailBits.push("חלקם מטפלים גם אונליין");
+    if (typesText) detailBits.push(`בין המטפלים ברשימה: ${typesText}`);
+    if (women > 0 && men > 0) detailBits.push("מטפלות ומטפלים כאחד");
+    if (specialties.length >= 2) detailBits.push(`בין תחומי ההתמחות: ${specialties.join(", ")}`);
   } else {
-    statsBits.push(`ההיצע ${inPlace} מתעדכן - בינתיים זמינים ${onlineCount} מטפלים מאומתים אונליין`);
-    if (regionName) statsBits.push(`ומטפלים נוספים באזור ${regionName}`);
+    statsBits.push(`ההיצע ${inPlace} מתעדכן - בינתיים אפשר לפנות למטפלים שתעודותיהם אומתו ומטפלים אונליין מכל הארץ`);
+    if (regionName) statsBits.push(`וכן למטפלים באזור ${regionName}`);
   }
-  const statsParagraph = `${statsBits.join(", ")}. הרשימה מתעדכנת באופן שוטף.`;
+  const statsParagraph = [
+    `${statsBits.join(", ")}.`,
+    detailBits.length > 0 ? `${detailBits.join(", ")}.` : "",
+    "הרשימה מתעדכנת באופן שוטף.",
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   // FAQ - phrasing varies by place hash; the content stays honest and generic-
   // free (no invented city facts, no fake price differences between cities).
@@ -223,7 +206,7 @@ export default function CitySeoSection({
   const onlineA =
     kind === "online"
       ? `מחקרים מהשנים האחרונות מראים שטיפול בשיחת וידאו משיג תוצאות דומות לטיפול פנים־אל־פנים ברוב הקשיים הנפוצים (חרדה, דיכאון, קשיי הסתגלות). היתרון: גישה למטפל המתאים ביותר - לא רק לקרוב ביותר.`
-      : `שווה לשקול טיפול אונליין: מחקרים מראים שטיפול בווידאו משיג תוצאות דומות לטיפול בקליניקה ברוב הקשיים הנפוצים, והוא פותח גישה ל־${onlineCount} מטפלים מאומתים מכל הארץ${regionName ? `, בנוסף למטפלים באזור ${regionName}` : ""}.`;
+      : `שווה לשקול טיפול אונליין: מחקרים מראים שטיפול בווידאו משיג תוצאות דומות לטיפול בקליניקה ברוב הקשיים הנפוצים, והוא פותח גישה למטפלים מכל הארץ${regionName ? `, בנוסף למטפלים באזור ${regionName}` : ""}.`;
 
   const kupaQ = "טיפול פרטי או דרך קופת החולים?";
   const kupaA =

@@ -113,7 +113,7 @@ export default async function CouplesDepthSection() {
             כשהקושי נוגע גם לילדים או לדינמיקה של הבית כולו ולא רק לקשר בין בני הזוג, טיפול משפחתי
             עשוי להתאים יותר.{" "}
             <Link href="/therapists/specialty/טיפול-משפחתי" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
-              {familyCount} מטפלים משפחתיים במאגר
+              למטפלים המשפחתיים במאגר
             </Link>
             .
           </p>
@@ -135,7 +135,7 @@ export default async function CouplesDepthSection() {
                 className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
                 style={{ border: "1px solid var(--line)", color: "var(--text-2)", textDecoration: "none" }}
               >
-                טיפול זוגי ב{city} ({n})
+                טיפול זוגי ב{city}
               </Link>
             ))}
           </div>

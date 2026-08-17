@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sendTherapistRegistrationReceivedEmail } from "@/app/lib/therapist-emails";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
 import { logEmail } from "@/app/lib/email-log";
+import { alertRecipients } from "@/app/lib/alert-recipients";
 import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 import { THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
@@ -159,8 +160,7 @@ export async function GET(req: NextRequest) {
         .eq("entity_id", liveRow.id as string)
         .limit(1);
       if (!alreadyAlerted?.length) {
-        const alertTo = (process.env.WEEKLY_REPORT_TO ?? "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com")
-          .split(",").map((s) => s.trim()).filter(Boolean);
+        const alertTo = alertRecipients();
         try {
           await new Resend(process.env.RESEND_API_KEY).emails.send({
             from: "טיפול חכם <noreply@mentalytics.co.il>",

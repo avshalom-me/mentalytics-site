@@ -1,4 +1,9 @@
 import "server-only";
+import {
+  KIDS_AQ_ITEMS, KIDS_MQ_ITEMS, KIDS_OQ_ITEMS, KIDS_TQ_ITEMS, KIDS_PQ_ITEMS,
+  KIDS_BQ_ITEMS, KIDS_LSAS_ITEMS, KIDS_AS_ITEMS, KIDS_AG_ITEMS, KIDS_AB_ITEMS,
+  KIDS_EA_RESTRICT, KIDS_EA_BINGE_UNDER12, KIDS_EB_RESTRICT, KIDS_EB_BINGE_OVER12,
+} from "./questionnaire-items.server";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -187,6 +192,20 @@ function computeResults(A: Ans): KidsBox[] {
             : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
       }
       addToGroup("📊 נמצאו סימנים לחרדה", ref, []);
+    } else if (KIDS_AQ_ITEMS.some(it => A[it.key] === undefined)) {
+      // A skipped questionnaire scores 0, and 0 used to fall straight into the
+      // "low stress" branch below - stating an all-clear about a child whose
+      // parent had just rated the anxiety gate at 3 or more, and adding a
+      // referral on the strength of it. The screen now blocks Continue until
+      // every item is answered, so this is the second line: it fires only if a
+      // client malfunctions, and it says what is actually known.
+      addToGroup(
+        "📊 סימנים של חרדה ללא הגדרה ספציפית (שאלון האפיון לא מולא)",
+        grp === "ga"
+          ? getGaRef()
+          : "✅ הפנייה: המשך בירור פסיכולוגי לאפיון הקושי ועוצמתו, ובמקביל טיפול CBT לחרדה",
+        [],
+      );
     } else {
       emoStandalones.push({ cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true });
     }
@@ -258,7 +277,15 @@ function computeResults(A: Ans): KidsBox[] {
     if (b >= 4) { const sv = b >= 7 ? "חמורה" : b >= 6 ? "בינונית" : "קלה"; addSyms.push("📊 נמצאו סימנים להתמכרות להימורים - " + sv); }
     if (A.ad_o) addSyms.push("📊 דווח על התמכרות אחרת - יש לפרט");
     if (addSyms.length) {
-      const ctrl = A.q4_ctrl || 5;
+      // Read only by the ב-ו branch below, and that screen now both requires an
+      // answer and is shown only to ב-ו, so an absent value means a client
+      // malfunction rather than a parent who skipped. It falls to the standard
+      // treatment for the finding; the parent-guidance branch is the
+      // modification for a child with no self-control at all, which is
+      // precisely what an absent answer cannot establish. Named rather than a
+      // bare `|| 5`, which read like a real reply at the end of the scale.
+      const CTRL_UNKNOWN = 5;
+      const ctrl = A.q4_ctrl || CTRL_UNKNOWN;
       const ref = grp === "ga"
         ? "✅ הפנייה: הדרכת הורים טיפולית"
         : grp === "bv"
@@ -348,6 +375,30 @@ function computeResults(A: Ans): KidsBox[] {
     if (bqTot >= 5) {
       const ref = grp === "ga" ? getGaRef() : "✅ הפנייה לטיפול DBT פרטני/קבוצתי";
       addToGroup("📊 נמצאו סימנים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
+    } else if (bqTot === 4) {
+      // Sub-clinical, but not nothing - and until now it produced nothing at
+      // all. Worse, two places on the screen already count 4 as a positive
+      // finding (hasGaPositive, and the anyPositive test that decides whether
+      // to ask the p-q10 catch-all), so a parent who flagged the regulation
+      // gate and answered 4 of 7 got an empty section AND lost the question
+      // that exists to catch exactly that. The old threshold was set by supply
+      // - there is no "פסיכולוג ילדים" therapist type - not by the clinical
+      // picture, which is the same reasoning that kept maths referrals silent
+      // in the academic block.
+      //
+      // The referral follows the child's own characteristics, in the same
+      // three-way this file already uses for the zy anxiety branch: a child
+      // with no motivation of their own is reached through the parents, one
+      // unlikely to practise between sessions does the work in a dynamic
+      // frame, and one who will practise gets CBT. traitNeeds collects both
+      // fields for this path - see regModerate there.
+      const m = A.t_motiv || 0, p = A.t_prac || 0;
+      const ref = grp === "ga"
+        ? getGaRef()
+        : m === 1 ? "✅ הפנייה: הדרכת הורים טיפולית"
+        : p <= 2  ? "✅ הפנייה: טיפול פסיכודינאמי"
+        :           "✅ הפנייה: טיפול CBT";
+      addToGroup("📊 נמצאו סימנים מתונים לקשיי ויסות על רקע קשרים בינאישיים", ref, []);
     }
   }
 
@@ -385,13 +436,31 @@ function computeResults(A: Ans): KidsBox[] {
   }
 
   // BV merge: Q1+Q2+Q3 all positive → combined referral
+  //
+  // The test is whether those three findings were actually emitted, not a second
+  // copy of their thresholds. Recomputing them had drifted twice over:
+  //
+  //   - anxiety was tested at aq_tot >= 14 while the finding itself needs 16, so
+  //     between 14 and 15 the merge fired with no anxiety group to merge. The
+  //     combined referral was printed anyway, and its CBT component answered an
+  //     anxiety finding the report never made - next to a "מתח ברמה נמוכה" line
+  //     saying the opposite.
+  //   - the mood label list held only the non-severe wording, so a child whose
+  //     mood finding was severe (mq_tot >= 6, a different string) triggered the
+  //     merge and was then left out of it.
+  //
+  // Reading the emitted groups makes both impossible: a finding cannot be
+  // merged unless it exists, and it cannot be missed once it does.
   if (grp === "bv") {
-    const q1p = (A.q1 || 0) >= 3 && (A.aq_tot || 0) >= 14;
-    const q2p = (A.q2 || 0) >= 3;
-    const q3p = (A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4;
-    if (q1p && q2p && q3p) {
+    // Deliberately not the "ללא הגדרה ספציפית" fallback: it states that the
+    // anxiety was never characterised, which is not a basis for prescribing CBT.
+    const ANXIETY    = ["📊 נמצאו סימנים לחרדה"];
+    const SELF_IMAGE = ["📊 נמצאו סימנים לדימוי עצמי נמוך"];
+    const MOOD       = ["📊 נמצאו סימנים למצב רוח ירוד", "📊 נמצאו סימנים מובהקים של מצב רוח ירוד"];
+    const has = (labels: string[]) => emoGroups.some(g => g.symptoms.some(s => labels.includes(s)));
+    if (has(ANXIETY) && has(SELF_IMAGE) && has(MOOD)) {
       const combinedRef = "✅ הפנייה: טיפול פסיכודינאמי בשילוב CBT בשילוב הדרכת הורים";
-      const bvLabels = ["📊 נמצאו סימנים לחרדה", "📊 נמצאו סימנים לדימוי עצמי נמוך", "📊 נמצאו סימנים למצב רוח ירוד"];
+      const bvLabels = [...ANXIETY, ...SELF_IMAGE, ...MOOD];
       const mergedExtras: KidsBox[] = [];
       const mergedSymptoms: string[] = [];
       for (let i = emoGroups.length - 1; i >= 0; i--) {
@@ -695,30 +764,65 @@ function makeAdhdEmitter(
 
 // ── Math grading helpers ──────────────────────────────────────────────────────
 
+/**
+ * The percentage token at the head of an academic severity answer.
+ *
+ * The screens store human labels - "5% הכי מתקשה בכיתה" in grades א-ג and
+ * "5% הכי נמוכים בכיתה" in ד-ו - while the scoring only cares about the
+ * percentage that opens them. Comparing whole labels is what made every maths
+ * referral in grades א-ו dead code: the branches were written against "5%" and
+ * never updated when the labels grew, so the child got a symptom and no
+ * recommendation at all. Reading the leading token survives the next rewording.
+ *
+ * Deliberately NOT used for grades ז-יב, whose options are bare values and
+ * include "מעל 20%" - splitting that on whitespace would yield "מעל".
+ */
+function pctTier(v: string | undefined): string {
+  return (v || "").trim().split(/\s+/)[0];
+}
+
+// Maths difficulty on its own is not an assessment finding. The route is
+// remedial teaching, and a psychodidactic assessment only if about six months
+// of it has produced no meaningful change.
+//
+// The escalation has to sit on a NOTES line, never on the first one:
+// parseRefBox classifies the first line only, and ASSESSMENT_PATTERNS matches
+// any text containing "פסיכודידקטי", so naming it up front would headline the
+// card as exactly the assessment we are declining to recommend.
+const MATH_REMEDIAL_REVIEW =
+  "\nאם לאחר כחצי שנה של הוראה מתקנת סדירה לא נראה שיפור משמעותי - יש לשקול אבחון פסיכודידקטי.";
+
 function gradeMathAG(math: string, f: Findings) {
-  if (math === "לא") return;
+  const tier = pctTier(math);
+  if (tier === "לא" || tier === "") return;
   addSym(f, "נמצאו סימנים לקשיי חשבון");
-  if (math === "5%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nא. יש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.\nב. במידה ולא נראה שיפור משמעותי - הפנייה לאבחון פסיכודידקטי " + PSYCHODIDACTIC_NOTE_AG);
-  } else if (math === "10%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nיש לשקול מתן סיוע פרטני דרך בית הספר או באופן פרטי.");
-  } else if (math === "30%") {
-    addRef(f, "נמצאו קשיים בחשבון: יש לשקול מתן סיוע פרטני.");
+  if (tier === "5%") {
+    addRef(f, "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." +
+      MATH_REMEDIAL_REVIEW + " " + PSYCHODIDACTIC_NOTE_AG);
+  } else if (tier === "10%") {
+    addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." +
+      MATH_REMEDIAL_REVIEW + " " + PSYCHODIDACTIC_NOTE_AG);
+  } else if (tier === "30%") {
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_AG);
 }
 
 function gradeMathDV(math: string, hasReadingOrAdhd: boolean, f: Findings) {
-  if (math === "לא") return;
+  const tier = pctTier(math);
+  if (tier === "לא" || tier === "") return;
   addSym(f, "נמצאו סימנים לקשיי חשבון");
-  if (math === "5%") {
+  if (tier === "5%") {
+    // Maths alongside a reading or attention difficulty is a different finding:
+    // there the assessment is warranted on the combination, not on the maths,
+    // so it leads and the remedial teaching rides along as a note.
     addRef(f, hasReadingOrAdhd
-      ? "נמצאו קשיים משמעותיים בחשבון בשילוב קשיים נוספים:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי."
-      : "נמצאו קשיים משמעותיים בחשבון:\nא. יש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.\nב. הפנייה לאבחון פסיכודידקטי.");
-  } else if (math === "10%") {
-    addRef(f, "נמצאו קשיים בחשבון:\nיש לשקול סיוע פרטני דרך בית הספר או באופן פרטי.");
-  } else if (math === "30%") {
-    addRef(f, "נמצאו קשיים קלים בחשבון - יש לשקול סיוע פרטני.");
+      ? "הפנייה לאבחון פסיכודידקטי לבירור קשיי החשבון בשילוב הקשיים הנוספים.\nלצד האבחון מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי."
+      : "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+  } else if (tier === "10%") {
+    addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+  } else if (tier === "30%") {
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_DV);
 }
@@ -918,8 +1022,16 @@ function computeZHTYBAcad(A: Ans, ga: "zh" | "tyb", boxes: KidsBox[], adhd: Adhd
   // קשיים במתמטיקה / אנגלית בלבד אינם מצריכים אבחון פסיכודידקטי כשלעצמם.
   // אבחון מומלץ רק אם הם מלווים בקשיים ברבי מלל, בקשב, או ברגשי-לימודי.
   const verbalPos = verbal !== "לא";
-  const mathSevere = math === "20%" || math === "מעל 20%";
-  const engSevere = eng === "20%" || eng === "מעל 20%";
+  // mathEngOpts on the screen runs worst-to-mildest: "10%" = קושי משמעותי,
+  // "20%" = בינוני, "מעל 20%" = קל. The old test listed "20%" / "מעל 20%",
+  // which are values from the VERBAL question (5% / 20% / מעל 20%) - a copy of
+  // the wrong option list. Against the maths values that excluded the WORST
+  // tier and included the MILDEST: a child with a significant maths difficulty
+  // got no psychodidactic referral, while the same child reporting a mild one
+  // did. Severe here means "anything but the mildest tier".
+  const SEVERE_MATH_ENG = ["10%", "20%"];
+  const mathSevere = SEVERE_MATH_ENG.includes(math);
+  const engSevere = SEVERE_MATH_ENG.includes(eng);
   if (math !== "לא") {
     addSym(f, "נמצאו סימנים לקשיים במתמטיקה");
     if (mathSevere && (verbalPos || adhdPos)) addRef(f, "הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");
@@ -1234,7 +1346,64 @@ export interface KidsScoreResult {
   social:       KidsBox[];
 }
 
-export function scoreKidsQuestionnaire(answers: Record<string, any>): KidsScoreResult {
+/**
+ * Recompute every derived total from the raw items the client sent.
+ *
+ * The browser computes aq_tot, mq_tot and the rest inside the upd* helpers and
+ * posts them alongside the answers; nothing here ever checked them. A client
+ * that failed to update one total - a helper not called on some code path, a
+ * stale render, a future refactor that renames an item - would score that whole
+ * section 0, and 0 is indistinguishable from "no difficulty". The section then
+ * vanishes from the report in silence, which is the same class of defect the
+ * questionnaires were just cleaned of, one layer down.
+ *
+ * The raw items are always in the payload (the page posts the entire answers
+ * object), so the server never has to trust the arithmetic. Every list below is
+ * the shared item definition rather than a second hand-written copy of the
+ * keys, so a renamed item breaks both sides together instead of silently
+ * zeroing one. The rules must stay identical to the upd* helpers in
+ * app/kids/page.tsx - they are the same formulas, read from the same lists.
+ */
+function normaliseTotals(A: Record<string, any>): Record<string, any> {
+  const n = { ...A };
+  const keysOf = (items: readonly { key: string }[]) => items.map(i => i.key);
+  const sumNum = (keys: string[]) => keys.reduce((s, k) => s + (Number(n[k]) || 0), 0);
+  const countYes = (keys: string[]) => keys.filter(k => n[k] === "כן").length;
+
+  n.aq_tot = sumNum(keysOf(KIDS_AQ_ITEMS));
+  n.oq_tot = sumNum(keysOf(KIDS_OQ_ITEMS));
+  n.tq_tot = sumNum(keysOf(KIDS_TQ_ITEMS));
+  n.mq_tot = countYes(keysOf(KIDS_MQ_ITEMS));
+  n.pq_tot = countYes(keysOf(KIDS_PQ_ITEMS));
+  n.bq_tot = countYes(keysOf(KIDS_BQ_ITEMS));
+  n.add_s_tot = countYes(keysOf(KIDS_AS_ITEMS));
+  n.add_g_tot = countYes(keysOf(KIDS_AG_ITEMS));
+  n.add_b_tot = countYes(keysOf(KIDS_AB_ITEMS));
+  // LSAS items are plain strings; the answer keys are positional.
+  n.lsas_tot = sumNum(KIDS_LSAS_ITEMS.map((_, i) => `lsas_a${i + 1}`));
+
+  // Eating blocks are age-split, and the "age 0" case follows the client: an
+  // unparseable age is treated as under 12.
+  const age = parseInt(n._age) || 0;
+  const under12 = age === 0 || age < 12;
+  n.eq_ano = countYes(under12 ? keysOf(KIDS_EA_RESTRICT) : keysOf(KIDS_EB_RESTRICT));
+  n.eq_bul = countYes(under12 ? keysOf(KIDS_EA_BINGE_UNDER12) : keysOf(KIDS_EB_BINGE_OVER12));
+
+  // Behaviour plan: same ladder as computeBehPlan, highest severity wins.
+  const sev = (v: string) => (v === "הרבה" ? 2 : v === "מעט" ? 1 : 0);
+  const s1 = sev(n.beh1 || ""), s2 = sev(n.beh2 || ""), s3 = sev(n.beh3 || "");
+  let ml = 0;
+  if (s1 === 1) ml = Math.max(ml, 1); if (s1 === 2) ml = Math.max(ml, 2);
+  if (s2 === 1) ml = Math.max(ml, 3); if (s2 === 2) ml = Math.max(ml, 4);
+  if (s3 === 1) ml = Math.max(ml, 5); if (s3 === 2) ml = Math.max(ml, 6);
+  n.beh_max_level = ml;
+  n.beh_plan = ml === 0 ? "" : ml <= 3 ? "חיובי" : ml <= 5 ? "חיובי_שלילי" : "חיובי_שלילי_פסיכולוגי";
+
+  return n;
+}
+
+export function scoreKidsQuestionnaire(raw: Record<string, any>): KidsScoreResult {
+  const answers = normaliseTotals(raw);
   return {
     emotional:    computeResults(answers),
     academic:     computeAcadResults(answers),

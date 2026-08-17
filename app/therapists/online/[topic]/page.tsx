@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/topics";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 // Online×topic (phase 3 of the online cluster - see ONLINE_TOPIC_SLUGS in
 // app/lib/topics.ts): "טיפול בחרדה אונליין", "טיפול זוגי אונליין". Same
@@ -71,13 +72,8 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
   const title = `${onlineHeading(topic.name)} - מטפלים מאומתים בווידאו`;
   const url = `${BASE}/therapists/online/${topic.slug}`;
   const count = await countListed({ ...topic.filter, online: true });
-  // Same shape as the city and topic pages: what the page is, how many, and
-  // the quiz. The old line said "מטפלים מאומתים" without ever saying it was a
-  // list you can browse, which is the half that earns the click.
-  const description =
-    count >= MIN_ONLINE_TOPIC
-      ? `${onlineHeading(topic.name)}: רשימת ${count} מטפלים ופסיכולוגים מאומתים שמטפלים בשיחת וידאו, מכל מקום בארץ - או מלאו שאלון קצר וקבלו התאמה אישית.`
-      : `${onlineHeading(topic.name)}: מטפלים ופסיכולוגים מאומתים שמטפלים בשיחת וידאו, מכל מקום בארץ - או מלאו שאלון קצר וקבלו התאמה אישית.`;
+  // Count-free, like the city and topic pages (owner's call, 14/8/26).
+  const description = `${onlineHeading(topic.name)}: ${CREDENTIALS} ומטפלים בשיחת וידאו מכל מקום בארץ, ו${QUIZ}.`;
   const robots =
     topic.adsOnly || count < MIN_ONLINE_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
@@ -138,7 +134,7 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
         <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, שמטפלים גם בשיחת וידאו - {list.length} מטפלים, מכל מקום בארץ או בחו"ל.
+          {topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.
         </p>
       </div>
 

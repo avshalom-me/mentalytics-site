@@ -203,10 +203,17 @@ function traitNeeds(A: Ans): TraitNeeds {
   const socTherapyPossible = socDomainOn &&
     ((A.soc2 === "כן" && (A.soc2_sev || 0) >= 5) || A.soc3 === "כן");
 
+  // The sub-clinical regulation finding (q9 positive, bq_tot exactly 4) picks
+  // its referral from motivation and practice ability. It is emitted for ga and
+  // zy only - ב-ו routes to the attention questionnaire instead - and ga is
+  // already covered through gaConsent, since hasGaPositive counts bq_tot >= 4.
+  const regModerate = grp === "zy" && A.q9 === "כן" && (A.bq_tot || 0) === 4;
+
   return {
     motiv:
       (grp === "bv" && (anx || (emoOn && (A.q2 || 0) >= 3) || q10On || socOn)) ||
       (grp === "zy" && anx) ||
+      regModerate ||
       socTherapyPossible,
     // The bv scoring returns early at motivation 1 and 2 and never reads these
     // two, so asking below 3 collected answers straight into the bin.
@@ -218,7 +225,10 @@ function traitNeeds(A: Ans): TraitNeeds {
       (grp === "zy" && (q10On || socOn)),
     prac:
       (grp === "bv" && anx && aqTot > 20 && m >= 3) ||
-      (grp === "zy" && anx && m >= 2),
+      (grp === "zy" && anx && m >= 2) ||
+      // Same shape as the zy anxiety branch: practice ability is only consulted
+      // once motivation is above the "reach them through the parents" answer.
+      (regModerate && m >= 2),
     interests: grp === "zy" && (q10On || socOn),
     // The social branch routes ga children through buildGaRef too, off soc1 plus
     // an LSAS of 8, which hasGaPositive knows nothing about. An unanswered
@@ -249,7 +259,11 @@ function skipPage(pid: string, A: Ans): boolean {
   if (pid === "p-q4-s")       return !A.ad_s;
   if (pid === "p-q4-g")       return !A.ad_g;
   if (pid === "p-q4-b")       return !A.ad_b;
-  if (pid === "p-q4-ctrl")    return A.q4 !== "כן";
+  // Only ב-ו branch on this answer; gan-א always goes to therapeutic parent
+  // guidance and ז-יב always to specialist CBT, so asking them was collecting a
+  // reply straight into the bin - on the questionnaire whose main problem is
+  // its length.
+  if (pid === "p-q4-ctrl")    return A.q4 !== "כן" || gg(A) !== "bv";
   if (pid === "p-oq")         return A.q5 !== "כן";
   if (pid === "p-tq")         return A.q6 !== "כן";
   // Only the beliefs-only path still needs the follow-up items: reporting
@@ -470,6 +484,35 @@ function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel = "המ�
     </div>
   );
 }
+/**
+ * "You still have N unanswered items" under a blocked Continue.
+ *
+ * Every screen that uses this sits behind a gate the parent already answered
+ * yes to, so tapping past the detail questionnaire scores that section 0 and
+ * the report then contradicts what they just said: it stays silent about a
+ * difficulty they flagged, or - on the anxiety screen - states low stress
+ * outright. Blocking is the fix at source; the informed fallbacks in the scorer
+ * are the second line, for a client that malfunctions rather than a parent who
+ * skips.
+ */
+/**
+ * How many of `keys` carry no answer.
+ *
+ * Tests for undefined rather than falsiness on purpose: the trauma scale starts
+ * at 0, so a genuine "כלל לא" is falsy and would otherwise be counted as
+ * unanswered and block a screen the parent had in fact completed.
+ */
+function countMissing(A: Ans, keys: string[]): number {
+  return keys.filter(k => A[k] === undefined || A[k] === null || A[k] === "").length;
+}
+function IncompleteHint({ missing }: { missing: number }) {
+  if (missing <= 0) return null;
+  return (
+    <p className="text-red-500 text-sm font-semibold mt-3">
+      ⛔ {missing === 1 ? "נותר סעיף אחד ללא מענה" : `נותרו ${missing} סעיפים ללא מענה`} - יש לענות על כולם כדי להמשיך
+    </p>
+  );
+}
 function SubCard({ children }: { children: React.ReactNode }) {
   return <div className="bg-[var(--surface)] rounded-xl p-3 sm:p-5 mt-2 border border-[var(--line)] space-y-4">{children}</div>;
 }
@@ -655,7 +698,7 @@ function PageDemo({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void;
   return (
     <div>
       <Card>
-        <StepTag>שלב 1 מתוך 3</StepTag>
+        <StepTag>שלב 1 מתוך 2</StepTag>
         <StepQ>קצת על הילד/ה</StepQ>
         <StepHint>{gradeChoices ? "שלוש שאלות קצרות, ומתחילים" : "שתי שאלות קצרות, ומתחילים"}</StepHint>
 
@@ -780,7 +823,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   return (
     <div>
       <Card>
-        <StepTag>שלב 2 מתוך 3</StepTag>
+        <StepTag>שלב 2 מתוך 2</StepTag>
         <StepQ>תחומי הקושי העיקריים</StepQ>
         <StepHint>דרג את רמת הקושי בכל תחום. ניתן ללחוץ על "הסבר מפורט" כדי לקרוא יותר על כל תחום.</StepHint>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -926,6 +969,7 @@ function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 // ── p-aq ─────────────────────────────────────────────────────────────────────
 function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const aqItems = (items?.aq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, aqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -944,7 +988,8 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -994,6 +1039,7 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // ── p-mq ─────────────────────────────────────────────────────────────────────
 function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const mqItems = (items?.mq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, mqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1013,7 +1059,8 @@ function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1029,7 +1076,10 @@ function PageMQSui({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onN
         <YNRow val={A.q3_sui||""} onChange={v=>{ const nA={...A,q3_sui:v}; setA(nA); if (v !== "כן") onNext(nA); }} />
         {A.q3_sui === "כן" && <CrisisResources className="mt-4" />}
       </Card>
-      <NavRow onBack={onBack} onNext={A.q3_sui === "כן" ? () => onNext(A) : undefined} />
+      {/* Answered at all, not answered "כן": a parent who chose "לא" and then
+          stepped back onto this screen found no way forward either, and of all
+          the screens to strand someone on, the suicidality one is the worst. */}
+      <NavRow onBack={onBack} onNext={A.q3_sui ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1045,7 +1095,11 @@ function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepHint>משחקי מחשב, אלכוהול, סמים, הימורים, פורנו</StepHint>
         <YNRow val={A.q4||""} onChange={v=>{ const nA={...A,q4:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q4 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1074,6 +1128,7 @@ function PageQ4Types({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; o
 // ── p-q4-s ────────────────────────────────────────────────────────────────────
 function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const asItems = (items?.as ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, asItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1093,7 +1148,8 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1101,6 +1157,7 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
 // ── p-q4-g ────────────────────────────────────────────────────────────────────
 function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const agItems = (items?.ag ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, agItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1120,7 +1177,8 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1128,6 +1186,7 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
 // ── p-q4-b ────────────────────────────────────────────────────────────────────
 function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const abItems = (items?.ab ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, abItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1147,7 +1206,8 @@ function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1167,7 +1227,12 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           ))}
         </div>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      {/* Required: this single answer decides between parent guidance and CBT
+          for addictions, and skipping it used to fall through to a default of 5
+          - the far end of the scale, indistinguishable from a parent who chose
+          it deliberately. */}
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={!A.q4_ctrl} />
+      <IncompleteHint missing={A.q4_ctrl ? 0 : 1} />
     </div>
   );
 }
@@ -1183,7 +1248,11 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepHint>למשל: שטיפת ידיים מרובה, ספירה, צורך לסדר דברים בצורה מסוימת. ברוב הימים, שבועיים רצופים לפחות.</StepHint>
         <YNRow val={A.q5||""} onChange={v=>{ const nA={...A,q5:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q5 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1191,6 +1260,7 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // ── p-oq ─────────────────────────────────────────────────────────────────────
 function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const oqItems = (items?.oq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, oqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1210,7 +1280,8 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1226,7 +1297,11 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepHint>תאונה, פיגוע, שוד, רעידת אדמה וכד׳</StepHint>
         <YNRow val={A.q6||""} onChange={v=>{ const nA={...A,q6:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q6 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1234,6 +1309,7 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // ── p-tq ─────────────────────────────────────────────────────────────────────
 function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const tqItems = (items?.tq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, tqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1254,7 +1330,8 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1299,6 +1376,7 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // only on the beliefs-only path; reporting hallucinations skips straight past.
 function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const pqItems = (items?.pq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, pqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1318,7 +1396,8 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1334,7 +1413,11 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepHint>קשיים סביב אוכל, משקל או דימוי גוף</StepHint>
         <YNRow val={A.q8||""} onChange={v=>{ const nA={...A,q8:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q8 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1344,6 +1427,11 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
   const age = parseInt(A._age) || 0;
   const under12 = age === 0 || age < 12;
   const bmi = calcBMI(parseFloat(A._h) || 0, parseFloat(A._w) || 0);
+  // Only the item block actually rendered for this age is required; height and
+  // weight stay optional, which is why they are not in this list.
+  const missing = countMissing(A, under12
+    ? ["ea1","ea2","ea3","ea4","ea5","ea6","ea7","ea8"]
+    : ["eb1","eb2","eb3","eb4","eb5","eb6","eb7"]);
 
   // Height and weight moved here from the opening screen. BMI is only ever read
   // by the eating-disorder scoring, so asking every parent for it up front cost
@@ -1474,7 +1562,8 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
           </>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1489,7 +1578,11 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>סימנים לחוסר יציבות ביחסים, קושי בוויסות רגשות ואימפולסיביות</StepQ>
         <YNRow val={A.q9||""} onChange={v=>{ const nA={...A,q9:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q9 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1497,6 +1590,7 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
 // ── p-bq ─────────────────────────────────────────────────────────────────────
 function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; items?: Record<string, any[]> | null }) {
   const bqItems = (items?.bq ?? []) as {key: string; label: string}[];
+  const missing = countMissing(A, bqItems.map(it => it.key));
   return (
     <div>
       <Card>
@@ -1516,7 +1610,8 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -1544,10 +1639,17 @@ function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
         <EqNum n={10}/>
         <StepTag>שאלה 10 מתוך 10 - רגשי</StepTag>
         <StepQ>קשיים רגשיים אחרים שלא עלו בשאלון</StepQ>
-        <StepHint>ענה רק אם לא ענית חיובי באף שאלה קודמת</StepHint>
+        {/* The old hint told the parent to answer only if nothing earlier came
+            back positive - which skipPage now enforces on its own, so the
+            screen is only ever shown in exactly that case. */}
+        <StepHint>שאלה אחרונה - כדי לוודא שלא פספסנו משהו</StepHint>
         <YNRow val={A.q10||""} onChange={v=>{ const nA={...A,q10:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q10 ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1561,7 +1663,11 @@ function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
         <StepQ>האם הקושי קשור לקשר עם אחד ההורים?</StepQ>
         <YNRow val={A.q10_par||""} onChange={v=>{ const nA={...A,q10_par:v}; setA(nA); onNext(nA); }} />
       </Card>
-      <NavRow onBack={onBack} />
+      {/* Continue appears once the gate is answered. These screens advance on the
+          pill itself, so on the way forward it is never seen - but arriving here
+          via back left NavRow rendering an empty div: the previous answer
+          highlighted and no control at all except re-tapping a selected pill. */}
+      <NavRow onBack={onBack} onNext={A.q10_par ? () => onNext(A) : undefined} />
     </div>
   );
 }
@@ -1773,7 +1879,11 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const histYes = ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].filter(k => A[k]==="כן").length;
     const showReadFlow = read !== "" && read !== "לא";
     const showHist0 = showReadFlow && histYes === 0 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
-    const showHist12 = showReadFlow && histYes >= 1 && histYes <= 2 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
+    // 1-3, matching the scoring band. At exactly 3 the screen used to stop
+    // asking while the scorer still expected an answer, so neither the "כן" nor
+    // the "לא" arm could fire and the reading difficulty was reported with no
+    // referral under it at all - 4+ (which does refer) was never reached either.
+    const showHist12 = showReadFlow && histYes >= 1 && histYes <= 3 && ["ag_h1","ag_h2","ag_h3","ag_h4","ag_h5","ag_h6"].every(k => A[k] !== undefined);
     const showMotivRg = showHist0 && A.ag_read_motiv === "לא";
     const agMotTot = (A.ag_mot1||1)+(A.ag_mot2||1)+(A.ag_mot3||1);
     const showAgAdhd = showMotivRg && agMotTot <= 5 && !q9AdhdActive(A);
@@ -1909,7 +2019,8 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
     const showReadFlow = A.dv_read === "כן";
     const histAllAnswered = showReadFlow && ["dv_h1","dv_h2","dv_h3","dv_h4","dv_h5"].every(k => A[k] !== undefined);
     const showHist0 = histAllAnswered && histYes === 0;
-    const showHist12 = histAllAnswered && histYes >= 1 && histYes <= 2;
+    // 1-3, matching the scoring band - see the same fix in the א-ג block above.
+    const showHist12 = histAllAnswered && histYes >= 1 && histYes <= 3;
     const showMotivRg = showHist0 && A.dv_read_motiv === "לא";
     const dvMotTot = (A.dv_mot1||1)+(A.dv_mot2||1)+(A.dv_mot3||1);
     const showDvReadAdhd = showMotivRg && dvMotTot <= 5 && !q9AdhdActive(A);
@@ -2091,6 +2202,10 @@ function PageAcad({ A, setA, onNext, onBack, items }: PageProps) {
 function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   function behSet(key: string, val: string) { setA(computeBehPlan({ ...A, [key]: val })); }
   const opts = ["לא","מעט","הרבה"];
+  // Leaving all three blank gives beh_max_level 0, and the scorer then returns
+  // an empty array - no output and no note - for a parent who flagged
+  // behavioural difficulties on the areas screen.
+  const missing = countMissing(A, ["beh1","beh2","beh3"]);
   return (
     <div>
       <Card>
@@ -2112,7 +2227,8 @@ function PageBeh({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
           </div>
         ))}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} />
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -2126,6 +2242,17 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
   const allComm = A.comm1 === "כן" && A.comm2 === "כן" && A.comm3 === "כן";
   const grp = gg(A);
   const lsasItems = (items?.lsas ?? []) as string[];
+  // Progressive screen, so the required set follows whatever is actually on
+  // display: the three base questions always, and each follow-up only once the
+  // answer that reveals it has been given. lsas_tot is what the social-anxiety
+  // severity is read from, so a half-filled LSAS block understates it.
+  const required = ["soc1", "soc2", "soc3"];
+  if (A.soc1 === "כן") required.push(...lsasItems.map((_, i) => `lsas_a${i + 1}`));
+  if (A.soc2 === "כן") required.push("soc2_sev");
+  if (A.soc3 === "כן") required.push("soc3_early");
+  if (soc3Early === "כן") required.push("comm1", "comm2", "comm3");
+  if (soc3Early === "כן" && allComm) required.push("comm_rep", "comm_rigid", "comm_interest", "comm_sens");
+  const missing = countMissing(A, required);
   return (
     <div>
       <Card>
@@ -2255,7 +2382,8 @@ function PageSoc({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
         </div>
 
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} />
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={missing > 0} />
+      <IncompleteHint missing={missing} />
     </div>
   );
 }
@@ -4096,6 +4224,19 @@ export default function KidsPage() {
     </main>
   );
 
+  // Every item-driven screen reads `items?.xx ?? []`, so before the fetch
+  // resolves they rendered their heading ("10 סעיפים…") over an empty box with
+  // a live Continue: a parent on a slow connection could walk the whole
+  // questionnaire and be scored all-negative. The consent and result screens
+  // need no items and are exempt - consent is where most of the dropout is, and
+  // it must never wait on a network round-trip. A failed fetch is handled by
+  // itemsError above, so this cannot become a permanent spinner.
+  if (!kidsItems && step !== "p-consent" && step !== "p-result") return (
+    <main className="quiz-shell min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
+      <div className="flex justify-center py-20" style={{ color: "var(--muted)" }}>טוען שאלון…</div>
+    </main>
+  );
+
   return (
     <main className="quiz-shell min-h-screen mx-auto max-w-2xl px-4 py-8 pb-20" style={{ background: "var(--surface)" }} dir="rtl">
       {/* Header */}
@@ -4104,7 +4245,7 @@ export default function KidsPage() {
           {step === "p-consent" ? (
             <div className="w-full text-center mb-1">
               <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-              <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – ילדים ונוער</p>
+              <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול - ילדים ונוער</p>
             </div>
           ) : (
             <>

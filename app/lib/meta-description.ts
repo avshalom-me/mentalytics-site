@@ -11,10 +11,9 @@
  *  1. Never cut mid-word, and never exceed the budget. Google truncates a long
  *     description cleanly by itself; a broken cut baked into the tag is ours
  *     forever.
- *  2. Say what the page offers - how many therapists are listed, and the quiz
- *     for people who don't want to choose alone. That is what the city pages
- *     do and what every competitor ranking above us on "טיפול פסיכולוגי ב..."
- *     does.
+ *  2. Say what the page offers - credentials that were checked, and a quiz
+ *     built by clinicians for people who don't want to choose alone. Never a
+ *     supply count: see CREDENTIALS/QUIZ below for why.
  *  3. Keep the page's own editorial opening, because 27 specialty pages that
  *     all open with the same sentence is a duplicate-description smell.
  *
@@ -69,23 +68,30 @@ export function introPlusOffer(intro: string, ...offers: string[]): string {
   if (best) return best;
   // A handful of intros open with a single sentence longer than the budget
   // itself. Keep the offer and cut the opening at a word boundary instead of
-  // dropping the offer: a searcher who reads "...רשימת 62 מטפלים מאומתים"
-  // learns what the page is, which a truncated definition alone never tells
-  // them - and that is the whole complaint this file exists to answer.
+  // dropping the offer: a searcher who reads "...שתעודותיהם אומתו" learns what
+  // the page is, which a truncated definition alone never tells them - and that
+  // is the whole complaint this file exists to answer.
   const shortest = offers[offers.length - 1].trim();
   return `${clampWords(intro, META_MAX - [...shortest].length - 1)} ${shortest}`;
 }
 
 /**
- * Offer tiers for a therapist listing page, richest first.
+ * The two things the shop window says, per the owner's decision on 14/8/2026:
+ * not how many therapists we hold, but that their credentials were checked and
+ * that the matching quiz was built by clinicians. Supply counts are gone from
+ * every SERP-facing string - they read as inventory data, and on a thin city
+ * page a small number argues against us.
  *
- * The count is dropped below the page's own index gate: "רשימת 2 מטפלים"
- * undersells a page that is noindex anyway, and Hebrew has no "1 מטפלים".
+ * The wording is deliberate. The site verifies certificates and training
+ * ("עברו אימות תעודות והכשרה"), which is not the same as holding a licence:
+ * psychologists and clinical social workers are licensed, but several of the
+ * professions listed here have no licence at all, so "מטפלים מורשים" would
+ * overclaim. "שתעודותיהם אומתו" says exactly what we actually do.
  */
-export function therapistOffers(count: number, gate: number): string[] {
-  const who = count >= gate ? `${count} מטפלים מאומתים` : "מטפלים מאומתים";
-  return [
-    `רשימת ${who} לפנייה ישירה, ושאלון קצר להתאמה אישית.`,
-    `רשימת ${who} ושאלון התאמה אישי.`,
-  ];
+export const CREDENTIALS = "מטפלים ופסיכולוגים שתעודותיהם אומתו";
+export const QUIZ = "שאלון מבוסס-מחקר שנבנה על ידי פסיכולוגים";
+
+/** Offer tiers for a therapist listing page, richest first. */
+export function therapistOffers(): string[] {
+  return [`${CREDENTIALS}, ו${QUIZ}.`, "מטפלים שתעודותיהם אומתו, ושאלון התאמה מבוסס-מחקר."];
 }

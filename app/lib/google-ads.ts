@@ -67,6 +67,33 @@ async function getAccessToken(): Promise<string> {
   return JSON.parse(text).access_token as string;
 }
 
+// POST מאומת גנרי מול חשבון ה-Ads - משרת גם את מודול העלאת ההמרות
+// (google-ads-conversions.ts), כדי שהאימות וההגדרות יחיו במקום אחד.
+// pathSuffix מודבק אחרי customers/{id}, למשל ":uploadClickConversions"
+// או "/googleAds:search".
+export async function googleAdsPost(
+  pathSuffix: string,
+  body: unknown
+): Promise<{ status: number; text: string }> {
+  const token = await getAccessToken();
+  const res = await fetch(
+    `https://googleads.googleapis.com/${API_VERSION}/customers/${CUSTOMER_ID}${pathSuffix}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "developer-token": DEV_TOKEN!,
+        ...(LOGIN_CUSTOMER_ID ? { "login-customer-id": LOGIN_CUSTOMER_ID } : {}),
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(body),
+      cache: "no-store",
+    }
+  );
+  const text = await res.text();
+  return { status: res.status, text };
+}
+
 function parseUtmCampaign(suffix?: string | null): string | null {
   if (!suffix) return null;
   const m = /utm_campaign=([^&]+)/.exec(suffix);

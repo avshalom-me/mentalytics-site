@@ -6,6 +6,7 @@ import { listRecurringForCustomer, cancelSubscription, updateRecurringPrice, SUB
 import { writeAudit } from "@/app/lib/audit";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
+import { alertRecipients } from "@/app/lib/alert-recipients";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -13,13 +14,7 @@ const supabase = createClient(
 );
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const ALERT_TO = (
-  process.env.WEEKLY_REPORT_TO ??
-  "admin@getmentalytics.com,avshalom@getmentalytics.com,omer@getmentalytics.com"
-)
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const ALERT_TO = alertRecipients();
 
 // Loud admin alert for a standing order that is still charging at Sumit but
 // should not be — and that we failed to auto-cancel. Best-effort: an email

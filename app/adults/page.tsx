@@ -179,9 +179,16 @@ function getReachableScreens(domains: string[]): string[] {
   });
 }
 
-function getAdultsProgress(screen: string, domains: string[] = []): number {
+/**
+ * @param positionAs Report progress as if the user were on this screen instead.
+ *   The order array is linear, but f2-q is now reachable from two places: the
+ *   ordinary route early in the functional domain, and the occupational bridge
+ *   near its end. Entering it from the bridge dropped the bar from 87% to 60%,
+ *   which reads as losing a quarter of the work already done.
+ */
+function getAdultsProgress(screen: string, domains: string[] = [], positionAs?: string): number {
   const reachable = getReachableScreens(domains);
-  const idx = reachable.indexOf(screen);
+  const idx = reachable.indexOf(positionAs ?? screen);
   if (idx < 0) return 0;
   if (reachable.length <= 1) return 0;
   return Math.round((idx / (reachable.length - 1)) * 100);
@@ -289,8 +296,8 @@ const NO_BAR = ["disclaimer","intake","domains","scoring","results","match-form"
 // and once the answers have been scored, stepping back into the questionnaire
 // would leave the results on screen out of sync with the answers behind them.
 const NO_BACK = ["disclaimer","scoring","results","match-form","match-results"];
-function Layout({ screen, domains, onBack, children }: { screen: string; domains?: string[]; onBack?: (() => void) | null; children: React.ReactNode }) {
-  const pct = getAdultsProgress(screen, domains ?? []);
+function Layout({ screen, domains, onBack, positionAs, children }: { screen: string; domains?: string[]; onBack?: (() => void) | null; positionAs?: string; children: React.ReactNode }) {
+  const pct = getAdultsProgress(screen, domains ?? [], positionAs);
   const showBar = pct > 0 && !NO_BAR.includes(screen);
   const showBack = Boolean(onBack) && !NO_BACK.includes(screen);
   return (
@@ -299,13 +306,16 @@ function Layout({ screen, domains, onBack, children }: { screen: string; domains
         {screen !== "results" && (
           <div className="mb-5 text-center">
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "52px", width: "auto", margin: "0 auto 8px", display: "block" }} />
-            <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול – מבוגרים</p>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>שאלון הפניה לטיפול - מבוגרים</p>
           </div>
         )}
         {showBar && <ProgressBar pct={pct} />}
         {showBack && (
           <button type="button" onClick={onBack!} className="mb-3 inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-[var(--teal-dark)] hover:underline">
-            → חזרה לשאלה הקודמת
+            {/* The domains and intake screens step back to the opening, not to
+                a question, so the specific label would be describing the wrong
+                destination. */}
+            {screen === "domains" || screen === "intake" ? "→ חזרה" : "→ חזרה לשאלה הקודמת"}
           </button>
         )}
         {children}
@@ -400,12 +410,28 @@ export default function AdultsPage() {
   // current answers no longer lead to. Going back consumes the entry, which is
   // what keeps "back" from turning into a ping-pong between two screens.
   const [prevScreen, setPrevScreen] = useState<Screen | null>(null);
+  // The domain and addiction cursors advance in the very handler that changes
+  // the screen, so rewinding `screen` alone leaves the cursor one step ahead:
+  // Continue then calls nextDomain() again and the domain in between is never
+  // asked - the report simply comes back missing a whole area of difficulty,
+  // with nothing on screen to say so. Captured inside setScreen because at that
+  // point in the handler the cursors still hold the values that belong to the
+  // screen being left (React has only scheduled the increment, not applied it).
+  const [prevIdx, setPrevIdx] = useState<{ domain: number; addiction: number } | null>(null);
   const setScreen = (next: Screen) => {
-    setPrevScreen((p) => (next === screen ? p : screen));
+    if (next !== screen) {
+      setPrevScreen(screen);
+      setPrevIdx({ domain: domainIdx, addiction: addictionIdx });
+    }
     setScreenRaw(next);
   };
   const goBack = prevScreen
-    ? () => { setScreenRaw(prevScreen); setPrevScreen(null); }
+    ? () => {
+        setScreenRaw(prevScreen);
+        if (prevIdx) { setDomainIdx(prevIdx.domain); setAddictionIdx(prevIdx.addiction); }
+        setPrevScreen(null);
+        setPrevIdx(null);
+      }
     : null;
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
@@ -430,7 +456,12 @@ export default function AdultsPage() {
   const [addictionCbtFallback, setAddictionCbtFallback] = useState(false);
   const [combinedTreatments, setCombinedTreatments] = useState<string[] | null>(null);
   const [combinedLabels, setCombinedLabels] = useState<string[] | null>(null);
-  const [combinedCouplesModality, setCombinedCouplesModality] = useState<string | undefined>(undefined);
+  // A list, not a single approach: since the tie rule shipped (13/8/2026) the
+  // singular couplesModality is undefined whenever two approaches tie, so a
+  // reader that only looked at it found nothing and the combined relationship
+  // search silently forfeited the entire 15-point couples bonus - in exactly
+  // the case the matcher was taught to score.
+  const [combinedCouplesModality, setCombinedCouplesModality] = useState<string[] | undefined>(undefined);
   const [combinedNeedsSexualTherapy, setCombinedNeedsSexualTherapy] = useState(false);
   const [loading, setLoading] = useState(false);
   const [explainData, setExplainData] = useState<Record<string, { title: string; explanation: string; tone_note: string } | null>>({});
@@ -532,7 +563,7 @@ export default function AdultsPage() {
       if (saved.matchPrefs) setMatchPrefs(saved.matchPrefs);
       if (saved.combinedTreatments) setCombinedTreatments(saved.combinedTreatments);
       if (saved.combinedLabels) setCombinedLabels(saved.combinedLabels);
-      if (saved.combinedCouplesModality) setCombinedCouplesModality(saved.combinedCouplesModality);
+      if (saved.combinedCouplesModality?.length) setCombinedCouplesModality(saved.combinedCouplesModality);
       if (typeof saved.combinedNeedsSexualTherapy === "boolean") setCombinedNeedsSexualTherapy(saved.combinedNeedsSexualTherapy);
       if (typeof saved.addictionCbtFallback === "boolean") setAddictionCbtFallback(saved.addictionCbtFallback);
       if (Array.isArray(saved.matchResults)) setMatchResults(saved.matchResults);
@@ -826,6 +857,18 @@ export default function AdultsPage() {
     }
   }
 
+  // The couples approaches this search is running for. One derivation for the
+  // request body, the AI explainer and the result card, because the three used
+  // to read the same thing three different ways and drifted apart the moment
+  // ties became possible.
+  function activeCouplesModalities(): string[] {
+    if (selectedRec) {
+      return selectedRec.couplesModalities
+        ?? (selectedRec.couplesModality ? [selectedRec.couplesModality] : []);
+    }
+    return combinedTreatments ? (combinedCouplesModality ?? []) : [];
+  }
+
   async function doMatch() {
     if (!selectedRec && !combinedTreatments) return;
     setLoading(true);
@@ -849,8 +892,7 @@ export default function AdultsPage() {
         styleP1: styleP1 > 0 ? styleP1 : undefined,
         styleP2: styleP2 > 0 ? styleP2 : undefined,
         styleP3: styleP3 > 0 ? styleP3 : undefined,
-        couplesModality: selectedRec?.couplesModality ?? (!selectedRec && combinedTreatments ? combinedCouplesModality : undefined),
-        couplesModalities: selectedRec?.couplesModalities ?? (selectedRec?.couplesModality ? [selectedRec.couplesModality] : (!selectedRec && combinedTreatments && combinedCouplesModality ? [combinedCouplesModality] : undefined)),
+        couplesModalities: activeCouplesModalities().length ? activeCouplesModalities() : undefined,
         needsSexualTherapy: selectedRec?.needsSexualTherapy ?? (!selectedRec && combinedTreatments ? combinedNeedsSexualTherapy : false),
         limit: 10,
       };
@@ -877,8 +919,11 @@ export default function AdultsPage() {
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const recommendedTreatments = scoring?.recommendations.map(r => r.treatment) ?? [];
-      // The couples modality this search was run for (EFT / דינאמי / מבני), if any.
-      const couplesModality = selectedRec?.couplesModality ?? (combinedTreatments ? combinedCouplesModality : undefined);
+      // The couples approach this search was run for (EFT / דינאמי / מבני), if
+      // any. Joined because the endpoint takes a single string; on a tie both
+      // approaches earned the bonus, so the explainer is told about both.
+      const modalities = activeCouplesModalities();
+      const couplesModality = modalities.length ? modalities.join(" או ") : undefined;
       const userSummary = {
         age_group: answers.age ? `${answers.age}` : undefined,
         gender: answers.gender || undefined,
@@ -1258,7 +1303,7 @@ export default function AdultsPage() {
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="תחום רגשי" badgeColor="green">
-          <p className="mb-3 font-semibold text-[#1a3a5c]">סמן/י את הרלוונטי (או דלג/י אם אין):</p>
+          <p className="mb-3 font-semibold text-[#1a3a5c]">3. סמן/י את הרלוונטי (או דלג/י אם אין):</p>
           <ul className="flex flex-col gap-2">
             <li>
               <label className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#ddd6c8] bg-white p-3 text-sm leading-snug transition-all hover:border-[#2e7d8c] hover:bg-[#f0fafc]">
@@ -1592,7 +1637,7 @@ export default function AdultsPage() {
           </div>
           {bmiH > 0 && bmiW > 0 && (() => { const bmi = bmiW / Math.pow(bmiH / 100, 2); const ok = bmi >= 18.5 && bmi <= 24.9; return (
             <p className={`mt-2 rounded-lg p-2 text-xs ${ok ? "bg-green-50 text-green-800" : "bg-amber-50 text-amber-800"}`}>
-              BMI: {bmi.toFixed(1)} – {ok ? "תקין ✓" : "אינו תקין – הפנייה לרופא משפחה"}
+              BMI: {bmi.toFixed(1)} - {ok ? "תקין ✓" : "אינו תקין - הפנייה לרופא משפחה"}
             </p>
           ); })()}
         </div>
@@ -1712,7 +1757,7 @@ export default function AdultsPage() {
                     className={`flex-1 rounded-lg border-2 py-2 text-xs font-semibold ${traumaFreq === v ? "border-[#2e7d8c] bg-[#2e7d8c] text-white" : "border-[#ddd6c8] bg-white"}`}>{l}</button>
                 ))}
               </div>
-              <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' – ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
+              <p className="mb-2 font-semibold text-[#1a3a5c]">חלק ב' - ענה/י בהתייחס לחודש האחרון (0=כלל לא, 4=חמור מאוד):</p>
               {qItems.trauma.map((item, i) => (
                 <ScaleRow key={i} label={item} group={`trauma-${i}`} values={[0,1,2,3,4]} value={traumaScores[i]}
                   onChange={(v) => setTraumaScores((p) => { const n = [...p]; n[i] = v; return n; })} />
@@ -1754,7 +1799,7 @@ export default function AdultsPage() {
   if (screen === "e10") return (
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="תחום רגשי" badgeColor="green">
-        <p className="mb-1 font-semibold text-[#1a3a5c]">9. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
+        <p className="mb-1 font-semibold text-[#1a3a5c]">7. האם את/ה מרגיש/ה שקיימת <strong>חוסר עקביות מתמשכת</strong> באופן שבו את/ה מנהל/ת את הקשרים עם אחרים?</p>
         <YesNo onYes={() => { updE({ e10: true }); setScreen("e10a"); }}
           onNo={() => { updE({ e10: false }); setScreen("therapist-style"); }} />
       </Card>
@@ -1792,7 +1837,7 @@ export default function AdultsPage() {
   if (screen === "e10b") return (
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="שאלון אישיות" badgeColor="green">
-        <p className="mb-3 font-semibold text-[#1a3a5c]">ענה/י על כל שאלה: 1=כן, 2=לא</p>
+        <p className="mb-3 font-semibold text-[#1a3a5c]">ענה/י על כל השאלות</p>
         {[
           "קושי בהבנת כוונות חברתיות/רמזים לא-מילוליים?",
           "העדפה חזקה לשגרה וקושי עם שינויים?",
@@ -1860,9 +1905,9 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="סגנון טיפול מועדף" badgeColor="teal">
         <p className="mb-3 font-semibold text-[#1a3a5c]">שלוש שאלות על סגנון הטיפול המועדף עליך:</p>
-        <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד – מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
-        <ScaleRow label="בבואי לפתור קושי רגשי, אני מעדיף/ה שהמטפל יספק לי תוכנית עבודה מוגדרת, כלים פרקטיים ומשימות לתרגול בין הפגישות." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מרחב פתוח וחופשי  |  7 = מסכים/ה מאוד – זקוק/ה למסגרת ברורה, כלים ומשימות" group="ts-q2" values={[1,2,3,4,5,6,7]} value={styleQ2} onChange={setStyleQ2} />
-        <ScaleRow label="בטיפול רגשי, נוח לי יותר עם מטפל שמגיב באופן פעיל, שואל, מכוון, מסכם ומביע את עמדתו, מאשר עם מטפל שמכיל יותר, שוהה ומתבונן." sublabel="1 = בכלל לא מסכים/ה – מעדיף/ה מטפל מכיל, שקט ומתבונן  |  7 = מסכים/ה מאוד – מעדיף/ה מטפל פעיל, מכוון ומעורב מילולית" group="ts-q3" values={[1,2,3,4,5,6,7]} value={styleQ3} onChange={setStyleQ3} />
+        <ScaleRow label="כדי ליצור שינוי אמיתי בחיי, אני מאמין/ה שעלי קודם כל להבין לעומק את שורשי הבעיה בעברי ואת הדפוסים הלא-מודעים שמנהלים אותי." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה הקלה מיידית ומעשית  |  7 = מסכים/ה מאוד - מחפש/ת תובנה עמוקה" group="ts-q1" values={[1,2,3,4,5,6,7]} value={styleQ1} onChange={setStyleQ1} />
+        <ScaleRow label="בבואי לפתור קושי רגשי, אני מעדיף/ה שהמטפל יספק לי תוכנית עבודה מוגדרת, כלים פרקטיים ומשימות לתרגול בין הפגישות." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה מרחב פתוח וחופשי  |  7 = מסכים/ה מאוד - זקוק/ה למסגרת ברורה, כלים ומשימות" group="ts-q2" values={[1,2,3,4,5,6,7]} value={styleQ2} onChange={setStyleQ2} />
+        <ScaleRow label="בטיפול רגשי, נוח לי יותר עם מטפל שמגיב באופן פעיל, שואל, מכוון, מסכם ומביע את עמדתו, מאשר עם מטפל שמכיל יותר, שוהה ומתבונן." sublabel="1 = בכלל לא מסכים/ה - מעדיף/ה מטפל מכיל, שקט ומתבונן  |  7 = מסכים/ה מאוד - מעדיף/ה מטפל פעיל, מכוון ומעורב מילולית" group="ts-q3" values={[1,2,3,4,5,6,7]} value={styleQ3} onChange={setStyleQ3} />
         <NavRow onBack={() => {
             const onlyPD = answers.domains.length === 1 && answers.domains[0] === "personal_development";
             setScreen(onlyPD ? "domains" : "e10");
@@ -1927,9 +1972,9 @@ export default function AdultsPage() {
           {/* No threshold in the copy: telling people "3 of 6 = the bar" invites
               tailoring answers to the outcome, and goes stale when the bar moves. */}
           <p className="mb-1 text-xs text-[#6b7280]">סמן/י את כל מה שמתאר אותך</p>
-          <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א – חוסר קשב:</p>
+          <p className="mb-2 font-bold text-[#1a3a5c]">בלוק א - חוסר קשב:</p>
           <CheckList items={ADHD1} checked={adhd1Checked} onChange={(i,v) => setAdhd1Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
-          <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב – היפראקטיביות:</p>
+          <p className="mb-2 mt-4 font-bold text-[#1a3a5c]">בלוק ב - היפראקטיביות:</p>
           <CheckList items={ADHD2} checked={adhd2Checked} onChange={(i,v) => setAdhd2Checked((p) => v ? [...p,i] : p.filter((x) => x !== i))} />
           <NavRow onBack={() => setScreen("f1")}
             onNext={() => {
@@ -1943,7 +1988,8 @@ export default function AdultsPage() {
                 // A positive attention block routes straight into the executive
                 // questionnaire: those are the people COG-FUN exists for, and
                 // the "קשיי התארגנות?" gate let them wave it off unseen.
-                ...(adhd1Checked.length >= 3 ? { f2: true } : {}),
+                f2Gate: adhd1Checked.length >= 3,
+                f2: adhd1Checked.length >= 3 || (answers.functional?.f2Bridge ?? false),
               });
               setScreen(answers.functional?.f1Processing ? "f1-ld" : (adhd1Checked.length >= 3 ? "f2-q" : "f2"));
             }} />
@@ -1980,21 +2026,23 @@ export default function AdultsPage() {
     <Layout screen={screen} domains={answers.domains} onBack={goBack}>
       <Card badge="תחום תפקודי">
         <p className="mb-1 font-semibold text-[#1a3a5c]">2. האם יש לך <strong>קשיי התארגנות</strong> (תכנון, ניהול זמן, ניהול משימות)?</p>
-        <YesNo onYes={() => { updF({ f2: true }); setScreen("f2-q"); }}
-          onNo={() => { updF({ f2: false }); setScreen("f3"); }} />
+        <YesNo onYes={() => { updF({ f2Gate: true, f2: true }); setScreen("f2-q"); }}
+          onNo={() => { updF({ f2Gate: false, f2: answers.functional?.f2Bridge ?? false }); setScreen("f3"); }} />
       </Card>
     </Layout>
   );
 
   if (screen === "f2-q") return (
-    <Layout screen={screen} domains={answers.domains} onBack={goBack}>
+    <Layout screen={screen} domains={answers.domains} onBack={goBack}
+      positionAs={execReturnsToNextDomain ? "f3-b" : undefined}>
       <Card badge="שאלון תפקודים ניהוליים">
         <p className="mb-3 font-semibold text-[#1a3a5c]">עד כמה כל אחד מהדברים הבאים מתאר אותך? (1=כלל לא, 3=תמיד)</p>
         {qItems.exec.map((item, i) => (
           <ScaleRow key={i} label={item} group={`exec-${i}`} values={[1,2,3]} value={execScores[i]}
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        <NavRow onBack={() => setScreen("f2")}
+        <NavRow
+          nextDisabled={!allExecAnswered()}
           onNext={() => {
             const a = updF({ execScores });
             if (execReturnsToNextDomain) {
@@ -2004,6 +2052,14 @@ export default function AdultsPage() {
               setScreen("f3");
             }
           }} />
+        {/* Required, for two reasons. A partial set still cleared the >= 12
+            threshold off four items and produced a COG-FUN recommendation; and
+            the occupational bridge decides whether to route here by asking
+            allExecAnswered(), so a screen left half-filled was offered again to
+            someone who had already worked through it. */}
+        {!allExecAnswered() && (
+          <p className="mt-3 text-sm font-semibold text-amber-700">יש לדרג את כל הפריטים כדי להמשיך</p>
+        )}
       </Card>
     </Layout>
   );
@@ -2079,7 +2135,13 @@ export default function AdultsPage() {
             // territory the occupational questions never probed. The bridge item
             // routes into the existing executive questionnaire - once - and its
             // Continue advances to the next domain rather than looping back here.
-            const a = updF({ empBItems: empBChecked, ...(empBChecked[4] ? { f2: true } : {}) });
+            // Recorded as this trigger's own flag, so stepping back and
+            // unticking the item withdraws it instead of leaving f2 latched on.
+            const a = updF({
+              empBItems: empBChecked,
+              f2Bridge: empBChecked[4],
+              f2: empBChecked[4] || (answers.functional?.f2Gate ?? false),
+            });
             if (empBChecked[4] && !allExecAnswered()) {
               setExecReturnsToNextDomain(true);
               setScreen("f2-q");
@@ -2124,7 +2186,7 @@ export default function AdultsPage() {
             <span><strong>ללא זוגיות</strong> כרגע</span>
           </label>
         </div>
-        <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
+        <NavRow
           onNext={() => {
             // "ללא זוגיות כרגע" מתנהג כמו דילוג על שאלות הזוגיות - עובר למסלול היחיד/ה (r-single)
             if (noRelationship && !hasChildren) { setScreen("r-single"); }
@@ -2366,7 +2428,7 @@ export default function AdultsPage() {
             );
           })}
         </div>
-        <NavRow onBack={() => { setDomainIdx((p) => Math.max(0, p - 1)); setScreen("domains"); }}
+        <NavRow
           onNext={() => {
             const types = answers.addiction?.types ?? [];
             if (types.length === 0) { nextDomain(); return; }
@@ -2481,15 +2543,15 @@ export default function AdultsPage() {
 
   if (screen === "a-gambling") {
     const GAMBLE_ITEMS = [
-      "עיסוק יתר בהימורים – מחשבות מתמשכות על הימורים (למשל, תכנון הימורים עתידיים, חשיבה על דרכים להשיג כסף להימורים).",
+      "עיסוק יתר בהימורים - מחשבות מתמשכות על הימורים (למשל, תכנון הימורים עתידיים, חשיבה על דרכים להשיג כסף להימורים).",
       "צורך להמר בסכומים הולכים וגדלים כדי להשיג את אותו ריגוש.",
-      "ניסיונות כושלים לחתוך או להפסיק את ההימורים – חוסר יכולת לשלוט בהרגלי ההימורים למרות ניסיונות חוזרים להפסיק.",
+      "ניסיונות כושלים לחתוך או להפסיק את ההימורים - חוסר יכולת לשלוט בהרגלי ההימורים למרות ניסיונות חוזרים להפסיק.",
       "תחושת אי-שקט או עצבנות כשמנסים לצמצם את ההימורים.",
       "הימור כדרך לברוח מבעיות או כדי להקל על מצב רגשי שלילי (כגון תחושת אשמה, חרדה, דיכאון).",
-      'חזרה להמר אחרי הפסדים – ניסיון "להחזיר" את הכסף שאבד באמצעות הימורים נוספים (תופעה שמכונה "ריצה אחרי הפסדים").',
-      "שקרים על מידת ההימורים – שקרים לבני משפחה, חברים או מטפלים כדי להסתיר את היקף ההימורים.",
-      "סיכון בקשרים אישיים, עבודה או לימודים – פגיעה במערכות יחסים, תעסוקה או הזדמנויות לימודיות כתוצאה מהימורים.",
-      "הסתמכות על אחרים לסיוע כלכלי – פנייה לאנשים אחרים כדי להשיג כסף ולחלץ את עצמך ממצב כלכלי שנגרם כתוצאה מההימורים.",
+      'חזרה להמר אחרי הפסדים - ניסיון "להחזיר" את הכסף שאבד באמצעות הימורים נוספים (תופעה שמכונה "ריצה אחרי הפסדים").',
+      "שקרים על מידת ההימורים - שקרים לבני משפחה, חברים או מטפלים כדי להסתיר את היקף ההימורים.",
+      "סיכון בקשרים אישיים, עבודה או לימודים - פגיעה במערכות יחסים, תעסוקה או הזדמנויות לימודיות כתוצאה מהימורים.",
+      "הסתמכות על אחרים לסיוע כלכלי - פנייה לאנשים אחרים כדי להשיג כסף ולחלץ את עצמך ממצב כלכלי שנגרם כתוצאה מההימורים.",
     ];
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
@@ -2666,7 +2728,15 @@ export default function AdultsPage() {
       <button
         type="button"
         onClick={() => {
-          const modality = relationshipGroups.find(g => g.recs[0]?.couplesModality)?.recs[0]?.couplesModality;
+          // Read the list first: on a two-way tie the singular field is
+          // undefined by construction, so a singular-only lookup found nothing
+          // and this search went out with no couples preference at all.
+          const withPref = relationshipGroups.find(g => {
+            const r = g.recs[0];
+            return r?.couplesModalities?.length || r?.couplesModality;
+          })?.recs[0];
+          const modality = withPref?.couplesModalities
+            ?? (withPref?.couplesModality ? [withPref.couplesModality] : undefined);
           const needsSexual = relationshipGroups.some(g => g.recs.some(r => r.treatment === "טיפול מיני"));
           setCombinedTreatments(relationshipGroups.map(g => g.treatment));
           setCombinedLabels(relationshipGroups.map(g => g.treatmentLabel));
@@ -3003,7 +3073,7 @@ export default function AdultsPage() {
           setCombinedLabels(null);
         }}
       />
-      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים – {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
+      <h2 className="mb-4 text-xl font-bold text-[#1a3a5c]">מטפלים מומלצים - {selectedRec?.treatmentLabel ?? "חיפוש משולב"}</h2>
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
       {(matchResults ?? []).length > 0 && (
         <SaveMatchesButton
@@ -3023,11 +3093,16 @@ export default function AdultsPage() {
       <div className="space-y-4">
         {(matchResults ?? []).map((t: any) => {
           const overall = t.combined_score ?? t.match_score;
-          const prefList = selectedRec?.couplesModalities
-            ?? (selectedRec?.couplesModality ? [selectedRec.couplesModality] : (combinedCouplesModality ? [combinedCouplesModality] : []));
+          // Same derivation the request body used, so the badge can never claim
+          // an approach the search did not actually ask for.
+          const prefList = activeCouplesModalities();
           const tMods = Array.isArray(t.couples_modalities) ? t.couples_modalities : [];
-          const matchesPref = prefList.length > 0 && tMods.some((m: string) =>
-            prefList.some(p => String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
+          // Only the approaches this therapist actually practises: on a tie the
+          // patient's list has two, and printing it whole told people someone
+          // works in an approach they never declared.
+          const matchedMods = prefList.filter(p => tMods.some((m: string) =>
+            String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
+          const matchesPref = matchedMods.length > 0;
           return (
             <div
               key={t.id}
@@ -3065,7 +3140,7 @@ export default function AdultsPage() {
                   )}
                   {matchesPref && (
                     <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
-                      ✓ עובד/ת בגישת {prefList.join(" / ")} שהותאמה לך
+                      ✓ עובד/ת {matchedMods.length > 1 ? "בגישות" : "בגישת"} {matchedMods.join(" ו-")} שהותאמ{matchedMods.length > 1 ? "ו" : "ה"} לך
                     </div>
                   )}
                 </div>
