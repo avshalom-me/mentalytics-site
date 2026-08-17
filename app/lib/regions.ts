@@ -300,6 +300,51 @@ export function citiesForRegion(region: string): string[] {
   return REGION_CITIES[region] ?? [];
 }
 
+// ── Region groups (the analytics granularity) ────────────────────────────────
+// צפיות בפרופיל נרשמות עם מפתח אזור גס ("center") ולא עם שם האזור המלא, כי
+// זו הרזולוציה שדוחות האנליטיקה עובדים בה. כל צרכן שמצליב צפיות מול אזורי
+// מטפלים חייב לתרגם בין השניים - אחרת "center" לא מתאים לאף מטפל, ונראה
+// שאין באזור אף אחד. המיפוי יושב כאן, במקום אחד, ולא משוכפל בכל צרכן.
+export const REGION_GROUPS: Record<string, string[]> = {
+  center: ["גוש דן", "השפלה והמרכז"],
+  sharon: ["דרום השרון", "צפון השרון"],
+  jerusalem: ["ירושלים והסביבה"],
+  haifa: ["חיפה והקריות"],
+  north: ["גליל וצפון", "עמק יזרעאל ונצרת"],
+  south: ["דרום"],
+  other: ["נגב ואילת", "יהודה ושומרון"],
+};
+
+// תוויות עבריות לתצוגה ולטקסט יוצא - "באזור center" במייל למטפל הוא בדיוק
+// סוג התקלה שהמפתח הגס מייצר כשהוא דולף החוצה.
+export const REGION_GROUP_LABELS: Record<string, string> = {
+  center: "המרכז והשפלה",
+  sharon: "השרון",
+  jerusalem: "ירושלים והסביבה",
+  haifa: "חיפה והקריות",
+  north: "הצפון",
+  south: "הדרום",
+  other: "אזורים נוספים",
+  online: "אונליין",
+};
+
+/** שם אזור מלא ("צפון השרון") → מפתח הקבוצה הגס ("sharon"). */
+export function regionGroupOf(region: string): string {
+  const r = String(region ?? "").trim();
+  if (!r) return "other";
+  for (const [key, members] of Object.entries(REGION_GROUPS)) {
+    if (members.includes(r)) return key;
+  }
+  // נפילה לתאימות עם המיפוי ההיסטורי של האנליטיקה, שעבד על הכלה בטקסט.
+  if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
+  if (r.includes("שרון")) return "sharon";
+  if (r.includes("ירושלים")) return "jerusalem";
+  if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
+  if (r.includes("גליל") || r.includes("עמק")) return "north";
+  if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
+  return "other";
+}
+
 // ── Region <-> URL-slug helpers (pure; safe for client + server) ──────────────
 // Hebrew region names with spaces become hyphenated slugs (percent-encoded in
 // the URL, which Google handles fine and which matches Hebrew search queries).

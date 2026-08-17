@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // עמוד השליטה בסוכנים (גל 1): יומן ריצות, תור ההצעות המאוחד, ותצוגה
 // מקדימה של דוח הבוקר. מינימלי בכוונה - מתרחב עם כל סוכן חדש.
@@ -171,6 +171,31 @@ function fmtDateTime(iso: string | null): string {
     minute: "2-digit",
     timeZone: "Asia/Jerusalem",
   });
+}
+
+// רובריקה מתקפלת. פלט הסוכנים ארוך מטבעו, והעמוד הזה מציג חמישה סוכנים
+// באותו מסך - כל מה שאינו "מה עליי לעשות עכשיו" נכנס לכאן וסגור כברירת
+// מחדל, בלי למחוק מידע.
+function Collapse({
+  title,
+  count,
+  defaultOpen,
+  children,
+}: {
+  title: string;
+  count?: number;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details open={defaultOpen} className="rounded-xl border border-stone-200 bg-stone-50/60">
+      <summary className="cursor-pointer select-none px-4 py-2 text-xs font-black text-stone-500 hover:text-stone-700">
+        {title}
+        {count != null && <span className="font-normal text-stone-400"> ({count})</span>}
+      </summary>
+      <div className="border-t border-stone-200 bg-white px-4 py-3 rounded-b-xl">{children}</div>
+    </details>
+  );
 }
 
 // כרטיס הצעת המתנה: בחירת נמען מבין המועמדים, עריכת הטיוטה, ושליחה בפועל.
@@ -364,6 +389,8 @@ export default function AgentsPage() {
   const [convError, setConvError] = useState("");
   const [convMsg, setConvMsg] = useState("");
 
+  const queueRef = useRef<HTMLElement>(null);
+
   function load() {
     setLoading(true);
     setError("");
@@ -423,6 +450,9 @@ export default function AgentsPage() {
       const j = await postAgents("supply_gaps_run");
       setGaps(j as unknown as GapsRun);
       load();
+      // ההצעות המוכנות לשליחה נמצאות בתור שלמעלה - קופצים אליהן מיד, כדי
+      // שהניתוח יסתיים על הפעולה עצמה ולא על עוד קיר של מידע.
+      setTimeout(() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
     } catch (e) {
       setGapsError(e instanceof Error ? e.message : "שגיאה בניתוח הפערים");
     } finally {
@@ -506,6 +536,102 @@ export default function AgentsPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">{error}</div>
         )}
 
+        {/* תור ההצעות - ראש העמוד בכוונה: זה מה שדורש פעולה, וכל השאר מתחתיו */}
+        <section className="mb-8 scroll-mt-4" ref={queueRef}>
+          <h2 className="text-sm font-black text-stone-500 mb-3">
+            דורש ממך פעולה ({pending.length})
+          </h2>
+          {actionError && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
+              {actionError}
+            </div>
+          )}
+          {actionMsg && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">
+              ✓ {actionMsg}
+            </div>
+          )}
+          {loading && <p className="text-sm text-stone-400">טוען...</p>}
+          {!loading && pending.length === 0 && (
+            <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400">
+              אין הצעות ממתינות. כשסוכן יציע פעולה (טיוטת מייל, המלצה, התראה) - היא תופיע כאן
+              לאישור או דחייה.
+            </div>
+          )}
+          <div className="space-y-3">
+            {pending.map((a) =>
+              a.action_type === "gift_offer" ? (
+                <GiftOfferCard
+                  key={a.id}
+                  action={a}
+                  dismissing={busyId === a.id}
+                  onSent={(msg) => {
+                    setActionMsg(msg);
+                    setActionError("");
+                    load();
+                  }}
+                  onDismiss={() => resolveAction(a.id, "dismissed")}
+                />
+              ) : (
+              <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-5">
+                <div className="flex items-start justify-between gap-3 mb-1">
+                  <h3 className="font-black text-stone-900 text-sm">{a.title}</h3>
+                  <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
+                    {agentLabel(a.agent)}
+                  </span>
+                </div>
+                {a.entity_label && <p className="text-xs text-stone-400 mb-1">{a.entity_label}</p>}
+                {a.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line">{a.body}</p>}
+                <div className="mt-3 flex gap-2">
+                  <button
+                    onClick={() => resolveAction(a.id, "approved")}
+                    disabled={busyId === a.id}
+                    className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+                  >
+                    ✓ אשר
+                  </button>
+                  <button
+                    onClick={() => resolveAction(a.id, "dismissed")}
+                    disabled={busyId === a.id}
+                    className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    ✕ דחה
+                  </button>
+                </div>
+              </div>
+              )
+            )}
+          </div>
+          {resolved.length > 0 && (
+            <div className="mt-4 space-y-1">
+              <h3 className="text-xs font-black text-stone-400 mb-1">הוכרעו לאחרונה</h3>
+              {resolved.map((a) => (
+                <div
+                  key={a.id}
+                  className="flex items-center justify-between text-xs text-stone-400 border-b border-stone-100 pb-1"
+                >
+                  <span>
+                    {a.status === "executed" ? "📤" : a.status === "approved" ? "✓" : "✕"} {a.title}
+                    {a.status === "executed" && <span className="text-emerald-600"> · נשלח</span>}
+                  </span>
+                  {/* הצעה שנשלחה בפועל לא חוזרת לתור - השרת גם חוסם את זה. */}
+                  {a.status !== "executed" && (
+                    <button
+                      onClick={() => resolveAction(a.id, "pending")}
+                      disabled={busyId === a.id}
+                      className="underline hover:text-stone-600 disabled:opacity-50"
+                    >
+                      החזר
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <h2 className="text-sm font-black text-stone-500 mb-3">הפעלת סוכנים וניתוחים</h2>
+
         {/* בקר הבוקר */}
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
@@ -525,9 +651,10 @@ export default function AgentsPage() {
 
           {latestDigest && !preview && (
             <div className="mb-4">
-              <div className="text-xs font-bold text-stone-400 mb-2">
-                הדוח האחרון · {fmtDateTime(latestDigest.started_at)}
-              </div>
+              <Collapse
+                title={`הדוח האחרון · ${fmtDateTime(latestDigest.started_at)}`}
+                count={latestDigest.sections.length || undefined}
+              >
               {latestDigest.status === "empty" || latestDigest.sections.length === 0 ? (
                 <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
                   בריצה האחרונה לא היה אף פריט שדורש תשומת לב.
@@ -560,6 +687,7 @@ export default function AgentsPage() {
                   ))}
                 </div>
               )}
+              </Collapse>
             </div>
           )}
 
@@ -668,8 +796,8 @@ export default function AgentsPage() {
           <p className="text-xs text-stone-500 mb-4">
             מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים חיפשו ולא היה מטפל משלם להציע.
             כשיש מטפל חינמי מתאים - מנסח הצעת קידום מתנה לחודשיים; כשאין אף מטפל - זה פער גיוס
-            לפרסום. הניתוח כאן הוא תצוגה בלבד: השליחה בפועל נעשית מתור ההצעות למטה, בכרטיס
-            שבו בוחרים נמען, עורכים את הטיוטה ולוחצים שלח.
+            לפרסום. ההצעות המוכנות לשליחה עולות לתור שבראש העמוד, שם בוחרים נמען, עורכים
+            את הטיוטה ושולחים.
           </p>
 
           {gapsError && (
@@ -677,43 +805,32 @@ export default function AgentsPage() {
           )}
 
           {gaps && (
-            <div className="space-y-4">
-              <div>
-                <h3 className="text-xs font-black text-stone-400 mb-2">
-                  להצעת קידום מתנה ({gaps.gift_gaps.length})
-                </h3>
-                {gaps.gift_gaps.length === 0 ? (
-                  <p className="text-sm text-stone-400">אין פערים שיש להם מועמד מתאים במאגר.</p>
-                ) : (
-                  gaps.gift_gaps.map((g) => (
-                    <div key={g.key} className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 mb-2">
-                      <div className="font-bold text-sm text-stone-900">
-                        {g.treatment} · {g.region}
-                        <span className="mr-2 text-xs font-normal text-stone-500">
-                          {g.events} מטופלים חיפשו ולא קיבלו
-                        </span>
-                      </div>
-                      <div className="text-xs text-stone-600 mt-1">
-                        מועמדים: {g.candidates.map((c) => c.full_name).join(", ")}
-                      </div>
-                      {g.draftEmail && (
-                        <details className="mt-2">
-                          <summary className="cursor-pointer text-xs font-bold text-stone-500">
-                            טיוטת המייל
-                          </summary>
-                          <pre className="mt-2 whitespace-pre-wrap rounded-lg bg-white p-3 text-xs leading-6 text-stone-700">
-                            {g.draftEmail}
-                          </pre>
-                        </details>
-                      )}
+            <div className="space-y-3">
+              {/* התוצאה שדורשת פעולה - שורה אחת וכפתור, ולא רשימה שצריך לגלול */}
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+                <div className="text-sm font-bold text-stone-900 mb-1">
+                  {gaps.gift_gaps.length > 0
+                    ? `${gaps.gift_gaps.length} הצעות קידום מתנה מוכנות לשליחה`
+                    : "אין כרגע פער שיש לו מועמד מתאים במאגר"}
+                </div>
+                {gaps.gift_gaps.length > 0 && (
+                  <>
+                    <div className="text-xs text-stone-600 mb-2">
+                      {gaps.gift_gaps
+                        .map((g) => `${g.treatment} · ${g.region}`)
+                        .join(" | ")}
                     </div>
-                  ))
+                    <button
+                      onClick={() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                      className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-sm font-bold text-white hover:opacity-90"
+                    >
+                      ↑ לתור ההצעות - בחירת נמען ושליחה
+                    </button>
+                  </>
                 )}
               </div>
-              <div>
-                <h3 className="text-xs font-black text-stone-400 mb-2">
-                  פערי גיוס - אין אף מטפל מתאים ({gaps.recruit_gaps.length})
-                </h3>
+
+              <Collapse title="פערי גיוס - אין אף מטפל מתאים במאגר" count={gaps.recruit_gaps.length}>
                 {gaps.recruit_gaps.length === 0 ? (
                   <p className="text-sm text-stone-400">אין פערי גיוס פתוחים.</p>
                 ) : (
@@ -725,12 +842,10 @@ export default function AgentsPage() {
                     ))}
                   </ul>
                 )}
-              </div>
+              </Collapse>
+
               {gaps.waiting_gaps && gaps.waiting_gaps.length > 0 && (
-                <div>
-                  <h3 className="text-xs font-black text-stone-400 mb-2">
-                    ממתינים לתשובה על הצעה שנשלחה ({gaps.waiting_gaps.length})
-                  </h3>
+                <Collapse title="ממתינים לתשובה על הצעה שנשלחה" count={gaps.waiting_gaps.length}>
                   <ul className="list-disc ps-5 text-sm text-stone-500 leading-6">
                     {gaps.waiting_gaps.map((w) => (
                       <li key={`${w.region}|${w.treatment}`}>
@@ -738,7 +853,7 @@ export default function AgentsPage() {
                       </li>
                     ))}
                   </ul>
-                </div>
+                </Collapse>
               )}
             </div>
           )}
@@ -904,100 +1019,6 @@ export default function AgentsPage() {
                   </table>
                 </div>
               )}
-            </div>
-          )}
-        </section>
-
-        {/* תור ההצעות */}
-        <section className="mb-8">
-          <h2 className="text-sm font-black text-stone-500 mb-3">
-            הצעות ממתינות לאישור ({pending.length})
-          </h2>
-          {actionError && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
-              {actionError}
-            </div>
-          )}
-          {actionMsg && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">
-              ✓ {actionMsg}
-            </div>
-          )}
-          {loading && <p className="text-sm text-stone-400">טוען...</p>}
-          {!loading && pending.length === 0 && (
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400">
-              אין הצעות ממתינות. כשסוכן יציע פעולה (טיוטת מייל, המלצה, התראה) - היא תופיע כאן
-              לאישור או דחייה.
-            </div>
-          )}
-          <div className="space-y-3">
-            {pending.map((a) =>
-              a.action_type === "gift_offer" ? (
-                <GiftOfferCard
-                  key={a.id}
-                  action={a}
-                  dismissing={busyId === a.id}
-                  onSent={(msg) => {
-                    setActionMsg(msg);
-                    setActionError("");
-                    load();
-                  }}
-                  onDismiss={() => resolveAction(a.id, "dismissed")}
-                />
-              ) : (
-              <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-5">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h3 className="font-black text-stone-900 text-sm">{a.title}</h3>
-                  <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
-                    {agentLabel(a.agent)}
-                  </span>
-                </div>
-                {a.entity_label && <p className="text-xs text-stone-400 mb-1">{a.entity_label}</p>}
-                {a.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line">{a.body}</p>}
-                <div className="mt-3 flex gap-2">
-                  <button
-                    onClick={() => resolveAction(a.id, "approved")}
-                    disabled={busyId === a.id}
-                    className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
-                  >
-                    ✓ אשר
-                  </button>
-                  <button
-                    onClick={() => resolveAction(a.id, "dismissed")}
-                    disabled={busyId === a.id}
-                    className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    ✕ דחה
-                  </button>
-                </div>
-              </div>
-              )
-            )}
-          </div>
-          {resolved.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <h3 className="text-xs font-black text-stone-400 mb-1">הוכרעו לאחרונה</h3>
-              {resolved.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between text-xs text-stone-400 border-b border-stone-100 pb-1"
-                >
-                  <span>
-                    {a.status === "executed" ? "📤" : a.status === "approved" ? "✓" : "✕"} {a.title}
-                    {a.status === "executed" && <span className="text-emerald-600"> · נשלח</span>}
-                  </span>
-                  {/* הצעה שנשלחה בפועל לא חוזרת לתור - השרת גם חוסם את זה. */}
-                  {a.status !== "executed" && (
-                    <button
-                      onClick={() => resolveAction(a.id, "pending")}
-                      disabled={busyId === a.id}
-                      className="underline hover:text-stone-600 disabled:opacity-50"
-                    >
-                      החזר
-                    </button>
-                  )}
-                </div>
-              ))}
             </div>
           )}
         </section>

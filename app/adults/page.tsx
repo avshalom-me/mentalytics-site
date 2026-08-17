@@ -6,7 +6,7 @@ import type {
   ScoringResult,
   Recommendation,
 } from "@/app/lib/questionnaire-types";
-import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
+import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
@@ -40,13 +40,9 @@ function normalizeGenderKey(g: string): string | null {
 function normalizeRegionKey(r: string, online: boolean): string | null {
   if (online && !r) return "online";
   if (!r) return null;
-  if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
-  if (r.includes("שרון")) return "sharon";
-  if (r.includes("ירושלים")) return "jerusalem";
-  if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
-  if (r.includes("גליל") || r.includes("עמק")) return "north";
-  if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
-  return "other";
+  // המיפוי עצמו עבר ל-regions.ts, כדי שמי שקורא את viewer_region בחזרה
+  // (למשל סוכן פערי ההיצע) יוכל לתרגם את המפתח הגס בחזרה לאזורים אמיתיים.
+  return regionGroupOf(r);
 }
 // Maps internal questionnaire-domain keys to the analytics-issue taxonomy
 // in `app/lib/stats-categories.ts`. Keys must match the union in

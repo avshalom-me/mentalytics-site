@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
 import { coversRegion, overlaps } from "./match-fallback";
+import { REGION_GROUPS, REGION_GROUP_LABELS, regionGroupOf } from "./regions";
 import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
 import {
   giftEligibilityError,
@@ -20,6 +21,12 @@ import {
 // מקור האמת לביקוש הוא אירוע match_free_fallback שמנוע ההתאמה כבר כותב
 // בכל פעם שלא מצא מטפל משלם - כלומר מטופל אמיתי שביקש ולא קיבל. זה מדויק
 // יותר מספירת צפיות, כי הוא נרשם רק כשבאמת היה חוסר.
+//
+// רזולוציית האזור: הצפיות נרשמות עם מפתח גס ("center") והאירועים עם שם אזור
+// מלא ("גוש דן"), ולכן שני האותות מתורגמים כאן לאותה קבוצת אזורים לפני
+// הצבירה. בלי זה שני הפערים היו נספרים בנפרד, והפער מהצפיות לא היה מתאים
+// לאף מטפל (המפתח הגס אינו אזור שקיים בפרופילים) - ולכן היה נראה בטעות
+// כאילו אין באזור אף מטפל, ומוצג כפער גיוס.
 //
 // בטיחות: הסוכן לא שולח דבר ולא מקדם אף אחד. הוא מנסח ומציע לתור; השליחה
 // נעשית בקליק מפורש שלך מעמוד הסוכנים (gift-offer.ts), והקידום עצמו מוענק
@@ -47,9 +54,23 @@ type TherapistRow = {
   admin_approved: boolean | null;
   accepting_new_patients: boolean | null;
   regions: string[] | null;
+  online: boolean | null;
   training_areas: string[] | null;
   age_groups: string[] | null;
 };
+
+// "אזורים נוספים" מאגד אזורים שאין ביניהם קשר גיאוגרפי (נגב ואילת, יהודה
+// ושומרון, ומה שלא מופה) - הצעה או פרסום גיוס ברזולוציה הזו חסרי משמעות.
+const UNACTIONABLE_GROUPS = new Set(["other"]);
+
+function regionGroupLabel(key: string): string {
+  return REGION_GROUP_LABELS[key] ?? key;
+}
+
+// "באזור המרכז והשפלה" מול "בטיפול אונליין" - אונליין אינו מקום.
+function regionPhrase(key: string): string {
+  return key === "online" ? "בטיפול אונליין" : `באזור ${regionGroupLabel(key)}`;
+}
 
 export type GapCandidate = {
   therapist_id: string;
@@ -110,27 +131,28 @@ function treatmentLabel(t: string): string {
 
 // טיוטת הצעת הקידום. תבנית קבועה בטון עובדתי-מסייע: מובילה בצורך שלנו,
 // לא במספרי הביצועים של המטפל, ובלי ניסוחים שיווקיים.
-function buildGiftDraft(name: string, region: string, rawTreatment: string, events: number): string {
+function buildGiftDraft(name: string, regionKey: string, rawTreatment: string, events: number): string {
   const treatment = treatmentLabel(rawTreatment);
+  const where = regionPhrase(regionKey);
   // בטיוטה היוצאת לא מציינים מספר מדויק - "מספר רב" נכון יותר לקריאה
   // ולא מעמיד את המספר במרכז. הספירה המדויקת נשארת בגוף ההצעה באדמין.
   // ל-2 מטופלים נאמר "מספר מטופלים" ולא "מספר רב", כדי לא להגזים.
   const demandLine =
     events > 1
-      ? `בחודשיים האחרונים ${events >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים"} חיפשו דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
-      : `לאחרונה מטופל חיפש דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע לו.`;
+      ? `בחודשיים האחרונים ${events >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים"} חיפשו דרכנו ${treatment} ${where}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
+      : `לאחרונה מטופל חיפש דרכנו ${treatment} ${where}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע לו.`;
 
   return [
     `שלום ${name},`,
     ``,
     demandLine,
     ``,
-    `הפרופיל שלך מתאים לחיתוך הזה, ולכן אנחנו מציעים לך ${GIFT_MONTHS} חודשי קידום במתנה - הפרופיל שלך יוצג למטופלים שמחפשים ${treatment} באזור ${region}, בלי תשלום ובלי התחייבות. בתום התקופה הקידום פשוט מסתיים, אלא אם תבחר/י להמשיך.`,
+    `הפרופיל שלך מתאים לחיתוך הזה, ולכן אנחנו מציעים לך ${GIFT_MONTHS} חודשי קידום במתנה - הפרופיל שלך יוצג למטופלים שמחפשים ${treatment} ${where}, בלי תשלום ובלי התחייבות. בתום התקופה הקידום פשוט מסתיים, אלא אם תבחר/י להמשיך.`,
     ``,
     `אם זה מתאים, מספיק להשיב למייל הזה ונפעיל את הקידום.`,
     ``,
     `בברכה,`,
-    `אבשלום, טיפול חכם`,
+    `צוות טיפול חכם`,
   ].join("\n");
 }
 
@@ -164,7 +186,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         supabaseAdmin
           .from("therapists")
           .select(
-            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, training_areas, age_groups"
+            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, online, training_areas, age_groups"
           )
           .in("status", ["paying", "approved"])
       ),
@@ -173,12 +195,12 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       recentGiftOffers(),
     ]);
 
-    // צבירה לפי אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
+    // צבירה לפי קבוצת אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
     // נספרים לפי סשן כדי שרפרוש לא ייספר כביקוש נוסף.
-    type Agg = { region: string; treatment: string; sessions: Set<string>; events: number; lastSeen: string };
+    type Agg = { regionKey: string; treatment: string; sessions: Set<string>; events: number; lastSeen: string };
     const agg = new Map<string, Agg>();
-    const touch = (region: string, treatment: string, sessionKey: string | null, at: string): void => {
-      const key = `${region}|${treatment}`;
+    const touch = (regionKey: string, treatment: string, sessionKey: string | null, at: string): void => {
+      const key = `${regionKey}|${treatment}`;
       const prev = agg.get(key);
       if (prev) {
         if (sessionKey) prev.sessions.add(sessionKey);
@@ -187,7 +209,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         return;
       }
       agg.set(key, {
-        region,
+        regionKey,
         treatment,
         sessions: new Set(sessionKey ? [sessionKey] : []),
         events: sessionKey ? 0 : 1,
@@ -196,20 +218,25 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     };
 
     for (const v of viewsRes) {
-      const region = String(v.viewer_region ?? "").trim();
+      // viewer_region כבר נשמר כמפתח קבוצה ("center"), חוץ מ"אונליין" שנשמר
+      // ככה גם הוא - שניהם משמשים כאן כמפתח ישירות.
+      const regionKey = String(v.viewer_region ?? "").trim();
       const treatment = String(v.viewer_treatment ?? "").trim();
-      if (!region || !treatment) continue;
-      touch(region, treatment, v.session_id ?? `anon:${region}|${treatment}`, sinceIso);
+      if (!regionKey || !treatment) continue;
+      touch(regionKey, treatment, v.session_id ?? `anon:${regionKey}|${treatment}`, sinceIso);
     }
     for (const row of (eventsRes.data ?? []) as (FallbackEvent & { created_at: string })[]) {
       const md = row.metadata ?? {};
       const region = String(md.region ?? "").trim();
       if (!region) continue;
+      // כאן האזור הוא שם מלא ("צפון השרון") - מתורגם לאותה קבוצה שהצפיות
+      // נספרות בה, אחרת אותו חוסר היה מופיע פעמיים בשתי שפות.
+      const regionKey = regionGroupOf(region);
       const treatments = asStringArray(md.requested_treatments);
       // בלי טיפול מפורש - הפער הוא אזורי; נרשם תחת "כללי".
       const list = treatments.length > 0 ? treatments : ["כללי"];
       for (const treatment of list) {
-        touch(region, treatment, null, row.created_at);
+        touch(regionKey, treatment, null, row.created_at);
       }
     }
 
@@ -234,28 +261,41 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     }
     const waitingGaps: WaitingGap[] = [];
 
-    const matchesGap = (t: TherapistRow, region: string, treatment: string): boolean => {
-      if (!coversRegion(t.regions ?? [], region)) return false;
+    // התאמה לקבוצת אזור: מטפל מכסה את הקבוצה אם הוא מכסה אחד מהאזורים שבה.
+    // "online" אינו מקום אלא אופן עבודה, ולכן נבדק מול דגל האונליין.
+    const matchesGap = (t: TherapistRow, regionKey: string, treatment: string): boolean => {
+      const inRegion =
+        regionKey === "online"
+          ? t.online === true
+          : (REGION_GROUPS[regionKey] ?? []).some((r) => coversRegion(t.regions ?? [], r));
+      if (!inRegion) return false;
       if (treatment === "כללי") return true;
       return overlaps(t.training_areas ?? [], [treatment]);
     };
 
     const gaps: SupplyGap[] = [];
+    let skippedUnactionable = 0;
     for (const a of agg.values()) {
+      if (UNACTIONABLE_GROUPS.has(a.regionKey)) {
+        skippedUnactionable += 1;
+        continue;
+      }
       const demand = a.events + a.sessions.size;
       if (demand < MIN_EVENTS) continue;
-      const payingCovering = paying.filter((t) => matchesGap(t, a.region, a.treatment)).length;
+      const payingCovering = paying.filter((t) => matchesGap(t, a.regionKey, a.treatment)).length;
       // "לא מספיק להציע": חיתוך ריק, או חיתוך דליל של מטפל אחד או שניים.
       if (payingCovering > THIN_SUPPLY_MAX) continue;
 
+      const regionLabel = regionGroupLabel(a.regionKey);
+
       // הצעה כבר בדרך לחיתוך הזה - ממתינים לתשובה ולא מציפים שוב.
-      const waitingSince = waitingByGap.get(`${a.region}|${a.treatment}`);
+      const waitingSince = waitingByGap.get(`${regionLabel}|${a.treatment}`);
       if (waitingSince) {
-        waitingGaps.push({ region: a.region, treatment: a.treatment, sentAt: waitingSince });
+        waitingGaps.push({ region: regionLabel, treatment: a.treatment, sentAt: waitingSince });
         continue;
       }
 
-      const matching = freePool.filter((t) => matchesGap(t, a.region, a.treatment));
+      const matching = freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment));
       const fresh = matching.filter((t) => !offeredRecently.has(t.id));
       // כל המתאימים כבר קיבלו הצעה בחלון הצינון: אין למי להציע, אבל גם אסור
       // להכריז "אין אף מטפל מתאים" ולשלוח את זה לגיוס - זו הצהרה לא נכונה.
@@ -265,13 +305,13 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         therapist_id: t.id,
         full_name: t.full_name ?? "",
         email: t.email ?? "",
-        draft: buildGiftDraft(t.full_name ?? "", a.region, a.treatment, demand),
+        draft: buildGiftDraft(t.full_name ?? "", a.regionKey, a.treatment, demand),
       }));
 
       const kind: "gift" | "recruit" = candidates.length > 0 ? "gift" : "recruit";
       gaps.push({
-        key: `gap:${kind}:${a.region}|${a.treatment}`,
-        region: a.region,
+        key: `gap:${kind}:${a.regionKey}|${a.treatment}`,
+        region: regionLabel,
         treatment: a.treatment,
         events: demand,
         lastSeen: a.lastSeen,
@@ -286,11 +326,9 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const giftGaps = gaps.filter((g) => g.kind === "gift");
     const recruitGaps = gaps.filter((g) => g.kind === "recruit");
 
-    // הצעות לתור, עם החלמה אוטומטית: פער שנסגר (נוסף מטפל משלם) סוגר את
-    // ההצעה שלו בריצה הבאה.
-    await syncAgentAlerts(
-      "supply_gaps",
-      gaps.map((g) =>
+    // הצעות לתור, עם החלמה אוטומטית: פער שנסגר (נוסף מטפל משלם, או שכבר
+    // יצאה בו הצעה) סוגר את ההצעה שלו בריצה הבאה.
+    const actions = gaps.map((g) =>
         g.kind === "gift"
           ? {
               actionType: "gift_offer",
@@ -323,12 +361,29 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               dedupeKey: g.key,
               payload: { region: g.region, treatment: g.treatment },
             }
-      ),
-      {
-        managedKeys: gaps.map((g) => g.key),
-        recoveryNote: "הפער נסגר (נמצא כיסוי משלם) - ההצעה נסגרה אוטומטית",
-      }
     );
+
+    // בלי managedKeys: הריצה מחשבת מחדש את כל תמונת הפערים, ולכן כל הצעה
+    // ממתינה שהריצה הזו לא הפיקה מחדש כבר לא רלוונטית ונסגרת. (עם רשימת
+    // המפתחות של הריצה הנוכחית, כפי שהיה קודם, שום הצעה לא הייתה נסגרת
+    // לעולם - הרשימה זהה לרשימת הפעילים, וההחלמה הייתה קוד מת.)
+    await syncAgentAlerts("supply_gaps", actions, {
+      recoveryNote: "הפער כבר לא עולה בניתוח (כיסוי משלם, או שכבר יצאה הצעה) - ההצעה נסגרה אוטומטית",
+    });
+
+    // רענון הצעות שכבר ממתינות בתור: createAgentAction לא דורס הצעה קיימת
+    // עם אותו מפתח, ולכן בלי זה טיוטה שהנוסח שלה השתנה (או ספירת ביקוש
+    // שהתעדכנה) הייתה נשארת תקועה בגרסה שנוצרה ביום הראשון.
+    for (const a of actions) {
+      if (!a.dedupeKey) continue;
+      const { error } = await supabaseAdmin
+        .from("agent_actions")
+        .update({ title: a.title, body: a.body ?? null, payload: a.payload ?? null })
+        .eq("agent", "supply_gaps")
+        .eq("dedupe_key", a.dedupeKey)
+        .eq("status", "pending");
+      if (error) console.error(`supply_gaps: refresh of ${a.dedupeKey} failed:`, error.message);
+    }
 
     await finishAgentRun(runId, {
       status: gaps.length > 0 ? "ok" : "empty",
@@ -344,6 +399,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         recruit: recruitGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
         waiting: waitingGaps,
         cooldown_days: GIFT_OFFER_COOLDOWN_DAYS,
+        skipped_unactionable: skippedUnactionable,
       },
     });
 
