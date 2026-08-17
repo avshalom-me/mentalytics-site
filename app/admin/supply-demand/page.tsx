@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AgentFindings from "../components/AgentFindings";
 
 type Period = "week" | "month" | "all";
 type RegionStatus = "needs_therapists" | "needs_patients" | "balanced" | "empty";
@@ -95,6 +96,14 @@ export default function SupplyDemandPage() {
         <p className="text-sm text-stone-500 mb-6">
           איפה יש עודף מטפלים (לפרסם למטופלים) ואיפה עודף ביקוש (לגייס מטפלים). ביקוש = צפיות בפרופיל לפי אזור המטופל.
         </p>
+
+        {/* ממצאי סוכן פערי ההיצע - כאן, ליד הנתונים שהם מדברים עליהם, ולא
+            בתור הפעולות בעמוד הסוכנים. */}
+        <AgentFindings
+          agent="supply_gaps"
+          title="חיתוכים שאין בהם מספיק מטפלים (מהסוכן)"
+          limit={15}
+        />
 
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}

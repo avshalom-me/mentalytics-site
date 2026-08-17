@@ -152,6 +152,13 @@ type GapsRun = {
   waiting_gaps: WaitingGap[];
 };
 
+// לאן שייך כל ממצא: העמוד שמדבר על אותו נושא. הממצא מוצג שם ליד הנתונים,
+// והתור כאן מסתפק במונה וקישור.
+const FINDING_HOMES: { agent: string; label: string; href: string }[] = [
+  { agent: "supply_gaps", label: "פערי היצע בעמוד היצע/ביקוש", href: "/admin/supply-demand" },
+  { agent: "ads", label: "ממצאי פרסום בעמוד הפרסום", href: "/admin/ads" },
+];
+
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   ok: { label: "תקין", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
   empty: { label: "אין חדש", cls: "bg-stone-50 border-stone-200 text-stone-500" },
@@ -695,7 +702,17 @@ export default function AgentsPage() {
               שהסוכן הגיע אליהן, ולכן הם מקופלים ואפשר לנקות אותם בבת אחת. */}
           {findings.length > 0 && (
             <div className="mt-3">
-              <Collapse title="ממצאים לידיעה (פערי גיוס, התראות)" count={findings.length}>
+              {/* הממצאים חיים בעמוד שהנושא שלהם שייך לו; כאן נשאר רק מונה
+                  וקישור, כדי שתור הפעולות לא יתארך עם כל סוכן חדש. */}
+              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-500">
+                <span className="font-bold text-stone-600">ממצאים לידיעה: {findings.length}</span>
+                {FINDING_HOMES.filter((h) => findings.some((f) => f.agent === h.agent)).map((h) => (
+                  <a key={h.agent} href={h.href} className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 font-bold text-stone-600 hover:bg-stone-100">
+                    {h.label} ({findings.filter((f) => f.agent === h.agent).length}) ←
+                  </a>
+                ))}
+              </div>
+              <Collapse title="הרשימה המלאה" count={findings.length}>
                 <div className="mb-3 flex flex-wrap items-center gap-2">
                   <button
                     onClick={dismissAllFindings}
