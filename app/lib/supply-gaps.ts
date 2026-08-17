@@ -22,6 +22,9 @@ const GIFT_MONTHS = 2;
 // מינימום אירועי פער כדי להציע פעולה - מתחת לזה זה רעש של מטופל בודד.
 const MIN_EVENTS = Number(process.env.SUPPLY_GAP_MIN_EVENTS ?? 1);
 const MAX_CANDIDATES_PER_GAP = 3;
+// עד כמה מטפלים משלמים בחיתוך עדיין נחשב "לא מספיק להציע". 2 = גם חיתוך
+// עם מטפל אחד או שניים נחשב פער, לא רק חיתוך ריק לגמרי.
+const THIN_SUPPLY_MAX = Number(process.env.SUPPLY_GAP_THIN_MAX ?? 2);
 
 type FallbackEvent = { metadata: Record<string, unknown> | null };
 
@@ -89,8 +92,8 @@ function buildGiftDraft(name: string, region: string, rawTreatment: string, even
   const treatment = treatmentLabel(rawTreatment);
   const demandLine =
     events > 1
-      ? `בחודשיים האחרונים ${events} מטופלים חיפשו דרכנו ${treatment} באזור ${region} ולא היה לנו מטפל מקודם להציע להם.`
-      : `לאחרונה מטופל חיפש דרכנו ${treatment} באזור ${region} ולא היה לנו מטפל מקודם להציע לו.`;
+      ? `בחודשיים האחרונים ${events} מטופלים חיפשו דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
+      : `לאחרונה מטופל חיפש דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע לו.`;
 
   return [
     `שלום ${name},`,
@@ -111,7 +114,20 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
   try {
     const sinceIso = new Date(Date.now() - LOOKBACK_DAYS * 86_400_000).toISOString();
 
-    const [eventsRes, therapists] = await Promise.all([
+    // אות ביקוש שני, ההכרחי לאיתור חיתוכים דלילים: כל צפייה שהגיעה ממסלול
+    // ההתאמה נושאת את האזור והטיפול שהמטופל ביקש - גם כשכן היו מטפלים
+    // להציע. אירוע הפער (למטה) נרשם רק כשלא היה אף משלם, ולכן הוא לבדו
+    // לא יכול לגלות חיתוך שיש בו מטפל אחד או שניים.
+    const [viewsRes, eventsRes, therapists] = await Promise.all([
+      fetchAllRows<{ viewer_region: string | null; viewer_treatment: string | null; session_id: string | null }>(
+        () =>
+          supabaseAdmin
+            .from("therapist_profile_views")
+            .select("viewer_region, viewer_treatment, session_id")
+            .not("viewer_region", "is", null)
+            .not("viewer_treatment", "is", null)
+            .gte("viewed_at", sinceIso)
+      ),
       supabaseAdmin
         .from("analytics_events")
         .select("metadata, created_at")
@@ -129,9 +145,34 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       ),
     ]);
 
-    // צבירה לפי אזור × טיפול.
-    type Agg = { region: string; treatment: string; events: number; lastSeen: string };
+    // צבירה לפי אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
+    // נספרים לפי סשן כדי שרפרוש לא ייספר כביקוש נוסף.
+    type Agg = { region: string; treatment: string; sessions: Set<string>; events: number; lastSeen: string };
     const agg = new Map<string, Agg>();
+    const touch = (region: string, treatment: string, sessionKey: string | null, at: string): void => {
+      const key = `${region}|${treatment}`;
+      const prev = agg.get(key);
+      if (prev) {
+        if (sessionKey) prev.sessions.add(sessionKey);
+        else prev.events += 1;
+        if (at > prev.lastSeen) prev.lastSeen = at;
+        return;
+      }
+      agg.set(key, {
+        region,
+        treatment,
+        sessions: new Set(sessionKey ? [sessionKey] : []),
+        events: sessionKey ? 0 : 1,
+        lastSeen: at,
+      });
+    };
+
+    for (const v of viewsRes) {
+      const region = String(v.viewer_region ?? "").trim();
+      const treatment = String(v.viewer_treatment ?? "").trim();
+      if (!region || !treatment) continue;
+      touch(region, treatment, v.session_id ?? `anon:${region}|${treatment}`, sinceIso);
+    }
     for (const row of (eventsRes.data ?? []) as (FallbackEvent & { created_at: string })[]) {
       const md = row.metadata ?? {};
       const region = String(md.region ?? "").trim();
@@ -140,10 +181,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // בלי טיפול מפורש - הפער הוא אזורי; נרשם תחת "כללי".
       const list = treatments.length > 0 ? treatments : ["כללי"];
       for (const treatment of list) {
-        const key = `${region}|${treatment}`;
-        const prev = agg.get(key);
-        if (prev) prev.events += 1;
-        else agg.set(key, { region, treatment, events: 1, lastSeen: row.created_at });
+        touch(region, treatment, null, row.created_at);
       }
     }
 
@@ -160,10 +198,11 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
 
     const gaps: SupplyGap[] = [];
     for (const a of agg.values()) {
-      if (a.events < MIN_EVENTS) continue;
+      const demand = a.events + a.sessions.size;
+      if (demand < MIN_EVENTS) continue;
       const payingCovering = paying.filter((t) => matchesGap(t, a.region, a.treatment)).length;
-      // אם בינתיים יש כיסוי משלם - הפער נסגר מעצמו ואין מה להציע.
-      if (payingCovering > 0) continue;
+      // "לא מספיק להציע": חיתוך ריק, או חיתוך דליל של מטפל אחד או שניים.
+      if (payingCovering > THIN_SUPPLY_MAX) continue;
 
       const candidates = freePool
         .filter((t) => matchesGap(t, a.region, a.treatment))
@@ -179,14 +218,14 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         key: `gap:${kind}:${a.region}|${a.treatment}`,
         region: a.region,
         treatment: a.treatment,
-        events: a.events,
+        events: demand,
         lastSeen: a.lastSeen,
         payingCovering,
         candidates,
         kind,
         draftEmail:
           kind === "gift"
-            ? buildGiftDraft(candidates[0].full_name || "", a.region, a.treatment, a.events)
+            ? buildGiftDraft(candidates[0].full_name || "", a.region, a.treatment, demand)
             : null,
       });
     }
@@ -205,7 +244,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               actionType: "gift_offer",
               title: `הצעת קידום מתנה: ${g.treatment} · ${g.region}`,
               body:
-                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region} ולא היה מטפל משלם להציע.\n` +
+                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}; ` +
+                `${g.payingCovering === 0 ? "אין אף מטפל משלם" : `רק ${g.payingCovering} מטפלים משלמים`} בחיתוך הזה.\n` +
                 `מועמדים מתאימים במאגר: ${g.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n\n` +
                 `--- טיוטת מייל למשלוח ידני אחרי אישור ---\n${g.draftEmail}`,
               entityType: "therapist",
@@ -221,10 +261,11 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
             }
           : {
               actionType: "recruit_gap",
-              title: `פער גיוס: אין אף מטפל ל${g.treatment} באזור ${g.region}`,
+              title: `פער גיוס: אין מספיק מטפלים ל${g.treatment} באזור ${g.region}`,
               body:
-                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region} ולא קיבלו אף תוצאה משלמת, ` +
-                `ואין במאגר אף מטפל מאושר שמתאים לחיתוך הזה. זה אזור/תחום לפרסום גיוס ממוקד.`,
+                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}, ` +
+                `${g.payingCovering === 0 ? "ואין אף מטפל משלם" : `ויש רק ${g.payingCovering} מטפלים משלמים`} בחיתוך הזה - ` +
+                `וגם אין במאגר אף מטפל חינמי מאושר שמתאים. זה אזור/תחום לפרסום גיוס ממוקד.`,
               dedupeKey: g.key,
               payload: { region: g.region, treatment: g.treatment },
             }
