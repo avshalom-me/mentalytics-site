@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
+import { fetchAllRows } from "./fetch-all-rows";
 
 // סוכן הכספים: משווה בין מי שמקבל שירות בפועל לבין מי שמשלם עליו.
 //
@@ -91,27 +92,32 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
 
   const runId = await startAgentRun("finance", "recon");
   try {
-    const [therapistsRes, subsRes, centersRes] = await Promise.all([
-      supabaseAdmin
-        .from("therapists")
-        .select("id, full_name, status, manually_promoted, promotion_source, promoted_until"),
-      supabaseAdmin
-        .from("subscriptions")
-        .select("id, therapist_id, status, amount, current_period_end, sync_miss_count"),
-      supabaseAdmin
-        .from("therapy_center_accounts")
-        .select(
-          "id, name, status, sumit_recurring_id, agreed_monthly_price, price_per_therapist, fixed_monthly_price, billing_track, billing_starts_at, last_billed_on, sumit_miss_count, gift_months, paid_at"
-        ),
+    // fetchAllRows ולא select רגיל: PostgREST מחזיר עד 1000 שורות בשקט.
+    // היום יש ~300 מטפלים, אבל ביום שבו יעברו את האלף הסוכן היה בודק רק
+    // את הראשונים ומדווח "אין פערים" - כלומר שקט שקרי בדיוק כשיש הכי הרבה
+    // כסף על הכף.
+    const [therapists, subs, centers] = await Promise.all([
+      fetchAllRows<TherapistRow>(() =>
+        supabaseAdmin
+          .from("therapists")
+          .select("id, full_name, status, manually_promoted, promotion_source, promoted_until")
+          .order("id")
+      ),
+      fetchAllRows<SubscriptionRow>(() =>
+        supabaseAdmin
+          .from("subscriptions")
+          .select("id, therapist_id, status, amount, current_period_end, sync_miss_count")
+          .order("id")
+      ),
+      fetchAllRows<CenterRow>(() =>
+        supabaseAdmin
+          .from("therapy_center_accounts")
+          .select(
+            "id, name, status, sumit_recurring_id, agreed_monthly_price, price_per_therapist, fixed_monthly_price, billing_track, billing_starts_at, last_billed_on, sumit_miss_count, gift_months, paid_at"
+          )
+          .order("id")
+      ),
     ]);
-
-    if (therapistsRes.error) throw new Error(`מטפלים: ${therapistsRes.error.message}`);
-    if (subsRes.error) throw new Error(`מנויים: ${subsRes.error.message}`);
-    if (centersRes.error) throw new Error(`מרכזים: ${centersRes.error.message}`);
-
-    const therapists = (therapistsRes.data ?? []) as TherapistRow[];
-    const subs = (subsRes.data ?? []) as SubscriptionRow[];
-    const centers = (centersRes.data ?? []) as CenterRow[];
 
     const activeSubByTherapist = new Map<string, SubscriptionRow>();
     for (const s of subs) {
