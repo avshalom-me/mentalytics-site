@@ -3,6 +3,13 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
 import { coversRegion, overlaps } from "./match-fallback";
 import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
+import {
+  giftEligibilityError,
+  recentGiftOffers,
+  GIFT_OFFER_MONTHS,
+  GIFT_OFFER_WAIT_DAYS,
+  GIFT_OFFER_COOLDOWN_DAYS,
+} from "./gift-offer";
 
 // סוכן פערי ההיצע (סוכן 11): מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים
 // ביקשו טיפול ולא היה לנו מטפל משלם להראות להם, ומציע מה לעשות עם כל פער:
@@ -15,10 +22,12 @@ import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
 // יותר מספירת צפיות, כי הוא נרשם רק כשבאמת היה חוסר.
 //
 // בטיחות: הסוכן לא שולח דבר ולא מקדם אף אחד. הוא מנסח ומציע לתור; השליחה
-// והקידום נעשים על ידך אחרי אישור (החלטת המשתמש 16/8).
+// נעשית בקליק מפורש שלך מעמוד הסוכנים (gift-offer.ts), והקידום עצמו מוענק
+// ידנית אחרי שהמטפל משיב (החלטת המשתמש 16/8).
 
 const LOOKBACK_DAYS = Number(process.env.SUPPLY_GAP_LOOKBACK_DAYS ?? 60);
-const GIFT_MONTHS = 2;
+const GIFT_MONTHS = GIFT_OFFER_MONTHS;
+const GIFT_SUBJECT = "הצעת קידום במתנה לחודשיים - טיפול חכם";
 // מינימום אירועי פער כדי להציע פעולה - מתחת לזה זה רעש של מטופל בודד.
 const MIN_EVENTS = Number(process.env.SUPPLY_GAP_MIN_EVENTS ?? 1);
 const MAX_CANDIDATES_PER_GAP = 3;
@@ -46,6 +55,17 @@ export type GapCandidate = {
   therapist_id: string;
   full_name: string;
   email: string;
+  // טיוטה אישית לכל מועמד (הפנייה נושאת את שמו) - כדי שהחלפת נמען בעמוד
+  // הסוכנים לא תשלח מייל שפותח בשם של מישהו אחר.
+  draft: string;
+};
+
+// פער שכבר יצאה בו הצעה וממתין לתשובה - לא מוצע שוב, ומוצג כדי שיהיה ברור
+// למה החיתוך הזה נעלם מהרשימה.
+export type WaitingGap = {
+  region: string;
+  treatment: string;
+  sentAt: string;
 };
 
 export type SupplyGap = {
@@ -65,6 +85,7 @@ export type SupplyGapsResult = {
   gaps: SupplyGap[];
   giftGaps: SupplyGap[];
   recruitGaps: SupplyGap[];
+  waitingGaps: WaitingGap[];
   error?: string;
 };
 
@@ -122,7 +143,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // ההתאמה נושאת את האזור והטיפול שהמטופל ביקש - גם כשכן היו מטפלים
     // להציע. אירוע הפער (למטה) נרשם רק כשלא היה אף משלם, ולכן הוא לבדו
     // לא יכול לגלות חיתוך שיש בו מטפל אחד או שניים.
-    const [viewsRes, eventsRes, therapists] = await Promise.all([
+    const [viewsRes, eventsRes, therapists, sentOffers] = await Promise.all([
       fetchAllRows<{ viewer_region: string | null; viewer_treatment: string | null; session_id: string | null }>(
         () =>
           supabaseAdmin
@@ -147,6 +168,9 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
           )
           .in("status", ["paying", "approved"])
       ),
+      // הצעות מתנה שכבר יצאו: מוציאות את מי שקיבל אותן מבריכת המועמדים,
+      // ומשתיקות את הפער שממנו יצאו כל עוד ההמתנה לתשובה נמשכת.
+      recentGiftOffers(),
     ]);
 
     // צבירה לפי אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
@@ -190,19 +214,25 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     }
 
     const paying = therapists.filter((t) => t.status === "paying");
-    // בריכת המועמדים להצעת מתנה - חינמיים בלבד, בשלוש שכבות הגנה:
-    // status='approved' (משלמים ומקודמי-מתנה נושאים 'paying' ולכן מסוננים
-    // כבר כאן), ובנוסף שלילה מפורשת של מקור קידום ושל חלון קידום פעיל -
-    // כדי שגם אם סטטוס ישתנה בעתיד, מי שכבר מקודם לא יקבל הצעת מתנה.
+    // בריכת המועמדים להצעת מתנה - חינמיים בלבד. תנאי הזכאות עצמם יושבים
+    // ב-gift-offer.ts ונבדקים גם כאן וגם שוב ברגע השליחה, כדי שמי שמקודם
+    // לא יקבל הצעת מתנה בשום מסלול.
     const nowIso = new Date().toISOString();
-    const freePool = therapists.filter(
-      (t) =>
-        t.status === "approved" &&
-        t.admin_approved &&
-        t.accepting_new_patients !== false &&
-        !t.promotion_source &&
-        !(t.promoted_until && t.promoted_until > nowIso)
-    );
+    const offeredRecently = new Set(sentOffers.map((o) => o.therapist_id));
+    // בלי כתובת מייל אין למי לשלוח - מועמד כזה רק היה יוצר הצעה שנחסמת
+    // בשליחה, ולכן הוא לא נכנס לבריכה מלכתחילה.
+    const freePool = therapists.filter((t) => Boolean(t.email) && giftEligibilityError(t, nowIso) === null);
+
+    // חיתוכים שיצאה בהם הצעה בטווח ההמתנה - לא מציעים שוב עד שתגיע תשובה.
+    const waitCutoff = new Date(Date.now() - GIFT_OFFER_WAIT_DAYS * 86_400_000).toISOString();
+    const waitingByGap = new Map<string, string>();
+    for (const o of sentOffers) {
+      if (o.sent_at < waitCutoff) continue;
+      const key = `${o.region}|${o.treatment}`;
+      const prev = waitingByGap.get(key);
+      if (!prev || o.sent_at > prev) waitingByGap.set(key, o.sent_at);
+    }
+    const waitingGaps: WaitingGap[] = [];
 
     const matchesGap = (t: TherapistRow, region: string, treatment: string): boolean => {
       if (!coversRegion(t.regions ?? [], region)) return false;
@@ -218,14 +248,25 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // "לא מספיק להציע": חיתוך ריק, או חיתוך דליל של מטפל אחד או שניים.
       if (payingCovering > THIN_SUPPLY_MAX) continue;
 
-      const candidates = freePool
-        .filter((t) => matchesGap(t, a.region, a.treatment))
-        .slice(0, MAX_CANDIDATES_PER_GAP)
-        .map((t) => ({
-          therapist_id: t.id,
-          full_name: t.full_name ?? "",
-          email: t.email ?? "",
-        }));
+      // הצעה כבר בדרך לחיתוך הזה - ממתינים לתשובה ולא מציפים שוב.
+      const waitingSince = waitingByGap.get(`${a.region}|${a.treatment}`);
+      if (waitingSince) {
+        waitingGaps.push({ region: a.region, treatment: a.treatment, sentAt: waitingSince });
+        continue;
+      }
+
+      const matching = freePool.filter((t) => matchesGap(t, a.region, a.treatment));
+      const fresh = matching.filter((t) => !offeredRecently.has(t.id));
+      // כל המתאימים כבר קיבלו הצעה בחלון הצינון: אין למי להציע, אבל גם אסור
+      // להכריז "אין אף מטפל מתאים" ולשלוח את זה לגיוס - זו הצהרה לא נכונה.
+      if (matching.length > 0 && fresh.length === 0) continue;
+
+      const candidates: GapCandidate[] = fresh.slice(0, MAX_CANDIDATES_PER_GAP).map((t) => ({
+        therapist_id: t.id,
+        full_name: t.full_name ?? "",
+        email: t.email ?? "",
+        draft: buildGiftDraft(t.full_name ?? "", a.region, a.treatment, demand),
+      }));
 
       const kind: "gift" | "recruit" = candidates.length > 0 ? "gift" : "recruit";
       gaps.push({
@@ -237,10 +278,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         payingCovering,
         candidates,
         kind,
-        draftEmail:
-          kind === "gift"
-            ? buildGiftDraft(candidates[0].full_name || "", a.region, a.treatment, demand)
-            : null,
+        draftEmail: kind === "gift" ? candidates[0].draft : null,
       });
     }
 
@@ -260,8 +298,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}; ` +
                 `${g.payingCovering === 0 ? "אין אף מטפל משלם" : `רק ${g.payingCovering} מטפלים משלמים`} בחיתוך הזה.\n` +
-                `מועמדים מתאימים במאגר: ${g.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n\n` +
-                `--- טיוטת מייל למשלוח ידני אחרי אישור ---\n${g.draftEmail}`,
+                `מועמדים מתאימים במאגר: ${g.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n` +
+                `הטיוטה ניתנת לעריכה למטה, והמייל יוצא רק בלחיצה שלך.`,
               entityType: "therapist",
               entityId: g.candidates[0].therapist_id,
               entityLabel: g.candidates[0].full_name,
@@ -270,6 +308,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
                 region: g.region,
                 treatment: g.treatment,
                 gift_months: GIFT_MONTHS,
+                gap_key: g.key,
+                subject: GIFT_SUBJECT,
                 candidates: g.candidates,
               },
             }
@@ -294,18 +334,23 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       status: gaps.length > 0 ? "ok" : "empty",
       summary:
         gaps.length > 0
-          ? `${gaps.length} פערי היצע: ${giftGaps.length} להצעת מתנה, ${recruitGaps.length} לגיוס`
-          : "אין פערי היצע פתוחים",
+          ? `${gaps.length} פערי היצע: ${giftGaps.length} להצעת מתנה, ${recruitGaps.length} לגיוס` +
+            (waitingGaps.length > 0 ? `, ${waitingGaps.length} ממתינים לתשובה` : "")
+          : waitingGaps.length > 0
+            ? `אין פערים חדשים; ${waitingGaps.length} ממתינים לתשובה על הצעה שנשלחה`
+            : "אין פערי היצע פתוחים",
       details: {
         gift: giftGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
         recruit: recruitGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
+        waiting: waitingGaps,
+        cooldown_days: GIFT_OFFER_COOLDOWN_DAYS,
       },
     });
 
-    return { ok: true, gaps, giftGaps, recruitGaps };
+    return { ok: true, gaps, giftGaps, recruitGaps, waitingGaps };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await finishAgentRun(runId, { status: "error", error: msg });
-    return { ok: false, gaps: [], giftGaps: [], recruitGaps: [], error: msg };
+    return { ok: false, gaps: [], giftGaps: [], recruitGaps: [], waitingGaps: [], error: msg };
   }
 }
