@@ -218,16 +218,29 @@ type AgentEntry = {
   runLabel: string;
 };
 
-function AgentStrip({ agents, runs }: { agents: AgentEntry[]; runs: AgentRun[] }) {
+function AgentStrip({
+  agents,
+  runs,
+  openKey,
+  onOpen,
+}: {
+  agents: AgentEntry[];
+  runs: AgentRun[];
+  openKey: string | null;
+  onOpen: (key: string | null) => void;
+}) {
   return (
     <div className="mb-8 overflow-hidden rounded-2xl border border-stone-200 bg-white">
       {agents.map((a) => {
         const last = runs.find((r) => r.agent === a.key);
         const st = last ? RUN_STATUS[last.status] ?? RUN_STATUS.running : null;
+        const isOpen = openKey === a.key;
         return (
           <div
             key={a.key}
-            className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5 last:border-0"
+            className={`flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5 last:border-0 ${
+              isOpen ? "bg-stone-50" : ""
+            }`}
           >
             <span className="text-sm font-bold text-stone-800 whitespace-nowrap">
               {a.icon} {a.label}
@@ -243,7 +256,18 @@ function AgentStrip({ agents, runs }: { agents: AgentEntry[]; runs: AgentRun[] }
               {last ? `${fmtDateTime(last.started_at)} · ${last.summary ?? ""}` : ""}
             </span>
             <button
-              onClick={a.onRun}
+              onClick={() => onOpen(isOpen ? null : a.key)}
+              className="shrink-0 rounded-full px-2 py-1 text-xs font-bold text-stone-400 hover:text-stone-700"
+            >
+              {isOpen ? "סגור ▲" : "פתח ▼"}
+            </button>
+            <button
+              // הרצה פותחת גם את הפאנל: מי שלוחץ "נתח" רוצה לראות את התוצאה,
+              // לא לחפש אותה.
+              onClick={() => {
+                onOpen(a.key);
+                a.onRun();
+              }}
               disabled={a.busy}
               className="shrink-0 rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
             >
@@ -455,6 +479,9 @@ export default function AgentsPage() {
   const [adsError, setAdsError] = useState("");
 
   const [convLoading, setConvLoading] = useState(false);
+  // איזה סוכן פתוח כרגע. אחד בלבד: חמישה גופי פלט פתוחים בו-זמנית הם בדיוק
+  // מה שהפך את העמוד לגלילה ארוכה שבה כל סוכן חדש מוסיף עוד קומה.
+  const [openAgent, setOpenAgent] = useState<string | null>(null);
   const [conv, setConv] = useState<ConversionsPreview | null>(null);
   const [convError, setConvError] = useState("");
   const [convMsg, setConvMsg] = useState("");
@@ -783,6 +810,8 @@ export default function AgentsPage() {
         {/* פס הסטטוס - כל הסוכנים במבט אחד, והרצה מכאן בלי לגלול */}
         <AgentStrip
           runs={runs}
+          openKey={openAgent}
+          onOpen={setOpenAgent}
           agents={[
             { key: "daily_digest", icon: "☀️", label: "בקר הבוקר", busy: previewLoading, onRun: runPreview, runLabel: "הפק" },
             { key: "watchdog", icon: "🌙", label: "שומר הלילה", busy: watchdogLoading, onRun: runWatchdogNow, runLabel: "בדוק" },
@@ -792,7 +821,9 @@ export default function AgentsPage() {
           ]}
         />
 
-        {/* בקר הבוקר */}
+        {/* גוף הפלט של הסוכן הפתוח, ורק שלו. הפס למעלה הוא התצוגה הקבועה;
+            הפאנלים נפתחים לפי דרישה במקום להיערם זה מתחת לזה. */}
+        {openAgent === "daily_digest" && (
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">☀️ בקר הבוקר</h2>
@@ -895,8 +926,9 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+        )}
 
-        {/* שומר הלילה */}
+        {openAgent === "watchdog" && (
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">🌙 שומר הלילה</h2>
@@ -940,8 +972,9 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+        )}
 
-        {/* פערי היצע */}
+        {openAgent === "supply_gaps" && (
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">⚖️ פערי היצע וקידום מתנה</h2>
@@ -1018,8 +1051,9 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+        )}
 
-        {/* סוכן הפרסום */}
+        {openAgent === "ads" && (
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">📣 סוכן הפרסום</h2>
@@ -1102,8 +1136,9 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+        )}
 
-        {/* המרות לגוגל */}
+        {openAgent === "conversions" && (
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">📈 המרות אמת לגוגל</h2>
@@ -1182,6 +1217,7 @@ export default function AgentsPage() {
             </div>
           )}
         </section>
+        )}
 
         {/* יומן ריצות */}
         <section>
