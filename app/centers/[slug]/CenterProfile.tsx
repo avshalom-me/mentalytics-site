@@ -30,12 +30,25 @@ const REGION_LABELS: Record<string, string> = {
 };
 const regionLabel = (r: string) => REGION_LABELS[r] ?? r;
 
-const AV_GRADIENTS = [
-  "linear-gradient(140deg,#3D8C8A,#2A6462)",
-  "linear-gradient(140deg,#D49018,#A87010)",
-  "linear-gradient(140deg,#5AA6A0,#3D8C8A)",
-  "linear-gradient(140deg,#4E9C93,#2A6462)",
-];
+// מטפל/ת ללא תמונה מקבל/ת שרטוט כללי במקום ראשי תיבות. המגדר נלקח מהתפקיד
+// שהמרכז עצמו כתב על אותו אדם ("מרכזת תחום אוטיזם" מול "מרכז תחום קשב") -
+// מילים של המרכז, לא ניחוש מהשם הפרטי, שבו קל לטעות ולהציג אדם כמין שאינו
+// שלו. כשאין סימן מגדרי ברור - שרטוט ניטרלי, לא ברירת מחדל גברית.
+//
+// הנשי נבדק ראשון: "מנהלת" מכילה את "מנהל" כתת-מחרוזת, וסדר הפוך היה מסמן כל
+// מנהלת כגבר.
+const FEMININE_ROLE = /(מנהלת|מרכזת|רכזת|מטפלת|פסיכולוגית|פסיכיאטרית|עובדת|יועצת|מדריכה|אחראית|סגנית|מייסדת|שותפה|קלינאית|דיאטנית|מאבחנת|מומחית|מרצה|רופאה)/;
+const MASCULINE_ROLE = /(מנהל|מרכז|רכז|מטפל|פסיכולוג|פסיכיאטר|עובד|יועץ|מדריך|אחראי|סגן|מייסד|שותף|קלינאי|דיאטן|מאבחן|מומחה|רופא)/;
+// רשומה אחת שמאגדת שני אנשים ("שני כהן וד\"ר איתי אדרס") - כל שרטוט מגדרי
+// יהיה שגוי לגבי אחד מהם.
+const PAIRED_NAME = /\sו[א-ת"']/;
+
+function avatarFor(name: string, role: string): string {
+  if (PAIRED_NAME.test(name)) return "/avatar-neutral.svg";
+  if (FEMININE_ROLE.test(role)) return "/avatar-female.svg";
+  if (MASCULINE_ROLE.test(role)) return "/avatar-male.svg";
+  return "/avatar-neutral.svg";
+}
 
 // נוסח הפתיחה בוואטסאפ - גרסת מרכז (רבים) לנוסח של מטפל בודד מ-phone.ts.
 const CENTER_WHATSAPP_MESSAGE = 'שלום, הגעתי אליכם דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי טיפול במרכז';
@@ -289,19 +302,13 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                       className={`w-[min(248px,68vw)] ${people.length > 1 && i % 2 === 1 ? "sm:translate-y-[26px]" : ""}`}>
                       <div className="overflow-hidden border-8 border-white bg-white"
                         style={{
-                          borderRadius: "999px 999px 26px 26px",
-                          aspectRatio: "1 / 1.22",
+                          borderRadius: "20px",
+                          aspectRatio: "1 / 1",
                           boxShadow: p.isDirector ? "0 24px 56px rgba(42,100,98,.22)" : "0 18px 44px rgba(42,100,98,.16)",
                         }}>
-                        {p.photoUrl ? (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img src={p.photoUrl} alt={p.name} className="h-full w-full object-cover" />
-                        ) : (
-                          <div className="flex h-full w-full items-center justify-center text-[46px] font-extrabold text-white"
-                            style={{ background: AV_GRADIENTS[i % AV_GRADIENTS.length] }}>
-                            {initials(p.name)}
-                          </div>
-                        )}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={p.photoUrl ?? avatarFor(p.name, p.role)} alt={p.name}
+                          className="h-full w-full object-cover" />
                       </div>
                       <p className="mt-5 text-[1.3rem] font-black tracking-tight text-[var(--text)]">{p.name}</p>
                       {p.role && <p className="mt-1 text-[15px] leading-6 text-[var(--text-2)]">{p.role}</p>}
