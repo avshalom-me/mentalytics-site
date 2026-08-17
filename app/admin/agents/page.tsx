@@ -704,11 +704,12 @@ export default function AgentsPage() {
 
   return (
     <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      {/* flex-col + order: הסוכנים למעלה תמיד, וכל השאר מתחתיהם - בלי להזיז
+          את סדר הקוד עצמו. הפרטים (תור, יומן) יורדים מתחת לפס. */}
+      <div className="mx-auto flex max-w-4xl flex-col px-6 py-8">
         <h1 className="text-2xl font-black text-stone-900 mb-2">סוכנים אוטונומיים</h1>
         <p className="text-sm text-stone-500 mb-6">
-          מרכז השליטה בסוכני האוטומציה: יומן הריצות, תור ההצעות, ותצוגה מקדימה של דוח הבוקר.
-          שום סוכן לא שולח מייל או מבצע פעולה בלי אישור.
+          שום סוכן לא שולח מייל ולא מבצע פעולה בלי אישור שלך.
         </p>
 
         {error && (
@@ -717,7 +718,7 @@ export default function AgentsPage() {
 
         {/* תור ההצעות - ראש העמוד בכוונה: זה מה שדורש פעולה, וכל השאר מתחתיו.
             מופרד לשניים: מה שמוביל לפעולה שלך, ומה שהוא ממצא לידיעה בלבד. */}
-        <section className="mb-8 scroll-mt-4" ref={queueRef}>
+        <section className="order-3 mb-8 scroll-mt-4" ref={queueRef}>
           <h2 className="text-sm font-black text-stone-500 mb-3">
             דורש ממך פעולה ({actionable.length})
             {findings.length > 0 && (
@@ -812,48 +813,22 @@ export default function AgentsPage() {
               {/* הממצאים חיים בעמוד שהנושא שלהם שייך לו; כאן נשאר רק מונה
                   וקישור, כדי שתור הפעולות לא יתארך עם כל סוכן חדש. */}
               <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-500">
-                <span className="font-bold text-stone-600">ממצאים לידיעה: {findings.length}</span>
+                <span className="font-bold text-stone-600">הממצאים מוצגים ב:</span>
                 {FINDING_HOMES.filter((h) => findings.some((f) => f.agent === h.agent)).map((h) => (
                   <a key={h.agent} href={h.href} className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 font-bold text-stone-600 hover:bg-stone-100">
                     {h.label} ({findings.filter((f) => f.agent === h.agent).length}) ←
                   </a>
                 ))}
               </div>
-              <Collapse title="הרשימה המלאה" count={findings.length}>
-                <div className="mb-3 flex flex-wrap items-center gap-2">
-                  <button
-                    onClick={dismissAllFindings}
-                    disabled={bulkBusy}
-                    className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    {bulkBusy ? "מנקה..." : `✕ דחה את כל ${findings.length} הממצאים`}
-                  </button>
-                  <span className="text-xs text-stone-400">
-                    ממצא שנדחה יחזור מעצמו בריצה הבאה אם המצב שיצר אותו עדיין קיים.
-                  </span>
-                </div>
-                <ul className="space-y-2">
-                  {findings.map((a) => (
-                    <li key={a.id} className="border-b border-stone-100 pb-2 last:border-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-bold text-stone-700">{a.title}</div>
-                          {a.body && (
-                            <div className="text-xs text-stone-500 leading-5 whitespace-pre-line">{a.body}</div>
-                          )}
-                        </div>
-                        <button
-                          onClick={() => resolveAction(a.id, "dismissed")}
-                          disabled={busyId === a.id || bulkBusy}
-                          className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
-                        >
-                          דחה
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </Collapse>
+              {/* הרשימה המלאה חיה בעמודי הנושא. כאן נשאר רק ניקוי,
+                  כדי שהעמוד הזה יישאר עמוד סוכנים ולא רשימת ממצאים. */}
+              <button
+                onClick={dismissAllFindings}
+                disabled={bulkBusy}
+                className="text-xs font-bold text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+              >
+                {bulkBusy ? "מנקה..." : "נקה את הממצאים"}
+              </button>
             </div>
           )}
 
@@ -885,9 +860,8 @@ export default function AgentsPage() {
           )}
         </section>
 
-        <h2 className="text-sm font-black text-stone-500 mb-3">הפעלת סוכנים וניתוחים</h2>
-
-        {/* פס הסטטוס - כל הסוכנים במבט אחד, והרצה מכאן בלי לגלול */}
+        {/* פס הסטטוס - order-1: זה ורק זה יושב בראש העמוד. */}
+        <div className="order-1">
         <AgentStrip
           runs={runs}
           openKey={openAgent}
@@ -900,11 +874,12 @@ export default function AgentsPage() {
             { key: "conversions", icon: "📈", label: "המרות לגוגל", busy: convLoading, onRun: conversionsPreview, runLabel: "בדוק" },
           ]}
         />
+        </div>
 
         {/* גוף הפלט של הסוכן הפתוח, ורק שלו. הפס למעלה הוא התצוגה הקבועה;
             הפאנלים נפתחים לפי דרישה במקום להיערם זה מתחת לזה. */}
         {openAgent === "daily_digest" && (
-        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">☀️ בקר הבוקר</h2>
             <button
@@ -1009,7 +984,7 @@ export default function AgentsPage() {
         )}
 
         {openAgent === "watchdog" && (
-        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">🌙 שומר הלילה</h2>
             <button
@@ -1055,7 +1030,7 @@ export default function AgentsPage() {
         )}
 
         {openAgent === "supply_gaps" && (
-        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">⚖️ פערי היצע וקידום מתנה</h2>
             <button
@@ -1134,7 +1109,7 @@ export default function AgentsPage() {
         )}
 
         {openAgent === "ads" && (
-        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">📣 סוכן הפרסום</h2>
             <button
@@ -1219,7 +1194,7 @@ export default function AgentsPage() {
         )}
 
         {openAgent === "conversions" && (
-        <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
           <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
             <h2 className="font-black text-stone-900">📈 המרות אמת לגוגל</h2>
             <button
@@ -1299,9 +1274,10 @@ export default function AgentsPage() {
         </section>
         )}
 
-        {/* יומן ריצות */}
-        <section>
-          <h2 className="text-sm font-black text-stone-500 mb-3">יומן ריצות</h2>
+        {/* יומן ריצות - מקופל. מי שרוצה לדעת מה קרה רואה את זה בפס למעלה;
+            הטבלה המלאה היא לחקירה, לא לתצוגה קבועה. */}
+        <section className="order-4">
+          <Collapse title="יומן ריצות" count={runs.length}>
           {!loading && runs.length === 0 && (
             <p className="text-sm text-stone-400">עדיין אין ריצות - הקרון ירוץ מחר בבוקר, או הפק תצוגה מקדימה עכשיו.</p>
           )}
@@ -1346,6 +1322,7 @@ export default function AgentsPage() {
               </table>
             </div>
           )}
+          </Collapse>
         </section>
       </div>
     </div>
