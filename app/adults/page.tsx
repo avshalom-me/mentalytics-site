@@ -3162,14 +3162,10 @@ export default function AdultsPage() {
                 </p>
               )}
               <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                {profileHrefForMatch(t) && (
-                  <a
-                    href={profileHrefForMatch(t)!}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
-                  >
-                    פרופיל מלא ←
-                  </a>
-                )}
+                {/* וואטסאפ ראשון ומלא, הפרופיל אחריו כמשני: 14 מתוך 17 הפניות
+                    של מסיימי שאלון הגיעו מהכפתור הזה ורק 3 מהפרופיל (17/8/2026),
+                    בזמן שהפרופיל היה הכפתור הבולט והוואטסאפ הקטן והאחרון. */}
+                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
                 <button
                   onClick={() => fetchExplanation(t)}
                   disabled={explainLoading[t.id]}
@@ -3181,7 +3177,15 @@ export default function AdultsPage() {
                   >✦</span>
                   {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
                 </button>
-                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                {profileHrefForMatch(t) && (
+                  <a
+                    href={profileHrefForMatch(t)!}
+                    className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)]"
+                    style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
+                  >
+                    פרופיל מלא ←
+                  </a>
+                )}
               </div>
               {explainData[t.id] && (
                 <div

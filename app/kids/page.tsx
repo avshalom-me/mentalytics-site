@@ -2720,12 +2720,6 @@ function KidsMatchSection({ A, score, selection }: {
   async function doMatch() {
     setLoading(true);
     setError("");
-    // Top of the kids match funnel - mirrors the adults' trackMatchingClick on
-    // "מצא לי מטפל". Until now the kids flow emitted no matching_click at all.
-    trackMatchingClick(
-      "kids",
-      isAssessment ? `assessment:${treatments[0] ?? ""}` : isProfessional ? `professional:${treatments[0] ?? ""}` : treatments.join("+")
-    );
     try {
       const res = await fetch("/api/match", {
         method: "POST",
@@ -2769,7 +2763,17 @@ function KidsMatchSection({ A, score, selection }: {
           scroll-up button here would be a second, weaker copy. */}
       {!open ? (
         <button
-          onClick={() => setOpen(true)}
+          onClick={() => {
+            setOpen(true);
+            // נורה בפתיחת הטופס, לא בשליחתו - כדי למדוד את אותה נקודה כמו
+            // במבוגרים (שם האירוע נורה במעבר ל-match-form). קודם לכן הוא נורה
+            // ב-doMatch, ולכן לא ניתן היה להשוות בין שתי הזרימות, וגם לא לדעת
+            // אם מי שנשר בילדים פתח את הטופס ונטש או לא פתח אותו כלל.
+            trackMatchingClick(
+              "kids",
+              isAssessment ? `assessment:${treatments[0] ?? ""}` : isProfessional ? `professional:${treatments[0] ?? ""}` : treatments.join("+"),
+            );
+          }}
           className="w-full py-4 rounded-2xl text-white font-bold text-base shadow-md transition hover:opacity-90 active:scale-95"
           style={{ background: isAssessment ? "linear-gradient(135deg,#5a3e7a,#7a4a9a)" : "linear-gradient(135deg,#2c3e7a,#4a6fa5)" }}
         >
@@ -2975,14 +2979,8 @@ function KidsMatchSection({ A, score, selection }: {
                         </p>
                       )}
                       <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                        {profileHref && (
-                          <a
-                            href={profileHref}
-                            className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
-                          >
-                            פרופיל מלא ←
-                          </a>
-                        )}
+                        {/* אותה היררכיה כמו במבוגרים - ראו ההערה שם ובקומפוננטה. */}
+                        {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
                         <button
                           onClick={() => fetchExplanation(t)}
                           disabled={explainLoading[t.id]}
@@ -2994,7 +2992,15 @@ function KidsMatchSection({ A, score, selection }: {
                           >✦</span>
                           {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
                         </button>
-                        {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                        {profileHref && (
+                          <a
+                            href={profileHref}
+                            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)]"
+                            style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
+                          >
+                            פרופיל מלא ←
+                          </a>
+                        )}
                       </div>
                       {explainData[t.id] && (
                         <div

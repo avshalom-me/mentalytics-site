@@ -15,9 +15,18 @@ import { trackingOptedOut } from "@/app/lib/track-optout";
 // Rationale: only ~6% of patients who see a match card open the profile, so
 // the 17% visit-to-contact rate never gets its chance.
 //
-// UX guardrails: secondary styling (outline, not a filled CTA) so the card's
-// primary action stays "open the profile"; a pre-written message so nobody
-// has to compose one cold; hidden entirely when the therapist has no phone.
+// This is now the card's PRIMARY action (filled green), and the profile link
+// is secondary. It started as a deliberately quiet outline behind "open the
+// profile", but a week of match-funnel data (17/8/2026) said the hierarchy was
+// backwards: of 17 contacts from quiz completers, 14 came from this button and
+// only 3 from the profile page. The most-converting action was the smallest,
+// last button on the card.
+//
+// Still WhatsApp-only, never phone/email/site-message: one channel is what
+// keeps this from flooding therapists, and it is the least intrusive one
+// (asynchronous, and the patient's own message text signals real intent).
+// A pre-written message so nobody has to compose one cold; hidden entirely
+// when the therapist has no usable phone.
 
 const waIcon = (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -64,8 +73,8 @@ export default function MatchCardWhatsApp({
       target="_blank"
       rel="noopener noreferrer"
       onClick={onClick}
-      className="inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-[13px] font-bold transition-colors hover:bg-green-50"
-      style={{ border: "1.5px solid #25D366", color: "#128C42" }}
+      className="inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90"
+      style={{ background: "#128C42" }}
     >
       {waIcon} וואטסאפ
     </a>
