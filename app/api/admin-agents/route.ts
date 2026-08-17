@@ -19,7 +19,8 @@ export const maxDuration = 300;
 
 export async function GET() {
   try {
-    const [runsRes, pendingRes, pendingCountRes, resolvedRes, latestDigestRes] = await Promise.all([
+    const [runsRes, pendingRes, actionCountRes, findingCountRes, resolvedRes, latestDigestRes] =
+      await Promise.all([
       supabaseAdmin
         .from("agent_runs")
         .select("id, agent, started_at, finished_at, status, mode, summary, error")
@@ -29,17 +30,25 @@ export async function GET() {
         .from("agent_actions")
         // payload נשלח לעמוד כי הצעת המתנה נערכת שם לפני השליחה (המועמדים
         // והטיוטה האישית לכל אחד יושבים בו).
-        .select("id, agent, action_type, title, body, entity_type, entity_id, entity_label, payload, created_at")
+        .select("id, agent, action_type, kind, title, body, entity_type, entity_id, entity_label, payload, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         // 200 ולא 50: העמוד מקבץ את התור לפי סוג ומקפל את החלק המידעי, ולכן
         // הוא סופג כמות כזו. עם 50 בלבד הכותרת ספרה את מה שהוחזר, ודחייה
         // אחת רק שאבה שורה חדשה פנימה - המספר נראה תקוע.
         .limit(200),
+      // שתי ספירות אמיתיות מהמאגר, לא אורך הרשימה שהוחזרה: פעולות שדורשות
+      // אותך, וממצאים לידיעה. ההפרדה מגיעה מעמודת kind שהסוכן מילא.
       supabaseAdmin
         .from("agent_actions")
         .select("id", { count: "exact", head: true })
-        .eq("status", "pending"),
+        .eq("status", "pending")
+        .eq("kind", "action"),
+      supabaseAdmin
+        .from("agent_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("kind", "finding"),
       supabaseAdmin
         .from("agent_actions")
         .select("id, agent, title, status, status_changed_at")
@@ -67,8 +76,10 @@ export async function GET() {
       ok: true,
       runs: runsRes.data ?? [],
       pending_actions: pendingRes.data ?? [],
-      // הספירה האמיתית מהמאגר, לא אורך הרשימה שהוחזרה.
-      pending_total: pendingCountRes.count ?? (pendingRes.data ?? []).length,
+      // הספירות האמיתיות מהמאגר, מופרדות לפי סוג התוצר.
+      pending_action_total: actionCountRes.count ?? 0,
+      pending_finding_total: findingCountRes.count ?? 0,
+      pending_total: (actionCountRes.count ?? 0) + (findingCountRes.count ?? 0),
       resolved_actions: resolvedRes.data ?? [],
       latest_digest: latestDigestRun
         ? {

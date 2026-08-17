@@ -324,6 +324,8 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
       "watchdog",
       failures.map((f) => ({
         actionType: "alert",
+        // ממצא: נכון כל עוד הבדיקה נכשלת, ונסגר מעצמו כשהיא חוזרת לעבור.
+        kind: "finding" as const,
         title: `בדיקה לילית נכשלה: ${f.label}`,
         body: f.detail,
         dedupeKey: `watchdog:${f.key}`,

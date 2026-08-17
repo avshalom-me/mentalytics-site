@@ -35,6 +35,7 @@ type PendingAction = {
   id: string;
   agent: string;
   action_type: string;
+  kind?: "action" | "finding";
   title: string;
   body: string | null;
   entity_type: string | null;
@@ -195,6 +196,56 @@ function Collapse({
       </summary>
       <div className="border-t border-stone-200 bg-white px-4 py-3 rounded-b-xl">{children}</div>
     </details>
+  );
+}
+
+// פס הסטטוס: שורה אחת לכל סוכן - שם, מתי רץ לאחרונה, מה מצא, וכפתור הרצה.
+// נבנה ממערך הגדרות אחד ולא מ-JSX לכל סוכן, ולכן הוספת סוכן 12 היא הוספת
+// אובייקט אחד למערך - זה מה שעוצר את הגדילה הליניארית של העמוד.
+type AgentEntry = {
+  key: string;
+  icon: string;
+  label: string;
+  busy: boolean;
+  onRun: () => void;
+  runLabel: string;
+};
+
+function AgentStrip({ agents, runs }: { agents: AgentEntry[]; runs: AgentRun[] }) {
+  return (
+    <div className="mb-8 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      {agents.map((a) => {
+        const last = runs.find((r) => r.agent === a.key);
+        const st = last ? RUN_STATUS[last.status] ?? RUN_STATUS.running : null;
+        return (
+          <div
+            key={a.key}
+            className="flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5 last:border-0"
+          >
+            <span className="text-sm font-bold text-stone-800 whitespace-nowrap">
+              {a.icon} {a.label}
+            </span>
+            {st ? (
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>
+                {st.label}
+              </span>
+            ) : (
+              <span className="text-[11px] text-stone-400">טרם רץ</span>
+            )}
+            <span className="flex-1 truncate text-xs text-stone-500" title={last?.summary ?? ""}>
+              {last ? `${fmtDateTime(last.started_at)} · ${last.summary ?? ""}` : ""}
+            </span>
+            <button
+              onClick={a.onRun}
+              disabled={a.busy}
+              className="shrink-0 rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+            >
+              {a.busy ? "רץ..." : a.runLabel}
+            </button>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -370,11 +421,15 @@ export default function AgentsPage() {
   const [actionError, setActionError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
-  // מה שמוביל לפעולה שלך (הצעת מתנה לשליחה) מול ממצא לידיעה (פער גיוס,
-  // התראה). הפרדה זו מה שמונע מהתור להיראות כמו 60 משימות פתוחות.
-  const INFO_TYPES = ["recruit_gap", "alert"];
-  const actionable = pending.filter((a) => !INFO_TYPES.includes(a.action_type));
-  const findings = pending.filter((a) => INFO_TYPES.includes(a.action_type));
+  // ההפרדה מגיעה מהשדה שהסוכן מילא בזמן הכתיבה, לא מניחוש לפי שם הפעולה:
+  // סוכן חדש מצהיר על הסוג בעצמו ונכנס לתבנית בלי לגעת בעמוד הזה.
+  // (שורות ישנות מלפני העמודה מסומנות action כברירת מחדל, ולכן נשמרת
+  // כאן נפילה לאחור לפי שם הפעולה עבורן בלבד.)
+  const LEGACY_INFO_TYPES = ["recruit_gap", "alert"];
+  const isFinding = (a: PendingAction) =>
+    a.kind ? a.kind === "finding" : LEGACY_INFO_TYPES.includes(a.action_type);
+  const actionable = pending.filter((a) => !isFinding(a));
+  const findings = pending.filter(isFinding);
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
@@ -707,6 +762,18 @@ export default function AgentsPage() {
         </section>
 
         <h2 className="text-sm font-black text-stone-500 mb-3">הפעלת סוכנים וניתוחים</h2>
+
+        {/* פס הסטטוס - כל הסוכנים במבט אחד, והרצה מכאן בלי לגלול */}
+        <AgentStrip
+          runs={runs}
+          agents={[
+            { key: "daily_digest", icon: "☀️", label: "בקר הבוקר", busy: previewLoading, onRun: runPreview, runLabel: "הפק" },
+            { key: "watchdog", icon: "🌙", label: "שומר הלילה", busy: watchdogLoading, onRun: runWatchdogNow, runLabel: "בדוק" },
+            { key: "supply_gaps", icon: "⚖️", label: "פערי היצע", busy: gapsLoading, onRun: runGapsNow, runLabel: "נתח" },
+            { key: "ads", icon: "📣", label: "סוכן הפרסום", busy: adsLoading, onRun: runAdsNow, runLabel: "נטר" },
+            { key: "conversions", icon: "📈", label: "המרות לגוגל", busy: convLoading, onRun: conversionsPreview, runLabel: "בדוק" },
+          ]}
+        />
 
         {/* בקר הבוקר */}
         <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">

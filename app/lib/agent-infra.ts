@@ -118,6 +118,10 @@ export async function syncAgentAlerts(
 export type NewAgentAction = {
   agent: string;
   actionType: string;
+  // סיווג התוצר, נקבע על ידי הסוכן שכתב אותו ולא מנוחש בתצוגה:
+  // "action" = יש מה לעשות וצריך אותך; "finding" = מסקנה לידיעה.
+  // ברירת המחדל היא action, כדי שסוכן שלא הצהיר לא ייעלם מהתור בשקט.
+  kind?: "action" | "finding";
   title: string;
   body?: string;
   entityType?: string;
@@ -138,6 +142,7 @@ export async function createAgentAction(
       .insert({
         agent: action.agent,
         action_type: action.actionType,
+        kind: action.kind ?? "action",
         title: action.title,
         body: action.body ?? null,
         entity_type: action.entityType ?? null,

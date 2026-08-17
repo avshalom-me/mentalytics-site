@@ -228,6 +228,8 @@ export async function runAdsMonitor(): Promise<AdsMonitorResult> {
       "ads",
       findings.map((f) => ({
         actionType: "alert",
+        // ממצא: נכון כל עוד הקמפיין במצב הזה. השינוי בגוגל נעשה על ידך.
+        kind: "finding" as const,
         title: f.title,
         body: f.detail,
         dedupeKey: f.key,

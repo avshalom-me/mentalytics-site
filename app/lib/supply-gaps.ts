@@ -332,6 +332,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         g.kind === "gift"
           ? {
               actionType: "gift_offer",
+              // פעולה: יש כאן מייל לשלוח, ורק אתה יכול להכריע.
+              kind: "action" as const,
               title: `הצעת קידום מתנה: ${g.treatment} · ${g.region}`,
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}; ` +
@@ -353,6 +355,9 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
             }
           : {
               actionType: "recruit_gap",
+              // ממצא: תיאור מצב היצע, לא משימה. הפעולה שנגזרת ממנו (פרסום
+              // גיוס) לא מתבצעת מכאן.
+              kind: "finding" as const,
               title: `פער גיוס: אין מספיק מטפלים ל${g.treatment} באזור ${g.region}`,
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}, ` +
