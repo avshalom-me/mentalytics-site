@@ -90,9 +90,12 @@ function treatmentLabel(t: string): string {
 // לא במספרי הביצועים של המטפל, ובלי ניסוחים שיווקיים.
 function buildGiftDraft(name: string, region: string, rawTreatment: string, events: number): string {
   const treatment = treatmentLabel(rawTreatment);
+  // בטיוטה היוצאת לא מציינים מספר מדויק - "מספר רב" נכון יותר לקריאה
+  // ולא מעמיד את המספר במרכז. הספירה המדויקת נשארת בגוף ההצעה באדמין.
+  // ל-2 מטופלים נאמר "מספר מטופלים" ולא "מספר רב", כדי לא להגזים.
   const demandLine =
     events > 1
-      ? `בחודשיים האחרונים ${events} מטופלים חיפשו דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
+      ? `בחודשיים האחרונים ${events >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים"} חיפשו דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
       : `לאחרונה מטופל חיפש דרכנו ${treatment} באזור ${region}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע לו.`;
 
   return [
