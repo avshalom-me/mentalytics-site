@@ -54,7 +54,7 @@ type TherapistRow = {
 /** slug, שם ולוגו של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
 type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null };
 
-function rowInRegion(regions: string[] | null, region: string): boolean {
+export function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
 }
 
