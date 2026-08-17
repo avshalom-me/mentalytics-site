@@ -6,6 +6,7 @@ import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads
 import { googleAdsConfigured } from "@/app/lib/google-ads";
 import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
+import { sendGiftOffer } from "@/app/lib/gift-offer";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -26,7 +27,9 @@ export async function GET() {
         .limit(30),
       supabaseAdmin
         .from("agent_actions")
-        .select("id, agent, action_type, title, body, entity_type, entity_label, created_at")
+        // payload נשלח לעמוד כי הצעת המתנה נערכת שם לפני השליחה (המועמדים
+        // והטיוטה האישית לכל אחד יושבים בו).
+        .select("id, agent, action_type, title, body, entity_type, entity_id, entity_label, payload, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         .limit(50),
@@ -105,7 +108,31 @@ export async function POST(req: NextRequest) {
         ok: result.ok,
         gift_gaps: result.giftGaps,
         recruit_gaps: result.recruitGaps,
+        waiting_gaps: result.waitingGaps,
         error: result.error,
+      });
+    }
+    // שליחת הצעת מתנה: מסלול השליחה היחיד, ורק מקליק מפורש באדמין. המייל
+    // יוצא כאן ורק כאן - אין קרון ואין מסלול אוטומטי שמריץ את זה.
+    if (body?.action === "gift_offer_send") {
+      const actionId = String(body?.id ?? "");
+      const therapistId = String(body?.therapist_id ?? "");
+      const subject = String(body?.subject ?? "");
+      const draft = String(body?.body ?? "");
+      if (!actionId || !therapistId || !draft.trim()) {
+        return NextResponse.json(
+          { ok: false, error: "חסרים פרטים: הצעה, נמען או גוף המייל" },
+          { status: 400 }
+        );
+      }
+      const result = await sendGiftOffer({ actionId, therapistId, subject, body: draft });
+      if (!result.ok) {
+        return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+      }
+      return NextResponse.json({
+        ok: true,
+        therapist_name: result.therapistName,
+        email: result.email,
       });
     }
     if (body?.action === "ads_run") {
@@ -161,6 +188,21 @@ export async function PATCH(req: NextRequest) {
     const status = String(body?.status ?? "");
     if (!id || !["approved", "dismissed", "pending"].includes(status)) {
       return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
+    }
+    // הצעה שכבר בוצעה (מייל יצא) לא חוזרת לתור: החזרה שלה מזמינה שליחה
+    // שנייה של אותה הצעה לאותו מטפל.
+    if (status === "pending") {
+      const { data: current } = await supabaseAdmin
+        .from("agent_actions")
+        .select("status")
+        .eq("id", id)
+        .single();
+      if (current?.status === "executed") {
+        return NextResponse.json(
+          { ok: false, error: "ההצעה כבר נשלחה בפועל - אי אפשר להחזיר אותה לתור" },
+          { status: 409 }
+        );
+      }
     }
     const { error } = await supabaseAdmin
       .from("agent_actions")

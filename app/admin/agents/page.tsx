@@ -16,6 +16,21 @@ type AgentRun = {
   error: string | null;
 };
 
+type GiftCandidate = {
+  therapist_id: string;
+  full_name: string;
+  email: string;
+  draft: string;
+};
+
+type GiftPayload = {
+  region?: string;
+  treatment?: string;
+  gift_months?: number;
+  subject?: string;
+  candidates?: GiftCandidate[];
+};
+
 type PendingAction = {
   id: string;
   agent: string;
@@ -23,7 +38,9 @@ type PendingAction = {
   title: string;
   body: string | null;
   entity_type: string | null;
+  entity_id: string | null;
   entity_label: string | null;
+  payload: GiftPayload | null;
   created_at: string;
 };
 
@@ -122,11 +139,17 @@ type SupplyGap = {
   region: string;
   treatment: string;
   events: number;
-  candidates: { therapist_id: string; full_name: string; email: string }[];
+  candidates: GiftCandidate[];
   draftEmail: string | null;
 };
 
-type GapsRun = { gift_gaps: SupplyGap[]; recruit_gaps: SupplyGap[] };
+type WaitingGap = { region: string; treatment: string; sentAt: string };
+
+type GapsRun = {
+  gift_gaps: SupplyGap[];
+  recruit_gaps: SupplyGap[];
+  waiting_gaps: WaitingGap[];
+};
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   ok: { label: "תקין", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
@@ -150,6 +173,165 @@ function fmtDateTime(iso: string | null): string {
   });
 }
 
+// כרטיס הצעת המתנה: בחירת נמען מבין המועמדים, עריכת הטיוטה, ושליחה בפועל.
+// מוגדר ברמת המודול (ולא בתוך AgentsPage) כדי שהקלדה בטיוטה לא תיצור
+// קומפוננטה חדשה בכל רינדור ותאבד את הפוקוס.
+function GiftOfferCard({
+  action,
+  onSent,
+  onDismiss,
+  dismissing,
+}: {
+  action: PendingAction;
+  onSent: (msg: string) => void;
+  onDismiss: () => void;
+  dismissing: boolean;
+}) {
+  // הצעות שנוצרו לפני מסלול השליחה נושאות מועמדים בלי טיוטה - הטקסט מנורמל
+  // למחרוזת ריקה כדי שהשדה יישאר מבוקר, וכפתור השליחה נחסם עד שיהיה תוכן.
+  const candidates: GiftCandidate[] = (action.payload?.candidates ?? []).map((c) => ({
+    ...c,
+    draft: c.draft ?? "",
+  }));
+  const [selectedId, setSelectedId] = useState(candidates[0]?.therapist_id ?? "");
+  const [subject, setSubject] = useState(action.payload?.subject ?? "הצעת קידום במתנה לחודשיים - טיפול חכם");
+  const [draft, setDraft] = useState(candidates[0]?.draft ?? "");
+  const [edited, setEdited] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const selected = candidates.find((c) => c.therapist_id === selectedId) ?? null;
+
+  // החלפת נמען מחליפה את הטיוטה - הפנייה בגוף המייל נושאת את שמו של הנמען,
+  // ומייל שנפתח בשם של מישהו אחר הוא בדיוק סוג התקלה שאסור שתקרה.
+  function pickCandidate(c: GiftCandidate) {
+    if (c.therapist_id === selectedId) return;
+    if (edited && !window.confirm(`להחליף את הנמען ל${c.full_name}? הטיוטה תוחלף בטיוטה שלו/ה והעריכות שלך יאבדו.`)) {
+      return;
+    }
+    setSelectedId(c.therapist_id);
+    setDraft(c.draft);
+    setEdited(false);
+    setError("");
+  }
+
+  async function send() {
+    if (!selected) return;
+    if (
+      !window.confirm(
+        `לשלוח עכשיו את הצעת הקידום במתנה אל ${selected.full_name} (${selected.email})?\n\nהמייל יוצא מיד. הקידום עצמו לא יינתן אוטומטית - הוא מוענק ידנית אחרי שהמטפל משיב.`
+      )
+    ) {
+      return;
+    }
+    setSending(true);
+    setError("");
+    try {
+      await postAgents("gift_offer_send", {
+        id: action.id,
+        therapist_id: selected.therapist_id,
+        subject,
+        body: draft,
+      });
+      onSent(`ההצעה נשלחה אל ${selected.full_name} (${selected.email})`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "השליחה נכשלה");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-white p-5">
+      <div className="flex items-start justify-between gap-3 mb-1">
+        <h3 className="font-black text-stone-900 text-sm">🎁 {action.title}</h3>
+        <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
+          {agentLabel(action.agent)}
+        </span>
+      </div>
+      {action.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line mb-3">{action.body}</p>}
+
+      {candidates.length === 0 ? (
+        <p className="text-sm text-amber-700">אין מועמדים בהצעה הזו - היא נוצרה לפני שמסלול השליחה קיים. אפשר לדחות ולהריץ ניתוח פערים מחדש.</p>
+      ) : (
+        <>
+          <div className="mb-3">
+            <div className="text-xs font-black text-stone-400 mb-1">נמען</div>
+            <div className="flex flex-wrap gap-2">
+              {candidates.map((c) => (
+                <button
+                  key={c.therapist_id}
+                  onClick={() => pickCandidate(c)}
+                  disabled={sending}
+                  className={`rounded-full border px-3 py-1.5 text-xs font-bold disabled:opacity-50 ${
+                    c.therapist_id === selectedId
+                      ? "border-[#3D8C8A] bg-[#EAF4F3] text-[#2A6462]"
+                      : "border-stone-300 text-stone-600 hover:bg-stone-50"
+                  }`}
+                >
+                  {c.full_name}
+                  <span className="font-normal text-stone-400"> · {c.email}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <label className="block text-xs font-black text-stone-400 mb-1">נושא</label>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={sending}
+            className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm mb-3 disabled:opacity-50"
+          />
+
+          <label className="block text-xs font-black text-stone-400 mb-1">גוף המייל (ניתן לעריכה)</label>
+          <textarea
+            value={draft}
+            onChange={(e) => {
+              setDraft(e.target.value);
+              setEdited(true);
+            }}
+            disabled={sending}
+            rows={12}
+            className="w-full rounded-xl border border-stone-300 p-3 text-sm leading-6 disabled:opacity-50"
+          />
+
+          {!draft.trim() && (
+            <p className="mt-2 text-xs text-amber-700">
+              אין טיוטה להצעה הזו (היא נוצרה לפני מסלול השליחה). אפשר לכתוב טקסט כאן, או לדחות
+              ולהריץ ניתוח פערים מחדש כדי לקבל טיוטה מנוסחת.
+            </p>
+          )}
+
+          {error && (
+            <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <button
+              onClick={send}
+              disabled={sending || dismissing || !selected || !draft.trim()}
+              className="rounded-full bg-[#2e7d8c] px-5 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {sending ? "שולח..." : "📤 שלח הצעה"}
+            </button>
+            <button
+              onClick={onDismiss}
+              disabled={sending || dismissing}
+              className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+            >
+              ✕ דחה
+            </button>
+            <span className="text-xs text-stone-400">
+              המייל יוצא רק מהלחיצה הזו. הקידום עצמו מוענק ידנית מעמוד המטפלים אחרי תשובה.
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AgentsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [pending, setPending] = useState<PendingAction[]>([]);
@@ -159,6 +341,7 @@ export default function AgentsPage() {
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState<string | null>(null);
   const [actionError, setActionError] = useState("");
+  const [actionMsg, setActionMsg] = useState("");
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
@@ -297,6 +480,7 @@ export default function AgentsPage() {
   async function resolveAction(id: string, status: "approved" | "dismissed" | "pending") {
     setBusyId(id);
     setActionError("");
+    setActionMsg("");
     try {
       await postAgents("resolve", { id, status });
       load();
@@ -484,7 +668,8 @@ export default function AgentsPage() {
           <p className="text-xs text-stone-500 mb-4">
             מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים חיפשו ולא היה מטפל משלם להציע.
             כשיש מטפל חינמי מתאים - מנסח הצעת קידום מתנה לחודשיים; כשאין אף מטפל - זה פער גיוס
-            לפרסום. שום מייל לא נשלח ואף קידום לא ניתן בלי אישור שלך.
+            לפרסום. הניתוח כאן הוא תצוגה בלבד: השליחה בפועל נעשית מתור ההצעות למטה, בכרטיס
+            שבו בוחרים נמען, עורכים את הטיוטה ולוחצים שלח.
           </p>
 
           {gapsError && (
@@ -541,6 +726,20 @@ export default function AgentsPage() {
                   </ul>
                 )}
               </div>
+              {gaps.waiting_gaps && gaps.waiting_gaps.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-black text-stone-400 mb-2">
+                    ממתינים לתשובה על הצעה שנשלחה ({gaps.waiting_gaps.length})
+                  </h3>
+                  <ul className="list-disc ps-5 text-sm text-stone-500 leading-6">
+                    {gaps.waiting_gaps.map((w) => (
+                      <li key={`${w.region}|${w.treatment}`}>
+                        <strong>{w.treatment}</strong> · {w.region} · נשלח ב-{fmtDateTime(w.sentAt)}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </section>
@@ -719,6 +918,11 @@ export default function AgentsPage() {
               {actionError}
             </div>
           )}
+          {actionMsg && (
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">
+              ✓ {actionMsg}
+            </div>
+          )}
           {loading && <p className="text-sm text-stone-400">טוען...</p>}
           {!loading && pending.length === 0 && (
             <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400">
@@ -727,7 +931,20 @@ export default function AgentsPage() {
             </div>
           )}
           <div className="space-y-3">
-            {pending.map((a) => (
+            {pending.map((a) =>
+              a.action_type === "gift_offer" ? (
+                <GiftOfferCard
+                  key={a.id}
+                  action={a}
+                  dismissing={busyId === a.id}
+                  onSent={(msg) => {
+                    setActionMsg(msg);
+                    setActionError("");
+                    load();
+                  }}
+                  onDismiss={() => resolveAction(a.id, "dismissed")}
+                />
+              ) : (
               <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-5">
                 <div className="flex items-start justify-between gap-3 mb-1">
                   <h3 className="font-black text-stone-900 text-sm">{a.title}</h3>
@@ -754,7 +971,8 @@ export default function AgentsPage() {
                   </button>
                 </div>
               </div>
-            ))}
+              )
+            )}
           </div>
           {resolved.length > 0 && (
             <div className="mt-4 space-y-1">
@@ -765,15 +983,19 @@ export default function AgentsPage() {
                   className="flex items-center justify-between text-xs text-stone-400 border-b border-stone-100 pb-1"
                 >
                   <span>
-                    {a.status === "approved" ? "✓" : "✕"} {a.title}
+                    {a.status === "executed" ? "📤" : a.status === "approved" ? "✓" : "✕"} {a.title}
+                    {a.status === "executed" && <span className="text-emerald-600"> · נשלח</span>}
                   </span>
-                  <button
-                    onClick={() => resolveAction(a.id, "pending")}
-                    disabled={busyId === a.id}
-                    className="underline hover:text-stone-600 disabled:opacity-50"
-                  >
-                    החזר
-                  </button>
+                  {/* הצעה שנשלחה בפועל לא חוזרת לתור - השרת גם חוסם את זה. */}
+                  {a.status !== "executed" && (
+                    <button
+                      onClick={() => resolveAction(a.id, "pending")}
+                      disabled={busyId === a.id}
+                      className="underline hover:text-stone-600 disabled:opacity-50"
+                    >
+                      החזר
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

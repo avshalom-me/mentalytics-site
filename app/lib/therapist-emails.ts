@@ -807,3 +807,56 @@ export async function sendTherapistAdminMessageEmail(opts: {
   if (!r.ok && !r.skipped) console.error("sendTherapistAdminMessageEmail: send error:", r.error);
   return { ok: r.ok, error: r.error };
 }
+
+// הצעת קידום מתנה שנולדה בסוכן פערי ההיצע ואושרה ידנית בעמוד הסוכנים.
+// הגוף הוא טקסט חופשי (הטיוטה של הסוכן, אחרי עריכת האדמין) ולכן אין כאן
+// שום קביעה קבועה מלבד המעטפת. אין כפתור פעולה בכוונה: ההצעה מבקשת תשובה
+// במייל, ולכן ה-reply-to מכוון לתיבה אנושית ולא ל-noreply.
+export async function sendGiftOfferEmail(opts: {
+  to: string;
+  name: string;
+  subject: string;
+  message: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendGiftOfferEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+  if (!opts.message?.trim()) {
+    return { ok: false, error: "empty message" };
+  }
+
+  const subject = opts.subject?.trim() || "הצעת קידום במתנה - טיפול חכם";
+  // הטיוטה כוללת את פנייתה ("שלום X,") ואת החתימה, ולכן היא נכנסת כגוש אחד
+  // ולא נעטפת שוב בשלום/חתימה של המעטפת.
+  const safeMessage = escapeHtml(opts.message.trim());
+  const profileUrl = `${SITE_URL}/therapists/dashboard`;
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.7;color:#1a4a5c;direction:rtl;text-align:right;">
+      ${EMAIL_LOGO_HEADER}
+      <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0 0 10px;font-size:13px;color:#6b7280;text-align:center;">
+        אפשר להשיב ישירות למייל הזה. <a href="${profileUrl}" style="color:#0F5468;">לאזור האישי שלך באתר</a>
+      </p>
+      <p style="margin:0;font-size:12px;color:#888;text-align:center;">
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
+        טיפול חכם - Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  const r = await sendBulkEmail({
+    from: FROM,
+    to: opts.to,
+    subject,
+    html,
+    replyTo: "admin@getmentalytics.com",
+  });
+  if (!r.ok && !r.skipped) console.error("sendGiftOfferEmail: send error:", r.error);
+  return { ok: r.ok, error: r.error };
+}
