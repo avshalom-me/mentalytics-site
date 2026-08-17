@@ -6,6 +6,7 @@ import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads
 import { googleAdsConfigured } from "@/app/lib/google-ads";
 import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
+import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { sendGiftOffer } from "@/app/lib/gift-offer";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
@@ -153,6 +154,15 @@ export async function POST(req: NextRequest) {
         ok: true,
         therapist_name: result.therapistName,
         email: result.email,
+      });
+    }
+    if (body?.action === "finance_run") {
+      const result = await runFinanceRecon();
+      return NextResponse.json({
+        ok: result.ok,
+        findings: result.findings,
+        checked: result.checked,
+        error: result.error,
       });
     }
     if (body?.action === "ads_run") {
