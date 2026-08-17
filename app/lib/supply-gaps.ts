@@ -34,6 +34,7 @@ type TherapistRow = {
   email: string | null;
   status: string;
   promotion_source: string | null;
+  promoted_until: string | null;
   admin_approved: boolean | null;
   accepting_new_patients: boolean | null;
   regions: string[] | null;
@@ -142,7 +143,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         supabaseAdmin
           .from("therapists")
           .select(
-            "id, full_name, email, status, promotion_source, admin_approved, accepting_new_patients, regions, training_areas, age_groups"
+            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, training_areas, age_groups"
           )
           .in("status", ["paying", "approved"])
       ),
@@ -189,8 +190,18 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     }
 
     const paying = therapists.filter((t) => t.status === "paying");
+    // בריכת המועמדים להצעת מתנה - חינמיים בלבד, בשלוש שכבות הגנה:
+    // status='approved' (משלמים ומקודמי-מתנה נושאים 'paying' ולכן מסוננים
+    // כבר כאן), ובנוסף שלילה מפורשת של מקור קידום ושל חלון קידום פעיל -
+    // כדי שגם אם סטטוס ישתנה בעתיד, מי שכבר מקודם לא יקבל הצעת מתנה.
+    const nowIso = new Date().toISOString();
     const freePool = therapists.filter(
-      (t) => t.status === "approved" && t.admin_approved && t.accepting_new_patients !== false
+      (t) =>
+        t.status === "approved" &&
+        t.admin_approved &&
+        t.accepting_new_patients !== false &&
+        !t.promotion_source &&
+        !(t.promoted_until && t.promoted_until > nowIso)
     );
 
     const matchesGap = (t: TherapistRow, region: string, treatment: string): boolean => {
