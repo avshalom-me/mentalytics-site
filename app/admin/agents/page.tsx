@@ -814,11 +814,26 @@ export default function AgentsPage() {
                   וקישור, כדי שתור הפעולות לא יתארך עם כל סוכן חדש. */}
               <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-500">
                 <span className="font-bold text-stone-600">הממצאים מוצגים ב:</span>
-                {FINDING_HOMES.filter((h) => findings.some((f) => f.agent === h.agent)).map((h) => (
-                  <a key={h.agent} href={h.href} className="rounded-full border border-stone-300 bg-white px-2.5 py-0.5 font-bold text-stone-600 hover:bg-stone-100">
-                    {h.label} ({findings.filter((f) => f.agent === h.agent).length}) ←
-                  </a>
-                ))}
+                {/* צ'יפ לכל סוכן שיש לו ממצאים - גם לסוכן בלי עמוד נושא.
+                    בלי זה, ממצא של שומר הלילה נספר במונה ואי אפשר לקרוא אותו
+                    בשום מקום, וזו בדיוק התקלה שהוא נועד להתריע עליה. */}
+                {Array.from(new Set(findings.map((f) => f.agent))).map((agent) => {
+                  const home = FINDING_HOMES.find((h) => h.agent === agent);
+                  const count = findings.filter((f) => f.agent === agent).length;
+                  const cls =
+                    "rounded-full border border-stone-300 bg-white px-2.5 py-0.5 font-bold text-stone-600 hover:bg-stone-100";
+                  return home ? (
+                    <a key={agent} href={home.href} className={cls}>
+                      {home.label} ({count}) ←
+                    </a>
+                  ) : (
+                    // אין עמוד נושא: הנושא הוא המערכת עצמה, ולכן הבית הוא
+                    // הפאנל של הסוכן כאן - והצ'יפ פותח אותו.
+                    <button key={agent} onClick={() => setOpenAgent(agent)} className={cls}>
+                      {agentLabel(agent)} ({count}) ▼
+                    </button>
+                  );
+                })}
               </div>
               {/* הרשימה המלאה חיה בעמודי הנושא. כאן נשאר רק ניקוי,
                   כדי שהעמוד הזה יישאר עמוד סוכנים ולא רשימת ממצאים. */}
@@ -995,6 +1010,31 @@ export default function AgentsPage() {
               {watchdogLoading ? "בודק..." : "הרץ בדיקות עכשיו"}
             </button>
           </div>
+
+          {/* ההתראות הפתוחות של השומר יושבות כאן, כי הנושא שלהן הוא המערכת
+              עצמה ואין לה עמוד אחר. */}
+          {findings.some((f) => f.agent === "watchdog") && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+              <div className="mb-1.5 text-xs font-black text-amber-800">
+                התראות פתוחות ({findings.filter((f) => f.agent === "watchdog").length})
+              </div>
+              <ul className="space-y-1.5">
+                {findings
+                  .filter((f) => f.agent === "watchdog")
+                  .map((f) => (
+                    <li key={f.id} className="text-sm text-stone-700">
+                      <span className="font-bold">{f.title}</span>
+                      {f.body && (
+                        <span className="block text-xs text-stone-500 leading-5 whitespace-pre-line">{f.body}</span>
+                      )}
+                    </li>
+                  ))}
+              </ul>
+              <p className="mt-2 text-[11px] text-amber-700">
+                התראה נסגרת מעצמה ברגע שהבדיקה חוזרת לעבור. אין כאן מה לאשר.
+              </p>
+            </div>
+          )}
           <p className="text-xs text-stone-500 mb-4">
             בדיקות תקינות ליליות של האתר החי: שאלונים, ניקוד, התאמה, עמודי מפתח, אנליטיקה
             וטריות הקרונים. כישלון נכנס לתור ההצעות; מייל התראה מיידי יחומש יחד עם דוח הבוקר.
