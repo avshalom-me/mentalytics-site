@@ -288,11 +288,15 @@ function GiftOfferCard({
   onSent,
   onDismiss,
   dismissing,
+  open,
+  onToggle,
 }: {
   action: PendingAction;
   onSent: (msg: string) => void;
   onDismiss: () => void;
   dismissing: boolean;
+  open: boolean;
+  onToggle: () => void;
 }) {
   // הצעות שנוצרו לפני מסלול השליחה נושאות מועמדים בלי טיוטה - הטקסט מנורמל
   // למחרוזת ריקה כדי שהשדה יישאר מבוקר, וכפתור השליחה נחסם עד שיהיה תוכן.
@@ -348,13 +352,46 @@ function GiftOfferCard({
     }
   }
 
+  // סגור כברירת מחדל: 14 טיוטות מייל פתוחות בבת אחת הן קיר טקסט שאי אפשר
+  // לסרוק. פותחים אחת, מטפלים בה, וממשיכים לבאה.
+  if (!open) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5">
+        <span className="text-sm font-bold text-stone-800">🎁 {action.title}</span>
+        <span className="flex-1 truncate text-xs text-stone-400">
+          {candidates.length
+            ? `${candidates.length} מועמדים · ${candidates[0].full_name}${candidates.length > 1 ? " ואחרים" : ""}`
+            : "אין מועמדים בהצעה הזו"}
+        </span>
+        <button
+          onClick={onToggle}
+          className="shrink-0 rounded-full border border-[#3D8C8A] px-3 py-1 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3]"
+        >
+          פתח וערוך ▼
+        </button>
+        <button
+          onClick={onDismiss}
+          disabled={dismissing}
+          className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+        >
+          דחה
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-2xl border border-emerald-200 bg-white p-5">
       <div className="flex items-start justify-between gap-3 mb-1">
         <h3 className="font-black text-stone-900 text-sm">🎁 {action.title}</h3>
-        <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
-          {agentLabel(action.agent)}
-        </span>
+        <div className="flex shrink-0 items-center gap-2">
+          <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
+            {agentLabel(action.agent)}
+          </span>
+          <button onClick={onToggle} className="text-xs font-bold text-stone-400 hover:text-stone-700">
+            סגור ▲
+          </button>
+        </div>
       </div>
       {action.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line mb-3">{action.body}</p>}
 
@@ -482,6 +519,8 @@ export default function AgentsPage() {
   // איזה סוכן פתוח כרגע. אחד בלבד: חמישה גופי פלט פתוחים בו-זמנית הם בדיוק
   // מה שהפך את העמוד לגלילה ארוכה שבה כל סוכן חדש מוסיף עוד קומה.
   const [openAgent, setOpenAgent] = useState<string | null>(null);
+  // אותו כלל בתור ההצעות: הצעת מתנה אחת פתוחה לעריכה, השאר שורות.
+  const [openOffer, setOpenOffer] = useState<string | null>(null);
   const [conv, setConv] = useState<ConversionsPreview | null>(null);
   const [convError, setConvError] = useState("");
   const [convMsg, setConvMsg] = useState("");
@@ -622,6 +661,31 @@ export default function AgentsPage() {
     }
   }
 
+  // ניקוי התור מהצעות שלא רוצים לטפל בהן. דחייה בלבד, אף פעם לא אישור
+  // קבוצתי - וההצעות שעדיין רלוונטיות נוצרות מחדש בריצה הבאה של הסוכן,
+  // ולכן זו פעולה שאפשר לחזור ממנה.
+  async function dismissAllOffers() {
+    if (
+      !window.confirm(
+        `לנקות את כל ${actionable.length} ההצעות מהתור?\n\nלא נשלח שום מייל. הצעה שעדיין רלוונטית תחזור בריצה הבאה של סוכן פערי ההיצע.`
+      )
+    )
+      return;
+    setBulkBusy(true);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("resolve", { ids: actionable.map((a) => a.id), status: "dismissed" });
+      setActionMsg(`${j.dismissed ?? 0} הצעות נוקו מהתור`);
+      load();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "הניקוי נכשל");
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function resolveAction(id: string, status: "approved" | "dismissed" | "pending") {
     setBusyId(id);
     setActionError("");
@@ -680,12 +744,28 @@ export default function AgentsPage() {
               לאישור או דחייה.
             </div>
           )}
-          <div className="space-y-3">
+          {actionable.length > 3 && (
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                onClick={dismissAllOffers}
+                disabled={bulkBusy}
+                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+              >
+                {bulkBusy ? "מנקה..." : `✕ נקה את כל ${actionable.length} ההצעות`}
+              </button>
+              <span className="text-xs text-stone-400">
+                בלי לשלוח כלום. הצעה שעדיין רלוונטית תחזור בריצה הבאה.
+              </span>
+            </div>
+          )}
+          <div className="space-y-2">
             {actionable.map((a) =>
               a.action_type === "gift_offer" ? (
                 <GiftOfferCard
                   key={a.id}
                   action={a}
+                  open={openOffer === a.id}
+                  onToggle={() => setOpenOffer(openOffer === a.id ? null : a.id)}
                   dismissing={busyId === a.id}
                   onSent={(msg) => {
                     setActionMsg(msg);
