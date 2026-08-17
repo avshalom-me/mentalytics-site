@@ -364,9 +364,17 @@ export default function AgentsPage() {
   const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [pendingTotal, setPendingTotal] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
+
+  // מה שמוביל לפעולה שלך (הצעת מתנה לשליחה) מול ממצא לידיעה (פער גיוס,
+  // התראה). הפרדה זו מה שמונע מהתור להיראות כמו 60 משימות פתוחות.
+  const INFO_TYPES = ["recruit_gap", "alert"];
+  const actionable = pending.filter((a) => !INFO_TYPES.includes(a.action_type));
+  const findings = pending.filter((a) => INFO_TYPES.includes(a.action_type));
 
   const [previewLoading, setPreviewLoading] = useState(false);
   const [preview, setPreview] = useState<DigestPreview | null>(null);
@@ -400,6 +408,7 @@ export default function AgentsPage() {
         if (j.ok) {
           setRuns(j.runs ?? []);
           setPending(j.pending_actions ?? []);
+          setPendingTotal(j.pending_total ?? (j.pending_actions ?? []).length);
           setResolved(j.resolved_actions ?? []);
           setLatestDigest(j.latest_digest ?? null);
         } else setError(j.error || "שגיאה בטעינה");
@@ -507,6 +516,23 @@ export default function AgentsPage() {
     }
   }
 
+  async function dismissAllFindings() {
+    if (!window.confirm(`לדחות את כל ${findings.length} הממצאים שלידיעה? הצעות המתנה לא ייגעו.`)) return;
+    setBulkBusy(true);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("resolve", { ids: findings.map((f) => f.id), status: "dismissed" });
+      setActionMsg(`${j.dismissed ?? 0} ממצאים נדחו`);
+      load();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "הדחייה נכשלה");
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
+
   async function resolveAction(id: string, status: "approved" | "dismissed" | "pending") {
     setBusyId(id);
     setActionError("");
@@ -536,10 +562,17 @@ export default function AgentsPage() {
           <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">{error}</div>
         )}
 
-        {/* תור ההצעות - ראש העמוד בכוונה: זה מה שדורש פעולה, וכל השאר מתחתיו */}
+        {/* תור ההצעות - ראש העמוד בכוונה: זה מה שדורש פעולה, וכל השאר מתחתיו.
+            מופרד לשניים: מה שמוביל לפעולה שלך, ומה שהוא ממצא לידיעה בלבד. */}
         <section className="mb-8 scroll-mt-4" ref={queueRef}>
           <h2 className="text-sm font-black text-stone-500 mb-3">
-            דורש ממך פעולה ({pending.length})
+            דורש ממך פעולה ({actionable.length})
+            {findings.length > 0 && (
+              <span className="font-normal text-stone-400"> · {findings.length} ממצאים לידיעה</span>
+            )}
+            {pendingTotal > pending.length && (
+              <span className="font-normal text-stone-400"> · מתוך {pendingTotal} ממתינים</span>
+            )}
           </h2>
           {actionError && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
@@ -559,7 +592,7 @@ export default function AgentsPage() {
             </div>
           )}
           <div className="space-y-3">
-            {pending.map((a) =>
+            {actionable.map((a) =>
               a.action_type === "gift_offer" ? (
                 <GiftOfferCard
                   key={a.id}
@@ -602,6 +635,49 @@ export default function AgentsPage() {
               )
             )}
           </div>
+
+          {/* ממצאים לידיעה: פערי גיוס והתראות. אלה לא "פעולות" - הם מסקנות
+              שהסוכן הגיע אליהן, ולכן הם מקופלים ואפשר לנקות אותם בבת אחת. */}
+          {findings.length > 0 && (
+            <div className="mt-3">
+              <Collapse title="ממצאים לידיעה (פערי גיוס, התראות)" count={findings.length}>
+                <div className="mb-3 flex flex-wrap items-center gap-2">
+                  <button
+                    onClick={dismissAllFindings}
+                    disabled={bulkBusy}
+                    className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                  >
+                    {bulkBusy ? "מנקה..." : `✕ דחה את כל ${findings.length} הממצאים`}
+                  </button>
+                  <span className="text-xs text-stone-400">
+                    ממצא שנדחה יחזור מעצמו בריצה הבאה אם המצב שיצר אותו עדיין קיים.
+                  </span>
+                </div>
+                <ul className="space-y-2">
+                  {findings.map((a) => (
+                    <li key={a.id} className="border-b border-stone-100 pb-2 last:border-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-bold text-stone-700">{a.title}</div>
+                          {a.body && (
+                            <div className="text-xs text-stone-500 leading-5 whitespace-pre-line">{a.body}</div>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => resolveAction(a.id, "dismissed")}
+                          disabled={busyId === a.id || bulkBusy}
+                          className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+                        >
+                          דחה
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </Collapse>
+            </div>
+          )}
+
           {resolved.length > 0 && (
             <div className="mt-4 space-y-1">
               <h3 className="text-xs font-black text-stone-400 mb-1">הוכרעו לאחרונה</h3>

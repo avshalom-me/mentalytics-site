@@ -19,7 +19,7 @@ export const maxDuration = 300;
 
 export async function GET() {
   try {
-    const [runsRes, pendingRes, resolvedRes, latestDigestRes] = await Promise.all([
+    const [runsRes, pendingRes, pendingCountRes, resolvedRes, latestDigestRes] = await Promise.all([
       supabaseAdmin
         .from("agent_runs")
         .select("id, agent, started_at, finished_at, status, mode, summary, error")
@@ -32,7 +32,14 @@ export async function GET() {
         .select("id, agent, action_type, title, body, entity_type, entity_id, entity_label, payload, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(50),
+        // 200 ולא 50: העמוד מקבץ את התור לפי סוג ומקפל את החלק המידעי, ולכן
+        // הוא סופג כמות כזו. עם 50 בלבד הכותרת ספרה את מה שהוחזר, ודחייה
+        // אחת רק שאבה שורה חדשה פנימה - המספר נראה תקוע.
+        .limit(200),
+      supabaseAdmin
+        .from("agent_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending"),
       supabaseAdmin
         .from("agent_actions")
         .select("id, agent, title, status, status_changed_at")
@@ -60,6 +67,8 @@ export async function GET() {
       ok: true,
       runs: runsRes.data ?? [],
       pending_actions: pendingRes.data ?? [],
+      // הספירה האמיתית מהמאגר, לא אורך הרשימה שהוחזרה.
+      pending_total: pendingCountRes.count ?? (pendingRes.data ?? []).length,
       resolved_actions: resolvedRes.data ?? [],
       latest_digest: latestDigestRun
         ? {
@@ -184,8 +193,32 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const id = String(body?.id ?? "");
     const status = String(body?.status ?? "");
+
+    // הכרעה קבוצתית: התור מתמלא בממצאים מידעיים (פערי גיוס, התראות), ואין
+    // טעם לדחות 43 שורות אחת-אחת. רק דחייה מותרת בקבוצה - אישור קבוצתי של
+    // הצעות שמובילות לפעולה הוא בדיוק מה שלא רוצים שיקרה בקליק אחד.
+    const ids = Array.isArray(body?.ids) ? body.ids.map((x: unknown) => String(x)).filter(Boolean) : [];
+    if (ids.length > 0) {
+      if (status !== "dismissed") {
+        return NextResponse.json({ ok: false, error: "הכרעה קבוצתית אפשרית רק לדחייה" }, { status: 400 });
+      }
+      const { data, error } = await supabaseAdmin
+        .from("agent_actions")
+        .update({
+          status: "dismissed",
+          status_changed_at: new Date().toISOString(),
+          resolved_by: "admin",
+          resolution_note: body?.note ? String(body.note) : "נדחה בהכרעה קבוצתית",
+        })
+        .in("id", ids)
+        .eq("status", "pending")
+        .select("id");
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, dismissed: data?.length ?? 0 });
+    }
+
+    const id = String(body?.id ?? "");
     if (!id || !["approved", "dismissed", "pending"].includes(status)) {
       return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
     }
