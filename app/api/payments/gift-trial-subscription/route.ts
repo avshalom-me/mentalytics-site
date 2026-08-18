@@ -108,7 +108,19 @@ export async function POST(req: NextRequest) {
       current_period_start: now,
       current_period_end: `${startsOn}T00:00:00.000Z`,
     });
-    if (subErr) throw new Error(`רישום המנוי נכשל: ${subErr.message}`);
+    if (subErr) {
+      // הוראת הקבע כבר קיימת ב-Sumit אבל לא נרשמה אצלנו. בלי המזהה בלוג
+      // אין דרך למצוא אותה ולבטל אותה, והלקוח היה נשאר עם הוראת קבע
+      // יתומה שאף סריקה לא מכירה.
+      console.error(
+        `gift-trial: subscription row insert failed AFTER Sumit succeeded. ` +
+          `therapist=${therapistId} sumit_recurring=${recurringId} err=${subErr.message}`
+      );
+      return NextResponse.json(
+        { ok: false, error: `ההרשמה נקלטה חלקית. אנא פנו אלינו עם המספר ${recurringId} ונשלים ידנית.` },
+        { status: 500 }
+      );
+    }
 
     // promotion_source נפרד ('gift_trial') כדי שהמסלול הזה לא יתערבב
     // במדדים של המשלמים הרגילים ולא ייספר כתקופת ניסיון חינמית.

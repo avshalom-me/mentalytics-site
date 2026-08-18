@@ -99,15 +99,32 @@ export async function GET(req: NextRequest) {
   let promosReverted = 0;
 
   // -------- (1) Sumit subscription state for paid therapists --------
+  // 'gift_trial' נכלל לצד 'paid': מטפל שהצטרף במסלול ההזמנה הוא לקוח משלם
+  // לכל דבר מרגע החיוב הראשון, ובלי הכללתו כאן הוא היה נשאר מקודם לנצח גם
+  // אחרי שיבטל ב-Sumit. הדילוג בזמן חלון המתנה נעשה בתוך הלולאה.
   const { data: paidTherapists } = await supabase
     .from("therapists")
-    .select("id, full_name, email, admin_approved")
+    .select("id, full_name, email, admin_approved, promotion_source")
     .eq("status", "paying")
-    .eq("promotion_source", "paid");
+    .in("promotion_source", ["paid", "gift_trial"]);
 
   for (const t of paidTherapists ?? []) {
     checked++;
     try {
+      // חלון המתנה: הוראת הקבע קיימת ב-Sumit אבל טרם חייבה, ומצבה שם אינו
+      // ניתן לשיפוט. בלי הדילוג הזה שתי ריצות היו מורידות את הקידום ומבטלות
+      // מנוי תקין יומיים אחרי שהמטפל הצטרף.
+      if (t.promotion_source === "gift_trial") {
+        const { data: pending } = await supabase
+          .from("subscriptions")
+          .select("current_period_end")
+          .eq("therapist_id", t.id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (pending?.current_period_end && new Date(pending.current_period_end).getTime() > Date.now()) {
+          continue;
+        }
+      }
       const items = await listRecurringForCustomer({
         externalIdentifier: t.id,
         includeInactive: true,
