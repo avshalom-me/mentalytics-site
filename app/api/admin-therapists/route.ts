@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelSubscription, listRecurringForCustomer, type RecurringItem } from "@/app/lib/sumit";
+import {
+  cancelSubscription,
+  listRecurringForCustomer,
+  SUMIT_RECURRING_ACTIVE_STATUSES,
+  type RecurringItem,
+} from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import {
   sendPromotionEndedEmail,
@@ -774,17 +779,26 @@ export async function PATCH(request: Request) {
     // Closes the gap where a standing order is still ACTIVE at Sumit but the
     // local subscription is already 'cancelled' — the status-change cancel
     // paths only look at status='active' subs, so they can never reach it.
-    // Here we check EVERY subscription that carries a Sumit recurring id
-    // (regardless of local status) and cancel any that are still live, so an
-    // admin isn't blind to a charge that keeps running. The daily cron does
-    // the same sweep automatically; this is the immediate, per-therapist
-    // version with a verified cancel.
+    //
+    // ⚠️ הביטול חייב לדלג על מנוי שפעיל אצלנו. הגרסה הקודמת שלפה כל שורת
+    // subscriptions עם מזהה, בלי סינון סטטוס, ולכן אצל מטפל שמשלם עכשיו היא
+    // ביטלה דווקא את הוראת הקבע התקינה שלו: המנוי הפעיל נסגר ב-Sumit, סומן
+    // מקומית כמבוטל, ולמחרת הסנכרון היומי הדיח אותו ושלח לו מייל "הקידום
+    // הסתיים" - מטפל משלם שלא עשה דבר. וגרוע מכך, במקרה של כפילות (שתי
+    // הוראות חיות) זו שנשארה מחייבת היא דווקא העודפת, שאינה רשומה אצלנו.
+    // מכאן: מבטלים אך ורק הוראות של מנויים שכבר אינם פעילים אצלנו. הוראה
+    // ששייכת למנוי פעיל מדווחת בלבד.
     if (body.action === "reconcile_sumit") {
-      const { data: subs } = await supabaseAdmin
+      const { data: allSubs } = await supabaseAdmin
         .from("subscriptions")
         .select("id, status, morning_token_id")
         .eq("therapist_id", id)
         .not("morning_token_id", "is", null);
+
+      // הקישוריות נקבעת לפי *כל* השורות, גם הפעילות — אחרת הוראה תקינה של
+      // מטפל משלם הייתה מדווחת כ"יתומה, בדקו ידנית" ומפחידה לחינם.
+      const subs = (allSubs ?? []).filter((s) => s.status !== "active");
+      const activeSubs = (allSubs ?? []).filter((s) => s.status === "active");
 
       const result = {
         checked: 0,
@@ -793,16 +807,17 @@ export async function PATCH(request: Request) {
         notFound: 0,
         failed: 0,
         unlinkedActive: 0,
+        keptActive: 0,
         details: [] as string[],
       };
 
-      if (!subs || subs.length === 0) {
+      if (subs.length === 0 && activeSubs.length === 0) {
         // No local subs with a token — but there could still be an orphaned
         // standing order at Sumit with no local record. Surface it.
         try {
           const items = await listRecurringForCustomer({ externalIdentifier: id, includeInactive: true });
           for (const item of items) {
-            if (item.Status === 0) {
+            if (SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
               result.unlinkedActive++;
               result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
             }
@@ -833,15 +848,9 @@ export async function PATCH(request: Request) {
           result.details.push(`הוראת קבע ${recurringId}: לא נמצאה ב-Sumit תחת המטפל הזה — ייתכן שאינה מקושרת לחשבון או שזהו מזהה ישן שאינו פעיל.`);
           continue;
         }
-        if (target.Status !== 0) {
+        if (!SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(target.Status))) {
           result.alreadyInactive++;
           result.details.push(`הוראת קבע ${recurringId}: כבר לא פעילה ב-Sumit.`);
-          if (sub.status === "active") {
-            await supabaseAdmin
-              .from("subscriptions")
-              .update({ status: "cancelled", updated_at: new Date().toISOString() })
-              .eq("id", sub.id);
-          }
           continue;
         }
 
@@ -878,10 +887,26 @@ export async function PATCH(request: Request) {
         }
       }
 
-      // Surface any ACTIVE Sumit order not linked to a local sub (true orphan).
-      const localTokens = new Set(subs.map((s) => String(s.morning_token_id)));
+      // הוראות של מנוי שפעיל אצלנו: מדווחות, לא נוגעים בהן.
+      for (const sub of activeSubs) {
+        const recurringId = String(sub.morning_token_id);
+        const item = items.find((i) => String(i.ID) === recurringId);
+        if (item && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
+          result.keptActive++;
+          result.details.push(`הוראת קבע ${recurringId}: פעילה ב-Sumit ושייכת למנוי הפעיל — לא נגענו בה ✓`);
+        } else if (!item) {
+          result.notFound++;
+          result.details.push(`⚠️ הוראת קבע ${recurringId}: רשומה אצלנו כמנוי פעיל אך לא נמצאה ב-Sumit — בדקו ידנית.`);
+        } else {
+          result.alreadyInactive++;
+          result.details.push(`⚠️ הוראת קבע ${recurringId}: המנוי פעיל אצלנו אך ההוראה כבר אינה פעילה ב-Sumit (סטטוס ${item.Status}) — בדקו ידנית.`);
+        }
+      }
+
+      // Surface any ACTIVE Sumit order not linked to ANY local sub (true orphan).
+      const localTokens = new Set((allSubs ?? []).map((s) => String(s.morning_token_id)));
       for (const item of items) {
-        if (item.Status === 0 && !localTokens.has(String(item.ID))) {
+        if (SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status)) && !localTokens.has(String(item.ID))) {
           result.unlinkedActive++;
           result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
         }

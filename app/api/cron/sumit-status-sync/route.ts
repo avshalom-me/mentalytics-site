@@ -102,6 +102,91 @@ async function alertAdminUnknownStatus(
   }
 }
 
+// יותר מהוראת קבע חיה אחת תחת אותו לקוח = הכרטיס מחויב פעמיים בכל חודש.
+// אף מסלול אחר לא רואה את זה: הביטול, ההדחה וסריקת היתומים כולם נשענים על
+// המזהה הרשום אצלנו, וההוראה העודפת היא בדיוק זו שאינה רשומה. הנתונים כבר
+// נשלפו עבור בדיקת הסטטוס, אז הגלאי לא עולה אף קריאת API.
+//
+// מתריעים בלבד, לא מבטלים: הבחירה איזו מהשתיים להשאיר עדינה מדי לאוטומציה -
+// חייבים להשאיר את זו שרשומה אצלנו, אחרת הקרון יראה למחרת מנוי "מבוטל"
+// וידיח מטפל שמשלם. המייל מביא את תאריכי ההתחלה והחיוב האחרון כדי שההכרעה
+// תהיה בעיניים פקוחות. אחת לשבוע לכל מטפל, כדי שלא ייהפך לרעש.
+async function alertAdminDuplicateOrders(
+  therapistId: string,
+  therapistName: string,
+  recordedId: string | null,
+  liveItems: RecurringItem[]
+): Promise<boolean> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await supabase
+    .from("therapist_audit_log")
+    .select("id")
+    .eq("therapist_id", therapistId)
+    .eq("action", "sumit_duplicate_orders_detected")
+    .gte("created_at", weekAgo)
+    .limit(1)
+    .maybeSingle();
+
+  await writeAudit(supabase, {
+    therapistId,
+    actorType: "sumit",
+    action: "sumit_duplicate_orders_detected",
+    before: null,
+    after: {
+      recorded: recordedId,
+      live: liveItems.map((i) => ({
+        id: String(i.ID),
+        status: i.Status,
+        date_start: i.Date_Start ?? null,
+        date_previous: i.Date_PreviousBilling ?? null,
+      })),
+    },
+    reason: `${liveItems.length} live standing orders at Sumit - the card is billed more than once a month`,
+  });
+
+  if (recent) return false; // כבר התרענו השבוע
+
+  const rows = liveItems
+    .map((i) => {
+      const mine = recordedId && String(i.ID) === String(recordedId);
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;"><strong>${i.ID}</strong>${mine ? " ✓" : ""}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${String(i.Date_Start ?? "").slice(0, 10) || "-"}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${String(i.Date_PreviousBilling ?? "").slice(0, 10) || "טרם חויבה"}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${mine ? "<strong>רשומה אצלנו - להשאיר</strong>" : "עודפת - מועמדת לביטול"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: `⚠️ חיוב כפול: ${liveItems.length} הוראות קבע חיות אצל ${therapistName || "מטפל/ת"}`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>ל<strong>${therapistName.replace(/</g, "&lt;") || "מטפל/ת"}</strong> יש ב-Sumit <strong>${liveItems.length} הוראות קבע חיות</strong> במקביל, כלומר הכרטיס מחויב יותר מפעם אחת בחודש.</p>
+        <table style="border-collapse:collapse;font-size:14px;margin:12px 0;">
+          <tr style="background:#F7FAF9;">
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">מזהה</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">התחלה</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">חיוב אחרון</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">מה לעשות</th>
+          </tr>
+          ${rows}
+        </table>
+        <p><strong>לא בוצע שום ביטול אוטומטי.</strong> יש לבטל ידנית ב-Sumit רק את ההוראות המסומנות כעודפות - ולהשאיר את זו הרשומה אצלנו, אחרת הסנכרון יראה מחר מנוי מבוטל וידיח מטפל שמשלם.</p>
+        <p>בדרך כלל העודפת היא זו עם תאריך ההתחלה המוקדם יותר. שווה גם לבדוק אם מגיע החזר על החיוב הכפול.</p>
+        <p><strong>therapist_id:</strong> ${therapistId}</p>
+        <p style="color:#6B807E;font-size:13px;">התראה נוספת על אותו מטפל תישלח לכל היותר בעוד שבוע.</p>
+      </div>`,
+    });
+    return true;
+  } catch (e) {
+    console.error("alertAdminDuplicateOrders: failed to send admin email:", e);
+    return false;
+  }
+}
+
 // מראה מקומית לחיובים החוזרים של מטפלים. Sumit גובה את החידוש החודשי
 // בשרתים שלה ולא שולחת webhook, ולכן בלי זה מטפל שמשלם כל חודש מופיע אצלנו
 // כשורת תשלום אחת בלבד - זו של ההרשמה - וכל שקל של חידוש נעדר ממסך הכספים
@@ -238,6 +323,8 @@ export async function GET(req: NextRequest) {
   let renewalsRecorded = 0; // חיובי חידוש של מטפלים ששוקפו לטבלת התשלומים
   let unknownStatuses = 0; // סטטוס Sumit שאיננו מכירים - לא נגענו
   let unknownStatusAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
+  let duplicateOrdersFound = 0; // מטפלים עם יותר מהוראת קבע חיה אחת
+  let duplicateOrderAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
 
   // -------- (1) Sumit subscription state for paid therapists --------
   // 'gift_trial' נכלל לצד 'paid': מטפל שהצטרף במסלול ההזמנה הוא לקוח משלם
@@ -281,6 +368,30 @@ export async function GET(req: NextRequest) {
       const target = sub?.morning_token_id
         ? items.find((i) => String(i.ID) === sub.morning_token_id)
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+
+      // גלאי חיוב כפול. רץ לפני כל שאר ההחלטות ואינו משנה אף אחת מהן - מטפל
+      // עם שתי הוראות חיות הוא עדיין מטפל תקין מבחינת הסטטוס, ולכן בלי
+      // הבדיקה הזו הכפילות שקופה לחלוטין.
+      const liveItems = items.filter((i) =>
+        SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status))
+      );
+      if (liveItems.length > 1) {
+        duplicateOrdersFound++;
+        console.error(
+          `DUPLICATE BILLING: therapist ${t.id} has ${liveItems.length} live Sumit orders: ` +
+            liveItems.map((i) => i.ID).join(", ")
+        );
+        if (
+          await alertAdminDuplicateOrders(
+            t.id,
+            t.full_name ?? "",
+            sub?.morning_token_id ?? null,
+            liveItems
+          )
+        ) {
+          duplicateOrderAlerts++;
+        }
+      }
 
       if (target && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(target.Status))) {
         // Active at Sumit — healthy. Clear any accumulated miss streak.
@@ -836,6 +947,8 @@ export async function GET(req: NextRequest) {
     renewalsRecorded,
     unknownStatuses,
     unknownStatusAlerts,
+    duplicateOrdersFound,
+    duplicateOrderAlerts,
     centersChecked,
     centersCancelled,
     centerTherapistsDemoted,

@@ -588,11 +588,15 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  // On-demand check of this therapist's standing orders at Sumit. Cancels any
-  // that are still live there (e.g. an order marked 'cancelled' locally but
-  // still charging — the billing leak), so the admin isn't blind to it.
+  // On-demand check of this therapist's standing orders at Sumit. Cancels only
+  // orders whose local subscription is already cancelled (e.g. an order still
+  // charging after we stopped the subscription — the billing leak). An order
+  // belonging to a LIVE subscription is reported and left alone: cancelling it
+  // used to stop a paying customer's billing and get them demoted overnight.
   async function reconcileSumit(id: string) {
-    if (!window.confirm("בדיקה מול Sumit: כל הוראת קבע שעדיין פעילה אצל המטפל תבוטל. להמשיך?")) return;
+    if (!window.confirm(
+      "בדיקה מול Sumit.\n\nיבוטלו רק הוראות קבע שממשיכות לחייב למרות שהמנוי כבר מבוטל אצלנו. מנוי פעיל לא ייגע - הוא רק ידווח.\n\nלהמשיך?"
+    )) return;
     try {
       setReconcilingId(id);
       setError("");
@@ -605,10 +609,11 @@ export default function AdminTherapistsPage() {
       if (!res.ok || !json.ok) throw new Error(json.error || "בדיקת Sumit נכשלה");
       const r = json.reconcile;
       const summary =
-        r.checked === 0 && !r.unlinkedActive
+        r.checked === 0 && !r.unlinkedActive && !r.keptActive
           ? "אין הוראות קבע עם מזהה Sumit לבדיקה."
           : [
               r.cancelled ? `בוטלו עכשיו: ${r.cancelled}` : null,
+              r.keptActive ? `פעילות ותקינות (לא נגענו): ${r.keptActive}` : null,
               r.alreadyInactive ? `כבר לא פעילות: ${r.alreadyInactive}` : null,
               r.notFound ? `לא נמצאו ב-Sumit: ${r.notFound}` : null,
               r.failed ? `נכשלו: ${r.failed}` : null,
