@@ -4,6 +4,7 @@ import { logEmail } from "./email-log";
 import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-feedback";
 import { buildArticleInviteEmail } from "./article-invite-email";
 import { alertRecipients } from "./alert-recipients";
+import { promotedPlanTable } from "./promoted-plan-table";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -838,6 +839,10 @@ export async function sendGiftOfferEmail(opts: {
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.7;color:#1a4a5c;direction:rtl;text-align:right;">
       ${EMAIL_LOGO_HEADER}
       <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
+      <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל המסלול המקודם - לעומת המסלול החינמי שיש לך היום</p>
+      ${promotedPlanTable(
+        'המסלול המקודם עולה 140 ש"ח + מע"מ לחודש, והחודשיים הראשונים ללא תשלום. ביטול בכל שלב בהודעת מייל אלינו.'
+      )}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0 0 10px;font-size:13px;color:#6b7280;text-align:center;">
         אפשר להשיב ישירות למייל הזה. <a href="${profileUrl}" style="color:#0F5468;">לאזור האישי שלך באתר</a>

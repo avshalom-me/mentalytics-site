@@ -183,30 +183,30 @@ export default function GiftCheckoutPage() {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="mb-1 block text-sm font-bold text-[#3E5250]">מספר כרטיס</label>
-            <input value={card} onChange={(e) => setCard(e.target.value)} inputMode="numeric" required className={field} />
+            <input value={card} onChange={(e) => setCard(e.target.value)} name="cardnumber" autoComplete="cc-number" inputMode="numeric" required className={field} />
           </div>
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="mb-1 block text-sm font-bold text-[#3E5250]">חודש</label>
-              <input value={expMonth} onChange={(e) => setExpMonth(e.target.value)} inputMode="numeric" placeholder="12" required className={field} />
+              <input value={expMonth} onChange={(e) => setExpMonth(e.target.value)} name="ccmonth" autoComplete="cc-exp-month" inputMode="numeric" placeholder="12" required className={field} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-bold text-[#3E5250]">שנה</label>
-              <input value={expYear} onChange={(e) => setExpYear(e.target.value)} inputMode="numeric" placeholder="2030" required className={field} />
+              <input value={expYear} onChange={(e) => setExpYear(e.target.value)} name="ccyear" autoComplete="cc-exp-year" inputMode="numeric" placeholder="2030" required className={field} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-bold text-[#3E5250]">CVV</label>
-              <input value={cvv} onChange={(e) => setCvv(e.target.value)} inputMode="numeric" required className={field} />
+              <input value={cvv} onChange={(e) => setCvv(e.target.value)} name="cvc" autoComplete="cc-csc" inputMode="numeric" required className={field} />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="mb-1 block text-sm font-bold text-[#3E5250]">תעודת זהות</label>
-              <input value={citizenId} onChange={(e) => setCitizenId(e.target.value)} inputMode="numeric" required className={field} />
+              <input value={citizenId} onChange={(e) => setCitizenId(e.target.value)} name="citizenId" autoComplete="off" inputMode="numeric" required className={field} />
             </div>
             <div>
               <label className="mb-1 block text-sm font-bold text-[#3E5250]">טלפון</label>
-              <input value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" className={field} />
+              <input value={phone} onChange={(e) => setPhone(e.target.value)} name="tel" autoComplete="tel" inputMode="tel" className={field} />
             </div>
           </div>
 
