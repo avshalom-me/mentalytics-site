@@ -2,7 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { Resend } from "resend";
-import { listRecurringForCustomer, cancelSubscription, updateRecurringPrice, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import {
+  listRecurringForCustomer,
+  cancelSubscription,
+  updateRecurringPrice,
+  SUBSCRIPTION_BASE_PRICE,
+  SUMIT_RECURRING_ACTIVE_STATUSES,
+  SUMIT_RECURRING_CANCELLED_STATUS,
+  type RecurringItem,
+} from "@/app/lib/sumit";
+import { VAT_RATE } from "@/app/lib/crm";
 import { writeAudit } from "@/app/lib/audit";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
@@ -40,6 +49,135 @@ async function alertAdminOrphan(
   } catch (e) {
     console.error("alertAdminOrphan: failed to send admin email:", e);
   }
+}
+
+// Sumit returned a standing-order status we have no rule for. NOT a
+// cancellation - see the policy note in pass (1). One alert per therapist per
+// week: the underlying condition (a card that keeps failing) can persist for
+// days, and a daily repeat would train the admin to ignore it.
+async function alertAdminUnknownStatus(
+  therapistId: string,
+  therapistName: string,
+  recurringItemId: string,
+  status: number
+): Promise<boolean> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await supabase
+    .from("therapist_audit_log")
+    .select("id")
+    .eq("therapist_id", therapistId)
+    .eq("action", "sumit_unknown_status")
+    .gte("created_at", weekAgo)
+    .limit(1)
+    .maybeSingle();
+
+  await writeAudit(supabase, {
+    therapistId,
+    actorType: "sumit",
+    action: "sumit_unknown_status",
+    before: null,
+    after: { sumit_recurring: recurringItemId, sumit_status: status },
+    reason: `unknown Sumit status ${status} - promotion left untouched`,
+  });
+
+  if (recent) return false; // כבר התרענו השבוע
+
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: `🔎 סטטוס Sumit לא מוכר (${status}) אצל ${therapistName || "מטפל/ת"}`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>הסנכרון היומי מצא להוראת הקבע של <strong>${therapistName.replace(/</g, "&lt;") || "מטפל/ת"}</strong> סטטוס שאיננו מכירים: <strong>${status}</strong>.</p>
+        <p><strong>לא בוצע שום שינוי</strong> - הקידום נשאר על כנו והוראת הקבע לא בוטלה. הסטטוסים המוכרים: 0 = פעילה, 12 = מתוזמנת, 1 = בוטלה.</p>
+        <p>סטטוס 3, למשל, הוא כשל חיוב זמני ש-Sumit מנסה שוב למחרת - ולרוב הוא נפתר מעצמו. אם הוא נתקע, כדאי לפנות למטפל/ת לעדכון אמצעי תשלום.</p>
+        <p><strong>therapist_id:</strong> ${therapistId}<br/><strong>מזהה הוראת קבע:</strong> ${recurringItemId}</p>
+        <p style="color:#6B807E;font-size:13px;">התראה נוספת על אותו מטפל תישלח לכל היותר בעוד שבוע.</p>
+      </div>`,
+    });
+    return true;
+  } catch (e) {
+    console.error("alertAdminUnknownStatus: failed to send admin email:", e);
+    return false;
+  }
+}
+
+// מראה מקומית לחיובים החוזרים של מטפלים. Sumit גובה את החידוש החודשי
+// בשרתים שלה ולא שולחת webhook, ולכן בלי זה מטפל שמשלם כל חודש מופיע אצלנו
+// כשורת תשלום אחת בלבד - זו של ההרשמה - וכל שקל של חידוש נעדר ממסך הכספים
+// ומהדוחות. זה בדיוק התיקון שמסלול המרכזים כבר קיבל; מסלול המטפלים לא.
+//
+// שתי מלכודות שהמסלול הזה חייב לעקוף:
+//  1. החיוב הראשון של הוראת הקבע קורה ב-Date_Start, וב-checkout רגיל הוא כבר
+//     נרשם כ-payment_type='subscription'. רישום נוסף שלו היה מכפיל הכנסה.
+//     היוצא מן הכלל הוא מסלול ההזמנה (gift-trial), שבו לא זזים כספים בהרשמה
+//     ולכן לא נוצרת שורת תשלום כלל - שם דווקא *כן* צריך לרשום אותו.
+//  2. created_at חייב להיות תאריך החיוב ולא זמן הריצה, אחרת חיוב של יולי
+//     נוחת בחודש הנוכחי וכל דוח חודשי מתעוות.
+async function mirrorRenewalCharge(
+  therapistId: string,
+  item: RecurringItem,
+  subAmount: number | null
+): Promise<boolean> {
+  const prev = item.Date_PreviousBilling ? String(item.Date_PreviousBilling).slice(0, 10) : null;
+  const start = item.Date_Start ? String(item.Date_Start).slice(0, 10) : null;
+  if (!prev || !start) return false;
+
+  if (prev === start) {
+    // החיוב הראשון של ההוראה. רושמים רק אם ה-checkout לא רשם אותו.
+    const { data: signup } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("payment_type", "subscription")
+      .eq("reference_id", therapistId)
+      .eq("status", "completed")
+      .limit(1)
+      .maybeSingle();
+    if (signup) return false;
+  }
+
+  // אידמפוטנטיות מול טבלת התשלומים עצמה ולא מול עמודת "חויב לאחרונה":
+  // insert שהצליח בזמן שעדכון העמודה נכשל היה מייצר כפילות בריצה הבאה.
+  const { data: already } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("payment_type", "subscription_renewal")
+    .eq("reference_id", therapistId)
+    .eq("metadata->>sumit_billing_date", prev)
+    .limit(1)
+    .maybeSingle();
+  if (already) return false;
+
+  // מה ש-Sumit חייבה בפועל גובר על המחיר השמור אצלנו. UnitPrice ב-Sumit הוא
+  // כולל מע"מ (שולחים UnitPrice נטו עם VATIncluded:false, ו-Sumit שומרת ברוטו),
+  // בעוד payments.amount הוא נטו ומסוג integer.
+  const gross = Number(item.UnitPrice);
+  const net =
+    Number.isFinite(gross) && gross > 0
+      ? Math.round(gross / (1 + VAT_RATE))
+      : Number(subAmount) || 0;
+  if (net <= 0) {
+    console.error(`renewal mirror: no usable amount for therapist ${therapistId} (UnitPrice=${item.UnitPrice})`);
+    return false;
+  }
+
+  const { error } = await supabase.from("payments").insert({
+    payment_type: "subscription_renewal",
+    reference_id: therapistId,
+    amount: net,
+    status: "completed",
+    created_at: new Date(String(item.Date_PreviousBilling)).toISOString(),
+    metadata: {
+      sumit_billing_date: prev,
+      sumit_recurring_id: String(item.ID),
+      recorded_by: "sumit-status-sync",
+    },
+  });
+  if (error) {
+    console.error(`renewal mirror failed (therapist=${therapistId}, date=${prev}):`, error.message);
+    return false;
+  }
+  return true;
 }
 
 function verifyCron(req: NextRequest): boolean {
@@ -97,6 +235,9 @@ export async function GET(req: NextRequest) {
   let orphansConfirmedInactive = 0; // newly stamped as confirmed-dead this run
   let orphansDeferredByDecay = 0; // confirmed-dead items skipped this run
   let promosReverted = 0;
+  let renewalsRecorded = 0; // חיובי חידוש של מטפלים ששוקפו לטבלת התשלומים
+  let unknownStatuses = 0; // סטטוס Sumit שאיננו מכירים - לא נגענו
+  let unknownStatusAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
 
   // -------- (1) Sumit subscription state for paid therapists --------
   // 'gift_trial' נכלל לצד 'paid': מטפל שהצטרף במסלול ההזמנה הוא לקוח משלם
@@ -132,7 +273,7 @@ export async function GET(req: NextRequest) {
 
       const { data: sub } = await supabase
         .from("subscriptions")
-        .select("id, morning_token_id, sync_miss_count")
+        .select("id, morning_token_id, sync_miss_count, amount")
         .eq("therapist_id", t.id)
         .eq("status", "active")
         .maybeSingle();
@@ -141,7 +282,7 @@ export async function GET(req: NextRequest) {
         ? items.find((i) => String(i.ID) === sub.morning_token_id)
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
 
-      if (target && target.Status === 0) {
+      if (target && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(target.Status))) {
         // Active at Sumit — healthy. Clear any accumulated miss streak.
         stillActive++;
         if (sub) {
@@ -152,12 +293,32 @@ export async function GET(req: NextRequest) {
           if ((sub.sync_miss_count ?? 0) > 0) patch.sync_miss_count = 0;
           await supabase.from("subscriptions").update(patch).eq("id", sub.id);
         }
+        if (await mirrorRenewalCharge(t.id, target, sub?.amount ?? null)) renewalsRecorded++;
+        continue;
+      }
+
+      // ── מדיניות הסטטוסים של Sumit ────────────────────────────────────────
+      // 0 = פעילה, 12 = מתוזמנת (חודשי מתנה) — חיות. 1 = בוטלה. כל ערך אחר
+      // הוא מצב ביניים שאיננו מכירים, ו**אסור** לקרוא אותו כביטול: ב-16/8/26
+      // הוראה חזרה עם Status=3 (כשל חיוב זמני), הקוד הישן קרא לזה "ההוראה
+      // מתה", הוריד מטפל משלם מהקידום ולא ביטל דבר ב-Sumit. Sumit ניסתה שוב
+      // למחרת, החיוב עבר, ובינתיים המטפל נרשם מחדש - שתי הוראות קבע וחיוב
+      // כפול. זו בדיוק המדיניות שמסלול המרכזים כבר עובד לפיה (סעיף 5).
+      if (target && Number(target.Status) !== SUMIT_RECURRING_CANCELLED_STATUS) {
+        unknownStatuses++;
+        console.warn(
+          `Sumit sync: unknown status ${target.Status} for therapist ${t.id} ` +
+            `(item ${target.ID}) — leaving the promotion untouched.`
+        );
+        if (await alertAdminUnknownStatus(t.id, t.full_name ?? "", String(target.ID), Number(target.Status))) {
+          unknownStatusAlerts++;
+        }
         continue;
       }
 
       // Not active. Distinguish two cases:
-      //  - `target` present with Status != 0: Sumit AUTHORITATIVELY reports the
-      //    standing order cancelled/suspended/expired. Trust it and demote now.
+      //  - `target` present with Status == 1: Sumit AUTHORITATIVELY reports the
+      //    standing order cancelled. Trust it and demote now.
       //  - `!target`: the item wasn't in the returned list. This is AMBIGUOUS —
       //    a transient empty/partial Sumit read looks identical to a real
       //    cancel here, and demoting on a single miss has torn down genuinely
@@ -672,6 +833,9 @@ export async function GET(req: NextRequest) {
     orphansConfirmedInactive,
     orphansDeferredByDecay,
     promosReverted,
+    renewalsRecorded,
+    unknownStatuses,
+    unknownStatusAlerts,
     centersChecked,
     centersCancelled,
     centerTherapistsDemoted,
