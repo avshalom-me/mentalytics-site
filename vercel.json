@@ -51,6 +51,10 @@
     {
       "schedule": "15 7 * * *",
       "path": "/api/cron/agent-finance"
+    },
+    {
+      "schedule": "0 8 * * *",
+      "path": "/api/cron/gift-trial-reminder"
     }
   ]
 }
