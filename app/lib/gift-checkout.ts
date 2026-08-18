@@ -122,3 +122,7 @@ export async function burnGiftCheckoutToken(token: string): Promise<void> {
     .eq("token", token)
     .is("used_at", null);
 }
+
+// הסמן שהטיוטה מכילה במקום הקישור. הקישור עצמו נוצר רק ברגע השליחה, כי
+// הוא חייב להיות קשור לנמען שנבחר בפועל ולא למועמד שהיה ברשימה.
+export const JOIN_LINK_PLACEHOLDER = "[קישור ההצטרפות יתווסף אוטומטית בשליחה]";

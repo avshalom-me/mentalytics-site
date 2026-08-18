@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
+import { JOIN_LINK_PLACEHOLDER } from "./gift-checkout";
 import { coversRegion, overlaps } from "./match-fallback";
 import { REGION_GROUPS, REGION_GROUP_LABELS, regionGroupOf } from "./regions";
 import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
@@ -34,7 +35,7 @@ import {
 
 const LOOKBACK_DAYS = Number(process.env.SUPPLY_GAP_LOOKBACK_DAYS ?? 60);
 const GIFT_MONTHS = GIFT_OFFER_MONTHS;
-const GIFT_SUBJECT = "הצעת קידום במתנה לחודשיים - טיפול חכם";
+const GIFT_SUBJECT = "הצעת קידום - חודשיים ראשונים ללא תשלום | טיפול חכם";
 // מינימום אירועי פער כדי להציע פעולה - מתחת לזה זה רעש של מטופל בודד.
 const MIN_EVENTS = Number(process.env.SUPPLY_GAP_MIN_EVENTS ?? 1);
 const MAX_CANDIDATES_PER_GAP = 3;
@@ -151,9 +152,16 @@ function buildGiftDraft(name: string, regionKey: string, rawTreatment: string, e
     ``,
     demandLine,
     ``,
-    `הפרופיל שלך מתאים לחיתוך הזה, ולכן אנחנו מציעים לך ${GIFT_MONTHS} חודשי קידום במתנה - הפרופיל שלך יוצג למטופלים שמחפשים ${treatment} ${where}, בלי תשלום ובלי התחייבות. בתום התקופה הקידום פשוט מסתיים, אלא אם תבחר/י להמשיך.`,
+    `הפרופיל שלך מתאים לחיתוך הזה, ולכן אנחנו מציעים לך להצטרף לקידום במסלול הבא: ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, ולאחריהם 140 ש"ח + מע"מ לחודש.`,
     ``,
-    `אם זה מתאים, מספיק להשיב למייל הזה ונפעיל את הקידום.`,
+    `מה זה אומר בפועל:`,
+    `• הפרופיל שלך ייכנס למערכת ההתאמות ויוצג למטופלים שמחפשים ${treatment} ${where}, מיד עם ההצטרפות.`,
+    `• ב-${GIFT_MONTHS} החודשים הראשונים לא נגבה תשלום.`,
+    `• שבוע לפני החיוב הראשון יישלח אליך מייל עם התאריך והסכום, כדי שתהיה לך אפשרות להחליט אם להמשיך.`,
+    `• ביטול בכל שלב בהודעת מייל אחת אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.`,
+    ``,
+    `הקישור להצטרפות אישי ומיועד עבורך בלבד:`,
+    JOIN_LINK_PLACEHOLDER,
     ``,
     `בברכה,`,
     `צוות טיפול חכם`,

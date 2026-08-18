@@ -2,6 +2,9 @@ import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendGiftOfferEmail } from "./therapist-emails";
 import { writeAudit } from "./audit";
+import { issueGiftCheckoutToken, JOIN_LINK_PLACEHOLDER } from "./gift-checkout";
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
 // מסלול השליחה של הצעות קידום מתנה.
 //
@@ -141,7 +144,23 @@ export async function sendGiftOffer(opts: {
   }
 
   const name = (t.full_name as string) ?? "";
-  const sent = await sendGiftOfferEmail({ to: t.email as string, name, subject, message: body });
+
+  // הקישור האישי נוצר כאן ולא בזמן ניסוח הטיוטה: הוא חייב להיות קשור
+  // לנמען שנבחר בפועל, ולא למועמד שהיה ברשימה כשהסוכן רץ. אם האדמין מחק
+  // את הסמן מהטיוטה, הקישור מתווסף בסופה - מייל בלי קישור הוא הצעה
+  // שאי אפשר לממש.
+  const joinToken = await issueGiftCheckoutToken({
+    therapistId: opts.therapistId,
+    actionId: opts.actionId,
+    region: payload.region ?? null,
+    treatment: payload.treatment ?? null,
+  });
+  const joinUrl = `${SITE_URL}/therapists/gift-checkout?token=${joinToken}`;
+  const bodyWithLink = body.includes(JOIN_LINK_PLACEHOLDER)
+    ? body.replace(JOIN_LINK_PLACEHOLDER, joinUrl)
+    : `${body}\n\n${joinUrl}`;
+
+  const sent = await sendGiftOfferEmail({ to: t.email as string, name, subject, message: bodyWithLink });
   if (!sent.ok) {
     // המייל לא יצא - ההצעה נשארת ממתינה בתור כדי שאפשר יהיה לנסות שוב.
     return { ok: false, error: sent.error || "שליחת המייל נכשלה" };
