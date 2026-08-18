@@ -107,6 +107,9 @@ export async function POST(req: NextRequest) {
       amount: SUBSCRIPTION_BASE_PRICE,
       current_period_start: now,
       current_period_end: `${startsOn}T00:00:00.000Z`,
+      // הסימון היחיד שמזהה "חיוב ראשון נדחה". מנוי רגיל מקבל NULL, ולכן
+      // הוא לא יכול להיתפס בתזכורת בשום מצב.
+      first_charge_on: startsOn,
     });
     if (subErr) {
       // הוראת הקבע כבר קיימת ב-Sumit אבל לא נרשמה אצלנו. בלי המזהה בלוג

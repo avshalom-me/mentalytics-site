@@ -100,22 +100,18 @@ function buildHtml(t: ReminderTarget): string {
 export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promise<ReminderRun> {
   const send = opts.send === true;
   try {
-    // חלון של יום אחד סביב "בעוד שבעה ימים". הסימון על המנוי מונע כפילות
-    // גם אם הקרון ירוץ פעמיים או אם החלון יזוז.
+    // התאמה על first_charge_on בלבד - העמודה שנכתבת רק בהצטרפות במסלול
+    // ההזמנה. מנוי רגיל מקבל שם NULL ולכן לא יכול להיתפס כאן לעולם.
     const target = new Date();
     target.setDate(target.getDate() + REMINDER_DAYS_BEFORE);
-    const from = new Date(target);
-    from.setHours(0, 0, 0, 0);
-    const to = new Date(target);
-    to.setHours(23, 59, 59, 999);
+    const chargeDay = target.toISOString().slice(0, 10);
 
     const { data: subs, error } = await supabaseAdmin
       .from("subscriptions")
-      .select("id, therapist_id, amount, current_period_end")
+      .select("id, therapist_id, amount, first_charge_on")
       .eq("status", "active")
-      .is("first_charge_reminded_at", null)
-      .gte("current_period_end", from.toISOString())
-      .lte("current_period_end", to.toISOString());
+      .eq("first_charge_on", chargeDay)
+      .is("first_charge_reminded_at", null);
     if (error) throw new Error(error.message);
 
     const rows = subs ?? [];
@@ -142,7 +138,7 @@ export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promi
         therapistId: r.therapist_id,
         name: (t.full_name as string) || "מטפל/ת יקר/ה",
         email: t.email as string,
-        chargeDate: String(r.current_period_end).slice(0, 10),
+        chargeDate: String(r.first_charge_on).slice(0, 10),
         amount: Number(r.amount) || 140,
       });
     }

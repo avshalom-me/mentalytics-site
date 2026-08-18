@@ -54,7 +54,7 @@
     },
     {
       "schedule": "0 8 * * *",
-      "path": "/api/cron/gift-trial-reminder"
+      "path": "/api/cron/gift-trial-reminder?send=confirm"
     }
   ]
 }
