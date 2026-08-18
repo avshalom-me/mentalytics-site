@@ -37,6 +37,27 @@ export type Topic = {
   adsOnly?: boolean;
 };
 
+/**
+ * Age groups that make a page a parent's destination rather than a patient's.
+ * "הגיל השלישי" is deliberately absent: it is an adult audience.
+ */
+const YOUTH_AGE_GROUPS = ["גיל הרך", "ילדים", "נוער"];
+
+/**
+ * Does this topic address a parent looking for their child, rather than an
+ * adult looking for themselves? Decides which questionnaire the page's CTA
+ * opens - a page titled "פסיכולוג לילדים" that sends people to the adults
+ * questionnaire contradicts its own headline.
+ *
+ * Uses `every`, not `some`: a topic that spans children AND adults belongs to
+ * both audiences, so it keeps the general two-button CTA rather than forcing
+ * the kids flow on everyone.
+ */
+export function isYouthTopic(topic: Pick<Topic, "filter">): boolean {
+  const ages = topic.filter.ageGroupsAny ?? [];
+  return ages.length > 0 && ages.every((a) => YOUTH_AGE_GROUPS.includes(a));
+}
+
 export const TOPICS: Topic[] = [
   {
     slug: "טיפול-בחרדה",

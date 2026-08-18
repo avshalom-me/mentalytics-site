@@ -10,6 +10,7 @@ import OnlineEvidenceSection from "@/app/therapists/OnlineEvidenceSection";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
+import QuizCta from "@/app/therapists/QuizCta";
 import { loadLocalArticles } from "@/app/lib/local-articles";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
@@ -152,29 +153,13 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       </div>
 
       {/* Prominent quiz CTA - offer the matching quiz as an alternative to
-          browsing. The quiz ends in a personal match the visitor can take online. */}
-      <div
-        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
-        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
-      >
-        <div>
-          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>
-            לא בטוחים מי מתאים לכם?
-          </p>
-          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {isOnline
-              ? "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת אונליין."
-              : "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."}
-          </p>
-        </div>
-        <Link
-          href="/adults"
-          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
-          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
-        >
-          למילוי השאלון
-        </Link>
-      </div>
+          browsing. Both audiences land on a region page, so it offers both
+          questionnaires rather than assuming everyone is looking for themselves. */}
+      <QuizCta
+        body={isOnline
+          ? "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת אונליין."
+          : "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."}
+      />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

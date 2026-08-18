@@ -5,7 +5,8 @@ import type { Metadata } from "next";
 import { loadPublicTherapists, countListed } from "@/app/lib/therapist-directory";
 import { slugToCity } from "@/app/lib/regions";
 import { regionToSlug } from "@/app/lib/regions";
-import { slugToCityTopic, isCityTopicAllowed, PILOT_CITIES, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
+import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, PILOT_CITIES, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
+import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
@@ -102,25 +103,15 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
         </p>
       </div>
 
-      {/* Quiz CTA */}
-      <div
-        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
-        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
-      >
-        <div>
-          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>רוצים התאמה מדויקת יותר?</p>
-          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {"ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת באזורכם או אונליין."}
-          </p>
-        </div>
-        <Link
-          href="/adults"
-          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
-          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
-        >
-          למילוי השאלון
-        </Link>
-      </div>
+      {/* Quiz CTA. A children/teens topic sends parents to the kids
+          questionnaire - the page's own headline promises a therapist for a
+          child, and /adults asks the visitor about themselves instead. */}
+      <QuizCta
+        audience={isYouthTopic(topic) ? "youth" : "both"}
+        body={isYouthTopic(topic)
+          ? `ענו על שאלון קצר מבוסס מחקר - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת ב${city} או אונליין.`
+          : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
+      />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
