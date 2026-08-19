@@ -28,13 +28,30 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+
+    // שני סוגי שמירה: רשימת מטפלים (אחרי החיפוש) או תוויות הטיפול המומלץ
+    // (במסך ההמלצות, לפני שיש בכלל מטפלים). לפחות אחד מהם חייב להגיע.
     const ids: unknown = body?.therapist_ids;
-    if (!Array.isArray(ids) || ids.length === 0 || ids.length > 20) {
-      return NextResponse.json({ ok: false, error: "bad therapist_ids" }, { status: 400 });
-    }
-    const therapistIds = ids.filter((x): x is string => typeof x === "string" && UUID_RE.test(x));
-    if (therapistIds.length === 0) {
-      return NextResponse.json({ ok: false, error: "bad therapist_ids" }, { status: 400 });
+    const therapistIds =
+      Array.isArray(ids) && ids.length > 0 && ids.length <= 20
+        ? ids.filter((x): x is string => typeof x === "string" && UUID_RE.test(x))
+        : [];
+
+    const recsRaw: unknown = body?.recommended_treatments;
+    // נשמרות תוויות טיפול בלבד, לא ממצאים קליניים - ראו המיגרציה. החיתוך
+    // ל-80 תווים ול-8 פריטים מונע דחיפת טקסט חופשי לשדה דרך ה-API.
+    const recommendedTreatments =
+      Array.isArray(recsRaw) && recsRaw.length > 0
+        ? [...new Set(
+            recsRaw
+              .filter((x): x is string => typeof x === "string")
+              .map((s) => s.trim().slice(0, 80))
+              .filter(Boolean),
+          )].slice(0, 8)
+        : [];
+
+    if (therapistIds.length === 0 && recommendedTreatments.length === 0) {
+      return NextResponse.json({ ok: false, error: "nothing to save" }, { status: 400 });
     }
 
     const quizType = body?.quiz_type === "kids" ? "kids" : "adults";
@@ -53,7 +70,8 @@ export async function POST(req: NextRequest) {
     const { error } = await supabaseAdmin.from("match_tokens").insert({
       token,
       quiz_type: quizType,
-      therapist_ids: therapistIds,
+      therapist_ids: therapistIds.length > 0 ? therapistIds : null,
+      recommended_treatments: recommendedTreatments.length > 0 ? recommendedTreatments : null,
       treatment_label: treatmentLabel,
       session_id: sessionId,
       channel: attr.channel,

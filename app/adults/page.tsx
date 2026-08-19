@@ -19,6 +19,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
+import SaveRecommendationsButton from "@/app/components/SaveRecommendationsButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 
@@ -2912,6 +2913,20 @@ export default function AdultsPage() {
             מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
           </div>
           <p className="mt-3 text-center text-xs text-gray-400">טיפול חכם</p>
+
+          {/* שמירה עם דרך חזרה. ה-PDF שלמטה הוא קובץ סטטי - מי ששומר אותו
+              ורוצה להמשיך מתחיל את השאלון מאפס. הקישור מחזיר בדיוק לכאן. */}
+          <div className="mt-5 rounded-2xl border p-4 print:hidden" data-html2canvas-ignore="true"
+            style={{ borderColor: "var(--teal-mid)", background: "var(--teal-pale)" }}>
+            <p className="mb-1 text-sm font-bold" style={{ color: "var(--teal-dark)" }}>רוצים לחשוב על זה?</p>
+            <p className="mb-3 text-xs leading-6 text-stone-600">
+              שמרו את ההמלצות ותוכלו לחזור לכאן בכל עת, גם ממכשיר אחר. השאלון עצמו אינו נשמר.
+            </p>
+            <SaveRecommendationsButton
+              quizType="adults"
+              treatments={recommendationGroups.map((g) => g.treatmentLabel)}
+            />
+          </div>
 
           {/* Actions */}
           <div className="mt-4 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
