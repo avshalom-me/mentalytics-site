@@ -372,9 +372,18 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
             לאנשי מקצוע ▸
           </Link>
         </div>
-        {isPara && (
+        {isPara ? (
           <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
             קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה. אפשר לסנן לפי אזור ואונליין.
+          </p>
+        ) : (
+          /* Without this the first <p> on the page is a therapist's own bio,
+             which is what Google would quote as the description of the whole
+             directory. Same sentence as the city pages. */
+          <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+            מאגר המטפלים של טיפול חכם: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את
+            ההתאמה הנכונה עבורכם, או סננו לפי אזור, סוג קושי, גישה טיפולית והסדר קופה ופנו ישירות
+            למטפלים שתעודות ההכשרה שלהם אומתו. בחינם וללא התחייבות.
           </p>
         )}
       </div>
