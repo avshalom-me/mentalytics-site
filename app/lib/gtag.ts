@@ -7,6 +7,10 @@
  *
  * Mark each of these events as a "key event" in the GA4 admin UI to turn it into
  * a conversion; once GA4 is linked to Google Ads they can be imported there too.
+ *
+ * `generate_lead` additionally fires the Google Ads conversion below, so Ads
+ * measures real contacts instead of the auto-created "About Us" page view it
+ * had been optimising against.
  */
 import { getAttribution } from "./attribution";
 
@@ -17,6 +21,17 @@ declare global {
   }
 }
 
+/**
+ * The Google Ads conversion action "פנייה למטפל" (created 2/8/2026).
+ *
+ * Ads needs its own event keyed by this send_to label - the GA4 event name
+ * alone means nothing to it. Until this existed, the only conversion the
+ * account recorded was an auto-created "About Us" page view counted on EVERY
+ * view, which reported conversion rates above 100% and made cost-per-lead
+ * unreadable.
+ */
+const ADS_LEAD_SEND_TO = "AW-18223934468/35zMCMTf8docEITY7PFD";
+
 /** Fire a GA4 event now. Safe no-op if gtag hasn't loaded yet. */
 export function gaEvent(name: string, params: Record<string, unknown> = {}): void {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
@@ -25,6 +40,14 @@ export function gaEvent(name: string, params: Record<string, unknown> = {}): voi
   // Google Ads needs for conversion import - this is an extra, friendly label.)
   const channel = getAttribution()?.channel;
   window.gtag("event", name, channel ? { ...params, channel } : params);
+
+  // A lead is the one event Google Ads should bid on. Sent as a separate call
+  // rather than folded into the one above: `send_to` would otherwise route the
+  // GA4 event away from the GA4 property, and the two destinations expect
+  // different payloads.
+  if (name === "generate_lead") {
+    window.gtag("event", "conversion", { send_to: ADS_LEAD_SEND_TO });
+  }
 }
 
 /**
