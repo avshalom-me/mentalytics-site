@@ -5,7 +5,7 @@ import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
-import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick, trackMatchSearch } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -2720,6 +2720,8 @@ function KidsMatchSection({ A, score, selection }: {
   async function doMatch() {
     setLoading(true);
     setError("");
+    // אותה נקודה בדיוק כמו במבוגרים - שליחת החיפוש, עם המיקום שנבחר.
+    trackMatchSearch("kids", { region: region || null, city: city || null, online: !!online });
     try {
       const res = await fetch("/api/match", {
         method: "POST",

@@ -79,6 +79,10 @@ type Flagged = {
   views: number;
   daysPromoted: number | null;
   paused: boolean; // מוקפא/ת מההתאמות - הירידה מכוונת, לא בעיה לחקור
+  // מאיפה הגיעה החשיפה שכן הייתה. בלי זה "0 פניות" הוא תסמין בלי אבחנה:
+  // חשיפה שכולה מקמפיין תיעלם עם התקציב (בעיה תקציבית), וחשיפה אפסית
+  // באורגני היא פרופיל שלא מדורג (בעיית תוכן). שתיהן דורשות טיפול הפוך.
+  channels: { paid: number; organic: number; direct: number; other: number };
 };
 
 function escapeHtml(s: string): string {
@@ -92,11 +96,27 @@ function escapeHtml(s: string): string {
 function buildEmailHtml(flagged: Flagged[], totalPromoted: number, monthLabel: string): string {
   const rows = flagged
     .map((t) => {
+      // האבחנה, לא רק התסמין: מקור החשיפה קובע איזה טיפול מתאים.
+      const ch = t.channels;
+      const chTotal = ch.paid + ch.organic + ch.direct + ch.other;
+      const paidShare = chTotal > 0 ? Math.round((ch.paid / chTotal) * 100) : 0;
       const flag = t.paused
         ? '<span style="color:#0284c7;">❄️ מוקפא/ת מההתאמות - צפוי</span>'
         : t.views === 0
-          ? '<span style="color:#dc2626;">🔇 לא נצפה כלל</span>'
-          : '<span style="color:#d97706;">👁️ נצפה — בלי פנייה</span>';
+          ? '<span style="color:#dc2626;">🔇 לא נצפה כלל - בעיית חשיפה</span>'
+          : paidShare >= 80
+            ? `<span style="color:#b45309;">💸 ${paidShare}% מהחשיפה מקמפיין - תלוי תקציב</span>`
+            : ch.organic === 0
+              ? '<span style="color:#7c3aed;">🔍 אפס חשיפה אורגנית - הפרופיל לא מדורג</span>'
+              : '<span style="color:#d97706;">👁️ נצפה — בלי פנייה</span>';
+      const chCell = chTotal === 0
+        ? '<span style="color:#999;">—</span>'
+        : [
+            ch.paid > 0 ? `ממומן ${ch.paid}` : null,
+            ch.organic > 0 ? `אורגני ${ch.organic}` : null,
+            ch.direct > 0 ? `ישיר ${ch.direct}` : null,
+            ch.other > 0 ? `אחר ${ch.other}` : null,
+          ].filter(Boolean).join(" · ");
       const days =
         t.daysPromoted == null
           ? "—"
@@ -110,6 +130,7 @@ function buildEmailHtml(flagged: Flagged[], totalPromoted: number, monthLabel: s
           <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:13px;">${escapeHtml(t.name)}</td>
           <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;font-weight:bold;">${t.clicks}</td>
           <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:13px;">${t.views}</td>
+          <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#555;">${chCell}</td>
           <td style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:12px;">${days}</td>
           <td style="padding:8px 10px;border:1px solid #e8e0d8;font-size:11px;">${flag}</td>
         </tr>`;
@@ -136,6 +157,7 @@ function buildEmailHtml(flagged: Flagged[], totalPromoted: number, monthLabel: s
               <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">מטפל</th>
               <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">פניות</th>
               <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">צפיות</th>
+              <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">מקור החשיפה</th>
               <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:center;font-size:11px;color:#666;">ימים בקידום</th>
               <th style="padding:8px 10px;border:1px solid #e8e0d8;text-align:right;font-size:11px;color:#666;">סטטוס</th>
             </tr>
@@ -212,10 +234,10 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
           .lt("clicked_at", untilIso)
           .in("therapist_id", ids),
       ),
-      fetchAllRows<{ therapist_id: string }>(() =>
+      fetchAllRows<{ therapist_id: string; channel: string | null }>(() =>
         supabaseAdmin
           .from("therapist_profile_views")
-          .select("therapist_id")
+          .select("therapist_id, channel")
           // כניסות לפרופיל בלבד - כמו האדמין, הפורטל והדשבורד. בלי הסינון
           // נספרו גם חשיפות כרטיס (match_card), שניפחו את ה"צפיות" פי כמה
           // והפכו אבחנה של "נצפה אך לא נלחץ" לשגויה: מטפל שאיש לא פתח את
@@ -230,7 +252,16 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
     const clicksBy: Record<string, number> = {};
     for (const c of clicks) clicksBy[c.therapist_id] = (clicksBy[c.therapist_id] ?? 0) + 1;
     const viewsBy: Record<string, number> = {};
-    for (const v of views) viewsBy[v.therapist_id] = (viewsBy[v.therapist_id] ?? 0) + 1;
+    const chBy: Record<string, { paid: number; organic: number; direct: number; other: number }> = {};
+    for (const v of views) {
+      viewsBy[v.therapist_id] = (viewsBy[v.therapist_id] ?? 0) + 1;
+      const c = (chBy[v.therapist_id] ??= { paid: 0, organic: 0, direct: 0, other: 0 });
+      const ch = v.channel ?? "";
+      if (ch === "google_paid" || ch === "meta_paid") c.paid++;
+      else if (ch === "google_organic") c.organic++;
+      else if (ch === "direct") c.direct++;
+      else c.other++;
+    }
 
     const nowMs = now.getTime();
     const flagged: Flagged[] = promoted
@@ -242,6 +273,7 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
           ? Math.floor((nowMs - new Date(t.promoted_since).getTime()) / 86_400_000)
           : null,
         paused: !!t.match_paused_until && new Date(t.match_paused_until).getTime() > nowMs,
+        channels: chBy[t.id] ?? { paid: 0, organic: 0, direct: 0, other: 0 },
       }))
       .filter((t) => t.clicks < CLICK_THRESHOLD)
       // Fewest clicks first; within that, longest-promoted-still-quiet first.

@@ -19,6 +19,9 @@ export const ANALYTICS_EVENT_TYPES = [
   "recruit_page_view",
   "therapist_explain_click",
   "matching_click",
+  // שליחת החיפוש בפועל (matching_click = הטופס נפתח). נושא את האזור שנבחר,
+  // שאינו קיים בשום אירוע אחר. מיגרציה: 20260819_match_search_event.sql
+  "match_search",
   "match_saved",
 ] as const;
 

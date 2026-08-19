@@ -56,6 +56,8 @@ type AdminTherapist = {
   contacts_30d: number;
   contacts_60d: number;
   contacts_total: number;
+  /** פילוח ערוץ של הצפיות ב-30 יום - האבחון של "מאיפה מגיעה החשיפה שלו". */
+  views_30d_by_channel?: { paid: number; organic: number; direct: number; other: number };
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
   center_account_id: string | null;
   center_name: string | null;
@@ -1291,6 +1293,30 @@ export default function AdminTherapistsPage() {
                 </b>
               </span>
               </>); })()}
+              {/* מקור החשיפה, 30 יום תמיד (הפילוח קיים רק לחלון הזה - ראו
+                  ההערה במיגרציה: ייחוס היסטורי מעורבב עם קו השבר של 8/8).
+                  זה מה שמבדיל בין "רעב תקציבי" ל"פרופיל שלא מדורג". */}
+              {(() => {
+                const ch = therapist.views_30d_by_channel;
+                if (!ch) return null;
+                const t30 = ch.paid + ch.organic + ch.direct + ch.other;
+                if (t30 === 0) return null;
+                const parts = [
+                  ch.paid > 0 ? `ממומן ${ch.paid}` : null,
+                  ch.organic > 0 ? `אורגני ${ch.organic}` : null,
+                  ch.direct > 0 ? `ישיר ${ch.direct}` : null,
+                  ch.other > 0 ? `אחר ${ch.other}` : null,
+                ].filter(Boolean);
+                const paidShare = Math.round((ch.paid / t30) * 100);
+                return (
+                  <span className="text-stone-500">
+                    · מקור (30י): {parts.join(" · ")}
+                    {paidShare >= 80 && (
+                      <b className="text-amber-700"> ⚠ {paidShare}% מקמפיין</b>
+                    )}
+                  </span>
+                );
+              })()}
               {therapist.created_at && (
                 <span className="text-stone-500">
                   · נרשם/ה לפני {Math.max(0, Math.floor((Date.now() - new Date(therapist.created_at).getTime()) / 86400000))} ימים

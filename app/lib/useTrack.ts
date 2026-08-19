@@ -6,7 +6,7 @@ import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_saved";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_saved";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים את הנתונים
@@ -132,6 +132,36 @@ export function trackMatchingClick(quizType: "adults" | "kids", treatment: strin
   // Single GA4 emission point (was inline gtag at each call site, which bypassed
   // the channel-attaching wrapper and only covered the adults flow).
   gaEvent("matching_click", { quiz_type: quizType, treatment });
+}
+
+/**
+ * Patient actually submitted the therapist search - the step AFTER
+ * matching_click, which only means the form opened.
+ *
+ * Carries the region they chose, and that is the point: region lives nowhere
+ * else in the event stream. It reaches the DB as viewer_region on profile-view
+ * rows, so it exists only for sessions whose results finished rendering. Here
+ * it is recorded at the moment of asking.
+ *
+ * `region: null` is meaningful, not missing data - it is the "no location
+ * given" search, which the scorer treats as professional-fit-only and which
+ * produces the inflated scores measured on 17/8/2026.
+ */
+export function trackMatchSearch(
+  quizType: "adults" | "kids",
+  opts: { region: string | null; city?: string | null; online: boolean },
+) {
+  sendTrack("match_search", {
+    source: quizType === "adults" ? "adult" : "child",
+    metadata: {
+      quiz_type: quizType,
+      region: opts.region || null,
+      city: opts.city || null,
+      online: opts.online,
+      // הדגל שמאפשר לספור בשאילתה אחת כמה חיפשו בלי מיקום בכלל.
+      no_location: !opts.region && !opts.city && !opts.online,
+    },
+  });
 }
 
 /** Patient saved their match list (WhatsApp-to-self / copy link). */

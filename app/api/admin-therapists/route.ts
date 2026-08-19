@@ -223,9 +223,16 @@ async function buildTherapistsResponse(onlyId?: string) {
   // parallel with URL signing) instead of pulling every row and counting in
   // memory — the views table grows fast during campaigns and blew past the
   // 1000-row cap. Falls back to the row-pull method if the RPC isn't deployed.
-  type Eng = { v30: number; v60: number; vt: number; c30: number; c60: number; ct: number };
+  // ch30 = פילוח ערוץ של הצפיות ב-30 יום. על *צפיות* ולא על פניות, כי אצל
+  // מטפל רעב הפניות אפס ממילא - מקור החשיפה הוא מה שמבדיל בין רעב תקציבי
+  // (הכל מקמפיין) לבין פרופיל שלא מדורג אורגנית.
+  type Eng = {
+    v30: number; v60: number; vt: number; c30: number; c60: number; ct: number;
+    ch30: { paid: number; organic: number; direct: number; other: number };
+  };
   const engByTherapist: Record<string, Eng> = {};
-  const engOf = (id: string): Eng => (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0 });
+  const engOf = (id: string): Eng =>
+    (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0, ch30: { paid: 0, organic: 0, direct: 0, other: 0 } });
   const subByTherapist: Record<
     string,
     { status: string; current_period_end: string | null; promo_reverts_at: string | null }
@@ -241,6 +248,10 @@ async function buildTherapistsResponse(onlyId?: string) {
         contacts_30d: number | string;
         contacts_60d: number | string;
         contacts_total: number | string;
+        views_30d_paid?: number | string;
+        views_30d_organic?: number | string;
+        views_30d_direct?: number | string;
+        views_30d_other?: number | string;
       }>) {
         engByTherapist[row.therapist_id] = {
           v30: Number(row.views_30d) || 0,
@@ -249,6 +260,13 @@ async function buildTherapistsResponse(onlyId?: string) {
           c30: Number(row.contacts_30d) || 0,
           c60: Number(row.contacts_60d) || 0,
           ct: Number(row.contacts_total) || 0,
+          // אופציונליים: אם ה-RPC בגרסה ישנה יותר, הפילוח יוצא אפסים ולא קורס.
+          ch30: {
+            paid: Number(row.views_30d_paid) || 0,
+            organic: Number(row.views_30d_organic) || 0,
+            direct: Number(row.views_30d_direct) || 0,
+            other: Number(row.views_30d_other) || 0,
+          },
         };
       }
     } else {
@@ -366,6 +384,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         contacts_30d: engByTherapist[t.id]?.c30 ?? 0,
         contacts_60d: engByTherapist[t.id]?.c60 ?? 0,
         contacts_total: engByTherapist[t.id]?.ct ?? 0,
+        views_30d_by_channel: engByTherapist[t.id]?.ch30 ?? { paid: 0, organic: 0, direct: 0, other: 0 },
         subscription: subByTherapist[t.id] ?? null,
         center_account_id: t.center_account_id ?? null,
         center_name: t.center_account_id ? centerNameById.get(t.center_account_id) ?? null : null,

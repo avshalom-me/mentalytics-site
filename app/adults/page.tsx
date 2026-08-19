@@ -9,7 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -869,6 +869,12 @@ export default function AdultsPage() {
     if (!selectedRec && !combinedTreatments) return;
     setLoading(true);
     setErr("");
+    // שליחת החיפוש בפועל, עם המיקום שנבחר - ראו trackMatchSearch.
+    trackMatchSearch("adults", {
+      region: matchPrefs.region || null,
+      city: matchPrefs.city || null,
+      online: !!matchPrefs.online,
+    });
     try {
       const styleP1 = answers.emotional?.therapistStyleQ1 ?? 0;
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
