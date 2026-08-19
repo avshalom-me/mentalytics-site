@@ -493,6 +493,39 @@ export default function AdminCentersPage() {
         );
       })()}
 
+      {/* התצוגה המרוכזת: סך כל המרכזים הפעילים במבט אחד. עד 19/8/26 לא היה
+          שום מקום שעונה על "כמה כל המרכזים ביחד מייצרים" - רק כרטיסים
+          בודדים. מחושב בצד הלקוח מנתוני ה-engagement שכבר בתשובת ה-API. */}
+      {!loading && (() => {
+        const act = centers.filter((c) => c.status === "active" && c.engagement);
+        if (act.length === 0) return null;
+        const sum = act.reduce(
+          (s, c) => {
+            const e = c.engagement!;
+            s.v30 += e.views_30; s.c30 += e.clicks_30; s.vt += e.views_total; s.ct += e.clicks_total;
+            s.paid += e.clicks_30_by_channel.paid; s.organic += e.clicks_30_by_channel.organic;
+            s.direct += e.clicks_30_by_channel.direct; s.other += e.clicks_30_by_channel.other;
+            return s;
+          },
+          { v30: 0, c30: 0, vt: 0, ct: 0, paid: 0, organic: 0, direct: 0, other: 0 },
+        );
+        const chParts = [
+          sum.paid > 0 ? `ממומן ${sum.paid}` : null,
+          sum.organic > 0 ? `אורגני ${sum.organic}` : null,
+          sum.direct > 0 ? `ישיר ${sum.direct}` : null,
+          sum.other > 0 ? `אחר ${sum.other}` : null,
+        ].filter(Boolean);
+        return (
+          <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-teal-200 bg-teal-50/60 px-5 py-3">
+            <span className="text-sm font-black text-teal-900">📊 כל המרכזים הפעילים ({act.length})</span>
+            <span className="text-sm text-stone-700">30 יום: <b className="text-stone-900">{sum.v30}</b> צפיות · <b className="text-stone-900">{sum.c30}</b> לחיצות ליצירת קשר
+              {sum.c30 > 0 && chParts.length > 0 && <span className="text-stone-500"> ({chParts.join(" · ")})</span>}
+            </span>
+            <span className="text-xs text-stone-500">מצטבר: {sum.vt} צפיות · {sum.ct} לחיצות</span>
+          </div>
+        );
+      })()}
+
       {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
       {!loading && (() => {
