@@ -254,7 +254,10 @@ export default function CitySeoSection({
       <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
         {headings[h % headings.length]}
       </h2>
-      <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
+      {/* data-nosnippet: still indexed for ranking, but Google may not quote it.
+          This paragraph kept winning the snippet over the intro line, which is
+          the one written to earn the click. */}
+      <p className="text-[15px] leading-8 text-stone-600 mb-6" data-nosnippet>{statsParagraph}</p>
 
       {articles.length > 0 && (
         <div className="mb-8">

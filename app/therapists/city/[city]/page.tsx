@@ -104,6 +104,20 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
     ...(region ? REGION_CITIES[region] ?? [] : []).filter((c) => !neighbors.includes(c)),
   ].filter((c) => c !== city && (CITY_SEO_LIST as readonly string[]).includes(c));
 
+  // Google is demonstrably quoting THIS paragraph for city queries (SERP
+  // screenshot 15/8/26 on "מטפל רגשי בירושלים"), not the meta description.
+  // So it has to BE the sentence we want shown: the clinician-built quiz
+  // first, the verified list second. The treatment phrase stays at the front
+  // because it is the query family these pages rank for.
+  const introLine =
+    `טיפול פסיכולוגי ונפשי ב${inCity.length > 0 ? city : `טווח נסיעה קצר מ${city}`}: ` +
+    "מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, " +
+    "או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות" +
+    (nearbyCityNames.length > 0
+      ? ` (גם בערים הצמודות: ${nearbyCityNames.slice(0, 3).join(", ")})`
+      : region ? ` (גם באזור ${region})` : "") +
+    ". בחינם וללא התחייבות.";
+
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
@@ -116,15 +130,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>פסיכולוגים ומטפלים ב{city}</h1>
-        {/* The first body paragraph doubles as Google's fallback snippet, so it
-            leads with what the page is (a list + a quiz) and carries the
-            treatment phrasing, not just the person phrasing. */}
-        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-          {inCity.length > 0
-            ? `רשימת מטפלים לטיפול פסיכולוגי ונפשי ב${city}: פסיכולוגים ומטפלים מאומתים להשוואה ולפנייה ישירה`
-            : `רשימת מטפלים לטיפול פסיכולוגי ונפשי בטווח נסיעה קצר מ${city}`}
-          {nearbyCityNames.length > 0 ? `, וגם בערים הצמודות (${nearbyCityNames.slice(0, 3).join(", ")})` : region ? `, וגם באזור ${region}` : ""}. מי שמעדיף התאמה אישית יכול למלא שאלון קצר - בחינם וללא התחייבות - או לבחור טיפול אונליין.
-        </p>
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>{introLine}</p>
       </div>
 
       {/* Prominent quiz CTA - same offer as the region/online pages, tailored to the city. */}
