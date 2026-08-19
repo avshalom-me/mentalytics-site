@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { sendTrialEndingEmail, trialEndingVariant, type TrialStats } from "@/app/lib/trial-ending-email";
@@ -147,6 +148,11 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
     });
 
     if (!opts.send) continue;
+
+    // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). ההתראה
+    // לאדמין שבהמשך נשארת - היא אלינו, ושם ההחלטה אנושית ממילא.
+    const gate = automatedSendAllowed(t.email);
+    if (!gate.allowed) { skipped++; continue; }
 
     const r = await sendTrialEndingEmail({
       to: t.email, name: t.full_name ?? "", stats, daysLeft, isReminder,

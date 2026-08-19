@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 import { centerProfileCompleteness } from "@/app/lib/center-completeness";
 import { sendCenterCompletenessNudgeEmail, sendCenterInviteReminderEmail } from "@/app/lib/center-emails";
+import { automatedSendAllowed, AUTOMATION_BLOCKED_NOTE } from "@/app/lib/automated-email-guard";
 
 // דחיפות עדינות למרכזים - רץ יומית:
 //   1. מרכז פעיל ששילם לפני 7+ ימים והפרופיל הציבורי שלו עדיין חסר -
@@ -55,6 +56,9 @@ async function runCenterNudges() {
       .eq("status", "sent");
     if ((prior ?? []).some((r) => String(r.subject ?? "").startsWith(subjectForCenter))) continue;
 
+    const gate = automatedSendAllowed(to);
+    if (!gate.allowed) { nudgeSkips.push(`${c.name}: ${gate.reason}`); continue; }
+
     const r = await sendCenterCompletenessNudgeEmail({
       to,
       centerName: c.name as string,
@@ -85,6 +89,9 @@ async function runCenterNudges() {
     const center = (Array.isArray(rawCenter) ? rawCenter[0] : rawCenter) as { name: string; status: string } | undefined;
     if (!center || center.status !== "active") continue; // מרכז שבוטל - לא מטרידים
 
+    const gate = automatedSendAllowed(inv.email as string);
+    if (!gate.allowed) { reminderSkips.push(`${inv.email}: ${gate.reason}`); continue; }
+
     const r = await sendCenterInviteReminderEmail({
       to: inv.email as string,
       centerName: center.name,
@@ -107,6 +114,7 @@ async function runCenterNudges() {
     completeness_nudges_sent: nudgesSent,
     invite_reminders_sent: remindersSent,
     skips: [...nudgeSkips, ...reminderSkips],
+    note: AUTOMATION_BLOCKED_NOTE,
   };
 }
 

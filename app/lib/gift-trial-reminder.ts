@@ -1,4 +1,5 @@
 import "server-only";
+import { automatedSendAllowed } from "./automated-email-guard";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendBulkEmail } from "./email-quota";
 import { promotedPlanTable } from "./promoted-plan-table";
@@ -149,6 +150,10 @@ export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promi
 
     let sent = 0;
     for (const t of targets) {
+      // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). הרשימה
+      // עדיין מוחזרת, כדי שאפשר יהיה לשלוח ידנית מהאדמין.
+      if (!automatedSendAllowed(t.email).allowed) continue;
+
       const res = await sendBulkEmail({
         from: FROM,
         to: t.email,

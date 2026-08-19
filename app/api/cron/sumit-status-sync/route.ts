@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/sumit";
 import { VAT_RATE } from "@/app/lib/crm";
 import { writeAudit } from "@/app/lib/audit";
+import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
@@ -306,6 +307,9 @@ export async function GET(req: NextRequest) {
 
   let checked = 0;
   let demoted = 0;
+  // מי הושעה בגלל חיוב שנכשל. מאז 19/8/2026 לא נשלח אליהם מייל אוטומטי,
+  // ולכן בלי הרשימה הזו ההשעיה הייתה קורית בלי שאיש יודע - לא הם ולא אנחנו.
+  const demotedForPayment: { name: string; email: string; reason: string }[] = [];
   let errors = 0;
   let stillActive = 0;
   let softMisses = 0;
@@ -486,11 +490,22 @@ export async function GET(req: NextRequest) {
           : `no_active_recurring_at_sumit_after_${MISS_THRESHOLD}_misses`,
       });
 
-      if (t.email) {
+      // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). דווקא כאן
+      // זה קריטי: כשל חיוב טכני שלח למטפל "החיוב נכשל" לפני שאיש הספיק
+      // לבדוק אם הכשל אמיתי (רועי חנין, 16/8 - חויב בהצלחה 4 שעות אחר כך).
+      if (t.email && automatedSendAllowed(t.email).allowed) {
         await sendPromotionEndedEmail({
           to: t.email,
           name: t.full_name ?? "",
           reason: "payment_failed" as PromotionEndedReason,
+        });
+      } else if (t.email) {
+        demotedForPayment.push({
+          name: t.full_name ?? "(ללא שם)",
+          email: t.email,
+          reason: authoritativeCancel
+            ? `Sumit status=${target!.Status}`
+            : `אין הוראת קבע פעילה ב-Sumit אחרי ${MISS_THRESHOLD} ריצות`,
         });
       }
       demoted++;
@@ -534,7 +549,7 @@ export async function GET(req: NextRequest) {
         reason: "trial_or_manual_expired",
       });
 
-      if (t.email) {
+      if (t.email && automatedSendAllowed(t.email).allowed) {
         await sendPromotionEndedEmail({
           to: t.email,
           name: t.full_name ?? "",
@@ -932,11 +947,41 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // התראה אחת מרוכזת אלינו על מי שהושעה בגלל חיוב שנכשל. המטפל עצמו לא
+  // מקבל דבר אוטומטית - ההחלטה אם ומתי לפנות אליו היא אנושית. הרקע: ב-16/8
+  // כשל חיוב טכני של רועי חנין שלח לו "החיוב נכשל", והוא שילם בהצלחה ארבע
+  // שעות אחר כך.
+  if (demotedForPayment.length > 0) {
+    const rows = demotedForPayment
+      .map(
+        (d) =>
+          `<li><strong>${d.name.replace(/</g, "&lt;")}</strong> (${d.email.replace(/</g, "&lt;")}) - ${d.reason}</li>`,
+      )
+      .join("");
+    try {
+      await resend.emails.send({
+        from: "טיפול חכם <noreply@mentalytics.co.il>",
+        to: ALERT_TO,
+        subject: `⚠️ ${demotedForPayment.length} מטפלים הושעו בגלל חיוב שנכשל`,
+        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+          <p>הסנכרון היומי השעה את המטפלים הבאים כי אין להם הוראת קבע פעילה ב-Sumit.
+          <strong>לא נשלח אליהם שום מייל</strong> - שליחה אוטומטית לנמענים חיצוניים מושבתת.</p>
+          <ul>${rows}</ul>
+          <p>לפני פנייה כדאי לוודא ב-Sumit שהכשל אמיתי ולא תקלה רגעית: כשל טכני
+          שנפתר מעצמו כעבור שעות קרה כבר בעבר.</p>
+        </div>`,
+      });
+    } catch (mailErr) {
+      console.error("demoted-for-payment alert failed:", mailErr);
+    }
+  }
+
   return NextResponse.json({
     checked,
     stillActive,
     softMisses,
     demoted,
+    demoted_for_payment: demotedForPayment.length,
     trialsExpired,
     orphansFound,
     orphansCancelled,
