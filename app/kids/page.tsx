@@ -2963,7 +2963,7 @@ function KidsMatchSection({ A, score, selection }: {
                           <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                             {combined}<span className="align-super text-base font-extrabold">%</span>
                           </div>
-                          <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה"}</div>
+                          <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה מקצועית"}</div>
                           {t.personality_score != null && (
                             <>
                               <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />

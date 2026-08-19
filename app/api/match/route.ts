@@ -440,8 +440,24 @@ function scoreTherapist(
     }
   }
 
+  // ── מיקום: משפיע על הדירוג, לא על הציון המוצג ────────────────────────────
+  // הציון שהמטופל רואה נמדד על התאמה מקצועית בלבד. שתי סיבות:
+  //
+  // 1) המרחק הוא המידע היחיד שהמטופל מעריך בעצמו בשנייה - הוא רואה "📍 תל
+  //    אביב" על הכרטיס. ההתאמה המקצועית היא מה שהוא לא יכול להעריך, וזה מה
+  //    שיש לנו לתרום. ערבוב השניים למספר אחד מקודד מידע שכבר מולו על המסך
+  //    ומטשטש את מה שאינו.
+  // 2) עד 19/8/2026 בלוק המיקום נכנס למכנה רק כשהמשתמש ביקש מיקום, ולכן אותו
+  //    מטפל בדיוק קיבל 94% אצל מי שלא בחר אזור ו-67% אצל מי שבחר (נמדד).
+  //    המספר לא היה שקרי - הוא ענה על "כמה ממה שביקשת קיבלת" - אבל הוא נקרא
+  //    כ"כמה הוא מתאים לי", והפער הזה הוא מה שהמשתמש רואה.
+  //
+  // locationEarned/locationPossible נצברים בנפרד ומוזרמים ל-rankScore בלבד,
+  // כך שמטפל קרוב עדיין מדורג גבוה יותר - רק שהמספר על הכרטיס לא מושפע.
+  let locationEarned = 0;
+  let locationPossible = 0;
   if (input.city || input.region || input.onlineRequired) {
-    possible += WEIGHTS.locationOnline;
+    locationPossible += WEIGHTS.locationOnline;
 
     // Hard filter: online-only request (no city/region) — exclude non-online therapists
     if (input.onlineRequired && !input.city && !input.region && !therapistOnline) {
@@ -469,7 +485,7 @@ function scoreTherapist(
     const onlineMatch = input.onlineRequired && therapistOnline;
 
     if (inExactCity) {
-      earned += WEIGHTS.locationOnline; // 100% — אותה עיר
+      locationEarned += WEIGHTS.locationOnline; // 100% — אותה עיר
       reasons.push("התאמה מלאה באזור");
     } else if (inSameRegion) {
       // The 60% tier exists to rank "your region" below "your city" - but only
@@ -480,7 +496,7 @@ function scoreTherapist(
       // ranked below therapists an hour away. When no city was named, matching
       // the region IS the exact answer to what was asked, and scores as such.
       const regionIsTheAsk = !input.city;
-      earned += regionIsTheAsk
+      locationEarned += regionIsTheAsk
         ? WEIGHTS.locationOnline
         : Math.round(WEIGHTS.locationOnline * 0.6);
       reasons.push(regionIsTheAsk ? "התאמה מלאה באזור" : "התאמה באזור");
@@ -511,7 +527,7 @@ function scoreTherapist(
       const onlinePts = onlineMatch
         ? (onlineIsTheWholeAsk ? WEIGHTS.locationOnline : Math.round(WEIGHTS.locationOnline * 0.4))
         : 0;
-      earned += Math.max(adjacentPts, onlinePts);
+      locationEarned += Math.max(adjacentPts, onlinePts);
       if (inAdjacentRegion) reasons.push("מטפל/ת מאזור סמוך");
       if (onlineMatch) reasons.push("מציע טיפול אונליין");
     } else if (patientRegion) {
@@ -558,8 +574,17 @@ function scoreTherapist(
     reasons.push("התאמה בקבוצת גיל");
   }
 
+  // הציון המוצג: התאמה מקצועית בלבד, בלי בלוק המיקום (ראו ההערה שם).
   const score =
     possible > 0 ? Math.round((earned / possible) * 100) : 0;
+  // ציון הדירוג: כולל מיקום, ולכן מטפל קרוב עדיין מדורג לפני רחוק. אינו מוצג
+  // בשום מקום - בלעדיו הוצאת המיקום מהציון הייתה שוברת את סדר התוצאות.
+  const rankScore =
+    possible + locationPossible > 0
+      ? Math.round(((earned + locationEarned) / (possible + locationPossible)) * 100)
+      : 0;
+  /** האם המטפל/ת באזור שהתבקש - לתג "באזור שלך" בכרטיס. */
+  const inRequestedArea = locationPossible > 0 && locationEarned >= locationPossible * 0.6;
 
   // ── Personality / style matching ─────────────────────────────────────────
   let personality_score: number | null = null;
@@ -587,6 +612,8 @@ function scoreTherapist(
 
   return {
     score,
+    rankScore,
+    inRequestedArea,
     personality_score,
     reasons,
     normalizedTherapist: {
@@ -768,13 +795,15 @@ export async function POST(req: NextRequest) {
     }
 
     scored.sort((a, b) => {
-      const profDiff = b.result.score - a.result.score;
+      // הדירוג על rankScore (כולל מיקום) ולא על הציון המוצג. מטפל קרוב עדיין
+      // עולה על רחוק - רק שהמספר בכרטיס אינו נושא את ההפרש הזה.
+      const profDiff = b.result.rankScore - a.result.rankScore;
       // Primary: professional score — expertise/location/etc.
       // Personality can only affect ranking when professional scores are within 8 points
       if (Math.abs(profDiff) > 8) return profDiff;
       // Tiebreaker within close range: combined score (personality can tip).
-      const ca = combinedScore(a.result.score, a.result.personality_score);
-      const cb = combinedScore(b.result.score, b.result.personality_score);
+      const ca = combinedScore(a.result.rankScore, a.result.personality_score);
+      const cb = combinedScore(b.result.rankScore, b.result.personality_score);
       if (cb !== ca) return cb - ca;
       // Genuinely tied on match quality → paying customers come first.
       // Deliberately AFTER the quality scores: a paying therapist never
@@ -851,6 +880,9 @@ export async function POST(req: NextRequest) {
           match_score: result.score,
           personality_score: result.personality_score,
           combined_score: combinedScore(result.score, result.personality_score),
+          // המרחק יצא מהציון ולכן חייב להיות גלוי כתג משלו - אחרת המידע פשוט
+          // נעלם מהמטופל במקום לעבור לערוץ ברור יותר.
+          in_requested_area: result.inRequestedArea,
           match_reasons: result.reasons,
         };
       })

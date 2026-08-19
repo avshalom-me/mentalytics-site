@@ -2630,7 +2630,12 @@ export default function AdultsPage() {
       sections.push({ key: dom, label: dom, groups: groups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom) });
     }
 
-    const renderGroupCard = (group: RecGroup) => {
+    // isPrimary: ההמלצה הראשונה בכל רובריקה מוצגת כראשית, והשאר כמשניות.
+    // מדוד 19/8/2026: מי שקיבל המלצה אחת המשיך לחיפוש ב-88%, ומי שקיבל
+    // שתיים-שלוש נפל ל-67-68%. הפער עקבי עם עומס בחירה - כמה כפתורים
+    // שווי-משקל דורשים הכרעה, וההכרעה היא שלא נעשתה. התוכן לא הוסתר: כל
+    // ההמלצות עדיין על המסך, רק שאחת מהן מובילה.
+    const renderGroupCard = (group: RecGroup, isPrimary = true) => {
       const firstRec = group.recs[0];
       const allNotes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[]));
       const notes = allNotes.length ? allNotes.join("\n\n") : undefined;
@@ -2671,7 +2676,11 @@ export default function AdultsPage() {
             <button
               type="button"
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
+              className={
+                isPrimary
+                  ? "inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
+                  : "inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
+              }
             >
               🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
             </button>
@@ -2866,6 +2875,10 @@ export default function AdultsPage() {
                   setSelectedRec({ id: "default", symptomText: "לא נמצאו ממצאים מובהקים", treatment: "טיפול דינאמי", treatmentLabel: "טיפול דינאמי", domain: "מורכבויות בתחום הרגשי/האישי", urgent: false });
                   setCombinedTreatments(null);
                   setScreen("match-form");
+                  // המסלול הזה לא דיווח matching_click, ולכן מי שהגיע ממנו
+                  // נראה במשפך כמי שסיים שאלון ולא חיפש מעולם. נדיר (3 סשנים
+                  // ב-30 יום) אבל מזייף בדיוק את המדד שאנחנו חוקרים.
+                  trackMatchingClick("adults", "טיפול דינאמי");
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal)] transition-colors"
               >
@@ -2885,7 +2898,7 @@ export default function AdultsPage() {
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
               <div className="space-y-3">
-                {section.groups.map((group) => renderGroupCard(group))}
+                {section.groups.map((group, i) => renderGroupCard(group, i === 0))}
               </div>
               {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
               {section.key === RELATIONSHIP_DOMAIN && showRelationshipCombined && renderCombinedRelationshipButton()}
@@ -3138,7 +3151,16 @@ export default function AdultsPage() {
                   <p className="mt-0.5 text-xs text-[var(--muted)]">{t.entity_type === "center" ? "מרכז טיפולי" : t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
                   {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
                   {t.regions?.length > 0 && (
-                    <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}</p>
+                    <p className="mt-1.5 text-xs text-[var(--muted)]">
+                      📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}
+                      {/* המרחק יצא מהציון, ולכן הוא מסומן כאן במפורש במקום
+                          להיבלע בתוך אחוז אחד. */}
+                      {t.in_requested_area && (
+                        <span className="ms-1.5 inline-block rounded-full bg-[var(--teal-pale)] px-2 py-0.5 text-[11px] font-bold text-[var(--teal-dark)]">
+                          ✓ באזור שלך
+                        </span>
+                      )}
+                    </p>
                   )}
                   {matchesPref && (
                     <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
@@ -3150,7 +3172,7 @@ export default function AdultsPage() {
                   <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                     {overall}<span className="align-super text-base font-extrabold">%</span>
                   </div>
-                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה"}</div>
+                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה מקצועית"}</div>
                   {t.personality_score != null && (
                     <>
                       <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
