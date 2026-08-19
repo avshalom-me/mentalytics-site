@@ -15,6 +15,7 @@ type GuaranteeRow = {
   contacts_certain: number;
   contacts_by_type: Record<string, number>;
   risk: "expired_no_contact" | "at_risk" | "watch" | "ok";
+  promotion_interrupted?: boolean;
 };
 
 // שמות סוגי הפנייה כפי שהם מוצגים למטפל עצמו בדשבורד שלו - כדי ששתי
@@ -166,6 +167,17 @@ export default function GuaranteePage() {
                       </td>
                       <td className="px-4 py-3 text-xs text-stone-400">
                         {fmtDate(r.window_start)} — {fmtDate(r.window_end)}
+                        {/* הקידום נקטע (כשל חיוב) ונפתח מחדש. החלון נמדד מהמנוי
+                            המקורי, ולכן הוא מקדים את תאריך הקידום הנוכחי -
+                            בלי הסימון הזה הפער נראה כמו תקלה בנתונים. */}
+                        {r.promotion_interrupted && (
+                          <div
+                            className="mt-1 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700"
+                            title="הקידום נקטע ונפתח מחדש (בדרך כלל כשל חיוב טכני). החלון נספר מתחילת המנוי המקורי, כדי שפניות שהגיעו לפני ההפסקה לא ייעלמו."
+                          >
+                            הקידום נקטע ונפתח מחדש
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1.5">
