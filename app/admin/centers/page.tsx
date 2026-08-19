@@ -31,6 +31,11 @@ type Center = {
   updated_at: string | null;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   pending_therapist_count: number; // כמה מהם ממתינים לאישור (כולל ישות-המרכז)
+  /** מעורבות מצטברת של המרכז: מסלול 1 = סכום המטפלים, מסלול 2 = שורת הישות. */
+  engagement?: {
+    views_30: number; clicks_30: number; views_total: number; clicks_total: number;
+    clicks_30_by_channel: { paid: number; organic: number; direct: number; other: number };
+  } | null;
   user_id: string | null;
   slug: string | null;
   public_page_enabled: boolean | null;
@@ -563,6 +568,26 @@ export default function AdminCentersPage() {
 
             {/* ציר המסע: איפה המרכז עומד בחמשת שלבי המשפך */}
             {c.status !== "cancelled" && <Journey c={c} />}
+
+            {/* מעורבות: התשובה המהירה ל"כמה פניות המרכז ייצר" בלי לפתוח את
+                תצוגת הפרופילים ולסכם ידנית. פילוח הערוץ (ממומן/אורגני/ישיר)
+                מוצג רק כשיש לחיצות בחלון - שורת אפסים אינה מידע. */}
+            {c.engagement && (c.engagement.views_total > 0 || c.engagement.clicks_total > 0) && (
+              <p className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs text-stone-700">
+                📊 30 יום: <b className="text-stone-900">{c.engagement.views_30}</b> צפיות · <b className="text-stone-900">{c.engagement.clicks_30}</b> לחיצות ליצירת קשר
+                {c.engagement.clicks_30 > 0 && (() => {
+                  const ch = c.engagement!.clicks_30_by_channel;
+                  const parts = [
+                    ch.paid > 0 ? `ממומן ${ch.paid}` : null,
+                    ch.organic > 0 ? `אורגני ${ch.organic}` : null,
+                    ch.direct > 0 ? `ישיר ${ch.direct}` : null,
+                    ch.other > 0 ? `אחר ${ch.other}` : null,
+                  ].filter(Boolean);
+                  return parts.length > 0 ? <span className="text-stone-500"> ({parts.join(" · ")})</span> : null;
+                })()}
+                <span className="text-stone-400"> · מצטבר: {c.engagement.views_total} צפיות, {c.engagement.clicks_total} לחיצות</span>
+              </p>
+            )}
 
             {c.status === "active" && c.payer_name && (
               <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">

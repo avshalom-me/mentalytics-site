@@ -1340,8 +1340,11 @@ export default function MarketingPage() {
           <>
             {/* KPI row — DATA FIRST */}
             <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {/* "כל המטפלים" במפורש: המספר סופר גם חינמיים וגם מרכזים, בעוד
+                  פאנל הכיסוי שמתחתיו סופר משלמים בלבד - בלי התיוג שני המספרים
+                  נראים כסתירה (נשאל בפועל, 19/8/26: "לאן הלכו שאר הפניות?"). */}
               <KpiCard
-                label={`סה״כ פניות (${periodLabel})`}
+                label={`סה״כ פניות - כל המטפלים (${periodLabel})`}
                 value={num(k.contacts)}
                 sub={<Delta cur={k.contacts} prev={k.contactsPrev} unit={periodLabel === "יומיים" ? "היומיים" : "טווח"} />}
               />

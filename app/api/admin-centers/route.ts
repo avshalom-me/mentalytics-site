@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
@@ -54,7 +55,7 @@ export async function GET() {
     // לסמן כשמשהו מחכה לאישור (כולל שורת ישות-המרכז במסלול 2).
     const { data: linked } = await supabaseAdmin
       .from("therapists")
-      .select("center_account_id, status, entity_type")
+      .select("id, center_account_id, status, entity_type")
       .not("center_account_id", "is", null);
     const counts = new Map<string, number>();
     const pendingCounts = new Map<string, number>();
@@ -63,12 +64,78 @@ export async function GET() {
       if (t.entity_type !== "center") counts.set(cid, (counts.get(cid) ?? 0) + 1); // שורת ישות אינה "מטפל משויך"
       if (t.status === "pending") pendingCounts.set(cid, (pendingCounts.get(cid) ?? 0) + 1);
     });
+    // ── מדדי מעורבות לכרטיס המרכז ────────────────────────────────────────
+    // עד 19/8/26 האדמין לא הציג לחיצות/צפיות למרכזים בכלל - התשובה ל"כמה
+    // פניות מכון X ייצר" חייבה כניסה לתצוגת הפרופילים וסיכום ידני. הסכימה:
+    // מסלול 1 = סכום המטפלים המשויכים; מסלול 2 = שורת הישות (שהיא השורה
+    // המקושרת היחידה שם, כך שאותה קבוצה משרתת את שני המסלולים).
+    // "צפיות" = כניסות לפרופיל (match+directory), אותה הגדרה כמו הפורטל,
+    // האדמין-מטפלים והדשבורד. פילוח הערוץ נותן את ההבחנה ממומן/אורגני/ישיר.
+    const byCenter = new Map<string, string>();
+    (linked ?? []).forEach((t) => byCenter.set(t.id as string, t.center_account_id as string));
+    const linkedIds = [...byCenter.keys()];
+
+    type Eng = {
+      views_30: number; clicks_30: number; views_total: number; clicks_total: number;
+      clicks_30_by_channel: { paid: number; organic: number; direct: number; other: number };
+    };
+    const engByCenter = new Map<string, Eng>();
+    const engOf = (cid: string): Eng => {
+      let e = engByCenter.get(cid);
+      if (!e) engByCenter.set(cid, (e = {
+        views_30: 0, clicks_30: 0, views_total: 0, clicks_total: 0,
+        clicks_30_by_channel: { paid: 0, organic: 0, direct: 0, other: 0 },
+      }));
+      return e;
+    };
+
+    if (linkedIds.length > 0) {
+      const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      const [viewRows, clickRows] = await Promise.all([
+        fetchAllRows<{ therapist_id: string; viewed_at: string }>(() =>
+          supabaseAdmin
+            .from("therapist_profile_views")
+            .select("therapist_id, viewed_at")
+            .in("therapist_id", linkedIds)
+            .in("source", ["match", "directory"]),
+        ),
+        fetchAllRows<{ therapist_id: string; clicked_at: string; channel: string | null }>(() =>
+          supabaseAdmin
+            .from("therapist_contact_clicks")
+            .select("therapist_id, clicked_at, channel")
+            .in("therapist_id", linkedIds),
+        ),
+      ]);
+      for (const v of viewRows) {
+        const cid = byCenter.get(v.therapist_id);
+        if (!cid) continue;
+        const e = engOf(cid);
+        e.views_total++;
+        if (v.viewed_at >= cutoff30) e.views_30++;
+      }
+      for (const c of clickRows) {
+        const cid = byCenter.get(c.therapist_id);
+        if (!cid) continue;
+        const e = engOf(cid);
+        e.clicks_total++;
+        if (c.clicked_at >= cutoff30) {
+          e.clicks_30++;
+          const ch = c.channel ?? "";
+          if (ch === "google_paid" || ch === "meta_paid") e.clicks_30_by_channel.paid++;
+          else if (ch === "google_organic") e.clicks_30_by_channel.organic++;
+          else if (ch === "direct") e.clicks_30_by_channel.direct++;
+          else e.clicks_30_by_channel.other++;
+        }
+      }
+    }
+
     // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
     // therapist_count שבטבלה, שהוא מספר המטפלים שבתמחור ההצעה).
     const centers = (data ?? []).map((c) => ({
       ...c,
       linked_therapist_count: counts.get(c.id as string) ?? 0,
       pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
+      engagement: engByCenter.get(c.id as string) ?? null,
     }));
     return NextResponse.json({ ok: true, centers });
   } catch (err) {

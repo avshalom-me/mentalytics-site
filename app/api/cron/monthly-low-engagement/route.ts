@@ -216,6 +216,11 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
         supabaseAdmin
           .from("therapist_profile_views")
           .select("therapist_id")
+          // כניסות לפרופיל בלבד - כמו האדמין, הפורטל והדשבורד. בלי הסינון
+          // נספרו גם חשיפות כרטיס (match_card), שניפחו את ה"צפיות" פי כמה
+          // והפכו אבחנה של "נצפה אך לא נלחץ" לשגויה: מטפל שאיש לא פתח את
+          // הפרופיל שלו נראה כאילו נצפה עשרות פעמים.
+          .in("source", ["match", "directory"])
           .gte("viewed_at", sinceIso)
           .lt("viewed_at", untilIso)
           .in("therapist_id", ids),
