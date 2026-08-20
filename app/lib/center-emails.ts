@@ -265,6 +265,39 @@ export async function sendCenterTherapistInviteEmail(opts: {
  * תזכורת שלמות פרופיל - נשלחת פעם אחת למרכז פעיל שבוע+ אחרי התשלום כשהפרופיל
  * הציבורי עדיין חסר. מפרטת בדיוק מה חסר ומקשרת להקמה/עריכה.
  */
+/**
+ * שולח מייל נדנוד שכבר נבנה (buildCenterNudgeEmail). מפריד בנייה משליחה
+ * כדי שאפשר יהיה להציג תצוגה מקדימה מדויקת בלי לשלוח דבר.
+ */
+export async function sendCenterNudgeEmail(opts: {
+  to: string;
+  subject: string;
+  html: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
+  try {
+    const { error } = await resendClient.emails.send({
+      from: FROM,
+      to: opts.to,
+      subject: opts.subject,
+      html: opts.html,
+    });
+    void logEmail({
+      recipient: opts.to,
+      recipientType: "organization",
+      subject: opts.subject,
+      template: "center_readiness_nudge",
+      sentBy: "system",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    return error ? { ok: false, error: String(error) } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
+/** @deprecated הוחלף ב-buildCenterNudgeEmail + sendCenterNudgeEmail (מודע למסלול). */
 export async function sendCenterCompletenessNudgeEmail(opts: {
   to: string;
   centerName: string;
