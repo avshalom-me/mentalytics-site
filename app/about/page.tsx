@@ -59,6 +59,47 @@ const team: TeamMember[] = [
   },
 ];
 
+const BASE = "https://www.mentalytics.co.il";
+
+/**
+ * AboutPage + Person entities, built FROM the `team` array above - never
+ * restated by hand, so the schema cannot drift from what the page displays.
+ *
+ * Why this exists: a therapy-matching site is squarely YMYL, where Google
+ * weighs who stands behind the advice. The credentials were already on the
+ * page in prose; until now nothing made them machine-readable, and the site
+ * carried no Person entity at all. `knowsAbout` is deliberately omitted -
+ * inferring topics from a job title would be us asserting expertise the page
+ * does not state.
+ */
+const aboutLd = {
+  "@context": "https://schema.org",
+  "@type": "AboutPage",
+  url: `${BASE}/about`,
+  inLanguage: "he",
+  name: "מי אנחנו - טיפול חכם",
+  mainEntity: {
+    "@type": "Organization",
+    name: "טיפול חכם",
+    alternateName: "Mentalytics",
+    url: BASE,
+    logo: `${BASE}/logo.svg.png`,
+    founder: {
+      "@type": "Person",
+      name: team[0].name,
+      jobTitle: team[0].role,
+    },
+    member: team.map((m) => ({
+      "@type": "Person",
+      name: m.name,
+      jobTitle: m.role,
+      // The bullets are the credentials the page already publishes.
+      description: m.bullets.join("; "),
+      image: `${BASE}${m.img}`,
+    })),
+  },
+};
+
 export default function AboutPage() {
   return (
     <main
@@ -66,6 +107,10 @@ export default function AboutPage() {
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(aboutLd).replace(/</g, "\\u003c") }}
+      />
       <PageViewTracker page="about" source="about" />
       <style>{`
 
