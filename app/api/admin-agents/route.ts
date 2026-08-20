@@ -157,6 +157,8 @@ export async function POST(req: NextRequest) {
         ok: true,
         therapist_name: result.therapistName,
         email: result.email,
+        remaining: result.remaining ?? [],
+        reoffer_after_days: result.reofferAfterDays ?? null,
       });
     }
     if (body?.action === "center_nudge_run") {

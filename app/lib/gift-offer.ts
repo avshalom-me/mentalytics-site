@@ -20,7 +20,9 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co
 //   3. צינון: לא שולחים למטפל שכבר קיבל הצעת מתנה לאחרונה.
 
 // כמה זמן מטפל שקיבל הצעה נשאר מחוץ לבריכת המועמדים.
-export const GIFT_OFFER_COOLDOWN_DAYS = Number(process.env.GIFT_OFFER_COOLDOWN_DAYS ?? 90);
+// חצי שנה (החלטת המשתמש 20/8/26, היה 90). הצעת קידום היא פנייה אישית,
+// ומטפל שקיבל אחת ולא הגיב לא אמור לשמוע את אותה הצעה שוב אחרי רבעון.
+export const GIFT_OFFER_COOLDOWN_DAYS = Number(process.env.GIFT_OFFER_COOLDOWN_DAYS ?? 180);
 // כמה זמן פער שכבר יצאה בו הצעה נשאר מושתק, בהמתנה לתשובה.
 export const GIFT_OFFER_WAIT_DAYS = Number(process.env.GIFT_OFFER_WAIT_DAYS ?? 21);
 export const GIFT_OFFER_MONTHS = 2;
@@ -78,6 +80,10 @@ export type GiftOfferSendResult = {
   error?: string;
   therapistName?: string;
   email?: string;
+  /** שמות המועמדים הנותרים באותו חיתוך - להצגה מיד אחרי השליחה. */
+  remaining?: string[];
+  /** בעוד כמה ימים הם יוצעו מחדש אם לא תגיע תשובה. */
+  reofferAfterDays?: number;
 };
 
 export async function sendGiftOffer(opts: {
@@ -192,7 +198,11 @@ export async function sendGiftOffer(opts: {
       status: "executed",
       status_changed_at: new Date().toISOString(),
       resolved_by: "admin",
-      resolution_note: `נשלחה הצעת מתנה ל${name || "מטפל"} (${t.email})`,
+      resolution_note:
+        `נשלחה הצעת מתנה ל${name || "מטפל"} (${t.email})` +
+        (candidates.length > 1
+          ? ` · ${candidates.length - 1} מועמדים נוספים בחיתוך נשמרו לגיבוי`
+          : ""),
     })
     .eq("id", opts.actionId);
   if (updErr) console.error("agent_actions gift_offer update failed:", updErr.message);
@@ -214,5 +224,20 @@ export async function sendGiftOffer(opts: {
     reason: "admin sent a gift-promotion offer from the supply-gap queue",
   });
 
-  return { ok: true, therapistName: name, email: t.email as string };
+  // מי נשאר בחיתוך הזה. ההצעה נסגרת אחרי שליחה אחת בכוונה - לא מחלקים
+  // שלושה קידומי מתנה על אותו חיתוך - אבל עד 20/8/26 המועמדים הנותרים
+  // פשוט נעלמו מהמסך בלי מילה. עכשיו הם מוחזרים לתצוגה, ואם לא תגיע
+  // תשובה תוך GIFT_OFFER_WAIT_DAYS הם יוצעו מחדש בריצה הבאה של הסוכן.
+  const remaining = candidates
+    .filter((c) => c.therapist_id !== opts.therapistId)
+    .map((c) => c.full_name ?? "")
+    .filter(Boolean);
+
+  return {
+    ok: true,
+    therapistName: name,
+    email: t.email as string,
+    remaining,
+    reofferAfterDays: GIFT_OFFER_WAIT_DAYS,
+  };
 }

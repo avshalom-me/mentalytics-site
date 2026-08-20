@@ -130,10 +130,83 @@ function treatmentLabel(t: string): string {
   return /^[a-z0-9\s-]+$/i.test(t) ? t.toUpperCase() : t;
 }
 
+// ── חיתוך משולב ────────────────────────────────────────────────────────
+// מטופל שמבקש "CBT + טיפול דינאמי" מייצר מחרוזת אחת, ועד 20/8/26 היא
+// הושוותה כמכלול מול תחומי ההתמחות של המטפל. אין מטפל שרשום אצלו תחום
+// בשם "CBT + טיפול דינאמי", ולכן אף מועמד לא נמצא לעולם וכל חיתוך משולב
+// סווג כ"אין לנו אף מטפל" ונשלח לרשימת הגיוס. בפועל 15 מתוך 26 פערי
+// הגיוס היו כאלה, והביקוש הגדול ביותר בנתונים הוא בדיוק שילוב כזה.
+//
+// נוסף לזה פיצול וריאנטים: "טיפול CBT + טיפול דינאמי" ו-"CBT + טיפול
+// דינאמי" נספרו כשני חיתוכים נפרדים, כל אחד מתחת לסף - וכך ריכוז ביקוש
+// אמיתי נראה כפירורים.
+
+function normTreat(v: string): string {
+  return v.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+// וריאנטים שהם אותו תחום. הרשימה מכוונת ומינימלית: רק תחילית "טיפול"
+// לפני ראשי תיבות לועזיים, שם ההבדל הוא ניסוח ולא תוכן.
+const TREATMENT_ALIASES: Record<string, string> = {
+  "טיפול cbt": "cbt",
+  "טיפול dbt": "dbt",
+  "טיפול emdr": "emdr",
+  "טיפול cpt": "cpt",
+  "טיפול act": "act",
+};
+
+function canonicalPart(raw: string): string {
+  const n = normTreat(raw);
+  return TREATMENT_ALIASES[n] ?? n;
+}
+
+/** פירוק "CBT + טיפול דינאמי" לרכיביו, בלי כפילויות ובסדר קבוע. */
+export function treatmentParts(raw: string): string[] {
+  const parts = raw
+    .split("+")
+    .map((x) => x.trim())
+    .filter(Boolean);
+  return parts.length > 0 ? parts : [raw.trim()].filter(Boolean);
+}
+
+function canonicalParts(raw: string): string[] {
+  return Array.from(new Set(treatmentParts(raw).map(canonicalPart))).sort();
+}
+
+/** מפתח הצבירה: שני ניסוחים של אותו שילוב מתמזגים לחיתוך אחד. */
+function treatmentKey(raw: string): string {
+  return canonicalParts(raw).join(" + ");
+}
+
+/** ניסוח קריא לשילוב: "שילוב של CBT וטיפול דינאמי", "X, Y ו-Z".
+ *  ו' לפני מילה לועזית מקבלת מקף ("ו-CPT"), אחרת היא נדבקת אליה. */
+function joinWithVav(word: string): string {
+  return /^[a-z0-9]/i.test(word) ? `ו-${word}` : `ו${word}`;
+}
+
+function treatmentPhrase(raw: string): string {
+  const parts = treatmentParts(raw).map(treatmentLabel);
+  if (parts.length === 1) return parts[0];
+  const last = joinWithVav(parts[parts.length - 1]);
+  const head = parts.slice(0, -1).join(", ");
+  // "שילוב של" - כדי שהמטפל יבין שהמטופל ביקש את הצירוף, ולא שהיו כמה
+  // מטופלים שכל אחד ביקש משהו אחר.
+  return `שילוב של ${head} ${last}`;
+}
+
 // טיוטת הצעת הקידום. תבנית קבועה בטון עובדתי-מסייע: מובילה בצורך שלנו,
 // לא במספרי הביצועים של המטפל, ובלי ניסוחים שיווקיים.
-function buildGiftDraft(name: string, regionKey: string, rawTreatment: string, events: number): string {
-  const treatment = treatmentLabel(rawTreatment);
+function buildGiftDraft(
+  name: string,
+  regionKey: string,
+  rawTreatment: string,
+  events: number,
+  // התאמה חלקית: המטופלים ביקשו שילוב, והנמען עוסק בחלק ממנו. נאמר
+  // במפורש בטיוטה - הצעה שמתיימרת להתאמה מלאה כשהיא חלקית היא בדיוק
+  // סוג ההבטחה שמאבדת אמון.
+  coveredPart?: string
+): string {
+  const treatment = treatmentPhrase(rawTreatment);
   const where = regionPhrase(regionKey);
   // בטיוטה היוצאת לא מציינים מספר מדויק - "מספר רב" נכון יותר לקריאה
   // ולא מעמיד את המספר במרכז. הספירה המדויקת נשארת בגוף ההצעה באדמין.
@@ -147,12 +220,16 @@ function buildGiftDraft(name: string, regionKey: string, rawTreatment: string, e
       ? `בחודשיים האחרונים ${events >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים"} חיפשו ${treatment} ${where} ${matchingSystem}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע להם.`
       : `לאחרונה מטופל חיפש ${treatment} ${where} ${matchingSystem}, ולא היו לנו מספיק מטפלים בתחום ובאזור הזה להציע לו.`;
 
+  const fitLine = coveredPart
+    ? `הפרופיל שלך מתאים ל${treatmentLabel(coveredPart)}, שהוא חלק מהשילוב הזה`
+    : "הפרופיל שלך מתאים לחיתוך הזה";
+
   return [
     `שלום ${name},`,
     ``,
     demandLine,
     ``,
-    `הפרופיל שלך מתאים לחיתוך הזה, ולכן אנחנו מציעים לך להצטרף לקידום במסלול הבא: ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, ולאחריהם 140 ש"ח + מע"מ לחודש.`,
+    `${fitLine}, ולכן אנחנו מציעים לך להצטרף לקידום במסלול הבא: ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, ולאחריהם 140 ש"ח + מע"מ לחודש.`,
     ``,
     `מה זה אומר בפועל:`,
     `• הפרופיל שלך ייכנס למערכת ההתאמות ויוצג למטופלים שמחפשים ${treatment} ${where}, מיד עם ההצטרפות.`,
@@ -212,7 +289,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     type Agg = { regionKey: string; treatment: string; sessions: Set<string>; events: number; lastSeen: string };
     const agg = new Map<string, Agg>();
     const touch = (regionKey: string, treatment: string, sessionKey: string | null, at: string): void => {
-      const key = `${regionKey}|${treatment}`;
+      const key = `${regionKey}|${treatmentKey(treatment)}`;
       const prev = agg.get(key);
       if (prev) {
         if (sessionKey) prev.sessions.add(sessionKey);
@@ -265,24 +342,55 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // חיתוכים שיצאה בהם הצעה בטווח ההמתנה - לא מציעים שוב עד שתגיע תשובה.
     const waitCutoff = new Date(Date.now() - GIFT_OFFER_WAIT_DAYS * 86_400_000).toISOString();
     const waitingByGap = new Map<string, string>();
+    // חיתוך שיצאה בו הצעה, חלון ההמתנה חלף, והוא עדיין פער - כלומר לא
+    // התקבלה תשובה. הוא חוזר לתור עם המועמדים הנותרים בלבד, והפעם עם
+    // ההקשר: למי כבר פנינו ומתי.
+    const lapsedByGap = new Map<string, { name: string; sentAt: string }>();
+    const offerNames = new Map<string, string>(
+      therapists.map((t) => [t.id, t.full_name ?? ""])
+    );
     for (const o of sentOffers) {
-      if (o.sent_at < waitCutoff) continue;
-      const key = `${o.region}|${o.treatment}`;
-      const prev = waitingByGap.get(key);
-      if (!prev || o.sent_at > prev) waitingByGap.set(key, o.sent_at);
+      const key = `${o.region}|${treatmentKey(o.treatment)}`;
+      if (o.sent_at >= waitCutoff) {
+        const prev = waitingByGap.get(key);
+        if (!prev || o.sent_at > prev) waitingByGap.set(key, o.sent_at);
+        continue;
+      }
+      const prevLapsed = lapsedByGap.get(key);
+      if (!prevLapsed || o.sent_at > prevLapsed.sentAt) {
+        lapsedByGap.set(key, { name: offerNames.get(o.therapist_id) ?? "", sentAt: o.sent_at });
+      }
     }
     const waitingGaps: WaitingGap[] = [];
 
     // התאמה לקבוצת אזור: מטפל מכסה את הקבוצה אם הוא מכסה אחד מהאזורים שבה.
     // "online" אינו מקום אלא אופן עבודה, ולכן נבדק מול דגל האונליין.
-    const matchesGap = (t: TherapistRow, regionKey: string, treatment: string): boolean => {
-      const inRegion =
-        regionKey === "online"
-          ? t.online === true
-          : (REGION_GROUPS[regionKey] ?? []).some((r) => coversRegion(t.regions ?? [], r));
-      if (!inRegion) return false;
-      if (treatment === "כללי") return true;
-      return overlaps(t.training_areas ?? [], [treatment]);
+    const inGapRegion = (t: TherapistRow, regionKey: string): boolean =>
+      regionKey === "online"
+        ? t.online === true
+        : (REGION_GROUPS[regionKey] ?? []).some((r) => coversRegion(t.regions ?? [], r));
+
+    // "all" = המטפל עוסק בכל רכיבי השילוב (ההתאמה האמיתית לבקשת המטופל).
+    // "any" = עוסק לפחות באחד מהם - תשובה חלקית, אבל תשובה.
+    const matchesGap = (
+      t: TherapistRow,
+      regionKey: string,
+      treatment: string,
+      mode: "all" | "any" = "any"
+    ): boolean => {
+      if (!inGapRegion(t, regionKey)) return false;
+      const parts = treatmentParts(treatment);
+      if (parts.length === 0 || parts.some((p) => canonicalPart(p) === "כללי")) return true;
+      const areas = t.training_areas ?? [];
+      const covers = (p: string) => overlaps(areas, [p]);
+      return mode === "all" ? parts.every(covers) : parts.some(covers);
+    };
+
+    /** איזה רכיב מהשילוב המטפל מכסה - לניסוח כן בטיוטה. */
+    const coveredPartOf = (t: TherapistRow, treatment: string): string | undefined => {
+      const parts = treatmentParts(treatment);
+      if (parts.length < 2) return undefined;
+      return parts.find((p) => overlaps(t.training_areas ?? [], [p]));
     };
 
     const gaps: SupplyGap[] = [];
@@ -301,13 +409,21 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       const regionLabel = regionGroupLabel(a.regionKey);
 
       // הצעה כבר בדרך לחיתוך הזה - ממתינים לתשובה ולא מציפים שוב.
-      const waitingSince = waitingByGap.get(`${regionLabel}|${a.treatment}`);
+      const gapKey = `${regionLabel}|${treatmentKey(a.treatment)}`;
+      const waitingSince = waitingByGap.get(gapKey);
       if (waitingSince) {
         waitingGaps.push({ region: regionLabel, treatment: a.treatment, sentAt: waitingSince });
         continue;
       }
 
-      const matching = freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment));
+      // התאמה מלאה קודמת: מי שעוסק בכל רכיבי השילוב הוא התשובה הנכונה
+      // למטופל. רק אם אין כזה עוברים למי שעוסק בחלק ממנו, והטיוטה תאמר
+      // את זה במפורש.
+      const fullMatch = freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "all"));
+      const matching = fullMatch.length > 0
+        ? fullMatch
+        : freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "any"));
+      const partialOnly = fullMatch.length === 0;
       const fresh = matching.filter((t) => !offeredRecently.has(t.id));
       // כל המתאימים כבר קיבלו הצעה בחלון הצינון: אין למי להציע, אבל גם אסור
       // להכריז "אין אף מטפל מתאים" ולשלוח את זה לגיוס - זו הצהרה לא נכונה.
@@ -317,9 +433,16 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         therapist_id: t.id,
         full_name: t.full_name ?? "",
         email: t.email ?? "",
-        draft: buildGiftDraft(t.full_name ?? "", a.regionKey, a.treatment, demand),
+        draft: buildGiftDraft(
+          t.full_name ?? "",
+          a.regionKey,
+          a.treatment,
+          demand,
+          partialOnly ? coveredPartOf(t, a.treatment) : undefined
+        ),
       }));
 
+      const lapsed = lapsedByGap.get(gapKey);
       const kind: "gift" | "recruit" = candidates.length > 0 ? "gift" : "recruit";
       gaps.push({
         key: `gap:${kind}:${a.regionKey}|${a.treatment}`,

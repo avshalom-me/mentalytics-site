@@ -500,13 +500,24 @@ function GiftOfferCard({
     setSending(true);
     setError("");
     try {
-      await postAgents("gift_offer_send", {
+      const j = await postAgents("gift_offer_send", {
         id: action.id,
         therapist_id: selected.therapist_id,
         subject,
         body: draft,
       });
-      onSent(`ההצעה נשלחה אל ${selected.full_name} (${selected.email})`);
+      // מה קרה למועמדים האחרים: ההצעה נסגרת אחרי שליחה אחת (לא מחלקים
+      // שלושה קידומי מתנה על אותו חיתוך), ובלי המשפט הזה הם פשוט נעלמו.
+      const left = Array.isArray(j.remaining) ? (j.remaining as string[]) : [];
+      const days = typeof j.reoffer_after_days === "number" ? j.reoffer_after_days : null;
+      onSent(
+        `ההצעה נשלחה אל ${selected.full_name} (${selected.email})` +
+          (left.length > 0
+            ? ` · ${left.join(", ")} נשמרו לגיבוי${
+                days ? ` ויוצעו מחדש בעוד ${days} יום אם לא תגיע תשובה` : ""
+              }`
+            : "")
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "השליחה נכשלה");
     } finally {
