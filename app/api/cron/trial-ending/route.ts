@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { sendTrialEndingEmail, trialEndingVariant, type TrialStats } from "@/app/lib/trial-ending-email";
@@ -142,20 +143,27 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
       continue;
     }
 
+    // מטפל של מרכז - היעד הוא המרכז, שהוא בעל החשבון והיחיד שיכול לפעול
+    // (ראו therapist-recipient). נפתר לפני התצוגה המקדימה ולא אחריה, אחרת
+    // התצוגה מבטיחה נמען אחד וההרצה האמיתית שולחת לאחר.
+    const target = await operationalMailTarget(t.id);
+
     results.push({
-      name: t.full_name, to: t.email, daysLeft, variant,
+      name: t.full_name, to: target.to ?? t.email, daysLeft, variant,
+      ...(target.viaCenter ? { via_center: target.viaCenter.name } : {}),
       stage: isReminder ? "reminder" : "notice", ...stats,
     });
 
     if (!opts.send) continue;
+    if (!target.to) { skipped++; continue; }
 
     // תבנית מאושרת (הבהרת 19/8): תזכורת סוף המתנה היא התנהגות ותיקה
     // שהוחלט עליה - השער חוסם רק תבניות שלא אושרו.
-    const gate = automatedSendAllowed(t.email, "trial_ending");
+    const gate = automatedSendAllowed(target.to, "trial_ending");
     if (!gate.allowed) { skipped++; continue; }
 
     const r = await sendTrialEndingEmail({
-      to: t.email, name: t.full_name ?? "", stats, daysLeft, isReminder,
+      to: target.to, name: t.full_name ?? "", stats, daysLeft, isReminder,
     });
     if (r.ok) {
       sent++;

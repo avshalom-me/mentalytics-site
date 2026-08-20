@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import {
@@ -603,8 +604,14 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email, profile_photo_path, regions, therapist_types, training_areas")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      // מטפל של מרכז: הבקשה מגיעה למרכז, כי המרכז הוא היחיד שיכול לערוך
+      // את הפרופיל (ראו therapist-recipient).
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
       }
       const { count: certCount } = await supabaseAdmin
         .from("therapist_certificates")
@@ -618,7 +625,7 @@ export async function PATCH(request: Request) {
           ? body.message.trim().slice(0, 4000)
           : defaultCompletionMessage(missing);
       const sent = await sendTherapistCompletionRequestEmail({
-        to: t.email,
+        to: target.to,
         name: t.full_name ?? "",
         message,
       });
@@ -644,7 +651,7 @@ export async function PATCH(request: Request) {
         after: { missing, message },
         reason: "admin requested profile completion",
       });
-      return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt });
+      return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin-triggered GENERAL message — a free-text note with a custom subject
@@ -657,8 +664,12 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
       }
       const message = typeof body.message === "string" ? body.message.trim().slice(0, 4000) : "";
       const subject = typeof body.subject === "string" ? body.subject.trim().slice(0, 200) : "";
@@ -666,7 +677,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ ok: false, error: "message required" }, { status: 400 });
       }
       const sent = await sendTherapistAdminMessageEmail({
-        to: t.email,
+        to: target.to,
         name: t.full_name ?? "",
         subject,
         message,
@@ -684,7 +695,7 @@ export async function PATCH(request: Request) {
         after: { subject, message },
         reason: "admin sent a message to the therapist",
       });
-      return NextResponse.json({ ok: true, id });
+      return NextResponse.json({ ok: true, id, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin-triggered "write an article, get 2 months promoted free" invite —
@@ -697,10 +708,14 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
       }
-      const sent = await sendArticleInviteEmail({ to: t.email, name: t.full_name ?? "" });
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
+      }
+      const sent = await sendArticleInviteEmail({ to: target.to, name: t.full_name ?? "" });
       if (!sent.ok) {
         return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
       }
@@ -722,7 +737,7 @@ export async function PATCH(request: Request) {
         after: {},
         reason: "admin invited the therapist to write an article for a promo gift",
       });
-      return NextResponse.json({ ok: true, id, article_invite_sent_at: invitedAt });
+      return NextResponse.json({ ok: true, id, article_invite_sent_at: invitedAt, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin deletes a single certificate (e.g. the therapist uploaded the wrong

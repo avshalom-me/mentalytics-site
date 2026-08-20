@@ -14,6 +14,7 @@ import {
 import { VAT_RATE } from "@/app/lib/crm";
 import { writeAudit } from "@/app/lib/audit";
 import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
@@ -511,9 +512,11 @@ export async function GET(req: NextRequest) {
       // תבנית מאושרת (הבהרת 19/8): ההודעה יוצאת, כי שורש תקלת רועי חנין
       // תוקן - סטטוס ביניים כבר לא נקרא כביטול, ורק ביטול מאושש מגיע לכאן.
       // הרשימה המרוכזת אלינו נשארת כגיבוי לכל מקרה שנחסם.
-      if (t.email && automatedSendAllowed(t.email, "promotion_ended:payment_failed").allowed) {
+      // מטפל של מרכז - המרכז הוא בעל החשבון ואליו ההודעה מגיעה.
+      const endedTarget = await operationalMailTarget(t.id);
+      if (endedTarget.to && automatedSendAllowed(endedTarget.to, "promotion_ended:payment_failed").allowed) {
         await sendPromotionEndedEmail({
-          to: t.email,
+          to: endedTarget.to,
           name: t.full_name ?? "",
           reason: "payment_failed" as PromotionEndedReason,
         });
@@ -567,9 +570,10 @@ export async function GET(req: NextRequest) {
         reason: "trial_or_manual_expired",
       });
 
-      if (t.email && automatedSendAllowed(t.email, "promotion_ended:trial_expired").allowed) {
+      const trialTarget = await operationalMailTarget(t.id);
+      if (trialTarget.to && automatedSendAllowed(trialTarget.to, "promotion_ended:trial_expired").allowed) {
         await sendPromotionEndedEmail({
-          to: t.email,
+          to: trialTarget.to,
           name: t.full_name ?? "",
           reason: "trial_expired",
         });

@@ -97,6 +97,7 @@ export default function CenterTherapistFormPage() {
     education: "",
     experience: "",
     license_number: "",
+    publication_links: [] as string[],
     price: "",
     accepting_new_patients: true,
   });
@@ -145,6 +146,7 @@ export default function CenterTherapistFormPage() {
             languages: t.languages ?? [],
             couples_modalities: t.couples_modalities ?? [],
             cogfun_age_groups: t.cogfun_age_groups ?? [],
+            publication_links: t.publication_links ?? [],
             style_q1: t.style_q1 ?? null,
             style_q2: t.style_q2 ?? null,
             activity_level: t.activity_level ?? null,
@@ -477,6 +479,50 @@ export default function CenterTherapistFormPage() {
             selected={form.cultural_prefs} onChange={v => setForm({...form, cultural_prefs: v})} />
           <CheckboxGroup label="הסדרים" options={ARRANGEMENTS}
             selected={form.arrangements} onChange={v => setForm({...form, arrangements: v})} />
+
+          {/* השדה היחיד שהשרת התיר למרכז לערוך אבל הטופס לא הציג (20/8/2026):
+              publication_links נמצא ב-THERAPIST_EDIT_FIELDS, ומטפל עצמאי עורך
+              אותו בדשבורד שלו - למרכז פשוט לא הייתה תיבה. */}
+          <div className="mt-5">
+            <label className="mb-1 block text-sm font-semibold text-stone-800">
+              קישורים לפרסומים <span className="font-normal text-stone-400">(לא חובה, עד 10)</span>
+            </label>
+            <p className="mb-2 text-xs text-stone-500">
+              מאמרים אקדמיים, פרסומים מקצועיים או כתבות. מוצגים בפרופיל הציבורי ומחזקים אותו גם מול גוגל.
+            </p>
+            {form.publication_links.map((link, i) => (
+              <div key={i} className="mb-2 flex gap-2">
+                <input
+                  value={link}
+                  onChange={e => {
+                    const next = [...form.publication_links];
+                    next[i] = e.target.value;
+                    setForm({ ...form, publication_links: next });
+                  }}
+                  dir="ltr"
+                  className="flex-1 rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+                  placeholder="https://..."
+                />
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, publication_links: form.publication_links.filter((_, j) => j !== i) })}
+                  className="rounded-xl border border-stone-200 px-3 text-sm text-stone-500 hover:bg-stone-50"
+                  aria-label={`הסרת קישור ${i + 1}`}
+                >
+                  הסרה
+                </button>
+              </div>
+            ))}
+            {form.publication_links.length < 10 && (
+              <button
+                type="button"
+                onClick={() => setForm({ ...form, publication_links: [...form.publication_links, ""] })}
+                className="rounded-xl border border-dashed border-stone-300 px-4 py-2 text-sm font-semibold text-[#2e7d8c] hover:bg-stone-50"
+              >
+                + הוספת קישור
+              </button>
+            )}
+          </div>
         </div>
 
         {!isEntity && (

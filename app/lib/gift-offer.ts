@@ -1,4 +1,5 @@
 import "server-only";
+import { operationalMailTarget } from "./therapist-recipient";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendGiftOfferEmail } from "./therapist-emails";
 import { writeAudit } from "./audit";
@@ -160,7 +161,11 @@ export async function sendGiftOffer(opts: {
     ? body.replace(JOIN_LINK_PLACEHOLDER, joinUrl)
     : `${body}\n\n${joinUrl}`;
 
-  const sent = await sendGiftOfferEmail({ to: t.email as string, name, subject, message: bodyWithLink });
+  // מטפל של מרכז - ההצעה מגיעה למרכז, שהוא בעל החשבון ומי שיממש אותה.
+  const target = await operationalMailTarget(opts.therapistId);
+  if (!target.to) return { ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" };
+
+  const sent = await sendGiftOfferEmail({ to: target.to, name, subject, message: bodyWithLink });
   if (!sent.ok) {
     // המייל לא יצא - ההצעה נשארת ממתינה בתור כדי שאפשר יהיה לנסות שוב.
     return { ok: false, error: sent.error || "שליחת המייל נכשלה" };

@@ -1,5 +1,6 @@
 import "server-only";
 import { automatedSendAllowed } from "./automated-email-guard";
+import { operationalMailTargets } from "./therapist-recipient";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendBulkEmail } from "./email-quota";
 import { promotedPlanTable } from "./promoted-plan-table";
@@ -148,15 +149,20 @@ export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promi
       return { ok: true, sent: 0, targets, previewOnly: true };
     }
 
+    // יעד תפעולי לכל מטפל: מטפל של מרכז - המרכז. שאילתה אחת לכל הקבוצה.
+    const mailTargets = await operationalMailTargets(targets.map((t) => t.therapistId));
+
     let sent = 0;
     for (const t of targets) {
+      const to = mailTargets.get(t.therapistId)?.to;
+      if (!to) continue;
       // תבנית מאושרת (הבהרת 19/8): זו הבטחה מפורשת ממסך ההצטרפות, והמשתמש
       // אישר את האוטומטיות שלה פעמיים. השער ממשיך לחסום כל תבנית אחרת.
-      if (!automatedSendAllowed(t.email, "gift_trial_first_charge").allowed) continue;
+      if (!automatedSendAllowed(to, "gift_trial_first_charge").allowed) continue;
 
       const res = await sendBulkEmail({
         from: FROM,
-        to: t.email,
+        to,
         subject: `החיוב הראשון שלך ב-${hebDate(t.chargeDate)} - טיפול חכם`,
         html: buildHtml(t),
         replyTo: "admin@getmentalytics.com",
