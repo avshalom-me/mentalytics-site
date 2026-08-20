@@ -947,6 +947,9 @@ export default function AdultsPage() {
           therapist: {
             id: t.id,
             full_name: t.full_name,
+            // מגיע ממנוע ההתאמה - כדי שההסבר ינקוב באותו תואר שמופיע
+            // בכותרת הפרופיל שאליו המטופל יגיע.
+            public_title: t.public_title ?? null,
             therapist_types: t.therapist_types ?? [],
             training_areas: t.training_areas ?? [],
             couples_modalities: t.couples_modalities ?? [],

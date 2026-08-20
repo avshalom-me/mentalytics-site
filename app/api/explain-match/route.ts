@@ -41,6 +41,10 @@ const BodySchema = z.object({
     bio: z.string().nullable().optional(),
     // 'center' = מרכז טיפולי (מסלול 2) ולא אדם - משנה כותרת, גוף ולשון.
     entity_type: z.string().nullable().optional(),
+    /** התואר הציבורי כפי שמוצג בכותרת הפרופיל (ראו publicTherapistTitle). */
+    public_title: z.string().nullable().optional(),
+    /** משמש לגזירת public_title בצד השרת כשהלקוח לא שלח אותו. */
+    age_groups: z.array(z.string()).nullable().optional(),
   }),
 
   match_result: z.object({
@@ -178,6 +182,10 @@ function buildPrompt(body: Body): string {
     user_summary: body.user_summary ?? {},
     therapist: {
       full_name: body.therapist.full_name,
+      // התואר כפי שהמטופל רואה אותו בכותרת הפרופיל. therapist_types נשאר
+      // לצדו כחומר נימוק - בלעדיו ההסבר היה מאבד את "הבעה ויצירה" ולא יכול
+      // להסביר את ההתאמה האמנותית, שהיא בדיוק החוזק של המטפלים האלה.
+      public_title: body.therapist.public_title ?? null,
       therapist_types: body.therapist.therapist_types ?? [],
       training_areas: body.therapist.training_areas ?? [],
       couples_modalities: body.therapist.couples_modalities ?? [],
@@ -260,6 +268,7 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
 **המשימה:** כתוב הסבר בן **שתי פסקאות**, מופרדות בשורה ריקה ("\\n\\n"). כל פסקה 2-4 משפטים.
 
 **פסקה 1 — מה במטפל/ת מתאים לצרכים שעלו**:
+כשאתה נוקב בתואר המקצועי - השתמש ב-therapist.public_title אם הוא קיים, ולא בערך הגולמי מ-therapist_types (שם התואר מנוסח לצורך המערכת ולא לצורך המטופל).
 סנתז מתוך match_reasons, matched_fields ושדות הפרופיל (training_areas, therapist_types, couples_modalities, bio) את ההתאמה המקצועית — אילו תחומי הכשרה/גישות של המטפל/ת עונים על מה שעלה בשאלון (main_needs / recommended_treatment_types / recommended_assessment_types).
 - **כלל עיגון:** קשור כל נקודת חוזק לצורך ספציפי שעלה אצל המשתמש — אל תכתוב שבחים כלליים ("מטפל/ת מנוסה ומקצועי/ת") שאינם נשענים על שדה שסופק.
 

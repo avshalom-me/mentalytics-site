@@ -6,7 +6,7 @@ import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
 import { specialtyToSlug } from "@/app/lib/specialties";
-import { genderTitle, genderTitles } from "@/app/lib/gender-text";
+import { genderTitle, genderTitles, publicTherapistTitle } from "@/app/lib/gender-text";
 import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/therapist-url";
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
@@ -89,6 +89,9 @@ type SimilarTherapist = {
   regions: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
+  /** נדרש לכלל התואר הציבורי - בלעדיו הכרטיס הזה היה היחיד בעמוד שמציג
+   *  "מטפלת בהבעה ויצירה" בזמן שהכותרת למעלה אומרת "פסיכותרפיסטית". */
+  age_groups: string[] | null;
 };
 
 // Alternatives shown on an unavailable therapist's profile: same professional
@@ -103,7 +106,7 @@ async function getSimilarTherapists(t: TherapistRow, limit = 3): Promise<Similar
 
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, gender, therapist_types, regions, profile_photo_path, status, accepting_new_patients")
+    .select("id, full_name, gender, therapist_types, regions, profile_photo_path, status, accepting_new_patients, age_groups")
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .eq("accepting_new_patients", true)
@@ -141,7 +144,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!therapist) return { title: "מטפל לא נמצא" };
 
   const name = therapist.full_name ?? "מטפל";
-  const type = genderTitle(therapist.therapist_types?.[0] ?? "מטפל נפשי", therapist.gender);
+  const type = publicTherapistTitle(
+    therapist.therapist_types?.[0] ?? "מטפל נפשי",
+    therapist.gender,
+    therapist.age_groups
+  );
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
   // Stable, crawlable photo URL (see app/therapist-photo/[id]/route.ts). Gives
@@ -220,7 +227,9 @@ export default async function TherapistProfilePage({
   ]);
   const t = therapistRow;
   const name = t.full_name ?? "מטפל";
-  const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
+  // הכותרת, ה-H1 ו-jobTitle בסכמה. שורת "הכשרה" בגוף העמוד נשארת על
+  // genderTitles ומציגה את ההסמכה כלשונה - זו כל הנקודה של ההפרדה.
+  const type = publicTherapistTitle(t.therapist_types?.[0] ?? "", t.gender, t.age_groups);
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   // Stable public photo URL (indexable) - replaces the 24h signed URL for both
   // display and structured data. Falls back to the gender avatar when no photo.
@@ -378,7 +387,7 @@ export default async function TherapistProfilePage({
                   <div className="font-extrabold text-stone-900 truncate">{s.full_name}</div>
                   {s.therapist_types?.[0] && (
                     <div className="text-sm font-semibold" style={{ color: "var(--teal)" }}>
-                      {genderTitle(s.therapist_types[0], s.gender)}
+                      {publicTherapistTitle(s.therapist_types[0], s.gender, s.age_groups)}
                     </div>
                   )}
                   {(s.regions?.length ?? 0) > 0 && (

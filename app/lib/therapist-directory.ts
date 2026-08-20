@@ -100,6 +100,9 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     regions: t.regions ?? [],
     cultural_prefs: t.cultural_prefs ?? [],
     arrangements: t.arrangements ?? [],
+    // נטען כבר לסינון, ונשמט כאן עד 20/8/26 - ובלעדיו כרטיסי המאגר לא יכלו
+    // להחיל את כלל התואר הציבורי (הבעה ויצירה + מבוגרים ← פסיכותרפיסט/ית).
+    age_groups: t.age_groups ?? [],
     profile_photo_path: t.profile_photo_path ?? null,
     profile_photo_url,
     tier: tierOf(t),

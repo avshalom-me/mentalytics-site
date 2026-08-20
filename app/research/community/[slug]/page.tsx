@@ -43,8 +43,8 @@ type ArticleRow = {
   canonical_url: string | null;
   author_name: string | null;
   therapists:
-    | { full_name: string | null; therapist_types: string[] | null; gender: string | null }
-    | { full_name: string | null; therapist_types: string[] | null; gender: string | null }[]
+    | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }
+    | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }[]
     | null;
 };
 
@@ -52,7 +52,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender, age_groups)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -72,7 +72,7 @@ function authorRole(row: ArticleRow): string {
   const t = Array.isArray(row.therapists) ? row.therapists[0] : row.therapists;
   return (t?.therapist_types ?? [])
     .filter(Boolean)
-    .map((tp) => therapistTypeLabel(tp, t?.gender))
+    .map((tp) => therapistTypeLabel(tp, t?.gender, t?.age_groups ?? null))
     .join(" · ");
 }
 

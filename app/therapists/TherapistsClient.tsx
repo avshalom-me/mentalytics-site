@@ -4,7 +4,7 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { genderTitle } from "@/app/lib/gender-text";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
 import { gaEvent } from "@/app/lib/gtag";
@@ -51,6 +51,8 @@ export type PublicTherapist = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  /** דרוש לכלל התואר הציבורי (ראו publicTherapistTitle ב-gender-text). */
+  age_groups: string[];
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   // Ranking tier for the directory: 0 = paying (paid + center), 1 = gift
@@ -182,7 +184,9 @@ function TherapistCard({
             <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>
               {/* למרכז אין מגדר - הטיה מגדרית של התואר ("פסיכולוגית קלינית")
                   על שם של מוסד היא פשוט שגויה. */}
-              {isCenter ? t.therapist_types.slice(0, 2).join(" · ") : genderTitle(t.therapist_types[0], t.gender)}
+              {isCenter
+                ? t.therapist_types.slice(0, 2).join(" · ")
+                : publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups)}
             </div>
           )}
           {/* שיוך למרכז - טקסט בלבד: הכרטיס עטוף בקישור, ועוגן בתוך עוגן אינו

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PublicTherapist } from "./TherapistsClient";
+import { publicTypeOverride } from "@/app/lib/gender-text";
 import { REGION_PRICE_RANGE, REGION_PUBLIC_SERVICES } from "@/app/lib/region-public-services";
 import type { LocalArticle } from "@/app/lib/local-articles";
 
@@ -36,7 +37,14 @@ function typeBreakdown(therapists: PublicTherapist[]): { label: string; count: n
   const counts = new Map<string, number>();
   for (const t of therapists) {
     const main = t.therapist_types?.[0];
-    if (main) counts.set(main, (counts.get(main) ?? 0) + 1);
+    if (!main) continue;
+    // הכלל מוחל לכל אדם בנפרד, ואז מקבצים: עיר עם שלושה שמטפלים במבוגרים
+    // ואחת שרק בילדים תציג את שתי הקבוצות נכון. בלי זה השורה הזו הייתה
+    // אומרת "מטפל/ת בהבעה ויצירה" בזמן שכל הכרטיסים באותו עמוד אומרים
+    // "פסיכותרפיסטית". מגדר null בכוונה - זו ספירה ולא אדם, ולכן הצורה
+    // הכוללת.
+    const label = publicTypeOverride(main, null, t.age_groups) ?? main;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))

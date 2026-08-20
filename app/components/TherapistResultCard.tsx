@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { genderTitle } from "@/app/lib/gender-text";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { CITY_TO_REGION } from "@/app/lib/regions";
 import CardImpression from "@/app/components/CardImpression";
@@ -38,7 +38,7 @@ export default function TherapistResultCard({
   const isCenter = t.is_center === true;
   const type = isCenter
     ? t.therapist_types.slice(0, 2).join(" · ")
-    : t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
+    : t.therapist_types[0] ? publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const snippet = bioSnippet(t.bio);
   // "ret" lets the profile's back link return to THIS listing page (region /

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
@@ -858,6 +859,19 @@ export async function POST(req: NextRequest) {
           gender: therapist.gender,
           online: therapist.online,
           therapist_types: therapist.therapist_types,
+          // התואר כפי שהוא מוצג בכותרת הפרופיל. מחושב כאן ולא בלקוח כי
+          // age_groups לא משודר החוצה, והכלל חייב לצאת ממקום אחד (ראו
+          // publicTherapistTitle). ישות-מרכז לא מקבלת תואר אישי.
+          public_title:
+            therapist.entity_type === "center"
+              ? null
+              : parseArray(therapist.therapist_types)[0]
+                ? publicTherapistTitle(
+                    parseArray(therapist.therapist_types)[0],
+                    typeof therapist.gender === "string" ? therapist.gender : null,
+                    parseArray(therapist.age_groups),
+                  )
+                : null,
           training_areas: therapist.training_areas,
           couples_modalities: therapist.couples_modalities,
           regions: therapist.regions,

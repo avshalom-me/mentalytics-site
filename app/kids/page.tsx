@@ -2528,6 +2528,8 @@ type KidsMatchResult = {
   gender: string | null;
   online: unknown;
   therapist_types: unknown;
+  /** התואר הציבורי מ-/api/match (ראו publicTherapistTitle). */
+  public_title?: string | null;
   training_areas: unknown;
   regions: unknown;
   arrangements: unknown;
@@ -2690,6 +2692,9 @@ function KidsMatchSection({ A, score, selection }: {
           therapist: {
             id: t.id,
             full_name: t.full_name ?? "",
+            // מגיע ממנוע ההתאמה - כדי שההסבר ינקוב באותו תואר שמופיע
+            // בכותרת הפרופיל שאליו המטופל יגיע.
+            public_title: t.public_title ?? null,
             therapist_types: t.therapist_types ?? [],
             training_areas: t.training_areas ?? [],
             regions: toArr(t.regions),
