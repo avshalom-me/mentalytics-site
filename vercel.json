@@ -55,6 +55,10 @@
     {
       "schedule": "0 8 * * *",
       "path": "/api/cron/gift-trial-reminder"
+    },
+    {
+      "schedule": "45 4 * * *",
+      "path": "/api/cron/agent-retention"
     }
   ]
 }

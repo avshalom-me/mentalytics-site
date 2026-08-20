@@ -41,7 +41,7 @@ type TherapistRow = {
   phone: string | null;
   profile_photo_path: string | null;
   status: string | null;
-  promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | null (חינמי)
+  promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | 'gift_trial' (חלון מתנה, מתגלגל ל-paid בחיוב הראשון) | null (חינמי)
   match_paused_until: string | null; // הקפאה זמנית מההתאמות בלבד (ראו migration)
   style_q1: number | null;
   style_q2: number | null;

@@ -134,6 +134,7 @@ const AGENT_LABELS: Record<string, string> = {
   ads: "סוכן הפרסום",
   supply_gaps: "פערי היצע",
   finance: "סוכן הכספים",
+  retention: "שימור מטפלים",
 };
 
 type SupplyGap = {
@@ -159,6 +160,7 @@ const FINDING_HOMES: { agent: string; label: string; href: string }[] = [
   { agent: "supply_gaps", label: "פערי היצע בעמוד היצע/ביקוש", href: "/admin/supply-demand" },
   { agent: "ads", label: "ממצאי פרסום בעמוד הפרסום", href: "/admin/ads" },
   { agent: "finance", label: "פערי גבייה בעמוד הכספים", href: "/admin/finance" },
+  { agent: "retention", label: "סיכוני שימור בעמוד המטפלים", href: "/admin/therapists" },
 ];
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
@@ -519,6 +521,7 @@ export default function AgentsPage() {
 
   const [convLoading, setConvLoading] = useState(false);
   const [financeLoading, setFinanceLoading] = useState(false);
+  const [retentionLoading, setRetentionLoading] = useState(false);
   // איזה סוכן פתוח כרגע. אחד בלבד: חמישה גופי פלט פתוחים בו-זמנית הם בדיוק
   // מה שהפך את העמוד לגלילה ארוכה שבה כל סוכן חדש מוסיף עוד קומה.
   const [openAgent, setOpenAgent] = useState<string | null>(null);
@@ -584,6 +587,25 @@ export default function AgentsPage() {
 
   // סוכן הכספים: אין לו פאנל פלט כאן. הממצאים שלו הם פערי גבייה, ומקומם
   // בעמוד הכספים ליד המספרים עצמם - כאן נשארת רק ההרצה.
+  // סוכן השימור: כמו הכספים, בלי פאנל פלט - הממצאים חיים בעמוד המטפלים.
+  async function runRetentionNow() {
+    setRetentionLoading(true);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("retention_run");
+      const n = Array.isArray(j.findings) ? j.findings.length : 0;
+      setActionMsg(
+        n > 0 ? `נמצאו ${n} מטפלים בסיכון שימור - מוצגים בעמוד המטפלים` : "כל המשלמים עם פעילות תקינה"
+      );
+      load();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "שגיאה בבדיקת השימור");
+    } finally {
+      setRetentionLoading(false);
+    }
+  }
+
   async function runFinanceNow() {
     setFinanceLoading(true);
     setActionError("");
@@ -913,6 +935,7 @@ export default function AgentsPage() {
             { key: "ads", icon: "📣", label: "סוכן הפרסום", busy: adsLoading, onRun: runAdsNow, runLabel: "נטר" },
             { key: "conversions", icon: "📈", label: "המרות לגוגל", busy: convLoading, onRun: conversionsPreview, runLabel: "בדוק" },
             { key: "finance", icon: "💰", label: "סוכן הכספים", busy: financeLoading, onRun: runFinanceNow, runLabel: "התאם" },
+            { key: "retention", icon: "🤝", label: "שימור מטפלים", busy: retentionLoading, onRun: runRetentionNow, runLabel: "סרוק" },
           ]}
         />
         </div>

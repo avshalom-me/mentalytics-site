@@ -54,6 +54,7 @@ type SubscriptionRow = {
   amount: number | null;
   current_period_end: string | null;
   sync_miss_count: number | null;
+  first_charge_on: string | null;
 };
 
 type CenterRow = {
@@ -107,7 +108,7 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
       fetchAllRows<SubscriptionRow>(() =>
         supabaseAdmin
           .from("subscriptions")
-          .select("id, therapist_id, status, amount, current_period_end, sync_miss_count")
+          .select("id, therapist_id, status, amount, current_period_end, sync_miss_count, first_charge_on")
           .order("id")
       ),
       fetchAllRows<CenterRow>(() =>
@@ -135,7 +136,7 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
 
       // 1. במסלול משלם, מקור "paid", ואין מנוי פעיל: מקודם באתר בלי שאף
       //    אחד גובה ממנו. זו הדליפה הישירה ביותר.
-      if (onPayingTrack && src === "paid" && !sub) {
+      if (onPayingTrack && (src === "paid" || src === "gift_trial") && !sub) {
         findings.push({
           key: `fin:promoted_unbilled:${t.id}`,
           severity: "high",
@@ -273,6 +274,24 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
       }
     }
 
+    // 4ב. רשת ביטחון לגלגול המסלול: מטפל בחלון מתנה שהחיוב הראשון שלו
+    // כבר יצא אמור להתגלגל ל-paid בסנכרון היומי. אם הוא עדיין gift_trial
+    // ימים אחרי התאריך - הגלגול נכשל, והוא סופר כמתנה בזמן שהוא משלם.
+    for (const s of subs) {
+      if (s.status !== "active") continue;
+      const t = therapistById.get(s.therapist_id);
+      if (t?.promotion_source !== "gift_trial") continue;
+      const sinceCharge = daysSince(s.first_charge_on);
+      if (sinceCharge != null && sinceCharge > 3) {
+        findings.push({
+          key: `fin:gift_rollover_stuck:${s.id}`,
+          severity: "high",
+          title: `${t ? name(t) : "מטפל/ת"} משלם/ת כבר ${sinceCharge} ימים ועדיין רשום/ה כחלון מתנה`,
+          detail: `החיוב הראשון היה ב-${String(s.first_charge_on).slice(0, 10)} והגלגול ל-paid לא קרה. המשמעות: מדורג/ת מתחת למשלמים בהתאמות ולא נספר/ת באף מדד הכנסה.`,
+        });
+      }
+    }
+
     // --- ערבות ההחזר ---
     // חלון שנסגר בלי אף פנייה הוא התחייבות כספית שלנו, ולכן כל מקרה כזה
     // מדווח בנפרד. השאר מרוכז לשורה אחת: 17 שורות "בסכנה" הן רעש, מספר
@@ -319,7 +338,7 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
         `fin:trial_expired:${t.id}`,
         `fin:paying_not_promoted:${t.id}`,
       ]),
-      ...subs.flatMap((s) => [`fin:renewal_stale:${s.id}`, `fin:sync_miss:${s.id}`]),
+      ...subs.flatMap((s) => [`fin:renewal_stale:${s.id}`, `fin:sync_miss:${s.id}`, `fin:gift_rollover_stuck:${s.id}`]),
       ...centers.flatMap((c) => [
         `fin:center_no_recurring:${c.id}`,
         `fin:center_billing_stale:${c.id}`,

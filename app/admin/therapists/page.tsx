@@ -10,6 +10,7 @@ import {
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
+import AgentFindings from "../components/AgentFindings";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -1652,6 +1653,12 @@ export default function AdminTherapistsPage() {
       </div>
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+
+      {/* סיכוני שימור מסוכן ה-retention - ליד המטפלים עצמם, לא בעמוד הסוכנים.
+          מטפל משלם בלי לחיצות הוא הביטול הבא, והמקום לראות את זה הוא כאן. */}
+      {!centerScope && (
+        <AgentFindings agent="retention" title="מטפלים בסיכון שימור (מהסוכן)" limit={10} />
+      )}
 
       {incompleteCount > 0 && (
         <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-900">

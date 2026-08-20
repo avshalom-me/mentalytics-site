@@ -310,6 +310,7 @@ export async function GET(req: NextRequest) {
   // מי הושעה בגלל חיוב שנכשל. מאז 19/8/2026 לא נשלח אליהם מייל אוטומטי,
   // ולכן בלי הרשימה הזו ההשעיה הייתה קורית בלי שאיש יודע - לא הם ולא אנחנו.
   const demotedForPayment: { name: string; email: string; reason: string }[] = [];
+  let rolledToPaid = 0;
   let errors = 0;
   let stillActive = 0;
   let softMisses = 0;
@@ -407,6 +408,23 @@ export async function GET(req: NextRequest) {
           }
           if ((sub.sync_miss_count ?? 0) > 0) patch.sync_miss_count = 0;
           await supabase.from("subscriptions").update(patch).eq("id", sub.id);
+        }
+        // מסלול ההזמנה מתגלגל למשלם רגיל: לכאן מגיעים רק אחרי שחלון המתנה
+        // נגמר (בתוכו הלולאה מדלגת) וההוראה פעילה ממש (Status 0 - לא 12,
+        // "מתוזמנת", שפירושה שהחיוב הראשון עוד לא יצא). מרגע זה הוא לקוח
+        // משלם בכל המובנים: דירוג ההתאמות, ספירות המשלמים וערבות ההחזר
+        // (החלטת המשתמש 18/8/26). אם החיוב נכשל, Sumit מבטלת את ההוראה
+        // ומסלול ההורדה שלמטה מטפל בזה.
+        if (t.promotion_source === "gift_trial" && Number(target.Status) === 0) {
+          await supabase.from("therapists").update({ promotion_source: "paid" }).eq("id", t.id);
+          await writeAudit(supabase, {
+            therapistId: t.id,
+            actorType: "cron",
+            action: "promotion_source:gift_trial->paid",
+            before: { promotion_source: "gift_trial" },
+            after: { promotion_source: "paid" },
+          });
+          rolledToPaid++;
         }
         if (await mirrorRenewalCharge(t.id, target, sub?.amount ?? null)) renewalsRecorded++;
         continue;
@@ -979,6 +997,7 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({
     checked,
     stillActive,
+    rolledToPaid,
     softMisses,
     demoted,
     demoted_for_payment: demotedForPayment.length,
