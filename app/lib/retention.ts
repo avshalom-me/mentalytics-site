@@ -43,6 +43,8 @@ type TRow = {
   promotion_source: string | null;
   promoted_since: string | null;
   match_paused_until: string | null;
+  center_account_id: string | null;
+  entity_type: string | null;
 };
 
 function nameOf(t: TRow): string {
@@ -69,7 +71,7 @@ export async function runRetention(): Promise<RetentionRun> {
       fetchAllRows<TRow>(() =>
         supabaseAdmin
           .from("therapists")
-          .select("id, full_name, status, promotion_source, promoted_since, match_paused_until")
+          .select("id, full_name, status, promotion_source, promoted_since, match_paused_until, center_account_id, entity_type")
           .eq("status", "paying")
           .order("id")
       ),
@@ -100,6 +102,22 @@ export async function runRetention(): Promise<RetentionRun> {
     const firstChargeByTherapist = new Map<string, string | null>();
     for (const s of subs) firstChargeByTherapist.set(s.therapist_id, s.first_charge_on);
 
+    // הלקוח של מטפל-מרכז הוא המרכז: ממצא פר-מטפל היה מציף חמש שורות על
+    // לקוח אחד ומפספס את התמונה ("המרכז כולו שקוף"). לכן מטפלי מרכז
+    // נאספים בצד ומקובצים לממצא אחד לכל מרכז, ושורת ישות (מסלול 2)
+    // מסומנת כמרכז ולא כ"מטפל/ת".
+    const centerNames = new Map<string, string>();
+    {
+      const centerIds = [...new Set(therapists.map((t) => t.center_account_id).filter(Boolean) as string[])];
+      if (centerIds.length > 0) {
+        const { data: centerRows } = await supabaseAdmin
+          .from("therapy_center_accounts")
+          .select("id, name")
+          .in("id", centerIds);
+        for (const c of centerRows ?? []) centerNames.set(c.id as string, (c.name as string) ?? "מרכז");
+      }
+    }
+
     type Buckets = { cur: number; prev: number };
     const bucket = (rows: { therapist_id: string; at: string }[]): Map<string, Buckets> => {
       const m = new Map<string, Buckets>();
@@ -116,6 +134,8 @@ export async function runRetention(): Promise<RetentionRun> {
     const clicksBy = bucket(clicks.map((c) => ({ therapist_id: c.therapist_id, at: c.clicked_at })));
 
     const findings: RetentionFinding[] = [];
+    // מטפלי מסלול 1 שקופים (בלי אף לחיצה ב-30 יום) - נאספים לפי מרכז.
+    const silentByCenter = new Map<string, { names: string[]; views: number }>();
 
     for (const t of therapists) {
       // הקפאה מכוונת מההתאמות - לא סיכון אלא החלטה.
@@ -126,6 +146,20 @@ export async function runRetention(): Promise<RetentionRun> {
 
       const v = viewsBy.get(t.id) ?? { cur: 0, prev: 0 };
       const c = clicksBy.get(t.id) ?? { cur: 0, prev: 0 };
+
+      // מטפל של מרכז במסלול 1: לא לקוח בפני עצמו. שקט 30 יום נאסף לקיבוץ
+      // פר-מרכז אחרי הלולאה; שאר הבדיקות (מתנה/צניחה) לא רלוונטיות לו -
+      // החיוב על שם המרכז.
+      if (t.center_account_id && t.entity_type !== "center") {
+        if (c.cur === 0) {
+          const key = t.center_account_id;
+          const agg = silentByCenter.get(key) ?? { names: [], views: 0 };
+          agg.names.push(nameOf(t));
+          agg.views += v.cur;
+          silentByCenter.set(key, agg);
+        }
+        continue;
+      }
       const firstCharge = firstChargeByTherapist.get(t.id) ?? null;
       const inGiftWindow =
         t.promotion_source === "gift_trial" && firstCharge != null && new Date(firstCharge).getTime() > now;
@@ -149,10 +183,13 @@ export async function runRetention(): Promise<RetentionRun> {
       //    (בעיית פרופיל) מול אין חשיפה בכלל (בעיית ביקוש בחיתוך).
       if (c.cur === 0) {
         const exposed = v.cur >= 20;
+        const isCenterEntity = t.entity_type === "center";
         findings.push({
           key: `retention:zero30:${t.id}`,
           severity: exposed ? "high" : "medium",
-          title: `${nameOf(t)} משלם/ת ובלי אף לחיצה ליצירת קשר ב-30 יום`,
+          title: isCenterEntity
+            ? `המרכז ${nameOf(t)} (מסלול 2) בלי אף לחיצה ליצירת קשר ב-30 יום`
+            : `${nameOf(t)} משלם/ת ובלי אף לחיצה ליצירת קשר ב-30 יום`,
           detail:
             `${v.cur} צפיות פרופיל ב-30 הימים האחרונים, אפס לחיצות (נכון ל-${stamp}). ` +
             (exposed
@@ -175,12 +212,31 @@ export async function runRetention(): Promise<RetentionRun> {
       }
     }
 
+    // ממצא אחד לכל מרכז שקוף - שם המרכז בכותרת, המטפלים בפירוט.
+    for (const [centerId, agg] of silentByCenter) {
+      const centerName = centerNames.get(centerId) ?? "מרכז";
+      findings.push({
+        key: `retention:center_silent:${centerId}`,
+        severity: agg.names.length >= 2 ? "high" : "medium",
+        title: `${agg.names.length} ממטפלי ${centerName} בלי אף לחיצה ליצירת קשר ב-30 יום`,
+        detail:
+          `${agg.names.join(", ")} - ${agg.views} צפיות פרופיל במצטבר ואפס לחיצות (נכון ל-${stamp}). ` +
+          `המרכז משלם על המקומות האלה; ביום שישאלו "מה קיבלנו" - זו התשובה שהם יראו. ` +
+          `כדאי לבדוק פרופילים חסרים ופיזור אזורים מול הביקוש.`,
+      });
+    }
+
     // כל המפתחות שנבדקו - כדי שממצא ייסגר מעצמו כשהמצב משתפר.
-    const managedKeys = therapists.flatMap((t) => [
-      `retention:gift_risk:${t.id}`,
-      `retention:zero30:${t.id}`,
-      `retention:drop:${t.id}`,
-    ]);
+    const managedKeys = [
+      ...therapists.flatMap((t) => [
+        `retention:gift_risk:${t.id}`,
+        `retention:zero30:${t.id}`,
+        `retention:drop:${t.id}`,
+      ]),
+      ...[...new Set(therapists.map((t) => t.center_account_id).filter(Boolean) as string[])].map(
+        (cid) => `retention:center_silent:${cid}`,
+      ),
+    ];
 
     const { recovered } = await syncAgentAlerts(
       "retention",

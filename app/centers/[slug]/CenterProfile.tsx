@@ -7,6 +7,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import TrackView from "@/app/therapists/[id]/TrackView";
+import { CenterPageView, CenterWebsiteLink } from "@/app/components/CenterTracking";
 import CenterMessageButton from "./CenterMessageButton";
 import CenterPhoneLink from "./CenterPhoneLink";
 import CenterWhatsAppLink from "./CenterWhatsAppLink";
@@ -231,6 +232,9 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
       )}
       {/* צפייה בעמוד נספרת כצפייה בפרופיל הישות (דה-דופ session בצד השרת) */}
       {entity && <TrackView therapistId={entity.id} source={viewSource} />}
+      {/* תנועת העמוד הציבורי - אחיד לשני המסלולים; במסלול 1 זה מדד הצפיות
+          היחיד של העמוד (אין שורת ישות). ראו המיגרציה 20260820. */}
+      <CenterPageView centerId={center.id} track={isEntity ? "center_entity" : "per_therapist"} />
 
       <div className="mx-auto max-w-[1380px] px-5 lg:grid lg:grid-cols-[minmax(0,1fr)_364px] lg:items-start lg:gap-9">
 
@@ -263,20 +267,16 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
               {center.public_city && (
                 <span className="inline-flex items-center gap-1.5"><MapPin size={17} style={{ color: "var(--teal)" }} /> {center.public_city}</span>
               )}
-              {phone && telHref && (entity ? (
-                <CenterPhoneLink entityId={entity.id} phone={phone}
+              {phone && telHref && (
+                <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone}
                   className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
                   <Phone size={17} style={{ color: "var(--teal)" }} /> {phone}
                 </CenterPhoneLink>
-              ) : (
-                <a href={telHref} className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
-                  <Phone size={17} style={{ color: "var(--teal)" }} /> {phone}
-                </a>
-              ))}
+              )}
               {websiteHref && (
-                <a href={websiteHref} target="_blank" rel="noopener noreferrer nofollow" className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
+                <CenterWebsiteLink centerId={center.id} href={websiteHref} className="inline-flex items-center gap-1.5 hover:underline" style={{ color: "var(--teal-dark)" }}>
                   <Globe size={17} style={{ color: "var(--teal)" }} /> אתר המרכז
-                </a>
+                </CenterWebsiteLink>
               )}
               <span className="inline-flex items-center gap-1.5 rounded-full border border-[#E9D6A6] px-3.5 py-1 text-[12.5px] font-extrabold"
                 style={{ background: "var(--gold-pale)", color: "var(--gold-dark)" }}>
@@ -481,46 +481,34 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
             {hasAnyContact && (
               <div className="hidden rounded-[24px] border border-[var(--line)] bg-white p-6 shadow-[0_14px_36px_rgba(42,100,98,.09)] lg:block">
                 <p className="mb-4 text-[13px] font-extrabold uppercase tracking-[.14em] text-[var(--muted)]">יצירת קשר</p>
-                {phone && telHref && (entity ? (
-                  <CenterPhoneLink entityId={entity.id} phone={phone} className="block text-[1.55rem] font-black tracking-wide text-[var(--text)] hover:text-[var(--teal-dark)]">
+                {phone && telHref && (
+                  <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone} className="block text-[1.55rem] font-black tracking-wide text-[var(--text)] hover:text-[var(--teal-dark)]">
                     {phone}
                   </CenterPhoneLink>
-                ) : (
-                  <a href={telHref} className="block text-[1.55rem] font-black tracking-wide text-[var(--text)] hover:text-[var(--teal-dark)]">{phone}</a>
-                ))}
+                )}
                 <div className="mt-4 flex flex-col gap-2.5">
-                  {waHref && (entity ? (
-                    <CenterWhatsAppLink entityId={entity.id} href={waHref}
+                  {waHref && (
+                    <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-500 px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-green-600">
                       {WA_SVG} שליחת וואטסאפ
                     </CenterWhatsAppLink>
-                  ) : (
-                    <a href={waHref} target="_blank" rel="noopener noreferrer"
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-500 px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-green-600">
-                      {WA_SVG} שליחת וואטסאפ
-                    </a>
-                  ))}
+                  )}
                   {canMessage && (
                     <CenterMessageButton {...messageTarget} centerName={center.name} label="הודעה דרך האתר"
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-5 py-3 text-[15px] font-extrabold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)]" />
                   )}
-                  {telHref && (entity ? (
-                    <CenterPhoneLink entityId={entity.id} phone={phone!}
+                  {telHref && (
+                    <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone!}
                       className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal)] px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-[var(--teal-dark)]">
                       <Phone size={17} /> חיוג למרכז
                     </CenterPhoneLink>
-                  ) : (
-                    <a href={telHref}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal)] px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-[var(--teal-dark)]">
-                      <Phone size={17} /> חיוג למרכז
-                    </a>
-                  ))}
+                  )}
                 </div>
                 {websiteHref && (
-                  <a href={websiteHref} target="_blank" rel="noopener noreferrer nofollow"
+                  <CenterWebsiteLink centerId={center.id} href={websiteHref}
                     className="mt-4 inline-flex items-center gap-1.5 text-[13.5px] font-bold text-[var(--teal-dark)] hover:underline">
                     <Globe size={14} /> לאתר המרכז
-                  </a>
+                  </CenterWebsiteLink>
                 )}
               </div>
             )}
@@ -638,31 +626,22 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                   למילוי שאלון התאמה <ArrowLeft size={16} />
                 </Link>
               )}
-              {waHref && (entity ? (
-                <CenterWhatsAppLink entityId={entity.id} href={waHref}
+              {waHref && (
+                <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
                   className="inline-flex items-center gap-2 rounded-full bg-green-500 px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-green-600">
                   {WA_SVG} שליחת וואטסאפ
                 </CenterWhatsAppLink>
-              ) : (
-                <a href={waHref} target="_blank" rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-green-500 px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-green-600">
-                  {WA_SVG} שליחת וואטסאפ
-                </a>
-              ))}
+              )}
               {canMessage && (
                 <CenterMessageButton {...messageTarget} centerName={center.name}
                   className="inline-flex items-center gap-2 rounded-full bg-white px-7 py-3.5 text-base font-extrabold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)]" />
               )}
-              {phone && telHref && (entity ? (
-                <CenterPhoneLink entityId={entity.id} phone={phone}
+              {phone && telHref && (
+                <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone}
                   className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-[rgba(255,255,255,.45)] px-7 py-3.5 text-base font-bold text-white transition hover:bg-[rgba(255,255,255,.1)]">
                   <Phone size={16} /> {phone}
                 </CenterPhoneLink>
-              ) : (
-                <a href={telHref} className="inline-flex items-center gap-2 rounded-full border-[1.5px] border-[rgba(255,255,255,.45)] px-7 py-3.5 text-base font-bold text-white transition hover:bg-[rgba(255,255,255,.1)]">
-                  <Phone size={16} /> {phone}
-                </a>
-              ))}
+              )}
             </div>
           </div>
         </section>
@@ -681,27 +660,18 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                 לשאלון התאמה
               </Link>
             )}
-            {waHref && (entity ? (
-              <CenterWhatsAppLink entityId={entity.id} href={waHref}
-                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600">
-                {WA_SVG} וואטסאפ
-              </CenterWhatsAppLink>
-            ) : (
-              <a href={waHref} target="_blank" rel="noopener noreferrer"
+            {waHref && (
+              <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
                 className={`inline-flex ${isEntity ? "flex-1" : ""} items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600`}>
                 {WA_SVG} וואטסאפ
-              </a>
-            ))}
-            {telHref && (entity ? (
-              <CenterPhoneLink entityId={entity.id} phone={phone!}
+              </CenterWhatsAppLink>
+            )}
+            {telHref && (
+              <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone!}
                 className={`inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--teal)] px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-[var(--teal-dark)] ${waHref ? "" : "flex-1"}`}>
                 <Phone size={15} /> חיוג
               </CenterPhoneLink>
-            ) : (
-              <a href={telHref} className={`inline-flex items-center justify-center gap-1.5 rounded-full bg-[var(--teal)] px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-[var(--teal-dark)] ${waHref ? "" : "flex-1"}`}>
-                <Phone size={15} /> חיוג
-              </a>
-            ))}
+            )}
             {canMessage && (
               <CenterMessageButton {...messageTarget} centerName={center.name} label="הודעה"
                 className={`inline-flex items-center justify-center gap-1.5 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2.5 text-[14px] font-bold text-[var(--teal-dark)] transition hover:bg-[var(--teal-pale)] ${waHref || telHref ? "" : "flex-1"}`} />

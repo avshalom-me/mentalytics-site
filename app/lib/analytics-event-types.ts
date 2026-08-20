@@ -23,6 +23,12 @@ export const ANALYTICS_EVENT_TYPES = [
   // שאינו קיים בשום אירוע אחר. מיגרציה: 20260819_match_search_event.sql
   "match_search",
   "match_saved",
+  // אירועי עמוד-מרכז (מיגרציה: 20260820_center_page_events.sql). מסלול 1
+  // בלי שורת ישות - אלה המדדים היחידים של העמוד שלו; במסלול 2 הם נוספים
+  // על therapist_profile_views של הישות (תנועת עמוד מול צפיות התאמה).
+  "center_page_view",
+  "center_website_click",
+  "center_contact_click",
 ] as const;
 
 // תת-הקבוצה שמותרת דרך /api/track (הלקוח). שני הנותרים נכתבים רק בצד

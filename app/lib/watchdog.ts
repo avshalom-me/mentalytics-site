@@ -198,6 +198,24 @@ function agentFreshnessCheck(agent: string, label: string, maxHours: number): Pr
   });
 }
 
+async function centerPageCheck(): Promise<WatchdogCheck> {
+  const key = "page_center";
+  const label = "עמוד מרכז ציבורי חי";
+  const { data } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("slug, name, billing_track, public_page_enabled")
+    .eq("status", "active")
+    .not("slug", "is", null)
+    .order("paid_at", { ascending: true });
+  const target = (data ?? []).find(
+    (c) => c.billing_track === "center_entity" || c.public_page_enabled === true,
+  );
+  if (!target) return skippedCheck(key, label, "דולג - אין מרכז פעיל עם עמוד ציבורי");
+  return httpCheck(key, `${label} (${target.name})`, `${SITE}/centers/${target.slug}`, {
+    validate: expectStatusAndContains(String(target.name).slice(0, 12)),
+  });
+}
+
 async function runChecks(): Promise<WatchdogCheck[]> {
   const staffToken = process.env.STAFF_BYPASS_TOKEN ?? "";
 
@@ -280,6 +298,10 @@ async function runChecks(): Promise<WatchdogCheck[]> {
       body: { online: true, limit: 3 },
       validate: matchValidate,
     }),
+    // עמוד מרכז חי: לוקח את המרכז הפעיל הראשון עם עמוד ציבורי ומוודא שהעמוד
+    // עונה ומכיל את שם המרכז. מרכז משלם שהעמוד שלו נופל = מוצר שנעלם בשקט
+    // (לעמודי מסלול 1 אין אף בדיקה אחרת שתתפוס את זה).
+    centerPageCheck(),
     // דריפט constraint האירועים
     eventConstraintCheck(),
     // טריות קרונים. בקר הבוקר: אם כובה במתג - הבדיקה מדלגת במקום להתריע
