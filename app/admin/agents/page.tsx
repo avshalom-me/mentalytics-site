@@ -30,6 +30,14 @@ type GiftPayload = {
   gift_months?: number;
   subject?: string;
   candidates?: GiftCandidate[];
+  // טיוטת נדנוד למרכז (action_type='center_nudge')
+  center_id?: string;
+  center_name?: string;
+  track?: string;
+  to?: string;
+  draft?: string;
+  missing?: string[];
+  blocked_on_us?: string[];
 };
 
 type PendingAction = {
@@ -136,6 +144,7 @@ const AGENT_LABELS: Record<string, string> = {
   supply_gaps: "פערי היצע",
   finance: "סוכן הכספים",
   retention: "שימור מטפלים",
+  center_nudge: "סוכן המרכזים",
 };
 
 type SupplyGap = {
@@ -283,6 +292,152 @@ function AgentStrip({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// כרטיס טיוטת הנדנוד למרכז: אותו דפוס כמו הצעת המתנה - הסוכן ניסח, אתה
+// קורא ומתקן, ואתה שולח. מוגדר ברמת המודול כדי שהקלדה בטיוטה לא תיצור
+// קומפוננטה חדשה בכל רינדור ותאבד את הפוקוס.
+function CenterNudgeCard({
+  action,
+  onSent,
+  onDismiss,
+  dismissing,
+  open,
+  onToggle,
+}: {
+  action: PendingAction;
+  onSent: (msg: string) => void;
+  onDismiss: () => void;
+  dismissing: boolean;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const p = action.payload ?? {};
+  const [subject, setSubject] = useState(p.subject ?? "");
+  const [draft, setDraft] = useState(p.draft ?? "");
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+
+  const centerName = p.center_name ?? action.entity_label ?? "המרכז";
+  const to = p.to ?? "";
+
+  async function send() {
+    if (
+      !window.confirm(
+        `לשלוח עכשיו את הנדנוד אל ${centerName} (${to})?\n\nהמייל יוצא מיד, בדיוק כפי שהוא מופיע כאן.`
+      )
+    ) {
+      return;
+    }
+    setSending(true);
+    setError("");
+    try {
+      const j = await postAgents("center_nudge_send", {
+        id: action.id,
+        center_id: p.center_id ?? "",
+        subject,
+        body: draft,
+      });
+      onSent(`הנדנוד נשלח אל ${j.center_name ?? centerName} (${j.email ?? to})`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "השליחה נכשלה");
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!open) {
+    return (
+      <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-sky-200 bg-white px-4 py-2.5">
+        <span className="text-sm font-bold text-stone-800">🏥 {centerName}</span>
+        <span className="flex-1 truncate text-xs text-stone-400">
+          {p.track ? `${p.track} · ` : ""}
+          {(p.missing ?? []).slice(0, 2).join(" · ")}
+        </span>
+        <button
+          onClick={onToggle}
+          className="shrink-0 rounded-full border border-[#3D8C8A] px-3 py-1 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3]"
+        >
+          פתח וערוך ▼
+        </button>
+        <button
+          onClick={onDismiss}
+          disabled={dismissing}
+          className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+        >
+          דחה
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-white p-5">
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h3 className="text-sm font-black text-stone-900">🏥 {centerName}</h3>
+        <div className="flex shrink-0 items-center gap-2">
+          {p.track && (
+            <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
+              {p.track}
+            </span>
+          )}
+          <button onClick={onToggle} className="text-xs font-bold text-stone-400 hover:text-stone-700">
+            סגור ▲
+          </button>
+        </div>
+      </div>
+      <p className="mb-3 text-xs text-stone-400">נמען: {to || "לא נמצאה כתובת"}</p>
+
+      {(p.blocked_on_us ?? []).length > 0 && (
+        <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3">
+          <div className="text-xs font-black text-amber-800">תקוע אצלנו - לא נכנס למייל</div>
+          <ul className="mt-1 list-inside list-disc text-xs text-amber-800">
+            {(p.blocked_on_us ?? []).map((b) => (
+              <li key={b}>{b}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <label className="mb-1 block text-xs font-black text-stone-400">נושא</label>
+      <input
+        value={subject}
+        onChange={(e) => setSubject(e.target.value)}
+        disabled={sending}
+        className="mb-3 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm disabled:opacity-50"
+      />
+
+      <label className="mb-1 block text-xs font-black text-stone-400">גוף המייל (ניתן לעריכה)</label>
+      <textarea
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        disabled={sending}
+        rows={16}
+        className="w-full rounded-xl border border-stone-300 p-3 text-sm leading-6 disabled:opacity-50"
+      />
+
+      {error && (
+        <div className="mt-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          onClick={send}
+          disabled={sending || dismissing || !to || !draft.trim()}
+          className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+        >
+          {sending ? "שולח..." : "📤 שלח למרכז"}
+        </button>
+        <button
+          onClick={onDismiss}
+          disabled={sending || dismissing}
+          className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+        >
+          ✕ דחה
+        </button>
+      </div>
     </div>
   );
 }
@@ -525,11 +680,13 @@ export default function AgentsPage() {
   const [convLoading, setConvLoading] = useState(false);
   const [financeLoading, setFinanceLoading] = useState(false);
   const [retentionLoading, setRetentionLoading] = useState(false);
+  const [centerNudgeLoading, setCenterNudgeLoading] = useState(false);
   // איזה סוכן פתוח כרגע. אחד בלבד: חמישה גופי פלט פתוחים בו-זמנית הם בדיוק
   // מה שהפך את העמוד לגלילה ארוכה שבה כל סוכן חדש מוסיף עוד קומה.
   const [openAgent, setOpenAgent] = useState<string | null>(null);
   // אותו כלל בתור ההצעות: הצעת מתנה אחת פתוחה לעריכה, השאר שורות.
   const [openOffer, setOpenOffer] = useState<string | null>(null);
+  const [openNudge, setOpenNudge] = useState<string | null>(null);
   const [conv, setConv] = useState<ConversionsPreview | null>(null);
   const [convError, setConvError] = useState("");
   const [convMsg, setConvMsg] = useState("");
@@ -591,6 +748,24 @@ export default function AgentsPage() {
   // סוכן הכספים: אין לו פאנל פלט כאן. הממצאים שלו הם פערי גבייה, ומקומם
   // בעמוד הכספים ליד המספרים עצמם - כאן נשארת רק ההרצה.
   // סוכן השימור: הממצאים מוצגים בפאנל שלו כאן (הועבר מעמוד המטפלים 20/8/26).
+  // סוכן המרכזים: מנסח טיוטות ומכניס אותן לתור. לא שולח כלום.
+  async function runCenterNudgeNow() {
+    setCenterNudgeLoading(true);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("center_nudge_run");
+      const n = Array.isArray(j.proposals) ? j.proposals.length : 0;
+      setActionMsg(n > 0 ? `${n} טיוטות נדנוד מוכנות בתור` : "אין מרכז שצריך נדנוד כרגע");
+      load();
+      setTimeout(() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "שגיאה בהרצת סוכן המרכזים");
+    } finally {
+      setCenterNudgeLoading(false);
+    }
+  }
+
   async function runRetentionNow() {
     setRetentionLoading(true);
     setActionError("");
@@ -811,6 +986,21 @@ export default function AgentsPage() {
           )}
           <div className="space-y-2">
             {actionable.map((a) =>
+              a.action_type === "center_nudge" ? (
+                <CenterNudgeCard
+                  key={a.id}
+                  action={a}
+                  open={openNudge === a.id}
+                  onToggle={() => setOpenNudge(openNudge === a.id ? null : a.id)}
+                  dismissing={busyId === a.id}
+                  onSent={(msg) => {
+                    setActionMsg(msg);
+                    setActionError("");
+                    load();
+                  }}
+                  onDismiss={() => resolveAction(a.id, "dismissed")}
+                />
+              ) :
               a.action_type === "gift_offer" ? (
                 <GiftOfferCard
                   key={a.id}
@@ -939,6 +1129,7 @@ export default function AgentsPage() {
             { key: "conversions", icon: "📈", label: "המרות לגוגל", busy: convLoading, onRun: conversionsPreview, runLabel: "בדוק" },
             { key: "finance", icon: "💰", label: "סוכן הכספים", busy: financeLoading, onRun: runFinanceNow, runLabel: "התאם" },
             { key: "retention", icon: "🤝", label: "שימור מטפלים", busy: retentionLoading, onRun: runRetentionNow, runLabel: "סרוק" },
+            { key: "center_nudge", icon: "🏥", label: "סוכן המרכזים", busy: centerNudgeLoading, onRun: runCenterNudgeNow, runLabel: "נסח" },
           ]}
         />
         </div>

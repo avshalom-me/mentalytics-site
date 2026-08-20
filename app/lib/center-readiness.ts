@@ -6,12 +6,12 @@ import type { CenterDirector, CenterFaqItem, CenterGalleryPhoto, CenterTeamMembe
 // למה זה קיים: ב-16/8/26 נשלח ל"ציידי המחשבות" מייל "הפרופיל שלכם מלא ב-0%".
 // הם משלמים במסלול per_therapist, שבו המוצר הוא המטפלים שלהם במערכת
 // ההתאמות - והעמוד הציבורי הוא תוספת. כלומר נמדדו במדד הלא נכון, וקיבלו
-// מייל שמדבר על הדבר הפחות חשוב אצלם. במקביל הדבר שכן היה חשוב - שהם
-// משלמים על עשרה מקומות ולא אוישו אף אחד - לא נאמר במילה.
+// מייל שמדבר על הדבר הפחות חשוב אצלם. במקביל הדבר שכן היה חשוב - עשרה
+// מקומות במרכז שאף אחד מהם לא אויש - לא נאמר במילה.
 //
 // שני מסלולים, שני מוצרים שונים:
 //   per_therapist  - מטפלי המרכז נכנסים להתאמות, כל אחד בפרופיל משלו.
-//                    המדד: כמה מהמקומות ששולמו מאוישים ומקודמים בפועל.
+//                    המדד: כמה מהמקומות במרכז מאוישים ומקודמים בפועל.
 //   center_entity  - המרכז נכנס להתאמות כרובריקה אחת. המדד: האם הרובריקה
 //                    מוגדרת (סוגי טיפול/אזורים/גילאים) והאם העמוד הציבורי
 //                    חי - כאן העמוד הוא המוצר עצמו, לא תוספת.
@@ -25,7 +25,7 @@ export type ReadinessItem = {
   label: string;
   done: boolean;
   owner: ReadinessOwner;
-  // critical = בלי זה המרכז לא מקבל את מה ששילם עליו.
+  // critical = בלי זה המרכז לא מקבל את מה שהמנוי אמור לתת לו.
   critical: boolean;
   hint?: string;
 };
@@ -41,7 +41,7 @@ export type CenterReadiness = {
   blockedOnUs: ReadinessItem[];
   /** הכותרת העסקית: מה הכי חשוב שיקרה אצלם עכשיו. */
   headline: string | null;
-  /** מקומות ששולמו מול מאוישים - רק במסלול per_therapist. */
+  /** מקומות במרכז מול מאוישים - רק במסלול per_therapist. */
   slots: { paid: number; filled: number; promoted: number } | null;
 };
 
@@ -153,7 +153,9 @@ export function centerReadiness(
       headline = "המרכז עדיין לא מופיע בהתאמות - חסרות ההגדרות הבסיסיות";
     }
   } else {
-    // מסלול 1: המוצר הוא המקומות. זה הדבר שעליו שילמו, ולכן הוא ראשון.
+    // מסלול 1: המוצר הוא המקומות, ולכן הם נמדדים ראשונים. לשון התשלום
+    // הוצאה מכל התוויות (החלטת המשתמש 20/8) - הן נקראות גם במייל למרכז,
+    // וזה מייל שירות ולא תזכורת גבייה.
     const paid = Math.max(0, Number(c.therapist_count) || 0);
     slots = { paid, filled: stats.linked, promoted: stats.promoted };
 
@@ -170,7 +172,7 @@ export function centerReadiness(
     items.push({
       label:
         paid > 0
-          ? `איוש המקומות ששולמו (${stats.promoted} מתוך ${paid} פעילים בהתאמות)`
+          ? `איוש המקומות במרכז (${stats.promoted} מתוך ${paid} פעילים בהתאמות)`
           : "מטפלים פעילים בהתאמות",
       done: paid > 0 ? stats.promoted >= paid : anyPromoted,
       owner: "center",
@@ -215,10 +217,10 @@ export function centerReadiness(
     if (stats.linked === 0) {
       headline =
         paid > 0
-          ? `שילמתם על ${paid} מקומות ואף מטפל/ת לא מקושר/ת עדיין`
+          ? `אף מטפל/ת מהמרכז לא מקושר/ת עדיין - ${paid} מקומות פנויים`
           : "אף מטפל/ת מהמרכז לא מקושר/ת עדיין";
     } else if (slotsFree > 0) {
-      headline = `${slotsFree} מתוך ${paid} המקומות ששולמו עדיין פנויים`;
+      headline = `${slotsFree} מתוך ${paid} המקומות במרכז עדיין פנויים`;
     } else if (!anyPromoted && stats.awaitingOurApproval === 0) {
       headline = "אף מטפל/ת מהמרכז לא פעיל/ה עדיין בהתאמות";
     }

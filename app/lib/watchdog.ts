@@ -314,6 +314,7 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     agentFreshnessCheck("conversions", "סוכן ההמרות רץ ביממה האחרונה", 26),
     agentFreshnessCheck("finance", "סוכן הכספים רץ ביממה האחרונה", 26),
     agentFreshnessCheck("retention", "סוכן השימור רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("center_nudge", "סוכן המרכזים רץ ביממה האחרונה", 26),
     agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
     freshnessCheck("cron_weekly_report", "דוח שבועי נוצר בשבוע האחרון", async () => {
       const { data } = await supabaseAdmin

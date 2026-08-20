@@ -8,6 +8,8 @@ import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetention } from "@/app/lib/retention";
+import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
+import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer } from "@/app/lib/gift-offer";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
@@ -156,6 +158,27 @@ export async function POST(req: NextRequest) {
         therapist_name: result.therapistName,
         email: result.email,
       });
+    }
+    if (body?.action === "center_nudge_run") {
+      const result = await runCenterNudgeAgent();
+      return NextResponse.json({
+        ok: result.ok,
+        checked: result.checked,
+        proposals: result.proposals,
+        skipped: result.skipped,
+        error: result.error,
+      });
+    }
+    // שליחת נדנוד למרכז: מסלול השליחה היחיד, ורק מקליק מפורש באדמין.
+    if (body?.action === "center_nudge_send") {
+      const result = await sendCenterNudge({
+        actionId: String(body?.id ?? ""),
+        centerId: String(body?.center_id ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+      return NextResponse.json({ ok: true, center_name: result.centerName, email: result.email });
     }
     if (body?.action === "retention_run") {
       const result = await runRetention();
