@@ -543,7 +543,17 @@ export default async function TherapistProfilePage({
           city / specialty / online landing pages with descriptive anchors. */}
       {(() => {
         const cityLinks = (t.regions ?? []).filter((c: string) => (CITY_SEO_LIST as readonly string[]).includes(c)).slice(0, 3);
-        const areaLinks = (t.training_areas ?? []).filter((a: string) => (TRAINING_AREAS as readonly string[]).includes(a)).slice(0, 3);
+        // Cities cap at 3 (only one live profile has more, so nothing is lost).
+        // Specialties cap higher: at 3, the "first three areas" rule silently
+        // dropped 304 internal links across 115 profiles - and it hit hardest
+        // exactly where we least want it. טיפול זוגי is our largest demand
+        // cluster (8,480 searches/month, Keyword Planner 8/8/26) and had 28
+        // therapists but only 5 rendered links; טיפול באומנות had 15 and zero.
+        // Profiles are the site's strongest-ranking pages, so this is the
+        // cheapest equity we own.
+        const AREA_LINK_CAP = 8;
+        const allAreas = (t.training_areas ?? []).filter((a: string) => (TRAINING_AREAS as readonly string[]).includes(a));
+        const areaLinks = allAreas.slice(0, AREA_LINK_CAP);
         if (cityLinks.length === 0 && areaLinks.length === 0 && !t.online) return null;
         return (
           <div className="mx-auto mt-10 max-w-5xl border-t border-[var(--line)] pt-6">

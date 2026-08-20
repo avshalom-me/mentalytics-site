@@ -68,11 +68,12 @@ export async function syncAgentAlerts(
   agent: string,
   active: Omit<NewAgentAction, "agent">[],
   opts?: { managedKeys?: string[]; recoveryNote?: string }
-): Promise<{ created: number; recovered: number }> {
+): Promise<{ created: number; refreshed: number; recovered: number }> {
   const results = await Promise.all(
     active.map((a) => createAgentAction({ agent, ...a }))
   );
   const created = results.filter((r) => r.created).length;
+  const refreshed = results.filter((r) => r.updated).length;
 
   const activeKeys = new Set(
     active.map((a) => a.dedupeKey).filter((k): k is string => Boolean(k))
@@ -112,7 +113,7 @@ export async function syncAgentAlerts(
     console.error(`syncAgentAlerts(${agent}) recovery failed:`, e);
   }
 
-  return { created, recovered };
+  return { created, refreshed, recovered };
 }
 
 export type NewAgentAction = {
@@ -135,7 +136,7 @@ export type NewAgentAction = {
 // כפילות (האינדקס הייחודי החלקי אוכף; קוד 23505 נבלע בשקט).
 export async function createAgentAction(
   action: NewAgentAction
-): Promise<{ created: boolean; id?: string }> {
+): Promise<{ created: boolean; updated?: boolean; id?: string }> {
   try {
     const { data, error } = await supabaseAdmin
       .from("agent_actions")
@@ -154,7 +155,29 @@ export async function createAgentAction(
       .select("id")
       .single();
     if (error) {
-      if (error.code === "23505") return { created: false };
+      if (error.code === "23505") {
+        // מפתח dedupe קיים - האינדקס חלקי על pending, כלומר יש שורה פתוחה
+        // עם אותו מפתח. ממצא הוא *תיאור מצב נוכחי*, ולכן הניסוח, הגוף
+        // והחומרה מתרעננים; המצב (status) ומי שסגר אותו לא נגעים.
+        //
+        // בלי זה ממצא נכתב פעם אחת ומתאבן: ב-20/8/26 שונה הניסוח כך
+        // שמקודם-מתנה לא ייקרא "משלם/ת", וכל 12 הממצאים הקיימים המשיכו
+        // להציג את הטקסט הישן ואת החומרה הישנה - התיקון היה בלתי נראה.
+        const { data: bumped } = await supabaseAdmin
+          .from("agent_actions")
+          .update({
+            title: action.title,
+            body: action.body ?? null,
+            payload: action.payload ?? null,
+            entity_label: action.entityLabel ?? null,
+          })
+          .eq("agent", action.agent)
+          .eq("dedupe_key", action.dedupeKey ?? "")
+          .eq("status", "pending")
+          .select("id")
+          .maybeSingle();
+        return { created: false, updated: !!bumped, id: bumped?.id as string | undefined };
+      }
       console.error("agent_actions insert failed:", error.message);
       return { created: false };
     }

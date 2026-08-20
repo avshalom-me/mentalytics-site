@@ -18,7 +18,16 @@ type Finding = {
   title: string;
   body: string | null;
   created_at: string;
+  payload?: { severity?: "high" | "medium" | "low" } | null;
 };
+
+// דחיפות: high/medium = הכנסה בסיכון, low = מידע (למשל מקודם במתנה).
+// ההפרדה נוספה 20/8/26 אחרי שרשימת השימור הציגה לקוח משלם בסיכון ביטול
+// ומקודם-מתנה באותה שורה בדיוק, בלי שום דרך להבחין ביניהם.
+const SEV_RANK: Record<string, number> = { high: 0, medium: 1, low: 2 };
+function sevOf(f: Finding): "high" | "medium" | "low" {
+  return f.payload?.severity ?? "medium";
+}
 
 export default function AgentFindings({
   agent,
@@ -59,7 +68,23 @@ export default function AgentFindings({
     ) : null;
   }
 
-  const shown = findings.slice(0, limit);
+  const sorted = [...findings].sort((a, b) => SEV_RANK[sevOf(a)] - SEV_RANK[sevOf(b)]);
+  const urgent = sorted.filter((f) => sevOf(f) !== "low");
+  const info = sorted.filter((f) => sevOf(f) === "low");
+  // המכסה נשמרת לדחופים: פריט אחד שדורש כסף לא נדחק ע"י עשרה אינפורמטיביים.
+  const shownUrgent = urgent.slice(0, limit);
+  const shownInfo = info.slice(0, Math.max(0, limit - shownUrgent.length) + 3);
+  const hiddenCount = urgent.length - shownUrgent.length + (info.length - shownInfo.length);
+
+  const renderItem = (f: Finding) => (
+    <li key={f.id} className="text-sm text-stone-700">
+      <span className="font-bold">
+        {sevOf(f) === "high" && <span className="text-red-600">● </span>}
+        {f.title}
+      </span>
+      {f.body && <span className="block text-xs text-stone-500 leading-5">{f.body}</span>}
+    </li>
+  );
 
   return (
     <section className="mb-6 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
@@ -67,17 +92,25 @@ export default function AgentFindings({
         <h2 className="text-sm font-black text-stone-800">🤖 {title}</h2>
         <span className="text-xs text-stone-500">({findings.length})</span>
       </div>
-      <ul className="space-y-1.5">
-        {shown.map((f) => (
-          <li key={f.id} className="text-sm text-stone-700">
-            <span className="font-bold">{f.title}</span>
-            {f.body && <span className="block text-xs text-stone-500 leading-5">{f.body}</span>}
-          </li>
-        ))}
-      </ul>
-      {findings.length > shown.length && (
-        <p className="mt-2 text-xs text-stone-500">ועוד {findings.length - shown.length}...</p>
+      {shownUrgent.length > 0 && (
+        <>
+          {info.length > 0 && (
+            <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-red-700">
+              דורש טיפול · הכנסה בסיכון ({urgent.length})
+            </p>
+          )}
+          <ul className="space-y-1.5">{shownUrgent.map(renderItem)}</ul>
+        </>
       )}
+      {shownInfo.length > 0 && (
+        <div className={shownUrgent.length > 0 ? "mt-3 border-t border-amber-200/70 pt-2.5" : ""}>
+          <p className="mb-1 text-[11px] font-extrabold uppercase tracking-wider text-stone-500">
+            לידיעה · מקודמים במתנה, אין הכנסה בסיכון ({info.length})
+          </p>
+          <ul className="space-y-1.5 opacity-75">{shownInfo.map(renderItem)}</ul>
+        </div>
+      )}
+      {hiddenCount > 0 && <p className="mt-2 text-xs text-stone-500">ועוד {hiddenCount}...</p>}
       <p className="mt-3 text-[11px] text-stone-400">
         ממצאים נסגרים מעצמם כשהמצב שיצר אותם משתנה. אין כאן מה לאשר.
       </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import AgentFindings from "../components/AgentFindings";
 
 // עמוד השליטה בסוכנים (גל 1): יומן ריצות, תור ההצעות המאוחד, ותצוגה
 // מקדימה של דוח הבוקר. מינימלי בכוונה - מתרחב עם כל סוכן חדש.
@@ -160,7 +161,9 @@ const FINDING_HOMES: { agent: string; label: string; href: string }[] = [
   { agent: "supply_gaps", label: "פערי היצע בעמוד היצע/ביקוש", href: "/admin/supply-demand" },
   { agent: "ads", label: "ממצאי פרסום בעמוד הפרסום", href: "/admin/ads" },
   { agent: "finance", label: "פערי גבייה בעמוד הכספים", href: "/admin/finance" },
-  { agent: "retention", label: "סיכוני שימור בעמוד המטפלים", href: "/admin/therapists" },
+  // 20/8/26: הועבר מ-/admin/therapists לכאן. עמוד המטפלים הוא ניהול תפעולי
+  // (אישור, עריכה, קישור חשבון), ורשימת חשיפה/פניות בראשו דחקה אותו מטה.
+  { agent: "retention", label: "סיכוני שימור - בכרטיס הסוכן כאן", href: "/admin/agents" },
 ];
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
@@ -587,7 +590,7 @@ export default function AgentsPage() {
 
   // סוכן הכספים: אין לו פאנל פלט כאן. הממצאים שלו הם פערי גבייה, ומקומם
   // בעמוד הכספים ליד המספרים עצמם - כאן נשארת רק ההרצה.
-  // סוכן השימור: כמו הכספים, בלי פאנל פלט - הממצאים חיים בעמוד המטפלים.
+  // סוכן השימור: הממצאים מוצגים בפאנל שלו כאן (הועבר מעמוד המטפלים 20/8/26).
   async function runRetentionNow() {
     setRetentionLoading(true);
     setActionError("");
@@ -596,7 +599,7 @@ export default function AgentsPage() {
       const j = await postAgents("retention_run");
       const n = Array.isArray(j.findings) ? j.findings.length : 0;
       setActionMsg(
-        n > 0 ? `נמצאו ${n} מטפלים בסיכון שימור - מוצגים בעמוד המטפלים` : "כל המשלמים עם פעילות תקינה"
+        n > 0 ? `נמצאו ${n} מטפלים בסיכון שימור - מוצגים כאן למטה` : "כל המקודמים עם פעילות תקינה"
       );
       load();
     } catch (e) {
@@ -1360,6 +1363,32 @@ export default function AgentsPage() {
               )}
             </div>
           )}
+        </section>
+        )}
+
+        {openAgent === "retention" && (
+        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
+            <h2 className="font-black text-stone-900">🤝 שימור מטפלים</h2>
+            <button
+              onClick={runRetentionNow}
+              disabled={retentionLoading}
+              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {retentionLoading ? "סורק..." : "סרוק עכשיו"}
+            </button>
+          </div>
+          <p className="text-xs text-stone-500 mb-4">
+            מי שנמצא במסלול לביטול - לפני שהוא מבטל. הרשימה מופרדת לפי דחיפות: קודם לקוחות
+            משלמים (שם ההכנסה בסיכון), ואחריהם מקודמי מתנה, שאצלם אין כסף בסיכון אלא נתח
+            חשיפה שלא מייצר. שום מייל לא נשלח לאף מטפל - כל פעולה נעשית בידיים.
+          </p>
+          <AgentFindings
+            agent="retention"
+            title="מטפלים בסיכון שימור"
+            limit={12}
+            emptyText="אין ממצאי שימור פתוחים - כל המקודמים עם פעילות תקינה."
+          />
         </section>
         )}
 

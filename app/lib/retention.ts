@@ -18,7 +18,15 @@ import { fetchAllRows } from "./fetch-all-rows";
 
 export type RetentionFinding = {
   key: string;
-  severity: "high" | "medium";
+  /**
+   * high/medium = לקוח שמשלם כסף. low = מקודם במתנה.
+   *
+   * ההפרדה נדרשה אחרי שהתצוגה ערבבה את השניים (20/8/26): המשתמש ראה
+   * "משה טבול משלם/ת ובלי אף לחיצה" לצד "גונן שש משלם/ת ובלי אף לחיצה"
+   * באותה שורה בדיוק - כשהראשון לקוח משלם בסיכון ביטול והשני קיבל קידום
+   * חינם. גם המילה "משלם/ת" עצמה הייתה שקר אצל השני.
+   */
+  severity: "high" | "medium" | "low";
   title: string;
   detail: string;
 };
@@ -49,6 +57,22 @@ type TRow = {
 
 function nameOf(t: TRow): string {
   return t.full_name?.trim() || "מטפל/ת ללא שם";
+}
+
+/**
+ * status='paying' הוא דגל *קידום*, לא דגל תשלום: הוא נושא גם את מקודמי
+ * המתנה (trial/manual) וגם את מי שבחלון gift_trial לפני החיוב הראשון.
+ * רק promotion_source='paid' הוא לקוח שמשלם כסף.
+ */
+function isRealPayer(t: TRow): boolean {
+  return t.promotion_source === "paid";
+}
+
+/** תיאור מדויק של המצב לכותרת - לא "משלם/ת" למי שקיבל מתנה. */
+function statusWord(t: TRow): string {
+  if (t.promotion_source === "paid") return "משלם/ת";
+  if (t.promotion_source === "gift_trial") return "לפני החיוב הראשון";
+  return "מקודם/ת במתנה";
 }
 
 function daysAgo(iso: string | null): number | null {
@@ -184,17 +208,22 @@ export async function runRetention(): Promise<RetentionRun> {
       if (c.cur === 0) {
         const exposed = v.cur >= 20;
         const isCenterEntity = t.entity_type === "center";
+        const payer = isRealPayer(t) || isCenterEntity;
         findings.push({
           key: `retention:zero30:${t.id}`,
-          severity: exposed ? "high" : "medium",
+          // מקודם במתנה יורד ל-low: אין כאן הכנסה בסיכון. זה עדיין שווה
+          // מבט - מקודמי מתנה תופסים נתח משמעותי מחשיפות ההתאמה, ומתנה
+          // שלא מייצרת כלום היא מועמדת לסיום - אבל זו לא דחיפות של ביטול.
+          severity: payer ? (exposed ? "high" : "medium") : "low",
           title: isCenterEntity
             ? `המרכז ${nameOf(t)} (מסלול 2) בלי אף לחיצה ליצירת קשר ב-30 יום`
-            : `${nameOf(t)} משלם/ת ובלי אף לחיצה ליצירת קשר ב-30 יום`,
+            : `${nameOf(t)} ${statusWord(t)} ובלי אף לחיצה ליצירת קשר ב-30 יום`,
           detail:
             `${v.cur} צפיות פרופיל ב-30 הימים האחרונים, אפס לחיצות (נכון ל-${stamp}). ` +
             (exposed
               ? "יש חשיפה ואין המרה - כנראה משהו בפרופיל עצמו (תמונה, ביו, מחיר)."
-              : "גם החשיפה נמוכה - כנראה הביקוש בחיתוך שלו/ה דל. שווה הצלבה מול עמוד היצע/ביקוש."),
+              : "גם החשיפה נמוכה - כנראה הביקוש בחיתוך שלו/ה דל. שווה הצלבה מול עמוד היצע/ביקוש.") +
+            (payer ? "" : " קידום מתנה - אין הכנסה בסיכון; המשמעות היא נתח חשיפה שלא מייצר."),
         });
         continue;
       }
@@ -203,7 +232,7 @@ export async function runRetention(): Promise<RetentionRun> {
       if (c.prev >= DROP_MIN_PREVIOUS && c.cur <= c.prev * DROP_RATIO) {
         findings.push({
           key: `retention:drop:${t.id}`,
-          severity: "medium",
+          severity: isRealPayer(t) ? "medium" : "low",
           title: `הלחיצות אצל ${nameOf(t)} צנחו`,
           detail:
             `${c.prev} לחיצות ליצירת קשר ב-30 הימים הקודמים, ${c.cur} ב-30 האחרונים ` +
@@ -213,6 +242,7 @@ export async function runRetention(): Promise<RetentionRun> {
     }
 
     // ממצא אחד לכל מרכז שקוף - שם המרכז בכותרת, המטפלים בפירוט.
+    // (המרכזים תמיד משלמים, ולכן נשארים בדחיפות רגילה.)
     for (const [centerId, agg] of silentByCenter) {
       const centerName = centerNames.get(centerId) ?? "מרכז";
       findings.push({
@@ -255,17 +285,25 @@ export async function runRetention(): Promise<RetentionRun> {
       status: findings.length > 0 ? "ok" : "empty",
       summary:
         findings.length > 0
-          ? `${findings.length} מטפלים בסיכון שימור: ${findings
-              .slice(0, 2)
-              .map((f) => f.title)
-              .join(" · ")}${findings.length > 2 ? " ..." : ""}`
-          : `כל ${therapists.length} המשלמים עם פעילות תקינה`,
+          ? (() => {
+              const paying = findings.filter((f) => f.severity !== "low").length;
+              const gift = findings.length - paying;
+              const head = `${paying} משלמים בסיכון שימור${gift > 0 ? ` (ועוד ${gift} מקודמי מתנה)` : ""}`;
+              const top = findings.slice(0, 2).map((f) => f.title).join(" · ");
+              return `${head}: ${top}${findings.length > 2 ? " ..." : ""}`;
+            })()
+          : `כל ${therapists.length} המקודמים עם פעילות תקינה`,
       details: {
         findings: findings.map((f) => ({ key: f.key, severity: f.severity, title: f.title })),
         checked: therapists.length,
         recovered_alerts: recovered,
       },
     });
+
+    // כסף קודם: הממצאים נשמרים ומוצגים לפי סדר הדחיפות, כדי שלקוח משלם
+    // בסיכון ביטול לא ייקבר מתחת לעשרה מקודמי-מתנה.
+    const rank: Record<RetentionFinding["severity"], number> = { high: 0, medium: 1, low: 2 };
+    findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
 
     return { ok: true, findings, checked: therapists.length };
   } catch (e) {
