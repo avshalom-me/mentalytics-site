@@ -25,7 +25,7 @@
       "schedule": "30 7 * * *"
     },
     {
-      "path": "/api/cron/trial-ending",
+      "path": "/api/cron/trial-ending?send=confirm",
       "schedule": "0 8 * * *"
     },
     {
@@ -54,7 +54,7 @@
     },
     {
       "schedule": "0 8 * * *",
-      "path": "/api/cron/gift-trial-reminder"
+      "path": "/api/cron/gift-trial-reminder?send=confirm"
     },
     {
       "schedule": "45 4 * * *",

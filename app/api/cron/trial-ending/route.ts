@@ -149,9 +149,9 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
 
     if (!opts.send) continue;
 
-    // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). ההתראה
-    // לאדמין שבהמשך נשארת - היא אלינו, ושם ההחלטה אנושית ממילא.
-    const gate = automatedSendAllowed(t.email);
+    // תבנית מאושרת (הבהרת 19/8): תזכורת סוף המתנה היא התנהגות ותיקה
+    // שהוחלט עליה - השער חוסם רק תבניות שלא אושרו.
+    const gate = automatedSendAllowed(t.email, "trial_ending");
     if (!gate.allowed) { skipped++; continue; }
 
     const r = await sendTrialEndingEmail({

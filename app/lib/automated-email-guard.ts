@@ -28,17 +28,40 @@ export function isInternalRecipient(to: string): boolean {
 export type AutomationBlock = { allowed: false; reason: string };
 export type AutomationPass = { allowed: true };
 
+// הבהרת המשתמש (19/8/2026, אחרי ההחלטה המקורית): האיסור נועד למנוע מיילים
+// שנולדו מבדיקות ועבודה על קוד - לא לעצור את המיילים העסקיים שכבר הוחלט
+// שיוצאים. לכן ברירת המחדל נשארת שלילית, ותבנית שאושרה במפורש עוברת.
+// תבנית חדשה שלא נרשמה כאן נחסמת - בדיוק כמו קודם.
+const APPROVED_AUTOMATED_TEMPLATES = new Set([
+  // תזכורת לפני סוף קידום מתנה מוגבל בזמן (trial) - התנהגות ותיקה שאושרה.
+  "trial_ending",
+  // תזכורת שבוע לפני החיוב הראשון במסלול ההזמנה - הבטחה מפורשת בהצטרפות
+  // (המשתמש אישר פעמיים: 18/8 ו-19/8).
+  "gift_trial_first_charge",
+  // הודעה שהקידום ירד כי תקופת המתנה נגמרה - התנהגות ותיקה.
+  "promotion_ended:trial_expired",
+  // הודעה שהקידום הושעה אחרי כשל חיוב. שורש התקלה של 16/8 (סטטוס ביניים
+  // שנקרא כביטול) תוקן ב-19/8 - עכשיו רק ביטול מאושש מוריד קידום.
+  "promotion_ended:payment_failed",
+]);
+// מה שנשאר חסום בכוונה: נדנודי השלמת פרופיל למרכזים ותזכורות הזמנה
+// (center-nudges) - אלה מעולם לא אושרו, והם הסיבה שהשער קיים.
+
 /**
  * שער יחיד לכל שליחה אוטומטית (קרון) לנמען חיצוני.
- * מחזיר allowed:false לכל מי שאינו אנחנו - הקורא מדלג ומדווח.
+ * נמען פנימי עובר תמיד; נמען חיצוני עובר רק עם תבנית שאושרה במפורש.
  */
-export function automatedSendAllowed(to: string | null | undefined): AutomationPass | AutomationBlock {
+export function automatedSendAllowed(
+  to: string | null | undefined,
+  template?: string
+): AutomationPass | AutomationBlock {
   const addr = (to ?? "").trim();
   if (!addr) return { allowed: false, reason: "אין כתובת" };
   if (isInternalRecipient(addr)) return { allowed: true };
+  if (template && APPROVED_AUTOMATED_TEMPLATES.has(template)) return { allowed: true };
   return {
     allowed: false,
-    reason: "שליחה אוטומטית לנמענים חיצוניים מושבתת (החלטת 19/8/2026)",
+    reason: "שליחה אוטומטית לנמענים חיצוניים מותרת רק לתבניות שאושרו (החלטת 19/8/2026)",
   };
 }
 

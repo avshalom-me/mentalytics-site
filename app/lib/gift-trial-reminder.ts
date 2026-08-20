@@ -150,9 +150,9 @@ export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promi
 
     let sent = 0;
     for (const t of targets) {
-      // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). הרשימה
-      // עדיין מוחזרת, כדי שאפשר יהיה לשלוח ידנית מהאדמין.
-      if (!automatedSendAllowed(t.email).allowed) continue;
+      // תבנית מאושרת (הבהרת 19/8): זו הבטחה מפורשת ממסך ההצטרפות, והמשתמש
+      // אישר את האוטומטיות שלה פעמיים. השער ממשיך לחסום כל תבנית אחרת.
+      if (!automatedSendAllowed(t.email, "gift_trial_first_charge").allowed) continue;
 
       const res = await sendBulkEmail({
         from: FROM,

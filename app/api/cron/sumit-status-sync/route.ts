@@ -508,10 +508,10 @@ export async function GET(req: NextRequest) {
           : `no_active_recurring_at_sumit_after_${MISS_THRESHOLD}_misses`,
       });
 
-      // מיילים אוטומטיים לצד שלישי מושבתים (החלטת 19/8/2026). דווקא כאן
-      // זה קריטי: כשל חיוב טכני שלח למטפל "החיוב נכשל" לפני שאיש הספיק
-      // לבדוק אם הכשל אמיתי (רועי חנין, 16/8 - חויב בהצלחה 4 שעות אחר כך).
-      if (t.email && automatedSendAllowed(t.email).allowed) {
+      // תבנית מאושרת (הבהרת 19/8): ההודעה יוצאת, כי שורש תקלת רועי חנין
+      // תוקן - סטטוס ביניים כבר לא נקרא כביטול, ורק ביטול מאושש מגיע לכאן.
+      // הרשימה המרוכזת אלינו נשארת כגיבוי לכל מקרה שנחסם.
+      if (t.email && automatedSendAllowed(t.email, "promotion_ended:payment_failed").allowed) {
         await sendPromotionEndedEmail({
           to: t.email,
           name: t.full_name ?? "",
@@ -567,7 +567,7 @@ export async function GET(req: NextRequest) {
         reason: "trial_or_manual_expired",
       });
 
-      if (t.email && automatedSendAllowed(t.email).allowed) {
+      if (t.email && automatedSendAllowed(t.email, "promotion_ended:trial_expired").allowed) {
         await sendPromotionEndedEmail({
           to: t.email,
           name: t.full_name ?? "",
