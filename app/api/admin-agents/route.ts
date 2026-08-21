@@ -21,15 +21,46 @@ export const dynamic = "force-dynamic";
 // הפונקציה לפני שהריצה נרשמת (ממצא ביקורת: ריצה שנהרגה נשארת "רץ..." לנצח).
 export const maxDuration = 300;
 
+// מספר אחד לכל ריצה, לגרף שבעמוד: כמה "תוצרים" הריצה מצאה. מחולץ כאן
+// בשרת מתוך details, כדי שהעמוד לא יקבל את גופי ה-details המלאים של 150
+// ריצות (הדוח היומי לבדו שוקל כמה KB לריצה).
+function runMetric(agent: string, details: unknown): number | null {
+  if (!details || typeof details !== "object") return null;
+  const d = details as Record<string, unknown>;
+  const len = (v: unknown): number | null => (Array.isArray(v) ? v.length : null);
+  switch (agent) {
+    case "watchdog": {
+      const checks = Array.isArray(d.checks) ? (d.checks as { ok?: boolean; skipped?: boolean }[]) : null;
+      if (!checks) return null;
+      return checks.filter((c) => !c.ok && !c.skipped).length;
+    }
+    case "supply_gaps":
+      return (len(d.gift) ?? 0) + (len(d.recruit) ?? 0);
+    case "center_nudge":
+      return len(d.proposals);
+    case "daily_digest": {
+      const secs = Array.isArray(d.sections)
+        ? (d.sections as { count?: number }[])
+        : null;
+      if (!secs) return null;
+      return secs.reduce((sum, x) => sum + (Number(x?.count) || 0), 0);
+    }
+    default:
+      return len(d.findings);
+  }
+}
+
 export async function GET() {
   try {
     const [runsRes, pendingRes, actionCountRes, findingCountRes, resolvedRes, latestDigestRes] =
       await Promise.all([
       supabaseAdmin
         .from("agent_runs")
-        .select("id, agent, started_at, finished_at, status, mode, summary, error")
+        // details נשלף כדי לחלץ ממנו מדד לגרף ואת הסקירה האחרונה של כל
+        // סוכן - אבל לא מוחזר לדפדפן כמו שהוא (ראו סינון למטה).
+        .select("id, agent, started_at, finished_at, status, mode, summary, error, details")
         .order("started_at", { ascending: false })
-        .limit(30),
+        .limit(150),
       supabaseAdmin
         .from("agent_actions")
         // payload נשלח לעמוד כי הצעת המתנה נערכת שם לפני השליחה (המועמדים
@@ -53,12 +84,13 @@ export async function GET() {
         .select("id", { count: "exact", head: true })
         .eq("status", "pending")
         .eq("kind", "finding"),
+      // ההיסטוריה: מה כבר הוכרע ובוצע, לחלק "מה נעשה בעבר" של כל סוכן.
       supabaseAdmin
         .from("agent_actions")
-        .select("id, agent, title, status, status_changed_at")
+        .select("id, agent, action_type, kind, title, status, status_changed_at, resolution_note")
         .neq("status", "pending")
         .order("status_changed_at", { ascending: false })
-        .limit(10),
+        .limit(80),
       // הדוח האחרון של בקר הבוקר, כולל תוכנו המלא (details) - כך העמוד מציג
       // אותו ישירות בלי מייל ובלי להריץ מחדש (החלטת המשתמש 16/8).
       supabaseAdmin
@@ -76,9 +108,31 @@ export async function GET() {
       ai_summary?: string | null;
     } | null;
 
+    // ריצות: המדד לגרף במקום details המלא; הסקירה האחרונה של כל סוכן
+    // נשמרת בנפרד (details של הריצה התקינה האחרונה בלבד).
+    type RunRow = {
+      id: string; agent: string; started_at: string; finished_at: string | null;
+      status: string; mode: string | null; summary: string | null; error: string | null;
+      details: unknown;
+    };
+    const rawRuns = (runsRes.data ?? []) as RunRow[];
+    const latestDetails: Record<string, { started_at: string; details: unknown }> = {};
+    for (const r of rawRuns) {
+      if (r.agent === "daily_digest") continue; // לדוח היומי יש מסלול משלו
+      if (latestDetails[r.agent]) continue;
+      if (r.status !== "ok" && r.status !== "empty") continue;
+      latestDetails[r.agent] = { started_at: r.started_at, details: r.details ?? null };
+    }
+    const runs = rawRuns.map((r) => ({
+      id: r.id, agent: r.agent, started_at: r.started_at, finished_at: r.finished_at,
+      status: r.status, mode: r.mode, summary: r.summary, error: r.error,
+      metric: runMetric(r.agent, r.details),
+    }));
+
     return NextResponse.json({
       ok: true,
-      runs: runsRes.data ?? [],
+      runs,
+      latest_details: latestDetails,
       pending_actions: pendingRes.data ?? [],
       // הספירות האמיתיות מהמאגר, מופרדות לפי סוג התוצר.
       pending_action_total: actionCountRes.count ?? 0,

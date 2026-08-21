@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import AgentFindings from "../components/AgentFindings";
+import { useEffect, useState } from "react";
 
-// עמוד השליטה בסוכנים (גל 1): יומן ריצות, תור ההצעות המאוחד, ותצוגה
-// מקדימה של דוח הבוקר. מינימלי בכוונה - מתרחב עם כל סוכן חדש.
+// עמוד השליטה בסוכנים - נבנה מחדש 20/8/26 לפי בקשת המשתמש:
+//
+//   - לכל סוכן רובריקה מלוא-הרוחב בראש העמוד. לחיצה פותחת את הפרטים של
+//     הסוכן הזה בלבד - שאר הסוכנים נשארים שורות סגורות.
+//   - בתוך כל סוכן, אותם שלושה חלקים תמיד: "ממתין לך עכשיו" (ההמלצות),
+//     "הסקירה האחרונה" (מה נבדק ומה יצא), ו"מה נעשה בעבר" (היסטוריה).
+//   - כל סוכן פותח בהסבר בשפה פשוטה מה הוא עושה ואיך לקרוא את המספרים.
+//   - גרף עמודות קטן לכל סוכן: התוצרים בכל ריצה לאורך זמן.
+//
+// עקרון קבוע: שום סוכן לא שולח מייל ולא מבצע פעולה בלי לחיצה מפורשת כאן.
+
+// ─────────────────────────────── טיפוסים ───────────────────────────────
 
 type AgentRun = {
   id: string;
@@ -15,7 +24,12 @@ type AgentRun = {
   mode: string | null;
   summary: string | null;
   error: string | null;
+  // מספר אחד לריצה, לגרף: כמה תוצרים הריצה מצאה (ממצאים / פערים / טיוטות;
+  // אצל שומר הלילה - כמה בדיקות נכשלו). null = לריצה אין מדד.
+  metric: number | null;
 };
+
+type LatestDetailsMap = Record<string, { started_at: string; details: unknown }>;
 
 type GiftCandidate = {
   therapist_id: string;
@@ -24,20 +38,21 @@ type GiftCandidate = {
   draft: string;
 };
 
-type GiftPayload = {
+type ActionPayload = {
   region?: string;
   treatment?: string;
   gift_months?: number;
   subject?: string;
   candidates?: GiftCandidate[];
-  // טיוטת נדנוד למרכז (action_type='center_nudge')
+  // טיוטת נדנוד למרכז
   center_id?: string;
   center_name?: string;
-  track?: string;
   to?: string;
   draft?: string;
+  track?: string;
   missing?: string[];
   blocked_on_us?: string[];
+  severity?: string;
 };
 
 type PendingAction = {
@@ -50,16 +65,19 @@ type PendingAction = {
   entity_type: string | null;
   entity_id: string | null;
   entity_label: string | null;
-  payload: GiftPayload | null;
+  payload: ActionPayload | null;
   created_at: string;
 };
 
 type ResolvedAction = {
   id: string;
   agent: string;
+  action_type?: string;
+  kind?: string;
   title: string;
   status: string;
   status_changed_at: string | null;
+  resolution_note?: string | null;
 };
 
 type DigestSection = {
@@ -85,8 +103,49 @@ type LatestDigest = {
   ai_summary: string | null;
 };
 
-// POST אחיד מול ה-API - בודק גם HTTP וגם ok, ומחזיר שגיאה קריאה אחת
-// (ממצא ביקורת: ההנדלרים הועתקו ארבע פעמים וכשל PATCH נבלע בשקט).
+type WatchdogCheck = {
+  key: string;
+  label?: string;
+  ok: boolean;
+  skipped?: boolean;
+  detail: string;
+  ms: number;
+};
+
+type WatchdogRun = { checks: WatchdogCheck[]; failures: number };
+
+type SupplyGap = {
+  key: string;
+  region: string;
+  treatment: string;
+  events: number;
+  candidates: GiftCandidate[];
+};
+
+type WaitingGap = { region: string; treatment: string; sentAt: string };
+
+type GapsRun = {
+  gift_gaps: SupplyGap[];
+  recruit_gaps: SupplyGap[];
+  waiting_gaps: WaitingGap[];
+};
+
+type AdsRun = {
+  configured: boolean;
+  findings: { key: string; severity: string; title: string; detail: string }[];
+  campaigns: { name: string; utm: string | null; cost: number; clicks: number; contacts: number; cpl: number | null }[];
+  spend_mtd: number;
+  budget_pace: { expected: number; actual: number } | null;
+};
+
+type ConversionsPreview = {
+  configured: boolean;
+  actions_ready: boolean;
+  pending: { payment_id: string; payment_type: string; value_ils: number; paid_at: string; click_id_kind: string }[];
+};
+
+// ─────────────────────────── קריאות לשרת ───────────────────────────────
+
 async function postAgents(action: string, extra?: Record<string, unknown>): Promise<Record<string, unknown>> {
   const res = await fetch("/api/admin-agents", {
     method: action === "resolve" ? "PATCH" : "POST",
@@ -100,80 +159,185 @@ async function postAgents(action: string, extra?: Record<string, unknown>): Prom
   return j;
 }
 
-type WatchdogCheck = {
+// ───────────────────────── רישום הסוכנים ────────────────────────────────
+// כל מה שהעמוד יודע על סוכן יושב כאן. סוכן חדש = אובייקט אחד נוסף.
+
+type AgentMeta = {
   key: string;
+  icon: string;
   label: string;
-  ok: boolean;
-  skipped?: boolean;
-  detail: string;
-  ms: number;
+  runAction: string; // שם הפעולה ב-POST
+  runLabel: string;
+  // מה הסוכן עושה - שפה פשוטה, בלי מונחים טכניים.
+  desc: string;
+  // איך לקרוא את מה שמוצג - ההסברים שביקש המשתמש.
+  howToRead: string[];
+  schedule: string;
+  chartLabel: string;
+  // גרף שבו אפס = טוב (שומר הלילה): עמודות שאינן אפס נצבעות אדום.
+  chartGoodWhenZero?: boolean;
+  // איפה עוד רואים את הממצאים של הסוכן.
+  home?: { href: string; label: string };
 };
 
-type WatchdogRun = {
-  checks: WatchdogCheck[];
-  failures: number;
-};
-
-type PendingConversion = {
-  payment_id: string;
-  payment_type: string;
-  value_ils: number;
-  paid_at: string;
-  click_id_kind: string;
-};
-
-type ConversionsPreview = {
-  configured: boolean;
-  actions_ready: boolean;
-  pending: PendingConversion[];
-};
-
-type AdsRun = {
-  configured: boolean;
-  findings: { key: string; severity: string; title: string; detail: string }[];
-  campaigns: { name: string; utm: string | null; cost: number; clicks: number; contacts: number; cpl: number | null }[];
-  spend_mtd: number;
-  budget_pace: { expected: number; actual: number } | null;
-};
-
-const AGENT_LABELS: Record<string, string> = {
-  daily_digest: "בקר הבוקר",
-  watchdog: "שומר הלילה",
-  conversions: "המרות לגוגל",
-  ads: "סוכן הפרסום",
-  supply_gaps: "פערי היצע",
-  finance: "סוכן הכספים",
-  retention: "שימור מטפלים",
-  center_nudge: "סוכן המרכזים",
-};
-
-type SupplyGap = {
-  key: string;
-  region: string;
-  treatment: string;
-  events: number;
-  candidates: GiftCandidate[];
-  draftEmail: string | null;
-};
-
-type WaitingGap = { region: string; treatment: string; sentAt: string };
-
-type GapsRun = {
-  gift_gaps: SupplyGap[];
-  recruit_gaps: SupplyGap[];
-  waiting_gaps: WaitingGap[];
-};
-
-// לאן שייך כל ממצא: העמוד שמדבר על אותו נושא. הממצא מוצג שם ליד הנתונים,
-// והתור כאן מסתפק במונה וקישור.
-const FINDING_HOMES: { agent: string; label: string; href: string }[] = [
-  { agent: "supply_gaps", label: "פערי היצע בעמוד היצע/ביקוש", href: "/admin/supply-demand" },
-  { agent: "ads", label: "ממצאי פרסום בעמוד הפרסום", href: "/admin/ads" },
-  { agent: "finance", label: "פערי גבייה בעמוד הכספים", href: "/admin/finance" },
-  // 20/8/26: הועבר מ-/admin/therapists לכאן. עמוד המטפלים הוא ניהול תפעולי
-  // (אישור, עריכה, קישור חשבון), ורשימת חשיפה/פניות בראשו דחקה אותו מטה.
-  { agent: "retention", label: "סיכוני שימור - בכרטיס הסוכן כאן", href: "/admin/agents" },
+const AGENTS: AgentMeta[] = [
+  {
+    key: "daily_digest",
+    icon: "☀️",
+    label: "בקר הבוקר",
+    runAction: "digest_preview",
+    runLabel: "הפק דוח עכשיו",
+    desc: "עובר כל בוקר על מה שקרה ביממה האחרונה - פניות חדשות, תשלומים, תקלות ומשימות פתוחות - ומרכז הכול לדוח קצר אחד, כדי שלא תצטרך לעבור עמוד-עמוד.",
+    howToRead: [
+      "הדוח מוצג כאן בעמוד בלבד. שום מייל לא נשלח אליך (ההחלטה שלך: להיכנס ולקרוא כאן).",
+      "כל סקציה בדוח היא קישור לעמוד המתאים באדמין, שם מטפלים בפריטים עצמם.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-08:00",
+    chartLabel: "כמה פריטים היו בדוח בכל בוקר",
+  },
+  {
+    key: "watchdog",
+    icon: "🌙",
+    label: "שומר הלילה",
+    runAction: "watchdog_run",
+    runLabel: "הרץ בדיקות עכשיו",
+    desc: "בודק כל לילה שהאתר באמת עובד: שהעמודים נטענים, שהשאלונים מחזירים תוצאות, שמנוע ההתאמה עונה, ושכל שאר הסוכנים רצים בזמן. כמו טכנאי שעובר על המערכת כשכולם ישנים.",
+    howToRead: [
+      "\"תקין\" = הבדיקה עברה. \"דולג\" = הבדיקה לא רלוונטית כרגע (למשל סוכן שכובה בכוונה) - זו לא תקלה.",
+      "בדיקה שנכשלת פותחת התראה שמוצגת כאן, ונסגרת מעצמה ברגע שהבדיקה חוזרת לעבור.",
+    ],
+    schedule: "רץ אוטומטית כל לילה ב-05:30",
+    chartLabel: "כמה בדיקות נכשלו בכל ריצה (אפס = לילה שקט)",
+    chartGoodWhenZero: true,
+  },
+  {
+    key: "supply_gaps",
+    icon: "⚖️",
+    label: "פערי היצע",
+    runAction: "supply_gaps_run",
+    runLabel: "נתח פערים עכשיו",
+    desc: "מאתר חיתוכים של אזור וסוג טיפול שבהם מטופלים חיפשו ולא היה מספיק מטפלים להציע להם. כשיש מטפל חינמי מתאים - מנסח טיוטת הצעת קידום; כשאין אף אחד - מסמן שכדאי לגייס שם.",
+    howToRead: [
+      "\"הצעת מתנה\" = יש מטפל חינמי מתאים, והסוכן ניסח לו טיוטה. אתה קורא, מתקן ולוחץ לשלוח - רק אז יוצא מייל.",
+      "\"פער גיוס\" = אין לנו אף מטפל מתאים בחיתוך. זו רשימת המקומות שבהם שווה לפרסם גיוס.",
+      "\"ממתין לתשובה\" = כבר נשלחה הצעה בחיתוך הזה, ולא מציעים שוב עד שיעברו 21 יום.",
+      "מטפל שקיבל הצעה לא יקבל עוד אחת במשך חצי שנה, גם אם החיתוך חוזר.",
+    ],
+    schedule: "רץ אוטומטית כל יום ראשון ב-08:30",
+    chartLabel: "כמה פערים (מתנה + גיוס) נמצאו בכל ריצה",
+    home: { href: "/admin/supply-demand", label: "עמוד היצע וביקוש" },
+  },
+  {
+    key: "center_nudge",
+    icon: "🏥",
+    label: "סוכן המרכזים",
+    runAction: "center_nudge_run",
+    runLabel: "נסח טיוטות עכשיו",
+    desc: "עוקב אחרי המוכנות של המרכזים הטיפוליים לפי המסלול שכל אחד רכש, ומנסח טיוטת תזכורת למרכז שחסר לו משהו - איוש מטפלים במסלול לפי-מטפלים, הגדרות ההתאמה במסלול מרכז-כישות.",
+    howToRead: [
+      "כל טיוטה ממתינה לך כאן. אתה קורא, מתקן ולוחץ לשלוח - שום מייל לא יוצא לבד.",
+      "דבר שתקוע אצלנו (מטפל שממתין לאישור שלנו) מוצג לך, אבל לא נכנס למייל למרכז.",
+      "מרכז לא מקבל יותר מתזכורת אחת בשלושה שבועות, ומרכז חדש מקבל שבוע להתארגן לפני הראשונה.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-10:30",
+    chartLabel: "כמה טיוטות נוסחו בכל ריצה",
+    home: { href: "/admin/centers", label: "עמוד המרכזים" },
+  },
+  {
+    key: "ads",
+    icon: "📣",
+    label: "סוכן הפרסום",
+    runAction: "ads_run",
+    runLabel: "נטר פרסום עכשיו",
+    desc: "קורא כל בוקר את נתוני Google Ads: כמה הוצאנו, כמה לחיצות ליצירת קשר יצאו מזה ובאיזה מחיר - ומתריע כשקמפיין שורף כסף בלי תוצאות או בלי מדידה תקינה.",
+    howToRead: [
+      "\"עלות ללחיצת פנייה\" = כמה שילמנו בגוגל על כל לחיצה של מטופל על וואטסאפ/טלפון של מטפל. מעל ₪250 - הסוכן מתריע.",
+      "\"קמפיין בלי utm\" = קמפיין שמוציא כסף ואי אפשר לדעת מה הוא מביא, כי חסר לו תיוג מדידה.",
+      "הסוכן קורא בלבד - הוא לא משנה שום דבר בחשבון הפרסום. השהיה או תיקון נעשים ידנית בגוגל.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-07:00",
+    chartLabel: "כמה ממצאי פרסום היו בכל ריצה",
+    home: { href: "/admin/ads", label: "עמוד הפרסום" },
+  },
+  {
+    key: "conversions",
+    icon: "📈",
+    label: "המרות לגוגל",
+    runAction: "conversions_preview",
+    runLabel: "בדוק מצב",
+    desc: "אמור לדווח לגוגל על תשלומים שהגיעו מפרסום, כדי שהאלגוריתם ילמד לכוון לקהל שמשלם. כרגע רדום בכוונה: הוחלט שגוגל מביא מטופלים (שלא משלמים לנו) והלקוחות המשלמים יגיעו ממטא - אז אין לו עדיין מה לדווח.",
+    howToRead: [
+      "\"אין תשלומים עם מזהה קליק\" = המצב התקין היום. הסוכן יתעורר כשיהיה פרסום במטא.",
+      "כפתור ההקמה בחשבון גוגל לא הופעל, וגם לא צריך - עד שיהיה מה לדווח.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-06:00 (ומחזיר \"אין חדש\")",
+    chartLabel: "",
+  },
+  {
+    key: "finance",
+    icon: "💰",
+    label: "סוכן הכספים",
+    runAction: "finance_run",
+    runLabel: "התאם חיובים עכשיו",
+    desc: "משווה כל בוקר בין מי שמקבל שירות לבין מי שמחויב עליו - מטפלים ומרכזים - ומתריע על כל פער: מקודם בלי חיוב, מחויב בלי קידום, חידוש שלא נגבה, וערבות החזר שלא קוימה.",
+    howToRead: [
+      "כל ממצא הוא פער בין שתי מערכות: מה שרשום אצלנו מול מה שקורה בסליקה (Sumit). התיקון תמיד ידני - הסוכן רק מצביע.",
+      "\"על סמך לחיצות בלבד\" = מטפל שנחשב כמי שקיבל פניות, אבל אף מטופל לא שלח לו הודעה שמורה באתר - רק לחיצות וואטסאפ/טלפון שאי אפשר להוכיח.",
+      "ממצא נסגר מעצמו ברגע שהפער נסגר במציאות.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-10:15, אחרי סנכרון הסליקה",
+    chartLabel: "כמה פערי גבייה נמצאו בכל ריצה",
+    chartGoodWhenZero: true,
+    home: { href: "/admin/finance", label: "עמוד הכספים" },
+  },
+  {
+    key: "retention",
+    icon: "🤝",
+    label: "שימור מטפלים",
+    runAction: "retention_run",
+    runLabel: "סרוק סיכונים עכשיו",
+    desc: "מזהה לקוח משלם שנמצא במסלול לביטול - לפני שהוא מבטל: מי שלא קיבל אף לחיצת פנייה בחודש, מי שהלחיצות אצלו צנחו, ומי שמתקרב לסוף חלון המתנה בלי תוצאות.",
+    howToRead: [
+      "\"יש חשיפה ואין המרה\" = מטופלים רואים את הפרופיל אבל לא פונים - כנראה משהו בפרופיל עצמו (תמונה, טקסט).",
+      "\"גם החשיפה נמוכה\" = הבעיה בביקוש בחיתוך שלו, לא בפרופיל - שווה הצלבה מול פערי ההיצע.",
+      "שום מייל לא נשלח למטפלים האלה. ההחלטה שלך: מיילי ביצועים רק מזכירים לחלשים לבטל.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-07:45",
+    chartLabel: "כמה מטפלים בסיכון נמצאו בכל ריצה",
+    chartGoodWhenZero: true,
+  },
 ];
+
+const AGENT_BY_KEY = new Map(AGENTS.map((a) => [a.key, a]));
+
+function agentLabel(agent: string): string {
+  return AGENT_BY_KEY.get(agent)?.label ?? agent;
+}
+
+// שמות הבדיקות של שומר הלילה בשפה פשוטה. ב-details נשמר רק המפתח הטכני,
+// והמשתמש ביקש במפורש פחות ז'רגון.
+const WATCHDOG_LABELS: Record<string, string> = {
+  page_home: "עמוד הבית נטען",
+  page_adults: "עמוד שאלון המבוגרים נטען",
+  page_kids: "עמוד שאלון הילדים נטען",
+  sitemap: "מפת האתר לגוגל תקינה",
+  robots: "קובץ ההנחיות לגוגל תקין",
+  api_questions_adults: "שאלות שאלון המבוגרים נטענות",
+  api_questions_kids: "שאלות שאלון הילדים נטענות",
+  api_score_adults: "מנוע הניקוד למבוגרים עונה",
+  api_score_kids: "מנוע הניקוד לילדים עונה",
+  api_match_region: "מנוע ההתאמה לפי אזור עונה",
+  api_match_online: "מנוע ההתאמה אונליין עונה",
+  db_event_constraint: "אירועי האנליטיקה תואמים למאגר",
+  cron_daily_digest: "בקר הבוקר רץ בזמן",
+  cron_ads: "סוכן הפרסום רץ בזמן",
+  cron_conversions: "סוכן ההמרות רץ בזמן",
+  cron_finance: "סוכן הכספים רץ בזמן",
+  cron_retention: "סוכן השימור רץ בזמן",
+  cron_supply_gaps: "סוכן פערי ההיצע רץ השבוע",
+  cron_weekly_report: "הדוח השבועי נוצר",
+  cron_monthly_report: "הדוח החודשי נוצר",
+};
 
 const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   ok: { label: "תקין", cls: "bg-emerald-50 border-emerald-200 text-emerald-700" },
@@ -182,9 +346,7 @@ const RUN_STATUS: Record<string, { label: string; cls: string }> = {
   running: { label: "רץ...", cls: "bg-blue-50 border-blue-200 text-blue-700" },
 };
 
-function agentLabel(agent: string): string {
-  return AGENT_LABELS[agent] ?? agent;
-}
+// ─────────────────────────── עזרי תצוגה ─────────────────────────────────
 
 function fmtDateTime(iso: string | null): string {
   if (!iso) return "";
@@ -197,9 +359,19 @@ function fmtDateTime(iso: string | null): string {
   });
 }
 
-// רובריקה מתקפלת. פלט הסוכנים ארוך מטבעו, והעמוד הזה מציג חמישה סוכנים
-// באותו מסך - כל מה שאינו "מה עליי לעשות עכשיו" נכנס לכאן וסגור כברירת
-// מחדל, בלי למחוק מידע.
+// "לפני 3 שעות" - קריא יותר מחותמת מלאה בכל השורות המשניות.
+function relTime(iso: string | null): string {
+  if (!iso) return "";
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60_000);
+  if (mins < 1) return "עכשיו";
+  if (mins < 60) return `לפני ${mins} דק'`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return hours === 1 ? "לפני שעה" : `לפני ${hours} שעות`;
+  const days = Math.floor(hours / 24);
+  if (days === 1) return "אתמול";
+  return `לפני ${days} ימים`;
+}
+
 function Collapse({
   title,
   count,
@@ -222,83 +394,62 @@ function Collapse({
   );
 }
 
-// פס הסטטוס: שורה אחת לכל סוכן - שם, מתי רץ לאחרונה, מה מצא, וכפתור הרצה.
-// נבנה ממערך הגדרות אחד ולא מ-JSX לכל סוכן, ולכן הוספת סוכן 12 היא הוספת
-// אובייקט אחד למערך - זה מה שעוצר את הגדילה הליניארית של העמוד.
-type AgentEntry = {
-  key: string;
-  icon: string;
-  label: string;
-  busy: boolean;
-  onRun: () => void;
-  runLabel: string;
-};
-
-function AgentStrip({
-  agents,
-  runs,
-  openKey,
-  onOpen,
+// גרף עמודות קטן, בלי ספריות: התוצרים בכל ריצה, מהישן (ימין) לחדש (שמאל).
+function MiniBars({
+  points,
+  label,
+  goodWhenZero,
 }: {
-  agents: AgentEntry[];
-  runs: AgentRun[];
-  openKey: string | null;
-  onOpen: (key: string | null) => void;
+  points: { at: string; value: number }[];
+  label: string;
+  goodWhenZero?: boolean;
 }) {
+  if (points.length < 3) return null;
+  const shown = points.slice(-16);
+  const max = Math.max(...shown.map((p) => p.value), 1);
+  const W = 15;
+  const GAP = 5;
+  const H = 56;
+  const width = shown.length * (W + GAP) - GAP;
   return (
-    <div className="mb-8 overflow-hidden rounded-2xl border border-stone-200 bg-white">
-      {agents.map((a) => {
-        const last = runs.find((r) => r.agent === a.key);
-        const st = last ? RUN_STATUS[last.status] ?? RUN_STATUS.running : null;
-        const isOpen = openKey === a.key;
-        return (
-          <div
-            key={a.key}
-            className={`flex flex-wrap items-center gap-3 border-b border-stone-100 px-4 py-2.5 last:border-0 ${
-              isOpen ? "bg-stone-50" : ""
-            }`}
-          >
-            <span className="text-sm font-bold text-stone-800 whitespace-nowrap">
-              {a.icon} {a.label}
-            </span>
-            {st ? (
-              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>
-                {st.label}
-              </span>
-            ) : (
-              <span className="text-[11px] text-stone-400">טרם רץ</span>
-            )}
-            <span className="flex-1 truncate text-xs text-stone-500" title={last?.summary ?? ""}>
-              {last ? `${fmtDateTime(last.started_at)} · ${last.summary ?? ""}` : ""}
-            </span>
-            <button
-              onClick={() => onOpen(isOpen ? null : a.key)}
-              className="shrink-0 rounded-full px-2 py-1 text-xs font-bold text-stone-400 hover:text-stone-700"
-            >
-              {isOpen ? "סגור ▲" : "פתח ▼"}
-            </button>
-            <button
-              // הרצה פותחת גם את הפאנל: מי שלוחץ "נתח" רוצה לראות את התוצאה,
-              // לא לחפש אותה.
-              onClick={() => {
-                onOpen(a.key);
-                a.onRun();
-              }}
-              disabled={a.busy}
-              className="shrink-0 rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-            >
-              {a.busy ? "רץ..." : a.runLabel}
-            </button>
-          </div>
-        );
-      })}
+    <div className="rounded-xl border border-stone-200 bg-white p-4">
+      <div className="mb-2 text-xs font-black text-stone-500">{label}</div>
+      <div className="overflow-x-auto">
+        <svg width={width} height={H + 18} role="img" aria-label={label} style={{ direction: "ltr" }}>
+          {shown.map((p, i) => {
+            const h = Math.max(2, Math.round((p.value / max) * H));
+            const bad = goodWhenZero && p.value > 0;
+            return (
+              <g key={i}>
+                <rect
+                  x={i * (W + GAP)}
+                  y={H - h}
+                  width={W}
+                  height={h}
+                  rx={3}
+                  fill={bad ? "#DC2626" : p.value === 0 ? "#D6D3D1" : "#3D8C8A"}
+                >
+                  <title>{`${fmtDateTime(p.at)} · ${p.value}`}</title>
+                </rect>
+                <text x={i * (W + GAP) + W / 2} y={H + 13} textAnchor="middle" fontSize="9" fill="#78716C">
+                  {p.value}
+                </text>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      <div className="mt-1 flex justify-between text-[10px] text-stone-400">
+        <span>{fmtDateTime(shown[0].at)}</span>
+        <span>{fmtDateTime(shown[shown.length - 1].at)}</span>
+      </div>
     </div>
   );
 }
 
-// כרטיס טיוטת הנדנוד למרכז: אותו דפוס כמו הצעת המתנה - הסוכן ניסח, אתה
-// קורא ומתקן, ואתה שולח. מוגדר ברמת המודול כדי שהקלדה בטיוטה לא תיצור
-// קומפוננטה חדשה בכל רינדור ותאבד את הפוקוס.
+// ─────────────────────── כרטיסי שליחה (ללא שינוי) ───────────────────────
+
+// כרטיס טיוטת הנדנוד למרכז: הסוכן ניסח, אתה קורא ומתקן, ואתה שולח.
 function CenterNudgeCard({
   action,
   onSent,
@@ -443,8 +594,6 @@ function CenterNudgeCard({
 }
 
 // כרטיס הצעת המתנה: בחירת נמען מבין המועמדים, עריכת הטיוטה, ושליחה בפועל.
-// מוגדר ברמת המודול (ולא בתוך AgentsPage) כדי שהקלדה בטיוטה לא תיצור
-// קומפוננטה חדשה בכל רינדור ותאבד את הפוקוס.
 function GiftOfferCard({
   action,
   onSent,
@@ -460,8 +609,6 @@ function GiftOfferCard({
   open: boolean;
   onToggle: () => void;
 }) {
-  // הצעות שנוצרו לפני מסלול השליחה נושאות מועמדים בלי טיוטה - הטקסט מנורמל
-  // למחרוזת ריקה כדי שהשדה יישאר מבוקר, וכפתור השליחה נחסם עד שיהיה תוכן.
   const candidates: GiftCandidate[] = (action.payload?.candidates ?? []).map((c) => ({
     ...c,
     draft: c.draft ?? "",
@@ -475,8 +622,6 @@ function GiftOfferCard({
 
   const selected = candidates.find((c) => c.therapist_id === selectedId) ?? null;
 
-  // החלפת נמען מחליפה את הטיוטה - הפנייה בגוף המייל נושאת את שמו של הנמען,
-  // ומייל שנפתח בשם של מישהו אחר הוא בדיוק סוג התקלה שאסור שתקרה.
   function pickCandidate(c: GiftCandidate) {
     if (c.therapist_id === selectedId) return;
     if (edited && !window.confirm(`להחליף את הנמען ל${c.full_name}? הטיוטה תוחלף בטיוטה שלו/ה והעריכות שלך יאבדו.`)) {
@@ -506,8 +651,6 @@ function GiftOfferCard({
         subject,
         body: draft,
       });
-      // מה קרה למועמדים האחרים: ההצעה נסגרת אחרי שליחה אחת (לא מחלקים
-      // שלושה קידומי מתנה על אותו חיתוך), ובלי המשפט הזה הם פשוט נעלמו.
       const left = Array.isArray(j.remaining) ? (j.remaining as string[]) : [];
       const days = typeof j.reoffer_after_days === "number" ? j.reoffer_after_days : null;
       onSent(
@@ -525,8 +668,6 @@ function GiftOfferCard({
     }
   }
 
-  // סגור כברירת מחדל: 14 טיוטות מייל פתוחות בבת אחת הן קיר טקסט שאי אפשר
-  // לסרוק. פותחים אחת, מטפלים בה, וממשיכים לבאה.
   if (!open) {
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5">
@@ -555,8 +696,8 @@ function GiftOfferCard({
 
   return (
     <div className="rounded-2xl border border-emerald-200 bg-white p-5">
-      <div className="flex items-start justify-between gap-3 mb-1">
-        <h3 className="font-black text-stone-900 text-sm">🎁 {action.title}</h3>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h3 className="text-sm font-black text-stone-900">🎁 {action.title}</h3>
         <div className="flex shrink-0 items-center gap-2">
           <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
             {agentLabel(action.agent)}
@@ -566,14 +707,16 @@ function GiftOfferCard({
           </button>
         </div>
       </div>
-      {action.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line mb-3">{action.body}</p>}
+      {action.body && <p className="mb-3 text-sm leading-6 text-stone-600 whitespace-pre-line">{action.body}</p>}
 
       {candidates.length === 0 ? (
-        <p className="text-sm text-amber-700">אין מועמדים בהצעה הזו - היא נוצרה לפני שמסלול השליחה קיים. אפשר לדחות ולהריץ ניתוח פערים מחדש.</p>
+        <p className="text-sm text-amber-700">
+          אין מועמדים בהצעה הזו - היא נוצרה לפני שמסלול השליחה קיים. אפשר לדחות ולהריץ ניתוח פערים מחדש.
+        </p>
       ) : (
         <>
           <div className="mb-3">
-            <div className="text-xs font-black text-stone-400 mb-1">נמען</div>
+            <div className="mb-1 text-xs font-black text-stone-400">נמען</div>
             <div className="flex flex-wrap gap-2">
               {candidates.map((c) => (
                 <button
@@ -593,15 +736,15 @@ function GiftOfferCard({
             </div>
           </div>
 
-          <label className="block text-xs font-black text-stone-400 mb-1">נושא</label>
+          <label className="mb-1 block text-xs font-black text-stone-400">נושא</label>
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}
             disabled={sending}
-            className="w-full rounded-xl border border-stone-300 px-3 py-2 text-sm mb-3 disabled:opacity-50"
+            className="mb-3 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm disabled:opacity-50"
           />
 
-          <label className="block text-xs font-black text-stone-400 mb-1">גוף המייל (ניתן לעריכה)</label>
+          <label className="mb-1 block text-xs font-black text-stone-400">גוף המייל (ניתן לעריכה)</label>
           <textarea
             value={draft}
             onChange={(e) => {
@@ -615,8 +758,8 @@ function GiftOfferCard({
 
           {!draft.trim() && (
             <p className="mt-2 text-xs text-amber-700">
-              אין טיוטה להצעה הזו (היא נוצרה לפני מסלול השליחה). אפשר לכתוב טקסט כאן, או לדחות
-              ולהריץ ניתוח פערים מחדש כדי לקבל טיוטה מנוסחת.
+              אין טיוטה להצעה הזו (היא נוצרה לפני מסלול השליחה). אפשר לכתוב טקסט כאן, או לדחות ולהריץ
+              ניתוח פערים מחדש כדי לקבל טיוטה מנוסחת.
             </p>
           )}
 
@@ -649,60 +792,38 @@ function GiftOfferCard({
   );
 }
 
+// ─────────────────────────────── העמוד ──────────────────────────────────
+
 export default function AgentsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
+  const [latestDetails, setLatestDetails] = useState<LatestDetailsMap>({});
   const [pending, setPending] = useState<PendingAction[]>([]);
   const [resolved, setResolved] = useState<ResolvedAction[]>([]);
   const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [pendingTotal, setPendingTotal] = useState(0);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [bulkBusy, setBulkBusy] = useState(false);
   const [actionError, setActionError] = useState("");
   const [actionMsg, setActionMsg] = useState("");
 
-  // ההפרדה מגיעה מהשדה שהסוכן מילא בזמן הכתיבה, לא מניחוש לפי שם הפעולה:
-  // סוכן חדש מצהיר על הסוג בעצמו ונכנס לתבנית בלי לגעת בעמוד הזה.
-  // (שורות ישנות מלפני העמודה מסומנות action כברירת מחדל, ולכן נשמרת
-  // כאן נפילה לאחור לפי שם הפעולה עבורן בלבד.)
+  // הסוכן שפתוח כרגע - אחד בלבד, כל השאר שורות סגורות (בקשת המשתמש 20/8).
+  const [selected, setSelected] = useState<string | null>(null);
+  const [openOffer, setOpenOffer] = useState<string | null>(null);
+  const [openNudge, setOpenNudge] = useState<string | null>(null);
+  const [busyAgent, setBusyAgent] = useState<string | null>(null);
+
+  // תוצרי הרצה ידנית - מוצגים ב"סקירה האחרונה" של הסוכן שהורץ.
+  const [preview, setPreview] = useState<DigestPreview | null>(null);
+  const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
+  const [gaps, setGaps] = useState<GapsRun | null>(null);
+  const [ads, setAds] = useState<AdsRun | null>(null);
+  const [conv, setConv] = useState<ConversionsPreview | null>(null);
+  const [runError, setRunError] = useState("");
+
   const LEGACY_INFO_TYPES = ["recruit_gap", "alert"];
   const isFinding = (a: PendingAction) =>
     a.kind ? a.kind === "finding" : LEGACY_INFO_TYPES.includes(a.action_type);
-  const actionable = pending.filter((a) => !isFinding(a));
-  const findings = pending.filter(isFinding);
-
-  const [previewLoading, setPreviewLoading] = useState(false);
-  const [preview, setPreview] = useState<DigestPreview | null>(null);
-  const [previewError, setPreviewError] = useState("");
-
-  const [watchdogLoading, setWatchdogLoading] = useState(false);
-  const [watchdog, setWatchdog] = useState<WatchdogRun | null>(null);
-  const [watchdogError, setWatchdogError] = useState("");
-
-  const [gapsLoading, setGapsLoading] = useState(false);
-  const [gaps, setGaps] = useState<GapsRun | null>(null);
-  const [gapsError, setGapsError] = useState("");
-
-  const [adsLoading, setAdsLoading] = useState(false);
-  const [ads, setAds] = useState<AdsRun | null>(null);
-  const [adsError, setAdsError] = useState("");
-
-  const [convLoading, setConvLoading] = useState(false);
-  const [financeLoading, setFinanceLoading] = useState(false);
-  const [retentionLoading, setRetentionLoading] = useState(false);
-  const [centerNudgeLoading, setCenterNudgeLoading] = useState(false);
-  // איזה סוכן פתוח כרגע. אחד בלבד: חמישה גופי פלט פתוחים בו-זמנית הם בדיוק
-  // מה שהפך את העמוד לגלילה ארוכה שבה כל סוכן חדש מוסיף עוד קומה.
-  const [openAgent, setOpenAgent] = useState<string | null>(null);
-  // אותו כלל בתור ההצעות: הצעת מתנה אחת פתוחה לעריכה, השאר שורות.
-  const [openOffer, setOpenOffer] = useState<string | null>(null);
-  const [openNudge, setOpenNudge] = useState<string | null>(null);
-  const [conv, setConv] = useState<ConversionsPreview | null>(null);
-  const [convError, setConvError] = useState("");
-  const [convMsg, setConvMsg] = useState("");
-
-  const queueRef = useRef<HTMLElement>(null);
 
   function load() {
     setLoading(true);
@@ -712,8 +833,8 @@ export default function AgentsPage() {
       .then((j) => {
         if (j.ok) {
           setRuns(j.runs ?? []);
+          setLatestDetails(j.latest_details ?? {});
           setPending(j.pending_actions ?? []);
-          setPendingTotal(j.pending_total ?? (j.pending_actions ?? []).length);
           setResolved(j.resolved_actions ?? []);
           setLatestDigest(j.latest_digest ?? null);
         } else setError(j.error || "שגיאה בטעינה");
@@ -722,203 +843,61 @@ export default function AgentsPage() {
       .finally(() => setLoading(false));
   }
 
+  // הסוכן הנבחר נשמר בכתובת (?agent=) - רענון או קישור חוזרים לאותו מקום.
   useEffect(() => {
     load();
+    const fromUrl = new URLSearchParams(window.location.search).get("agent");
+    if (fromUrl && AGENT_BY_KEY.has(fromUrl)) setSelected(fromUrl);
   }, []);
 
-  async function runPreview() {
-    setPreviewLoading(true);
-    setPreviewError("");
-    setPreview(null);
-    try {
-      const j = await postAgents("digest_preview");
-      setPreview(j as unknown as DigestPreview);
-      load(); // הריצה נרשמת ביומן
-    } catch (e) {
-      setPreviewError(e instanceof Error ? e.message : "שגיאה בהפקת התצוגה המקדימה");
-    } finally {
-      setPreviewLoading(false);
-    }
+  function selectAgent(key: string | null) {
+    setSelected(key);
+    setRunError("");
+    const url = new URL(window.location.href);
+    if (key) url.searchParams.set("agent", key);
+    else url.searchParams.delete("agent");
+    window.history.replaceState(null, "", url.toString());
   }
 
-  async function runWatchdogNow() {
-    setWatchdogLoading(true);
-    setWatchdogError("");
-    setWatchdog(null);
-    try {
-      const j = await postAgents("watchdog_run");
-      setWatchdog(j as unknown as WatchdogRun);
-      load();
-    } catch (e) {
-      setWatchdogError(e instanceof Error ? e.message : "שגיאה בהרצת הבדיקות");
-    } finally {
-      setWatchdogLoading(false);
-    }
-  }
-
-  // סוכן הכספים: אין לו פאנל פלט כאן. הממצאים שלו הם פערי גבייה, ומקומם
-  // בעמוד הכספים ליד המספרים עצמם - כאן נשארת רק ההרצה.
-  // סוכן השימור: הממצאים מוצגים בפאנל שלו כאן (הועבר מעמוד המטפלים 20/8/26).
-  // סוכן המרכזים: מנסח טיוטות ומכניס אותן לתור. לא שולח כלום.
-  async function runCenterNudgeNow() {
-    setCenterNudgeLoading(true);
-    setActionError("");
+  // הרצה ידנית של סוכן. פותחת את הפאנל שלו - מי שמריץ רוצה לראות תוצאה.
+  async function runAgent(meta: AgentMeta) {
+    selectAgent(meta.key);
+    setBusyAgent(meta.key);
+    setRunError("");
     setActionMsg("");
-    try {
-      const j = await postAgents("center_nudge_run");
-      const n = Array.isArray(j.proposals) ? j.proposals.length : 0;
-      setActionMsg(n > 0 ? `${n} טיוטות נדנוד מוכנות בתור` : "אין מרכז שצריך נדנוד כרגע");
-      load();
-      setTimeout(() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "שגיאה בהרצת סוכן המרכזים");
-    } finally {
-      setCenterNudgeLoading(false);
-    }
-  }
-
-  async function runRetentionNow() {
-    setRetentionLoading(true);
     setActionError("");
-    setActionMsg("");
     try {
-      const j = await postAgents("retention_run");
-      const n = Array.isArray(j.findings) ? j.findings.length : 0;
-      setActionMsg(
-        n > 0 ? `נמצאו ${n} מטפלים בסיכון שימור - מוצגים כאן למטה` : "כל המקודמים עם פעילות תקינה"
-      );
+      const j = await postAgents(meta.runAction);
+      if (meta.key === "daily_digest") setPreview(j as unknown as DigestPreview);
+      if (meta.key === "watchdog") setWatchdog(j as unknown as WatchdogRun);
+      if (meta.key === "supply_gaps") setGaps(j as unknown as GapsRun);
+      if (meta.key === "ads") setAds(j as unknown as AdsRun);
+      if (meta.key === "conversions") setConv(j as unknown as ConversionsPreview);
       load();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "שגיאה בבדיקת השימור");
+      setRunError(e instanceof Error ? e.message : "ההרצה נכשלה");
     } finally {
-      setRetentionLoading(false);
-    }
-  }
-
-  async function runFinanceNow() {
-    setFinanceLoading(true);
-    setActionError("");
-    setActionMsg("");
-    try {
-      const j = await postAgents("finance_run");
-      const n = Array.isArray(j.findings) ? j.findings.length : 0;
-      setActionMsg(
-        n > 0
-          ? `נמצאו ${n} פערי גבייה - הם מוצגים בעמוד הכספים`
-          : "לא נמצאו פערי גבייה"
-      );
-      load();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "שגיאה בבדיקת הכספים");
-    } finally {
-      setFinanceLoading(false);
-    }
-  }
-
-  async function runGapsNow() {
-    setGapsLoading(true);
-    setGapsError("");
-    setGaps(null);
-    try {
-      const j = await postAgents("supply_gaps_run");
-      setGaps(j as unknown as GapsRun);
-      load();
-      // ההצעות המוכנות לשליחה נמצאות בתור שלמעלה - קופצים אליהן מיד, כדי
-      // שהניתוח יסתיים על הפעולה עצמה ולא על עוד קיר של מידע.
-      setTimeout(() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 100);
-    } catch (e) {
-      setGapsError(e instanceof Error ? e.message : "שגיאה בניתוח הפערים");
-    } finally {
-      setGapsLoading(false);
-    }
-  }
-
-  async function runAdsNow() {
-    setAdsLoading(true);
-    setAdsError("");
-    setAds(null);
-    try {
-      const j = await postAgents("ads_run");
-      setAds(j as unknown as AdsRun);
-      load();
-    } catch (e) {
-      setAdsError(e instanceof Error ? e.message : "שגיאה בניטור הפרסום");
-    } finally {
-      setAdsLoading(false);
-    }
-  }
-
-  async function conversionsPreview() {
-    setConvLoading(true);
-    setConvError("");
-    setConvMsg("");
-    try {
-      const j = await postAgents("conversions_preview");
-      setConv(j as unknown as ConversionsPreview);
-      load();
-    } catch (e) {
-      setConvError(e instanceof Error ? e.message : "שגיאה בתצוגה המקדימה");
-    } finally {
-      setConvLoading(false);
+      setBusyAgent(null);
     }
   }
 
   async function conversionsSetup() {
-    if (!window.confirm("להקים בחשבון Google Ads שתי פעולות המרה (רכישת שאלון, מנוי מטפל)? זו פעולה חד-פעמית בחשבון הפרסום.")) return;
-    setConvLoading(true);
-    setConvError("");
-    setConvMsg("");
-    try {
-      const j = await postAgents("conversions_setup");
-      setConvMsg("פעולות ההמרה קיימות בחשבון ✓");
-      setConv(conv ? { ...conv, actions_ready: Boolean(j.actions_ready) } : conv);
-      load();
-    } catch (e) {
-      setConvError(e instanceof Error ? e.message : "שגיאה בהקמה");
-    } finally {
-      setConvLoading(false);
-    }
-  }
-
-  async function dismissAllFindings() {
-    if (!window.confirm(`לדחות את כל ${findings.length} הממצאים שלידיעה? הצעות המתנה לא ייגעו.`)) return;
-    setBulkBusy(true);
-    setActionError("");
-    setActionMsg("");
-    try {
-      const j = await postAgents("resolve", { ids: findings.map((f) => f.id), status: "dismissed" });
-      setActionMsg(`${j.dismissed ?? 0} ממצאים נדחו`);
-      load();
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "הדחייה נכשלה");
-      load();
-    } finally {
-      setBulkBusy(false);
-    }
-  }
-
-  // ניקוי התור מהצעות שלא רוצים לטפל בהן. דחייה בלבד, אף פעם לא אישור
-  // קבוצתי - וההצעות שעדיין רלוונטיות נוצרות מחדש בריצה הבאה של הסוכן,
-  // ולכן זו פעולה שאפשר לחזור ממנה.
-  async function dismissAllOffers() {
     if (
       !window.confirm(
-        `לנקות את כל ${actionable.length} ההצעות מהתור?\n\nלא נשלח שום מייל. הצעה שעדיין רלוונטית תחזור בריצה הבאה של סוכן פערי ההיצע.`
+        "להקים בחשבון Google Ads שתי פעולות המרה (רכישת שאלון, מנוי מטפל)? זו פעולה חד-פעמית בחשבון הפרסום."
       )
     )
       return;
-    setBulkBusy(true);
-    setActionError("");
-    setActionMsg("");
+    setBusyAgent("conversions");
+    setRunError("");
     try {
-      const j = await postAgents("resolve", { ids: actionable.map((a) => a.id), status: "dismissed" });
-      setActionMsg(`${j.dismissed ?? 0} הצעות נוקו מהתור`);
+      await postAgents("conversions_setup");
+      setActionMsg("פעולות ההמרה קיימות בחשבון ✓");
       load();
     } catch (e) {
-      setActionError(e instanceof Error ? e.message : "הניקוי נכשל");
-      load();
+      setRunError(e instanceof Error ? e.message : "שגיאה בהקמה");
     } finally {
-      setBulkBusy(false);
+      setBusyAgent(null);
     }
   }
 
@@ -930,7 +909,6 @@ export default function AgentsPage() {
       await postAgents("resolve", { id, status });
       load();
     } catch (e) {
-      // כשל מוצג במקום להיבלע - למשל "החזר" כשכבר קיימת הצעה זהה ממתינה.
       setActionError(e instanceof Error ? e.message : "הפעולה נכשלה");
       load();
     } finally {
@@ -938,104 +916,424 @@ export default function AgentsPage() {
     }
   }
 
-  return (
-    <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      {/* flex-col + order: הסוכנים למעלה תמיד, וכל השאר מתחתיהם - בלי להזיז
-          את סדר הקוד עצמו. הפרטים (תור, יומן) יורדים מתחת לפס. */}
-      <div className="mx-auto flex max-w-4xl flex-col px-6 py-8">
-        <h1 className="text-2xl font-black text-stone-900 mb-2">סוכנים אוטונומיים</h1>
-        <p className="text-sm text-stone-500 mb-6">
-          שום סוכן לא שולח מייל ולא מבצע פעולה בלי אישור שלך.
-        </p>
+  async function dismissMany(items: PendingAction[], what: string) {
+    if (items.length === 0) return;
+    if (
+      !window.confirm(
+        `לנקות ${items.length} ${what}?\n\nלא נשלח שום מייל. מה שעדיין רלוונטי ייווצר מחדש בריצה הבאה של הסוכן.`
+      )
+    )
+      return;
+    setBulkBusy(true);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("resolve", { ids: items.map((f) => f.id), status: "dismissed" });
+      setActionMsg(`${j.dismissed ?? 0} נוקו מהתור`);
+      load();
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "הניקוי נכשל");
+      load();
+    } finally {
+      setBulkBusy(false);
+    }
+  }
 
-        {error && (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-4">{error}</div>
-        )}
+  // ─────────────────────── תצוגות פנימיות ────────────────────────────────
 
-        {/* תור ההצעות - ראש העמוד בכוונה: זה מה שדורש פעולה, וכל השאר מתחתיו.
-            מופרד לשניים: מה שמוביל לפעולה שלך, ומה שהוא ממצא לידיעה בלבד. */}
-        <section className="order-3 mb-8 scroll-mt-4" ref={queueRef}>
-          <h2 className="text-sm font-black text-stone-500 mb-3">
-            דורש ממך פעולה ({actionable.length})
-            {findings.length > 0 && (
-              <span className="font-normal text-stone-400"> · {findings.length} ממצאים לידיעה</span>
-            )}
-            {pendingTotal > pending.length && (
-              <span className="font-normal text-stone-400"> · מתוך {pendingTotal} ממתינים</span>
-            )}
-          </h2>
-          {actionError && (
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 mb-3">
-              {actionError}
+  function StatusChip({ run }: { run: AgentRun | undefined }) {
+    if (!run) return <span className="text-[11px] text-stone-400">טרם רץ</span>;
+    const st = RUN_STATUS[run.status] ?? RUN_STATUS.running;
+    return (
+      <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>{st.label}</span>
+    );
+  }
+
+  // הסקירה האחרונה: מה שנשמר מהריצה התקינה האחרונה, מוצג בשפה של בני אדם.
+  function LastReview({ meta }: { meta: AgentMeta }) {
+    const stored = latestDetails[meta.key];
+    const d = (stored?.details ?? null) as Record<string, unknown> | null;
+    const when = stored ? `נכון ל-${fmtDateTime(stored.started_at)}` : "";
+
+    // בקר הבוקר - הדוח המלא האחרון.
+    if (meta.key === "daily_digest") {
+      const src = preview ?? latestDigest;
+      if (!src) return <p className="text-sm text-stone-400">עדיין אין דוח - אפשר להפיק עכשיו.</p>;
+      const sections = (src.sections ?? []) as DigestSection[];
+      return (
+        <div className="space-y-3">
+          {"started_at" in src && (
+            <p className="text-xs text-stone-400">הדוח האחרון נוצר {relTime((src as LatestDigest).started_at)}</p>
+          )}
+          {src.ai_summary && (
+            <div className="rounded-xl border border-teal-100 bg-[#EAF4F3] p-3 text-sm leading-6 text-stone-700">
+              {src.ai_summary}
             </div>
           )}
-          {actionMsg && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">
-              ✓ {actionMsg}
+          {sections.length === 0 && <p className="text-sm text-stone-400">אין פריטים - בוקר שקט.</p>}
+          {sections.map((s) => (
+            <div key={s.key} className="rounded-xl border border-stone-200 bg-white p-3">
+              <a href={s.link} className="text-sm font-black text-stone-800 hover:underline">
+                {s.urgent ? "🔴 " : ""}
+                {s.label} ({s.count})
+              </a>
+              <ul className="mt-1 space-y-0.5">
+                {s.lines.slice(0, 6).map((l, i) => (
+                  <li key={i} className="text-xs leading-5 text-stone-500">
+                    {l}
+                  </li>
+                ))}
+                {s.lines.length > 6 && <li className="text-xs text-stone-400">ועוד {s.lines.length - 6}...</li>}
+              </ul>
             </div>
-          )}
-          {loading && <p className="text-sm text-stone-400">טוען...</p>}
-          {!loading && pending.length === 0 && (
-            <div className="rounded-2xl border border-stone-200 bg-white p-5 text-sm text-stone-400">
-              אין הצעות ממתינות. כשסוכן יציע פעולה (טיוטת מייל, המלצה, התראה) - היא תופיע כאן
-              לאישור או דחייה.
+          ))}
+        </div>
+      );
+    }
+
+    // שומר הלילה - כל הבדיקות, עם השמות הפשוטים.
+    if (meta.key === "watchdog") {
+      const checks: WatchdogCheck[] =
+        watchdog?.checks ??
+        ((Array.isArray(d?.checks) ? (d?.checks as WatchdogCheck[]) : []) || []);
+      if (checks.length === 0) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+      const failed = checks.filter((c) => !c.ok && !c.skipped);
+      const skipped = checks.filter((c) => c.skipped);
+      const passed = checks.filter((c) => c.ok && !c.skipped);
+      return (
+        <div className="space-y-2">
+          <p className="text-sm text-stone-600">
+            {failed.length === 0
+              ? `כל ${passed.length} הבדיקות עברו ✓`
+              : `${failed.length} בדיקות נכשלו מתוך ${checks.length}`}
+            {skipped.length > 0 && ` · ${skipped.length} דולגו`}
+            {when && <span className="text-xs text-stone-400"> · {when}</span>}
+          </p>
+          {failed.map((c) => (
+            <div key={c.key} className="rounded-xl border border-red-200 bg-red-50 p-3">
+              <div className="text-sm font-bold text-red-700">✗ {c.label ?? WATCHDOG_LABELS[c.key] ?? c.key}</div>
+              <div className="text-xs text-red-600">{c.detail}</div>
             </div>
-          )}
-          {actionable.length > 3 && (
-            <div className="mb-3 flex flex-wrap items-center gap-2">
-              <button
-                onClick={dismissAllOffers}
-                disabled={bulkBusy}
-                className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-              >
-                {bulkBusy ? "מנקה..." : `✕ נקה את כל ${actionable.length} ההצעות`}
-              </button>
-              <span className="text-xs text-stone-400">
-                בלי לשלוח כלום. הצעה שעדיין רלוונטית תחזור בריצה הבאה.
-              </span>
-            </div>
-          )}
-          <div className="space-y-2">
-            {actionable.map((a) =>
-              a.action_type === "center_nudge" ? (
-                <CenterNudgeCard
-                  key={a.id}
-                  action={a}
-                  open={openNudge === a.id}
-                  onToggle={() => setOpenNudge(openNudge === a.id ? null : a.id)}
-                  dismissing={busyId === a.id}
-                  onSent={(msg) => {
-                    setActionMsg(msg);
-                    setActionError("");
-                    load();
-                  }}
-                  onDismiss={() => resolveAction(a.id, "dismissed")}
-                />
-              ) :
-              a.action_type === "gift_offer" ? (
-                <GiftOfferCard
-                  key={a.id}
-                  action={a}
-                  open={openOffer === a.id}
-                  onToggle={() => setOpenOffer(openOffer === a.id ? null : a.id)}
-                  dismissing={busyId === a.id}
-                  onSent={(msg) => {
-                    setActionMsg(msg);
-                    setActionError("");
-                    load();
-                  }}
-                  onDismiss={() => resolveAction(a.id, "dismissed")}
-                />
-              ) : (
-              <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-5">
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <h3 className="font-black text-stone-900 text-sm">{a.title}</h3>
-                  <span className="shrink-0 rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
-                    {agentLabel(a.agent)}
+          ))}
+          <Collapse title="כל הבדיקות" count={checks.length}>
+            <ul className="space-y-1">
+              {checks.map((c) => (
+                <li key={c.key} className="flex items-baseline gap-2 text-sm">
+                  <span>{c.skipped ? "⊘" : c.ok ? "✓" : "✗"}</span>
+                  <span className={c.skipped ? "text-stone-400" : c.ok ? "text-stone-600" : "font-bold text-red-700"}>
+                    {c.label ?? WATCHDOG_LABELS[c.key] ?? c.key}
                   </span>
+                  {c.skipped && <span className="text-xs text-stone-400">({c.detail})</span>}
+                </li>
+              ))}
+            </ul>
+          </Collapse>
+        </div>
+      );
+    }
+
+    // פערי היצע - מהריצה הידנית (עשיר) או מהשמור.
+    if (meta.key === "supply_gaps") {
+      if (gaps) {
+        return (
+          <div className="space-y-2 text-sm">
+            <p className="text-stone-600">
+              🎁 {gaps.gift_gaps.length} הצעות מתנה · 🧲 {gaps.recruit_gaps.length} פערי גיוס · ⏳{" "}
+              {gaps.waiting_gaps.length} ממתינים לתשובה
+            </p>
+            {gaps.recruit_gaps.length > 0 && (
+              <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={gaps.recruit_gaps.length}>
+                <ul className="space-y-1 text-xs text-stone-600">
+                  {gaps.recruit_gaps.map((g) => (
+                    <li key={g.key}>
+                      {g.treatment} · {g.region} · {g.events} מטופלים חיפשו
+                    </li>
+                  ))}
+                </ul>
+              </Collapse>
+            )}
+          </div>
+        );
+      }
+      const gift = Array.isArray(d?.gift) ? (d?.gift as { region: string; treatment: string; events: number }[]) : [];
+      const recruit = Array.isArray(d?.recruit)
+        ? (d?.recruit as { region: string; treatment: string; events: number }[])
+        : [];
+      const waiting = Array.isArray(d?.waiting) ? (d?.waiting as WaitingGap[]) : [];
+      if (!stored) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+      return (
+        <div className="space-y-2 text-sm">
+          <p className="text-stone-600">
+            🎁 {gift.length} הצעות מתנה · 🧲 {recruit.length} פערי גיוס · ⏳ {waiting.length} ממתינים לתשובה
+            <span className="text-xs text-stone-400"> · {when}</span>
+          </p>
+          {recruit.length > 0 && (
+            <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={recruit.length}>
+              <ul className="space-y-1 text-xs text-stone-600">
+                {recruit.map((g, i) => (
+                  <li key={i}>
+                    {g.treatment} · {g.region} · {g.events} מטופלים חיפשו
+                  </li>
+                ))}
+              </ul>
+            </Collapse>
+          )}
+          {waiting.length > 0 && (
+            <Collapse title="הצעות שכבר נשלחו וממתינות לתשובה" count={waiting.length}>
+              <ul className="space-y-1 text-xs text-stone-600">
+                {waiting.map((w, i) => (
+                  <li key={i}>
+                    {w.treatment} · {w.region} · נשלח {relTime(w.sentAt)}
+                  </li>
+                ))}
+              </ul>
+            </Collapse>
+          )}
+        </div>
+      );
+    }
+
+    // סוכן המרכזים.
+    if (meta.key === "center_nudge") {
+      if (!stored) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+      const proposals = Array.isArray(d?.proposals) ? (d?.proposals as { center: string; subject: string }[]) : [];
+      const skipped = Array.isArray(d?.skipped) ? (d?.skipped as unknown[]) : [];
+      return (
+        <div className="space-y-2 text-sm">
+          <p className="text-stone-600">
+            {proposals.length > 0
+              ? `${proposals.length} טיוטות נוסחו בריצה האחרונה`
+              : "אף מרכז לא היה צריך תזכורת בריצה האחרונה"}
+            <span className="text-xs text-stone-400"> · {when}</span>
+          </p>
+          {proposals.length > 0 && (
+            <ul className="space-y-1 text-xs text-stone-600">
+              {proposals.map((p, i) => (
+                <li key={i}>🏥 {p.center} - {p.subject}</li>
+              ))}
+            </ul>
+          )}
+          {skipped.length > 0 && (
+            <p className="text-xs text-stone-400">{skipped.length} מרכזים דולגו (שלמים, טריים מדי, או שכבר קיבלו לאחרונה).</p>
+          )}
+        </div>
+      );
+    }
+
+    // סוכן הפרסום.
+    if (meta.key === "ads") {
+      const campaigns = ads?.campaigns ?? (Array.isArray(d?.campaigns) ? (d?.campaigns as AdsRun["campaigns"]) : []);
+      const spend = ads?.spend_mtd ?? (typeof d?.spend_mtd === "number" ? (d?.spend_mtd as number) : null);
+      const findingsList =
+        ads?.findings ??
+        (Array.isArray(d?.findings) ? (d?.findings as { title: string; severity?: string }[]) : []);
+      if (!stored && !ads) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+      return (
+        <div className="space-y-2 text-sm">
+          <p className="text-stone-600">
+            {spend != null && <>הוצאה החודש: ₪{Math.round(spend).toLocaleString("he-IL")} · </>}
+            {findingsList.length > 0 ? `${findingsList.length} ממצאים` : "אין ממצאים - הקמפיינים בגבולות היעד"}
+            {when && <span className="text-xs text-stone-400"> · {when}</span>}
+          </p>
+          {findingsList.length > 0 && (
+            <ul className="space-y-1 text-xs text-stone-600">
+              {findingsList.map((f, i) => (
+                <li key={i}>
+                  {f.severity === "high" ? "🔴" : "🟡"} {f.title}
+                </li>
+              ))}
+            </ul>
+          )}
+          {campaigns.length > 0 && (
+            <Collapse title="קמפיינים (7 ימים)" count={campaigns.length}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-stone-200 text-stone-400">
+                      <th className="py-1 pe-2 text-right font-semibold">קמפיין</th>
+                      <th className="px-2 text-center font-semibold">עלות</th>
+                      <th className="px-2 text-center font-semibold">לחיצות</th>
+                      <th className="px-2 text-center font-semibold">לחיצות פנייה</th>
+                      <th className="px-2 text-center font-semibold">עלות ללחיצת פנייה</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {campaigns.map((c, i) => (
+                      <tr key={i} className="border-b border-stone-100">
+                        <td className="py-1 pe-2 font-semibold text-stone-700">{c.name}</td>
+                        <td className="px-2 text-center">₪{Math.round(c.cost)}</td>
+                        <td className="px-2 text-center">{c.clicks}</td>
+                        <td className="px-2 text-center">{c.contacts}</td>
+                        <td className="px-2 text-center">{c.cpl == null ? "-" : `₪${Math.round(c.cpl)}`}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Collapse>
+          )}
+        </div>
+      );
+    }
+
+    // המרות לגוגל.
+    if (meta.key === "conversions") {
+      const ready = conv?.actions_ready ?? (d?.actions_ready === true);
+      return (
+        <div className="space-y-2 text-sm">
+          <p className="text-stone-600">
+            {conv
+              ? conv.pending.length > 0
+                ? `${conv.pending.length} תשלומים ממתינים לדיווח`
+                : "אין תשלומים חדשים עם מזהה קליק - אין מה לדווח (זה המצב התקין היום)"
+              : stored
+                ? `הריצה האחרונה: אין מה לדווח (המצב התקין היום) · ${when}`
+                : "עדיין אין ריצה."}
+          </p>
+          <p className="text-xs text-stone-400">
+            פעולות ההמרה בחשבון גוגל: {ready ? "קיימות ✓" : "טרם הוקמו (בכוונה - אין עדיין מה לדווח)"}
+          </p>
+          <button
+            onClick={conversionsSetup}
+            disabled={busyAgent === "conversions"}
+            className="rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-500 hover:bg-stone-50 disabled:opacity-50"
+          >
+            הקם פעולות המרה בחשבון (חד-פעמי)
+          </button>
+        </div>
+      );
+    }
+
+    // כספים / שימור - ממצאים + מה נבדק.
+    const findingsList = Array.isArray(d?.findings) ? (d?.findings as { title: string; severity?: string }[]) : [];
+    const checked = d?.checked;
+    if (!stored) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+    return (
+      <div className="space-y-2 text-sm">
+        <p className="text-stone-600">
+          {findingsList.length > 0 ? `${findingsList.length} ממצאים` : "לא נמצאו פערים - הכול תקין ✓"}
+          {typeof checked === "number" && ` · נבדקו ${checked} מקודמים`}
+          {checked != null && typeof checked === "object" && (
+            <>
+              {" "}
+              · נבדקו {(checked as Record<string, number>).therapists ?? "?"} מטפלים,{" "}
+              {(checked as Record<string, number>).subscriptions ?? "?"} מנויים,{" "}
+              {(checked as Record<string, number>).centers ?? "?"} מרכזים
+            </>
+          )}
+          <span className="text-xs text-stone-400"> · {when}</span>
+        </p>
+        {findingsList.length > 0 && (
+          <ul className="space-y-1 text-xs text-stone-600">
+            {findingsList.slice(0, 10).map((f, i) => (
+              <li key={i}>
+                {f.severity === "high" ? "🔴" : "🟡"} {f.title}
+              </li>
+            ))}
+            {findingsList.length > 10 && <li className="text-stone-400">ועוד {findingsList.length - 10}...</li>}
+          </ul>
+        )}
+      </div>
+    );
+  }
+
+  // מה נעשה בעבר: הכרעות ושליחות של הסוכן הזה + סטטיסטיקת ריצות.
+  function PastWork({ meta }: { meta: AgentMeta }) {
+    // שליחות בפועל קודמות לדחיות: ביום עמוס הסוכן דוחה עשרות ממצאים
+    // אוטומטית, והם היו קוברים את הדבר החשוב באמת - מה נשלח.
+    const all = resolved.filter((r) => r.agent === meta.key);
+    const mine = [...all.filter((r) => r.status === "executed"), ...all.filter((r) => r.status !== "executed")];
+    const myRuns = runs.filter((r) => r.agent === meta.key);
+    const errors = myRuns.filter((r) => r.status === "error").length;
+    const icon = (s: string) => (s === "executed" ? "📤" : s === "approved" ? "✓" : "✕");
+    return (
+      <div className="space-y-2">
+        <p className="text-xs text-stone-400">
+          {myRuns.length > 0
+            ? `${myRuns.length} ריצות נרשמו ביומן${errors > 0 ? ` · ${errors} נכשלו` : " · בלי שגיאות"}`
+            : "עדיין לא נרשמו ריצות"}
+        </p>
+        {mine.length === 0 ? (
+          <p className="text-sm text-stone-400">
+            עדיין לא בוצעו פעולות דרך הסוכן הזה - כל מה שיישלח או יוכרע יופיע כאן.
+          </p>
+        ) : (
+          <ul className="space-y-1.5">
+            {mine.slice(0, 12).map((r) => (
+              <li key={r.id} className="flex items-baseline justify-between gap-3 border-b border-stone-100 pb-1.5 text-sm last:border-0">
+                <span className={r.status === "executed" ? "font-semibold text-stone-700" : "text-stone-500"}>
+                  {icon(r.status)} {r.resolution_note || r.title}
+                </span>
+                <span className="shrink-0 text-xs text-stone-400">{relTime(r.status_changed_at)}</span>
+              </li>
+            ))}
+            {mine.length > 12 && <li className="text-xs text-stone-400">ועוד {mine.length - 12}...</li>}
+          </ul>
+        )}
+        <p className="text-[11px] text-stone-400">📤 נשלח בפועל · ✓ אושר · ✕ נדחה (דחייה אינה שולחת דבר)</p>
+      </div>
+    );
+  }
+
+  // ההמלצות של הסוכן עכשיו: פעולות (כרטיסים) + ממצאים (רשימה).
+  function AgentQueue({ meta }: { meta: AgentMeta }) {
+    const mine = pending.filter((a) => a.agent === meta.key);
+    const acts = mine.filter((a) => !isFinding(a));
+    const finds = mine.filter(isFinding);
+    if (mine.length === 0) {
+      return <p className="text-sm text-stone-400">אין המלצות פתוחות כרגע - כשהסוכן ימצא משהו, זה יופיע כאן.</p>;
+    }
+    return (
+      <div className="space-y-3">
+        {acts.length > 3 && (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => dismissMany(acts, "הצעות")}
+              disabled={bulkBusy}
+              className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+            >
+              {bulkBusy ? "מנקה..." : `✕ נקה את כל ${acts.length} ההצעות`}
+            </button>
+            <span className="text-xs text-stone-400">בלי לשלוח כלום. מה שרלוונטי יחזור בריצה הבאה.</span>
+          </div>
+        )}
+        <div className="space-y-2">
+          {acts.map((a) =>
+            a.action_type === "center_nudge" ? (
+              <CenterNudgeCard
+                key={a.id}
+                action={a}
+                open={openNudge === a.id}
+                onToggle={() => setOpenNudge(openNudge === a.id ? null : a.id)}
+                dismissing={busyId === a.id}
+                onSent={(msg) => {
+                  setActionMsg(msg);
+                  setActionError("");
+                  load();
+                }}
+                onDismiss={() => resolveAction(a.id, "dismissed")}
+              />
+            ) : a.action_type === "gift_offer" ? (
+              <GiftOfferCard
+                key={a.id}
+                action={a}
+                open={openOffer === a.id}
+                onToggle={() => setOpenOffer(openOffer === a.id ? null : a.id)}
+                dismissing={busyId === a.id}
+                onSent={(msg) => {
+                  setActionMsg(msg);
+                  setActionError("");
+                  load();
+                }}
+                onDismiss={() => resolveAction(a.id, "dismissed")}
+              />
+            ) : (
+              <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+                <div className="mb-1 flex items-start justify-between gap-3">
+                  <h3 className="text-sm font-black text-stone-900">{a.title}</h3>
                 </div>
-                {a.entity_label && <p className="text-xs text-stone-400 mb-1">{a.entity_label}</p>}
-                {a.body && <p className="text-sm text-stone-600 leading-6 whitespace-pre-line">{a.body}</p>}
+                {a.entity_label && <p className="mb-1 text-xs text-stone-400">{a.entity_label}</p>}
+                {a.body && <p className="text-sm leading-6 text-stone-600 whitespace-pre-line">{a.body}</p>}
                 <div className="mt-3 flex gap-2">
                   <button
                     onClick={() => resolveAction(a.id, "approved")}
@@ -1053,597 +1351,246 @@ export default function AgentsPage() {
                   </button>
                 </div>
               </div>
-              )
-            )}
-          </div>
-
-          {/* ממצאים לידיעה: פערי גיוס והתראות. אלה לא "פעולות" - הם מסקנות
-              שהסוכן הגיע אליהן, ולכן הם מקופלים ואפשר לנקות אותם בבת אחת. */}
-          {findings.length > 0 && (
-            <div className="mt-3">
-              {/* הממצאים חיים בעמוד שהנושא שלהם שייך לו; כאן נשאר רק מונה
-                  וקישור, כדי שתור הפעולות לא יתארך עם כל סוכן חדש. */}
-              <div className="mb-2 flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-xs text-stone-500">
-                <span className="font-bold text-stone-600">הממצאים מוצגים ב:</span>
-                {/* צ'יפ לכל סוכן שיש לו ממצאים - גם לסוכן בלי עמוד נושא.
-                    בלי זה, ממצא של שומר הלילה נספר במונה ואי אפשר לקרוא אותו
-                    בשום מקום, וזו בדיוק התקלה שהוא נועד להתריע עליה. */}
-                {Array.from(new Set(findings.map((f) => f.agent))).map((agent) => {
-                  const home = FINDING_HOMES.find((h) => h.agent === agent);
-                  const count = findings.filter((f) => f.agent === agent).length;
-                  const cls =
-                    "rounded-full border border-stone-300 bg-white px-2.5 py-0.5 font-bold text-stone-600 hover:bg-stone-100";
-                  return home ? (
-                    <a key={agent} href={home.href} className={cls}>
-                      {home.label} ({count}) ←
-                    </a>
-                  ) : (
-                    // אין עמוד נושא: הנושא הוא המערכת עצמה, ולכן הבית הוא
-                    // הפאנל של הסוכן כאן - והצ'יפ פותח אותו.
-                    <button key={agent} onClick={() => setOpenAgent(agent)} className={cls}>
-                      {agentLabel(agent)} ({count}) ▼
-                    </button>
-                  );
-                })}
-              </div>
-              {/* הרשימה המלאה חיה בעמודי הנושא. כאן נשאר רק ניקוי,
-                  כדי שהעמוד הזה יישאר עמוד סוכנים ולא רשימת ממצאים. */}
-              <button
-                onClick={dismissAllFindings}
-                disabled={bulkBusy}
-                className="text-xs font-bold text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
-              >
-                {bulkBusy ? "מנקה..." : "נקה את הממצאים"}
-              </button>
-            </div>
+            )
           )}
-
-          {resolved.length > 0 && (
-            <div className="mt-4 space-y-1">
-              <h3 className="text-xs font-black text-stone-400 mb-1">הוכרעו לאחרונה</h3>
-              {resolved.map((a) => (
-                <div
-                  key={a.id}
-                  className="flex items-center justify-between text-xs text-stone-400 border-b border-stone-100 pb-1"
-                >
-                  <span>
-                    {a.status === "executed" ? "📤" : a.status === "approved" ? "✓" : "✕"} {a.title}
-                    {a.status === "executed" && <span className="text-emerald-600"> · נשלח</span>}
-                  </span>
-                  {/* הצעה שנשלחה בפועל לא חוזרת לתור - השרת גם חוסם את זה. */}
-                  {a.status !== "executed" && (
-                    <button
-                      onClick={() => resolveAction(a.id, "pending")}
-                      disabled={busyId === a.id}
-                      className="underline hover:text-stone-600 disabled:opacity-50"
-                    >
-                      החזר
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* פס הסטטוס - order-1: זה ורק זה יושב בראש העמוד. */}
-        <div className="order-1">
-        <AgentStrip
-          runs={runs}
-          openKey={openAgent}
-          onOpen={setOpenAgent}
-          agents={[
-            { key: "daily_digest", icon: "☀️", label: "בקר הבוקר", busy: previewLoading, onRun: runPreview, runLabel: "הפק" },
-            { key: "watchdog", icon: "🌙", label: "שומר הלילה", busy: watchdogLoading, onRun: runWatchdogNow, runLabel: "בדוק" },
-            { key: "supply_gaps", icon: "⚖️", label: "פערי היצע", busy: gapsLoading, onRun: runGapsNow, runLabel: "נתח" },
-            { key: "ads", icon: "📣", label: "סוכן הפרסום", busy: adsLoading, onRun: runAdsNow, runLabel: "נטר" },
-            { key: "conversions", icon: "📈", label: "המרות לגוגל", busy: convLoading, onRun: conversionsPreview, runLabel: "בדוק" },
-            { key: "finance", icon: "💰", label: "סוכן הכספים", busy: financeLoading, onRun: runFinanceNow, runLabel: "התאם" },
-            { key: "retention", icon: "🤝", label: "שימור מטפלים", busy: retentionLoading, onRun: runRetentionNow, runLabel: "סרוק" },
-            { key: "center_nudge", icon: "🏥", label: "סוכן המרכזים", busy: centerNudgeLoading, onRun: runCenterNudgeNow, runLabel: "נסח" },
-          ]}
-        />
         </div>
 
-        {/* גוף הפלט של הסוכן הפתוח, ורק שלו. הפס למעלה הוא התצוגה הקבועה;
-            הפאנלים נפתחים לפי דרישה במקום להיערם זה מתחת לזה. */}
-        {openAgent === "daily_digest" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">☀️ בקר הבוקר</h2>
-            <button
-              onClick={runPreview}
-              disabled={previewLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {previewLoading ? "מפיק..." : "הצג תצוגה מקדימה"}
-            </button>
-          </div>
-          <p className="text-xs text-stone-500 mb-4">
-            רץ כל בוקר ושומר את הדוח כאן בעמוד. המיילים כבויים בכוונה (החלטה 16/8) - הכול
-            נצפה ישירות למטה. הכפתור מפיק דוח טרי ברגע זה.
-          </p>
-
-          {latestDigest && !preview && (
-            <div className="mb-4">
-              <Collapse
-                title={`הדוח האחרון · ${fmtDateTime(latestDigest.started_at)}`}
-                count={latestDigest.sections.length || undefined}
+        {finds.length > 0 && (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-xs font-black text-stone-700">ממצאים לידיעה ({finds.length})</span>
+              <button
+                onClick={() => dismissMany(finds, "ממצאים")}
+                disabled={bulkBusy}
+                className="text-xs font-bold text-stone-500 underline hover:text-stone-700 disabled:opacity-50"
               >
-              {latestDigest.status === "empty" || latestDigest.sections.length === 0 ? (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-                  בריצה האחרונה לא היה אף פריט שדורש תשומת לב.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {latestDigest.ai_summary && (
-                    <div className="rounded-xl bg-[#EAF4F3] p-4 text-sm text-[#2A6462] leading-7 whitespace-pre-line">
-                      {latestDigest.ai_summary}
-                    </div>
-                  )}
-                  {latestDigest.sections.map((s) => (
-                    <div key={s.key} className="rounded-xl border border-stone-200 p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="font-bold text-stone-900 text-sm">
-                          {s.label} ({s.count})
-                        </span>
-                        {s.urgent && (
-                          <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
-                            דורש טיפול
-                          </span>
-                        )}
-                      </div>
-                      <ul className="list-disc ps-5 text-sm text-stone-600 leading-6">
-                        {s.lines.map((l, i) => (
-                          <li key={i}>{l}</li>
-                        ))}
-                      </ul>
-                    </div>
-                  ))}
-                </div>
-              )}
-              </Collapse>
+                נקה הכול
+              </button>
             </div>
-          )}
-
-          {previewError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">
-              {previewError}
-            </div>
-          )}
-
-          {preview && preview.empty && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-              אין כרגע אף פריט שדורש תשומת לב - ביום כזה לא נשלח מייל בכלל.
-            </div>
-          )}
-
-          {preview && !preview.empty && (
-            <div className="space-y-4">
-              {preview.ai_summary && (
-                <div className="rounded-xl bg-[#EAF4F3] p-4 text-sm text-[#2A6462] leading-7 whitespace-pre-line">
-                  {preview.ai_summary}
-                </div>
-              )}
-              {preview.sections.map((s) => (
-                <div key={s.key} className="rounded-xl border border-stone-200 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="font-bold text-stone-900 text-sm">
-                      {s.label} ({s.count})
-                    </span>
-                    {s.urgent && (
-                      <span className="rounded-full bg-red-50 border border-red-200 px-2.5 py-0.5 text-[11px] font-bold text-red-700">
-                        דורש טיפול
-                      </span>
-                    )}
+            <ul className="space-y-1.5">
+              {finds.slice(0, 10).map((f) => (
+                <li key={f.id} className="flex items-start justify-between gap-3 text-sm">
+                  <div>
+                    <span className="font-bold text-stone-700">{f.title}</span>
+                    {f.body && <span className="block text-xs leading-5 text-stone-500">{f.body}</span>}
                   </div>
-                  <ul className="list-disc ps-5 text-sm text-stone-600 leading-6">
-                    {s.lines.map((l, i) => (
-                      <li key={i}>{l}</li>
-                    ))}
-                  </ul>
-                </div>
+                  <button
+                    onClick={() => resolveAction(f.id, "dismissed")}
+                    disabled={busyId === f.id || bulkBusy}
+                    className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+                  >
+                    דחה
+                  </button>
+                </li>
               ))}
-              <p className="text-xs text-stone-400">
-                כשיחומש, המייל יישלח אל: {preview.recipients.join(", ")}
-              </p>
-            </div>
-          )}
-        </section>
+              {finds.length > 10 && <li className="text-xs text-stone-500">ועוד {finds.length - 10}...</li>}
+            </ul>
+            <p className="mt-2 text-[11px] text-stone-500">
+              ממצא הוא מידע, לא משימה: הוא נסגר מעצמו כשהמצב שיצר אותו משתנה, ודחייה רק מסתירה אותו.
+            </p>
+          </div>
         )}
 
-        {openAgent === "watchdog" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">🌙 שומר הלילה</h2>
-            <button
-              onClick={runWatchdogNow}
-              disabled={watchdogLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {watchdogLoading ? "בודק..." : "הרץ בדיקות עכשיו"}
-            </button>
-          </div>
-
-          {/* ההתראות הפתוחות של השומר יושבות כאן, כי הנושא שלהן הוא המערכת
-              עצמה ואין לה עמוד אחר. */}
-          {findings.some((f) => f.agent === "watchdog") && (
-            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <div className="mb-1.5 text-xs font-black text-amber-800">
-                התראות פתוחות ({findings.filter((f) => f.agent === "watchdog").length})
-              </div>
-              <ul className="space-y-1.5">
-                {findings
-                  .filter((f) => f.agent === "watchdog")
-                  .map((f) => (
-                    <li key={f.id} className="text-sm text-stone-700">
-                      <span className="font-bold">{f.title}</span>
-                      {f.body && (
-                        <span className="block text-xs text-stone-500 leading-5 whitespace-pre-line">{f.body}</span>
-                      )}
-                    </li>
-                  ))}
-              </ul>
-              <p className="mt-2 text-[11px] text-amber-700">
-                התראה נסגרת מעצמה ברגע שהבדיקה חוזרת לעבור. אין כאן מה לאשר.
-              </p>
-            </div>
-          )}
-          <p className="text-xs text-stone-500 mb-4">
-            בדיקות תקינות ליליות של האתר החי: שאלונים, ניקוד, התאמה, עמודי מפתח, אנליטיקה
-            וטריות הקרונים. כישלון נכנס לתור ההצעות; מייל התראה מיידי יחומש יחד עם דוח הבוקר.
+        {meta.home && (
+          <p className="text-xs text-stone-400">
+            הממצאים מוצגים גם ב<a href={meta.home.href} className="font-bold text-[#2A6462] underline">{meta.home.label}</a>, ליד הנתונים שהם מדברים עליהם.
           </p>
+        )}
+      </div>
+    );
+  }
 
-          {watchdogError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">
-              {watchdogError}
-            </div>
+  function AgentDetail({ meta }: { meta: AgentMeta }) {
+    const myRuns = runs.filter((r) => r.agent === meta.key);
+    const chartPoints = myRuns
+      .filter((r) => r.metric != null)
+      .map((r) => ({ at: r.started_at, value: r.metric as number }))
+      .reverse();
+    return (
+      <div className="rounded-b-2xl border border-t-0 border-stone-200 bg-white p-5">
+        {/* מה הסוכן עושה + איך לקרוא */}
+        <p className="mb-2 text-sm leading-6 text-stone-700">{meta.desc}</p>
+        <ul className="mb-4 space-y-1">
+          {meta.howToRead.map((h, i) => (
+            <li key={i} className="text-xs leading-5 text-stone-500">
+              💡 {h}
+            </li>
+          ))}
+        </ul>
+
+        {/* שורת הפעלה */}
+        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
+          <button
+            onClick={() => runAgent(meta)}
+            disabled={busyAgent === meta.key}
+            className="rounded-full bg-stone-800 px-4 py-1.5 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+          >
+            {busyAgent === meta.key ? "רץ..." : meta.runLabel}
+          </button>
+          <span className="text-xs text-stone-500">{meta.schedule}</span>
+          {myRuns[0] && (
+            <span className="text-xs text-stone-400">
+              ריצה אחרונה: {relTime(myRuns[0].started_at)}
+            </span>
           )}
+        </div>
 
-          {watchdog && (
-            <div className="overflow-x-auto rounded-xl border border-stone-200">
-              <table className="w-full text-sm" dir="rtl">
-                <tbody>
-                  {watchdog.checks.map((c) => (
-                    <tr key={c.key} className="border-b border-stone-100 last:border-0">
-                      <td className="px-3 py-1.5 whitespace-nowrap">
-                        {c.skipped ? "⏭️" : c.ok ? "✅" : "❌"}
+        {runError && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{runError}</div>
+        )}
+
+        {/* 1. ממתין לך עכשיו */}
+        <h3 className="mb-2 text-sm font-black text-stone-800">📥 ממתין לך עכשיו</h3>
+        <div className="mb-6">
+          <AgentQueue meta={meta} />
+        </div>
+
+        {/* 2. הסקירה האחרונה */}
+        <h3 className="mb-2 text-sm font-black text-stone-800">🔎 הסקירה האחרונה</h3>
+        <div className="mb-6">
+          <LastReview meta={meta} />
+        </div>
+
+        {/* גרף */}
+        {meta.chartLabel && chartPoints.length >= 3 && (
+          <div className="mb-6">
+            <MiniBars points={chartPoints} label={meta.chartLabel} goodWhenZero={meta.chartGoodWhenZero} />
+          </div>
+        )}
+
+        {/* 3. מה נעשה בעבר */}
+        <h3 className="mb-2 text-sm font-black text-stone-800">🗂️ מה נעשה בעבר</h3>
+        <div className="mb-4">
+          <PastWork meta={meta} />
+        </div>
+
+        {/* יומן הריצות של הסוכן */}
+        <Collapse title="יומן הריצות של הסוכן" count={myRuns.length}>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-stone-200 text-stone-400">
+                  <th className="py-1 pe-2 text-right font-semibold">מתי</th>
+                  <th className="px-2 text-right font-semibold">סטטוס</th>
+                  <th className="px-2 text-right font-semibold">סיכום</th>
+                </tr>
+              </thead>
+              <tbody>
+                {myRuns.slice(0, 20).map((r) => {
+                  const st = RUN_STATUS[r.status] ?? RUN_STATUS.running;
+                  return (
+                    <tr key={r.id} className="border-b border-stone-100">
+                      <td className="whitespace-nowrap py-1.5 pe-2 text-stone-500">{fmtDateTime(r.started_at)}</td>
+                      <td className="px-2">
+                        <span className={`rounded-full border px-2 py-0.5 text-[10px] font-bold ${st.cls}`}>
+                          {st.label}
+                        </span>
                       </td>
-                      <td className="px-3 py-1.5 font-bold text-stone-700 whitespace-nowrap">{c.label}</td>
-                      <td className="px-3 py-1.5 text-stone-500">{c.detail}</td>
-                      <td className="px-3 py-1.5 text-stone-400 text-xs whitespace-nowrap">
-                        {c.ms > 0 ? `${(c.ms / 1000).toFixed(1)}s` : ""}
+                      <td className="px-2 text-stone-600">
+                        {r.error ? <span className="text-red-600">{r.error}</span> : r.summary}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-        )}
-
-        {openAgent === "supply_gaps" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">⚖️ פערי היצע וקידום מתנה</h2>
-            <button
-              onClick={runGapsNow}
-              disabled={gapsLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {gapsLoading ? "מנתח..." : "נתח פערים עכשיו"}
-            </button>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-          <p className="text-xs text-stone-500 mb-4">
-            מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים חיפשו ולא היה מטפל משלם להציע.
-            כשיש מטפל חינמי מתאים - מנסח הצעת קידום מתנה לחודשיים; כשאין אף מטפל - זה פער גיוס
-            לפרסום. ההצעות המוכנות לשליחה עולות לתור שבראש העמוד, שם בוחרים נמען, עורכים
-            את הטיוטה ושולחים.
-          </p>
+        </Collapse>
+      </div>
+    );
+  }
 
-          {gapsError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{gapsError}</div>
-          )}
+  // ─────────────────────────────── רינדור ─────────────────────────────────
 
-          {gaps && (
-            <div className="space-y-3">
-              {/* התוצאה שדורשת פעולה - שורה אחת וכפתור, ולא רשימה שצריך לגלול */}
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-                <div className="text-sm font-bold text-stone-900 mb-1">
-                  {gaps.gift_gaps.length > 0
-                    ? `${gaps.gift_gaps.length} הצעות קידום מתנה מוכנות לשליחה`
-                    : "אין כרגע פער שיש לו מועמד מתאים במאגר"}
-                </div>
-                {gaps.gift_gaps.length > 0 && (
-                  <>
-                    <div className="text-xs text-stone-600 mb-2">
-                      {gaps.gift_gaps
-                        .map((g) => `${g.treatment} · ${g.region}`)
-                        .join(" | ")}
-                    </div>
-                    <button
-                      onClick={() => queueRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                      className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-sm font-bold text-white hover:opacity-90"
-                    >
-                      ↑ לתור ההצעות - בחירת נמען ושליחה
-                    </button>
-                  </>
-                )}
+  const totalActionable = pending.filter((a) => !isFinding(a)).length;
+
+  return (
+    <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+      <div className="mx-auto max-w-4xl px-6 py-8">
+        <h1 className="mb-1 text-2xl font-black text-stone-900">סוכנים אוטונומיים</h1>
+        <p className="mb-5 text-sm text-stone-500">
+          כל סוכן רץ לבד לפי לוח הזמנים שלו, וכל מה שדורש החלטה מחכה בפנים.{" "}
+          <span className="font-bold">שום מייל לא יוצא ושום פעולה לא מתבצעת בלי לחיצה שלך.</span>
+        </p>
+
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+        )}
+        {actionError && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+            {actionError}
+          </div>
+        )}
+        {actionMsg && (
+          <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">
+            ✓ {actionMsg}
+          </div>
+        )}
+        {loading && runs.length === 0 && <p className="mb-4 text-sm text-stone-400">טוען...</p>}
+
+        {/* הרובריקות: שורה מלוא-הרוחב לכל סוכן. לחיצה פותחת רק אותו. */}
+        <div className="space-y-2">
+          {AGENTS.map((meta) => {
+            const last = runs.find((r) => r.agent === meta.key);
+            const mine = pending.filter((a) => a.agent === meta.key);
+            const acts = mine.filter((a) => !isFinding(a)).length;
+            const finds = mine.length - acts;
+            const isOpen = selected === meta.key;
+            return (
+              <div key={meta.key}>
+                <button
+                  onClick={() => selectAgent(isOpen ? null : meta.key)}
+                  className={`flex w-full flex-wrap items-center gap-3 border px-4 py-3 text-right transition-colors ${
+                    isOpen
+                      ? "rounded-t-2xl border-stone-300 bg-white"
+                      : "rounded-2xl border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60"
+                  }`}
+                >
+                  <span className="text-xl">{meta.icon}</span>
+                  <span className="min-w-28 text-sm font-black text-stone-900">{meta.label}</span>
+                  <StatusChip run={last} />
+                  {acts > 0 && (
+                    <span className="rounded-full bg-[#2e7d8c] px-2 py-0.5 text-[11px] font-bold text-white">
+                      {acts} ממתינות לך
+                    </span>
+                  )}
+                  {finds > 0 && (
+                    <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                      {finds} ממצאים
+                    </span>
+                  )}
+                  <span className="hidden flex-1 truncate text-xs text-stone-400 sm:block">
+                    {last ? `${relTime(last.started_at)} · ${last.summary ?? ""}` : "טרם רץ"}
+                  </span>
+                  <span className="ms-auto text-xs font-bold text-stone-400">{isOpen ? "סגור ▲" : "פתח ▼"}</span>
+                </button>
+                {isOpen && <AgentDetail meta={meta} />}
               </div>
+            );
+          })}
+        </div>
 
-              <Collapse title="פערי גיוס - אין אף מטפל מתאים במאגר" count={gaps.recruit_gaps.length}>
-                {gaps.recruit_gaps.length === 0 ? (
-                  <p className="text-sm text-stone-400">אין פערי גיוס פתוחים.</p>
-                ) : (
-                  <ul className="list-disc ps-5 text-sm text-stone-600 leading-6">
-                    {gaps.recruit_gaps.map((g) => (
-                      <li key={g.key}>
-                        <strong>{g.treatment}</strong> · {g.region} · {g.events} מטופלים חיפשו
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </Collapse>
-
-              {gaps.waiting_gaps && gaps.waiting_gaps.length > 0 && (
-                <Collapse title="ממתינים לתשובה על הצעה שנשלחה" count={gaps.waiting_gaps.length}>
-                  <ul className="list-disc ps-5 text-sm text-stone-500 leading-6">
-                    {gaps.waiting_gaps.map((w) => (
-                      <li key={`${w.region}|${w.treatment}`}>
-                        <strong>{w.treatment}</strong> · {w.region} · נשלח ב-{fmtDateTime(w.sentAt)}
-                      </li>
-                    ))}
-                  </ul>
-                </Collapse>
+        {/* כשאף סוכן לא פתוח - הסבר קצר על המודל */}
+        {!selected && (
+          <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600">
+            <p className="mb-2 font-black text-stone-800">איך זה עובד</p>
+            <ul className="space-y-1.5">
+              <li>🕐 כל סוכן רץ אוטומטית לפי הלוח שלו (מוצג בתוך כל סוכן), ואפשר גם להריץ ידנית בכל רגע.</li>
+              <li>
+                📥 כשסוכן מנסח טיוטה או מוצא משהו שדורש החלטה - זה מופיע אצלו עם התג{" "}
+                <span className="rounded-full bg-[#2e7d8c] px-2 py-0.5 text-[11px] font-bold text-white">ממתינות לך</span>
+                . פתח, קרא, ותחליט.
+              </li>
+              <li>🟡 &quot;ממצאים&quot; הם מידע בלבד - הם נסגרים מעצמם כשהמצב משתנה, ואין חובה לטפל בהם.</li>
+              <li>📤 מייל יוצא אך ורק מלחיצת &quot;שלח&quot; שלך על טיוטה שקראת. דחייה לעולם לא שולחת כלום.</li>
+              {totalActionable > 0 && (
+                <li className="font-bold text-stone-800">
+                  כרגע {totalActionable} הצעות ממתינות לך - מסומנות בתגים למעלה.
+                </li>
               )}
-            </div>
-          )}
-        </section>
-        )}
-
-        {openAgent === "ads" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">📣 סוכן הפרסום</h2>
-            <button
-              onClick={runAdsNow}
-              disabled={adsLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {adsLoading ? "בודק..." : "הרץ ניטור עכשיו"}
-            </button>
+            </ul>
           </div>
-          <p className="text-xs text-stone-500 mb-4">
-            מצליב כל בוקר את ההוצאה בגוגל מול המשפך הפנימי: קמפיין ששורף כסף בלי לחיצות פנייה,
-            עלות מעל היעד, חריגה מקצב התקציב, וקמפיין בלי utm שאי אפשר למדוד. קריאה בלבד -
-            הסוכן לא נוגע בקמפיינים, רק מציע.
-          </p>
-
-          {adsError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{adsError}</div>
-          )}
-
-          {ads && !ads.configured && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-              חיבור Google Ads לא מוגדר בסביבה הזו.
-            </div>
-          )}
-
-          {ads && ads.configured && (
-            <div className="space-y-3">
-              {ads.budget_pace && (
-                <div className="text-xs text-stone-500">
-                  הוצאה החודש: <strong>₪{ads.spend_mtd.toLocaleString("he-IL")}</strong> · לפי הקצב המתוכנן:
-                  ₪{ads.budget_pace.expected.toLocaleString("he-IL")}
-                </div>
-              )}
-              {ads.findings.length === 0 ? (
-                <p className="text-sm text-stone-500">אין ממצאים - הקמפיינים בטווח הנורמה.</p>
-              ) : (
-                ads.findings.map((f) => (
-                  <div
-                    key={f.key}
-                    className={`rounded-xl border p-4 ${f.severity === "high" ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}
-                  >
-                    <div className="font-bold text-sm text-stone-900 mb-1">{f.title}</div>
-                    <div className="text-sm text-stone-600 leading-6">{f.detail}</div>
-                  </div>
-                ))
-              )}
-              {ads.campaigns.length > 0 && (
-                <div className="overflow-x-auto rounded-xl border border-stone-200">
-                  <table className="w-full text-sm" dir="rtl">
-                    <thead>
-                      <tr className="border-b border-stone-200 bg-stone-50 text-right text-xs text-stone-500">
-                        <th className="px-3 py-2 font-bold">קמפיין</th>
-                        <th className="px-3 py-2 font-bold">הוצאה (7 ימים)</th>
-                        <th className="px-3 py-2 font-bold">קליקים</th>
-                        <th className="px-3 py-2 font-bold">לחיצות פנייה</th>
-                        <th className="px-3 py-2 font-bold">עלות ללחיצה</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {ads.campaigns.map((c) => (
-                        <tr key={c.name} className="border-b border-stone-100 last:border-0">
-                          <td className="px-3 py-1.5 font-bold text-stone-700">
-                            {c.name}
-                            {!c.utm && <span className="text-red-600 text-xs"> (בלי utm)</span>}
-                          </td>
-                          <td className="px-3 py-1.5 text-stone-600">₪{c.cost.toLocaleString("he-IL")}</td>
-                          <td className="px-3 py-1.5 text-stone-500">{c.clicks}</td>
-                          <td className={`px-3 py-1.5 font-bold ${c.contacts === 0 ? "text-red-600" : "text-emerald-600"}`}>
-                            {c.contacts}
-                          </td>
-                          <td className="px-3 py-1.5 text-stone-600">{c.cpl != null ? `₪${c.cpl}` : "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
         )}
-
-        {openAgent === "conversions" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">📈 המרות אמת לגוגל</h2>
-            <button
-              onClick={conversionsPreview}
-              disabled={convLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {convLoading ? "בודק..." : "תצוגה מקדימה"}
-            </button>
-          </div>
-          <p className="text-xs text-stone-500 mb-4">
-            מדווח לגוגל על תשלומים אמיתיים שהגיעו מקליק ממומן (דרך מזהה הקליק בלבד - בלי שום פרט
-            אישי), כדי שהאופטימיזציה תרדוף לקוחות משלמים. רץ יומית בתצוגה מקדימה; העלאה אמיתית רק
-            אחרי הקמת פעולות ההמרה וחימוש.
-          </p>
-
-          {convError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 mb-3">{convError}</div>
-          )}
-          {convMsg && (
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700 mb-3">{convMsg}</div>
-          )}
-
-          {conv && !conv.configured && (
-            <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm text-stone-500">
-              חיבור Google Ads לא מוגדר בסביבה הזו.
-            </div>
-          )}
-
-          {conv && conv.configured && (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 text-sm">
-                <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${conv.actions_ready ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-amber-50 border-amber-200 text-amber-800"}`}>
-                  {conv.actions_ready ? "פעולות ההמרה קיימות בחשבון ✓" : "פעולות ההמרה טרם הוקמו"}
-                </span>
-                {!conv.actions_ready && (
-                  <button
-                    onClick={conversionsSetup}
-                    disabled={convLoading}
-                    className="rounded-full border border-stone-300 px-3 py-1 text-xs font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                  >
-                    הקם פעולות המרה בגוגל
-                  </button>
-                )}
-              </div>
-              {conv.pending.length === 0 ? (
-                <p className="text-sm text-stone-500">
-                  אין כרגע תשלומים עם מזהה קליק שממתינים להעלאה - הצינור מוכן וימלא את עצמו ברגע
-                  שלקוח משלם יגיע מקליק ממומן.
-                </p>
-              ) : (
-                <div className="overflow-x-auto rounded-xl border border-stone-200">
-                  <table className="w-full text-sm" dir="rtl">
-                    <thead>
-                      <tr className="border-b border-stone-200 bg-stone-50 text-right text-xs text-stone-500">
-                        <th className="px-3 py-2 font-bold">סוג</th>
-                        <th className="px-3 py-2 font-bold">סכום</th>
-                        <th className="px-3 py-2 font-bold">תאריך תשלום</th>
-                        <th className="px-3 py-2 font-bold">מזהה קליק</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {conv.pending.map((p) => (
-                        <tr key={p.payment_id} className="border-b border-stone-100 last:border-0">
-                          <td className="px-3 py-1.5 font-bold text-stone-700">{p.payment_type === "quiz" ? "שאלון" : "מנוי מטפל"}</td>
-                          <td className="px-3 py-1.5 text-stone-600">₪{p.value_ils}</td>
-                          <td className="px-3 py-1.5 text-stone-500">{fmtDateTime(p.paid_at)}</td>
-                          <td className="px-3 py-1.5 text-stone-400 text-xs">{p.click_id_kind}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-          )}
-        </section>
-        )}
-
-        {openAgent === "retention" && (
-        <section className="order-2 mb-8 rounded-2xl border border-stone-200 bg-white p-5">
-          <div className="flex flex-wrap items-center justify-between gap-3 mb-1">
-            <h2 className="font-black text-stone-900">🤝 שימור מטפלים</h2>
-            <button
-              onClick={runRetentionNow}
-              disabled={retentionLoading}
-              className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-            >
-              {retentionLoading ? "סורק..." : "סרוק עכשיו"}
-            </button>
-          </div>
-          <p className="text-xs text-stone-500 mb-4">
-            מי שנמצא במסלול לביטול - לפני שהוא מבטל. הרשימה מופרדת לפי דחיפות: קודם לקוחות
-            משלמים (שם ההכנסה בסיכון), ואחריהם מקודמי מתנה, שאצלם אין כסף בסיכון אלא נתח
-            חשיפה שלא מייצר. שום מייל לא נשלח לאף מטפל - כל פעולה נעשית בידיים.
-          </p>
-          <AgentFindings
-            agent="retention"
-            title="מטפלים בסיכון שימור"
-            limit={12}
-            emptyText="אין ממצאי שימור פתוחים - כל המקודמים עם פעילות תקינה."
-          />
-        </section>
-        )}
-
-        {/* יומן ריצות - מקופל. מי שרוצה לדעת מה קרה רואה את זה בפס למעלה;
-            הטבלה המלאה היא לחקירה, לא לתצוגה קבועה. */}
-        <section className="order-4">
-          <Collapse title="יומן ריצות" count={runs.length}>
-          {!loading && runs.length === 0 && (
-            <p className="text-sm text-stone-400">עדיין אין ריצות - הקרון ירוץ מחר בבוקר, או הפק תצוגה מקדימה עכשיו.</p>
-          )}
-          {runs.length > 0 && (
-            <div className="overflow-x-auto rounded-2xl border border-stone-200 bg-white">
-              <table className="w-full text-sm" dir="rtl">
-                <thead>
-                  <tr className="border-b border-stone-200 bg-stone-50 text-right text-xs text-stone-500">
-                    <th className="px-4 py-2 font-bold">סוכן</th>
-                    <th className="px-4 py-2 font-bold">מתי</th>
-                    <th className="px-4 py-2 font-bold">מצב</th>
-                    <th className="px-4 py-2 font-bold">סטטוס</th>
-                    <th className="px-4 py-2 font-bold">סיכום</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {runs.map((r) => {
-                    const st = RUN_STATUS[r.status] ?? RUN_STATUS.running;
-                    return (
-                      <tr key={r.id} className="border-b border-stone-100 last:border-0">
-                        <td className="px-4 py-2 font-bold text-stone-700 whitespace-nowrap">
-                          {agentLabel(r.agent)}
-                        </td>
-                        <td className="px-4 py-2 text-stone-500 whitespace-nowrap">
-                          {fmtDateTime(r.started_at)}
-                        </td>
-                        <td className="px-4 py-2 text-stone-500 whitespace-nowrap">
-                          {r.mode === "send" ? "שליחה" : r.mode === "preview" ? "תצוגה מקדימה" : ""}
-                        </td>
-                        <td className="px-4 py-2 whitespace-nowrap">
-                          <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${st.cls}`}>
-                            {st.label}
-                          </span>
-                        </td>
-                        <td className="px-4 py-2 text-stone-600">
-                          {r.error ? <span className="text-red-600">{r.error}</span> : r.summary}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-          </Collapse>
-        </section>
       </div>
     </div>
   );
