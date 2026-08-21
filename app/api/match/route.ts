@@ -576,14 +576,21 @@ function scoreTherapist(
   }
 
   // הציון המוצג: התאמה מקצועית בלבד, בלי בלוק המיקום (ראו ההערה שם).
-  const score =
-    possible > 0 ? Math.round((earned / possible) * 100) : 0;
+  //
+  // כשאין *שום* קריטריון מקצועי (חיפוש לפי אזור בלבד, או אונליין בלבד -
+  // מהמאגר ולא מהשאלון) המכנה הוא 0, והנוסחה החזירה **0% לכל מטפל**. זה
+  // נקרא למטופל כ"לא נמצאה שום התאמה" בדיוק במסך שאמור לשכנע אותו לפנות.
+  // במקרה הזה אין מה למדוד מקצועית, ולכן נופלים ל-rankScore - שכולל את
+  // המיקום, וזה בדיוק מה שהציון היה לפני הפיצול (19/8/2026). מסלול השאלון
+  // לא מגיע לכאן: הוא תמיד שולח גילאים ושפה.
+  const professionalScore = possible > 0 ? Math.round((earned / possible) * 100) : null;
   // ציון הדירוג: כולל מיקום, ולכן מטפל קרוב עדיין מדורג לפני רחוק. אינו מוצג
   // בשום מקום - בלעדיו הוצאת המיקום מהציון הייתה שוברת את סדר התוצאות.
   const rankScore =
     possible + locationPossible > 0
       ? Math.round(((earned + locationEarned) / (possible + locationPossible)) * 100)
       : 0;
+  const score = professionalScore ?? rankScore;
   /** האם המטפל/ת באזור שהתבקש - לתג "באזור שלך" בכרטיס. */
   const inRequestedArea = locationPossible > 0 && locationEarned >= locationPossible * 0.6;
 
