@@ -412,7 +412,7 @@ function MiniBars({
   const H = 56;
   const width = shown.length * (W + GAP) - GAP;
   return (
-    <div className="rounded-xl border border-stone-200 bg-white p-4">
+    <div>
       <div className="mb-2 text-xs font-black text-stone-500">{label}</div>
       <div className="overflow-x-auto">
         <svg width={width} height={H + 18} role="img" aria-label={label} style={{ direction: "ltr" }}>
@@ -847,7 +847,8 @@ export default function AgentsPage() {
   useEffect(() => {
     load();
     const fromUrl = new URLSearchParams(window.location.search).get("agent");
-    if (fromUrl && AGENT_BY_KEY.has(fromUrl)) setSelected(fromUrl);
+    // תמיד יש סוכן פתוח: הטאבים למעלה הם הניווט, והמסך הוא דף הסוכן.
+    setSelected(fromUrl && AGENT_BY_KEY.has(fromUrl) ? fromUrl : "daily_digest");
   }, []);
 
   function selectAgent(key: string | null) {
@@ -1402,70 +1403,102 @@ export default function AgentsPage() {
 
   function AgentDetail({ meta }: { meta: AgentMeta }) {
     const myRuns = runs.filter((r) => r.agent === meta.key);
+    const last = myRuns[0];
+    const errorsCount = myRuns.filter((r) => r.status === "error").length;
     const chartPoints = myRuns
       .filter((r) => r.metric != null)
       .map((r) => ({ at: r.started_at, value: r.metric as number }))
       .reverse();
+    const acts = pending.filter((a) => a.agent === meta.key && !isFinding(a)).length;
     return (
-      <div className="rounded-b-2xl border border-t-0 border-stone-200 bg-white p-5">
-        {/* מה הסוכן עושה + איך לקרוא */}
-        <p className="mb-2 text-sm leading-6 text-stone-700">{meta.desc}</p>
-        <ul className="mb-4 space-y-1">
-          {meta.howToRead.map((h, i) => (
-            <li key={i} className="text-xs leading-5 text-stone-500">
-              💡 {h}
-            </li>
-          ))}
-        </ul>
-
-        {/* שורת הפעלה */}
-        <div className="mb-5 flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
-          <button
-            onClick={() => runAgent(meta)}
-            disabled={busyAgent === meta.key}
-            className="rounded-full bg-stone-800 px-4 py-1.5 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-50"
-          >
-            {busyAgent === meta.key ? "רץ..." : meta.runLabel}
-          </button>
-          <span className="text-xs text-stone-500">{meta.schedule}</span>
-          {myRuns[0] && (
-            <span className="text-xs text-stone-400">
-              ריצה אחרונה: {relTime(myRuns[0].started_at)}
-            </span>
+      <div className="space-y-5">
+        {/* כותרת דף הסוכן */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-6">
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-4xl leading-none">{meta.icon}</span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-3">
+                <h2 className="text-2xl font-black text-stone-900">{meta.label}</h2>
+                <StatusChip run={last} />
+                {last && (
+                  <span className="text-sm text-stone-400">ריצה אחרונה: {relTime(last.started_at)}</span>
+                )}
+              </div>
+              <p className="mt-0.5 text-sm text-stone-500">{meta.schedule}</p>
+            </div>
+            <button
+              onClick={() => runAgent(meta)}
+              disabled={busyAgent === meta.key}
+              className="rounded-full bg-stone-800 px-6 py-2.5 text-base font-bold text-white hover:bg-stone-700 disabled:opacity-50"
+            >
+              {busyAgent === meta.key ? "רץ..." : meta.runLabel}
+            </button>
+          </div>
+          <p className="mt-4 max-w-3xl text-base leading-7 text-stone-700">{meta.desc}</p>
+          <div className="mt-4 rounded-xl border border-stone-200 bg-stone-50 p-4">
+            <div className="mb-1.5 text-xs font-black text-stone-500">איך לקרוא את מה שמוצג כאן</div>
+            <ul className="space-y-1.5">
+              {meta.howToRead.map((h, i) => (
+                <li key={i} className="text-sm leading-6 text-stone-600">
+                  💡 {h}
+                </li>
+              ))}
+            </ul>
+          </div>
+          {last?.summary && (
+            <p className="mt-3 text-sm text-stone-500">
+              <span className="font-bold text-stone-600">תמצית הריצה האחרונה:</span> {last.summary}
+            </p>
           )}
         </div>
 
         {runError && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{runError}</div>
+          <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{runError}</div>
         )}
 
-        {/* 1. ממתין לך עכשיו */}
-        <h3 className="mb-2 text-sm font-black text-stone-800">📥 ממתין לך עכשיו</h3>
-        <div className="mb-6">
+        {/* ממתין לך עכשיו */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-6">
+          <h3 className="mb-4 flex items-center gap-2 text-lg font-black text-stone-900">
+            📥 ממתין לך עכשיו
+            {acts > 0 && (
+              <span className="rounded-full bg-[#2e7d8c] px-2.5 py-0.5 text-sm font-bold text-white">{acts}</span>
+            )}
+          </h3>
           <AgentQueue meta={meta} />
+        </section>
+
+        {/* סקירה אחרונה + גרף, זה לצד זה במסך רחב */}
+        <div className="grid gap-5 lg:grid-cols-2">
+          <section className="rounded-2xl border border-stone-200 bg-white p-6">
+            <h3 className="mb-4 text-lg font-black text-stone-900">🔎 הסקירה האחרונה</h3>
+            <LastReview meta={meta} />
+          </section>
+          <section className="rounded-2xl border border-stone-200 bg-white p-6">
+            <h3 className="mb-4 text-lg font-black text-stone-900">📊 לאורך זמן</h3>
+            {meta.chartLabel && chartPoints.length >= 3 ? (
+              <MiniBars points={chartPoints} label={meta.chartLabel} goodWhenZero={meta.chartGoodWhenZero} />
+            ) : (
+              <p className="text-sm text-stone-400">
+                {meta.chartLabel
+                  ? "עוד אין מספיק ריצות לגרף - הוא יופיע אחרי כמה ימים."
+                  : "לסוכן הזה אין כרגע מדד מספרי להצגה."}
+              </p>
+            )}
+            <p className="mt-3 text-xs text-stone-400">
+              {myRuns.length > 0
+                ? `${myRuns.length} ריצות נרשמו ביומן${errorsCount > 0 ? ` · ${errorsCount} נכשלו` : " · בלי שגיאות"}`
+                : "עדיין לא נרשמו ריצות."}
+            </p>
+          </section>
         </div>
 
-        {/* 2. הסקירה האחרונה */}
-        <h3 className="mb-2 text-sm font-black text-stone-800">🔎 הסקירה האחרונה</h3>
-        <div className="mb-6">
-          <LastReview meta={meta} />
-        </div>
-
-        {/* גרף */}
-        {meta.chartLabel && chartPoints.length >= 3 && (
-          <div className="mb-6">
-            <MiniBars points={chartPoints} label={meta.chartLabel} goodWhenZero={meta.chartGoodWhenZero} />
-          </div>
-        )}
-
-        {/* 3. מה נעשה בעבר */}
-        <h3 className="mb-2 text-sm font-black text-stone-800">🗂️ מה נעשה בעבר</h3>
-        <div className="mb-4">
+        {/* מה נעשה בעבר */}
+        <section className="rounded-2xl border border-stone-200 bg-white p-6">
+          <h3 className="mb-4 text-lg font-black text-stone-900">🗂️ מה נעשה בעבר</h3>
           <PastWork meta={meta} />
-        </div>
+        </section>
 
-        {/* יומן הריצות של הסוכן */}
-        <Collapse title="יומן הריצות של הסוכן" count={myRuns.length}>
+        <Collapse title="יומן הריצות המלא של הסוכן" count={myRuns.length}>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -1503,14 +1536,18 @@ export default function AgentsPage() {
   // ─────────────────────────────── רינדור ─────────────────────────────────
 
   const totalActionable = pending.filter((a) => !isFinding(a)).length;
+  const selectedMeta = selected ? AGENT_BY_KEY.get(selected) : undefined;
 
   return (
     <div className="min-h-screen bg-stone-50" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <div className="mx-auto max-w-4xl px-6 py-8">
+      <div className="mx-auto max-w-5xl px-6 py-8">
         <h1 className="mb-1 text-2xl font-black text-stone-900">סוכנים אוטונומיים</h1>
         <p className="mb-5 text-sm text-stone-500">
-          כל סוכן רץ לבד לפי לוח הזמנים שלו, וכל מה שדורש החלטה מחכה בפנים.{" "}
+          כל סוכן רץ לבד לפי לוח הזמנים שלו. בחר סוכן למעלה כדי לפתוח את הדף שלו.{" "}
           <span className="font-bold">שום מייל לא יוצא ושום פעולה לא מתבצעת בלי לחיצה שלך.</span>
+          {totalActionable > 0 && (
+            <span className="font-bold text-[#2A6462]"> כרגע {totalActionable} הצעות ממתינות לך.</span>
+          )}
         </p>
 
         {error && (
@@ -1528,69 +1565,65 @@ export default function AgentsPage() {
         )}
         {loading && runs.length === 0 && <p className="mb-4 text-sm text-stone-400">טוען...</p>}
 
-        {/* הרובריקות: שורה מלוא-הרוחב לכל סוכן. לחיצה פותחת רק אותו. */}
-        <div className="space-y-2">
+        {/* סרגל הסוכנים - טאבים לרוחב. לחיצה מחליפה את הדף שמתחת. */}
+        <div className="mb-6 flex flex-wrap gap-2">
           {AGENTS.map((meta) => {
             const last = runs.find((r) => r.agent === meta.key);
             const mine = pending.filter((a) => a.agent === meta.key);
             const acts = mine.filter((a) => !isFinding(a)).length;
             const finds = mine.length - acts;
-            const isOpen = selected === meta.key;
+            const isSel = selected === meta.key;
             return (
-              <div key={meta.key}>
-                <button
-                  onClick={() => selectAgent(isOpen ? null : meta.key)}
-                  className={`flex w-full flex-wrap items-center gap-3 border px-4 py-3 text-right transition-colors ${
-                    isOpen
-                      ? "rounded-t-2xl border-stone-300 bg-white"
-                      : "rounded-2xl border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/60"
-                  }`}
-                >
-                  <span className="text-xl">{meta.icon}</span>
-                  <span className="min-w-28 text-sm font-black text-stone-900">{meta.label}</span>
-                  <StatusChip run={last} />
-                  {acts > 0 && (
-                    <span className="rounded-full bg-[#2e7d8c] px-2 py-0.5 text-[11px] font-bold text-white">
-                      {acts} ממתינות לך
-                    </span>
-                  )}
-                  {finds > 0 && (
-                    <span className="rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
-                      {finds} ממצאים
-                    </span>
-                  )}
-                  <span className="hidden flex-1 truncate text-xs text-stone-400 sm:block">
-                    {last ? `${relTime(last.started_at)} · ${last.summary ?? ""}` : "טרם רץ"}
+              <button
+                key={meta.key}
+                onClick={() => selectAgent(meta.key)}
+                title={`${meta.label}${last ? ` · ${relTime(last.started_at)}` : ""}`}
+                className={`relative flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-bold transition-colors ${
+                  isSel
+                    ? "border-stone-800 bg-stone-800 text-white shadow-sm"
+                    : "border-stone-200 bg-white text-stone-700 hover:border-stone-400"
+                }`}
+              >
+                <span className="text-lg leading-none">{meta.icon}</span>
+                <span>{meta.label}</span>
+                {acts > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${
+                      isSel ? "bg-white text-stone-900" : "bg-[#2e7d8c] text-white"
+                    }`}
+                  >
+                    {acts}
                   </span>
-                  <span className="ms-auto text-xs font-bold text-stone-400">{isOpen ? "סגור ▲" : "פתח ▼"}</span>
-                </button>
-                {isOpen && <AgentDetail meta={meta} />}
-              </div>
+                )}
+                {/* נקודת מצב: אדום = הריצה האחרונה נכשלה, ענבר = יש ממצאים */}
+                {last?.status === "error" ? (
+                  <span className="h-2 w-2 rounded-full bg-red-500" title="הריצה האחרונה נכשלה" />
+                ) : finds > 0 && acts === 0 ? (
+                  <span className="h-2 w-2 rounded-full bg-amber-400" title={`${finds} ממצאים`} />
+                ) : null}
+              </button>
             );
           })}
         </div>
 
-        {/* כשאף סוכן לא פתוח - הסבר קצר על המודל */}
-        {!selected && (
-          <div className="mt-6 rounded-2xl border border-stone-200 bg-white p-5 text-sm leading-6 text-stone-600">
-            <p className="mb-2 font-black text-stone-800">איך זה עובד</p>
-            <ul className="space-y-1.5">
-              <li>🕐 כל סוכן רץ אוטומטית לפי הלוח שלו (מוצג בתוך כל סוכן), ואפשר גם להריץ ידנית בכל רגע.</li>
+        {/* דף הסוכן הנבחר */}
+        {selectedMeta && <AgentDetail meta={selectedMeta} />}
+
+        {/* הסבר המודל - זמין תמיד, מקופל */}
+        <div className="mt-6">
+          <Collapse title="איך העמוד הזה עובד">
+            <ul className="space-y-1.5 text-sm leading-6 text-stone-600">
+              <li>🕐 כל סוכן רץ אוטומטית לפי הלוח שלו (מוצג בדף שלו), ואפשר גם להריץ ידנית בכל רגע.</li>
               <li>
-                📥 כשסוכן מנסח טיוטה או מוצא משהו שדורש החלטה - זה מופיע אצלו עם התג{" "}
-                <span className="rounded-full bg-[#2e7d8c] px-2 py-0.5 text-[11px] font-bold text-white">ממתינות לך</span>
-                . פתח, קרא, ותחליט.
+                📥 כשסוכן מנסח טיוטה או מוצא משהו שדורש החלטה - מופיע מספר על הטאב שלו למעלה. פתח, קרא,
+                ותחליט.
               </li>
-              <li>🟡 &quot;ממצאים&quot; הם מידע בלבד - הם נסגרים מעצמם כשהמצב משתנה, ואין חובה לטפל בהם.</li>
+              <li>🟡 נקודה ענברית על טאב = יש ממצאים לידיעה. הם נסגרים מעצמם כשהמצב משתנה, ואין חובה לטפל.</li>
+              <li>🔴 נקודה אדומה על טאב = הריצה האחרונה של הסוכן נכשלה.</li>
               <li>📤 מייל יוצא אך ורק מלחיצת &quot;שלח&quot; שלך על טיוטה שקראת. דחייה לעולם לא שולחת כלום.</li>
-              {totalActionable > 0 && (
-                <li className="font-bold text-stone-800">
-                  כרגע {totalActionable} הצעות ממתינות לך - מסומנות בתגים למעלה.
-                </li>
-              )}
             </ul>
-          </div>
-        )}
+          </Collapse>
+        </div>
       </div>
     </div>
   );
