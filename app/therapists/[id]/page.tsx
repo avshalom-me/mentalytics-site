@@ -45,17 +45,30 @@ type TherapistRow = {
  * המרכז שהמטפל/ת שייך/ת אליו - רק כשהעמוד הציבורי שלו חי (אותם תנאים
  * שאוכף getPublicCenterBySlug), אחרת הקישור היה מוביל ל-404.
  */
-async function getAffiliatedCenter(centerId: string | null): Promise<{ name: string; slug: string } | null> {
+async function getAffiliatedCenter(
+  centerId: string | null
+): Promise<{ name: string; slug: string; phone: string | null } | null> {
   if (!centerId) return null;
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("name, slug")
+    .select("name, slug, phone, public_phone")
     .eq("id", centerId)
     .eq("status", "active")
     .not("slug", "is", null)
     .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
     .maybeSingle();
-  return data ? { name: data.name as string, slug: data.slug as string } : null;
+  if (!data) return null;
+  // הטלפון הציבורי לפני הטלפון התפעולי: הראשון נבחר להצגה למטופלים,
+  // השני עלול להיות הקו האישי של מי שחתם על המנוי.
+  const clean = (v: unknown): string | null => {
+    const x = typeof v === "string" ? v.trim() : "";
+    return x.length > 0 ? x : null;
+  };
+  return {
+    name: data.name as string,
+    slug: data.slug as string,
+    phone: clean(data.public_phone) ?? clean(data.phone),
+  };
 }
 
 async function getTherapist(id: string): Promise<TherapistRow | null> {
@@ -237,8 +250,14 @@ export default async function TherapistProfilePage({
   // Validated: a `phone` holding something that is not a number (one paying
   // therapist has an email address there) yields null, so the button is hidden
   // rather than linking to wa.me/972ZJOURY@GMAIL.COM.
-  const waLink = waLinkFor(t.phone);
-  const telLink = telHref(t.phone);
+  // מטפל/ת של מרכז בלי קו אישי: הקו של המרכז הוא דרך הקשר המהירה, והוא
+  // מסומן ככזה בכפתורים. בלי הנפילה הזו הפרופיל נשאר בלי אף כפתור מהיר -
+  // רק טופס הודעה - וזה מה שקרה לשמעון ערנרייך, מקודם ומשולם, עד 21/8/2026.
+  const ownPhone = (t.phone ?? "").trim();
+  const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
+  const contactPhone = ownPhone || centerPhone;
+  const waLink = waLinkFor(contactPhone);
+  const telLink = telHref(contactPhone);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -360,6 +379,7 @@ export default async function TherapistProfilePage({
                 telLink={telLink}
                 source={source}
                 mobileSticky
+                viaCenterName={centerPhone ? affiliatedCenter?.name ?? null : null}
               />
             )}
           </div>

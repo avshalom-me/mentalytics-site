@@ -2,7 +2,7 @@ import Link from "next/link";
 import { MapPin, Globe, Phone, BadgeCheck, Clock, Accessibility, Languages, Handshake, Navigation, ArrowLeft } from "lucide-react";
 import { treatmentExplainer } from "@/app/lib/treatment-explainers";
 import type { PublicCenter } from "@/app/lib/center-public";
-import { telHref as telHrefFor, phoneNationalDigits } from "@/app/lib/phone";
+import { telHref as telHrefFor, phoneNationalDigits, isMobileNumber } from "@/app/lib/phone";
 import { therapistPath } from "@/app/lib/therapist-url";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -203,7 +203,9 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
   const phone = center.public_phone?.trim() || null;
   // ולידציה כמו אצל מטפלים (phone.ts): שדה חופשי עם מייל/טקסט לא מייצר כפתור מת.
   const telHref = telHrefFor(phone);
-  const waDigits = phoneNationalDigits(phone);
+  // וואטסאפ רק לנייד: מרכז רושם מרכזייה, ו-wa.me למספר נייח פותח שיחה
+  // ריקה. עמוד "מרכז CBT" הציג כפתור כזה אל 04-6157797 (תוקן 21/8/2026).
+  const waDigits = isMobileNumber(phone) ? phoneNationalDigits(phone) : null;
   const waHref = waDigits ? `https://wa.me/972${waDigits}?text=${encodeURIComponent(CENTER_WHATSAPP_MESSAGE)}` : null;
 
   // כפתורי קשר משותפים (פס דביק במובייל + CTA). מוצג רק מה שקיים בפועל.

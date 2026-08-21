@@ -62,6 +62,7 @@ export default function ContactButtons({
   telLink,
   source = "directory",
   mobileSticky = false,
+  viaCenterName,
 }: {
   therapistId: string;
   therapistName: string;
@@ -69,6 +70,14 @@ export default function ContactButtons({
   telLink: string | null;
   source?: "match" | "directory";
   mobileSticky?: boolean;
+  /**
+   * מלא כשהקו שמוצג הוא של המרכז ולא של המטפל/ת עצמם - מטפל/ת שהוזמנו ע"י
+   * מרכז ולא נמסר עבורם קו אישי. הכפתורים מסומנים "למרכז" במפורש: מטופל
+   * שמחייג ומגיע למזכירות זה בסדר גמור כשאמרו לו, ולא בסדר כשהתחזינו לקו
+   * האישי. עד 21/8/2026 לא הייתה נפילה כזו בכלל - שמעון ערנרייך היה מקודם
+   * ומשולם עם אפס כפתורי קשר מהירים, רק טופס הודעה.
+   */
+  viaCenterName?: string | null;
 }) {
   const [messageOpen, setMessageOpen] = useState(false);
   // These buttons only ever render on the profile page, so a non-match visitor
@@ -78,6 +87,9 @@ export default function ContactButtons({
   const clickSource: "match" | "profile" = source === "match" ? "match" : "profile";
   const messageSource = clickSource;
   const hasDirect = Boolean(waLink || telLink);
+  const viaCenter = Boolean(viaCenterName && hasDirect);
+  const waLabel = viaCenter ? "וואטסאפ למרכז" : "שליחת וואטסאפ";
+  const telLabel = viaCenter ? "חיוג למרכז" : "חיוג";
 
   return (
     <>
@@ -87,14 +99,14 @@ export default function ContactButtons({
           <a href={waLink} target="_blank" rel="noopener noreferrer"
             onClick={() => track(therapistId, "whatsapp", clickSource)}
             className={`${pill} bg-green-500 text-white hover:bg-green-600`}>
-            {wasvg} שליחת וואטסאפ
+            {wasvg} {waLabel}
           </a>
         )}
         {telLink && (
           <a href={telLink}
             onClick={() => track(therapistId, "phone", clickSource)}
             className={`${pill} bg-[#3D8C8A] text-white hover:bg-[#2A6462]`}>
-            {phonesvg} חיוג
+            {phonesvg} {telLabel}
           </a>
         )}
         <button
@@ -104,6 +116,12 @@ export default function ContactButtons({
           {messagesvg} הודעה דרך האתר
         </button>
       </div>
+      {viaCenter && (
+        <p className="mt-2 text-[13px] leading-6 text-[#3E5250]">
+          הקו הזה הוא של <strong>{viaCenterName}</strong>, שמתאם את הפגישות עבור {therapistName || "המטפל/ת"}.
+          אפשר לבקש אותו/ה בשם. הודעה דרך האתר מגיעה לאותו מקום.
+        </p>
+      )}
 
       {/* Sticky mobile contact bar - always reachable while scrolling */}
       {mobileSticky && (
@@ -114,14 +132,14 @@ export default function ContactButtons({
               <a href={waLink} target="_blank" rel="noopener noreferrer"
                 onClick={() => track(therapistId, "whatsapp", clickSource)}
                 className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-green-500 text-white py-3 text-[15px] font-extrabold">
-                {wasvg} וואטסאפ
+                {wasvg} {viaCenter ? "וואטסאפ למרכז" : "וואטסאפ"}
               </a>
             ) : null}
             {telLink ? (
               <a href={telLink}
                 onClick={() => track(therapistId, "phone", clickSource)}
                 className={`${waLink ? "" : "flex-1 "}inline-flex items-center justify-center gap-2 rounded-full bg-[#3D8C8A] text-white px-5 py-3 text-[15px] font-extrabold`}>
-                {phonesvg} חיוג
+                {phonesvg} {viaCenter ? "חיוג למרכז" : "חיוג"}
               </a>
             ) : null}
             {!hasDirect && (
