@@ -267,6 +267,39 @@ export default function CitySeoSection({
           the one written to earn the click. */}
       <p className="text-[15px] leading-8 text-stone-600 mb-6" data-nosnippet>{statsParagraph}</p>
 
+      {/* One link, three phrasings, picked by the same place hash as the
+          headings. Every landing page claims the questionnaire was built by
+          clinicians and rests on research; this points at the page that
+          substantiates it. Deliberately a LINK and not a repeated block of
+          prose: 25% of a city page's sentences are already identical across
+          places, and a shared paragraph would have pushed that past 40%. */}
+      <p className="text-[15px] leading-8 text-stone-600 mb-6">
+        {h % 3 === 0 ? (
+          <>
+            רוצים לדעת איך ההתאמה נעשית?{" "}
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              כתבנו בפירוט על המודל שמאחורי השאלון
+            </Link>
+            .
+          </>
+        ) : h % 3 === 1 ? (
+          <>
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              איך עובדת ההתאמה בטיפול חכם
+            </Link>{" "}
+            - על מה המודל נשען, מה השאלון מודד, ומה הוא לא עושה.
+          </>
+        ) : (
+          <>
+            לפני שממלאים את השאלון, אפשר לקרוא{" "}
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              מה עומד מאחורי ההתאמה ועל אילו מקורות היא נשענת
+            </Link>
+            .
+          </>
+        )}
+      </p>
+
       {articles.length > 0 && (
         <div className="mb-8">
           <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>

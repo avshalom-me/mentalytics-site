@@ -221,6 +221,13 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
   },
   // ── בחירת טיפול ומטפל ──────────────────────────────────────────────────────
   {
+    slug: "how-matching-works",
+    title: "איך עובדת ההתאמה בטיפול חכם",
+    desc: "על מה המודל נשען, מה השאלון מודד, איך מחושבת ההתאמה - ומה המודל לא עושה.",
+    img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "בחירת-טיפול-ומטפל",
+  },
+  {
     slug: "recommended-psychologist",
     title: "פסיכולוג מומלץ - איך מוצאים פסיכולוג טוב?",
     desc: "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לכם.",
