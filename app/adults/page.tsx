@@ -21,6 +21,7 @@ import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
 // Anonymous viewer context derived from the questionnaire - used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -401,34 +402,14 @@ type MatchPrefs = {
 
 export default function AdultsPage() {
   const [screen, setScreenRaw] = useState<Screen>("disclaimer");
-  // One step of history, deliberately not a stack. The questionnaire branches on
-  // answers, so replaying a longer trail would land people on screens their
-  // current answers no longer lead to. Going back consumes the entry, which is
-  // what keeps "back" from turning into a ping-pong between two screens.
-  const [prevScreen, setPrevScreen] = useState<Screen | null>(null);
-  // The domain and addiction cursors advance in the very handler that changes
-  // the screen, so rewinding `screen` alone leaves the cursor one step ahead:
-  // Continue then calls nextDomain() again and the domain in between is never
-  // asked - the report simply comes back missing a whole area of difficulty,
-  // with nothing on screen to say so. Captured inside setScreen because at that
-  // point in the handler the cursors still hold the values that belong to the
-  // screen being left (React has only scheduled the increment, not applied it).
-  const [prevIdx, setPrevIdx] = useState<{ domain: number; addiction: number } | null>(null);
-  const setScreen = (next: Screen) => {
-    if (next !== screen) {
-      setPrevScreen(screen);
-      setPrevIdx({ domain: domainIdx, addiction: addictionIdx });
-    }
-    setScreenRaw(next);
-  };
-  const goBack = prevScreen
-    ? () => {
-        setScreenRaw(prevScreen);
-        if (prevIdx) { setDomainIdx(prevIdx.domain); setAddictionIdx(prevIdx.addiction); }
-        setPrevScreen(null);
-        setPrevIdx(null);
-      }
-    : null;
+  // ההיסטוריה מנוהלת בדפדפן עצמו (useScreenHistory), ולא במחסנית מקבילה.
+  // עד 21/8/2026 מעבר מסך לא נגע בהיסטוריה בכלל, ולכן "חזור" של הדפדפן לא
+  // חזר שאלה אחת אלא עזב את השאלון וקפץ לדף הבית - עם כל התשובות.
+  //
+  // הצילום כולל את שני הסמנים ולא רק את המסך: הם מתקדמים באותו handler
+  // שמחליף את המסך, ולכן שחזור המסך לבדו משאיר אותם צעד קדימה - "המשך"
+  // קורא ל-nextDomain() שוב, והתחום שבאמצע לא נשאל לעולם. הדוח חוזר בלי
+  // תחום קושי שלם ובלי שום סימן על המסך.
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
 
@@ -468,6 +449,23 @@ export default function AdultsPage() {
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
+
+  const restoreScreen = (snap: { screen: Screen; domain: number; addiction: number }) => {
+    setScreenRaw(snap.screen);
+    setDomainIdx(snap.domain);
+    setAddictionIdx(snap.addiction);
+  };
+  const { pushScreen, goBack: browserBack } = useScreenHistory(
+    { screen, domain: domainIdx, addiction: addictionIdx },
+    restoreScreen,
+  );
+  const setScreen = (next: Screen) => {
+    if (next !== screen) pushScreen();
+    setScreenRaw(next);
+  };
+  // כפתור החזרה שבתוך העמוד וכפתור החזרה של הדפדפן הם אותו מסלול בדיוק,
+  // כדי ששניהם לא יוכלו להיפרד זה מזה.
+  const goBack = screen !== "disclaimer" ? browserBack : null;
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
 
   // usageAllowed === false replaces the whole page with the payment block, so

@@ -306,7 +306,20 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     if (p.get("online") === "1") setOnlineOnly(true);
   }, []);
 
-  // סנכרון הסינון ל-URL (replaceState - בלי להוסיף רשומות היסטוריה).
+  // סנכרון הסינון ל-URL. שני תיקונים (21/8/2026):
+  //
+  // 1. **push במקום replace.** בלי רשומת היסטוריה, "חזור" של הדפדפן אחרי
+  //    סינון לא ביטל את הסינון אלא עזב את המאגר וקפץ לעמוד שממנו נכנסו -
+  //    בדרך כלל דף הבית. עכשיו כל שינוי סינון הוא צעד שאפשר לחזור ממנו.
+  //    שלושת הערכים בדידים (אזור, עיר, אונליין) ואין כאן שדה חופשי, ולכן
+  //    אין סכנה של הצפת ההיסטוריה בהקלדה.
+  // 2. **שמירת ה-state הקיים.** ה-replaceState הקודם דרס אותו ב-null,
+  //    ואיתו את עץ הראוטר של Next (__PRIVATE_NEXTJS_INTERNALS_TREE) - מה
+  //    שהותיר את App Router בלי מצב לשחזר ברשומה הזו.
+  //
+  // הריצה הראשונה מסונכרנת ב-replace: המצב ההתחלתי הוא העמוד שהמשתמש נחת
+  // עליו, לא צעד שהוא עשה, ודחיפה שם הייתה מחייבת שתי לחיצות "חזור" לצאת.
+  const filtersSynced = useRef(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const set = (k: string, v: string) => { if (v) p.set(k, v); else p.delete(k); };
@@ -314,8 +327,32 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     set("city", cityFilter);
     set("online", onlineOnly ? "1" : "");
     const qs = p.toString();
-    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    const url = window.location.pathname + (qs ? `?${qs}` : "");
+    // הדגל נסגר גם כשאין מה לכתוב: אחרת הריצה על ה-mount (שיוצאת כאן) הייתה
+    // משאירה אותו פתוח, והשינוי הראשון של המשתמש היה נרשם כ-replace - כלומר
+    // הצעד הראשון שלו היה נבלע ולא היה אפשר לחזור ממנו.
+    const isFirstSync = !filtersSynced.current;
+    filtersSynced.current = true;
+    if (url === window.location.pathname + window.location.search) return; // אין שינוי
+    const state = window.history.state ?? {};
+    if (isFirstSync) window.history.replaceState(state, "", url);
+    else window.history.pushState(state, "", url);
   }, [regionFilter, cityFilter, onlineOnly]);
+
+  // "חזור" מחזיר את הסינון שברשומה הקודמת. בלי זה ה-URL היה משתנה
+  // והמסננים על המסך היו נשארים - שתי אמיתות סותרות באותו עמוד.
+  useEffect(() => {
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search);
+      const region = p.get("region") ?? "";
+      const city = p.get("city") ?? "";
+      setRegionFilter(region && ALL_REGIONS.includes(region) ? region : "");
+      setCityFilter(city && CITY_TO_REGION[city] ? city : "");
+      setOnlineOnly(p.get("online") === "1");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const availableCities = useMemo(() => {
     const cities = new Set<string>();

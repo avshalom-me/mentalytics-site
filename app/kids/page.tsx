@@ -22,6 +22,7 @@ import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
 function getOrCreateSessionId(): string | null {
   try {
@@ -4179,10 +4180,18 @@ export default function KidsPage() {
     }
   }
 
-  // One step of history, deliberately not a stack: going back consumes it, so
-  // the trail can never be replayed past a branch whose answers have since
-  // changed. canGoBack also hides the control on the first screen.
+  // ההיסטוריה מנוהלת בדפדפן (useScreenHistory): עד 21/8/2026 מעבר שאלה לא
+  // נגע בהיסטוריה, ולכן "חזור" של הדפדפן עזב את השאלון וקפץ לדף הבית עם כל
+  // התשובות. כאן די בשחזור step - prevPid/nextPid גוזרים את ההסתעפות
+  // מהתשובות עצמן, שאינן משתנות בניווט.
   const [canGoBack, setCanGoBack] = useState(false);
+  const { pushScreen, goBack: browserBack } = useScreenHistory(
+    { step },
+    (snap: { step: PageId | string }) => {
+      setStep(snap.step as typeof step);
+      setCanGoBack(snap.step !== PAGES[0]);
+    },
+  );
 
   // Refresh/close guard for the question screens. Answers deliberately live in
   // memory only - nothing mid-quiz is persisted, so the branching and scoring
@@ -4204,12 +4213,13 @@ export default function KidsPage() {
 
   function goNext(newA: Ans = A) {
     setA(newA);
+    pushScreen();
     setStep(s => nextPid(s, newA));
     setCanGoBack(true);
   }
+  // כפתור החזרה שבעמוד וכפתור הדפדפן הם אותו מסלול, כדי שלא ייפרדו.
   function goBack() {
-    setStep(s => prevPid(s, A));
-    setCanGoBack(false);
+    browserBack();
   }
 
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
