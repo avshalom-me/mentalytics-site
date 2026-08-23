@@ -56,7 +56,7 @@ type StarvingRow = { id: string; name: string; tier: "paid" | "trial"; views30: 
 type Coverage = {
   paidTotal: number;
   trialTotal: number;
-  periods: Record<string, { paid: number; trial: number }>;
+  periods: Record<string, { paid: number; trial: number; paidAds: number; trialAds: number }>;
   starving: StarvingRow[];
 };
 
@@ -192,7 +192,7 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
 // THE goal metric: does every paying (then promoted) therapist get inquiries?
 // A coverage chip per tier for the selected period, plus the 30-day "starving"
 // list — who to act on (promote harder / point campaigns at their region).
-function CoverageChip({ label, covered, total }: { label: string; covered: number; total: number }) {
+function CoverageChip({ label, covered, total, fromAds }: { label: string; covered: number; total: number; fromAds: number }) {
   const ratio = total > 0 ? covered / total : 1;
   const cls =
     ratio >= 1 ? "bg-green-100 text-green-800 border-green-200"
@@ -204,12 +204,15 @@ function CoverageChip({ label, covered, total }: { label: string; covered: numbe
         {num(covered)}<span className="text-sm font-bold opacity-60"> / {num(total)}</span>
       </div>
       <div className="text-xs font-semibold">{label}</div>
+      <div className="mt-1.5 border-t border-black/10 pt-1 text-[11px] font-semibold opacity-75">
+        מתוכם {num(fromAds)} מגוגל אדס
+      </div>
     </div>
   );
 }
 
 function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
-  const p = c.periods[periodKey] ?? { paid: 0, trial: 0 };
+  const p = c.periods[periodKey] ?? { paid: 0, trial: 0, paidAds: 0, trialAds: 0 };
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? c.starving : c.starving.slice(0, 6);
   return (
@@ -220,8 +223,8 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
       </div>
       <p className="mb-3 text-xs text-stone-500">כמה מהמטפלים המוצגים קיבלו לפחות פנייה אחת ({periodLabel} אחרונים).</p>
       <div className="mb-4 flex flex-wrap gap-2">
-        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} />
-        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} />
+        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} fromAds={p.paidAds} />
+        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} fromAds={p.trialAds} />
       </div>
       {c.starving.length > 0 ? (
         <>

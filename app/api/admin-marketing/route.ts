@@ -104,8 +104,8 @@ export async function GET() {
       .select("id, full_name, promotion_source")
       .eq("status", "paying")
       .eq("admin_approved", true);
-    const clicksAllQ = fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
-      supabaseAdmin.from("therapist_contact_clicks").select("therapist_id, clicked_at")
+    const clicksAllQ = fetchAllRows<{ therapist_id: string; clicked_at: string; channel: string | null }>(() =>
+      supabaseAdmin.from("therapist_contact_clicks").select("therapist_id, clicked_at, channel")
     );
     const views30Q = fetchAllRows<{ therapist_id: string }>(() =>
       supabaseAdmin
@@ -198,11 +198,19 @@ export async function GET() {
     const payingIdSet = new Set(payingList.map((t) => t.id));
 
     // Last contact ever + per-window covered sets, from one pass over all clicks.
+    // Ads contacts are tracked in a parallel map so the coverage chips can also
+    // answer "and how many of those did the ad spend actually reach". Coverage
+    // alone cannot: a therapist reached purely by organic traffic looks
+    // identical to one a campaign is paying for.
     const lastContactAt = new Map<string, number>();
+    const lastAdsContactAt = new Map<string, number>();
     for (const c of clicksAll) {
       if (!payingIdSet.has(c.therapist_id)) continue;
       const ts = new Date(c.clicked_at).getTime();
       if (ts > (lastContactAt.get(c.therapist_id) ?? 0)) lastContactAt.set(c.therapist_id, ts);
+      if (c.channel === "google_paid" && ts > (lastAdsContactAt.get(c.therapist_id) ?? 0)) {
+        lastAdsContactAt.set(c.therapist_id, ts);
+      }
     }
     const views30ByTherapist = new Map<string, number>();
     for (const v of views30) {
@@ -215,10 +223,20 @@ export async function GET() {
     const coveredInWindow = (t: PayingRow, days: number) =>
       (lastContactAt.get(t.id) ?? 0) >= Date.now() - days * 86_400_000;
 
-    const coveragePeriods: Record<string, { paid: number; trial: number }> = {};
+    const coveredByAdsInWindow = (t: PayingRow, days: number) =>
+      (lastAdsContactAt.get(t.id) ?? 0) >= Date.now() - days * 86_400_000;
+
+    type CoveragePeriod = { paid: number; trial: number; paidAds: number; trialAds: number };
+    const coveragePeriods: Record<string, CoveragePeriod> = {};
     for (const d of PERIODS) {
-      const p = { paid: 0, trial: 0 };
-      for (const t of payingList) if (coveredInWindow(t, d)) p[tierOf(t)]++;
+      const p: CoveragePeriod = { paid: 0, trial: 0, paidAds: 0, trialAds: 0 };
+      for (const t of payingList) {
+        const tier = tierOf(t);
+        if (coveredInWindow(t, d)) p[tier]++;
+        // Always a subset of the line above - being reached by an ad is one way
+        // of being reached - so paidAds can never exceed paid.
+        if (coveredByAdsInWindow(t, d)) p[tier === "paid" ? "paidAds" : "trialAds"]++;
+      }
       coveragePeriods[`d${d}`] = p;
     }
 
