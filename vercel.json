@@ -59,6 +59,10 @@
     {
       "schedule": "45 4 * * *",
       "path": "/api/cron/agent-retention"
+    },
+    {
+      "schedule": "0 9 * * 1",
+      "path": "/api/cron/agent-prospects"
     }
   ]
 }

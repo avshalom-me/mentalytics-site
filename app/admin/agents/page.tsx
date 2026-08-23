@@ -31,6 +31,25 @@ type AgentRun = {
 
 type LatestDetailsMap = Record<string, { started_at: string; details: unknown }>;
 
+type Prospect = {
+  id: string;
+  name: string;
+  source: "places" | "internal_lead" | "manual";
+  city: string | null;
+  address: string | null;
+  phone: string | null;
+  website: string | null;
+  email: string | null;
+  gaps_in_region: number;
+  contacted_at: string | null;
+  answer: "yes" | "no" | "maybe" | null;
+  notes: string | null;
+  obstacles: string | null;
+  draft_subject: string | null;
+  draft_body: string | null;
+  draft_sent_at: string | null;
+};
+
 type GiftCandidate = {
   therapist_id: string;
   full_name: string;
@@ -307,6 +326,23 @@ const AGENTS: AgentMeta[] = [
     chartGoodWhenZero: true,
   },
 ];
+
+AGENTS.push({
+  key: "center_prospects",
+  icon: "🧭",
+  label: "איתור מכונים",
+  runAction: "prospects_run",
+  runLabel: "עדכן רשימה עכשיו",
+  desc: "בונה ומתחזק רשימת מרכזים טיפוליים שאפשר להפוך ללקוחות: קודם מרכזים שכבר קיבלו מאיתנו הצעה ולא סגרו, ואחריהם מכונים שנמצאו בחיפוש Google באזורים שבהם חסרים לנו מטפלים. בכל ריצה הרשימה מתעדכנת - נוספים חדשים, והקיימים מרועננים בלי לגעת במעקב שלך.",
+  howToRead: [
+    "הרשימה היא רשימת שיחות. הטור \"פערים באזור\" הוא הדירוג: כמה חוסרים המרכז הזה יכול לסגור.",
+    "\"ליד חם\" = מרכז שכבר ביקש מאיתנו הצעה ולא סגר. אלה תמיד בראש - אין טעם לחייג למכון חדש כשמישהו שכבר התעניין ממתין.",
+    "סמן \"פנינו\" אחרי שיחה, ואז אפשר לבחור מה ענו ולכתוב הערות ומכשולים. הכול נשמר מיד.",
+    "מייל למכון לא נשלח אוטומטית לעולם (חוק הספאם). כפתור הטיוטה נפתח רק אחרי שסימנת שפנית ולא קיבלת תשובה.",
+  ],
+  schedule: "רץ אוטומטית כל יום שני ב-12:00",
+  chartLabel: "כמה מועמדים חדשים נמצאו בכל ריצה",
+});
 
 const AGENT_BY_KEY = new Map(AGENTS.map((a) => [a.key, a]));
 
@@ -792,11 +828,257 @@ function GiftOfferCard({
   );
 }
 
+// טבלת מועמדים - רשימת השיחות. עריכה נשמרת מיד, בלי כפתור שמירה: זו
+// טבלת עבודה שמתעדכנת תוך כדי שיחת טלפון, ולא טופס.
+function ProspectTable({
+  rows,
+  onChanged,
+  onNotify,
+}: {
+  rows: Prospect[];
+  onChanged: (rows: Prospect[]) => void;
+  onNotify: (msg: string, isError?: boolean) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [draftFor, setDraftFor] = useState<string | null>(null);
+  const [draft, setDraft] = useState<{ subject: string; body: string; email: string }>({
+    subject: "",
+    body: "",
+    email: "",
+  });
+
+  async function patch(id: string, body: Record<string, unknown>) {
+    setBusy(id);
+    try {
+      const j = await postAgents("prospect_update", { id, ...body });
+      if (Array.isArray(j.prospects)) onChanged(j.prospects as Prospect[]);
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "העדכון נכשל", true);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function makeDraft(p: Prospect) {
+    setBusy(p.id);
+    try {
+      const j = await postAgents("prospect_draft", { id: p.id });
+      setDraft({ subject: String(j.subject ?? ""), body: String(j.body ?? ""), email: p.email ?? "" });
+      setDraftFor(p.id);
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "יצירת הטיוטה נכשלה", true);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function sendDraft(p: Prospect) {
+    if (!window.confirm(`לשלוח את הפנייה אל ${p.name} (${draft.email})?\n\nהמייל יוצא מיד, בדיוק כפי שהוא כאן.`))
+      return;
+    setBusy(p.id);
+    try {
+      const j = await postAgents("prospect_send", { id: p.id, ...draft });
+      onNotify(`הפנייה נשלחה אל ${j.name ?? p.name} (${j.email ?? draft.email})`);
+      setDraftFor(null);
+      const refreshed = await postAgents("prospect_update", { id: p.id });
+      if (Array.isArray(refreshed.prospects)) onChanged(refreshed.prospects as Prospect[]);
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "השליחה נכשלה", true);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  if (rows.length === 0) {
+    return (
+      <p className="text-sm text-stone-400">
+        הרשימה ריקה. הרץ את הסוכן כדי לבנות אותה - הוא יתחיל מהמרכזים שכבר קיבלו הצעה ולא סגרו.
+      </p>
+    );
+  }
+
+  const answerChip = (p: Prospect) => {
+    const opts: { v: "yes" | "no" | "maybe"; label: string; cls: string }[] = [
+      { v: "yes", label: "כן", cls: "bg-emerald-600 text-white" },
+      { v: "maybe", label: "?", cls: "bg-amber-500 text-white" },
+      { v: "no", label: "לא", cls: "bg-stone-500 text-white" },
+    ];
+    return (
+      <div className="flex gap-1">
+        {opts.map((o) => (
+          <button
+            key={o.v}
+            onClick={() => patch(p.id, { answer: p.answer === o.v ? null : o.v })}
+            disabled={busy === p.id || !p.contacted_at}
+            title={p.contacted_at ? "" : "סמנו קודם שפניתם"}
+            className={`rounded-full px-2 py-0.5 text-[11px] font-bold disabled:opacity-40 ${
+              p.answer === o.v ? o.cls : "border border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
+            }`}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="overflow-x-auto rounded-xl border border-stone-200">
+        <table className="w-full min-w-[820px] text-sm">
+          <thead>
+            <tr className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
+              <th className="p-2 text-right font-bold">מרכז</th>
+              <th className="p-2 text-right font-bold">טלפון</th>
+              <th className="p-2 text-center font-bold">פערים באזור</th>
+              <th className="p-2 text-center font-bold">פנינו</th>
+              <th className="p-2 text-center font-bold">ענו</th>
+              <th className="p-2 text-right font-bold">הערות</th>
+              <th className="p-2 text-right font-bold">מכשולים</th>
+              <th className="p-2"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((p) => (
+              <tr key={p.id} className={`border-b border-stone-100 ${p.answer === "no" ? "opacity-50" : ""}`}>
+                <td className="p-2 align-top">
+                  <div className="flex items-center gap-1.5">
+                    {p.source === "internal_lead" && (
+                      <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-black text-red-700">
+                        ליד חם
+                      </span>
+                    )}
+                    <span className="font-bold text-stone-800">{p.name}</span>
+                  </div>
+                  <div className="text-xs text-stone-400">
+                    {[p.city, p.address].filter(Boolean).join(" · ").slice(0, 60)}
+                  </div>
+                  {p.website && (
+                    <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2A6462] underline">
+                      אתר
+                    </a>
+                  )}
+                </td>
+                <td className="whitespace-nowrap p-2 align-top text-stone-600">
+                  {p.phone ? <a href={`tel:${p.phone}`} className="font-bold text-[#2A6462]">{p.phone}</a> : "-"}
+                </td>
+                <td className="p-2 text-center align-top">
+                  {p.gaps_in_region > 0 ? (
+                    <span className="rounded-full bg-[#EAF4F3] px-2 py-0.5 text-xs font-black text-[#2A6462]">
+                      {p.gaps_in_region}
+                    </span>
+                  ) : (
+                    <span className="text-xs text-stone-300">-</span>
+                  )}
+                </td>
+                <td className="p-2 text-center align-top">
+                  <input
+                    type="checkbox"
+                    checked={!!p.contacted_at}
+                    disabled={busy === p.id}
+                    onChange={(e) => patch(p.id, { contacted: e.target.checked })}
+                    className="h-4 w-4 accent-[#2e7d8c]"
+                  />
+                </td>
+                <td className="p-2 align-top">{answerChip(p)}</td>
+                <td className="p-2 align-top">
+                  <input
+                    defaultValue={p.notes ?? ""}
+                    onBlur={(e) => e.target.value !== (p.notes ?? "") && patch(p.id, { notes: e.target.value })}
+                    placeholder="מה נאמר"
+                    className="w-40 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+                  />
+                </td>
+                <td className="p-2 align-top">
+                  <input
+                    defaultValue={p.obstacles ?? ""}
+                    onBlur={(e) => e.target.value !== (p.obstacles ?? "") && patch(p.id, { obstacles: e.target.value })}
+                    placeholder="מה חוסם"
+                    className="w-36 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+                  />
+                </td>
+                <td className="whitespace-nowrap p-2 align-top">
+                  {p.draft_sent_at ? (
+                    <span className="text-[11px] text-stone-400">מייל נשלח</span>
+                  ) : p.contacted_at && !p.answer ? (
+                    <button
+                      onClick={() => makeDraft(p)}
+                      disabled={busy === p.id}
+                      className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                    >
+                      טיוטה
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => patch(p.id, { dismissed: true })}
+                    disabled={busy === p.id}
+                    className="ms-1 text-[11px] text-stone-400 underline hover:text-stone-600"
+                  >
+                    הסר
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {draftFor && (
+        <div className="rounded-2xl border border-sky-200 bg-white p-4">
+          <div className="mb-2 flex items-center justify-between">
+            <h4 className="text-sm font-black text-stone-800">
+              טיוטת פנייה - {rows.find((r) => r.id === draftFor)?.name}
+            </h4>
+            <button onClick={() => setDraftFor(null)} className="text-xs text-stone-400 underline">
+              סגור
+            </button>
+          </div>
+          <p className="mb-3 text-xs text-amber-700">
+            מייל קר לעסק מוסדר בחוק הספאם. שלח רק אם ניסית להשיג אותם בטלפון ולא הצלחת, ורק אחרי שקראת את
+            הטקסט.
+          </p>
+          <label className="mb-1 block text-xs font-black text-stone-400">כתובת המייל (יש להשלים ידנית)</label>
+          <input
+            value={draft.email}
+            onChange={(e) => setDraft({ ...draft, email: e.target.value })}
+            placeholder="info@example.co.il"
+            className="mb-2 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
+          />
+          <label className="mb-1 block text-xs font-black text-stone-400">נושא</label>
+          <input
+            value={draft.subject}
+            onChange={(e) => setDraft({ ...draft, subject: e.target.value })}
+            className="mb-2 w-full rounded-xl border border-stone-300 px-3 py-2 text-sm"
+          />
+          <label className="mb-1 block text-xs font-black text-stone-400">גוף המייל</label>
+          <textarea
+            value={draft.body}
+            onChange={(e) => setDraft({ ...draft, body: e.target.value })}
+            rows={14}
+            className="w-full rounded-xl border border-stone-300 p-3 text-sm leading-6"
+          />
+          <button
+            onClick={() => {
+              const p = rows.find((r) => r.id === draftFor);
+              if (p) sendDraft(p);
+            }}
+            disabled={busy === draftFor || !draft.email.includes("@")}
+            className="mt-3 rounded-full bg-[#2e7d8c] px-5 py-1.5 text-sm font-bold text-white hover:opacity-90 disabled:opacity-50"
+          >
+            שלח פנייה
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─────────────────────────────── העמוד ──────────────────────────────────
 
 export default function AgentsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [latestDetails, setLatestDetails] = useState<LatestDetailsMap>({});
+  const [prospects, setProspects] = useState<Prospect[]>([]);
   const [pending, setPending] = useState<PendingAction[]>([]);
   const [resolved, setResolved] = useState<ResolvedAction[]>([]);
   const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
@@ -834,6 +1116,7 @@ export default function AgentsPage() {
         if (j.ok) {
           setRuns(j.runs ?? []);
           setLatestDetails(j.latest_details ?? {});
+          setProspects(j.prospects ?? []);
           setPending(j.pending_actions ?? []);
           setResolved(j.resolved_actions ?? []);
           setLatestDigest(j.latest_digest ?? null);
@@ -1278,6 +1561,24 @@ export default function AgentsPage() {
 
   // ההמלצות של הסוכן עכשיו: פעולות (כרטיסים) + ממצאים (רשימה).
   function AgentQueue({ meta }: { meta: AgentMeta }) {
+    // סוכן איתור המכונים: "ממתין לך" הוא רשימת השיחות עצמה, לא תור הצעות.
+    if (meta.key === "center_prospects") {
+      return (
+        <ProspectTable
+          rows={prospects}
+          onChanged={setProspects}
+          onNotify={(msg, isErr) => {
+            if (isErr) {
+              setActionError(msg);
+              setActionMsg("");
+            } else {
+              setActionMsg(msg);
+              setActionError("");
+            }
+          }}
+        />
+      );
+    }
     const mine = pending.filter((a) => a.agent === meta.key);
     const acts = mine.filter((a) => !isFinding(a));
     const finds = mine.filter(isFinding);
@@ -1409,7 +1710,10 @@ export default function AgentsPage() {
       .filter((r) => r.metric != null)
       .map((r) => ({ at: r.started_at, value: r.metric as number }))
       .reverse();
-    const acts = pending.filter((a) => a.agent === meta.key && !isFinding(a)).length;
+    const acts =
+      meta.key === "center_prospects"
+        ? prospects.filter((p) => !p.contacted_at).length
+        : pending.filter((a) => a.agent === meta.key && !isFinding(a)).length;
     return (
       <div className="space-y-5">
         {/* כותרת דף הסוכן */}
@@ -1570,8 +1874,11 @@ export default function AgentsPage() {
           {AGENTS.map((meta) => {
             const last = runs.find((r) => r.agent === meta.key);
             const mine = pending.filter((a) => a.agent === meta.key);
-            const acts = mine.filter((a) => !isFinding(a)).length;
-            const finds = mine.length - acts;
+            const acts =
+              meta.key === "center_prospects"
+                ? prospects.filter((p) => !p.contacted_at).length
+                : mine.filter((a) => !isFinding(a)).length;
+            const finds = meta.key === "center_prospects" ? 0 : mine.length - acts;
             const isSel = selected === meta.key;
             return (
               <button

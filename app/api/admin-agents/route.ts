@@ -11,6 +11,8 @@ import { runRetention } from "@/app/lib/retention";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer } from "@/app/lib/gift-offer";
+import { runCenterProspects, listProspects, updateProspect } from "@/app/lib/center-prospects";
+import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -131,6 +133,7 @@ export async function GET() {
 
     return NextResponse.json({
       ok: true,
+      prospects: await listProspects().catch(() => []),
       runs,
       latest_details: latestDetails,
       pending_actions: pendingRes.data ?? [],
@@ -214,6 +217,49 @@ export async function POST(req: NextRequest) {
         remaining: result.remaining ?? [],
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
+    }
+    if (body?.action === "prospects_run") {
+      const result = await runCenterProspects();
+      return NextResponse.json({
+        ok: result.ok,
+        places_configured: result.placesConfigured,
+        found: result.found,
+        refreshed: result.refreshed,
+        warm_leads: result.warmLeads,
+        calls: result.calls,
+        errors: result.errors,
+        error: result.error,
+      });
+    }
+    // עדכון שורה בטבלת המעקב - פנינו / ענו / תשובה / הערות / מכשולים.
+    if (body?.action === "prospect_update") {
+      const id = String(body?.id ?? "");
+      if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+      await updateProspect(id, {
+        contacted_at: body?.contacted === true ? new Date().toISOString() : body?.contacted === false ? null : undefined,
+        answer: body?.answer === null || typeof body?.answer === "string" ? body.answer : undefined,
+        notes: typeof body?.notes === "string" ? body.notes : undefined,
+        obstacles: typeof body?.obstacles === "string" ? body.obstacles : undefined,
+        phone: typeof body?.phone === "string" ? body.phone : undefined,
+        email: typeof body?.email === "string" ? body.email : undefined,
+        dismissed: typeof body?.dismissed === "boolean" ? body.dismissed : undefined,
+      });
+      return NextResponse.json({ ok: true, prospects: await listProspects() });
+    }
+    // ג: טיוטה למכון מסוים, רק אחרי ניסיון טלפוני. לא אוטומטי לעולם.
+    if (body?.action === "prospect_draft") {
+      const draft = await requestProspectDraft(String(body?.id ?? ""));
+      return NextResponse.json({ ok: true, ...draft });
+    }
+    if (body?.action === "prospect_send") {
+      const r = await sendProspectDraft({
+        id: String(body?.id ?? ""),
+        email: String(body?.email ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, name: r.name, email: r.email });
     }
     if (body?.action === "center_nudge_run") {
       const result = await runCenterNudgeAgent();
