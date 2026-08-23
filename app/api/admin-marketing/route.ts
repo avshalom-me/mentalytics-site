@@ -66,9 +66,13 @@ export async function GET() {
     // Supply tiers. "therapists_total" (the plan metric) = therapists who
     // actually completed registration, i.e. have a name — NOT the ~86 nameless
     // abandoned drafts. We count each tier so the dashboard can show the split:
-    //   paid  = real paying (promotion_source='paid')
-    //   trial = gifted / promoted for free (paying status but not 'paid')
-    //   free  = approved directory listings (not paying)
+    //   paid   = real paying (promotion_source='paid')
+    //   center = מקודם דרך מנוי של מרכז טיפולי (promotion_source='center') -
+    //            כולל שורת ישות של מסלול 2. **הכנסה אמיתית, לא מתנה.** עד
+    //            21/8/2026 הם נפלו לתוך trial ("מקודמים במתנה") כי הסינון היה
+    //            neq('paid') בלבד, וכך מרכז משלם הוצג כמי שקיבל חינם.
+    //   trial  = gifted / promoted for free (trial / manual / gift_trial)
+    //   free   = approved directory listings (not paying)
     // pendingNamed (submitted, awaiting approval) and incomplete (no name) are
     // derived on the client from total/registered.
     const tCount = () => supabaseAdmin.from("therapists").select("id", { count: "exact", head: true });
@@ -79,7 +83,11 @@ export async function GET() {
     // "מוצגים למטופלים" here would overcount vs. /admin/analytics the moment a
     // paid-but-unvetted therapist exists. Unvetted payers fall into pendingNamed.
     const paidQ = tCount().eq("status", "paying").eq("promotion_source", "paid").eq("admin_approved", true);
-    const trialQ = tCount().eq("status", "paying").neq("promotion_source", "paid").eq("admin_approved", true);
+    const centerQ = tCount().eq("status", "paying").eq("promotion_source", "center").eq("admin_approved", true);
+    const trialQ = tCount()
+      .eq("status", "paying")
+      .not("promotion_source", "in", "(paid,center)")
+      .eq("admin_approved", true);
     const freeQ = tCount().eq("status", "approved").eq("admin_approved", true);
 
     // Questionnaires completed in the current calendar month (UTC on Vercel).
@@ -101,7 +109,7 @@ export async function GET() {
     // the last 30d likewise; both fetched cap-safe.
     const payingListQ = supabaseAdmin
       .from("therapists")
-      .select("id, full_name, promotion_source")
+      .select("id, full_name, promotion_source, center_account_id, entity_type, promoted_since")
       .eq("status", "paying")
       .eq("admin_approved", true);
     const clicksAllQ = fetchAllRows<{ therapist_id: string; clicked_at: string; channel: string | null }>(() =>
@@ -126,13 +134,13 @@ export async function GET() {
     // Typed Promise.all groups (kept apart so the period results stay a
     // single count-query type), run concurrently.
     const [
-      [aiRes, targetsRes, totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes, subsRes],
+      [aiRes, targetsRes, totalRes, registeredRes, paidRes, centerRes, trialRes, freeRes, quizMonthRes, subsRes],
       periodRes,
       payingListRes,
       clicksAll,
       views30,
     ] = await Promise.all([
-      Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, trialQ, freeQ, quizMonthQ, subsQ]),
+      Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, centerQ, trialQ, freeQ, quizMonthQ, subsQ]),
       Promise.all(periodQs),
       payingListQ,
       clicksAllQ,
@@ -143,7 +151,7 @@ export async function GET() {
     if (targetsRes.error) throw targetsRes.error;
     if (subsRes.error) throw subsRes.error;
     if (payingListRes.error) throw payingListRes.error;
-    for (const r of [totalRes, registeredRes, paidRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
+    for (const r of [totalRes, registeredRes, paidRes, centerRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
 
     const report = aiRes.data?.[0] ?? null;
@@ -177,23 +185,35 @@ export async function GET() {
     const total = totalRes.count ?? 0;
     const registered = registeredRes.count ?? 0;
     const paid = paidRes.count ?? 0;
+    const center = centerRes.count ?? 0;
     const trial = trialRes.count ?? 0;
     const free = freeRes.count ?? 0;
     const supply = {
       total,
       registered,
       paid,
+      center,
       trial,
       free,
-      listed: paid + trial + free, // approved & shown to patients (= /admin dashboard's paying+approved)
-      paying: paid + trial,
-      pendingNamed: Math.max(0, registered - paid - trial - free),
+      listed: paid + center + trial + free, // approved & shown to patients
+      // "paying" = מי שמישהו משלם עבורו. מרכז נכלל - הוא לקוח משלם.
+      paying: paid + center + trial,
+      revenueBearing: paid + center,
+      pendingNamed: Math.max(0, registered - paid - center - trial - free),
       incomplete: Math.max(0, total - registered),
     };
     const quizThisMonth = quizMonthRes.count ?? 0;
 
     // --- Contact coverage of paying/promoted therapists ---
-    type PayingRow = { id: string; full_name: string | null; promotion_source: string | null };
+    type PayingRow = {
+      id: string;
+      full_name: string | null;
+      promotion_source: string | null;
+      center_account_id: string | null;
+      entity_type: string | null;
+      promoted_since: string | null;
+    };
+    type Tier = "paid" | "center" | "trial";
     const payingList = (payingListRes.data ?? []) as PayingRow[];
     const payingIdSet = new Set(payingList.map((t) => t.id));
 
@@ -219,32 +239,51 @@ export async function GET() {
       }
     }
 
-    const tierOf = (t: PayingRow) => (t.promotion_source === "paid" ? "paid" : "trial");
+    // שלוש דרגות ולא שתיים: מרכז הוא לקוח משלם ואינו "מתנה".
+    const tierOf = (t: PayingRow): Tier =>
+      t.promotion_source === "paid" ? "paid" : t.promotion_source === "center" ? "center" : "trial";
     const coveredInWindow = (t: PayingRow, days: number) =>
       (lastContactAt.get(t.id) ?? 0) >= Date.now() - days * 86_400_000;
 
     const coveredByAdsInWindow = (t: PayingRow, days: number) =>
       (lastAdsContactAt.get(t.id) ?? 0) >= Date.now() - days * 86_400_000;
 
-    type CoveragePeriod = { paid: number; trial: number; paidAds: number; trialAds: number };
+    type CoveragePeriod = {
+      paid: number; center: number; trial: number;
+      paidAds: number; centerAds: number; trialAds: number;
+    };
     const coveragePeriods: Record<string, CoveragePeriod> = {};
+    const adsKey = { paid: "paidAds", center: "centerAds", trial: "trialAds" } as const;
     for (const d of PERIODS) {
-      const p: CoveragePeriod = { paid: 0, trial: 0, paidAds: 0, trialAds: 0 };
+      const p: CoveragePeriod = { paid: 0, center: 0, trial: 0, paidAds: 0, centerAds: 0, trialAds: 0 };
       for (const t of payingList) {
         const tier = tierOf(t);
         if (coveredInWindow(t, d)) p[tier]++;
         // Always a subset of the line above - being reached by an ad is one way
         // of being reached - so paidAds can never exceed paid.
-        if (coveredByAdsInWindow(t, d)) p[tier === "paid" ? "paidAds" : "trialAds"]++;
+        if (coveredByAdsInWindow(t, d)) p[adsKey[tier]]++;
       }
       coveragePeriods[`d${d}`] = p;
     }
 
     // "Starving" = paying/promoted, listed, and no contact in the last 30 days.
     // Never-contacted first, then longest-since; paid before trial.
+    //
+    // **סף ותק (21/8/2026):** מי שקודם לפני פחות מ-14 יום אינו "שקט" - הוא
+    // פשוט חדש. בלי הסף, שמונת מטפלי "מרכז שדות" שקודמו ב-20-23/8 נספרו
+    // כשמונה מטפלים ללא פניות, והרובריקה הציגה משבר במקום מרכז שזה עתה עלה.
+    // אותו סף בדיוק כמו MIN_TENURE_DAYS בסוכן השימור, כדי ששני המסכים לא
+    // יתנו שתי תשובות על אותו מטפל.
+    const MIN_TENURE_DAYS = 14;
     const nowMs = Date.now();
+    const tenureDays = (t: PayingRow): number | null =>
+      t.promoted_since ? Math.floor((nowMs - new Date(t.promoted_since).getTime()) / 86_400_000) : null;
+    const tooNew = (t: PayingRow) => {
+      const d = tenureDays(t);
+      return d !== null && d < MIN_TENURE_DAYS;
+    };
     const starving = payingList
-      .filter((t) => !coveredInWindow(t, 30))
+      .filter((t) => !coveredInWindow(t, 30) && !tooNew(t))
       .map((t) => {
         const last = lastContactAt.get(t.id) ?? null;
         return {
@@ -256,7 +295,9 @@ export async function GET() {
         };
       })
       .sort((a, b) => {
-        if (a.tier !== b.tier) return a.tier === "paid" ? -1 : 1;
+        // כסף קודם: משלם ישיר, אחריו מטפל של מרכז (גם עליו משלמים), ואז מתנה.
+        const rank: Record<Tier, number> = { paid: 0, center: 1, trial: 2 };
+        if (a.tier !== b.tier) return rank[a.tier] - rank[b.tier];
         const aDays = a.daysSinceContact ?? Number.MAX_SAFE_INTEGER;
         const bDays = b.daysSinceContact ?? Number.MAX_SAFE_INTEGER;
         return bDays !== aDays ? bDays - aDays : b.views30 - a.views30;
@@ -264,10 +305,75 @@ export async function GET() {
 
     const coverage = {
       paidTotal: payingList.filter((t) => tierOf(t) === "paid").length,
+      centerTotal: payingList.filter((t) => tierOf(t) === "center").length,
       trialTotal: payingList.filter((t) => tierOf(t) === "trial").length,
       periods: coveragePeriods,
       starving,
+      // כמה הוחרגו כ"חדשים מדי" - נאמר במפורש, אחרת המספר נראה כאילו ירד לבד.
+      tooNew: payingList.filter((t) => !coveredInWindow(t, 30) && tooNew(t)).length,
     };
+
+    // ── רובריקת המרכזים: כללי לכל מרכז, ופירוט למטפליו ──────────────────────
+    // נבנית מאותם נתונים שכבר נשלפו (payingList + clicksAll + views30), כדי
+    // ששני המסכים לא יציגו שני מספרים שונים לאותו מרכז.
+    const centerIds = [
+      ...new Set(payingList.map((t) => t.center_account_id).filter(Boolean) as string[]),
+    ];
+    let centersBlock: unknown = { centers: [], totals: null };
+    if (centerIds.length > 0) {
+      const { data: centerRows } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select("id, name, billing_track, status, therapist_count, agreed_monthly_price")
+        .in("id", centerIds);
+      const byId = new Map((centerRows ?? []).map((c) => [c.id as string, c]));
+
+      const contactsIn = (id: string, days: number) =>
+        clicksAll.filter(
+          (c) => c.therapist_id === id && new Date(c.clicked_at).getTime() >= Date.now() - days * 86_400_000,
+        ).length;
+
+      const centers = centerIds.map((cid) => {
+        const row = byId.get(cid);
+        const members = payingList.filter((t) => t.center_account_id === cid);
+        const therapists = members.map((t) => ({
+          id: t.id,
+          name: t.full_name ?? "—",
+          is_entity: t.entity_type === "center",
+          views30: views30ByTherapist.get(t.id) ?? 0,
+          contacts30: contactsIn(t.id, 30),
+          daysSinceContact: lastContactAt.get(t.id)
+            ? Math.floor((Date.now() - (lastContactAt.get(t.id) as number)) / 86_400_000)
+            : null,
+        }));
+        return {
+          id: cid,
+          name: (row?.name as string) ?? "מרכז",
+          track: (row?.billing_track as string) ?? "per_therapist",
+          status: (row?.status as string) ?? null,
+          seats: row?.therapist_count ?? null,
+          monthly: row?.agreed_monthly_price ?? null,
+          promoted: members.length,
+          views30: therapists.reduce((n, t) => n + t.views30, 0),
+          contacts30: therapists.reduce((n, t) => n + t.contacts30, 0),
+          // אותו סף ותק: מרכז שעלה השבוע אינו מרכז שנכשל.
+          starving: members.filter((t) => !coveredInWindow(t, 30) && !tooNew(t)).length,
+          tooNew: members.filter((t) => tooNew(t)).length,
+          therapists: therapists.sort((a, b) => b.contacts30 - a.contacts30 || b.views30 - a.views30),
+        };
+      });
+      centers.sort((a, b) => b.contacts30 - a.contacts30 || b.views30 - a.views30);
+      centersBlock = {
+        centers,
+        totals: {
+          centers: centers.length,
+          promoted: centers.reduce((n, c) => n + c.promoted, 0),
+          views30: centers.reduce((n, c) => n + c.views30, 0),
+          contacts30: centers.reduce((n, c) => n + c.contacts30, 0),
+          starving: centers.reduce((n, c) => n + c.starving, 0),
+          monthly: centers.reduce((n, c) => n + (Number(c.monthly) || 0), 0),
+        },
+      };
+    }
 
     // Cumulative churn: therapists who ever had a subscription but no longer have
     // an active one. cancelled_at is unreliable (nullable), so we compare the
@@ -311,6 +417,8 @@ export async function GET() {
       supply,
       churn,
       coverage,
+      // רובריקת המרכזים - כללי ופירוט לכל מכון (בקשת המשתמש 21/8/2026).
+      centers: centersBlock,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {
