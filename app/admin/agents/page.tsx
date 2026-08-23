@@ -841,11 +841,14 @@ function ProspectTable({
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [draftFor, setDraftFor] = useState<string | null>(null);
-  const [draft, setDraft] = useState<{ subject: string; body: string; email: string }>({
-    subject: "",
-    body: "",
-    email: "",
-  });
+  const [draft, setDraft] = useState<{
+    subject: string;
+    body: string;
+    email: string;
+    source: "ai" | "template";
+    facts: string[];
+    note: string | null;
+  }>({ subject: "", body: "", email: "", source: "template", facts: [], note: null });
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(id);
@@ -863,7 +866,14 @@ function ProspectTable({
     setBusy(p.id);
     try {
       const j = await postAgents("prospect_draft", { id: p.id });
-      setDraft({ subject: String(j.subject ?? ""), body: String(j.body ?? ""), email: p.email ?? "" });
+      setDraft({
+        subject: String(j.subject ?? ""),
+        body: String(j.body ?? ""),
+        email: p.email ?? "",
+        source: j.source === "ai" ? "ai" : "template",
+        facts: Array.isArray(j.facts) ? (j.facts as string[]) : [],
+        note: typeof j.note === "string" ? j.note : null,
+      });
       setDraftFor(p.id);
     } catch (e) {
       onNotify(e instanceof Error ? e.message : "יצירת הטיוטה נכשלה", true);
@@ -1026,13 +1036,48 @@ function ProspectTable({
       {draftFor && (
         <div className="rounded-2xl border border-sky-200 bg-white p-4">
           <div className="mb-2 flex items-center justify-between">
-            <h4 className="text-sm font-black text-stone-800">
+            <h4 className="flex items-center gap-2 text-sm font-black text-stone-800">
               טיוטת פנייה - {rows.find((r) => r.id === draftFor)?.name}
+              <span
+                className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+                  draft.source === "ai"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-stone-100 text-stone-600"
+                }`}
+              >
+                {draft.source === "ai" ? "נכתב ב-AI" : "תבנית קבועה"}
+              </span>
             </h4>
             <button onClick={() => setDraftFor(null)} className="text-xs text-stone-400 underline">
               סגור
             </button>
           </div>
+          {draft.source === "ai" && (
+            <div className="mb-3 rounded-xl border-2 border-amber-400 bg-amber-50 p-4">
+              <p className="text-sm font-black text-amber-900">
+                ⚠️ הטיוטה הזו נכתבה על ידי AI אחרי קריאת האתר של המכון - חובה לאמת כל פרט לפני שליחה
+              </p>
+              <p className="mt-1 text-xs leading-5 text-amber-800">
+                מודל שפה יכול לטעות בפרט או להסיק דבר שלא נאמר. עברו על המשפט האישי מול האתר שלהם,
+                ותקנו כל מה שלא מדויק. הטקסט יוצא בשמך.
+              </p>
+              {draft.facts.length > 0 && (
+                <div className="mt-2">
+                  <div className="text-xs font-black text-amber-900">הפרטים שהמודל לקח מהאתר - אלה מה שצריך לאמת:</div>
+                  <ul className="mt-1 list-inside list-disc text-xs text-amber-800">
+                    {draft.facts.map((f, i) => (
+                      <li key={i}>{f}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          {draft.note && (
+            <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 p-3 text-xs text-stone-500">
+              {draft.note}
+            </p>
+          )}
           <p className="mb-3 text-xs text-amber-700">
             מייל קר לעסק מוסדר בחוק הספאם. שלח רק אם ניסית להשיג אותם בטלפון ולא הצלחת, ורק אחרי שקראת את
             הטקסט.
@@ -1079,6 +1124,7 @@ export default function AgentsPage() {
   const [runs, setRuns] = useState<AgentRun[]>([]);
   const [latestDetails, setLatestDetails] = useState<LatestDetailsMap>({});
   const [prospects, setProspects] = useState<Prospect[]>([]);
+  const [placesReady, setPlacesReady] = useState(true);
   const [pending, setPending] = useState<PendingAction[]>([]);
   const [resolved, setResolved] = useState<ResolvedAction[]>([]);
   const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
@@ -1117,6 +1163,7 @@ export default function AgentsPage() {
           setRuns(j.runs ?? []);
           setLatestDetails(j.latest_details ?? {});
           setProspects(j.prospects ?? []);
+          setPlacesReady(j.places_configured !== false);
           setPending(j.pending_actions ?? []);
           setResolved(j.resolved_actions ?? []);
           setLatestDigest(j.latest_digest ?? null);
@@ -1564,6 +1611,14 @@ export default function AgentsPage() {
     // סוכן איתור המכונים: "ממתין לך" הוא רשימת השיחות עצמה, לא תור הצעות.
     if (meta.key === "center_prospects") {
       return (
+        <>
+          {!placesReady && (
+            <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+              <span className="font-black">חיפוש המכונים באינטרנט כבוי.</span> חסר המפתח{" "}
+              <code className="rounded bg-amber-100 px-1">GOOGLE_PLACES_API_KEY</code> בהגדרות Vercel, ולכן
+              הסוכן עובד כרגע על הלידים הפנימיים בלבד. אחרי הוספת המפתח הוא יתחיל למלא את הרשימה.
+            </div>
+          )}
         <ProspectTable
           rows={prospects}
           onChanged={setProspects}
@@ -1577,6 +1632,7 @@ export default function AgentsPage() {
             }
           }}
         />
+        </>
       );
     }
     const mine = pending.filter((a) => a.agent === meta.key);

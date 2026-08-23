@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import type { ProspectRow } from "./center-prospects";
+import { buildAiProspectDraft } from "./prospect-ai-draft";
 
 // טיוטת פנייה למכון שלא הצלחנו לתפוס בטלפון.
 //
@@ -16,7 +17,15 @@ import type { ProspectRow } from "./center-prospects";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
-export type ProspectDraft = { subject: string; body: string };
+export type ProspectDraft = {
+  subject: string;
+  body: string;
+  /** ai = נכתב על ידי מודל אחרי קריאת אתר המכון; template = תבנית קבועה. */
+  source: "ai" | "template";
+  /** הפרטים שהמודל לקח מהאתר - **חובה לאמת אותם לפני שליחה**. */
+  facts: string[];
+  note?: string;
+};
 
 export function buildProspectDraft(p: ProspectRow, gapExamples: string[]): ProspectDraft {
   const name = (p.name || "המרכז").trim();
@@ -58,6 +67,8 @@ export function buildProspectDraft(p: ProspectRow, gapExamples: string[]): Prosp
   return {
     subject: `${name} - פניות ממטופלים${where} שאין לנו למי להעביר`,
     body: lines.join("\n"),
+    source: "template",
+    facts: [],
   };
 }
 
@@ -90,7 +101,16 @@ export async function requestProspectDraft(id: string): Promise<ProspectDraft> {
     .filter((t) => t && t.length < 60)
     .slice(0, 3);
 
-  const draft = buildProspectDraft(p, examples);
+  // קודם ניסיון לטיוטה אישית: המודל קורא את אתר המכון וכותב פנייה
+  // שמתייחסת אליהם. אם אין אתר, אין מפתח, או שהקריאה נכשלה - התבנית
+  // הקבועה. עדיף טקסט גנרי נכון מטקסט אישי שהומצא.
+  const ai = await buildAiProspectDraft(p, examples);
+  const draft: ProspectDraft = ai ?? {
+    ...buildProspectDraft(p, examples),
+    note: !p.website
+      ? "אין אתר למכון הזה - נוצרה טיוטה מהתבנית הקבועה."
+      : "לא הצלחנו לקרוא את האתר - נוצרה טיוטה מהתבנית הקבועה.",
+  };
   const { error: updErr } = await supabaseAdmin
     .from("center_prospects")
     .update({

@@ -13,6 +13,7 @@ import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
+import { placesConfigured } from "@/app/lib/places-search";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -134,6 +135,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       prospects: await listProspects().catch(() => []),
+      places_configured: placesConfigured(),
       runs,
       latest_details: latestDetails,
       pending_actions: pendingRes.data ?? [],
@@ -249,7 +251,14 @@ export async function POST(req: NextRequest) {
     // ג: טיוטה למכון מסוים, רק אחרי ניסיון טלפוני. לא אוטומטי לעולם.
     if (body?.action === "prospect_draft") {
       const draft = await requestProspectDraft(String(body?.id ?? ""));
-      return NextResponse.json({ ok: true, ...draft });
+      return NextResponse.json({
+        ok: true,
+        subject: draft.subject,
+        body: draft.body,
+        source: draft.source,
+        facts: draft.facts,
+        note: draft.note ?? null,
+      });
     }
     if (body?.action === "prospect_send") {
       const r = await sendProspectDraft({
