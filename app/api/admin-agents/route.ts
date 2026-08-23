@@ -11,7 +11,7 @@ import { runRetention } from "@/app/lib/retention";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer } from "@/app/lib/gift-offer";
-import { runCenterProspects, listProspects, updateProspect } from "@/app/lib/center-prospects";
+import { runCenterProspects, listProspects, updateProspect, addProspectsFromText } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
 
@@ -234,6 +234,11 @@ export async function POST(req: NextRequest) {
       });
     }
     // עדכון שורה בטבלת המעקב - פנינו / ענו / תשובה / הערות / מכשולים.
+    // הדבקת רשימה שהמשתמש כבר מחזיק - בלי תלות בחיפוש החיצוני.
+    if (body?.action === "prospects_add") {
+      const r = await addProspectsFromText(String(body?.text ?? ""));
+      return NextResponse.json({ ok: true, ...r, prospects: await listProspects() });
+    }
     if (body?.action === "prospect_update") {
       const id = String(body?.id ?? "");
       if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });

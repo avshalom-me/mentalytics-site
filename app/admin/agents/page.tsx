@@ -840,6 +840,9 @@ function ProspectTable({
   onNotify: (msg: string, isError?: boolean) => void;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
+  const [paste, setPaste] = useState("");
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteBusy, setPasteBusy] = useState(false);
   const [draftFor, setDraftFor] = useState<string | null>(null);
   const [draft, setDraft] = useState<{
     subject: string;
@@ -859,6 +862,31 @@ function ProspectTable({
       onNotify(e instanceof Error ? e.message : "העדכון נכשל", true);
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function addPasted() {
+    if (!paste.trim()) return;
+    setPasteBusy(true);
+    try {
+      const j = await postAgents("prospects_add", { text: paste });
+      if (Array.isArray(j.prospects)) onChanged(j.prospects as Prospect[]);
+      const added = Number(j.added ?? 0);
+      const dup = Number(j.duplicates ?? 0);
+      const skipped = Number(j.skipped ?? 0);
+      onNotify(
+        `נוספו ${added} מכונים` +
+          (dup > 0 ? ` · ${dup} כבר היו ברשימה` : "") +
+          (skipped > 0 ? ` · ${skipped} שורות לא זוהו` : "")
+      );
+      if (added > 0) {
+        setPaste("");
+        setPasteOpen(false);
+      }
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "ההוספה נכשלה", true);
+    } finally {
+      setPasteBusy(false);
     }
   }
 
@@ -899,11 +927,66 @@ function ProspectTable({
     }
   }
 
+  const pasteBox = (
+    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+      {!pasteOpen ? (
+        <button
+          onClick={() => setPasteOpen(true)}
+          className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-xs font-bold text-stone-700 hover:bg-stone-50"
+        >
+          + הוספת מכונים מרשימה שלך
+        </button>
+      ) : (
+        <div>
+          <div className="mb-1 text-xs font-black text-stone-600">
+            הדבק כאן את הרשימה - שורה לכל מכון
+          </div>
+          <p className="mb-2 text-[11px] leading-5 text-stone-500">
+            אפשר להדביק ישירות מגיליון, או לכתוב חופשי. הסדר לא משנה - שם, טלפון, עיר ואתר מזוהים
+            לבד. מה שכבר ברשימה או שכבר לקוח שלנו - מדולג.
+            <br />
+            לדוגמה: <span dir="ltr">מכון שלווה, 03-1234567, רמת גן</span>
+          </p>
+          <textarea
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+            rows={7}
+            dir="rtl"
+            placeholder={"מכון שלווה, 03-1234567, רמת גן\nמרכז אופק - 052-9876543 - חיפה\nהמכון לטיפול רגשי"}
+            className="w-full rounded-xl border border-stone-300 p-3 text-sm leading-6"
+          />
+          <div className="mt-2 flex items-center gap-2">
+            <button
+              onClick={addPasted}
+              disabled={pasteBusy || !paste.trim()}
+              className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50"
+            >
+              {pasteBusy ? "מוסיף..." : "הוסף לרשימה"}
+            </button>
+            <button
+              onClick={() => {
+                setPasteOpen(false);
+                setPaste("");
+              }}
+              className="text-xs text-stone-400 underline hover:text-stone-600"
+            >
+              ביטול
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+
   if (rows.length === 0) {
     return (
-      <p className="text-sm text-stone-400">
-        הרשימה ריקה. הרץ את הסוכן כדי לבנות אותה - הוא יתחיל מהמרכזים שכבר קיבלו הצעה ולא סגרו.
-      </p>
+      <div className="space-y-3">
+        {pasteBox}
+        <p className="text-sm text-stone-400">
+          הרשימה ריקה. אפשר להדביק רשימה משלך למעלה, או להריץ את הסוכן - הוא יתחיל מהמרכזים שכבר
+          קיבלו הצעה ולא סגרו.
+        </p>
+      </div>
     );
   }
 
@@ -934,6 +1017,7 @@ function ProspectTable({
 
   return (
     <div className="space-y-3">
+      {pasteBox}
       <div className="overflow-x-auto rounded-xl border border-stone-200">
         <table className="w-full min-w-[820px] text-sm">
           <thead>

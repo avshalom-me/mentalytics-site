@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
-import { REGION_GROUPS, REGION_CITIES, REGION_GROUP_LABELS } from "./regions";
+import { REGION_GROUPS, REGION_CITIES, REGION_GROUP_LABELS, CITY_TO_REGION, regionGroupOf } from "./regions";
 import { placesConfigured, searchCentersInCities } from "./places-search";
 
 // סוכן איתור המכונים: בונה ומתחזק רשימת מרכזים טיפוליים שאפשר להפוך
@@ -308,4 +308,143 @@ export async function updateProspect(
   }
   const { error } = await supabaseAdmin.from("center_prospects").update(update).eq("id", id);
   if (error) throw new Error(`העדכון נכשל: ${error.message}`);
+}
+
+// ── הוספה ידנית ────────────────────────────────────────────────────────
+// המשתמש כבר מחזיק רשימת מכונים, ומכונים חדשים לא נפתחים בקצב שמצדיק
+// המתנה לריצה שבועית. ההדבקה תומכת בפורמטים שאנשים באמת מדביקים: שורה
+// מגיליון (טאבים), שורה מופרדת בפסיקים, מקף, או סתם שם.
+
+export type ParsedProspect = {
+  name: string;
+  phone: string | null;
+  city: string | null;
+  website: string | null;
+};
+
+/** זיהוי טלפון ישראלי בתוך מקטע טקסט. */
+function looksLikePhone(v: string): boolean {
+  const digits = v.replace(/\D/g, "");
+  return digits.length >= 9 && digits.length <= 11 && /^0/.test(digits);
+}
+
+function looksLikeUrl(v: string): boolean {
+  return /^(https?:\/\/|www\.)/i.test(v.trim()) || /\.(co\.il|com|org|net)(\/|$)/i.test(v.trim());
+}
+
+/** פירוק שורה אחת. הסדר לא חשוב - כל מקטע מזוהה לפי הצורה שלו. */
+export function parseProspectLine(line: string): ParsedProspect | null {
+  const raw = line.trim();
+  if (!raw) return null;
+  // טאב קודם לפסיק: הדבקה מגיליון היא המקרה הנפוץ, ובתוך תא יכול להיות פסיק.
+  const parts = (raw.includes("\t") ? raw.split("\t") : raw.split(/\s*[,|]\s*|\s+-\s+/))
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return null;
+
+  let phone: string | null = null;
+  let city: string | null = null;
+  let website: string | null = null;
+  const rest: string[] = [];
+
+  for (const part of parts) {
+    if (!phone && looksLikePhone(part)) {
+      phone = part;
+      continue;
+    }
+    if (!website && looksLikeUrl(part)) {
+      website = part.startsWith("http") ? part : `https://${part}`;
+      continue;
+    }
+    if (!city && CITY_TO_REGION[part]) {
+      city = part;
+      continue;
+    }
+    rest.push(part);
+  }
+
+  const name = rest.join(" - ").trim();
+  if (!name) return null;
+  // עיר שלא ברשימה הקנונית עדיין נשמרת כטקסט, אם היא המקטע האחרון וקצרה.
+  if (!city && rest.length > 1) {
+    const last = rest[rest.length - 1];
+    if (last.length <= 14 && !looksLikePhone(last)) city = last;
+  }
+  return { name, phone, city, website };
+}
+
+export type AddResult = { added: number; duplicates: number; skipped: number; names: string[] };
+
+/** קליטת רשימה מודבקת. מדלג על מה שכבר קיים - ברשימה או כלקוח. */
+export async function addProspectsFromText(text: string): Promise<AddResult> {
+  const lines = String(text ?? "").split(/\r?\n/);
+  const parsed = lines.map(parseProspectLine).filter((x): x is ParsedProspect => x !== null);
+  const result: AddResult = { added: 0, duplicates: 0, skipped: lines.filter((l) => l.trim()).length - parsed.length, names: [] };
+  if (parsed.length === 0) return result;
+
+  const [{ data: existing }, { data: accounts }, { data: gapActions }] = await Promise.all([
+    supabaseAdmin.from("center_prospects").select("name, phone"),
+    supabaseAdmin.from("therapy_center_accounts").select("name, phone, payer_phone"),
+    supabaseAdmin
+      .from("agent_actions")
+      .select("title")
+      .eq("agent", "supply_gaps")
+      .eq("action_type", "recruit_gap")
+      .eq("status", "pending"),
+  ]);
+
+  const taken = new Set<string>();
+  for (const e of existing ?? []) {
+    taken.add(normName(String(e.name ?? "")));
+    const ph = normPhone(e.phone as string);
+    if (ph) taken.add(ph);
+  }
+  for (const a of accounts ?? []) {
+    taken.add(normName(String(a.name ?? "")));
+    for (const ph of [normPhone(a.phone as string), normPhone(a.payer_phone as string)]) {
+      if (ph) taken.add(ph);
+    }
+  }
+
+  // אותו דירוג כמו במסלול האוטומטי: כמה פערים פתוחים באזור של המכון.
+  const gapsByRegionLabel = new Map<string, number>();
+  for (const a of gapActions ?? []) {
+    const label = String(a.title ?? "").split(" באזור ")[1]?.trim();
+    if (label) gapsByRegionLabel.set(label, (gapsByRegionLabel.get(label) ?? 0) + 1);
+  }
+  const gapsByKey = new Map<string, number>();
+  for (const [key, label] of Object.entries(REGION_GROUP_LABELS)) {
+    const n = gapsByRegionLabel.get(label);
+    if (n) gapsByKey.set(key, n);
+  }
+
+  for (const p of parsed) {
+    const nName = normName(p.name);
+    const nPhone = normPhone(p.phone);
+    if (taken.has(nName) || (nPhone && taken.has(nPhone))) {
+      result.duplicates++;
+      continue;
+    }
+    taken.add(nName);
+    if (nPhone) taken.add(nPhone);
+
+    const regionName = p.city ? CITY_TO_REGION[p.city] : null;
+    const regionKey = regionName ? regionGroupOf(regionName) : null;
+
+    const { error } = await supabaseAdmin.from("center_prospects").insert({
+      name: p.name,
+      source: "manual",
+      city: p.city,
+      region_key: regionKey,
+      phone: p.phone,
+      website: p.website,
+      gaps_in_region: regionKey ? gapsByKey.get(regionKey) ?? 0 : 0,
+    });
+    if (error) result.skipped++;
+    else {
+      result.added++;
+      result.names.push(p.name);
+    }
+  }
+  return result;
 }
