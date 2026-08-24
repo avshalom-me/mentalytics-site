@@ -147,14 +147,29 @@ export async function runBackup(): Promise<BackupRun> {
     // admin_storage_objects_rpc.
     const { data: objectRows, error: objErr } = await supabaseAdmin.rpc("admin_storage_objects");
     if (objErr) throw new Error(`storage listing failed: ${objErr.message}`);
-    const objects = (objectRows ?? []) as { bucket_id: string; name: string; size_bytes: number }[];
+    const objects = (objectRows ?? []) as {
+      bucket_id: string; name: string; size_bytes: number; updated_at: string | null;
+    }[];
     const { data: doneRows } = await supabaseAdmin
       .from("backup_state")
-      .select("source_key")
+      .select("source_key, source_updated_at")
       .eq("kind", "storage_object");
-    const done = new Set((doneRows ?? []).map((r) => r.source_key as string));
+    // הזמן שבו גובתה הגרסה, לא רק "האם גובה". קובץ שהוחלף במקום - אותו
+    // נתיב, תוכן חדש - נחשב עד 24/8/2026 מגובה לנצח, והגרסה החדשה לא הייתה
+    // עולה לעולם. בבדיקה נמצא קובץ אחד כזה מתוך 426.
+    const doneAt = new Map(
+      (doneRows ?? []).map((r) => [r.source_key as string, (r.source_updated_at as string | null) ?? null]),
+    );
 
-    const pending = objects.filter((o) => !done.has(`${o.bucket_id}/${o.name}`));
+    const pending = objects.filter((o) => {
+      const key = `${o.bucket_id}/${o.name}`;
+      if (!doneAt.has(key)) return true; // מעולם לא גובה
+      const backedUpAt = doneAt.get(key);
+      // רשומה ישנה בלי חותמת נחשבת מעודכנת - אחרת כל 426 הקבצים היו עולים
+      // מחדש פעם אחת בלי צורך. חותמת נכתבת מכאן והלאה.
+      if (!backedUpAt || !o.updated_at) return false;
+      return new Date(o.updated_at).getTime() > new Date(backedUpAt).getTime();
+    });
     let uploaded = 0;
     let bytes = 0;
     const filesFolder = await ensureFolder("storage", root);
@@ -182,7 +197,14 @@ export async function runBackup(): Promise<BackupRun> {
           mimeType: "application/octet-stream",
         });
         await supabaseAdmin.from("backup_state").upsert(
-          { kind: "storage_object", source_key: key, drive_file_id: res.id, size_bytes: buf.byteLength },
+          {
+            kind: "storage_object",
+            source_key: key,
+            drive_file_id: res.id,
+            size_bytes: buf.byteLength,
+            source_updated_at: obj.updated_at,
+            uploaded_at: new Date().toISOString(),
+          },
           { onConflict: "kind,source_key" },
         );
         uploaded++;
