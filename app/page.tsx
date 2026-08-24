@@ -293,11 +293,19 @@ export default function HomePage() {
 
       {/* ─── STATS STRIP ─── */}
       <style>{`
+        /* Four stats no longer fit one nowrap row: the longest label is ~210px at
+           13px, so below roughly 1150px it has to be allowed to wrap, and on a
+           phone the row itself becomes a 2x2 grid (with the dividers dropped,
+           since a divider at the end of a row reads as a mistake). */
+        @media (max-width: 1150px) {
+          .stat-item { padding: 0 20px !important; }
+          .stat-label { white-space: normal !important; text-align: center; }
+        }
         @media (max-width: 640px) {
-          .stats-strip { padding: 20px 12px !important; }
-          .stat-item { padding: 0 10px !important; }
+          .stats-strip { padding: 20px 12px !important; flex-wrap: wrap !important; row-gap: 18px; }
+          .stat-item { padding: 0 8px !important; flex: 1 1 42% !important; border-inline-end: none !important; }
           .stat-number { font-size: 1.35rem !important; }
-          .stat-label { font-size: 11px !important; white-space: normal !important; text-align: center; }
+          .stat-label { font-size: 11px !important; }
         }
       `}</style>
       <div className="stats-strip" style={{
@@ -308,13 +316,14 @@ export default function HomePage() {
         gap: 0, flexWrap: "nowrap",
       }}>
         {[
+          { n: "מאות", l: "מטפלים רשומים" },
           { n: "20+", l: "סוגי טיפולים רגשיים ופרה-רפואיים" },
           { n: "100%", l: "אנונימי לחלוטין" },
-          { n: "מאות", l: "מחקרים כבסיס" },
+          { n: "מעל 400", l: "מחקרים כבסיס" },
         ].map(({ n, l }, i, arr) => (
           <div key={n} className="stat-item" style={{
             display: "flex", flexDirection: "column", alignItems: "center", gap: "3px",
-            padding: "0 44px",
+            padding: "0 30px",
             borderInlineEnd: i < arr.length - 1 ? "1px solid var(--line)" : "none",
             flex: "1 1 0", minWidth: 0,
           }}>
@@ -413,7 +422,7 @@ export default function HomePage() {
             שאלון התאמת<br />הטיפול למבוגרים
           </h3>
           <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8, marginBottom: "28px", maxWidth: "36ch" }}>
-            פותח במשך מספר שנים, מבוסס על מאות מחקרים ועל ניסיון קליני מצטבר.
+            פותח במשך מספר שנים, מבוסס על מעל 400 מחקרים ועל ניסיון קליני מצטבר.
           </p>
           <ul style={{ listStyle: "none", marginBottom: "36px", display: "flex", flexDirection: "column", gap: "10px" }}>
             {["מיקוד הקושי וסוג הטיפול המתאים", "התאמת אישיות המטפל לצרכיכם", 'דו"ח אישי הניתן לשמירה'].map(item => (
