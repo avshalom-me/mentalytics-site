@@ -71,7 +71,7 @@
 --   ('דימונה','south'),('אילת','south'),('ערד','south'),('מצפה רמון','south'),
 --   ('ירוחם','south'),('רהט','south'),
 --   ('אריאל','other'),('גוש עציון','other'),('ביתר עילית','other'),
---   ('מודיעין עילית','other'),('אלפי מנשה','other')
+--   ('מודיעין עילית','other'),('אלפי מנשה','other'),('בנימין','other')
 -- ),
 -- th AS (
 --   SELECT t.id, array_agg(DISTINCT cm.bucket) FILTER (WHERE cm.bucket IS NOT NULL) AS buckets

@@ -1172,7 +1172,7 @@ export default function AdultsPage() {
             ["emotional","/icons/emotional.svg","מורכבויות בתחום הרגשי/האישי","חרדות, מצב רוח, טראומה, שינה, אכילה"],
             ["functional","/icons/functional.svg","סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים","קשיי למידה, ריכוז, כיוון מקצועי"],
             ["relationship","/icons/relationship.png","זוגיות ומשפחה","קשיים זוגיים, הורות, מיניות"],
-            ["addiction","/icons/addiction.svg","קשיי התמכרות","אלכוהול, סמים, מסכים, הימורים"],
+            ["addiction","/icons/addiction.svg","קשיי שימוש יתר","אלכוהול, סמים, מסכים, הימורים"],
           ] as const).map(([id, icon, title, desc]) => {
             const sel = answers.domains.includes(id as any);
             return (
@@ -2796,7 +2796,7 @@ export default function AdultsPage() {
                       emotional: "מורכבויות בתחום הרגשי/האישי",
                       functional: "תחומים תפקודיים / תעסוקתיים / אקדמאיים",
                       relationship: "זוגיות ומשפחה",
-                      addiction: "קשיי התמכרות",
+                      addiction: "קשיי שימוש יתר",
                       personal_development: "התפתחות אישית",
                     } as Record<string, string>)[d] ?? d}</span>
                   </div>
