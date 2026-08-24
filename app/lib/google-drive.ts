@@ -25,12 +25,44 @@ function refreshToken(): string | null {
   // לקבצים שהאפליקציה עצמה יצרה - לא לשאר הדרייב.
   return process.env.GOOGLE_DRIVE_REFRESH_TOKEN ?? null;
 }
-export function driveFolderId(): string | null {
+
+/**
+ * דריסה ידנית של תיקיית היעד. כמעט תמיד ריק, ובכוונה:
+ *
+ * scope drive.file נותן גישה **רק לקבצים שהאפליקציה יצרה**, ולכן תיקייה
+ * שהוכנה ידנית בממשק הדרייב פשוט אינה נראית לה. במקום לדרוש scope רחב יותר
+ * (drive מלא = גישה לכל הדרייב), האפליקציה יוצרת את תיקיית הגיבוי בעצמה
+ * בריצה הראשונה. התיקייה בבעלות המשתמש, והטוקן לא יכול לגעת בשום דבר אחר -
+ * גם אם ידלוף.
+ *
+ * המשתנה קיים בכל זאת למקרה שמישהו רוצה לכוון לתיקייה שהאפליקציה כבר יצרה.
+ */
+export function driveFolderOverride(): string | null {
   return process.env.GOOGLE_DRIVE_FOLDER_ID ?? null;
 }
 
 export function driveConfigured(): boolean {
-  return !!(clientId() && clientSecret() && refreshToken() && driveFolderId());
+  return !!(clientId() && clientSecret() && refreshToken());
+}
+
+/** שם תיקיית הגיבוי ב-My Drive של המשתמש. */
+export const BACKUP_FOLDER_NAME = "Mentalytics Backups";
+
+/** יוצר תיקייה ברמה העליונה (My Drive) ומחזיר את מזהה + הקישור אליה. */
+export async function createRootFolder(): Promise<{ id: string; link: string }> {
+  const token = await accessToken();
+  const res = await fetch(`${FILES_URL}?fields=id,webViewLink`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name: BACKUP_FOLDER_NAME,
+      mimeType: "application/vnd.google-apps.folder",
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`Drive root folder create failed (${res.status}): ${text.slice(0, 300)}`);
+  const json = JSON.parse(text) as { id: string; webViewLink?: string };
+  return { id: json.id, link: json.webViewLink ?? `https://drive.google.com/drive/folders/${json.id}` };
 }
 
 let cachedToken: { value: string; expiresAt: number } | null = null;

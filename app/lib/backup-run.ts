@@ -1,7 +1,14 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
-import { driveConfigured, driveFolderId, ensureFolder, uploadFile } from "./google-drive";
+import {
+  BACKUP_FOLDER_NAME,
+  createRootFolder,
+  driveConfigured,
+  driveFolderOverride,
+  ensureFolder,
+  uploadFile,
+} from "./google-drive";
 
 // גיבוי לדרייב של המשתמש - שני חלקים, ושניהם עונים על פער אמיתי:
 //
@@ -46,6 +53,8 @@ export type BackupRun = {
   configured: boolean;
   dump?: { tables: number; rows: number; bytes: number; skipped?: string[] };
   storage?: { uploaded: number; remaining: number; bytes: number };
+  /** מוחזר פעם אחת בלבד - בריצה שיצרה את תיקיית הגיבוי. */
+  folderLink?: string;
   error?: string;
   note?: string;
 };
@@ -60,14 +69,39 @@ export async function runBackup(): Promise<BackupRun> {
       ok: false,
       configured: false,
       note:
-        "Google Drive לא מוגדר. נדרשים GOOGLE_DRIVE_REFRESH_TOKEN ו-GOOGLE_DRIVE_FOLDER_ID " +
-        "(ה-client id/secret נלקחים מ-GOOGLE_ADS_* אם לא הוגדרו בנפרד).",
+        "Google Drive לא מוגדר. נדרש GOOGLE_DRIVE_REFRESH_TOKEN עם scope drive.file " +
+        "(ה-client id/secret נלקחים מ-GOOGLE_ADS_* אם לא הוגדרו בנפרד). " +
+        "תיקיית היעד נוצרת אוטומטית בריצה הראשונה.",
     };
   }
   const startedAt = Date.now();
-  const root = driveFolderId()!;
 
   try {
+    // ── תיקיית היעד ─────────────────────────────────────────────────────────
+    // נוצרת ע"י האפליקציה ולא מסופקת ידנית: scope drive.file אינו רואה
+    // תיקיות שהמשתמש הכין בעצמו. נוצרת פעם אחת ונזכרת, כדי שלא תיווצר
+    // תיקייה חדשה בכל ריצה.
+    let root = driveFolderOverride();
+    let rootLink: string | null = null;
+    if (!root) {
+      const { data: saved } = await supabaseAdmin
+        .from("backup_state")
+        .select("drive_file_id")
+        .eq("kind", "root_folder")
+        .eq("source_key", BACKUP_FOLDER_NAME)
+        .maybeSingle();
+      root = (saved?.drive_file_id as string | undefined) ?? null;
+      if (!root) {
+        const created = await createRootFolder();
+        root = created.id;
+        rootLink = created.link;
+        await supabaseAdmin.from("backup_state").upsert(
+          { kind: "root_folder", source_key: BACKUP_FOLDER_NAME, drive_file_id: created.id },
+          { onConflict: "kind,source_key" },
+        );
+        console.log(`backup: created Drive folder "${BACKUP_FOLDER_NAME}" - ${created.link}`);
+      }
+    }
     // ── 1. דאמפ הטבלאות ─────────────────────────────────────────────────────
     const dumpFolder = await ensureFolder("db", root);
     const payload: Record<string, unknown[]> = {};
@@ -152,6 +186,8 @@ export async function runBackup(): Promise<BackupRun> {
       configured: true,
       dump: { tables: Object.keys(payload).length, rows, bytes: json.length, ...(skipped.length ? { skipped } : {}) },
       storage: { uploaded, remaining: Math.max(0, pending.length - uploaded), bytes },
+      // מוחזר רק בריצה שיצרה את התיקייה - כדי שיהיה קישור ישיר אליה בלוג.
+      ...(rootLink ? { folderLink: rootLink } : {}),
     };
   } catch (e) {
     return { ok: false, configured: true, error: e instanceof Error ? e.message : String(e) };
