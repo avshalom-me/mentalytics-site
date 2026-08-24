@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/backup",
+      "schedule": "0 1 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-pending-payments",
       "schedule": "15 6 * * *"
     },
