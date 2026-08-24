@@ -13,12 +13,23 @@ const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const UPLOAD_URL = "https://www.googleapis.com/upload/drive/v3/files";
 const FILES_URL = "https://www.googleapis.com/drive/v3/files";
 
-/** ה-OAuth client של Google Ads משמש כברירת מחדל - אותו פרויקט Cloud. */
+// **מומלץ: OAuth client ייעודי לגיבוי** (GOOGLE_DRIVE_CLIENT_ID/SECRET).
+// הנפילה ל-GOOGLE_ADS_* קיימת רק כדי לאפשר התחלה מהירה, והיא לא חינם: היא
+// כובלת את מערכת הגיבוי לאינטגרציית הפרסום. סיבוב או ביטול של אישורי Ads
+// ישבור גם את הגיבוי, וזה בדיוק הרגע שבו לא רוצים לגלות שאין גיבוי.
+// driveCredentialSource() מחזיר במה נעשה שימוש בפועל, כדי שזה לא יישאר סמוי.
 function clientId(): string | null {
   return process.env.GOOGLE_DRIVE_CLIENT_ID ?? process.env.GOOGLE_ADS_CLIENT_ID ?? null;
 }
 function clientSecret(): string | null {
   return process.env.GOOGLE_DRIVE_CLIENT_SECRET ?? process.env.GOOGLE_ADS_CLIENT_SECRET ?? null;
+}
+
+/** 'dedicated' = אישורים משלו; 'google_ads_fallback' = מושאלים מהפרסום. */
+export function driveCredentialSource(): "dedicated" | "google_ads_fallback" | "missing" {
+  if (process.env.GOOGLE_DRIVE_CLIENT_ID && process.env.GOOGLE_DRIVE_CLIENT_SECRET) return "dedicated";
+  if (process.env.GOOGLE_ADS_CLIENT_ID && process.env.GOOGLE_ADS_CLIENT_SECRET) return "google_ads_fallback";
+  return "missing";
 }
 function refreshToken(): string | null {
   // טוקן נפרד מזה של Ads: הוא נושא scope של drive.file, שמעניק גישה אך ורק

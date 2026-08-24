@@ -5,6 +5,7 @@ import {
   BACKUP_FOLDER_NAME,
   createRootFolder,
   driveConfigured,
+  driveCredentialSource,
   driveFolderOverride,
   ensureFolder,
   uploadFile,
@@ -55,6 +56,8 @@ export type BackupRun = {
   storage?: { uploaded: number; remaining: number; bytes: number };
   /** מוחזר פעם אחת בלבד - בריצה שיצרה את תיקיית הגיבוי. */
   folderLink?: string;
+  /** באילו אישורים נעשה שימוש - כדי שהשאלה לא תישאר פתוחה. */
+  credentials?: "dedicated" | "google_ads_fallback" | "missing";
   error?: string;
   note?: string;
 };
@@ -186,6 +189,7 @@ export async function runBackup(): Promise<BackupRun> {
       configured: true,
       dump: { tables: Object.keys(payload).length, rows, bytes: json.length, ...(skipped.length ? { skipped } : {}) },
       storage: { uploaded, remaining: Math.max(0, pending.length - uploaded), bytes },
+      credentials: driveCredentialSource(),
       // מוחזר רק בריצה שיצרה את התיקייה - כדי שיהיה קישור ישיר אליה בלוג.
       ...(rootLink ? { folderLink: rootLink } : {}),
     };
