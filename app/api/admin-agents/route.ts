@@ -42,6 +42,9 @@ function runMetric(agent: string, details: unknown): number | null {
       return (len(d.gift) ?? 0) + (len(d.recruit) ?? 0);
     case "center_nudge":
       return len(d.proposals);
+    // לגיבוי אין "ממצאים" - המדד הוא כמה קבצים עלו בפועל.
+    case "backup":
+      return typeof d.uploaded === "number" ? d.uploaded : null;
     case "daily_digest": {
       const secs = Array.isArray(d.sections)
         ? (d.sections as { count?: number }[])

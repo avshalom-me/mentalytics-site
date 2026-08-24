@@ -1,6 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
+import { startAgentRun, finishAgentRun } from "./agent-infra";
 import {
   BACKUP_FOLDER_NAME,
   createRootFolder,
@@ -78,6 +79,10 @@ export async function runBackup(): Promise<BackupRun> {
     };
   }
   const startedAt = Date.now();
+  // נרשם ביומן הריצות כמו כל סוכן - לא לתצוגה בלבד: שומר הלילה בודק טריות
+  // של כל סוכן, וכך "הגיבוי לא רץ שלושה ימים" נתפס מעצמו. זו בדיוק התקלה
+  // שאי אפשר להרשות לגלות ביום שבו צריך את הגיבוי.
+  const runId = await startAgentRun("backup", "run");
 
   try {
     // ── תיקיית היעד ─────────────────────────────────────────────────────────
@@ -137,9 +142,12 @@ export async function runBackup(): Promise<BackupRun> {
     );
 
     // ── 2. קבצי Storage, מצטבר ──────────────────────────────────────────────
-    const objects = await fetchAllRows<{ name: string; bucket_id: string; metadata: { size?: number } | null }>(
-      () => supabaseAdmin.schema("storage").from("objects").select("name, bucket_id, metadata"),
-    );
+    // דרך RPC ולא ישירות: supabase-js מדבר רק עם סכמות שנחשפו ל-API, ו-
+    // .schema("storage") מוחזר כ-"Invalid schema: storage". ראו את המיגרציה
+    // admin_storage_objects_rpc.
+    const { data: objectRows, error: objErr } = await supabaseAdmin.rpc("admin_storage_objects");
+    if (objErr) throw new Error(`storage listing failed: ${objErr.message}`);
+    const objects = (objectRows ?? []) as { bucket_id: string; name: string; size_bytes: number }[];
     const { data: doneRows } = await supabaseAdmin
       .from("backup_state")
       .select("source_key")
@@ -184,16 +192,27 @@ export async function runBackup(): Promise<BackupRun> {
       }
     }
 
+    const remaining = Math.max(0, pending.length - uploaded);
+    await finishAgentRun(runId, {
+      status: "ok",
+      summary:
+        `${rows} שורות ב-${Object.keys(payload).length} טבלאות · ${uploaded} קבצים הועלו` +
+        (remaining > 0 ? ` · ${remaining} נותרו לריצה הבאה` : " · הכול מגובה"),
+      details: { uploaded, remaining, dump_rows: rows, credentials: driveCredentialSource() },
+    });
+
     return {
       ok: true,
       configured: true,
       dump: { tables: Object.keys(payload).length, rows, bytes: json.length, ...(skipped.length ? { skipped } : {}) },
-      storage: { uploaded, remaining: Math.max(0, pending.length - uploaded), bytes },
+      storage: { uploaded, remaining, bytes },
       credentials: driveCredentialSource(),
       // מוחזר רק בריצה שיצרה את התיקייה - כדי שיהיה קישור ישיר אליה בלוג.
       ...(rootLink ? { folderLink: rootLink } : {}),
     };
   } catch (e) {
-    return { ok: false, configured: true, error: e instanceof Error ? e.message : String(e) };
+    const msg = e instanceof Error ? e.message : String(e);
+    await finishAgentRun(runId, { status: "error", error: msg });
+    return { ok: false, configured: true, error: msg };
   }
 }

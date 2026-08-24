@@ -314,6 +314,9 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     agentFreshnessCheck("conversions", "סוכן ההמרות רץ ביממה האחרונה", 26),
     agentFreshnessCheck("finance", "סוכן הכספים רץ ביממה האחרונה", 26),
     agentFreshnessCheck("retention", "סוכן השימור רץ ביממה האחרונה", 26),
+    // הגיבוי הוא הבדיקה שהכי חשוב שלא תישמט: קבצי ה-Storage אינם מכוסים
+    // בשום גיבוי של Supabase, ולכן כל יום שהוא לא רץ הוא יום בלי עותק.
+    agentFreshnessCheck("backup", "הגיבוי לדרייב רץ ביממה האחרונה", 26),
     agentFreshnessCheck("center_prospects", "סוכן איתור המכונים רץ השבוע", 8 * 24),
     agentFreshnessCheck("center_nudge", "סוכן המרכזים רץ ביממה האחרונה", 26),
     agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
