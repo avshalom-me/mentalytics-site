@@ -14,6 +14,7 @@ import { sendGiftOffer } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect, addProspectsFromText } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
+import { runBackup } from "@/app/lib/backup-run";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -295,6 +296,13 @@ export async function POST(req: NextRequest) {
       });
       if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
       return NextResponse.json({ ok: true, center_name: result.centerName, email: result.email });
+    }
+    // הרצת גיבוי ידנית. קיימת כדי שאחרי הקמת אישורי הדרייב אפשר יהיה לדעת
+    // **מיד** אם הם תקינים, במקום לחכות לקרון של 01:00 ולגלות מחר. בטוחה
+    // לחזרה: הגיבוי מצטבר, ולכן הרצה נוספת רק ממשיכה מהמקום שנעצר.
+    if (body?.action === "backup_run") {
+      const result = await runBackup();
+      return NextResponse.json(result);
     }
     if (body?.action === "retention_run") {
       const result = await runRetention();
