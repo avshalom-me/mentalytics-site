@@ -2647,8 +2647,9 @@ function KidsMatchSection({ A, score, selection }: {
     // Attribution rides along so match-card impressions stop landing under the
     // "unknown" channel in the attribution report (they carried no channel/utm).
     const attribution = getAttribution() ?? {};
+    // הבדיקה מעל הלולאה - ראו ההערה המקבילה בשאלון המבוגרים.
+    if (trackingOptedOut()) return;
     for (const t of results) {
-      if (trackingOptedOut()) return;
       fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3431,8 +3432,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
     setRecExplainLoading(prev => ({ ...prev, [key]: true }));
 
     // Fire-and-forget analytics event - admin sees who clicks and on what.
+    //
+    // התנאי עוטף את השליחה ואינו יוצא מהפונקציה - ראו ההערה המקבילה
+    // בשאלון המבוגרים: `return` כאן השאיר את הכרטיס על "טוען" לנצח.
     try {
-      if (trackingOptedOut()) return;
+      if (!trackingOptedOut()) {
       fetch("/api/track-explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -3448,6 +3452,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
           viewer_gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : undefined,
         }),
       }).catch(() => {});
+      }
     } catch {}
 
     try {

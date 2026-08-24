@@ -585,8 +585,11 @@ export default function AdultsPage() {
     // Attribution rides along so match-card impressions stop landing under the
     // "unknown" channel in the attribution report (they carried no channel/utm).
     const attribution = getAttribution() ?? {};
+    // הבדיקה מעל הלולאה ולא בתוכה: היא אינה תלויה בפריט, וכ-`return` בתוך
+    // לולאה היא אותה מלכודת שהקפיאה את הסבר ה-AI על "טוען" - שורת קוד
+    // שתתווסף אחריה תדולג בשקט במכשירי הצוות.
+    if (trackingOptedOut()) return;
     for (const t of matchResults) {
-      if (trackingOptedOut()) return;
       fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -986,8 +989,13 @@ export default function AdultsPage() {
     const firstDomain = answers.domains?.[0];
 
     // Fire-and-forget analytics event - captures who clicks and on what.
+    //
+    // התנאי עוטף את השליחה ואינו יוצא מהפונקציה. `return` כאן הפיל את כל
+    // ההסבר: מצב הטעינה כבר נדלק שורה קודם, והיציאה דילגה גם על קריאת
+    // ה-AI וגם על ניקוי הדגל - הכרטיס נתקע על "טוען" לנצח. זה קרה רק
+    // במכשירים שסימנו "אל תספור אותי", כלומר בדיוק אצלנו (24/8/2026).
     try {
-      if (trackingOptedOut()) return;
+      if (!trackingOptedOut()) {
       fetch("/api/track-explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1004,6 +1012,7 @@ export default function AdultsPage() {
           viewer_gender: normalizeGenderKey(answers.gender),
         }),
       }).catch(() => {});
+      }
     } catch {}
 
     try {
