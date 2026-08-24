@@ -21,6 +21,7 @@ import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { minDwell } from "@/app/lib/min-dwell";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
 // Anonymous viewer context derived from the questionnaire - used for impression
@@ -816,6 +817,9 @@ export default function AdultsPage() {
     setScreen("scoring");
     setLoading(true);
     setErr("");
+    // מסך "מעבד תשובות" חלף ברבע שנייה, ולכן קרא כאילו לא נשקל דבר. רצפה
+    // ולא עיכוב - ראו minDwell.
+    const scoringStartedAt = Date.now();
     const fp = await getFingerprint().catch(() => null);
     const staffToken = localStorage.getItem("staff_token") || undefined;
     try {
@@ -829,6 +833,7 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations });
+      await minDwell(scoringStartedAt);
       setScreen("results");
       // Coarse, anonymous facts alongside the completion - without these the
       // event recorded only quiz_type, so "what did the system recommend, and
@@ -848,6 +853,7 @@ export default function AdultsPage() {
       // trackQuizComplete already reports quiz_complete to GA4, matching the DB
       // event name.)
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
+      await minDwell(scoringStartedAt);
       setScreen("results");
     } finally {
       setLoading(false);
@@ -2700,7 +2706,7 @@ export default function AdultsPage() {
               disabled={aiLoading}
               className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
             >
-              {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
+              {aiLoading ? "מעבד · כ-20 שניות" : "✦ למה הוצע לי?"}
             </button>
           </div>
           {aiData && (
@@ -3231,7 +3237,7 @@ export default function AdultsPage() {
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
                     style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
                   >✦</span>
-                  {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
+                  {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
                 </button>
                 {profileHrefForMatch(t) && (
                   <a

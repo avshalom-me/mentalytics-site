@@ -22,6 +22,7 @@ import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { minDwell } from "@/app/lib/min-dwell";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
 function getOrCreateSessionId(): string | null {
@@ -2999,7 +3000,7 @@ function KidsMatchSection({ A, score, selection }: {
                             className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
                             style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
                           >✦</span>
-                          {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
+                          {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
                         </button>
                         {profileHref && (
                           <a
@@ -3216,7 +3217,7 @@ function GroupCard({
               disabled={explanationLoading}
               className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
             >
-              {explanationLoading ? "טוען..." : "✦ למה הוצע לי?"}
+              {explanationLoading ? "מעבד · כ-20 שניות" : "✦ למה הוצע לי?"}
             </button>
           )}
         </div>
@@ -4162,6 +4163,8 @@ export default function KidsPage() {
   async function fetchScore(answers: Ans) {
     setScoreError(false);
     setKidsScore(null);
+    // רצפת זמן למסך העיבוד - ראו minDwell והערה מקבילה בשאלון המבוגרים.
+    const scoringStartedAt = Date.now();
     const fp = await getFingerprint().catch(() => null);
     const staffToken = localStorage.getItem("staff_token") || undefined;
     try {
@@ -4173,14 +4176,17 @@ export default function KidsPage() {
       if (r.status === 402) { setPaymentRequired(true); return; }
       if (!r.ok) throw new Error();
       const d = await r.json();
-      if (d.ok) setKidsScore({
+      if (!d.ok) throw new Error();
+      await minDwell(scoringStartedAt);
+      setKidsScore({
         emotional: d.emotional,
         academic: d.academic,
         developmental: d.developmental,
         behavioral: d.behavioral,
         social: d.social,
-      }); else throw new Error();
+      });
     } catch {
+      await minDwell(scoringStartedAt);
       setScoreError(true);
     }
   }
