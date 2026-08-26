@@ -15,6 +15,15 @@
 -- (118 of 326 all time). Folding it into `from_other` made the UI columns fail
 -- to add up, so it gets its own count.
 --
+-- Each row carries `clicks_all_channels` - the therapist's total across EVERY
+-- channel in the same window - so a scoped table can never be mistaken for an
+-- absolute one. That confusion was real: a therapist showed 9 in the paid view
+-- and 12 on her profile, and the gap looked like a bug. 77 of 108 therapists
+-- with clicks differ that way, and 81 of 328 clicks sit in channels neither the
+-- organic nor the paid view shows. It is PER THERAPIST: in the paid view a
+-- therapist with three campaigns produces three rows carrying the same value,
+-- so display it as context and never sum it down the column.
+--
 -- p_since null = all time. p_channel null = every channel. p_campaign null =
 -- every campaign, and is only meaningful for paid channels.
 -- Aggregated in SQL so it stays exact past the 1000-row PostgREST cap.
@@ -51,6 +60,7 @@ as $$
            end                                    as plan,
            cl.utm_campaign                        as campaign,
            count(*)                               as clicks,
+           coalesce(max(ac.clicks_all_channels), 0) as clicks_all_channels,
            -- the split that stops the aggregate from misleading
            count(*) filter (where cl.source = 'match')     as from_match,
            count(*) filter (where cl.source = 'directory') as from_directory,
@@ -64,6 +74,7 @@ as $$
            max(cl.clicked_at)                     as last_click
     from clicks cl
     join public.therapists t on t.id = cl.therapist_id
+    left join all_ch ac on ac.therapist_id = cl.therapist_id
     group by t.id, t.full_name, plan, cl.utm_campaign
     order by count(*) desc, t.full_name
   )

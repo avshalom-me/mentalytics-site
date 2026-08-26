@@ -29,6 +29,7 @@ type Row = {
   plan: "paid" | "center" | "trial" | "free";
   campaign: string | null;
   clicks: number;
+  clicks_all_channels: number;
   from_match: number;
   from_directory: number;
   from_profile: number;
@@ -109,6 +110,12 @@ export default function ContactDestinations({
   // The three routes must account for every click; if they ever do not, say so
   // rather than showing a table whose columns quietly fail to add up.
   const unaccounted = total - (viaMatch + viaDirectory + viaProfile + viaOther);
+  // clicks_all_channels repeats across a therapist's campaign rows - summing the
+  // column would double count, so total it over distinct therapists.
+  const allChannels = rows
+    ? [...new Map(rows.map((r) => [r.therapist_id, r.clicks_all_channels])).values()].reduce((a, b) => a + b, 0)
+    : 0;
+  const scopeLabel = channel === "google_paid" ? "גוגל בתשלום" : channel === "google_organic" ? "אורגני" : "כל הערוצים";
 
   return (
     <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
@@ -143,8 +150,13 @@ export default function ContactDestinations({
         <>
           <div className="mb-4 flex flex-wrap gap-2 text-xs">
             <span className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1 font-semibold text-stone-700">
-              סה&quot;כ {total} לחיצות
+              {total} לחיצות ב{scopeLabel}
             </span>
+            {channel && allChannels > total && (
+              <span className="rounded-md border border-stone-300 bg-white px-2.5 py-1 font-semibold text-stone-500">
+                לאותם מטפלים, בכל הערוצים: {allChannels}
+              </span>
+            )}
             <span className="rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 font-semibold text-teal-800">
               דרך השאלון: {viaMatch}
             </span>
@@ -179,6 +191,7 @@ export default function ContactDestinations({
                   <th className="py-2 font-semibold">מסלול</th>
                   {showCampaign && <th className="py-2 font-semibold">קמפיין</th>}
                   <th className="py-2 font-semibold">לחיצות</th>
+                  {channel && <th className="py-2 font-semibold">מתוך הכל</th>}
                   <th className="py-2 font-semibold">מהשאלון</th>
                   <th className="py-2 font-semibold">מהמאגר</th>
                   <th className="py-2 font-semibold">מהפרופיל</th>
@@ -210,6 +223,11 @@ export default function ContactDestinations({
                       </td>
                     )}
                     <td className="py-2 font-bold text-stone-800">{r.clicks}</td>
+                    {channel && (
+                      <td className="py-2 text-xs text-stone-400" title="סך הלחיצות של המטפל/ת בכל הערוצים באותה תקופה">
+                        {r.clicks_all_channels}
+                      </td>
+                    )}
                     <td className="py-2 font-semibold text-teal-700">{r.from_match || "-"}</td>
                     <td className="py-2 text-stone-500">{r.from_directory || "-"}</td>
                     <td className="py-2 text-stone-500">{r.from_profile || "-"}</td>
@@ -239,6 +257,14 @@ export default function ContactDestinations({
             <strong> מהמאגר</strong> היא לחיצה ישירות מכרטיס ברשימה, בלי כניסה לפרופיל - והמאגר מציג
             גם מטפלים חינמיים. <strong>מהפרופיל</strong> היא לחיצה בעמוד המטפל/ת, ולרוב מגיעה מחיפוש
             שם שהמטפל/ת הביא/ה בעצמו/ה.
+            {channel && (
+              <>
+                {" "}
+                <strong>הטבלה מסוננת ל{scopeLabel} בלבד</strong>, ולכן המספר כאן קטן ממה שמופיע בעמוד
+                המטפל/ת, שסופר את כל הערוצים. עמודת &quot;מתוך הכל&quot; היא סך הלחיצות של אותו/ה מטפל/ת
+                בכל הערוצים באותה תקופה - היא חוזרת על עצמה בין שורות קמפיין, ואין לסכם אותה.
+              </>
+            )}
           </p>
         </>
       )}
