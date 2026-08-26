@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
+import ContactDestinations from "@/app/admin/ContactDestinations";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
@@ -1145,6 +1146,13 @@ function FunnelsCampaigns() {
               <p className="text-sm text-stone-400">אין עדיין פניות מתויגות בקמפיין לטווח זה.</p>
             )}
           </div>
+
+          <ContactDestinations
+            channel="google_paid"
+            showCampaign
+            title="לאן הלכו הפניות מגוגל בתשלום"
+            note="לכל קמפיין - מי קיבל בפועל את הלחיצה, באיזה מסלול הוא נמצא, והאם הלחיצה באה מתוצאות ההתאמה או מעמוד הפרופיל."
+          />
         </>
       )}
     </>

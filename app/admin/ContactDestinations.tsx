@@ -1,0 +1,201 @@
+"use client";
+
+import { useEffect, useState } from "react";
+
+/**
+ * "לאן הלכו הפניות" - which therapists received contact clicks, on which plan,
+ * and through which route.
+ *
+ * The match/profile split is the whole point and must never be collapsed. On
+ * 26/8/2026 the organic aggregate said 85% of contact clicks went to free
+ * therapists, which reads as the regional fallback flooding results. Split by
+ * route, free therapists took 20 of 21 clicks on their OWN profile pages -
+ * traffic they brought via name searches - and 1 of 8 through the matcher.
+ * The same number, told two ways, supports opposite decisions.
+ */
+
+type Row = {
+  therapist_id: string;
+  full_name: string;
+  plan: "paid" | "center" | "trial" | "free";
+  campaign: string | null;
+  clicks: number;
+  from_match: number;
+  from_profile: number;
+  from_other: number;
+  whatsapp: number;
+  phone: number;
+  email: number;
+  site_message: number;
+  last_click: string;
+};
+
+const PLAN_LABEL: Record<Row["plan"], string> = {
+  paid: "משלם",
+  center: "מרכז",
+  trial: "מתנה/ניסיון",
+  free: "חינמי",
+};
+const PLAN_STYLE: Record<Row["plan"], string> = {
+  paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  center: "bg-sky-50 text-sky-700 border-sky-200",
+  trial: "bg-amber-50 text-amber-700 border-amber-200",
+  free: "bg-stone-100 text-stone-600 border-stone-300",
+};
+
+const PERIODS: { key: string; label: string }[] = [
+  { key: "2d", label: "יומיים" },
+  { key: "month", label: "30 יום" },
+  { key: "all", label: "סה\"כ" },
+];
+
+export default function ContactDestinations({
+  channel,
+  title,
+  note,
+  showCampaign = false,
+}: {
+  /** "google_organic" | "google_paid" | undefined for every channel */
+  channel?: string;
+  title: string;
+  note?: string;
+  /** paid views group by campaign; organic has none */
+  showCampaign?: boolean;
+}) {
+  const [period, setPeriod] = useState("month");
+  const [rows, setRows] = useState<Row[] | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setRows(null);
+    setErr(null);
+    const q = new URLSearchParams({ period });
+    if (channel) q.set("channel", channel);
+    fetch(`/api/admin-contact-destinations?${q}`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (!alive) return;
+        if (d.ok) setRows(d.rows as Row[]);
+        else setErr(d.error ?? "שגיאה");
+      })
+      .catch((e) => alive && setErr(String(e)));
+    return () => {
+      alive = false;
+    };
+  }, [period, channel]);
+
+  const total = rows?.reduce((s, r) => s + r.clicks, 0) ?? 0;
+  const viaMatch = rows?.reduce((s, r) => s + r.from_match, 0) ?? 0;
+  const viaProfile = rows?.reduce((s, r) => s + r.from_profile, 0) ?? 0;
+  // The headline that matters: of clicks the MATCHER produced, how many reached
+  // someone who pays. Profile clicks are the therapist's own name traffic and
+  // say nothing about the matcher.
+  const matchPaid = rows?.filter((r) => r.plan === "paid").reduce((s, r) => s + r.from_match, 0) ?? 0;
+
+  return (
+    <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+      <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-base font-black text-stone-700">{title}</h2>
+        <div className="flex gap-1">
+          {PERIODS.map((p) => (
+            <button
+              key={p.key}
+              onClick={() => setPeriod(p.key)}
+              className={`rounded-md border px-2.5 py-0.5 text-xs font-semibold ${
+                period === p.key
+                  ? "border-stone-700 bg-stone-700 text-white"
+                  : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {note && <p className="mb-3 text-xs text-stone-500">{note}</p>}
+
+      {err && <p className="text-sm text-red-600">שגיאה: {err}</p>}
+      {!err && rows === null && <p className="text-sm text-stone-400">טוען...</p>}
+
+      {rows !== null && rows.length === 0 && (
+        <p className="text-sm text-stone-500">אין לחיצות ליצירת קשר בתקופה הזו.</p>
+      )}
+
+      {rows !== null && rows.length > 0 && (
+        <>
+          <div className="mb-4 flex flex-wrap gap-2 text-xs">
+            <span className="rounded-md border border-stone-200 bg-stone-50 px-2.5 py-1 font-semibold text-stone-700">
+              סה&quot;כ {total} לחיצות
+            </span>
+            <span className="rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 font-semibold text-teal-800">
+              דרך השאלון: {viaMatch}
+            </span>
+            <span className="rounded-md border border-stone-200 bg-white px-2.5 py-1 font-semibold text-stone-600">
+              דרך הפרופיל: {viaProfile}
+            </span>
+            {viaMatch > 0 && (
+              <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800">
+                מתוך השאלון, למשלמים: {matchPaid} מתוך {viaMatch}
+              </span>
+            )}
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[620px] text-right text-sm">
+              <thead>
+                <tr className="border-b border-stone-200 text-xs text-stone-500">
+                  <th className="py-2 font-semibold">מטפל/ת</th>
+                  <th className="py-2 font-semibold">מסלול</th>
+                  {showCampaign && <th className="py-2 font-semibold">קמפיין</th>}
+                  <th className="py-2 font-semibold">לחיצות</th>
+                  <th className="py-2 font-semibold">מהשאלון</th>
+                  <th className="py-2 font-semibold">מהפרופיל</th>
+                  <th className="py-2 font-semibold">איך</th>
+                  <th className="py-2 font-semibold">אחרונה</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => (
+                  <tr key={`${r.therapist_id}-${r.campaign ?? ""}`} className="border-b border-stone-100">
+                    <td className="py-2 font-semibold text-stone-800">{r.full_name}</td>
+                    <td className="py-2">
+                      <span className={`rounded border px-1.5 py-0.5 text-[11px] font-bold ${PLAN_STYLE[r.plan]}`}>
+                        {PLAN_LABEL[r.plan]}
+                      </span>
+                    </td>
+                    {showCampaign && (
+                      <td className="py-2 text-xs text-stone-600">{r.campaign ?? "-"}</td>
+                    )}
+                    <td className="py-2 font-bold text-stone-800">{r.clicks}</td>
+                    <td className="py-2 text-teal-700">{r.from_match || "-"}</td>
+                    <td className="py-2 text-stone-500">{r.from_profile || "-"}</td>
+                    <td className="py-2 text-xs text-stone-500">
+                      {[
+                        r.whatsapp ? `וואטסאפ ${r.whatsapp}` : null,
+                        r.phone ? `טלפון ${r.phone}` : null,
+                        r.email ? `מייל ${r.email}` : null,
+                        r.site_message ? `טופס ${r.site_message}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </td>
+                    <td className="py-2 text-xs text-stone-400">
+                      {new Date(r.last_click).toLocaleDateString("he-IL")}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <p className="mt-3 text-[11px] leading-5 text-stone-400">
+            אלה <strong>לחיצות ליצירת קשר</strong>, לא פניות שהתקבלו בפועל. &quot;מהשאלון&quot; היא לחיצה
+            מתוך תוצאות ההתאמה - זו העמודה שמודדת את המנוע. &quot;מהפרופיל&quot; היא לחיצה בעמוד המטפל/ת,
+            ולרוב מגיעה מחיפוש שם שהמטפל/ת הביא/ה בעצמו/ה.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
