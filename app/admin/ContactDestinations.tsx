@@ -6,12 +6,21 @@ import { useEffect, useState } from "react";
  * "לאן הלכו הפניות" - which therapists received contact clicks, on which plan,
  * and through which route.
  *
- * The match/profile split is the whole point and must never be collapsed. On
+ * The split by route is the whole point and must never be collapsed. On
  * 26/8/2026 the organic aggregate said 85% of contact clicks went to free
  * therapists, which reads as the regional fallback flooding results. Split by
  * route, free therapists took 20 of 21 clicks on their OWN profile pages -
  * traffic they brought via name searches - and 1 of 8 through the matcher.
  * The same number, told two ways, supports opposite decisions.
+ *
+ * Three routes, and they answer different questions:
+ *   match     - from the matcher's results. Paying therapists only (plus the
+ *               regional fallback), so this is the column that scores the engine.
+ *   directory - straight off a card in a listing, without opening the profile.
+ *               The directory lists FREE therapists too, so its mix differs.
+ *   profile   - on the therapist's own page, usually their own name traffic.
+ * `unaccounted` below is a guard: if these ever stop summing to the total, the
+ * table says so instead of quietly under-reporting.
  */
 
 type Row = {
@@ -21,6 +30,7 @@ type Row = {
   campaign: string | null;
   clicks: number;
   from_match: number;
+  from_directory: number;
   from_profile: number;
   from_other: number;
   whatsapp: number;
@@ -87,11 +97,18 @@ export default function ContactDestinations({
 
   const total = rows?.reduce((s, r) => s + r.clicks, 0) ?? 0;
   const viaMatch = rows?.reduce((s, r) => s + r.from_match, 0) ?? 0;
+  const viaDirectory = rows?.reduce((s, r) => s + r.from_directory, 0) ?? 0;
   const viaProfile = rows?.reduce((s, r) => s + r.from_profile, 0) ?? 0;
+  const viaOther = rows?.reduce((s, r) => s + r.from_other, 0) ?? 0;
   // The headline that matters: of clicks the MATCHER produced, how many reached
-  // someone who pays. Profile clicks are the therapist's own name traffic and
-  // say nothing about the matcher.
-  const matchPaid = rows?.filter((r) => r.plan === "paid").reduce((s, r) => s + r.from_match, 0) ?? 0;
+  // someone we are paid for. Profile clicks are the therapist's own name traffic
+  // and say nothing about the matcher. "center" counts as paying - those seats
+  // are bought by a paying centre, and excluding them silently undercounts.
+  const matchPaid =
+    rows?.filter((r) => r.plan === "paid" || r.plan === "center").reduce((s, r) => s + r.from_match, 0) ?? 0;
+  // The three routes must account for every click; if they ever do not, say so
+  // rather than showing a table whose columns quietly fail to add up.
+  const unaccounted = total - (viaMatch + viaDirectory + viaProfile + viaOther);
 
   return (
     <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
@@ -132,8 +149,21 @@ export default function ContactDestinations({
               דרך השאלון: {viaMatch}
             </span>
             <span className="rounded-md border border-stone-200 bg-white px-2.5 py-1 font-semibold text-stone-600">
+              דרך המאגר: {viaDirectory}
+            </span>
+            <span className="rounded-md border border-stone-200 bg-white px-2.5 py-1 font-semibold text-stone-600">
               דרך הפרופיל: {viaProfile}
             </span>
+            {viaOther > 0 && (
+              <span className="rounded-md border border-stone-200 bg-white px-2.5 py-1 font-semibold text-stone-600">
+                מקור אחר: {viaOther}
+              </span>
+            )}
+            {unaccounted !== 0 && (
+              <span className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1 font-bold text-red-700">
+                לא מסתכם: {unaccounted}
+              </span>
+            )}
             {viaMatch > 0 && (
               <span className="rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-semibold text-emerald-800">
                 מתוך השאלון, למשלמים: {matchPaid} מתוך {viaMatch}
@@ -150,6 +180,7 @@ export default function ContactDestinations({
                   {showCampaign && <th className="py-2 font-semibold">קמפיין</th>}
                   <th className="py-2 font-semibold">לחיצות</th>
                   <th className="py-2 font-semibold">מהשאלון</th>
+                  <th className="py-2 font-semibold">מהמאגר</th>
                   <th className="py-2 font-semibold">מהפרופיל</th>
                   <th className="py-2 font-semibold">איך</th>
                   <th className="py-2 font-semibold">אחרונה</th>
@@ -165,10 +196,22 @@ export default function ContactDestinations({
                       </span>
                     </td>
                     {showCampaign && (
-                      <td className="py-2 text-xs text-stone-600">{r.campaign ?? "-"}</td>
+                      <td className="py-2 text-xs text-stone-600">
+                        {r.campaign ?? "-"}
+                        {/* A recruitment campaign (therapist-*) targets THERAPISTS. A
+                            patient contact attributed to one means a recruitment
+                            visitor browsed the patient site - same flag the campaigns
+                            table already carries, so the two cannot be read differently. */}
+                        {r.campaign?.startsWith("therapist") && (
+                          <span className="mr-1.5 rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-700">
+                            גיוס
+                          </span>
+                        )}
+                      </td>
                     )}
                     <td className="py-2 font-bold text-stone-800">{r.clicks}</td>
-                    <td className="py-2 text-teal-700">{r.from_match || "-"}</td>
+                    <td className="py-2 font-semibold text-teal-700">{r.from_match || "-"}</td>
+                    <td className="py-2 text-stone-500">{r.from_directory || "-"}</td>
                     <td className="py-2 text-stone-500">{r.from_profile || "-"}</td>
                     <td className="py-2 text-xs text-stone-500">
                       {[
@@ -190,9 +233,12 @@ export default function ContactDestinations({
           </div>
 
           <p className="mt-3 text-[11px] leading-5 text-stone-400">
-            אלה <strong>לחיצות ליצירת קשר</strong>, לא פניות שהתקבלו בפועל. &quot;מהשאלון&quot; היא לחיצה
-            מתוך תוצאות ההתאמה - זו העמודה שמודדת את המנוע. &quot;מהפרופיל&quot; היא לחיצה בעמוד המטפל/ת,
-            ולרוב מגיעה מחיפוש שם שהמטפל/ת הביא/ה בעצמו/ה.
+            אלה <strong>לחיצות ליצירת קשר</strong>, לא פניות שהתקבלו בפועל. שלושה מסלולים, והם
+            אומרים דברים שונים: <strong>מהשאלון</strong> היא לחיצה מתוך תוצאות ההתאמה - זו העמודה
+            שמודדת את המנוע, ומנוע ההתאמה מציג משלמים בלבד (למעט גיבוי אזורי).
+            <strong> מהמאגר</strong> היא לחיצה ישירות מכרטיס ברשימה, בלי כניסה לפרופיל - והמאגר מציג
+            גם מטפלים חינמיים. <strong>מהפרופיל</strong> היא לחיצה בעמוד המטפל/ת, ולרוב מגיעה מחיפוש
+            שם שהמטפל/ת הביא/ה בעצמו/ה.
           </p>
         </>
       )}

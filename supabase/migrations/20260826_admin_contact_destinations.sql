@@ -10,6 +10,11 @@
 -- through the matcher. Aggregating without `source` produces a number that is
 -- arithmetically true and directionally misleading.
 --
+-- THREE sources, not two: `directory` is a contact click straight off a card in
+-- the listing without opening the profile, and it is the largest of the three
+-- (118 of 326 all time). Folding it into `from_other` made the UI columns fail
+-- to add up, so it gets its own count.
+--
 -- p_since null = all time. p_channel null = every channel. p_campaign null =
 -- every campaign, and is only meaningful for paid channels.
 -- Aggregated in SQL so it stays exact past the 1000-row PostgREST cap.
@@ -47,9 +52,11 @@ as $$
            cl.utm_campaign                        as campaign,
            count(*)                               as clicks,
            -- the split that stops the aggregate from misleading
-           count(*) filter (where cl.source = 'match')   as from_match,
-           count(*) filter (where cl.source = 'profile') as from_profile,
-           count(*) filter (where cl.source not in ('match','profile') or cl.source is null) as from_other,
+           count(*) filter (where cl.source = 'match')     as from_match,
+           count(*) filter (where cl.source = 'directory') as from_directory,
+           count(*) filter (where cl.source = 'profile')   as from_profile,
+           count(*) filter (where cl.source is null
+                              or cl.source not in ('match','directory','profile')) as from_other,
            count(*) filter (where cl.click_type = 'whatsapp')     as whatsapp,
            count(*) filter (where cl.click_type = 'phone')        as phone,
            count(*) filter (where cl.click_type = 'email')        as email,
