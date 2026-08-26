@@ -1153,6 +1153,16 @@ function FunnelsCampaigns() {
             title="לאן הלכו הפניות מגוגל בתשלום"
             note="לכל קמפיין - מי קיבל בפועל את הלחיצה, באיזה מסלול הוא נמצא, והאם הלחיצה באה מתוצאות ההתאמה או מעמוד הפרופיל."
           />
+
+          {/* The two scoped tables above and on /admin/seo cover google_paid and
+              google_organic - 247 of 328 clicks all time. The other 81 (ישיר 42,
+              הפניה 11, פייסבוק 14, ריק 11, אחר 3) appear in neither, and 20 of
+              them came through the matcher. This is the only view whose numbers
+              match what a therapist sees on their own profile page. */}
+          <ContactDestinations
+            title="לאן הלכו הפניות - כל הערוצים"
+            note="התמונה המלאה, בלי סינון ערוץ. זו הטבלה היחידה שמספריה זהים למה שמופיע בעמוד המטפל/ת, ובה נספרות גם פניות מתנועה ישירה, מהפניות ומפייסבוק שלא מופיעות בשתי הטבלאות המסוננות."
+          />
         </>
       )}
     </>

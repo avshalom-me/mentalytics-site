@@ -30,6 +30,8 @@ type Row = {
   campaign: string | null;
   clicks: number;
   clicks_all_channels: number;
+  /** every channel in the window, {channel: clicks} - explains a scope gap */
+  channels_all: Record<string, number> | null;
   from_match: number;
   from_directory: number;
   from_profile: number;
@@ -53,6 +55,27 @@ const PLAN_STYLE: Record<Row["plan"], string> = {
   trial: "bg-amber-50 text-amber-700 border-amber-200",
   free: "bg-stone-100 text-stone-600 border-stone-300",
 };
+
+const CHANNEL_LABEL: Record<string, string> = {
+  google_paid: "גוגל בתשלום",
+  google_organic: "אורגני",
+  direct: "ישיר",
+  referral: "הפניה",
+  meta_paid: "פייסבוק בתשלום",
+  meta_organic: "פייסבוק אורגני",
+  other: "אחר",
+  unknown: "לא ידוע",
+};
+
+/** "גוגל בתשלום 9 · אורגני 1 · ישיר 1", busiest first. Unknown keys fall
+ *  through as-is so a channel added later shows up instead of vanishing. */
+function channelMix(mix: Row["channels_all"]): string {
+  if (!mix) return "";
+  return Object.entries(mix)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${CHANNEL_LABEL[k] ?? k} ${n}`)
+    .join(" · ");
+}
 
 const PERIODS: { key: string; label: string }[] = [
   { key: "2d", label: "יומיים" },
@@ -83,6 +106,9 @@ export default function ContactDestinations({
     setErr(null);
     const q = new URLSearchParams({ period });
     if (channel) q.set("channel", channel);
+    // group by campaign iff the campaign column is displayed - otherwise one
+    // therapist fragments into several rows with nothing on screen to explain it
+    q.set("byCampaign", showCampaign ? "1" : "0");
     fetch(`/api/admin-contact-destinations?${q}`)
       .then((r) => r.json())
       .then((d) => {
@@ -94,7 +120,7 @@ export default function ContactDestinations({
     return () => {
       alive = false;
     };
-  }, [period, channel]);
+  }, [period, channel, showCampaign]);
 
   const total = rows?.reduce((s, r) => s + r.clicks, 0) ?? 0;
   const viaMatch = rows?.reduce((s, r) => s + r.from_match, 0) ?? 0;
@@ -115,6 +141,20 @@ export default function ContactDestinations({
   const allChannels = rows
     ? [...new Map(rows.map((r) => [r.therapist_id, r.clicks_all_channels])).values()].reduce((a, b) => a + b, 0)
     : 0;
+  // Channel totals, shown only in the all-channels view - this is the number the
+  // two scoped tables cannot show between them. Each therapist is one row there,
+  // but dedupe by id anyway so the sum survives a future grouping change.
+  const channelTotals: [string, number][] = channel
+    ? []
+    : Object.entries(
+        [...new Map((rows ?? []).map((r) => [r.therapist_id, r.channels_all])).values()].reduce(
+          (acc: Record<string, number>, mix) => {
+            for (const [k, n] of Object.entries(mix ?? {})) acc[k] = (acc[k] ?? 0) + n;
+            return acc;
+          },
+          {}
+        )
+      ).sort((a, b) => b[1] - a[1]);
   const scopeLabel = channel === "google_paid" ? "גוגל בתשלום" : channel === "google_organic" ? "אורגני" : "כל הערוצים";
 
   return (
@@ -160,6 +200,14 @@ export default function ContactDestinations({
             <span className="rounded-md border border-teal-200 bg-teal-50 px-2.5 py-1 font-semibold text-teal-800">
               דרך השאלון: {viaMatch}
             </span>
+            {channelTotals.map(([k, n]) => (
+              <span
+                key={k}
+                className="rounded-md border border-indigo-200 bg-indigo-50 px-2.5 py-1 font-semibold text-indigo-800"
+              >
+                {CHANNEL_LABEL[k] ?? k}: {n}
+              </span>
+            ))}
             <span className="rounded-md border border-stone-200 bg-white px-2.5 py-1 font-semibold text-stone-600">
               דרך המאגר: {viaDirectory}
             </span>
@@ -192,6 +240,7 @@ export default function ContactDestinations({
                   {showCampaign && <th className="py-2 font-semibold">קמפיין</th>}
                   <th className="py-2 font-semibold">לחיצות</th>
                   {channel && <th className="py-2 font-semibold">מתוך הכל</th>}
+                  {!channel && <th className="py-2 font-semibold">ערוצים</th>}
                   <th className="py-2 font-semibold">מהשאלון</th>
                   <th className="py-2 font-semibold">מהמאגר</th>
                   <th className="py-2 font-semibold">מהפרופיל</th>
@@ -228,6 +277,9 @@ export default function ContactDestinations({
                         {r.clicks_all_channels}
                       </td>
                     )}
+                    {!channel && (
+                      <td className="py-2 text-xs text-stone-500">{channelMix(r.channels_all)}</td>
+                    )}
                     <td className="py-2 font-semibold text-teal-700">{r.from_match || "-"}</td>
                     <td className="py-2 text-stone-500">{r.from_directory || "-"}</td>
                     <td className="py-2 text-stone-500">{r.from_profile || "-"}</td>
@@ -257,6 +309,13 @@ export default function ContactDestinations({
             <strong> מהמאגר</strong> היא לחיצה ישירות מכרטיס ברשימה, בלי כניסה לפרופיל - והמאגר מציג
             גם מטפלים חינמיים. <strong>מהפרופיל</strong> היא לחיצה בעמוד המטפל/ת, ולרוב מגיעה מחיפוש
             שם שהמטפל/ת הביא/ה בעצמו/ה.
+            {!channel && (
+              <>
+                {" "}
+                <strong>הטבלה הזו כוללת את כל הערוצים</strong>, ולכן היא היחידה שמספריה מתאימים למה
+                שמופיע בעמוד המטפל/ת. עמודת &quot;ערוצים&quot; מראה מאיפה הגיעו הלחיצות של כל מטפל/ת.
+              </>
+            )}
             {channel && (
               <>
                 {" "}

@@ -12,6 +12,10 @@ export async function GET(req: NextRequest) {
   const period = req.nextUrl.searchParams.get("period") ?? "month";
   const channel = req.nextUrl.searchParams.get("channel");
   const campaign = req.nextUrl.searchParams.get("campaign");
+  // Group by campaign only when the caller actually shows a campaign column.
+  // The all-channels view must not: 172 of 328 clicks carry a utm_campaign, so
+  // grouping would split one therapist into rows that read as duplicates.
+  const byCampaign = req.nextUrl.searchParams.get("byCampaign") !== "0";
   const since =
     period === "all" ? null : new Date(Date.now() - (DAYS[period] ?? 30) * 86_400_000).toISOString();
   try {
@@ -19,6 +23,7 @@ export async function GET(req: NextRequest) {
       p_since: since,
       p_channel: channel || null,
       p_campaign: campaign || null,
+      p_by_campaign: byCampaign,
     });
     if (error) throw error;
     return NextResponse.json({ ok: true, rows: data ?? [], generated_at: new Date().toISOString() });
