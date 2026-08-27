@@ -3,7 +3,7 @@ import { operationalMailTarget } from "./therapist-recipient";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendGiftOfferEmail } from "./therapist-emails";
 import { writeAudit } from "./audit";
-import { issueGiftCheckoutToken, JOIN_LINK_PLACEHOLDER } from "./gift-checkout";
+import { issueGiftCheckoutToken, JOIN_LINK_PLACEHOLDER, GIFT_OFFER_TTL_DAYS } from "./gift-checkout";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
@@ -162,7 +162,7 @@ export async function sendGiftOffer(opts: {
   // לנמען שנבחר בפועל, ולא למועמד שהיה ברשימה כשהסוכן רץ. אם האדמין מחק
   // את הסמן מהטיוטה, הקישור מתווסף בסופה - מייל בלי קישור הוא הצעה
   // שאי אפשר לממש.
-  const joinToken = await issueGiftCheckoutToken({
+  const { token: joinToken, expiresAt: offerExpiresAt } = await issueGiftCheckoutToken({
     therapistId: opts.therapistId,
     actionId: opts.actionId,
     region: payload.region ?? null,
@@ -173,11 +173,24 @@ export async function sendGiftOffer(opts: {
     ? body.replace(JOIN_LINK_PLACEHOLDER, joinUrl)
     : `${body}\n\n${joinUrl}`;
 
+  // הקישור נסגר בקוד אחרי GIFT_OFFER_TTL_DAYS ימים, ולכן המייל חייב לומר
+  // זאת. אם הסעיף נמחק בעריכה הוא מוחזר: מועד אחרון שנאכף ולא נאמר הוא
+  // הפתעה, ולא כך פונים למי שמבקשים ממנו למסור כרטיס אשראי.
+  const bodyFinal = /תקפה ל-\d+ ימים/.test(bodyWithLink)
+    ? bodyWithLink
+    : `${bodyWithLink}\n\nההצעה תקפה ל-${GIFT_OFFER_TTL_DAYS} ימים מרגע שליחת המייל הזה. אחרי כן הקישור נסגר.`;
+
   // מטפל של מרכז - ההצעה מגיעה למרכז, שהוא בעל החשבון ומי שיממש אותה.
   const target = await operationalMailTarget(opts.therapistId);
   if (!target.to) return { ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" };
 
-  const sent = await sendGiftOfferEmail({ to: target.to, name, subject, message: bodyWithLink });
+  const sent = await sendGiftOfferEmail({
+    to: target.to,
+    name,
+    subject,
+    message: bodyFinal,
+    expiresAt: offerExpiresAt,
+  });
   if (!sent.ok) {
     // המייל לא יצא - ההצעה נשארת ממתינה בתור כדי שאפשר יהיה לנסות שוב.
     return { ok: false, error: sent.error || "שליחת המייל נכשלה" };

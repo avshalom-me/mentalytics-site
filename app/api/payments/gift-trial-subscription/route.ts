@@ -36,6 +36,8 @@ export async function GET(req: NextRequest) {
       treatment: check.data.treatment,
       gift_months: check.data.giftMonths,
       first_charge_date: firstChargeDate(new Date(), check.data.giftMonths),
+      // מתי הקישור נסגר - מוצג בעמוד לצד התנאים, כי זו מגבלה שנאכפת בקוד.
+      expires_at: check.data.expiresAt,
       amount: SUBSCRIPTION_BASE_PRICE,
     });
   } catch (e) {

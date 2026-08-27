@@ -818,6 +818,8 @@ export async function sendGiftOfferEmail(opts: {
   name: string;
   subject: string;
   message: string;
+  /** מתי הקישור נסגר. מוצג ליד טבלת התנאים, לא רק בגוף המכתב. */
+  expiresAt?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendGiftOfferEmail: RESEND_API_KEY not configured, skipping");
@@ -832,6 +834,13 @@ export async function sendGiftOfferEmail(opts: {
   // ולא נעטפת שוב בשלום/חתימה של המעטפת.
   const safeMessage = escapeHtml(opts.message.trim());
   const profileUrl = `${SITE_URL}/therapists/dashboard`;
+  const deadline = opts.expiresAt
+    ? new Date(opts.expiresAt).toLocaleDateString("he-IL", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      })
+    : "";
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">
@@ -841,7 +850,8 @@ export async function sendGiftOfferEmail(opts: {
       <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
       <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל המסלול המקודם - לעומת המסלול החינמי שיש לך היום</p>
       ${promotedPlanTable(
-        'המסלול המקודם עולה 140 ש"ח + מע"מ לחודש, והחודשיים הראשונים ללא תשלום. ביטול בכל שלב בהודעת מייל אלינו.'
+        'המסלול המקודם עולה 140 ש"ח + מע"מ לחודש, והחודשיים הראשונים ללא תשלום. ביטול בכל שלב בהודעת מייל אלינו.' +
+          (deadline ? ` ההצעה תקפה עד ${deadline}, ואחריו הקישור נסגר.` : "")
       )}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0 0 10px;font-size:13px;color:#6b7280;text-align:center;">

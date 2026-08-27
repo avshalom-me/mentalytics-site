@@ -16,6 +16,7 @@ type Offer = {
   region: string | null;
   gift_months: number;
   first_charge_date: string;
+  expires_at: string;
   amount: number;
 };
 
@@ -28,6 +29,17 @@ type SumitTokenizeResponse = {
 
 function hebDate(iso: string): string {
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
+}
+
+// כמה נשאר עד סגירת הקישור. ביום האחרון נכון לומר שעות ולא "0 ימים".
+function timeLeft(iso: string): string {
+  const ms = new Date(iso).getTime() - Date.now();
+  if (ms <= 0) return "פג";
+  const hours = Math.floor(ms / 3_600_000);
+  if (hours < 1) return "פחות משעה";
+  if (hours < 24) return `${hours} שעות`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? "יום אחד" : `${days} ימים`;
 }
 
 export default function GiftCheckoutPage() {
@@ -163,9 +175,18 @@ export default function GiftCheckoutPage() {
           {offer.region ? ` באזור ${offer.region}` : ""}.
         </p>
 
+        {/* מועד הסגירה. מעל קופסת התנאים ולא בתוכה: זו מגבלה שנאכפת בקוד
+            (הקישור מפסיק לעבוד), ולכן היא צריכה להיקרא לפני שממלאים כרטיס. */}
+        <div className="mb-4 rounded-2xl border border-[#E8CE94] bg-[#FDF6E3] px-5 py-3 leading-7 text-[#131F1E]">
+          ההצעה תקפה עד <strong>{hebDate(offer.expires_at)}</strong> - נותרו{" "}
+          {timeLeft(offer.expires_at)}. אחרי המועד הזה הקישור נסגר, ואפשר לבקש חדש בתשובה
+          לאותו מייל.
+        </div>
+
         {/* קופסת ההבהרה - מה בדיוק קורה ומתי. זו ההתחייבות שהובטחה במייל,
             ולכן היא מופיעה כאן מעל כפתור התשלום ולא בהערת שוליים. */}
         <div className="mb-8 rounded-2xl border border-[#C2DFDE] bg-[#EAF4F3] p-5">
+          <div className="mb-3 text-sm font-black text-[#2A6462]">מה מקבלים, ובאילו תנאים</div>
           <ul className="space-y-2 leading-7 text-[#131F1E]">
             <li>הקידום מתחיל היום, והפרופיל נכנס למערכת ההתאמות מיד.</li>
             <li>

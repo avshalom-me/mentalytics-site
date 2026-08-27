@@ -1,7 +1,7 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
-import { JOIN_LINK_PLACEHOLDER } from "./gift-checkout";
+import { JOIN_LINK_PLACEHOLDER, GIFT_OFFER_TTL_DAYS } from "./gift-checkout";
 import { coversRegion, overlaps } from "./match-fallback";
 import { REGION_GROUPS, REGION_GROUP_LABELS, regionGroupOf } from "./regions";
 import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
@@ -261,6 +261,7 @@ function buildGiftDraft(
     `• ב-${GIFT_MONTHS} החודשים הראשונים לא נגבה תשלום.`,
     `• שבוע לפני החיוב הראשון יישלח אליך מייל עם התאריך והסכום, כדי שתהיה לך אפשרות להחליט אם להמשיך.`,
     `• ביטול בכל שלב בהודעת מייל אחת אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.`,
+    `• ההצעה תקפה ל-${GIFT_OFFER_TTL_DAYS} ימים מרגע שליחת המייל הזה. אחרי כן הקישור נסגר.`,
     ``,
     `הקישור להצטרפות אישי ומיועד עבורך בלבד:`,
     JOIN_LINK_PLACEHOLDER,

@@ -7,10 +7,13 @@ import { supabaseAdmin } from "./supabaseAdmin";
 //
 // למה טוקן ולא סתם עמוד: בלעדיו כל מטפל שישמע על ההצעה יוכל להיכנס
 // למסלול המוזל, וההצעה תפסיק להיות כלי לסגירת פערי היצע ותהפוך למחירון
-// חלופי. הטוקן קשור למטפל אחד, פוקע אחרי 30 יום, ונשרף בשימוש.
+// חלופי. הטוקן קשור למטפל אחד, פוקע, ונשרף בשימוש.
 
 export const GIFT_MONTHS = 2;
-const TOKEN_TTL_DAYS = 30;
+// כמה זמן ההצעה תקפה (החלטת המשתמש 27/8/26, היה 30 יום). המספר הזה מופיע
+// גם בטיוטה שנשלחת וגם בעמוד ההצטרפות, ולכן הוא מיוצא ולא משוכפל: הבטחה
+// שכתובה במייל וסף שנאכף בקוד חייבים להיות אותו מספר.
+export const GIFT_OFFER_TTL_DAYS = 3;
 
 export type GiftCheckoutToken = {
   token: string;
@@ -40,10 +43,10 @@ export async function issueGiftCheckoutToken(params: {
   actionId?: string | null;
   region?: string | null;
   treatment?: string | null;
-}): Promise<string> {
+}): Promise<{ token: string; expiresAt: string }> {
   const token = randomBytes(24).toString("base64url");
   const expires = new Date();
-  expires.setDate(expires.getDate() + TOKEN_TTL_DAYS);
+  expires.setDate(expires.getDate() + GIFT_OFFER_TTL_DAYS);
 
   const { error } = await supabaseAdmin.from("gift_checkout_tokens").insert({
     token,
@@ -55,7 +58,7 @@ export async function issueGiftCheckoutToken(params: {
     expires_at: expires.toISOString(),
   });
   if (error) throw new Error(`יצירת קישור ההצטרפות נכשלה: ${error.message}`);
-  return token;
+  return { token, expiresAt: expires.toISOString() };
 }
 
 // אימות בכל טעינה של עמוד ההצטרפות ושוב לפני החיוב עצמו. הזכאות נבדקת
@@ -79,7 +82,11 @@ export async function validateGiftCheckoutToken(token: string): Promise<TokenVal
     return { ok: false, reason: "used", message: "הקישור כבר נוצל" };
   }
   if (new Date(row.expires_at).getTime() < Date.now()) {
-    return { ok: false, reason: "expired", message: "תוקף הקישור פג" };
+    return {
+      ok: false,
+      reason: "expired",
+      message: `תוקף הקישור פג. ההצעה תקפה ל-${GIFT_OFFER_TTL_DAYS} ימים מרגע שליחת המייל.`,
+    };
   }
 
   const { data: t } = await supabaseAdmin
