@@ -20,7 +20,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
-import { trackingOptedOut } from "@/app/lib/track-optout";
+import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
 import { minDwell } from "@/app/lib/min-dwell";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
@@ -528,7 +528,14 @@ export default function AdultsPage() {
     // server, which validates it against STAFF_BYPASS_TOKEN. No token literal
     // is shipped in this bundle; this flag only controls the UI optimistically.
     const staffParam = params.get("staff");
-    if (staffParam) localStorage.setItem("staff_token", staffParam);
+    if (staffParam) {
+      localStorage.setItem("staff_token", staffParam);
+      // קישור צוות מנטרל גם מדידה. בלי זה כל שאלון בדיקה של העובדת נספר
+      // כהשלמה אמיתית ומזהם בדיוק את המדדים שמהם נגזרים שיעורי ההמרה
+      // בדשבורד השיווק. נדלק פעם אחת בפתיחת הקישור ולא בכל טעינה, כדי
+      // שכפתור המדידה ב-/admin/seo יישאר הסמכות היחידה להחזיר אותה.
+      setTrackingOptOut(true);
+    }
     if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
       .then(fp => fetch(`/api/usage/check?type=adults&fp=${fp}`))

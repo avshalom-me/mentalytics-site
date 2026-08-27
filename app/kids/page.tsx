@@ -21,7 +21,7 @@ import {
 import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
-import { trackingOptedOut } from "@/app/lib/track-optout";
+import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
 import { minDwell } from "@/app/lib/min-dwell";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
@@ -4094,7 +4094,14 @@ export default function KidsPage() {
     const params = new URLSearchParams(window.location.search);
     // Staff bypass token - validated server-side; not shipped in the bundle.
     const staffParam = params.get("staff");
-    if (staffParam) localStorage.setItem("staff_token", staffParam);
+    if (staffParam) {
+      localStorage.setItem("staff_token", staffParam);
+      // קישור צוות מנטרל גם מדידה. בלי זה כל שאלון בדיקה של העובדת נספר
+      // כהשלמה אמיתית ומזהם בדיוק את המדדים שמהם נגזרים שיעורי ההמרה
+      // בדשבורד השיווק. נדלק פעם אחת בפתיחת הקישור ולא בכל טעינה, כדי
+      // שכפתור המדידה ב-/admin/seo יישאר הסמכות היחידה להחזיר אותה.
+      setTrackingOptOut(true);
+    }
     if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
       .then(fp => fetch(`/api/usage/check?type=kids&fp=${fp}`))
