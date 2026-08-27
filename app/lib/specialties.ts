@@ -26,6 +26,11 @@ export function slugToSpecialty(slug: string): string | null {
 // specialties (query phrasing people actually use). Everything else falls back
 // to a generic pattern.
 export const SPECIALTY_META: Record<string, { title: string; intro: string }> = {
+  "טיפול בקשיי תקשורת ASD": {
+    title: "טיפול בקשיי תקשורת ואוטיזם (ASD) - מטפלים מוסמכים",
+    intro:
+      "טיפול בקשיי תקשורת על רצף האוטיזם עובד על תקשורת חברתית, גמישות וויסות חושי, בהתאמה לגיל ולתפקוד, ולרוב בשילוב הדרכת הורים והסביבה החינוכית. שונה מאבחון: האבחון קובע אם קיים ASD, והטיפול הוא הליווי שאחריו.",
+  },
   "טיפול דינאמי": {
     title: "טיפול דינאמי - פסיכולוגים ומטפלים בגישה פסיכודינמית",
     intro:
