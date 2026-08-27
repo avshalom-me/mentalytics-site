@@ -10,7 +10,7 @@ import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetention } from "@/app/lib/retention";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
-import { sendGiftOffer } from "@/app/lib/gift-offer";
+import { sendGiftOffer, recentGiftOffers } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect, addProspectsFromText } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
@@ -143,6 +143,12 @@ export async function GET() {
       runs,
       latest_details: latestDetails,
       pending_actions: pendingRes.data ?? [],
+      // מי כבר קיבל הצעת מתנה בחלון הצינון. הכרטיס מסתיר אותם, אחרת הוא
+      // מציג נמען שהשליחה אליו תיחסם ברגע הלחיצה - אותו מטפל עולה כמועמד
+      // בכמה חיתוכים במקביל.
+      gift_offered_ids: await recentGiftOffers()
+        .then((rows) => Array.from(new Set(rows.map((r) => r.therapist_id))))
+        .catch(() => [] as string[]),
       // הספירות האמיתיות מהמאגר, מופרדות לפי סוג התוצר.
       pending_action_total: actionCountRes.count ?? 0,
       pending_finding_total: findingCountRes.count ?? 0,
@@ -221,6 +227,8 @@ export async function POST(req: NextRequest) {
         therapist_name: result.therapistName,
         email: result.email,
         remaining: result.remaining ?? [],
+        still_open: result.stillOpen ?? false,
+        still_short: result.stillShort ?? 0,
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
     }

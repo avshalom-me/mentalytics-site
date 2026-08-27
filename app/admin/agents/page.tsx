@@ -63,6 +63,9 @@ type ActionPayload = {
   gift_months?: number;
   subject?: string;
   candidates?: GiftCandidate[];
+  sent_count?: number;
+  supply_target?: number;
+  paying_covering?: number;
   // טיוטת נדנוד למרכז
   center_id?: string;
   center_name?: string;
@@ -658,6 +661,7 @@ function CenterNudgeCard({
 // כרטיס הצעת המתנה: בחירת נמען מבין המועמדים, עריכת הטיוטה, ושליחה בפועל.
 function GiftOfferCard({
   action,
+  offeredIds,
   onSent,
   onDismiss,
   dismissing,
@@ -665,16 +669,22 @@ function GiftOfferCard({
   onToggle,
 }: {
   action: PendingAction;
+  /** מטפלים שכבר קיבלו הצעת מתנה בחלון הצינון - לא מוצגים כנמענים. */
+  offeredIds: string[];
   onSent: (msg: string) => void;
   onDismiss: () => void;
   dismissing: boolean;
   open: boolean;
   onToggle: () => void;
 }) {
-  const candidates: GiftCandidate[] = (action.payload?.candidates ?? []).map((c) => ({
+  const all: GiftCandidate[] = (action.payload?.candidates ?? []).map((c) => ({
     ...c,
     draft: c.draft ?? "",
   }));
+  // מטפל שכבר קיבל הצעה בחצי השנה האחרונה יורד מהרשימה. השרת חוסם אותו
+  // בכל מקרה; בלי הסינון הכפתור פשוט היה מחזיר שגיאה.
+  const candidates = all.filter((c) => !offeredIds.includes(c.therapist_id));
+  const hidden = all.length - candidates.length;
   const [selectedId, setSelectedId] = useState(candidates[0]?.therapist_id ?? "");
   const [subject, setSubject] = useState(action.payload?.subject ?? "הצעת קידום במתנה לחודשיים - טיפול חכם");
   const [draft, setDraft] = useState(candidates[0]?.draft ?? "");
@@ -683,6 +693,8 @@ function GiftOfferCard({
   const [error, setError] = useState("");
 
   const selected = candidates.find((c) => c.therapist_id === selectedId) ?? null;
+  // כמה הצעות כבר יצאו בחיתוך הזה - נכתב ע"י מסלול השליחה כשההצעה נשארת פתוחה.
+  const sentCount = Number(action.payload?.sent_count ?? 0);
 
   function pickCandidate(c: GiftCandidate) {
     if (c.therapist_id === selectedId) return;
@@ -715,13 +727,17 @@ function GiftOfferCard({
       });
       const left = Array.isArray(j.remaining) ? (j.remaining as string[]) : [];
       const days = typeof j.reoffer_after_days === "number" ? j.reoffer_after_days : null;
+      const stillOpen = j.still_open === true;
+      const short = typeof j.still_short === "number" ? j.still_short : 0;
       onSent(
         `ההצעה נשלחה אל ${selected.full_name} (${selected.email})` +
-          (left.length > 0
-            ? ` · ${left.join(", ")} נשמרו לגיבוי${
-                days ? ` ויוצעו מחדש בעוד ${days} יום אם לא תגיע תשובה` : ""
-              }`
-            : "")
+          (stillOpen
+            ? ` · החיתוך עדיין חסר ${short}, וההצעה נשארה פתוחה - אפשר לשלוח גם ל${left.join(", ")}`
+            : left.length > 0
+              ? ` · ${left.join(", ")} נשמרו לגיבוי${
+                  days ? ` ויוצעו מחדש בעוד ${days} יום אם לא תגיע תשובה` : ""
+                }`
+              : "")
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : "השליחה נכשלה");
@@ -736,7 +752,7 @@ function GiftOfferCard({
         <span className="text-sm font-bold text-stone-800">🎁 {action.title}</span>
         <span className="flex-1 truncate text-xs text-stone-400">
           {candidates.length
-            ? `${candidates.length} מועמדים · ${candidates[0].full_name}${candidates.length > 1 ? " ואחרים" : ""}`
+            ? `${sentCount > 0 ? `${sentCount} כבר נשלחו · ` : ""}${candidates.length} מועמדים · ${candidates[0].full_name}${candidates.length > 1 ? " ואחרים" : ""}`
             : "אין מועמדים בהצעה הזו"}
         </span>
         <button
@@ -773,7 +789,9 @@ function GiftOfferCard({
 
       {candidates.length === 0 ? (
         <p className="text-sm text-amber-700">
-          אין מועמדים בהצעה הזו - היא נוצרה לפני שמסלול השליחה קיים. אפשר לדחות ולהריץ ניתוח פערים מחדש.
+          {hidden > 0
+            ? `כל ${hidden} המועמדים בחיתוך הזה כבר קיבלו הצעת מתנה בחצי השנה האחרונה. אין למי לפנות כאן עד שיצטרפו מטפלים חדשים.`
+            : "אין מועמדים בהצעה הזו - היא נוצרה לפני שמסלול השליחה קיים. אפשר לדחות ולהריץ ניתוח פערים מחדש."}
         </p>
       ) : (
         <>
@@ -1236,6 +1254,9 @@ export default function AgentsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [placesReady, setPlacesReady] = useState(true);
   const [pending, setPending] = useState<PendingAction[]>([]);
+  // מטפלים שקיבלו הצעת מתנה בחלון הצינון (חצי שנה) - נטען מהשרת פעם אחת
+  // ומשותף לכל כרטיסי ההצעות, כי אותו מטפל עולה כמועמד בכמה חיתוכים.
+  const [giftOfferedIds, setGiftOfferedIds] = useState<string[]>([]);
   const [resolved, setResolved] = useState<ResolvedAction[]>([]);
   const [latestDigest, setLatestDigest] = useState<LatestDigest | null>(null);
   const [loading, setLoading] = useState(true);
@@ -1275,6 +1296,7 @@ export default function AgentsPage() {
           setProspects(j.prospects ?? []);
           setPlacesReady(j.places_configured !== false);
           setPending(j.pending_actions ?? []);
+          setGiftOfferedIds(j.gift_offered_ids ?? []);
           setResolved(j.resolved_actions ?? []);
           setLatestDigest(j.latest_digest ?? null);
         } else setError(j.error || "שגיאה בטעינה");
@@ -1786,8 +1808,9 @@ export default function AgentsPage() {
               />
             ) : a.action_type === "gift_offer" ? (
               <GiftOfferCard
-                key={a.id}
+                key={`${a.id}:${(a.payload?.candidates ?? []).map((c) => c.therapist_id).join(",")}`}
                 action={a}
+                offeredIds={giftOfferedIds}
                 open={openOffer === a.id}
                 onToggle={() => setOpenOffer(openOffer === a.id ? null : a.id)}
                 dismissing={busyId === a.id}

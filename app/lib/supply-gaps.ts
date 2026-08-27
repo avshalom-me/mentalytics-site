@@ -550,6 +550,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
                 gap_key: g.key,
                 subject: GIFT_SUBJECT,
                 candidates: g.candidates,
+                // כמה החיתוך צריך וכמה כבר יש בו - מסלול השליחה קורא
+                // את אלה כדי לדעת אם אחרי השליחה נותר פער למלא.
+                paying_covering: g.payingCovering,
+                supply_target: g.supplyTarget,
               },
             }
           : {
