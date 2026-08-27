@@ -6,7 +6,7 @@ import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_saved";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
 
 function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
   if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים את הנתונים
@@ -160,6 +160,32 @@ export function trackMatchSearch(
       online: opts.online,
       // הדגל שמאפשר לספור בשאילתה אחת כמה חיפשו בלי מיקום בכלל.
       no_location: !opts.region && !opts.city && !opts.online,
+    },
+  });
+}
+
+/**
+ * כמה אפשרויות המטופל באמת קיבל בחיפוש הזה.
+ *
+ * נשלח **אחרי** שהתשובה חזרה, ולכן בנפרד מ-trackMatchSearch שנשלח ברגע
+ * השאלה. בלי המספר הזה אי אפשר לדעת אם אזור "מכוסה" באמת: סוכן פערי
+ * ההיצע ידע לספור כמה מטפלים קיימים, אבל לא כמה מהם הופיעו בפועל למי
+ * שחיפש - וזה ההבדל בין ירושלים "מכוסה" לירושלים עם שתי אפשרויות למסך.
+ */
+export function trackMatchResults(
+  quizType: "adults" | "kids",
+  opts: { region: string | null; city?: string | null; online: boolean; returned: number },
+) {
+  sendTrack("match_results", {
+    source: quizType === "adults" ? "adult" : "child",
+    metadata: {
+      quiz_type: quizType,
+      region: opts.region || null,
+      city: opts.city || null,
+      online: opts.online,
+      returned: opts.returned,
+      // הדגל שמאפשר לספור בשאילתה אחת כמה חיפושים הציגו בחירה דלה.
+      thin: opts.returned < 4,
     },
   });
 }

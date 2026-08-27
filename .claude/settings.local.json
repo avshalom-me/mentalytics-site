@@ -319,8 +319,8 @@
       "Bash(curl -sI -A \"Mozilla/5.0\" \"https://upload.wikimedia.org/wikipedia/commons/7/72/Flickr_-_Israel_Defense_Forces_-_Hermon_Brigade_Reservists_Return_to_Training%2C_April_2008.jpg\")",
       "Bash(curl -sI -A \"Mozilla/5.0\" \"https://upload.wikimedia.org/wikipedia/commons/thumb/7/72/Flickr_-_Israel_Defense_Forces_-_Hermon_Brigade_Reservists_Return_to_Training%2C_April_2008.jpg/1280px-Flickr_-_Israel_Defense_Forces_-_Hermon_Brigade_Reservists_Return_to_Training%2C_April_2008.jpg\")",
       "mcp__0ec2f33e-1f7a-4b6c-9a9e-b0d0d22333ff__create_file",
-      "mcp__claude_ai_Supabase__execute_sql",
-      "mcp__claude_ai_Supabase__apply_migration"
+      "Bash(git -C /c/projects/mentalytics-site merge --ff-only claude/autonomous-agents-review-061b2c)",
+      "Bash(git -C /c/projects/mentalytics-site push origin master)"
     ]
   }
 }

@@ -141,7 +141,15 @@ type SupplyGap = {
   candidates: GiftCandidate[];
 };
 
-type WaitingGap = { region: string; treatment: string; sentAt: string };
+// pending/needed/covering נוספו ב-27/8/26 וחסרים בריצות שנשמרו לפני כן.
+type WaitingGap = {
+  region: string;
+  treatment: string;
+  sentAt: string;
+  pending?: number;
+  needed?: number;
+  covering?: number;
+};
 
 type GapsRun = {
   gift_gaps: SupplyGap[];
@@ -1517,6 +1525,9 @@ export default function AgentsPage() {
                 {waiting.map((w, i) => (
                   <li key={i}>
                     {w.treatment} · {w.region} · נשלח {relTime(w.sentAt)}
+                    {typeof w.needed === "number"
+                      ? ` · ${w.covering ?? 0} מקודמים + ${w.pending ?? 0} בהמתנה, מתוך ${w.needed} שצריך`
+                      : ""}
                   </li>
                 ))}
               </ul>

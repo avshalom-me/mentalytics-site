@@ -39,9 +39,28 @@ const GIFT_SUBJECT = "הצעת קידום - חודשיים ראשונים ללא
 // מינימום אירועי פער כדי להציע פעולה - מתחת לזה זה רעש של מטופל בודד.
 const MIN_EVENTS = Number(process.env.SUPPLY_GAP_MIN_EVENTS ?? 1);
 const MAX_CANDIDATES_PER_GAP = 3;
-// עד כמה מטפלים משלמים בחיתוך עדיין נחשב "לא מספיק להציע". 2 = גם חיתוך
-// עם מטפל אחד או שניים נחשב פער, לא רק חיתוך ריק לגמרי.
-const THIN_SUPPLY_MAX = Number(process.env.SUPPLY_GAP_THIN_MAX ?? 2);
+// כמה מטפלים מקודמים צריכים להיות בחיתוך שמחפשים אותו. 4 הוא הרצפה
+// (החלטת המשתמש 23/8/26): מתחת לזה למטופל אין באמת ממה לבחור.
+//
+// למה זה שונה מהגרסה הקודמת: עד היום הסף היה 2, והשאלה היחידה הייתה
+// "כמה יש". כך אזור כמו ירושלים - הביקוש השני בגודלו בארץ (847 צפיות
+// ב-60 יום) עם שני משלמים אמיתיים בלבד - נחשב "מכוסה" ולא ייצר אף
+// הצעה, כי בחיתוכים הרחבים הצטברו ארבעה-שישה מקודמים.
+const MIN_SUPPLY_PER_SLICE = Number(process.env.SUPPLY_GAP_MIN_SUPPLY ?? 4);
+// ככל שהביקוש בחיתוך גדול יותר, כך צריך יותר אפשרויות. הסף עולה בערך
+// אחד לכל עשרה מחפשים, עד תקרה - אחרת חיתוך פופולרי לעולם לא "מספיק".
+const SUPPLY_PER_DEMAND = Number(process.env.SUPPLY_GAP_PER_DEMAND ?? 10);
+const MAX_SUPPLY_TARGET = Number(process.env.SUPPLY_GAP_MAX_TARGET ?? 8);
+
+/** כמה מטפלים החיתוך הזה צריך, לפי כמה מחפשים אותו. */
+function supplyTargetFor(demand: number): number {
+  return Math.min(MAX_SUPPLY_TARGET, MIN_SUPPLY_PER_SLICE + Math.floor(demand / SUPPLY_PER_DEMAND));
+}
+
+// מקור קידום שמשקף לקוח שמשלם בפועל (ישירות או דרך מרכז), מול קידום
+// מתנה שיפוג. שניהם נספרים ככיסוי - למטופל אין הבדל - אבל ההפרדה מוצגת,
+// כי חיתוך שנשען כולו על מתנות יתרוקן ברגע שהן יסתיימו.
+const PAID_SOURCES = new Set(["paid", "center", "gift_trial"]);
 
 type FallbackEvent = { metadata: Record<string, unknown> | null };
 
@@ -88,6 +107,9 @@ export type WaitingGap = {
   region: string;
   treatment: string;
   sentAt: string;
+  pending: number; // כמה הצעות פתוחות בחיתוך הזה
+  needed: number; // כמה מטפלים החיתוך צריך
+  covering: number; // כמה כבר מקודמים בו
 };
 
 export type SupplyGap = {
@@ -96,7 +118,10 @@ export type SupplyGap = {
   treatment: string;
   events: number; // כמה מטופלים נתקלו בפער
   lastSeen: string;
-  payingCovering: number; // מטפלים משלמים שמכסים את החיתוך
+  payingCovering: number; // סך המקודמים שמכסים את החיתוך
+  paidCovering: number; // מתוכם משלמים בפועל (ישירות או דרך מרכז)
+  giftCovering: number; // מתוכם קידום מתנה - כיסוי שיפוג
+  supplyTarget: number; // כמה צריכים להיות בחיתוך הזה לפי הביקוש
   candidates: GapCandidate[]; // מטפלים חינמיים שמתאימים - יעד ההצעה
   kind: "gift" | "recruit";
   draftEmail: string | null; // טיוטה מוכנה למשלוח ידני אחרי אישור
@@ -245,6 +270,22 @@ function buildGiftDraft(
   ].join("\n");
 }
 
+/** תיאור ההיצע בחיתוך: כמה יש, כמה צריך, וכמה מזה נשען על מתנה. */
+function supplyLine(g: {
+  payingCovering: number;
+  paidCovering: number;
+  giftCovering: number;
+  supplyTarget: number;
+}): string {
+  if (g.payingCovering === 0) return "אין אף מטפל מקודם בחיתוך הזה.";
+  const base = `יש ${g.payingCovering} מטפלים מקודמים מתוך ${g.supplyTarget} שצריך לביקוש הזה`;
+  if (g.giftCovering === 0) return `${base}.`;
+  if (g.paidCovering === 0) {
+    return `${base}, וכולם בקידום מתנה שיפוג - כלומר החיתוך יתרוקן בסיומו.`;
+  }
+  return `${base} (${g.paidCovering} משלמים, ${g.giftCovering} בקידום מתנה שיפוג).`;
+}
+
 export async function runSupplyGaps(): Promise<SupplyGapsResult> {
   const runId = await startAgentRun("supply_gaps", "monitor");
   try {
@@ -339,9 +380,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // בשליחה, ולכן הוא לא נכנס לבריכה מלכתחילה.
     const freePool = therapists.filter((t) => Boolean(t.email) && giftEligibilityError(t, nowIso) === null);
 
-    // חיתוכים שיצאה בהם הצעה בטווח ההמתנה - לא מציעים שוב עד שתגיע תשובה.
+    // הצעות פתוחות בחיתוך - טרם הגיעה עליהן תשובה. נספרות ולא רק
+    // מסמנות "מחכים": כל הצעה סוגרת לכל היותר מטפל אחד מתוך הפער.
     const waitCutoff = new Date(Date.now() - GIFT_OFFER_WAIT_DAYS * 86_400_000).toISOString();
-    const waitingByGap = new Map<string, string>();
+    const waitingByGap = new Map<string, { count: number; latest: string }>();
     // חיתוך שיצאה בו הצעה, חלון ההמתנה חלף, והוא עדיין פער - כלומר לא
     // התקבלה תשובה. הוא חוזר לתור עם המועמדים הנותרים בלבד, והפעם עם
     // ההקשר: למי כבר פנינו ומתי.
@@ -353,7 +395,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       const key = `${o.region}|${treatmentKey(o.treatment)}`;
       if (o.sent_at >= waitCutoff) {
         const prev = waitingByGap.get(key);
-        if (!prev || o.sent_at > prev) waitingByGap.set(key, o.sent_at);
+        waitingByGap.set(key, {
+          count: (prev?.count ?? 0) + 1,
+          latest: prev && prev.latest > o.sent_at ? prev.latest : o.sent_at,
+        });
         continue;
       }
       const prevLapsed = lapsedByGap.get(key);
@@ -402,17 +447,33 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       }
       const demand = a.events + a.sessions.size;
       if (demand < MIN_EVENTS) continue;
-      const payingCovering = paying.filter((t) => matchesGap(t, a.regionKey, a.treatment)).length;
+      const covering = paying.filter((t) => matchesGap(t, a.regionKey, a.treatment));
+      const payingCovering = covering.length;
+      const paidCovering = covering.filter((t) => PAID_SOURCES.has(t.promotion_source ?? "")).length;
+      const giftCovering = payingCovering - paidCovering;
+      const supplyTarget = supplyTargetFor(demand);
       // "לא מספיק להציע": חיתוך ריק, או חיתוך דליל של מטפל אחד או שניים.
-      if (payingCovering > THIN_SUPPLY_MAX) continue;
+      // הפער נקבע ביחס לביקוש, לא במספר מוחלט.
+      if (payingCovering >= supplyTarget) continue;
 
       const regionLabel = regionGroupLabel(a.regionKey);
 
-      // הצעה כבר בדרך לחיתוך הזה - ממתינים לתשובה ולא מציפים שוב.
+      // הצעות שכבר בדרך לחיתוך הזה. עד כה הספיקה הצעה אחת כדי
+      // להשתיק את החיתוך לגמרי, וזה הגיוני כשהיעד הוא מטפל אחד. כשהיעד
+      // הוא ארבעה, הצעה אחת שלא נענתה הקפיאה אזור שלם - כך ירושלים
+      // נעלמה מההמלצות. לכן נספרות ההצעות הפתוחות כאילו כולן יתקבלו,
+      // ורק אם גם אז החיתוך מלא - מחכים.
       const gapKey = `${regionLabel}|${treatmentKey(a.treatment)}`;
-      const waitingSince = waitingByGap.get(gapKey);
-      if (waitingSince) {
-        waitingGaps.push({ region: regionLabel, treatment: a.treatment, sentAt: waitingSince });
+      const waiting = waitingByGap.get(gapKey);
+      if (waiting && payingCovering + waiting.count >= supplyTarget) {
+        waitingGaps.push({
+          region: regionLabel,
+          treatment: a.treatment,
+          sentAt: waiting.latest,
+          pending: waiting.count,
+          needed: supplyTarget,
+          covering: payingCovering,
+        });
         continue;
       }
 
@@ -451,6 +512,9 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         events: demand,
         lastSeen: a.lastSeen,
         payingCovering,
+        paidCovering,
+        giftCovering,
+        supplyTarget,
         candidates,
         kind,
         draftEmail: kind === "gift" ? candidates[0].draft : null,
@@ -472,7 +536,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               title: `הצעת קידום מתנה: ${g.treatment} · ${g.region}`,
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}; ` +
-                `${g.payingCovering === 0 ? "אין אף מטפל משלם" : `רק ${g.payingCovering} מטפלים משלמים`} בחיתוך הזה.\n` +
+                `${supplyLine(g)}\n` +
                 `מועמדים מתאימים במאגר: ${g.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n` +
                 `הטיוטה ניתנת לעריכה למטה, והמייל יוצא רק בלחיצה שלך.`,
               entityType: "therapist",
@@ -495,8 +559,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               kind: "finding" as const,
               title: `פער גיוס: אין מספיק מטפלים ל${g.treatment} באזור ${g.region}`,
               body:
-                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}, ` +
-                `${g.payingCovering === 0 ? "ואין אף מטפל משלם" : `ויש רק ${g.payingCovering} מטפלים משלמים`} בחיתוך הזה - ` +
+                `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}. ` +
+                `${supplyLine(g)} ` +
                 `וגם אין במאגר אף מטפל חינמי מאושר שמתאים. זה אזור/תחום לפרסום גיוס ממוקד.`,
               dedupeKey: g.key,
               payload: { region: g.region, treatment: g.treatment },
@@ -539,6 +603,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         recruit: recruitGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
         waiting: waitingGaps,
         cooldown_days: GIFT_OFFER_COOLDOWN_DAYS,
+        min_supply_per_slice: MIN_SUPPLY_PER_SLICE,
         skipped_unactionable: skippedUnactionable,
       },
     });

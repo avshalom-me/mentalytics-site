@@ -9,7 +9,7 @@ import type {
 import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -920,6 +920,13 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setMatchResults(json.matches ?? []);
+      // כמה אפשרויות באמת הוצגו - ראו trackMatchResults.
+      trackMatchResults("adults", {
+        region: matchPrefs.region || null,
+        city: matchPrefs.city || null,
+        online: !!matchPrefs.online,
+        returned: Array.isArray(json.matches) ? json.matches.length : 0,
+      });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
     } catch (e) {
