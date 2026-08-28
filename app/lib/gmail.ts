@@ -90,9 +90,19 @@ export type InboundMessage = {
   receivedAt: string; // ISO
 };
 
-/** מזהי הודעות בתיבה הנכנסת (חדשות בלבד נקבעות מול הטבלה, לא כאן). */
+/**
+ * מזהי הודעות בתיבה הנכנסת (חדשות בלבד נקבעות מול הטבלה, לא כאן).
+ *
+ * GMAIL_INGEST_TO (אופציונלי): אם admin@ הוא כינוי שנוחת לתיבה אישית
+ * (למשל של avshalom@), התיבה מכילה גם מייל אישי - ואסור שהסוכן
+ * יקרא אותו או ישלח אותו ל-OpenAI. הגדרת המשתנה מצמצמת את הקליטה
+ * למייל שמוען לכתובת הזו בלבד (deliveredto: תופס גם עותק וכינויים).
+ */
 export async function listInboxIds(newerThanDays: number, max = 50): Promise<{ id: string; threadId: string }[]> {
-  const q = encodeURIComponent(`in:inbox -in:chats newer_than:${newerThanDays}d`);
+  const onlyTo = (process.env.GMAIL_INGEST_TO ?? "").trim();
+  const q = encodeURIComponent(
+    `in:inbox -in:chats newer_than:${newerThanDays}d` + (onlyTo ? ` deliveredto:${onlyTo}` : "")
+  );
   const j = await gmailFetch<{ messages?: { id: string; threadId: string }[] }>(
     `/messages?q=${q}&maxResults=${max}`
   );
@@ -204,7 +214,12 @@ export async function sendGmailReply(opts: {
   const subject = opts.subject.startsWith("Re:") || opts.subject.startsWith("RE:")
     ? opts.subject
     : `Re: ${opts.subject}`;
+  // GMAIL_SENDER (אופציונלי): כתובת המוען לתשובות, למשל admin@getmentalytics.com.
+  // בלעדיה Gmail שולח מכתובת החשבון המחובר; עם המשתנה, הכתובת חייבת
+  // להיות כינוי מאומת של החשבון ("Send mail as" בהגדרות Gmail), אחרת Gmail יתעלם ממנה.
+  const sender = (process.env.GMAIL_SENDER ?? "").trim();
   const lines = [
+    ...(sender ? [`From: ${encodeHeader("טיפול חכם")} <${sender}>`] : []),
     `To: ${opts.to}`,
     `Subject: ${encodeHeader(subject)}`,
     ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`, `References: ${opts.inReplyTo}`] : []),
