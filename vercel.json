@@ -67,6 +67,10 @@
     {
       "schedule": "0 9 * * 1",
       "path": "/api/cron/agent-prospects"
+    },
+    {
+      "schedule": "*/30 * * * *",
+      "path": "/api/cron/agent-inbox"
     }
   ]
 }

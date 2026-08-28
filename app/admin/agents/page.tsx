@@ -31,6 +31,22 @@ type AgentRun = {
 
 type LatestDetailsMap = Record<string, { started_at: string; details: unknown }>;
 
+type InboxItem = {
+  id: string;
+  from_email: string;
+  from_name: string | null;
+  subject: string | null;
+  body_text: string | null;
+  received_at: string;
+  sender_therapist_name?: string | null;
+  category: string | null;
+  status: string;
+  draft_subject: string | null;
+  draft_body: string | null;
+  final_body: string | null;
+  replied_at: string | null;
+};
+
 type Prospect = {
   id: string;
   name: string;
@@ -224,6 +240,22 @@ const AGENTS: AgentMeta[] = [
     ],
     schedule: "רץ אוטומטית כל בוקר ב-08:00",
     chartLabel: "כמה פריטים היו בדוח בכל בוקר",
+  },
+  {
+    key: "inbox",
+    icon: "📨",
+    label: "שירות לקוחות",
+    runAction: "inbox_run",
+    runLabel: "בדוק מיילים עכשיו",
+    desc: "קורא כל חצי שעה את המיילים הנכנסים ל-admin@getmentalytics.com, מסווג כל פנייה (מטפל, מטופל, מרכז, ספאם), ומכין טיוטת תשובה מתוך בסיס הידע והתשובות שכבר אישרת בעבר. אתה עורך ושולח - וכל תשובה ששלחת מלמדת את הטיוטות הבאות.",
+    howToRead: [
+      "שום מייל לא יוצא לבד. כל תשובה נשלחת רק מלחיצה שלך, אחרי עריכה אם צריך.",
+      "סימון [להשלים] בטיוטה = הסוכן לא ידע עובדה ולא ניחש. השליחה נחסמת עד שתמלא אותו.",
+      "פנייה שענית לה ישירות בג'ימייל נסגרת מעצמה בריצה הבאה - התור לא מצטבר.",
+      "התשובות יוצאות מ-admin@ באותו שרשור, ומופיעות גם בתיקיית הנשלח שלך בג'ימייל.",
+    ],
+    schedule: "רץ אוטומטית כל חצי שעה",
+    chartLabel: "כמה טיוטות הוכנו בכל ריצה",
   },
   {
     key: "watchdog",
@@ -874,6 +906,206 @@ function GiftOfferCard({
 
 // טבלת מועמדים - רשימת השיחות. עריכה נשמרת מיד, בלי כפתור שמירה: זו
 // טבלת עבודה שמתעדכנת תוך כדי שיחת טלפון, ולא טופס.
+// ── שירות לקוחות: תור המיילים והטיוטות ──────────────────────────────────
+
+const INBOX_CATEGORY_LABELS: Record<string, string> = {
+  therapist_billing: "מטפל/ת · תשלום",
+  therapist_profile: "מטפל/ת · פרופיל",
+  therapist_cancel: "מטפל/ת · ביטול",
+  patient: "מטופל/ת",
+  center: "מרכז",
+  system: "מערכת",
+  spam: "ספאם",
+  other: "אחר",
+};
+
+function InboxCard({
+  row,
+  onChanged,
+  onNotify,
+}: {
+  row: InboxItem;
+  onChanged: (rows: InboxItem[]) => void;
+  onNotify: (msg: string, isErr?: boolean) => void;
+}) {
+  const [subject, setSubject] = useState(row.draft_subject ?? `Re: ${row.subject ?? ""}`);
+  const [body, setBody] = useState(row.draft_body ?? "");
+  const [showFull, setShowFull] = useState(false);
+  const [busy, setBusy] = useState<"" | "send" | "draft" | "ignore">("");
+  const needsFill = body.includes("[להשלים");
+
+  async function act(action: string, extra?: Record<string, unknown>, confirmMsg?: string) {
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+    setBusy(action === "inbox_send" ? "send" : action === "inbox_draft" ? "draft" : "ignore");
+    try {
+      const j = await postAgents(action, { id: row.id, ...extra });
+      if (Array.isArray(j.inbox)) onChanged(j.inbox as InboxItem[]);
+      if (action === "inbox_send") onNotify(`התשובה נשלחה אל ${j.to ?? row.from_email}`);
+      else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "הפעולה נכשלה", true);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const bodyText = row.body_text ?? "";
+  const preview = showFull ? bodyText : bodyText.slice(0, 400);
+
+  return (
+    <div className="rounded-2xl border border-sky-200 bg-white p-4">
+      <div className="mb-1 flex flex-wrap items-center gap-2">
+        <span className="text-sm font-black text-stone-900">
+          {row.from_name || row.from_email}
+        </span>
+        {row.sender_therapist_name && (
+          <span className="rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-700">
+            מזוהה: {row.sender_therapist_name}
+          </span>
+        )}
+        {row.category && (
+          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">
+            {INBOX_CATEGORY_LABELS[row.category] ?? row.category}
+          </span>
+        )}
+        <span className="text-xs text-stone-400">{relTime(row.received_at)}</span>
+        <span className="flex-1" />
+        <button
+          onClick={() => act("inbox_status", { status: "ignored" }, "לסמן שהפנייה לא דורשת מענה?")}
+          disabled={busy !== ""}
+          className="text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
+        >
+          לא דורש מענה
+        </button>
+      </div>
+      <div className="mb-2 text-xs font-bold text-stone-500">{row.subject || "(ללא נושא)"}</div>
+      <div className="mb-3 whitespace-pre-line rounded-xl bg-stone-50 p-3 text-sm leading-6 text-stone-700">
+        {preview}
+        {bodyText.length > 400 && (
+          <button onClick={() => setShowFull(!showFull)} className="ms-2 text-xs font-bold text-sky-700 underline">
+            {showFull ? "פחות" : "עוד"}
+          </button>
+        )}
+      </div>
+
+      {row.status === "drafted" && row.draft_body != null ? (
+        <>
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-xs font-black text-stone-400">טיוטת תשובה</span>
+            {needsFill && (
+              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+                יש [להשלים] בטיוטה - השליחה נחסמת עד שתמלא
+              </span>
+            )}
+          </div>
+          <input
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            disabled={busy !== ""}
+            className="mb-2 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-bold"
+          />
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            disabled={busy !== ""}
+            rows={Math.min(14, Math.max(6, body.split("\n").length + 1))}
+            className="mb-2 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm leading-6"
+            dir="rtl"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={() =>
+                act(
+                  "inbox_send",
+                  { subject, body },
+                  `לשלוח עכשיו את התשובה אל ${row.from_email}?\n\nהמייל יוצא מיד מ-admin@getmentalytics.com באותו שרשור.`
+                )
+              }
+              disabled={busy !== "" || !body.trim() || needsFill}
+              className="rounded-full bg-[#3D8C8A] px-5 py-2 text-sm font-black text-white hover:bg-[#2A6462] disabled:opacity-50"
+            >
+              {busy === "send" ? "שולח..." : "שלח תשובה"}
+            </button>
+            <button
+              onClick={() => act("inbox_draft", {}, "לנסח טיוטה חדשה? הטיוטה הנוכחית והעריכות שלך יוחלפו.")}
+              disabled={busy !== ""}
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-bold text-stone-600 hover:border-stone-500 disabled:opacity-50"
+            >
+              {busy === "draft" ? "מנסח..." : "נסח מחדש"}
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-stone-500">אין טיוטה עדיין - הסוכן ינסח בריצה הקרובה.</span>
+          <button
+            onClick={() => act("inbox_draft")}
+            disabled={busy !== ""}
+            className="rounded-full border border-[#3D8C8A] px-4 py-1.5 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3] disabled:opacity-50"
+          >
+            {busy === "draft" ? "מנסח..." : "נסח עכשיו"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InboxQueue({
+  rows,
+  configured,
+  onChanged,
+  onNotify,
+}: {
+  rows: InboxItem[];
+  configured: boolean;
+  onChanged: (rows: InboxItem[]) => void;
+  onNotify: (msg: string, isErr?: boolean) => void;
+}) {
+  const open = rows.filter((r) => r.status === "new" || r.status === "drafted");
+  const done = rows.filter((r) => r.status === "sent" || r.status === "sent_external" || r.status === "ignored");
+
+  return (
+    <div className="space-y-3">
+      {!configured && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <span className="font-black">החיבור לתיבה עוד לא הוגדר.</span> חסרים{" "}
+          <code className="rounded bg-amber-100 px-1">GMAIL_CLIENT_ID</code>,{" "}
+          <code className="rounded bg-amber-100 px-1">GMAIL_CLIENT_SECRET</code>,{" "}
+          <code className="rounded bg-amber-100 px-1">GMAIL_REFRESH_TOKEN</code> בהגדרות Vercel. עד אז
+          הסוכן רץ ומדווח "לא מוגדר" בלי לגעת בכלום.
+        </div>
+      )}
+      {open.length === 0 ? (
+        <p className="text-sm text-stone-400">אין פניות שממתינות למענה. 🎉</p>
+      ) : (
+        open.map((r) => (
+          <InboxCard
+            // מפתח שכולל את מועד הניסוח: טיוטה חדשה מהשרת מחליפה את העריכה המקומית.
+            key={`${r.id}:${r.draft_subject ?? ""}:${(r.draft_body ?? "").length}`}
+            row={r}
+            onChanged={onChanged}
+            onNotify={onNotify}
+          />
+        ))
+      )}
+      {done.length > 0 && (
+        <Collapse title="טופלו לאחרונה" count={done.length}>
+          <ul className="space-y-1 text-xs text-stone-600">
+            {done.map((r) => (
+              <li key={r.id}>
+                {r.status === "sent" ? "✅ נענתה מכאן" : r.status === "sent_external" ? "📤 נענתה בג'ימייל" : "🚫 ללא מענה"}
+                {" · "}
+                {r.from_name || r.from_email} · {r.subject || "(ללא נושא)"} · {relTime(r.received_at)}
+              </li>
+            ))}
+          </ul>
+        </Collapse>
+      )}
+    </div>
+  );
+}
+
 function ProspectTable({
   rows,
   onChanged,
@@ -1253,6 +1485,8 @@ export default function AgentsPage() {
   const [latestDetails, setLatestDetails] = useState<LatestDetailsMap>({});
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [placesReady, setPlacesReady] = useState(true);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [inboxReady, setInboxReady] = useState(true);
   const [pending, setPending] = useState<PendingAction[]>([]);
   // מטפלים שקיבלו הצעת מתנה בחלון הצינון (חצי שנה) - נטען מהשרת פעם אחת
   // ומשותף לכל כרטיסי ההצעות, כי אותו מטפל עולה כמועמד בכמה חיתוכים.
@@ -1295,6 +1529,8 @@ export default function AgentsPage() {
           setLatestDetails(j.latest_details ?? {});
           setProspects(j.prospects ?? []);
           setPlacesReady(j.places_configured !== false);
+          setInbox(j.inbox ?? []);
+          setInboxReady(j.inbox_configured !== false);
           setPending(j.pending_actions ?? []);
           setGiftOfferedIds(j.gift_offered_ids ?? []);
           setResolved(j.resolved_actions ?? []);
@@ -1743,6 +1979,25 @@ export default function AgentsPage() {
 
   // ההמלצות של הסוכן עכשיו: פעולות (כרטיסים) + ממצאים (רשימה).
   function AgentQueue({ meta }: { meta: AgentMeta }) {
+    // שירות הלקוחות: "ממתין לך" הוא תור המיילים עם הטיוטות.
+    if (meta.key === "inbox") {
+      return (
+        <InboxQueue
+          rows={inbox}
+          configured={inboxReady}
+          onChanged={setInbox}
+          onNotify={(msg, isErr) => {
+            if (isErr) {
+              setActionError(msg);
+              setActionMsg("");
+            } else {
+              setActionMsg(msg);
+              setActionError("");
+            }
+          }}
+        />
+      );
+    }
     // סוכן איתור המכונים: "ממתין לך" הוא רשימת השיחות עצמה, לא תור הצעות.
     if (meta.key === "center_prospects") {
       return (
@@ -2069,8 +2324,10 @@ export default function AgentsPage() {
             const acts =
               meta.key === "center_prospects"
                 ? prospects.filter((p) => !p.contacted_at).length
-                : mine.filter((a) => !isFinding(a)).length;
-            const finds = meta.key === "center_prospects" ? 0 : mine.length - acts;
+                : meta.key === "inbox"
+                  ? inbox.filter((m) => m.status === "new" || m.status === "drafted").length
+                  : mine.filter((a) => !isFinding(a)).length;
+            const finds = meta.key === "center_prospects" || meta.key === "inbox" ? 0 : mine.length - acts;
             const isSel = selected === meta.key;
             return (
               <button

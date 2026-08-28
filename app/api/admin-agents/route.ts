@@ -15,6 +15,8 @@ import { runCenterProspects, listProspects, updateProspect, addProspectsFromText
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
+import { runInboxAgent, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
+import { gmailConfigured } from "@/app/lib/gmail";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -45,6 +47,9 @@ function runMetric(agent: string, details: unknown): number | null {
     // לגיבוי אין "ממצאים" - המדד הוא כמה קבצים עלו בפועל.
     case "backup":
       return typeof d.uploaded === "number" ? d.uploaded : null;
+    // שירות לקוחות: כמה טיוטות הוכנו בריצה.
+    case "inbox":
+      return typeof d.drafted === "number" ? d.drafted : null;
     case "daily_digest": {
       const secs = Array.isArray(d.sections)
         ? (d.sections as { count?: number }[])
@@ -140,6 +145,8 @@ export async function GET() {
       ok: true,
       prospects: await listProspects().catch(() => []),
       places_configured: placesConfigured(),
+      inbox: await listInbox().catch(() => []),
+      inbox_configured: gmailConfigured(),
       runs,
       latest_details: latestDetails,
       pending_actions: pendingRes.data ?? [],
@@ -231,6 +238,41 @@ export async function POST(req: NextRequest) {
         still_short: result.stillShort ?? 0,
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
+    }
+    if (body?.action === "inbox_run") {
+      const r = await runInboxAgent();
+      return NextResponse.json({
+        ok: r.ok,
+        configured: r.configured,
+        inserted: r.inserted,
+        drafted: r.drafted,
+        auto_ignored: r.autoIgnored,
+        answered_external: r.answeredExternal,
+        errors: r.errors,
+        error: r.error,
+        inbox: await listInbox().catch(() => []),
+      });
+    }
+    if (body?.action === "inbox_draft") {
+      const r = await regenerateInboxDraft(String(body?.id ?? ""));
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
+    }
+    // השליחה היחידה במערכת: לחיצת אדמין על פנייה אחת, עם הגוף שעל המסך.
+    if (body?.action === "inbox_send") {
+      const r = await sendInboxReply({
+        id: String(body?.id ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, to: r.to, inbox: await listInbox().catch(() => []) });
+    }
+    if (body?.action === "inbox_status") {
+      const status = body?.status === "new" ? "new" : "ignored";
+      const r = await setInboxStatus(String(body?.id ?? ""), status as "ignored" | "new");
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
     }
     if (body?.action === "prospects_run") {
       const result = await runCenterProspects();

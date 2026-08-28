@@ -319,6 +319,8 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     agentFreshnessCheck("backup", "הגיבוי לדרייב רץ ביממה האחרונה", 26),
     agentFreshnessCheck("center_prospects", "סוכן איתור המכונים רץ השבוע", 8 * 24),
     agentFreshnessCheck("center_nudge", "סוכן המרכזים רץ ביממה האחרונה", 26),
+    // רץ כל חצי שעה; שלוש שעות בלי ריצה = משהו תקוע, לא סטייה רגילה.
+    agentFreshnessCheck("inbox", "סוכן שירות הלקוחות רץ בשלוש השעות האחרונות", 3),
     agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
     freshnessCheck("cron_weekly_report", "דוח שבועי נוצר בשבוע האחרון", async () => {
       const { data } = await supabaseAdmin
