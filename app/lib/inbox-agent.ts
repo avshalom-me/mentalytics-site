@@ -4,6 +4,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
 import {
   gmailConfigured,
+  connectedAccount,
   listInboxIds,
   getMessage,
   threadAnsweredAfter,
@@ -28,6 +29,10 @@ const MODEL = process.env.AGENT_INBOX_LLM_MODEL ?? "gpt-4o";
 const MAX_DRAFTS_PER_RUN = 10;
 const MAX_EXTERNAL_CHECKS_PER_RUN = 20;
 const INGEST_WINDOW_DAYS = 7;
+// התיבה שהסוכן אמור לעבוד מולה. ב-OAuth Playground קל לאשר בטעות עם
+// החשבון האישי שמחובר בדפדפן - ואז הסוכן היה קורא תיבה אישית בשקט.
+// הריצה מאמתת את זהות החשבון ומסרבת לעבוד על כל תיבה אחרת.
+const EXPECTED_ACCOUNT = (process.env.GMAIL_ACCOUNT ?? "admin@getmentalytics.com").toLowerCase();
 
 // כתובות שלנו - מייל מהן אינו "פנייה נכנסת" (התשובות של עצמנו חוזרות
 // ב-in:inbox כשהפונה עונה, אבל ההודעה המקורית שלנו לא צריכה שורה).
@@ -254,6 +259,14 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
   }
 
   try {
+    // 0. אימות זהות: הטוקן חייב להיות של התיבה הנכונה.
+    const account = await connectedAccount();
+    if (account !== EXPECTED_ACCOUNT) {
+      const msg = `הטוקן שייך ל-${account} ולא ל-${EXPECTED_ACCOUNT} - אושר חשבון שגוי ב-OAuth Playground. הסוכן מסרב לקרוא תיבה אחרת.`;
+      await finishAgentRun(runId, { status: "error", error: msg, details: { configured: true, account } });
+      return { ...result, ok: false, error: msg };
+    }
+
     // 1. קליטה: מה חדש בתיבה שעוד לא אצלנו.
     const ids = await listInboxIds(INGEST_WINDOW_DAYS);
     result.fetched = ids.length;
@@ -451,6 +464,14 @@ export async function sendInboxReply(opts: {
     return { ok: false, error: "בטיוטה נשאר סימון [להשלים] - יש למלא אותו לפני שליחה" };
   }
   if (!gmailConfigured()) return { ok: false, error: "Gmail לא מוגדר" };
+  try {
+    const account = await connectedAccount();
+    if (account !== EXPECTED_ACCOUNT) {
+      return { ok: false, error: `הטוקן שייך ל-${account} ולא ל-${EXPECTED_ACCOUNT} - לא נשלח` };
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "בדיקת החשבון נכשלה" };
+  }
 
   const { data: row } = await supabaseAdmin
     .from("inbox_messages")

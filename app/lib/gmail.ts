@@ -61,6 +61,12 @@ async function gmailFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+/** כתובת החשבון שהטוקן מאשר בפועל - לאימות שאושר החשבון הנכון. */
+export async function connectedAccount(): Promise<string> {
+  const j = await gmailFetch<{ emailAddress?: string }>(`/profile`);
+  return (j.emailAddress ?? "").toLowerCase();
+}
+
 // ── קריאת הודעות ────────────────────────────────────────────────────────
 
 export type GmailHeaderMap = Record<string, string>;
