@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePageView } from "@/app/lib/useTrack";
 
 // עמוד ההצטרפות במסלול ההזמנה: חודשיים ראשונים ללא תשלום, ואחריהם המנוי
 // הרגיל. נפתח רק עם קישור אישי תקף - בלעדיו אין כאן טופס בכלל.
@@ -27,6 +28,19 @@ type SumitTokenizeResponse = {
   Data: { SingleUseToken?: string } | null;
 };
 
+// דיווח כשל מצד הדפדפן. בלעדיו הצטרפות שנשברה אצל המטפל לא משאירה שום
+// עקבה בשרת, ואי אפשר להבדיל בין "אף אחד לא ניסה" ל"מישהו ניסה ונשבר".
+// אותו מסלול בדיוק שנבנה להצטרפות מרכזים אחרי שני אירועים כאלה.
+function reportFailure(stage: "gate" | "config" | "tokenize" | "subscribe" | "exception", message: string) {
+  const safeStage = stage === "gate" ? "exception" : stage;
+  fetch("/api/payment-client-error", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ source: "gift_join", stage: safeStage, message: `${stage}: ${message}` }),
+    keepalive: true,
+  }).catch(() => {});
+}
+
 function hebDate(iso: string): string {
   return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 }
@@ -43,6 +57,9 @@ function timeLeft(iso: string): string {
 }
 
 export default function GiftCheckoutPage() {
+  // מי בכלל פתח את הקישור. בלי זה "אף אחד לא נרשם" הוא נתון חסר משמעות:
+  // אי אפשר לדעת אם המייל לא נפתח, או שהעמוד נפתח והמסלול נשבר.
+  usePageView("gift-checkout", "therapist");
   const [token, setToken] = useState("");
   const [offer, setOffer] = useState<Offer | null>(null);
   const [gateError, setGateError] = useState("");
@@ -65,9 +82,15 @@ export default function GiftCheckoutPage() {
       .then((r) => r.json())
       .then((j) => {
         if (j.ok) setOffer(j as Offer);
-        else setGateError(j.error || "הקישור אינו תקף");
+        else {
+          setGateError(j.error || "הקישור אינו תקף");
+          reportFailure("gate", j.reason || j.error || "unknown");
+        }
       })
-      .catch(() => setGateError("שגיאה בבדיקת הקישור"))
+      .catch(() => {
+        setGateError("שגיאה בבדיקת הקישור");
+        reportFailure("gate", "fetch failed");
+      })
       .finally(() => setChecking(false));
   }, []);
 
@@ -78,7 +101,10 @@ export default function GiftCheckoutPage() {
     try {
       const cardDigits = card.replace(/\D/g, "");
       const cfgRes = await fetch("/api/payments/sumit-config");
-      if (!cfgRes.ok) throw new Error("שגיאה בטעינת מערכת התשלום. נסו שוב בעוד מספר רגעים.");
+      if (!cfgRes.ok) {
+        reportFailure("config", `status ${cfgRes.status}`);
+        throw new Error("שגיאה בטעינת מערכת התשלום. נסו שוב בעוד מספר רגעים.");
+      }
       const cfg: SumitConfig = await cfgRes.json();
 
       const tokRes = await fetch(SUMIT_TOKENIZE_URL, {
@@ -95,6 +121,7 @@ export default function GiftCheckoutPage() {
       });
       const tok = (await tokRes.json()) as SumitTokenizeResponse;
       if (tok.Status !== 0 || !tok.Data?.SingleUseToken) {
+        reportFailure("tokenize", `status ${tok.Status} ${tok.UserErrorMessage ?? ""}`);
         throw new Error(
           tok.UserErrorMessage || "פרטי הכרטיס לא תקינים. בדקו את המספר, התוקף וה-CVV ונסו שוב."
         );
@@ -106,10 +133,16 @@ export default function GiftCheckoutPage() {
         body: JSON.stringify({ token, singleUseToken: tok.Data.SingleUseToken, phone }),
       });
       const j = await res.json();
-      if (!res.ok || !j.ok) throw new Error(j.error || "ההרשמה נכשלה");
+      if (!res.ok || !j.ok) {
+        reportFailure("subscribe", `status ${res.status} ${j.error ?? ""}`);
+        throw new Error(j.error || "ההרשמה נכשלה");
+      }
       setDone({ first_charge_date: j.first_charge_date });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "שגיאה");
+      const msg = err instanceof Error ? err.message : "שגיאה";
+      // ענף שלא דיווח בעצמו (חריגת רשת, חוסם פרסומות שחסם את Sumit).
+      if (!/^(שגיאה בטעינת מערכת|פרטי הכרטיס לא תקינים)/.test(msg)) reportFailure("exception", msg);
+      setError(msg);
     } finally {
       setLoading(false);
     }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { createAgentAction } from "@/app/lib/agent-infra";
+import { writeAudit } from "@/app/lib/audit";
 import { createSubscription, SumitPaymentDeclinedError, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import {
   validateGiftCheckoutToken,
@@ -44,6 +46,36 @@ export async function GET(req: NextRequest) {
     const msg = e instanceof Error ? e.message : "שגיאה";
     console.error("gift-trial-subscription GET failed:", msg);
     return NextResponse.json({ ok: false, error: "שגיאה בבדיקת הקישור" }, { status: 500 });
+  }
+}
+
+/**
+ * הוראת קבע שנפתחה ב-Sumit אבל לא נרשמה אצלנו. זה המצב היחיד במסלול הזה
+ * שאף מנגנון לא מגלה מעצמו, ולכן הוא נכתב כמשימה בתור ולא רק ללוג.
+ */
+async function orphanAlert(
+  therapistId: string,
+  therapistName: string,
+  recurringId: string,
+  err: string
+): Promise<void> {
+  try {
+    await createAgentAction({
+      agent: "finance",
+      actionType: "sumit_orphan",
+      kind: "action",
+      title: `הוראת קבע ב-Sumit בלי רישום אצלנו: ${therapistName || therapistId}`,
+      body:
+        `מסלול המתנה פתח הוראת קבע ב-Sumit (מספר ${recurringId}) והכתיבה למאגר נכשלה.\n` +
+        `בלי טיפול ידני המטפל לא מקודם, ובעוד חודשיים הוא כן יחויב.\n` +
+        `שגיאה: ${err}`,
+      dedupeKey: `sumit_orphan:${recurringId}`,
+      entityId: therapistId,
+      entityLabel: therapistName,
+      payload: { therapist_id: therapistId, sumit_recurring_id: recurringId, error: err },
+    });
+  } catch (e) {
+    console.error("gift-trial: orphanAlert failed:", e instanceof Error ? e.message : e);
   }
 }
 
@@ -102,17 +134,24 @@ export async function POST(req: NextRequest) {
 
     // המנוי נרשם כפעיל שתקופתו הנוכחית נגמרת ביום החיוב הראשון. כך סוכן
     // הכספים רואה מנוי תקין עם תאריך חידוש, ולא "מנוי שלא התחדש".
-    const { error: subErr } = await supabaseAdmin.from("subscriptions").insert({
-      therapist_id: therapistId,
-      morning_token_id: recurringId,
-      status: "active",
-      amount: SUBSCRIPTION_BASE_PRICE,
-      current_period_start: now,
-      current_period_end: `${startsOn}T00:00:00.000Z`,
-      // הסימון היחיד שמזהה "חיוב ראשון נדחה". מנוי רגיל מקבל NULL, ולכן
-      // הוא לא יכול להיתפס בתזכורת בשום מצב.
-      first_charge_on: startsOn,
-    });
+    // upsert ולא insert: על subscriptions יש UNIQUE(therapist_id), ומטפל
+    // שהיה פעם מנוי ועזב נושא שורה ישנה. insert היה נכשל עליה - אחרי
+    // ש-Sumit כבר פתח הוראת קבע - והמסלול הרגיל עושה בדיוק upsert.
+    const { error: subErr } = await supabaseAdmin.from("subscriptions").upsert(
+      {
+        therapist_id: therapistId,
+        morning_token_id: recurringId,
+        status: "active",
+        amount: SUBSCRIPTION_BASE_PRICE,
+        current_period_start: now,
+        current_period_end: `${startsOn}T00:00:00.000Z`,
+        // הסימון היחיד שמזהה "חיוב ראשון נדחה". מנוי רגיל מקבל NULL, ולכן
+        // הוא לא יכול להיתפס בתזכורת בשום מצב.
+        first_charge_on: startsOn,
+        updated_at: now,
+      },
+      { onConflict: "therapist_id" }
+    );
     if (subErr) {
       // הוראת הקבע כבר קיימת ב-Sumit אבל לא נרשמה אצלנו. בלי המזהה בלוג
       // אין דרך למצוא אותה ולבטל אותה, והלקוח היה נשאר עם הוראת קבע
@@ -121,6 +160,10 @@ export async function POST(req: NextRequest) {
         `gift-trial: subscription row insert failed AFTER Sumit succeeded. ` +
           `therapist=${therapistId} sumit_recurring=${recurringId} err=${subErr.message}`
       );
+      // לוג ב-Vercel לא נקרא אף פעם, וסריקת היתומים מתחילה מטבלת המנויים
+      // שלנו - כלומר הוראת קבע שלא נרשמה אצלנו אינה נראית לאף מנגנון.
+      // לכן היא נכנסת לתור ההצעות כמשימה, עם המספר שצריך כדי לבטל אותה.
+      await orphanAlert(therapistId, therapistName, recurringId, subErr.message);
       return NextResponse.json(
         { ok: false, error: `ההרשמה נקלטה חלקית. אנא פנו אלינו עם המספר ${recurringId} ונשלים ידנית.` },
         { status: 500 }
@@ -136,9 +179,24 @@ export async function POST(req: NextRequest) {
         promotion_source: "gift_trial",
         promoted_since: now,
         promoted_until: null,
+        manually_promoted: false, // עמודה ישנה שהמסלול הרגיל שומר מסונכרנת
       })
       .eq("id", therapistId);
-    if (tErr) throw new Error(`הפעלת הקידום נכשלה: ${tErr.message}`);
+    if (tErr) {
+      await orphanAlert(therapistId, therapistName, recurringId, tErr.message);
+      throw new Error(`הפעלת הקידום נכשלה: ${tErr.message}`);
+    }
+
+    // רישום ביומן, כמו במסלול הרגיל. בלעדיו ההצטרפות לא מופיעה בציר הזמן
+    // של המטפל ואי אפשר לשחזר מתי ואיך הוא נכנס לקידום.
+    await writeAudit(supabaseAdmin, {
+      therapistId,
+      actorType: "self",
+      action: "status_change:approved->paying",
+      before: { status: "approved", promotion_source: null },
+      after: { status: "paying", promotion_source: "gift_trial", first_charge_on: startsOn },
+      reason: "gift_trial_subscription_created",
+    });
 
     await burnGiftCheckoutToken(token);
 
