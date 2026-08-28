@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { createAgentAction } from "@/app/lib/agent-infra";
+import { sendGiftTrialWelcomeEmail } from "@/app/lib/therapist-emails";
 import { writeAudit } from "@/app/lib/audit";
 import { createSubscription, SumitPaymentDeclinedError, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
 import {
@@ -199,6 +200,23 @@ export async function POST(req: NextRequest) {
     });
 
     await burnGiftCheckoutToken(token);
+
+    // אישור הצטרפות. best-effort: כשל במייל לא הופך הצטרפות מוצלחת לכישלון,
+    // אבל הוא כן נרשם - זה המייל שסוגר את ההבטחה שניתנה בהצעה.
+    try {
+      await sendGiftTrialWelcomeEmail({
+        to: email,
+        name: therapistName,
+        firstChargeDate: startsOn,
+        amount: SUBSCRIPTION_BASE_PRICE,
+        giftMonths,
+      });
+    } catch (mailErr) {
+      console.error(
+        "gift-trial: welcome email failed:",
+        mailErr instanceof Error ? mailErr.message : mailErr
+      );
+    }
 
     return NextResponse.json({
       ok: true,

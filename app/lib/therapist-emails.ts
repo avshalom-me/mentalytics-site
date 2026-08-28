@@ -339,6 +339,88 @@ export async function sendPromotionGrantedEmail(opts: {
   }
 }
 
+/**
+ * אישור הצטרפות במסלול ההזמנה (חודשיים ראשונים ללא תשלום).
+ *
+ * מייל הברוכים-הבאים הרגיל לא מתאים כאן: הוא אומר "תודה ששדרגת" ושהפרופיל
+ * יעלה "אחרי שהצוות יאשר אותו" - שני דברים לא נכונים במסלול הזה, שבו
+ * הפרופיל כבר מאושר ונכנס לקידום מיד. וחשוב מזה, הוא לא אומר את מה שהובטח
+ * בהצעה: שלא נגבה תשלום היום, מתי כן, ושתישלח תזכורת לפני.
+ */
+export async function sendGiftTrialWelcomeEmail(opts: {
+  to: string;
+  name: string;
+  firstChargeDate: string; // YYYY-MM-DD
+  amount: number;
+  giftMonths: number;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn("sendGiftTrialWelcomeEmail: RESEND_API_KEY not configured, skipping");
+    return { ok: false, error: "resend not configured" };
+  }
+
+  const safeName = escapeHtml(opts.name || "מטפל/ת יקר/ה");
+  const dashboardUrl = `${SITE_URL}/therapists/dashboard`;
+  const charge = new Date(opts.firstChargeDate).toLocaleDateString("he-IL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.7;color:#1a4a5c;direction:rtl;text-align:right;">
+      ${EMAIL_LOGO_HEADER}
+      <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">ההצטרפות הושלמה, ${safeName}</h1>
+      <p style="margin:0 0 12px;">הפרופיל שלך נכנס <strong>למערכת ההתאמות</strong> ומוצג מעכשיו למטופלים שמחפשים מטפל/ת בתחום ובאזור שלך.</p>
+
+      <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:16px 18px;margin:20px 0;">
+        <p style="margin:0 0 10px;font-weight:bold;color:#0F5468;">מה קורה מבחינת תשלום</p>
+        <ul style="margin:0;padding-right:18px;font-size:15px;">
+          <li style="margin-bottom:6px;">לא נגבה ממך תשלום היום, ולא ב-${opts.giftMonths} החודשים הראשונים.</li>
+          <li style="margin-bottom:6px;">החיוב הראשון: <strong>${escapeHtml(charge)}</strong>, בסך ${opts.amount} ש"ח + מע"מ לחודש.</li>
+          <li style="margin-bottom:6px;">שבוע לפני התאריך הזה יישלח אליך מייל תזכורת עם התאריך והסכום.</li>
+          <li>ביטול בכל שלב בהודעת מייל אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.</li>
+        </ul>
+      </div>
+
+      <p style="margin:0 0 16px;">באזור האישי אפשר לראות כמה מטופלים ראו את הפרופיל, כמה הופעות היו לך בהתאמות ובמאגר, וכמה לחיצות ליצירת קשר הגיעו:</p>
+      <p style="margin:0 0 16px;">
+        <a href="${dashboardUrl}"
+           style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
+          לאזור האישי שלי
+        </a>
+      </p>
+
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;">
+        אפשר להשיב ישירות למייל הזה. לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
+        טיפול חכם - Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resend.emails.send({
+      from: FROM,
+      to: opts.to,
+      subject: "ההצטרפות הושלמה - הפרופיל שלך במערכת ההתאמות",
+      html,
+    });
+    if (error) {
+      console.error("sendGiftTrialWelcomeEmail: resend error:", error);
+      return { ok: false, error: String(error) };
+    }
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error("sendGiftTrialWelcomeEmail: throw:", msg);
+    return { ok: false, error: msg };
+  }
+}
+
 // Onboarding email sent once a therapist becomes active:
 //   tier 'paid' - they just subscribed (create-subscription)
 //   tier 'free' - admin approved their pending profile (admin-therapists)

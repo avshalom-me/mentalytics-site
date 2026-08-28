@@ -188,6 +188,14 @@ export default function GiftCheckoutPage() {
             החיוב הראשון: <strong>{hebDate(done.first_charge_date)}</strong>. שבוע לפני התאריך הזה
             יישלח אליך מייל תזכורת. ביטול בכל שלב בהודעת מייל אלינו.
           </div>
+          {/* הצעד הבא הוא לראות את הפרופיל המקודם ואת הנתונים שלו. בלי
+              הכפתור הזה המסך היה מסתיים בלי שום מקום ללכת אליו. */}
+          <a
+            href="/therapists/dashboard"
+            className="mt-6 inline-block rounded-full bg-[#3D8C8A] px-7 py-3 text-base font-black text-white hover:bg-[#2A6462]"
+          >
+            לאזור האישי והסטטיסטיקות שלי
+          </a>
         </div>
       </div>
     );
