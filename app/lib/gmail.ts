@@ -198,6 +198,65 @@ export async function getMessage(id: string): Promise<InboundMessage | null> {
   };
 }
 
+/** מזהי הודעות שיצאו מאיתנו - בסיס לבניית מאגר הדוגמאות ההיסטורי. */
+export async function listSentIds(newerThanDays: number, max = 60): Promise<string[]> {
+  const q = encodeURIComponent(`in:sent newer_than:${newerThanDays}d`);
+  const j = await gmailFetch<{ messages?: { id: string }[] }>(
+    `/messages?q=${q}&maxResults=${max}`
+  );
+  return (j.messages ?? []).map((m) => m.id);
+}
+
+export type ThreadMessage = {
+  id: string;
+  fromEmail: string;
+  fromName: string | null;
+  subject: string;
+  bodyText: string;
+  internalDate: number;
+  isSent: boolean;
+};
+
+/**
+ * שרשור מלא, ממוין לפי זמן. משמש לזיווג "פנייה שנכנסה" עם "התשובה שיצאה
+ * עליה" - הזוג הזה הוא הדוגמה שהסוכן לומד ממנה.
+ */
+export async function getThread(threadId: string): Promise<ThreadMessage[]> {
+  const j = await gmailFetch<{ messages?: (RawMessage & { labelIds?: string[] })[] }>(
+    `/threads/${threadId}?format=full`
+  );
+  const out: ThreadMessage[] = [];
+  for (const raw of j.messages ?? []) {
+    const headers: GmailHeaderMap = {};
+    for (const h of raw.payload?.headers ?? []) headers[h.name.toLowerCase()] = h.value;
+    const from = parseFrom(headers["from"] ?? "");
+    if (!from.email) continue;
+    out.push({
+      id: raw.id,
+      fromEmail: from.email,
+      fromName: from.name,
+      subject: (headers["subject"] ?? "").slice(0, 500),
+      // הציטוט של ההתכתבות הקודמת נחתך: בדוגמה הוא רעש שמסתיר את מה
+      // שנכתב בפועל, ומנפח כל דוגמה פי כמה.
+      bodyText: stripQuoted(extractBody(raw.payload)).slice(0, 4000),
+      internalDate: Number(raw.internalDate ?? 0),
+      isSent: (raw.labelIds ?? []).includes("SENT"),
+    });
+  }
+  return out.sort((a, b) => a.internalDate - b.internalDate);
+}
+
+/** חיתוך הציטוט של ההודעה הקודמת מגוף המייל. */
+function stripQuoted(body: string): string {
+  const lines = body.split("\n");
+  const cut = lines.findIndex((l) =>
+    /^\s*>/.test(l) ||
+    /^\s*(On .+ wrote:|בתאריך .+ מאת)/.test(l) ||
+    /^-{2,}\s*Original Message/i.test(l)
+  );
+  return (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
+}
+
 // ── שליחת תשובה ─────────────────────────────────────────────────────────
 
 /** כותרת מייל בעברית חייבת קידוד RFC 2047. */

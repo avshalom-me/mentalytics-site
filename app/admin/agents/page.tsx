@@ -1064,6 +1064,30 @@ function InboxQueue({
 }) {
   const open = rows.filter((r) => r.status === "new" || r.status === "drafted");
   const done = rows.filter((r) => r.status === "sent" || r.status === "sent_external" || r.status === "ignored");
+  const [backfilling, setBackfilling] = useState(false);
+
+  async function backfill() {
+    if (
+      !window.confirm(
+        "לייבא דוגמאות מההתכתבות של השנה האחרונה?\n\nהסוכן יקרא את התשובות שכבר שלחת בתיבה וילמד מהן את הסגנון שלך. קריאה בלבד - לא נשלח דבר, ופניות שממתינות לך לא ישתנו."
+      )
+    ) {
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const j = await postAgents("inbox_backfill", { days: 365, max: 60 });
+      if (Array.isArray(j.inbox)) onChanged(j.inbox as InboxItem[]);
+      onNotify(
+        `נסרקו ${j.scanned} תשובות, נמצאו ${j.pairs} זוגות, יובאו ${j.imported} דוגמאות` +
+          (j.skipped ? ` (${j.skipped} כבר היו במערכת)` : "")
+      );
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "הייבוא נכשל", true);
+    } finally {
+      setBackfilling(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -1074,6 +1098,21 @@ function InboxQueue({
           <code className="rounded bg-amber-100 px-1">GMAIL_CLIENT_SECRET</code>,{" "}
           <code className="rounded bg-amber-100 px-1">GMAIL_REFRESH_TOKEN</code> בהגדרות Vercel. עד אז
           הסוכן רץ ומדווח "לא מוגדר" בלי לגעת בכלום.
+        </div>
+      )}
+      {configured && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
+          <span className="text-xs text-stone-600">
+            כדי שהטיוטות יישמעו כמוך כבר מהתחלה, אפשר ללמד את הסוכן מהתשובות שכבר שלחת בתיבה.
+          </span>
+          <span className="flex-1" />
+          <button
+            onClick={backfill}
+            disabled={backfilling}
+            className="shrink-0 rounded-full border border-[#3D8C8A] px-3.5 py-1.5 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3] disabled:opacity-50"
+          >
+            {backfilling ? "מייבא..." : "למד מההתכתבות שלי"}
+          </button>
         </div>
       )}
       {open.length === 0 ? (

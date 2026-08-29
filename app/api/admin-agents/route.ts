@@ -15,7 +15,7 @@ import { runCenterProspects, listProspects, updateProspect, addProspectsFromText
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
-import { runInboxAgent, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
+import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
@@ -250,6 +250,24 @@ export async function POST(req: NextRequest) {
         answered_external: r.answeredExternal,
         errors: r.errors,
         error: r.error,
+        inbox: await listInbox().catch(() => []),
+      });
+    }
+    // ייבוא חד-פעמי של דוגמאות מההתכתבות ההיסטורית. קריאה בלבד -
+    // לא שולח כלום ולא משנה פניות קיימות.
+    if (body?.action === "inbox_backfill") {
+      const r = await runInboxBackfill({
+        days: Number(body?.days) || undefined,
+        max: Number(body?.max) || undefined,
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({
+        ok: true,
+        scanned: r.scanned,
+        pairs: r.pairs,
+        imported: r.imported,
+        skipped: r.skipped,
+        errors: r.errors.slice(0, 5),
         inbox: await listInbox().catch(() => []),
       });
     }

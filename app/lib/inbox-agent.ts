@@ -6,6 +6,8 @@ import {
   gmailConfigured,
   connectedAccount,
   listInboxIds,
+  listSentIds,
+  getThread,
   getMessage,
   threadAnsweredAfter,
   sendGmailReply,
@@ -84,7 +86,7 @@ async function senderContext(email: string): Promise<SenderContext> {
   // מעדיפים את הפרופיל המקודם, ואחריו את הוותיק.
   const { data: matches } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, status, promotion_source, promoted_since, entity_type, created_at")
+    .select("id, full_name, status, promotion_source, promoted_since, entity_type, created_at, admin_approved, accepting_new_patients, match_paused_until")
     .eq("email", email)
     .order("created_at", { ascending: true })
     .limit(5);
@@ -115,6 +117,48 @@ async function senderContext(email: string): Promise<SenderContext> {
   } else {
     lines.push(`מסלול נוכחי: חינמי (מופיע במאגר, לא במערכת ההתאמות).`);
   }
+
+  // מצב הפרופיל: מה שחוסם אותו מלהופיע, אם משהו חוסם. בלי זה טיוטה
+  // לשאלה "למה אני לא מקבל פניות" יוצאת כללית, בזמן שהתשובה מונחת כאן.
+  if (t.admin_approved === false) {
+    lines.push("הפרופיל טרם אושר על ידינו לתצוגה - זה תלוי בנו, לא בו/ה.");
+  }
+  if (t.accepting_new_patients === false) {
+    lines.push("סימן/ה שאינו/ה מקבל/ת מטופלים חדשים, ולכן אינו/ה מוצג/ת בהתאמות.");
+  }
+  if (t.match_paused_until && new Date(t.match_paused_until as string) > new Date()) {
+    lines.push("מוקפא/ת זמנית מההתאמות לבקשתו/ה.");
+  }
+
+  // נתוני חשיפה של 30 יום. מספרים בלבד, בלי שום פרט על המטופלים עצמם.
+  const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const [views, clicks, impressions] = await Promise.all([
+    supabaseAdmin
+      .from("therapist_profile_views")
+      .select("id", { count: "exact", head: true })
+      .eq("therapist_id", t.id)
+      .gte("viewed_at", since),
+    supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("id", { count: "exact", head: true })
+      .eq("therapist_id", t.id)
+      .gte("clicked_at", since),
+    supabaseAdmin
+      .from("analytics_events")
+      .select("id", { count: "exact", head: true })
+      .eq("therapist_id", t.id)
+      .eq("event_type", "profile_impression")
+      .gte("created_at", since),
+  ]);
+  lines.push(
+    `ב-30 הימים האחרונים: ${impressions.count ?? 0} הופעות במאגר, ` +
+      `${views.count ?? 0} כניסות לפרופיל, ${clicks.count ?? 0} לחיצות ליצירת קשר.`
+  );
+  lines.push(
+    "המספרים האלה הם רקע עבורך. אל תצטט אותם בטיוטה אלא אם הפונה שאל/ה " +
+      "עליהם במפורש - מטפל שלא ביקש נתונים לא אמור לקבל דוח ביצועים."
+  );
+
   return { therapistId: t.id as string, contextText: lines.join("\n") };
 }
 
@@ -170,19 +214,36 @@ const VALID_CATEGORIES = new Set([
   "other",
 ]);
 
+// שתי דוגמאות אחרונות מכל קטגוריה, ולא חמש אחרונות בסך הכל.
+//
+// הסיווג והניסוח קורים באותה קריאה, ולכן אי אפשר לסנן לפי הקטגוריה של
+// הפנייה הנוכחית - היא עוד לא ידועה. הפיזור הוא הפתרון: אחרי שבוע של
+// תשובות על חשבוניות, פנייה של מטופל עדיין תמצא בפרומפט דוגמה של מטופל.
+const EXEMPLARS_PER_CATEGORY = 2;
+
 async function exemplars(): Promise<{ category: string; incoming: string; reply: string }[]> {
   const { data } = await supabaseAdmin
     .from("inbox_messages")
-    .select("category, subject, body_text, final_body")
+    .select("category, subject, body_text, final_body, replied_at")
     .eq("is_exemplar", true)
     .not("final_body", "is", null)
     .order("replied_at", { ascending: false })
-    .limit(5);
-  return (data ?? []).map((r) => ({
-    category: r.category ?? "other",
-    incoming: `${r.subject ?? ""}\n${(r.body_text ?? "").slice(0, 400)}`,
-    reply: (r.final_body ?? "").slice(0, 1200),
-  }));
+    .limit(60);
+
+  const perCategory = new Map<string, number>();
+  const picked: { category: string; incoming: string; reply: string }[] = [];
+  for (const r of data ?? []) {
+    const cat = r.category ?? "other";
+    const seen = perCategory.get(cat) ?? 0;
+    if (seen >= EXEMPLARS_PER_CATEGORY) continue;
+    perCategory.set(cat, seen + 1);
+    picked.push({
+      category: cat,
+      incoming: `${r.subject ?? ""}\n${(r.body_text ?? "").slice(0, 400)}`,
+      reply: (r.final_body ?? "").slice(0, 1200),
+    });
+  }
+  return picked;
 }
 
 async function classifyAndDraft(row: InboxRow, ctx: SenderContext): Promise<Classified | null> {
@@ -381,6 +442,140 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
     const msg = e instanceof Error ? e.message : "שגיאה";
     await finishAgentRun(runId, { status: "error", error: msg });
     return { ...result, ok: false, error: msg };
+  }
+}
+
+// ── ייבוא דוגמאות מההתכתבות ההיסטורית ──────────────────────────────────
+//
+// בלי זה הסוכן מתחיל מאפס דוגמאות וכותב גנרי עד שיצטברו 15-20 תשובות
+// שאושרו. בתיבה כבר יש שנים של תשובות אמיתיות לשאלות שחוזרות, והן
+// הקיצור הישיר: הסוכן מתחיל עם הקול שכבר קיים.
+//
+// **הדוגמאות מלמדות סגנון, לא עובדות.** תשובה משנה שעברה יכולה לצטט מחיר
+// ישן, ולכן הפרומפט קובע במפורש שעובדות מגיעות מבסיס הידע בלבד.
+
+const BACKFILL_CLASSIFY_MODEL = process.env.AGENT_INBOX_CLASSIFY_MODEL ?? "gpt-4o-mini";
+
+export type BackfillResult = {
+  ok: boolean;
+  scanned: number;
+  pairs: number;
+  imported: number;
+  skipped: number;
+  errors: string[];
+  error?: string;
+};
+
+/** סיווג בלבד לזוג היסטורי - תווית מרשימה סגורה, בלי ניסוח. */
+async function classifyPair(subject: string, body: string): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) return "other";
+  try {
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const res = await openai.chat.completions.create(
+      {
+        model: BACKFILL_CLASSIFY_MODEL,
+        max_tokens: 60,
+        temperature: 0,
+        response_format: { type: "json_object" },
+        messages: [
+          {
+            role: "system",
+            content:
+              'סווג מייל נכנס לפלטפורמת "טיפול חכם" לאחת מהקטגוריות: ' +
+              Array.from(VALID_CATEGORIES).join(", ") +
+              '. החזר JSON: {"category": "..."}',
+          },
+          { role: "user", content: `${subject}\n\n${body.slice(0, 1500)}` },
+        ],
+      },
+      { timeout: 30_000, maxRetries: 1 }
+    );
+    const raw = res.choices[0]?.message?.content?.trim();
+    const cat = raw ? String((JSON.parse(raw) as { category?: string }).category ?? "") : "";
+    return VALID_CATEGORIES.has(cat) ? cat : "other";
+  } catch {
+    return "other";
+  }
+}
+
+export async function runInboxBackfill(opts: { days?: number; max?: number } = {}): Promise<BackfillResult> {
+  const days = Math.min(1095, Math.max(30, opts.days ?? 365));
+  const max = Math.min(120, Math.max(5, opts.max ?? 60));
+  const result: BackfillResult = { ok: true, scanned: 0, pairs: 0, imported: 0, skipped: 0, errors: [] };
+
+  if (!gmailConfigured()) return { ...result, ok: false, error: "Gmail לא מוגדר" };
+  try {
+    const account = await connectedAccount();
+    if (account !== EXPECTED_ACCOUNT) {
+      return { ...result, ok: false, error: `הטוקן שייך ל-${account} ולא ל-${EXPECTED_ACCOUNT}` };
+    }
+
+    const sentIds = await listSentIds(days, max);
+    result.scanned = sentIds.length;
+
+    // זיווג: לכל תשובה שיצאה, ההודעה הנכנסת האחרונה שלפניה באותו שרשור.
+    const seenThreads = new Set<string>();
+    const pairs: { inbound: Awaited<ReturnType<typeof getThread>>[number]; reply: string; repliedAt: number }[] = [];
+    for (const id of sentIds) {
+      try {
+        const meta = await getMessage(id);
+        if (!meta) continue;
+        if (seenThreads.has(meta.threadId)) continue; // תשובה אחת לשרשור מספיקה
+        seenThreads.add(meta.threadId);
+
+        const thread = await getThread(meta.threadId);
+        const sentIdx = thread.findIndex((m) => m.id === id);
+        if (sentIdx <= 0) continue; // אין הודעה נכנסת לפניה
+
+        const ours = thread[sentIdx];
+        // ההודעה הנכנסת האחרונה לפני התשובה, מגורם חיצוני.
+        const inbound = [...thread.slice(0, sentIdx)]
+          .reverse()
+          .find((m) => !m.isSent && !isOurAddress(m.fromEmail));
+        if (!inbound || inbound.bodyText.length < 20 || ours.bodyText.length < 20) continue;
+
+        pairs.push({ inbound, reply: ours.bodyText, repliedAt: ours.internalDate });
+      } catch (e) {
+        result.errors.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+    result.pairs = pairs.length;
+    if (pairs.length === 0) return result;
+
+    // מה שכבר קיים אצלנו לא נדרס - פנייה פתוחה בתור נשארת כפי שהיא.
+    const { data: existing } = await supabaseAdmin
+      .from("inbox_messages")
+      .select("gmail_message_id")
+      .in("gmail_message_id", pairs.map((p) => p.inbound.id));
+    const known = new Set((existing ?? []).map((r) => r.gmail_message_id as string));
+
+    for (const p of pairs) {
+      if (known.has(p.inbound.id)) {
+        result.skipped++;
+        continue;
+      }
+      const category = await classifyPair(p.inbound.subject, p.inbound.bodyText);
+      const { error } = await supabaseAdmin.from("inbox_messages").insert({
+        gmail_message_id: p.inbound.id,
+        gmail_thread_id: p.inbound.id, // השרשור לא נדרש לדוגמה, ואין בו שימוש
+        from_email: p.inbound.fromEmail,
+        from_name: p.inbound.fromName,
+        subject: p.inbound.subject,
+        body_text: p.inbound.bodyText,
+        received_at: new Date(p.inbound.internalDate).toISOString(),
+        category,
+        // sent_external ולא sent: התשובה יצאה מהתיבה, לא מהמערכת הזו.
+        status: "sent_external",
+        final_body: p.reply,
+        replied_at: new Date(p.repliedAt).toISOString(),
+        is_exemplar: true,
+      });
+      if (error) result.errors.push(error.message);
+      else result.imported++;
+    }
+    return result;
+  } catch (e) {
+    return { ...result, ok: false, error: e instanceof Error ? e.message : "שגיאה" };
   }
 }
 
