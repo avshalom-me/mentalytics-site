@@ -12,4 +12,18 @@ if [ $status -ne 0 ]; then
   exit $status
 fi
 echo "✓ type-check passed"
+
+# A stale sitemap <lastmod> is invisible everywhere except a search result weeks
+# later. It already cost us once: the landing date sat at 10/8 while the fix that
+# stops therapist names being quoted shipped on 22/8, so Google re-crawled some
+# city pages and not others. The comment asking humans to remember did not
+# survive three commits, so the check runs here instead.
+echo "pre-push: node scripts/check-page-revised.mjs ..."
+node scripts/check-page-revised.mjs
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ Sitemap revision dates are stale — push aborted. See above."
+  exit $status
+fi
 exit 0
