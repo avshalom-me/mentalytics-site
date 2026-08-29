@@ -43,6 +43,7 @@ type InboxItem = {
   status: string;
   draft_subject: string | null;
   draft_body: string | null;
+  draft_note: string | null;
   final_body: string | null;
   replied_at: string | null;
 };
@@ -998,6 +999,13 @@ function InboxCard({
               </span>
             )}
           </div>
+          {/* ההערה הפנימית של הסוכן - "לא בטוח לגבי X", "נדרש אימות".
+              נכתבת אליך ולא נשלחת לפונה. */}
+          {row.draft_note && (
+            <div className="mb-2 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
+              🤖 {row.draft_note}
+            </div>
+          )}
           <input
             value={subject}
             onChange={(e) => setSubject(e.target.value)}

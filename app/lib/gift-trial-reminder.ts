@@ -62,7 +62,7 @@ function buildHtml(t: ReminderTarget): string {
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${escapeHtml(t.name)},</h1>
 
       <p style="margin:0 0 16px;font-size:15px;">
-        לפני כשני חודשים הצטרפת לקידום באתר, והתחייבנו לעדכן אותך שבוע לפני החיוב הראשון.
+        לפני כשני חודשים הצטרפת לקידום באתר, והתחייבנו לעדכן אותך לפני החיוב הראשון.
         זה המייל הזה.
       </p>
 
@@ -104,15 +104,26 @@ export async function runGiftTrialReminder(opts: { send?: boolean } = {}): Promi
   try {
     // התאמה על first_charge_on בלבד - העמודה שנכתבת רק בהצטרפות במסלול
     // ההזמנה. מנוי רגיל מקבל שם NULL ולכן לא יכול להיתפס כאן לעולם.
+    //
+    // חלון ולא שוויון מדויק: התנאי הקודם (בדיוק שבעה ימים) החזיק רק כל
+    // עוד הקרון רץ כל יום. יום אחד שנופל, והמנוי חוצה את נקודת השבע -
+    // התזכורת שהובטחה במסך ההצטרפות לא הייתה יוצאת לעולם, והחיוב הראשון
+    // היה נוחת בלי התראה. עכשיו כל מי שהחיוב שלו בשבוע הקרוב וטרם קיבל
+    // תזכורת - מקבל, גם באיחור. חותמת first_charge_reminded_at שומרת
+    // על פעם אחת בלבד.
     const target = new Date();
     target.setDate(target.getDate() + REMINDER_DAYS_BEFORE);
     const chargeDay = target.toISOString().slice(0, 10);
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const tomorrowDay = tomorrow.toISOString().slice(0, 10);
 
     const { data: subs, error } = await supabaseAdmin
       .from("subscriptions")
       .select("id, therapist_id, amount, first_charge_on")
       .eq("status", "active")
-      .eq("first_charge_on", chargeDay)
+      .lte("first_charge_on", chargeDay)
+      .gte("first_charge_on", tomorrowDay)
       .is("first_charge_reminded_at", null);
     if (error) throw new Error(error.message);
 

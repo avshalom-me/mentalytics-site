@@ -279,12 +279,14 @@ export async function sendGmailReply(opts: {
   const subject = opts.subject.startsWith("Re:") || opts.subject.startsWith("RE:")
     ? opts.subject
     : `Re: ${opts.subject}`;
-  // GMAIL_SENDER (אופציונלי): כתובת המוען לתשובות, למשל admin@getmentalytics.com.
-  // בלעדיה Gmail שולח מכתובת החשבון המחובר; עם המשתנה, הכתובת חייבת
-  // להיות כינוי מאומת של החשבון ("Send mail as" בהגדרות Gmail), אחרת Gmail יתעלם ממנה.
-  const sender = (process.env.GMAIL_SENDER ?? "").trim();
+  // From מפורש תמיד: בלעדיו התשובה יוצאת עם שם התצוגה של חשבון גוגל
+  // ("Admin Admin") במקום שם המותג. הכתובת היא של החשבון המחובר עצמו,
+  // אלא אם הוגדר כינוי מאומת ב-GMAIL_SENDER ("Send mail as" בהגדרות Gmail).
+  const sender =
+    (process.env.GMAIL_SENDER ?? "").trim() ||
+    (process.env.GMAIL_ACCOUNT ?? "admin@getmentalytics.com").trim();
   const lines = [
-    ...(sender ? [`From: ${encodeHeader("טיפול חכם")} <${sender}>`] : []),
+    `From: ${encodeHeader("טיפול חכם")} <${sender}>`,
     `To: ${opts.to}`,
     `Subject: ${encodeHeader(subject)}`,
     ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`, `References: ${opts.inReplyTo}`] : []),
