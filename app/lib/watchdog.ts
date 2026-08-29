@@ -322,6 +322,12 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     // רץ כל חצי שעה; שלוש שעות בלי ריצה = משהו תקוע, לא סטייה רגילה.
     agentFreshnessCheck("inbox", "סוכן שירות הלקוחות רץ בשלוש השעות האחרונות", 3),
     agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
+    // שלושת הקרונים ששולחים מיילים אמיתיים ללקוחות, ועד עכשיו אף
+    // אחד לא ניטר אותם. קרון שנופל כאן הוא הבטחה שלא מקוימת: מטפל שלא
+    // קיבל התראה לפני סוף המתנה, או חיוב ראשון שהגיע בלי תזכורת השבוע שהובטחה.
+    agentFreshnessCheck("cron_trial_ending", "התראת סוף מתנה רצה ביממה האחרונה", 26),
+    agentFreshnessCheck("cron_gift_reminder", "תזכורת החיוב הראשון רצה ביממה האחרונה", 26),
+    agentFreshnessCheck("cron_sumit_sync", "סנכרון סומיט רץ ביממה האחרונה", 26),
     freshnessCheck("cron_weekly_report", "דוח שבועי נוצר בשבוע האחרון", async () => {
       const { data } = await supabaseAdmin
         .from("weekly_reports")

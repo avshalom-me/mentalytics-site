@@ -16,6 +16,7 @@ import { writeAudit } from "@/app/lib/audit";
 import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
 import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
+import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 
@@ -305,6 +306,10 @@ export async function GET(req: NextRequest) {
   if (!verifyCron(req)) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+
+  // דופק ליומן הריצות. הקרון הזה מוריד קידומים, מגלגל מתנות לתשלום
+  // ושולח מיילים ללקוחות - ועד היום לא השאיר שום עקבה שמעידה שהוא בכלל רץ.
+  const runId = await startAgentRun("cron_sumit_sync");
 
   let checked = 0;
   let demoted = 0;
@@ -997,6 +1002,14 @@ export async function GET(req: NextRequest) {
       console.error("demoted-for-payment alert failed:", mailErr);
     }
   }
+
+  await finishAgentRun(runId, {
+    status: errors > 0 ? "error" : "ok",
+    summary:
+      `נבדקו ${checked} מנויים; ${demoted} הורדו, ${trialsExpired} מתנות פגו, ` +
+      `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו`,
+    error: errors > 0 ? `${errors} שגיאות בריצה` : undefined,
+  });
 
   return NextResponse.json({
     checked,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { cronAuthorized } from "@/app/lib/cron-auth";
+import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 import { runGiftTrialReminder } from "@/app/lib/gift-trial-reminder";
 
 // תזכורת שבוע לפני החיוב הראשון במסלול ההזמנה.
@@ -17,7 +18,16 @@ export async function GET(req: NextRequest) {
   }
 
   const send = req.nextUrl.searchParams.get("send") === "confirm";
+  // דופק ליומן הריצות. שלושת הקרונים ששולחים מייל ללקוחות לא נרשמו בשום
+// מקום, ולכן קרון שהפסיק לרוץ היה כשל שקט לחלוטין - איש לא היה יודע עד
+// שמטפל היה שואל למה לא קיבל הודעה. שומר הלילה בודק את הרישום הזה.
+  const runId = await startAgentRun("cron_gift_reminder", send ? "send" : "preview");
   const result = await runGiftTrialReminder({ send });
+  await finishAgentRun(runId, {
+    status: result.ok ? "ok" : "error",
+    summary: `${result.targets.length} חיובים ראשונים בעוד שבוע, נשלחו ${result.sent}`,
+    error: result.error,
+  });
 
   return NextResponse.json(
     {

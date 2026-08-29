@@ -8,6 +8,7 @@ import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { sendTrialEndingEmail, trialEndingVariant, type TrialStats } from "@/app/lib/trial-ending-email";
 import { TRIAL_UPGRADE_OFFER_DAYS } from "@/app/lib/promo";
 import { alertRecipients } from "@/app/lib/alert-recipients";
+import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 
 // סיום תקופת מתנה: דוח כל-התקופה + הצעת שדרוג אישית.
 //   3 ימים לפני הסיום  → המייל המרכזי (trial_ending_notified_at)
@@ -230,7 +231,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const send = req.nextUrl.searchParams.get("send") === "confirm";
+  // דופק ליומן הריצות. שלושת הקרונים ששולחים מייל ללקוחות לא נרשמו בשום
+// מקום, ולכן קרון שהפסיק לרוץ היה כשל שקט לחלוטין - איש לא היה יודע עד
+// שמטפל היה שואל למה לא קיבל הודעה. שומר הלילה בודק את הרישום הזה.
+  const runId = await startAgentRun("cron_trial_ending", send ? "send" : "preview");
   const result = await runTrialEndingNotices({ send });
   const { status, ...body } = result as Record<string, unknown> & { status?: number };
+  await finishAgentRun(runId, {
+    status: result.ok === false ? "error" : "ok",
+    summary: `נבדקו ${result.candidates ?? 0} תקופות מתנה, נשלחו ${(body as { sent?: number }).sent ?? 0}`,
+    error: typeof result.error === "string" ? result.error : undefined,
+  });
   return NextResponse.json(body, { status: status ?? 200 });
 }
