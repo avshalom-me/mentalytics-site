@@ -35,8 +35,21 @@ export const revalidate = 3600;
  * BUMP THIS when the landing-page copy or template actually changes. Do not
  * wire it to `new Date()` - a lastmod that is always "today" is the pattern
  * Google learns to ignore, and then it is worth nothing when it matters.
+ *
+ * It then rotted exactly as warned. Three copy changes shipped after the date
+ * below without touching it: the description budget fix (14/8), the intro
+ * paragraph Google quotes (19/8), and - the one that matters most for snippets
+ * - data-nosnippet on the therapist cards (22/8, 3993498), which is what stops
+ * a list of therapist names being quoted instead of our own copy. For twelve
+ * days the sitemap told Google the copy was last revised on 10/8, so any page
+ * crawled in that window saw a lastmod it already had and had no reason to come
+ * back. On 29/8 the Jerusalem SERP showed the new copy and Haifa still showed
+ * names, which is what that looks like from outside.
+ *
+ * So: bumping this is not paperwork, it is the only re-crawl lever we control.
+ * The date is the last real copy change, never today's date.
  */
-const LANDING_COPY_REVISED = new Date("2026-08-10");
+const LANDING_COPY_REVISED = new Date("2026-08-22");
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
