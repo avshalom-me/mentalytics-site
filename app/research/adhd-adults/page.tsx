@@ -5,15 +5,15 @@ import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/adhd-adults" },
-  title: "אבחון ADHD למבוגרים",
-  description: "מה כולל אבחון ADHD למבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
+  title: "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים: מי מוסמך, כמה עולה ומה הלאה",
+  description: "מה כולל אבחון הפרעת קשב וריכוז (ADHD) במבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
 };
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "אבחון ADHD למבוגרים",
-  "description": "מה כולל אבחון ADHD למבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות.",
+  "headline": "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים",
+  "description": "מה כולל אבחון הפרעת קשב וריכוז במבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
   "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
@@ -24,13 +24,13 @@ export default function AdhdAdultsPage() {
   return (
     <ArticleShell
       href="/research/adhd-adults"
-      title="אבחון ADHD למבוגרים"
+      title="אבחון הפרעת קשב וריכוז במבוגרים"
       sectionSlug="אבחונים-והערכות"
     >
-      <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון ADHD למבוגרים" />
+      <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון הפרעת קשב וריכוז (ADHD) במבוגרים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
-      <h1 className="text-3xl font-black text-stone-900 mb-3">אבחון ADHD למבוגרים</h1>
+      <h1 className="text-3xl font-black text-stone-900 mb-3">אבחון הפרעת קשב וריכוז (ADHD) במבוגרים</h1>
       <p className="text-stone-600 leading-7 mb-8">
         רבים מגיעים לאבחון ADHD רק בבגרות - לאחר שנים של תחושת "משהו לא עובד" בלי הסבר. האבחון יכול להיות נקודת מפנה משמעותית.
       </p>
