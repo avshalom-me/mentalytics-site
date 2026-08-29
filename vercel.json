@@ -71,6 +71,10 @@
     {
       "schedule": "*/30 * * * *",
       "path": "/api/cron/agent-inbox"
+    },
+    {
+      "schedule": "15 4 * * *",
+      "path": "/api/cron/agent-quiz"
     }
   ]
 }

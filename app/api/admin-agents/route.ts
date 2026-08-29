@@ -16,6 +16,7 @@ import { runCenterProspects, listProspects, updateProspect, addProspectsFromText
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
+import { runQuizFunnel } from "@/app/lib/quiz-funnel";
 import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
 
@@ -51,6 +52,15 @@ function runMetric(agent: string, details: unknown): number | null {
     // שירות לקוחות: כמה טיוטות הוכנו בריצה.
     case "inbox":
       return typeof d.drafted === "number" ? d.drafted : null;
+    // שאלונים: שיעור ההשלמה של שאלון המבוגרים באחוזים - המדד
+    // היחיד שמסכם את כל המשפך למספר אחד, וכאן גבוה = טוב.
+    case "quiz_funnel": {
+      const fs = Array.isArray(d.funnels)
+        ? (d.funnels as { quiz?: string; recentCompletion?: number }[])
+        : null;
+      const adults = fs?.find((f) => f.quiz === "adults") ?? fs?.[0];
+      return adults?.recentCompletion != null ? Math.round(adults.recentCompletion * 100) : null;
+    }
     case "daily_digest": {
       const secs = Array.isArray(d.sections)
         ? (d.sections as { count?: number }[])
@@ -246,6 +256,10 @@ export async function POST(req: NextRequest) {
         still_short: result.stillShort ?? 0,
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
+    }
+    if (body?.action === "quiz_run") {
+      const r = await runQuizFunnel();
+      return NextResponse.json({ ok: r.ok, funnels: r.funnels, findings: r.findings, error: r.error });
     }
     if (body?.action === "inbox_run") {
       const r = await runInboxAgent();
