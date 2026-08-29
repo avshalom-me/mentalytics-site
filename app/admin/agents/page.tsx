@@ -97,6 +97,7 @@ type ActionPayload = {
 type PendingAction = {
   id: string;
   agent: string;
+  severity?: string;
   action_type: string;
   kind?: "action" | "finding";
   title: string;
@@ -406,6 +407,23 @@ AGENTS.push({
 });
 
 const AGENT_BY_KEY = new Map(AGENTS.map((a) => [a.key, a]));
+
+// תג חומרה. רק critical ו-high מקבלים תג - אם גם "רגיל" יבלוט, שוב שום
+// דבר לא בולט.
+const SEVERITY_BADGE: Record<string, { label: string; cls: string }> = {
+  critical: { label: "קריטי", cls: "border-red-300 bg-red-50 text-red-800" },
+  high: { label: "דחוף", cls: "border-amber-300 bg-amber-50 text-amber-900" },
+};
+
+function SeverityTag({ severity }: { severity?: string }) {
+  const b = SEVERITY_BADGE[severity ?? ""];
+  if (!b) return null;
+  return (
+    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-black ${b.cls}`}>
+      {b.label}
+    </span>
+  );
+}
 
 function agentLabel(agent: string): string {
   return AGENT_BY_KEY.get(agent)?.label ?? agent;
@@ -2080,6 +2098,7 @@ export default function AgentsPage() {
         </>
       );
     }
+    // ה-API כבר מחזיר ממוין לפי חומרה; הסינון לקבוצות שומר על הסדר.
     const mine = pending.filter((a) => a.agent === meta.key);
     const acts = mine.filter((a) => !isFinding(a));
     const finds = mine.filter(isFinding);
@@ -2132,9 +2151,15 @@ export default function AgentsPage() {
                 onDismiss={() => resolveAction(a.id, "dismissed")}
               />
             ) : (
-              <div key={a.id} className="rounded-2xl border border-stone-200 bg-white p-4">
+              <div
+                key={a.id}
+                className={`rounded-2xl border bg-white p-4 ${
+                  a.severity === "critical" ? "border-red-300 shadow-sm" : "border-stone-200"
+                }`}
+              >
                 <div className="mb-1 flex items-start justify-between gap-3">
                   <h3 className="text-sm font-black text-stone-900">{a.title}</h3>
+                  <SeverityTag severity={a.severity} />
                 </div>
                 {a.entity_label && <p className="mb-1 text-xs text-stone-400">{a.entity_label}</p>}
                 {a.body && <p className="text-sm leading-6 text-stone-600 whitespace-pre-line">{a.body}</p>}
@@ -2160,9 +2185,19 @@ export default function AgentsPage() {
         </div>
 
         {finds.length > 0 && (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+          <div
+            className={`rounded-2xl border p-4 ${
+              finds.some((f) => f.severity === "critical")
+                ? "border-red-300 bg-red-50/60"
+                : "border-amber-200 bg-amber-50/60"
+            }`}
+          >
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <span className="text-xs font-black text-stone-700">ממצאים לידיעה ({finds.length})</span>
+              <span className="text-xs font-black text-stone-700">
+                {finds.some((f) => f.severity === "critical" || f.severity === "high")
+                  ? `ממצאים (${finds.length})`
+                  : `ממצאים לידיעה (${finds.length})`}
+              </span>
               <button
                 onClick={() => dismissMany(finds, "ממצאים")}
                 disabled={bulkBusy}
@@ -2175,6 +2210,9 @@ export default function AgentsPage() {
               {finds.slice(0, 10).map((f) => (
                 <li key={f.id} className="flex items-start justify-between gap-3 text-sm">
                   <div>
+                    <span className="me-2 align-middle">
+                      <SeverityTag severity={f.severity} />
+                    </span>
                     <span className="font-bold text-stone-700">{f.title}</span>
                     {f.body && <span className="block text-xs leading-5 text-stone-500">{f.body}</span>}
                   </div>
@@ -2383,6 +2421,7 @@ export default function AgentsPage() {
                   ? inbox.filter((m) => m.status === "new" || m.status === "drafted").length
                   : mine.filter((a) => !isFinding(a)).length;
             const finds = meta.key === "center_prospects" || meta.key === "inbox" ? 0 : mine.length - acts;
+            const crit = mine.filter((a) => a.severity === "critical").length;
             const isSel = selected === meta.key;
             return (
               <button
@@ -2397,6 +2436,14 @@ export default function AgentsPage() {
               >
                 <span className="text-lg leading-none">{meta.icon}</span>
                 <span>{meta.label}</span>
+                {crit > 0 && (
+                  <span
+                    title={`${crit} ממצאים קריטיים`}
+                    className="absolute -top-1.5 -start-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-black text-white"
+                  >
+                    !
+                  </span>
+                )}
                 {acts > 0 && (
                   <span
                     className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${
@@ -2428,6 +2475,11 @@ export default function AgentsPage() {
               <li>
                 📥 כשסוכן מנסח טיוטה או מוצא משהו שדורש החלטה - מופיע מספר על הטאב שלו למעלה. פתח, קרא,
                 ותחליט.
+              </li>
+              <li>
+                <span className="font-bold text-red-700">קריטי</span> = נתונים אובדים, כסף נגבה שלא כדין,
+                או מסלול שבור. <span className="font-bold text-amber-800">דחוף</span> = הבטחה ללקוח או
+                הכנסה בסיכון. שניהם עולים לראש התור ומופיעים גם בדוח הבוקר.
               </li>
               <li>🟡 נקודה ענברית על טאב = יש ממצאים לידיעה. הם נסגרים מעצמם כשהמצב משתנה, ואין חובה לטפל.</li>
               <li>🔴 נקודה אדומה על טאב = הריצה האחרונה של הסוכן נכשלה.</li>

@@ -277,6 +277,9 @@ export async function runRetention(): Promise<RetentionRun> {
         body: f.detail,
         dedupeKey: f.key,
         payload: { severity: f.severity },
+        // החומרה כבר חושבה למעלה לפי "האם יש כאן הכנסה בסיכון" - עד היום
+        // היא נשמרה ב-payload בלבד ולא השפיעה על סדר התור.
+        severity: f.severity === "high" ? "high" : f.severity === "low" ? "low" : "normal",
       })),
       { managedKeys, recoveryNote: "המצב השתפר - הממצא נסגר אוטומטית" }
     );

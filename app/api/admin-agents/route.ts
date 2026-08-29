@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { SEVERITY_RANK, type AgentSeverity } from "@/app/lib/agent-infra";
 import { runDailyDigest } from "@/app/lib/daily-digest";
 import { runWatchdog } from "@/app/lib/watchdog";
 import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
@@ -77,7 +78,7 @@ export async function GET() {
         .from("agent_actions")
         // payload נשלח לעמוד כי הצעת המתנה נערכת שם לפני השליחה (המועמדים
         // והטיוטה האישית לכל אחד יושבים בו).
-        .select("id, agent, action_type, kind, title, body, entity_type, entity_id, entity_label, payload, created_at")
+        .select("id, agent, action_type, kind, title, body, entity_type, entity_id, entity_label, payload, severity, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
         // 200 ולא 50: העמוד מקבץ את התור לפי סוג ומקפל את החלק המידעי, ולכן
@@ -149,7 +150,14 @@ export async function GET() {
       inbox_configured: gmailConfigured(),
       runs,
       latest_details: latestDetails,
-      pending_actions: pendingRes.data ?? [],
+      // החמור בראש, ובתוך אותה חומרה - הישן קודם. עד היום התור היה
+      // כרונולוגי בלבד, וממצא קריטי נבלע בין עשרות פריטים שגרתיים.
+      pending_actions: (pendingRes.data ?? []).slice().sort((a, b) => {
+        const rank = (x: { severity?: string | null }) =>
+          SEVERITY_RANK[(x.severity ?? "normal") as AgentSeverity] ?? 2;
+        const d = rank(a) - rank(b);
+        return d !== 0 ? d : String(a.created_at).localeCompare(String(b.created_at));
+      }),
       // מי כבר קיבל הצעת מתנה בחלון הצינון. הכרטיס מסתיר אותם, אחרת הוא
       // מציג נמען שהשליחה אליו תיחסם ברגע הלחיצה - אותו מטפל עולה כמועמד
       // בכמה חיתוכים במקביל.

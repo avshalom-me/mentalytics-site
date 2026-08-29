@@ -85,6 +85,37 @@ async function gatherSections(): Promise<DigestSection[]> {
   const q = dash.queue;
   const sections: DigestSection[] = [];
 
+  // ממצאים קריטיים ודחופים מכל הסוכנים, בראש הדוח. הלקח מ-match_results:
+  // התראה על אובדן נתונים שקט ישבה יומיים בעמוד הסוכנים בלי שאיש ראה
+  // אותה. דוח הבוקר נקרא כל בוקר - שם מקומה.
+  try {
+    const { data: severe } = await supabaseAdmin
+      .from("agent_actions")
+      .select("agent, title, severity, created_at")
+      .eq("status", "pending")
+      .in("severity", ["critical", "high"])
+      .order("severity", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(20);
+    const rows = severe ?? [];
+    if (rows.length > 0) {
+      const criticals = rows.filter((r) => r.severity === "critical").length;
+      sections.push({
+        key: "agent_severe",
+        label: criticals > 0 ? `ממצאים קריטיים מהסוכנים` : "ממצאים דחופים מהסוכנים",
+        count: rows.length,
+        urgent: criticals > 0,
+        lines: rows.slice(0, MAX_LINES_PER_SECTION).map(
+          (r) =>
+            `${r.severity === "critical" ? "🔴" : "🟠"} ${r.title} · ${ageText(r.created_at as string)}`
+        ),
+        link: "/admin/agents",
+      });
+    }
+  } catch (e) {
+    console.error("digest severe section failed:", e instanceof Error ? e.message : e);
+  }
+
   // פניות מייל שממתינות למענה אצל סוכן שירות הלקוחות. הדוח הוא המקום
   // שסוגר את הלולאה: טיוטה שמחכה בטאב צדדי נשכחת, ופנייה של לקוח בת
   // יומיים היא כבר דחופה.

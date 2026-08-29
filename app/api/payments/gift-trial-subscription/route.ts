@@ -65,6 +65,9 @@ async function orphanAlert(
       agent: "finance",
       actionType: "sumit_orphan",
       kind: "action",
+      // הכי חמור שיש: כרטיס אשראי יחויב בעוד חודשיים על קידום שהמטפל
+      // מעולם לא קיבל, ושום סריקה לא רואה את ההוראה הזו.
+      severity: "critical",
       title: `הוראת קבע ב-Sumit בלי רישום אצלנו: ${therapistName || therapistId}`,
       body:
         `מסלול המתנה פתח הוראת קבע ב-Sumit (מספר ${recurringId}) והכתיבה למאגר נכשלה.\n` +

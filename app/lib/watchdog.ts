@@ -359,6 +359,35 @@ async function runChecks(): Promise<WatchdogCheck[]> {
   return Promise.all(promises);
 }
 
+// לא כל בדיקה שנכשלת שווה. בדיקה שמשמעותה "מידע הולך לאיבוד" או "הציון
+// הקליני שגוי" חייבת להיראות אחרת מ-robots.txt שנפל - אחרת הכול נראה זהה,
+// וממצא קריטי יושב יומיים בתור (מה שקרה בפועל עם match_results).
+//
+// הרשימות מכוונות וקצרות: אם חצי מהבדיקות יהיו "קריטי", חזרנו לנקודת
+// ההתחלה. מה שלא מופיע כאן הוא normal, וזו ברירת מחדל לגיטימית.
+const CRITICAL_CHECKS = new Set([
+  "db_event_constraint", // אירועים נדחים בשקט - נתונים אובדים ללא שחזור
+  "api_score_adults", // מנוע הניקוד - פלט שגוי הוא המלצה קלינית שגויה
+  "api_score_kids",
+  "cron_backup", // יום בלי גיבוי = יום בלי עותק לקבצי ה-Storage
+  "page_home", // האתר למטה
+]);
+const HIGH_CHECKS = new Set([
+  "page_adults", // עמודי השאלון - הכניסה היחידה למשפך
+  "page_kids",
+  "api_match_region", // מנוע ההתאמה - בלעדיו השאלון מסתיים בלא כלום
+  "api_match_online",
+  "cron_trial_ending", // הבטחה מפורשת למטפל לפני סוף המתנה
+  "cron_gift_reminder", // הבטחה מפורשת לפני החיוב הראשון
+  "cron_sumit_sync", // קידומים שפגו, גלגול לתשלום, הוראות קבע יתומות
+]);
+
+function checkSeverity(key: string): "critical" | "high" | "normal" {
+  if (CRITICAL_CHECKS.has(key)) return "critical";
+  if (HIGH_CHECKS.has(key)) return "high";
+  return "normal";
+}
+
 export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResult> {
   const mode = opts.send ? "send" : "preview";
   const runId = await startAgentRun("watchdog", mode);
@@ -379,6 +408,7 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
         kind: "finding" as const,
         title: `בדיקה לילית נכשלה: ${f.label}`,
         body: f.detail,
+        severity: checkSeverity(f.key),
         dedupeKey: `watchdog:${f.key}`,
       })),
       { managedKeys, recoveryNote: "הבדיקה חזרה לעבור - נסגר אוטומטית" }

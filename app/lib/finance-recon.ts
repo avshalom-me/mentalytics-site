@@ -362,6 +362,9 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
         body: f.detail,
         dedupeKey: f.key,
         payload: { severity: f.severity },
+        // אי-התאמה בכסף היא לכל הפחות high: או שגובים ממי שלא צריך, או
+        // שלא גובים ממי שכן. "medium" כאן עדיין חמור יותר מרוב התור.
+        severity: f.severity === "high" ? "high" : "normal",
       })),
       { managedKeys, recoveryNote: "הפער נסגר - הממצא נסגר אוטומטית" }
     );

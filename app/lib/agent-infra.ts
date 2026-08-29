@@ -116,6 +116,16 @@ export async function syncAgentAlerts(
   return { created, refreshed, recovered };
 }
 
+export type AgentSeverity = "critical" | "high" | "normal" | "low";
+
+/** סדר הצגה: החמור קודם. */
+export const SEVERITY_RANK: Record<AgentSeverity, number> = {
+  critical: 0,
+  high: 1,
+  normal: 2,
+  low: 3,
+};
+
 export type NewAgentAction = {
   agent: string;
   actionType: string;
@@ -123,6 +133,10 @@ export type NewAgentAction = {
   // "action" = יש מה לעשות וצריך אותך; "finding" = מסקנה לידיעה.
   // ברירת המחדל היא action, כדי שסוכן שלא הצהיר לא ייעלם מהתור בשקט.
   kind?: "action" | "finding";
+  // דחיפות. ברירת המחדל normal - סוכן שלא הצהיר לא מקבל בליטה שלא מגיעה
+  // לו, אבל גם לא נבלע. critical שמור למה שאסור שיחכה יום: אובדן נתונים,
+  // כסף שנגבה שלא כדין, מסלול שבור בפרודקשן.
+  severity?: AgentSeverity;
   title: string;
   body?: string;
   entityType?: string;
@@ -150,6 +164,7 @@ export async function createAgentAction(
         entity_id: action.entityId ?? null,
         entity_label: action.entityLabel ?? null,
         payload: action.payload ?? null,
+        severity: action.severity ?? "normal",
         dedupe_key: action.dedupeKey ?? null,
       })
       .select("id")
@@ -170,6 +185,7 @@ export async function createAgentAction(
             body: action.body ?? null,
             payload: action.payload ?? null,
             entity_label: action.entityLabel ?? null,
+            severity: action.severity ?? "normal",
           })
           .eq("agent", action.agent)
           .eq("dedupe_key", action.dedupeKey ?? "")
