@@ -20,7 +20,7 @@
 
 var ENDPOINT = 'https://www.mentalytics.co.il/api/ads-sync';
 var SECRET = 'PASTE_ADS_SYNC_SECRET_HERE'; // from Vercel env ADS_SYNC_SECRET
-var LOOKBACK = 'LAST_7_DAYS';
+var LOOKBACK = 'LAST_30_DAYS';
 
 function main() {
   var payload = {
