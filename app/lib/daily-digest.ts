@@ -85,6 +85,37 @@ async function gatherSections(): Promise<DigestSection[]> {
   const q = dash.queue;
   const sections: DigestSection[] = [];
 
+  // פניות מייל שממתינות למענה אצל סוכן שירות הלקוחות. הדוח הוא המקום
+  // שסוגר את הלולאה: טיוטה שמחכה בטאב צדדי נשכחת, ופנייה של לקוח בת
+  // יומיים היא כבר דחופה.
+  try {
+    const { data: inboxOpen } = await supabaseAdmin
+      .from("inbox_messages")
+      .select("from_email, from_name, subject, received_at, status")
+      .in("status", ["new", "drafted"])
+      .order("received_at", { ascending: true })
+      .limit(30);
+    const openRows = inboxOpen ?? [];
+    if (openRows.length > 0) {
+      sections.push({
+        key: "inbox",
+        label: "פניות במייל שממתינות למענה",
+        count: openRows.length,
+        urgent: daysAgo(openRows[0].received_at as string) >= 2,
+        lines: openRows.slice(0, MAX_LINES_PER_SECTION).map((m) => {
+          const who = (m.from_name as string) || (m.from_email as string);
+          const what = (m.subject as string) || "(ללא נושא)";
+          const ready = m.status === "drafted" ? " · טיוטה מוכנה" : "";
+          return `${who} · ${what.slice(0, 60)} · ${ageText(m.received_at as string)}${ready}`;
+        }),
+        link: "/admin/agents?agent=inbox",
+      });
+    }
+  } catch (e) {
+    // דוח הבוקר לא נופל בגלל סקציה אחת - השאר חשוב מכדי להיחסם.
+    console.error("digest inbox section failed:", e instanceof Error ? e.message : e);
+  }
+
   // פניות לחברה בלבד - הפיצול ממדיניות 15/8 חי ב-work-queue, פעם אחת,
   // והספירה/הדחיפות מחושבות שם על הרשימה המלאה (לא על חיתוך תצוגה).
   if (q.new_leads_total > 0) {

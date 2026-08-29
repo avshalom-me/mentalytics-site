@@ -1071,7 +1071,9 @@ function InboxQueue({
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
   const open = rows.filter((r) => r.status === "new" || r.status === "drafted");
-  const done = rows.filter((r) => r.status === "sent" || r.status === "sent_external" || r.status === "ignored");
+  const done = rows.filter((r) =>
+    ["sent", "sent_external", "ignored", "superseded"].includes(r.status)
+  );
   const [backfilling, setBackfilling] = useState(false);
 
   async function backfill() {
@@ -1141,7 +1143,13 @@ function InboxQueue({
           <ul className="space-y-1 text-xs text-stone-600">
             {done.map((r) => (
               <li key={r.id}>
-                {r.status === "sent" ? "✅ נענתה מכאן" : r.status === "sent_external" ? "📤 נענתה בג'ימייל" : "🚫 ללא מענה"}
+                {r.status === "sent"
+                  ? "✅ נענתה מכאן"
+                  : r.status === "sent_external"
+                    ? "📤 נענתה בג'ימייל"
+                    : r.status === "superseded"
+                      ? "🔁 הפונה כתב/ה שוב - עונים על ההודעה החדשה"
+                      : "🚫 ללא מענה"}
                 {" · "}
                 {r.from_name || r.from_email} · {r.subject || "(ללא נושא)"} · {relTime(r.received_at)}
               </li>
