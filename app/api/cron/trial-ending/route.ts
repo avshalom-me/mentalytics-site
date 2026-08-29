@@ -105,11 +105,20 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
 
   for (const t of rows) {
     const daysLeft = daysUntil(t.promoted_until, now);
-    const isReminder = daysLeft <= REMINDER_DAYS;
-    // מחוץ לשני החלונות (למשל 2 ימים) - לא עושים כלום.
-    if (!isReminder && daysLeft !== NOTICE_DAYS) continue;
+    if (daysLeft > NOTICE_DAYS) continue; // עוד מוקדם
+
+    // המייל המרכזי קודם תמיד, גם באיחור.
+    //
+    // התנאי הקודם דרש שוויון מדויק ל-3 ימים. כל עוד הקרון רץ כל יום זה
+    // מדויק, אבל יום אחד שנופל מקפיץ את הספירה מ-4 ל-2, והמייל המרכזי -
+    // זה שנושא את הדוח ואת הצעת השדרוג - לא היה יוצא לעולם. המטפל היה
+    // מקבל רק את התזכורת הרזה של היום האחרון. עם 19 מטפלים שפגים בשני
+    // ימים מרוכזים, קרון אחד שנופל היה עולה ביוקר.
+    const isReminder = Boolean(t.trial_ending_notified_at);
+    // המרכזי כבר יצא, ועוד לא הגענו לחלון התזכורת.
+    if (isReminder && daysLeft > REMINDER_DAYS) continue;
     // כל שלב נשלח פעם אחת בלבד.
-    if (isReminder ? t.trial_ending_reminded_at : t.trial_ending_notified_at) continue;
+    if (isReminder && t.trial_ending_reminded_at) continue;
     if (!t.email) { skipped++; continue; }
 
     const since = t.promoted_since ?? t.promoted_until;
