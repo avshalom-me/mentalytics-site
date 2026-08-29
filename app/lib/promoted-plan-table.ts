@@ -10,7 +10,10 @@ function no(): string {
   return `<td style="text-align:center;padding:11px 8px;border-bottom:1px solid #EAF0EE;color:#C9D4D2;font-weight:800;font-size:16px;">✗</td>`;
 }
 
-const ROWS: { label: string; free: boolean }[] = [
+// מיוצא: בסיס הידע של סוכן שירות הלקוחות קורא מכאן, כדי שהטיוטות יתארו
+// את המסלול מאותה רשימה שהמיילים מציגים. בלי זה המודל שאב את התכולה
+// מהציטוט שבשרשור הנכנס - מקור שמתיישן ואינו בשליטתנו.
+export const PROMOTED_PLAN_ROWS: { label: string; free: boolean }[] = [
   { label: "דף פרופיל אישי - תמונה, ביוגרפיה ותחומי התמחות", free: true },
   { label: "הופעה בחיפוש לפי אזור או עיר", free: true },
   { label: "הופעה ראשונה בתוצאות החיפוש", free: false },
@@ -22,7 +25,7 @@ const ROWS: { label: string; free: boolean }[] = [
 // footnote - השורה שמתחת לטבלה. משתנה בין המיילים כי התנאים שונים
 // (מתנה מלאה מול חודשיים ראשונים ללא תשלום), ולכן היא לא מקובעת כאן.
 export function promotedPlanTable(footnote?: string): string {
-  const rows = ROWS.map(
+  const rows = PROMOTED_PLAN_ROWS.map(
     (r) => `
           <tr>
             <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">${r.label}</td>
