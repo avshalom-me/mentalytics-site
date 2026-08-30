@@ -46,6 +46,8 @@ type Data = {
   searchTerms: {
     generic: { campaign: string; term: string; impressions: number; clicks: number; cost: number }[];
     hiddenShare: { campaign: string; cost30: number; hiddenPct: number }[];
+    placeless: { campaign: string; pct: number; cost30: number; top: { term: string; cost: number; clicks: number }[] }[];
+    hmoFree: { campaign: string; term: string; cost: number; clicks: number }[];
   };
 };
 
@@ -275,12 +277,33 @@ function SearchTermsPanel({ s }: { s: Data["searchTerms"] }) {
   return (
     <div className="mb-5 rounded-2xl border-2 border-[#C2DFDE] bg-white p-5">
       <h2 className="mb-2 text-base font-black text-stone-800">🔍 מונחי חיפוש</h2>
-      {s.generic.length === 0 && s.hiddenShare.length === 0 && <p className="text-sm text-stone-500">אין דליפות גנריות ידועות. יתעדכן עם הסנכרון.</p>}
+      {s.generic.length === 0 && s.hiddenShare.length === 0 && s.placeless.length === 0 && s.hmoFree.length === 0 && <p className="text-sm text-stone-500">אין דליפות גנריות ידועות. יתעדכן עם הסנכרון.</p>}
       {s.generic.length > 0 && (
         <div className="mb-3">
           <div className="mb-1 text-xs font-black text-red-700">מונחים גנריים שקיבלו חשיפות (לחסום כמילים שליליות):</div>
           {s.generic.map((g, i) => (
             <div key={i} className="text-sm">{g.campaign} · <b>{g.term}</b> - {num(g.impressions)} חשיפות, {g.clicks} קליקים, {nis(g.cost)}</div>
+          ))}
+        </div>
+      )}
+      {s.placeless.map((p) => (
+        <div key={p.campaign} className="mb-3 rounded-xl bg-amber-50 p-3">
+          <div className="mb-1 text-xs font-black text-amber-800">
+            🧭 {p.campaign}: {p.pct}% מהתקציב ({nis(p.cost30)}) על חיפושים בלי שם מקום
+          </div>
+          <div className="text-xs text-stone-600">
+            שאילתה כללית מביאה מי שבודק אפשרויות, לא מי שמחפש מטפל בעיר שלו. המובילות:
+          </div>
+          {p.top.map((t, i) => (
+            <div key={i} className="text-sm">· <b>{t.term}</b> - {t.clicks} קליקים, {nis(t.cost)}</div>
+          ))}
+        </div>
+      ))}
+      {s.hmoFree.length > 0 && (
+        <div className="mb-3 rounded-xl bg-amber-50 p-3">
+          <div className="mb-1 text-xs font-black text-amber-800">🏥 מחפשי קופת חולים / טיפול חינם (לחסום כשליליות):</div>
+          {s.hmoFree.map((t, i) => (
+            <div key={i} className="text-sm">{t.campaign} · <b>{t.term}</b> - {t.clicks} קליקים, {nis(t.cost)}</div>
           ))}
         </div>
       )}
