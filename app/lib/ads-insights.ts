@@ -394,7 +394,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     // alert clears within a week instead of dragging a month of history.
     if (c.clicks7 >= 10 && c.conv7 / c.clicks7 > 1.05) {
       pollutionFired = true;
-      push(`ads:pollution:${c.google_name}`, "red", `🗑️ ${c.google_name} - ${c.conv7} המרות מ-${c.clicks7} קליקים בשבוע`, "יחס מעל 1 = פעולת המרה ראשית סופרת צפיות עמוד. Goals > Conversions > להוריד ל-Secondary.");
+      push(`ads:pollution:${c.google_name}`, "red", `🗑️ ${c.google_name} - ${Math.round(c.conv7)} המרות מ-${c.clicks7} קליקים בשבוע`, "יחס מעל 1 = פעולת המרה ראשית סופרת צפיות עמוד. Goals > Conversions > להוריד ל-Secondary.");
     }
     // Spend with zero contacts: amber at ₪50/week, red at ₪150/week - the
     // old agent threshold, where "maybe noise" stops being an excuse.
