@@ -18,8 +18,9 @@ import { CITY_SEO_LIST, ALL_REGIONS } from "./regions";
 // queue can auto-recover the moment a fixed problem stops re-appearing.
 
 const LOOKBACK_DAYS = 7;
-// תקציב חודשי מתוכנן לפרסום (₪). ניתן לעקוף בסביבה בלי דיפלוי.
-const MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3000);
+// תקציב חודשי מתוכנן לפרסום (₪) - נקבע ל-3,500 ב-30/8/26. ניתן לעקוף
+// בסביבה (ADS_MONTHLY_BUDGET) בלי דיפלוי.
+const MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
 // יעד עלות ללחיצת פנייה כשאין אבן דרך בתוכנית העסקית.
 const FALLBACK_MAX_CPL = Number(process.env.ADS_MAX_CPL ?? 250);
 
@@ -373,15 +374,41 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     }
   }
 
-  // Monthly pace, month-to-date against the planned budget.
+  // Budget: where the month LANDS, not whether today's slice is over. One
+  // alert carries all three numbers a decision needs - spent so far, where
+  // this month ends at the current pace, and what the last seven days would
+  // cost over a full month (which is what next month inherits). The run-rate
+  // number is the one that moved on 30/08/26: 4,026 spent over 30 days, but
+  // the trailing week ran at 202/day - a 6,150 month - because a
+  // total-budget campaign accelerates as its end date approaches.
   const totalCost30 = r2([...g30.values()].reduce((s, a) => s + a.cost, 0));
   const now = new Date();
   const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-  const expected = r2(MONTHLY_BUDGET * (now.getDate() / daysInMonth));
+  const dayOfMonth = now.getDate();
+  const expected = r2(MONTHLY_BUDGET * (dayOfMonth / daysInMonth));
   const budgetPace = { expected, actual: spendMtd };
-  if (spendMtd >= 200 && spendMtd > expected * 1.2) {
-    const projected = Math.round((spendMtd / now.getDate()) * daysInMonth);
-    push(`ads:pace:${today.slice(0, 7)}`, "amber", "💸 קצב ההוצאה החודשי חורג מהתקציב", `מתחילת החודש הוצאו ₪${Math.round(spendMtd)}, מול ₪${Math.round(expected)} לפי הקצב המתוכנן (₪${MONTHLY_BUDGET} לחודש). בקצב הזה החודש ייסגר על כ-₪${projected}. להחליט מאיפה מקצצים לפני שמוסיפים.`);
+  // Projection needs a few days of month behind it; before day 3 only an
+  // outright overspend counts.
+  const projectedThisMonth = dayOfMonth >= 3 ? r2((spendMtd / dayOfMonth) * daysInMonth) : null;
+  const runRateDaily = r2(campaigns.reduce((s, c) => s + c.cost7, 0) / 7);
+  const runRateMonthly = r2(runRateDaily * 30.4);
+
+  const overNow = spendMtd > MONTHLY_BUDGET;
+  const overProjected = projectedThisMonth != null && projectedThisMonth > MONTHLY_BUDGET * 1.05;
+  const overRunRate = runRateMonthly > MONTHLY_BUDGET * 1.25;
+  if (overNow || overProjected || overRunRate) {
+    const worst = Math.max(spendMtd, projectedThisMonth ?? 0, runRateMonthly);
+    push(
+      `ads:pace:${today.slice(0, 7)}`,
+      overNow || worst > MONTHLY_BUDGET * 1.25 ? "red" : "amber",
+      overNow
+        ? `💸 עברנו את התקציב החודשי: ₪${Math.round(spendMtd)} מתוך ₪${MONTHLY_BUDGET}`
+        : `💸 בקצב הנוכחי החודש ייסגר על ₪${Math.round(projectedThisMonth ?? runRateMonthly)} מול יעד ₪${MONTHLY_BUDGET}`,
+      `מתחילת החודש: ₪${Math.round(spendMtd)} (הקצב המתוכנן ליום הזה: ₪${Math.round(expected)}). ` +
+      `${projectedThisMonth != null ? `סגירה צפויה של החודש: ₪${Math.round(projectedThisMonth)}. ` : ""}` +
+      `שבעת הימים האחרונים רצו ב-₪${runRateDaily} ליום - כלומר ₪${Math.round(runRateMonthly)} לחודש מלא, וזה מה שהחודש הבא יורש אם לא משנים תקציבים. ` +
+      `העמודה שמחליטה מאיפה מקצצים היא עלות-לפנייה בקונסולה, לא ההוצאה המוחלטת.`
+    );
   }
 
   let pollutionFired = false;
