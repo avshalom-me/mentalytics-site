@@ -1,4 +1,5 @@
 import "server-only";
+import { randomBytes } from "crypto";
 
 // לקוח Gmail לתיבת admin@getmentalytics.com, במסלול OAuth פנימי של
 // Workspace - אותו דפוס בדיוק כמו GOOGLE_ADS_REFRESH_TOKEN: אפליקציה
@@ -269,6 +270,39 @@ function encodeHeader(s: string): string {
  * 2822 גולמי כי זה מה ש-Gmail API מקבל; In-Reply-To/References הם מה
  * שגורם לה להופיע אצל הנמען כתשובה ולא כמייל חדש.
  */
+/** הברחת תווים ל-HTML. עותק מקומי - gmail.ts לא תלוי בשכבת המיילים. */
+function escapeHtmlText(str: string): string {
+  return str
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * גוף התשובה כ-HTML עם כיוון מפורש.
+ *
+ * טקסט פשוט הוא חסר כיוון: אין בו מטא-דאטה, ולכן הלקוח מרנדר לפי ברירת
+ * המחדל שלו - שהיא LTR. בעברית זה מזיז סימני פיסוק לצד הלא נכון ומיישר
+ * את כל הפסקה שמאלה. הפתרון היחיד שעובד בכל הלקוחות הוא dir="rtl" מפורש,
+ * וזה מחייב HTML.
+ *
+ * pre-wrap שומר על שורות ריקות ורווחים כפי שהאדמין הקליד, ו-<br> נשאר
+ * כגיבוי ללקוחות שמסירים סגנונות (חלק מגרסאות אאוטלוק).
+ */
+function rtlHtmlBody(text: string): string {
+  // בלי תו שורה אחרי ה-<br>: תחת pre-wrap גם הוא נספר כשבירה, וכל שורה
+  // בתשובה הייתה יוצאת מוכפלת.
+  const safe = escapeHtmlText(text).replace(/\r?\n/g, "<br>");
+  return [
+    '<div dir="rtl" style="direction:rtl;text-align:right;unicode-bidi:plaintext;',
+    "white-space:pre-wrap;font-family:'Heebo',Arial,sans-serif;font-size:15px;",
+    'line-height:1.7;color:#1a4a5c;">',
+    safe,
+    "</div>",
+  ].join("");
+}
+
 export async function sendGmailReply(opts: {
   threadId: string;
   to: string;
@@ -285,16 +319,32 @@ export async function sendGmailReply(opts: {
   const sender =
     (process.env.GMAIL_SENDER ?? "").trim() ||
     (process.env.GMAIL_ACCOUNT ?? "admin@getmentalytics.com").trim();
+
+  // multipart/alternative: גרסת HTML לכיוון נכון, וגרסת טקסט כגיבוי למי
+  // שחוסם HTML. הגבול אקראי כדי שלא יופיע בטעות בתוך גוף ההודעה.
+  const boundary = `mtl_${randomBytes(12).toString("hex")}`;
+  const b64 = (v: string) => Buffer.from(v, "utf-8").toString("base64");
+
   const lines = [
     `From: ${encodeHeader("טיפול חכם")} <${sender}>`,
     `To: ${opts.to}`,
     `Subject: ${encodeHeader(subject)}`,
     ...(opts.inReplyTo ? [`In-Reply-To: ${opts.inReplyTo}`, `References: ${opts.inReplyTo}`] : []),
     "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    Buffer.from(opts.body, "utf-8").toString("base64"),
+    b64(opts.body),
+    `--${boundary}`,
+    'Content-Type: text/html; charset="UTF-8"',
+    "Content-Transfer-Encoding: base64",
+    "",
+    b64(rtlHtmlBody(opts.body)),
+    `--${boundary}--`,
+    "",
   ];
   const raw = Buffer.from(lines.join("\r\n"), "utf-8").toString("base64url");
   const j = await gmailFetch<{ id: string }>(`/messages/send`, {
