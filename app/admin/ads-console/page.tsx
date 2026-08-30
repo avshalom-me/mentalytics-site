@@ -341,8 +341,14 @@ export default function AdsConsolePage() {
 
   return (
     <div dir="rtl" className="mx-auto max-w-6xl p-4">
-      <h1 className="mb-1 text-2xl font-black text-stone-900">קונסולת גוגל אדס</h1>
-      <p className="mb-4 text-sm text-stone-500">עלות מגוגל מול פניות מהאדמין, והתראות על כל מה שהתגלה עד היום במקרה.</p>
+      <h1 className="mb-1 text-2xl font-black text-stone-900">גוגל אדס - ניתוח מלא</h1>
+      <div className="mb-4 rounded-xl border border-[#C2DFDE] bg-[#EAF4F3] p-3 text-sm text-stone-700">
+        <b>מה זה העמוד:</b> הצלבה של ההוצאה בגוגל מול הפניות שנמדדו באתר, ברמת קמפיין, מילת מפתח ומונח חיפוש.{" "}
+        <b>לא חייבים להיכנס לכאן:</b> אותן התראות בדיוק נבדקות כל בוקר ב-07:00 ומגיעות אליך לתור הסוכנים ולדוח היומי -{" "}
+        <a href="/admin/ads" className="font-black text-[#2A6462] underline">פרסום ממומן</a>. העמוד הזה הוא לצלילה: לראות את המספרים שמאחורי כל התראה, ולערוך את רישום הקמפיינים.
+        <br />
+        <span className="text-xs text-stone-500">קריאה בלבד מול גוגל - כל שינוי בקמפיינים מתבצע ידנית בגוגל אדס.</span>
+      </div>
       {err && <p className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-700">{err}</p>}
       {!data && !err && <p className="text-sm text-stone-500">טוען...</p>}
       {data && (
