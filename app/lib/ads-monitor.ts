@@ -65,14 +65,22 @@ function ils(n: number): string {
 // הרשומה הקרובה ביותר לחודש הנוכחי; נפילה לברירת מחדל אם אין.
 async function maxCplTarget(): Promise<{ value: number; fromPlan: boolean }> {
   try {
+    // plan_targets holds a trajectory of milestones (09/26 ₪65 → 12/26 ₪50 →
+    // 06/27 ₪40), so the newest row is the FUTURE goal, not today's. Taking it
+    // judged August against a target ten months away and flagged nearly every
+    // campaign every morning - six pending alerts and twelve already dismissed
+    // by the time this was caught (30/08/26). Use the milestone in force now:
+    // the latest month that has already started, or the earliest one if the
+    // plan begins in the future.
     const { data } = await supabaseAdmin
       .from("plan_targets")
       .select("metric, month, target")
       .eq("metric", "cpl_max")
-      .order("month", { ascending: false })
-      .limit(1);
-    const raw = data?.[0]?.target;
-    const n = Number(raw);
+      .order("month", { ascending: true });
+    const rows = (data ?? []).filter((r) => Number(r.target) > 0);
+    const today = new Date().toISOString().slice(0, 10);
+    const current = [...rows].reverse().find((r) => String(r.month) <= today) ?? rows[0];
+    const n = Number(current?.target);
     if (Number.isFinite(n) && n > 0) return { value: n, fromPlan: true };
   } catch {
     /* ממשיכים עם ברירת המחדל */
