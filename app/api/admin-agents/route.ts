@@ -12,7 +12,7 @@ import { runRetention } from "@/app/lib/retention";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer, recentGiftOffers } from "@/app/lib/gift-offer";
-import { runCenterProspects, listProspects, updateProspect, addProspectsFromText } from "@/app/lib/center-prospects";
+import { runCenterProspects, listProspects, updateProspect, addProspectsFromText, moveProspectToDeal } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
@@ -329,6 +329,15 @@ export async function POST(req: NextRequest) {
     }
     // עדכון שורה בטבלת המעקב - פנינו / ענו / תשובה / הערות / מכשולים.
     // הדבקת רשימה שהמשתמש כבר מחזיק - בלי תלות בחיפוש החיצוני.
+    // "רוצים" - המכון עובר מרשימת החיוג לצינור העסקאות.
+    if (body?.action === "prospect_to_deal") {
+      const id = String(body?.id ?? "");
+      const stage = body?.stage === "negotiation" ? "negotiation" : "first_contact";
+      if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+      const r = await moveProspectToDeal(id, stage);
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, deal_id: r.dealId, prospects: await listProspects() });
+    }
     if (body?.action === "prospects_add") {
       const r = await addProspectsFromText(String(body?.text ?? ""));
       return NextResponse.json({ ok: true, ...r, prospects: await listProspects() });
@@ -336,9 +345,15 @@ export async function POST(req: NextRequest) {
     if (body?.action === "prospect_update") {
       const id = String(body?.id ?? "");
       if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+      const VALID_PROSPECT_STATUSES = ["new", "contacted", "later", "not_interested", "moved_to_deal"];
       await updateProspect(id, {
         contacted_at: body?.contacted === true ? new Date().toISOString() : body?.contacted === false ? null : undefined,
         answer: body?.answer === null || typeof body?.answer === "string" ? body.answer : undefined,
+        status: VALID_PROSPECT_STATUSES.includes(String(body?.status))
+          ? (body.status as "new" | "contacted" | "later" | "not_interested" | "moved_to_deal")
+          : undefined,
+        follow_up_at: typeof body?.follow_up_at === "string" || body?.follow_up_at === null ? body.follow_up_at : undefined,
+        status_note: typeof body?.status_note === "string" ? body.status_note : undefined,
         notes: typeof body?.notes === "string" ? body.notes : undefined,
         obstacles: typeof body?.obstacles === "string" ? body.obstacles : undefined,
         phone: typeof body?.phone === "string" ? body.phone : undefined,

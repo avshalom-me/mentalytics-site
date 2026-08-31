@@ -1,6 +1,6 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
-import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
+import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled, createAgentAction } from "./agent-infra";
 import { REGION_GROUPS, REGION_CITIES, REGION_GROUP_LABELS, CITY_TO_REGION, regionGroupOf } from "./regions";
 import { placesConfigured, searchCentersInCities } from "./places-search";
 
@@ -35,6 +35,11 @@ export type ProspectRow = {
   contacted_at: string | null;
   answered_at: string | null;
   answer: "yes" | "no" | "maybe" | null;
+  // הסטטוס המפורש - מקור האמת מ-30/8/26 (answer נשאר לתאימות בלבד).
+  status: "new" | "contacted" | "later" | "not_interested" | "moved_to_deal";
+  follow_up_at: string | null;
+  status_note: string | null;
+  deal_id: string | null;
   notes: string | null;
   obstacles: string | null;
   draft_subject: string | null;
@@ -220,6 +225,33 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
       }
     }
 
+    // ── תזכורות "לחזור בעוד X" שהגיע זמנן ──────────────────────────────
+    // מכון שסומן "לא כרגע, אולי בעתיד" עם תאריך חזרה. כשהתאריך מגיע,
+    // נפתחת משימה בתור - פעם אחת (dedupe), והיא נסגרת ידנית כשמטפלים בה.
+    {
+      const { data: due } = await supabaseAdmin
+        .from("center_prospects")
+        .select("id, name, phone, status_note, follow_up_at")
+        .eq("status", "later")
+        .lte("follow_up_at", nowIso)
+        .limit(20);
+      for (const d of due ?? []) {
+        await createAgentAction({
+          agent: "center_prospects",
+          actionType: "prospect_follow_up",
+          kind: "action",
+          title: `הגיע הזמן לחזור אל ${d.name}`,
+          body:
+            `סומן "לא כרגע - אולי בעתיד" עם תזכורת ל-${String(d.follow_up_at).slice(0, 10)}.` +
+            (d.status_note ? `
+מה נאמר אז: ${d.status_note}` : "") +
+            (d.phone ? `
+טלפון: ${d.phone}` : ""),
+          dedupeKey: `prospect:follow_up:${d.id}`,
+        });
+      }
+    }
+
     // ── התראה על ליד פנימי שנתקע ───────────────────────────────────────
     // זו הצעה שכבר יצאה ולא נסגרה, ולכן היא ממצא ולא משימה חדשה: היא
     // נסגרת מעצמה ברגע שהמרכז משלם או שההצעה מבוטלת.
@@ -288,11 +320,25 @@ export async function listProspects(): Promise<ProspectRow[]> {
 /** עדכון שורה מהטבלה באדמין. רק שדות המעקב ניתנים לעריכה. */
 export async function updateProspect(
   id: string,
-  patch: Partial<Pick<ProspectRow, "contacted_at" | "answer" | "notes" | "obstacles" | "phone" | "email">> & {
+  patch: Partial<
+    Pick<
+      ProspectRow,
+      "contacted_at" | "answer" | "notes" | "obstacles" | "phone" | "email" | "status" | "follow_up_at" | "status_note"
+    >
+  > & {
     dismissed?: boolean;
   }
 ): Promise<void> {
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  if ("status" in patch && patch.status) {
+    update.status = patch.status;
+    // "נוצרה פנייה ראשונה" גוררת סימון פנינו - אין פנייה בלי תאריך.
+    if (patch.status === "contacted") update.contacted_at = new Date().toISOString();
+    // יציאה ממצב ההמתנה מנקה את התזכורת.
+    if (patch.status !== "later") update.follow_up_at = null;
+  }
+  if ("follow_up_at" in patch) update.follow_up_at = patch.follow_up_at;
+  if ("status_note" in patch) update.status_note = patch.status_note;
   if ("contacted_at" in patch) update.contacted_at = patch.contacted_at;
   if ("phone" in patch) update.phone = patch.phone;
   if ("email" in patch) update.email = patch.email;
@@ -308,6 +354,55 @@ export async function updateProspect(
   }
   const { error } = await supabaseAdmin.from("center_prospects").update(update).eq("id", id);
   if (error) throw new Error(`העדכון נכשל: ${error.message}`);
+}
+
+// ── העברה לעסקאות B2B ──────────────────────────────────────────────────
+// מכון שאמר "רוצים" עובר מרשימת החיוג לצינור העסקאות, עם כל מה שנאסף
+// עליו: שם, קשר, אזור, הערות. המעבר חד-כיווני ומקושר - העסקה זוכרת את
+// המכון, והסגירה האוטומטית משתמשת בקישור הזה לזהות תשלום.
+
+export async function moveProspectToDeal(
+  id: string,
+  stage: "first_contact" | "negotiation"
+): Promise<{ ok: boolean; dealId?: string; error?: string }> {
+  const { data: p } = await supabaseAdmin
+    .from("center_prospects")
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  if (!p) return { ok: false, error: "המכון לא נמצא" };
+  if (p.deal_id) return { ok: false, error: "המכון כבר בעסקאות" };
+
+  const contact = [p.phone, p.email].filter(Boolean).join(" · ");
+  const noteParts = [p.notes, p.obstacles ? `מכשולים: ${p.obstacles}` : null].filter(Boolean);
+  const { data: deal, error } = await supabaseAdmin
+    .from("crm_deals")
+    .insert({
+      title: p.name,
+      deal_type: "center",
+      stage,
+      contact_name: p.name,
+      contact_info: contact || null,
+      notes: noteParts.length > 0 ? noteParts.join("\n") : null,
+      next_step: stage === "first_contact" ? "לתאם שיחת היכרות" : "להמשיך משא ומתן",
+      prospect_id: p.id,
+      region_key: p.region_key,
+    })
+    .select("id")
+    .single();
+  if (error || !deal) return { ok: false, error: error?.message ?? "יצירת העסקה נכשלה" };
+
+  const { error: updErr } = await supabaseAdmin
+    .from("center_prospects")
+    .update({
+      status: "moved_to_deal",
+      deal_id: deal.id,
+      follow_up_at: null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id);
+  if (updErr) return { ok: false, error: updErr.message };
+  return { ok: true, dealId: deal.id as string };
 }
 
 // ── הוספה ידנית ────────────────────────────────────────────────────────

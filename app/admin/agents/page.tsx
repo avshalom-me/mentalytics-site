@@ -1,4 +1,5 @@
 "use client";
+import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 
 import { useEffect, useState } from "react";
 
@@ -53,6 +54,7 @@ type Prospect = {
   name: string;
   source: "places" | "internal_lead" | "manual";
   city: string | null;
+  region_key: string | null;
   address: string | null;
   phone: string | null;
   website: string | null;
@@ -65,6 +67,10 @@ type Prospect = {
   draft_subject: string | null;
   draft_body: string | null;
   draft_sent_at: string | null;
+  status: "new" | "contacted" | "later" | "not_interested" | "moved_to_deal";
+  follow_up_at: string | null;
+  status_note: string | null;
+  deal_id: string | null;
 };
 
 type GiftCandidate = {
@@ -398,11 +404,11 @@ AGENTS.push({
   runLabel: "עדכן רשימה עכשיו",
   desc: "בונה ומתחזק רשימת מרכזים טיפוליים שאפשר להפוך ללקוחות: קודם מרכזים שכבר קיבלו מאיתנו הצעה ולא סגרו, ואחריהם מכונים שנמצאו בחיפוש Google באזורים שבהם חסרים לנו מטפלים. בכל ריצה הרשימה מתעדכנת - נוספים חדשים, והקיימים מרועננים בלי לגעת במעקב שלך.",
   howToRead: [
-    "הרשימה היא רשימת שיחות. הטור \"פערים באזור\" הוא הדירוג: כמה חוסרים המרכז הזה יכול לסגור.",
-    "\"ליד חם\" = מרכז שכבר ביקש מאיתנו הצעה ולא סגר. אלה תמיד בראש - אין טעם לחייג למכון חדש כשמישהו שכבר התעניין ממתין.",
-    "סמן \"פנינו\" אחרי שיחה, ואז אפשר לבחור מה ענו ולכתוב הערות ומכשולים. הכול נשמר מיד.",
-    "מייל למכון לא נשלח אוטומטית לעולם (חוק הספאם). כפתור הטיוטה נפתח רק אחרי שסימנת שפנית ולא קיבלת תשובה.",
-  ],
+      "הסטטוס בכל שורה הוא רשימה נפתחת: \"לא מעוניין\" גורר הערה ויורד אדום לתחתית; \"אולי בעתיד\" קובע תזכורת (ברירת מחדל 3 חודשים) שתקפוץ כאן כמשימה; \"רוצים\" מעביר את המכון לעסקאות B2B עם כל מה שנאסף.",
+      "עסקה שנפתחה מכאן נסגרת מעצמה כשהמערכת מזהה שהמרכז השלים הרשמה ותשלום.",
+      "הפילטרים למעלה: לפי אזור ולפי מצב (לא נגענו / בתהליך / בפנים / לא מעוניין).",
+      "מייל קר אסור (חוק הספאם) - כפתור הטיוטה נפתח רק אחרי שסומן שפנינו בטלפון ואין תשובה.",
+    ],
   schedule: "רץ אוטומטית כל יום שני ב-12:00",
   chartLabel: "כמה מועמדים חדשים נמצאו בכל ריצה",
 });
@@ -1197,6 +1203,20 @@ function InboxQueue({
   );
 }
 
+// סטטוסי המכון בטבלת ה-CRM. הסדר כאן קובע גם את סדר המיון: פעילים
+// למעלה, ממתינים באמצע, "לא מעוניין" באדום בתחתית.
+const PROSPECT_STATUSES = [
+  { value: "new", label: "לא נגענו", rank: 0 },
+  { value: "contacted", label: "נוצרה פנייה ראשונה", rank: 1 },
+  { value: "later", label: "לא כרגע - אולי בעתיד", rank: 2 },
+  { value: "moved_to_deal", label: "הועבר לעסקאות ✓", rank: 3 },
+  { value: "not_interested", label: "לא מעוניין - לא לפנות שוב", rank: 4 },
+] as const;
+
+const PROSPECT_STATUS_RANK: Record<string, number> = Object.fromEntries(
+  PROSPECT_STATUSES.map((st) => [st.value, st.rank])
+);
+
 function ProspectTable({
   rows,
   onChanged,
@@ -1220,6 +1240,10 @@ function ProspectTable({
     note: string | null;
   }>({ subject: "", body: "", email: "", source: "template", facts: [], note: null });
 
+  // פילטרים: אזור + דלי סטטוס. מסוננים בצד הלקוח - הרשימה קטנה.
+  const [regionFilter, setRegionFilter] = useState("");
+  const [bucketFilter, setBucketFilter] = useState("");
+
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(id);
     try {
@@ -1230,6 +1254,48 @@ function ProspectTable({
     } finally {
       setBusy(null);
     }
+  }
+
+  // שינוי סטטוס עם הזרימות שהוגדרו: "לא מעוניין" גורר הערה, "אולי
+  // בעתיד" גורר תאריך חזרה (ברירת מחדל 3 חודשים), ו"רוצים" מעביר לעסקאות.
+  async function changeStatus(pr: Prospect, next: string) {
+    if (next === pr.status) return;
+    if (next === "not_interested") {
+      const note = window.prompt(`מה נאמר? (יישמר על ${pr.name} ולא נפנה אליו שוב)`, pr.status_note ?? "");
+      if (note === null) return;
+      await patch(pr.id, { status: "not_interested", status_note: note.trim() || null });
+      return;
+    }
+    if (next === "later") {
+      const months = window.prompt("לחזור בעוד כמה חודשים? (תיפתח תזכורת אוטומטית)", "3");
+      if (months === null) return;
+      const m = Math.min(24, Math.max(1, Number(months) || 3));
+      const due = new Date();
+      due.setMonth(due.getMonth() + m);
+      await patch(pr.id, { status: "later", follow_up_at: due.toISOString() });
+      return;
+    }
+    if (next === "deal_first" || next === "deal_negotiation") {
+      const stage = next === "deal_negotiation" ? "negotiation" : "first_contact";
+      if (
+        !window.confirm(
+          `להעביר את ${pr.name} לעסקאות B2B (${stage === "negotiation" ? "משא ומתן" : "פנייה ראשונית"})?\n\nהעסקה תיפתח עם כל הפרטים שנאספו, והמכון יסומן כאן "הועבר לעסקאות".`
+        )
+      )
+        return;
+      setBusy(pr.id);
+      try {
+        const j = await postAgents("prospect_to_deal", { id: pr.id, stage });
+        if (Array.isArray(j.prospects)) onChanged(j.prospects as Prospect[]);
+        onNotify(`${pr.name} הועבר לעסקאות B2B - העסקה נפתחה בשלב "${stage === "negotiation" ? "משא ומתן" : "פנייה ראשונית"}"`);
+      } catch (e) {
+        onNotify(e instanceof Error ? e.message : "ההעברה נכשלה", true);
+      } finally {
+        setBusy(null);
+      }
+      return;
+    }
+    await patch(pr.id, { status: next });
   }
 
   async function addPasted() {
@@ -1357,51 +1423,94 @@ function ProspectTable({
     );
   }
 
-  const answerChip = (p: Prospect) => {
-    const opts: { v: "yes" | "no" | "maybe"; label: string; cls: string }[] = [
-      { v: "yes", label: "כן", cls: "bg-emerald-600 text-white" },
-      { v: "maybe", label: "?", cls: "bg-amber-500 text-white" },
-      { v: "no", label: "לא", cls: "bg-stone-500 text-white" },
-    ];
-    return (
-      <div className="flex gap-1">
-        {opts.map((o) => (
-          <button
-            key={o.v}
-            onClick={() => patch(p.id, { answer: p.answer === o.v ? null : o.v })}
-            disabled={busy === p.id || !p.contacted_at}
-            title={p.contacted_at ? "" : "סמנו קודם שפניתם"}
-            className={`rounded-full px-2 py-0.5 text-[11px] font-bold disabled:opacity-40 ${
-              p.answer === o.v ? o.cls : "border border-stone-300 bg-white text-stone-500 hover:bg-stone-50"
-            }`}
-          >
-            {o.label}
-          </button>
-        ))}
-      </div>
-    );
-  };
+  // דלי הסינון: "בתהליך" = נוצרה פנייה או ממתין לעתיד; "בפנים" = בעסקאות.
+  const bucketOf = (pr: Prospect): string =>
+    pr.status === "new"
+      ? "untouched"
+      : pr.status === "contacted" || pr.status === "later"
+        ? "in_progress"
+        : pr.status === "moved_to_deal"
+          ? "inside"
+          : "not_interested";
+
+  const regionsPresent = Array.from(
+    new Set(rows.map((r) => r.region_key).filter((v): v is string => Boolean(v)))
+  );
+
+  const visible = rows
+    .filter((r) => (regionFilter ? r.region_key === regionFilter : true))
+    .filter((r) => (bucketFilter ? bucketOf(r) === bucketFilter : true))
+    .slice()
+    .sort((a, b) => {
+      const d = (PROSPECT_STATUS_RANK[a.status] ?? 0) - (PROSPECT_STATUS_RANK[b.status] ?? 0);
+      if (d !== 0) return d;
+      // בתוך "ממתין לעתיד" - הקרוב ביותר קודם; בשאר - פערים גדולים קודם.
+      if (a.status === "later" && a.follow_up_at && b.follow_up_at) {
+        return a.follow_up_at.localeCompare(b.follow_up_at);
+      }
+      return (b.gaps_in_region ?? 0) - (a.gaps_in_region ?? 0);
+    });
 
   return (
     <div className="space-y-3">
       {pasteBox}
+
+      {/* פילטרים */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <select
+          value={bucketFilter}
+          onChange={(e) => setBucketFilter(e.target.value)}
+          className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
+        >
+          <option value="">כל הסטטוסים</option>
+          <option value="untouched">לא נגענו</option>
+          <option value="in_progress">בתהליך</option>
+          <option value="inside">בפנים (בעסקאות)</option>
+          <option value="not_interested">לא מעוניין</option>
+        </select>
+        <select
+          value={regionFilter}
+          onChange={(e) => setRegionFilter(e.target.value)}
+          className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
+        >
+          <option value="">כל האזורים</option>
+          {regionsPresent.map((rk) => (
+            <option key={rk} value={rk}>
+              {REGION_GROUP_LABELS[rk] ?? rk}
+            </option>
+          ))}
+        </select>
+        <span className="text-stone-400">
+          {visible.length} מתוך {rows.length}
+        </span>
+      </div>
+
       <div className="overflow-x-auto rounded-xl border border-stone-200">
-        <table className="w-full min-w-[820px] text-sm">
+        <table className="w-full min-w-[980px] text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
               <th className="p-2 text-right font-bold">מרכז</th>
+              <th className="p-2 text-right font-bold">אזור</th>
               <th className="p-2 text-right font-bold">טלפון</th>
               <th className="p-2 text-center font-bold">פערים באזור</th>
-              <th className="p-2 text-center font-bold">פנינו</th>
-              <th className="p-2 text-center font-bold">ענו</th>
+              <th className="p-2 text-right font-bold">סטטוס</th>
               <th className="p-2 text-right font-bold">הערות</th>
               <th className="p-2 text-right font-bold">מכשולים</th>
               <th className="p-2"></th>
             </tr>
           </thead>
           <tbody>
-            {rows.map((p) => (
-              <tr key={p.id} className={`border-b border-stone-100 ${p.answer === "no" ? "opacity-50" : ""}`}>
+            {visible.map((p) => (
+              <tr
+                key={p.id}
+                className={`border-b border-stone-100 ${
+                  p.status === "not_interested"
+                    ? "bg-red-50/70 text-red-900"
+                    : p.status === "moved_to_deal"
+                      ? "bg-emerald-50/40"
+                      : ""
+                }`}
+              >
                 <td className="p-2 align-top">
                   <div className="flex items-center gap-1.5">
                     {p.source === "internal_lead" && (
@@ -1420,6 +1529,9 @@ function ProspectTable({
                     </a>
                   )}
                 </td>
+                <td className="whitespace-nowrap p-2 align-top text-xs text-stone-600">
+                  {p.region_key ? (REGION_GROUP_LABELS[p.region_key] ?? p.region_key) : "-"}
+                </td>
                 <td className="whitespace-nowrap p-2 align-top text-stone-600">
                   {p.phone ? <a href={`tel:${p.phone}`} className="font-bold text-[#2A6462]">{p.phone}</a> : "-"}
                 </td>
@@ -1432,16 +1544,44 @@ function ProspectTable({
                     <span className="text-xs text-stone-300">-</span>
                   )}
                 </td>
-                <td className="p-2 text-center align-top">
-                  <input
-                    type="checkbox"
-                    checked={!!p.contacted_at}
-                    disabled={busy === p.id}
-                    onChange={(e) => patch(p.id, { contacted: e.target.checked })}
-                    className="h-4 w-4 accent-[#2e7d8c]"
-                  />
+                <td className="p-2 align-top">
+                  {p.status === "moved_to_deal" ? (
+                    <a
+                      href="/admin/deals"
+                      className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-200"
+                    >
+                      בעסקאות ✓
+                    </a>
+                  ) : (
+                    <select
+                      value={p.status}
+                      disabled={busy === p.id}
+                      onChange={(e) => changeStatus(p, e.target.value)}
+                      className={`w-44 rounded-lg border px-2 py-1 text-xs font-bold ${
+                        p.status === "not_interested"
+                          ? "border-red-300 bg-red-50 text-red-800"
+                          : p.status === "later"
+                            ? "border-amber-300 bg-amber-50 text-amber-900"
+                            : "border-stone-200 bg-white text-stone-700"
+                      }`}
+                    >
+                      <option value="new">לא נגענו</option>
+                      <option value="contacted">נוצרה פנייה ראשונה</option>
+                      <option value="later">לא כרגע - אולי בעתיד</option>
+                      <option value="not_interested">לא מעוניין - לא לפנות שוב</option>
+                      <option value="deal_first">רוצים ← לעסקאות (פנייה ראשונית)</option>
+                      <option value="deal_negotiation">רוצים ← לעסקאות (משא ומתן)</option>
+                    </select>
+                  )}
+                  {p.status === "later" && p.follow_up_at && (
+                    <div className="mt-1 text-[10px] font-bold text-amber-700">
+                      ⏰ תזכורת: {new Date(p.follow_up_at).toLocaleDateString("he-IL")}
+                    </div>
+                  )}
+                  {p.status === "not_interested" && p.status_note && (
+                    <div className="mt-1 max-w-44 text-[10px] leading-4 text-red-700">{p.status_note}</div>
+                  )}
                 </td>
-                <td className="p-2 align-top">{answerChip(p)}</td>
                 <td className="p-2 align-top">
                   <input
                     defaultValue={p.notes ?? ""}
@@ -1461,7 +1601,7 @@ function ProspectTable({
                 <td className="whitespace-nowrap p-2 align-top">
                   {p.draft_sent_at ? (
                     <span className="text-[11px] text-stone-400">מייל נשלח</span>
-                  ) : p.contacted_at && !p.answer ? (
+                  ) : p.contacted_at && (p.status === "new" || p.status === "contacted") ? (
                     <button
                       onClick={() => makeDraft(p)}
                       disabled={busy === p.id}

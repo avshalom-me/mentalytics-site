@@ -4,7 +4,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { buildDashboardData } from "./work-queue";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
-import { LEAD_TYPES, DEAL_STAGES, labelOf } from "./crm";
+import { LEAD_TYPES, DEAL_STAGES, CLOSED_DEAL_STAGES, labelOf } from "./crm";
 
 // בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב.
 // מקור הנתונים הוא אותו תור עבודה של לוח הבקרה (work-queue.ts) + תורי
@@ -23,8 +23,8 @@ const MAX_LINES_PER_SECTION = 6;
 
 // שלבי עסקה פתוחים - נגזר מאוצר המילים המשותף, לא רשימה קשיחה (ביקורת).
 const OPEN_DEAL_STAGES = DEAL_STAGES.filter(
-  (s) => s.value !== "won" && s.value !== "lost"
-).map((s) => s.value);
+  (st) => !(CLOSED_DEAL_STAGES as readonly string[]).includes(st.value)
+).map((st) => st.value);
 
 export type DigestSection = {
   key: string;

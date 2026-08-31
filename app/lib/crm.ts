@@ -19,15 +19,18 @@ export const LEAD_TYPES = [
   { value: "general", label: "כללי" },
 ] as const;
 
+// תחנות הצינור (הוחלפו 30/8/26; הערכים הישנים מופו במיגרציה). עסקה
+// נעה שמאלה תחנה-תחנה, ו-closed מגיע גם אוטומטית כשמזוהה מנוי פעיל.
 export const DEAL_STAGES = [
-  { value: "inquiry", label: "פנייה" },
-  { value: "meeting", label: "פגישה" },
-  { value: "pilot", label: "פיילוט" },
-  { value: "proposal", label: "הצעה" },
-  { value: "contract", label: "חוזה" },
-  { value: "won", label: "נסגרה ✓" },
+  { value: "first_contact", label: "פנייה ראשונית" },
+  { value: "negotiation", label: "משא ומתן" },
+  { value: "link_sent", label: "נשלח לינק הרשמה" },
+  { value: "closed", label: "הרשמה נסגרה ✓" },
   { value: "lost", label: "אבודה" },
 ] as const;
+
+/** התחנות שמוציאות עסקה מהצינור הפתוח. */
+export const CLOSED_DEAL_STAGES = ["closed", "lost"] as const;
 
 export const DEAL_TYPES = [
   { value: "school", label: "בית ספר / חינוך" },
