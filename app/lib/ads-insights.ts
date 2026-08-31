@@ -230,7 +230,11 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   type KwAgg = { campaign: string; keyword: string; impr: number; clicks: number; cost: number };
   const kwMap = new Map<string, KwAgg>();
   const broadByCampaign = new Map<string, { broad: number; total: number }>();
+  // 30-day keyword impressions per campaign, for the "what is actually
+  // serving" check below.
+  const kwImprByCampaign = new Map<string, number>();
   for (const k of kwDaily) {
+    kwImprByCampaign.set(k.campaign_name, (kwImprByCampaign.get(k.campaign_name) ?? 0) + k.impressions);
     const b = broadByCampaign.get(k.campaign_name) ?? { broad: 0, total: 0 };
     b.total += k.cost;
     if ((k.match_type ?? "").toUpperCase() === "BROAD") b.broad += k.cost;
@@ -256,10 +260,12 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 15)
     .map((k) => ({ ...k, cost: r2(k.cost), cpc: k.clicks > 0 ? r2(k.cost / k.clicks) : null, ctr: k.impr > 0 ? r2((k.clicks / k.impr) * 100) : null }));
-  const rarely = ((kwStatusQ.data ?? []) as { campaign_name: string; serving_status: string | null }[])
-    .filter((k) => (k.serving_status ?? "").toUpperCase().includes("RARELY"));
+  const kwStatusRows = (kwStatusQ.data ?? []) as { campaign_name: string; serving_status: string | null; status: string | null }[];
+  const rarely = kwStatusRows.filter((k) => (k.serving_status ?? "").toUpperCase().includes("RARELY"));
   const rarelyByCampaign = new Map<string, number>();
   for (const k of rarely) rarelyByCampaign.set(k.campaign_name, (rarelyByCampaign.get(k.campaign_name) ?? 0) + 1);
+  const kwCountByCampaign = new Map<string, number>();
+  for (const k of kwStatusRows) kwCountByCampaign.set(k.campaign_name, (kwCountByCampaign.get(k.campaign_name) ?? 0) + 1);
 
   // --- Search terms ---
   // The "צפון" family is what ate 62% of g-hadera; any generic geo term
@@ -449,6 +455,32 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     }
   }
 
+  // Impressions its own keywords cannot explain. A Search campaign whose
+  // keyword impressions are a small fraction of the campaign total is
+  // serving somewhere other than the searches it was built for - Display
+  // expansion or search partners. g-emek1, 30/08/26: 854 campaign
+  // impressions against 11 from keywords, clicks at 1.20 where the rest of
+  // the account pays 3-8, and a CTR under 2% against a 5.9% median. Three
+  // independent tells, all pointing off the search network.
+  for (const [name, a] of g30) {
+    if (a.impr < 200) continue;
+    const kwImpr = kwImprByCampaign.get(name) ?? 0;
+    const share = kwImpr / a.impr;
+    if (share < 0.25) {
+      push(`ads:offnetwork:${name}`, "red", `📺 ${name} - ${Math.round((1 - share) * 100)}% מהחשיפות לא הגיעו ממילות המפתח`, `${a.impr} חשיפות בקמפיין מול ${kwImpr} ממילות המפתח שלו. קמפיין חיפוש אמור לקבל את רוב החשיפות ממילותיו - הפער הזה אומר שהוא מוגש במקום אחר (רשת המדיה או שותפי חיפוש). לבדוק Settings > Networks ולכבות את מה שאינו Search.`);
+    }
+  }
+
+  // Keywords Google refuses to serve for lack of search volume. This is not
+  // a setup error - it is Google saying the demand does not exist - and it
+  // matters most when it hits the town the paying therapists are actually in.
+  for (const [name, total] of kwCountByCampaign) {
+    const r = rarelyByCampaign.get(name) ?? 0;
+    if (total >= 10 && r / total >= 0.5) {
+      push(`ads:rarely:${name}`, "amber", `🔇 ${name} - ${r} מתוך ${total} מילות המפתח לא מוגשות (נפח חיפוש נמוך)`, `גוגל סימנה אותן "Low search volume" והן לא רצות בכלל. זה לא באג בהגדרות אלא קביעה של גוגל שאין ביקוש למונחים האלה. לשקול ערים גדולות יותר בסביבה, או להסיט את המאמץ לערוץ אחר (התאמות/אונליין) במקום להעלות תקציב לביקוש שלא קיים.`);
+    }
+  }
+
   // Broad-match share of keyword spend. The sharon lesson: broad keywords
   // map to place-less queries however geographic their text looks, and the
   // campaign's phrase keywords starve at ₪0-9 while two broads eat ₪450.
@@ -520,6 +552,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       `ads:end:${n}`, `ads:cap-missing:${n}`, `ads:cap-cpc:${n}`, `ads:pollution:${n}`,
       `ads:cold:${n}`, `ads:cpl:${n}`, `ads:spike:${n}`, `ads:unregistered:${n}`,
       `ads:broad:${n}`, `ads:ctr:${n}`, `ads:rename:${n}`, `ads:placeless:${n}`,
+      `ads:offnetwork:${n}`, `ads:rarely:${n}`,
     ]),
     ...config.flatMap((c) => [`ads:untracked:${c.campaign_id}`, `ads:zero:${c.campaign_id}`, `ads:cpl:${c.campaign_id}`]),
     `ads:pace:${today.slice(0, 7)}`,
