@@ -398,7 +398,7 @@ const AGENTS: AgentMeta[] = [
 
 AGENTS.push({
   key: "deals",
-  icon: "🤝",
+  icon: "💼",
   label: "עסקאות B2B",
   runAction: "deals_run",
   runLabel: "רענן תזכורות",
@@ -450,6 +450,34 @@ AGENTS.push({
 });
 
 const AGENT_BY_KEY = new Map(AGENTS.map((a) => [a.key, a]));
+
+// קיבוץ הסוכנים לתצוגה. **ויזואלי בלבד** - מערך AGENTS, המפתחות, הקישורים
+// העמוקים (?agent=) וכל לוגיקת הסוכנים לא נגעו.
+//
+// הקיבוץ לפי נושא ולא לפי "מה מחכה לך": נושא הוא תכונה קבועה של הסוכן,
+// ולכן מיקום הטאב לא זז אף פעם. קיבוץ לפי עומס עבודה היה מזיז סוכנים בין
+// קבוצות כל יום, וזיכרון השרירים לא היה נבנה.
+const AGENT_GROUPS: { key: string; label: string; keys: string[] }[] = [
+  {
+    key: "control",
+    label: "סוכני בקרים ושמירה",
+    // סוכן הכספים כאן ולא בשיווק: הוא מצליב מנויים מול סומיט ומחפש
+    // אי-התאמות - אותו זן של שומר הלילה, לא של הפרסום.
+    keys: ["daily_digest", "watchdog", "finance", "backup", "quiz_funnel"],
+  },
+  {
+    key: "customers",
+    label: "סוכני לקוחות ושימור",
+    // פערי היצע כאן כי הוא פונה למטפלים שכבר רשומים אצלנו - הפעלה של מי
+    // שבפנים, לא גיוס מבחוץ.
+    keys: ["inbox", "supply_gaps", "center_nudge", "retention"],
+  },
+  {
+    key: "growth",
+    label: "סוכני שיווק ומכירות",
+    keys: ["ads", "conversions", "deals", "center_prospects"],
+  },
+];
 
 // תג חומרה. רק critical ו-high מקבלים תג - אם גם "רגיל" יבלוט, שוב שום
 // דבר לא בולט.
@@ -2586,59 +2614,118 @@ export default function AgentsPage() {
         )}
         {loading && runs.length === 0 && <p className="mb-4 text-sm text-stone-400">טוען...</p>}
 
-        {/* סרגל הסוכנים - טאבים לרוחב. לחיצה מחליפה את הדף שמתחת. */}
-        <div className="mb-6 flex flex-wrap gap-2">
-          {AGENTS.map((meta) => {
-            const last = runs.find((r) => r.agent === meta.key);
-            const mine = pending.filter((a) => a.agent === meta.key);
-            const acts =
-              meta.key === "center_prospects"
-                ? prospects.filter((p) => !p.contacted_at).length
-                : meta.key === "inbox"
-                  ? inbox.filter((m) => m.status === "new" || m.status === "drafted").length
-                  : mine.filter((a) => !isFinding(a)).length;
-            const finds = meta.key === "center_prospects" || meta.key === "inbox" ? 0 : mine.length - acts;
-            const crit = mine.filter((a) => a.severity === "critical").length;
-            const isSel = selected === meta.key;
-            return (
-              <button
-                key={meta.key}
-                onClick={() => selectAgent(meta.key)}
-                title={`${meta.label}${last ? ` · ${relTime(last.started_at)}` : ""}`}
-                className={`relative flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-bold transition-colors ${
-                  isSel
-                    ? "border-stone-800 bg-stone-800 text-white shadow-sm"
-                    : "border-stone-200 bg-white text-stone-700 hover:border-stone-400"
-                }`}
-              >
-                <span className="text-lg leading-none">{meta.icon}</span>
-                <span>{meta.label}</span>
-                {crit > 0 && (
-                  <span
-                    title={`${crit} ממצאים קריטיים`}
-                    className="absolute -top-1.5 -start-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-black text-white"
-                  >
-                    !
-                  </span>
-                )}
-                {acts > 0 && (
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${
-                      isSel ? "bg-white text-stone-900" : "bg-[#2e7d8c] text-white"
-                    }`}
-                  >
-                    {acts}
-                  </span>
-                )}
-                {/* נקודת מצב: אדום = הריצה האחרונה נכשלה, ענבר = יש ממצאים */}
-                {last?.status === "error" ? (
-                  <span className="h-2 w-2 rounded-full bg-red-500" title="הריצה האחרונה נכשלה" />
-                ) : finds > 0 && acts === 0 ? (
-                  <span className="h-2 w-2 rounded-full bg-amber-400" title={`${finds} ממצאים`} />
-                ) : null}
-              </button>
-            );
-          })}
+        {/* סרגל הסוכנים - מקובץ לפי תחום. הקיבוץ ויזואלי; הכפתור עצמו
+            והמונים שעליו זהים למה שהיה. */}
+        <div className="mb-6 space-y-3">
+          {(() => {
+            // מונים לכל סוכן, במקום אחד: גם הכפתור וגם תג הקבוצה קוראים
+            // מכאן, כך שהם לא יכולים להיפרד.
+            const countsFor = (meta: AgentMeta) => {
+              const last = runs.find((r) => r.agent === meta.key);
+              const mine = pending.filter((a) => a.agent === meta.key);
+              const acts =
+                meta.key === "center_prospects"
+                  ? prospects.filter((p) => !p.contacted_at).length
+                  : meta.key === "inbox"
+                    ? inbox.filter((m) => m.status === "new" || m.status === "drafted").length
+                    : mine.filter((a) => !isFinding(a)).length;
+              const finds = meta.key === "center_prospects" || meta.key === "inbox" ? 0 : mine.length - acts;
+              const crit = mine.filter((a) => a.severity === "critical").length;
+              return { last, acts, finds, crit };
+            };
+
+            const renderTab = (meta: AgentMeta) => {
+              const { last, acts, finds, crit } = countsFor(meta);
+              const isSel = selected === meta.key;
+              return (
+                <button
+                  key={meta.key}
+                  onClick={() => selectAgent(meta.key)}
+                  title={`${meta.label}${last ? ` · ${relTime(last.started_at)}` : ""}`}
+                  className={`relative flex items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-bold transition-colors ${
+                    isSel
+                      ? "border-stone-800 bg-stone-800 text-white shadow-sm"
+                      : "border-stone-200 bg-white text-stone-700 hover:border-stone-400"
+                  }`}
+                >
+                  <span className="text-lg leading-none">{meta.icon}</span>
+                  <span>{meta.label}</span>
+                  {crit > 0 && (
+                    <span
+                      title={`${crit} ממצאים קריטיים`}
+                      className="absolute -top-1.5 -start-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[11px] font-black text-white"
+                    >
+                      !
+                    </span>
+                  )}
+                  {acts > 0 && (
+                    <span
+                      className={`rounded-full px-1.5 py-0.5 text-[11px] font-black leading-none ${
+                        isSel ? "bg-white text-stone-900" : "bg-[#2e7d8c] text-white"
+                      }`}
+                    >
+                      {acts}
+                    </span>
+                  )}
+                  {/* נקודת מצב: אדום = הריצה האחרונה נכשלה, ענבר = יש ממצאים */}
+                  {last?.status === "error" ? (
+                    <span className="h-2 w-2 rounded-full bg-red-500" title="הריצה האחרונה נכשלה" />
+                  ) : finds > 0 && acts === 0 ? (
+                    <span className="h-2 w-2 rounded-full bg-amber-400" title={`${finds} ממצאים`} />
+                  ) : null}
+                </button>
+              );
+            };
+
+            // רשת ביטחון: סוכן שיתווסף בעתיד ולא ישובץ לקבוצה עדיין יופיע,
+            // בקבוצה משלו, במקום להיעלם מהעמוד בשקט.
+            const grouped = new Set(AGENT_GROUPS.flatMap((g) => g.keys));
+            const orphans = AGENTS.filter((a) => !grouped.has(a.key));
+            const sections = [
+              ...AGENT_GROUPS.map((g) => ({
+                key: g.key,
+                label: g.label,
+                metas: g.keys.map((k) => AGENT_BY_KEY.get(k)).filter((m): m is AgentMeta => Boolean(m)),
+              })),
+              ...(orphans.length > 0 ? [{ key: "other", label: "סוכנים נוספים", metas: orphans }] : []),
+            ];
+
+            return sections.map((sec) => {
+              if (sec.metas.length === 0) return null;
+              const totals = sec.metas.reduce(
+                (acc, m) => {
+                  const c = countsFor(m);
+                  return { acts: acc.acts + c.acts, crit: acc.crit + c.crit };
+                },
+                { acts: 0, crit: 0 }
+              );
+              return (
+                <div key={sec.key}>
+                  <div className="mb-1.5 flex items-center gap-2 px-0.5">
+                    <span className="text-xs font-black text-stone-400">{sec.label}</span>
+                    {totals.acts > 0 && (
+                      <span
+                        title={`${totals.acts} ממתינים לך בקבוצה הזו`}
+                        className="rounded-full bg-[#2e7d8c] px-1.5 py-0.5 text-[10px] font-black leading-none text-white"
+                      >
+                        {totals.acts}
+                      </span>
+                    )}
+                    {totals.crit > 0 && (
+                      <span
+                        title={`${totals.crit} ממצאים קריטיים בקבוצה הזו`}
+                        className="rounded-full bg-red-600 px-1.5 py-0.5 text-[10px] font-black leading-none text-white"
+                      >
+                        !
+                      </span>
+                    )}
+                    <span className="h-px flex-1 bg-stone-200" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">{sec.metas.map(renderTab)}</div>
+                </div>
+              );
+            });
+          })()}
         </div>
 
         {/* דף הסוכן הנבחר */}
