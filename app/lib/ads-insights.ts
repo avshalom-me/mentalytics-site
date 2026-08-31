@@ -160,6 +160,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     campaign_name: string; status: string | null; end_date: string | null;
     daily_budget: number | null; total_budget: number | null;
     bidding_strategy: string | null; cpc_ceiling: number | null;
+    net_search: boolean | null; net_partners: boolean | null; net_display: boolean | null;
   };
   const config = (configQ.data ?? []) as ConfigRow[];
   const configByName = new Map(config.map((c) => [c.campaign_name, c]));
@@ -176,8 +177,13 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   const gPrev7 = new Map<string, Agg>();
   const g30 = new Map<string, Agg>();
   const monthStart = new Date().toISOString().slice(0, 8) + "01";
+  // First day we ever saw data for a campaign - the launch audit below uses
+  // it to know which campaigns are young enough to still be fixable cheaply.
+  const firstSeen = new Map<string, string>();
   let spendMtd = 0;
   for (const d of daily) {
+    const f = firstSeen.get(d.campaign_name);
+    if (!f || d.date < f) firstSeen.set(d.campaign_name, d.date);
     const into = (m: Map<string, Agg>) => {
       const a = m.get(d.campaign_name) ?? zero();
       a.impr += d.impressions; a.clicks += d.clicks; a.cost += d.cost; a.conv += d.conversions;
@@ -455,6 +461,57 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     }
   }
 
+  // Day zero: the networks a campaign is ALLOWED to serve on, straight from
+  // its settings. This is the only check here that fires before a single
+  // impression exists - g-emek1 burned its first week taking 100% of clicks
+  // from Display while its type read "Search", and no amount of impression
+  // analysis could have said so on launch day. Null means an older sync
+  // script that does not send the fields; the impression-share check below
+  // stays as the fallback for that case.
+  for (const c of config) {
+    if (c.status !== "ENABLED") continue;
+    const wrong: string[] = [];
+    if (c.net_display === true) wrong.push("רשת המדיה (Display)");
+    if (c.net_partners === true) wrong.push("שותפי חיפוש");
+    if (wrong.length > 0) {
+      push(`ads:networks:${c.campaign_name}`, c.net_display === true ? "red" : "amber",
+        `🌐 ${c.campaign_name} - מוגש גם ב${wrong.join(" וב")}`,
+        `קמפיין חיפוש אמור לרוץ על חיפוש בלבד. ${c.net_display === true ? "ברשת המדיה המודעה מוצגת כבאנר למי שלא חיפש כלום - זה מה שבלע 100% מהקליקים של g-emek1 בשבוע הראשון שלו. " : ""}Campaign settings > Networks > להוריד את הסימון ולשמור.`);
+    }
+    if (c.net_search === false) {
+      push(`ads:nosearch:${c.campaign_name}`, "red", `🌐 ${c.campaign_name} - רשת החיפוש כבויה`,
+        "הקמפיין לא מוגש בחיפוש בגוגל בכלל. Campaign settings > Networks > לסמן Search Network.");
+    }
+  }
+
+  // Launch audit: everything worth catching in a campaign's first two weeks,
+  // delivered as ONE finding rather than a drip of separate alerts. A new
+  // campaign is the cheapest moment to fix a misconfiguration and the moment
+  // nobody is watching the console, so the queue does the watching.
+  for (const c of campaigns) {
+    const first = firstSeen.get(c.google_name);
+    if (!first || c.status !== "ENABLED") continue;
+    const ageDays = Math.floor((Date.now() - new Date(first + "T00:00:00Z").getTime()) / 86_400_000);
+    if (ageDays > 14) continue;
+    const cfg = configByName.get(c.google_name);
+    const issues: string[] = [];
+    if (cfg?.net_display === true) issues.push("מוגש ברשת המדיה");
+    if (cfg?.net_partners === true) issues.push("מוגש בשותפי חיפוש");
+    if (!c.registered) issues.push("אינו ברישום הקמפיינים");
+    else if (!c.utm_campaign) issues.push("אין לו utm_campaign ברישום - אי אפשר לחבר הוצאה לפניות");
+    if (cfg && cfg.cpc_ceiling == null) issues.push("אין תקרת CPC");
+    const kwTotal = kwCountByCampaign.get(c.google_name) ?? 0;
+    const kwRarely = rarelyByCampaign.get(c.google_name) ?? 0;
+    if (kwTotal >= 10 && kwRarely / kwTotal >= 0.5) issues.push(`${kwRarely} מ-${kwTotal} מילות המפתח לא מוגשות (נפח חיפוש נמוך)`);
+    const b = broadByCampaign.get(c.google_name);
+    if (b && b.total >= 20 && b.broad / b.total >= 0.4) issues.push("רוב ההוצאה בהתאמה רחבה");
+    if (c.sessions7 === 0 && c.clicks7 >= 5) issues.push(`${c.clicks7} קליקים בגוגל אבל 0 סשנים מתויגים באתר - ה-Final URL suffix כנראה חסר`);
+    if (issues.length > 0) {
+      push(`ads:launch:${c.google_name}`, "red", `🚀 ${c.google_name} - קמפיין בן ${ageDays} ימים עם ${issues.length} ליקויים`,
+        `${issues.map((x) => "• " + x).join("  ")}  |  שבועיים ראשונים הם הרגע הזול לתקן. אחרי 14 יום הבדיקה הזו נסגרת מעצמה, וכל ליקוי שנשאר ימשיך להתריע בנפרד.`);
+    }
+  }
+
   // Impressions its own keywords cannot explain. A Search campaign whose
   // keyword impressions are a small fraction of the campaign total is
   // serving somewhere other than the searches it was built for - Display
@@ -552,7 +609,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       `ads:end:${n}`, `ads:cap-missing:${n}`, `ads:cap-cpc:${n}`, `ads:pollution:${n}`,
       `ads:cold:${n}`, `ads:cpl:${n}`, `ads:spike:${n}`, `ads:unregistered:${n}`,
       `ads:broad:${n}`, `ads:ctr:${n}`, `ads:rename:${n}`, `ads:placeless:${n}`,
-      `ads:offnetwork:${n}`, `ads:rarely:${n}`,
+      `ads:offnetwork:${n}`, `ads:rarely:${n}`, `ads:networks:${n}`, `ads:nosearch:${n}`, `ads:launch:${n}`,
     ]),
     ...config.flatMap((c) => [`ads:untracked:${c.campaign_id}`, `ads:zero:${c.campaign_id}`, `ads:cpl:${c.campaign_id}`]),
     `ads:pace:${today.slice(0, 7)}`,
