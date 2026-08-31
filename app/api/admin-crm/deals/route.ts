@@ -5,14 +5,20 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 // integration, education-ministry deal). Small volume, high value.
 
 import { autoCloseWonDeals } from "@/app/lib/deal-autoclose";
+import { syncDealReminders } from "@/app/lib/deal-reminders";
 
 const VALID_STAGES = ["first_contact", "negotiation", "link_sent", "closed", "lost"];
+const VALID_LOST_REASONS = ["price", "competitor", "not_relevant", "no_response", "timing", "other"];
 
 export async function GET() {
   // סגירה אוטומטית לפני הקריאה: מרכז שהשלים הרשמה ותשלום סוגר את העסקה
   // שלו לבד. רץ בטעינת העמוד - זה הרגע שבו עדכניות חשובה.
   await autoCloseWonDeals().catch((e) =>
     console.error("autoCloseWonDeals failed:", e instanceof Error ? e.message : e)
+  );
+  // רענון התזכורות מיד אחרי: עסקה שנסגרה כרגע לא צריכה להישאר "תקועה".
+  await syncDealReminders().catch((e) =>
+    console.error("syncDealReminders failed:", e instanceof Error ? e.message : e)
   );
   const { data, error } = await supabaseAdmin
     .from("crm_deals")
@@ -66,6 +72,9 @@ export async function PATCH(req: NextRequest) {
     if (b.stage && VALID_STAGES.includes(b.stage)) {
       update.stage = b.stage;
       update.closed_at = b.stage === "closed" || b.stage === "lost" ? new Date().toISOString() : null;
+      // עסקה שחוזרת לצינור מאבדת את סיבת האבודה - אחרת היא נשארת תלויה
+      // על עסקה פעילה ומזהמת את הספירה.
+      if (b.stage !== "lost") update.lost_reason = null;
     }
     if ("title" in b && String(b.title).trim()) update.title = String(b.title).trim().slice(0, 300);
     if ("deal_type" in b) update.deal_type = b.deal_type ? String(b.deal_type) : null;
@@ -76,6 +85,9 @@ export async function PATCH(req: NextRequest) {
     if ("next_step" in b) update.next_step = b.next_step ? String(b.next_step).slice(0, 500) : null;
     if ("next_step_due" in b) update.next_step_due = b.next_step_due ? String(b.next_step_due) : null;
     if ("notes" in b) update.notes = b.notes ? String(b.notes).slice(0, 4000) : null;
+    if ("lost_reason" in b) {
+      update.lost_reason = VALID_LOST_REASONS.includes(b.lost_reason) ? b.lost_reason : null;
+    }
 
     const { error } = await supabaseAdmin.from("crm_deals").update(update).eq("id", b.id);
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

@@ -29,6 +29,17 @@ export const DEAL_STAGES = [
   { value: "lost", label: "אבודה" },
 ] as const;
 
+// למה עסקה נפלה. רשימה סגורה וקצרה - טקסט חופשי לא ניתן לספירה, וזו
+// בדיוק השאלה שרוצים לענות עליה בעוד חצי שנה.
+export const LOST_REASONS = [
+  { value: "price", label: "יקר מדי" },
+  { value: "competitor", label: "הלכו למתחרה" },
+  { value: "not_relevant", label: "לא רלוונטי" },
+  { value: "no_response", label: "הפסיקו להגיב" },
+  { value: "timing", label: "לא בתזמון הנכון" },
+  { value: "other", label: "אחר" },
+] as const;
+
 /** התחנות שמוציאות עסקה מהצינור הפתוח. */
 export const CLOSED_DEAL_STAGES = ["closed", "lost"] as const;
 

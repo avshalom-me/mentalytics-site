@@ -252,6 +252,45 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
       }
     }
 
+    // ── ליד פנימי → עסקה פתוחה ─────────────────────────────────────────
+    // מרכז שכבר קיבל מאיתנו הצעה והלינק אצלו הוא בדיוק "נשלח לינק
+    // הרשמה" - התחנה החמה ביותר בצינור. עד היום הוא חי רק כהתראה בתור,
+    // כלומר הליד הכי קרוב לכסף היה היחיד שלא נוהל כעסקה.
+    for (const a of warm) {
+      const { data: pr } = await supabaseAdmin
+        .from("center_prospects")
+        .select("id, name, phone, email, region_key, notes, deal_id")
+        .eq("center_account_id", a.id as string)
+        .maybeSingle();
+      if (!pr || pr.deal_id) continue;
+
+      const { data: deal, error: dealErr } = await supabaseAdmin
+        .from("crm_deals")
+        .insert({
+          title: pr.name,
+          deal_type: "center",
+          stage: "link_sent",
+          contact_name: pr.name,
+          contact_info: [pr.phone, pr.email].filter(Boolean).join(" · ") || null,
+          region_key: pr.region_key,
+          prospect_id: pr.id,
+          next_step: "לוודא שההרשמה הושלמה",
+          notes:
+            `נפתח אוטומטית: ההצעה נשלחה ב-${String(a.created_at).slice(0, 10)} והמרכז עדיין בסטטוס "${a.status}".` +
+            (pr.notes ? `\n${pr.notes}` : ""),
+        })
+        .select("id")
+        .single();
+      if (dealErr || !deal) {
+        base.errors.push(`עסקה ל${pr.name}: ${dealErr?.message ?? "נכשלה"}`);
+        continue;
+      }
+      await supabaseAdmin
+        .from("center_prospects")
+        .update({ status: "moved_to_deal", deal_id: deal.id, updated_at: nowIso })
+        .eq("id", pr.id);
+    }
+
     // ── התראה על ליד פנימי שנתקע ───────────────────────────────────────
     // זו הצעה שכבר יצאה ולא נסגרה, ולכן היא ממצא ולא משימה חדשה: היא
     // נסגרת מעצמה ברגע שהמרכז משלם או שההצעה מבוטלת.

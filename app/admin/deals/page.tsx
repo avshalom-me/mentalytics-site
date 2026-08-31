@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HelpTip from "../components/HelpTip";
-import { DEAL_STAGES, DEAL_TYPES, labelOf } from "@/app/lib/crm";
+import { DEAL_STAGES, DEAL_TYPES, LOST_REASONS, labelOf } from "@/app/lib/crm";
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 
 // עסקאות B2B - טבלה עם כותרות קבועות במקום קנבן (החלטת המשתמש 30/8/26):
@@ -23,6 +23,7 @@ type Deal = {
   notes: string | null;
   prospect_id: string | null;
   region_key: string | null;
+  lost_reason: string | null;
   created_at: string;
   updated_at: string;
   closed_at?: string | null;
@@ -57,6 +58,7 @@ export default function DealsPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<Deal | null>(null);
+  const [losing, setLosing] = useState<Deal | null>(null);
 
   // פילטרים - צד לקוח, הרשימה קטנה.
   const [stageFilter, setStageFilter] = useState("");
@@ -81,13 +83,13 @@ export default function DealsPage() {
     load();
   }, [load]);
 
-  async function setStage(deal: Deal, stage: string) {
+  async function setStage(deal: Deal, stage: string, lostReason?: string) {
     setBusy(deal.id);
     try {
       await fetch("/api/admin-crm/deals", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: deal.id, stage }),
+        body: JSON.stringify({ id: deal.id, stage, ...(stage === "lost" ? { lost_reason: lostReason ?? null } : {}) }),
       });
       load();
     } finally {
@@ -165,7 +167,13 @@ export default function DealsPage() {
             disabled={busy === d.id}
             onChange={(e) => {
               const v = e.target.value;
-              if (v === "lost" && !window.confirm(`לסמן את "${d.title}" כעסקה אבודה?`)) return;
+              if (v === "lost") {
+                // הסיבה נשאלת כאן ולא בטופס: זה הרגע היחיד שבו זוכרים
+                // אותה, ובלעדיו השדה נשאר ריק לנצח.
+                setLosing(d);
+                e.target.value = d.stage;
+                return;
+              }
               setStage(d, v);
             }}
             className={`w-40 rounded-lg border px-2 py-1 text-xs font-bold ${STAGE_CLS[d.stage] ?? ""}`}
@@ -203,7 +211,12 @@ export default function DealsPage() {
             <span className="font-bold text-amber-600">⚠ אין צעד הבא</span>
           )}
         </td>
-        <td className="whitespace-nowrap p-2 align-top text-[11px] text-stone-400">{fmtDate(d.updated_at)}</td>
+        <td className="whitespace-nowrap p-2 align-top text-[11px] text-stone-400">
+          {fmtDate(d.updated_at)}
+          {d.stage === "lost" && d.lost_reason && (
+            <div className="font-bold text-red-500">{labelOf(LOST_REASONS, d.lost_reason)}</div>
+          )}
+        </td>
       </tr>
     );
   }
@@ -334,12 +347,39 @@ export default function DealsPage() {
             <summary className="cursor-pointer text-xs font-bold text-stone-400 hover:text-stone-600">
               עסקאות אבודות ({lost.length})
             </summary>
+            {(() => {
+              const byReason = new Map<string, number>();
+              for (const d of lost) {
+                const k = d.lost_reason ?? "unset";
+                byReason.set(k, (byReason.get(k) ?? 0) + 1);
+              }
+              const parts = Array.from(byReason.entries()).sort((a, b) => b[1] - a[1]);
+              return (
+                <p className="mt-2 text-xs text-stone-500">
+                  {parts
+                    .map(([k, n]) => `${k === "unset" ? "ללא סיבה" : labelOf(LOST_REASONS, k)}: ${n}`)
+                    .join(" · ")}
+                </p>
+              );
+            })()}
             <div className="mt-2 overflow-x-auto rounded-2xl border border-stone-200 bg-white opacity-80">
               <table className="w-full min-w-[900px] text-sm">
                 <tbody>{lost.map((d) => dealRow(d, true))}</tbody>
               </table>
             </div>
           </details>
+        )}
+
+        {losing && (
+          <LostReasonDialog
+            deal={losing}
+            onClose={() => setLosing(null)}
+            onPick={(reason) => {
+              const d = losing;
+              setLosing(null);
+              setStage(d, "lost", reason);
+            }}
+          />
         )}
 
         {showForm && (
@@ -352,6 +392,40 @@ export default function DealsPage() {
             }}
           />
         )}
+      </div>
+    </div>
+  );
+}
+
+function LostReasonDialog({
+  deal,
+  onClose,
+  onPick,
+}: {
+  deal: Deal;
+  onClose: () => void;
+  onPick: (reason: string) => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto" dir="rtl">
+      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
+      <div className="relative mx-auto my-16 w-[calc(100%-2rem)] max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <h2 className="mb-1 text-base font-black text-stone-900">למה העסקה נפלה?</h2>
+        <p className="mb-4 text-xs text-stone-500">{deal.title}</p>
+        <div className="space-y-2">
+          {LOST_REASONS.map((r) => (
+            <button
+              key={r.value}
+              onClick={() => onPick(r.value)}
+              className="w-full rounded-xl border border-stone-200 px-4 py-2.5 text-start text-sm font-bold text-stone-700 hover:border-red-300 hover:bg-red-50"
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
+        <button onClick={onClose} className="mt-4 w-full text-xs font-bold text-stone-400 hover:text-stone-600">
+          ביטול
+        </button>
       </div>
     </div>
   );

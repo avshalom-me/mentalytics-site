@@ -17,6 +17,7 @@ import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draf
 import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
 import { runQuizFunnel } from "@/app/lib/quiz-funnel";
+import { syncDealReminders } from "@/app/lib/deal-reminders";
 import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
 
@@ -256,6 +257,10 @@ export async function POST(req: NextRequest) {
         still_short: result.stillShort ?? 0,
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
+    }
+    if (body?.action === "deals_run") {
+      const r = await syncDealReminders();
+      return NextResponse.json({ ok: true, ...r });
     }
     if (body?.action === "quiz_run") {
       const r = await runQuizFunnel();

@@ -5,6 +5,7 @@ import { buildDashboardData } from "./work-queue";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
 import { LEAD_TYPES, DEAL_STAGES, CLOSED_DEAL_STAGES, labelOf } from "./crm";
+import { syncDealReminders } from "./deal-reminders";
 
 // בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב.
 // מקור הנתונים הוא אותו תור עבודה של לוח הבקרה (work-queue.ts) + תורי
@@ -84,6 +85,14 @@ async function gatherSections(): Promise<DigestSection[]> {
 
   const q = dash.queue;
   const sections: DigestSection[] = [];
+
+  // תזכורות העסקאות מרועננות לפני בניית הדוח: אחרת ממצא "צעד באיחור"
+  // שנוצר רק בכניסה לעמוד העסקאות לא היה מגיע לדוח הבוקר לעולם.
+  try {
+    await syncDealReminders();
+  } catch (e) {
+    console.error("digest deal reminders failed:", e instanceof Error ? e.message : e);
+  }
 
   // ממצאים קריטיים ודחופים מכל הסוכנים, בראש הדוח. הלקח מ-match_results:
   // התראה על אובדן נתונים שקט ישבה יומיים בעמוד הסוכנים בלי שאיש ראה
