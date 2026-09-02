@@ -174,7 +174,9 @@ export const ACCEPTABLE_BY_CATEGORY: Record<DisabilityCategory, Acceptable> = {
 type ImpliedSigner = DiagnosingBody | "any-psychologist" | "any-physician";
 
 const IMPLIED_SIGNERS: Record<DiagnosisKind, ImpliedSigner[]> = {
-  "פסיכו-דידקטי": ["פסיכולוג מומחה", "מאבחן דידקטי"],
+  // A psycho-didactic assessment always carries a didactic assessor; whether
+  // the psychologist half was a specialist is exactly what the word does not say.
+  "פסיכו-דידקטי": ["any-psychologist", "מאבחן דידקטי"],
   "פסיכו-דיאגנוסטי": ["any-psychologist"],
   "נוירו-פסיכולוגי": ["any-psychologist"],
   "הערכה פסיכולוגית": ["any-psychologist"],
@@ -206,7 +208,17 @@ export type GateResult = "acceptable" | "verify_signer" | "not_acceptable";
 /** Would this document be accepted by ועדת זכאות ואפיון as the diagnosis of `category`? */
 export function diagnosisGate(d: Diagnosis, category: DisabilityCategory): GateResult {
   const rule = ACCEPTABLE_BY_CATEGORY[category];
-  const signers: ImpliedSigner[] = d.signedBy ? [d.signedBy] : IMPLIED_SIGNERS[d.kind];
+  const implied = IMPLIED_SIGNERS[d.kind];
+  const isWildcard = (s: ImpliedSigner) => s === "any-psychologist" || s === "any-physician";
+  // A named signer fills the wildcard the document kind left open; the parts the
+  // kind guarantees (a didactic assessor inside a psycho-didactic report) stay.
+  // For a kind with no wildcard the counsellor's word replaces the assumption.
+  const signedBy = d.signedBy;
+  const signers: ImpliedSigner[] = !signedBy
+    ? implied
+    : implied.some(isWildcard)
+      ? implied.map(s => (isWildcard(s) ? signedBy : s))
+      : [signedBy];
   const exact = signers.filter((s): s is DiagnosingBody => s !== "any-psychologist" && s !== "any-physician");
 
   if (exact.some(s => rule.bodies.includes(s))) return "acceptable";
@@ -493,7 +505,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
 
     if (acceptable.length) {
       relevance = "consider";
-      why.push(`בתיק קיימת אבחנה קבילה לצורך אפיון המוגבלות: ${acceptable.join(", ")}`);
+      why.push(`בתיק מסמך מגורם שאבחנתו קבילה לצורך: ${acceptable.join(", ")} - בתנאי שהאבחנה עצמה כתובה בו`);
     } else if (verify.length) {
       relevance = "consider";
       why.push(`ייתכן שקיימת אבחנה קבילה עבור: ${verify.join(", ")} - תלוי בהתמחות החותם/ת על המסמך`);
@@ -582,7 +594,8 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       if (usable.length) why.push(`בתיק אבחון שיכול לשמש להתאמות: ${usable.map(x => x.d.kind).join(", ")}`);
       if (stale.length) cautions.push(`אבחון משנת ${stale.map(x => x.d.year).join(", ")} קדם ל-${formatDateHe(floor)} ולכן לא ישמש לוועדה המחוזית - נדרש אבחון עדכני`);
       if (unsure.length) cautions.push(`אבחון משנת ${unsure.map(x => x.d.year).join(", ")}: לבדוק אם נערך אחרי 1 ביולי של אותה שנה`);
-      if (!usable.length && !unsure.length) why.push("אין בתיק אבחון מהסוג שהוועדה המחוזית מקבלת (דידקטי, פסיכו-דידקטי, או פסיכולוגי ודידקטי)");
+      // A stale assessment is explained by its caution; saying "none of that kind" on top of it would be false.
+      if (!usable.length && !unsure.length && !stale.length) why.push("אין בתיק אבחון מהסוג שהוועדה המחוזית מקבלת (דידקטי, פסיכו-דידקטי, או פסיכולוגי ודידקטי)");
       cautions.push("אבחון ראשון שנערך סמוך להגשה: חייב להיות חתום לפחות שישה חודשים לפני ההגשה, ובתקופה זו מתקיימת התערבות לפי המלצותיו");
     }
 

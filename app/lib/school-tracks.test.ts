@@ -63,9 +63,16 @@ describe("diagnosisGate - the First Schedule as a function", () => {
     expect(diagnosisGate(d, "לקות למידה רב-בעייתית")).toBe("not_acceptable");
   });
 
-  it("a psycho-didactic assessment satisfies the psychologist-plus-didactic combination for learning disability", () => {
-    expect(diagnosisGate({ kind: "פסיכו-דידקטי", year: 2025 }, "לקות למידה רב-בעייתית")).toBe("acceptable");
-    expect(diagnosisGate({ kind: "פסיכו-דידקטי", year: 2025 }, "הפרעות נפשיות")).toBe("not_acceptable");
+  it("a psycho-didactic assessment guarantees the didactic half; the psychologist half must be named", () => {
+    const unsigned = { kind: "פסיכו-דידקטי" as const, year: 2025 };
+    expect(diagnosisGate(unsigned, "לקות למידה רב-בעייתית")).toBe("verify_signer");
+    expect(diagnosisGate(unsigned, "AD(H)D")).toBe("verify_signer");
+    expect(diagnosisGate(unsigned, "הפרעות נפשיות")).toBe("not_acceptable");
+    // Naming the psychologist completes the Schedule's combination...
+    expect(diagnosisGate({ ...unsigned, signedBy: "פסיכולוג מומחה" }, "לקות למידה רב-בעייתית")).toBe("acceptable");
+    // ...or matches a body that is acceptable on its own, with the didactic part still attached.
+    expect(diagnosisGate({ ...unsigned, signedBy: "פסיכולוג חינוכי" }, "לקות למידה רב-בעייתית")).toBe("acceptable");
+    expect(diagnosisGate({ ...unsigned, signedBy: "פסיכולוג קליני" }, "לקות למידה רב-בעייתית")).toBe("not_acceptable");
   });
 
   it("a psychological evaluation of unknown specialty is 'verify the signer', not a yes and not a no", () => {
