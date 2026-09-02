@@ -53,7 +53,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/topics.ts",
     ],
   },
-  "/": { date: "2026-08-24", sources: ["app/page.tsx"] },
+  "/": { date: "2026-09-02", sources: ["app/page.tsx"] },
   "/therapists": { date: "2026-08-22", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx"] },
   "/research": { date: "2026-08-02", sources: ["app/research/page.tsx"] },
   "/research/academic": { date: "2026-08-05", sources: ["app/research/academic/page.tsx"] },
