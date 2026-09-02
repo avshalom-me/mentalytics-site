@@ -54,6 +54,20 @@ export const TRIAL_UPGRADE_TOTAL = +(TRIAL_UPGRADE_PRICE * (1 + VAT_RATE)).toFix
 // כמה ימים ההצעה תקפה מרגע שליחת המייל (3 לפני הסיום + חלון חסד אחרי).
 export const TRIAL_UPGRADE_OFFER_DAYS = 10;
 
+/**
+ * כמה שאלונים אפשר למלא בחינם מאותו דפדפן, לפני התשלום.
+ *
+ * יושב כאן ולא ב-usage.ts כי usage.ts הוא `server-only`, והמספר הזה מופיע גם
+ * בטקסט שהמשתמש קורא (מסך התשלום ושאלות ותשובות בדף הבית). כשהוא היה מוגדר
+ * בשני מקומות, העלאת המכסה מ-5 ל-8 השאירה את המסכים מבטיחים 5 - בדיוק סוג
+ * הפער שמייצר פנייה של "כתוב אחד וקורה אחר".
+ *
+ * 5 → 8 (2/9/2026): המונה אינו מתאפס לעולם, ולכן "חמש פעמים" הוא חמש פעמים
+ * בכל חייו של הדפדפן. הורה שבודק שני ילדים, או מי שחוזר אחרי חודש, מיצה אותן
+ * בלי לחשוב שהוא צורך מכסה.
+ */
+export const MAX_FREE_QUIZZES = 8;
+
 /** ההצעה האישית פעילה עבור המטפל/ת הזה/ו כרגע? */
 export function trialUpgradeActive(upgradeOfferUntil: string | null | undefined, at: Date = new Date()): boolean {
   if (!upgradeOfferUntil) return false;

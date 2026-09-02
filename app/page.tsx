@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import PageViewTracker from "./components/PageViewTracker";
 import ContactForm from "./components/ContactForm";
+import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
 import TooltipAsterisk from "./components/TooltipAsterisk";
 import OutputShowcase from "./components/OutputShowcase";
 
@@ -36,7 +37,7 @@ const faqs = [
   },
   {
     q: "כמה פעמים אפשר להשתמש ומה העלות?",
-    a: 'ניתן להשתמש 5 פעמים בשאלון. לאחר מכן תשלום סמלי של 30 ש"ח + מע"מ. לרוב אין צורך ביותר מפעם או פעמיים.',
+    a: `ניתן להשתמש ${MAX_FREE_QUIZZES} פעמים בשאלון. לאחר מכן תשלום סמלי של 30 ש"ח + מע"מ. לרוב אין צורך ביותר מפעם או פעמיים.`,
   },
   {
     q: "כמה זמן זה לוקח?",
