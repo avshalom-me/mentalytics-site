@@ -332,7 +332,7 @@ function computeResults(A: Ans): KidsBox[] {
   // was cleared as a matter of course by anyone endorsing 7א - the referral
   // already fired on the gate in practice. Holding 1-of-3 against the reduced
   // list would have made the most serious presentation harder to flag. Keep this
-  // identical to pqThresholdFor() in app/kids/page.tsx.
+  // identical to pqThresholdFor() in app/kids/quiz-logic.ts.
   const q7Hall = A.q7a === "כן";
   const q7Bel = A.q7b === "כן";
   const pqThreshold = q7Hall ? 0 : (q7Bel ? 2 : Infinity);
@@ -1362,7 +1362,7 @@ export interface KidsScoreResult {
  * the shared item definition rather than a second hand-written copy of the
  * keys, so a renamed item breaks both sides together instead of silently
  * zeroing one. The rules must stay identical to the upd* helpers in
- * app/kids/page.tsx - they are the same formulas, read from the same lists.
+ * app/kids/quiz-logic.ts - they are the same formulas, read from the same lists.
  */
 function normaliseTotals(A: Record<string, any>): Record<string, any> {
   const n = { ...A };
