@@ -199,6 +199,18 @@ describe("nextPid / prevPid", () => {
     expect(prevPid("p-consent", {})).toBe("p-consent");
     expect(nextPid("p-result", {})).toBe("p-result");
   });
+
+  it("shows the refinement screen to a counsellor only, right before the report", () => {
+    const parent: Ans = { a_soc: "הרבה" };
+    const counselor: Ans = { ...parent, _audience: "counselor" };
+    expect(skipPage("p-refine", parent)).toBe(true);
+    expect(skipPage("p-refine", counselor)).toBe(false);
+    expect(nextPid("p-soc", parent)).toBe("p-result");
+    expect(nextPid("p-soc", counselor)).toBe("p-refine");
+    expect(nextPid("p-refine", counselor)).toBe("p-result");
+    expect(prevPid("p-result", counselor)).toBe("p-refine");
+    expect(prevPid("p-result", parent)).toBe("p-soc");
+  });
 });
 
 describe("traitNeeds", () => {

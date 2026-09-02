@@ -14,6 +14,7 @@
  */
 
 // ── Types ────────────────────────────────────────────────────────────────────
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Ans = Record<string, any>;
 export type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
 export interface Box { cls: BoxCls; txt: string; isLowStress?: boolean; }
@@ -99,6 +100,9 @@ export const PAGES = [
   "p-beh",
   "p-soc",
   "p-traits",
+  // The counsellor's closing screen - what was tried, what the file holds. Only
+  // ever shown when the answers carry _audience: "counselor"; see skipPage.
+  "p-refine",
   "p-result",
 ] as const;
 export type PageId = (typeof PAGES)[number];
@@ -275,6 +279,11 @@ export function skipPage(pid: string, A: Ans): boolean {
     // motiv true as well - except the zy verbal path, which stands on its own.
     return !n.motiv && !n.verbal && !n.interests && !n.gaConsent;
   }
+
+  // The refinement screen belongs to the counsellor rubric alone. Parents never
+  // see it, and the flag travels inside the answers so this stays a pure
+  // function of A like every other rule here.
+  if (pid === "p-refine") return A._audience !== "counselor";
 
   return false;
 }

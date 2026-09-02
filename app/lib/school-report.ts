@@ -1,15 +1,19 @@
 /**
- * שאלון היועצות: התשובות, התוויות, ההמרה לקלט המנוע, וטיוטת הסיכום להפניה.
+ * The counsellor rubric on top of the kids questionnaire: the extra answer keys
+ * (all prefixed c_), their labels, the conversion into the tracks engine's
+ * input, and the summary a counsellor pastes into her referral document.
  *
- * Pure, and the only place that knows both the answer keys the screens write
- * and the vocabulary the tracks engine reads. The screens in app/school render
- * these labels; the summary below is what a counsellor pastes into her own
- * referral document. No answer here is free text - that is how the rubric
+ * The clinical answers are the kids questionnaire's own and are scored by its
+ * engine; nothing here touches them. This file only knows the counsellor's
+ * angle - what the school sees that home does not, what was tried, what the
+ * file already holds - and none of it is free text, which is how the rubric
  * stays anonymous by construction rather than by warning.
  */
 
+import type { KidsDomainResult } from "./kids-recommendations";
 import {
   DIAGNOSIS_KINDS,
+  SCHOOL_GRADES,
   formatDateHe,
   type Diagnosis,
   type DiagnosisKind,
@@ -18,14 +22,15 @@ import {
   type SchoolTracksInput,
 } from "./school-tracks";
 
-export type Role = "counselor" | "psychologist" | "teacher" | "other";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type Ans = Record<string, any>;
+
 export type FillMode = "counselor_alone" | "with_parent" | "phone_parent";
 export type Parents = "aware_consent" | "aware_no_consent" | "not_aware";
-export type Initiator = "teacher" | "parents" | "student" | "counselor" | "external";
 export type Duration = "this_year" | "over_year" | "years";
-/** כלל לא / מעט / הרבה / הרבה מאוד - the four-point scale the kids questionnaire uses for its areas. */
+/** כלל לא / מעט / הרבה / הרבה מאוד - the four-point scale the questionnaire uses for its areas. */
 export type Level = 0 | 1 | 2 | 3;
-export type Outcome = "not_tried" | "helped" | "partial" | "no_help";
+export type Outcome = "helped" | "partial" | "no_help";
 
 export const INTERVENTIONS = [
   { key: "talks", label: "שיחות פרטניות עם מחנכ/ת או יועצת" },
@@ -39,54 +44,39 @@ export const INTERVENTIONS = [
 ] as const;
 export type InterventionKey = (typeof INTERVENTIONS)[number]["key"];
 
-export interface SchoolAnswers {
-  // S1
-  role?: Role;
-  fillMode?: FillMode;
-  parents?: Parents;
-  initiator?: Initiator;
-  grade?: SchoolGrade;
-  gender?: "זכר" | "נקבה";
-  duration?: Duration;
-  // S2
-  attendance?: "regular" | "some" | "frequent";
-  lateness?: "no" | "some" | "frequent";
-  refusal?: "no" | "signs" | "clear";
-  cls_attention?: Level;
-  cls_org?: Level;
-  cls_authority?: Level;
-  cls_regulation?: Level;
-  soc_isolation?: Level;
-  soc_conflict?: Level;
-  bully_victim?: "no" | "suspected" | "known";
-  bully_perp?: "no" | "suspected" | "known";
-  emo_internal?: Level;
-  emo_external?: Level;
-  emo_change?: "no" | "yes";
-  acad_gap?: Level;
-  acad_response?: "improves" | "partial" | "none" | "not_given";
-  safety?: "no" | "yes" | "unknown";
-  // S3
-  interventions?: Partial<Record<InterventionKey, Outcome>>;
-  // S4
-  diagnoses?: Diagnosis[];
-  schoolTeam?: "yes" | "no" | "unknown";
-  zakautStatus?: "none" | "in_process" | "decided";
-  zakautDecisionOn?: string;
-  hatamotStatus?: "none" | "school_level" | "district_submitted" | "district_decided";
-  hatamotAnswerOn?: string;
-  supports?: string[];
-  health?: string[];
-  fam_cooperation?: "good" | "partial" | "poor" | "unknown";
-  fam_economic?: "no" | "yes" | "unknown";
-  fam_welfare?: "no" | "yes" | "unknown";
+/** The keys the counsellor screens write into the questionnaire's answers. */
+export interface CounselorFields {
+  _audience?: "parent" | "counselor";
+  _age?: string;
+  _grade?: SchoolGrade;
+  c_duration?: Duration;
+  // in the emotional branch (p-q1)
+  c_attend?: "regular" | "some" | "frequent" | "refusal";
+  c_change?: "כן" | "לא";
+  // in the academic branch (p-acad)
+  c_support?: "improves" | "partial" | "none" | "not_given";
+  c_org?: Level;
+  // in the behavioural branch (p-beh)
+  c_regulation?: Level;
+  c_bully_perp?: "no" | "suspected" | "known";
+  // in the social branch (p-soc)
+  c_isolation?: Level;
+  c_bully_victim?: "no" | "suspected" | "known";
+  // the refinement screen (p-refine)
+  c_fill?: FillMode;
+  c_parents?: Parents;
+  c_tried?: Partial<Record<InterventionKey, Outcome>>;
+  c_diag?: Diagnosis[];
+  c_team?: "yes" | "no" | "unknown";
+  c_zakaut?: "none" | "in_process" | "decided";
+  c_zakaut_on?: string;
+  c_hatamot?: "none" | "school_level" | "district_submitted" | "district_decided";
+  c_hatamot_on?: string;
+  c_economic?: "no" | "yes" | "unknown";
 }
 
 // ── Labels ───────────────────────────────────────────────────────────────────
 
-export const ROLE_LABELS: Record<Role, string> = {
-  counselor: "יועצת חינוכית", psychologist: "פסיכולוג/ית חינוכי/ת", teacher: "מחנכ/ת", other: "איש/אשת צוות חינוכי",
-};
 export const FILL_MODE_LABELS: Record<FillMode, string> = {
   counselor_alone: "מילוי עצמאי, ללא ההורים", with_parent: "מילוי יחד עם ההורים", phone_parent: "מילוי בשיחת טלפון עם הורה",
 };
@@ -95,28 +85,23 @@ export const PARENTS_LABELS: Record<Parents, string> = {
   aware_no_consent: "ההורים מודעים, טרם התקבלה הסכמה",
   not_aware: "ההורים טרם יודעו",
 };
-export const INITIATOR_LABELS: Record<Initiator, string> = {
-  teacher: "המחנכ/ת", parents: "ההורים", student: "התלמיד/ה", counselor: "היועצת", external: "גורם חיצוני",
-};
 export const DURATION_LABELS: Record<Duration, string> = { this_year: "מהשנה", over_year: "מעל שנה", years: "מספר שנים" };
 export const LEVEL_LABELS = ["כלל לא", "מעט", "הרבה", "הרבה מאוד"] as const;
-export const ATTENDANCE_LABELS = { regular: "סדיר", some: "היעדרויות מדי פעם", frequent: "היעדרויות תכופות" } as const;
-export const LATENESS_LABELS = { no: "אין", some: "מדי פעם", frequent: "תכופים" } as const;
-export const REFUSAL_LABELS = { no: "אין", signs: "סימנים", clear: "מובהקת" } as const;
+export const ATTEND_LABELS = {
+  regular: "סדיר", some: "היעדרויות או איחורים מדי פעם", frequent: "היעדרויות תכופות", refusal: "סרבנות בית ספר",
+} as const;
+export const YN_LABELS = { "כן": "כן", "לא": "לא" } as const;
+export const SUPPORT_RESPONSE_LABELS = {
+  improves: "משתפר/ת", partial: "שיפור חלקי", none: "ללא שיפור", not_given: "לא ניתנה תמיכה",
+} as const;
 export const BULLY_LABELS = { no: "לא", suspected: "חשד", known: "ידוע" } as const;
-export const CHANGE_LABELS = { no: "לא", yes: "כן" } as const;
-export const RESPONSE_LABELS = { improves: "משתפר/ת", partial: "שיפור חלקי", none: "ללא שיפור", not_given: "לא ניתנה תמיכה" } as const;
-export const SAFETY_LABELS = { no: "לא", yes: "כן", unknown: "לא ידוע" } as const;
-export const OUTCOME_LABELS: Record<Outcome, string> = { not_tried: "לא נוסה", helped: "הועיל", partial: "הועיל חלקית", no_help: "לא הועיל" };
+export const OUTCOME_LABELS: Record<Outcome, string> = { helped: "הועיל", partial: "הועיל חלקית", no_help: "לא הועיל" };
 export const TEAM_LABELS = { yes: "התכנס", no: "לא התכנס", unknown: "לא ידוע" } as const;
 export const ZAKAUT_LABELS = { none: "לא הופנה/תה", in_process: "בתהליך", decided: "התקבלה החלטה" } as const;
 export const HATAMOT_LABELS = {
   none: "לא נדון", school_level: "אושרו התאמות בסמכות בית הספר", district_submitted: "הוגש לוועדה המחוזית", district_decided: "התקבלה תשובת הוועדה המחוזית",
 } as const;
-export const COOPERATION_LABELS = { good: "טוב", partial: "חלקי", poor: "מועט", unknown: "לא ידוע" } as const;
 export const YES_NO_UNKNOWN_LABELS = { no: "לא", yes: "כן", unknown: "לא ידוע" } as const;
-export const SUPPORT_OPTIONS = ["סייעת", "שילוב / מתי\"א", "הוראה מתקנת", "מלווה אישי/ת"] as const;
-export const HEALTH_OPTIONS = ["מעקב נוירולוג/ית", "מעקב פסיכיאטר/ית", "טיפול תרופתי", "טיפול בבריאות הנפש בקופת החולים", "טיפול רגשי פרטי"] as const;
 
 /** What a counsellor may say the student already has - the questionnaire's own keys, minus the two with no school meaning. */
 export const SCHOOL_DIAGNOSIS_KINDS: DiagnosisKind[] = DIAGNOSIS_KINDS.filter(k => k !== "אבחון תעסוקתי" && k !== "הערכת בשלות לגן");
@@ -137,31 +122,33 @@ export const DIAGNOSIS_KIND_LABELS: Record<DiagnosisKind, string> = {
 
 export const RELEVANCE_LABELS = { primary: "לטיפול עכשיו", consider: "לשיקול", info: "מידע" } as const;
 
+export const KIND_LABELS = { treatment: "טיפול", assessment: "אבחון", professional: "איש מקצוע", external: "פנייה" } as const;
+
 // ── Engine input ─────────────────────────────────────────────────────────────
 
-/** Count of interventions the counsellor reported as tried, whatever their outcome. */
-export function interventionsTried(A: SchoolAnswers): number {
-  return Object.values(A.interventions ?? {}).filter(o => o && o !== "not_tried").length;
+export function interventionsTried(A: Ans): number {
+  return Object.values((A.c_tried ?? {}) as Record<string, Outcome | undefined>).filter(Boolean).length;
 }
 
-export function toTracksInput(A: SchoolAnswers, today: string): SchoolTracksInput | null {
-  if (!A.grade) return null;
+export function isSchoolGrade(g: unknown): g is SchoolGrade {
+  return typeof g === "string" && (SCHOOL_GRADES as readonly string[]).includes(g);
+}
+
+export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
+  const f = A as CounselorFields;
+  if (!isSchoolGrade(f._grade)) return null;
   return {
-    grade: A.grade,
+    grade: f._grade,
     today,
-    diagnoses: A.diagnoses ?? [],
-    schoolTeam: A.schoolTeam ? { convened: A.schoolTeam === "yes" } : undefined,
-    zakaut: A.zakautStatus
-      ? { status: A.zakautStatus, decisionReceivedOn: A.zakautDecisionOn || undefined }
-      : undefined,
-    hatamot: A.hatamotStatus
-      ? { status: A.hatamotStatus, districtAnswerReceivedOn: A.hatamotAnswerOn || undefined }
-      : undefined,
+    diagnoses: f.c_diag ?? [],
+    schoolTeam: f.c_team ? { convened: f.c_team === "yes" } : undefined,
+    zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
+    hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
-    economicConstraint: A.fam_economic === "yes",
+    economicConstraint: f.c_economic === "yes",
     risk: {
-      suicidality: A.safety === "yes",
-      schoolRefusal: A.refusal === "signs" || A.refusal === "clear",
+      suicidality: A.q3_sui === "כן",
+      schoolRefusal: f.c_attend === "refusal",
     },
   };
 }
@@ -175,99 +162,87 @@ export interface SchoolSummary {
   html: string;
 }
 
+export interface SummaryDomain { label: string; result: KidsDomainResult }
+
 type Section = { title: string; lines: string[] };
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-function studentWord(A: SchoolAnswers): string {
-  return A.gender === "זכר" ? "התלמיד" : A.gender === "נקבה" ? "התלמידה" : "התלמיד/ה";
-}
+const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
+const stripPrefix = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
 function levelLine(label: string, v: Level | undefined): string | null {
   return v === undefined || v === 0 ? null : `${label}: ${LEVEL_LABELS[v]}`;
 }
 
-export function buildSchoolSummary(A: SchoolAnswers, tracks: SchoolTrack[], today: string): SchoolSummary {
-  const S = studentWord(A);
+export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string, domains: SummaryDomain[] = []): SchoolSummary {
+  const f = A as CounselorFields;
   const sections: Section[] = [];
 
   // רקע
   const bg: string[] = [];
-  if (A.grade) bg.push(`כיתה ${A.grade}${A.gender ? `, ${A.gender === "זכר" ? "בן" : "בת"}` : ""}`);
-  if (A.duration) bg.push(`משך הקושי: ${DURATION_LABELS[A.duration]}`);
-  if (A.initiator) bg.push(`הפנייה נפתחה ביוזמת ${INITIATOR_LABELS[A.initiator]}`);
-  if (A.parents) bg.push(PARENTS_LABELS[A.parents]);
+  if (f._grade) bg.push(`כיתה ${f._grade}${f._age ? `, גיל ${f._age}` : ""}`);
+  if (f.c_duration) bg.push(`משך הקושי: ${DURATION_LABELS[f.c_duration]}`);
+  if (f.c_parents) bg.push(PARENTS_LABELS[f.c_parents]);
   if (bg.length) sections.push({ title: "רקע", lines: bg });
 
-  // תפקוד בבית הספר
+  // ממצאי השאלון לפי תחום
+  for (const d of domains) {
+    const lines: string[] = [];
+    const symptoms = uniq(d.result.groups.flatMap(g => g.recs.flatMap(r => r.symptoms))).map(stripPrefix).filter(Boolean);
+    if (symptoms.length) lines.push(`ממצאים: ${symptoms.join("; ")}`);
+    const referrals = uniq(
+      d.result.groups
+        // "Consult the school counsellor" is the engine talking to parents; in a
+        // counsellor's own summary it is noise.
+        .filter(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר")
+        .map(g => `${g.treatmentLabel} (${KIND_LABELS[g.kind]})${g.urgent ? " - דחוף" : ""}`),
+    );
+    if (referrals.length) lines.push(`הפניה מומלצת: ${referrals.join("; ")}`);
+    for (const w of d.result.standaloneWarnings) lines.push(stripPrefix(w.text));
+    if (lines.length) sections.push({ title: stripPrefix(d.label), lines });
+  }
+
+  // זווית בית הספר
   const school: string[] = [];
-  const att: string[] = [];
-  if (A.attendance && A.attendance !== "regular") att.push(ATTENDANCE_LABELS[A.attendance]);
-  if (A.lateness && A.lateness !== "no") att.push(`איחורים ${LATENESS_LABELS[A.lateness]}`);
-  if (A.refusal && A.refusal !== "no") att.push(`סרבנות בית ספר ${A.refusal === "clear" ? "מובהקת" : "- סימנים"}`);
-  if (att.length) school.push(`ביקור סדיר: ${att.join("; ")}`);
-  else if (A.attendance === "regular") school.push("ביקור סדיר: תקין");
-
-  const cls = [
-    levelLine("קשב והתמדה בשיעור", A.cls_attention),
-    levelLine("התארגנות", A.cls_org),
-    levelLine("התנהלות מול סמכות", A.cls_authority),
-    levelLine("ויסות רגשי בכיתה ובהפסקות", A.cls_regulation),
-  ].filter((x): x is string => !!x);
-  if (cls.length) school.push(`בכיתה - ${cls.join("; ")}`);
-
-  const soc = [levelLine("בידוד או דחייה חברתית", A.soc_isolation), levelLine("חיכוכים עם בני הגיל", A.soc_conflict)].filter((x): x is string => !!x);
-  if (A.bully_victim && A.bully_victim !== "no") soc.push(`נפגע/ת מהצקות או חרם: ${BULLY_LABELS[A.bully_victim]}`);
-  if (A.bully_perp && A.bully_perp !== "no") soc.push(`מעורבות כפוגע/ת: ${BULLY_LABELS[A.bully_perp]}`);
-  if (soc.length) school.push(`חברתי - ${soc.join("; ")}`);
-
-  const emo = [levelLine("מופנמות, עצב או חרדה נצפית", A.emo_internal), levelLine("החצנה והתפרצויות", A.emo_external)].filter((x): x is string => !!x);
-  if (A.emo_change === "yes") emo.push("שינוי חד בהתנהגות או במצב הרוח השנה");
-  if (emo.length) school.push(`רגשי, כפי שנצפה בבית הספר - ${emo.join("; ")}`);
-
-  const acad: string[] = [];
-  const gap = levelLine("פער לימודי ביחס לכיתה", A.acad_gap);
-  if (gap) acad.push(gap);
-  if (A.acad_response) acad.push(`תגובה לתמיכה שניתנה: ${RESPONSE_LABELS[A.acad_response]}`);
-  if (acad.length) school.push(`לימודי - ${acad.join("; ")}`);
-
-  if (A.safety === "yes") school.push(`עלה חשש לפגיעה עצמית או אמירות אובדניות - דווח לגורמים המוסמכים בבית הספר לפי הנוהל`);
-  if (school.length) sections.push({ title: "תפקוד בבית הספר", lines: school });
+  if (f.c_attend && f.c_attend !== "regular") school.push(`ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
+  if (f.c_change === "כן") school.push("שינוי חד בהתנהגות או במצב הרוח השנה");
+  const org = levelLine("קושי בהתארגנות (ציוד, שיעורי בית, זמנים)", f.c_org);
+  if (org) school.push(org);
+  if (f.c_support) school.push(`תגובה לתמיכה לימודית שניתנה: ${SUPPORT_RESPONSE_LABELS[f.c_support]}`);
+  const reg = levelLine("קושי בוויסות בכיתה ובהפסקות", f.c_regulation);
+  if (reg) school.push(reg);
+  if (f.c_bully_perp && f.c_bully_perp !== "no") school.push(`מעורבות כפוגע/ת בהצקות: ${BULLY_LABELS[f.c_bully_perp]}`);
+  const iso = levelLine("בידוד או דחייה חברתית בכיתה", f.c_isolation);
+  if (iso) school.push(iso);
+  if (f.c_bully_victim && f.c_bully_victim !== "no") school.push(`נפגע/ת מהצקות או חרם: ${BULLY_LABELS[f.c_bully_victim]}`);
+  if (A.q3_sui === "כן") school.push("דווח על מחשבות אובדניות - הדיווח לגורמים המוסמכים בבית הספר נעשה לפי הנוהל");
+  if (school.length) sections.push({ title: "כפי שנצפה בבית הספר", lines: school });
 
   // התערבויות
-  const tried: string[] = [];
-  const notTried: string[] = [];
-  for (const it of INTERVENTIONS) {
-    const o = A.interventions?.[it.key];
-    if (!o || o === "not_tried") notTried.push(it.label);
-    else tried.push(`${it.label}: ${OUTCOME_LABELS[o]}`);
-  }
-  if (tried.length || A.interventions) {
-    const lines = [...tried];
-    if (notTried.length && tried.length) lines.push(`טרם נוסו: ${notTried.join(", ")}`);
-    if (!tried.length) lines.push("טרם נוסו התערבויות בית-ספריות");
+  if (f.c_tried) {
+    const tried: string[] = [];
+    const notTried: string[] = [];
+    for (const it of INTERVENTIONS) {
+      const o = f.c_tried[it.key];
+      if (o) tried.push(`${it.label}: ${OUTCOME_LABELS[o]}`);
+      else notTried.push(it.label);
+    }
+    const lines = tried.length ? [...tried] : ["טרם נוסו התערבויות בית-ספריות"];
+    if (tried.length && notTried.length) lines.push(`טרם נוסו: ${notTried.join(", ")}`);
     sections.push({ title: "התערבויות שנוסו בבית הספר", lines });
   }
 
-  // אבחונים, ועדות, תמיכות
+  // אבחונים, ועדות, משפחה
   const docs: string[] = [];
-  for (const d of A.diagnoses ?? []) {
+  for (const d of f.c_diag ?? []) {
     docs.push(`${DIAGNOSIS_KIND_LABELS[d.kind]} (${d.year})${d.signedBy ? `, חתום/ה: ${d.signedBy}` : ""}`);
   }
-  if (!docs.length && A.diagnoses) docs.push("אין אבחונים או חוות דעת בתיק");
-  if (A.schoolTeam) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[A.schoolTeam]}`);
-  if (A.zakautStatus) docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[A.zakautStatus]}${A.zakautStatus === "decided" && A.zakautDecisionOn ? ` (${formatDateHe(A.zakautDecisionOn)})` : ""}`);
-  if (A.hatamotStatus) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[A.hatamotStatus]}`);
-  if (A.supports?.length) docs.push(`תמיכות פעילות: ${A.supports.join(", ")}`);
-  if (A.health?.length) docs.push(`מעקב וטיפול מחוץ לבית הספר: ${A.health.join(", ")}`);
-  if (docs.length) sections.push({ title: "אבחונים, ועדות ותמיכות", lines: docs });
-
-  // משפחה
-  const fam: string[] = [];
-  if (A.fam_cooperation && A.fam_cooperation !== "unknown") fam.push(`שיתוף פעולה הורי: ${COOPERATION_LABELS[A.fam_cooperation]}`);
-  if (A.fam_welfare === "yes") fam.push("המשפחה מוכרת לרווחה");
-  if (A.fam_economic === "yes") fam.push("קיימת מגבלה כלכלית מוכרת");
-  if (fam.length) sections.push({ title: "המשפחה", lines: fam });
+  if (f.c_diag && !docs.length) docs.push("אין אבחונים או חוות דעת בתיק");
+  if (f.c_team) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
+  if (f.c_zakaut) docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
+  if (f.c_hatamot) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
+  if (f.c_economic === "yes") docs.push("קיימת מגבלה כלכלית מוכרת");
+  if (docs.length) sections.push({ title: "אבחונים, ועדות ומשאבים", lines: docs });
 
   // מסלולים
   const active = tracks.filter(t => t.relevance !== "info");
@@ -278,16 +253,11 @@ export function buildSchoolSummary(A: SchoolAnswers, tracks: SchoolTrack[], toda
     });
   }
 
-  const head = `סיכום לקראת הפניה - ${S}`;
-  const meta = `נוצר בעזרת "טיפול חכם" ב-${formatDateHe(today)}${A.role ? `, על סמך דיווח של ${ROLE_LABELS[A.role]}` : ""}${A.fillMode ? ` (${FILL_MODE_LABELS[A.fillMode]})` : ""}.`;
+  const head = "סיכום לקראת הפניה - התלמיד/ה";
+  const meta = `נוצר בעזרת "טיפול חכם" ב-${formatDateHe(today)}${f.c_fill ? `, ${FILL_MODE_LABELS[f.c_fill]}` : ""}.`;
   const foot = "הסיכום מבוסס על דיווח הממלא/ת בלבד. הוא אינו אבחון, אינו קובע זכאות ואינו מחליף הערכה מקצועית או החלטת ועדה. אינו מכיל פרטים מזהים.";
 
-  const text = [
-    head, meta, "",
-    ...sections.flatMap(s => [s.title, ...s.lines.map(l => `- ${l}`), ""]),
-    foot,
-  ].join("\n");
-
+  const text = [head, meta, "", ...sections.flatMap(s => [s.title, ...s.lines.map(l => `- ${l}`), ""]), foot].join("\n");
   const html = [
     `<h2>${esc(head)}</h2>`,
     `<p><em>${esc(meta)}</em></p>`,
