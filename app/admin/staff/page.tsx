@@ -5,6 +5,8 @@ import { useCallback, useEffect, useState } from "react";
 // ניהול צוות ושעות עבודה: הוספת עובדים, קודי דיווח, ותיקון/צפייה ברישומי
 // נוכחות לפי חודש. העובדים מדווחים בעצמם ב-/staff עם הקוד האישי שלהם.
 
+import { WORK_KINDS, type WorkKind } from "@/app/lib/staff-work-kinds";
+
 type Session = {
   id: string;
   staff_id: string;
@@ -12,6 +14,7 @@ type Session = {
   clock_out: string | null;
   note: string | null;
   source: string;
+  work_kinds: WorkKind[] | null;
 };
 
 type Employee = {
@@ -67,6 +70,7 @@ export default function AdminStaffPage() {
   const [fIn, setFIn] = useState("");
   const [fOut, setFOut] = useState("");
   const [fNote, setFNote] = useState("");
+  const [fKinds, setFKinds] = useState<WorkKind[]>([]);
 
   // נועל את גלילת העמוד שמאחורי המודל — בלעדיו, גלילה מעל הרקע הכהה מזיזה
   // את דף האדמין שמתחת במקום את תוכן המודל.
@@ -127,10 +131,11 @@ export default function AdminStaffPage() {
     setFIn(isoToLocal(s.clock_in));
     setFOut(isoToLocal(s.clock_out));
     setFNote(s.note ?? "");
+    setFKinds(s.work_kinds ?? []);
   }
   function openAdd(e: Employee) {
     setAddFor(e);
-    setFIn(""); setFOut(""); setFNote("");
+    setFIn(""); setFOut(""); setFNote(""); setFKinds([]);
   }
 
   async function saveSession() {
@@ -141,6 +146,7 @@ export default function AdminStaffPage() {
         clock_in: localToIso(fIn),
         clock_out: fOut ? localToIso(fOut) : null,
         note: fNote,
+        work_kinds: fKinds,
       });
       if (ok) setEditSession(null);
     } else if (addFor) {
@@ -150,6 +156,7 @@ export default function AdminStaffPage() {
         clock_in: localToIso(fIn),
         clock_out: fOut ? localToIso(fOut) : null,
         note: fNote,
+        work_kinds: fKinds,
       });
       if (ok) setAddFor(null);
     }
@@ -265,6 +272,7 @@ export default function AdminStaffPage() {
                       <th className="py-1.5 font-semibold">כניסה</th>
                       <th className="py-1.5 font-semibold">יציאה</th>
                       <th className="py-1.5 font-semibold text-center">משך</th>
+                      <th className="py-1.5 font-semibold">אופי העבודה</th>
                       <th className="py-1.5 font-semibold">הערה</th>
                       <th className="py-1.5 font-semibold text-center">מקור</th>
                       <th className="py-1.5"></th>
@@ -280,6 +288,9 @@ export default function AdminStaffPage() {
                           <td className="py-1.5">{fmtDateTime(s.clock_in)}</td>
                           <td className="py-1.5">{s.clock_out ? fmtDateTime(s.clock_out) : <span className="text-green-700 font-bold">פתוח</span>}</td>
                           <td className="py-1.5 text-center font-bold text-[#0F5468]">{min != null ? fmtMinutes(min) : "—"}</td>
+                          <td className="py-1.5 text-xs text-stone-600 max-w-[200px]" title={(s.work_kinds ?? []).join(", ")}>
+                            {s.work_kinds?.length ? s.work_kinds.join(" · ") : <span className="text-stone-300">—</span>}
+                          </td>
                           <td className="py-1.5 text-xs text-stone-500 max-w-[180px] truncate" title={s.note ?? ""}>{s.note ?? ""}</td>
                           <td className="py-1.5 text-center text-xs text-stone-400">{s.source === "admin" ? "אדמין" : "עצמי"}</td>
                           <td className="py-1.5 text-left whitespace-nowrap">
@@ -336,12 +347,36 @@ export default function AdminStaffPage() {
           <Field label="יציאה (ריק = משמרת פתוחה)">
             <input type="datetime-local" value={fOut} onChange={(e) => setFOut(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
           </Field>
+          <Field label="אופי העבודה * (אפשר לבחור כמה)">
+            <div className="flex flex-wrap gap-1.5">
+              {WORK_KINDS.map((k) => {
+                const on = fKinds.includes(k);
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setFKinds((prev) => (on ? prev.filter((x) => x !== k) : [...prev, k]))}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      on
+                        ? "border-[#0F5468] bg-[#0F5468] text-white"
+                        : "border-stone-300 bg-white text-stone-600 hover:border-stone-400"
+                    }`}
+                  >
+                    {k}
+                  </button>
+                );
+              })}
+            </div>
+            {fKinds.length === 0 && (
+              <p className="mt-1.5 text-[11px] text-red-500">חובה לבחור לפחות אחד כדי לשמור.</p>
+            )}
+          </Field>
           <Field label="הערה">
             <input value={fNote} onChange={(e) => setFNote(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
           </Field>
           <button
             onClick={saveSession}
-            disabled={busy || !fIn}
+            disabled={busy || !fIn || fKinds.length === 0}
             className="mt-2 w-full rounded-xl bg-stone-800 py-2.5 text-sm font-bold text-white disabled:opacity-40"
           >
             שמירה
