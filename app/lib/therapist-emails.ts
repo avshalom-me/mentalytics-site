@@ -926,9 +926,8 @@ export async function sendGiftOfferEmail(opts: {
   // (התוכן כבר נוטרל, ו-** אינו תו HTML), והוא מאפשר לאדמין להדגיש שורה
   // בטיוטה בלי לכתוב HTML. שורת התזכורת לפני החיוב הראשון מסומנת כך.
   const safeMessage = escapeHtml(opts.message.trim()).replace(
-    /\*\*([^*
-]+)\*\*/g,
-    '<strong>$1</strong>'
+    /\*\*([^*\n]+)\*\*/g,
+    "<strong>$1</strong>"
   );
   const profileUrl = `${SITE_URL}/therapists/dashboard`;
   const deadline = opts.expiresAt
