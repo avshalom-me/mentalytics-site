@@ -2708,8 +2708,8 @@ export default function AdultsPage() {
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
               className={
                 isPrimary
-                  ? "inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
-                  : "inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
+                  ? "cta-pulse-soft inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
+                  : "inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
               }
             >
               🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
@@ -2756,7 +2756,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_emotional");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
@@ -2787,7 +2787,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_relationship");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--gold-dark), var(--gold))", border: "1px solid #C8961A" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#FDF6E3]">חיפוש מתקדם ✦</div>

@@ -129,6 +129,14 @@ a { text-decoration: none; color: inherit; }
   50%      { box-shadow: 0 0 0 10px rgba(61, 140, 138, 0); transform: translateZ(0) scale(1.015); }
 }
 .cta-pulse { animation: cta-pulse 2.4s ease-in-out infinite; }
+
+/* The same nudge for the per-finding search buttons further down the report.
+   When several findings are shown, every one of them is a real choice, so
+   they all carry it - staggered by 0.4s so the screen reads as a set of
+   options breathing together rather than one alarm. */
+.cta-pulse-soft { animation: cta-pulse 2.8s ease-in-out infinite; }
+.cta-pulse-soft:nth-of-type(2n)  { animation-delay: 0.4s; }
+.cta-pulse-soft:nth-of-type(3n)  { animation-delay: 0.8s; }
 @media (prefers-reduced-motion: reduce) {
-  .cta-pulse { animation: none; }
+  .cta-pulse, .cta-pulse-soft { animation: none; }
 }

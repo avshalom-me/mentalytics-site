@@ -3184,7 +3184,7 @@ function GroupCard({
             <button
               type="button"
               onClick={onSelect}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
+              className={`cta-pulse-soft inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
                 isAssessment
                   ? "bg-purple-700"
                   : isProfessional
@@ -3209,7 +3209,7 @@ function GroupCard({
                 key={s.treatmentKey}
                 type="button"
                 onClick={cb}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
+                className={`cta-pulse-soft inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
                   sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : "bg-[var(--teal-dark)]"
                 }`}
               >
