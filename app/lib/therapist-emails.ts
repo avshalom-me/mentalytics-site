@@ -5,6 +5,7 @@ import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-fee
 import { buildArticleInviteEmail } from "./article-invite-email";
 import { alertRecipients } from "./alert-recipients";
 import { promotedPlanTable } from "./promoted-plan-table";
+import { SUBSCRIPTION_BASE_PRICE } from "./sumit";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -144,7 +145,11 @@ export async function sendPromotionEndedEmail(opts: {
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">${safeBody}</p>
       ${feedbackHtml}
-      <p style="margin:0 0 24px;">לתחילת מסלול בתשלום:</p>
+      <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה נשאר במסלול החינמי, ומה חוזר עם המסלול המקודם</p>
+      ${promotedPlanTable(
+        `המסלול המקודם עולה ${SUBSCRIPTION_BASE_PRICE} ש"ח + מע"מ לחודש. ביטול בכל שלב בהודעת מייל אלינו.`
+      )}
+      <p style="margin:18px 0 24px;">לתחילת מסלול בתשלום:</p>
       <p style="margin:0 0 16px;">
         <a href="${checkoutUrl}"
            style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
