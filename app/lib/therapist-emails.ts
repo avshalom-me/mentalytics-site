@@ -353,6 +353,9 @@ export async function sendGiftTrialWelcomeEmail(opts: {
   firstChargeDate: string; // YYYY-MM-DD
   amount: number;
   giftMonths: number;
+  /** מדרגת ההמשך: כמה חודשים במחיר המוזל, ומה המחיר המלא שאחריה. */
+  followonMonths?: number;
+  fullAmount?: number;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendGiftTrialWelcomeEmail: RESEND_API_KEY not configured, skipping");
@@ -379,7 +382,11 @@ export async function sendGiftTrialWelcomeEmail(opts: {
         <p style="margin:0 0 10px;font-weight:bold;color:#0F5468;">מה קורה מבחינת תשלום</p>
         <ul style="margin:0;padding-right:18px;font-size:15px;">
           <li style="margin-bottom:6px;">לא נגבה ממך תשלום היום, ולא ב-${opts.giftMonths} החודשים הראשונים.</li>
-          <li style="margin-bottom:6px;">החיוב הראשון: <strong>${escapeHtml(charge)}</strong>, בסך ${opts.amount} ש"ח + מע"מ לחודש.</li>
+          <li style="margin-bottom:6px;">החיוב הראשון: <strong>${escapeHtml(charge)}</strong>, בסך ${opts.amount} ש"ח + מע"מ לחודש${
+            opts.followonMonths && opts.fullAmount
+              ? `, וכך גם בחודש שאחריו (${opts.followonMonths} חודשים במחיר מוזל). מהחודש שלאחר מכן - ${opts.fullAmount} ש"ח + מע"מ לחודש.`
+              : "."
+          }</li>
           <li style="margin-bottom:6px;">שבוע לפני התאריך הזה יישלח אליך מייל תזכורת עם התאריך והסכום.</li>
           <li>ביטול בכל שלב בהודעת מייל אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.</li>
         </ul>

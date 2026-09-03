@@ -19,6 +19,8 @@ type Offer = {
   first_charge_date: string;
   expires_at: string;
   amount: number;
+  followon_months?: number;
+  full_amount?: number;
 };
 
 type SumitConfig = { companyId: string; publicKey: string };
@@ -232,7 +234,9 @@ export default function GiftCheckoutPage() {
             <li>הקידום מתחיל היום, והפרופיל נכנס למערכת ההתאמות מיד.</li>
             <li>
               החיוב הראשון: <strong>{hebDate(offer.first_charge_date)}</strong>, בסך {offer.amount} ש"ח
-              + מע"מ לחודש.
+              + מע"מ לחודש{offer.followon_months && offer.full_amount
+                ? `, וכך גם בחודש שאחריו (${offer.followon_months} חודשים במחיר מוזל). מהחודש שלאחר מכן - ${offer.full_amount} ש"ח + מע"מ לחודש.`
+                : "."}
             </li>
             <li>שבוע לפני התאריך הזה יישלח אליך מייל תזכורת.</li>
             <li>

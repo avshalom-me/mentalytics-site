@@ -1,6 +1,7 @@
 import "server-only";
 import { PROMOTED_PLAN_ROWS } from "./promoted-plan-table";
 import { QUIZ_BASE_PRICE, SUBSCRIPTION_BASE_PRICE } from "./sumit";
+import { GIFT_FOLLOWON_PRICE, GIFT_FOLLOWON_MONTHS } from "./promo";
 import { MAX_FREE } from "./usage";
 import { GIFT_MONTHS, GIFT_OFFER_TTL_DAYS } from "./gift-checkout";
 
@@ -50,7 +51,7 @@ ${PLAN_TABLE}
   אם חסרה חשבונית - אנחנו בודקים מול סומיט ומחזירים תשובה.
 
 ## מסלול הצטרפות בהזמנה אישית (רלוונטי רק למי שקיבל מאיתנו מייל עם קישור)
-- ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, ואחריהם המחיר הרגיל (${SUBSCRIPTION_BASE_PRICE} ש"ח + מע"מ לחודש).
+- ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, אחריהם ${GIFT_FOLLOWON_MONTHS} חודשים ב-${GIFT_FOLLOWON_PRICE} ש"ח + מע"מ לחודש, ורק אז המחיר הרגיל (${SUBSCRIPTION_BASE_PRICE} ש"ח + מע"מ לחודש).
 - החיוב הראשון בדיוק ${GIFT_MONTHS} חודשים מיום ההצטרפות; שבוע לפני נשלח מייל תזכורת.
 - הקישור אישי ותקף ל-${GIFT_OFFER_TTL_DAYS} ימים ממועד המייל. פג? משיבים למייל ושולחים קישור חדש.
 - מי שלא קיבל את המייל לא יכול להצטרף דרך המסלול הזה.
