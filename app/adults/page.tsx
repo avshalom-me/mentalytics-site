@@ -2804,6 +2804,34 @@ export default function AdultsPage() {
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
 
+          {/* One primary button above the report. Measured 3/9/26 over 30 days:
+              of 122 finishers who never searched, 107 never pressed any
+              per-finding button and left the results screen within ~30s
+              (median). The per-finding buttons stay exactly as they were -
+              this only puts the leading finding's search one tap away, before
+              the report, PDF and article links offer an exit. Target: the
+              urgent finding if there is one, otherwise the first primary. */}
+          {!err && recs.length > 0 && (() => {
+            const topGroup = groups.find((g) => g.urgent) ?? sections[0]?.groups[0];
+            if (!topGroup) return null;
+            const topRec = topGroup.recs[0];
+            return (
+              <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
+                <p className="mb-2.5 text-sm text-[#2a3a4a]">
+                  הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{topGroup.treatmentLabel}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedRec(topRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", topGroup.treatment, "top"); }}
+                  className="cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal-dark)] px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal)] sm:w-auto"
+                >
+                  🔍 מצא/י לי מטפל - {topGroup.treatmentLabel} ←
+                </button>
+                <p className="mt-2 text-xs text-gray-500">הדוח המלא, הכלים והאפשרויות הנוספות - למטה</p>
+              </div>
+            );
+          })()}
+
           {/* Summary + demographics + "what now?" */}
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4">
             <p className="text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)] mb-2">סיכום שאלון</p>

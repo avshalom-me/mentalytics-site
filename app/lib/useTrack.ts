@@ -127,11 +127,20 @@ export function trackTherapistExplain(therapistId: string, quizType: "adults" | 
 }
 
 /** Patient entered the matching flow for a treatment type (top of the match funnel). */
-export function trackMatchingClick(quizType: "adults" | "kids", treatment: string) {
-  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata: { treatment } });
+export function trackMatchingClick(
+  quizType: "adults" | "kids",
+  treatment: string,
+  // "top" = the single prominent button above the report, added 3/9/26 after
+  // 107 of 122 non-searching sessions left the results screen within ~30s
+  // without pressing any of the per-finding buttons. Tagged so the two
+  // placements can be compared; omitted = the in-card button (unchanged).
+  placement?: "top" | "card",
+) {
+  const metadata = placement ? { treatment, placement } : { treatment };
+  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata });
   // Single GA4 emission point (was inline gtag at each call site, which bypassed
   // the channel-attaching wrapper and only covered the adults flow).
-  gaEvent("matching_click", { quiz_type: quizType, treatment });
+  gaEvent("matching_click", { quiz_type: quizType, treatment, ...(placement ? { placement } : {}) });
 }
 
 /**

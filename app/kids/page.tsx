@@ -3715,6 +3715,36 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       <div className="mb-4 flex justify-center">
         <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
       </div>
+
+      {/* One primary button above the report - same reasoning as the adults
+          screen (3/9/26): 24 of the 36 sessions that stopped dead on a results
+          screen were parents. The per-finding buttons are untouched; this
+          puts the first actionable finding one tap away, before the tools,
+          PDF and notes offer an exit. Assessment and professional referrals
+          keep their own verb and colour so the promise matches the button
+          the parent would otherwise have found lower down. */}
+      {hasAnyFindings && (() => {
+        const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0);
+        const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0]) : null;
+        if (!bucket || !g) return null;
+        const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת";
+        const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
+        return (
+          <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
+            <p className="mb-2.5 text-sm text-[#2a3a4a]">
+              הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{g.treatmentLabel}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => { trackQuizStep("kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
+              className={`cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors sm:w-auto ${tone}`}
+            >
+              {verb} - {g.treatmentLabel} ←
+            </button>
+            <p className="mt-2 text-xs text-gray-500">דוח הממצאים המלא, הכלים המעשיים וההפניות הנוספות - למטה</p>
+          </div>
+        );
+      })()}
       {/* Demographics card */}
       <Card>
         <StepTag>סיכום שאלון</StepTag>

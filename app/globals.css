@@ -118,3 +118,17 @@ a { text-decoration: none; color: inherit; }
 .details-card[open] > summary .details-card-toggle {
   transform: rotate(45deg);
 }
+
+/* Results-screen primary CTA. A slow, low-amplitude pulse (2.4s, +1.5% scale,
+   a fading teal halo) - enough to draw the eye on a page that previously lost
+   a quarter of finishers within 30 seconds, not enough to read as an alarm.
+   Honours prefers-reduced-motion: the button is still the primary one by
+   colour and position, the motion is only the extra nudge. */
+@keyframes cta-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(61, 140, 138, 0.45); transform: translateZ(0) scale(1); }
+  50%      { box-shadow: 0 0 0 10px rgba(61, 140, 138, 0); transform: translateZ(0) scale(1.015); }
+}
+.cta-pulse { animation: cta-pulse 2.4s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .cta-pulse { animation: none; }
+}
