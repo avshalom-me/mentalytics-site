@@ -18,6 +18,7 @@ export const CHANNELS = [
   "tiktok_organic",  // organic TikTok (ttclid alone, or tiktok referrer)
   "whatsapp",        // WhatsApp referral or utm_source=whatsapp
   "direct",          // no referrer, no campaign params
+  "ai",              // an AI assistant sent them (ChatGPT, Gemini, Claude, Perplexity, Copilot)
   "referral",        // any other website (incl. organic social)
   "other",           // utm present but source not recognised
 ] as const;
@@ -111,6 +112,33 @@ function isTikTokSource(src: string): boolean {
   return src.includes("tiktok") || src.includes("tik_tok") || src === "tt";
 }
 
+/**
+ * Hosts that mean "an AI assistant handed the user this link".
+ *
+ * Matched on the referrer host, so a link shared FROM a chat lands here too -
+ * which is what we want: either way the assistant is what put us in front of
+ * the person. Kept as full hosts rather than loose substrings, because "ai" or
+ * "chat" as substrings would swallow unrelated domains.
+ */
+const AI_HOSTS = [
+  "chatgpt.com",
+  "chat.openai.com",
+  "openai.com",
+  "gemini.google.com",
+  "bard.google.com",
+  "claude.ai",
+  "perplexity.ai",
+  "copilot.microsoft.com",
+  "you.com",
+  "poe.com",
+  "grok.com",
+  "x.ai",
+] as const;
+
+function isAiReferrer(ref: string): boolean {
+  return AI_HOSTS.some((h) => ref.includes(h));
+}
+
 /** Derive a single normalized channel from URL params + referrer. */
 function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const src = (params.get("utm_source") || "").trim().toLowerCase();
@@ -125,6 +153,8 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // Explicit UTM tagging - trust the medium to separate paid from organic.
   if (src) {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
+    // utm_source=chatgpt.com is what ChatGPT appends when it tags a link at all
+    if (isAiReferrer(src)) return "ai";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
     if (isTikTokSource(src)) return PAID_MEDIUMS.has(med) ? "tiktok_paid" : "tiktok_organic";
@@ -141,6 +171,12 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // No UTM - infer from the referrer.
   if (!ref) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
+  // BEFORE the google. test, and that order is the whole point: gemini.google.com
+  // contains "google." and was being counted as organic search. Measured 3/9/2026,
+  // Gemini had sent 2 sessions and 6 page views that landed in google_organic, and
+  // ChatGPT 2 more that fell to "other" - so the one channel we most wanted to see
+  // growing was the one channel we could not see at all.
+  if (isAiReferrer(ref)) return "ai";
   if (ref.includes("google.")) return "google_organic";
   if (ref.includes("facebook.") || ref.includes("instagram.") || ref.includes("fb.")) return "meta_organic";
   if (ref.includes("tiktok.")) return "tiktok_organic";
@@ -433,6 +469,7 @@ export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
   tiktok_organic: "TikTok - אורגני",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
+  ai: "עוזר AI",
   referral: "הפניה מאתר אחר",
   other: "אחר",
   unknown: "לא ידוע",
