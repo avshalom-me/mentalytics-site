@@ -921,7 +921,15 @@ export async function sendGiftOfferEmail(opts: {
   const subject = opts.subject?.trim() || "הצעת קידום במתנה - טיפול חכם";
   // הטיוטה כוללת את פנייתה ("שלום X,") ואת החתימה, ולכן היא נכנסת כגוש אחד
   // ולא נעטפת שוב בשלום/חתימה של המעטפת.
-  const safeMessage = escapeHtml(opts.message.trim());
+  // הטיוטה נכנסת כטקסט ולכן עוברת escape. אחריו - ורק אחריו - מותר סימון
+  // הדגשה אחד: **טקסט** הופך ל-<strong>. הסדר הזה הוא מה שהופך את זה לבטוח
+  // (התוכן כבר נוטרל, ו-** אינו תו HTML), והוא מאפשר לאדמין להדגיש שורה
+  // בטיוטה בלי לכתוב HTML. שורת התזכורת לפני החיוב הראשון מסומנת כך.
+  const safeMessage = escapeHtml(opts.message.trim()).replace(
+    /\*\*([^*
+]+)\*\*/g,
+    '<strong>$1</strong>'
+  );
   const profileUrl = `${SITE_URL}/therapists/dashboard`;
   const deadline = opts.expiresAt
     ? new Date(opts.expiresAt).toLocaleDateString("he-IL", {
