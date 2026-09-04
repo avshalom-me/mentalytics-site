@@ -45,11 +45,13 @@ import {
   SCHOOL_DIAGNOSIS_KINDS,
   DIAGNOSIS_KIND_LABELS,
   RELEVANCE_LABELS,
+  UNKNOWN,
   toTracksInput,
   buildSchoolSummary,
   type CounselorFields,
   type Level,
   type Outcome,
+  type Unknown,
 } from "@/app/lib/school-report";
 import { PAGES, type Ans } from "./quiz-logic";
 import { Card, StepTag, StepQ, StepHint, NavRow, YNRow, ob } from "./ui";
@@ -127,8 +129,24 @@ function Choice<T extends string | number>({ value, options, onChange }: { value
     </div>
   );
 }
-function LevelRow({ value, onChange }: { value?: Level; onChange: (v: Level) => void }) {
-  return <Choice value={value} options={LEVEL_LABELS.map((l, i) => [i as Level, l] as [Level, string])} onChange={onChange} />;
+
+/**
+ * The same row with a "לא יודע/ת" option on the end.
+ *
+ * A counsellor sees six hours of the day, and on her own observations not
+ * knowing is not the same as answering "no": the summary and the tracks engine
+ * both leave such a field out rather than report an absence of difficulty. That
+ * is the opposite of the emotional items, which are summed against thresholds
+ * and therefore store a real "no" - see markUnknown in quiz-logic.
+ */
+function ChoiceU<T extends string | number>({ value, options, onChange }: {
+  value?: T | Unknown; options: [T, string][]; onChange: (v: T | Unknown) => void;
+}) {
+  const all: [T | Unknown, string][] = [...options, [UNKNOWN, "לא יודע/ת"]];
+  return <Choice value={value} options={all} onChange={onChange} />;
+}
+function LevelRow({ value, onChange }: { value?: Level | Unknown; onChange: (v: Level | Unknown) => void }) {
+  return <ChoiceU value={value} options={LEVEL_LABELS.map((l, i) => [i as Level, l] as [Level, string])} onChange={onChange} />;
 }
 function Q({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -273,8 +291,10 @@ export function CounselorQ1Block({ A, setA }: { A: Ans; setA: (a: Ans) => void }
   const f = A as CounselorFields; const set = setField(A, setA);
   return (
     <CounselorBlock>
-      <Q label="ביקור סדיר"><Choice value={f.c_attend} options={entries(ATTEND_LABELS)} onChange={v => set("c_attend", v)} /></Q>
-      <Q label="שינוי חד בהתנהגות או במצב הרוח השנה"><YNRow val={f.c_change || ""} onChange={v => set("c_change", v as "כן" | "לא")} /></Q>
+      <Q label="ביקור סדיר"><ChoiceU value={f.c_attend} options={entries(ATTEND_LABELS)} onChange={v => set("c_attend", v)} /></Q>
+      <Q label="שינוי חד בהתנהגות או במצב הרוח השנה">
+        <ChoiceU value={f.c_change} options={[["כן", "כן"], ["לא", "לא"]]} onChange={v => set("c_change", v as CounselorFields["c_change"])} />
+      </Q>
     </CounselorBlock>
   );
 }
@@ -282,7 +302,7 @@ export function CounselorAcadBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void
   const f = A as CounselorFields; const set = setField(A, setA);
   return (
     <CounselorBlock>
-      <Q label="תגובה לתמיכה לימודית שניתנה"><Choice value={f.c_support} options={entries(SUPPORT_RESPONSE_LABELS)} onChange={v => set("c_support", v)} /></Q>
+      <Q label="תגובה לתמיכה לימודית שניתנה"><ChoiceU value={f.c_support} options={entries(SUPPORT_RESPONSE_LABELS)} onChange={v => set("c_support", v)} /></Q>
       <Q label="קושי בהתארגנות (ציוד, שיעורי בית, זמנים)"><LevelRow value={f.c_org} onChange={v => set("c_org", v)} /></Q>
     </CounselorBlock>
   );
@@ -292,7 +312,7 @@ export function CounselorBehBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void 
   return (
     <CounselorBlock>
       <Q label="קושי בוויסות בכיתה ובהפסקות"><LevelRow value={f.c_regulation} onChange={v => set("c_regulation", v)} /></Q>
-      <Q label="מעורבות כפוגע/ת בהצקות או בחרם"><Choice value={f.c_bully_perp} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_perp", v)} /></Q>
+      <Q label="מעורבות כפוגע/ת בהצקות או בחרם"><ChoiceU value={f.c_bully_perp} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_perp", v)} /></Q>
     </CounselorBlock>
   );
 }
@@ -301,7 +321,7 @@ export function CounselorSocBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void 
   return (
     <CounselorBlock>
       <Q label="בידוד או דחייה חברתית בכיתה"><LevelRow value={f.c_isolation} onChange={v => set("c_isolation", v)} /></Q>
-      <Q label="נפגע/ת מהצקות או חרם"><Choice value={f.c_bully_victim} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_victim", v)} /></Q>
+      <Q label="נפגע/ת מהצקות או חרם"><ChoiceU value={f.c_bully_victim} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_victim", v)} /></Q>
     </CounselorBlock>
   );
 }

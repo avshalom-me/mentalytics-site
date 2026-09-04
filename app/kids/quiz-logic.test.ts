@@ -25,6 +25,11 @@ import {
   prevPid,
   updAQ,
   updPQ,
+  isUnknown,
+  markUnknown,
+  markKnown,
+  schoolWording,
+  sw,
   type Ans,
 } from "./quiz-logic";
 
@@ -200,6 +205,17 @@ describe("nextPid / prevPid", () => {
     expect(nextPid("p-result", {})).toBe("p-result");
   });
 
+  it("opens the emotional block with a word to the counsellor, and only to her", () => {
+    const emo: Ans = { a_emo: "הרבה" };
+    expect(skipPage("p-emo-intro", emo)).toBe(true);
+    expect(skipPage("p-emo-intro", { ...emo, _audience: "counselor" })).toBe(false);
+    // Not flagged the emotional area at all: nobody sees it.
+    expect(skipPage("p-emo-intro", { _audience: "counselor" })).toBe(true);
+    expect(nextPid("p-areas", { ...emo, _audience: "counselor" })).toBe("p-emo-intro");
+    expect(nextPid("p-emo-intro", { ...emo, _audience: "counselor" })).toBe("p-q1");
+    expect(nextPid("p-areas", emo)).toBe("p-q1");
+  });
+
   it("shows the refinement screen to a counsellor only, right before the report", () => {
     const parent: Ans = { a_soc: "הרבה" };
     const counselor: Ans = { ...parent, _audience: "counselor" };
@@ -263,6 +279,72 @@ describe("traitNeeds", () => {
     const zyVerbalOnly: Ans = { _grade: "י", a_soc: "הרבה", soc1: "כן", lsas_tot: 8 };
     expect(traitNeeds(zyVerbalOnly).verbal).toBe(true);
     expect(skipPage("p-traits", zyVerbalOnly)).toBe(false);
+  });
+});
+
+describe('"לא ידוע / לא רלוונטי"', () => {
+  it("remembers the click without putting anything the scoring reads into the answers", () => {
+    const A = markUnknown({ q5: "לא" }, "q5");
+    expect(isUnknown(A, "q5")).toBe(true);
+    expect(A.q5).toBe("לא");
+    expect(Object.keys(A).filter(k => !k.endsWith("__unk"))).toEqual(["q5"]);
+  });
+
+  it("is cleared by a real answer", () => {
+    const A = markKnown(markUnknown({ q5: "לא" }, "q5"), "q5");
+    expect(isUnknown(A, "q5")).toBe(false);
+  });
+
+  it("is per item", () => {
+    const A = markUnknown({ q5: "לא", q6: "כן" }, "q5");
+    expect(isUnknown(A, "q6")).toBe(false);
+  });
+
+  it("keeps a battery total inside its own scale, never below the floor", () => {
+    // The anxiety scale runs 1-3, so its "כלל לא" is 1. Ten unknown items give
+    // 10, the legal floor - not 0, which is below anything the scale can produce
+    // and would drag the total under the threshold that names the finding.
+    let A: Ans = {};
+    for (let i = 1; i <= 10; i++) A = markUnknown(updAQ(A, `aq${i}`, 1), `aq${i}`);
+    expect(A.aq_tot).toBe(10);
+    expect(A.aq_tot).toBeLessThan(16); // still below the finding threshold, as "no" should be
+    expect(countMissingKeys(A, 10)).toBe(0);
+  });
+
+  it("counts an unknown item as answered, so the screen is not blocked", () => {
+    const A = markUnknown(updAQ({}, "aq1", 1), "aq1");
+    expect(A.aq1).toBe(1);
+    expect(A.aq1 === undefined).toBe(false);
+  });
+});
+
+/** Mirrors countMissing in ui.tsx: undefined, null and "" are unanswered. */
+function countMissingKeys(A: Ans, n: number): number {
+  return Array.from({ length: n }, (_, i) => `aq${i + 1}`)
+    .filter(k => A[k] === undefined || A[k] === null || A[k] === "").length;
+}
+
+describe("schoolWording", () => {
+  it("turns the child into the student, keeping any Hebrew prefix", () => {
+    expect(schoolWording("ילדך חש דאגות")).toBe("התלמיד/ה חש דאגות");
+    expect(schoolWording("האם הילד/ה סובל/ת מכאבים?")).toBe("האם התלמיד/ה סובל/ת מכאבים?");
+    expect(schoolWording("שקשה לילד/ה להפסיק")).toBe("שקשה לתלמיד/ה להפסיק");
+    expect(schoolWording("התרשמותך מהילד באותה תקופה")).toBe("התרשמותך מהתלמיד/ה באותה תקופה");
+    expect(schoolWording("האם הילד מסכים?")).toBe("האם התלמיד/ה מסכים?");
+    expect(schoolWording("ילדכם מתמודדים")).toBe("התלמיד/ה מתמודדים");
+  });
+
+  it("leaves the plural alone, because there it means the class", () => {
+    expect(schoolWording("בין הילדים הכי מתקשים בכיתה")).toBe("בין הילדים הכי מתקשים בכיתה");
+  });
+
+  it("applies only to a counsellor, and an explicit text wins", () => {
+    const parent: Ans = {};
+    const counselor: Ans = { _audience: "counselor" };
+    expect(sw(parent, "ילדך חש דאגות")).toBe("ילדך חש דאגות");
+    expect(sw(counselor, "ילדך חש דאגות")).toBe("התלמיד/ה חש דאגות");
+    expect(sw(counselor, "ילדך חש דאגות", "התלמיד/ה חש/ה דאגות")).toBe("התלמיד/ה חש/ה דאגות");
+    expect(sw(parent, "ילדך חש דאגות", "התלמיד/ה חש/ה דאגות")).toBe("ילדך חש דאגות");
   });
 });
 

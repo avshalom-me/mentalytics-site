@@ -84,6 +84,9 @@ export function q9AdhdPositive(A: Ans): boolean {
 // p-traits now asks each once, at the end.
 export const PAGES = [
   "p-consent","p-demo","p-areas",
+  // Counsellor only: the emotional domain is the one a school sees least of,
+  // so it opens with a word about filling it together with the parents.
+  "p-emo-intro",
   "p-q1","p-q1-pain","p-aq",
   "p-q2",
   "p-q3","p-mq","p-mq-sui",
@@ -209,16 +212,79 @@ export function traitNeeds(A: Ans): TraitNeeds {
   };
 }
 
+// ── "לא ידוע / לא רלוונטי" ───────────────────────────────────────────────────
+/**
+ * A counsellor answers about a child she sees for six hours a day and never at
+ * home, so on the emotional questions "I do not know" is an honest answer that
+ * the parent questionnaire never needed.
+ *
+ * It is stored as the item's OWN "no" answer - 1 on a 1-5 scale, "לא" on a
+ * yes/no, the floor of whatever scale the item uses - and never as 0 or as a
+ * hole. That is what "treat it as if they answered no" has to mean here: the
+ * scoring sums these items against absolute thresholds, so a value below the
+ * scale's floor would drag the total under the threshold and turn a real
+ * finding into a reassuring silence. The click itself is remembered in a
+ * sidecar key, which the scoring never reads, so the screen can show which
+ * button was pressed and the report can say the answer was not known.
+ */
+export const unkKey = (key: string) => `${key}__unk`;
+export function isUnknown(A: Ans, key: string): boolean { return A[unkKey(key)] === true; }
+/** Record that `key` was answered "not known"; pass the object already carrying the item's own "no" value. */
+export function markUnknown(A: Ans, key: string): Ans { return { ...A, [unkKey(key)]: true }; }
+/** Record that `key` was answered for real. */
+export function markKnown(A: Ans, key: string): Ans { return { ...A, [unkKey(key)]: false }; }
+
+// ── Wording ──────────────────────────────────────────────────────────────────
+/**
+ * Parent phrasing to school phrasing, for the labels a counsellor reads.
+ *
+ * Applied to display text only. The stored answers, the emoji prefixes and the
+ * referral strings the scoring engine parses are untouched - rewriting those is
+ * what would break the recommendation parser.
+ *
+ * The generic rule rewrites the noun and leaves any Hebrew prefix attached to
+ * it, so "הילד/ה" becomes "התלמיד/ה" and "לילד/ה" becomes "לתלמיד/ה" without a
+ * rule of their own.
+ */
+const SCHOOL_WORDING: [RegExp, string][] = [
+  [/הילד\/ה שלכם/g, "התלמיד/ה"],
+  [/ילדכם/g, "התלמיד/ה"],
+  [/ילדך/g, "התלמיד/ה"],
+  [/ילד\/ה/g, "תלמיד/ה"],
+  // "הילד מסכים", "מהילד באותה תקופה" - the masculine singular, but not the
+  // plural "הילדים", which is right as it is when it means the class.
+  [/הילד(?![א-ת/])/g, "התלמיד/ה"],
+];
+
+export function schoolWording(text: string): string {
+  return SCHOOL_WORDING.reduce((s, [rx, to]) => s.replace(rx, to), text);
+}
+
+/**
+ * Label text for whoever is answering: as written for a parent, rewritten for a
+ * counsellor. `counselorText` overrides the automatic rewrite where verb
+ * agreement needs a human. Takes the answers rather than a flag so a screen can
+ * call it inline without a setup line, and so nothing is stored per module.
+ */
+export function sw(A: Ans, parentText: string, counselorText?: string): string {
+  if (A._audience !== "counselor") return parentText;
+  return counselorText ?? schoolWording(parentText);
+}
+
 // ── Skip logic ───────────────────────────────────────────────────────────────
 export function skipPage(pid: string, A: Ans): boolean {
   const emoOn = ["מעט","הרבה","הרבה מאוד"].includes(A.a_emo || "");
   const emoPages = [
+    "p-emo-intro",
     "p-q1","p-q1-pain","p-aq","p-q2","p-q3","p-mq","p-mq-sui",
     "p-q4","p-q4-types","p-q4-s","p-q4-g","p-q4-b","p-q4-ctrl",
     "p-q5","p-oq","p-q6","p-tq","p-q7","p-pq","p-q8","p-eq",
     "p-q9","p-bq","p-q9-adhd","p-q10","p-q10-par",
   ];
   if (emoPages.includes(pid) && !emoOn) return true;
+
+  // Parents live with the child; the intro is advice only a counsellor needs.
+  if (pid === "p-emo-intro") return A._audience !== "counselor";
 
   if (pid === "p-q1-pain")    return (A.q1 || 0) < 3;
   if (pid === "p-aq")         return (A.q1 || 0) < 3;

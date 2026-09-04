@@ -71,7 +71,8 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
   return null;
 }
 
-import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteHint, SubCard, GradeBlock, ScaleRow, YNRow } from "./ui";
+import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteHint, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
+import { isUnknown, markUnknown, markKnown, sw } from "./quiz-logic";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
   "פעוט":[1,2],"גן3":[3,3],"גן-טרום":[4,4],"גן":[5,6],
@@ -137,6 +138,109 @@ function bmiLabel(bmi: number): string {
   if (bmi < 25)   return "תקין";
   if (bmi < 30)   return "עודף משקל";
   return "השמנה";
+}
+
+/** Is this a counsellor? Read from the answers so no screen needs the prop. */
+const isCounselor = (A: Ans) => A._audience === "counselor";
+
+/**
+ * One item row inside an emotional battery.
+ *
+ * For a counsellor it carries a third option, "לא ידוע / לא רלוונטי", which
+ * stores `noValue` - the item's own "כלל לא" - through the same updater as a
+ * real answer, so the running total stays consistent, and remembers the click
+ * in a sidecar key so the row can show it. See markUnknown in quiz-logic.
+ */
+function ItemRow({ A, setA, itemKey, values, noValue, upd, after }: {
+  A: Ans; setA: (a: Ans) => void; itemKey: string;
+  values: (number | string)[]; noValue: number | string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  upd: (a: Ans, k: string, v: any) => Ans;
+  after?: (a: Ans) => void;
+}) {
+  const on = isUnknown(A, itemKey);
+  const put = (v: number | string, unknown: boolean) => {
+    const next = upd(A, itemKey, v);
+    const marked = unknown ? markUnknown(next, itemKey) : markKnown(next, itemKey);
+    setA(marked);
+    after?.(marked);
+  };
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {values.map(v => (
+        <button key={v} className={so(A[itemKey] === v && !on)} onClick={() => put(v, false)}>{v}</button>
+      ))}
+      {isCounselor(A) && <UnknownOpt on={on} onClick={() => put(noValue, true)} />}
+    </div>
+  );
+}
+
+/**
+ * A yes/no gate question. For a counsellor it carries "לא ידוע / לא רלוונטי",
+ * which stores "לא" and is remembered as not known.
+ */
+function GateYN({ A, setA, itemKey, advance }: {
+  A: Ans; setA: (a: Ans) => void; itemKey: string; advance?: (a: Ans, v: string) => void;
+}) {
+  const put = (v: string, unknown: boolean) => {
+    const base = { ...A, [itemKey]: v };
+    const nA = unknown ? markUnknown(base, itemKey) : markKnown(base, itemKey);
+    setA(nA);
+    advance?.(nA, v);
+  };
+  return (
+    <YNRow
+      val={A[itemKey] || ""}
+      unknown={isCounselor(A)}
+      unknownOn={isUnknown(A, itemKey)}
+      onChange={v => put(v, false)}
+      onUnknown={() => put("לא", true)}
+    />
+  );
+}
+
+/** A 1-5 gate scale. "לא ידוע" stores 1, which is this scale's own "כלל לא". */
+function ScaleGate({ A, setA, itemKey, advance }: {
+  A: Ans; setA: (a: Ans) => void; itemKey: string; advance?: (a: Ans) => void;
+}) {
+  const on = isUnknown(A, itemKey);
+  const put = (v: number, unknown: boolean) => {
+    const base = { ...A, [itemKey]: v };
+    const nA = unknown ? markUnknown(base, itemKey) : markKnown(base, itemKey);
+    setA(nA);
+    advance?.(nA);
+  };
+  return (
+    <>
+      <div className="flex gap-1.5">
+        {[1,2,3,4,5].map(n => (
+          <button key={n} className={sb(A[itemKey] === n && !on)} onClick={() => put(n, false)}>{n}</button>
+        ))}
+      </div>
+      {isCounselor(A) && <div className="mt-2"><UnknownOpt on={on} onClick={() => put(1, true)} /></div>}
+    </>
+  );
+}
+
+// ── p-emo-intro ──────────────────────────────────────────────────────────────
+function PageEmoIntro({ onNext, onBack }: { onNext: () => void; onBack?: () => void }) {
+  return (
+    <div>
+      <Card>
+        <StepTag>לפני התחום הרגשי</StepTag>
+        <StepQ>את החלק הזה עדיף למלא יחד עם ההורים</StepQ>
+        <div className="rounded-xl p-4 text-sm leading-relaxed" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
+          <p className="mb-3">
+            בתחום זה עדיף למלא את השאלון יחד עם ההורים, בטלפון או בפגישה, משום שישנם סימפטומים שמתרחשים בבית ואינם נראים בבית הספר: שינה, אכילה, חרדות ליליות, מצוקה בהיפרדות, ומחשבות שהתלמיד/ה משתף/ת רק בבית.
+          </p>
+          <p>
+            אם אינך יכולה למלא עכשיו יחד איתם, אפשר לענות רק על מה שידוע לך ולסמן <strong>&quot;לא ידוע / לא רלוונטי&quot;</strong> בשאר - התשובות האלה ייחשבו כ&quot;לא&quot;, והדוח יתייחס אליהן בהתאם. אפשר גם לשמור טיוטה ולחזור לכאן אחרי שיחה עם ההורים.
+          </p>
+        </div>
+      </Card>
+      <NavRow onBack={onBack} onNext={onNext} />
+    </div>
+  );
 }
 
 // ── p-consent ─────────────────────────────────────────────────────────────────
@@ -358,7 +462,7 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
             <div key={key}
               className={`bg-[var(--surface)] border-2 rounded-xl p-4 transition-all ${A[key] && A[key] !== "כלל לא" ? "border-[var(--teal)]" : "border-[var(--line)]"}`}>
               <div className="text-sm font-bold text-[#1a2a3a] mb-1">{title}</div>
-              <div className="text-xs text-gray-400 mb-2 leading-relaxed">{desc}</div>
+              <div className="text-xs text-gray-400 mb-2 leading-relaxed">{sw(A, desc)}</div>
               <details className="mb-3 area-details">
                 <summary className="text-xs font-semibold text-[var(--teal)] cursor-pointer hover:underline list-none flex items-center gap-1 select-none">
                   <span className="inline-block transition-transform area-plus text-base leading-none">+</span>
@@ -411,7 +515,7 @@ function GaConsentBlock({ A, setA, onDone }: {
   function pick(key: string, val: any) { const n={...A,[key]:val}; setA(n); return n; }
   return (
     <div>
-      <p className="text-base font-bold text-[#1a2a3a] mb-3">האם הילד מסכים לטיפול?</p>
+      <p className="text-base font-bold text-[#1a2a3a] mb-3">{sw(A, "האם הילד מסכים לטיפול?", "האם התלמיד/ה מסכים/ה לטיפול?")}</p>
       <div className="flex gap-3 mb-4">
         <button className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent==="כן"?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
           onClick={() => { const n=pick("ga_consent","כן"); if(veryHigh) onDone?.(n); }}>כן</button>
@@ -421,7 +525,7 @@ function GaConsentBlock({ A, setA, onDone }: {
 
       {A.ga_consent === "לא" && (
         <div>
-          <p className="text-sm font-semibold text-[#1a2a3a] mb-3">האם הילד יסכים לטיפול יחד עם אחד ההורים?</p>
+          <p className="text-sm font-semibold text-[#1a2a3a] mb-3">{sw(A, "האם הילד יסכים לטיפול יחד עם אחד ההורים?", "האם התלמיד/ה יסכים/תסכים לטיפול יחד עם אחד ההורים?")}</p>
           <div className="flex gap-3">
             {["כן","לא"].map(v=>(
               <button key={v} className={`flex-1 py-3 text-base font-bold rounded-xl border-2 transition-all ${A.ga_consent_parent===v?"bg-[var(--teal)] text-white border-[var(--teal)]":"bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`}
@@ -433,7 +537,7 @@ function GaConsentBlock({ A, setA, onDone }: {
 
       {A.ga_consent === "כן" && !veryHigh && (
         <div>
-          <p className="text-sm font-semibold text-[#1a2a3a] mb-3">סמן את כל התחומים בהם ייתכן שילדך יתעניין:</p>
+          <p className="text-sm font-semibold text-[#1a2a3a] mb-3">{sw(A, "סמן את כל התחומים בהם ייתכן שילדך יתעניין:", "סמני את כל התחומים בהם ייתכן שהתלמיד/ה יתעניין/תתעניין:")}</p>
           <div className="flex gap-2 flex-wrap mb-5">
             {GA_INT_LIST.map(({key,label})=>(
               <button key={key} className={cb(!!A[key])}
@@ -448,25 +552,16 @@ function GaConsentBlock({ A, setA, onDone }: {
 
 // ── p-q1 ─────────────────────────────────────────────────────────────────────
 function PageQ1({ A, setA, onNext, onBack, audience }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void; audience?: Audience }) {
-  function pickScale(v: number) {
-    const n = {...A, q1:v};
-    setA(n);
-    // The counsellor still has the school block below to fill in.
-    if (audience !== "counselor") onNext(n);
-  }
   return (
     <div>
       <Card>
         <EqNum n={1}/>
         <StepTag>שאלה 1 מתוך 10 - רגשי</StepTag>
-        <StepQ>ילדך חש דאגות/לחצים מתמשכים</StepQ>
+        <StepQ>{sw(A, "ילדך חש דאגות/לחצים מתמשכים", "התלמיד/ה חש/ה דאגות או לחצים מתמשכים")}</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5">
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} className={sb(A.q1===n)} onClick={()=>pickScale(n)}>{n}</button>
-          ))}
-        </div>
+        {/* The counsellor still has the school block below to fill in, so her click does not advance. */}
+        <ScaleGate A={A} setA={setA} itemKey="q1" advance={audience === "counselor" ? undefined : onNext} />
         {audience === "counselor" && <CounselorQ1Block A={A} setA={setA} />}
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
@@ -480,13 +575,13 @@ function PageQ1Pain({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
     <div>
       <Card>
         <StepTag>שאלה משלימה - חרדה וגוף</StepTag>
-        <StepQ>האם הילד/ה סובל/ת מכאבים כרוניים?</StepQ>
+        <StepQ>{sw(A, "האם הילד/ה סובל/ת מכאבים כרוניים?")}</StepQ>
         <StepHint>למשל: כאבי בטן או כאבי ראש חוזרים</StepHint>
-        <YNRow val={A.q1_pain||""} onChange={v=>setA({...A,q1_pain:v})} />
+        <GateYN A={A} setA={setA} itemKey="q1_pain" />
         {A.q1_pain === "כן" && (
           <div className="mt-4 pt-4 border-t border-dashed border-[#d0dae8]">
             <p className="text-sm font-semibold text-[#1a2a3a] mb-2">האם נשללו בעיות רפואיות כגורם לכאבים?</p>
-            <YNRow val={A.q1_med_clear||""} onChange={v=>setA({...A,q1_med_clear:v})} />
+            <GateYN A={A} setA={setA} itemKey="q1_med_clear" />
           </div>
         )}
       </Card>
@@ -509,9 +604,7 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {[1,2,3].map(n=>(
-                  <button key={n} className={so(A[key]===n)} onClick={()=>setA(updAQ(A,key,n))}>{n}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={[1,2,3]} noValue={1} upd={updAQ} />
               </div>
             </div>
           ))}
@@ -530,13 +623,11 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
       <Card>
         <EqNum n={2}/>
         <StepTag>שאלה 2 מתוך 10 - רגשי</StepTag>
-        <StepQ>הילד/ה חש/ה כי "אינו/ה שווה" או אינו/ה מוערך/ת</StepQ>
+        <StepQ>{sw(A, "הילד/ה חש/ה כי \"אינו/ה שווה\" או אינו/ה מוערך/ת")}</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
         <div className="flex gap-1.5">
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} className={sb(A.q2===n)} onClick={()=>{ const nA={...A,q2:n}; setA(nA); onNext(nA); }}>{n}</button>
-          ))}
+          <ScaleGate A={A} setA={setA} itemKey="q2" advance={onNext} />
         </div>
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
@@ -555,9 +646,7 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
         <div className="flex gap-1.5">
-          {[1,2,3,4,5].map(n=>(
-            <button key={n} className={sb(A.q3===n)} onClick={()=>{ const nA={...A,q3:n}; setA(nA); onNext(nA); }}>{n}</button>
-          ))}
+          <ScaleGate A={A} setA={setA} itemKey="q3" advance={onNext} />
         </div>
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
@@ -580,9 +669,7 @@ function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updMQ(A,key,v))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updMQ} />
               </div>
             </div>
           ))}
@@ -602,7 +689,7 @@ function PageMQSui({ A, setA, onNext, onBack, audience }: { A:Ans; setA:(a:Ans)=
         <StepTag>מצב רוח - אובדנות</StepTag>
         <StepQ>האם קיימות מחשבות אובדניות חוזרות?</StepQ>
         <StepHint>או ניסיונות אובדניים בעבר</StepHint>
-        <YNRow val={A.q3_sui||""} onChange={v=>{ const nA={...A,q3_sui:v}; setA(nA); if (v !== "כן") onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q3_sui" advance={(nA, v) => { if (v !== "כן") onNext(nA); }} />
         {A.q3_sui === "כן" && (audience === "counselor" ? <CounselorSafetyNotice /> : <CrisisResources className="mt-4" />)}
       </Card>
       {/* Answered at all, not answered "כן": a parent who chose "לא" and then
@@ -622,7 +709,7 @@ function PageQ4({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepTag>שאלה 4 מתוך 10 - רגשי</StepTag>
         <StepQ>סימנים להתמכרות לחומרים / התנהגויות</StepQ>
         <StepHint>משחקי מחשב, אלכוהול, סמים, הימורים, פורנו</StepHint>
-        <YNRow val={A.q4||""} onChange={v=>{ const nA={...A,q4:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q4" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -669,9 +756,7 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updAddict(A,key,v,"s"))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={(a,k,v)=>updAddict(a,k,v,"s")} />
               </div>
             </div>
           ))}
@@ -698,9 +783,7 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updAddict(A,key,v,"g"))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={(a,k,v)=>updAddict(a,k,v,"g")} />
               </div>
             </div>
           ))}
@@ -727,9 +810,7 @@ function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updAddict(A,key,v,"b"))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={(a,k,v)=>updAddict(a,k,v,"b")} />
               </div>
             </div>
           ))}
@@ -747,7 +828,7 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
     <div>
       <Card>
         <StepTag>התמכרות - שליטה</StepTag>
-        <StepQ>עד כמה הילד/ה בשליטה על ההתנהגות?</StepQ>
+        <StepQ>{sw(A, "עד כמה הילד/ה בשליטה על ההתנהגות?")}</StepQ>
         <StepHint>1 = כלל לא בשליטה  |  5 = בשליטה מלאה</StepHint>
         <div className="flex gap-2 flex-wrap">
           {[1,2,3,4,5].map(n=>(
@@ -773,9 +854,9 @@ function PageQ5({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
       <Card>
         <EqNum n={5}/>
         <StepTag>שאלה 5 מתוך 10 - רגשי</StepTag>
-        <StepQ>מחשבות חוזרות שקשה לילד/ה להפסיק, או טקסים שחוזרים על עצמם?</StepQ>
+        <StepQ>{sw(A, "מחשבות חוזרות שקשה לילד/ה להפסיק, או טקסים שחוזרים על עצמם?")}</StepQ>
         <StepHint>למשל: שטיפת ידיים מרובה, ספירה, צורך לסדר דברים בצורה מסוימת. ברוב הימים, שבועיים רצופים לפחות.</StepHint>
-        <YNRow val={A.q5||""} onChange={v=>{ const nA={...A,q5:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q5" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -801,9 +882,7 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {[1,2,3].map(n=>(
-                  <button key={n} className={so(A[key]===n)} onClick={()=>setA(updOQ(A,key,n))}>{n}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={[1,2,3]} noValue={1} upd={updOQ} />
               </div>
             </div>
           ))}
@@ -824,7 +903,7 @@ function PageQ6({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepTag>שאלה 6 מתוך 10 - רגשי</StepTag>
         <StepQ>חווה אירוע טראומטי</StepQ>
         <StepHint>תאונה, פיגוע, שוד, רעידת אדמה וכד׳</StepHint>
-        <YNRow val={A.q6||""} onChange={v=>{ const nA={...A,q6:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q6" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -851,9 +930,7 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {[0,1,2,3,4].map(n=>(
-                  <button key={n} className={so(A[key]===n)} onClick={()=>setA(updTQ(A,key,n))}>{n}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={[0,1,2,3,4]} noValue={0} upd={updTQ} />
               </div>
             </div>
           ))}
@@ -881,12 +958,12 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>חוויות פנימיות חריגות</StepQ>
         <StepHint>שתי שאלות קצרות - נא לענות על שתיהן כדי להמשיך.</StepHint>
         <div className="mb-5">
-          <p className="text-sm font-semibold text-gray-800 mb-2">א. האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?</p>
-          <YNRow val={A.q7a||""} onChange={v => setKey("q7a", v)} />
+          <p className="text-sm font-semibold text-gray-800 mb-2">{sw(A, "א. האם הילד/ה ראה/תה או שמע/ה דברים שאחרים אמרו שאינם קיימים?")}</p>
+          <GateYN A={A} setA={setA} itemKey="q7a" />
         </div>
         <div className="mb-2">
-          <p className="text-sm font-semibold text-gray-800 mb-2">ב. האם יש לילד/ה אמונות או חשדות יוצאי דופן שאחרים סביבו/ה לא חולקים?</p>
-          <YNRow val={A.q7b||""} onChange={v => setKey("q7b", v)} />
+          <p className="text-sm font-semibold text-gray-800 mb-2">{sw(A, "ב. האם יש לילד/ה אמונות או חשדות יוצאי דופן שאחרים סביבו/ה לא חולקים?")}</p>
+          <GateYN A={A} setA={setA} itemKey="q7b" />
         </div>
         {!canContinue && (
           <p className="text-xs text-amber-700 mt-3">יש לענות על שתי השאלות.</p>
@@ -917,9 +994,7 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updPQ(A,key,v))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updPQ} />
               </div>
             </div>
           ))}
@@ -940,7 +1015,7 @@ function PageQ8({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepTag>שאלה 8 מתוך 10 - רגשי</StepTag>
         <StepQ>דפוסי אכילה מדאיגים</StepQ>
         <StepHint>קשיים סביב אוכל, משקל או דימוי גוף</StepHint>
-        <YNRow val={A.q8||""} onChange={v=>{ const nA={...A,q8:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q8" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -988,7 +1063,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
     <div>
       <Card>
         <StepTag>🍽️ שאלות על הרגלי אכילה</StepTag>
-        <StepHint>לפי גיל הילד/ה</StepHint>
+        <StepHint>{sw(A, "לפי גיל הילד/ה")}</StepHint>
 
         <div className="bg-[var(--surface)] rounded-xl p-3 sm:p-4 mb-4 border border-[var(--line)]">
           <div className="text-sm font-semibold text-[#2a3a4a] mb-1">📏 גובה ומשקל</div>
@@ -1025,9 +1100,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
                 <div key={key}>
                   <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
                   <div className="flex gap-2">
-                    {["כן","לא"].map(v=>(
-                      <button key={v} className={so(A[key]===v)} onClick={()=>setA(updEQ(A,key,v))}>{v}</button>
-                    ))}
+                    <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updEQ} />
                   </div>
                 </div>
               ))}
@@ -1043,9 +1116,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
                 <div key={key}>
                   <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
                   <div className="flex gap-2">
-                    {["כן","לא"].map(v=>(
-                      <button key={v} className={so(A[key]===v)} onClick={()=>setA(updEQ(A,key,v))}>{v}</button>
-                    ))}
+                    <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updEQ} />
                   </div>
                 </div>
               ))}
@@ -1063,9 +1134,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
                 <div key={key}>
                   <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
                   <div className="flex gap-2">
-                    {["כן","לא"].map(v=>(
-                      <button key={v} className={so(A[key]===v)} onClick={()=>setA(updEQ(A,key,v))}>{v}</button>
-                    ))}
+                    <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updEQ} />
                   </div>
                 </div>
               ))}
@@ -1081,9 +1150,7 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
                 <div key={key}>
                   <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
                   <div className="flex gap-2">
-                    {["כן","לא"].map(v=>(
-                      <button key={v} className={so(A[key]===v)} onClick={()=>setA(updEQ(A,key,v))}>{v}</button>
-                    ))}
+                    <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updEQ} />
                   </div>
                 </div>
               ))}
@@ -1105,7 +1172,7 @@ function PageQ9({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <EqNum n={9}/>
         <StepTag>שאלה 9 מתוך 10 - רגשי</StepTag>
         <StepQ>סימנים לחוסר יציבות ביחסים, קושי בוויסות רגשות ואימפולסיביות</StepQ>
-        <YNRow val={A.q9||""} onChange={v=>{ const nA={...A,q9:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q9" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -1131,9 +1198,7 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
             <div key={key}>
               <div className="text-sm font-medium text-[#2a3a4a] mb-2">{label}</div>
               <div className="flex gap-2">
-                {["כן","לא"].map(v=>(
-                  <button key={v} className={so(A[key]===v)} onClick={()=>setA(updBQ(A,key,v))}>{v}</button>
-                ))}
+                <ItemRow A={A} setA={setA} itemKey={key} values={["כן","לא"]} noValue="לא" upd={updBQ} />
               </div>
             </div>
           ))}
@@ -1172,7 +1237,7 @@ function PageQ10({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNex
             back positive - which skipPage now enforces on its own, so the
             screen is only ever shown in exactly that case. */}
         <StepHint>שאלה אחרונה - כדי לוודא שלא פספסנו משהו</StepHint>
-        <YNRow val={A.q10||""} onChange={v=>{ const nA={...A,q10:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q10" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -1190,7 +1255,7 @@ function PageQ10Par({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
       <Card>
         <StepTag>קשיים כלליים</StepTag>
         <StepQ>האם הקושי קשור לקשר עם אחד ההורים?</StepQ>
-        <YNRow val={A.q10_par||""} onChange={v=>{ const nA={...A,q10_par:v}; setA(nA); onNext(nA); }} />
+        <GateYN A={A} setA={setA} itemKey="q10_par" advance={onNext} />
       </Card>
       {/* Continue appears once the gate is answered. These screens advance on the
           pill itself, so on the way forward it is never seen - but arriving here
@@ -1328,31 +1393,32 @@ function VisionHearingBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   return (
     <div className="mb-5">
       <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
+      {isCounselor(A) && (
+        <div className="mb-3 rounded-xl p-3 text-xs leading-relaxed" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text-2)" }}>
+          את חלק הרקע הזה כדאי למלא עם ההורים - בדיקות ראייה ושמיעה נעשות מחוץ לבית הספר, ולרוב רק הם יודעים אם ומתי נעשו. אם אינך יודעת, סמני &quot;לא ידוע&quot;.
+        </div>
+      )}
       <div className="mb-4">
         <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת ראייה?</p>
-        <div className="flex gap-2 mb-2">
-          {["כן","לא"].map(v => <button key={v} className={ob(A.vision === v)} onClick={() => setA({...A, vision:v})}>{v}</button>)}
+        <div className="mb-2">
+          <GateYN A={A} setA={setA} itemKey="vision" />
         </div>
-        {A.vision === "לא" && (
+        {A.vision === "לא" && !isUnknown(A, "vision") && (
           <div className="pr-4 border-r-2 border-blue-200 mt-2">
             <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי ראייה?</p>
-            <div className="flex gap-2">
-              {["כן","לא"].map(v => <button key={v} className={ob(A.vis_sym === v)} onClick={() => setA({...A, vis_sym:v})}>{v}</button>)}
-            </div>
+            <GateYN A={A} setA={setA} itemKey="vis_sym" />
           </div>
         )}
       </div>
       <div className="mb-2">
         <p className="text-sm text-gray-500 mb-2">האם נעשתה בדיקת שמיעה?</p>
-        <div className="flex gap-2 mb-2">
-          {["כן","לא"].map(v => <button key={v} className={ob(A.hearing === v)} onClick={() => setA({...A, hearing:v})}>{v}</button>)}
+        <div className="mb-2">
+          <GateYN A={A} setA={setA} itemKey="hearing" />
         </div>
-        {A.hearing === "לא" && (
+        {A.hearing === "לא" && !isUnknown(A, "hearing") && (
           <div className="pr-4 border-r-2 border-blue-200 mt-2">
             <p className="text-sm text-gray-500 mb-2">האם יש סימנים לקשיי שמיעה?</p>
-            <div className="flex gap-2">
-              {["כן","לא"].map(v => <button key={v} className={ob(A.hear_sym === v)} onClick={() => setA({...A, hear_sym:v})}>{v}</button>)}
-            </div>
+            <GateYN A={A} setA={setA} itemKey="hear_sym" />
           </div>
         )}
       </div>
@@ -1435,7 +1501,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">1. האם יש קושי בקריאה?</p>
               <div className="flex gap-2 flex-wrap">
-                {["לא","5% הכי מתקשה בכיתה","10% הכי מתקשה בכיתה","30% הכי מתקשה בכיתה"].map(opt => (
+                {["לא","5% מהכי מתקשים בכיתה","10% מהכי מתקשים בכיתה","30% מהכי מתקשים בכיתה"].map(opt => (
                   <button key={opt} className={ob(A.ag_read===opt)} onClick={() => setA({...A, ag_read:opt})}>{opt}</button>
                 ))}
               </div>
@@ -1443,7 +1509,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
                   <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
-                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתה הצעירה, ניתן לענות על פי התרשמותך הכוללת מהילד באותה תקופה.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתה הצעירה, ניתן לענות על פי התרשמותך הכוללת מהתלמיד/ה באותה תקופה.</div>
                   {[
                     {k:"ag_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},
                     {k:"ag_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},
@@ -1467,7 +1533,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                           <div className="text-sm font-bold text-rose-800">📋 שאלון מוטיבציה וקשיים רגשיים בלמידה</div>
                           <div className="text-xs text-gray-500">דרג: 1=ללא קושי | 2=קושי בינוני | 3=קושי משמעותי</div>
                           {[{k:"ag_mot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"ag_mot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"ag_mot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
-                            <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
+                            <div key={k}><div className="text-sm text-gray-700 mb-1">{sw(A, q)}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                           ))}
                           {showAgAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
                         </div>
@@ -1488,7 +1554,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                               <div className="text-sm font-bold text-rose-800">📋 שאלון מוטיבציה וקשיים רגשיים בלמידה</div>
                               <div className="text-xs text-gray-500">דרג: 1=ללא קושי | 2=קושי בינוני | 3=קושי משמעותי</div>
                               {[{k:"ag_smot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"ag_smot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"ag_smot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
-                                <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
+                                <div key={k}><div className="text-sm text-gray-700 mb-1">{sw(A, q)}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                               ))}
                               {showSpeechAdhd && <AcadAdhdBlock prefix="ag" A={A} setA={setA} items={items} />}
                             </div>
@@ -1523,13 +1589,13 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = מהילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = מ-10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
-                  ["5% הכי מתקשה בכיתה","קושי חמור (5% הכי מתקשים)"],
-                  ["10% הכי מתקשה בכיתה","קושי משמעותי (10% הכי מתקשים)"],
-                  ["30% הכי מתקשה בכיתה","קושי קל-בינוני (30% הכי מתקשים)"],
+                  ["5% מהכי מתקשים בכיתה","קושי חמור (5% מהכי מתקשים)"],
+                  ["10% מהכי מתקשים בכיתה","קושי משמעותי (10% מהכי מתקשים)"],
+                  ["30% מהכי מתקשים בכיתה","קושי קל-בינוני (30% מהכי מתקשים)"],
                 ].map(([val, label]) => (
                   <button key={val} className={ob(A.ag_math===val)} onClick={() => setA({...A, ag_math:val})}>{label}</button>
                 ))}
@@ -1575,7 +1641,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
                   <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
-                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתות הראשונות, ניתן לענות על פי התרשמותך הכוללת מהילד באותה תקופה.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתות הראשונות, ניתן לענות על פי התרשמותך הכוללת מהתלמיד/ה באותה תקופה.</div>
                   {[{k:"dv_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},{k:"dv_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},{k:"dv_h3",q:"ג. האם דווח על קשיים בזכירת צורות וצבעים בגן?"},{k:"dv_h4",q:"ד. האם דווח על קשיים בחריזה או זיהוי צליל פותח בגן?"},{k:"dv_h5",q:"ה. האם דווח על קשיים בביטוי עצמי ואוצר מילים בגן?"}].map(({k,q}) => (
                     <div key={k} className="mb-3"><p className="text-sm text-gray-700 mb-1">{q}</p><YNRow val={A[k]||""} onChange={v => setA({...A,[k]:v})} /></div>
                   ))}
@@ -1588,7 +1654,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                           <div className="text-sm font-bold text-rose-800">📋 שאלון מוטיבציה וקשיים רגשיים בלמידה</div>
                           <div className="text-xs text-gray-500">דרג: 1=ללא קושי | 2=קושי בינוני | 3=קושי משמעותי</div>
                           {[{k:"dv_mot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"dv_mot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"dv_mot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
-                            <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
+                            <div key={k}><div className="text-sm text-gray-700 mb-1">{sw(A, q)}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                           ))}
                           {showDvReadAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} items={items} />}
                         </div>
@@ -1608,7 +1674,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                               <div className="text-sm font-bold text-rose-800">📋 שאלון מוטיבציה וקשיים רגשיים בלמידה</div>
                               <div className="text-xs text-gray-500">דרג: 1=ללא קושי | 2=קושי בינוני | 3=קושי משמעותי</div>
                               {[{k:"dv_smot1",q:"א. הילד/ה מתקשה להאמין ביכולתו להצליח בלמידה"},{k:"dv_smot2",q:"ב. חרדה ופחד מכישלון במהלך למידה או מבחנים"},{k:"dv_smot3",q:"ג. חוסר מוטיבציה ואי-נכונות להתמודד עם אתגרי למידה"}].map(({k,q}) => (
-                                <div key={k}><div className="text-sm text-gray-700 mb-1">{q}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
+                                <div key={k}><div className="text-sm text-gray-700 mb-1">{sw(A, q)}</div><div className="flex gap-2">{[1,2,3].map(n => <button key={n} className={so(A[k]===n)} onClick={() => setA({...A,[k]:n})}>{n}</button>)}</div></div>
                               ))}
                               {showDvSpeechAdhd && <AcadAdhdBlock prefix="dv_read" A={A} setA={setA} items={items} />}
                             </div>
@@ -1643,13 +1709,13 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
             {/* שאלה 5: חשבון */}
             <div className="mb-4">
               <p className="text-sm font-semibold text-gray-800 mb-2">5. האם יש קושי בחשבון?</p>
-              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
+              <p className="text-xs text-gray-500 mb-2">דירוג ביחס לבני הכיתה: <strong>5%</strong> = מהילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת). <strong>10%</strong> = מ-10% הכי מתקשים (כ-3 ילדים בכיתה). <strong>30%</strong> = בקבוצה החלשה יותר אך לא הכי. אם לא בטוח/ה - אפשר להיוועץ עם המחנכ/ת.</p>
               <div className="flex gap-2 flex-wrap">
                 {[
                   ["לא","ללא קושי"],
-                  ["5% הכי נמוכים בכיתה","קושי חמור (5% הכי מתקשים)"],
-                  ["10% הכי נמוכים בכיתה","קושי משמעותי (10% הכי מתקשים)"],
-                  ["30% הכי נמוכים בכיתה","קושי קל-בינוני (30% הכי מתקשים)"],
+                  ["5% מהכי נמוכים בכיתה","קושי חמור (5% מהכי מתקשים)"],
+                  ["10% מהכי נמוכים בכיתה","קושי משמעותי (10% מהכי מתקשים)"],
+                  ["30% מהכי נמוכים בכיתה","קושי קל-בינוני (30% מהכי מתקשים)"],
                 ].map(([val, label]) => (
                   <button key={val} className={ob(A.dv_math===val)} onClick={() => setA({...A, dv_math:val})}>{label}</button>
                 ))}
@@ -1667,14 +1733,14 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
   const gradeLabel = grp === "zh" ? "🎓 כיתות ז׳–ח׳" : "🏫 כיתות ט׳–י\"ב";
   const verbalOpts: [string, string][] = [
     ["לא","ללא קושי"],
-    ["5%","קושי חמור (5% הכי מתקשים)"],
-    ["20%","קושי משמעותי (20% הכי מתקשים)"],
+    ["5%","קושי חמור (5% מהכי מתקשים)"],
+    ["20%","קושי משמעותי (20% מהכי מתקשים)"],
     ["מעל 20%","קושי קל-בינוני (מעל 20%)"],
   ];
   const mathEngOpts: [string, string][] = [
     ["לא","ללא קושי"],
-    ["10%","קושי משמעותי (10% הכי מתקשים)"],
-    ["20%","קושי בינוני (20% הכי מתקשים)"],
+    ["10%","קושי משמעותי (10% מהכי מתקשים)"],
+    ["20%","קושי בינוני (20% מהכי מתקשים)"],
     ["מעל 20%","קושי קל (מעל 20%)"],
   ];
   return (
@@ -1689,8 +1755,8 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
         <GradeBlock title={gradeLabel}>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 text-xs text-blue-900 leading-6">
             <strong>איך לדרג כל מקצוע:</strong> דירוג ביחס לבני הכיתה.
-            <br />• <strong>5%</strong> = בין הילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת).
-            <br />• <strong>10%</strong> = בין 10% הכי מתקשים (כ-3 ילדים בכיתה).
+            <br />• <strong>5%</strong> = מהילדים הכי מתקשים בכיתה (1–2 ילדים בכיתה ממוצעת).
+            <br />• <strong>10%</strong> = מ-10% הכי מתקשים (כ-3 ילדים בכיתה).
             <br />• <strong>20%</strong> = בקבוצה החלשה - לא הכי, אך מתקשה משמעותית.
             <br />• <strong>מעל 20%</strong> = קושי קל-בינוני.
           </div>
@@ -1810,9 +1876,7 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
                     <div key={n} className="pb-3 border-b border-[#ddd6f3] last:border-0">
                       <p className="text-xs font-semibold text-[#2a1a4a] mb-2">{n}. {item}</p>
                       <div className="flex gap-2">
-                        {[0,1,2,3].map(v => (
-                          <button key={v} className={so(A[`lsas_a${n}`]===v)} onClick={() => setA(updLSAS(A,`lsas_a${n}`,v))}>{v}</button>
-                        ))}
+                        <ItemRow A={A} setA={setA} itemKey={`lsas_a${n}`} values={[0,1,2,3]} noValue={0} upd={updLSAS} />
                       </div>
                     </div>
                   );
@@ -1955,7 +2019,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
   return (
     <div>
       <Card>
-        <StepTag>מאפייני הילד/ה</StepTag>
+        <StepTag>{sw(A, "מאפייני הילד/ה")}</StepTag>
         <StepQ>כמה שאלות אחרונות</StepQ>
         <StepHint>אלה לא שאלות על הקושי אלא על מה שיעזור להתאים את סוג הטיפול.</StepHint>
 
@@ -1967,7 +2031,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 
         {needs.motiv && (
           <div className="mb-5">
-            <p className="text-sm font-semibold text-gray-700 mb-2">מה רמת המוטיבציה של הילד/ה לטיפול?</p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">{sw(A, "מה רמת המוטיבציה של הילד/ה לטיפול?")}</p>
             <p className="text-xs text-gray-400 mb-2">1 = כלל לא &nbsp;·&nbsp; 7 = מוטיבציה גבוהה מאוד</p>
             <ScaleRow max={7} val={A.t_motiv || 0} onChange={(v) => set("t_motiv", v)} />
           </div>
@@ -1975,7 +2039,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 
         {needs.verbal && (
           <div className="mb-5">
-            <p className="text-sm font-semibold text-gray-700 mb-2">עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה, ביחס לבני גילו/ה?</p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">{sw(A, "עד כמה ילדך ורבאלי/ת ויודע/ת לשתף אחרים בשיחה, ביחס לבני גילו/ה?", "עד כמה התלמיד/ה ורבאלי/ת ויודע/ת לשתף אחרים בשיחה, ביחס לבני גילו/ה?")}</p>
             <p className="text-xs text-gray-400 mb-2">1 = מעט מאוד &nbsp;·&nbsp; 5 = הרבה מאוד</p>
             <ScaleRow max={5} val={A.t_verbal || 0} onChange={(v) => set("t_verbal", v)} />
           </div>
@@ -1983,7 +2047,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 
         {needs.prac && (
           <div className="mb-5">
-            <p className="text-sm font-semibold text-gray-700 mb-2">עד כמה יש לילד/ה יכולת ומוטיבציה לתרגל כלים בזמן הפנוי?</p>
+            <p className="text-sm font-semibold text-gray-700 mb-2">{sw(A, "עד כמה יש לילד/ה יכולת ומוטיבציה לתרגל כלים בזמן הפנוי?")}</p>
             <p className="text-xs text-gray-400 mb-2">1 = כלל לא &nbsp;·&nbsp; 7 = הרבה מאוד</p>
             <ScaleRow max={7} val={A.t_prac || 0} onChange={(v) => set("t_prac", v)} />
           </div>
@@ -3309,7 +3373,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
       <div className="mt-4">
         {bmiAbnormal && (
           <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-            ⚕️ ה-BMI של הילד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.
+            ⚕️ ה-BMI של התלמיד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.
           </div>
         )}
 
@@ -3902,6 +3966,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-consent" && audience === "counselor" && <Card><PageConsentCounselor onStart={startCounselor} drafts={drafts} onResume={resumeDraft} onDelete={removeDraft} /></Card>}
       {step === "p-consent" && audience !== "counselor" && <Card><PageConsent onNext={()=>goNext()} /></Card>}
       {step === "p-demo"      && (audience === "counselor" ? <PageDemoCounselor {...pageProps} /> : <PageDemo {...pageProps} />)}
+      {step === "p-emo-intro" && <PageEmoIntro onNext={()=>goNext()} onBack={canGoBack ? goBack : undefined} />}
       {step === "p-areas"     && <PageAreas   {...pageProps} />}
       {step === "p-q1"        && <PageQ1      {...pageProps} />}
       {step === "p-q1-pain"   && <PageQ1Pain  {...pageProps} />}

@@ -123,13 +123,38 @@ export function ScaleRow({ max, val, onChange }: { max: number; val: number; onC
     </div>
   );
 }
-// Yes/No row
-export function YNRow({ val, onChange }: { val: string; onChange: (v: string) => void }) {
+// Yes/No row.
+//
+// `unknown` turns it into three options for the counsellor rubric: the third
+// stores "לא" like the second, and differs only in being remembered as "not
+// known" (see markUnknown). `unknownOn` is that memory, so the row can show
+// which of the two was actually pressed.
+export const UNKNOWN_LABEL = "לא ידוע / לא רלוונטי";
+export function YNRow({ val, onChange, unknown = false, unknownOn = false, onUnknown }: {
+  val: string; onChange: (v: string) => void;
+  unknown?: boolean; unknownOn?: boolean; onUnknown?: () => void;
+}) {
+  const cls = (on: boolean) =>
+    `flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${on ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`;
   return (
-    <div className="flex gap-3 mt-1">
-      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="כן" ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`} onClick={() => onChange("כן")}>כן</button>
-      <button className={`flex-1 text-center py-3 text-base font-bold rounded-xl border-2 transition-all ${val==="לא" ? "bg-[var(--teal)] text-white border-[var(--teal)]" : "bg-white border-[#d0dae8] text-[#3a4a5a] hover:border-[var(--teal)]"}`} onClick={() => onChange("לא")}>לא</button>
+    <div className={`flex gap-3 mt-1 ${unknown ? "flex-wrap" : ""}`}>
+      <button className={cls(val === "כן" && !unknownOn)} onClick={() => onChange("כן")}>כן</button>
+      <button className={cls(val === "לא" && !unknownOn)} onClick={() => onChange("לא")}>לא</button>
+      {unknown && (
+        <button className={`${cls(unknownOn)} basis-full text-sm py-2.5`} onClick={onUnknown}>{UNKNOWN_LABEL}</button>
+      )}
     </div>
+  );
+}
+
+/** The "not known" option next to a scale. Stores the scale's own "כלל לא" value. */
+export function UnknownOpt({ on, onClick, className = "" }: { on: boolean; onClick: () => void; className?: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`${CB_BASE} ${on ? CB_SEL : CB_DEF} text-xs ${className}`}
+    >{UNKNOWN_LABEL}</button>
   );
 }
 

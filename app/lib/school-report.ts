@@ -25,6 +25,18 @@ import {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Ans = Record<string, any>;
 
+/**
+ * "לא יודע/ת" on a counsellor's own observation.
+ *
+ * Different from the emotional items' "לא ידוע / לא רלוונטי", which stores a
+ * real "no" because the scoring sums those against thresholds. Nothing scores
+ * these fields, so here not knowing simply means the question was not answered:
+ * it is left out of the summary and out of the tracks engine, rather than being
+ * reported as an absence of difficulty.
+ */
+export const UNKNOWN = "unknown";
+export type Unknown = typeof UNKNOWN;
+
 export type FillMode = "counselor_alone" | "with_parent" | "phone_parent";
 export type Parents = "aware_consent" | "aware_no_consent" | "not_aware";
 export type Duration = "this_year" | "over_year" | "years";
@@ -51,17 +63,17 @@ export interface CounselorFields {
   _grade?: SchoolGrade;
   c_duration?: Duration;
   // in the emotional branch (p-q1)
-  c_attend?: "regular" | "some" | "frequent" | "refusal";
-  c_change?: "כן" | "לא";
+  c_attend?: "regular" | "some" | "frequent" | "refusal" | Unknown;
+  c_change?: "כן" | "לא" | Unknown;
   // in the academic branch (p-acad)
-  c_support?: "improves" | "partial" | "none" | "not_given";
-  c_org?: Level;
+  c_support?: "improves" | "partial" | "none" | "not_given" | Unknown;
+  c_org?: Level | Unknown;
   // in the behavioural branch (p-beh)
-  c_regulation?: Level;
-  c_bully_perp?: "no" | "suspected" | "known";
+  c_regulation?: Level | Unknown;
+  c_bully_perp?: "no" | "suspected" | "known" | Unknown;
   // in the social branch (p-soc)
-  c_isolation?: Level;
-  c_bully_victim?: "no" | "suspected" | "known";
+  c_isolation?: Level | Unknown;
+  c_bully_victim?: "no" | "suspected" | "known" | Unknown;
   // the refinement screen (p-refine)
   c_fill?: FillMode;
   c_parents?: Parents;
@@ -141,12 +153,15 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     grade: f._grade,
     today,
     diagnoses: f.c_diag ?? [],
-    schoolTeam: f.c_team ? { convened: f.c_team === "yes" } : undefined,
+    // "not known" is not "did not convene" - the engine must see no answer.
+    schoolTeam: f.c_team && f.c_team !== "unknown" ? { convened: f.c_team === "yes" } : undefined,
     zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
     hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
     economicConstraint: f.c_economic === "yes",
     risk: {
+      // Read from the questionnaire's own screen. An item the counsellor marked
+      // "not known" stored "לא" there, so it never reads as a risk.
       suicidality: A.q3_sui === "כן",
       schoolRefusal: f.c_attend === "refusal",
     },
@@ -170,8 +185,12 @@ const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
 const stripPrefix = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
 
-function levelLine(label: string, v: Level | undefined): string | null {
-  return v === undefined || v === 0 ? null : `${label}: ${LEVEL_LABELS[v]}`;
+function levelLine(label: string, v: Level | Unknown | undefined): string | null {
+  return v === undefined || v === UNKNOWN || v === 0 ? null : `${label}: ${LEVEL_LABELS[v]}`;
+}
+/** A counsellor answer worth reporting: given, and not "I do not know". */
+function said<T extends string>(v: T | Unknown | undefined, ...excluded: T[]): v is T {
+  return v !== undefined && v !== UNKNOWN && !excluded.includes(v as T);
 }
 
 export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string, domains: SummaryDomain[] = []): SchoolSummary {
@@ -204,17 +223,17 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
 
   // זווית בית הספר
   const school: string[] = [];
-  if (f.c_attend && f.c_attend !== "regular") school.push(`ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
+  if (said(f.c_attend, "regular")) school.push(`ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
   if (f.c_change === "כן") school.push("שינוי חד בהתנהגות או במצב הרוח השנה");
   const org = levelLine("קושי בהתארגנות (ציוד, שיעורי בית, זמנים)", f.c_org);
   if (org) school.push(org);
-  if (f.c_support) school.push(`תגובה לתמיכה לימודית שניתנה: ${SUPPORT_RESPONSE_LABELS[f.c_support]}`);
+  if (said(f.c_support)) school.push(`תגובה לתמיכה לימודית שניתנה: ${SUPPORT_RESPONSE_LABELS[f.c_support]}`);
   const reg = levelLine("קושי בוויסות בכיתה ובהפסקות", f.c_regulation);
   if (reg) school.push(reg);
-  if (f.c_bully_perp && f.c_bully_perp !== "no") school.push(`מעורבות כפוגע/ת בהצקות: ${BULLY_LABELS[f.c_bully_perp]}`);
+  if (said(f.c_bully_perp, "no")) school.push(`מעורבות כפוגע/ת בהצקות: ${BULLY_LABELS[f.c_bully_perp]}`);
   const iso = levelLine("בידוד או דחייה חברתית בכיתה", f.c_isolation);
   if (iso) school.push(iso);
-  if (f.c_bully_victim && f.c_bully_victim !== "no") school.push(`נפגע/ת מהצקות או חרם: ${BULLY_LABELS[f.c_bully_victim]}`);
+  if (said(f.c_bully_victim, "no")) school.push(`נפגע/ת מהצקות או חרם: ${BULLY_LABELS[f.c_bully_victim]}`);
   if (A.q3_sui === "כן") school.push("דווח על מחשבות אובדניות - הדיווח לגורמים המוסמכים בבית הספר נעשה לפי הנוהל");
   if (school.length) sections.push({ title: "כפי שנצפה בבית הספר", lines: school });
 
