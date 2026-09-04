@@ -540,7 +540,14 @@ function scoreTherapist(
 
   if (input.genderPreference) {
     possible += WEIGHTS.gender;
-    if (therapistGender && therapistGender === normalizeText(input.genderPreference)) {
+    // מרכז כישות: לרשומה אין מגדר אחד, כי מאחוריה צוות מעורב. אותו היגיון
+    // של הציון האישיותי - המרכז מעמיד מטפל/ת מתוך הצוות. בלי החריגה הזו
+    // הוא הפסיד את מלוא משקל המגדר בכל שאלון שבו נבחרה העדפה, על סמך שדה
+    // ריק ולא על סמך אי-התאמה אמיתית.
+    if (therapist.entity_type === "center") {
+      earned += WEIGHTS.gender;
+      reasons.push("במרכז מטפלים ומטפלות, בהתאם להעדפה");
+    } else if (therapistGender && therapistGender === normalizeText(input.genderPreference)) {
       earned += WEIGHTS.gender;
       reasons.push("התאמה בהעדפת מגדר");
     }
