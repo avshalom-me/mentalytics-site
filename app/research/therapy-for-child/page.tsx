@@ -20,6 +20,26 @@ const jsonLd = {
   "url": "https://www.mentalytics.co.il/research/therapy-for-child",
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מטפל לילד?") are deliberately excluded - they are
+// not informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מה שונה בטיפול פסיכולוגי בילדים?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ילדים לא תמיד מסוגלים לבטא את עצמם במילים, ולכן המטפל עובד דרך משחק, ציור, סיפורים ופעילות. הקשר עם ההורים הוא חלק מרכזי בטיפול, ומטפל טוב ישלב אתכם ולא יבודד אתכם מהתהליך. גיל הילד משמעותי: הגיל הרך, גיל בית הספר וגיל ההתבגרות דורשים גישות שונות לחלוטין."
+        }
+      }
+    ]
+  };
+
 export default function TherapyForChildPage() {
   return (
     <ArticleShell
@@ -29,6 +49,7 @@ export default function TherapyForChildPage() {
     >
       <ResearchBreadcrumbLd slug="therapy-for-child" title="איך לבחור פסיכולוג לילד?" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">איך לבחור פסיכולוג לילד?</h1>
       <p className="text-stone-600 leading-7 mb-8">

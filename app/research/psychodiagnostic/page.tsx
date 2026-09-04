@@ -68,6 +68,42 @@ const breadcrumbLd = {
   ],
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מאבחן?") are deliberately excluded - they are not
+// informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מהו אבחון פסיכודיאגנוסטי?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "הערכה פסיכולוגית מקיפה ומעמיקה, המבוצעת לרוב על ידי פסיכולוגים קליניים שעברו הכשרה של כעשר שנות לימודים והתמחות. המטרה אינה להדביק תווית או אבחנה רשמית, אלא לשרטט מפה מפורטת של מבנה האישיות ומתוכה להתוות תוכנית טיפולית מותאמת."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "אילו מבחנים כולל אבחון פסיכודיאגנוסטי וכמה מפגשים הוא נמשך?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "האבחון מורכב מסדרה של פגישות, לרוב בין שתיים לארבע, הכוללות ראיון קליני מעמיק, מבחנים אובייקטיביים ומבחני ביצוע כמו מבחני אינטליגנציה וזיכרון ושאלונים עצמיים, ומבחנים השלכתיים כמו רורשאך או מבחני ציורים וסיפורים."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "מתי כדאי לפנות לאבחון פסיכודיאגנוסטי?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "כשיש ערפל טיפולי, כלומר המטופל בטיפול זמן רב ללא שיפור ותחושה שמשהו חסר. לצורך אבחנה מבדלת, כשקשה להבחין בין מצבים נפשיים דומים. לקראת צמתים משמעותיים כמו ועדות רפואיות, קביעת אחוזי נכות, התאמות תעסוקתיות או צבאיות וחוות דעת משפטיות. ואצל ילדים ונוער, לעיתים קרובות עבור ועדות והתאמה למסגרות טיפוליות."
+        }
+      }
+    ]
+  };
+
 export default function PsychodiagnosticPage() {
   return (
     <ArticleShell
@@ -76,6 +112,7 @@ export default function PsychodiagnosticPage() {
       sectionSlug="אבחונים-והערכות"
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
       {/* Header */}
