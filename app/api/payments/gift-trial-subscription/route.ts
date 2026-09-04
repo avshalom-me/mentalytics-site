@@ -29,7 +29,8 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get("token") ?? "";
-    const check = await validateGiftCheckoutToken(token);
+    // recordView: זו טעינת העמוד, כלומר הקליק על הקישור שבמייל.
+    const check = await validateGiftCheckoutToken(token, { recordView: true });
     if (!check.ok) {
       return NextResponse.json({ ok: false, reason: check.reason, error: check.message }, { status: 403 });
     }
