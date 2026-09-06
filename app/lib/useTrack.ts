@@ -183,7 +183,7 @@ export function trackMatchSearch(
  */
 export function trackMatchResults(
   quizType: "adults" | "kids",
-  opts: { region: string | null; city?: string | null; online: boolean; returned: number },
+  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
 ) {
   sendTrack("match_results", {
     source: quizType === "adults" ? "adult" : "child",
@@ -193,6 +193,9 @@ export function trackMatchResults(
       city: opts.city || null,
       online: opts.online,
       returned: opts.returned,
+      // כמה מהתוצאות באזור שהתבקש (null כשלא התבקש מיקום). מ-6/9/2026
+      // התוצאות מחולקות לקבוצה מקומית וקבוצה חיצונית, וזה המדד לפני/אחרי.
+      local: opts.local ?? null,
       // הדגל שמאפשר לספור בשאילתה אחת כמה חיפושים הציגו בחירה דלה.
       thin: opts.returned < 4,
     },

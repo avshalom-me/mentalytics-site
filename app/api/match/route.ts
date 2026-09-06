@@ -89,7 +89,13 @@ type NormalizedMatchInput = {
 const WEIGHTS = {
   expertise: 25,       // training_areas
   therapistType: 8,    // therapist_types
-  locationOnline: 10,  // regions + online
+  // מיקום. היה 10 עד 6/9/2026: אז ההפרש בין מקומי לאזור-סמוך היה 8 נקודות
+  // דירוג, בדיוק משקל של קריטריון רך אחד (סוג מטפל 8, חצי מטיפול משולב
+  // 12.5, גיל 15), ולכן מטפל מחדרה עם דינאמי+CBT עקף מטפל מחיפה עם דינאמי
+  // בלבד, על שאלון שהתחיל ב"חיפה". נמדד על 30 יום: כרטיס מקומי הביא פנייה
+  // פי 13 יותר מכרטיס לא-מקומי (29 מ-761 מול 2 מ-695). ב-25 הפער מקומי-סמוך
+  // הוא 21 נקודות, יותר מכל קריטריון בודד. הציון המוצג לא מושפע (ראו למטה).
+  locationOnline: 25,  // regions + online
   gender: 4,           // gender
   cultural: 5,         // cultural_prefs
   arrangements: 3,     // arrangements
@@ -497,9 +503,14 @@ function scoreTherapist(
       // ranked below therapists an hour away. When no city was named, matching
       // the region IS the exact answer to what was asked, and scores as such.
       const regionIsTheAsk = !input.city;
+      // 0.85 ולא 0.6: כשהמשקל עלה ל-25, 60% היה משאיר פער של 10 נקודות דירוג
+      // בין העיר לשאר האזור - מעל רצועת ה-8 שבה האישיותי מכריע - ומטפל
+      // מקריית מוצקין עם 100% היה נעול מתחת למטפל מחיפה עם 85%, והרשימה
+      // נראית לא מסודרת. ב-85% הפער הוא 4 נקודות: העיר שוברת שוויון, לא
+      // חומה. רבע שעה נסיעה לא צריכה להיות יותר מזה.
       locationEarned += regionIsTheAsk
         ? WEIGHTS.locationOnline
-        : Math.round(WEIGHTS.locationOnline * 0.6);
+        : Math.round(WEIGHTS.locationOnline * 0.85);
       reasons.push(regionIsTheAsk ? "התאמה מלאה באזור" : "התאמה באזור");
     } else if (inAdjacentRegion || onlineMatch) {
       // Adjacent region and "works online" are independent partial answers and
@@ -515,8 +526,10 @@ function scoreTherapist(
       // 2.8x less often and contacted 4.2x less often than in-area ones. A
       // neighbouring region can be an hour's drive for a weekly session, so it
       // stays in the results as a fallback but must not compete with someone
-      // local. (At a weight of 10 the tier rounds to 2 points, i.e. 20% - the
-      // scale has no finer resolution.)
+      // local. (At a weight of 25 the tier rounds to 4 points. Since 6/9/2026
+      // adjacency is also a separate result group, ordered after everyone in
+      // the requested area - see the sort - so this tier only orders the
+      // out-of-area group among itself.)
       const adjacentPts = inAdjacentRegion ? Math.round(WEIGHTS.locationOnline * 0.15) : 0;
       // An online-only request (no city, no region) has no geography to match
       // against: the hard filter above already dropped everyone who does not
@@ -810,6 +823,14 @@ export async function POST(req: NextRequest) {
     }
 
     scored.sort((a, b) => {
+      // קודם כל: מי שבאזור שהתבקש, ורק אחריו כל השאר. זו חלוקה לשתי קבוצות
+      // ולא עוד נקודה במשקל, כי משקל לבדו לא סוגר את זה: מטפל מאזור סמוך עם
+      // התאמה מקצועית מלאה (דירוג 68) עדיין עוקף מקומי בינוני (62), והמסך
+      // הראה 95% מחיפה ומתחתיו 98% מחדרה. הלקוח מציג את הקבוצה השנייה תחת
+      // כותרת משלה. כשלא התבקש מיקום כלל, הדגל זהה לכולם ואין השפעה.
+      if (a.result.inRequestedArea !== b.result.inRequestedArea) {
+        return a.result.inRequestedArea ? -1 : 1;
+      }
       // הדירוג על rankScore (כולל מיקום) ולא על הציון המוצג. מטפל קרוב עדיין
       // עולה על רחוק - רק שהמספר בכרטיס אינו נושא את ההפרש הזה.
       const profDiff = b.result.rankScore - a.result.rankScore;

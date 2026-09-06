@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import type {
   QuestionnaireAnswers,
   ScoringResult,
@@ -10,6 +10,7 @@ import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions"
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -926,6 +927,10 @@ export default function AdultsPage() {
         city: matchPrefs.city || null,
         online: !!matchPrefs.online,
         returned: Array.isArray(json.matches) ? json.matches.length : 0,
+        // כמה מהם באזור שהתבקש - המדד שלפיו נבדק פיצול הקבוצות (6/9/2026).
+        local: !!(matchPrefs.city || matchPrefs.region) && Array.isArray(json.matches)
+          ? json.matches.filter((m: any) => m.in_requested_area).length
+          : undefined,
       });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
@@ -3182,7 +3187,18 @@ export default function AdultsPage() {
         </div>
       )}
       <div className="space-y-4">
-        {(matchResults ?? []).map((t: any) => {
+        {(() => {
+          // שתי קבוצות: באזור שבחרת, ואחריה מחוץ לו. השרת כבר ממיין כך, אבל
+          // הכותרות והתווית נקבעות כאן, ולכן החלוקה נעשית גם כאן במפורש.
+          // בלי מיקום מבוקש אין קבוצות - הכל נחשב "באזור".
+          const all: any[] = matchResults ?? [];
+          const locationAsked = !!(matchPrefs.city || matchPrefs.region);
+          const localCount = locationAsked ? all.filter((m) => m.in_requested_area).length : all.length;
+          const ordered = locationAsked
+            ? [...all.filter((m) => m.in_requested_area), ...all.filter((m) => !m.in_requested_area)]
+            : all;
+          return ordered.map((t: any, idx: number) => {
+          const away = locationAsked && !t.in_requested_area;
           const overall = t.combined_score ?? t.match_score;
           // Same derivation the request body used, so the badge can never claim
           // an approach the search did not actually ask for.
@@ -3195,8 +3211,28 @@ export default function AdultsPage() {
             String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
           const matchesPref = matchedMods.length > 0;
           return (
+            <Fragment key={t.id}>
+            {locationAsked && idx === 0 && localCount > 0 && localCount < ordered.length && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרת</span>
+                <span className="h-px flex-1 bg-[var(--line)]" />
+              </div>
+            )}
+            {away && idx === localCount && (
+              <div className="pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-[var(--text-2)]">מחוץ לאזור שבחרת</span>
+                  <span className="h-px flex-1 bg-[var(--line)]" />
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  {localCount === 0
+                    ? "לא מצאנו מטפלים באזור שבחרת. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים"
+                    : "מטפלים מאזורים סמוכים"}
+                  {matchPrefs.online ? " ומטפלים שעובדים אונליין" : ""}. ההתאמה המקצועית שלהם מסומנת במילים ולא באחוז, כי המרחק לא נכלל בחישוב.
+                </p>
+              </div>
+            )}
             <div
-              key={t.id}
               className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="flex items-stretch gap-4">
@@ -3244,6 +3280,15 @@ export default function AdultsPage() {
                     </div>
                   )}
                 </div>
+                {away ? (
+                  // מחוץ לאזור: מילים במקום אחוז, כדי שהמספר לא יתחרה במספר של
+                  // מי שקרוב (ראו app/lib/match-card-label.ts).
+                  <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
+                    <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
+                    <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
+                    <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!matchPrefs.online, t.online)}</div>
+                  </div>
+                ) : (
                 <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
                   <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                     {overall}<span className="align-super text-base font-extrabold">%</span>
@@ -3259,6 +3304,7 @@ export default function AdultsPage() {
                     </>
                   )}
                 </div>
+                )}
               </div>
               {t.entity_type === "center" && t.personality_score != null && (
                 <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
@@ -3312,8 +3358,10 @@ export default function AdultsPage() {
                 </div>
               )}
             </div>
+            </Fragment>
           );
-        })}
+          });
+        })()}
       </div>
     </Layout>
   );
