@@ -3036,7 +3036,8 @@ function KidsMatchSection({ A, score, selection }: {
                         </div>
                         )}
                       </div>
-                      {t.entity_type === "center" && t.personality_score != null && (
+                      {/* אותו כלל כמו במבוגרים: בלי מספר אישיותי אין כוכבית להסביר. */}
+                      {t.entity_type === "center" && t.personality_score != null && !away && (
                         <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
                           * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לכם מתוכו את המטפל/ת המתאים/ה גם אישיותית.
                         </p>

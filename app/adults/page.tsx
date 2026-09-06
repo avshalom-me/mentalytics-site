@@ -3306,7 +3306,9 @@ export default function AdultsPage() {
                 </div>
                 )}
               </div>
-              {t.entity_type === "center" && t.personality_score != null && (
+              {/* ההערה מסבירה את הכוכבית שליד המספר האישיותי - ולכרטיס מחוץ
+                  לאזור אין מספר, אז גם לא הערה. */}
+              {t.entity_type === "center" && t.personality_score != null && !away && (
                 <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
                   * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית.
                 </p>
