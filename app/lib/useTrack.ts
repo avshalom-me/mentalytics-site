@@ -5,6 +5,7 @@ import { getOrCreateSessionId } from "./session";
 import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
+import { tfaEvent } from "./taboola";
 
 type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
 
@@ -38,6 +39,9 @@ function deviceBucket(): "mobile" | "tablet" | "desktop" | undefined {
 
 export function trackQuizStep(quizType: "adults" | "kids", step: string, progress: number) {
   sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress, device: deviceBucket() } });
+  // המרת Taboola נורית רק במסך הפתיחה. בלי התנאי הזה כל שאלה בשאלון
+  // הייתה נספרת כהמרה נפרדת ומנפחת את הנתון פי עשרות.
+  if (step === "disclaimer") tfaEvent("quiz_start");
 }
 
 /**

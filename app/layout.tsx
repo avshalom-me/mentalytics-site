@@ -64,6 +64,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           gtag('config', 'G-V3QQRXSQ0T');
           gtag('config', 'AW-18223934468');
         `}</Script>
+        {/*
+          פיקסל Taboola (חשבון 2102216) עבור קמפייני הנייטיב. הותקן ידנית
+          ולא דרך GTM כי לאתר אין מיכל GTM - ה-gtag שמעליו מוגדר ישירות
+          בקוד, ולהקים מיכל רק בשביל הפיקסל היה מחייב להעביר אליו גם את
+          מעקב ההמרות של Google Ads שכבר עובד.
+          כאן נטען הבסיס ונורה page_view; אירועי ההמרה נשלחים מ-app/lib/taboola.ts.
+        */}
+        <Script id="taboola-pixel" strategy="afterInteractive">{`
+          window._tfa = window._tfa || [];
+          window._tfa.push({notify: 'event', name: 'page_view', id: 2102216});
+          !function (t, f, a, x) {
+            if (!document.getElementById(x)) {
+              t.async = 1;t.src = a;t.id=x;f.parentNode.insertBefore(t, f);
+            }
+          }(document.createElement('script'),
+          document.getElementsByTagName('script')[0],
+          '//cdn.taboola.com/libtrc/unip/2102216/tfa.js',
+          'tb_tfa_script');
+        `}</Script>
 
         <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
           <div className="mx-auto max-w-5xl px-6 py-8">
