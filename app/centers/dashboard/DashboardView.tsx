@@ -170,11 +170,11 @@ export default function CenterDashboardView({ data, preview = false, justCreated
       <div className="-mt-4 mb-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
         <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>
         <p className="text-[13px] leading-6 text-stone-700">
-          <strong>חשיפות</strong> = כמה פעמים הפרופיל הוצג - בהתאמות או בגלישה במאגר.
-          {" "}<strong>צפיות</strong> = מי שבאמת נכנס לפרופיל.
-          {" "}<strong>לחיצות ליצירת קשר</strong> = כל פעם שמטופל לחץ על הוואטסאפ, הטלפון או המייל, כלומר ביקש ליצור קשר.
-          חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליכם בפועל.
-          הודעות שנשלחו דרך טופס האתר הן היחידות שמגיעות תמיד, ישירות למייל.
+          <strong>חשיפות</strong> = כמה פעמים הפרופיל הוצג. <strong>צפיות</strong> = מי שנכנס אליו.
+          {" "}<strong>לחיצות ליצירת קשר</strong> = לחיצה על וואטסאפ, טלפון או מייל.
+          {" "}לא כל לחיצה הופכת לשיחה בפועל, ומצד שני חלק מהמטופלים מוצאים אתכם כאן ואז מחפשים
+          אתכם בגוגל ופונים ישירות - דרך האתר שלכם או בטלפון - ופניות כאלה לא נספרות כאן כלל.
+          {" "}<strong>המספר הוא רצפה, לא התמונה המלאה.</strong>
         </p>
       </div>
 
