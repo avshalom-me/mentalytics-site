@@ -74,6 +74,11 @@ export async function PATCH(req: NextRequest) {
     if ("snoozed_until" in b) update.snoozed_until = b.snoozed_until ? String(b.snoozed_until) : null;
     if ("priority" in b && ["low", "normal", "high"].includes(b.priority)) update.priority = b.priority;
     if ("assignee" in b) update.assignee = b.assignee ? String(b.assignee).slice(0, 60) : null;
+    // הערת סיום נשמרת בנפרד מ-details: details הוא מה שהתבקש, וזו התשובה
+    // מה יצא מזה. דריסה של האחד בשני הייתה מוחקת חצי מהתיעוד.
+    if ("completion_note" in b) {
+      update.completion_note = b.completion_note ? String(b.completion_note).trim().slice(0, 1000) : null;
+    }
 
     if (Object.keys(update).length === 0) {
       return NextResponse.json({ ok: false, error: "אין מה לעדכן" }, { status: 400 });

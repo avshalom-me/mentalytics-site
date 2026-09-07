@@ -18,6 +18,7 @@ type Task = {
   snoozed_until: string | null;
   created_at: string;
   completed_at: string | null;
+  completion_note: string | null;
 };
 
 type Suggestion = {
@@ -150,6 +151,29 @@ export default function TasksPage() {
     }
   }
 
+  // שני מסלולי סגירה מפורשים, לצד ה-✓ המהיר שסוגר ומשאיר בלי הערה.
+  async function doneWithNote(id: string) {
+    const note = window.prompt("מה יצא מזה? (הערת סיום)");
+    // ביטול הדיאלוג מחזיר null - ואז לא סוגרים בכלל. מחרוזת ריקה = נסגר בלי הערה.
+    if (note === null) return;
+    patch(id, { status: "done", completion_note: note.trim() || null });
+  }
+
+  async function doneAndDelete(id: string) {
+    if (!confirm("לסמן כבוצע ולמחוק לצמיתות? לא יישאר תיעוד שהמשימה הייתה.")) return;
+    setBusy(id);
+    try {
+      await fetch("/api/admin-crm/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function remove(id: string) {
     if (!confirm("למחוק את המשימה לצמיתות?")) return;
     setBusy(id);
@@ -274,10 +298,10 @@ export default function TasksPage() {
           </div>
         )}
 
-        <TaskGroup title={`באיחור (${overdue.length})`} tone="text-red-600" tasks={overdue} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} />
-        <TaskGroup title={`להיום (${dueToday.length})`} tone="text-teal-700" tasks={dueToday} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} />
-        <TaskGroup title={`בהמשך (${upcoming.length})`} tone="text-stone-500" tasks={upcoming} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} />
-        <TaskGroup title={`בלי תאריך (${noDate.length})`} tone="text-stone-400" tasks={noDate} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} />
+        <TaskGroup title={`באיחור (${overdue.length})`} tone="text-red-600" tasks={overdue} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`להיום (${dueToday.length})`} tone="text-teal-700" tasks={dueToday} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`בהמשך (${upcoming.length})`} tone="text-stone-500" tasks={upcoming} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`בלי תאריך (${noDate.length})`} tone="text-stone-400" tasks={noDate} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
 
         {done.length > 0 && (
           <div className="mt-8">
@@ -293,6 +317,11 @@ export default function TasksPage() {
                 {done.map((t) => (
                   <div key={t.id} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-2">
                     <span className="text-sm text-stone-400 line-through">{t.title}</span>
+                    {t.completion_note && (
+                      <span className="min-w-0 truncate text-xs text-teal-700" title={t.completion_note}>
+                        {t.completion_note}
+                      </span>
+                    )}
                     <span className="ms-auto text-xs text-stone-300">{fmtDate(t.completed_at)}</span>
                     <button
                       onClick={() => patch(t.id, { status: "open" })}
@@ -320,6 +349,8 @@ function TaskGroup({
   onRemove,
   today,
   assignees,
+  onDoneNote,
+  onDoneDelete,
 }: {
   title: string;
   tone: string;
@@ -329,6 +360,8 @@ function TaskGroup({
   onRemove: (id: string) => void;
   today: string;
   assignees: string[];
+  onDoneNote: (id: string) => void;
+  onDoneDelete: (id: string) => void;
 }) {
   if (tasks.length === 0) return null;
   return (
@@ -384,6 +417,24 @@ function TaskGroup({
                 <span className="text-xs font-semibold text-stone-400">{fmtDate(t.due_date)}</span>
               )}
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onDoneNote(t.id)}
+                  disabled={busy === t.id}
+                  title="סימון בוצע, המשימה נשארת עם הערת סיום"
+                  className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100"
+                >
+                  בוצע + הערה
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDoneDelete(t.id)}
+                  disabled={busy === t.id}
+                  title="סימון בוצע ומחיקה לצמיתות"
+                  className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] font-bold text-stone-400 hover:bg-red-50 hover:text-red-500"
+                >
+                  בוצע ומחק
+                </button>
                 <button
                   type="button"
                   onClick={() => onPatch(t.id, { snoozed_until: addDays(today, 1) })}
