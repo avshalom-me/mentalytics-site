@@ -16,6 +16,7 @@ export const CHANNELS = [
   "meta_organic",    // organic Facebook / Instagram (fbclid alone, or social medium)
   "tiktok_paid",     // paid TikTok (utm_medium paid + tiktok source)
   "tiktok_organic",  // organic TikTok (ttclid alone, or tiktok referrer)
+  "taboola_paid",    // Taboola native ads (utm_source=taboola; the platform has no organic side)
   "whatsapp",        // WhatsApp referral or utm_source=whatsapp
   "direct",          // no referrer, no campaign params
   "ai",              // an AI assistant sent them (ChatGPT, Gemini, Claude, Perplexity, Copilot)
@@ -155,6 +156,11 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
     // utm_source=chatgpt.com is what ChatGPT appends when it tags a link at all
     if (isAiReferrer(src)) return "ai";
+    // Taboola is paid by definition - there is no organic Taboola - so the medium
+    // is not consulted. Without this line the campaign's traffic landed in
+    // "other" (utm_medium=native is not in PAID_MEDIUMS) and the first native
+    // test would have been unreadable in /admin/attribution.
+    if (src === "taboola") return "taboola_paid";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
     if (isTikTokSource(src)) return PAID_MEDIUMS.has(med) ? "tiktok_paid" : "tiktok_organic";
@@ -467,6 +473,7 @@ export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
   meta_organic: "Meta - אורגני",
   tiktok_paid: "TikTok - בתשלום",
   tiktok_organic: "TikTok - אורגני",
+  taboola_paid: "טאבולה - בתשלום",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
   ai: "עוזר AI",

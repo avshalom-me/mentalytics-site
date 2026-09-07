@@ -141,7 +141,7 @@ export async function GET() {
         if (c.clicked_at >= cutoff30) {
           e.clicks_30++;
           const ch = c.channel ?? "";
-          if (ch === "google_paid" || ch === "meta_paid") e.clicks_30_by_channel.paid++;
+          if (ch === "google_paid" || ch === "meta_paid" || ch === "taboola_paid") e.clicks_30_by_channel.paid++;
           else if (ch === "google_organic") e.clicks_30_by_channel.organic++;
           else if (ch === "direct") e.clicks_30_by_channel.direct++;
           else e.clicks_30_by_channel.other++;
