@@ -6,6 +6,7 @@ import { slugToCity, slugToRegion, CITY_TO_REGION } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import QuizCta from "@/app/therapists/QuizCta";
+import TooltipAsterisk from "@/app/components/TooltipAsterisk";
 
 // עמוד נחיתה לקמפיינים בתשלום (Taboola/נייטיב). קיים בנפרד מעמודי הערים
 // והאזורים ב-/therapists מסיבה אחת: אלה נכסי SEO מדורגים, ואסור לשנות
@@ -23,6 +24,9 @@ import QuizCta from "@/app/therapists/QuizCta";
 // מדסקטופ, ותנועת אתרי התוכן בישראל היא ברובה מובייל).
 
 const HOW_MANY_CARDS = 6;
+
+const BADGE = { display: "flex", alignItems: "center", gap: "6px" } as const;
+const ICON = { display: "block" } as const;
 
 export const revalidate = 300;
 
@@ -86,12 +90,39 @@ export default async function LandingPage({ params }: Params) {
             lineHeight: 1.2,
           }}
         >
-          איזה טיפול מתאים לכם, ואיזה מטפל/ת ב{place.name}?
+          איך אדע מה הקושי שלי ואיזה טיפול אני צריך?
         </h1>
         <p className="mt-3 leading-7" style={{ color: "var(--text-2)", fontSize: "1.05rem" }}>
-          לא רשימה אלפביתית. שאלון קצר שבנו פסיכולוגים קליניים מתאים לכם מטפל/ת לפי סוג
-          הקושי, הגישה הטיפולית והאישיות המקצועית.
+          {/* הרווח מפורש: מעבר שורה בין ביטוי לטקסט נבלע ב-JSX, ובלעדיו
+              נדבק "בתל אביבלפי". */}
+          לא רשימה אלפביתית. שאלון קצר שבנו פסיכולוגים קליניים מתאים לכם מטפל/ת ב{place.name}{" "}
+          לפי סוג הקושי, הגישה הטיפולית והאישיות המקצועית.
         </p>
+
+        {/* אותן חמש תגיות אמון שבדף הבית. הן עונות בדיוק על ההתלבטויות
+            שעוצרות אנשים כאן - עלות, חשיפה, מאמץ - ולכן מקומן מעל הכפתור
+            ולא ב-FAQ שבתחתית, שאליו רוב הגולשים לא יגיעו. */}
+        <div
+          className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5"
+          style={{ fontSize: "13px", color: "var(--muted)" }}
+        >
+          <span style={BADGE}>
+            <img src="/icons/anonymous.svg" alt="" width={20} height={20} style={ICON} /> שאלון אנונימי
+          </span>
+          <span style={BADGE}>
+            <img src="/icons/free.svg" alt="" width={20} height={20} style={ICON} /> חינמי
+            <TooltipAsterisk />
+          </span>
+          <span style={BADGE}>
+            <img src="/icons/minutes.svg" alt="" width={20} height={20} style={ICON} /> כמה דקות
+          </span>
+          <span style={BADGE}>
+            <img src="/icons/report.svg" alt="" width={20} height={20} style={ICON} /> דו&quot;ח אישי לשמירה
+          </span>
+          <span style={BADGE}>
+            <img src="/icons/team.svg" alt="" width={20} height={20} style={ICON} /> מטפלים מורשים בלבד
+          </span>
+        </div>
 
         <QuizCta body="ענו על שאלון קצר, ובסופו תקבלו התאמה אישית למטפל/ת באזורכם או באונליין." />
       </section>
