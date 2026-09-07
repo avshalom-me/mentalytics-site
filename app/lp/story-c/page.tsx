@@ -1,12 +1,17 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import OutputShowcase from "@/app/components/OutputShowcase";
 import QuizCta from "@/app/therapists/QuizCta";
-import { Byline, TrustBadges, H2, P, StoryClosing } from "@/app/lp/_story/parts";
+import { TrustBadges, H2, P, StoryClosing } from "@/app/lp/_story/parts";
 
-// גרסה ג' - "הבעיה". מתחילה מהקורא: שיתוק ההחלטה של מי שרוצה טיפול ונתקע
-// בז'רגון. הזווית: אמפתיה קודם, ואז ההקלה - לא חייבים לדעת, השאלון שואל
-// עליכם ולא על טיפול. הטלפון הוא הגילוי: "וזה מה שמקבלים".
+// גרסה ג' - "הבעיה" - הגרסה שנבחרה לקמפיין B (7/9/26), אחרי תיקוני הבעלים:
+//   - הדמו (הטלפון) ראשון, מיד אחרי הכותרת. הקורא רואה את המוצר לפני שהוא
+//     קורא עליו, והתגיות והכפתורים מתחתיו.
+//   - בלי ביילוס ובלי שם המייסד. העמוד מדבר בשם המערכת, לא בשם אדם.
+//   - שלוש קריאות לשאלון, וכל אחת מציעה גם את שאלון הילדים והנוער - זרוע
+//     ארצית תופסת גם הורים, ו-QuizCta מציג את שני הכפתורים כברירת מחדל.
+// הזווית נשארה: שיתוק ההחלטה של מי שרוצה טיפול ונתקע בז'רגון.
 
 export const revalidate = 300;
 
@@ -31,15 +36,32 @@ export default function StoryC() {
     <main dir="rtl" style={{ background: "var(--bg)" }}>
       <PageViewTracker page="lp:story-c" />
 
-      <article className="mx-auto max-w-3xl px-5 pt-8 pb-4 sm:pt-12">
+      <header className="mx-auto max-w-3xl px-5 pt-8 pb-2 sm:pt-12">
         <h1
           style={{ fontSize: "clamp(1.75rem,5vw,2.5rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.2 }}
         >
           CBT או דינמי? פסיכולוג או עו&quot;ס? לא חייבים לדעת לפני שמתחילים
         </h1>
-        <Byline />
+      </header>
+
+      {/* הדמו ראשון: מהשאלון עד המטפל, מסך אחרי מסך */}
+      <OutputShowcase />
+
+      <article className="mx-auto max-w-3xl px-5 pt-6 pb-14">
         <TrustBadges />
 
+        <div className="mt-6">
+          <QuizCta body="שאלון קצר ששואל עליכם, לא על טיפול. ובסופו דו&quot;ח והתאמה למטפל/ת, באזורכם או באונליין." />
+        </div>
+        <p className="mt-3 text-sm leading-6" style={{ color: "var(--muted)" }}>
+          הורים לילד או לנער?{" "}
+          <Link href="/kids" className="font-bold hover:underline" style={{ color: "var(--teal-dark)" }}>
+            יש שאלון נפרד לילדים ונוער
+          </Link>
+          , שההורים ממלאים.
+        </p>
+
+        <H2>למה רוב האנשים נתקעים לפני שהתחילו</H2>
         <P>
           רוב האנשים שרוצים טיפול לא נתקעים כי אין מטפלים. הם נתקעים כי יש יותר מדי שאלות לפני,
           וכולן נשמעות כאילו צריך להיות איש מקצוע כדי לענות עליהן:
@@ -70,22 +92,20 @@ export default function StoryC() {
         </P>
 
         <div className="mt-6">
-          <QuizCta body="שאלון קצר ששואל עליכם, לא על טיפול. ובסופו דו&quot;ח והתאמה." />
+          <QuizCta body="לא צריך לדעת כלום לפני. השאלון שואל, אתם עונים." />
         </div>
 
-        <H2>וזה מה שמקבלים</H2>
-      </article>
-
-      <OutputShowcase />
-
-      <article className="mx-auto max-w-3xl px-5 pt-6 pb-14">
+        <H2>מה בדיוק מקבלים בסוף</H2>
         <P>
           דו&quot;ח שמתאר במילים פשוטות מה עלה, בלי אבחנות ובלי תוויות. סוגי הטיפול שמתאימים לזה,
           עם הסבר למה. ורשימת מטפלים ומטפלות מורשים, מדורגת לפי התאמה מקצועית ואישיותית, עם
           הסבר ליד כל אחד למה דווקא הוא או היא. ניתן לשמירה, ואפשר להביא אותו לפגישה הראשונה.
         </P>
+        <P>
+          כל המטפלים באתר בעלי רישיון, ותעודות ההכשרה שלהם אומתו מול המסמכים המקוריים.
+        </P>
 
-        <StoryClosing ctaBody="לא צריך לדעת כלום לפני. השאלון שואל, אתם עונים. בחינם, אנונימי, וללא התחייבות." />
+        <StoryClosing ctaBody="שאלון למבוגרים או לילדים ונוער. בחינם, אנונימי, וללא התחייבות." />
       </article>
     </main>
   );
