@@ -150,6 +150,10 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // fbclid is NOT: Meta appends it to organic clicks too (shares, profile-link
   // taps, in-app browser), so it must never imply paid on its own (see below).
   if (params.has("gclid") || params.has("gbraid") || params.has("wbraid")) return "google_paid";
+  // Taboola appends its own click id (tblci) to every paid click. It proves paid
+  // traffic on its own, so a publisher's in-app browser that strips the utm
+  // still lands as Taboola and not as a referral from the publisher's domain.
+  if (params.has("tblci")) return "taboola_paid";
 
   // Explicit UTM tagging - trust the medium to separate paid from organic.
   if (src) {
@@ -265,7 +269,7 @@ export function captureAttribution(): void {
     // utm_source and is captured normally.
     const hasCampaignSignal =
       params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
-      params.has("utm_source");
+      params.has("tblci") || params.has("utm_source");
 
     // An expired touch is treated as if it were never there, so this landing
     // gets classified on its own merits instead of inheriting an old campaign.

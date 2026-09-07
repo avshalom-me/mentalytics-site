@@ -40,8 +40,11 @@ function deviceBucket(): "mobile" | "tablet" | "desktop" | undefined {
 export function trackQuizStep(quizType: "adults" | "kids", step: string, progress: number) {
   sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress, device: deviceBucket() } });
   // המרת Taboola נורית רק במסך הפתיחה. בלי התנאי הזה כל שאלה בשאלון
-  // הייתה נספרת כהמרה נפרדת ומנפחת את הנתון פי עשרות.
-  if (step === "disclaimer") tfaEvent("quiz_start");
+  // הייתה נספרת כהמרה נפרדת ומנפחת את הנתון פי עשרות. לכל שאלון מסך פתיחה
+  // משלו: "disclaimer" במבוגרים, "p-consent" בילדים - בלי השני, רבע
+  // מההתחלות (הורים) לא היו נספרות לקמפיין הארצי.
+  const opening = quizType === "adults" ? "disclaimer" : "p-consent";
+  if (step === opening) tfaEvent("quiz_start", { once: `tfa_quiz_start_${quizType}` });
 }
 
 /**

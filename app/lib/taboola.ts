@@ -27,9 +27,22 @@ declare global {
   }
 }
 
-export function tfaEvent(name: TaboolaEvent) {
+/**
+ * @param opts.once - מפתח ב-sessionStorage שמונע ירי חוזר באותה לשונית.
+ *   מסך הפתיחה של השאלון נטען מחדש בכל חזרה אחורה (וגם ב-back של הדפדפן),
+ *   ובלי זה מבקר אחד שהלך קדימה-אחורה נספר כשתי המרות.
+ */
+export function tfaEvent(name: TaboolaEvent, opts?: { once?: string }) {
   if (typeof window === "undefined") return;
   if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים גם את Taboola
+  if (opts?.once) {
+    try {
+      if (sessionStorage.getItem(opts.once) === "1") return;
+      sessionStorage.setItem(opts.once, "1");
+    } catch {
+      // sessionStorage חסום - עדיף לירות פעמיים מאשר לאבד את ההמרה
+    }
+  }
   try {
     window._tfa = window._tfa || [];
     window._tfa.push({ notify: "event", name, id: TABOOLA_ACCOUNT_ID });

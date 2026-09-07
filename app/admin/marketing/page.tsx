@@ -6,6 +6,11 @@ import {
 } from "recharts";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
+
+
+// שמות הקמפיינים הממומנים לפי קידומת ה-utm_campaign: g-* בגוגל, tab-* בטאבולה.
+// בלי הקידומת השנייה, שורות הטאבולה חזרו מה-RPC ונזרקו בדרך למסך (9/2026).
+const isPaidCampaign = (campaign: string) => /^(g-|tab-)/.test(campaign);
 import ContactDestinations from "@/app/admin/ContactDestinations";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
@@ -885,7 +890,7 @@ function FunnelsCampaigns() {
             })()}
 
           {/* Per-campaign funnel: billed clicks -> site sessions -> profile view -> contact (by type + source) */}
-          {campFunnel && campFunnel.some((r) => r.campaign.startsWith("g-")) && (
+          {campFunnel && campFunnel.some((r) => isPaidCampaign(r.campaign)) && (
             <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
               <h3 className="mb-1 text-base font-black text-stone-800">משפך לפי קמפיין ממומן</h3>
               <p className="mb-3 text-xs text-stone-500">
@@ -908,7 +913,7 @@ function FunnelsCampaigns() {
                 </thead>
                 <tbody>
                   {campFunnel
-                    .filter((r) => r.campaign.startsWith("g-"))
+                    .filter((r) => isPaidCampaign(r.campaign))
                     .map((r) => {
                       // Billed clicks from Google Ads = the REAL top-of-funnel. Site
                       // "sessions" over-counts (bots + our own setup/test loads that

@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
+import { tfaEvent } from "@/app/lib/taboola";
 
 type Props = {
   /** מזהה המטפל/ת, או מזהה חשבון המרכז כש-target="center". */
@@ -81,6 +82,9 @@ export default function SiteMessageModal({
         setDone(true);
         // GA4 conversion: patient sent a site message to a therapist (a lead).
         gaEvent("generate_lead", { method: "site_message", source });
+        // אותה פנייה גם ל-Taboola: זה הכפתור היחיד בפס הצף במובייל כשאין
+        // טלפון, ובלעדיו הקמפיין רואה פחות פניות ממה שהאדמין סופר.
+        tfaEvent("contact");
       }
     } catch {
       setError("שגיאה בשליחה");
