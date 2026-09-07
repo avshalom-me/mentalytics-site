@@ -781,12 +781,6 @@ export default function AdminCentersPage() {
                   className="text-xs font-bold text-indigo-700 hover:underline">
                   {detailFor === c.id ? "▲ סגירת הפירוט" : "▼ פירוט לפי מטפל (צפיות ופניות)"}
                 </button>
-                {/* אותו מסך שהמרכז רואה אצלו, קריאה בלבד - לתמיכה ולבדיקה
-                    שמה שהם רואים באמת אומר מה שהתכוונו. */}
-                <a href={`/admin/centers/preview/${c.id}`}
-                  className="ms-3 text-xs font-bold text-amber-700 hover:underline">
-                  👁 צפייה בתור מרכז
-                </a>
                 {detailFor === c.id && (
                   detailLoading && !detailRows[c.id] ? (
                     <p className="mt-1 text-xs text-stone-400">טוען...</p>
@@ -897,6 +891,15 @@ export default function AdminCentersPage() {
                 <a href={`/centers/${c.slug}`} target="_blank" rel="noopener noreferrer"
                   className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
                   🌐 לעמוד הציבורי ↗
+                </a>
+              )}
+              {/* הפורטל הפנימי של המרכז, כפי שהם רואים אותו. יושב לצד העמוד
+                  הציבורי כי אלה שני הצדדים של אותו מוצר: מה שהמטופל רואה ומה
+                  שהלקוח רואה. קריאה בלבד. */}
+              {c.status === "active" && (
+                <a href={`/admin/centers/preview/${c.id}`}
+                  className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-bold text-amber-800 hover:bg-amber-100">
+                  👁 הפורטל שלהם (צפייה בתור מרכז)
                 </a>
               )}
               {/* רק במרכז ששילם. בטיוטה שורת-הישות נוצרת אוטומטית עם הבחירה
