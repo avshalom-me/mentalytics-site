@@ -6,8 +6,8 @@ import QuizCta from "@/app/therapists/QuizCta";
 import { TrustBadges, H2, P, StoryClosing } from "@/app/lp/_story/parts";
 
 // גרסה ג' - "הבעיה" - הגרסה שנבחרה לקמפיין B (7/9/26), אחרי תיקוני הבעלים:
-//   - הדמו (הטלפון) ראשון, מיד אחרי הכותרת. הקורא רואה את המוצר לפני שהוא
-//     קורא עליו, והתגיות והכפתורים מתחתיו.
+//   - הדמו (הטלפון) פותח את העמוד, בלי כותרת משלנו מעליו: המודעה כבר אמרה
+//     את המשפט, והקורא נוחת ישר על המוצר. התגיות והכפתורים מתחתיו.
 //   - בלי ביילוס ובלי שם המייסד. העמוד מדבר בשם המערכת, לא בשם אדם.
 //   - שלוש קריאות לשאלון, וכל אחת מציעה גם את שאלון הילדים והנוער - זרוע
 //     ארצית תופסת גם הורים, ו-QuizCta מציג את שני הכפתורים כברירת מחדל.
@@ -36,16 +36,9 @@ export default function StoryC() {
     <main dir="rtl" style={{ background: "var(--bg)" }}>
       <PageViewTracker page="lp:story-c" />
 
-      <header className="mx-auto max-w-3xl px-5 pt-8 pb-2 sm:pt-12">
-        <h1
-          style={{ fontSize: "clamp(1.75rem,5vw,2.5rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em", lineHeight: 1.2 }}
-        >
-          CBT או דינמי? פסיכולוג או עו&quot;ס? לא חייבים לדעת לפני שמתחילים
-        </h1>
-      </header>
-
-      {/* הדמו ראשון: מהשאלון עד המטפל, מסך אחרי מסך */}
-      <OutputShowcase />
+      {/* בלי כותרת משלנו מעל: הקורא מגיע מהמודעה, שכבר אמרה את המשפט, ונוחת
+          ישר על הדמו. הכותרת של הדמו היא ה-h1 של העמוד. */}
+      <OutputShowcase headingLevel="h1" />
 
       <article className="mx-auto max-w-3xl px-5 pt-6 pb-14">
         <TrustBadges />
