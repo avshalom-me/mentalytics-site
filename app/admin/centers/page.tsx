@@ -781,6 +781,12 @@ export default function AdminCentersPage() {
                   className="text-xs font-bold text-indigo-700 hover:underline">
                   {detailFor === c.id ? "▲ סגירת הפירוט" : "▼ פירוט לפי מטפל (צפיות ופניות)"}
                 </button>
+                {/* אותו מסך שהמרכז רואה אצלו, קריאה בלבד - לתמיכה ולבדיקה
+                    שמה שהם רואים באמת אומר מה שהתכוונו. */}
+                <a href={`/admin/centers/preview/${c.id}`}
+                  className="ms-3 text-xs font-bold text-amber-700 hover:underline">
+                  👁 צפייה בתור מרכז
+                </a>
                 {detailFor === c.id && (
                   detailLoading && !detailRows[c.id] ? (
                     <p className="mt-1 text-xs text-stone-400">טוען...</p>

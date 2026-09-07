@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
+import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
@@ -796,6 +798,20 @@ export async function POST(req: NextRequest) {
           (b.cards_30 + b.dir_impr_30) - (a.cards_30 + a.dir_impr_30));
 
       return NextResponse.json({ ok: true, therapists });
+    }
+
+    // "צפייה בתור מרכז": אותו מטען בדיוק שהפורטל מקבל, דרך אותה פונקציה
+    // (buildCenterPortalPayload). קריאה בלבד - אין כאן שום כתיבה, ואין
+    // התחזות לחשבון: האדמין מזוהה ב-Basic Auth של /api/admin-, והמרכז נטען
+    // לפי id ולא לפי סשן שלו.
+    if (action === "center_portal_preview") {
+      const { data: c } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select(PORTAL_CENTER_COLS)
+        .eq("id", id)
+        .maybeSingle();
+      if (!c) return NextResponse.json({ ok: false, error: "מרכז לא נמצא" }, { status: 404 });
+      return NextResponse.json(await buildCenterPortalPayload(c as unknown as PortalCenter));
     }
 
     return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });
