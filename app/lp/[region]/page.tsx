@@ -103,7 +103,7 @@ export default async function LandingPage({ params }: Params) {
             שעוצרות אנשים כאן - עלות, חשיפה, מאמץ - ולכן מקומן מעל הכפתור
             ולא ב-FAQ שבתחתית, שאליו רוב הגולשים לא יגיעו. */}
         <div
-          className="mt-4 flex flex-wrap gap-x-5 gap-y-2.5"
+          className="mt-4 mb-8 flex flex-wrap gap-x-5 gap-y-2.5"
           style={{ fontSize: "13px", color: "var(--muted)" }}
         >
           <span style={BADGE}>
