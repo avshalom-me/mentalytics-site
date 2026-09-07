@@ -32,6 +32,8 @@ type TherapistRow = {
   profile_photo_path: string | null;
   regions: string[] | null;
   online: boolean | null;
+  phone: string | null;
+  age_groups: string[] | null;
   promoted_since: string | null;
   created_at: string | null;
 };
@@ -44,6 +46,10 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
   const isEntity = (center.billing_track as string) === "center_entity";
   let entity: { id: string; status: string; admin_approved: boolean; matching_filled: boolean; since: string | null } | null = null;
+  // האזורים של המרכז לצורך בחירת קבוצת ההשוואה. במסלול ישות אין שורות
+  // מטפלים, ולכן בלי זה הסינון האזורי היה נופל חזרה לממוצע הארצי בדיוק
+  // אצל המרכזים שאין להם רשימת מטפלים.
+  let entityRegions: string[] = [];
   if (isEntity) {
     const { data: e } = await supabaseAdmin
       .from("therapists")
@@ -52,6 +58,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
       .eq("entity_type", "center")
       .maybeSingle();
     if (e) {
+      entityRegions = Array.isArray(e.regions) ? (e.regions as string[]) : [];
       // "מולא להתאמות" = יש לפחות תחום/סוג טיפול + קהל (גילאים) + כיסוי
       // (אזור או אונליין). בלי אלה המרכז לא ייתפס באף שאלון - הדשבורד
       // מציג אזהרה בולטת עד שימולאו.
@@ -74,7 +81,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
 
   const { data: therapistsData } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, status, admin_approved, profile_photo_path, regions, online, promoted_since, created_at")
+    .select("id, full_name, status, admin_approved, profile_photo_path, regions, online, phone, age_groups, promoted_since, created_at")
     .eq("center_account_id", center.id)
     .neq("entity_type", "center")
     .order("full_name", { ascending: true });
@@ -190,12 +197,16 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     ),
     // הופעות במאגר המטפלים - נרשמות כאירוע analytics ולא כ-profile_view,
     // ולכן נעדרו מהפורטל לגמרי. זו החשיפה הגדולה מבין השתיים.
-    // count בלבד: הטבלה גדולה (42K+ שורות) ואנחנו צריכים רק מספר.
-    supabaseAdmin
-      .from("analytics_events")
-      .select("*", { count: "exact", head: true })
-      .eq("event_type", "profile_impression")
-      .in("therapist_id", statIds),
+    // נשלפות כשורות (ולא count) כדי שיהיה אפשר לפרק אותן לפי מטפל: בטבלה
+    // מטפל נראה כמו כישלון כשהוא בכלל לא נחשף, וזה ההבדל בין השניים.
+    // מסונן ל-statIds, כלומר חסום לגודל המרכז ולא לגודל הטבלה.
+    fetchAllRows<{ therapist_id: string }>(() =>
+      supabaseAdmin
+        .from("analytics_events")
+        .select("therapist_id")
+        .eq("event_type", "profile_impression")
+        .in("therapist_id", statIds),
+    ),
   ]);
 
   const clicksMonth = clicks.filter((c) => c.clicked_at >= mAgo);
@@ -223,7 +234,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   };
   const bySource = {
     match: funnelFor("match", matchImpressions),
-    directory: funnelFor("directory", dirImpressions.count ?? 0),
+    directory: funnelFor("directory", dirImpressions.length),
     // פניות ישירות מעמוד הפרופיל - בלי מקור פנימי מזוהה.
     direct_contacts: clicks.filter((c) => c.source === "profile").length,
   };
@@ -253,7 +264,10 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   // התחיל להתמלא ב-23/6, ולכן חלון של 60 יום מוצא כמעט אף עמית ותיק -
   // בלי הנסיגה דווקא המרכזים הוותיקים היו נשארים בלי השוואה בכלל.
   const BENCH_WINDOWS = [60, 45, 30, 21, 14];
-  const BENCH_MIN_PEERS = 20;
+  // סף מותאם לקבוצת השוואה אזורית: ארצית היו 130+ עמיתים ו-20 היה סף סביר,
+  // אבל באזור בודד יש 4-42, ו-20 היה מבטל את ההשוואה כמעט בכל מקום. 8 הוא
+  // מדגם גס אך כן, ומספר העמיתים מוצג למרכז ממילא כדי שידע על מה מדובר.
+  const BENCH_MIN_PEERS = 8;
 
   let benchmark: {
     days: number; peers: number;
@@ -279,15 +293,30 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     // שליפה אחת של כל החינמיים עם תאריך ההצטרפות; ממנה נגזרות כל הבדיקות.
     const { data: freeRows } = await supabaseAdmin
       .from("therapists")
-      .select("id, created_at")
+      .select("id, created_at, regions")
       .eq("status", "approved")
       .eq("admin_approved", true)
       .eq("accepting_new_patients", true)
       .neq("entity_type", "center");
-    const freePeers = (freeRows ?? []).map((r) => ({
-      id: r.id as string,
-      joined: new Date(r.created_at as string).getTime(),
-    }));
+    // עמיתים להשוואה: רק מטפלים חינמיים שחולקים אזור עם מטפלי המרכז.
+    // עד 7/9/2026 ההשוואה הייתה מול ממוצע ארצי, וזה הפך אותה להפוכה בפריפריה:
+    // מרכז שדות במגדל העמק הוצג כ-2.5 מול 3.2 ("מתחת לממוצע") בזמן שמטפל
+    // חינמי באזור שלו מקבל 0.8 - כלומר המנוי משלש לו את החשיפה, והמסך אמר לו
+    // את ההפך. הממוצע הארצי נשלט ע"י גוש דן וירושלים (3.3-3.4).
+    const centerRegions = new Set<string>([
+      ...therapists.flatMap((t) => (Array.isArray(t.regions) ? t.regions : [])),
+      ...entityRegions,
+    ]);
+    const freePeers = (freeRows ?? [])
+      .filter((r) => {
+        if (centerRegions.size === 0) return true; // אין למרכז אזורים - אין מה לסנן
+        const rr = Array.isArray(r.regions) ? (r.regions as string[]) : [];
+        return rr.some((x) => centerRegions.has(x));
+      })
+      .map((r) => ({
+        id: r.id as string,
+        joined: new Date(r.created_at as string).getTime(),
+      }));
 
     // המועמד הראשון הוא גיל המרכז עצמו (עד 60 יום) - כך מרכז בן 20 יום
     // נמדד על 20 יום מלאים ולא נופל לשלב הבא בסולם.
@@ -368,6 +397,19 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   const viewsPerTherapist = new Map<string, number>();
   for (const v of realViews) viewsPerTherapist.set(v.therapist_id, (viewsPerTherapist.get(v.therapist_id) ?? 0) + 1);
 
+  // חשיפה לכל מטפל: כרטיס בהתאמות + הופעה במאגר. בלי זה השורה מציגה
+  // "0 פניות" ליד "2 צפיות" ואי אפשר לדעת אם המטפל לא משכנע או שפשוט
+  // לא הוצג. אצל מכון הכרה זה בדיוק ההבדל בין 84 הופעות לשתיים.
+  const cardsPerTherapist = new Map<string, number>();
+  for (const v of views) {
+    if (v.source !== "match_card") continue;
+    cardsPerTherapist.set(v.therapist_id, (cardsPerTherapist.get(v.therapist_id) ?? 0) + 1);
+  }
+  const dirPerTherapist = new Map<string, number>();
+  for (const e of dirImpressions) {
+    dirPerTherapist.set(e.therapist_id, (dirPerTherapist.get(e.therapist_id) ?? 0) + 1);
+  }
+
   const therapistList = therapists.map((t) => ({
     id: t.id,
     name: t.full_name || "-",
@@ -378,6 +420,11 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     profile_path: therapistPath(t.id, t.full_name),
     month_views: viewsPerTherapist.get(t.id) ?? 0,
     month_clicks: clicksPerTherapist.get(t.id) ?? 0,
+    exposure: (cardsPerTherapist.get(t.id) ?? 0) + (dirPerTherapist.get(t.id) ?? 0),
+    // מה שמונע מהמטפל להיחשף או לקבל פנייה, וניתן לתיקון על ידי המרכז.
+    // בלי טלפון אין בכרטיס כפתור וואטסאפ ואין חיוג - אפס פניות מובנה.
+    has_phone: typeof t.phone === "string" && t.phone.trim().length > 0,
+    age_groups: Array.isArray(t.age_groups) ? (t.age_groups as string[]) : [],
   }));
 
   // אותו חשבון מחזיק גם פרופיל מטפל אישי (מנהל/ת שגם מטפל/ת). מוחזר כדי
@@ -416,7 +463,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
       // המשמעות היא all-time - התוויות בממשק עודכנו בהתאם.
       views_month: realViews.length,
       impressions_month: matchImpressions,
-      directory_impressions: dirImpressions.count ?? 0,
+      directory_impressions: dirImpressions.length,
       clicks_total: clicksByType(clicks),
       by_source: bySource,
       benchmark,

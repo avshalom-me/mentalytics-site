@@ -20,6 +20,9 @@ type TherapistItem = {
   profile_path: string;
   month_views: number;
   month_clicks: number;
+  exposure: number;
+  has_phone: boolean;
+  age_groups: string[];
 };
 
 type Clicks = { whatsapp: number; phone: number; email: number; site_message?: number; total: number };
@@ -71,6 +74,25 @@ const REGION_LABELS: Record<string, string> = {
   center: "מרכז", sharon: "שרון", jerusalem: "ירושלים", haifa: "חיפה", north: "צפון", south: "דרום", online: "אונליין", other: "אחר",
 };
 const GENDER_LABELS: Record<string, string> = { m: "גברים", f: "נשים", other: "אחר" };
+
+// מה מונע ממטפל להיחשף או לקבל פנייה, וניתן לתיקון על ידי המרכז. זה הדבר
+// היחיד בטבלה שהמרכז יכול לעשות איתו משהו: בלי טלפון אין בכרטיס כפתור
+// וואטסאפ ואין חיוג, ולכן אפס פניות אינו שיפוט על המטפל אלא שדה חסר.
+function blockers(t: TherapistItem) {
+  const flags: string[] = [];
+  if (!t.has_phone) flags.push("אין טלפון");
+  if (!t.online) flags.push("לא אונליין");
+  if (t.age_groups.length === 0) flags.push("אין קבוצות גיל");
+  else if (t.age_groups.length === 1) flags.push(`רק ${t.age_groups[0]}`);
+  if (flags.length === 0) return <span className="text-stone-300">-</span>;
+  return (
+    <span className="inline-flex flex-wrap justify-center gap-1">
+      {flags.map((f) => (
+        <span key={f} className="rounded border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[10.5px] font-semibold text-amber-800">{f}</span>
+      ))}
+    </span>
+  );
+}
 
 // התצוגה של פורטל המרכז, מופרדת מטעינת הנתונים (7/9/2026). שני קוראים:
 // הפורטל עצמו, ו-"צפייה בתור מרכז" באדמין. preview=true מסתיר את הפעולות
@@ -142,6 +164,13 @@ export default function CenterDashboardView({ data, preview = false, justCreated
         <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="מצטבר" color="#1A7A96" />
         <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? 0} sub="מצטבר" color="#2A5C3A" />
       </div>
+
+      {stats?.by_source && stats.by_source.direct_contacts > 0 && (
+        <p className="-mt-4 mb-8 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-xs leading-6 text-stone-600">
+          מתוך הפניות, <strong>{stats.by_source.direct_contacts}</strong> הגיעו מכניסה ישירה
+          לעמוד הפרופיל - קישור שנשלח או חיפוש השם בגוגל, בלי מעבר דרך ההתאמות או המאגר.
+        </p>
+      )}
 
       {/* מסלול 2: הצעד הקריטי - בלי סוגי טיפול המרכז לא קיים בהתאמות */}
       {isEntity && center.entity && center.entity.matching_filled === false && (
@@ -234,8 +263,10 @@ export default function CenterDashboardView({ data, preview = false, justCreated
                 <tr className="border-b border-stone-200 text-xs text-stone-500">
                   <th className="py-2 font-semibold">מטפל/ת</th>
                   <th className="py-2 font-semibold text-center">סטטוס</th>
-                  <th className="py-2 font-semibold text-center">צפיות (מצטבר)</th>
-                  <th className="py-2 font-semibold text-center">לחיצות ליצירת קשר (מצטבר)</th>
+                  <th className="py-2 font-semibold text-center">חשיפות</th>
+                  <th className="py-2 font-semibold text-center">צפיות</th>
+                  <th className="py-2 font-semibold text-center">לחיצות ליצירת קשר</th>
+                  <th className="py-2 font-semibold text-center">מה חוסם</th>
                   <th className="py-2 font-semibold text-left">פעולות</th>
                 </tr>
               </thead>
@@ -265,8 +296,10 @@ export default function CenterDashboardView({ data, preview = false, justCreated
                         <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-xs text-stone-500">ממתין לאישור</span>
                       )}
                     </td>
+                    <td className="py-2.5 text-center font-bold text-[#7c3aed]">{t.exposure}</td>
                     <td className="py-2.5 text-center font-bold text-[#1A7A96]">{t.month_views}</td>
                     <td className="py-2.5 text-center font-bold text-[#2A5C3A]">{t.month_clicks}</td>
+                    <td className="py-2.5 text-center">{blockers(t)}</td>
                     <td className="py-2.5 text-left whitespace-nowrap">
                       <Link href={`/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline me-3">
                         ✏️ עריכה
@@ -314,43 +347,18 @@ export default function CenterDashboardView({ data, preview = false, justCreated
         </section>
       )}
 
-      {/* מאיפה מגיעות הפניות - משפך לכל מקור בנפרד */}
-      {stats?.by_source && (stats.by_source.match.impressions > 0 || stats.by_source.directory.impressions > 0) && (
-        <section className="mb-6 rounded-2xl border border-stone-200 bg-white p-5">
-          <h2 className="mb-1 text-base font-black text-stone-800">מאיפה מגיעות הפניות</h2>
-          <p className="mb-5 text-xs text-stone-400">
-            שני מקורות חשיפה נפרדים - שאלון ההתאמה וגלישה במאגר. הפילוח מראה איפה החשיפה
-            באמת הופכת לפנייה, וממילא איפה כדאי להשקיע.
-          </p>
-          <div className="grid gap-3 md:grid-cols-2">
-            <SourceFunnelCard
-              title="✨ שאלון ההתאמה" color="#7c3aed"
-              hint={isEntity ? "לפי סוגי הטיפול שסימנתם" : "לפי הפרופילים של מטפלי המרכז"}
-              f={stats.by_source.match}
-            />
-            <SourceFunnelCard
-              title="🔎 מאגר המטפלים" color="#0F766E"
-              hint="גלישה חופשית ועמודי עיר/גישה בגוגל"
-              f={stats.by_source.directory}
-            />
-          </div>
-          {stats.by_source.direct_contacts > 0 && (
-            <p className="mt-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
-              בנוסף: <strong>{stats.by_source.direct_contacts}</strong> לחיצות ליצירת קשר הגיעו מכניסה
-              ישירה לעמוד הפרופיל (קישור שנשלח, חיפוש בגוגל) - בלי מעבר דרך ההתאמות או המאגר.
-            </p>
-          )}
-        </section>
-      )}
-
+      {/* משפך שני-המקורות הוסר 7/9/2026: הוא הציג למרכז יחסי המרה בין
+          "הופעות במאגר" ל"הופעות בהתאמות" שאין לו שום ידית להשפיע עליהם,
+          ובעיקר נקרא כהתנצלות. מה שכן שרד ממנו - כמה פניות הגיעו בכניסה
+          ישירה - יושב עכשיו כשורה אחת מתחת למדדים. */}
       {/* מה המנוי מייצר מול מטפל ללא קידום */}
       {stats?.benchmark && (stats.benchmark.free_avg_views > 0 || stats.benchmark.free_avg_contacts > 0) && (
         <section className="mb-6 rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
           <h2 className="mb-1 text-base font-black" style={{ color: "var(--teal-dark)" }}>מה המנוי מייצר</h2>
           <p className="mb-4 text-xs leading-5 text-stone-500">
             {isEntity ? "המרכז שלכם" : "ממוצע למטפל במרכז"} מול {stats.benchmark.peers} מטפלים
-            ללא קידום, <strong>באותם {stats.benchmark.days} הימים בדיוק</strong> - כך שגודל
-            התקופה ונפח התנועה באתר זהים לשני הצדדים.
+            ללא קידום <strong>באזורים שלכם</strong>, ובאותם {stats.benchmark.days} הימים בדיוק - כך
+            שגם האזור, גם אורך התקופה וגם נפח התנועה באתר זהים לשני הצדדים.
           </p>
           <div className="grid gap-3 sm:grid-cols-2">
             <CompareRow
