@@ -165,8 +165,21 @@ export default function CenterDashboardView({ data, preview = false, justCreated
         <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? 0} sub="מצטבר" color="#2A5C3A" />
       </div>
 
+      {/* ההסבר יושב מיד מתחת למדדים ולא בתחתית העמוד: הוא מגדיר מה המספרים
+          שמעליו אומרים, וקורא שהגיע אליו רק אחרי גלילה כבר פירש אותם לבד. */}
+      <div className="-mt-4 mb-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
+        <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>
+        <p className="text-[13px] leading-6 text-stone-700">
+          <strong>חשיפות</strong> = כמה פעמים הפרופיל הוצג - בהתאמות או בגלישה במאגר.
+          {" "}<strong>צפיות</strong> = מי שבאמת נכנס לפרופיל.
+          {" "}<strong>לחיצות ליצירת קשר</strong> = כל פעם שמטופל לחץ על הוואטסאפ, הטלפון או המייל, כלומר ביקש ליצור קשר.
+          חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליכם בפועל.
+          הודעות שנשלחו דרך טופס האתר הן היחידות שמגיעות תמיד, ישירות למייל.
+        </p>
+      </div>
+
       {stats?.by_source && stats.by_source.direct_contacts > 0 && (
-        <p className="-mt-4 mb-8 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-xs leading-6 text-stone-600">
+        <p className="mb-8 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5 text-xs leading-6 text-stone-600">
           מתוך הפניות, <strong>{stats.by_source.direct_contacts}</strong> הגיעו מכניסה ישירה
           לעמוד הפרופיל - קישור שנשלח או חיפוש השם בגוגל, בלי מעבר דרך ההתאמות או המאגר.
         </p>
@@ -396,14 +409,6 @@ export default function CenterDashboardView({ data, preview = false, justCreated
               <Channel label="טלפון" value={(stats.clicks_total ?? EMPTY_CLICKS).phone} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#57534e" />
               <Channel label="מייל" value={(stats.clicks_total ?? EMPTY_CLICKS).email} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#3b82f6" />
               <Channel label="📝 הודעות מהאתר" value={(stats.clicks_total ?? EMPTY_CLICKS).site_message ?? 0} total={(stats.clicks_total ?? EMPTY_CLICKS).total} color="#d97706" />
-            </div>
-            <div className="mt-4 rounded-xl border p-4" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
-              <h4 className="mb-1.5 text-sm font-black" style={{ color: "var(--teal-dark)" }}>ⓘ מה נספר כאן?</h4>
-              <p className="text-[13px] leading-6 text-stone-700">
-                המספרים סופרים כל פעם שמטופל <strong>לחץ</strong> על הוואטסאפ, הטלפון או המייל שבפרופיל, כלומר ביקש ליצור קשר.
-                חלק מהלוחצים לא משלימים את השליחה או את השיחה, ולכן ייתכן שלא כל לחיצה הגיעה אליכם בפועל.
-                הודעות שנשלחו דרך טופס האתר הן היחידות שמגיעות תמיד, ישירות למייל.
-              </p>
             </div>
           </div>
 
