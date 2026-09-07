@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HelpTip from "../components/HelpTip";
-import { TASK_PRIORITIES, labelOf } from "@/app/lib/crm";
+import { TASK_PRIORITIES, TASK_STATUSES, labelOf } from "@/app/lib/crm";
 
 type Task = {
   id: string;
@@ -75,7 +75,7 @@ export default function TasksPage() {
       .then((j) => setAssignees(j.ok ? j.assignees : []))
       .catch(() => setAssignees([]));
     Promise.all([
-      fetch("/api/admin-crm/tasks?status=open").then((r) => r.json()),
+      fetch("/api/admin-crm/tasks?status=active").then((r) => r.json()),
       fetch("/api/admin-crm/tasks?status=done").then((r) => r.json()),
       fetch("/api/admin-crm/task-suggestions").then((r) => r.json()),
     ])
@@ -389,6 +389,21 @@ function TaskGroup({
                   </div>
                 )}
               </div>
+              <select
+                value={t.status}
+                onChange={(e) => onPatch(t.id, { status: e.target.value })}
+                disabled={busy === t.id}
+                title="סטטוס"
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+                  TASK_STATUSES.find((x) => x.value === t.status)?.cls ?? ""
+                }`}
+              >
+                {TASK_STATUSES.map((x) => (
+                  <option key={x.value} value={x.value}>
+                    {x.label}
+                  </option>
+                ))}
+              </select>
               {/* שינוי אחראי במקום, בלי לפתוח את המשימה. PATCH כבר תמך בשדה. */}
               <select
                 value={t.assignee ?? ""}

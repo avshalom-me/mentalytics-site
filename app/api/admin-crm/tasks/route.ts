@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { ACTIVE_TASK_STATUSES, TASK_STATUSES } from "@/app/lib/crm";
 
 // CRM follow-up tasks. Open tasks with a due date surface in the dashboard
 // work queue; entity_label is denormalized so lists render without joins.
 
 export async function GET(req: NextRequest) {
   const params = req.nextUrl.searchParams;
-  const status = params.get("status") ?? "open"; // open | done | all
+  // "active" = כל מה שלא בוצע. בלעדיו העמוד היה טוען open בלבד ומשימה
+  // "בתהליך" לא הייתה מופיעה באף אחת משתי הרשימות.
+  const status = params.get("status") ?? "open"; // open | in_progress | done | active | all
   const entityType = params.get("entity_type");
   const entityId = params.get("entity_id");
 
@@ -17,7 +20,8 @@ export async function GET(req: NextRequest) {
     .order("created_at", { ascending: false })
     .limit(500);
 
-  if (status !== "all") q = q.eq("status", status);
+  if (status === "active") q = q.in("status", [...ACTIVE_TASK_STATUSES]);
+  else if (status !== "all") q = q.eq("status", status);
   if (entityType) q = q.eq("entity_type", entityType);
   if (entityId) q = q.eq("entity_id", entityId);
 
@@ -61,12 +65,11 @@ export async function PATCH(req: NextRequest) {
     if (!b.id) return NextResponse.json({ ok: false, error: "חסר id" }, { status: 400 });
 
     const update: Record<string, unknown> = {};
-    if (b.status === "done") {
-      update.status = "done";
-      update.completed_at = new Date().toISOString();
-    } else if (b.status === "open") {
-      update.status = "open";
-      update.completed_at = null;
+    // completed_at נגזר מהמצב ולא נשלח מהלקוח: רק "בוצע" נושא חותמת, וכל
+    // חזרה אחורה (כולל ל"בתהליך") מנקה אותה.
+    if (TASK_STATUSES.some((x) => x.value === b.status)) {
+      update.status = b.status;
+      update.completed_at = b.status === "done" ? new Date().toISOString() : null;
     }
     if ("title" in b && String(b.title).trim()) update.title = String(b.title).trim().slice(0, 300);
     if ("details" in b) update.details = b.details ? String(b.details).slice(0, 2000) : null;
