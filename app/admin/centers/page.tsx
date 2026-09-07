@@ -85,9 +85,17 @@ type CenterTherapistRow = {
   admin_approved: boolean;
   email: string | null;
   missing_fields: string[];
+  /** חשיפה: כרטיס בהתאמות + הופעה במאגר. נפרד מ"צפיות" שהן כניסות לפרופיל. */
+  cards_30: number; cards_total: number;
+  dir_impr_30: number; dir_impr_total: number;
   views_30: number; views_total: number;
   clicks_30: number; clicks_total: number;
   by_type_30: Record<string, number>;
+  /** דגלי מוכנות - למה מטפל מאושר עדיין לא נחשף או לא ניתן לפנייה. */
+  has_phone: boolean;
+  online: boolean;
+  age_groups: string[];
+  promoted_since: string | null;
 };
 
 // אותם שמות סוג-פנייה כמו בעמוד הערבות ובדשבורד המטפל - ודאי מול כוונה.
@@ -104,6 +112,33 @@ function clickTypeParts(byType: Record<string, number>): string {
     .sort((a, b) => b[1] - a[1])
     .map(([k, n]) => `${CLICK_TYPE_LABELS[k] ?? k} ${n}`)
     .join(" · ");
+}
+
+// למה מטפל מאושר בכל זאת לא נחשף או לא ניתן לפנייה. אלה לא שדות חסרים
+// (יש לזה עמודה משלה) אלא מגבלות שנבחרו: בלי טלפון אין כפתור וואטסאפ ואין
+// חיוג בכרטיס, קבוצת גיל אחת מוציאה מכל שאלון אחר, ומי שאינו אונליין נראה
+// רק לחיפושים מהאזור שלו. במכון הכרה (7/9/26) שלושת אלה הסבירו את מלוא
+// הפער בין 8 פניות ל-0, בלי שאף אחד מהם הופיע במסך.
+function readinessFlags(t: CenterTherapistRow) {
+  const flags: string[] = [];
+  if (!t.is_entity && !t.has_phone) flags.push("אין טלפון");
+  if (!t.online) flags.push("לא אונליין");
+  if (t.age_groups.length > 0 && t.age_groups.length <= 1) flags.push(`גיל: ${t.age_groups[0]}`);
+  if (t.age_groups.length === 0) flags.push("אין קבוצות גיל");
+  if (t.promoted && t.promoted_since) {
+    const days = Math.floor((Date.now() - new Date(t.promoted_since).getTime()) / 86_400_000);
+    if (days <= 14) flags.push(`מקודם ${days} י'`);
+  }
+  if (flags.length === 0) return <span className="text-stone-400">-</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {flags.map((f) => (
+        <span key={f} className="rounded border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[10.5px] font-semibold text-amber-800">
+          {f}
+        </span>
+      ))}
+    </span>
+  );
 }
 
 const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = {
@@ -758,9 +793,11 @@ export default function AdminCentersPage() {
                           <tr className="bg-stone-50 text-right text-stone-500">
                             <th className="px-2 py-1.5 font-semibold">מטפל/ת</th>
                             <th className="px-2 py-1.5 font-semibold">מצב</th>
-                            <th className="px-2 py-1.5 font-semibold">צפיות 30 י'</th>
+                            <th className="px-2 py-1.5 font-semibold">חשיפות 30 י'</th>
+                            <th className="px-2 py-1.5 font-semibold">נכנסו לפרופיל</th>
                             <th className="px-2 py-1.5 font-semibold">פניות 30 י'</th>
                             <th className="px-2 py-1.5 font-semibold">לפי סוג</th>
+                            <th className="px-2 py-1.5 font-semibold">מוכנות</th>
                             <th className="px-2 py-1.5 font-semibold">מצטבר</th>
                             <th className="px-2 py-1.5 font-semibold">חסר בפרופיל</th>
                           </tr>
@@ -778,15 +815,32 @@ export default function AdminCentersPage() {
                                     ? <span className="text-stone-600">מאושר/ת, לא מקודם/ת</span>
                                     : <span className="font-bold text-amber-700">ממתין/ה לאישור</span>}
                               </td>
+                              <td className="px-2 py-1.5 text-stone-700">
+                                <b className="text-stone-900">{t.cards_30 + t.dir_impr_30}</b>
+                                {(t.cards_30 > 0 || t.dir_impr_30 > 0) && (
+                                  <span className="text-stone-400"> ({t.cards_30} התאמה / {t.dir_impr_30} מאגר)</span>
+                                )}
+                              </td>
                               <td className="px-2 py-1.5">{t.views_30}</td>
                               <td className="px-2 py-1.5 font-bold text-stone-900">{t.clicks_30}</td>
                               <td className="px-2 py-1.5 text-stone-600">{clickTypeParts(t.by_type_30) || "-"}</td>
-                              <td className="px-2 py-1.5 text-stone-500">{t.views_total} צ' / {t.clicks_total} פ'</td>
+                              <td className="px-2 py-1.5">{readinessFlags(t)}</td>
+                              <td className="px-2 py-1.5 text-stone-500">{t.cards_total + t.dir_impr_total} ח' / {t.views_total} צ' / {t.clicks_total} פ'</td>
                               <td className="px-2 py-1.5 text-amber-700">{t.missing_fields.length > 0 ? t.missing_fields.join(", ") : "✓ מלא"}</td>
                             </tr>
                           ))}
                         </tbody>
                       </table>
+                      {/* בלי המשפט הזה "0 פניות" נקרא כמו כישלון של המטפל.
+                          המספרים שלנו הם רצפה: מי שראה שם ומספר יכול לחפש
+                          אותו בגוגל ולפנות ישירות, וזה לא עובר דרכנו כלל. */}
+                      <p className="border-t border-stone-200 bg-stone-50 px-2 py-1.5 text-[11px] leading-5 text-stone-500">
+                        <b>חשיפות</b> = כרטיס שהוצג בהתאמות + הופעה במאגר. <b>נכנסו לפרופיל</b> = מי שבאמת פתח את הפרופיל.
+                        <b> פניות</b> = לחיצות ליצירת קשר (טלפון, וואטסאפ, הודעה), ולא אנשים - אותו אדם יכול ללחוץ פעמיים.
+                        {" "}מספר הפניות הוא <b>רצפה ולא התמונה המלאה</b>: חלק ממי שנחשף כאן ממשיך לאתר של המרכז או מחפש את השם בגוגל
+                        ופונה משם ישירות, וזה לא נספר אצלנו. לכן פער בין חשיפות לפניות אינו בהכרח כישלון - אבל פער בין
+                        מטפלים <i>באותו מרכז</i> כן מצביע על ההבדל ביניהם, ועמודת המוכנות מסבירה אותו.
+                      </p>
                     </div>
                   )
                 )}
