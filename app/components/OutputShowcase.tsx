@@ -26,7 +26,17 @@ const STEPS = [
 /** בדף נחיתה שאין בו כותרת משלו (למשל /lp/story-c, שם הדמו הוא הפתיח)
  *  הכותרת של הרכיב היא הכותרת הראשית של העמוד. בדף הבית ובשאר העמודים היא
  *  נשארת h2, כי שם כבר יש h1 מעליה. */
-export default function OutputShowcase({ headingLevel = "h2" }: { headingLevel?: "h1" | "h2" } = {}) {
+/** ה"אייברו" שמעל הכותרת. בדף הבית הוא תגית קצרה, ובדף נחיתה הוא יכול לשאת
+ *  משפט שלם שמסביר מה עושים כאן - ואז הוא נקרא כשורת פתיח ולא כתגית. */
+export default function OutputShowcase({
+  headingLevel = "h2",
+  eyebrow = "כך זה נראה מבפנים",
+  eyebrowVariant = "pill",
+}: {
+  headingLevel?: "h1" | "h2";
+  eyebrow?: string;
+  eyebrowVariant?: "pill" | "lead";
+} = {}) {
   const Heading = headingLevel;
   const [idx, setIdx] = useState(0);
   // Bumped on every pane change - remounts the step progress bar so its CSS
@@ -63,7 +73,7 @@ export default function OutputShowcase({ headingLevel = "h2" }: { headingLevel?:
       <style>{OSW_CSS}</style>
 
       <div className="osw-head">
-        <span className="osw-eyebrow">כך זה נראה מבפנים</span>
+        <span className={eyebrowVariant === "lead" ? "osw-lead" : "osw-eyebrow"}>{eyebrow}</span>
         <Heading>
           מהשאלון - עד <em>המטפל המתאים</em>
         </Heading>
@@ -280,6 +290,7 @@ const OSW_CSS = `
   display:flex;flex-direction:column;align-items:center;
 }
 .osw-head{text-align:center;max-width:620px;margin:0 auto 44px;}
+.osw-lead{display:block;color:var(--teal-dark);font-size:15.5px;font-weight:800;line-height:1.65;background:var(--teal-pale);border-radius:16px;padding:14px 20px;margin:0 auto 18px;text-align:center;}
 .osw-eyebrow{display:inline-block;background:var(--teal-pale);color:var(--teal-dark);font-size:12.5px;font-weight:800;border-radius:50px;padding:4px 14px;margin-bottom:14px;}
 .osw-head h1,.osw-head h2{font-size:clamp(1.9rem,3.2vw,3rem);font-weight:900;line-height:1.12;letter-spacing:-.02em;color:var(--text);}
 .osw-head h1 em,.osw-head h2 em{font-style:normal;color:var(--teal);}

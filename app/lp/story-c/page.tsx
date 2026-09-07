@@ -22,6 +22,11 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// שורת הפתיח מעל הדמו. היא מחליפה את התגית "כך זה נראה מבפנים" של דף הבית
+// ואומרת לקורא שהגיע ממודעה מה בדיוק הוא עומד לעשות כאן.
+const LEAD =
+  "מלא/י שאלון פסיכולוגי מקצועי שימצא מה הקושי, מה סוג הטיפול המתאים, איזה אישיות פסיכולוג אתה צריך, ומשדך לך את הפסיכולוג/ית המתאימה ביותר";
+
 const QUESTIONS = [
   "CBT או טיפול דינמי? ומה ההבדל בכלל?",
   "פסיכולוג, פסיכותרפיסט או עובד סוציאלי קליני?",
@@ -38,7 +43,11 @@ export default function StoryC() {
 
       {/* בלי כותרת משלנו מעל: הקורא מגיע מהמודעה, שכבר אמרה את המשפט, ונוחת
           ישר על הדמו. הכותרת של הדמו היא ה-h1 של העמוד. */}
-      <OutputShowcase headingLevel="h1" />
+      <OutputShowcase
+        headingLevel="h1"
+        eyebrowVariant="lead"
+        eyebrow={LEAD}
+      />
 
       <article className="mx-auto max-w-3xl px-5 pt-6 pb-14">
         <TrustBadges />
