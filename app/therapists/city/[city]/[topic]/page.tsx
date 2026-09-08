@@ -98,9 +98,15 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר ותחום</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, הפועלים {inPhrase(city)} ושתעודותיהם אומתו{onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.
+        {/* The first paragraph is what Google quotes when it skips the meta
+            description. It used to be the thin supply line below, so the snippet
+            read "מוצגים מטפלים..." and then ran into the card grid. Same sentence
+            shape as the city pages, which is the one that produced the snippet
+            we wanted ("מלאו שאלון מקצועי..."). */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים ${inPhrase(city)} שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
         </p>
+        <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
       </div>
 
       {/* Quiz CTA. A children/teens topic sends parents to the kids

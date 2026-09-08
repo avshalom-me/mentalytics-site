@@ -95,11 +95,12 @@ export default async function AssessmentPage({ params }: { params: Promise<{ typ
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
           {a.searchTitle}
         </h1>
-        {list.length >= MIN_LISTED_FOR_INDEX && (
-          <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם מוצגים מאבחנים שתעודותיהם אומתו${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
-          </p>
-        )}
+        {/* Quotable intro - see city/[city]/[topic]. List first: on an
+            assessment page the assessor list is the primary offer, and the
+            questionnaire is orientation, not a route to an assessment. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${a.name}: עברו על רשימת המאבחנים שתעודות ההכשרה שלהם אומתו ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים כדי להבין מה מתאים לכם. בחינם וללא התחייבות.`}
+        </p>
       </div>
 
       {/* The editorial half - what the searcher actually asked. */}

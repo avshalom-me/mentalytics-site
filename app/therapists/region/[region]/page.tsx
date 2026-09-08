@@ -139,8 +139,12 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
           {isOnline ? (
             <>
-              כל הפסיכולוגים והמטפלים שמציעים טיפול נפשי אונליין דרך טיפול חכם - בזום או בשיחת וידאו,
-              מכל מקום בארץ או בחו"ל. מתלבטים אם טיפול מרחוק בכלל מתאים לכם?{" "}
+              {/* The online hub is the strongest organic page in its family
+                  (42 entries) and was the only branch here without the
+                  quotable sentence. Same shape as the geographic branch below. */}
+              טיפול פסיכולוגי אונליין: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם
+              אומתו ומטפלים בזום או בשיחת וידאו מכל מקום בארץ או בחו"ל ופנו ישירות. בחינם וללא התחייבות.
+              מתלבטים אם טיפול מרחוק בכלל מתאים לכם?{" "}
               <Link href="/research/online-therapy" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
                 כתבנו על מה שהמחקר אומר ולמי זה מתאים
               </Link>

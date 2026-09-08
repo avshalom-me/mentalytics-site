@@ -89,11 +89,11 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
           {a.searchTitle}
         </h1>
-        {list.length >= MIN_LISTED_FOR_INDEX && (
-          <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו ושציינו שהם עובדים מול ${a.name}${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
-          </p>
-        )}
+        {/* Quotable intro - see city/[city]/[topic]. List first: "who takes
+            my funding" is the intent, so the funded list leads. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${a.searchTitle}: עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ושציינו שהם עובדים מול ${a.name} ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם. בחינם וללא התחייבות.`}
+        </p>
       </div>
 
       <div className="mb-8 grid gap-4 lg:grid-cols-3">

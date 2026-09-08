@@ -104,10 +104,13 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
           {topic.kind === "audience" ? "לפי קהל" : "לפי קושי"}
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{topic.searchTitle}</h1>
+        {/* Quotable intro first - see city/[city]/[topic]. Unconditional: it
+            claims no supply, so it is true on a thin page too. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${topic.name}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
+        </p>
         {list.length >= MIN_LISTED_FOR_INDEX && (
-          <p className="mt-2 text-sm text-stone-500">
-            {topic.supplyNote}, שתעודותיהם אומתו{onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.
-          </p>
+          <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
         )}
       </div>
 
