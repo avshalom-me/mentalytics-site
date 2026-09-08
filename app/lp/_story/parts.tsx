@@ -24,6 +24,29 @@ export function Byline({ date = "ספטמבר 2026" }: { date?: string }) {
   );
 }
 
+/** שני כפתורי השאלון בשורה אחת, בלי הקופסה של QuizCta. לדף שבו הדמו פותח
+ *  את העמוד: הכפתור הראשון חייב להיות במסך הראשון גם כשהטלפון תופס מסך שלם. */
+const INLINE_BTN =
+  "inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95";
+const INLINE_STYLE = { borderRadius: "50px", padding: "12px 26px", fontSize: "15px" } as const;
+
+export function QuizButtonsInline() {
+  return (
+    <div className="mt-5 flex flex-wrap justify-center gap-2.5">
+      <Link href="/adults" className={INLINE_BTN} style={{ ...INLINE_STYLE, background: "var(--teal)", color: "#fff" }}>
+        שאלון למבוגרים
+      </Link>
+      <Link
+        href="/kids"
+        className={INLINE_BTN}
+        style={{ ...INLINE_STYLE, background: "var(--bg)", color: "var(--teal-dark)", border: "1.5px solid var(--teal)" }}
+      >
+        שאלון לילדים ולנוער
+      </Link>
+    </div>
+  );
+}
+
 export function TrustBadges() {
   return (
     <div className="mt-5 mb-2 flex flex-wrap gap-x-5 gap-y-2.5" style={{ fontSize: "13px", color: "var(--muted)" }}>

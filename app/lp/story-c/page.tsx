@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import OutputShowcase from "@/app/components/OutputShowcase";
 import QuizCta from "@/app/therapists/QuizCta";
-import { TrustBadges, H2, P, StoryClosing } from "@/app/lp/_story/parts";
+import { TrustBadges, QuizButtonsInline, H2, P, StoryClosing } from "@/app/lp/_story/parts";
 
 // גרסה ג' - "הבעיה" - הגרסה שנבחרה לקמפיין B (7/9/26), אחרי תיקוני הבעלים:
 //   - הדמו (הטלפון) פותח את העמוד, בלי כותרת משלנו מעליו: המודעה כבר אמרה
@@ -47,6 +47,7 @@ export default function StoryC() {
         headingLevel="h1"
         eyebrowVariant="lead"
         eyebrow={LEAD}
+        headExtra={<QuizButtonsInline />}
       />
 
       <article className="mx-auto max-w-3xl px-5 pt-6 pb-14">

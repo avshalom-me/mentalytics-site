@@ -32,10 +32,14 @@ export default function OutputShowcase({
   headingLevel = "h2",
   eyebrow = "כך זה נראה מבפנים",
   eyebrowVariant = "pill",
+  headExtra,
 }: {
   headingLevel?: "h1" | "h2";
   eyebrow?: string;
   eyebrowVariant?: "pill" | "lead";
+  /** נוסף מתחת לכותרת ולפני הטלפון - למשל כפתורי השאלון בדף נחיתה, כדי
+   *  שמי שכבר משוכנע לא יצטרך לגלול מסך שלם של דמו כדי להתחיל. */
+  headExtra?: React.ReactNode;
 } = {}) {
   const Heading = headingLevel;
   const [idx, setIdx] = useState(0);
@@ -78,6 +82,7 @@ export default function OutputShowcase({
           מהשאלון - עד <em>המטפל המתאים</em>
         </Heading>
         <p>דוח אישי ברור, ניתוח מותאם, ורשימת מטפלים שמדורגת בדיוק בשבילך.</p>
+        {headExtra}
       </div>
 
       <div className="osw-stage">

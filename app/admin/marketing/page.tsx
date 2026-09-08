@@ -718,6 +718,8 @@ type AdsData = {
 type CampaignFunnelRow = {
   campaign: string;
   sessions: number;
+  /** Distinct sessions that reached a questionnaire's opening screen (8/9/26). */
+  quiz_started?: number;
   quiz_completed: number;
   viewed_profile: number;
   contacts: number;
@@ -894,7 +896,7 @@ function FunnelsCampaigns() {
             <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
               <h3 className="mb-1 text-base font-black text-stone-800">משפך לפי קמפיין ממומן</h3>
               <p className="mb-3 text-xs text-stone-500">
-                מה עשו מי שהגיעו מכל קמפיין: קליקים בגוגל ← כניסות לאתר ← מילאו שאלון ← צפו בפרופיל ← פנו (לפי סוג ומקור).
+                מה עשו מי שהגיעו מכל קמפיין: קליקים ← כניסות לאתר ← התחילו שאלון ← מילאו שאלון ← צפו בפרופיל ← פנו (לפי סוג ומקור).
               </p>
               <table className="w-full text-sm">
                 <thead>
@@ -902,6 +904,7 @@ function FunnelsCampaigns() {
                     <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
                     <th className="px-2 py-2 text-center font-semibold">קליקים (גוגל)</th>
                     <th className="px-2 py-2 text-center font-semibold">כניסות לאתר</th>
+                    <th className="px-2 py-2 text-center font-semibold">התחילו שאלון</th>
                     <th className="px-2 py-2 text-center font-semibold">מילאו שאלון</th>
                     <th className="px-2 py-2 text-center font-semibold">צפו בפרופיל</th>
                     <th className="px-2 py-2 text-center font-semibold">פנו (אנשים)</th>
@@ -937,6 +940,7 @@ function FunnelsCampaigns() {
                             {billed != null ? num(billed) : "—"}
                           </td>
                           <td className="px-2 text-center text-stone-400">{num(r.sessions)}</td>
+                          <td className="px-2 text-center font-semibold text-stone-700">{num(r.quiz_started ?? 0)}</td>
                           <td className="px-2 text-center text-stone-600">{num(r.quiz_completed)}</td>
                           <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
                           <td className="px-2 py-1 text-center">
