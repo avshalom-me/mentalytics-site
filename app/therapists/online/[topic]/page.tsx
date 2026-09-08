@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/topics";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import TopicFaq from "@/app/therapists/TopicFaq";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 // Online×topic (phase 3 of the online cluster - see ONLINE_TOPIC_SLUGS in
@@ -160,6 +161,8 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           למילוי השאלון
         </Link>
       </div>
+
+      <TopicFaq topic={topic} title={`${heading} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

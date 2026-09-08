@@ -2,7 +2,8 @@ import { notFound } from "next/navigation";
 import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, loadListedCounts, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
+import TopicFaq from "@/app/therapists/TopicFaq";
 import { TOPICS, slugToTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS } from "@/app/lib/topics";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
@@ -83,8 +84,10 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
   // City sub-pages (the M4 pilot) - link only combos that are actually indexable.
   const cityLinks: { city: string; count: number }[] = [];
   if ((CITY_TOPIC_SLUGS as readonly string[]).includes(topic.slug)) {
+    // One in-memory count set: audience topics now span every city with a page.
+    const counts = await loadListedCounts();
     for (const city of cityTopicCitiesFor(topic)) {
-      const count = await countListed({ ...topic.filter, city });
+      const count = counts.count({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) cityLinks.push({ city, count });
     }
   }
@@ -135,6 +138,8 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
           למילוי השאלון
         </Link>
       </div>
+
+      <TopicFaq topic={topic} title={`${topic.name} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

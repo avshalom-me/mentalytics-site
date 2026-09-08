@@ -2,9 +2,10 @@ import { notFound } from "next/navigation";
 import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists, countListed } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, loadListedCounts } from "@/app/lib/therapist-directory";
 import { slugToCity } from "@/app/lib/regions";
-import { regionToSlug } from "@/app/lib/regions";
+import { regionToSlug, neighborsOf } from "@/app/lib/regions";
+import TopicFaq from "@/app/therapists/TopicFaq";
 import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
 import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const r = await resolve(params);
   if (!r) return { title: "עמוד לא נמצא" };
   const { city, topic } = r;
-  const title = `${topic.name} ${inPhrase(city)} - מטפלים מאומתים`;
+  const title = `${topic.name} ${inPhrase(city)} - ${topic.cityTitleTail ?? "מטפלים מאומתים"} | טיפול חכם`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
   // Same shape as the city pages, and count-free for the same reason.
@@ -78,13 +79,34 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
   };
 
   // Sister pages for internal linking: same topic in the other allowed cities
-  // (only when THEY are indexable too), and the parent pages.
-  const sisterCities: string[] = [];
-  for (const c of cityTopicCitiesFor(topic)) {
-    if (c === city) continue;
-    const n = await countListed({ ...topic.filter, city: c });
-    if (n >= MIN_CITY_TOPIC) sisterCities.push(c);
-  }
+  // (only when THEY are indexable too), nearest first, capped. One in-memory
+  // count set: the audience list is every city with a page, not three.
+  const counts = await loadListedCounts();
+  const eligible = cityTopicCitiesFor(topic).filter(
+    (c) => c !== city && counts.count({ ...topic.filter, city: c }) >= MIN_CITY_TOPIC
+  );
+  const near = neighborsOf(city).filter((c) => eligible.includes(c));
+  const sisterCities = [...near, ...eligible.filter((c) => !near.includes(c))].slice(0, 8);
+
+  // What makes THIS city's page differ from the next one, derived from its own
+  // listing and count-free (owner's rule): which professions are actually
+  // here, which ages they cover, whether video is an option, and where else
+  // nearby a parent could look. Audience pages only.
+  const cityNote = (() => {
+    if (topic.kind !== "audience" || list.length === 0) return null;
+    const freq = new Map<string, number>();
+    for (const t of list) for (const p of t.therapist_types ?? []) freq.set(p, (freq.get(p) ?? 0) + 1);
+    const professions = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => p);
+    const ages = ["גיל הרך", "ילדים", "נוער"].filter((a) => list.some((t) => (t.age_groups ?? []).includes(a)));
+    const parts: string[] = [];
+    if (professions.length) parts.push(`${inPhrase(city)} מוצגים ${professions.join(", ")}`);
+    if (ages.length) parts.push(`שמטפלים ב${ages.join(", ")}`);
+    let s = parts.join(" ");
+    if (onlineHere > 0) s += ", וחלקם זמינים גם בשיחת וידאו";
+    s += ".";
+    if (near.length) s += ` מטפלים בתחום יש גם ${near.slice(0, 3).map(inPhrase).join(", ")}.`;
+    return s;
+  })();
   const isNamedTopic = TOPICS.some((t) => t.slug === topic.slug);
 
   return (
@@ -118,6 +140,11 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           ? `ענו על שאלון קצר מבוסס מחקר - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת ב${city} או אונליין.`
           : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
       />
+
+      {cityNote && (
+        <p className="mb-8 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>{cityNote}</p>
+      )}
+      <TopicFaq topic={topic} title={`${topic.name} ${inPhrase(city)} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
