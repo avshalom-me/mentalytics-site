@@ -11,6 +11,7 @@ import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { cityFact } from "@/app/lib/city-facts";
 
 // City×topic (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב", "CBT בירושלים".
 // Allow-listed topics, cities per cityTopicCitiesFor(), indexable only at
@@ -107,6 +108,12 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
     if (near.length) s += ` מטפלים בתחום יש גם ${near.slice(0, 3).map(inPhrase).join(", ")}.`;
     return s;
   })();
+  // One verified sentence about THIS city's public service for children
+  // (its שפ"ח, or the closest official equivalent), with the source linked.
+  // Audience pages only, and only for cities that were checked - see
+  // city-facts.ts for the rules. Rendered inside the same paragraph as the
+  // data-derived note so the page gains a sentence, not a section.
+  const fact = topic.kind === "audience" ? cityFact(city) : null;
   const isNamedTopic = TOPICS.some((t) => t.slug === topic.slug);
 
   return (
@@ -141,8 +148,19 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
       />
 
-      {cityNote && (
-        <p className="mb-8 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>{cityNote}</p>
+      {(cityNote || fact) && (
+        <p className="mb-8 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
+          {cityNote}
+          {cityNote && fact ? " " : null}
+          {fact && (
+            <>
+              {fact.text}
+              {" (מקור: "}
+              <a href={fact.url} target="_blank" rel="noopener" className="font-semibold text-[#2e7d8c] hover:underline">{fact.source}</a>
+              {")."}
+            </>
+          )}
+        </p>
       )}
       <TopicFaq topic={topic} title={`${topic.name} ${inPhrase(city)} - שאלות של הורים`} />
 

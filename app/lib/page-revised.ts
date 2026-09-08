@@ -51,6 +51,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/components/TherapistResultCard.tsx",
       "app/lib/meta-description.ts",
       "app/lib/topics.ts",
+      "app/lib/city-facts.ts",
     ],
   },
   "/": { date: "2026-09-02", sources: ["app/page.tsx"] },
