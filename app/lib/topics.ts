@@ -26,13 +26,13 @@ export type Topic = {
   /**
    * Paid-landing only: noindex + kept out of the sitemap.
    *
-   * For topics that deliberately overlap an existing indexed topic. Nobody
-   * searches "פסיכולוג ילדים ונוער" as a phrase - they search one or the
-   * other - so indexing a union page buys no organic traffic while handing
-   * Google a third near-identical therapist list per city. That is the
-   * scaled-content pattern the roadmap's anti-doorway rules exist to avoid.
-   * It still works perfectly as an ad destination: noindex has no effect on
-   * paid serving.
+   * Reserved for a topic that exists purely as an ad destination. It used to
+   * hide the kids+youth union page on the theory that nobody searches
+   * "פסיכולוג לילדים ונוער" as one phrase. A SERP check on 9/9/26 showed the
+   * opposite: the top result for exactly that query in Jerusalem is a
+   * competitor page titled "פסיכולוגים מומלצים לילדים ולבני נוער בירושלים",
+   * and the owner searched the phrase himself. The union page is indexed
+   * since then; the field stays for any future paid-only topic.
    */
   adsOnly?: boolean;
 };
@@ -163,10 +163,11 @@ export const TOPICS: Topic[] = [
   },
   {
     slug: "פסיכולוג-ילדים-ונוער",
-    name: "פסיכולוג לילדים ולנוער",
-    searchTitle: "פסיכולוג לילדים ולנוער - מטפלים רגשיים לילדים ומתבגרים",
+    // "לילדים ונוער", not "לילדים ולנוער": the former is how the query is
+    // typed (and how the competitor that ranks for it phrases its title).
+    name: "פסיכולוג לילדים ונוער",
+    searchTitle: "פסיכולוג לילדים ונוער - מטפלים רגשיים לילדים ומתבגרים",
     kind: "audience",
-    adsOnly: true,
     intro:
       "טיפול רגשי בילדים עובד אחרת מטיפול במבוגרים: דרך משחק, יצירה והקשר הטיפולי, ולרוב בשילוב הדרכת הורים שפעמים רבות היא המנוף המרכזי. הסימנים שמצדיקים התייעצות בגיל הזה הם שינוי התנהגותי מתמשך, קשיי שינה או אכילה, הסתגרות, התפרצויות חוזרות או קושי חברתי. בגיל ההתבגרות התמונה משתנה: עולות שאלות של זהות עצמית, דילמות חברתיות ולחצים לימודיים, והכל בגיל שבו עדיין אין עוגנים נפשיים חזקים, ולכן הוא משופע בקשיים שקשורים לחרדה, דכדוך או פגיעה עצמית. מתבגרים זקוקים למטפל שמדבר בגובה העיניים ויודע לבנות אמון הדרגתי גם עם מי שאינו מעוניין בטיפול בשלב ההתחלתי. גם כאן נמשכת העבודה עם ההורים, אך במינון מותאם: ככל שגיל המתבגר/ת עולה, כך כדאי יותר להתייעץ איתו/ה על מידת השילוב של ההורים בטיפול. שאלון הילדים והנוער שלנו ממפה את הקושי, מתחשב בגיל, וממליץ על סוג הטיפול המתאים.",
     filter: { ageGroupsAny: ["ילדים", "גיל הרך", "נוער"] },
@@ -232,6 +233,27 @@ export function isCityTopicAllowed(topic: Topic): boolean {
     (CITY_TOPIC_SLUGS as readonly string[]).includes(topic.slug) ||
     (CITY_TOPIC_APPROACHES as readonly string[]).includes(topic.name)
   );
+}
+
+/**
+ * Which cities may carry a page for this topic.
+ *
+ * Five places used to read PILOT_CITIES directly (the route resolver, the
+ * sister-city links, the sitemap, the national topic page, the city page).
+ * Routing every one of them through here means widening one family - the
+ * kids/youth audiences have real supply in ~20 cities and pages in 3 - is a
+ * change to this function, not to five files that must agree. The supply
+ * gate (MIN_CITY_TOPIC) stays where it is: this decides where a page MAY
+ * exist, the count decides whether it is indexed.
+ */
+export function cityTopicCitiesFor(_topic: Topic): readonly string[] {
+  return PILOT_CITIES;
+}
+
+/** The topics that can have city pages, resolved - the sitemap's list, shared. */
+export function cityTopicList(): Topic[] {
+  const slugs = [...CITY_TOPIC_SLUGS, ...CITY_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-"))];
+  return slugs.map((s) => slugToCityTopic(s)).filter((t): t is Topic => !!t && !t.adsOnly);
 }
 
 // ── Online×topic (phase 3 of the online cluster, 5/8/26) ─────────────────────

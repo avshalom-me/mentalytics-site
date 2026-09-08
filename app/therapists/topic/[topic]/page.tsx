@@ -3,7 +3,7 @@ import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { TOPICS, slugToTopic, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS } from "@/app/lib/topics";
+import { TOPICS, slugToTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS } from "@/app/lib/topics";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -83,7 +83,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
   // City sub-pages (the M4 pilot) - link only combos that are actually indexable.
   const cityLinks: { city: string; count: number }[] = [];
   if ((CITY_TOPIC_SLUGS as readonly string[]).includes(topic.slug)) {
-    for (const city of PILOT_CITIES) {
+    for (const city of cityTopicCitiesFor(topic)) {
       const count = await countListed({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) cityLinks.push({ city, count });
     }

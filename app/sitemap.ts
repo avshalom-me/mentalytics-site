@@ -4,7 +4,7 @@ import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib
 import { therapistPath } from "@/app/lib/therapist-url";
 import { loadListedCounts, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
-import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
+import { TOPICS, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
 import { ASSESSMENTS } from "@/app/lib/assessments";
@@ -224,7 +224,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const slug of cityTopicSlugs) {
     const topic = slugToCityTopic(slug);
     if (!topic || topic.adsOnly) continue;
-    for (const city of PILOT_CITIES) {
+    for (const city of cityTopicCitiesFor(topic)) {
       const count = counts.count({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) {
         topicPages.push({

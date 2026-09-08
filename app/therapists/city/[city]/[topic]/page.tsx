@@ -5,16 +5,16 @@ import type { Metadata } from "next";
 import { loadPublicTherapists, countListed } from "@/app/lib/therapist-directory";
 import { slugToCity } from "@/app/lib/regions";
 import { regionToSlug } from "@/app/lib/regions";
-import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, PILOT_CITIES, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
+import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
 import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
-// City×topic PILOT (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב",
-// "CBT בירושלים". Deliberately narrow - 3 pilot cities, allow-listed topics,
-// indexable only at ≥MIN_CITY_TOPIC listed therapists - everything below that
-// is noindex, and non-pilot combinations simply 404. This is the anti-doorway
+// City×topic (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב", "CBT בירושלים".
+// Allow-listed topics, cities per cityTopicCitiesFor(), indexable only at
+// ≥MIN_CITY_TOPIC listed therapists - everything below that is noindex, and
+// combinations outside the allowed cities simply 404. This is the anti-doorway
 // discipline: pages exist only where real supply exists.
 
 const BASE = "https://www.mentalytics.co.il";
@@ -30,8 +30,8 @@ async function resolve(params: Promise<{ city: string; topic: string }>) {
   const city = slugToCity(citySlug);
   const topic = slugToCityTopic(topicSlug);
   if (!city || !topic) return null;
-  if (!(PILOT_CITIES as readonly string[]).includes(city)) return null;
   if (!isCityTopicAllowed(topic)) return null;
+  if (!cityTopicCitiesFor(topic).includes(city)) return null;
   return { city, topic, citySlug };
 }
 
@@ -77,10 +77,10 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
     ],
   };
 
-  // Sister pages for internal linking: same topic in the other pilot cities
+  // Sister pages for internal linking: same topic in the other allowed cities
   // (only when THEY are indexable too), and the parent pages.
   const sisterCities: string[] = [];
-  for (const c of PILOT_CITIES) {
+  for (const c of cityTopicCitiesFor(topic)) {
     if (c === city) continue;
     const n = await countListed({ ...topic.filter, city: c });
     if (n >= MIN_CITY_TOPIC) sisterCities.push(c);
