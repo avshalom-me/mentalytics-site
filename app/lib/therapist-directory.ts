@@ -245,6 +245,13 @@ export type DirectoryFilter = {
   assessmentType?: string;
   /** Exact value from ARRANGEMENTS - powers /therapists/arrangement/[slug]. */
   arrangement?: string;
+  /**
+   * Exact value from the therapists table ("נקבה" / "זכר"). Powers the
+   * פסיכולוגית city pages: 31% of job-title searches use the feminine form
+   * and no page answered them, while 128 of our 200 approved therapists are
+   * women. A filter, never a ranking - see topics.ts.
+   */
+  gender?: string;
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
   trainingAreasAny?: string[];
   ageGroupsAny?: string[];
@@ -291,6 +298,7 @@ function applyDirectoryFilter(data: TherapistRow[], filter?: DirectoryFilter): T
   );
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
+  if (filter?.gender) rows = rows.filter((t) => t.gender === filter.gender);
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
   if (filter?.citiesAny?.length) {
     const wanted = new Set(filter.citiesAny);
