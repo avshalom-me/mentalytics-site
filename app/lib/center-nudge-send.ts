@@ -49,7 +49,12 @@ export async function sendCenterNudge(opts: {
   const to = center.payerEmail ?? center.email;
   if (!to) return { ok: false, error: "אין כתובת מייל למרכז" };
 
-  const sent = await sendCenterNudgeEmail({ to, subject: subject || `${center.name} - השלמת פרטים`, message: body });
+  const sent = await sendCenterNudgeEmail({
+    to,
+    subject: subject || `${center.name} - השלמת פרטים`,
+    message: body,
+    centerId,
+  });
   if (!sent.ok) return { ok: false, error: sent.error || "שליחת המייל נכשלה" };
 
   await supabaseAdmin

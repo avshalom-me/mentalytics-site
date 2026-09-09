@@ -10,6 +10,7 @@ import { runSupplyGaps } from "@/app/lib/supply-gaps";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetention } from "@/app/lib/retention";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
+import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
 import { sendGiftOffer, recentGiftOffers } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect, addProspectsFromText, moveProspectToDeal } from "@/app/lib/center-prospects";
@@ -158,6 +159,7 @@ export async function GET() {
       prospects: await listProspects().catch(() => []),
       places_configured: placesConfigured(),
       inbox: await listInbox().catch(() => []),
+      center_history: await loadCenterEmailHistory().catch(() => []),
       inbox_configured: gmailConfigured(),
       runs,
       latest_details: latestDetails,
