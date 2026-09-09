@@ -192,21 +192,15 @@ function computeResults(A: Ans): KidsBox[] {
             : "✅ הפנייה: טיפול CBT בשילוב הדרכת הורים";
       }
       addToGroup("📊 נמצאו סימנים לחרדה", ref, []);
-    } else if (KIDS_AQ_ITEMS.some(it => A[it.key] === undefined)) {
-      // A skipped questionnaire scores 0, and 0 used to fall straight into the
-      // "low stress" branch below - stating an all-clear about a child whose
-      // parent had just rated the anxiety gate at 3 or more, and adding a
-      // referral on the strength of it. The screen now blocks Continue until
-      // every item is answered, so this is the second line: it fires only if a
-      // client malfunctions, and it says what is actually known.
-      addToGroup(
-        "📊 סימנים של חרדה ללא הגדרה ספציפית (שאלון האפיון לא מולא)",
-        grp === "ga"
-          ? getGaRef()
-          : "✅ הפנייה: המשך בירור פסיכולוגי לאפיון הקושי ועוצמתו, ובמקביל טיפול CBT לחרדה",
-        [],
-      );
     } else {
+      // Includes the parent who opened the characterisation questionnaire and
+      // rated none of it. Between 15/8 and 9/9/2026 that case had a branch of
+      // its own ("סימנים של חרדה ללא הגדרה ספציפית"), because the screen was
+      // impossible to leave unanswered and reaching here meant the client had
+      // malfunctioned. The owner reopened those screens on 9/9 and set the rule
+      // that an unanswered item counts as the symptom being absent, which is
+      // exactly this branch - so the special case is gone and blanks score 0
+      // and read as low stress, like any other set of low ratings.
       emoStandalones.push({ cls: "purple", txt: "📊 נמצאו סימפטומים של מתח ברמה נמוכה", isLowStress: true });
     }
     if (grp === "zy") {
@@ -452,8 +446,10 @@ function computeResults(A: Ans): KidsBox[] {
   // Reading the emitted groups makes both impossible: a finding cannot be
   // merged unless it exists, and it cannot be missed once it does.
   if (grp === "bv") {
-    // Deliberately not the "ללא הגדרה ספציפית" fallback: it states that the
-    // anxiety was never characterised, which is not a basis for prescribing CBT.
+    // One label only, and deliberately not the low-stress standalone: the merge
+    // prescribes CBT, and "מתח ברמה נמוכה" is not a basis for prescribing it.
+    // (Until 9/9/2026 a third label lived here too, for an anxiety
+    // questionnaire left unfilled; blanks now score as absent, so it is gone.)
     const ANXIETY    = ["📊 נמצאו סימנים לחרדה"];
     const SELF_IMAGE = ["📊 נמצאו סימנים לדימוי עצמי נמוך"];
     const MOOD       = ["📊 נמצאו סימנים למצב רוח ירוד", "📊 נמצאו סימנים מובהקים של מצב רוח ירוד"];

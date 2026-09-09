@@ -721,6 +721,11 @@ export default function AdultsPage() {
   // FROM the occupational screen that would loop the user backwards - so the
   // bridge flips this and the handler advances to the next domain instead.
   const [execReturnsToNextDomain, setExecReturnsToNextDomain] = useState(false);
+  // Whether the executive questionnaire has already been shown in this pass.
+  // The occupational bridge routes into it once and must not offer it again -
+  // and since a screen may now be left blank on purpose, "was it shown" and
+  // "was it answered" are no longer the same question.
+  const [execSeen, setExecSeen] = useState(false);
   const [inRelationship, setInRelationship] = useState(false);
   const [hasChildren, setHasChildren] = useState(false);
   const [noRelationship, setNoRelationship] = useState(false);
@@ -788,13 +793,6 @@ export default function AdultsPage() {
   // routinely answered no to.
   function afterLearningScreen(): Screen {
     return (answers.functional?.adhd1Count ?? 0) >= 3 ? "f2-q" : "f2";
-  }
-
-  // True when the executive questionnaire was already answered in this pass -
-  // the occupational bridge must not send someone back into a screen they
-  // completed minutes earlier.
-  function allExecAnswered(): boolean {
-    return execScores.length > 0 && execScores.every((v) => v > 0);
   }
 
   function nextDomain(ao?: QuestionnaireAnswers) {
@@ -1277,7 +1275,6 @@ export default function AdultsPage() {
   if (screen === "e2") {
     const m1 = answers.emotional?.maniaScreen1;
     const m2 = answers.emotional?.maniaScreen2;
-    const canContinue = m1 !== undefined && (m1 === false || m2 !== undefined);
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="תחום רגשי" badgeColor="green">
@@ -1302,7 +1299,6 @@ export default function AdultsPage() {
               if (m1 && m2) setScreen("e2-q");
               else setScreen("e3");
             }}
-            nextDisabled={!canContinue}
           />
         </Card>
       </Layout>
@@ -1510,8 +1506,10 @@ export default function AdultsPage() {
           </ul>
           <NavRow
             onBack={() => setScreen("e4")}
+            // Left blank, e4Medical stays undefined and neither chronic-pain
+            // branch in the scorer fires - no finding, which is what a blank
+            // is meant to mean.
             onNext={() => setScreen("e4-q")}
-            nextDisabled={chronic && e.e4Medical === undefined}
           />
         </Card>
       </Layout>
@@ -1815,7 +1813,13 @@ export default function AdultsPage() {
                 setScreen("e10");
                 return;
               }
-              if (!traumaType) return;
+              // No type chosen reads as "no event": the Continue used to be
+              // dead here, which left the screen with no way forward at all.
+              if (!traumaType) {
+                updE({ e9: false });
+                setScreen("e10");
+                return;
+              }
               updE({
                 e9: true,
                 traumaScores,
@@ -1826,7 +1830,6 @@ export default function AdultsPage() {
               });
               setScreen("e10");
             }}
-            nextDisabled={!noTrauma && !traumaType}
           />
         </Card>
       </Layout>
@@ -1854,14 +1857,10 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={q} group={`pm-${i}`} values={[1,2,3,4,5]} value={persMain[i]}
             onChange={(v) => setPersMain((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        {/* Both scales are required: an unanswered pair sums to 0, which reads as
-            "below threshold" and silently drops the entire personality block for
-            someone who just told us they do have a recurring difficulty. */}
-        {persMain.some((v) => !v) && (
-          <p className="mt-2 text-xs text-amber-700">יש לדרג את שתי השאלות כדי להמשיך.</p>
-        )}
+        {/* Blank sums to 0, which is under the threshold of 5 and ends the
+            personality block here - the no-difficulty reading a blank is meant
+            to carry. */}
         <NavRow onBack={() => setScreen("e10")}
-          nextDisabled={persMain.some((v) => !v)}
           onNext={() => {
             updE({ persMainScores: persMain });
             const s = persMain[0] + persMain[1];
@@ -1893,22 +1892,21 @@ export default function AdultsPage() {
             </div>
           </div>
         ))}
-        {/* All four are required. Unanswered items default to 0, so skipping the
-            screen produced a total of 0 - read below as "three or more yes" and
-            handed the user an autism-communication referral they never answered
-            for. Blocking Continue is the cheap half of the fix; the scoring side
-            refuses to act on a partial set as well. */}
-        {disQ.some((v) => !v) && (
-          <p className="mt-2 text-xs text-amber-700">יש לענות על כל ארבע השאלות כדי להמשיך.</p>
-        )}
         <NavRow
-          nextDisabled={disQ.some((v) => !v)}
           onNext={() => {
             updE({ disQAnswers: disQ });
             // 1=כן, 2=לא לכל אחד מ-4 פריטים. סכום נמוך = הרבה "כן" = סימני אוטיזם.
             // סכום <= 5 (3+ "כן") → ההפניה היא לאבחון תקשורת, מדלגים על שאלון אישיות.
+            //
+            // This is the one scale in the questionnaire that runs backwards, so
+            // it is also the one place a blank does not mean "no symptom" on its
+            // own: an unanswered item is 0, which drags the total DOWN and lands
+            // inside the autism range. All four must carry a real answer before
+            // the low total is allowed to mean anything - the same rule
+            // questionnaire-score.ts applies with disComplete.
+            const complete = disQ.every((v) => v === 1 || v === 2);
             const total = disQ.reduce((a, b) => a + b, 0);
-            setScreen(total <= 5 ? "therapist-style" : "e10c");
+            setScreen(complete && total <= 5 ? "therapist-style" : "e10c");
           }} />
       </Card>
     </Layout>
@@ -2079,8 +2077,8 @@ export default function AdultsPage() {
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <NavRow
-          nextDisabled={!allExecAnswered()}
           onNext={() => {
+            setExecSeen(true);
             const a = updF({ execScores });
             if (execReturnsToNextDomain) {
               setExecReturnsToNextDomain(false);
@@ -2089,14 +2087,6 @@ export default function AdultsPage() {
               setScreen("f3");
             }
           }} />
-        {/* Required, for two reasons. A partial set still cleared the >= 12
-            threshold off four items and produced a COG-FUN recommendation; and
-            the occupational bridge decides whether to route here by asking
-            allExecAnswered(), so a screen left half-filled was offered again to
-            someone who had already worked through it. */}
-        {!allExecAnswered() && (
-          <p className="mt-3 text-sm font-semibold text-amber-700">יש לדרג את כל הפריטים כדי להמשיך</p>
-        )}
       </Card>
     </Layout>
   );
@@ -2179,7 +2169,7 @@ export default function AdultsPage() {
               f2Bridge: empBChecked[4],
               f2: empBChecked[4] || (answers.functional?.f2Gate ?? false),
             });
-            if (empBChecked[4] && !allExecAnswered()) {
+            if (empBChecked[4] && !execSeen) {
               setExecReturnsToNextDomain(true);
               setScreen("f2-q");
             } else {
@@ -2267,7 +2257,6 @@ export default function AdultsPage() {
             updR({ rSingleCBTScale, rSingleDynScale });
             setScreen("r1");
           }}
-          nextDisabled={rSingleCBTScale === 0 || rSingleDynScale === 0}
         />
       </Card>
     </Layout>
@@ -2320,7 +2309,8 @@ export default function AdultsPage() {
             else if (hasChildren) { setScreen("r3-conflict"); }
             else { nextDomain(a); }
           }}
-          nextDisabled={coupleScale === 0} />
+          /* Blank stays 0, which is under the threshold of 4, so the couple
+             questionnaire is skipped and no finding is made. */ />
       </Card>
     </Layout>
   );
@@ -2350,7 +2340,8 @@ export default function AdultsPage() {
             const a = updR({ eftScores, dynScores, structScores });
             if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(a); }
           }}
-          nextDisabled={!eftScores.some(s => s > 0) || !dynScores.some(s => s > 0) || !structScores.some(s => s > 0)} />
+          /* A blank block sums to 0, and the scorer only names a winning
+             approach when the top sum is above 0. */ />
       </Card>
     </Layout>
   );
@@ -2364,10 +2355,6 @@ export default function AdultsPage() {
     const conflict = r.r3Conflict;
     const affects = r.r3AffectsAll;
     const willing = r.r3PartnerWilling;
-    const fullyAnswered =
-      conflict === false ||
-      (conflict === true && affects === false) ||
-      (conflict === true && affects === true && willing !== undefined);
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="זוגיות ומשפחה">
@@ -2397,10 +2384,7 @@ export default function AdultsPage() {
               />
             </div>
           )}
-          <NavRow
-            onNext={() => setScreen("r3-child")}
-            nextDisabled={!fullyAnswered}
-          />
+          <NavRow onNext={() => setScreen("r3-child")} />
         </Card>
       </Layout>
     );
@@ -2471,8 +2455,7 @@ export default function AdultsPage() {
             if (types.length === 0) { nextDomain(); return; }
             setAddictionIdx(0);
             setScreen(addictionScreen(types[0]));
-          }}
-          nextDisabled={(answers.addiction?.types ?? []).length === 0} />
+          }} />
       </Card>
     </Layout>
   );
