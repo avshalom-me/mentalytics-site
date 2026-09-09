@@ -64,7 +64,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "המנוי עדיין לא הופעל - השלימו קודם את שמירת פרטי התשלום" }, { status: 400 });
     }
     if (center.user_id === user.id) {
-      return NextResponse.json({ ok: true, already: true }); // אידמפוטנטי - רענון/לחיצה כפולה
+      // אידמפוטנטי - רענון/לחיצה כפולה. ריפוי-עצמי: מאז שהגישה נקבעת לפי
+      // center_members, חשבון ראשי שאין לו שורה שם היה נשאר בחוץ.
+      await supabaseAdmin
+        .from("center_members")
+        .upsert({ center_id: center.id, user_id: user.id, email: user.email ?? null }, { onConflict: "center_id,user_id", ignoreDuplicates: true });
+      return NextResponse.json({ ok: true, already: true });
     }
     if (center.user_id) {
       return NextResponse.json(
@@ -96,6 +101,17 @@ export async function POST(req: NextRequest) {
         { ok: false, error: "המרכז קושר הרגע לחשבון אחר. אם זה החשבון שלכם - היכנסו דרך /centers/login; אחרת כתבו לנו." },
         { status: 409 },
       );
+    }
+
+    // הגישה עצמה נקבעת לפי center_members (ראו center-auth.ts). user_id לעיל
+    // הוא "החשבון הראשי"; בלי השורה כאן resolveCenter לא היה מוצא את המרכז.
+    const { error: memErr } = await supabaseAdmin
+      .from("center_members")
+      .upsert({ center_id: center.id, user_id: user.id, email: user.email ?? null }, { onConflict: "center_id,user_id", ignoreDuplicates: true });
+    if (memErr) {
+      // הקישור הראשי כבר נשמר; לא מדווחים כישלון על מה שהצליח, אבל זה חייב
+      // להישמע - אחרת המרכז יקבל "מקושר" ויפגוש 401 בדשבורד.
+      console.error(`centers/claim-account: member row failed for center=${center.id} user=${user.id}:`, memErr.message);
     }
 
     console.log(`centers/claim-account: center=${center.id} (${center.name}) linked to user=${user.id} (${user.email})`);

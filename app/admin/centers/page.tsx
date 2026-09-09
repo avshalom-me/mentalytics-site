@@ -51,6 +51,7 @@ type Center = {
     blocked_on_us: string[];
   } | null;
   user_id: string | null;
+  members?: { user_id: string; email: string | null; is_primary: boolean }[];
   slug: string | null;
   public_page_enabled: boolean | null;
   public_description: string | null;
@@ -851,7 +852,9 @@ export default function AdminCentersPage() {
               <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
                 משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
                 {c.user_id
-                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל</strong>
+                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל{(c.members?.length ?? 0) > 1 && (
+                      <span className="font-normal text-stone-600"> ({c.members!.length} חשבונות: {c.members!.map((m) => m.email ?? "?").join(", ")})</span>
+                    )}</strong>
                   : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "-"})</span>}
                 {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - ביטול רק דרך ממשק Sumit</strong>}
               </p>

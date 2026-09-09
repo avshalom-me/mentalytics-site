@@ -203,8 +203,22 @@ export async function GET() {
 
     // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
     // therapist_count שבטבלה, שהוא מספר המטפלים שבתמחור ההצעה).
+    // צוות הניהול לכל מרכז: מאז 9/9/26 הגישה לפורטל נקבעת לפי center_members
+    // ולא לפי user_id בלבד, ו"נכנסו לפורטל" חייב להראות את כל החשבונות.
+    const { data: memberRows } = await supabaseAdmin
+      .from("center_members")
+      .select("center_id, user_id, email, created_at")
+      .order("created_at", { ascending: true });
+    const membersByCenter = new Map<string, { user_id: string; email: string | null }[]>();
+    (memberRows ?? []).forEach((m) => {
+      const cid = m.center_id as string;
+      if (!membersByCenter.has(cid)) membersByCenter.set(cid, []);
+      membersByCenter.get(cid)!.push({ user_id: m.user_id as string, email: (m.email as string | null) ?? null });
+    });
+
     const centers = (data ?? []).map((c) => ({
       ...c,
+      members: (membersByCenter.get(c.id as string) ?? []).map((m) => ({ ...m, is_primary: m.user_id === c.user_id })),
       linked_therapist_count: counts.get(c.id as string) ?? 0,
       pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
       engagement: engByCenter.get(c.id as string) ?? null,

@@ -430,20 +430,38 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   // אותו חשבון מחזיק גם פרופיל מטפל אישי (מנהל/ת שגם מטפל/ת). מוחזר כדי
   // שהפורטל יציע מעבר לפרופיל - הכיוון ההפוך לשורה שבדשבורד המטפל. שורת
   // ישות-המרכז אינה פרופיל אישי ולכן מוחרגת.
+  // המשתמש בסשן ולא user_id של המרכז: מאז שיש כמה חברים, השני היה מקבל
+  // קישור לפרופיל האישי של הראשון. בצפייה מהאדמין אין סשן ונופלים לראשי.
+  const sessionUserId = center.acting_user_id ?? center.user_id;
   let ownTherapist: { id: string; full_name: string } | null = null;
-  if (center.user_id) {
+  if (sessionUserId) {
     const { data: mine } = await supabaseAdmin
       .from("therapists")
       .select("id, full_name")
-      .eq("user_id", center.user_id)
+      .eq("user_id", sessionUserId)
       .neq("entity_type", "center")
       .maybeSingle();
     if (mine) ownTherapist = { id: mine.id as string, full_name: (mine.full_name as string) ?? "" };
   }
 
+  // צוות הניהול, לפאנל בדשבורד. is_primary מסמן את החשבון שאינו ניתן להסרה.
+  const { data: memberRows } = await supabaseAdmin
+    .from("center_members")
+    .select("user_id, email, created_at")
+    .eq("center_id", center.id)
+    .order("created_at", { ascending: true });
+  const members = (memberRows ?? []).map((m) => ({
+    user_id: m.user_id as string,
+    email: (m.email as string | null) ?? null,
+    created_at: m.created_at as string,
+    is_primary: m.user_id === center.user_id,
+    is_me: m.user_id === center.acting_user_id,
+  }));
+
   return ({
     ok: true,
     own_therapist: ownTherapist,
+    members,
     center: {
       name: center.name,
       status: center.status,

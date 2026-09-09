@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 import InvitePanel from "./InvitePanel";
+import MembersPanel from "./MembersPanel";
 
 // דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד - כל השינויים
 // והעריכות מרוכזים באזור עריכה נפרד (/centers/dashboard/profile), כמו אצל
@@ -55,6 +56,7 @@ type Stats = {
 export type PortalData = {
   /** פרופיל מטפל אישי שמוחזק באותו חשבון (מנהל/ת שגם מטפל/ת). */
   own_therapist?: { id: string; full_name: string } | null;
+  members?: { user_id: string; email: string | null; created_at: string; is_primary: boolean; is_me: boolean }[];
   center: {
     name: string;
     status: string;
@@ -237,6 +239,12 @@ export default function CenterDashboardView({ data, preview = false, justCreated
       {!preview && !isEntity && center.status === "active" && (
         <InvitePanel quota={center.therapist_quota} linkedCount={center.linked_count} />
       )}
+
+      {/* צוות הניהול. בכוונה לא מוגבל ל-!isEntity ולא למנוי פעיל: גם ישות
+          מסלול 2 מנהלת צוות, ומרכז שהמנוי שלו נגמר עדיין צריך לראות מי נכנס
+          (ההוספה עצמה חסומה בשרת כשהמנוי אינו פעיל). לא ב-preview - מאותה
+          סיבה כמו InvitePanel: אין סשן מרכז בצפייה מהאדמין. */}
+      {!preview && <MembersPanel initial={data.members ?? []} />}
 
       {/* רשימת המטפלים (מסלול 1) */}
       {!isEntity && (
