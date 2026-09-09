@@ -2185,6 +2185,8 @@ function KidsMatchSection({ A, score, selection }: {
   const [explainLoading, setExplainLoading] = useState<Record<string, boolean>>({});
 
   const selectionKey = selection.keys.join("|") + "::" + selection.kind;
+  // See the note above trackQuizStep: nothing a counsellor does is measured yet.
+  const measured = !isCounselor(A);
 
   // Reset results when the selection changes (e.g. user clicked a different recommendation card),
   // but skip the reset when we are restoring saved state for the same selection on mount.
@@ -2262,7 +2264,7 @@ function KidsMatchSection({ A, score, selection }: {
     // הבדיקה מעל הלולאה - ראו ההערה המקבילה בשאלון המבוגרים.
     if (trackingOptedOut()) return;
     for (const t of results) {
-      fetch("/api/track-view", {
+      if (measured) fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2286,14 +2288,14 @@ function KidsMatchSection({ A, score, selection }: {
 
   async function fetchExplanation(t: KidsMatchResult) {
     if (explainLoading[t.id] || explainData[t.id]) return;
-    trackTherapistExplain(t.id, "kids");
+    if (measured) trackTherapistExplain(t.id, "kids");
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const res = await fetch("/api/explain-match", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionnaire_type: "child",
+          questionnaire_type: isCounselor(A) ? "school" : "child",
           user_summary: {
             gender: A.gender || undefined,
             region_preference: city || region || undefined,
@@ -2340,7 +2342,7 @@ function KidsMatchSection({ A, score, selection }: {
     setLoading(true);
     setError("");
     // אותה נקודה בדיוק כמו במבוגרים - שליחת החיפוש, עם המיקום שנבחר.
-    trackMatchSearch("kids", { region: region || null, city: city || null, online: !!online });
+    if (measured) trackMatchSearch("kids", { region: region || null, city: city || null, online: !!online });
     try {
       const res = await fetch("/api/match", {
         method: "POST",
@@ -2365,7 +2367,7 @@ function KidsMatchSection({ A, score, selection }: {
       if (!data.ok) throw new Error(data.error || "שגיאה בחיפוש");
       setResults(data.matches || []);
       // כמה אפשרויות באמת הוצגו - ראו trackMatchResults.
-      trackMatchResults("kids", {
+      if (measured) trackMatchResults("kids", {
         region: region || null,
         city: city || null,
         online: !!online,
@@ -2397,7 +2399,7 @@ function KidsMatchSection({ A, score, selection }: {
             // במבוגרים (שם האירוע נורה במעבר ל-match-form). קודם לכן הוא נורה
             // ב-doMatch, ולכן לא ניתן היה להשוות בין שתי הזרימות, וגם לא לדעת
             // אם מי שנשר בילדים פתח את הטופס ונטש או לא פתח אותו כלל.
-            trackMatchingClick(
+            if (measured) trackMatchingClick(
               "kids",
               isAssessment ? `assessment:${treatments[0] ?? ""}` : isProfessional ? `professional:${treatments[0] ?? ""}` : treatments.join("+"),
             );
@@ -2618,7 +2620,7 @@ function KidsMatchSection({ A, score, selection }: {
                             className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
                             style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
                           >✦</span>
-                          {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
+                          {explainLoading[t.id] ? "מעבד · כ-20 שניות" : isCounselor(A) ? "למה הותאמ/ה לתלמיד/ה?" : "למה הותאמ/ה לי?"}
                         </button>
                         {profileHref && (
                           <a
@@ -2708,6 +2710,7 @@ function GroupCard({
   explanationLoading,
   siblings,
   onSelectSiblings,
+  forCounselor = false,
 }: {
   group: KidsRecommendationGroup & { domainLabel: string };
   onSelect: (() => void) | null;
@@ -2719,6 +2722,8 @@ function GroupCard({
   explanationLoading?: boolean;
   siblings?: (KidsRecommendationGroup & { domainLabel: string })[];
   onSelectSiblings?: (() => void)[];
+  /** A counsellor reads the card about a student, not about herself. */
+  forCounselor?: boolean;
 }) {
   const allSymptoms = uniq(group.recs.flatMap(r => r.symptoms));
   const allTools = group.recs.flatMap(r => r.tools);
@@ -2835,7 +2840,7 @@ function GroupCard({
               disabled={explanationLoading}
               className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
             >
-              {explanationLoading ? "מעבד · כ-20 שניות" : "✦ למה הוצע לי?"}
+              {explanationLoading ? "מעבד · כ-20 שניות" : forCounselor ? "✦ למה זה הוצע?" : "✦ למה הוצע לי?"}
             </button>
           )}
         </div>
@@ -3061,7 +3066,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionnaire_type: "child",
+          questionnaire_type: isCounselor(A) ? "school" : "child",
           treatment_key: g.treatmentKey,
           treatment_label: g.treatmentLabel,
           domain: domainLabel,
@@ -3089,7 +3094,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionnaire_type: "child",
+          questionnaire_type: isCounselor(A) ? "school" : "child",
           recommendation: {
             treatment: g.treatmentKey,
             treatment_label: g.treatmentLabel,
@@ -3401,15 +3406,13 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
-              {audience !== "counselor" && (
-                <button
-                  type="button"
-                  onClick={selectDynamicFallback}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal-dark)]"
-                >
-                  🔍 חיפוש מטפל/ת לטיפול דינאמי
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={selectDynamicFallback}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal-dark)]"
+              >
+                🔍 חיפוש מטפל/ת לטיפול דינאמי
+              </button>
             </div>
           </Card>
         )}
@@ -3440,7 +3443,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
         {audience === "counselor" && hasAnyFindings && (
           <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
-            הכרטיסים שלמטה מציגים את סוג הטיפול או האבחון המומלץ ואת ההסבר לו. חיפוש מטפל/ת אינו מוצג ליועצת - את הבחירה במטפל/ת ההורים עושים בעצמם.
+            בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם.
           </div>
         )}
         {/* Per-domain sections */}
@@ -3497,22 +3500,23 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                     const siblings = b.treatments.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
+                        forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={audience === "counselor" ? null : () => selectGroup(b.key, g)}
+                        onSelect={() => selectGroup(b.key, g)}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={audience === "counselor" ? undefined : () => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={audience !== "counselor" && siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedT && audience !== "counselor" && (
+                  {showCombinedT && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "treatment")}
@@ -3539,22 +3543,23 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                     const siblings = b.assessments.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
+                        forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={audience === "counselor" ? null : () => selectGroup(b.key, g)}
+                        onSelect={() => selectGroup(b.key, g)}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={audience === "counselor" ? undefined : () => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={audience !== "counselor" && siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
-                  {showCombinedA && audience !== "counselor" && (
+                  {showCombinedA && (
                     <button
                       type="button"
                       onClick={() => selectCombined(b.key, "assessment")}
@@ -3580,18 +3585,19 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                     const siblings = b.professionals.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
                     return (
                       <GroupCard
+                        forCounselor={audience === "counselor"}
                         key={g.recs[0].id}
                         group={g}
-                        onSelect={audience === "counselor" ? null : () => selectGroup(b.key, g)}
+                        onSelect={() => selectGroup(b.key, g)}
                         selected={
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={audience === "counselor" ? undefined : () => fetchRecExplain(b.key, b.label, g)}
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
                         explanation={recExplain[explainKey]}
                         explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
-                        onSelectSiblings={audience !== "counselor" && siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
                     );
                   })}
@@ -3605,6 +3611,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                   <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה - יש לפנות אליהם בנפרד.</p>
                   {b.externals.map(g => (
                     <GroupCard
+                        forCounselor={audience === "counselor"}
                       key={g.recs[0].id}
                       group={g}
                       onSelect={null}
@@ -3620,6 +3627,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                   <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 pr-1">📊 ממצאים נוספים</div>
                   {b.informational.map(g => (
                     <GroupCard
+                        forCounselor={audience === "counselor"}
                       key={g.recs[0].id}
                       group={g}
                       onSelect={null}
