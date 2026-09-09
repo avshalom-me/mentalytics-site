@@ -37,14 +37,31 @@ function deviceBucket(): "mobile" | "tablet" | "desktop" | undefined {
   return "desktop";
 }
 
-export function trackQuizStep(quizType: "adults" | "kids", step: string, progress: number) {
+/** Which questionnaire an event belongs to. "school" is the counsellor rubric. */
+export type QuizType = "adults" | "kids" | "school";
+
+/**
+ * The audience tag carried on therapist-facing events.
+ *
+ * A counsellor is neither the patient nor the parent, so she gets her own
+ * value rather than being folded into "child" - otherwise every count of who
+ * looked at a therapist would quietly include professionals browsing on behalf
+ * of families who have chosen nothing.
+ */
+function sourceOf(quizType: QuizType): "adult" | "child" | "school" {
+  return quizType === "adults" ? "adult" : quizType === "school" ? "school" : "child";
+}
+
+export function trackQuizStep(quizType: QuizType, step: string, progress: number) {
   sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress, device: deviceBucket() } });
   // המרת Taboola נורית רק במסך הפתיחה. בלי התנאי הזה כל שאלה בשאלון
   // הייתה נספרת כהמרה נפרדת ומנפחת את הנתון פי עשרות. לכל שאלון מסך פתיחה
   // משלו: "disclaimer" במבוגרים, "p-consent" בילדים - בלי השני, רבע
   // מההתחלות (הורים) לא היו נספרות לקמפיין הארצי.
+  // Taboola pays for parents and adults; a counsellor is not a campaign
+  // conversion, so the school rubric reports no start to it.
   const opening = quizType === "adults" ? "disclaimer" : "p-consent";
-  if (step === opening) tfaEvent("quiz_start", { once: `tfa_quiz_start_${quizType}` });
+  if (step === opening && quizType !== "school") tfaEvent("quiz_start", { once: `tfa_quiz_start_${quizType}` });
 }
 
 /**
@@ -78,7 +95,7 @@ export type QuizCompleteFacts = {
  */
 const QUIZ_COMPLETE_SCHEMA = 2;
 
-export function trackQuizComplete(quizType: "adults" | "kids", facts?: QuizCompleteFacts) {
+export function trackQuizComplete(quizType: QuizType, facts?: QuizCompleteFacts) {
   sendTrack("quiz_complete", {
     metadata: {
       v: QUIZ_COMPLETE_SCHEMA,
@@ -108,7 +125,7 @@ export function trackQuizComplete(quizType: "adults" | "kids", facts?: QuizCompl
  * Keys, not display labels - the same strings the matching searches on.
  */
 export function trackQuizTreatments(
-  quizType: "adults" | "kids",
+  quizType: QuizType,
   keys: { treatments?: string[]; assessments?: string[]; professionals?: string[] },
 ) {
   const { treatments = [], assessments = [], professionals = [] } = keys;
@@ -129,13 +146,13 @@ export function trackQuizTreatments(
  * fired the OpenAI call but was tracked nowhere. Persisted per therapist_id so
  * the admin can see which therapists drive deep evaluation.
  */
-export function trackTherapistExplain(therapistId: string, quizType: "adults" | "kids") {
-  sendTrack("therapist_explain_click", { therapist_id: therapistId, source: quizType === "adults" ? "adult" : "child" });
+export function trackTherapistExplain(therapistId: string, quizType: QuizType) {
+  sendTrack("therapist_explain_click", { therapist_id: therapistId, source: sourceOf(quizType) });
 }
 
 /** Patient entered the matching flow for a treatment type (top of the match funnel). */
 export function trackMatchingClick(
-  quizType: "adults" | "kids",
+  quizType: QuizType,
   treatment: string,
   // "top" = the single prominent button above the report, added 3/9/26 after
   // 107 of 122 non-searching sessions left the results screen within ~30s
@@ -144,7 +161,7 @@ export function trackMatchingClick(
   placement?: "top" | "card",
 ) {
   const metadata = placement ? { treatment, placement } : { treatment };
-  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata });
+  sendTrack("matching_click", { source: sourceOf(quizType), metadata });
   // Single GA4 emission point (was inline gtag at each call site, which bypassed
   // the channel-attaching wrapper and only covered the adults flow).
   gaEvent("matching_click", { quiz_type: quizType, treatment, ...(placement ? { placement } : {}) });
@@ -164,11 +181,11 @@ export function trackMatchingClick(
  * produces the inflated scores measured on 17/8/2026.
  */
 export function trackMatchSearch(
-  quizType: "adults" | "kids",
+  quizType: QuizType,
   opts: { region: string | null; city?: string | null; online: boolean },
 ) {
   sendTrack("match_search", {
-    source: quizType === "adults" ? "adult" : "child",
+    source: sourceOf(quizType),
     metadata: {
       quiz_type: quizType,
       region: opts.region || null,
@@ -189,11 +206,11 @@ export function trackMatchSearch(
  * שחיפש - וזה ההבדל בין ירושלים "מכוסה" לירושלים עם שתי אפשרויות למסך.
  */
 export function trackMatchResults(
-  quizType: "adults" | "kids",
+  quizType: QuizType,
   opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
 ) {
   sendTrack("match_results", {
-    source: quizType === "adults" ? "adult" : "child",
+    source: sourceOf(quizType),
     metadata: {
       quiz_type: quizType,
       region: opts.region || null,
@@ -210,8 +227,8 @@ export function trackMatchResults(
 }
 
 /** Patient saved their match list (WhatsApp-to-self / copy link). */
-export function trackMatchSaved(quizType: "adults" | "kids", token: string, count: number) {
-  sendTrack("match_saved", { source: quizType === "adults" ? "adult" : "child", metadata: { token, count } });
+export function trackMatchSaved(quizType: QuizType, token: string, count: number) {
+  sendTrack("match_saved", { source: sourceOf(quizType), metadata: { token, count } });
   gaEvent("match_saved", { quiz_type: quizType });
 }
 

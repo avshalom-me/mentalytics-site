@@ -166,6 +166,8 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
   "p-soc": { group: "התפתחות ותפקוד", desc: "שאלות על קשיים חברתיים: 3 שאלות פתיחה, ולאחריהן בלוק LSAS לפי שכבת הגיל", input: "scales", items: 3 },
   "p-traits": { group: "מאפייני הילד", desc: "צעד מאוחד בסוף השאלון: מוטיבציה לטיפול, ורבליות, יכולת תרגול, תחומי עניין והסכמת הילד - לפי מה שהניקוד באמת קורא עבור הילד הזה", input: "scales", items: 3 },
 
+  "p-emo-intro": { group: "רגשי", desc: "מסך מקדים ליועצת: את התחום הרגשי עדיף למלא יחד עם ההורים (רק ב-/school)", input: "system" },
+  "p-refine": { group: "דיוק ההפניה", desc: "מסך היועצת שלפני הדוח: אופן המילוי, ידיעת ההורים, מה נוסה בבית הספר, אבחונים וועדות (רק ב-/school)", input: "choice", items: 5 },
   "p-result": { group: "תוצאות", desc: "עמוד התוצאות (השלמת השאלון)", input: "system" },
 };
 
@@ -176,7 +178,9 @@ export const KIDS_STEP_INFO: Record<string, QuizStepInfo> = {
 export const ADULTS_TERMINAL_STEPS = new Set(["scoring", "results", "match-form", "match-results"]);
 export const KIDS_TERMINAL_STEPS = new Set(["p-result"]);
 
-export function stepInfo(quiz: "adults" | "kids", step: string): QuizStepInfo {
+export function stepInfo(quiz: "adults" | "kids" | "school", step: string): QuizStepInfo {
+  // The counsellor rubric is the kids questionnaire with two screens of its
+  // own, so it reads the same map rather than a copy that would drift from it.
   const map = quiz === "adults" ? ADULTS_STEP_INFO : KIDS_STEP_INFO;
   return map[step] ?? { group: "לא מזוהה", desc: `שלב ${step} (אין תיאור במפה - ייתכן שנוסף לשאלון ולא עודכן ב-quiz-step-content.ts)`, input: "form" };
 }

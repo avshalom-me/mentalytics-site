@@ -152,7 +152,7 @@ export async function runQuizFunnel(): Promise<QuizFunnelResult> {
         steps,
       });
 
-      const quizLabel = quiz === "kids" ? "ילדים ונוער" : "מבוגרים";
+      const quizLabel = quiz === "kids" ? "ילדים ונוער" : quiz === "school" ? "יועצות וצוותי חינוך" : "מבוגרים";
 
       for (const st of steps) {
         if (st.baselineSessions < MIN_BASELINE_SESSIONS) continue;

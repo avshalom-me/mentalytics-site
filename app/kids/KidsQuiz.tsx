@@ -2189,7 +2189,7 @@ function KidsMatchSection({ A, score, selection }: {
 
   const selectionKey = selection.keys.join("|") + "::" + selection.kind;
   // See the note above trackQuizStep: nothing a counsellor does is measured yet.
-  const measured = !isCounselor(A);
+  const quizType = isCounselor(A) ? "school" as const : "kids" as const;
 
   // Reset results when the selection changes (e.g. user clicked a different recommendation card),
   // but skip the reset when we are restoring saved state for the same selection on mount.
@@ -2267,7 +2267,8 @@ function KidsMatchSection({ A, score, selection }: {
     // הבדיקה מעל הלולאה - ראו ההערה המקבילה בשאלון המבוגרים.
     if (trackingOptedOut()) return;
     for (const t of results) {
-      if (measured) fetch("/api/track-view", {
+      // Deliberately not fired for a counsellor - see quizType above.
+      if (!isCounselor(A)) fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -2291,7 +2292,7 @@ function KidsMatchSection({ A, score, selection }: {
 
   async function fetchExplanation(t: KidsMatchResult) {
     if (explainLoading[t.id] || explainData[t.id]) return;
-    if (measured) trackTherapistExplain(t.id, "kids");
+    trackTherapistExplain(t.id, quizType);
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
       const res = await fetch("/api/explain-match", {
@@ -2345,7 +2346,7 @@ function KidsMatchSection({ A, score, selection }: {
     setLoading(true);
     setError("");
     // אותה נקודה בדיוק כמו במבוגרים - שליחת החיפוש, עם המיקום שנבחר.
-    if (measured) trackMatchSearch("kids", { region: region || null, city: city || null, online: !!online });
+    trackMatchSearch(quizType, { region: region || null, city: city || null, online: !!online });
     try {
       const res = await fetch("/api/match", {
         method: "POST",
@@ -2370,7 +2371,7 @@ function KidsMatchSection({ A, score, selection }: {
       if (!data.ok) throw new Error(data.error || "שגיאה בחיפוש");
       setResults(data.matches || []);
       // כמה אפשרויות באמת הוצגו - ראו trackMatchResults.
-      if (measured) trackMatchResults("kids", {
+      trackMatchResults(quizType, {
         region: region || null,
         city: city || null,
         online: !!online,
@@ -2406,7 +2407,7 @@ function KidsMatchSection({ A, score, selection }: {
             // במבוגרים (שם האירוע נורה במעבר ל-match-form). קודם לכן הוא נורה
             // ב-doMatch, ולכן לא ניתן היה להשוות בין שתי הזרימות, וגם לא לדעת
             // אם מי שנשר בילדים פתח את הטופס ונטש או לא פתח אותו כלל.
-            if (measured) trackMatchingClick(
+            trackMatchingClick(
               "kids",
               isAssessment ? `assessment:${treatments[0] ?? ""}` : isProfessional ? `professional:${treatments[0] ?? ""}` : treatments.join("+"),
             );
@@ -3180,10 +3181,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
   // of quiz_complete on the kids side.
   const treatmentsReported = useRef(false);
   useEffect(() => {
-    if (!score || treatmentsReported.current || audience === "counselor") return;
+    if (!score || treatmentsReported.current) return;
     treatmentsReported.current = true;
     const agg = aggregateForMatch(domainResults.map(d => d.result));
-    trackQuizTreatments("kids", {
+    trackQuizTreatments(audience === "counselor" ? "school" : "kids", {
       treatments: agg.treatmentKeys,
       assessments: agg.assessmentKeys,
       professionals: agg.professionalKeys,
@@ -3402,7 +3403,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             </p>
             <button
               type="button"
-              onClick={() => { if (audience !== "counselor") trackQuizStep("kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
+              onClick={() => { trackQuizStep(audience === "counselor" ? "school" : "kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
               className={`cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors sm:w-auto ${tone}`}
             >
               {verb} - {g.treatmentLabel} ←
@@ -3783,16 +3784,16 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   const [draftId, setDraftId] = useState<string | null>(null);
   const drafts = useSyncExternalStore(subscribeDrafts, readDrafts, () => NO_DRAFTS);
   const saveTimer = useRef<number | null>(null);
+  // The rubric reports under its own quiz type. Folding a counsellor's
+  // walkthrough into the kids funnel would move the number that questionnaire
+  // is judged by without anything having changed for a parent.
+  const quizType = audience === "counselor" ? ("school" as const) : ("kids" as const);
 
   useEffect(() => {
-    // Counsellors are not measured yet: their steps would land in the kids
-    // funnel under quiz_type "kids" and distort the very metric this
-    // questionnaire is judged by. Analytics for the rubric is a later phase.
-    if (audience === "counselor") return;
     const idx = PAGES.indexOf(step as typeof PAGES[number]);
     const pct = idx >= 0 ? Math.round(((idx + 1) / PAGES.length) * 100) : 0;
-    (window as any).gtag?.("event", "quiz_step", { quiz_type: "kids", step, progress: pct });
-    trackQuizStep("kids", step, pct);
+    (window as any).gtag?.("event", "quiz_step", { quiz_type: quizType, step, progress: pct });
+    trackQuizStep(quizType, step, pct);
   }, [step]);
 
   // Reset scroll to the top on every step change. Without this, advancing from a
@@ -3885,7 +3886,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       // The cost is that the domain profile is not available yet, so kids
       // events carry the demographic facts only - the treatment side of the
       // question is answered by the adults flow, which scores before it fires.
-      if (audience !== "counselor") trackQuizComplete("kids", {
+      trackQuizComplete(quizType, {
         issue: "child",
         age_band: "child",
         gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,

@@ -57,7 +57,7 @@ type AnalyticsData = {
   popularFilters: FilterEntry[];
   trends: TrendEntry[];
   therapistCTR: CTRRow[];
-  quizDropout: { adults: QuizFunnel; kids: QuizFunnel };
+  quizDropout: { adults: QuizFunnel; kids: QuizFunnel; school: QuizFunnel };
   demographics: { byRegion: FilterEntry[]; byIssue: FilterEntry[]; byAgeBand: FilterEntry[]; byGender: FilterEntry[] };
   clickTypeBreakdown: Record<string, number>;
   clickTypeBySource: ClickTypeBySource;
@@ -477,6 +477,16 @@ const KIDS_GROUPS: Record<string, { label: string; steps: string[] }> = {
   end:     { label: "תוצאות",     steps: ["p-result"] },
 };
 
+// The counsellor rubric walks the kids screens, so it reuses their grouping
+// and adds only the two screens that exist for her: the word about filling the
+// emotional part with the parents, and the refinement before the report.
+const SCHOOL_GROUPS: Record<string, { label: string; steps: string[] }> = {
+  ...KIDS_GROUPS,
+  anxiety: { label: "חרדה", steps: ["p-emo-intro", ...KIDS_GROUPS.anxiety.steps] },
+  refine:  { label: "דיוק ההפניה", steps: ["p-refine"] },
+  end:     KIDS_GROUPS.end,
+};
+
 type GroupedStep = {
   groupKey: string;
   label: string;
@@ -860,6 +870,7 @@ function QuizTab({ data, period }: { data: AnalyticsData; period: Period }) {
       <QuizAiAnalysisPanel period={period} />
       <QuizDropoutChart quiz={data.quizDropout.adults} title="שאלון מבוגרים — נשירה לפי שלב" groups={ADULTS_GROUPS} />
       <QuizDropoutChart quiz={data.quizDropout.kids} title="שאלון ילדים — נשירה לפי שלב" groups={KIDS_GROUPS} />
+      <QuizDropoutChart quiz={data.quizDropout.school} title="שאלון יועצות — נשירה לפי שלב" groups={SCHOOL_GROUPS} />
     </>
   );
 }

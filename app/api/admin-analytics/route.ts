@@ -213,6 +213,7 @@ export async function GET(req: NextRequest) {
 
     const adultsQuiz = buildQuizFunnel("adults");
     const kidsQuiz = buildQuizFunnel("kids");
+    const schoolQuiz = buildQuizFunnel("school");
 
     // --- Demographics from profile views ---
     const viewsWithContext = views;
@@ -410,7 +411,7 @@ export async function GET(req: NextRequest) {
       popularFilters,
       trends,
       therapistCTR,
-      quizDropout: { adults: adultsQuiz, kids: kidsQuiz },
+      quizDropout: { adults: adultsQuiz, kids: kidsQuiz, school: schoolQuiz },
       demographics,
       clickTypeBreakdown,
       clickTypeBySource,
