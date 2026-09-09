@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
 import {
   cancelSubscription,
   listRecurringForCustomer,
@@ -43,6 +44,9 @@ type TherapistRow = {
   cogfun_age_groups: string[] | null;
   education: string | null;
   experience: string | null;
+  license_number: string | null;
+  publication_links: string[] | null;
+  price: number | null;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -116,6 +120,9 @@ async function buildTherapistsResponse(onlyId?: string) {
       cogfun_age_groups,
       education,
       experience,
+      license_number,
+      publication_links,
+      price,
       style_q1,
       style_q2,
       activity_level,
@@ -358,6 +365,9 @@ async function buildTherapistsResponse(onlyId?: string) {
         cogfun_age_groups: t.cogfun_age_groups ?? [],
         education: t.education ?? "",
         experience: t.experience ?? "",
+        license_number: t.license_number ?? null,
+        publication_links: t.publication_links ?? [],
+        price: t.price ?? null,
         style_q1: t.style_q1 ?? null,
         style_q2: t.style_q2 ?? null,
         activity_level: t.activity_level ?? null,
@@ -1066,14 +1076,32 @@ export async function PATCH(request: Request) {
 
     // עדכון שדות מלאים (עריכה)
     if (body.fields) {
-      const allowed = ["full_name","email","phone","bio","gender","online","therapist_types","training_areas","assessment_types","regions","cultural_prefs","arrangements","accepting_new_patients"];
+      // הרשימה המשותפת ולא רשימה משלנו. כשהיא הייתה כתובה כאן בנפרד היא
+      // נשארה מאחור: תשעה שדות שהמטפל, המרכז וטופס המילוי יכלו לערוך -
+      // ובהם קבוצות גיל ושפות - פשוט לא נשמרו מהאדמין. עכשיו שדה חדש
+      // ב-THERAPIST_EDIT_FIELDS מגיע לכאן מעצמו.
+      // שלושת שדות הסגנון מטופלים בלולאה שמתחת (המרה למספר תקין), ולכן
+      // מוחרגים כאן כדי שלא ייכתבו פעמיים.
+      const STYLE_KEYS = ["style_q1", "style_q2", "activity_level"] as const;
+      const allowed = CENTER_THERAPIST_EDIT_FIELDS.filter(
+        (k) => !(STYLE_KEYS as readonly string[]).includes(k),
+      );
       const update: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body.fields) update[key] = body.fields[key];
       }
       // Therapeutic-style answers (1–7 scale). Coerce to a valid smallint or
       // null so an out-of-range/blank value clears the field rather than erroring.
-      for (const key of ["style_q1","style_q2","activity_level"]) {
+      // חובה בכל נתיב כתיבה: הקישורים מרונדרים כעוגנים אמיתיים בפרופיל
+      // הציבורי, ובלי הסינון הזה "javascript:" היה מגיע לשם.
+      if ("publication_links" in update) {
+        update.publication_links = sanitizePublicationLinks(update.publication_links);
+      }
+      if ("price" in update) {
+        const n = Number(update.price);
+        update.price = Number.isFinite(n) && n >= 0 ? n : null;
+      }
+      for (const key of STYLE_KEYS) {
         if (key in body.fields) {
           const n = Number(body.fields[key]);
           update[key] = Number.isInteger(n) && n >= 1 && n <= 7 ? n : null;

@@ -5,6 +5,7 @@ import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-fee
 import { buildArticleInviteEmail } from "./article-invite-email";
 import { alertRecipients } from "./alert-recipients";
 import { promotedPlanTable } from "./promoted-plan-table";
+import { SUBSCRIPTION_BASE_PRICE } from "./sumit";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -144,7 +145,11 @@ export async function sendPromotionEndedEmail(opts: {
       <h1 style="color:#0F5468;font-size:20px;margin:0 0 16px;">שלום ${safeName},</h1>
       <p style="margin:0 0 16px;">${safeBody}</p>
       ${feedbackHtml}
-      <p style="margin:0 0 24px;">לתחילת מסלול בתשלום:</p>
+      <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה נשאר במסלול החינמי, ומה חוזר עם המסלול המקודם</p>
+      ${promotedPlanTable(
+        `המסלול המקודם עולה ${SUBSCRIPTION_BASE_PRICE} ש"ח + מע"מ לחודש. ביטול בכל שלב בהודעת מייל אלינו.`
+      )}
+      <p style="margin:18px 0 24px;">לתחילת מסלול בתשלום:</p>
       <p style="margin:0 0 16px;">
         <a href="${checkoutUrl}"
            style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">
@@ -353,6 +358,9 @@ export async function sendGiftTrialWelcomeEmail(opts: {
   firstChargeDate: string; // YYYY-MM-DD
   amount: number;
   giftMonths: number;
+  /** מדרגת ההמשך: כמה חודשים במחיר המוזל, ומה המחיר המלא שאחריה. */
+  followonMonths?: number;
+  fullAmount?: number;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendGiftTrialWelcomeEmail: RESEND_API_KEY not configured, skipping");
@@ -379,7 +387,11 @@ export async function sendGiftTrialWelcomeEmail(opts: {
         <p style="margin:0 0 10px;font-weight:bold;color:#0F5468;">מה קורה מבחינת תשלום</p>
         <ul style="margin:0;padding-right:18px;font-size:15px;">
           <li style="margin-bottom:6px;">לא נגבה ממך תשלום היום, ולא ב-${opts.giftMonths} החודשים הראשונים.</li>
-          <li style="margin-bottom:6px;">החיוב הראשון: <strong>${escapeHtml(charge)}</strong>, בסך ${opts.amount} ש"ח + מע"מ לחודש.</li>
+          <li style="margin-bottom:6px;">החיוב הראשון: <strong>${escapeHtml(charge)}</strong>, בסך ${opts.amount} ש"ח + מע"מ לחודש${
+            opts.followonMonths && opts.fullAmount
+              ? `, וכך גם בחודש שאחריו (${opts.followonMonths} חודשים במחיר מוזל). מהחודש שלאחר מכן - ${opts.fullAmount} ש"ח + מע"מ לחודש.`
+              : "."
+          }</li>
           <li style="margin-bottom:6px;">שבוע לפני התאריך הזה יישלח אליך מייל תזכורת עם התאריך והסכום.</li>
           <li>ביטול בכל שלב בהודעת מייל אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.</li>
         </ul>
@@ -914,7 +926,14 @@ export async function sendGiftOfferEmail(opts: {
   const subject = opts.subject?.trim() || "הצעת קידום במתנה - טיפול חכם";
   // הטיוטה כוללת את פנייתה ("שלום X,") ואת החתימה, ולכן היא נכנסת כגוש אחד
   // ולא נעטפת שוב בשלום/חתימה של המעטפת.
-  const safeMessage = escapeHtml(opts.message.trim());
+  // הטיוטה נכנסת כטקסט ולכן עוברת escape. אחריו - ורק אחריו - מותר סימון
+  // הדגשה אחד: **טקסט** הופך ל-<strong>. הסדר הזה הוא מה שהופך את זה לבטוח
+  // (התוכן כבר נוטרל, ו-** אינו תו HTML), והוא מאפשר לאדמין להדגיש שורה
+  // בטיוטה בלי לכתוב HTML. שורת התזכורת לפני החיוב הראשון מסומנת כך.
+  const safeMessage = escapeHtml(opts.message.trim()).replace(
+    /\*\*([^*\n]+)\*\*/g,
+    "<strong>$1</strong>"
+  );
   const profileUrl = `${SITE_URL}/therapists/dashboard`;
   const deadline = opts.expiresAt
     ? new Date(opts.expiresAt).toLocaleDateString("he-IL", {

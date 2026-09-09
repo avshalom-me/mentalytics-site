@@ -76,11 +76,11 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי התמחות</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        {list.length >= 3 && (
-          <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו בתחום${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
-          </p>
-        )}
+        {/* Quotable intro - see city/[city]/[topic]. Replaces a generic line
+            that said only "מוצגים מטפלים שתעודותיהם אומתו". */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${specialty}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בגישה ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
+        </p>
       </div>
 
       {/* Quiz CTA - same offer as the city/region pages */}

@@ -1,3 +1,4 @@
+import { ACTIVE_TASK_STATUSES } from "@/app/lib/crm";
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { computeGuarantee } from "./guarantee";
@@ -134,12 +135,12 @@ export async function buildDashboardData(): Promise<DashboardData> {
     supabaseAdmin
       .from("crm_tasks")
       .select("id, title, entity_type, entity_id, entity_label, due_date, priority, snoozed_until")
-      .eq("status", "open")
+      .in("status", [...ACTIVE_TASK_STATUSES])
       .not("due_date", "is", null)
       .lte("due_date", todayIso)
       .order("due_date", { ascending: true })
       .limit(20),
-    supabaseAdmin.from("crm_tasks").select("id", { count: "exact", head: true }).eq("status", "open"),
+    supabaseAdmin.from("crm_tasks").select("id", { count: "exact", head: true }).in("status", [...ACTIVE_TASK_STATUSES]),
     supabaseAdmin
       .from("payments")
       .select("reference_id, amount, created_at")

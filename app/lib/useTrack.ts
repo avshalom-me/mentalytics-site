@@ -5,6 +5,7 @@ import { getOrCreateSessionId } from "./session";
 import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
+import { tfaEvent } from "./taboola";
 
 type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
 
@@ -38,6 +39,12 @@ function deviceBucket(): "mobile" | "tablet" | "desktop" | undefined {
 
 export function trackQuizStep(quizType: "adults" | "kids", step: string, progress: number) {
   sendTrack("quiz_step", { metadata: { quiz_type: quizType, step, progress, device: deviceBucket() } });
+  // המרת Taboola נורית רק במסך הפתיחה. בלי התנאי הזה כל שאלה בשאלון
+  // הייתה נספרת כהמרה נפרדת ומנפחת את הנתון פי עשרות. לכל שאלון מסך פתיחה
+  // משלו: "disclaimer" במבוגרים, "p-consent" בילדים - בלי השני, רבע
+  // מההתחלות (הורים) לא היו נספרות לקמפיין הארצי.
+  const opening = quizType === "adults" ? "disclaimer" : "p-consent";
+  if (step === opening) tfaEvent("quiz_start", { once: `tfa_quiz_start_${quizType}` });
 }
 
 /**
@@ -127,11 +134,20 @@ export function trackTherapistExplain(therapistId: string, quizType: "adults" | 
 }
 
 /** Patient entered the matching flow for a treatment type (top of the match funnel). */
-export function trackMatchingClick(quizType: "adults" | "kids", treatment: string) {
-  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata: { treatment } });
+export function trackMatchingClick(
+  quizType: "adults" | "kids",
+  treatment: string,
+  // "top" = the single prominent button above the report, added 3/9/26 after
+  // 107 of 122 non-searching sessions left the results screen within ~30s
+  // without pressing any of the per-finding buttons. Tagged so the two
+  // placements can be compared; omitted = the in-card button (unchanged).
+  placement?: "top" | "card",
+) {
+  const metadata = placement ? { treatment, placement } : { treatment };
+  sendTrack("matching_click", { source: quizType === "adults" ? "adult" : "child", metadata });
   // Single GA4 emission point (was inline gtag at each call site, which bypassed
   // the channel-attaching wrapper and only covered the adults flow).
-  gaEvent("matching_click", { quiz_type: quizType, treatment });
+  gaEvent("matching_click", { quiz_type: quizType, treatment, ...(placement ? { placement } : {}) });
 }
 
 /**
@@ -174,7 +190,7 @@ export function trackMatchSearch(
  */
 export function trackMatchResults(
   quizType: "adults" | "kids",
-  opts: { region: string | null; city?: string | null; online: boolean; returned: number },
+  opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
 ) {
   sendTrack("match_results", {
     source: quizType === "adults" ? "adult" : "child",
@@ -184,6 +200,9 @@ export function trackMatchResults(
       city: opts.city || null,
       online: opts.online,
       returned: opts.returned,
+      // כמה מהתוצאות באזור שהתבקש (null כשלא התבקש מיקום). מ-6/9/2026
+      // התוצאות מחולקות לקבוצה מקומית וקבוצה חיצונית, וזה המדד לפני/אחרי.
+      local: opts.local ?? null,
       // הדגל שמאפשר לספור בשאילתה אחת כמה חיפושים הציגו בחירה דלה.
       thin: opts.returned < 4,
     },

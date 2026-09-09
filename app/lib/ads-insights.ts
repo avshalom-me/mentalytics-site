@@ -18,6 +18,9 @@ import { CITY_SEO_LIST, ALL_REGIONS } from "./regions";
 // queue can auto-recover the moment a fixed problem stops re-appearing.
 
 const LOOKBACK_DAYS = 7;
+// כמה אחורה מחפשים את הפנייה האחרונה של קמפיין. בצורת ארוכה מזה כבר לא
+// צריכה מספר מדויק כדי להיות ברורה, והחלון הקצר שומר את השאילתה זולה.
+const DRY_WINDOW_DAYS = 45;
 // תקציב חודשי מתוכנן לפרסום (₪) - נקבע ל-3,500 ב-30/8/26. ניתן לעקוף
 // בסביבה (ADS_MONTHLY_BUDGET) בלי דיפלוי.
 const MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
@@ -50,6 +53,10 @@ export type AdsCampaignRow = {
   views30: number;
   contacts7: number; contacts30: number;
   costPerContact30: number | null;
+  // אורך הבצורת: כמה ימים עברו מאז הפנייה האחרונה, וכמה כסף נשרף מאז.
+  // null = לא נראתה פנייה בכל חלון הבדיקה (DRY_WINDOW_DAYS).
+  daysSinceContact: number | null;
+  costSinceContact: number;
 };
 
 export type AdsInsights = {
@@ -140,6 +147,8 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
   const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
   const since30 = new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const sinceDryDay = new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
 
   // Keyword/search-term dailies can exceed the 1000-row PostgREST cap, so
   // they page through fetchAllRows. Keywords come as a single 30-day fetch
@@ -154,12 +163,31 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     ),
   ]);
 
+  // מתי כל קמפיין הביא פנייה בפעם האחרונה. בלי זה בדיקת ה"קר" מכירה רק
+  // "אפס בשבוע", וזה מדד רועש: שבוע יבש בקמפיין קטן הוא לפעמים מקריות,
+  // בעוד עשרה ימים רצופים בקמפיין שממשיך לשלם הם ממצא. נמדד מול
+  // utm_campaign כי זו הזהות שצד האתר מכיר.
+  const contactRows = await fetchAllRows<{ utm_campaign: string | null; clicked_at: string }>(
+    () => supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("utm_campaign, clicked_at")
+      .gte("clicked_at", new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString())
+  );
+  const lastContactByUtm = new Map<string, string>();
+  for (const row of contactRows) {
+    if (!row.utm_campaign) continue;
+    const day = row.clicked_at.slice(0, 10);
+    const prev = lastContactByUtm.get(row.utm_campaign);
+    if (!prev || day > prev) lastContactByUtm.set(row.utm_campaign, day);
+  }
+
   const registry = (registryQ.data ?? []) as RegistryRow[];
   type ConfigRow = {
     campaign_id: number;
     campaign_name: string; status: string | null; end_date: string | null;
     daily_budget: number | null; total_budget: number | null;
     bidding_strategy: string | null; cpc_ceiling: number | null;
+    net_search: boolean | null; net_partners: boolean | null; net_display: boolean | null;
   };
   const config = (configQ.data ?? []) as ConfigRow[];
   const configByName = new Map(config.map((c) => [c.campaign_name, c]));
@@ -176,8 +204,13 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   const gPrev7 = new Map<string, Agg>();
   const g30 = new Map<string, Agg>();
   const monthStart = new Date().toISOString().slice(0, 8) + "01";
+  // First day we ever saw data for a campaign - the launch audit below uses
+  // it to know which campaigns are young enough to still be fixable cheaply.
+  const firstSeen = new Map<string, string>();
   let spendMtd = 0;
   for (const d of daily) {
+    const f = firstSeen.get(d.campaign_name);
+    if (!f || d.date < f) firstSeen.set(d.campaign_name, d.date);
     const into = (m: Map<string, Agg>) => {
       const a = m.get(d.campaign_name) ?? zero();
       a.impr += d.impressions; a.clicks += d.clicks; a.cost += d.cost; a.conv += d.conversions;
@@ -200,6 +233,11 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     const a30 = g30.get(name) ?? zero();
     const s7 = reg?.utm_campaign ? site7.get(reg.utm_campaign) : undefined;
     const s30 = reg?.utm_campaign ? site30.get(reg.utm_campaign) : undefined;
+    // הפנייה האחרונה, ומה שנשרף מאז. כשאין פנייה בכל החלון סופרים את כל
+    // ההוצאה שיש עליה נתונים - כלומר 30 הימים של ads_campaign_daily, ולכן
+    // הסכום הזה הוא רצפה ולא הסכום המלא של הבצורת.
+    const lastContactDay = reg?.utm_campaign ? lastContactByUtm.get(reg.utm_campaign) ?? null : null;
+    const dryFrom = lastContactDay ?? sinceDryDay;
     return {
       google_name: name,
       registered: !!reg,
@@ -217,6 +255,12 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       views30: s30?.profile_views ?? 0,
       contacts7: s7?.contacts ?? 0, contacts30: s30?.contacts ?? 0,
       costPerContact30: s30 && s30.contacts > 0 && a30.cost > 0 ? r2(a30.cost / s30.contacts) : null,
+      daysSinceContact: lastContactDay
+        ? Math.floor((Date.parse(todayIso) - Date.parse(lastContactDay)) / 86_400_000)
+        : null,
+      costSinceContact: r2(
+        daily.filter((d) => d.campaign_name === name && d.date > dryFrom).reduce((s, d) => s + d.cost, 0)
+      ),
     };
   }).sort((a, b) => b.cost30 - a.cost30 || a.google_name.localeCompare(b.google_name));
 
@@ -230,7 +274,11 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   type KwAgg = { campaign: string; keyword: string; impr: number; clicks: number; cost: number };
   const kwMap = new Map<string, KwAgg>();
   const broadByCampaign = new Map<string, { broad: number; total: number }>();
+  // 30-day keyword impressions per campaign, for the "what is actually
+  // serving" check below.
+  const kwImprByCampaign = new Map<string, number>();
   for (const k of kwDaily) {
+    kwImprByCampaign.set(k.campaign_name, (kwImprByCampaign.get(k.campaign_name) ?? 0) + k.impressions);
     const b = broadByCampaign.get(k.campaign_name) ?? { broad: 0, total: 0 };
     b.total += k.cost;
     if ((k.match_type ?? "").toUpperCase() === "BROAD") b.broad += k.cost;
@@ -256,10 +304,12 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     .sort((a, b) => b.cost - a.cost)
     .slice(0, 15)
     .map((k) => ({ ...k, cost: r2(k.cost), cpc: k.clicks > 0 ? r2(k.cost / k.clicks) : null, ctr: k.impr > 0 ? r2((k.clicks / k.impr) * 100) : null }));
-  const rarely = ((kwStatusQ.data ?? []) as { campaign_name: string; serving_status: string | null }[])
-    .filter((k) => (k.serving_status ?? "").toUpperCase().includes("RARELY"));
+  const kwStatusRows = (kwStatusQ.data ?? []) as { campaign_name: string; serving_status: string | null; status: string | null }[];
+  const rarely = kwStatusRows.filter((k) => (k.serving_status ?? "").toUpperCase().includes("RARELY"));
   const rarelyByCampaign = new Map<string, number>();
   for (const k of rarely) rarelyByCampaign.set(k.campaign_name, (rarelyByCampaign.get(k.campaign_name) ?? 0) + 1);
+  const kwCountByCampaign = new Map<string, number>();
+  for (const k of kwStatusRows) kwCountByCampaign.set(k.campaign_name, (kwCountByCampaign.get(k.campaign_name) ?? 0) + 1);
 
   // --- Search terms ---
   // The "צפון" family is what ate 62% of g-hadera; any generic geo term
@@ -423,10 +473,36 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       pollutionFired = true;
       push(`ads:pollution:${c.google_name}`, "red", `🗑️ ${c.google_name} - ${Math.round(c.conv7)} המרות מ-${c.clicks7} קליקים בשבוע`, "יחס מעל 1 = פעולת המרה ראשית סופרת צפיות עמוד. Goals > Conversions > להוריד ל-Secondary.");
     }
-    // Spend with zero contacts: amber at ₪50/week, red at ₪150/week - the
-    // old agent threshold, where "maybe noise" stops being an excuse.
+    // Spend with zero contacts. The trigger is still a spending week with no
+    // contact, but the alert now leads with HOW LONG the campaign has been
+    // dry, because that is what separates noise from a finding: a single zero
+    // week on a small campaign happens, ten consecutive days on one that keeps
+    // paying does not. g-haifa (03/09/26) fired at ₪173/week and sat in the
+    // queue for three days reading like every other weekly zero, while the
+    // real fact was that its last contact had been on 26/08.
     if (c.cost7 >= 50 && c.contacts7 === 0 && c.utm_campaign) {
-      push(`ads:cold:${c.google_name}`, c.cost7 >= 150 ? "red" : "amber", `🥶 ${c.google_name} - ₪${Math.round(c.cost7)} בשבוע בלי אף פנייה`, "לבדוק דוח מונחי חיפוש ותקרת CPC לפני שמסיקים - ולזכור שאפס בשבוע בודד הוא לפעמים רעש.");
+      const dry = c.daysSinceContact;
+      const burned = Math.round(Math.max(c.costSinceContact, c.cost7));
+      // אדום כשהבצורת ארוכה משבוע וגם נשרף בה כסף אמיתי, או בכל מקרה
+      // מעל ₪150 בשבוע - הסף הישן, שנשאר כדי שקמפיין יקר לא יירד לכתום
+      // רק בגלל שהפנייה האחרונה שלו הייתה אתמול.
+      const severity = (dry != null && dry >= 7 && burned >= 120) || c.cost7 >= 150 ? "red" : "amber";
+      const howLong = dry == null
+        ? `${DRY_WINDOW_DAYS}+ ימים`
+        : `${dry} ימים`;
+      push(
+        `ads:cold:${c.google_name}`,
+        severity,
+        `🥶 ${c.google_name} - ${howLong} בלי פנייה, ₪${burned} מאז`,
+        `השבוע האחרון: ₪${Math.round(c.cost7)} על ${c.clicks7} קליקים ואפס פניות. ` +
+        (dry == null
+          ? `לא נרשמה אף פנייה מהקמפיין הזה ב-${DRY_WINDOW_DAYS} הימים האחרונים. `
+          : dry >= 7
+            ? `הפנייה האחרונה הייתה לפני ${dry} ימים - זה כבר לא רעש של שבוע בודד. `
+            : `הפנייה האחרונה הייתה לפני ${dry} ימים, כך שייתכן שזו עדיין תנודתיות. `) +
+        `לבדוק לפי הסדר: דוח מונחי חיפוש (האם הקליקים עברו לשאילתות בלי כוונה), תקרת CPC, ואז ההיצע באזור. ` +
+        `אם שלושתם תקינים - השאלה היא כמה עוד שווה לשלם על הבצורת הזו.`
+      );
     }
     // Cost per contact against the business-plan milestone in force.
     if (c.utm_campaign && c.cost7 >= 75 && c.contacts7 > 0) {
@@ -446,6 +522,83 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       push(`ads:unregistered:${c.google_name}`, "red", `📝 ${c.google_name} - מוציא כסף ואינו ברישום`, "בלי שורה ברישום (utm, תקציב, תקרה) אי אפשר לחבר את ההוצאה לפניות באתר. להוסיף בקונסולת האדס.");
     } else if (!c.registered && c.cost30 > 0) {
       push(`ads:unregistered:${c.google_name}`, "info", `📝 ${c.google_name} - קמפיין בגוגל שאינו ברישום`, "להוסיף שורה בטבלת הרישום (utm, תקציב, תקרה) כדי שההצלבות וההתראות יכסו אותו.");
+    }
+  }
+
+  // Day zero: the networks a campaign is ALLOWED to serve on, straight from
+  // its settings. This is the only check here that fires before a single
+  // impression exists - g-emek1 burned its first week taking 100% of clicks
+  // from Display while its type read "Search", and no amount of impression
+  // analysis could have said so on launch day. Null means an older sync
+  // script that does not send the fields; the impression-share check below
+  // stays as the fallback for that case.
+  for (const c of config) {
+    if (c.status !== "ENABLED") continue;
+    const wrong: string[] = [];
+    if (c.net_display === true) wrong.push("רשת המדיה (Display)");
+    if (c.net_partners === true) wrong.push("שותפי חיפוש");
+    if (wrong.length > 0) {
+      push(`ads:networks:${c.campaign_name}`, c.net_display === true ? "red" : "amber",
+        `🌐 ${c.campaign_name} - מוגש גם ב${wrong.join(" וב")}`,
+        `קמפיין חיפוש אמור לרוץ על חיפוש בלבד. ${c.net_display === true ? "ברשת המדיה המודעה מוצגת כבאנר למי שלא חיפש כלום - זה מה שבלע 100% מהקליקים של g-emek1 בשבוע הראשון שלו. " : ""}Campaign settings > Networks > להוריד את הסימון ולשמור.`);
+    }
+    if (c.net_search === false) {
+      push(`ads:nosearch:${c.campaign_name}`, "red", `🌐 ${c.campaign_name} - רשת החיפוש כבויה`,
+        "הקמפיין לא מוגש בחיפוש בגוגל בכלל. Campaign settings > Networks > לסמן Search Network.");
+    }
+  }
+
+  // Launch audit: everything worth catching in a campaign's first two weeks,
+  // delivered as ONE finding rather than a drip of separate alerts. A new
+  // campaign is the cheapest moment to fix a misconfiguration and the moment
+  // nobody is watching the console, so the queue does the watching.
+  for (const c of campaigns) {
+    const first = firstSeen.get(c.google_name);
+    if (!first || c.status !== "ENABLED") continue;
+    const ageDays = Math.floor((Date.now() - new Date(first + "T00:00:00Z").getTime()) / 86_400_000);
+    if (ageDays > 14) continue;
+    const cfg = configByName.get(c.google_name);
+    const issues: string[] = [];
+    if (cfg?.net_display === true) issues.push("מוגש ברשת המדיה");
+    if (cfg?.net_partners === true) issues.push("מוגש בשותפי חיפוש");
+    if (!c.registered) issues.push("אינו ברישום הקמפיינים");
+    else if (!c.utm_campaign) issues.push("אין לו utm_campaign ברישום - אי אפשר לחבר הוצאה לפניות");
+    if (cfg && cfg.cpc_ceiling == null) issues.push("אין תקרת CPC");
+    const kwTotal = kwCountByCampaign.get(c.google_name) ?? 0;
+    const kwRarely = rarelyByCampaign.get(c.google_name) ?? 0;
+    if (kwTotal >= 10 && kwRarely / kwTotal >= 0.5) issues.push(`${kwRarely} מ-${kwTotal} מילות המפתח לא מוגשות (נפח חיפוש נמוך)`);
+    const b = broadByCampaign.get(c.google_name);
+    if (b && b.total >= 20 && b.broad / b.total >= 0.4) issues.push("רוב ההוצאה בהתאמה רחבה");
+    if (c.sessions7 === 0 && c.clicks7 >= 5) issues.push(`${c.clicks7} קליקים בגוגל אבל 0 סשנים מתויגים באתר - ה-Final URL suffix כנראה חסר`);
+    if (issues.length > 0) {
+      push(`ads:launch:${c.google_name}`, "red", `🚀 ${c.google_name} - קמפיין בן ${ageDays} ימים עם ${issues.length} ליקויים`,
+        `${issues.map((x) => "• " + x).join("  ")}  |  שבועיים ראשונים הם הרגע הזול לתקן. אחרי 14 יום הבדיקה הזו נסגרת מעצמה, וכל ליקוי שנשאר ימשיך להתריע בנפרד.`);
+    }
+  }
+
+  // Impressions its own keywords cannot explain. A Search campaign whose
+  // keyword impressions are a small fraction of the campaign total is
+  // serving somewhere other than the searches it was built for - Display
+  // expansion or search partners. g-emek1, 30/08/26: 854 campaign
+  // impressions against 11 from keywords, clicks at 1.20 where the rest of
+  // the account pays 3-8, and a CTR under 2% against a 5.9% median. Three
+  // independent tells, all pointing off the search network.
+  for (const [name, a] of g30) {
+    if (a.impr < 200) continue;
+    const kwImpr = kwImprByCampaign.get(name) ?? 0;
+    const share = kwImpr / a.impr;
+    if (share < 0.25) {
+      push(`ads:offnetwork:${name}`, "red", `📺 ${name} - ${Math.round((1 - share) * 100)}% מהחשיפות לא הגיעו ממילות המפתח`, `${a.impr} חשיפות בקמפיין מול ${kwImpr} ממילות המפתח שלו. קמפיין חיפוש אמור לקבל את רוב החשיפות ממילותיו - הפער הזה אומר שהוא מוגש במקום אחר (רשת המדיה או שותפי חיפוש). לבדוק Settings > Networks ולכבות את מה שאינו Search.`);
+    }
+  }
+
+  // Keywords Google refuses to serve for lack of search volume. This is not
+  // a setup error - it is Google saying the demand does not exist - and it
+  // matters most when it hits the town the paying therapists are actually in.
+  for (const [name, total] of kwCountByCampaign) {
+    const r = rarelyByCampaign.get(name) ?? 0;
+    if (total >= 10 && r / total >= 0.5) {
+      push(`ads:rarely:${name}`, "amber", `🔇 ${name} - ${r} מתוך ${total} מילות המפתח לא מוגשות (נפח חיפוש נמוך)`, `גוגל סימנה אותן "Low search volume" והן לא רצות בכלל. זה לא באג בהגדרות אלא קביעה של גוגל שאין ביקוש למונחים האלה. לשקול ערים גדולות יותר בסביבה, או להסיט את המאמץ לערוץ אחר (התאמות/אונליין) במקום להעלות תקציב לביקוש שלא קיים.`);
     }
   }
 
@@ -520,6 +673,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       `ads:end:${n}`, `ads:cap-missing:${n}`, `ads:cap-cpc:${n}`, `ads:pollution:${n}`,
       `ads:cold:${n}`, `ads:cpl:${n}`, `ads:spike:${n}`, `ads:unregistered:${n}`,
       `ads:broad:${n}`, `ads:ctr:${n}`, `ads:rename:${n}`, `ads:placeless:${n}`,
+      `ads:offnetwork:${n}`, `ads:rarely:${n}`, `ads:networks:${n}`, `ads:nosearch:${n}`, `ads:launch:${n}`,
     ]),
     ...config.flatMap((c) => [`ads:untracked:${c.campaign_id}`, `ads:zero:${c.campaign_id}`, `ads:cpl:${c.campaign_id}`]),
     `ads:pace:${today.slice(0, 7)}`,

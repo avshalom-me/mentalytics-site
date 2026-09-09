@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
+import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
@@ -139,7 +141,7 @@ export async function GET() {
         if (c.clicked_at >= cutoff30) {
           e.clicks_30++;
           const ch = c.channel ?? "";
-          if (ch === "google_paid" || ch === "meta_paid") e.clicks_30_by_channel.paid++;
+          if (ch === "google_paid" || ch === "meta_paid" || ch === "taboola_paid") e.clicks_30_by_channel.paid++;
           else if (ch === "google_organic") e.clicks_30_by_channel.organic++;
           else if (ch === "direct") e.clicks_30_by_channel.direct++;
           else e.clicks_30_by_channel.other++;
@@ -675,20 +677,23 @@ export async function POST(req: NextRequest) {
     if (action === "center_engagement") {
       const { data: mine } = await supabaseAdmin
         .from("therapists")
-        .select("id, full_name, status, promotion_source, entity_type, admin_approved, email, profile_photo_path, regions, therapist_types, training_areas")
+        .select("id, full_name, status, promotion_source, entity_type, admin_approved, email, phone, online, age_groups, promoted_since, profile_photo_path, regions, therapist_types, training_areas")
         .eq("center_account_id", id);
       const rows = mine ?? [];
       if (rows.length === 0) return NextResponse.json({ ok: true, therapists: [] });
 
       const ids2 = rows.map((t) => t.id as string);
       const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
-      const [views2, clicks2, certRows] = await Promise.all([
-        fetchAllRows<{ therapist_id: string; viewed_at: string }>(() =>
+      const [views2, clicks2, certRows, dirImpr] = await Promise.all([
+        // כולל match_card: זו החשיפה הגדולה מכולן, והיא נעדרה מכאן לגמרי.
+        // בלעדיה הטבלה הראתה "8 פניות מול 0" בלי להסביר שמאחוריהן עומדות
+        // 84 הופעות מול 2 - כלומר פער חשיפה, לא פער איכות (מכון הכרה, 7/9/26).
+        fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null }>(() =>
           supabaseAdmin
             .from("therapist_profile_views")
-            .select("therapist_id, viewed_at")
+            .select("therapist_id, viewed_at, source")
             .in("therapist_id", ids2)
-            .in("source", ["match", "directory"]),
+            .in("source", ["match", "directory", "match_card"]),
         ),
         fetchAllRows<{ therapist_id: string; clicked_at: string; click_type: string | null }>(() =>
           supabaseAdmin
@@ -697,17 +702,47 @@ export async function POST(req: NextRequest) {
             .in("therapist_id", ids2),
         ),
         supabaseAdmin.from("therapist_certificates").select("therapist_id").in("therapist_id", ids2),
+        // הופעות במאגר הציבורי - נרשמות כאירוע ולא כצפייה, ולכן נעדרו גם הן.
+        fetchAllRows<{ therapist_id: string; created_at: string }>(() =>
+          supabaseAdmin
+            .from("analytics_events")
+            .select("therapist_id, created_at")
+            .eq("event_type", "profile_impression")
+            .in("therapist_id", ids2),
+        ),
       ]);
       const certSet = new Set((certRows.data ?? []).map((r) => r.therapist_id as string));
 
-      type Per = { views_30: number; views_total: number; clicks_30: number; clicks_total: number; by_type_30: Record<string, number> };
+      type Per = {
+        cards_30: number; cards_total: number;
+        dir_impr_30: number; dir_impr_total: number;
+        views_30: number; views_total: number;
+        clicks_30: number; clicks_total: number;
+        by_type_30: Record<string, number>;
+      };
       const per = new Map<string, Per>();
       const perOf = (tid: string): Per => {
         let x = per.get(tid);
-        if (!x) per.set(tid, (x = { views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {} }));
+        if (!x) per.set(tid, (x = {
+          cards_30: 0, cards_total: 0, dir_impr_30: 0, dir_impr_total: 0,
+          views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {},
+        }));
         return x;
       };
-      for (const v of views2) { const x = perOf(v.therapist_id); x.views_total++; if (v.viewed_at >= cutoff) x.views_30++; }
+      for (const v of views2) {
+        const x = perOf(v.therapist_id);
+        // כרטיס בהתאמות הוא חשיפה, לא צפייה. הפרדה ולא איחוד: "נראה 84 פעם
+        // ונפתח 19" הוא משפט אחר לגמרי מ-"103 צפיות".
+        if (v.source === "match_card") {
+          x.cards_total++; if (v.viewed_at >= cutoff) x.cards_30++;
+        } else {
+          x.views_total++; if (v.viewed_at >= cutoff) x.views_30++;
+        }
+      }
+      for (const e of dirImpr) {
+        const x = perOf(e.therapist_id);
+        x.dir_impr_total++; if (e.created_at >= cutoff) x.dir_impr_30++;
+      }
       for (const cl of clicks2) {
         const x = perOf(cl.therapist_id);
         x.clicks_total++;
@@ -720,7 +755,10 @@ export async function POST(req: NextRequest) {
 
       const therapists = rows
         .map((t) => {
-          const x = per.get(t.id as string) ?? { views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {} };
+          const x = per.get(t.id as string) ?? {
+            cards_30: 0, cards_total: 0, dir_impr_30: 0, dir_impr_total: 0,
+            views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {},
+          };
           // לשורת ישות-מרכז אין "תעודת רישיון" - זה ארגון, לא אדם מוסמך.
           const missing = missingProfileFields(
             {
@@ -741,13 +779,39 @@ export async function POST(req: NextRequest) {
             admin_approved: !!t.admin_approved,
             email: (t.email as string) || null,
             missing_fields: missing,
+            // דגלי מוכנות: לא "חסר בפרופיל" (שם נבדקת שלמות לאישור) אלא
+            // הסיבות שבגללן מטפל מאושר בכל זאת לא נחשף או לא ניתן לפנייה.
+            // בלעדיהם "0 פניות" נראה כמו כישלון של המטפל, בזמן שהסיבה יכולה
+            // להיות שאין לו טלפון ולכן אין בכרטיס שלו כפתור וואטסאפ בכלל.
+            has_phone: typeof t.phone === "string" && t.phone.trim().length > 0,
+            online: t.online === true,
+            age_groups: Array.isArray(t.age_groups) ? (t.age_groups as string[]) : [],
+            promoted_since: (t.promoted_since as string | null) ?? null,
             ...x,
           };
         })
-        // הישות ראשונה, אחריה לפי לחיצות 30 יום - מי שמייצר הכי הרבה למעלה.
-        .sort((a, b) => (b.is_entity ? 1 : 0) - (a.is_entity ? 1 : 0) || b.clicks_30 - a.clicks_30);
+        // הישות ראשונה, אחריה לפי לחיצות 30 יום, ובתיקו לפי חשיפה - כדי שמי
+        // שנחשף הרבה ולא הביא פנייה יעלה מעל מי שגם לא נחשף.
+        .sort((a, b) =>
+          (b.is_entity ? 1 : 0) - (a.is_entity ? 1 : 0) ||
+          b.clicks_30 - a.clicks_30 ||
+          (b.cards_30 + b.dir_impr_30) - (a.cards_30 + a.dir_impr_30));
 
       return NextResponse.json({ ok: true, therapists });
+    }
+
+    // "צפייה בתור מרכז": אותו מטען בדיוק שהפורטל מקבל, דרך אותה פונקציה
+    // (buildCenterPortalPayload). קריאה בלבד - אין כאן שום כתיבה, ואין
+    // התחזות לחשבון: האדמין מזוהה ב-Basic Auth של /api/admin-, והמרכז נטען
+    // לפי id ולא לפי סשן שלו.
+    if (action === "center_portal_preview") {
+      const { data: c } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select(PORTAL_CENTER_COLS)
+        .eq("id", id)
+        .maybeSingle();
+      if (!c) return NextResponse.json({ ok: false, error: "מרכז לא נמצא" }, { status: 404 });
+      return NextResponse.json(await buildCenterPortalPayload(c as unknown as PortalCenter));
     }
 
     return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });

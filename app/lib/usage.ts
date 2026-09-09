@@ -11,7 +11,10 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-export const MAX_FREE = 5;
+// המספר עצמו חי ב-promo.ts, שנגיש גם ללקוח - ראו ההסבר שם. כאן רק שם מקוצר,
+// כדי שכל מסלולי השרת הקיימים ימשיכו לייבא MAX_FREE כרגיל.
+export { MAX_FREE_QUIZZES as MAX_FREE } from "./promo";
+import { MAX_FREE_QUIZZES as MAX_FREE } from "./promo";
 
 // Coarse per-IP daily ceiling on FREE scored quizzes. Backstops the
 // fingerprint-rotation bypass: the free tier is keyed on a client-minted

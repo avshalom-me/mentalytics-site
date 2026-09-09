@@ -2,19 +2,21 @@ import { notFound } from "next/navigation";
 import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists, countListed } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, loadListedCounts } from "@/app/lib/therapist-directory";
 import { slugToCity } from "@/app/lib/regions";
-import { regionToSlug } from "@/app/lib/regions";
-import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, PILOT_CITIES, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
+import { regionToSlug, neighborsOf } from "@/app/lib/regions";
+import TopicFaq from "@/app/therapists/TopicFaq";
+import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
 import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { cityFact } from "@/app/lib/city-facts";
 
-// City×topic PILOT (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב",
-// "CBT בירושלים". Deliberately narrow - 3 pilot cities, allow-listed topics,
-// indexable only at ≥MIN_CITY_TOPIC listed therapists - everything below that
-// is noindex, and non-pilot combinations simply 404. This is the anti-doorway
+// City×topic (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב", "CBT בירושלים".
+// Allow-listed topics, cities per cityTopicCitiesFor(), indexable only at
+// ≥MIN_CITY_TOPIC listed therapists - everything below that is noindex, and
+// combinations outside the allowed cities simply 404. This is the anti-doorway
 // discipline: pages exist only where real supply exists.
 
 const BASE = "https://www.mentalytics.co.il";
@@ -30,8 +32,8 @@ async function resolve(params: Promise<{ city: string; topic: string }>) {
   const city = slugToCity(citySlug);
   const topic = slugToCityTopic(topicSlug);
   if (!city || !topic) return null;
-  if (!(PILOT_CITIES as readonly string[]).includes(city)) return null;
   if (!isCityTopicAllowed(topic)) return null;
+  if (!cityTopicCitiesFor(topic).includes(city)) return null;
   return { city, topic, citySlug };
 }
 
@@ -39,7 +41,7 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const r = await resolve(params);
   if (!r) return { title: "עמוד לא נמצא" };
   const { city, topic } = r;
-  const title = `${topic.name} ${inPhrase(city)} - מטפלים מאומתים`;
+  const title = `${topic.name} ${inPhrase(city)} - ${topic.cityTitleTail ?? "מטפלים מאומתים"} | טיפול חכם`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
   // Same shape as the city pages, and count-free for the same reason.
@@ -77,14 +79,41 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
     ],
   };
 
-  // Sister pages for internal linking: same topic in the other pilot cities
-  // (only when THEY are indexable too), and the parent pages.
-  const sisterCities: string[] = [];
-  for (const c of PILOT_CITIES) {
-    if (c === city) continue;
-    const n = await countListed({ ...topic.filter, city: c });
-    if (n >= MIN_CITY_TOPIC) sisterCities.push(c);
-  }
+  // Sister pages for internal linking: same topic in the other allowed cities
+  // (only when THEY are indexable too), nearest first, capped. One in-memory
+  // count set: the audience list is every city with a page, not three.
+  const counts = await loadListedCounts();
+  const eligible = cityTopicCitiesFor(topic).filter(
+    (c) => c !== city && counts.count({ ...topic.filter, city: c }) >= MIN_CITY_TOPIC
+  );
+  const near = neighborsOf(city).filter((c) => eligible.includes(c));
+  const sisterCities = [...near, ...eligible.filter((c) => !near.includes(c))].slice(0, 8);
+
+  // What makes THIS city's page differ from the next one, derived from its own
+  // listing and count-free (owner's rule): which professions are actually
+  // here, which ages they cover, whether video is an option, and where else
+  // nearby a parent could look. Audience pages only.
+  const cityNote = (() => {
+    if (topic.kind !== "audience" || list.length === 0) return null;
+    const freq = new Map<string, number>();
+    for (const t of list) for (const p of t.therapist_types ?? []) freq.set(p, (freq.get(p) ?? 0) + 1);
+    const professions = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => p);
+    const ages = ["גיל הרך", "ילדים", "נוער"].filter((a) => list.some((t) => (t.age_groups ?? []).includes(a)));
+    const parts: string[] = [];
+    if (professions.length) parts.push(`${inPhrase(city)} מוצגים ${professions.join(", ")}`);
+    if (ages.length) parts.push(`שמטפלים ב${ages.join(", ")}`);
+    let s = parts.join(" ");
+    if (onlineHere > 0) s += ", וחלקם זמינים גם בשיחת וידאו";
+    s += ".";
+    if (near.length) s += ` מטפלים בתחום יש גם ${near.slice(0, 3).map(inPhrase).join(", ")}.`;
+    return s;
+  })();
+  // One verified sentence about THIS city's public service for children
+  // (its שפ"ח, or the closest official equivalent), with the source linked.
+  // Audience pages only, and only for cities that were checked - see
+  // city-facts.ts for the rules. Rendered inside the same paragraph as the
+  // data-derived note so the page gains a sentence, not a section.
+  const fact = topic.kind === "audience" ? cityFact(city) : null;
   const isNamedTopic = TOPICS.some((t) => t.slug === topic.slug);
 
   return (
@@ -98,9 +127,15 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר ותחום</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, הפועלים {inPhrase(city)} ושתעודותיהם אומתו{onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.
+        {/* The first paragraph is what Google quotes when it skips the meta
+            description. It used to be the thin supply line below, so the snippet
+            read "מוצגים מטפלים..." and then ran into the card grid. Same sentence
+            shape as the city pages, which is the one that produced the snippet
+            we wanted ("מלאו שאלון מקצועי..."). */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים ${inPhrase(city)} שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
         </p>
+        <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
       </div>
 
       {/* Quiz CTA. A children/teens topic sends parents to the kids
@@ -112,6 +147,22 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           ? `ענו על שאלון קצר מבוסס מחקר - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת ב${city} או אונליין.`
           : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
       />
+
+      {(cityNote || fact) && (
+        <p className="mb-8 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
+          {cityNote}
+          {cityNote && fact ? " " : null}
+          {fact && (
+            <>
+              {fact.text}
+              {" (מקור: "}
+              <a href={fact.url} target="_blank" rel="noopener" className="font-semibold text-[#2e7d8c] hover:underline">{fact.source}</a>
+              {")."}
+            </>
+          )}
+        </p>
+      )}
+      <TopicFaq topic={topic} title={`${topic.name} ${inPhrase(city)} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

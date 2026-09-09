@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/topics";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import TopicFaq from "@/app/therapists/TopicFaq";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 // Online×topic (phase 3 of the online cluster - see ONLINE_TOPIC_SLUGS in
@@ -133,9 +134,11 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           טיפול מרחוק לפי נושא
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.
+        {/* Quotable intro - see city/[city]/[topic]. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${heading}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ומטפלים בשיחת וידאו מכל מקום בארץ ופנו ישירות. בחינם וללא התחייבות.`}
         </p>
+        <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.</p>
       </div>
 
       {/* Quiz CTA */}
@@ -158,6 +161,8 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           למילוי השאלון
         </Link>
       </div>
+
+      <TopicFaq topic={topic} title={`${heading} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

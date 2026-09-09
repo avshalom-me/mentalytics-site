@@ -264,6 +264,13 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
     section: "בחירת-טיפול-ומטפל",
   },
   {
+    slug: "first-session",
+    title: "הפגישה הראשונה אצל פסיכולוג",
+    desc: "מה קורה בפגישה, מה שואלים, מה אם בוכים או משתתקים, וכמה זה עולה.",
+    img: "https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "בחירת-טיפול-ומטפל",
+  },
+  {
     slug: "therapist-types",
     title: "סוגי המטפלים בישראל",
     desc: 'פסיכולוג קליני, עו"ס קליני, מטפל בהבעה ויצירה - מה ההבדל ומי מתאים למה?',

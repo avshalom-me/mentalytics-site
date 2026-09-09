@@ -23,7 +23,25 @@ const STEPS = [
   { t: "ניתוח AI אישי", d: "הסבר במילים פשוטות למה המטפל הותאם דווקא לך" },
 ];
 
-export default function OutputShowcase() {
+/** בדף נחיתה שאין בו כותרת משלו (למשל /lp/story-c, שם הדמו הוא הפתיח)
+ *  הכותרת של הרכיב היא הכותרת הראשית של העמוד. בדף הבית ובשאר העמודים היא
+ *  נשארת h2, כי שם כבר יש h1 מעליה. */
+/** ה"אייברו" שמעל הכותרת. בדף הבית הוא תגית קצרה, ובדף נחיתה הוא יכול לשאת
+ *  משפט שלם שמסביר מה עושים כאן - ואז הוא נקרא כשורת פתיח ולא כתגית. */
+export default function OutputShowcase({
+  headingLevel = "h2",
+  eyebrow = "כך זה נראה מבפנים",
+  eyebrowVariant = "pill",
+  headExtra,
+}: {
+  headingLevel?: "h1" | "h2";
+  eyebrow?: string;
+  eyebrowVariant?: "pill" | "lead";
+  /** נוסף מתחת לכותרת ולפני הטלפון - למשל כפתורי השאלון בדף נחיתה, כדי
+   *  שמי שכבר משוכנע לא יצטרך לגלול מסך שלם של דמו כדי להתחיל. */
+  headExtra?: React.ReactNode;
+} = {}) {
+  const Heading = headingLevel;
   const [idx, setIdx] = useState(0);
   // Bumped on every pane change - remounts the step progress bar so its CSS
   // animation restarts from zero.
@@ -59,11 +77,12 @@ export default function OutputShowcase() {
       <style>{OSW_CSS}</style>
 
       <div className="osw-head">
-        <span className="osw-eyebrow">כך זה נראה מבפנים</span>
-        <h2>
+        <span className={eyebrowVariant === "lead" ? "osw-lead" : "osw-eyebrow"}>{eyebrow}</span>
+        <Heading>
           מהשאלון - עד <em>המטפל המתאים</em>
-        </h2>
+        </Heading>
         <p>דוח אישי ברור, ניתוח מותאם, ורשימת מטפלים שמדורגת בדיוק בשבילך.</p>
+        {headExtra}
       </div>
 
       <div className="osw-stage">
@@ -276,9 +295,10 @@ const OSW_CSS = `
   display:flex;flex-direction:column;align-items:center;
 }
 .osw-head{text-align:center;max-width:620px;margin:0 auto 44px;}
+.osw-lead{display:block;color:var(--teal-dark);font-size:15.5px;font-weight:800;line-height:1.65;background:var(--teal-pale);border-radius:16px;padding:14px 20px;margin:0 auto 18px;text-align:center;}
 .osw-eyebrow{display:inline-block;background:var(--teal-pale);color:var(--teal-dark);font-size:12.5px;font-weight:800;border-radius:50px;padding:4px 14px;margin-bottom:14px;}
-.osw-head h2{font-size:clamp(1.9rem,3.2vw,3rem);font-weight:900;line-height:1.12;letter-spacing:-.02em;color:var(--text);}
-.osw-head h2 em{font-style:normal;color:var(--teal);}
+.osw-head h1,.osw-head h2{font-size:clamp(1.9rem,3.2vw,3rem);font-weight:900;line-height:1.12;letter-spacing:-.02em;color:var(--text);}
+.osw-head h1 em,.osw-head h2 em{font-style:normal;color:var(--teal);}
 .osw-head p{color:var(--muted);font-size:16px;margin-top:10px;line-height:1.8;}
 
 .osw-stage{display:flex;align-items:center;gap:56px;flex-wrap:wrap;justify-content:center;max-width:1080px;margin:0 auto;}

@@ -16,8 +16,10 @@ export const CHANNELS = [
   "meta_organic",    // organic Facebook / Instagram (fbclid alone, or social medium)
   "tiktok_paid",     // paid TikTok (utm_medium paid + tiktok source)
   "tiktok_organic",  // organic TikTok (ttclid alone, or tiktok referrer)
+  "taboola_paid",    // Taboola native ads (utm_source=taboola; the platform has no organic side)
   "whatsapp",        // WhatsApp referral or utm_source=whatsapp
   "direct",          // no referrer, no campaign params
+  "ai",              // an AI assistant sent them (ChatGPT, Gemini, Claude, Perplexity, Copilot)
   "referral",        // any other website (incl. organic social)
   "other",           // utm present but source not recognised
 ] as const;
@@ -111,6 +113,33 @@ function isTikTokSource(src: string): boolean {
   return src.includes("tiktok") || src.includes("tik_tok") || src === "tt";
 }
 
+/**
+ * Hosts that mean "an AI assistant handed the user this link".
+ *
+ * Matched on the referrer host, so a link shared FROM a chat lands here too -
+ * which is what we want: either way the assistant is what put us in front of
+ * the person. Kept as full hosts rather than loose substrings, because "ai" or
+ * "chat" as substrings would swallow unrelated domains.
+ */
+const AI_HOSTS = [
+  "chatgpt.com",
+  "chat.openai.com",
+  "openai.com",
+  "gemini.google.com",
+  "bard.google.com",
+  "claude.ai",
+  "perplexity.ai",
+  "copilot.microsoft.com",
+  "you.com",
+  "poe.com",
+  "grok.com",
+  "x.ai",
+] as const;
+
+function isAiReferrer(ref: string): boolean {
+  return AI_HOSTS.some((h) => ref.includes(h));
+}
+
 /** Derive a single normalized channel from URL params + referrer. */
 function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const src = (params.get("utm_source") || "").trim().toLowerCase();
@@ -121,10 +150,21 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // fbclid is NOT: Meta appends it to organic clicks too (shares, profile-link
   // taps, in-app browser), so it must never imply paid on its own (see below).
   if (params.has("gclid") || params.has("gbraid") || params.has("wbraid")) return "google_paid";
+  // Taboola appends its own click id (tblci) to every paid click. It proves paid
+  // traffic on its own, so a publisher's in-app browser that strips the utm
+  // still lands as Taboola and not as a referral from the publisher's domain.
+  if (params.has("tblci")) return "taboola_paid";
 
   // Explicit UTM tagging - trust the medium to separate paid from organic.
   if (src) {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
+    // utm_source=chatgpt.com is what ChatGPT appends when it tags a link at all
+    if (isAiReferrer(src)) return "ai";
+    // Taboola is paid by definition - there is no organic Taboola - so the medium
+    // is not consulted. Without this line the campaign's traffic landed in
+    // "other" (utm_medium=native is not in PAID_MEDIUMS) and the first native
+    // test would have been unreadable in /admin/attribution.
+    if (src === "taboola") return "taboola_paid";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
     if (isTikTokSource(src)) return PAID_MEDIUMS.has(med) ? "tiktok_paid" : "tiktok_organic";
@@ -141,6 +181,12 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // No UTM - infer from the referrer.
   if (!ref) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
+  // BEFORE the google. test, and that order is the whole point: gemini.google.com
+  // contains "google." and was being counted as organic search. Measured 3/9/2026,
+  // Gemini had sent 2 sessions and 6 page views that landed in google_organic, and
+  // ChatGPT 2 more that fell to "other" - so the one channel we most wanted to see
+  // growing was the one channel we could not see at all.
+  if (isAiReferrer(ref)) return "ai";
   if (ref.includes("google.")) return "google_organic";
   if (ref.includes("facebook.") || ref.includes("instagram.") || ref.includes("fb.")) return "meta_organic";
   if (ref.includes("tiktok.")) return "tiktok_organic";
@@ -223,7 +269,7 @@ export function captureAttribution(): void {
     // utm_source and is captured normally.
     const hasCampaignSignal =
       params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
-      params.has("utm_source");
+      params.has("tblci") || params.has("utm_source");
 
     // An expired touch is treated as if it were never there, so this landing
     // gets classified on its own merits instead of inheriting an old campaign.
@@ -431,8 +477,10 @@ export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
   meta_organic: "Meta - אורגני",
   tiktok_paid: "TikTok - בתשלום",
   tiktok_organic: "TikTok - אורגני",
+  taboola_paid: "טאבולה - בתשלום",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
+  ai: "עוזר AI",
   referral: "הפניה מאתר אחר",
   other: "אחר",
   unknown: "לא ידוע",

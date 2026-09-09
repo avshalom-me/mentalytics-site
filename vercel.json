@@ -69,7 +69,7 @@
       "path": "/api/cron/agent-prospects"
     },
     {
-      "schedule": "*/30 * * * *",
+      "schedule": "0 */2 * * *",
       "path": "/api/cron/agent-inbox"
     },
     {

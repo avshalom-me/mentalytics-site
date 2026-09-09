@@ -5,6 +5,7 @@ import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
 import { waLinkFor } from "@/app/lib/phone";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { tfaEvent } from "@/app/lib/taboola";
 
 // WhatsApp-only contact straight from the match card.
 //
@@ -51,7 +52,8 @@ export default function MatchCardWhatsApp({
     e.stopPropagation();
     if (trackingOptedOut()) { return; }
     const attribution = getAttribution() ?? {};
-    fetch("/api/track-click", {
+    tfaEvent("contact");
+  fetch("/api/track-click", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Mobile backgrounds the page the instant WhatsApp opens.

@@ -150,7 +150,44 @@ function campaignConfig() {
       daily_budget_micros: toMicros(safeCall(budget, 'getAmount')),
       total_budget_micros: toMicros(safeCall(budget, 'getTotalAmount')),
       cpc_ceiling_micros: null, // filled below when the GAQL engine allows it
+      net_search: null,         // ditto
+      net_partners: null,
+      net_display: null,
     });
+  }
+
+  // Which networks the campaign may serve on. This is the one field that
+  // catches a Search campaign quietly running on Display BEFORE it spends -
+  // g-emek1 took 100% of its clicks there in its first week while its type
+  // still read "Search". Best-effort like the ceiling probe: if this account's
+  // engine rejects the field, the booleans stay null and the impression-share
+  // check remains the fallback.
+  try {
+    var nets = {};
+    query(
+      "SELECT campaign.id, campaign.network_settings.target_google_search, " +
+      "campaign.network_settings.target_search_network, " +
+      "campaign.network_settings.target_content_network " +
+      "FROM campaign WHERE campaign.status IN ('ENABLED','PAUSED')",
+      function (r) {
+        var n = r.campaign.networkSettings || {};
+        nets[r.campaign.id] = {
+          net_search: n.targetGoogleSearch === true,
+          net_partners: n.targetSearchNetwork === true,
+          net_display: n.targetContentNetwork === true,
+        };
+        return null;
+      });
+    for (var j = 0; j < out.length; j++) {
+      var n2 = nets[out[j].id];
+      if (n2) {
+        out[j].net_search = n2.net_search;
+        out[j].net_partners = n2.net_partners;
+        out[j].net_display = n2.net_display;
+      }
+    }
+  } catch (e) {
+    Logger.log('network settings unavailable, leaving null: %s', e);
   }
 
   // The CPC ceiling (Maximize clicks bid limit) has no object-API getter, so

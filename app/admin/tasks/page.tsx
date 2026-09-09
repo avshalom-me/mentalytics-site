@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HelpTip from "../components/HelpTip";
-import { TASK_PRIORITIES, labelOf } from "@/app/lib/crm";
+import { TASK_PRIORITIES, TASK_STATUSES, labelOf } from "@/app/lib/crm";
 
 type Task = {
   id: string;
@@ -13,10 +13,12 @@ type Task = {
   entity_label: string | null;
   due_date: string | null;
   priority: string;
+  assignee: string | null;
   status: string;
   snoozed_until: string | null;
   created_at: string;
   completed_at: string | null;
+  completion_note: string | null;
 };
 
 type Suggestion = {
@@ -59,13 +61,21 @@ export default function TasksPage() {
   const [newTitle, setNewTitle] = useState("");
   const [newDue, setNewDue] = useState("");
   const [newPriority, setNewPriority] = useState("normal");
+  const [newAssignee, setNewAssignee] = useState("");
+  const [assignees, setAssignees] = useState<string[]>([]);
   const [creating, setCreating] = useState(false);
 
   const load = useCallback(() => {
     setLoading(true);
     setError("");
+    // רשימת האחראים נטענת בנפרד ולא כאיבר ב-Promise.all: הפירוק למטה הוא
+    // לפי מיקום, ואיבר נוסף בראש המערך היה מזיז את כל השאר בשקט.
+    fetch("/api/admin-crm/assignees")
+      .then((r) => r.json())
+      .then((j) => setAssignees(j.ok ? j.assignees : []))
+      .catch(() => setAssignees([]));
     Promise.all([
-      fetch("/api/admin-crm/tasks?status=open").then((r) => r.json()),
+      fetch("/api/admin-crm/tasks?status=active").then((r) => r.json()),
       fetch("/api/admin-crm/tasks?status=done").then((r) => r.json()),
       fetch("/api/admin-crm/task-suggestions").then((r) => r.json()),
     ])
@@ -109,6 +119,7 @@ export default function TasksPage() {
           title: newTitle.trim(),
           due_date: newDue || null,
           priority: newPriority,
+          assignee: newAssignee || null,
         }),
       });
       const j = await res.json();
@@ -116,6 +127,7 @@ export default function TasksPage() {
         setNewTitle("");
         setNewDue("");
         setNewPriority("normal");
+        setNewAssignee("");
         load();
       } else {
         setError(j.error || "שגיאה ביצירה");
@@ -132,6 +144,29 @@ export default function TasksPage() {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id, ...body }),
+      });
+      load();
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  // שני מסלולי סגירה מפורשים, לצד ה-✓ המהיר שסוגר ומשאיר בלי הערה.
+  async function doneWithNote(id: string) {
+    const note = window.prompt("מה יצא מזה? (הערת סיום)");
+    // ביטול הדיאלוג מחזיר null - ואז לא סוגרים בכלל. מחרוזת ריקה = נסגר בלי הערה.
+    if (note === null) return;
+    patch(id, { status: "done", completion_note: note.trim() || null });
+  }
+
+  async function doneAndDelete(id: string) {
+    if (!confirm("לסמן כבוצע ולמחוק לצמיתות? לא יישאר תיעוד שהמשימה הייתה.")) return;
+    setBusy(id);
+    try {
+      await fetch("/api/admin-crm/tasks", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
       });
       load();
     } finally {
@@ -195,6 +230,18 @@ export default function TasksPage() {
               </option>
             ))}
           </select>
+          <select
+            value={newAssignee}
+            onChange={(e) => setNewAssignee(e.target.value)}
+            className="rounded-xl border border-stone-200 px-3 py-2 text-sm text-stone-600"
+          >
+            <option value="">ללא אחראי</option>
+            {assignees.map((a) => (
+              <option key={a} value={a}>
+                {a}
+              </option>
+            ))}
+          </select>
           <button
             type="submit"
             disabled={creating || !newTitle.trim()}
@@ -251,10 +298,10 @@ export default function TasksPage() {
           </div>
         )}
 
-        <TaskGroup title={`באיחור (${overdue.length})`} tone="text-red-600" tasks={overdue} busy={busy} onPatch={patch} onRemove={remove} today={today} />
-        <TaskGroup title={`להיום (${dueToday.length})`} tone="text-teal-700" tasks={dueToday} busy={busy} onPatch={patch} onRemove={remove} today={today} />
-        <TaskGroup title={`בהמשך (${upcoming.length})`} tone="text-stone-500" tasks={upcoming} busy={busy} onPatch={patch} onRemove={remove} today={today} />
-        <TaskGroup title={`בלי תאריך (${noDate.length})`} tone="text-stone-400" tasks={noDate} busy={busy} onPatch={patch} onRemove={remove} today={today} />
+        <TaskGroup title={`באיחור (${overdue.length})`} tone="text-red-600" tasks={overdue} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`להיום (${dueToday.length})`} tone="text-teal-700" tasks={dueToday} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`בהמשך (${upcoming.length})`} tone="text-stone-500" tasks={upcoming} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
+        <TaskGroup title={`בלי תאריך (${noDate.length})`} tone="text-stone-400" tasks={noDate} busy={busy} onPatch={patch} onRemove={remove} today={today} assignees={assignees} onDoneNote={doneWithNote} onDoneDelete={doneAndDelete} />
 
         {done.length > 0 && (
           <div className="mt-8">
@@ -270,6 +317,11 @@ export default function TasksPage() {
                 {done.map((t) => (
                   <div key={t.id} className="flex items-center gap-3 rounded-xl border border-stone-200 bg-white px-4 py-2">
                     <span className="text-sm text-stone-400 line-through">{t.title}</span>
+                    {t.completion_note && (
+                      <span className="min-w-0 truncate text-xs text-teal-700" title={t.completion_note}>
+                        {t.completion_note}
+                      </span>
+                    )}
                     <span className="ms-auto text-xs text-stone-300">{fmtDate(t.completed_at)}</span>
                     <button
                       onClick={() => patch(t.id, { status: "open" })}
@@ -296,6 +348,9 @@ function TaskGroup({
   onPatch,
   onRemove,
   today,
+  assignees,
+  onDoneNote,
+  onDoneDelete,
 }: {
   title: string;
   tone: string;
@@ -304,6 +359,9 @@ function TaskGroup({
   onPatch: (id: string, body: Record<string, unknown>) => void;
   onRemove: (id: string) => void;
   today: string;
+  assignees: string[];
+  onDoneNote: (id: string) => void;
+  onDoneDelete: (id: string) => void;
 }) {
   if (tasks.length === 0) return null;
   return (
@@ -331,6 +389,40 @@ function TaskGroup({
                   </div>
                 )}
               </div>
+              <select
+                value={t.status}
+                onChange={(e) => onPatch(t.id, { status: e.target.value })}
+                disabled={busy === t.id}
+                title="סטטוס"
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+                  TASK_STATUSES.find((x) => x.value === t.status)?.cls ?? ""
+                }`}
+              >
+                {TASK_STATUSES.map((x) => (
+                  <option key={x.value} value={x.value}>
+                    {x.label}
+                  </option>
+                ))}
+              </select>
+              {/* שינוי אחראי במקום, בלי לפתוח את המשימה. PATCH כבר תמך בשדה. */}
+              <select
+                value={t.assignee ?? ""}
+                onChange={(e) => onPatch(t.id, { assignee: e.target.value || null })}
+                disabled={busy === t.id}
+                title="אחראי/ת"
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-bold ${
+                  t.assignee
+                    ? "border-teal-200 bg-teal-50 text-teal-700"
+                    : "border-stone-200 bg-white text-stone-300"
+                }`}
+              >
+                <option value="">ללא אחראי</option>
+                {(t.assignee && !assignees.includes(t.assignee) ? [t.assignee, ...assignees] : assignees).map((a) => (
+                  <option key={a} value={a}>
+                    {a}
+                  </option>
+                ))}
+              </select>
               {t.priority !== "normal" && (
                 <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${pMeta?.cls ?? ""}`}>
                   {labelOf(TASK_PRIORITIES, t.priority)}
@@ -340,6 +432,24 @@ function TaskGroup({
                 <span className="text-xs font-semibold text-stone-400">{fmtDate(t.due_date)}</span>
               )}
               <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => onDoneNote(t.id)}
+                  disabled={busy === t.id}
+                  title="סימון בוצע, המשימה נשארת עם הערת סיום"
+                  className="rounded-full border border-teal-200 bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-700 hover:bg-teal-100"
+                >
+                  בוצע + הערה
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDoneDelete(t.id)}
+                  disabled={busy === t.id}
+                  title="סימון בוצע ומחיקה לצמיתות"
+                  className="rounded-full border border-stone-200 px-2 py-0.5 text-[11px] font-bold text-stone-400 hover:bg-red-50 hover:text-red-500"
+                >
+                  בוצע ומחק
+                </button>
                 <button
                   type="button"
                   onClick={() => onPatch(t.id, { snoozed_until: addDays(today, 1) })}

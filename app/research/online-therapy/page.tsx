@@ -75,6 +75,26 @@ const h2 = {
   paddingBottom: "8px",
 } as const;
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מטפל לילד?") are deliberately excluded - they are
+// not informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "כמה עולה טיפול פסיכולוגי אונליין?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "פגישה פרטית עם פסיכולוג או מטפל מוסמך עולה בישראל לרוב בין 300 ל-550 שקלים, כשהממוצע נע סביב 400. טיפול אונליין נמצא פעמים רבות בחלק הנמוך של הטווח, כי המטפל חוסך את עלות הקליניקה. הגורם המשפיע ביותר על המחיר אינו הפורמט אלא ההכשרה והניסיון. קיימים גם מסלולים מסובסדים דרך קופות החולים."
+        }
+      }
+    ]
+  };
+
 export default async function OnlineTherapyPage() {
   const onlineCount = await countListed({ online: true });
   return (
@@ -86,6 +106,7 @@ export default async function OnlineTherapyPage() {
     >
       <ResearchBreadcrumbLd slug="online-therapy" title={TITLE} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">{TITLE}</h1>
 

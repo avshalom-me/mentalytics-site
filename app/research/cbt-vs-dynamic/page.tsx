@@ -20,6 +20,26 @@ const jsonLd = {
   "url": "https://www.mentalytics.co.il/research/cbt-vs-dynamic",
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מטפל לילד?") are deliberately excluded - they are
+// not informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מתי כדאי לבחור CBT ומתי טיפול דינמי?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "CBT מתאים יותר כשיש בעיה ספציפית כמו חרדה, פוביה, OCD או דיכאון אפיזודי, כשמעדיפים מבנה וכלים מעשיים ליישום מחוץ לפגישה, כשהזמן או התקציב מוגבלים, וכשמחפשים שינוי מהיר יחסית. טיפול דינמי מתאים יותר כשיש דפוסים חוזרים ביחסים ובעבודה, כשהתחושה היא שהבעיה עמוקה יותר ממה שנראה, כשרוצים להבין את עצמכם לעומק ולא רק לפתור בעיה, וכשהקשיים מתחברים לחוויות ילדות ומשפחה."
+        }
+      }
+    ]
+  };
+
 export default function CbtVsDynamicPage() {
   return (
     <ArticleShell
@@ -29,6 +49,7 @@ export default function CbtVsDynamicPage() {
     >
       <ResearchBreadcrumbLd slug="cbt-vs-dynamic" title="הבדל בין CBT לטיפול דינמי" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
 
       <h1 className="text-3xl font-black text-stone-900 mb-3">הבדל בין CBT לטיפול דינמי</h1>
       <p className="text-stone-600 leading-7 mb-8">

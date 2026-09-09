@@ -52,6 +52,21 @@ export const DEAL_TYPES = [
   { value: "other", label: "אחר" },
 ] as const;
 
+// שלושת מצבי המשימה. "open" הוא "משימה חדשה" ולא שם חדש בכוונה: כל המשימות
+// הקיימות כבר שמורות ככה, ושינוי שם היה דורש מיגרציית נתונים בשביל תווית.
+export const TASK_STATUSES = [
+  { value: "open", label: "משימה חדשה", cls: "bg-stone-50 border-stone-200 text-stone-600" },
+  { value: "in_progress", label: "בתהליך", cls: "bg-amber-50 border-amber-200 text-amber-700" },
+  { value: "done", label: "בוצע", cls: "bg-teal-50 border-teal-200 text-teal-700" },
+] as const;
+
+/**
+ * מה נחשב משימה חיה. חייב לשמש בכל מקום שסופר או מציג משימות פתוחות -
+ * לפני שהמצב "בתהליך" נוסף, שאילתות סיננו status = "open" בלבד, ומשימה
+ * שמישהו התחיל הייתה נעלמת מתור העבודה ומהמונה בלי שאיש ישים לב.
+ */
+export const ACTIVE_TASK_STATUSES = ["open", "in_progress"] as const;
+
 export const TASK_PRIORITIES = [
   { value: "high", label: "גבוהה", cls: "bg-red-50 border-red-200 text-red-700" },
   { value: "normal", label: "רגילה", cls: "bg-stone-50 border-stone-200 text-stone-600" },

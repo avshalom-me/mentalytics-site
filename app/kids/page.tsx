@@ -1,11 +1,12 @@
 "use client";
 
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, Fragment } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -2544,6 +2545,8 @@ type KidsMatchResult = {
   match_score: number;
   personality_score: number | null;
   combined_score: number | null;
+  /** באזור שהתבקש (עיר/אזור) - קובע לאיזו קבוצת תוצאות הכרטיס שייך. */
+  in_requested_area?: boolean;
   match_reasons: string[];
 };
 
@@ -2758,6 +2761,10 @@ function KidsMatchSection({ A, score, selection }: {
         region: region || null,
         city: city || null,
         online: !!online,
+        // כמה מהם באזור שהתבקש - המדד שלפיו נבדק פיצול הקבוצות (6/9/2026).
+        local: !!(city || region) && Array.isArray(data.matches)
+          ? data.matches.filter((m: any) => m.in_requested_area).length
+          : undefined,
         returned: Array.isArray(data.matches) ? data.matches.length : 0,
       });
       setSearched(true);
@@ -2919,7 +2926,17 @@ function KidsMatchSection({ A, score, selection }: {
               <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
               <SaveMatchesButton matches={results} quizType="kids" treatmentLabel={treatmentLabels.join(" + ") || null} />
               <div className="space-y-4">
-                {results.map(t => {
+                {(() => {
+                  // שתי קבוצות, כמו במבוגרים: באזור שבחרתם, ואחריה מחוץ לו.
+                  // בלי מיקום מבוקש אין קבוצות - הכל נחשב "באזור".
+                  const locationAsked = !!(city || region);
+                  const inArea = (m: any) => !!m.in_requested_area;
+                  const localCount = locationAsked ? results.filter(inArea).length : results.length;
+                  const ordered = locationAsked
+                    ? [...results.filter(inArea), ...results.filter((m) => !inArea(m))]
+                    : results;
+                  return ordered.map((t, idx) => {
+                  const away = locationAsked && !inArea(t);
                   const regionsArr = toArr(t.regions);
                   const combined = t.combined_score ?? t.match_score;
                   const profileHref = (() => {
@@ -2939,8 +2956,28 @@ function KidsMatchSection({ A, score, selection }: {
                     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
                   })();
                   return (
+                    <Fragment key={t.id}>
+                    {locationAsked && idx === 0 && localCount > 0 && localCount < ordered.length && (
+                      <div className="flex items-center gap-2 pt-1">
+                        <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרתם</span>
+                        <span className="h-px flex-1 bg-[var(--line)]" />
+                      </div>
+                    )}
+                    {away && idx === localCount && (
+                      <div className="pt-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-extrabold text-[var(--text-2)]">מחוץ לאזור שבחרתם</span>
+                          <span className="h-px flex-1 bg-[var(--line)]" />
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                          {localCount === 0
+                            ? `לא מצאנו ${isAssessment ? "מאבחנים" : "מטפלים"} באזור שבחרתם. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים`
+                            : `${isAssessment ? "מאבחנים" : "מטפלים"} מאזורים סמוכים`}
+                          {online ? " וכאלה שעובדים אונליין" : ""}. ההתאמה המקצועית שלהם מסומנת במילים ולא באחוז, כי המרחק לא נכלל בחישוב.
+                        </p>
+                      </div>
+                    )}
                     <div
-                      key={t.id}
                       className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
                     >
                       <div className="flex items-stretch gap-4">
@@ -2974,6 +3011,14 @@ function KidsMatchSection({ A, score, selection }: {
                             <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {regionsArr.join(", ")}</p>
                           )}
                         </div>
+                        {away ? (
+                          // מחוץ לאזור: מילים במקום אחוז (ראו app/lib/match-card-label.ts).
+                          <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
+                            <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
+                            <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
+                            <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!online, t.online === true)}</div>
+                          </div>
+                        ) : (
                         <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
                           <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                             {combined}<span className="align-super text-base font-extrabold">%</span>
@@ -2989,8 +3034,10 @@ function KidsMatchSection({ A, score, selection }: {
                             </>
                           )}
                         </div>
+                        )}
                       </div>
-                      {t.entity_type === "center" && t.personality_score != null && (
+                      {/* אותו כלל כמו במבוגרים: בלי מספר אישיותי אין כוכבית להסביר. */}
+                      {t.entity_type === "center" && t.personality_score != null && !away && (
                         <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
                           * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לכם מתוכו את המטפל/ת המתאים/ה גם אישיותית.
                         </p>
@@ -3040,8 +3087,10 @@ function KidsMatchSection({ A, score, selection }: {
                         </div>
                       )}
                     </div>
+                    </Fragment>
                   );
-                })}
+                  });
+                })()}
               </div>
             </>
           )}
@@ -3184,7 +3233,7 @@ function GroupCard({
             <button
               type="button"
               onClick={onSelect}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
+              className={`cta-pulse-soft inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
                 isAssessment
                   ? "bg-purple-700"
                   : isProfessional
@@ -3209,7 +3258,7 @@ function GroupCard({
                 key={s.treatmentKey}
                 type="button"
                 onClick={cb}
-                className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
+                className={`cta-pulse-soft inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
                   sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : "bg-[var(--teal-dark)]"
                 }`}
               >
@@ -3715,6 +3764,36 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart }: { A: Ans;
       <div className="mb-4 flex justify-center">
         <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
       </div>
+
+      {/* One primary button above the report - same reasoning as the adults
+          screen (3/9/26): 24 of the 36 sessions that stopped dead on a results
+          screen were parents. The per-finding buttons are untouched; this
+          puts the first actionable finding one tap away, before the tools,
+          PDF and notes offer an exit. Assessment and professional referrals
+          keep their own verb and colour so the promise matches the button
+          the parent would otherwise have found lower down. */}
+      {hasAnyFindings && (() => {
+        const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0);
+        const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0]) : null;
+        if (!bucket || !g) return null;
+        const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת";
+        const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
+        return (
+          <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
+            <p className="mb-2.5 text-sm text-[#2a3a4a]">
+              הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{g.treatmentLabel}</span>
+            </p>
+            <button
+              type="button"
+              onClick={() => { trackQuizStep("kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
+              className={`cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors sm:w-auto ${tone}`}
+            >
+              {verb} - {g.treatmentLabel} ←
+            </button>
+            <p className="mt-2 text-xs text-gray-500">דוח הממצאים המלא, הכלים המעשיים וההפניות הנוספות - למטה</p>
+          </div>
+        );
+      })()}
       {/* Demographics card */}
       <Card>
         <StepTag>סיכום שאלון</StepTag>

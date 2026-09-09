@@ -12,6 +12,7 @@ import {
   GIFT_OFFER_WAIT_DAYS,
   GIFT_OFFER_COOLDOWN_DAYS,
 } from "./gift-offer";
+import { GIFT_FOLLOWON_PRICE, GIFT_FOLLOWON_MONTHS } from "./promo";
 
 // סוכן פערי ההיצע (סוכן 11): מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים
 // ביקשו טיפול ולא היה לנו מטפל משלם להראות להם, ומציע מה לעשות עם כל פער:
@@ -185,6 +186,18 @@ function canonicalPart(raw: string): string {
   return TREATMENT_ALIASES[n] ?? n;
 }
 
+/** הרכיב כפי שהוא נבדק מול training_areas של המטפל.
+ *
+ *  תוויות ההמלצה מהשאלון נושאות לעיתים סיוג בסוגריים - "טיפול זוגי (בהעדפה
+ *  לגישה דינמית)". הסיוג הוא העדפה ולא דרישה, אבל ההשוואה מול training_areas
+ *  היא שוויון מחרוזות מנורמל, ולכן התווית המלאה לא תאמה אף מטפל: כל פער של
+ *  טיפול זוגי סווג כ"אין במאגר אף מטפל חינמי מאושר שמתאים" ונשלח לגיוס במקום
+ *  להצעת מתנה (14 ממצאים ב-60 יום, מול הצעת מתנה אחת). מסירים את הסיוג לצורך
+ *  ההתאמה בלבד - התווית המלאה נשארת בכותרת הממצא ובמפתח הצבירה. */
+function matchPart(raw: string): string {
+  return raw.replace(/\s*\([^)]*\)\s*/g, " ").trim() || raw.trim();
+}
+
 /** פירוק "CBT + טיפול דינאמי" לרכיביו, בלי כפילויות ובסדר קבוע. */
 export function treatmentParts(raw: string): string[] {
   const parts = raw
@@ -254,11 +267,11 @@ function buildGiftDraft(
     ``,
     demandLine,
     ``,
-    `${fitLine}, ולכן אנחנו מציעים לך להצטרף לקידום במסלול הבא: ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, ולאחריהם 140 ש"ח + מע"מ לחודש.`,
+    `${fitLine}, ולכן אנחנו מציעים לך להצטרף לקידום במסלול הבא: ${GIFT_MONTHS} חודשים ראשונים ללא תשלום, אחריהם ${GIFT_FOLLOWON_MONTHS} חודשים ב-${GIFT_FOLLOWON_PRICE} ש"ח + מע"מ לחודש, ורק לאחר מכן המחיר המלא - 140 ש"ח + מע"מ לחודש.`,
     ``,
     `מה זה אומר בפועל:`,
     `• הפרופיל שלך ייכנס למערכת ההתאמות ויוצג למטופלים שמחפשים ${treatment} ${where}, מיד עם ההצטרפות.`,
-    `• ב-${GIFT_MONTHS} החודשים הראשונים לא נגבה תשלום.`,
+    `• ב-${GIFT_MONTHS} החודשים הראשונים לא נגבה תשלום, ובשני החודשים שאחריהם התשלום הוא ${GIFT_FOLLOWON_PRICE} ש"ח + מע"מ לחודש.`,
     `• שבוע לפני החיוב הראשון יישלח אליך מייל עם התאריך והסכום, כדי שתהיה לך אפשרות להחליט אם להמשיך.`,
     `• ביטול בכל שלב בהודעת מייל אחת אלינו, לפני החיוב הראשון או אחריו. אנחנו מטפלים בזה מיד.`,
     `• ההצעה תקפה ל-${GIFT_OFFER_TTL_DAYS} ימים מרגע שליחת המייל הזה. אחרי כן הקישור נסגר.`,
@@ -428,7 +441,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       const parts = treatmentParts(treatment);
       if (parts.length === 0 || parts.some((p) => canonicalPart(p) === "כללי")) return true;
       const areas = t.training_areas ?? [];
-      const covers = (p: string) => overlaps(areas, [p]);
+      const covers = (p: string) => overlaps(areas, [matchPart(p)]);
       return mode === "all" ? parts.every(covers) : parts.some(covers);
     };
 
@@ -436,7 +449,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const coveredPartOf = (t: TherapistRow, treatment: string): string | undefined => {
       const parts = treatmentParts(treatment);
       if (parts.length < 2) return undefined;
-      return parts.find((p) => overlaps(t.training_areas ?? [], [p]));
+      return parts.find((p) => overlaps(t.training_areas ?? [], [matchPart(p)]));
     };
 
     const gaps: SupplyGap[] = [];
