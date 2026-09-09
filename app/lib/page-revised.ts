@@ -52,6 +52,11 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/meta-description.ts",
       "app/lib/topics.ts",
       "app/lib/city-facts.ts",
+      // What the listings actually contain (the filters) and how a therapist's
+      // title is spelled - both are visible page text, so a change here is a
+      // change Google should re-crawl.
+      "app/lib/therapist-directory.ts",
+      "app/lib/gender-text.ts",
     ],
   },
   "/": { date: "2026-09-02", sources: ["app/page.tsx"] },

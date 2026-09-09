@@ -17,10 +17,10 @@ export type Topic = {
   name: string;
   /** H1 / <title> in searcher phrasing. */
   searchTitle: string;
-  kind: "condition" | "audience";
+  kind: "condition" | "audience" | "gender";
   intro: string;
   /** Therapist filter - union within each field, intersection across fields. */
-  filter: { trainingAreasAny?: string[]; ageGroupsAny?: string[] };
+  filter: { trainingAreasAny?: string[]; ageGroupsAny?: string[]; gender?: string };
   /** How the supply line explains WHO is listed (honesty line). */
   supplyNote: string;
   related: { href: string; label: string }[];
@@ -75,6 +75,41 @@ export function isYouthTopic(topic: Pick<Topic, "filter">): boolean {
 }
 
 export const TOPICS: Topic[] = [
+  {
+    // 31% of job-title searches use the feminine form (2,047 impressions in the
+    // ads search-term report, 370 distinct terms) and NOTHING on the site said
+    // "פסיכולוגית" - every city title read "פסיכולוגים ומטפלים ב<עיר>", which
+    // Hebrew search does not treat as an answer. The CTR proved it: 91
+    // impressions on "פסיכולוגית תל אביב" bought 2 clicks, "פסיכולוגית הרצליה"
+    // bought none. Supply is the easy half - 128 of 200 approved therapists are
+    // women, so this filters the directory rather than stretching it.
+    //
+    // It is a FILTER, never a ranking: nothing on the page says a woman is a
+    // better therapist. The page exists because the preference is real and
+    // common, and because for some people it is the precondition for showing up.
+    slug: "פסיכולוגית",
+    name: "פסיכולוגית",
+    searchTitle: "פסיכולוגית - מטפלות ופסיכולוגיות מאומתות",
+    kind: "gender",
+    intro:
+      "הרבה אנשים מעדיפים להיפגש עם מטפלת, ולא פעם ההעדפה הזו היא מה שמאפשר להתחיל בכלל. זו אינה בקשה שצריך להצדיק: מה שמנבא את הצלחת הטיפול יותר מכל הוא הקשר הטיפולי, וקשר נבנה קודם כול מתוך תחושת ביטחון. יש גם מצבים שבהם זו יותר מהעדפה - אחרי פגיעה מינית, בהיריון ולאחר לידה, בנושאי גוף ואכילה, ובקהילות שבהן מפגש אישי עם גבר אינו מקובל. כאן מוצגות מטפלות ופסיכולוגיות לפי עיר, שתעודות ההכשרה שלהן אומתו.",
+    cityTitleTail: "מטפלות ופסיכולוגיות מאומתות",
+    faq: [
+      { q: "האם זה בסדר לבקש דווקא מטפלת אישה?", a: "כן, לחלוטין, וזו בקשה נפוצה הרבה יותר ממה שנדמה. מטפל או מטפלת מנוסים מקבלים אותה כמידע קליני ולא כעלבון: מי שמרגיש בטוח יותר מול אישה יגיע לפגישות, ידבר בכנות, ויישאר בטיפול, ואלה בדיוק התנאים שהופכים טיפול למועיל. אין צורך להסביר או להצדיק, ואפשר פשוט לומר את זה בשיחת הטלפון הראשונה. ככל שהבקשה נאמרת מוקדם יותר, כך נחסכות פגישות היכרות שלא היו מתאימות מלכתחילה." },
+      { q: "האם מגדר המטפלת משפיע על הצלחת הטיפול?", a: "התשובה הכנה היא כפולה. הגורם החזק והעקבי ביותר בתוצאות של טיפול נפשי הוא איכות הקשר הטיפולי, יותר מהמגדר של המטפל/ת ואפילו יותר מהשיטה הספציפית. במובן הזה, מגדר כשלעצמו אינו מנבא הצלחה. אבל זה חותך לשני הכיוונים: אם מפגש עם גבר ימנע ממך לדבר בפתיחות, אז אצלך המגדר אינו פרט צדדי אלא תנאי מקדים לקשר הטיפולי עצמו. לכן ההעדפה שלך רלוונטית גם אם המגדר לבדו אינו משתנה מכריע." },
+      { q: "מתי ההעדפה למטפלת חשובה במיוחד?", a: "יש מצבים שבהם זו יותר מהעדפה. אחרי פגיעה מינית או הטרדה; בהיריון, אחרי לידה ובתקופה שלאחריה; בקשיי פוריות ואובדן היריון; בנושאי גוף, דימוי גוף ואכילה; במשברים זוגיים שבהם אדם מרגיש שהוא צריך קודם כל להישמע; ובקהילות שבהן מפגש אישי עם גבר אינו מקובל. גם מי שהקושי המשמעותי בחייו נקשר בדמות גברית מוקדמת מוצא לעיתים שקל לו יותר להתחיל מול אישה. גברים מבקשים מטפלת מאותן סיבות בדיוק, ולעיתים כדי לאפשר לעצמם רכות שקשה להם מול גבר." },
+      { q: "מה ההבדל בין פסיכולוגית קלינית, עו\"סית קלינית ופסיכותרפיסטית?", a: "פסיכולוגית קלינית היא בעלת תואר שני בפסיכולוגיה, התמחות קלינית ורישום בפנקס הפסיכולוגים של משרד הבריאות, והיא היחידה מבין השלוש שמוסמכת לבצע אבחון פסיכולוגי. עובדת סוציאלית קלינית היא בעלת תואר בעבודה סוציאלית והכשרה קלינית, עם דגש חזק על הקשר בין האדם למשפחתו ולסביבתו. פסיכותרפיסטית היא מי שסיימה הכשרת פסיכותרפיה, לרוב על גבי מקצוע טיפולי קודם. שלושתן מטפלות בפסיכותרפיה, וההבדל המעשי הוא בסוג ההכשרה ובמה שכל אחת מוסמכת לעשות. בעמודים האלה מוצגות כל הקבוצות, ותעודות ההכשרה של כולן אומתו." },
+      { q: "איך בוחרים מטפלת, מעבר למגדר?", a: "שלושה דברים קובעים יותר מכל השאר: הכשרה שמתאימה לסוג הקושי, ניסיון עם מקרים דומים, ומה שקורה בפגישה הראשונה. השניים הראשונים ניתנים לבדיקה מראש, ואפשר לשאול עליהם ישירות. השלישי מתברר רק בפועל, וסביר לתת לו שתיים או שלוש פגישות לפני שמחליטים. אם אינך בטוח איזה סוג טיפול מתאים לך מלכתחילה, השאלון שלנו נבנה בדיוק לשלב הזה: הוא ממפה את הקושי וממליץ על סוג הטיפול, לפני שמתחילים לחפש מטפל/ת." },
+      { q: "איפה עוד אפשר למצוא מטפלת, ומה לגבי מסלולים ציבוריים?", a: "יש שלושה מסלולים והם לא מתחרים זה בזה. קופות החולים מפעילות מרפאות לבריאות הנפש וגם מטפלים בהסדר בהשתתפות עצמית, ובביטוח המשלים יש לעיתים החזר על טיפול פרטי. השירות הפסיכולוגי החינוכי של הרשות המקומית נותן מענה לילדים ולנוער דרך מערכת החינוך, ללא תשלום. במסלול הפרטי הבחירה רחבה יותר וזמני ההמתנה קצרים יותר. הבחירה תלויה בדחיפות, בסוג הקושי ובתקציב, ורוב האנשים משלבים בין המסלולים." },
+    ],
+    filter: { gender: "נקבה" },
+    supplyNote: "מוצגות מטפלות ופסיכולוגיות שתעודות ההכשרה שלהן אומתו",
+    related: [
+      { href: "/adults", label: "✦ שאלון התאמה למבוגרים" },
+      { href: "/research/choosing-therapist", label: "איך בוחרים מטפל/ת" },
+      { href: "/research/first-session", label: "הפגישה הראשונה אצל פסיכולוג" },
+    ],
+  },
   {
     slug: "טיפול-בחרדה",
     name: "טיפול בחרדה",
@@ -264,6 +299,7 @@ export const MIN_CITY_TOPIC = 5;
 /** Topics eligible for city×topic pages: the pilot uses approaches with clear
  *  local search demand + the audiences. */
 export const CITY_TOPIC_SLUGS = [
+  "פסיכולוגית",
   "פסיכולוג-ילדים",
   "פסיכולוג-לנוער",
   "פסיכולוג-ילדים-ונוער",
@@ -299,7 +335,7 @@ export function cityTopicCitiesFor(topic: Topic): readonly string[] {
   // them is indexed, so a city with two child therapists renders noindex, not
   // a thin indexed page. Condition and approach topics stay on the pilot list
   // until GSC proves the pattern for them too.
-  return topic.kind === "audience" ? CITY_SEO_LIST : PILOT_CITIES;
+  return topic.kind === "audience" || topic.kind === "gender" ? CITY_SEO_LIST : PILOT_CITIES;
 }
 
 /** The topics that can have city pages, resolved - the sitemap's list, shared. */

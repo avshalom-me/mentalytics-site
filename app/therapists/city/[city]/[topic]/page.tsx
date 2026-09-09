@@ -12,6 +12,7 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 import { cityFact } from "@/app/lib/city-facts";
+import { genderTitle } from "@/app/lib/gender-text";
 
 // City×topic (docs/seo-roadmap.md M4): "טיפול בחרדה בתל אביב", "CBT בירושלים".
 // Allow-listed topics, cities per cityTopicCitiesFor(), indexable only at
@@ -93,19 +94,26 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
   // listing and count-free (owner's rule): which professions are actually
   // here, which ages they cover, whether video is an option, and where else
   // nearby a parent could look. Audience pages only.
+  // A women-only page inflects: "מוצגות פסיכולוגית קלינית" would be broken
+  // Hebrew, so the professions run through the canonical feminine map rather
+  // than being printed as the database stores them (masculine canonical form).
+  const fem = topic.kind === "gender";
   const cityNote = (() => {
-    if (topic.kind !== "audience" || list.length === 0) return null;
+    if ((topic.kind !== "audience" && topic.kind !== "gender") || list.length === 0) return null;
     const freq = new Map<string, number>();
     for (const t of list) for (const p of t.therapist_types ?? []) freq.set(p, (freq.get(p) ?? 0) + 1);
-    const professions = [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([p]) => p);
+    const professions = [...freq.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([p]) => (fem ? genderTitle(p, "נקבה") : p));
     const ages = ["גיל הרך", "ילדים", "נוער"].filter((a) => list.some((t) => (t.age_groups ?? []).includes(a)));
     const parts: string[] = [];
-    if (professions.length) parts.push(`${inPhrase(city)} מוצגים ${professions.join(", ")}`);
-    if (ages.length) parts.push(`שמטפלים ב${ages.join(", ")}`);
+    if (professions.length) parts.push(`${inPhrase(city)} מוצג${fem ? "ות" : "ים"} ${professions.join(", ")}`);
+    if (ages.length) parts.push(`שמטפל${fem ? "ות" : "ים"} ב${ages.join(", ")}`);
     let s = parts.join(" ");
-    if (onlineHere > 0) s += ", וחלקם זמינים גם בשיחת וידאו";
+    if (onlineHere > 0) s += fem ? ", וחלקן זמינות גם בשיחת וידאו" : ", וחלקם זמינים גם בשיחת וידאו";
     s += ".";
-    if (near.length) s += ` מטפלים בתחום יש גם ${near.slice(0, 3).map(inPhrase).join(", ")}.`;
+    if (near.length) s += ` מטפל${fem ? "ות" : "ים"} בתחום יש גם ${near.slice(0, 3).map(inPhrase).join(", ")}.`;
     return s;
   })();
   // One verified sentence about THIS city's public service for children
@@ -133,7 +141,9 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
             shape as the city pages, which is the one that produced the snippet
             we wanted ("מלאו שאלון מקצועי..."). */}
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-          {`${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים ${inPhrase(city)} שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
+          {fem
+            ? `${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלות ${inPhrase(city)} שתעודות ההכשרה שלהן אומתו ובעלות הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקן זמינות גם אונליין)" : ""}. בחינם וללא התחייבות.`
+            : `${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים ${inPhrase(city)} שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
         </p>
         <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
       </div>
@@ -162,7 +172,10 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           )}
         </p>
       )}
-      <TopicFaq topic={topic} title={`${topic.name} ${inPhrase(city)} - שאלות של הורים`} />
+      <TopicFaq
+        topic={topic}
+        title={`${topic.name} ${inPhrase(city)} - ${topic.kind === "audience" ? "שאלות של הורים" : "שאלות נפוצות"}`}
+      />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
