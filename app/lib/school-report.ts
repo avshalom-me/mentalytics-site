@@ -176,11 +176,26 @@ export interface SchoolSummary {
   text: string;
   /** The same content as simple HTML - what lands in Word or Google Docs. */
   html: string;
+  /**
+   * The same content again, still structured.
+   *
+   * The PDF lays the report out itself - real pages, real margins, a heading
+   * that cannot be cut in half by a page break - and to do that it needs the
+   * parts, not a string it would have to parse back apart.
+   */
+  doc: SummaryDoc;
+}
+
+export interface SummaryDoc {
+  head: string;
+  meta: string;
+  sections: Section[];
+  foot: string;
 }
 
 export interface SummaryDomain { label: string; result: KidsDomainResult }
 
-type Section = { title: string; lines: string[] };
+export type Section = { title: string; lines: string[] };
 
 const esc = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 const uniq = <T,>(xs: T[]) => Array.from(new Set(xs));
@@ -289,5 +304,5 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     `<p><small>${esc(foot)}</small></p>`,
   ].join("");
 
-  return { text, html };
+  return { text, html, doc: { head, meta, sections, foot } };
 }

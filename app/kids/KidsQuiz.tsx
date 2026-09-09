@@ -3720,13 +3720,19 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
       {/* Actions */}
       <div className="mt-6 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
-        <button
-          onClick={() => downloadResultsPDF("kids-results-card", "תוצאות-השאלון-ילדים", "#ffffff")}
-          data-pdf-trigger="kids-results-card"
-          className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all disabled:opacity-60"
-        >
-          💾 שמירה כ-PDF
-        </button>
+        {/* Parents save the screen they just read. A counsellor saves a
+            document instead - see the button inside CounselorAddendum, which
+            has the summary, the map and the tools as data rather than as
+            pixels. Capturing this page for her produced 52 pages of web UI. */}
+        {audience !== "counselor" && (
+          <button
+            onClick={() => downloadResultsPDF("kids-results-card", "תוצאות-השאלון-ילדים", "#ffffff")}
+            data-pdf-trigger="kids-results-card"
+            className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all disabled:opacity-60"
+          >
+            💾 שמירה כ-PDF
+          </button>
+        )}
         <button
           onClick={onRestart}
           className="px-5 py-2 rounded-xl bg-gray-100 text-gray-600 text-sm font-semibold hover:bg-gray-200 transition-all"

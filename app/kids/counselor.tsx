@@ -499,6 +499,9 @@ export function UnknownNotice({ A }: { A: Ans }) {
   );
 }
 
+/** Leading emoji and punctuation off a label the engine wrote for the screen. */
+const stripMarks = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
+
 export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: string; result: KidsDomainResult }[] }) {
   const f = A as CounselorFields;
   const today = useMemo(() => israelToday(), []);
@@ -506,6 +509,45 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   const tracks = useMemo(() => (input ? mapSchoolTracks(input) : []), [input]);
   const summary = useMemo(() => buildSchoolSummary(A, tracks, today, domains), [A, tracks, today, domains]);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
+  const [pdf, setPdf] = useState<"idle" | "busy">("idle");
+
+  // The tools become the appendix. Grouped by the finding that produced them,
+  // which is the only thing that makes a list of tips readable - the screen
+  // groups them the same way inside each finding's card.
+  const toolGroups = useMemo(() => {
+    const map = new Map<string, string[]>();
+    for (const d of domains)
+      for (const g of d.result.groups)
+        for (const r of g.recs)
+          for (const t of r.tools) {
+            const key = stripMarks(t.sourceSymptom || g.treatmentLabel) || stripMarks(g.treatmentLabel);
+            const arr = map.get(key) ?? [];
+            const text = stripMarks(t.text);
+            if (text && !arr.includes(text)) arr.push(text);
+            map.set(key, arr);
+          }
+    return Array.from(map, ([title, tools]) => ({ title, tools })).filter(g => g.tools.length > 0);
+  }, [domains]);
+
+  const savePdf = async () => {
+    setPdf("busy");
+    try {
+      const { downloadSchoolReportPDF } = await import("@/app/lib/school-pdf");
+      await downloadSchoolReportPDF({
+        summary,
+        tracks,
+        relevanceLabel: t => RELEVANCE_LABELS[t.relevance],
+        graphsEl: document.getElementById("school-graphs"),
+        toolGroups,
+        todayLabel: formatDateHe(today),
+        filename: `דוח-הפניה-${f._grade ? `כיתה-${f._grade}-` : ""}${today}`,
+      });
+    } catch (e) {
+      console.error("school PDF failed", e);
+    } finally {
+      setPdf("idle");
+    }
+  };
 
   const copy = async () => {
     try {
@@ -540,7 +582,9 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           </div>
         )}
         {tracks.length > 0 && (
-          <div className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
+          // id: the PDF clones this box - the diagram and the timeline are the
+          // one part of the report that is a picture rather than text.
+          <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
             <TrackFlow tracks={tracks} />
             <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
@@ -552,14 +596,21 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
       </div>
 
       <div>
-        <StepTag>טיוטת סיכום להפניה</StepTag>
-        <StepQ>להעתקה למסמך שלך</StepQ>
-        <StepHint>ללא פרטים מזהים - את השם משלימים במסמך. ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.</StepHint>
+        <StepTag>הדוח לתיק</StepTag>
+        <StepQ>לשמירה, להדפסה ולהעתקה</StepQ>
+        <StepHint>ללא פרטים מזהים - את השם משלימים במסמך. ה-PDF הוא הסיכום, מפת המסלולים אחריו והכלים כנספח; ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.</StepHint>
         <div className="flex flex-wrap gap-2 mb-3 print:hidden">
-          <button type="button" onClick={copy} className="px-6 py-2.5 rounded-full font-bold text-sm text-white" style={{ background: "var(--teal-dark)" }}>
+          {/* The document, not a photograph of this page: real A4 pages, a
+              running header, and a break that can only fall between blocks.
+              It is the primary button because it is what leaves the screen -
+              and it replaced the browser's own print, which produced exactly
+              the coloured web page this was built to stop producing. */}
+          <button type="button" onClick={savePdf} disabled={pdf === "busy"} className="px-6 py-2.5 rounded-full font-bold text-sm text-white disabled:opacity-60" style={{ background: "var(--teal-dark)" }}>
+            {pdf === "busy" ? "מייצר מסמך…" : "שמירת הדוח כ-PDF"}
+          </button>
+          <button type="button" onClick={copy} className="px-6 py-2.5 rounded-full font-semibold text-sm border-2 border-[var(--teal)] text-[var(--teal)]">
             {copied === "ok" ? "הועתק ✓" : copied === "fail" ? "ההעתקה נכשלה - סמני והעתיקי ידנית" : "העתקת הסיכום"}
           </button>
-          <button type="button" onClick={() => window.print()} className="px-6 py-2.5 rounded-full font-semibold text-sm border-2 border-[var(--teal)] text-[var(--teal)]">הדפסה</button>
         </div>
         <pre dir="rtl" className="whitespace-pre-wrap rounded-2xl p-4 sm:p-5 text-sm leading-relaxed bg-white border font-[inherit]" style={{ borderColor: "var(--line)", color: "var(--text)" }}>{summary.text}</pre>
       </div>
