@@ -78,7 +78,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research/kupa-guide": { date: "2026-08-02", sources: ["app/research/kupa-guide/page.tsx"] },
   "/research/online-therapy": { date: "2026-09-04", sources: ["app/research/online-therapy/page.tsx"] },
   "/research/psychodiagnostic": { date: "2026-09-04", sources: ["app/research/psychodiagnostic/page.tsx"] },
-  "/research/psychodidactic": { date: "2026-08-04", sources: ["app/research/psychodidactic/page.tsx"] },
+  "/research/psychodidactic": { date: "2026-09-09", sources: ["app/research/psychodidactic/page.tsx"] },
   "/research/recommended-psychologist": { date: "2026-08-04", sources: ["app/research/recommended-psychologist/page.tsx"] },
   "/research/social-anxiety": { date: "2026-08-02", sources: ["app/research/social-anxiety/page.tsx"] },
   "/research/therapist-patient-match": { date: "2026-08-04", sources: ["app/research/therapist-patient-match/page.tsx"] },
@@ -91,6 +91,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-08-06", sources: ["app/developers/page.tsx"] },
+  "/counselors": { date: "2026-09-09", sources: ["app/counselors/page.tsx"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
 };

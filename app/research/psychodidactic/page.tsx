@@ -294,6 +294,15 @@ export default function PsychodidacticPage() {
             אבחון כן נדרש להתאמות ברמה 2 וברמה 3, למשל הקראת שאלון, הכתבה לבוחן ניטרלי או המרת בחינה. את אלה
             מאשרת ועדה מחוזית ולא בית הספר, והדרישות שם מחמירות יותר.
           </p>
+          {/* The counsellor is named twice in this section as the person to ask;
+              this is the quiet route from the article she is already reading. */}
+          <p className="mt-4 text-[15px]" style={{ color: "var(--muted)" }}>
+            יועצות וצוותי חינוך:{" "}
+            <a href="/counselors" style={{ color: "var(--teal)", textDecoration: "underline" }}>
+              שאלון מסייע להפניות
+            </a>{" "}
+            ממפה את מוקד הקושי, את סוג האבחון או הטיפול המתאים, ואת מפת הוועדות עם המועדים לתלמיד/ה מסוים/ת.
+          </p>
         </section>
 
         <section>
