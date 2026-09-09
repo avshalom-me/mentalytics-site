@@ -10,6 +10,7 @@
  * stays anonymous by construction rather than by warning.
  */
 
+import { unknownCount } from "../kids/quiz-logic";
 import type { KidsDomainResult } from "./kids-recommendations";
 import {
   DIAGNOSIS_KINDS,
@@ -274,7 +275,11 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
 
   const head = "סיכום לקראת הפניה - התלמיד/ה";
   const meta = `נוצר בעזרת "טיפול חכם" ב-${formatDateHe(today)}${f.c_fill ? `, ${FILL_MODE_LABELS[f.c_fill]}` : ""}.`;
-  const foot = "הסיכום מבוסס על דיווח הממלא/ת בלבד. הוא אינו אבחון, אינו קובע זכאות ואינו מחליף הערכה מקצועית או החלטת ועדה. אינו מכיל פרטים מזהים.";
+  const unknowns = unknownCount(A);
+  const partial = unknowns > 0
+    ? ` ${unknowns === 1 ? "פריט אחד סומן" : `${unknowns} פריטים סומנו`} כ"לא ידוע" ונספרו כאילו הקושי אינו קיים, ולכן היעדר ממצא בתחום שלא היה עליו מידע אינו שולל קושי בו.`
+    : "";
+  const foot = "הסיכום מבוסס על דיווח הממלא/ת בלבד. הוא אינו אבחון, אינו קובע זכאות ואינו מחליף הערכה מקצועית או החלטת ועדה. אינו מכיל פרטים מזהים." + partial;
 
   const text = [head, meta, "", ...sections.flatMap(s => [s.title, ...s.lines.map(l => `- ${l}`), ""]), foot].join("\n");
   const html = [

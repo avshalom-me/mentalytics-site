@@ -235,6 +235,21 @@ export function markUnknown(A: Ans, key: string): Ans { return { ...A, [unkKey(k
 export function markKnown(A: Ans, key: string): Ans { return { ...A, [unkKey(key)]: false }; }
 
 /**
+ * How many items carry an explicit "not known".
+ *
+ * The scoring cannot tell them from a real "not at all" - both are the scale's
+ * floor, deliberately, so a partly-filled battery can only ever under-report
+ * and never invent a finding. That is the right rule for a parent, whose blank
+ * means the symptom is absent. For a counsellor it is not: she pressed
+ * "לא ידוע" because she has no information, and a report that answers her with
+ * "low stress" is asserting something she did not say. The count is what the
+ * report needs to say so, and it is the only place the sidecar is read.
+ */
+export function unknownCount(A: Ans): number {
+  return Object.keys(A).filter(k => k.endsWith("__unk") && A[k] === true).length;
+}
+
+/**
  * A counsellor may move on with items unanswered. Each one is then stored as
  * its own "no" - the value "לא ידוע" would have written - and remembered as not
  * known, so the report can say so. Parents keep the block on those screens:

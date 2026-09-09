@@ -135,3 +135,21 @@ describe("buildSchoolSummary", () => {
     expect(bare).not.toContain("תחום");
   });
 });
+
+describe("the partial-information caveat", () => {
+  it("says nothing when every item was answered", () => {
+    const t = buildSchoolSummary(full, [], TODAY).text;
+    expect(t).not.toContain("לא ידוע");
+  });
+
+  it("names the count when items were marked not known, and says how they were scored", () => {
+    const t = buildSchoolSummary({ ...full, aq1__unk: true, aq2__unk: true, q5__unk: true }, [], TODAY).text;
+    expect(t).toContain("3 פריטים סומנו");
+    expect(t).toContain("נספרו כאילו הקושי אינו קיים");
+  });
+
+  it("counts only the flags that are actually set", () => {
+    const t = buildSchoolSummary({ ...full, aq1__unk: true, aq2__unk: false }, [], TODAY).text;
+    expect(t).toContain("פריט אחד סומן");
+  });
+});

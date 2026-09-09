@@ -35,7 +35,7 @@ import {
   type Ans, type PageId, type KidsScoreResult,
 } from "./quiz-logic";
 import {
-  PageConsentCounselor, PageDemoCounselor, PageRefine, CounselorAddendum, CounselorSafetyNotice,
+  PageConsentCounselor, PageDemoCounselor, PageRefine, CounselorAddendum, CounselorSafetyNotice, UnknownNotice,
   CounselorQ1Block, CounselorAcadBlock, CounselorBehBlock, CounselorSocBlock,
   readDrafts, subscribeDrafts, upsertDraft, removeDraft, NO_DRAFTS, type Draft,
 } from "./counselor";
@@ -3477,6 +3477,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           <Card>
             <div className="py-4">
               <p className="font-bold text-[#1a2a3a] text-base mb-2">לא נמצאו ממצאים משמעותיים בתחומים שנבדקו</p>
+              {audience === "counselor" && <div className="mb-3"><UnknownNotice A={A} /></div>}
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
@@ -3515,6 +3516,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           </div>
         )}
 
+        {audience === "counselor" && <div className="mb-4"><UnknownNotice A={A} /></div>}
         {audience === "counselor" && hasAnyFindings && (
           <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
             בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם.

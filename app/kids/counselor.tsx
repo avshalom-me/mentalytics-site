@@ -54,7 +54,7 @@ import {
   type Outcome,
   type Unknown,
 } from "@/app/lib/school-report";
-import { PAGES, type Ans } from "./quiz-logic";
+import { PAGES, unknownCount, type Ans } from "./quiz-logic";
 import { Card, StepTag, StepQ, StepHint, NavRow, ob } from "./ui";
 import { TrackFlow, TrackTimeline } from "./counselor-map";
 
@@ -475,6 +475,26 @@ function TrackCard({ t }: { t: SchoolTrack }) {
           <div className="text-xs" style={{ color: "var(--muted)" }}>אומת מול: {t.verified}</div>
         </div>
       </details>
+    </div>
+  );
+}
+
+/**
+ * What "לא ידוע" means for the findings above.
+ *
+ * The scoring stores it as the item's own "no", which is what keeps a
+ * half-filled battery from inventing a finding - but it also means a domain
+ * she had no information about reads as an absence of difficulty. Said plainly
+ * here, because the report cannot say it: the engine never sees the difference.
+ */
+export function UnknownNotice({ A }: { A: Ans }) {
+  const n = unknownCount(A);
+  if (n === 0) return null;
+  return (
+    <div className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+      סימנת <strong>{n === 1 ? "פריט אחד" : `${n} פריטים`}</strong> כ&quot;לא ידוע&quot;. הממצאים למטה מבוססים על מה שכן נמסר,
+      ופריט שלא היה לך מידע עליו נספר כאילו הקושי אינו קיים. לכן היעדר ממצא בתחום שלא הכרת אינו אומר שאין שם קושי -
+      אם התחום רלוונטי, כדאי להשלים את המידע עם ההורים ולמלא שוב.
     </div>
   );
 }
