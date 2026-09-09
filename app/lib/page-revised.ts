@@ -56,7 +56,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   },
   "/": { date: "2026-09-02", sources: ["app/page.tsx"] },
   "/therapists": { date: "2026-09-08", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx"] },
-  "/research": { date: "2026-09-03", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
+  "/research": { date: "2026-09-09", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/academic": { date: "2026-08-05", sources: ["app/research/academic/page.tsx"] },
   "/research/adhd-adults": { date: "2026-09-04", sources: ["app/research/adhd-adults/page.tsx"] },
   "/research/assessments": { date: "2026-08-05", sources: ["app/research/assessments/page.tsx"] },

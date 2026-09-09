@@ -171,7 +171,7 @@ export default async function ResearchHubPage() {
   };
 
   return (
-    <main className="mx-auto max-w-4xl px-5 py-14 pb-20" dir="rtl">
+    <main className="mx-auto max-w-[1280px] px-5 py-14 pb-20" dir="rtl">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(collectionLd).replace(/</g, "\\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd).replace(/</g, "\\u003c") }} />
 
@@ -188,20 +188,69 @@ export default async function ResearchHubPage() {
         </p>
       </div>
 
-      {/* Jump links: the whole taxonomy visible at a glance, and a crawl path to
-          every section hub from the top of the page. */}
-      <nav aria-label="נושאים" className="mb-12 flex flex-wrap justify-center gap-2">
-        {populated.map(({ section }) => (
-          <Link
-            key={section.slug}
-            href={`/research/topic/${section.slug}`}
-            className="rounded-full px-4 py-2 text-sm font-semibold transition hover:opacity-80"
-            style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)", textDecoration: "none" }}
+      {/* מכאן ולמטה: סרגל נושאים + תוכן. הכותרת נשארת מעל הפיצול ברוחב מלא,
+          כדי שה-H1 יישאר ראשון במסמך ולא יידחק אחרי רשימת הניווט.
+
+          הסרגל והצ'יפים הם **אותו סט קישורים** ולא שני עותקים: ברוחב נייד
+          ה-nav הוא שורת פילים כמו שהיה, ומ-lg הוא הופך לרשימה אנכית דביקה.
+          שכפול הקישורים היה מייצר שתי עוגנים לכל עמוד נושא באותו דף. */}
+      <div className="lg:grid lg:grid-cols-[232px_minmax(0,1fr)] lg:items-start lg:gap-12">
+        {/* גובה מוגבל וגלילה משלו: עשרה נושאים ועוד קופסת השאלון מגיעים
+            לכ-520 פיקסלים, ובחלון נמוך (לפטופ 13" עם סרגלי דפדפן) התחתית
+            הייתה נחתכת בלי דרך להגיע אליה. */}
+        <aside className="mb-12 lg:sticky lg:top-6 lg:mb-0 lg:max-h-[calc(100dvh-3rem)] lg:overflow-y-auto">
+          <p
+            className="mb-3 hidden lg:block"
+            style={{ fontSize: "11.5px", fontWeight: 800, letterSpacing: ".14em", color: "var(--teal-dark)" }}
           >
-            {section.name}
-          </Link>
-        ))}
-      </nav>
+            נושאים
+          </p>
+          <nav
+            aria-label="נושאים"
+            className="flex flex-wrap justify-center gap-2 lg:block lg:gap-0 lg:border-s-2 lg:border-s-[var(--line)]"
+          >
+            {populated.map(({ section, editorial, community: items }) => (
+              <Link
+                key={section.slug}
+                href={`/research/topic/${section.slug}`}
+                className="flex items-baseline justify-between gap-2 rounded-full border border-[var(--line)] bg-[var(--surface)] px-4 py-2 text-sm font-semibold text-[var(--text-2)] no-underline transition hover:opacity-80 lg:-ms-0.5 lg:rounded-none lg:rounded-e-[10px] lg:border-0 lg:border-s-2 lg:border-s-transparent lg:bg-transparent lg:px-3.5 lg:text-[13.5px] lg:hover:border-s-[var(--teal)] lg:hover:bg-[var(--teal-pale)] lg:hover:opacity-100"
+              >
+                {section.name}
+                {/* המונה מופיע רק בסרגל: בשורת פילים צרה הוא רק מוסיף רעש. */}
+                <span className="hidden tabular-nums lg:inline" style={{ fontSize: "11.5px", color: "var(--faint)" }}>
+                  {editorial.length + items.length}
+                </span>
+              </Link>
+            ))}
+          </nav>
+
+          <div
+            className="mt-5 hidden lg:block"
+            style={{ background: "var(--gold-pale)", border: "1px solid #EDDCB4", borderRadius: "14px", padding: "14px" }}
+          >
+            <p style={{ fontSize: "12.5px", color: "var(--text-2)", lineHeight: 1.65, margin: "0 0 10px" }}>
+              לא בטוחים איזה טיפול מתאים? השאלון נותן כיוון תוך כמה דקות.
+            </p>
+            <div className="flex gap-2">
+              <Link
+                href="/adults"
+                className="flex-1 rounded-full py-2 text-center text-[12.5px] font-extrabold text-white no-underline transition hover:opacity-90"
+                style={{ background: "var(--teal)" }}
+              >
+                למבוגרים
+              </Link>
+              <Link
+                href="/kids"
+                className="flex-1 rounded-full py-2 text-center text-[12.5px] font-extrabold no-underline transition hover:opacity-90"
+                style={{ background: "#fff", border: "1px solid var(--teal)", color: "var(--teal-dark)" }}
+              >
+                לילדים
+              </Link>
+            </div>
+          </div>
+        </aside>
+
+        <div>
 
       {populated.map(({ section, editorial, community: items }) => {
         // Featured guides first, then the rest, then therapist-written pieces.
@@ -297,6 +346,8 @@ export default async function ResearchHubPage() {
           >
             לרשימת המאמרים ←
           </Link>
+        </div>
+      </div>
         </div>
       </div>
     </main>
