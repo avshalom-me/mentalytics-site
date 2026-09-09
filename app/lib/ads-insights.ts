@@ -18,6 +18,9 @@ import { CITY_SEO_LIST, ALL_REGIONS } from "./regions";
 // queue can auto-recover the moment a fixed problem stops re-appearing.
 
 const LOOKBACK_DAYS = 7;
+// כמה אחורה מחפשים את הפנייה האחרונה של קמפיין. בצורת ארוכה מזה כבר לא
+// צריכה מספר מדויק כדי להיות ברורה, והחלון הקצר שומר את השאילתה זולה.
+const DRY_WINDOW_DAYS = 45;
 // תקציב חודשי מתוכנן לפרסום (₪) - נקבע ל-3,500 ב-30/8/26. ניתן לעקוף
 // בסביבה (ADS_MONTHLY_BUDGET) בלי דיפלוי.
 const MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
@@ -50,6 +53,10 @@ export type AdsCampaignRow = {
   views30: number;
   contacts7: number; contacts30: number;
   costPerContact30: number | null;
+  // אורך הבצורת: כמה ימים עברו מאז הפנייה האחרונה, וכמה כסף נשרף מאז.
+  // null = לא נראתה פנייה בכל חלון הבדיקה (DRY_WINDOW_DAYS).
+  daysSinceContact: number | null;
+  costSinceContact: number;
 };
 
 export type AdsInsights = {
@@ -140,6 +147,8 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
   const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
   const since30 = new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10);
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const sinceDryDay = new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
 
   // Keyword/search-term dailies can exceed the 1000-row PostgREST cap, so
   // they page through fetchAllRows. Keywords come as a single 30-day fetch
@@ -153,6 +162,24 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       () => supabaseAdmin.from("ads_search_term_daily").select("*").gte("date", since30)
     ),
   ]);
+
+  // מתי כל קמפיין הביא פנייה בפעם האחרונה. בלי זה בדיקת ה"קר" מכירה רק
+  // "אפס בשבוע", וזה מדד רועש: שבוע יבש בקמפיין קטן הוא לפעמים מקריות,
+  // בעוד עשרה ימים רצופים בקמפיין שממשיך לשלם הם ממצא. נמדד מול
+  // utm_campaign כי זו הזהות שצד האתר מכיר.
+  const contactRows = await fetchAllRows<{ utm_campaign: string | null; clicked_at: string }>(
+    () => supabaseAdmin
+      .from("therapist_contact_clicks")
+      .select("utm_campaign, clicked_at")
+      .gte("clicked_at", new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString())
+  );
+  const lastContactByUtm = new Map<string, string>();
+  for (const row of contactRows) {
+    if (!row.utm_campaign) continue;
+    const day = row.clicked_at.slice(0, 10);
+    const prev = lastContactByUtm.get(row.utm_campaign);
+    if (!prev || day > prev) lastContactByUtm.set(row.utm_campaign, day);
+  }
 
   const registry = (registryQ.data ?? []) as RegistryRow[];
   type ConfigRow = {
@@ -206,6 +233,11 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     const a30 = g30.get(name) ?? zero();
     const s7 = reg?.utm_campaign ? site7.get(reg.utm_campaign) : undefined;
     const s30 = reg?.utm_campaign ? site30.get(reg.utm_campaign) : undefined;
+    // הפנייה האחרונה, ומה שנשרף מאז. כשאין פנייה בכל החלון סופרים את כל
+    // ההוצאה שיש עליה נתונים - כלומר 30 הימים של ads_campaign_daily, ולכן
+    // הסכום הזה הוא רצפה ולא הסכום המלא של הבצורת.
+    const lastContactDay = reg?.utm_campaign ? lastContactByUtm.get(reg.utm_campaign) ?? null : null;
+    const dryFrom = lastContactDay ?? sinceDryDay;
     return {
       google_name: name,
       registered: !!reg,
@@ -223,6 +255,12 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       views30: s30?.profile_views ?? 0,
       contacts7: s7?.contacts ?? 0, contacts30: s30?.contacts ?? 0,
       costPerContact30: s30 && s30.contacts > 0 && a30.cost > 0 ? r2(a30.cost / s30.contacts) : null,
+      daysSinceContact: lastContactDay
+        ? Math.floor((Date.parse(todayIso) - Date.parse(lastContactDay)) / 86_400_000)
+        : null,
+      costSinceContact: r2(
+        daily.filter((d) => d.campaign_name === name && d.date > dryFrom).reduce((s, d) => s + d.cost, 0)
+      ),
     };
   }).sort((a, b) => b.cost30 - a.cost30 || a.google_name.localeCompare(b.google_name));
 
@@ -435,10 +473,36 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       pollutionFired = true;
       push(`ads:pollution:${c.google_name}`, "red", `🗑️ ${c.google_name} - ${Math.round(c.conv7)} המרות מ-${c.clicks7} קליקים בשבוע`, "יחס מעל 1 = פעולת המרה ראשית סופרת צפיות עמוד. Goals > Conversions > להוריד ל-Secondary.");
     }
-    // Spend with zero contacts: amber at ₪50/week, red at ₪150/week - the
-    // old agent threshold, where "maybe noise" stops being an excuse.
+    // Spend with zero contacts. The trigger is still a spending week with no
+    // contact, but the alert now leads with HOW LONG the campaign has been
+    // dry, because that is what separates noise from a finding: a single zero
+    // week on a small campaign happens, ten consecutive days on one that keeps
+    // paying does not. g-haifa (03/09/26) fired at ₪173/week and sat in the
+    // queue for three days reading like every other weekly zero, while the
+    // real fact was that its last contact had been on 26/08.
     if (c.cost7 >= 50 && c.contacts7 === 0 && c.utm_campaign) {
-      push(`ads:cold:${c.google_name}`, c.cost7 >= 150 ? "red" : "amber", `🥶 ${c.google_name} - ₪${Math.round(c.cost7)} בשבוע בלי אף פנייה`, "לבדוק דוח מונחי חיפוש ותקרת CPC לפני שמסיקים - ולזכור שאפס בשבוע בודד הוא לפעמים רעש.");
+      const dry = c.daysSinceContact;
+      const burned = Math.round(Math.max(c.costSinceContact, c.cost7));
+      // אדום כשהבצורת ארוכה משבוע וגם נשרף בה כסף אמיתי, או בכל מקרה
+      // מעל ₪150 בשבוע - הסף הישן, שנשאר כדי שקמפיין יקר לא יירד לכתום
+      // רק בגלל שהפנייה האחרונה שלו הייתה אתמול.
+      const severity = (dry != null && dry >= 7 && burned >= 120) || c.cost7 >= 150 ? "red" : "amber";
+      const howLong = dry == null
+        ? `${DRY_WINDOW_DAYS}+ ימים`
+        : `${dry} ימים`;
+      push(
+        `ads:cold:${c.google_name}`,
+        severity,
+        `🥶 ${c.google_name} - ${howLong} בלי פנייה, ₪${burned} מאז`,
+        `השבוע האחרון: ₪${Math.round(c.cost7)} על ${c.clicks7} קליקים ואפס פניות. ` +
+        (dry == null
+          ? `לא נרשמה אף פנייה מהקמפיין הזה ב-${DRY_WINDOW_DAYS} הימים האחרונים. `
+          : dry >= 7
+            ? `הפנייה האחרונה הייתה לפני ${dry} ימים - זה כבר לא רעש של שבוע בודד. `
+            : `הפנייה האחרונה הייתה לפני ${dry} ימים, כך שייתכן שזו עדיין תנודתיות. `) +
+        `לבדוק לפי הסדר: דוח מונחי חיפוש (האם הקליקים עברו לשאילתות בלי כוונה), תקרת CPC, ואז ההיצע באזור. ` +
+        `אם שלושתם תקינים - השאלה היא כמה עוד שווה לשלם על הבצורת הזו.`
+      );
     }
     // Cost per contact against the business-plan milestone in force.
     if (c.utm_campaign && c.cost7 >= 75 && c.contacts7 > 0) {

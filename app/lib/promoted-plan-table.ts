@@ -24,7 +24,10 @@ export const PROMOTED_PLAN_ROWS: { label: string; free: boolean }[] = [
 
 // footnote - השורה שמתחת לטבלה. משתנה בין המיילים כי התנאים שונים
 // (מתנה מלאה מול חודשיים ראשונים ללא תשלום), ולכן היא לא מקובעת כאן.
-export function promotedPlanTable(footnote?: string): string {
+// promotedLabel - כותרת עמודת המסלול המקודם. ברירת המחדל "מקודם"; מייל
+// הזמנת המאמר מוסיף לה 🎁 כי שם הקידום ניתן במתנה מלאה. זה ההבדל היחיד
+// שהיה בין העותק שלו לטבלה הזו, והוא הסיבה שהוא נשאר משוכפל עד 3/9/26.
+export function promotedPlanTable(footnote?: string, promotedLabel = "מקודם"): string {
   const rows = PROMOTED_PLAN_ROWS.map(
     (r) => `
           <tr>
@@ -39,7 +42,7 @@ export function promotedPlanTable(footnote?: string): string {
           <tr>
             <th style="text-align:right;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#0F5468;">מה מקבלים</th>
             <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#6B807E;width:78px;">חינמי</th>
-            <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#0F5468;width:110px;">מקודם</th>
+            <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#0F5468;width:110px;">${promotedLabel}</th>
           </tr>
         </thead>
         <tbody>${rows}

@@ -37,7 +37,7 @@ export type AttributionResult = {
  * more of them, and folding them into any bucket would flatter it.
  */
 export const ACQUISITION_BUCKETS = {
-  paid: { label: "בתשלום", channels: ["google_paid", "meta_paid", "tiktok_paid"] },
+  paid: { label: "בתשלום", channels: ["google_paid", "meta_paid", "tiktok_paid", "taboola_paid"] },
   organic: { label: "אורגני (SEO)", channels: ["google_organic"] },
   referral: { label: "קישורים והפניות", channels: ["referral", "whatsapp", "meta_organic", "tiktok_organic"] },
   unattributed: { label: "ישיר / לא מזוהה", channels: ["direct", "other", "unknown"] },

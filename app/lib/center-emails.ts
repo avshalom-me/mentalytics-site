@@ -273,6 +273,9 @@ export async function sendCenterNudgeEmail(opts: {
   to: string;
   subject: string;
   message: string;
+  // מזהה המרכז - נשמר ביומן כדי שהיסטוריה תהיה של מרכז ולא
+  // של כתובת מייל. שני מרכזים של אותו בעלים חולקים כתובת.
+  centerId?: string;
 }): Promise<{ ok: boolean; error?: string }> {
   if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
   if (!opts.message?.trim()) return { ok: false, error: "גוף המייל ריק" };
@@ -303,6 +306,7 @@ export async function sendCenterNudgeEmail(opts: {
     void logEmail({
       recipient: opts.to,
       recipientType: "organization",
+      entityId: opts.centerId ?? null,
       subject,
       template: "center_readiness_nudge",
       sentBy: "admin",

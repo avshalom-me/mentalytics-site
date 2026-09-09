@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { getFingerprint } from "@/app/lib/fingerprint";
+import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
 import { getClickIds } from "@/app/lib/attribution";
 
 // The "json" variant accepts JSON bodies; the plain endpoint expects
@@ -130,7 +131,7 @@ export default function QuizPaymentBlock({ quizType }: { quizType: "adults" | "k
       <div className="text-5xl mb-4">🔒</div>
       <h2 className="text-2xl font-black text-stone-900 mb-3 text-center">הגעת למגבלת השימוש החינמי</h2>
       <p className="text-stone-600 leading-7 max-w-sm mb-6 text-center">
-        ניתן למלא את השאלון עד 5 פעמים ללא תשלום.<br />
+        ניתן למלא את השאלון עד {MAX_FREE_QUIZZES} פעמים ללא תשלום.<br />
         להמשך מילוי - תשלום חד־פעמי בסך ₪30 + מע&quot;מ.
       </p>
 

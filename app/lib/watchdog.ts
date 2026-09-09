@@ -198,6 +198,55 @@ function agentFreshnessCheck(agent: string, label: string, maxHours: number): Pr
   });
 }
 
+// פניות מטופלים נרשמות ב-CRM.
+//
+// שלושה מסלולים כותבים ל-crm_leads, ושניים מהם עוטפים את הכתיבה ב-try/catch
+// שכל מטרתו למנוע מכשל CRM להגיע לשולח. ב-8/8/2026 עמודה חסרה (referrer_host)
+// הפילה כל אחת מהן: ההודעה למטפל יצאה, שורת הקליק נרשמה, והליד נעלם
+// ל-console.error. חודש שלם, חמש פניות, עד שקופסת המשוב - המסלול היחיד
+// שמחזיר שגיאה למשתמש - חשפה את זה במקרה.
+//
+// האינווריאנט שנבדק: הודעה למטפל כותבת גם קליק וגם ליד; הודעה למרכז כותבת
+// ליד בלבד. לכן מספר הלידים לעולם אינו אמור להיות קטן ממספר הקליקים.
+// חלון של שבועיים ולא שבוע: הנפח הוא 1-3 הודעות בשבוע, ושבוע שקט לגיטימי
+// היה מייצר אזעקת שווא.
+function leadCaptureCheck(): Promise<WatchdogCheck> {
+  return freshnessCheck("crm_lead_capture", "פניות מטופלים נרשמות ב-CRM", async () => {
+    // רצפה: העמודה החסרה תוקנה ב-9/9/2026, והנזק שלפניה בלתי הפיך. בלי
+    // הרצפה הבדיקה הייתה מתריעה עשרה ימים ברציפות על פניות שכבר אבדו -
+    // רעש על תקלה סגורה, וזה בדיוק מה ששוחק אמון בשומר. השאלה שהבדיקה
+    // שואלת היא "האם הרישום עובד עכשיו", לא "האם הוא נשבר פעם".
+    // מ-23/9/2026 והלאה השורה הזו חסרת השפעה וניתן למחוק אותה.
+    const FIXED_AT = "2026-09-09T12:00:00Z";
+    const windowStart = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    const since = windowStart > FIXED_AT ? windowStart : FIXED_AT;
+    const [msgRes, leadRes] = await Promise.all([
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("id", { count: "exact", head: true })
+        .eq("click_type", "site_message")
+        .gte("clicked_at", since),
+      supabaseAdmin
+        .from("crm_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("source", "site_message")
+        .gte("created_at", since),
+    ]);
+    const sent = msgRes.count ?? 0;
+    const saved = leadRes.count ?? 0;
+    if (sent === 0 && saved === 0) {
+      return { ok: true, detail: "אין פניות בשבועיים האחרונים - אין מה להשוות" };
+    }
+    if (saved < sent) {
+      return {
+        ok: false,
+        detail: `${sent} פניות נשלחו ורק ${saved} נרשמו ב-CRM - הכתיבה נכשלת בשקט`,
+      };
+    }
+    return { ok: true, detail: `${sent} פניות נשלחו, ${saved} נרשמו` };
+  });
+}
+
 async function centerPageCheck(): Promise<WatchdogCheck> {
   const key = "page_center";
   const label = "עמוד מרכז ציבורי חי";
@@ -304,6 +353,8 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     centerPageCheck(),
     // דריפט constraint האירועים
     eventConstraintCheck(),
+    // פניות שנשלחו אך לא נרשמו - אותה משפחה של כשל שקט
+    leadCaptureCheck(),
     // טריות קרונים. בקר הבוקר: אם כובה במתג - הבדיקה מדלגת במקום להתריע
     // על כיבוי מכוון (ממצא ביקורת: שני מנגנוני הבטיחות התנגשו).
     // הסוכנים שומרים זה על זה: כל סוכן יומי נבדק ל-26 שעות, ופערי ההיצע
@@ -368,6 +419,7 @@ async function runChecks(): Promise<WatchdogCheck[]> {
 // ההתחלה. מה שלא מופיע כאן הוא normal, וזו ברירת מחדל לגיטימית.
 const CRITICAL_CHECKS = new Set([
   "db_event_constraint", // אירועים נדחים בשקט - נתונים אובדים ללא שחזור
+  "crm_lead_capture", // פנייה שאבדה היא אדם שניסה להגיע למטפל, ואין ממנה עותק
   "api_score_adults", // מנוע הניקוד - פלט שגוי הוא המלצה קלינית שגויה
   "api_score_kids",
   "cron_backup", // יום בלי גיבוי = יום בלי עותק לקבצי ה-Storage

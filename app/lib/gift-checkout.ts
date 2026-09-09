@@ -10,10 +10,16 @@ import { supabaseAdmin } from "./supabaseAdmin";
 // חלופי. הטוקן קשור למטפל אחד, פוקע, ונשרף בשימוש.
 
 export const GIFT_MONTHS = 2;
-// כמה זמן ההצעה תקפה (החלטת המשתמש 27/8/26, היה 30 יום). המספר הזה מופיע
-// גם בטיוטה שנשלחת וגם בעמוד ההצטרפות, ולכן הוא מיוצא ולא משוכפל: הבטחה
-// שכתובה במייל וסף שנאכף בקוד חייבים להיות אותו מספר.
-export const GIFT_OFFER_TTL_DAYS = 3;
+// כמה זמן ההצעה תקפה. המספר הזה מופיע גם בטיוטה שנשלחת וגם בעמוד
+// ההצטרפות, ולכן הוא מיוצא ולא משוכפל: הבטחה שכתובה במייל וסף שנאכף
+// בקוד חייבים להיות אותו מספר.
+//
+// 30 → 3 ב-27/8/26, ובחזרה ל-14 ב-6/9/26. שלושה ימים התבררו כקצרים מדי
+// לקהל הזה: המנה של 3/9 יצאה ביום חמישי ופגה ביום ראשון, כך שכל חייה
+// היו סוף שבוע, ואף אחת מ-12 ההצעות לא מומשה. מטפל עצמאי לא בהכרח פותח
+// מייל תפעולי באותו יום, ומועד אחרון שנופל לפני שהוא בכלל קרא אותו לא
+// יוצר דחיפות אלא קישור מת.
+export const GIFT_OFFER_TTL_DAYS = 14;
 
 export type GiftCheckoutToken = {
   token: string;
@@ -61,10 +67,34 @@ export async function issueGiftCheckoutToken(params: {
   return { token, expiresAt: expires.toISOString() };
 }
 
+/**
+ * רישום פתיחה של קישור ההצעה. נקרא רק ממסלול ה-GET (טעינת העמוד), ולא
+ * מהשליחה עצמה, כדי שהמספר יישאר "כמה פעמים נפתח" ולא יתערבב בהגשה.
+ *
+ * למה בכלל: 12 הצעות יצאו ב-3/9 ולא הניבו הרשמה, ולא היה אפשר לדעת אם איש
+ * לא לחץ או שכולם לחצו ונרתעו. ה-page_view של העמוד ניתן לחסימה ע"י חוסם
+ * פרסומות, ומעקב הפתיחות ב-Resend התברר ככבוי לגמרי. הרישום כאן רץ אצלנו
+ * בשרת ולכן אינו ניתן לחסימה.
+ *
+ * best-effort: כישלון עדכון לא מונע מהמטפל להיכנס לעמוד.
+ */
+async function recordTokenView(token: string): Promise<void> {
+  try {
+    const nowIso = new Date().toISOString();
+    await supabaseAdmin.rpc("gift_token_mark_viewed", { p_token: token, p_now: nowIso });
+  } catch (e) {
+    console.error("recordTokenView failed:", e instanceof Error ? e.message : e);
+  }
+}
+
 // אימות בכל טעינה של עמוד ההצטרפות ושוב לפני החיוב עצמו. הזכאות נבדקת
 // מחדש ולא נשענת על מה שהיה נכון ביום שליחת המייל: מטפל שבינתיים כבר
 // שילם או קיבל קידום לא ייכנס למסלול הזה שוב.
-export async function validateGiftCheckoutToken(token: string): Promise<TokenValidation> {
+export async function validateGiftCheckoutToken(
+  token: string,
+  // true רק מטעינת העמוד - כדי שספירת הפתיחות תמדוד קליקים במייל ולא הגשות.
+  opts?: { recordView?: boolean },
+): Promise<TokenValidation> {
   const clean = (token ?? "").trim();
   if (!clean) return { ok: false, reason: "missing", message: "חסר קישור הצטרפות" };
 
@@ -88,6 +118,9 @@ export async function validateGiftCheckoutToken(token: string): Promise<TokenVal
       message: `תוקף הקישור פג. ההצעה תקפה ל-${GIFT_OFFER_TTL_DAYS} ימים מרגע שליחת המייל.`,
     };
   }
+
+  // נרשם אחרי שהטוקן נמצא ולא פג - פתיחה של קישור מת אינה "קליק על ההצעה".
+  if (opts?.recordView) await recordTokenView(clean);
 
   const { data: t } = await supabaseAdmin
     .from("therapists")

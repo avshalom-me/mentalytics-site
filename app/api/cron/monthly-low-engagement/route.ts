@@ -257,7 +257,7 @@ export async function runLowEngagementReminder(now: Date = new Date()): Promise<
       viewsBy[v.therapist_id] = (viewsBy[v.therapist_id] ?? 0) + 1;
       const c = (chBy[v.therapist_id] ??= { paid: 0, organic: 0, direct: 0, other: 0 });
       const ch = v.channel ?? "";
-      if (ch === "google_paid" || ch === "meta_paid") c.paid++;
+      if (ch === "google_paid" || ch === "meta_paid" || ch === "taboola_paid") c.paid++;
       else if (ch === "google_organic") c.organic++;
       else if (ch === "direct") c.direct++;
       else c.other++;

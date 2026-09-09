@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import type {
   QuestionnaireAnswers,
   ScoringResult,
@@ -10,6 +10,7 @@ import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions"
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -926,6 +927,10 @@ export default function AdultsPage() {
         city: matchPrefs.city || null,
         online: !!matchPrefs.online,
         returned: Array.isArray(json.matches) ? json.matches.length : 0,
+        // כמה מהם באזור שהתבקש - המדד שלפיו נבדק פיצול הקבוצות (6/9/2026).
+        local: !!(matchPrefs.city || matchPrefs.region) && Array.isArray(json.matches)
+          ? json.matches.filter((m: any) => m.in_requested_area).length
+          : undefined,
       });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
@@ -2708,8 +2713,8 @@ export default function AdultsPage() {
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
               className={
                 isPrimary
-                  ? "inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
-                  : "inline-flex items-center gap-1.5 rounded-xl border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
+                  ? "cta-pulse-soft inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
+                  : "inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
               }
             >
               🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
@@ -2756,7 +2761,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_emotional");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
@@ -2787,7 +2792,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_relationship");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--gold-dark), var(--gold))", border: "1px solid #C8961A" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#FDF6E3]">חיפוש מתקדם ✦</div>
@@ -2803,6 +2808,34 @@ export default function AdultsPage() {
           <div className="mb-4 flex justify-center">
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
+
+          {/* One primary button above the report. Measured 3/9/26 over 30 days:
+              of 122 finishers who never searched, 107 never pressed any
+              per-finding button and left the results screen within ~30s
+              (median). The per-finding buttons stay exactly as they were -
+              this only puts the leading finding's search one tap away, before
+              the report, PDF and article links offer an exit. Target: the
+              urgent finding if there is one, otherwise the first primary. */}
+          {!err && recs.length > 0 && (() => {
+            const topGroup = groups.find((g) => g.urgent) ?? sections[0]?.groups[0];
+            if (!topGroup) return null;
+            const topRec = topGroup.recs[0];
+            return (
+              <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
+                <p className="mb-2.5 text-sm text-[#2a3a4a]">
+                  הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{topGroup.treatmentLabel}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedRec(topRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", topGroup.treatment, "top"); }}
+                  className="cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal-dark)] px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal)] sm:w-auto"
+                >
+                  🔍 מצא/י לי מטפל - {topGroup.treatmentLabel} ←
+                </button>
+                <p className="mt-2 text-xs text-gray-500">הדוח המלא, הכלים והאפשרויות הנוספות - למטה</p>
+              </div>
+            );
+          })()}
 
           {/* Summary + demographics + "what now?" */}
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4">
@@ -3154,7 +3187,18 @@ export default function AdultsPage() {
         </div>
       )}
       <div className="space-y-4">
-        {(matchResults ?? []).map((t: any) => {
+        {(() => {
+          // שתי קבוצות: באזור שבחרת, ואחריה מחוץ לו. השרת כבר ממיין כך, אבל
+          // הכותרות והתווית נקבעות כאן, ולכן החלוקה נעשית גם כאן במפורש.
+          // בלי מיקום מבוקש אין קבוצות - הכל נחשב "באזור".
+          const all: any[] = matchResults ?? [];
+          const locationAsked = !!(matchPrefs.city || matchPrefs.region);
+          const localCount = locationAsked ? all.filter((m) => m.in_requested_area).length : all.length;
+          const ordered = locationAsked
+            ? [...all.filter((m) => m.in_requested_area), ...all.filter((m) => !m.in_requested_area)]
+            : all;
+          return ordered.map((t: any, idx: number) => {
+          const away = locationAsked && !t.in_requested_area;
           const overall = t.combined_score ?? t.match_score;
           // Same derivation the request body used, so the badge can never claim
           // an approach the search did not actually ask for.
@@ -3167,8 +3211,28 @@ export default function AdultsPage() {
             String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
           const matchesPref = matchedMods.length > 0;
           return (
+            <Fragment key={t.id}>
+            {locationAsked && idx === 0 && localCount > 0 && localCount < ordered.length && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרת</span>
+                <span className="h-px flex-1 bg-[var(--line)]" />
+              </div>
+            )}
+            {away && idx === localCount && (
+              <div className="pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-[var(--text-2)]">מחוץ לאזור שבחרת</span>
+                  <span className="h-px flex-1 bg-[var(--line)]" />
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  {localCount === 0
+                    ? "לא מצאנו מטפלים באזור שבחרת. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים"
+                    : "מטפלים מאזורים סמוכים"}
+                  {matchPrefs.online ? " ומטפלים שעובדים אונליין" : ""}. ההתאמה המקצועית שלהם מסומנת במילים ולא באחוז, כי המרחק לא נכלל בחישוב.
+                </p>
+              </div>
+            )}
             <div
-              key={t.id}
               className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="flex items-stretch gap-4">
@@ -3216,6 +3280,15 @@ export default function AdultsPage() {
                     </div>
                   )}
                 </div>
+                {away ? (
+                  // מחוץ לאזור: מילים במקום אחוז, כדי שהמספר לא יתחרה במספר של
+                  // מי שקרוב (ראו app/lib/match-card-label.ts).
+                  <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
+                    <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
+                    <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
+                    <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!matchPrefs.online, t.online)}</div>
+                  </div>
+                ) : (
                 <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
                   <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                     {overall}<span className="align-super text-base font-extrabold">%</span>
@@ -3231,8 +3304,11 @@ export default function AdultsPage() {
                     </>
                   )}
                 </div>
+                )}
               </div>
-              {t.entity_type === "center" && t.personality_score != null && (
+              {/* ההערה מסבירה את הכוכבית שליד המספר האישיותי - ולכרטיס מחוץ
+                  לאזור אין מספר, אז גם לא הערה. */}
+              {t.entity_type === "center" && t.personality_score != null && !away && (
                 <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
                   * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית.
                 </p>
@@ -3284,8 +3360,10 @@ export default function AdultsPage() {
                 </div>
               )}
             </div>
+            </Fragment>
           );
-        })}
+          });
+        })()}
       </div>
     </Layout>
   );

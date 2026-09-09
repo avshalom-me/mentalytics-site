@@ -42,11 +42,19 @@ export default function QuizFeedbackBox({ quizType }: { quizType: "adults" | "ki
   return (
     <div dir="rtl" className="mt-8 text-center">
       {!open ? (
+        // הטריגר נשאר מכווץ בכוונה - הוא לא אמור להתחרות בכפתורי יצירת הקשר.
+        // אבל בגרסה הקודמת הוא היה קישור בגוון --muted בלי מסגרת ובלי רקע,
+        // ונקרא כאותיות קטנות: 182 מסיימי שאלון עברו לידו בשבועיים ואיש לא
+        // לחץ. רקע, מסגרת וצבע טקסט קריא הופכים אותו להזמנה בלי להגדיל אותו.
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="text-sm font-semibold underline-offset-4 hover:underline"
-          style={{ color: "var(--muted, #6B807E)" }}
+          className="mx-auto block w-full max-w-md rounded-2xl border px-4 py-3 text-sm font-semibold transition-colors"
+          style={{
+            borderColor: "var(--line, #DDE9E8)",
+            background: "var(--surface, #F7FAF9)",
+            color: "var(--text-2, #3E5250)",
+          }}
         >
           משהו לא ברור או לא הסתדר? ספרו לנו ←
         </button>

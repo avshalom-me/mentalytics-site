@@ -415,7 +415,8 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
         </div>
         {isPara ? (
           <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-            קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה. אפשר לסנן לפי אזור ואונליין.
+            מטפלים פרה-רפואיים שתעודותיהם אומתו: קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה.
+            מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או סננו לפי אזור ואונליין ופנו ישירות. בחינם וללא התחייבות.
           </p>
         ) : (
           /* Without this the first <p> on the page is a therapist's own bio,

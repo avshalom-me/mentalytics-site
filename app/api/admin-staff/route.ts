@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { cleanWorkKinds } from "@/app/lib/staff-work-kinds";
 
 // ניהול צוות ושעות עבודה — מוגן ע"י ה-middleware של האדמין (/api/admin-*).
 // GET  ?month=YYYY-MM — כל העובדים + רישומי החודש + סיכומים.
@@ -46,7 +47,7 @@ export async function GET(req: NextRequest) {
         .order("created_at", { ascending: true }),
       supabaseAdmin
         .from("staff_work_sessions")
-        .select("id, staff_id, clock_in, clock_out, note, source")
+        .select("id, staff_id, clock_in, clock_out, note, source, work_kinds")
         .gte("clock_in", from)
         .lt("clock_in", to)
         .order("clock_in", { ascending: false })
@@ -54,7 +55,7 @@ export async function GET(req: NextRequest) {
       // משמרות פתוחות מוצגות תמיד, גם אם נפתחו בחודש אחר
       supabaseAdmin
         .from("staff_work_sessions")
-        .select("id, staff_id, clock_in, clock_out, note, source")
+        .select("id, staff_id, clock_in, clock_out, note, source, work_kinds")
         .is("clock_out", null),
     ]);
     if (staffRes.error) throw staffRes.error;
@@ -146,6 +147,13 @@ export async function POST(req: NextRequest) {
       const inAt = parseTime(body.clock_in);
       const outAt = parseTime(body.clock_out);
       const note = typeof body.note === "string" ? body.note.trim().slice(0, 300) : undefined;
+      // אופי העבודה חובה בכל רישום חדש או נערך. הרישומים שנוצרו לפני שהשדה
+      // היה קיים נשארים ריקים במסד ואיש לא ממציא להם ערך - אבל ברגע שנוגעים
+      // ברישום, צריך לומר מה נעשה בו.
+      const workKinds = cleanWorkKinds(body.work_kinds);
+      if (!workKinds) {
+        return NextResponse.json({ ok: false, error: "יש לבחור לפחות אופי עבודה אחד" }, { status: 400 });
+      }
 
       if (action === "add_session") {
         const staffId = typeof body.staff_id === "string" ? body.staff_id : "";
@@ -160,6 +168,7 @@ export async function POST(req: NextRequest) {
             clock_in: inAt.toISOString(),
             clock_out: outAt ? outAt.toISOString() : null,
             note: note ?? null,
+            work_kinds: workKinds,
             source: "admin",
           })
           .throwOnError();
@@ -173,6 +182,7 @@ export async function POST(req: NextRequest) {
       if (body.clock_out === null) update.clock_out = null;
       else if (outAt) update.clock_out = outAt.toISOString();
       if (note !== undefined) update.note = note;
+      update.work_kinds = workKinds;
       // אימות סדר זמנים גם כשמעדכנים רק צד אחד
       const { data: existing } = await supabaseAdmin
         .from("staff_work_sessions")

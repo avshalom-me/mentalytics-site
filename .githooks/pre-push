@@ -40,4 +40,15 @@ if [ $status -ne 0 ]; then
   echo "❌ Sitemap revision dates are stale — push aborted. See above."
   exit $status
 fi
+
+# A city-facts key that does not match the vocabulary drops that city's
+# sentence without any error; keep the keys honest.
+echo "pre-push: node scripts/check-city-facts.mjs ..."
+node scripts/check-city-facts.mjs
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ city-facts keys do not match regions.ts — push aborted. See above."
+  exit $status
+fi
 exit 0

@@ -49,6 +49,21 @@ type InboxItem = {
   replied_at: string | null;
 };
 
+type CenterHistory = {
+  centerId: string;
+  centerName: string;
+  status: string;
+  email: string | null;
+  emails: {
+    template: string;
+    templateLabel: string;
+    subject: string | null;
+    sentAt: string;
+    status: string;
+    fromAgent: boolean;
+  }[];
+};
+
 type Prospect = {
   id: string;
   name: string;
@@ -1264,6 +1279,53 @@ const PROSPECT_STATUS_RANK: Record<string, number> = Object.fromEntries(
   PROSPECT_STATUSES.map((st) => [st.value, st.rank])
 );
 
+// היסטוריית ההתכתבות מול המרכזים, מרכז-מרכז. crm_email_log נכתב עם כתובת
+// הנמען בלבד עד 9/9/26, ולכן "מה נשלח למרכז הזה" פשוט לא היה שאילתה
+// שאפשר לשאול; הקישור נוסף מכאן והלאה והישן מותאם לפי כתובת.
+function CenterHistoryBlock({ rows }: { rows: CenterHistory[] }) {
+  if (rows.length === 0) return null;
+  const withMail = rows.filter((r) => r.emails.length > 0);
+  const silent = rows.filter((r) => r.emails.length === 0);
+
+  return (
+    <div className="mt-5 border-t border-stone-100 pt-4">
+      <div className="mb-2 text-sm font-black text-stone-700">היסטוריית מיילים לכל מרכז</div>
+      {withMail.length === 0 ? (
+        <p className="text-xs text-stone-400">עדיין לא נשלח מייל לאף מרכז.</p>
+      ) : (
+        <ul className="space-y-3">
+          {withMail.map((c) => (
+            <li key={c.centerId}>
+              <div className="flex flex-wrap items-baseline gap-2">
+                <span className="text-sm font-bold text-stone-800">{c.centerName}</span>
+                <span className="text-[11px] text-stone-400">{c.email}</span>
+                <span className="text-[11px] text-stone-400">· {c.emails.length} מיילים</span>
+              </div>
+              <ul className="mt-1 space-y-0.5 ps-3 text-xs text-stone-600">
+                {c.emails.map((e, i) => (
+                  <li key={i} className="flex flex-wrap items-baseline gap-1.5">
+                    <span className="text-stone-400">{new Date(e.sentAt).toLocaleDateString("he-IL")}</span>
+                    <span className={e.fromAgent ? "font-bold text-[#2A6462]" : "text-stone-600"}>
+                      {e.templateLabel}
+                    </span>
+                    {e.subject && <span className="text-stone-400">· {e.subject.slice(0, 60)}</span>}
+                    {e.status !== "sent" && <span className="font-bold text-red-600">· נכשל</span>}
+                  </li>
+                ))}
+              </ul>
+            </li>
+          ))}
+        </ul>
+      )}
+      {silent.length > 0 && (
+        <p className="mt-3 text-xs text-stone-400">
+          לא נשלח מייל מעולם ל: {silent.map((c) => c.centerName).join(" · ")}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function ProspectTable({
   rows,
   onChanged,
@@ -1764,6 +1826,7 @@ export default function AgentsPage() {
   const [prospects, setProspects] = useState<Prospect[]>([]);
   const [placesReady, setPlacesReady] = useState(true);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [centerHistory, setCenterHistory] = useState<CenterHistory[]>([]);
   const [inboxReady, setInboxReady] = useState(true);
   const [pending, setPending] = useState<PendingAction[]>([]);
   // מטפלים שקיבלו הצעת מתנה בחלון הצינון (חצי שנה) - נטען מהשרת פעם אחת
@@ -1808,6 +1871,7 @@ export default function AgentsPage() {
           setProspects(j.prospects ?? []);
           setPlacesReady(j.places_configured !== false);
           setInbox(j.inbox ?? []);
+          setCenterHistory(j.center_history ?? []);
           setInboxReady(j.inbox_configured !== false);
           setPending(j.pending_actions ?? []);
           setGiftOfferedIds(j.gift_offered_ids ?? []);
@@ -2077,7 +2141,9 @@ export default function AgentsPage() {
     if (meta.key === "center_nudge") {
       if (!stored) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
       const proposals = Array.isArray(d?.proposals) ? (d?.proposals as { center: string; subject: string }[]) : [];
-      const skipped = Array.isArray(d?.skipped) ? (d?.skipped as unknown[]) : [];
+      const skipped = Array.isArray(d?.skipped)
+        ? (d?.skipped as { center?: string; reason?: string }[])
+        : [];
       return (
         <div className="space-y-2 text-sm">
           <p className="text-stone-600">
@@ -2093,8 +2159,23 @@ export default function AgentsPage() {
               ))}
             </ul>
           )}
+          {/* מי דולג ולמה, בשמות. הסיבה קיימת בריצה מאז ומעולם - היא פשוט
+              לא הוצגה, ולכן "למה אין טיוטה למרכז X" לא היה ניתן לענייה
+              מהמסך. */}
           {skipped.length > 0 && (
-            <p className="text-xs text-stone-400">{skipped.length} מרכזים דולגו (שלמים, טריים מדי, או שכבר קיבלו לאחרונה).</p>
+            <div>
+              <div className="mb-1 text-xs font-black text-stone-500">
+                {skipped.length} מרכזים דולגו בריצה הזו
+              </div>
+              <ul className="space-y-0.5 text-xs text-stone-500">
+                {skipped.map((sk, i) => (
+                  <li key={i}>
+                    <span className="font-bold text-stone-600">{sk.center}</span>
+                    <span className="text-stone-400"> - {sk.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
         </div>
       );
@@ -2545,6 +2626,9 @@ export default function AgentsPage() {
         <section className="rounded-2xl border border-stone-200 bg-white p-6">
           <h3 className="mb-4 text-lg font-black text-stone-900">🗂️ מה נעשה בעבר</h3>
           <PastWork meta={meta} />
+          {/* לסוכן המרכזים: כל מה שנשלח לכל מרכז, לא רק מה שיצא מהסוכן -
+              כדי שלפני שלחיחה אפשר לראות מה המרכז כבר קיבל מאיתנו. */}
+          {meta.key === "center_nudge" && <CenterHistoryBlock rows={centerHistory} />}
         </section>
 
         <Collapse title="יומן הריצות המלא של הסוכן" count={myRuns.length}>

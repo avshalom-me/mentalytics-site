@@ -4,13 +4,15 @@ import { createAgentAction } from "@/app/lib/agent-infra";
 import { sendGiftTrialWelcomeEmail } from "@/app/lib/therapist-emails";
 import { writeAudit } from "@/app/lib/audit";
 import { createSubscription, SumitPaymentDeclinedError, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import { GIFT_FOLLOWON_PRICE, GIFT_FOLLOWON_MONTHS, giftFollowonRevertDate } from "@/app/lib/promo";
 import {
   validateGiftCheckoutToken,
   burnGiftCheckoutToken,
   firstChargeDate,
 } from "@/app/lib/gift-checkout";
 
-// הצטרפות במסלול ההזמנה: חודשיים ראשונים ללא תשלום, ואחריהם המנוי הרגיל.
+// הצטרפות במסלול ההזמנה: חודשיים ללא תשלום, אחריהם חודשיים במחיר מוזל,
+// ואז המנוי הרגיל.
 //
 // מסלול נפרד לחלוטין מהצ'ק-אאוט הרגיל, ובכוונה: הכניסה אליו היא דרך טוקן
 // אישי שנוצר בשליחת ההצעה בלבד. מטפל שלא קיבל את המייל לא יכול להגיע לכאן,
@@ -27,7 +29,8 @@ export const maxDuration = 60;
 export async function GET(req: NextRequest) {
   try {
     const token = req.nextUrl.searchParams.get("token") ?? "";
-    const check = await validateGiftCheckoutToken(token);
+    // recordView: זו טעינת העמוד, כלומר הקליק על הקישור שבמייל.
+    const check = await validateGiftCheckoutToken(token, { recordView: true });
     if (!check.ok) {
       return NextResponse.json({ ok: false, reason: check.reason, error: check.message }, { status: 403 });
     }
@@ -41,7 +44,10 @@ export async function GET(req: NextRequest) {
       first_charge_date: firstChargeDate(new Date(), check.data.giftMonths),
       // מתי הקישור נסגר - מוצג בעמוד לצד התנאים, כי זו מגבלה שנאכפת בקוד.
       expires_at: check.data.expiresAt,
-      amount: SUBSCRIPTION_BASE_PRICE,
+      // המחיר שייגבה בחיוב הראשון - המדרגה המוזלת, לא המחיר המלא.
+      amount: GIFT_FOLLOWON_PRICE,
+      followon_months: GIFT_FOLLOWON_MONTHS,
+      full_amount: SUBSCRIPTION_BASE_PRICE,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";
@@ -112,6 +118,7 @@ export async function POST(req: NextRequest) {
         therapistEmail: email,
         therapistPhone: phone || undefined,
         singleUseToken,
+        unitPrice: GIFT_FOLLOWON_PRICE,
         firstChargeDate: startsOn,
       });
     } catch (e) {
@@ -146,12 +153,15 @@ export async function POST(req: NextRequest) {
         therapist_id: therapistId,
         morning_token_id: recurringId,
         status: "active",
-        amount: SUBSCRIPTION_BASE_PRICE,
+        amount: GIFT_FOLLOWON_PRICE,
         current_period_start: now,
         current_period_end: `${startsOn}T00:00:00.000Z`,
         // הסימון היחיד שמזהה "חיוב ראשון נדחה". מנוי רגיל מקבל NULL, ולכן
         // הוא לא יכול להיתפס בתזכורת בשום מצב.
         first_charge_on: startsOn,
+        // מתי ה-cron היומי יעלה את הוראת הקבע למחיר המלא - אחרי שני
+        // חיובים במחיר המוזל. אותה עמודה שמשרתת את ה-early-bird.
+        promo_reverts_at: giftFollowonRevertDate(startsOn).toISOString(),
         updated_at: now,
       },
       { onConflict: "therapist_id" }
@@ -211,8 +221,10 @@ export async function POST(req: NextRequest) {
         to: email,
         name: therapistName,
         firstChargeDate: startsOn,
-        amount: SUBSCRIPTION_BASE_PRICE,
+        amount: GIFT_FOLLOWON_PRICE,
         giftMonths,
+        followonMonths: GIFT_FOLLOWON_MONTHS,
+        fullAmount: SUBSCRIPTION_BASE_PRICE,
       });
     } catch (mailErr) {
       console.error(
@@ -225,7 +237,7 @@ export async function POST(req: NextRequest) {
       ok: true,
       first_charge_date: startsOn,
       gift_months: giftMonths,
-      amount: SUBSCRIPTION_BASE_PRICE,
+      amount: GIFT_FOLLOWON_PRICE,
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה";

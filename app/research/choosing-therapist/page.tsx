@@ -208,6 +208,15 @@ export default function ChoosingTherapistPage() {
             <li>{`מה עלות הפגישה, ומה המדיניות לגבי ביטולים?`}</li>
             <li>{`האם אתה עובד עם קופת חולים או ביטוח מסוים?`}</li>
           </ul>
+          {/* The two guides split one journey: this page ends where a first
+              session is booked, and that is exactly where the other begins. */}
+          <p className="mt-5">
+            כבר קבעתם פגישה?{" "}
+            <Link href="/research/first-session" style={{ color: "var(--teal-dark)", fontWeight: 700 }}>
+              כתבנו בפירוט מה קורה בפגישה הראשונה אצל פסיכולוג
+            </Link>
+            {" "}- מה שואלים בה, איך כדאי להגיע, ומה קורה עם הסודיות והמחיר.
+          </p>
         </section>
 
         <section>

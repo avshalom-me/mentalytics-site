@@ -9,6 +9,7 @@ import {
   SUBSCRIPTION_PROMO_MONTHS,
   isPromoActive,
 } from "@/app/lib/promo";
+import { promotedPlanTable } from "@/app/lib/promoted-plan-table";
 
 function escapeHtml(str: string): string {
   return str
@@ -17,14 +18,6 @@ function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-// One green ✓ / muted ✗ cell for the comparison table.
-function yes(): string {
-  return `<td style="text-align:center;padding:11px 8px;border-bottom:1px solid #EAF0EE;color:#2A8C6A;font-weight:800;font-size:16px;">✓</td>`;
-}
-function no(): string {
-  return `<td style="text-align:center;padding:11px 8px;border-bottom:1px solid #EAF0EE;color:#C9D4D2;font-weight:800;font-size:16px;">✗</td>`;
 }
 
 export function buildArticleInviteEmail(opts: {
@@ -48,44 +41,13 @@ export function buildArticleInviteEmail(opts: {
 
   const subject = "הזמנה אישית: כתבו מאמר וקבלו חודשיים קידום במתנה 🎁";
 
-  // Free vs. promoted comparison - mirrors the /therapists/join pricing table.
-  const comparisonTable = `
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 8px;font-size:13.5px;color:#1a4a5c;">
-        <thead>
-          <tr>
-            <th style="text-align:right;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#0F5468;">מה מקבלים</th>
-            <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#6B807E;width:78px;">חינמי</th>
-            <th style="text-align:center;padding:10px 8px;border-bottom:2px solid #DDE9E8;font-weight:800;color:#0F5468;width:110px;">מקודם 🎁</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">דף פרופיל אישי - תמונה, ביוגרפיה ותחומי התמחות</td>
-            ${yes()}${yes()}
-          </tr>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">הופעה בחיפוש לפי אזור או עיר</td>
-            ${yes()}${yes()}
-          </tr>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">הופעה ראשונה בתוצאות החיפוש</td>
-            ${no()}${yes()}
-          </tr>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">מערכת ההתאמה החכמה - פניות לפי גיל, אזור, שפה וסגנון טיפולי</td>
-            ${no()}${yes()}
-          </tr>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">דו&quot;ח צפיות, לחיצות ואחוזי המרה</td>
-            ${no()}${yes()}
-          </tr>
-          <tr>
-            <td style="padding:11px 8px;border-bottom:1px solid #EAF0EE;">פילוח הפונים + השוואה לממוצע + סוכן AI אישי</td>
-            ${no()}${yes()}
-          </tr>
-        </tbody>
-      </table>
-      <p style="margin:0 0 4px;font-size:12px;color:#6B807E;">המסלול המקודם ${regularPriceNote} - ואצלך הוא במתנה מלאה לחודשיים, ללא כרטיס אשראי וללא התחייבות.</p>`;
+  // Free vs. promoted comparison. Shared with the gift-offer and pre-charge
+  // reminder mails through promotedPlanTable, so the three of them cannot
+  // drift into promising different things about the same plan.
+  const comparisonTable = promotedPlanTable(
+    `המסלול המקודם ${regularPriceNote} - ואצלך הוא במתנה מלאה לחודשיים, ללא כרטיס אשראי וללא התחייבות.`,
+    "מקודם 🎁",
+  );
 
   const html = `<!doctype html>
 <html dir="rtl" lang="he">

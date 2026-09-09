@@ -62,6 +62,7 @@ const CHANNEL_LABEL: Record<string, string> = {
   direct: "ישיר",
   referral: "הפניה",
   meta_paid: "פייסבוק בתשלום",
+  taboola_paid: "טאבולה בתשלום",
   meta_organic: "פייסבוק אורגני",
   other: "אחר",
   unknown: "לא ידוע",
