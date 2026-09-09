@@ -93,11 +93,27 @@ export function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel =
 export function countMissing(A: Ans, keys: string[]): number {
   return keys.filter(k => A[k] === undefined || A[k] === null || A[k] === "").length;
 }
-export function IncompleteHint({ missing }: { missing: number }) {
+/**
+ * "N items are still blank, and blank counts as no difficulty."
+ *
+ * These screens used to block Continue for a parent until every item carried a
+ * rating. The owner reversed that on 9/9/2026: answer as much or as little as
+ * you like, and a blank is scored exactly as if the symptom had been said to be
+ * absent - which is what fillMissing then writes on the way out. So this is a
+ * note, never a gate: it says what the blank will mean instead of demanding it
+ * be filled, and Continue stays live beside it.
+ *
+ * Shown to both audiences. A counsellor who presses the explicit לא ידוע pill
+ * has given the item a value, so it stops being counted here.
+ */
+export function IncompleteNote({ missing, prefs = false }: { missing: number; prefs?: boolean }) {
   if (missing <= 0) return null;
   return (
-    <p className="text-red-500 text-sm font-semibold mt-3">
-      ⛔ {missing === 1 ? "נותר סעיף אחד ללא מענה" : `נותרו ${missing} סעיפים ללא מענה`} - יש לענות על כולם כדי להמשיך
+    <p className="text-gray-400 text-xs mt-3 leading-relaxed">
+      {missing === 1 ? "סעיף אחד נותר ללא מענה" : `${missing} סעיפים נותרו ללא מענה`} - אפשר להמשיך
+      {/* p-traits asks how the child engages, not what is wrong, so the symptom
+          wording would be describing the wrong thing there. */}
+      {prefs ? ", וההתאמה תיעשה לפי מה שכן נמסר" : ", ומה שלא סומן ייחשב כאילו הקושי אינו קיים"}
     </p>
   );
 }
