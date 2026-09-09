@@ -503,6 +503,7 @@ export default function AdminCentersPage() {
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
         <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
         <a href="/centers" target="_blank" className="font-bold text-[#0F5468] underline">🔗 עמוד ההסבר למרכזים</a>
+        <a href="/centers/team-guide" target="_blank" className="font-bold text-[#0F5468] underline" title="דף לא מאונדקס לשליחה למרכז: שלושת הצעדים לצירוף מנהל נוסף לפורטל">👥 מדריך למנהל נוסף (לשליחה למרכז)</a>
         <a href="/api/admin-sales-sheet" target="_blank" className="font-bold text-red-700 underline" title="מסמך פנימי לצוות המכירות - מוגש רק דרך האדמין, לא לשליחה ללקוח">🔒 דף הכנה לשיחת מכירה (פנימי - לא לשליחה)</a>
       </div>
 
