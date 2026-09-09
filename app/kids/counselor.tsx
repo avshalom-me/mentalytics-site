@@ -54,7 +54,7 @@ import {
   type Unknown,
 } from "@/app/lib/school-report";
 import { PAGES, type Ans } from "./quiz-logic";
-import { Card, StepTag, StepQ, StepHint, NavRow, YNRow, ob } from "./ui";
+import { Card, StepTag, StepQ, StepHint, NavRow, ob } from "./ui";
 
 type ScreenProps = { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void };
 type Entries<T extends string> = [T, string][];
@@ -431,8 +431,9 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           <Q label="מגבלה כלכלית מוכרת במשפחה"><Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} /></Q>
         </Box>
       </Card>
-      {missing > 0 && <p className="text-red-500 text-sm font-semibold mt-3">⛔ {missing === 1 ? "נותר סעיף אחד ללא מענה" : `נותרו ${missing} סעיפים ללא מענה`} - המילוי, ההורים ושלוש שאלות הוועדות</p>}
-      <NavRow onBack={onBack} onNext={() => onNext(A)} nextLabel="לדוח ←" nextDisabled={missing > 0} />
+      {/* Nothing here blocks: what was not answered is simply left out of the summary and the map. */}
+      {missing > 0 && <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>אפשר להמשיך גם בלי לענות על הכל - מה שלא נענה לא ייכנס לסיכום ולמפה.</p>}
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextLabel="לדוח ←" />
     </div>
   );
 }
@@ -503,7 +504,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   };
 
   return (
-    <div className="mt-8 space-y-6" data-html2canvas-ignore="true">
+    <div className="mt-8 space-y-6">
       <div>
         <StepTag>מפת המסלולים</StepTag>
         <StepQ>מה רלוונטי עכשיו, ומתי</StepQ>

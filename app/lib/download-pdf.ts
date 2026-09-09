@@ -50,18 +50,29 @@ export async function downloadResultsPDF(
       detailsEls.forEach((d, i) => { d.open = prevOpen[i]; });
     }
 
-    // Lay the capture onto an A4-width page (proportional height) so the file
-    // opens at a sensible size instead of a giant pixel-sized page.
-    const pageWidthMm = 210; // A4 width
-    const pageHeightMm = (canvas.height / canvas.width) * pageWidthMm;
-    const pdf = new jsPDF({
-      orientation: "portrait",
-      unit: "mm",
-      format: [pageWidthMm, pageHeightMm],
-    });
-
-    const imgData = canvas.toDataURL("image/jpeg", 0.95);
-    pdf.addImage(imgData, "JPEG", 0, 0, pageWidthMm, pageHeightMm);
+    // Slice the capture into A4 pages. It used to go onto one page of
+    // proportional height, which was fine for a parent's short report and
+    // became a metre-long sheet once the counsellor's report carried a
+    // committee map and a summary underneath. A slice may cut through a line
+    // of text at the page edge - the price of capturing pixels rather than
+    // laying out text, and better than a page no printer can hold.
+    const pageWidthMm = 210;
+    const pageHeightMm = 297;
+    const pageHeightPx = Math.floor(canvas.width * (pageHeightMm / pageWidthMm));
+    const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pages = Math.max(1, Math.ceil(canvas.height / pageHeightPx));
+    for (let i = 0; i < pages; i++) {
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = Math.min(pageHeightPx, canvas.height - i * pageHeightPx);
+      const ctx = slice.getContext("2d");
+      if (!ctx) throw new Error("canvas 2d context unavailable");
+      ctx.fillStyle = backgroundColor;
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, i * pageHeightPx, canvas.width, slice.height, 0, 0, canvas.width, slice.height);
+      if (i > 0) pdf.addPage();
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.95), "JPEG", 0, 0, pageWidthMm, (slice.height / canvas.width) * pageWidthMm);
+    }
 
     const blob = pdf.output("blob");
     const url = URL.createObjectURL(blob);

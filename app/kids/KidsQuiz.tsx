@@ -72,7 +72,7 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
 }
 
 import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteHint, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
-import { isUnknown, markUnknown, markKnown, sw } from "./quiz-logic";
+import { isUnknown, markUnknown, markKnown, sw, fillMissing } from "./quiz-logic";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
   "פעוט":[1,2],"גן3":[3,3],"גן-טרום":[4,4],"גן":[5,6],
@@ -610,8 +610,8 @@ function PageAQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, aqItems.map(it => it.key), 1, updAQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -626,9 +626,7 @@ function PageQ2({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>{sw(A, "הילד/ה חש/ה כי \"אינו/ה שווה\" או אינו/ה מוערך/ת")}</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5">
-          <ScaleGate A={A} setA={setA} itemKey="q2" advance={onNext} />
-        </div>
+        <ScaleGate A={A} setA={setA} itemKey="q2" advance={onNext} />
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
     </div>
@@ -645,9 +643,7 @@ function PageQ3({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         <StepQ>מצב רוח ירוד או עצוב</StepQ>
         <StepHint>1 = כלל לא  |  5 = בעוצמה גבוהה מאוד</StepHint>
         <div className="flex justify-between text-xs text-gray-400 mb-2"><span>כלל לא</span><span>בעוצמה גבוהה</span></div>
-        <div className="flex gap-1.5">
-          <ScaleGate A={A} setA={setA} itemKey="q3" advance={onNext} />
-        </div>
+        <ScaleGate A={A} setA={setA} itemKey="q3" advance={onNext} />
       </Card>
       <NavRow onBack={onBack} onNext={()=>onNext(A)} />
     </div>
@@ -675,8 +671,8 @@ function PageMQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, mqItems.map(it => it.key), "לא", updMQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -762,8 +758,8 @@ function PageQ4S({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, asItems.map(it => it.key), "לא", (a, k, v) => updAddict(a, k, v, "s")) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -789,8 +785,8 @@ function PageQ4G({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, agItems.map(it => it.key), "לא", (a, k, v) => updAddict(a, k, v, "g")) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -816,8 +812,8 @@ function PageQ4B({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, abItems.map(it => it.key), "לא", (a, k, v) => updAddict(a, k, v, "b")) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -841,8 +837,8 @@ function PageQ4Ctrl({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           for addictions, and skipping it used to fall through to a default of 5
           - the far end of the scale, indistinguishable from a parent who chose
           it deliberately. */}
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={!A.q4_ctrl} />
-      <IncompleteHint missing={A.q4_ctrl ? 0 : 1} />
+      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={!isCounselor(A) && !A.q4_ctrl} />
+      <IncompleteHint missing={isCounselor(A) || A.q4_ctrl ? 0 : 1} />
     </div>
   );
 }
@@ -888,8 +884,8 @@ function PageOQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, oqItems.map(it => it.key), 1, updOQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -936,8 +932,8 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, tqItems.map(it => it.key), 0, updTQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -945,7 +941,7 @@ function PageTQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
 // ── p-q7 ─────────────────────────────────────────────────────────────────────
 // שאלה 7 - הזיות (7א) ואמונות יוצאות דופן / חשדות (7ב), על אותו מסך
 function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
-  const canContinue = !!A.q7a && !!A.q7b;
+  const canContinue = isCounselor(A) || (!!A.q7a && !!A.q7b);
   function setKey(k: "q7a" | "q7b", v: string) {
     const nA = { ...A, [k]: v };
     setA(nA);
@@ -970,7 +966,7 @@ function PageQ7({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
         )}
       </Card>
       {/* Disabled rather than absent - a missing Continue reads as a dead end. */}
-      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={!canContinue} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, ["q7a", "q7b"], "לא", (a, k, v) => ({ ...a, [k]: v })) : A)} nextDisabled={!canContinue} />
     </div>
   );
 }
@@ -1000,8 +996,8 @@ function PagePQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, pqItems.map(it => it.key), "לא", updPQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -1033,9 +1029,10 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
   const bmi = calcBMI(parseFloat(A._h) || 0, parseFloat(A._w) || 0);
   // Only the item block actually rendered for this age is required; height and
   // weight stay optional, which is why they are not in this list.
-  const missing = countMissing(A, under12
+  const eqKeys = under12
     ? ["ea1","ea2","ea3","ea4","ea5","ea6","ea7","ea8"]
-    : ["eb1","eb2","eb3","eb4","eb5","eb6","eb7"]);
+    : ["eb1","eb2","eb3","eb4","eb5","eb6","eb7"];
+  const missing = countMissing(A, eqKeys);
 
   // Height and weight moved here from the opening screen. BMI is only ever read
   // by the eating-disorder scoring, so asking every parent for it up front cost
@@ -1158,8 +1155,8 @@ function PageEQ({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext
           </>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, eqKeys, "לא", updEQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -1204,8 +1201,8 @@ function PageBQ({ A, setA, onNext, onBack, items }: { A:Ans; setA:(a:Ans)=>void;
           ))}
         </SubCard>
       </Card>
-      <NavRow onBack={onBack} onNext={()=>onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, bqItems.map(it => it.key), "לא", updBQ) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -1824,8 +1821,8 @@ function PageBeh({ A, setA, onNext, onBack, audience }: { A:Ans; setA:(a:Ans)=>v
         ))}
         {audience === "counselor" && <CounselorBehBlock A={A} setA={setA} />}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, ["beh1", "beh2", "beh3"], "לא", (a, k, v) => computeBehPlan({ ...a, [k]: v })) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -1978,8 +1975,8 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
 
         {audience === "counselor" && <CounselorSocBlock A={A} setA={setA} />}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={missing > 0} />
-      <IncompleteHint missing={missing} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillMissing(A, required, "לא", (a, k) => k.startsWith("lsas_a") ? updLSAS(a, k, 0) : k === "soc2_sev" ? { ...a, soc2_sev: 1 } : { ...a, [k]: "לא" }) : A)} nextDisabled={!isCounselor(A) && missing > 0} />
+      <IncompleteHint missing={isCounselor(A) ? 0 : missing} />
     </div>
   );
 }
@@ -1989,6 +1986,26 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
 // p-q2-grade, p-q10-grade and p-ga-traits, which between them asked motivation
 // four times, verbality three and interests twice. See traitNeeds for which
 // sub-questions apply to a given child.
+/**
+ * A counsellor may leave the traits unanswered. Each one the scoring will read
+ * is then stored at its scale's lowest value - the literal "answered no": no
+ * motivation, not verbal, no practice, no consent - and marked not known.
+ * Never 0: the anxiety branch reads a 0 motivation as "3 or more" and walks on
+ * into a recommendation nobody asked for (see the note on p-traits).
+ */
+function fillTraits(A: Ans, needs: ReturnType<typeof traitNeeds>): Ans {
+  const plain = (a: Ans, k: string, v: number | string) => ({ ...a, [k]: v });
+  let out = A;
+  if (needs.motiv)  out = fillMissing(out, ["t_motiv"], 1, plain);
+  if (needs.verbal) out = fillMissing(out, ["t_verbal"], 1, plain);
+  if (needs.prac)   out = fillMissing(out, ["t_prac"], 1, plain);
+  if (needs.gaConsent) {
+    out = fillMissing(out, ["ga_consent"], "לא", plain);
+    if (out.ga_consent === "לא") out = fillMissing(out, ["ga_consent_parent"], "לא", plain);
+  }
+  return out;
+}
+
 function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const needs = traitNeeds(A);
   const set = (k: string, v: any) => setA({ ...A, [k]: v });
@@ -2067,7 +2084,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           <p className="text-xs text-amber-700 mt-4">יש לענות על השאלות שלמעלה כדי להמשיך.</p>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(A)} nextDisabled={!ready} />
+      <NavRow onBack={onBack} onNext={() => onNext(isCounselor(A) ? fillTraits(A, needs) : A)} nextDisabled={!isCounselor(A) && !ready} />
     </div>
   );
 }
@@ -3421,6 +3438,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           </div>
         )}
 
+        {audience === "counselor" && hasAnyFindings && (
+          <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
+            הכרטיסים שלמטה מציגים את סוג הטיפול או האבחון המומלץ ואת ההסבר לו. חיפוש מטפל/ת אינו מוצג ליועצת - את הבחירה במטפל/ת ההורים עושים בעצמם.
+          </div>
+        )}
         {/* Per-domain sections */}
         {byDomain.map(b => {
           const hasAny =

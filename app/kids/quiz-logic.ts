@@ -234,6 +234,28 @@ export function markUnknown(A: Ans, key: string): Ans { return { ...A, [unkKey(k
 /** Record that `key` was answered for real. */
 export function markKnown(A: Ans, key: string): Ans { return { ...A, [unkKey(key)]: false }; }
 
+/**
+ * A counsellor may move on with items unanswered. Each one is then stored as
+ * its own "no" - the value "לא ידוע" would have written - and remembered as not
+ * known, so the report can say so. Parents keep the block on those screens:
+ * for a parent an unanswered item is a slip, not a gap in knowledge, and a
+ * report scored on the slip contradicts the difficulty they just flagged.
+ */
+export function fillMissing(
+  A: Ans,
+  keys: string[],
+  noValue: number | string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  upd: (a: Ans, k: string, v: any) => Ans,
+): Ans {
+  let out = A;
+  for (const k of keys) {
+    const v = out[k];
+    if (v === undefined || v === null || v === "") out = markUnknown(upd(out, k, noValue), k);
+  }
+  return out;
+}
+
 // ── Wording ──────────────────────────────────────────────────────────────────
 /**
  * Parent phrasing to school phrasing, for the labels a counsellor reads.

@@ -28,6 +28,7 @@ import {
   isUnknown,
   markUnknown,
   markKnown,
+  fillMissing,
   schoolWording,
   sw,
   type Ans,
@@ -315,6 +316,36 @@ describe('"לא ידוע / לא רלוונטי"', () => {
     const A = markUnknown(updAQ({}, "aq1", 1), "aq1");
     expect(A.aq1).toBe(1);
     expect(A.aq1 === undefined).toBe(false);
+  });
+});
+
+describe("fillMissing - moving on with items unanswered", () => {
+  const plain = (a: Ans, k: string, v: string) => ({ ...a, [k]: v });
+
+  it("stores the item's own no for every unanswered key and remembers it as not known", () => {
+    const A = fillMissing({ q7a: "כן" }, ["q7a", "q7b"], "לא", plain);
+    expect(A.q7b).toBe("לא");
+    expect(isUnknown(A, "q7b")).toBe(true);
+  });
+
+  it("leaves answered items alone, including a real answer of no", () => {
+    const A = fillMissing({ q7a: "כן", q7b: "לא" }, ["q7a", "q7b"], "לא", plain);
+    expect(A.q7a).toBe("כן");
+    expect(isUnknown(A, "q7a")).toBe(false);
+    expect(isUnknown(A, "q7b")).toBe(false);
+  });
+
+  it("runs the battery updater, so the total stays consistent and on the scale floor", () => {
+    let A: Ans = updAQ({}, "aq1", 3);
+    A = fillMissing(A, Array.from({ length: 10 }, (_, i) => `aq${i + 1}`), 1, updAQ);
+    expect(A.aq1).toBe(3);
+    expect(A.aq_tot).toBe(3 + 9);
+    expect(Array.from({ length: 9 }, (_, i) => isUnknown(A, `aq${i + 2}`)).every(Boolean)).toBe(true);
+  });
+
+  it("treats an empty string as unanswered, like countMissing does", () => {
+    const A = fillMissing({ soc1: "" }, ["soc1"], "לא", plain);
+    expect(A.soc1).toBe("לא");
   });
 });
 
