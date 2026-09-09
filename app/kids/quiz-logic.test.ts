@@ -29,6 +29,8 @@ import {
   markUnknown,
   markKnown,
   fillMissing,
+  traitKeys,
+  fillTraits,
   schoolWording,
   sw,
   type Ans,
@@ -346,6 +348,45 @@ describe("fillMissing - moving on with items unanswered", () => {
   it("treats an empty string as unanswered, like countMissing does", () => {
     const A = fillMissing({ soc1: "" }, ["soc1"], "לא", plain);
     expect(A.soc1).toBe("לא");
+  });
+});
+
+describe("traitKeys - the one screen that still blocks", () => {
+  const anxiousBv: Ans = { _grade: "ג", a_emo: "הרבה", q1: 3, aq_tot: 18 };
+
+  it("demands exactly the traits the screen is showing, and grows with them", () => {
+    expect(traitKeys(anxiousBv)).toEqual(["t_motiv"]);
+    expect(traitKeys({ ...anxiousBv, t_motiv: 3 })).toEqual(["t_motiv", "t_verbal"]);
+  });
+
+  it("follows the consent answer into the follow-up it opens", () => {
+    const gaChild: Ans = { _grade: "א", a_emo: "הרבה", q1: 3 };
+    expect(traitKeys(gaChild)).toEqual(["ga_consent"]);
+    expect(traitKeys({ ...gaChild, ga_consent: "כן" })).toEqual(["ga_consent"]);
+    expect(traitKeys({ ...gaChild, ga_consent: "לא" })).toEqual(["ga_consent", "ga_consent_parent"]);
+  });
+
+  it("never demands an interest, because nothing ticked is an answer there", () => {
+    const zy: Ans = { _grade: "י", a_emo: "הרבה", q1: 3, aq_tot: 22, t_motiv: 4, q10_par: "כן" };
+    expect(traitNeeds(zy).interests).toBe(true);
+    expect(traitKeys(zy).some(k => k.startsWith("int_"))).toBe(false);
+  });
+
+  it("demands nothing at all when no branch will read a trait", () => {
+    expect(traitKeys({ _grade: "ג" })).toEqual([]);
+  });
+
+  it("fills every key it demands, so a restored draft cannot slip past blank", () => {
+    for (const A of [anxiousBv, { ...anxiousBv, t_motiv: 3 }, { _grade: "א", a_emo: "הרבה", q1: 3 }] as Ans[]) {
+      const filled = fillTraits(A);
+      expect(traitKeys(filled).filter(k => filled[k] === undefined)).toEqual([]);
+    }
+  });
+
+  it("fills a scale at its floor and never at 0, which the anxiety branch reads as high", () => {
+    const filled = fillTraits(anxiousBv);
+    expect(filled.t_motiv).toBe(1);
+    expect(isUnknown(filled, "t_motiv")).toBe(true);
   });
 });
 

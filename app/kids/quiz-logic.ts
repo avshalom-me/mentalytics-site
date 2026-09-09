@@ -250,11 +250,14 @@ export function unknownCount(A: Ans): number {
 }
 
 /**
- * A counsellor may move on with items unanswered. Each one is then stored as
- * its own "no" - the value "לא ידוע" would have written - and remembered as not
- * known, so the report can say so. Parents keep the block on those screens:
- * for a parent an unanswered item is a slip, not a gap in knowledge, and a
- * report scored on the slip contradicts the difficulty they just flagged.
+ * Anyone may move on with items unanswered. Each one is then stored as its own
+ * "no" - the value "לא ידוע" would have written - and remembered as not known,
+ * so the report can say so. This was a counsellor-only escape until 9/9/2026,
+ * when the owner opened it to parents too: answer as much or as little as you
+ * like, and a blank is scored exactly as if the symptom had been said to be
+ * absent.
+ *
+ * p-traits is the one exception and still blocks - see traitKeys for why.
  */
 export function fillMissing(
   A: Ans,
@@ -267,6 +270,55 @@ export function fillMissing(
   for (const k of keys) {
     const v = out[k];
     if (v === undefined || v === null || v === "") out = markUnknown(upd(out, k, noValue), k);
+  }
+  return out;
+}
+
+// ── p-traits: the one screen that still asks ─────────────────────────────────
+/**
+ * The items on p-traits that must carry an answer before Continue lights up.
+ *
+ * Everywhere else in the questionnaire a blank means "the difficulty is
+ * absent". That is a real answer, and for a symptom it is the safe one: it can
+ * only ever under-report. p-traits does not ask about symptoms. It asks how the
+ * child engages - motivation, verbality, willingness to practise between
+ * sessions, consent to come - and the bottom of those scales is a statement in
+ * its own right, not a neutral. Read as one it moves the recommendation off
+ * direct therapy and onto reaching the child through the parents, which is a
+ * clinical decision nobody made. So here it is asked rather than assumed: at
+ * most three questions, on the last screen, after everything else is answered.
+ *
+ * Interests are left out on purpose - nothing ticked is itself an answer there.
+ *
+ * The blankness test is countMissing's, repeated in the screen rather than
+ * imported: ui.tsx imports this file, so the arrow cannot point back.
+ */
+export function traitKeys(A: Ans, needs: TraitNeeds = traitNeeds(A)): string[] {
+  return [
+    ...(needs.motiv     ? ["t_motiv"]  : []),
+    ...(needs.verbal    ? ["t_verbal"] : []),
+    ...(needs.prac      ? ["t_prac"]   : []),
+    ...(needs.gaConsent ? ["ga_consent"] : []),
+    ...(needs.gaConsent && A.ga_consent === "לא" ? ["ga_consent_parent"] : []),
+  ];
+}
+
+/**
+ * The fallback behind that gate, for the one way past it: a saved draft from
+ * before the gate existed, restored straight onto a later screen. Each item the
+ * scoring will read is stored at its scale's lowest value - never 0, which the
+ * anxiety branch reads as "3 or more" and walks on into a recommendation nobody
+ * asked for - and marked not known, so the report says the answer was missing.
+ */
+export function fillTraits(A: Ans, needs: TraitNeeds = traitNeeds(A)): Ans {
+  const plain = (a: Ans, k: string, v: number | string) => ({ ...a, [k]: v });
+  let out = A;
+  if (needs.motiv)  out = fillMissing(out, ["t_motiv"], 1, plain);
+  if (needs.verbal) out = fillMissing(out, ["t_verbal"], 1, plain);
+  if (needs.prac)   out = fillMissing(out, ["t_prac"], 1, plain);
+  if (needs.gaConsent) {
+    out = fillMissing(out, ["ga_consent"], "לא", plain);
+    if (out.ga_consent === "לא") out = fillMissing(out, ["ga_consent_parent"], "לא", plain);
   }
   return out;
 }

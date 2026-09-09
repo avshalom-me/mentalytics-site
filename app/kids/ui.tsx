@@ -73,17 +73,6 @@ export function NavRow({ onBack, onNext, backLabel = "→ חזרה", nextLabel =
   );
 }
 /**
- * "You still have N unanswered items" under a blocked Continue.
- *
- * Every screen that uses this sits behind a gate the parent already answered
- * yes to, so tapping past the detail questionnaire scores that section 0 and
- * the report then contradicts what they just said: it stays silent about a
- * difficulty they flagged, or - on the anxiety screen - states low stress
- * outright. Blocking is the fix at source; the informed fallbacks in the scorer
- * are the second line, for a client that malfunctions rather than a parent who
- * skips.
- */
-/**
  * How many of `keys` carry no answer.
  *
  * Tests for undefined rather than falsiness on purpose: the trauma scale starts
@@ -106,14 +95,28 @@ export function countMissing(A: Ans, keys: string[]): number {
  * Shown to both audiences. A counsellor who presses the explicit לא ידוע pill
  * has given the item a value, so it stops being counted here.
  */
-export function IncompleteNote({ missing, prefs = false }: { missing: number; prefs?: boolean }) {
+export function IncompleteNote({ missing }: { missing: number }) {
   if (missing <= 0) return null;
   return (
     <p className="text-gray-400 text-xs mt-3 leading-relaxed">
-      {missing === 1 ? "סעיף אחד נותר ללא מענה" : `${missing} סעיפים נותרו ללא מענה`} - אפשר להמשיך
-      {/* p-traits asks how the child engages, not what is wrong, so the symptom
-          wording would be describing the wrong thing there. */}
-      {prefs ? ", וההתאמה תיעשה לפי מה שכן נמסר" : ", ומה שלא סומן ייחשב כאילו הקושי אינו קיים"}
+      {missing === 1 ? "סעיף אחד נותר ללא מענה" : `${missing} סעיפים נותרו ללא מענה`} - אפשר להמשיך, ומה שלא סומן ייחשב כאילו הקושי אינו קיים
+    </p>
+  );
+}
+
+/**
+ * "N still waiting" under a Continue that is greyed out.
+ *
+ * The counterpart of IncompleteNote, and the only place left that blocks: on
+ * p-traits a blank has no honest reading, so the screen waits (see traitKeys).
+ * The button stays visible and disabled rather than disappearing - on the last
+ * screen of the questionnaire a missing Continue reads as "it ended here".
+ */
+export function RequiredNote({ missing }: { missing: number }) {
+  if (missing <= 0) return null;
+  return (
+    <p className="text-gray-400 text-xs mt-3 leading-relaxed">
+      {missing === 1 ? "נותרה שאלה אחת ללא מענה" : `נותרו ${missing} שאלות ללא מענה`} - התשובות כאן קובעות איזה סוג טיפול יומלץ, ולכן אין להן ברירת מחדל
     </p>
   );
 }

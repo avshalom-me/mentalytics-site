@@ -72,8 +72,8 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
   return null;
 }
 
-import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
-import { isUnknown, markUnknown, markKnown, sw, fillMissing } from "./quiz-logic";
+import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, RequiredNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
+import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits } from "./quiz-logic";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
   "פעוט":[1,2],"גן3":[3,3],"גן-טרום":[4,4],"גן":[5,6],
@@ -1984,42 +1984,17 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
 // p-q2-grade, p-q10-grade and p-ga-traits, which between them asked motivation
 // four times, verbality three and interests twice. See traitNeeds for which
 // sub-questions apply to a given child.
-/**
- * A counsellor may leave the traits unanswered. Each one the scoring will read
- * is then stored at its scale's lowest value - the literal "answered no": no
- * motivation, not verbal, no practice, no consent - and marked not known.
- * Never 0: the anxiety branch reads a 0 motivation as "3 or more" and walks on
- * into a recommendation nobody asked for (see the note on p-traits).
- */
-function fillTraits(A: Ans, needs: ReturnType<typeof traitNeeds>): Ans {
-  const plain = (a: Ans, k: string, v: number | string) => ({ ...a, [k]: v });
-  let out = A;
-  if (needs.motiv)  out = fillMissing(out, ["t_motiv"], 1, plain);
-  if (needs.verbal) out = fillMissing(out, ["t_verbal"], 1, plain);
-  if (needs.prac)   out = fillMissing(out, ["t_prac"], 1, plain);
-  if (needs.gaConsent) {
-    out = fillMissing(out, ["ga_consent"], "לא", plain);
-    if (out.ga_consent === "לא") out = fillMissing(out, ["ga_consent_parent"], "לא", plain);
-  }
-  return out;
-}
-
 function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; onNext:(a:Ans)=>void; onBack?:()=>void }) {
   const needs = traitNeeds(A);
   const set = (k: string, v: any) => setA({ ...A, [k]: v });
 
-  // Anything left blank here is written by fillTraits on the way out - each at
-  // its scale's lowest value, never 0, because the anxiety branch reads a 0
-  // motivation as "3 or more" and walks on into a recommendation nobody asked
-  // for. The count below is displayed, not enforced. Interests stay optional
-  // either way; they only add a preference line when ticked.
-  const missingTraits = countMissing(A, [
-    ...(needs.motiv     ? ["t_motiv"]    : []),
-    ...(needs.verbal    ? ["t_verbal"]   : []),
-    ...(needs.prac      ? ["t_prac"]     : []),
-    ...(needs.gaConsent ? ["ga_consent"] : []),
-    ...(needs.gaConsent && A.ga_consent === "לא" ? ["ga_consent_parent"] : []),
-  ]);
+  // The one screen that still blocks: a blank here is not "the difficulty is
+  // absent" but "no motivation, not verbal, will not practise, does not
+  // consent", and that answer moves the referral onto the parents. traitKeys
+  // carries the reasoning and the list; fillTraits behind it is the fallback
+  // for a draft saved before this gate existed.
+  const missingTraits = countMissing(A, traitKeys(A, needs));
+  const ready = missingTraits === 0;
 
   const INTERESTS = [
     { key:"int_art",    label:"אומנות" },
@@ -2035,7 +2010,7 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
       <Card>
         <StepTag>{sw(A, "מאפייני הילד/ה")}</StepTag>
         <StepQ>כמה שאלות אחרונות</StepQ>
-        <StepHint>אלה לא שאלות על הקושי אלא על מה שיעזור להתאים את סוג הטיפול.</StepHint>
+        <StepHint>{sw(A, "אלה לא שאלות על הקושי אלא על מה שיעזור להתאים את סוג הטיפול.", "אלה לא שאלות על הקושי אלא על מה שיעזור להתאים את סוג הטיפול. אם אינך בטוחה - סמני את ההערכה הקרובה ביותר.")}</StepHint>
 
         {needs.gaConsent && (
           <div className="mb-4">
@@ -2078,8 +2053,8 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
           </div>
         )}
       </Card>
-      <NavRow onBack={onBack} onNext={() => onNext(fillTraits(A, needs))} />
-      <IncompleteNote missing={missingTraits} prefs />
+      <NavRow onBack={onBack} onNext={() => onNext(fillTraits(A, needs))} nextDisabled={!ready} />
+      <RequiredNote missing={missingTraits} />
     </div>
   );
 }
