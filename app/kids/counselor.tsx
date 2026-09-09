@@ -22,6 +22,7 @@ import {
   DIAGNOSING_BODIES,
   israelToday,
   formatDateHe,
+  schoolYear,
   type Diagnosis,
   type DiagnosisKind,
   type SchoolTrack,
@@ -55,6 +56,7 @@ import {
 } from "@/app/lib/school-report";
 import { PAGES, type Ans } from "./quiz-logic";
 import { Card, StepTag, StepQ, StepHint, NavRow, ob } from "./ui";
+import { TrackFlow, TrackTimeline } from "./counselor-map";
 
 type ScreenProps = { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void };
 type Entries<T extends string> = [T, string][];
@@ -515,6 +517,15 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         {f.c_parents === "not_aware" && (
           <div className="rounded-xl p-3 text-sm my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
             ההורים טרם יודעו: כל הפניה לוועדה או לגורם חוץ מותנית ביידוע ובהסכמת ההורים (בהורים פרודים - שני ההורים).
+          </div>
+        )}
+        {tracks.length > 0 && (
+          <div className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
+            <TrackFlow tracks={tracks} />
+            <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
+              <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
+              <TrackTimeline tracks={tracks} today={today} />
+            </div>
           </div>
         )}
         <div className="space-y-3 mt-3">{tracks.map(t => <TrackCard key={t.key} t={t} />)}</div>
