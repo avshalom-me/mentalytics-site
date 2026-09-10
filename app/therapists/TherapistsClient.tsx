@@ -7,6 +7,7 @@ import { therapistPath } from "@/app/lib/therapist-url";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
+import QuizCta from "./QuizCta";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
@@ -429,6 +430,14 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
           </p>
         )}
       </div>
+
+      {/* The paragraph above says "מלאו שאלון מקצועי" and, until 10/9/2026,
+          there was nothing on the page to click: the only button in the header
+          is "לאנשי מקצוע", which is for therapists. The directory took 49
+          organic entries in 90 days, all of them patients reading an
+          instruction they could not follow. Both buttons here on purpose - the
+          directory is the one page that genuinely lands both audiences. */}
+      <QuizCta body="ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות." />
 
       {/* Filters */}
       <div className="mb-7 flex flex-wrap items-center gap-3 p-4 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>

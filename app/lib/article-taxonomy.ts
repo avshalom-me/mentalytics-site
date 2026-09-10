@@ -399,3 +399,23 @@ export function editorialBySection(slug: string): EditorialArticle[] {
  * noindex and stays out of the sitemap.
  */
 export const MIN_ARTICLES_FOR_SECTION_INDEX = 3;
+
+/**
+ * Which questionnaire a piece of content should offer, from its topic.
+ *
+ * The site has two questionnaires and they are not interchangeable: /adults
+ * asks the visitor about themselves, /kids asks a parent about their child.
+ * Sending a parent into the adults flow was measured once already - 22 of the
+ * 50 questionnaire sessions from the kids ad campaign went in that way - which
+ * is why QuizCta exists at all.
+ *
+ * Topics are the therapist-facing vocabulary from the article form, so this
+ * maps them rather than guessing from the title. Anything unrecognised lands
+ * "both" and gets two buttons, which is never wrong, only less pointed.
+ */
+export function quizAudienceForTopic(topic: string | null | undefined): "youth" | "adults" | "both" {
+  const t = (topic ?? "").trim();
+  if (t === "הורות" || t === "טיפול בילדים ונוער") return "youth";
+  if (t === "טיפול במבוגרים") return "adults";
+  return "both";
+}

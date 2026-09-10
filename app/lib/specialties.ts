@@ -6,6 +6,22 @@ import { TRAINING_AREAS } from "./therapist-options";
 // Thin-page protection mirrors the city pages: <MIN_LISTED_FOR_INDEX listed →
 // noindex + out of the sitemap.
 
+/**
+ * Specialties a parent, not a patient, searches for.
+ *
+ * The specialty page offered a single button to /adults regardless, so someone
+ * who searched "הדרכת הורים" - by definition a parent asking about their child
+ * - was sent into the questionnaire that asks about themselves. Only the
+ * unambiguous ones are listed: everything absent gets both buttons, which is
+ * never wrong. "טיפול משפחתי" is deliberately absent, since adults seek family
+ * therapy for themselves as often as parents seek it for a child.
+ */
+const PARENT_FACING_SPECIALTIES = ["הדרכת הורים", "טיפול דיאדי", "טיפול באנקופרזיס"];
+
+export function specialtyQuizAudience(specialty: string): "youth" | "both" {
+  return PARENT_FACING_SPECIALTIES.includes(specialty) ? "youth" : "both";
+}
+
 export const SPECIALTY_LIST: readonly string[] = TRAINING_AREAS;
 
 export function specialtyToSlug(s: string): string {

@@ -8,6 +8,7 @@ import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { introPlusOffer } from "@/app/lib/meta-description";
+import QuizCta from "@/app/therapists/QuizCta";
 
 // Funding-route landing pages. See app/lib/arrangements.ts for why this family
 // exists and why it carries editorial content rather than only a filtered list.
@@ -95,6 +96,13 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
           {`${a.searchTitle}: עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ושציינו שהם עובדים מול ${a.name} ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם. בחינם וללא התחייבות.`}
         </p>
       </div>
+
+      {/* The paragraph above offers the questionnaire; until 10/9/2026 the only
+          link to it on this page sat inside the empty state, which a visitor
+          sees precisely when there is no list. 24 organic entries in 90 days
+          arrived here and could not reach it. Both audiences: a funding route
+          is a question a parent asks as readily as an adult. */}
+      <QuizCta body="ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות." />
 
       <div className="mb-8 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
