@@ -35,9 +35,15 @@ const CONTENT_H = PAGE_H - HEAD_H - FOOT_H;
 
 // A document palette: ink on paper, one restrained accent. The screen report is
 // colour-coded because a parent scans it; this one is read like a file note.
-const INK = "#15201f";
-const INK_2 = "#3b4a48";
-const INK_3 = "#6b807e";
+//
+// Darker than the screen's own greys on purpose. html2canvas paints without
+// subpixel antialiasing and jsPDF then fits the bitmap to the sheet, and both
+// steps thin a stroke; a body grey that reads as quiet on a backlit screen
+// comes out of a printer looking faded. Body text is 500 for the same reason -
+// Heebo 400 at 13.5px survives neither step with its weight intact.
+const INK = "#101a19";
+const INK_2 = "#1f2b2a";
+const INK_3 = "#4f6260";
 const RULE = "#d3dedd";
 const ACCENT = "#2A6462";
 const PAPER = "#ffffff";
@@ -69,7 +75,7 @@ const PAD = "10px";
 
 function paragraph(text: string, style: Style = {}): HTMLElement {
   return el("div", {
-    font: `400 13.5px/1.75 ${FONT}`, color: INK_2, paddingBottom: PAD,
+    font: `500 13.5px/1.75 ${FONT}`, color: INK_2, paddingBottom: PAD,
     textAlign: "justify", ...style,
   }, text);
 }
@@ -81,7 +87,7 @@ function bullet(text: string, opts: { marker?: string; color?: string; bold?: bo
     font: `700 12px/1.75 ${FONT}`, color: opts.color ?? ACCENT, flex: "0 0 auto", minWidth: "14px",
   }, opts.marker ?? "•"));
   row.appendChild(el("div", {
-    font: `${opts.bold ? 600 : 400} 13.5px/1.75 ${FONT}`, color: opts.color ?? INK_2, flex: "1 1 auto",
+    font: `${opts.bold ? 700 : 500} 13.5px/1.75 ${FONT}`, color: opts.color ?? INK_2, flex: "1 1 auto",
   }, text));
   return row;
 }
@@ -113,7 +119,7 @@ function sectionHeading(n: number, text: string): Block {
 function titleBlocks(doc: SchoolSummary["doc"]): Block[] {
   const wrap = el("div", { paddingBottom: "18px" });
   wrap.appendChild(el("div", { font: `800 25px/1.35 ${FONT}`, color: INK, paddingBottom: "6px" }, doc.head));
-  wrap.appendChild(el("div", { font: `400 12.5px/1.7 ${FONT}`, color: INK_3 }, doc.meta));
+  wrap.appendChild(el("div", { font: `500 12.5px/1.7 ${FONT}`, color: INK_3 }, doc.meta));
   wrap.appendChild(el("div", { height: "2px", background: ACCENT, width: "72px", marginTop: "12px" }));
   return [{ node: wrap, keepWithNext: true }];
 }
@@ -131,7 +137,7 @@ function summaryBlocks(doc: SchoolSummary["doc"]): Block[] {
 function footBlocks(foot: string): Block[] {
   const wrap = el("div", { paddingTop: "8px" });
   wrap.appendChild(el("div", { height: "1px", background: RULE, marginBottom: "10px" }));
-  wrap.appendChild(el("div", { font: `400 11.5px/1.7 ${FONT}`, color: INK_3, textAlign: "justify" }, foot));
+  wrap.appendChild(el("div", { font: `500 11.5px/1.7 ${FONT}`, color: INK_3, textAlign: "justify" }, foot));
   return [{ node: wrap }];
 }
 
@@ -173,7 +179,7 @@ function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => 
     if (t.deadline) {
       const d = el("div", { padding: "7px 0 6px" });
       d.appendChild(el("div", { font: `700 13px/1.6 ${FONT}`, color: INK }, `מועד: ${t.deadline.label}`));
-      if (t.deadline.note) d.appendChild(el("div", { font: `400 12px/1.65 ${FONT}`, color: INK_3, paddingTop: "2px" }, t.deadline.note));
+      if (t.deadline.note) d.appendChild(el("div", { font: `500 12px/1.65 ${FONT}`, color: INK_3, paddingTop: "2px" }, t.deadline.note));
       out.push({ node: d });
     }
     for (const c of t.cautions) out.push({ node: bullet(c, { marker: "!", color: "#A83B22" }) });
@@ -190,7 +196,7 @@ function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => 
       out.push({ node: subHeading("ערר"), keepWithNext: true });
       t.appeals.forEach(a => out.push({ node: bullet(`על ${a.against}: ${a.window}, אל ${a.to}`) }));
     }
-    out.push({ node: paragraph(`אומת מול: ${t.verified}`, { font: `400 11px/1.6 ${FONT}`, color: INK_3, paddingBottom: "22px" }) });
+    out.push({ node: paragraph(`אומת מול: ${t.verified}`, { font: `500 11px/1.6 ${FONT}`, color: INK_3, paddingBottom: "22px" }) });
   }
   return out;
 }
@@ -222,7 +228,7 @@ function toolBlocks(groups: ToolGroup[]): Block[] {
   out.push({
     node: paragraph(
       "הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם בבית הספר או בבית בזמן ההמתנה.",
-      { color: INK_3, font: `400 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
+      { color: INK_3, font: `500 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
     ),
   });
   for (const g of groups) {
@@ -260,7 +266,7 @@ function newPage(logoSrc: string): HTMLElement {
   logo.alt = "טיפול חכם";
   Object.assign(logo.style, { height: "30px", width: "auto", display: "block" });
   head.appendChild(logo);
-  head.appendChild(el("div", { font: `600 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "start" }, PDF_DISCLAIMER));
+  head.appendChild(el("div", { font: `700 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "start" }, PDF_DISCLAIMER));
   page.appendChild(head);
   page.appendChild(el("div", {
     position: "absolute", top: `${HEAD_H - 14}px`, insetInlineStart: `${MARGIN_X}px`,
@@ -285,7 +291,7 @@ function stampFooter(page: HTMLElement, n: number, total: number, todayLabel: st
   const foot = el("div", {
     position: "absolute", bottom: "16px", insetInlineStart: `${MARGIN_X}px`, width: `${CONTENT_W}px`,
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    font: `400 10.5px/1.4 ${FONT}`, color: INK_3,
+    font: `500 10.5px/1.4 ${FONT}`, color: INK_3,
   });
   foot.appendChild(el("span", {}, `טיפול חכם · ${todayLabel}`));
   foot.appendChild(el("span", { fontWeight: "700" }, `עמוד ${n} מתוך ${total}`));
@@ -325,8 +331,9 @@ export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<vo
     blocks.push({
       node: paragraph(
         "המסלולים והמועדים מחושבים מכללי חוזרי המנכ\"ל ומן החוק, לפי הכיתה ולפי מה שנמסר על התיק. השיפוט הקליני - מה מצדיק הפניה ובאיזו דחיפות - נשאר בידי הצוות.",
-        { color: INK_3, font: `400 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
+        { color: INK_3, font: `500 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
       ),
+      keepWithNext: true,
     });
     blocks.push(...graphBlocks(input.graphsEl));
     blocks.push(...trackBlocks(input.tracks, input.relevanceLabel));
@@ -383,8 +390,14 @@ export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<vo
         h = h * k;
       }
 
+      // Follow the whole keep-with-next chain, not just one link: the map's
+      // heading holds its opening paragraph, which holds the diagram, and
+      // measuring only the first pair left the heading alone at the foot of a
+      // page with a third of it blank. Capped at a page, so a chain longer
+      // than one sheet asks for a break it cannot be given.
       let need = h + topGap;
-      if (b.keepWithNext && i + 1 < blocks.length) need += heights[i + 1];
+      for (let j = i; blocks[j]?.keepWithNext && j + 1 < blocks.length; j++) need += heights[j + 1];
+      need = Math.min(need, CONTENT_H);
       const mostlyEmpty = CONTENT_H - y > CONTENT_H * 0.45;
       if (y > 0 && ((b.breakBefore && !mostlyEmpty) || y + need > CONTENT_H)) { open(); topGap = 0; }
       if (topGap) b.node.style.paddingTop = `${topGap}px`;
@@ -418,11 +431,15 @@ async function renderPdf(pages: HTMLElement[], filename: string): Promise<void> 
   ]);
   const pdf = new jsPDFMod.jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   for (let i = 0; i < pages.length; i++) {
-    // scale 2 puts a 794px page at ~190dpi: sharp in print, and a report of a
-    // dozen pages still lands under a few MB.
-    const canvas = await html2canvas(pages[i], { scale: 2, backgroundColor: PAPER, useCORS: true, logging: false });
+    // scale 3 puts a 794px page at ~285dpi. Two was enough to read on a screen
+    // and left the letters looking washed out on paper: JPEG spends its budget
+    // on the edges of glyphs, and at 190dpi a Hebrew stroke is thin enough that
+    // it loses. Quality then comes down, not up: on a page that is mostly white,
+    // JPEG spends far less on 285dpi at 0.86 than on 190dpi at 0.95, and the
+    // strokes come out heavier either way.
+    const canvas = await html2canvas(pages[i], { scale: 3, backgroundColor: PAPER, useCORS: true, logging: false });
     if (i > 0) pdf.addPage();
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, 210, 297);
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.86), "JPEG", 0, 0, 210, 297);
   }
   const blob = pdf.output("blob");
   const url = URL.createObjectURL(blob);
