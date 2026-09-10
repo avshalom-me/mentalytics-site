@@ -15,10 +15,11 @@ type Props = {
   body: string;
   /**
    * "youth" - the page is written for parents, so it opens the kids
-   * questionnaire alone. Anything else lands both audiences, and gets both
-   * buttons rather than a guess.
+   * questionnaire alone. "adults" is the mirror image, for a page no parent
+   * lands on (a career assessment, say). Anything else lands both audiences,
+   * and gets both buttons rather than a guess.
    */
-  audience?: "both" | "youth";
+  audience?: "both" | "youth" | "adults";
 };
 
 const SHELL =
@@ -29,6 +30,7 @@ const BUTTON_STYLE = { borderRadius: "50px", padding: "13px 30px", fontSize: "15
 
 export default function QuizCta({ body, audience = "both" }: Props) {
   const youth = audience === "youth";
+  const adultsOnly = audience === "adults";
   return (
     <div className={SHELL} style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
       <div>
@@ -44,6 +46,10 @@ export default function QuizCta({ body, audience = "both" }: Props) {
         {youth ? (
           <Link href="/kids" className={BUTTON} style={{ ...BUTTON_STYLE, background: "var(--teal)", color: "#fff" }}>
             למילוי שאלון הילדים
+          </Link>
+        ) : adultsOnly ? (
+          <Link href="/adults" className={BUTTON} style={{ ...BUTTON_STYLE, background: "var(--teal)", color: "#fff" }}>
+            למילוי השאלון
           </Link>
         ) : (
           <>
