@@ -10,7 +10,12 @@ import { UserPlus, Loader2, ShieldCheck } from "lucide-react";
 
 type Member = { user_id: string; email: string | null; created_at: string; is_primary: boolean; is_me: boolean };
 
-export default function MembersPanel({ initial }: { initial: Member[] }) {
+// readOnly: הצפייה מהאדמין ("צפייה בתור מרכז"). אין שם סשן של המרכז, ולכן
+// כל פעולה הייתה נכשלת ב-401 וזורקת את האדמין ל-/centers/login. הפאנל היה
+// מוסתר שם לגמרי, וזה בדיוק מה שהכשיל את התמיכה: מנהלת של מרכז אמרה שאין
+// מקום להזין מייל, ומהאדמין אי אפשר היה לראות מה היא רואה כדי להפריך. עכשיו
+// הרשימה מוצגת בלי הטופס ובלי כפתורי ההסרה.
+export default function MembersPanel({ initial, readOnly = false }: { initial: Member[]; readOnly?: boolean }) {
   const [members, setMembers] = useState<Member[]>(initial);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -66,7 +71,7 @@ export default function MembersPanel({ initial }: { initial: Member[] }) {
                 <span className="ms-2 rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-bold text-teal-700">חשבון ראשי</span>
               )}
             </div>
-            {!m.is_primary && (
+            {!m.is_primary && !readOnly && (
               <button
                 type="button"
                 disabled={busy}
@@ -80,6 +85,11 @@ export default function MembersPanel({ initial }: { initial: Member[] }) {
         ))}
       </ul>
 
+      {readOnly ? (
+        <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-4 py-2.5 text-xs text-stone-500">
+          בצפייה מהאדמין הטופס מוסתר. המרכז עצמו רואה כאן שדה מייל וכפתור &quot;הוספה לצוות&quot;.
+        </p>
+      ) : (
       <form
         className="flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => { e.preventDefault(); if (email.trim()) call("POST", { email: email.trim() }); }}
@@ -101,6 +111,7 @@ export default function MembersPanel({ initial }: { initial: Member[] }) {
           הוספה לצוות
         </button>
       </form>
+      )}
 
       {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
       {msg && <p className="mt-2 text-sm text-teal-700">{msg}</p>}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
 
 // עורך העמוד הציבורי של המרכז - קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
@@ -272,8 +273,11 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
       </div>
 
       {/* צוות / ראשי המרכז */}
-      <label className="mb-1 block text-sm font-semibold text-stone-700">הצוות המוביל / ראשי המרכז</label>
-      <p className="mb-2 text-xs text-stone-500">אנשי המקצוע הבכירים שיוצגו בעמוד - שם, תפקיד ותמונה.</p>
+      <label className="mb-1 block text-sm font-semibold text-stone-700">הצוות המוביל / ראשי המרכז (לתצוגה בעמוד הציבורי)</label>
+      <p className="mb-2 text-xs text-stone-500">
+        אנשי המקצוע הבכירים שיוצגו בעמוד - שם, תפקיד ותמונה. זו רשימת תצוגה בלבד ואינה מעניקה גישה:
+        להוספת מנהל/ת שיוכל/תוכל להיכנס ולערוך, חזרו ל<Link href="/centers/dashboard" className="font-semibold text-[var(--teal-dark)] underline">דשבורד</Link> אל &quot;צוות הניהול&quot;.
+      </p>
       <div className="mb-2 space-y-2">
         {team.map((m, i) => (
           <div key={i} className="flex flex-wrap items-center gap-2 rounded-xl border border-stone-200 bg-white p-2.5">
