@@ -357,22 +357,24 @@ describe("clinical layer", () => {
     for (const r of CLINICAL_RULES) if (r.status === "approved") expect(r.reviewedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("ignores draft rules at runtime", () => {
-    // Suicidality and the learning-findings promotion are both still drafts, so
-    // neither shows up; school refusal is left out here because its rule is not.
-    const input = base({ grade: "ז", risk: { suicidality: true }, findings: { assessmentKeys: ["פסיכו-דידקטי"], treatmentKeys: [], externalKeys: [] } });
+  it("leaves the map mechanical when no rule fires", () => {
+    const input = base({ grade: "ז", findings: { assessmentKeys: ["פסיכו-דידקטי"], treatmentKeys: [], externalKeys: [] } });
     expect(mapSchoolTracks(input)).toEqual(mechanicalTracks(input));
   });
 
-  it("applies a rule once it is approved", () => {
-    const input = base({ grade: "ז", risk: { suicidality: true } });
-    const rule = CLINICAL_RULES.find(r => r.id === "risk.suicidality")!;
-    const out = mapSchoolTracks(input, [{ ...rule, status: "approved", reviewedOn: "2026-09-02" }]);
-    expect(out[0].key).toBe("risk_protocol");
-    expect(out[0].relevance).toBe("primary");
+  it("raises accommodations early on a learning finding, but only where the track exists", () => {
+    const findings = { assessmentKeys: ["פסיכו-דידקטי"], treatmentKeys: [], externalKeys: [] };
+    const byGrade = (grade: "ז" | "ח" | "ט") =>
+      mapSchoolTracks(base({ grade, findings })).find(t => t.key === "hatamot");
+    expect(byGrade("ח")?.relevance).toBe("consider");
+    expect(byGrade("ט")?.relevance).toBe("consider");
+    expect(byGrade("ז")).toBeUndefined();
+    // Without the findings it stays background.
+    expect(mapSchoolTracks(base({ grade: "ח" })).find(t => t.key === "hatamot")?.relevance).toBe("info");
   });
 
   it("publishes its open questions", () => {
-    expect(PENDING_CLINICAL_DECISIONS.length).toBeGreaterThanOrEqual(5);
+    expect(PENDING_CLINICAL_DECISIONS.length).toBeGreaterThan(0);
+    for (const q of PENDING_CLINICAL_DECISIONS) expect(q.length).toBeGreaterThan(10);
   });
 });

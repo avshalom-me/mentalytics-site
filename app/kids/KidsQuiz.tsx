@@ -35,7 +35,7 @@ import {
   type Ans, type PageId, type KidsScoreResult,
 } from "./quiz-logic";
 import {
-  PageConsentCounselor, PageDemoCounselor, PageRefine, CounselorAddendum, CounselorSafetyNotice, UnknownNotice,
+  PageConsentCounselor, PageDemoCounselor, PageRefine, PageDocs, CounselorAddendum, CounselorSafetyNotice, UnknownNotice,
   CounselorQ1Block, CounselorAcadBlock, CounselorBehBlock, CounselorSocBlock,
   readDrafts, subscribeDrafts, upsertDraft, removeDraft, NO_DRAFTS, type Draft,
 } from "./counselor";
@@ -3853,7 +3853,43 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     } catch {}
   }, [step, A, kidsScore]);
 
+  /**
+   * The scored findings travel inside the answers.
+   *
+   * p-docs asks which documents matter, and that depends on what the scoring
+   * found - but the routing rules are pure functions of the answers and the
+   * summary builder takes the answers alone. So the two facts the counsellor
+   * layer needs out of the score are written back into them, exactly as the
+   * audience flag is.
+   */
   useEffect(() => {
+    if (audience !== "counselor" || !kidsScore) return;
+    const parsed = (["emotional", "academic", "developmental", "behavioral", "social"] as const)
+      .map(key => ({ key, result: parseKidsBoxes(kidsScore[key], key) }));
+    const found = parsed
+      .filter(d => d.result.groups.some(g => g.treatmentKey !== "_no_action" && g.treatmentKey !== "יועצת בית ספר"))
+      .map(d => d.key as string);
+    const agg = aggregateForMatch(parsed.map(d => d.result));
+    // The engine calls them professionals; the tracks input calls the same
+    // referrals external. Same list, two vocabularies.
+    const keys = { assessmentKeys: agg.assessmentKeys, treatmentKeys: agg.treatmentKeys, externalKeys: agg.professionalKeys };
+    setA(prev => {
+      if (JSON.stringify(prev._found) === JSON.stringify(found) && JSON.stringify(prev._findingKeys) === JSON.stringify(keys)) return prev;
+      return { ...prev, _found: found, _findingKeys: keys };
+    });
+  }, [kidsScore, audience]);
+
+  useEffect(() => {
+    // A counsellor's questionnaire is scored one screen early: p-docs asks what
+    // is in the file, and which documents are worth asking about depends on
+    // what was found. Her rubric is free, so nothing is spent by running the
+    // scoring a screen sooner - and the report then opens without a wait.
+    if (audience === "counselor") {
+      const i = PAGES.indexOf(step as PageId);
+      // Stepping back into the questionnaire invalidates what was computed from it.
+      if (i >= 0 && i < PAGES.indexOf("p-refine") && kidsScore) { setKidsScore(null); return; }
+      if (step === "p-refine" && !kidsScore) { fetchScore(A); return; }
+    }
     if (step === "p-result") {
       // trackQuizComplete already reports quiz_complete to GA4 - the inline
       // "quiz_completed" duplicate (a second GA4 name for the same action) is gone.
@@ -3870,7 +3906,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
         age_band: "child",
         gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
       });
-      fetchScore(A);
+      if (!kidsScore) fetchScore(A);
     }
   }, [step]);
 
@@ -4090,6 +4126,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-soc"          && <PageSoc        {...pageProps} />}
       {step === "p-traits"       && <PageTraits     {...pageProps} />}
       {step === "p-refine"       && <PageRefine     {...pageProps} />}
+      {step === "p-docs"         && <PageDocs       {...pageProps} />}
 
       {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
     </main>

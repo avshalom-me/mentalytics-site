@@ -327,12 +327,26 @@ export interface RouteState {
  * refinement screen, which runs before scoring, asks exactly the questions the
  * report will use.
  */
+/**
+ * Did the emotional rubric actually produce a referral?
+ *
+ * Read from the scoring where it is available - KidsQuiz writes the domains
+ * that produced findings into _found once the questionnaire is scored, which
+ * is why p-docs sits after the scoring rather than before it. The area flag is
+ * the fallback for the one moment the score is not in yet.
+ */
+const emotionalFinding = (A: Ans): boolean =>
+  Array.isArray(A._found) ? A._found.includes("emotional") : areaOn(A.a_emo, "הרבה");
+
 export function eligibilityRoutes(A: Ans): RouteState {
   const candidates: EligibilityDirection[] = [];
-  if (areaOn(A.a_emo, "הרבה")) candidates.push("emotional");
+  if (emotionalFinding(A)) candidates.push("emotional");
   // Not gated on the area level: suicidality and psychotic features are the
   // finding whatever was ticked on the opening screen.
   if (areaOn(A.a_emo) && psychiatricSeverity(A)) candidates.push("psychiatric");
+  // Nothing to add for the learning route: its rule is the ladder and the
+  // profile, both of which are the counsellor's own answers rather than the
+  // engine's reading of them.
   if (academicOn(A) && acaExhaustionAdequate(A) && acaProfileQualifies(A)) candidates.push("learning");
   if (!candidates.length) return { live: [], pending: [], missing: [] };
   const missing = missingAttempts(A, candidates);
@@ -434,6 +448,9 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
     hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
+    // What the scoring recommended, in its own keys. Written into the answers
+    // by KidsQuiz when the score arrives; absent until then.
+    findings: A._findingKeys,
     directions: routes.live,
     pendingDirections: routes.pending,
     exhaustionNote: routes.missing.length ? exhaustionMessage(routes.missing) : undefined,

@@ -365,44 +365,34 @@ export function CounselorSafetyNotice() {
   );
 }
 
-// ── p-refine: right before the report ────────────────────────────────────────
+// ── p-refine: what the school did, before anything is computed ───────────────
+/**
+ * The two closing screens are split by the scoring, not by length.
+ *
+ * What the school already tried is an input to the computation - it decides
+ * whether a committee route opens at all - so it is asked here, before. What
+ * the file holds is only worth asking about once there is a finding for a
+ * document to answer, so it is asked on p-docs, after. Both used to sit on
+ * this one screen, ahead of the score, and the documents question had to guess
+ * from the raw answers which route the report would end up naming.
+ */
 export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
   const f = A as CounselorFields; const set = setField(A, setA);
-  const thisYear = Number(israelToday().slice(0, 4));
-  const years = Array.from({ length: 15 }, (_, i) => thisYear - i);
-  const diagnoses = f.c_diag ?? [];
   const tried = f.c_tried ?? {};
-  const [adding, setAdding] = useState<{ kind?: DiagnosisKind; year?: number; signedBy?: string }>({});
-  const add = () => {
-    if (!adding.kind || !adding.year) return;
-    const d: Diagnosis = { kind: adding.kind, year: adding.year };
-    if (adding.signedBy) d.signedBy = adding.signedBy as Diagnosis["signedBy"];
-    set("c_diag", [...diagnoses, d]);
-    setAdding({});
-  };
   const toggleTried = (k: keyof typeof tried) => {
     const next = { ...tried };
     if (next[k]) delete next[k]; else next[k] = "partial";
     set("c_tried", next);
   };
-  // What the questionnaire's own rubrics opened, computed from the answers
-  // rather than from the scoring, which has not run yet. A social or a
-  // behavioural finding opens nothing, and then this screen says nothing about
-  // committees and asks for no documents - there would be no committee for the
-  // documents to be checked against.
   const routes = eligibilityRoutes(A);
-  const directions = routes.live;
-  const onRoute = directions.length > 0;
-  const showHatamot = !!f._grade && hatamotApplies(f._grade);
-  const missing = [f.c_fill, f.c_parents, f.c_team, ...(onRoute ? [f.c_zakaut] : []), ...(showHatamot ? [f.c_hatamot] : [])].filter(x => !x).length;
-  const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
+  const missing = [f.c_fill, f.c_parents, f.c_team].filter(x => !x).length;
 
   return (
     <div>
       <Card>
-        <StepTag>לפני הדוח</StepTag>
-        <StepQ>כמה שאלות שמדייקות את ההפניה</StepQ>
-        <StepHint>מה כבר נוסה, מה כבר יש בתיק, ומי היה שותף למילוי. מכאן המנוע מחשב מה תקף, מה חסר ומה המועד הקרוב.</StepHint>
+        <StepTag>לפני החישוב</StepTag>
+        <StepQ>מה כבר נעשה בבית הספר</StepQ>
+        <StepHint>מי היה שותף למילוי, ומה כבר נוסה. אחרי המסך הזה השאלון מחושב, ורק לפי התוצאה נשאל מה קיים בתיק.</StepHint>
 
         <Box title="המילוי">
           <Q label="איך מולא השאלון"><Choice value={f.c_fill} options={entries(FILL_MODE_LABELS)} onChange={v => set("c_fill", v)} /></Q>
@@ -410,9 +400,7 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
         </Box>
 
         <Box title="מה כבר נוסה בבית הספר">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>
-            סמני מה נוסה; לכל מה שסומן - מה קרה.{onRoute && " זה בדיוק מה שוועדת זכאות מבקשת כ\"סיכום התערבויות\"."}
-          </p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>סמני מה נוסה; לכל מה שסומן - מה קרה. זהו &quot;סיכום ההתערבויות&quot;, והוא גם מה שקובע אם ייפתח דיון על ועדה.</p>
           <div className="flex flex-wrap gap-2">
             {INTERVENTIONS.map(it => (
               <button key={it.key} type="button" className={ob(!!tried[it.key])} onClick={() => toggleTried(it.key)}>{it.label}</button>
@@ -425,31 +413,71 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           ))}
         </Box>
 
-        {/* The route is live: the findings point somewhere and the school has
-            already tried something. Now, and only now, the file is worth
-            checking against it. */}
-        {onRoute && (
-          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
-            המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
-            <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-              הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו")}. השאלות הבאות בודקות אם המסמכים שבתיק תואמים לו.
-            </div>
-            {directions.includes("psychiatric") && (
-              <div className="text-xs mt-1 font-semibold" style={{ color: "var(--gold-dark)" }}>{PSYCHIATRIC_NOTE}</div>
-            )}
-          </div>
-        )}
-
-        {/* The findings point somewhere the file cannot follow yet. Said here
-            rather than only on the report, because this is the screen where the
-            missing attempts are ticked - the box opens as they are. */}
+        {/* The findings point somewhere the file cannot follow yet. Said on this
+            screen because this is where the missing attempts are ticked. */}
         {routes.pending.length > 0 && (
           <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
             {exhaustionMessage(routes.missing)}
           </div>
         )}
 
-        {onRoute && (
+        <Box title="בית הספר והמשפחה">
+          <Q label="צוות רב-מקצועי בית-ספרי"><Choice value={f.c_team} options={entries(TEAM_LABELS)} onChange={v => set("c_team", v)} /></Q>
+          <Q label="מגבלה כלכלית מוכרת במשפחה">
+            <Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} />
+            {/* The answer used to be a line in the summary and nothing else. */}
+            {f.c_economic === "yes" && (
+              <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>המלצות לאפשרויות ציבוריות יופיעו לפני פרטיות.</p>
+            )}
+          </Q>
+        </Box>
+      </Card>
+      {/* Nothing here blocks: what was not answered is simply left out of the summary and the map. */}
+      {missing > 0 && <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>אפשר להמשיך גם בלי לענות על הכל - מה שלא נענה לא ייכנס לסיכום ולמפה.</p>}
+      {/* _route is the decision skipPage cannot make: whether a committee route
+          is open depends on the scored findings and on the attempts above, and
+          the routing rules are pure functions of the answers. So it is computed
+          here, on the way out, and travels inside them. */}
+      <NavRow onBack={onBack} onNext={() => onNext({ ...A, _route: eligibilityRoutes(A).live.length > 0 })} nextLabel="לחישוב ←" />
+    </div>
+  );
+}
+
+// ── p-docs: what the file holds, once there is a finding to match it against ─
+export function PageDocs({ A, setA, onNext, onBack }: ScreenProps) {
+  const f = A as CounselorFields; const set = setField(A, setA);
+  const thisYear = Number(israelToday().slice(0, 4));
+  const years = Array.from({ length: 15 }, (_, i) => thisYear - i);
+  const diagnoses = f.c_diag ?? [];
+  const [adding, setAdding] = useState<{ kind?: DiagnosisKind; year?: number; signedBy?: string }>({});
+  const add = () => {
+    if (!adding.kind || !adding.year) return;
+    const d: Diagnosis = { kind: adding.kind, year: adding.year };
+    if (adding.signedBy) d.signedBy = adding.signedBy as Diagnosis["signedBy"];
+    set("c_diag", [...diagnoses, d]);
+    setAdding({});
+  };
+  const directions = eligibilityRoutes(A).live;
+  const showHatamot = !!f._grade && hatamotApplies(f._grade);
+  const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
+
+  return (
+    <div>
+      <Card>
+        <StepTag>אחרי החישוב</StepTag>
+        <StepQ>מה קיים בתיק</StepQ>
+        <StepHint>השאלון חושב, והכיוון שעלה ממנו קובע אילו מסמכים רלוונטיים. מה שיסומן כאן נבדק מול הגורמים שאבחנתם קבילה לאותו כיוון.</StepHint>
+
+        <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
+          המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
+          <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+            הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו")}.
+          </div>
+          {directions.includes("psychiatric") && (
+            <div className="text-xs mt-1 font-semibold" style={{ color: "var(--gold-dark)" }}>{PSYCHIATRIC_NOTE}</div>
+          )}
+        </div>
+
         <Box title="אבחונים וחוות דעת בתיק">
           {diagnoses.length > 0 && (
             <ul className="flex flex-col gap-2">
@@ -478,19 +506,13 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           <button type="button" onClick={add} disabled={!adding.kind || !adding.year} className={`${ob(false)} disabled:opacity-40`}>+ הוספה לתיק</button>
           <p className="text-xs" style={{ color: "var(--muted)" }}>החותם/ת קובע/ת אם המסמך קביל לוועדת זכאות: התוספת הראשונה לתיקון 11 מונה התמחות, לא רק מקצוע. אם לא ידוע, המפה תבקש לבדוק.</p>
         </Box>
-        )}
 
-        <Box title={onRoute || showHatamot ? "ועדות" : "הצוות הבית-ספרי"}>
-          <Q label="צוות רב-מקצועי בית-ספרי"><Choice value={f.c_team} options={entries(TEAM_LABELS)} onChange={v => set("c_team", v)} /></Q>
-          {onRoute && (
-            <>
-              <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
-              {f.c_zakaut === "decided" && (
-                <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
-                  <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
-                </Q>
-              )}
-            </>
+        <Box title="ועדות">
+          <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
+          {f.c_zakaut === "decided" && (
+            <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
+              <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
+            </Q>
           )}
           {/* Not a word about matriculation accommodations before ח'. */}
           {showHatamot && (
@@ -503,17 +525,8 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
               )}
             </>
           )}
-          <Q label="מגבלה כלכלית מוכרת במשפחה">
-            <Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} />
-            {/* The answer used to be a line in the summary and nothing else. */}
-            {f.c_economic === "yes" && (
-              <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>המלצות לאפשרויות ציבוריות יופיעו לפני פרטיות.</p>
-            )}
-          </Q>
         </Box>
       </Card>
-      {/* Nothing here blocks: what was not answered is simply left out of the summary and the map. */}
-      {missing > 0 && <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>אפשר להמשיך גם בלי לענות על הכל - מה שלא נענה לא ייכנס לסיכום ולמפה.</p>}
       <NavRow onBack={onBack} onNext={() => onNext(A)} nextLabel="לדוח ←" />
     </div>
   );

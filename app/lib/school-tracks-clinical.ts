@@ -41,31 +41,18 @@ function setRelevance(tracks: SchoolTrack[], key: SchoolTrack["key"], relevance:
 }
 
 /**
- * Proposals. Each one is a question for the joint session, phrased as code so
- * that approving it is a one-word change and the tests already cover it.
+ * The rules. Two are approved and run; anything added here starts as a draft
+ * and is listed, tested for shape, and ignored at runtime until it is read.
+ *
+ * Two proposals were removed on 10/9/2026 rather than approved. The suicidality
+ * protocol went because the safety notice on the questionnaire's own screen
+ * already does the work a map track would have done, and a second copy of it
+ * with placeholder steps was worse than none. The "interventions first" rule
+ * went because the attempts floor in school-report.ts replaced it outright: a
+ * committee is not named at all until one treatment attempt and one system
+ * intervention are recorded, which is stricter than demoting the track.
  */
 export const CLINICAL_RULES: ClinicalRule[] = [
-  {
-    id: "risk.suicidality",
-    status: "draft",
-    describe: "דיווח על מחשבות אובדניות מוסיף מסלול נוהל סיכון בעדיפות ראשונה - הניסוח ייכתב מול חוזר מנכ\"ל התנהגות אובדנית",
-    when: input => input.risk?.suicidality === true,
-    apply: tracks => [
-      {
-        key: "risk_protocol",
-        name: "נוהל סיכון - התנהגות אובדנית",
-        relevance: "primary",
-        why: ["דווח על מחשבות אובדניות"],
-        documents: [],
-        steps: ["[טיוטה - הצעדים ייכתבו יחד מול חוזר המנכ\"ל: יידוע פסיכולוג/ית ביה\"ס והמנהל/ת, אי-השארת התלמיד/ה לבד, תיעוד]"],
-        appeals: [],
-        cautions: ["טיוטה שטרם אושרה קלינית"],
-        officialLinks: [],
-        verified: "טרם",
-      },
-      ...tracks,
-    ],
-  },
   {
     id: "attendance.school_refusal",
     status: "approved",
@@ -96,18 +83,16 @@ export const CLINICAL_RULES: ClinicalRule[] = [
     ],
   },
   {
-    id: "zakaut.interventions_first",
-    status: "draft",
-    describe: "כשאף התערבות בית-ספרית לא נוסתה והצוות הרב-מקצועי לא התכנס, ועדת זכאות יורדת ל'מידע' גם אם קיימת אבחנה קבילה",
-    when: input => (input.interventionsTried ?? 0) === 0 && input.schoolTeam?.convened !== true,
-    apply: tracks => setRelevance(tracks, "zakaut", "info", "לפני ועדה: התערבות בבית הספר ודיון בצוות הרב-מקצועי - הוועדה מצפה לראות סיכום התערבויות"),
-  },
-  {
     id: "hatamot.learning_findings_promote",
-    status: "draft",
-    describe: "ממצאי למידה או קשב מהשאלון בכיתות ז'-ט' מעלים את מסלול ההתאמות ל'לשיקול' כבר עכשיו, כדי שהאבחון ייערך בזמן",
+    status: "approved",
+    reviewedOn: "2026-09-10",
+    describe: "ממצאי למידה או קשב מהשאלון בכיתות ח'-ט' מעלים את מסלול ההתאמות ל'לשיקול' כבר עכשיו, כדי שהאבחון ייערך בזמן",
+    // ז' is out because the track itself does not exist before ח' - see
+    // hatamotApplies. Reads input.findings, which toTracksInput fills from the
+    // scoring once the questionnaire has been scored; before that it is absent
+    // and the rule simply does not fire.
     when: input =>
-      ["ז", "ח", "ט"].includes(input.grade) &&
+      ["ח", "ט"].includes(input.grade) &&
       !!input.findings &&
       (input.findings.assessmentKeys.some(k => k === "פסיכו-דידקטי") ||
         input.findings.externalKeys.some(k => k === "נוירולוג קשב" || k === "הוראה מתקנת")),
@@ -120,14 +105,10 @@ export const CLINICAL_RULES: ClinicalRule[] = [
  * and none of them is technical.
  */
 export const PENDING_CLINICAL_DECISIONS: string[] = [
-  "אילו ממצאים מהשאלון מצדיקים הפניה לוועדת זכאות ואפיון, ובאיזו עוצמה - ואילו נשארים בטיפול בית-ספרי",
-  "מיפוי ממצאי השאלון למוגבלות המשוערת לפי התוספת הראשונה (הפרעות התנהגותיות ורגשיות, הפרעות נפשיות, לקות למידה, AD(H)D, ASD) - ולכן לאיזה אבחון קביל להפנות",
-  "מה נחשב 'התערבות שנוסתה מספיק' לפני הסלמה לוועדה: כמה זמן, אילו סוגי התערבות",
   "מדיניות תחומים במילוי-לבד: אילו דומיינים יועצת יכולה למלא בלי הורה, ואילו מסומנים 'לא הוערך'",
-  "נוסח נוהל הסיכון האובדני במצב בית-ספרי, מול חוזר מנכ\"ל התנהגות אובדנית",
   "נוסח תזכורת חובת הדיווח באינדיקציות לפגיעה",
-  "האם מגבלה כלכלית משנה את סדר המסלולים (ציבורי לפני פרטי) ואיך זה מנוסח",
   "מה מוצג ליועצת מתוך המלצות הטיפול של השאלון, ומה עובר להורים בלבד",
+  "האם קושי בהבנה אכן שקול לתחום שני בפרופיל הלימודי, או שרק רמת הקריאה נחשבת (COMP_COUNTS ב-school-report.ts)",
 ];
 
 /** Rules the engine will actually apply. */

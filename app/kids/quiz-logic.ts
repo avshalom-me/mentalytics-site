@@ -103,9 +103,17 @@ export const PAGES = [
   "p-beh",
   "p-soc",
   "p-traits",
-  // The counsellor's closing screen - what was tried, what the file holds. Only
-  // ever shown when the answers carry _audience: "counselor"; see skipPage.
+  // The counsellor's closing screens. Only ever shown when the answers carry
+  // _audience: "counselor"; see skipPage.
+  //
+  // p-refine is what the school did, and it feeds the computation. p-docs is
+  // what the file holds, and it comes AFTER the questionnaire has been scored:
+  // the documents worth asking about are the ones that answer the finding, and
+  // until the scoring has run there is no finding to answer. It used to sit
+  // inside p-refine, before the score existed, and had to guess from the raw
+  // answers which route the report would end up naming.
   "p-refine",
+  "p-docs",
   "p-result",
 ] as const;
 export type PageId = (typeof PAGES)[number];
@@ -439,6 +447,12 @@ export function skipPage(pid: string, A: Ans): boolean {
   // see it, and the flag travels inside the answers so this stays a pure
   // function of A like every other rule here.
   if (pid === "p-refine") return A._audience !== "counselor";
+
+  // Same trick for the documents screen, one step further: whether a committee
+  // route is open depends on the scored findings and on what the school tried,
+  // and neither belongs in a pure routing rule. p-refine computes it on the way
+  // out and writes the answer here, exactly as the audience flag travels.
+  if (pid === "p-docs") return A._audience !== "counselor" || A._route !== true;
 
   return false;
 }
