@@ -8,11 +8,25 @@ import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { introPlusOffer } from "@/app/lib/meta-description";
+import QuizCta from "@/app/therapists/QuizCta";
 
 // Assessment landing pages. See app/lib/assessments.ts for why this family
 // exists and why each page carries editorial content rather than only a list.
 
 const BASE = "https://www.mentalytics.co.il";
+
+/**
+ * What the questionnaire actually promises on an assessment page.
+ *
+ * Not "we will find you an assessor" - the matching quiz routes to therapists,
+ * and that gap is why this family carried no questionnaire button at all until
+ * 10/9/2026. What it does do is decide whether an assessment is needed and
+ * which one: ASSESSMENT_PATTERNS in kids-recommendations.ts carries all seven
+ * values on this page's own list, "הערכת בשלות לגן" included. A parent who
+ * reaches "הערכת בשלות לגן" from search usually has not yet decided that their
+ * child needs one, so orientation is the honest offer and the useful one.
+ */
+const QUIZ_ORIENTATION = "ותקבלו כיוון - האם נדרש אבחון, איזה, ומה עוד יכול לעזור";
 
 export const revalidate = 300;
 
@@ -28,15 +42,20 @@ export async function generateMetadata({ params }: { params: Promise<{ type: str
   // Same thin-page gate as cities, specialties and topics: no page without real
   // supply behind it.
   const count = await countListed({ assessmentType: a.value });
-  // No quiz offer here on purpose - the matching quiz routes to therapists, not
-  // to diagnosticians, so promising it on an assessment page would mislead.
-  // What the page really does carry is intro / whoFor / performedBy, so the
-  // richest tier promises exactly those three.
-  const description = introPlusOffer(
-    a.intro,
-    "מאבחנים מוסמכים שתעודותיהם אומתו - מה האבחון בודק, מי מוסמך לבצע אותו ולמי הוא מתאים.",
-    "מאבחנים מוסמכים שתעודותיהם אומתו, לפנייה ישירה."
-  );
+  // A parent's page leads with the orientation offer rather than with the
+  // definition. Google was quoting the definition ("הערכה שבודקת אם הילד מוכן
+  // למסגרת הבאה..."), which tells a searcher what the assessment IS but never
+  // that we can help them decide whether their child needs one. Everyone else
+  // keeps the definition first: an adult searching "אבחון תעסוקתי" has already
+  // decided, and the intro is the better answer for them.
+  const description =
+    a.audience === "youth"
+      ? `${a.name}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ${QUIZ_ORIENTATION}, או עברו על רשימת המאבחנים שתעודותיהם אומתו.`
+      : introPlusOffer(
+          a.intro,
+          "מאבחנים מוסמכים שתעודותיהם אומתו - מה האבחון בודק, מי מוסמך לבצע אותו ולמי הוא מתאים.",
+          "מאבחנים מוסמכים שתעודותיהם אומתו, לפנייה ישירה."
+        );
   const robots = count < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   return {
     title: a.searchTitle,
@@ -95,13 +114,29 @@ export default async function AssessmentPage({ params }: { params: Promise<{ typ
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
           {a.searchTitle}
         </h1>
-        {/* Quotable intro - see city/[city]/[topic]. List first: on an
-            assessment page the assessor list is the primary offer, and the
-            questionnaire is orientation, not a route to an assessment. */}
+        {/* Quotable intro - see city/[city]/[topic]. Order depends on who
+            arrives: an adult searching "אבחון תעסוקתי" wants the assessor list,
+            while a parent searching "הערכת בשלות לגן" is usually still deciding
+            whether their child needs one at all, so the questionnaire comes
+            first for them. The clause Google quotes is identical either way. */}
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-          {`${a.name}: עברו על רשימת המאבחנים שתעודות ההכשרה שלהם אומתו ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים כדי להבין מה מתאים לכם. בחינם וללא התחייבות.`}
+          {a.audience === "youth"
+            ? `${a.name}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ${QUIZ_ORIENTATION}, או עברו על רשימת המאבחנים שתעודות ההכשרה שלהם אומתו ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`
+            : `${a.name}: עברו על רשימת המאבחנים שתעודות ההכשרה שלהם אומתו ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ${QUIZ_ORIENTATION}. בחינם וללא התחייבות.`}
         </p>
       </div>
+
+      {/* The questionnaire, routed to the audience that lands here. Above the
+          editorial half so a parent who is still deciding meets it before the
+          definition, and above the assessor list for the same reason. */}
+      <QuizCta
+        audience={a.audience}
+        body={
+          a.audience === "youth"
+            ? `ענו על שאלון קצר מבוסס מחקר - נזהה מה הילד/ה עובר/ת, ונאמר אם דרוש אבחון, איזה, ומה עוד יכול לעזור. השאלון אינו קובע תור לאבחון.`
+            : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, ונאמר אם דרוש אבחון, איזה, ומה עוד יכול לעזור. השאלון אינו קובע תור לאבחון.`
+        }
+      />
 
       {/* The editorial half - what the searcher actually asked. */}
       <div className="mb-8 grid gap-4 lg:grid-cols-3">
@@ -140,7 +175,12 @@ export default async function AssessmentPage({ params }: { params: Promise<{ typ
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מאבחנים מוצגים בסוג האבחון הזה. אפשר לעיין ב
           <Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא{" "}
-          <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
+          <Link
+            href={a.audience === "youth" ? "/kids" : "/adults"}
+            className="font-semibold text-[#2e7d8c] hover:underline"
+          >
+            {a.audience === "youth" ? "שאלון התאמה לילדים" : "שאלון התאמה"}
+          </Link>.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

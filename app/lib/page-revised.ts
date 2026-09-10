@@ -34,7 +34,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   // one revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
-    date: "2026-09-09",
+    date: "2026-09-10",
     sources: [
       "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
@@ -43,6 +43,8 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/therapists/topic/[topic]/page.tsx",
       "app/therapists/specialty/[specialty]/page.tsx",
       "app/therapists/assessment/[type]/page.tsx",
+      "app/lib/assessments.ts",
+      "app/therapists/QuizCta.tsx",
       "app/therapists/arrangement/[slug]/page.tsx",
       "app/therapists/online/[topic]/page.tsx",
       "app/therapists/online/page.tsx",
@@ -87,7 +89,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research/therapy-types": { date: "2026-08-03", sources: ["app/research/therapy-types/page.tsx"] },
   "/research/topic/[topic]": { date: "2026-09-03", sources: ["app/research/topic/[topic]/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/which-therapy": { date: "2026-08-03", sources: ["app/research/which-therapy/page.tsx"] },
-  "/about": { date: "2026-08-20", sources: ["app/about/page.tsx"] },
+  "/about": { date: "2026-09-10", sources: ["app/about/page.tsx"] },
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-08-06", sources: ["app/developers/page.tsx"] },

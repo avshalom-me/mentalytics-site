@@ -103,7 +103,7 @@ const aboutLd = {
 export default function AboutPage() {
   return (
     <main
-      className="mx-auto max-w-5xl px-5 pb-20"
+      className="about-scale mx-auto max-w-5xl px-5 pb-20"
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
@@ -113,6 +113,15 @@ export default function AboutPage() {
       />
       <PageViewTracker page="about" source="about" />
       <style>{`
+        /* גודל הדף כולו נגזר ממשתנה אחד: 10% בנייד, 30% במחשב (בקשת הבעלים,
+           10/9/2026). הכל כאן מוכפל ב-var(--s) - גם גדלי הגופן וגם התמונות -
+           כדי ששני היחסים יישבו במקום אחד ולא יתפזרו על פני שלושים ערכים.
+           הריווח, הפדינג והרדיוסים לא גדלים: התבקשו גופנים ותמונות בלבד,
+           והגדלת המסגרת הייתה דוחפת את רשת שלושת הכרטיסים לגלישה.
+           גבהי שורה נכתבים כמספר חסר-יחידה כדי שיגדלו עם הגופן; leading-6
+           קבוע של Tailwind היה הופך טקסט גדול יותר לצפוף יותר. */
+        .about-scale { --s: 1.1; --story-pad: 26px 22px; }
+        @media (min-width: 768px) { .about-scale { --s: 1.3; --story-pad: 52px 56px; } }
 
         @keyframes fadeUp {
           from { opacity: 0; transform: translateY(22px); }
@@ -138,14 +147,16 @@ export default function AboutPage() {
           overflow: "hidden",
           background: "linear-gradient(160deg, #FDFAF6 0%, #F4F9F7 100%)",
           border: "1px solid var(--line)",
-          padding: "52px 56px",
+          // 56px קבוע בכל רוחב השאיר לטקסט 221 פיקסלים בנייד, כלומר 23 תווים
+          // לשורה, וההגדלה רק החמירה את זה. במחשב הריווח נשאר כשהיה.
+          padding: "var(--story-pad)",
         }}>
           {/* Decorative quote mark */}
           <div aria-hidden="true" style={{
             position: "absolute",
             top: "-12px",
             right: "24px",
-            fontSize: "200px",
+            fontSize: "calc(200px * var(--s))",
             lineHeight: 1,
             fontFamily: "Georgia, serif",
             color: "var(--teal)",
@@ -156,27 +167,27 @@ export default function AboutPage() {
           }}>״</div>
 
           {/* Eyebrow */}
-          <p style={{ fontSize: "11px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".2em", marginBottom: "28px" }}>
+          <p style={{ fontSize: "calc(11px * var(--s))", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".2em", marginBottom: "28px" }}>
             הסיפור שלנו
           </p>
 
           {/* Opening hook */}
-          <p style={{ fontSize: "20px", fontWeight: 800, color: "var(--text)", lineHeight: 1.8, marginBottom: "22px", maxWidth: "68ch" }}>
+          <p style={{ fontSize: "calc(20px * var(--s))", fontWeight: 800, color: "var(--text)", lineHeight: 1.8, marginBottom: "22px", maxWidth: "68ch" }}>
             הסיפור שלנו התחיל בערב אחד, כשקבוצה של פסיכולוגים וחוקרים ישבה סביב שולחן ושאלה שאלה פשוטה:{" "}
             <span style={{ color: "var(--teal)" }}>למה כל כך מורכב למצוא מטפל/ת?</span>
           </p>
 
           {/* Body */}
-          <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text-2)", maxWidth: "68ch", marginBottom: "28px" }}>
+          <p style={{ fontSize: "calc(17px * var(--s))", lineHeight: 2.0, color: "var(--text-2)", maxWidth: "68ch", marginBottom: "28px" }}>
             כולנו הכרנו מטפלים מצוינים וגם הפנינו אליהם, אבל שוב ושוב ראינו שלא תמיד נוצרת התאמה טובה. לפעמים סוג הטיפול לא היה המדויק ביותר עבור האדם שפנה, ולפעמים פשוט לא נוצר החיבור האנושי והאישי שכל כך חשוב להצלחת התהליך. פעמים רבות המטופל בכלל לא ידע מה הוא מחפש.
           </p>
 
           {/* Founding moment - gold side border */}
           <div style={{ borderInlineStart: "4px solid var(--gold)", paddingInlineStart: "22px" }}>
-            <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch" }}>
+            <p style={{ fontSize: "calc(17px * var(--s))", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch" }}>
               משם התחיל רעיון קטן, שהלך וגדל: האם אפשר להפוך את בחירת המטפל למקצועית יותר?
             </p>
-            <p style={{ fontSize: "17px", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch", marginTop: "12px" }}>
+            <p style={{ fontSize: "calc(17px * var(--s))", lineHeight: 2.0, color: "var(--text)", fontWeight: 500, maxWidth: "66ch", marginTop: "12px" }}>
               כך נולדה <strong style={{ color: "var(--teal)" }}>"טיפול חכם"</strong> - מערכת שנבנתה במשך מספר שנים, הנשענת על ידע מחקרי וקליני, ומסייעת להתאים בין מטפלים למטופלים לא רק לפי זמינות או המלצה מקרית, אלא לפי הצרכים, הבנת הקשיים, ההעדפות וסוג הטיפול המתאים ביותר לכל אדם.
             </p>
           </div>
@@ -194,8 +205,8 @@ export default function AboutPage() {
           alignItems: "center",
           gap: "16px",
         }}>
-          <img src="/icons/lightbulb.svg" alt="" width={28} height={28} style={{ flexShrink: 0, display: "block" }} />
-          <p style={{ fontSize: "16px", fontWeight: 600, color: "var(--teal-dark)", lineHeight: 1.7, margin: 0 }}>
+          <img src="/icons/lightbulb.svg" alt="" width={28} height={28} style={{ flexShrink: 0, display: "block", width: "calc(28px * var(--s))", height: "calc(28px * var(--s))" }} />
+          <p style={{ fontSize: "calc(16px * var(--s))", fontWeight: 600, color: "var(--teal-dark)", lineHeight: 1.7, margin: 0 }}>
             אנחנו לא מחליפים טיפול או אבחון מקצועי - אנחנו עוזרים לכם להגיע אליו במהירות ובמקצועיות
           </p>
         </div>
@@ -205,14 +216,14 @@ export default function AboutPage() {
       <section className="mt-14 fade-up fade-up-3">
         <div className="flex items-start gap-3 mb-6">
           <div
-            className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "var(--surface)", border: "1px solid var(--line)" }}
+            className="mt-1 flex flex-shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: "var(--surface)", border: "1px solid var(--line)", width: "calc(40px * var(--s))", height: "calc(40px * var(--s))" }}
           >
-            <img src="/icons/team.svg" alt="" width={24} height={24} style={{ display: "block" }} />
+            <img src="/icons/team.svg" alt="" width={24} height={24} style={{ display: "block", width: "calc(24px * var(--s))", height: "calc(24px * var(--s))" }} />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-stone-900">הצוות המקצועי המפתח</h2>
-            <p className="mt-1 text-stone-600">אנשי מקצוע מהתחום הקליני והאבחוני שמובילים את הפיתוח המקצועי.</p>
+            <h2 className="font-extrabold text-stone-900" style={{ fontSize: "calc(24px * var(--s))", lineHeight: 1.33 }}>הצוות המקצועי המפתח</h2>
+            <p className="mt-1 text-stone-600" style={{ fontSize: "calc(16px * var(--s))", lineHeight: 1.6 }}>אנשי מקצוע מהתחום הקליני והאבחוני שמובילים את הפיתוח המקצועי.</p>
           </div>
         </div>
 
@@ -227,13 +238,13 @@ export default function AboutPage() {
               }}
             >
               <div className="flex items-center gap-4">
-                <div className="relative h-16 w-16 overflow-hidden rounded-2xl flex-shrink-0"
-                  style={{ border: "2px solid var(--line)", background: "var(--surface)" }}>
+                <div className="relative overflow-hidden rounded-2xl flex-shrink-0"
+                  style={{ border: "2px solid var(--line)", background: "var(--surface)", width: "calc(64px * var(--s))", height: "calc(64px * var(--s))" }}>
                   <Image src={m.img} alt={m.name} fill className="object-cover" />
                 </div>
                 <div>
-                  <div className="text-base font-extrabold text-stone-900">{m.name}</div>
-                  <div className="mt-0.5 text-xs font-semibold" style={{ color: "#8B6A50" }}>
+                  <div className="font-extrabold text-stone-900" style={{ fontSize: "calc(16px * var(--s))", lineHeight: 1.4 }}>{m.name}</div>
+                  <div className="mt-0.5 font-semibold" style={{ color: "#8B6A50", fontSize: "calc(12px * var(--s))", lineHeight: 1.4 }}>
                     {m.role}
                   </div>
                 </div>
@@ -241,10 +252,10 @@ export default function AboutPage() {
 
               <ul className="mt-4 space-y-2">
                 {m.bullets.map((b, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm leading-6 text-stone-700">
+                  <li key={i} className="flex items-start gap-2 text-stone-700" style={{ fontSize: "calc(14px * var(--s))", lineHeight: 1.71 }}>
                     <span
-                      className="mt-2 h-1.5 w-1.5 flex-shrink-0 rounded-full"
-                      style={{ background: "var(--teal)" }}
+                      className="mt-2 flex-shrink-0 rounded-full"
+                      style={{ background: "var(--teal)", width: "calc(6px * var(--s))", height: "calc(6px * var(--s))" }}
                     />
                     <span>{b}</span>
                   </li>
@@ -259,14 +270,14 @@ export default function AboutPage() {
       <section className="mt-14 fade-up fade-up-2">
         <div className="flex items-start gap-3 mb-6">
           <div
-            className="mt-1 flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl"
-            style={{ background: "var(--surface)", border: "1px solid var(--line)" }}
+            className="mt-1 flex flex-shrink-0 items-center justify-center rounded-2xl"
+            style={{ background: "var(--surface)", border: "1px solid var(--line)", width: "calc(40px * var(--s))", height: "calc(40px * var(--s))" }}
           >
-            <img src="/icons/values.svg" alt="" width={24} height={24} style={{ display: "block" }} />
+            <img src="/icons/values.svg" alt="" width={24} height={24} style={{ display: "block", width: "calc(24px * var(--s))", height: "calc(24px * var(--s))" }} />
           </div>
           <div>
-            <h2 className="text-2xl font-extrabold text-stone-900">מה מנחה אותנו</h2>
-            <p className="mt-1 text-stone-600">הערכים שעומדים מאחורי כל שאלה ושאלה.</p>
+            <h2 className="font-extrabold text-stone-900" style={{ fontSize: "calc(24px * var(--s))", lineHeight: 1.33 }}>מה מנחה אותנו</h2>
+            <p className="mt-1 text-stone-600" style={{ fontSize: "calc(16px * var(--s))", lineHeight: 1.6 }}>הערכים שעומדים מאחורי כל שאלה ושאלה.</p>
           </div>
         </div>
 
@@ -306,10 +317,10 @@ export default function AboutPage() {
                 className="flex items-start gap-4 rounded-2xl p-5"
                 style={{ background: "#FAFAF9", border: "1px solid #EAE0D5" }}
               >
-                <img src={v.icon} alt="" width={32} height={32} className="mt-0.5 flex-shrink-0" style={{ display: "block" }} />
+                <img src={v.icon} alt="" width={32} height={32} className="mt-0.5 flex-shrink-0" style={{ display: "block", width: "calc(32px * var(--s))", height: "calc(32px * var(--s))" }} />
                 <div>
-                  <div className="font-bold text-stone-900">{v.title}</div>
-                  <p className="mt-1 text-sm leading-6 text-stone-700">{v.body}</p>
+                  <div className="font-bold text-stone-900" style={{ fontSize: "calc(16px * var(--s))", lineHeight: 1.5 }}>{v.title}</div>
+                  <p className="mt-1 text-stone-700" style={{ fontSize: "calc(14px * var(--s))", lineHeight: 1.71 }}>{v.body}</p>
                 </div>
               </div>
             ))}
