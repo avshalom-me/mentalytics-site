@@ -242,9 +242,10 @@ export default function CenterDashboardView({ data, preview = false, justCreated
 
       {/* צוות הניהול. בכוונה לא מוגבל ל-!isEntity ולא למנוי פעיל: גם ישות
           מסלול 2 מנהלת צוות, ומרכז שהמנוי שלו נגמר עדיין צריך לראות מי נכנס
-          (ההוספה עצמה חסומה בשרת כשהמנוי אינו פעיל). לא ב-preview - מאותה
-          סיבה כמו InvitePanel: אין סשן מרכז בצפייה מהאדמין. */}
-      {!preview && <MembersPanel initial={data.members ?? []} />}
+          (ההוספה עצמה חסומה בשרת כשהמנוי אינו פעיל). ב-preview מוצג לקריאה
+          בלבד - שלא כמו InvitePanel, שכולו פעולה. הסתרה מלאה מהאדמין הותירה
+          את התמיכה בלי דרך לראות מה המרכז רואה. */}
+      <MembersPanel initial={data.members ?? []} readOnly={preview} />
 
       {/* רשימת המטפלים (מסלול 1) */}
       {!isEntity && (
