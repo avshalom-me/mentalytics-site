@@ -238,6 +238,10 @@ export default function HomePage() {
             lineHeight: 1.8, maxWidth: "46ch", margin: "0 auto 38px",
           }} className="fade fade-3">
             שאלון שמוביל להמלצה מדויקת על <strong style={{ color: "var(--teal)", fontWeight: 700 }}>סוג הטיפול</strong> ועל <strong style={{ color: "var(--gold)", fontWeight: 700 }}>סוג המטפל</strong> שמתאים לכם.
+            {/* קו הסמכות, מיד אחרי ההבטחה ובאותה פסקה. הצבע הוא teal-dark
+                ולא teal/gold של שתי ההדגשות שלפניו: אלו הדגשות ולא קישורים,
+                וקו תחתון בלבד לא היה מבדיל ביניהם בסריקה מהירה. */}
+            {" "}נבנה ע&quot;י <Link href="/about" style={{ color: "var(--teal-dark)", fontWeight: 700, textDecoration: "underline", textUnderlineOffset: "3px" }}>חוקרים ופסיכולוגים</Link>.
           </p>
           <p style={{
             fontSize: "1.25rem", color: "var(--teal-dark)", fontWeight: 700,

@@ -59,7 +59,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/gender-text.ts",
     ],
   },
-  "/": { date: "2026-09-02", sources: ["app/page.tsx"] },
+  "/": { date: "2026-09-10", sources: ["app/page.tsx"] },
   "/therapists": { date: "2026-09-08", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx"] },
   "/research": { date: "2026-09-09", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/academic": { date: "2026-08-05", sources: ["app/research/academic/page.tsx"] },
