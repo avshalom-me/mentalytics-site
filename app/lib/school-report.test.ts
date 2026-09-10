@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { KidsDomainResult } from "./kids-recommendations";
-import { toTracksInput, buildSchoolSummary, interventionsTried, SCHOOL_DIAGNOSIS_KINDS, type Ans } from "./school-report";
+import {
+  toTracksInput, buildSchoolSummary, interventionsTried, SCHOOL_DIAGNOSIS_KINDS,
+  eligibilityDirections, acaExhaustionAdequate, acaSevere, type Ans,
+} from "./school-report";
 import { mapSchoolTracks } from "./school-tracks-engine";
 
 const TODAY = "2026-09-02";
@@ -29,6 +32,52 @@ const anxietyDomain: KidsDomainResult = {
   externalNotes: [],
   standaloneWarnings: [{ text: "⚠️ מומלץ לשלול גורם רפואי לפני הטיפול", urgent: false }],
 };
+
+describe("eligibilityDirections - which committee route, if any", () => {
+  const worked = { remedial: "done", inclusion: "done" } as const;
+
+  it("opens nothing for a social or a behavioural finding", () => {
+    expect(eligibilityDirections({ a_soc: "הרבה מאוד", a_beh: "הרבה מאוד" })).toEqual([]);
+  });
+
+  it("opens the emotional route on a real emotional finding, not on a slight one", () => {
+    expect(eligibilityDirections({ a_emo: "מעט" })).toEqual([]);
+    expect(eligibilityDirections({ a_emo: "הרבה" })).toEqual(["emotional"]);
+    expect(eligibilityDirections({ a_emo: "הרבה מאוד" })).toEqual(["emotional"]);
+  });
+
+  it("needs the school to have worked the learning difficulty AND a bottom-5% subject", () => {
+    const severe = { a_aca: "הרבה", dv_math: "5% מהכי נמוכים בכיתה" };
+    expect(eligibilityDirections(severe)).toEqual([]);                                   // nothing tried
+    expect(eligibilityDirections({ a_aca: "הרבה", c_aca_steps: worked })).toEqual([]);   // tried, not severe
+    expect(eligibilityDirections({ ...severe, c_aca_steps: worked })).toEqual(["learning"]);
+  });
+
+  it("holds the route back while something the school said was needed is still open", () => {
+    const A = { a_aca: "הרבה", ag_read: "5% מהכי מתקשים בכיתה", c_aca_steps: { ...worked, adhd_doc: "not_done" } };
+    expect(eligibilityDirections(A)).toEqual([]);
+    expect(eligibilityDirections({ ...A, c_aca_steps: { ...worked, adhd_doc: "not_needed" } })).toEqual(["learning"]);
+  });
+
+  it("reads the 5% wording of every age band, and nothing weaker", () => {
+    expect(acaSevere({ ag_read: "5% מהכי מתקשים בכיתה" })).toBe(true);
+    expect(acaSevere({ dv_math: "5% מהכי נמוכים בכיתה" })).toBe(true);
+    expect(acaSevere({ tyb_verbal: "5%" })).toBe(true);
+    expect(acaSevere({ zh_math: "10%" })).toBe(false);
+    expect(acaSevere({ q1: "5%" })).toBe(false);   // not an academic key
+  });
+
+  it("counts an unanswered optional row as nothing said, not as a blocker", () => {
+    expect(acaExhaustionAdequate({ c_aca_steps: worked })).toBe(true);
+    expect(acaExhaustionAdequate({ c_aca_steps: { remedial: "done" } })).toBe(false);
+    expect(acaExhaustionAdequate({ c_aca_steps: { remedial: "in_progress", inclusion: "done" } })).toBe(false);
+  });
+
+  it("carries the route into the engine's input", () => {
+    expect(toTracksInput({ _grade: "ד", a_emo: "הרבה" }, TODAY)?.directions).toEqual(["emotional"]);
+    expect(toTracksInput({ _grade: "ד", a_soc: "הרבה" }, TODAY)?.directions).toEqual([]);
+  });
+});
 
 describe("toTracksInput", () => {
   it("needs a school grade and nothing else", () => {

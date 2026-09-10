@@ -23,6 +23,8 @@ import {
   israelToday,
   formatDateHe,
   schoolYear,
+  hatamotApplies,
+  DIRECTION_LABELS,
   type Diagnosis,
   type DiagnosisKind,
   type SchoolTrack,
@@ -46,9 +48,14 @@ import {
   SCHOOL_DIAGNOSIS_KINDS,
   DIAGNOSIS_KIND_LABELS,
   RELEVANCE_LABELS,
+  ACA_STEPS,
+  ACA_STEP_LABELS,
   UNKNOWN,
   toTracksInput,
   buildSchoolSummary,
+  eligibilityDirections,
+  type AcaStepKey,
+  type AcaStepState,
   type CounselorFields,
   type Level,
   type Outcome,
@@ -302,10 +309,26 @@ export function CounselorQ1Block({ A, setA }: { A: Ans; setA: (a: Ans) => void }
 }
 export function CounselorAcadBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   const f = A as CounselorFields; const set = setField(A, setA);
+  const steps = f.c_aca_steps ?? {};
+  const setStep = (k: AcaStepKey, v: AcaStepState) => set("c_aca_steps", { ...steps, [k]: v });
   return (
     <CounselorBlock>
       <Q label="תגובה לתמיכה לימודית שניתנה"><ChoiceU value={f.c_support} options={entries(SUPPORT_RESPONSE_LABELS)} onChange={v => set("c_support", v)} /></Q>
       <Q label="קושי בהתארגנות (ציוד, שיעורי בית, זמנים)"><LevelRow value={f.c_org} onChange={v => set("c_org", v)} /></Q>
+      {/* The ladder a learning difficulty is worked through before anyone says
+          the word "committee". It is read as a gate, not as background: see
+          eligibilityDirections. */}
+      <div className="pt-1">
+        <div className="text-sm font-bold mb-1" style={{ color: "var(--text)" }}>מיצוי אפשרויות</div>
+        <p className="text-xs mb-1" style={{ color: "var(--muted)" }}>
+          מה כבר ניתן לתלמיד/ה בתחום הלימודי. שלוש השורות האחרונות נשאלות רק כדי לדעת אם היה בהן צורך - &quot;לא נדרש&quot; היא תשובה מלאה.
+        </p>
+        {ACA_STEPS.map(x => (
+          <Q key={x.key} label={x.core ? x.label : `${x.label} (אם נדרש)`}>
+            <Choice value={steps[x.key]} options={entries(ACA_STEP_LABELS)} onChange={v => setStep(x.key, v)} />
+          </Q>
+        ))}
+      </div>
     </CounselorBlock>
   );
 }
@@ -358,7 +381,15 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
     if (next[k]) delete next[k]; else next[k] = "partial";
     set("c_tried", next);
   };
-  const missing = [f.c_fill, f.c_parents, f.c_team, f.c_zakaut, f.c_hatamot].filter(x => !x).length;
+  // What the questionnaire's own rubrics opened, computed from the answers
+  // rather than from the scoring, which has not run yet. A social or a
+  // behavioural finding opens nothing, and then this screen says nothing about
+  // committees and asks for no documents - there would be no committee for the
+  // documents to be checked against.
+  const directions = eligibilityDirections(A);
+  const onRoute = directions.length > 0;
+  const showHatamot = !!f._grade && hatamotApplies(f._grade);
+  const missing = [f.c_fill, f.c_parents, f.c_team, ...(onRoute ? [f.c_zakaut] : []), ...(showHatamot ? [f.c_hatamot] : [])].filter(x => !x).length;
   const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
 
   return (
@@ -374,7 +405,9 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
         </Box>
 
         <Box title="מה כבר נוסה בבית הספר">
-          <p className="text-xs" style={{ color: "var(--muted)" }}>סמני מה נוסה; לכל מה שסומן - מה קרה. זה בדיוק מה שוועדת זכאות מבקשת כ&quot;סיכום התערבויות&quot;.</p>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            סמני מה נוסה; לכל מה שסומן - מה קרה.{onRoute && " זה בדיוק מה שוועדת זכאות מבקשת כ\"סיכום התערבויות\"."}
+          </p>
           <div className="flex flex-wrap gap-2">
             {INTERVENTIONS.map(it => (
               <button key={it.key} type="button" className={ob(!!tried[it.key])} onClick={() => toggleTried(it.key)}>{it.label}</button>
@@ -387,6 +420,16 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           ))}
         </Box>
 
+        {onRoute && (
+          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
+            המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
+            <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+              הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}. השאלות הבאות בודקות אם המסמכים שבתיק תואמים לו.
+            </div>
+          </div>
+        )}
+
+        {onRoute && (
         <Box title="אבחונים וחוות דעת בתיק">
           {diagnoses.length > 0 && (
             <ul className="flex flex-col gap-2">
@@ -415,20 +458,30 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           <button type="button" onClick={add} disabled={!adding.kind || !adding.year} className={`${ob(false)} disabled:opacity-40`}>+ הוספה לתיק</button>
           <p className="text-xs" style={{ color: "var(--muted)" }}>החותם/ת קובע/ת אם המסמך קביל לוועדת זכאות: התוספת הראשונה לתיקון 11 מונה התמחות, לא רק מקצוע. אם לא ידוע, המפה תבקש לבדוק.</p>
         </Box>
+        )}
 
-        <Box title="ועדות">
+        <Box title={onRoute || showHatamot ? "ועדות" : "הצוות הבית-ספרי"}>
           <Q label="צוות רב-מקצועי בית-ספרי"><Choice value={f.c_team} options={entries(TEAM_LABELS)} onChange={v => set("c_team", v)} /></Q>
-          <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
-          {f.c_zakaut === "decided" && (
-            <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
-              <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
-            </Q>
+          {onRoute && (
+            <>
+              <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
+              {f.c_zakaut === "decided" && (
+                <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
+                  <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
+                </Q>
+              )}
+            </>
           )}
-          <Q label="התאמות בדרכי היבחנות"><Choice value={f.c_hatamot} options={entries(HATAMOT_LABELS)} onChange={v => set("c_hatamot", v)} /></Q>
-          {f.c_hatamot === "district_decided" && (
-            <Q label="תאריך קבלת תשובת הוועדה המחוזית (לחישוב חלון הערעור)">
-              <input type="date" className={selectCls} value={f.c_hatamot_on ?? ""} onChange={e => set("c_hatamot_on", e.target.value || undefined)} />
-            </Q>
+          {/* Not a word about matriculation accommodations before ח'. */}
+          {showHatamot && (
+            <>
+              <Q label="התאמות בדרכי היבחנות"><Choice value={f.c_hatamot} options={entries(HATAMOT_LABELS)} onChange={v => set("c_hatamot", v)} /></Q>
+              {f.c_hatamot === "district_decided" && (
+                <Q label="תאריך קבלת תשובת הוועדה המחוזית (לחישוב חלון הערעור)">
+                  <input type="date" className={selectCls} value={f.c_hatamot_on ?? ""} onChange={e => set("c_hatamot_on", e.target.value || undefined)} />
+                </Q>
+              )}
+            </>
           )}
           <Q label="מגבלה כלכלית מוכרת במשפחה"><Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} /></Q>
         </Box>
@@ -508,6 +561,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   const input = useMemo(() => toTracksInput(A, today), [A, today]);
   const tracks = useMemo(() => (input ? mapSchoolTracks(input) : []), [input]);
   const summary = useMemo(() => buildSchoolSummary(A, tracks, today, domains), [A, tracks, today, domains]);
+  const directions = useMemo(() => eligibilityDirections(A), [A]);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   const [pdf, setPdf] = useState<"idle" | "busy">("idle");
 
@@ -574,6 +628,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         <StepQ>מה רלוונטי עכשיו, ומתי</StepQ>
         <StepHint>
           מחושב לתאריך {formatDateHe(today)} לפי הכיתה ומה שבתיק, מכללי מועדים ומסמכים במקורות רשמיים בלבד. השיפוט הקליני - מה מצדיק הפניה ובאיזו דחיפות - נשאר בידיך.
+          {directions.length === 0 && " הממצאים שעלו מטופלים במסגרת בית הספר ובהפניה לטיפול, ולכן המפה מציגה את התחנה הבית-ספרית בלבד."}
         </StepHint>
         {A.q3_sui === "כן" && <CounselorSafetyNotice />}
         {f.c_parents === "not_aware" && (
@@ -581,11 +636,15 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
             ההורים טרם יודעו: כל הפניה לוועדה או לגורם חוץ מותנית ביידוע ובהסכמת ההורים (בהורים פרודים - שני ההורים).
           </div>
         )}
-        {tracks.length > 0 && (
+        {/* The diagram and the timeline are the committee route drawn out. With
+            no route open they would be drawing a road nobody is on, so they are
+            not rendered at all - and the PDF, which clones this box, then has
+            nothing to clone. */}
+        {directions.length > 0 && tracks.length > 0 && (
           // id: the PDF clones this box - the diagram and the timeline are the
           // one part of the report that is a picture rather than text.
           <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
-            <TrackFlow tracks={tracks} />
+            <TrackFlow tracks={tracks} showHatamot={!!f._grade && hatamotApplies(f._grade)} />
             <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
               <TrackTimeline tracks={tracks} today={today} />

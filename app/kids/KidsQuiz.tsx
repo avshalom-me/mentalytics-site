@@ -1597,6 +1597,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
               </div>
             </div>
           </GradeBlock>
+          {audience === "counselor" && <CounselorAcadBlock A={A} setA={setA} />}
         </Card>
         <NavRow onBack={onBack} onNext={() => onNext(A)} />
       </div>
@@ -1717,6 +1718,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
               </div>
             </div>
           </GradeBlock>
+          {audience === "counselor" && <CounselorAcadBlock A={A} setA={setA} />}
         </Card>
         <NavRow onBack={onBack} onNext={() => onNext(A)} />
       </div>

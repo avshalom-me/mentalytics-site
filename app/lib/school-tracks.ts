@@ -45,6 +45,20 @@ export const SCHOOL_GRADES = ["א", "ב", "ג", "ד", "ה", "ו", "ז", "ח", "�
 export type SchoolGrade = (typeof SCHOOL_GRADES)[number];
 
 /**
+ * Matriculation accommodations are not mentioned before ח'.
+ *
+ * The track is real from ז' - the assessment floor is 1 July at the end of ו' -
+ * but naming it to the counsellor of a younger student put a committee on the
+ * map years before anything could be submitted to it, and a map is read as a
+ * list of things to do. From ח' the assessment has to be arranged in time to
+ * be useful in י', which is when saying so is worth something.
+ */
+export const HATAMOT_FIRST_GRADE: SchoolGrade = "ח";
+export function hatamotApplies(grade: SchoolGrade): boolean {
+  return SCHOOL_GRADES.indexOf(grade) >= SCHOOL_GRADES.indexOf(HATAMOT_FIRST_GRADE);
+}
+
+/**
  * External referral keys of the kids questionnaire that name a diagnosing
  * professional. Must match the `key` strings in EXTERNAL_PATTERNS of
  * kids-recommendations.ts character for character - the drift test checks.
@@ -60,6 +74,24 @@ export const DIAGNOSIS_KINDS = [...ASSESSMENT_TYPES, ...EXTERNAL_DIAGNOSER_KEYS]
 export type DiagnosisKind = (typeof DIAGNOSIS_KINDS)[number];
 
 // ── The First Schedule: who may diagnose what [A] ────────────────────────────
+
+/**
+ * The two routes to ועדת זכאות ואפיון that this rubric will name, by the
+ * disability codes the Ministry files them under.
+ *
+ * The questionnaire has four rubrics and only two of them lead here. A social
+ * or a behavioural finding is a matter for the school and for treatment, not
+ * for an eligibility committee, and when those are all there is the map says
+ * nothing about committees at all - naming one would send a counsellor down a
+ * track her finding does not support. Which categories each route is checked
+ * against is below: a hearing report in the file is no longer an answer to an
+ * emotional finding, which is what checking all fourteen at once made it.
+ */
+export type EligibilityDirection = "emotional" | "learning";
+export const DIRECTION_LABELS: Record<EligibilityDirection, string> = {
+  emotional: "רגשי/נפשי (לקויות 55, 57)",
+  learning: "לימודי/קשב (לקות 58)",
+};
 
 export const DISABILITY_CATEGORIES = [
   "משכל גבולי",
@@ -108,6 +140,11 @@ type Acceptable = {
 };
 
 /** Verbatim from the First Schedule [A]. Do not "improve" the wording; it is what the committee reads. */
+export const DIRECTION_CATEGORIES: Record<EligibilityDirection, DisabilityCategory[]> = {
+  emotional: ["הפרעות התנהגותיות ורגשיות", "הפרעות נפשיות"],
+  learning: ["לקות למידה רב-בעייתית", "AD(H)D"],
+};
+
 export const ACCEPTABLE_BY_CATEGORY: Record<DisabilityCategory, Acceptable> = {
   "משכל גבולי": { bodies: ["פסיכולוג חינוכי", "פסיכולוג התפתחותי", "פסיכולוג קליני"] },
   "מוגבלות שכלית התפתחותית": {
@@ -428,6 +465,13 @@ export interface SchoolTracksInput {
   /** From the counsellor's own module. Read by the clinical rules only. */
   interventionsTried?: number;
   economicConstraint?: boolean;
+  /**
+   * Which eligibility route the questionnaire's own rubrics point to. Empty -
+   * the default - means the map stays silent about committees entirely. See
+   * EligibilityDirection, and eligibilityDirections in school-report.ts for
+   * what puts a route on the list.
+   */
+  directions?: EligibilityDirection[];
 }
 
 const LINKS = {
@@ -469,6 +513,10 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   const tracks: SchoolTrack[] = [];
   const gi = SCHOOL_GRADES.indexOf(grade);
   const sy = schoolYear(today);
+  const directions = input.directions ?? [];
+  const onCommitteeRoute = directions.length > 0;
+  const dirCategories = Array.from(new Set(directions.flatMap(d => DIRECTION_CATEGORIES[d])));
+  const hatamotOn = hatamotApplies(grade);
 
   // ── צוות רב-מקצועי: the first station, always ──
   const convened = input.schoolTeam?.convened === true;
@@ -483,26 +531,33 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     steps: [
       "לכנס את הצוות הרב-מקצועי עם ההורים ועם התלמיד/ה",
       "לתעד את התמיכות שהוחלט עליהן ואת מועד הבדיקה מחדש",
-      "אם התמיכות בבית הספר אינן מספיקות - זו נקודת היציאה למסלול ועדת זכאות ואפיון",
+      // The exit toward a committee is named only when a route is actually
+      // open; otherwise this is the whole track and the sentence would be
+      // pointing at a door that is not there.
+      ...(onCommitteeRoute ? ["אם התמיכות בבית הספר אינן מספיקות - זו נקודת היציאה למסלול ועדת זכאות ואפיון"] : []),
     ],
     appeals: [],
     cautions: [],
-    officialLinks: [LINKS.zakautPortal],
+    officialLinks: onCommitteeRoute ? [LINKS.zakautPortal] : [],
     verified: "פורטל משרד החינוך [B], 2.9.2026",
   });
 
   // ── ועדת זכאות ואפיון ──
+  // Checked against the route's own categories only: "is there a document that
+  // answers THIS finding", not "is there any admissible document in the file".
   const eligibility = eligibilityByCategory(diagnoses);
-  const acceptable = CATEGORY_LIST(eligibility, "acceptable");
-  const verify = CATEGORY_LIST(eligibility, "verify_signer");
+  const inRoute = (c: DisabilityCategory) => dirCategories.includes(c);
+  const acceptable = CATEGORY_LIST(eligibility, "acceptable").filter(inRoute);
+  const verify = CATEGORY_LIST(eligibility, "verify_signer").filter(inRoute);
   const win = zakautWindow(today);
   const zStatus = input.zakaut?.status ?? "none";
 
-  if (zStatus !== "decided") {
+  if (onCommitteeRoute && zStatus !== "decided") {
     const why: string[] = [];
     const cautions: string[] = [];
     let relevance: Relevance = "info";
 
+    why.push(`הכיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}`);
     if (acceptable.length) {
       relevance = "consider";
       why.push(`בתיק מסמך מגורם שאבחנתו קבילה לצורך: ${acceptable.join(", ")} - בתנאי שהאבחנה עצמה כתובה בו`);
@@ -511,7 +566,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       why.push(`ייתכן שקיימת אבחנה קבילה עבור: ${verify.join(", ")} - תלוי בהתמחות החותם/ת על המסמך`);
       cautions.push("לבדוק מי חתום/ה על האבחון ולהשוות לתוספת הראשונה: התוספת קובעת התמחות, לא רק מקצוע");
     } else {
-      why.push("הוועדה דנה בתלמידים עם מוגבלות מזכה שיש עליה אבחנה קבילה - ובתיק אין כרגע מסמך כזה. אבחון קודם, ועדה אחר כך");
+      why.push(`הוועדה דנה בתלמידים עם מוגבלות מזכה שיש עליה אבחנה קבילה - ובתיק אין כרגע מסמך שמתאים לכיוון הזה (${dirCategories.join(", ")}). אבחון קודם, ועדה אחר כך`);
     }
     if (zStatus === "in_process") why.push("ההליך כבר בעיצומו לפי הדיווח");
 
@@ -574,14 +629,12 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   const stale = currency.filter(x => x.c === "too_early");
   const unsure = currency.filter(x => x.c === "verify_month");
 
-  if (hStatus !== "district_decided") {
+  if (hatamotOn && hStatus !== "district_decided") {
     const why: string[] = [];
     const cautions: string[] = [];
     let relevance: Relevance = "info";
 
-    if (gi <= 5) {
-      why.push(`רלוונטי מחטיבת הביניים. אבחון שיוגש לוועדה המחוזית חייב להיערך מ-${formatDateHe(floor)} ואילך (1 ביולי בסיום כיתה ו') - אבחון מוקדם יותר לא ישמש להתאמות`);
-    } else {
+    {
       if (grade === "י") {
         relevance = "consider";
         why.push("כיתה י' היא שנת ההגשה לוועדת ההתאמות המחוזית לקראת הבגרויות");
@@ -589,8 +642,9 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
         relevance = "consider";
         why.push("ההגשה המרכזית נעשית בכיתה י'; בקשה מאוחרת יותר - לברר את המסלול מול רכז/ת ההתאמות והמחוז");
       } else {
-        why.push("השנים ז'-ט' הן הזמן להסדיר אבחון תקף ולבסס התערבות לפני ההגשה בכיתה י'");
+        why.push("השנים ח'-ט' הן הזמן להסדיר אבחון תקף ולבסס התערבות לפני ההגשה בכיתה י'");
       }
+      why.push(`אבחון שיוגש לוועדה המחוזית חייב להיערך מ-${formatDateHe(floor)} ואילך (1 ביולי בסיום כיתה ו')`);
       if (usable.length) why.push(`בתיק אבחון שיכול לשמש להתאמות: ${usable.map(x => x.d.kind).join(", ")}`);
       if (stale.length) cautions.push(`אבחון משנת ${stale.map(x => x.d.year).join(", ")} קדם ל-${formatDateHe(floor)} ולכן לא ישמש לוועדה המחוזית - נדרש אבחון עדכני`);
       if (unsure.length) cautions.push(`אבחון משנת ${unsure.map(x => x.d.year).join(", ")}: לבדוק אם נערך אחרי 1 ביולי של אותה שנה`);
@@ -626,7 +680,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   }
 
   // ── ערעור על החלטת הוועדה המחוזית ──
-  if (hStatus === "district_decided" && input.hatamot?.districtAnswerReceivedOn) {
+  if (hatamotOn && hStatus === "district_decided" && input.hatamot?.districtAnswerReceivedOn) {
     const received = input.hatamot.districtAnswerReceivedOn;
     const until14 = isoAddDays(received, 14);
     const until21 = isoAddDays(received, 21);
@@ -651,28 +705,34 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   }
 
   // ── אבחון: the prerequisite both committees share ──
-  const needsForZakaut = zStatus !== "decided" && !acceptable.length;
-  const needsForHatamot = gi >= 6 && hStatus !== "district_decided" && !usable.length;
-  if (needsForZakaut || needsForHatamot || stale.length) {
+  const needsForZakaut = onCommitteeRoute && zStatus !== "decided" && !acceptable.length;
+  const needsForHatamot = hatamotOn && hStatus !== "district_decided" && !usable.length;
+  if (needsForZakaut || needsForHatamot || (hatamotOn && stale.length)) {
     const why: string[] = [];
-    if (needsForZakaut) why.push("ועדת זכאות ואפיון דורשת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה");
+    if (needsForZakaut) why.push(`ועדת זכאות ואפיון דורשת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה, בהתאם לכיוון שעלה: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}`);
     if (needsForHatamot) why.push("ועדת ההתאמות המחוזית דורשת אבחון דידקטי או פסיכו-דידקטי (או פסיכולוגי ודידקטי) שנערך מ-1 ביולי בסיום כיתה ו' ואילך");
-    if (stale.length) why.push("האבחון הקיים קדם לתאריך הרצפה ואינו משמש להתאמות");
+    if (hatamotOn && stale.length) why.push("האבחון הקיים קדם לתאריך הרצפה ואינו משמש להתאמות");
     tracks.push({
       key: "assessment",
       name: "אבחון קביל",
-      relevance: zStatus === "in_process" || stale.length ? "consider" : "info",
+      // "consider" once something is actually waiting on the assessment: a
+      // committee already in process, or an assessment that exists and cannot
+      // be used. Otherwise this is background.
+      relevance: (needsForZakaut && zStatus === "in_process") || (hatamotOn && stale.length) ? "consider" : "info",
       why,
       documents: ["הפניה מבית הספר עם תיאור הקשיים וההתערבויות שנוסו", "ויתור סודיות להעברת האבחון לוועדה"],
       steps: [
-        "לבחור את סוג האבחון לפי הצורך: ועדת זכאות - לפי המוגבלות המשוערת והגורם הקביל לה; התאמות - דידקטי או פסיכו-דידקטי",
+        ...(needsForZakaut ? ["לבחור את סוג האבחון לפי המוגבלות המשוערת ולפי הגורם שאבחנתו קבילה לה"] : []),
+        ...(needsForHatamot ? ["להתאמות בדרכי היבחנות: אבחון דידקטי או פסיכו-דידקטי"] : []),
         "לוודא מראש שהחותם/ת על האבחון עומד/ת בדרישת התוספת הראשונה - לא כל פסיכולוג וכל רופא",
-        "לתעד את מועד הפנייה: אבחון ראשון סמוך להגשה להתאמות חייב להיות חתום שישה חודשים לפני ההגשה",
+        ...(hatamotOn ? ["לתעד את מועד הפנייה: אבחון ראשון סמוך להגשה להתאמות חייב להיות חתום שישה חודשים לפני ההגשה"] : []),
       ],
       appeals: [],
       cautions: [],
-      officialLinks: [LINKS.admissible, LINKS.hatamotShefi],
-      verified: "תוספת ראשונה [A] וחוזר התאמות [D], 2.9.2026",
+      // The accommodations circular is not linked to a counsellor who was
+      // never told the committee exists - see hatamotApplies.
+      officialLinks: hatamotOn ? [LINKS.admissible, LINKS.hatamotShefi] : [LINKS.admissible],
+      verified: hatamotOn ? "תוספת ראשונה [A] וחוזר התאמות [D], 2.9.2026" : "תוספת ראשונה [A], 2.9.2026",
     });
   }
 

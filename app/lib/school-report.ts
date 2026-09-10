@@ -16,8 +16,10 @@ import {
   DIAGNOSIS_KINDS,
   SCHOOL_GRADES,
   formatDateHe,
+  hatamotApplies,
   type Diagnosis,
   type DiagnosisKind,
+  type EligibilityDirection,
   type SchoolGrade,
   type SchoolTrack,
   type SchoolTracksInput,
@@ -57,6 +59,33 @@ export const INTERVENTIONS = [
 ] as const;
 export type InterventionKey = (typeof INTERVENTIONS)[number]["key"];
 
+/**
+ * מיצוי אפשרויות - what the school already put in front of a learning
+ * difficulty before anyone says the word "committee".
+ *
+ * The two core rows are the school's own to give and a committee expects to
+ * see them tried; the three below them are only asked about because a
+ * counsellor knows whether they were called for at all, which is why each can
+ * be answered "לא נדרש" without counting against anything.
+ *
+ * Separate from INTERVENTIONS on purpose. That list is the whole school file,
+ * across every rubric, and it is what the summary reports as "סיכום
+ * התערבויות"; this one is the learning ladder specifically, and it is the
+ * thing that decides whether an eligibility route opens at all.
+ */
+export const ACA_STEPS = [
+  { key: "remedial", label: "הוראה מתקנת או תגבור לימודי", core: true },
+  { key: "inclusion", label: "תמיכה מסל השילוב", core: true },
+  { key: "speech", label: "קלינאי/ת תקשורת", core: false },
+  { key: "ot", label: "ריפוי בעיסוק", core: false },
+  { key: "adhd_doc", label: "בירור קשב אצל רופא/ה", core: false },
+] as const;
+export type AcaStepKey = (typeof ACA_STEPS)[number]["key"];
+export type AcaStepState = "done" | "in_progress" | "not_needed" | "not_done";
+export const ACA_STEP_LABELS: Record<AcaStepState, string> = {
+  done: "נעשה", in_progress: "בתהליך", not_needed: "לא נדרש", not_done: "טרם נעשה",
+};
+
 /** The keys the counsellor screens write into the questionnaire's answers. */
 export interface CounselorFields {
   _audience?: "parent" | "counselor";
@@ -79,6 +108,8 @@ export interface CounselorFields {
   c_fill?: FillMode;
   c_parents?: Parents;
   c_tried?: Partial<Record<InterventionKey, Outcome>>;
+  /** מיצוי אפשרויות, asked inside the academic branch. See ACA_STEPS. */
+  c_aca_steps?: Partial<Record<AcaStepKey, AcaStepState>>;
   c_diag?: Diagnosis[];
   c_team?: "yes" | "no" | "unknown";
   c_zakaut?: "none" | "in_process" | "decided";
@@ -137,6 +168,67 @@ export const RELEVANCE_LABELS = { primary: "לטיפול עכשיו", consider: 
 
 export const KIND_LABELS = { treatment: "טיפול", assessment: "אבחון", professional: "איש מקצוע", external: "פנייה" } as const;
 
+// ── Which eligibility route, if any ──────────────────────────────────────────
+
+/** The four-point area flags the questionnaire opens each rubric with. */
+const areaOn = (v: unknown, from: "מעט" | "הרבה" = "מעט") =>
+  (from === "מעט" ? ["מעט", "הרבה", "הרבה מאוד"] : ["הרבה", "הרבה מאוד"]).includes(String(v ?? ""));
+
+export const academicOn = (A: Ans) => areaOn(A.a_aca);
+
+/**
+ * True once the school has actually worked the learning difficulty: both of
+ * its own steps taken, and nothing it said was needed still waiting.
+ *
+ * An unanswered optional row does not block - the counsellor simply did not
+ * say - but one answered "טרם נעשה" does, which is the whole point: a
+ * committee asked to look at a child whose attention was never checked is
+ * being asked the wrong question.
+ */
+export function acaExhaustionAdequate(A: Ans): boolean {
+  const s = (A as CounselorFields).c_aca_steps ?? {};
+  return ACA_STEPS.filter(x => x.core).every(x => s[x.key] === "done") &&
+    ACA_STEPS.filter(x => !x.core).every(x => s[x.key] !== "not_done");
+}
+
+/**
+ * A class-percentile answer in the bottom 5%.
+ *
+ * The questionnaire words the option differently by age band - "5% מהכי
+ * מתקשים בכיתה", "5% מהכי נמוכים בכיתה", or a bare "5%" - so the leading token
+ * is what is read, exactly as the scoring engine's own pctTier does. The
+ * prefixes are the four academic age blocks; nothing else in the answers uses
+ * this scale.
+ */
+const ACA_KEY = /^(ag|dv|zh|tyb)_/;
+export function acaSevere(A: Ans): boolean {
+  return Object.keys(A).some(k => ACA_KEY.test(k) && typeof A[k] === "string" && A[k].trim().startsWith("5%"));
+}
+
+/**
+ * Which route to ועדת זכאות ואפיון the questionnaire's own rubrics opened.
+ *
+ * Emotional: the rubric was marked as a real difficulty, which is the finding
+ * codes 55 and 57 are about. Learning: not on the difficulty alone, but only
+ * once the school has exhausted what it can give AND one subject sits in the
+ * bottom 5% of the class - a committee is the end of that ladder, not its
+ * first rung.
+ *
+ * Social and behavioural are deliberately absent. They lead to treatment and
+ * to the school's own team, and the map says nothing about committees for
+ * them.
+ *
+ * Read from the raw answers rather than from the scored findings so that the
+ * refinement screen, which runs before scoring, asks exactly the questions the
+ * report will use.
+ */
+export function eligibilityDirections(A: Ans): EligibilityDirection[] {
+  const out: EligibilityDirection[] = [];
+  if (areaOn(A.a_emo, "הרבה")) out.push("emotional");
+  if (academicOn(A) && acaExhaustionAdequate(A) && acaSevere(A)) out.push("learning");
+  return out;
+}
+
 // ── Engine input ─────────────────────────────────────────────────────────────
 
 export function interventionsTried(A: Ans): number {
@@ -159,6 +251,7 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
     hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
+    directions: eligibilityDirections(A),
     economicConstraint: f.c_economic === "yes",
     risk: {
       // Read from the questionnaire's own screen. An item the counsellor marked
@@ -267,6 +360,15 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     sections.push({ title: "התערבויות שנוסו בבית הספר", lines });
   }
 
+  // מיצוי אפשרויות בתחום הלימודי
+  if (academicOn(A) && f.c_aca_steps) {
+    const rows = ACA_STEPS.filter(x => f.c_aca_steps?.[x.key]).map(x => `${x.label}: ${ACA_STEP_LABELS[f.c_aca_steps![x.key]!]}`);
+    if (rows.length) {
+      if (!acaExhaustionAdequate(A)) rows.push("טרם מוצו כל האפשרויות הבית-ספריות");
+      sections.push({ title: "מיצוי אפשרויות בתחום הלימודי", lines: rows });
+    }
+  }
+
   // אבחונים, ועדות, משפחה
   const docs: string[] = [];
   for (const d of f.c_diag ?? []) {
@@ -275,7 +377,8 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   if (f.c_diag && !docs.length) docs.push("אין אבחונים או חוות דעת בתיק");
   if (f.c_team) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
   if (f.c_zakaut) docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
-  if (f.c_hatamot) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
+  // Not a word about matriculation accommodations before ח' - see hatamotApplies.
+  if (f.c_hatamot && f._grade && hatamotApplies(f._grade)) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
   if (f.c_economic === "yes") docs.push("קיימת מגבלה כלכלית מוכרת");
   if (docs.length) sections.push({ title: "אבחונים, ועדות ומשאבים", lines: docs });
 

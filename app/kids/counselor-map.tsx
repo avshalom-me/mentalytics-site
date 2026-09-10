@@ -64,13 +64,22 @@ function Arrows({ cols }: { cols: 1 | 2 }) {
   );
 }
 
-export function TrackFlow({ tracks }: { tracks: SchoolTrack[] }) {
+/**
+ * showHatamot: the accommodations column is drawn only from ח'.
+ *
+ * The stations are drawn whether or not this student has a live track on them,
+ * because the shape of the route is the point - but a station that will not
+ * exist for this student for another four years is not part of her route, and
+ * drawing it greyed out still puts the words on the page.
+ */
+export function TrackFlow({ tracks, showHatamot = true }: { tracks: SchoolTrack[]; showHatamot?: boolean }) {
   const team = toneOf(tracks, "school_team");
   const assessment = toneOf(tracks, "assessment");
   const zakaut = toneOf(tracks, "zakaut");
   const hatamot = toneOf(tracks, "hatamot");
   const zAppeal = toneOf(tracks, "zakaut_appeal");
   const hAppeal = toneOf(tracks, "hatamot_appeal");
+  const cols = showHatamot ? 2 : 1;
   // A node carries the date only; the full sentence lives on the card below.
   const sub = (key: TrackKey, fallback: string) => {
     const t = tracks.find(x => x.key === key);
@@ -84,19 +93,19 @@ export function TrackFlow({ tracks }: { tracks: SchoolTrack[] }) {
       <Arrows cols={1} />
       <Node
         title="אבחנה קבילה"
-        sub={assessment === "absent" ? "קיימת בתיק" : "תנאי לשתי הוועדות - חסרה או לא תקפה"}
+        sub={assessment === "absent" ? "קיימת בתיק" : `תנאי ${showHatamot ? "לשתי הוועדות" : "לוועדה"} - חסרה או לא תקפה`}
         tone={assessment}
         dashed
       />
-      <Arrows cols={2} />
-      <div className="grid grid-cols-2 gap-3">
+      <Arrows cols={cols} />
+      <div className={`grid gap-3 ${showHatamot ? "grid-cols-2" : "grid-cols-1"}`}>
         <Node title="ועדת זכאות ואפיון" sub={sub("zakaut", "זכאות לשירותי חינוך מיוחדים")} tone={zakaut} />
-        <Node title="התאמות בדרכי היבחנות" sub={sub("hatamot", "בגרויות, מכיתה י'")} tone={hatamot} />
+        {showHatamot && <Node title="התאמות בדרכי היבחנות" sub={sub("hatamot", "בגרויות, מכיתה י'")} tone={hatamot} />}
       </div>
-      <Arrows cols={2} />
-      <div className="grid grid-cols-2 gap-3">
+      <Arrows cols={cols} />
+      <div className={`grid gap-3 ${showHatamot ? "grid-cols-2" : "grid-cols-1"}`}>
         <Node title="השגה" sub={zAppeal === "absent" ? "אם תידחה: 21 יום" : sub("zakaut_appeal", "21 יום")} tone={zAppeal} />
-        <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 או 21 יום" : sub("hatamot_appeal", "14 או 21 יום")} tone={hAppeal} />
+        {showHatamot && <Node title="ערעור לוועדה העליונה" sub={hAppeal === "absent" ? "אם תידחה: 14 או 21 יום" : sub("hatamot_appeal", "14 או 21 יום")} tone={hAppeal} />}
       </div>
     </div>
   );

@@ -31,6 +31,14 @@ const base = (over: Partial<SchoolTracksInput> = {}): SchoolTracksInput => ({
   grade: "ד", today: TODAY, diagnoses: [], ...over,
 });
 const byKey = (tracks: ReturnType<typeof mechanicalTracks>, key: string) => tracks.find(t => t.key === key);
+/**
+ * A file whose findings opened a route to the committee.
+ *
+ * The eligibility tracks exist only on one: a questionnaire that raised a
+ * social or a behavioural finding and nothing else gets no committee at all,
+ * which is what the bare base() now stands for.
+ */
+const onRoute = (over: Partial<SchoolTracksInput> = {}) => base({ directions: ["emotional"], ...over });
 
 describe("vocabulary shared with the kids questionnaire", () => {
   it("uses only grades the kids questionnaire knows", () => {
@@ -182,52 +190,83 @@ describe("mechanicalTracks", () => {
     expect(byKey(mechanicalTracks(base({ schoolTeam: { convened: true } })), "school_team")?.relevance).toBe("info");
   });
 
+  it("says nothing at all about committees when no rubric opened a route", () => {
+    const t = mechanicalTracks(base());
+    expect(byKey(t, "zakaut")).toBeUndefined();
+    expect(byKey(t, "assessment")).toBeUndefined();
+    expect(byKey(t, "school_team")?.steps.join(" ")).not.toContain("ועדת זכאות");
+  });
+
   it("does not send a child without an acceptable diagnosis to the eligibility committee", () => {
-    const z = byKey(mechanicalTracks(base()), "zakaut");
+    const z = byKey(mechanicalTracks(onRoute()), "zakaut");
     expect(z?.relevance).toBe("info");
     expect(z?.why.join(" ")).toContain("אבחון קודם");
-    expect(byKey(mechanicalTracks(base()), "assessment")).toBeDefined();
+    expect(byKey(mechanicalTracks(onRoute()), "assessment")).toBeDefined();
+  });
+
+  it("names the route it is checking, and checks the file against that route's categories only", () => {
+    const learning = byKey(mechanicalTracks(base({ directions: ["learning"] })), "zakaut");
+    expect(learning?.why.join(" ")).toContain("לימודי/קשב");
+    expect(learning?.why.join(" ")).toContain("לקות למידה רב-בעייתית");
+    expect(learning?.why.join(" ")).not.toContain("הפרעות נפשיות");
+  });
+
+  it("reads the same document differently on the two routes", () => {
+    // A child neurologist's attention diagnosis answers AD(H)D and answers
+    // nothing on the emotional route - which is the whole reason the check is
+    // per route rather than across all fourteen categories at once.
+    const doc = [{ kind: "נוירולוג קשב" as const, year: 2025 }];
+    expect(byKey(mechanicalTracks(base({ directions: ["learning"], diagnoses: doc })), "zakaut")?.relevance).toBe("consider");
+    expect(byKey(mechanicalTracks(base({ directions: ["emotional"], diagnoses: doc })), "zakaut")?.relevance).toBe("info");
   });
 
   it("raises the committee to 'consider' once an acceptable diagnosis exists, and names the category", () => {
-    const z = byKey(mechanicalTracks(base({ diagnoses: [{ kind: "פסיכיאטר ילדים", year: 2025 }] })), "zakaut");
+    const z = byKey(mechanicalTracks(onRoute({ diagnoses: [{ kind: "פסיכיאטר ילדים", year: 2025 }] })), "zakaut");
     expect(z?.relevance).toBe("consider");
     expect(z?.why.join(" ")).toContain("הפרעות נפשיות");
   });
 
   it("asks to verify the signer when that is all the document tells us", () => {
-    const z = byKey(mechanicalTracks(base({ diagnoses: [{ kind: "הערכה פסיכולוגית", year: 2025 }] })), "zakaut");
+    const z = byKey(mechanicalTracks(onRoute({ diagnoses: [{ kind: "הערכה פסיכולוגית", year: 2025 }] })), "zakaut");
     expect(z?.relevance).toBe("consider");
     expect(z?.cautions.join(" ")).toContain("חתום");
   });
 
   it("states the statutory deadline and warns that the municipality may close earlier", () => {
-    const z = byKey(mechanicalTracks(base()), "zakaut");
+    const z = byKey(mechanicalTracks(onRoute()), "zakaut");
     expect(z?.deadline?.date).toBe("2027-03-31");
     expect(z?.deadline?.note).toContain("מועד פנימי");
   });
 
   it("switches to the next window once 31 March has passed", () => {
-    const z = byKey(mechanicalTracks(base({ today: "2027-04-02" })), "zakaut");
+    const z = byKey(mechanicalTracks(onRoute({ today: "2027-04-02" })), "zakaut");
     expect(z?.deadline?.date).toBe("2027-09-01");
     expect(z?.deadline?.label).toContain("חלף");
   });
 
   it("opens a 21-day appeal track after a decision, and closes it after", () => {
-    const fresh = byKey(mechanicalTracks(base({ zakaut: { status: "decided", decisionReceivedOn: "2026-08-25" } })), "zakaut_appeal");
+    const fresh = byKey(mechanicalTracks(onRoute({ zakaut: { status: "decided", decisionReceivedOn: "2026-08-25" } })), "zakaut_appeal");
     expect(fresh?.relevance).toBe("primary");
     expect(fresh?.deadline?.date).toBe("2026-09-15");
 
-    const late = byKey(mechanicalTracks(base({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut_appeal");
+    const late = byKey(mechanicalTracks(onRoute({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut_appeal");
     expect(late?.relevance).toBe("info");
     expect(late?.deadline?.label).toContain("חלף");
-    expect(byKey(mechanicalTracks(base({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut")).toBeUndefined();
+    expect(byKey(mechanicalTracks(onRoute({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut")).toBeUndefined();
   });
 
-  it("keeps accommodations informational in primary school, with the floor date spelled out", () => {
-    const h = byKey(mechanicalTracks(base({ grade: "ג" })), "hatamot");
-    expect(h?.relevance).toBe("info");
-    expect(h?.why.join(" ")).toContain("1.7.2030");
+  it("does not say the word accommodations before ח, in any track", () => {
+    for (const grade of ["א", "ד", "ו", "ז"] as const) {
+      const t = mechanicalTracks(onRoute({ grade }));
+      expect(byKey(t, "hatamot")).toBeUndefined();
+      expect(byKey(t, "hatamot_appeal")).toBeUndefined();
+      expect(JSON.stringify(t)).not.toContain("התאמות בדרכי היבחנות");
+    }
+    expect(byKey(mechanicalTracks(onRoute({ grade: "ח" })), "hatamot")).toBeDefined();
+  });
+
+  it("spells out the assessment floor from ח onward", () => {
+    expect(byKey(mechanicalTracks(base({ grade: "ח" })), "hatamot")?.why.join(" ")).toContain("1.7.2025");
   });
 
   it("makes grade י the year to consider accommodations", () => {
@@ -259,10 +298,19 @@ describe("mechanicalTracks", () => {
   });
 
   it("stamps every track with the source it was verified against", () => {
-    for (const t of mechanicalTracks(base({ grade: "י", zakaut: { status: "decided", decisionReceivedOn: "2026-08-25" } }))) {
+    for (const t of mechanicalTracks(onRoute({ grade: "י", zakaut: { status: "decided", decisionReceivedOn: "2026-08-25" } }))) {
       expect(t.verified.length).toBeGreaterThan(0);
       expect(t.officialLinks.length).toBeGreaterThan(0);
     }
+  });
+
+  it("keeps the source but drops the link off a committee route", () => {
+    // The school team's only official link is the eligibility committee's own
+    // portal, and its name is the committee's name - the one thing the map is
+    // deliberately not saying here. The provenance stamp still stands.
+    const team = mechanicalTracks(base())[0];
+    expect(team.verified.length).toBeGreaterThan(0);
+    expect(team.officialLinks).toEqual([]);
   });
 });
 
