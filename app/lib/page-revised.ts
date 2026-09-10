@@ -87,7 +87,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research/therapy-types": { date: "2026-08-03", sources: ["app/research/therapy-types/page.tsx"] },
   "/research/topic/[topic]": { date: "2026-09-03", sources: ["app/research/topic/[topic]/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/which-therapy": { date: "2026-08-03", sources: ["app/research/which-therapy/page.tsx"] },
-  "/about": { date: "2026-08-20", sources: ["app/about/page.tsx"] },
+  "/about": { date: "2026-09-10", sources: ["app/about/page.tsx"] },
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-08-06", sources: ["app/developers/page.tsx"] },
