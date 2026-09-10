@@ -25,6 +25,7 @@ import {
   schoolYear,
   hatamotApplies,
   DIRECTION_LABELS,
+  PSYCHIATRIC_NOTE,
   type Diagnosis,
   type DiagnosisKind,
   type SchoolTrack,
@@ -54,6 +55,9 @@ import {
   toTracksInput,
   buildSchoolSummary,
   eligibilityDirections,
+  eligibilityRoutes,
+  exhaustionMessage,
+  SCHOOL_TIPS,
   type AcaStepKey,
   type AcaStepState,
   type CounselorFields,
@@ -386,7 +390,8 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
   // behavioural finding opens nothing, and then this screen says nothing about
   // committees and asks for no documents - there would be no committee for the
   // documents to be checked against.
-  const directions = eligibilityDirections(A);
+  const routes = eligibilityRoutes(A);
+  const directions = routes.live;
   const onRoute = directions.length > 0;
   const showHatamot = !!f._grade && hatamotApplies(f._grade);
   const missing = [f.c_fill, f.c_parents, f.c_team, ...(onRoute ? [f.c_zakaut] : []), ...(showHatamot ? [f.c_hatamot] : [])].filter(x => !x).length;
@@ -420,12 +425,27 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           ))}
         </Box>
 
+        {/* The route is live: the findings point somewhere and the school has
+            already tried something. Now, and only now, the file is worth
+            checking against it. */}
         {onRoute && (
           <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
             המערכת זיהתה שיש כיוון להצעה לשליחה לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
             <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
-              הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}. השאלות הבאות בודקות אם המסמכים שבתיק תואמים לו.
+              הכיוון שעלה: {directions.map(d => DIRECTION_LABELS[d]).join(" ו")}. השאלות הבאות בודקות אם המסמכים שבתיק תואמים לו.
             </div>
+            {directions.includes("psychiatric") && (
+              <div className="text-xs mt-1 font-semibold" style={{ color: "var(--gold-dark)" }}>{PSYCHIATRIC_NOTE}</div>
+            )}
+          </div>
+        )}
+
+        {/* The findings point somewhere the file cannot follow yet. Said here
+            rather than only on the report, because this is the screen where the
+            missing attempts are ticked - the box opens as they are. */}
+        {routes.pending.length > 0 && (
+          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+            {exhaustionMessage(routes.missing)}
           </div>
         )}
 
@@ -483,7 +503,13 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
               )}
             </>
           )}
-          <Q label="מגבלה כלכלית מוכרת במשפחה"><Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} /></Q>
+          <Q label="מגבלה כלכלית מוכרת במשפחה">
+            <Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} />
+            {/* The answer used to be a line in the summary and nothing else. */}
+            {f.c_economic === "yes" && (
+              <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>המלצות לאפשרויות ציבוריות יופיעו לפני פרטיות.</p>
+            )}
+          </Q>
         </Box>
       </Card>
       {/* Nothing here blocks: what was not answered is simply left out of the summary and the map. */}
@@ -562,6 +588,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   const tracks = useMemo(() => (input ? mapSchoolTracks(input) : []), [input]);
   const summary = useMemo(() => buildSchoolSummary(A, tracks, today, domains), [A, tracks, today, domains]);
   const directions = useMemo(() => eligibilityDirections(A), [A]);
+  const tips = useMemo(() => SCHOOL_TIPS.filter(t => t.when(A as CounselorFields)), [A]);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   const [pdf, setPdf] = useState<"idle" | "busy">("idle");
 
@@ -653,6 +680,22 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         )}
         <div className="space-y-3 mt-3">{tracks.map(t => <TrackCard key={t.key} t={t} />)}</div>
       </div>
+
+      {tips.length > 0 && (
+        <div>
+          <StepTag>כלים והכוונה</StepTag>
+          <StepQ>מה אפשר לעשות בבית הספר</StepQ>
+          <StepHint>לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בכיתה.</StepHint>
+          <div className="space-y-3">
+            {tips.map(t => (
+              <div key={t.key} className="rounded-2xl p-4 border bg-white" style={{ borderColor: "var(--line)" }}>
+                <div className="text-sm font-extrabold mb-1" style={{ color: "var(--text)" }}>{t.title}</div>
+                <p className="text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>{t.lines[0]} {t.lines[1]}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <StepTag>הדוח לתיק</StepTag>

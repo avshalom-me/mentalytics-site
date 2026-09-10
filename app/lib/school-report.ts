@@ -47,17 +47,32 @@ export type Duration = "this_year" | "over_year" | "years";
 export type Level = 0 | 1 | 2 | 3;
 export type Outcome = "helped" | "partial" | "no_help";
 
+/**
+ * What the school already put in front of the difficulty, across every rubric.
+ *
+ * Remedial teaching used to sit here too and was moved into ACA_STEPS: it is
+ * the first rung of the learning ladder, and a counsellor was answering the
+ * same question twice on two different screens.
+ *
+ * Split into two kinds because a committee expects both. One attempt at
+ * treating the child and one at changing what the system around them does is
+ * the floor under any referral - see missingAttempts.
+ */
 export const INTERVENTIONS = [
-  { key: "talks", label: "שיחות פרטניות עם מחנכ/ת או יועצת" },
-  { key: "plan", label: "תוכנית התנהגותית או רגשית בית-ספרית" },
-  { key: "tachi", label: "תוכנית אישית (תח\"י)" },
-  { key: "therapy_school", label: "טיפול רגשי בבית הספר (סל שילוב, טיפול באמנויות)" },
-  { key: "shach", label: "מעורבות שפ\"ח או פסיכולוג/ית בית הספר" },
-  { key: "remedial", label: "הוראה מתקנת או תגבור לימודי" },
-  { key: "parents", label: "תיווך ושיחות עם ההורים" },
-  { key: "external", label: "הפניה קודמת לגורם חוץ" },
+  { key: "talks", label: "שיחות פרטניות עם מחנכ/ת או יועצת", kind: "system" },
+  { key: "plan", label: "תוכנית התנהגותית או רגשית בית-ספרית", kind: "system" },
+  { key: "tachi", label: "תוכנית אישית (תח\"י)", kind: "system" },
+  { key: "parents", label: "תיווך ושיחות עם ההורים", kind: "system" },
+  { key: "therapy_school", label: "טיפול רגשי בבית הספר (סל שילוב, טיפול באמנויות)", kind: "treatment" },
+  { key: "shach", label: "מעורבות שפ\"ח או פסיכולוג/ית בית הספר", kind: "treatment" },
+  { key: "external", label: "הפניה קודמת לגורם חוץ", kind: "treatment" },
 ] as const;
 export type InterventionKey = (typeof INTERVENTIONS)[number]["key"];
+export type AttemptKind = "treatment" | "system";
+export const ATTEMPT_LABELS: Record<AttemptKind, string> = {
+  treatment: "ניסיון טיפולי אחד (טיפול רגשי בבית הספר, מעורבות שפ\"ח או פסיכולוג/ית, או הפניה לגורם חוץ)",
+  system: "התערבות מערכתית אחת (שיחות פרטניות, תוכנית התנהגותית או רגשית, תוכנית אישית, או עבודה עם ההורים)",
+};
 
 /**
  * מיצוי אפשרויות - what the school already put in front of a learning
@@ -192,17 +207,107 @@ export function acaExhaustionAdequate(A: Ans): boolean {
 }
 
 /**
- * A class-percentile answer in the bottom 5%.
+ * The class-percentile answers, by subject and by age band.
  *
- * The questionnaire words the option differently by age band - "5% מהכי
- * מתקשים בכיתה", "5% מהכי נמוכים בכיתה", or a bare "5%" - so the leading token
- * is what is read, exactly as the scoring engine's own pctTier does. The
- * prefixes are the four academic age blocks; nothing else in the answers uses
- * this scale.
+ * The questionnaire words each option differently per band - "5% מהכי מתקשים
+ * בכיתה", "5% מהכי נמוכים בכיתה", or a bare "5%" - so the leading token is
+ * what is read, exactly as the scoring engine's own pctTier does.
  */
-const ACA_KEY = /^(ag|dv|zh|tyb)_/;
-export function acaSevere(A: Ans): boolean {
-  return Object.keys(A).some(k => ACA_KEY.test(k) && typeof A[k] === "string" && A[k].trim().startsWith("5%"));
+export const ACA_SUBJECTS = {
+  read: ["ag_read", "dv_read", "zh_verbal", "tyb_verbal"],
+  write: ["ag_write", "dv_write", "zh_write", "tyb_write"],
+  math: ["ag_math", "dv_math", "zh_math", "tyb_math"],
+  eng: ["zh_eng", "tyb_eng"],
+} as const;
+/** Comprehension is a yes/no in every band, never a percentile. */
+const ACA_COMP = ["ag_comp", "dv_comp", "zh_comp", "tyb_comp"];
+
+export type AcaTier = "5%" | "10%" | "20%" | "none";
+const TIER_RANK: Record<AcaTier, number> = { "5%": 3, "10%": 2, "20%": 1, none: 0 };
+
+export function acaTier(v: unknown): AcaTier {
+  const t = String(v ?? "").trim();
+  if (t.startsWith("5%")) return "5%";
+  if (t.startsWith("10%")) return "10%";
+  if (t.startsWith("20%")) return "20%";
+  return "none";
+}
+export function subjectTier(A: Ans, subject: keyof typeof ACA_SUBJECTS): AcaTier {
+  return ACA_SUBJECTS[subject].reduce<AcaTier>((best, k) => {
+    const t = acaTier(A[k]);
+    return TIER_RANK[t] > TIER_RANK[best] ? t : best;
+  }, "none");
+}
+
+/**
+ * Whether the learning profile is the kind a committee looks at.
+ *
+ * Reading is the anchor: at the bottom 5% it stands on its own. Any other
+ * subject at 5% needs a second affected domain beside it, because the
+ * disability the committee recognises is לקות למידה רב-בעייתית - multi-domain
+ * by name. Reading at the 10% tier is that second domain.
+ *
+ * So is a reported comprehension difficulty, and that is the one judgement
+ * here rather than a rule from the brief: comprehension is a yes/no and a
+ * non-specific one - attention, language and hearing all produce it - so it
+ * carries the weight of a second domain and never the weight of an anchor.
+ * Flip COMP_COUNTS to false to require the reading tier alone.
+ */
+const COMP_COUNTS = true;
+export function acaProfileQualifies(A: Ans): boolean {
+  const read = subjectTier(A, "read");
+  if (read === "5%") return true;
+  const otherAt5 = (["write", "math", "eng"] as const).some(x => subjectTier(A, x) === "5%");
+  if (!otherAt5) return false;
+  return read === "10%" || (COMP_COUNTS && ACA_COMP.some(k => A[k] === "כן"));
+}
+
+/**
+ * The severity that makes the psychiatric route (57) a question at all.
+ *
+ * 55 and 57 are different disabilities with different admissible diagnosers -
+ * a school psychologist's opinion answers 55 and answers nothing at all for
+ * 57, which only a child and adolescent psychiatrist can sign. So 57 is raised
+ * only where the questionnaire found what it is for: suicidality, psychotic
+ * features, a mood finding, or anxiety at the engine's own high tier.
+ */
+export function psychiatricSeverity(A: Ans): boolean {
+  return A.q3_sui === "כן"
+    || A.q7a === "כן" || A.q7b === "כן"
+    || (A.aq_tot || 0) > 20
+    || ((A.q3 || 0) >= 3 && (A.mq_tot || 0) >= 4);
+}
+
+/**
+ * The floor under any committee referral: one attempt at treating the child
+ * and one at changing what the system around them does.
+ *
+ * On the learning route the ladder's own two core rungs are that treatment -
+ * remedial teaching and inclusion support are what treating a learning
+ * difficulty in a school looks like - so asking for school counselling on top
+ * of them would block a route the ladder has already earned.
+ */
+export function missingAttempts(A: Ans, candidates: EligibilityDirection[]): AttemptKind[] {
+  const f = A as CounselorFields;
+  const tried = f.c_tried ?? {};
+  const out: AttemptKind[] = [];
+  const ladderDone = candidates.includes("learning") &&
+    ACA_STEPS.filter(x => x.core).every(x => f.c_aca_steps?.[x.key] === "done");
+  if (!INTERVENTIONS.some(i => i.kind === "treatment" && tried[i.key]) && !ladderDone) out.push("treatment");
+  if (!INTERVENTIONS.some(i => i.kind === "system" && tried[i.key])) out.push("system");
+  return out;
+}
+
+export function exhaustionMessage(missing: AttemptKind[]): string {
+  return `מומלץ להשלים ${missing.map(m => ATTEMPT_LABELS[m]).join(" ו")} כדי לסיים מיצוי אפשרויות, ולאחר מכן מומלץ לשקול פנייה לוועדת זכאות ואפיון.`;
+}
+
+export interface RouteState {
+  /** Routes the map may name. */
+  live: EligibilityDirection[];
+  /** Routes the findings support, waiting only on the attempts below. */
+  pending: EligibilityDirection[];
+  missing: AttemptKind[];
 }
 
 /**
@@ -222,12 +327,89 @@ export function acaSevere(A: Ans): boolean {
  * refinement screen, which runs before scoring, asks exactly the questions the
  * report will use.
  */
-export function eligibilityDirections(A: Ans): EligibilityDirection[] {
-  const out: EligibilityDirection[] = [];
-  if (areaOn(A.a_emo, "הרבה")) out.push("emotional");
-  if (academicOn(A) && acaExhaustionAdequate(A) && acaSevere(A)) out.push("learning");
-  return out;
+export function eligibilityRoutes(A: Ans): RouteState {
+  const candidates: EligibilityDirection[] = [];
+  if (areaOn(A.a_emo, "הרבה")) candidates.push("emotional");
+  // Not gated on the area level: suicidality and psychotic features are the
+  // finding whatever was ticked on the opening screen.
+  if (areaOn(A.a_emo) && psychiatricSeverity(A)) candidates.push("psychiatric");
+  if (academicOn(A) && acaExhaustionAdequate(A) && acaProfileQualifies(A)) candidates.push("learning");
+  if (!candidates.length) return { live: [], pending: [], missing: [] };
+  const missing = missingAttempts(A, candidates);
+  return missing.length
+    ? { live: [], pending: candidates, missing }
+    : { live: candidates, pending: [], missing: [] };
 }
+
+export function eligibilityDirections(A: Ans): EligibilityDirection[] {
+  return eligibilityRoutes(A).live;
+}
+
+// ── What the school can do with what it reported ─────────────────────────────
+
+/**
+ * Two lines of practical guidance beside each school observation.
+ *
+ * These answers used to produce a line of prose in the summary and nothing
+ * else: the rubrics they belong to lead to treatment and to the school's own
+ * team, never to a committee, so nothing downstream read them. A counsellor
+ * who reports weekly dysregulation should get something back for it.
+ *
+ * Conventional school practice, not a protocol - phrased as what tends to help
+ * rather than as what must be done, and always beside the referral rather than
+ * instead of it.
+ */
+export const SCHOOL_TIPS: { key: string; title: string; when: (f: CounselorFields) => boolean; lines: [string, string] }[] = [
+  {
+    key: "regulation",
+    title: "ויסות בכיתה ובהפסקות",
+    when: f => typeof f.c_regulation === "number" && f.c_regulation >= 2,
+    lines: [
+      "כדאי לקבוע מראש סימן מוסכם ומקום יציאה מוסדר לרגיעה, ולהשתמש בו לפני שהעומס מגיע לשיא ולא כתגובה להתפרצות.",
+      "תיעוד קצר של מה שקדם לאירועים החוזרים מגלה לרוב שעה, מקצוע או מעבר שחוזרים על עצמם, ומשם אפשר לשנות את הסידור ולא רק את התגובה.",
+    ],
+  },
+  {
+    key: "isolation",
+    title: "בידוד או דחייה חברתית",
+    when: f => typeof f.c_isolation === "number" && f.c_isolation >= 2,
+    lines: [
+      "עבודה בקבוצות קטנות שהמורה מרכיב/ה, ולא בבחירה חופשית, מורידה את החשיפה לדחייה ומייצרת הזדמנויות לקשר.",
+      "כדאי לאתר תלמיד/ה אחד/ת שאיתו/ה יש בסיס לקשר ולבסס אותו לפני שמרחיבים לקבוצה - קשר אחד יציב מועיל יותר מניסיון לשלב בכיתה כולה.",
+    ],
+  },
+  {
+    key: "bully_victim",
+    title: "נפגע/ת מהצקות או מחרם",
+    when: f => f.c_bully_victim === "suspected" || f.c_bully_victim === "known",
+    lines: [
+      "הטיפול בהצקות הוא מערכתי ולא שיחה בין הנפגע/ת לפוגע/ת: תיעוד, יידוע ההורים, עבודה עם הכיתה ומעקב לאורך זמן.",
+      "חשוב לוודא שהתלמיד/ה יודע/ת למי לפנות ומתי, ושהמענה אינו תלוי ביוזמה שלו/ה - מי שנפגע/ת לרוב מפסיק/ה לדווח.",
+    ],
+  },
+  {
+    key: "bully_perp",
+    title: "מעורבות כפוגע/ת",
+    when: f => f.c_bully_perp === "suspected" || f.c_bully_perp === "known",
+    lines: [
+      "עבודה עם הפוגע/ת מתמקדת באחריות ובתיקון ולא בענישה בלבד, לצד בירור מה מחזיק את ההתנהגות.",
+      "כדאי לבדוק אם מדובר בקושי בוויסות, במאבק על מעמד חברתי, או בדפוס שנלמד מחוץ לבית הספר - לכל אחד מהם מענה אחר.",
+    ],
+  },
+  {
+    key: "org",
+    title: "התארגנות",
+    when: f => typeof f.c_org === "number" && f.c_org >= 2,
+    lines: [
+      "עזרים חיצוניים - צ'קליסט קבוע, צילום הלוח, תיק שנארז בבית הספר - עובדים טוב יותר מתזכורות מילוליות.",
+      "כדאי שגורם אחד קבוע יבדוק את ההתארגנות בזמן קבוע ביום, ולא כל מורה בנפרד; העקביות היא מה שעושה את ההבדל.",
+    ],
+  },
+];
+
+/** When money is the constraint, the public route is named before the private one. */
+export const ECONOMIC_NOTE =
+  "קיימת מגבלה כלכלית מוכרת - מומלץ למצות אפשרויות ציבוריות (שפ\"ח, מרפאות בריאות הנפש, קופות החולים) לפני הפניה פרטית.";
 
 // ── Engine input ─────────────────────────────────────────────────────────────
 
@@ -242,6 +424,7 @@ export function isSchoolGrade(g: unknown): g is SchoolGrade {
 export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
   const f = A as CounselorFields;
   if (!isSchoolGrade(f._grade)) return null;
+  const routes = eligibilityRoutes(A);
   return {
     grade: f._grade,
     today,
@@ -251,7 +434,9 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
     hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
-    directions: eligibilityDirections(A),
+    directions: routes.live,
+    pendingDirections: routes.pending,
+    exhaustionNote: routes.missing.length ? exhaustionMessage(routes.missing) : undefined,
     economicConstraint: f.c_economic === "yes",
     risk: {
       // Read from the questionnaire's own screen. An item the counsellor marked
@@ -360,6 +545,15 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     sections.push({ title: "התערבויות שנוסו בבית הספר", lines });
   }
 
+  // כלים והכוונה
+  const tips = SCHOOL_TIPS.filter(t => t.when(f));
+  if (tips.length) {
+    sections.push({
+      title: "כלים והכוונה לצוות",
+      lines: tips.flatMap(t => [`${t.title}: ${t.lines[0]}`, t.lines[1]]),
+    });
+  }
+
   // מיצוי אפשרויות בתחום הלימודי
   if (academicOn(A) && f.c_aca_steps) {
     const rows = ACA_STEPS.filter(x => f.c_aca_steps?.[x.key]).map(x => `${x.label}: ${ACA_STEP_LABELS[f.c_aca_steps![x.key]!]}`);
@@ -379,7 +573,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   if (f.c_zakaut) docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
   // Not a word about matriculation accommodations before ח' - see hatamotApplies.
   if (f.c_hatamot && f._grade && hatamotApplies(f._grade)) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
-  if (f.c_economic === "yes") docs.push("קיימת מגבלה כלכלית מוכרת");
+  if (f.c_economic === "yes") docs.push(ECONOMIC_NOTE);
   if (docs.length) sections.push({ title: "אבחונים, ועדות ומשאבים", lines: docs });
 
   // מסלולים

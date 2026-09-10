@@ -87,11 +87,19 @@ export type DiagnosisKind = (typeof DIAGNOSIS_KINDS)[number];
  * against is below: a hearing report in the file is no longer an answer to an
  * emotional finding, which is what checking all fourteen at once made it.
  */
-export type EligibilityDirection = "emotional" | "learning";
+export type EligibilityDirection = "emotional" | "psychiatric" | "learning";
 export const DIRECTION_LABELS: Record<EligibilityDirection, string> = {
-  emotional: "רגשי/נפשי (לקויות 55, 57)",
+  emotional: "רגשי/התנהגותי (לקות 55)",
+  psychiatric: "נפשי (לקות 57)",
   learning: "לימודי/קשב (לקות 58)",
 };
+/**
+ * 57 is the one route whose admissible diagnoser is a single profession. A
+ * school psychologist's opinion answers 55 and answers nothing here, so a
+ * counsellor heading down it is told what to look for before she looks.
+ */
+export const PSYCHIATRIC_NOTE =
+  "בלקות 57 (הפרעות נפשיות) קבילה אך ורק אבחנה של רופא/ה מומחה/ית בפסיכיאטריה של ילדים ונוער - יש לברר אם קיימת הערכה פסיכיאטרית בתיק";
 
 export const DISABILITY_CATEGORIES = [
   "משכל גבולי",
@@ -141,7 +149,8 @@ type Acceptable = {
 
 /** Verbatim from the First Schedule [A]. Do not "improve" the wording; it is what the committee reads. */
 export const DIRECTION_CATEGORIES: Record<EligibilityDirection, DisabilityCategory[]> = {
-  emotional: ["הפרעות התנהגותיות ורגשיות", "הפרעות נפשיות"],
+  emotional: ["הפרעות התנהגותיות ורגשיות"],
+  psychiatric: ["הפרעות נפשיות"],
   learning: ["לקות למידה רב-בעייתית", "AD(H)D"],
 };
 
@@ -422,7 +431,8 @@ export type TrackKey =
   | "hatamot_appeal"
   | "assessment"
   | "risk_protocol"
-  | "attendance";
+  | "attendance"
+  | "exhaustion";
 
 export type Relevance = "primary" | "consider" | "info";
 
@@ -472,6 +482,14 @@ export interface SchoolTracksInput {
    * what puts a route on the list.
    */
   directions?: EligibilityDirection[];
+  /**
+   * Routes the findings support and that are waiting on nothing but the
+   * attempts the school has yet to make. The map names the work, not the
+   * committee - see the exhaustion track.
+   */
+  pendingDirections?: EligibilityDirection[];
+  /** What is still missing before a pending route may be named, already phrased. */
+  exhaustionNote?: string;
 }
 
 const LINKS = {
@@ -514,6 +532,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   const gi = SCHOOL_GRADES.indexOf(grade);
   const sy = schoolYear(today);
   const directions = input.directions ?? [];
+  const pending = input.pendingDirections ?? [];
   const onCommitteeRoute = directions.length > 0;
   const dirCategories = Array.from(new Set(directions.flatMap(d => DIRECTION_CATEGORIES[d])));
   const hatamotOn = hatamotApplies(grade);
@@ -557,7 +576,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     const cautions: string[] = [];
     let relevance: Relevance = "info";
 
-    why.push(`הכיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}`);
+    why.push(`הכיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`);
     if (acceptable.length) {
       relevance = "consider";
       why.push(`בתיק מסמך מגורם שאבחנתו קבילה לצורך: ${acceptable.join(", ")} - בתנאי שהאבחנה עצמה כתובה בו`);
@@ -568,6 +587,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     } else {
       why.push(`הוועדה דנה בתלמידים עם מוגבלות מזכה שיש עליה אבחנה קבילה - ובתיק אין כרגע מסמך שמתאים לכיוון הזה (${dirCategories.join(", ")}). אבחון קודם, ועדה אחר כך`);
     }
+    if (directions.includes("psychiatric")) cautions.push(PSYCHIATRIC_NOTE);
     if (zStatus === "in_process") why.push("ההליך כבר בעיצומו לפי הדיווח");
 
     const deadline = win.open
@@ -618,6 +638,29 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       cautions: [],
       officialLinks: [LINKS.zakautKolzchut],
       verified: "כל-זכות [C], 2.9.2026",
+    });
+  }
+
+  // ── מיצוי אפשרויות: the findings support a route, the file does not yet ──
+  if (pending.length > 0) {
+    tracks.push({
+      key: "exhaustion",
+      name: "מיצוי אפשרויות לפני ועדה",
+      relevance: "primary",
+      why: [
+        `הממצאים מצביעים על כיוון אפשרי (${pending.map(d => DIRECTION_LABELS[d]).join(", ")}), אך טרם נרשמו ההתערבויות שהוועדה מצפה לראות`,
+        ...(input.exhaustionNote ? [input.exhaustionNote] : []),
+      ],
+      documents: ["סיכום ההתערבויות שנוסו ותוצאותיהן"],
+      steps: [
+        "לקבוע מי אחראי/ת על כל התערבות ומתי נבדקת מחדש",
+        "לתעד תוצאה לכל התערבות - זהו סיכום ההתערבויות שהוועדה מבקשת",
+        "לשוב ולמלא את השאלון לאחר תקופת ההתערבות",
+      ],
+      appeals: [],
+      cautions: [],
+      officialLinks: [],
+      verified: "החלטת הצוות הקליני של טיפול חכם, 10.9.2026",
     });
   }
 
@@ -709,7 +752,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
   const needsForHatamot = hatamotOn && hStatus !== "district_decided" && !usable.length;
   if (needsForZakaut || needsForHatamot || (hatamotOn && stale.length)) {
     const why: string[] = [];
-    if (needsForZakaut) why.push(`ועדת זכאות ואפיון דורשת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה, בהתאם לכיוון שעלה: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו-")}`);
+    if (needsForZakaut) why.push(`ועדת זכאות ואפיון דורשת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה, בהתאם לכיוון שעלה: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`);
     if (needsForHatamot) why.push("ועדת ההתאמות המחוזית דורשת אבחון דידקטי או פסיכו-דידקטי (או פסיכולוגי ודידקטי) שנערך מ-1 ביולי בסיום כיתה ו' ואילך");
     if (hatamotOn && stale.length) why.push("האבחון הקיים קדם לתאריך הרצפה ואינו משמש להתאמות");
     tracks.push({

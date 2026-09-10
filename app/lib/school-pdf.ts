@@ -47,7 +47,21 @@ const INK_3 = "#4f6260";
 const RULE = "#d3dedd";
 const ACCENT = "#2A6462";
 const PAPER = "#ffffff";
-const BAND = "#f4f8f7";
+
+/**
+ * The three relevance levels, told apart on paper.
+ *
+ * They were all printed in the same teal, so a card marked "מידע" read exactly
+ * like one marked "לטיפול עכשיו" - and in a document that goes into a file and
+ * gets passed on, that is the difference between background and a referral.
+ * Restrained on purpose: a weight and a tint, not a colour-coded web card.
+ */
+const REL_TONE: Record<string, { fg: string; band: string; border: string }> = {
+  "לטיפול עכשיו": { fg: "#8a5a06", band: "#fdf6e3", border: "#e3c98a" },
+  "לשיקול": { fg: ACCENT, band: "#eef5f4", border: "#bcd6d4" },
+  "מידע": { fg: "#5c6d6b", band: "#f5f6f6", border: "#dfe4e3" },
+};
+const toneFor = (label: string) => REL_TONE[label] ?? REL_TONE["מידע"];
 
 const FONT = "Heebo, system-ui, sans-serif";
 
@@ -165,13 +179,18 @@ function graphBlocks(source: HTMLElement | null): Block[] {
 function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => string): Block[] {
   const out: Block[] = [];
   for (const t of tracks) {
+    const label = relevanceLabel(t);
+    const tone = toneFor(label);
     const head = el("div", {
       display: "flex", justifyContent: "space-between", gap: "12px", alignItems: "baseline",
-      background: BAND, border: `1px solid ${RULE}`, borderRadius: "8px",
+      background: tone.band, border: `1px solid ${tone.border}`, borderRadius: "8px",
       padding: "9px 12px", marginBottom: "9px",
     });
     head.appendChild(el("span", { font: `800 14.5px/1.5 ${FONT}`, color: INK }, t.name));
-    head.appendChild(el("span", { font: `700 11.5px/1.5 ${FONT}`, color: ACCENT, whiteSpace: "nowrap" }, relevanceLabel(t)));
+    head.appendChild(el("span", {
+      font: `800 11px/1.5 ${FONT}`, color: tone.fg, whiteSpace: "nowrap",
+      border: `1px solid ${tone.border}`, borderRadius: "999px", padding: "2px 9px", background: PAPER,
+    }, label));
     out.push({ node: head, keepWithNext: true });
 
     for (const w of t.why) out.push({ node: bullet(w) });
@@ -333,7 +352,10 @@ export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<vo
         "המסלולים והמועדים מחושבים מכללי חוזרי המנכ\"ל ומן החוק, לפי הכיתה ולפי מה שנמסר על התיק. השיפוט הקליני - מה מצדיק הפניה ובאיזו דחיפות - נשאר בידי הצוות.",
         { color: INK_3, font: `500 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
       ),
-      keepWithNext: true,
+      // Deliberately NOT kept with the diagram: chaining heading -> paragraph ->
+      // diagram meant all three moved together, and a summary that ends near the
+      // top of a page then left two thirds of it white. The heading keeps its
+      // paragraph; the picture may start overleaf, which is what a document does.
     });
     blocks.push(...graphBlocks(input.graphsEl));
     blocks.push(...trackBlocks(input.tracks, input.relevanceLabel));

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import type { KidsDomainResult } from "./kids-recommendations";
 import {
   toTracksInput, buildSchoolSummary, interventionsTried, SCHOOL_DIAGNOSIS_KINDS,
-  eligibilityDirections, acaExhaustionAdequate, acaSevere, type Ans,
+  eligibilityDirections, eligibilityRoutes, acaExhaustionAdequate, acaProfileQualifies,
+  psychiatricSeverity, INTERVENTIONS, type Ans,
 } from "./school-report";
 import { mapSchoolTracks } from "./school-tracks-engine";
 
@@ -16,7 +17,7 @@ const full: Ans = {
   a_aca: "הרבה", c_support: "partial", c_org: 2,
   a_soc: "הרבה", soc1: "כן", c_isolation: 2, c_bully_victim: "suspected",
   c_fill: "phone_parent", c_parents: "aware_consent",
-  c_tried: { talks: "helped", remedial: "no_help" },
+  c_tried: { talks: "helped", shach: "no_help" },
   c_diag: [{ kind: "פסיכיאטר ילדים", year: 2025 }],
   c_team: "yes", c_zakaut: "none", c_hatamot: "none", c_economic: "yes",
 };
@@ -33,38 +34,56 @@ const anxietyDomain: KidsDomainResult = {
   standaloneWarnings: [{ text: "⚠️ מומלץ לשלול גורם רפואי לפני הטיפול", urgent: false }],
 };
 
-describe("eligibilityDirections - which committee route, if any", () => {
+describe("eligibilityRoutes - which committee route, if any", () => {
   const worked = { remedial: "done", inclusion: "done" } as const;
+  /** The floor under every referral: one treatment attempt, one system one. */
+  const attempts = { c_tried: { shach: "partial", talks: "helped" } } as const;
 
   it("opens nothing for a social or a behavioural finding", () => {
-    expect(eligibilityDirections({ a_soc: "הרבה מאוד", a_beh: "הרבה מאוד" })).toEqual([]);
+    expect(eligibilityRoutes({ a_soc: "הרבה מאוד", a_beh: "הרבה מאוד", ...attempts }))
+      .toEqual({ live: [], pending: [], missing: [] });
   });
 
   it("opens the emotional route on a real emotional finding, not on a slight one", () => {
-    expect(eligibilityDirections({ a_emo: "מעט" })).toEqual([]);
-    expect(eligibilityDirections({ a_emo: "הרבה" })).toEqual(["emotional"]);
-    expect(eligibilityDirections({ a_emo: "הרבה מאוד" })).toEqual(["emotional"]);
+    expect(eligibilityDirections({ a_emo: "מעט", ...attempts })).toEqual([]);
+    expect(eligibilityDirections({ a_emo: "הרבה", ...attempts })).toEqual(["emotional"]);
   });
 
-  it("needs the school to have worked the learning difficulty AND a bottom-5% subject", () => {
-    const severe = { a_aca: "הרבה", dv_math: "5% מהכי נמוכים בכיתה" };
-    expect(eligibilityDirections(severe)).toEqual([]);                                   // nothing tried
-    expect(eligibilityDirections({ a_aca: "הרבה", c_aca_steps: worked })).toEqual([]);   // tried, not severe
-    expect(eligibilityDirections({ ...severe, c_aca_steps: worked })).toEqual(["learning"]);
+  it("raises 57 beside 55 only where the questionnaire found what 57 is for", () => {
+    expect(eligibilityDirections({ a_emo: "הרבה", ...attempts })).toEqual(["emotional"]);
+    expect(eligibilityDirections({ a_emo: "הרבה", q3_sui: "כן", ...attempts })).toEqual(["emotional", "psychiatric"]);
+    expect(eligibilityDirections({ a_emo: "הרבה", q7a: "כן", ...attempts })).toEqual(["emotional", "psychiatric"]);
+    expect(eligibilityDirections({ a_emo: "הרבה", aq_tot: 21, ...attempts })).toEqual(["emotional", "psychiatric"]);
+    expect(eligibilityDirections({ a_emo: "הרבה", q3: 3, mq_tot: 4, ...attempts })).toEqual(["emotional", "psychiatric"]);
+  });
+
+  it("raises 57 even where the opening screen was ticked only 'מעט'", () => {
+    // Suicidality is the finding whatever the area flag said.
+    expect(eligibilityDirections({ a_emo: "מעט", q3_sui: "כן", ...attempts })).toEqual(["psychiatric"]);
+    expect(psychiatricSeverity({ aq_tot: 20 })).toBe(false);
+    expect(psychiatricSeverity({ aq_tot: 21 })).toBe(true);
+  });
+
+  it("makes reading the anchor of the learning profile, and needs a second domain beside anything else", () => {
+    expect(acaProfileQualifies({ dv_read: "5% מהכי נמוכים בכיתה" })).toBe(true);
+    expect(acaProfileQualifies({ dv_math: "5% מהכי נמוכים בכיתה" })).toBe(false);
+    expect(acaProfileQualifies({ dv_math: "5% מהכי נמוכים בכיתה", dv_read: "10% מהכי נמוכים בכיתה" })).toBe(true);
+    expect(acaProfileQualifies({ dv_math: "5% מהכי נמוכים בכיתה", dv_comp: "כן" })).toBe(true);
+    expect(acaProfileQualifies({ dv_comp: "כן" })).toBe(false);
+    expect(acaProfileQualifies({})).toBe(false);
+  });
+
+  it("needs the school to have worked the learning difficulty as well as the profile", () => {
+    const profile = { a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", ...attempts };
+    expect(eligibilityDirections(profile)).toEqual([]);                                  // ladder untouched
+    expect(eligibilityDirections({ a_aca: "הרבה", c_aca_steps: worked, ...attempts })).toEqual([]);  // no profile
+    expect(eligibilityDirections({ ...profile, c_aca_steps: worked })).toEqual(["learning"]);
   });
 
   it("holds the route back while something the school said was needed is still open", () => {
-    const A = { a_aca: "הרבה", ag_read: "5% מהכי מתקשים בכיתה", c_aca_steps: { ...worked, adhd_doc: "not_done" } };
+    const A = { a_aca: "הרבה", ag_read: "5% מהכי מתקשים בכיתה", ...attempts, c_aca_steps: { ...worked, adhd_doc: "not_done" } };
     expect(eligibilityDirections(A)).toEqual([]);
     expect(eligibilityDirections({ ...A, c_aca_steps: { ...worked, adhd_doc: "not_needed" } })).toEqual(["learning"]);
-  });
-
-  it("reads the 5% wording of every age band, and nothing weaker", () => {
-    expect(acaSevere({ ag_read: "5% מהכי מתקשים בכיתה" })).toBe(true);
-    expect(acaSevere({ dv_math: "5% מהכי נמוכים בכיתה" })).toBe(true);
-    expect(acaSevere({ tyb_verbal: "5%" })).toBe(true);
-    expect(acaSevere({ zh_math: "10%" })).toBe(false);
-    expect(acaSevere({ q1: "5%" })).toBe(false);   // not an academic key
   });
 
   it("counts an unanswered optional row as nothing said, not as a blocker", () => {
@@ -73,9 +92,34 @@ describe("eligibilityDirections - which committee route, if any", () => {
     expect(acaExhaustionAdequate({ c_aca_steps: { remedial: "in_progress", inclusion: "done" } })).toBe(false);
   });
 
-  it("carries the route into the engine's input", () => {
-    expect(toTracksInput({ _grade: "ד", a_emo: "הרבה" }, TODAY)?.directions).toEqual(["emotional"]);
-    expect(toTracksInput({ _grade: "ד", a_soc: "הרבה" }, TODAY)?.directions).toEqual([]);
+  it("holds every route behind one treatment attempt and one system attempt", () => {
+    const finding = { a_emo: "הרבה" };
+    expect(eligibilityRoutes(finding)).toMatchObject({ live: [], pending: ["emotional"], missing: ["treatment", "system"] });
+    expect(eligibilityRoutes({ ...finding, c_tried: { talks: "helped" } }))
+      .toMatchObject({ live: [], pending: ["emotional"], missing: ["treatment"] });
+    expect(eligibilityRoutes({ ...finding, c_tried: { shach: "helped" } }))
+      .toMatchObject({ live: [], pending: ["emotional"], missing: ["system"] });
+    expect(eligibilityRoutes({ ...finding, ...attempts }).live).toEqual(["emotional"]);
+  });
+
+  it("counts the academic ladder as the treatment the learning route already had", () => {
+    // Remedial teaching and inclusion support ARE treating a learning
+    // difficulty; asking for school counselling on top of them would block a
+    // route the ladder has earned.
+    const A = { a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", c_aca_steps: worked, c_tried: { talks: "helped" } };
+    expect(eligibilityRoutes(A).live).toEqual(["learning"]);
+  });
+
+  it("carries the route, what is pending, and the sentence that says why", () => {
+    const pending = toTracksInput({ _grade: "ד", a_emo: "הרבה" }, TODAY)!;
+    expect(pending.directions).toEqual([]);
+    expect(pending.pendingDirections).toEqual(["emotional"]);
+    expect(pending.exhaustionNote).toContain("מיצוי אפשרויות");
+    expect(pending.exhaustionNote).toContain("ולאחר מכן");
+
+    const live = toTracksInput({ _grade: "ד", a_emo: "הרבה", c_tried: { shach: "partial", talks: "helped" } }, TODAY)!;
+    expect(live.directions).toEqual(["emotional"]);
+    expect(live.exhaustionNote).toBeUndefined();
   });
 });
 
@@ -103,6 +147,13 @@ describe("toTracksInput", () => {
   it("counts an intervention as tried whatever its outcome", () => {
     expect(interventionsTried({ c_tried: { talks: "no_help" } })).toBe(1);
     expect(interventionsTried({})).toBe(0);
+  });
+
+  it("no longer asks about remedial teaching twice", () => {
+    // It lives in the academic ladder now - see ACA_STEPS.
+    expect(INTERVENTIONS.map(i => i.key)).not.toContain("remedial");
+    expect(INTERVENTIONS.some(i => i.kind === "treatment")).toBe(true);
+    expect(INTERVENTIONS.some(i => i.kind === "system")).toBe(true);
   });
 
   it("never offers the two questionnaire kinds that have no meaning in a school file", () => {
@@ -155,7 +206,7 @@ describe("buildSchoolSummary", () => {
 
   it("lists the interventions with their outcomes, then the ones not tried", () => {
     expect(text).toContain("שיחות פרטניות עם מחנכ/ת או יועצת: הועיל");
-    expect(text).toContain("הוראה מתקנת או תגבור לימודי: לא הועיל");
+    expect(text).toContain("מעורבות שפ\"ח או פסיכולוג/ית בית הספר: לא הועיל");
     expect(text).toContain("טרם נוסו: תוכנית התנהגותית");
   });
 
@@ -182,6 +233,25 @@ describe("buildSchoolSummary", () => {
     expect(bare).toContain("כיתה ח");
     expect(bare).not.toContain("התערבויות");
     expect(bare).not.toContain("תחום");
+  });
+});
+
+describe("what the school gets back for what it reported", () => {
+  it("gives two lines of guidance beside each observation it used to only echo", () => {
+    const t = buildSchoolSummary({ ...full, c_regulation: 2 }, [], TODAY).text;
+    expect(t).toContain("כלים והכוונה לצוות");
+    expect(t).toContain("ויסות בכיתה ובהפסקות");
+    expect(t).toContain("בידוד או דחייה חברתית");   // c_isolation is 2 in the fixture
+    expect(t).toContain("נפגע/ת מהצקות או מחרם");   // c_bully_victim is "suspected"
+  });
+
+  it("says nothing where nothing was reported", () => {
+    expect(buildSchoolSummary({ _grade: "ח" }, [], TODAY).text).not.toContain("כלים והכוונה");
+  });
+
+  it("names the public route before the private one when money is the constraint", () => {
+    expect(buildSchoolSummary(full, [], TODAY).text).toContain("אפשרויות ציבוריות");
+    expect(buildSchoolSummary({ ...full, c_economic: "no" }, [], TODAY).text).not.toContain("אפשרויות ציבוריות");
   });
 });
 

@@ -223,7 +223,12 @@ describe("mechanicalTracks", () => {
   it("raises the committee to 'consider' once an acceptable diagnosis exists, and names the category", () => {
     const z = byKey(mechanicalTracks(onRoute({ diagnoses: [{ kind: "פסיכיאטר ילדים", year: 2025 }] })), "zakaut");
     expect(z?.relevance).toBe("consider");
-    expect(z?.why.join(" ")).toContain("הפרעות נפשיות");
+    expect(z?.why.join(" ")).toContain("הפרעות התנהגותיות ורגשיות");
+    // The same signature also answers 57, which is the only route it answers.
+    const psych = byKey(mechanicalTracks(base({ directions: ["psychiatric"], diagnoses: [{ kind: "פסיכיאטר ילדים", year: 2025 }] })), "zakaut");
+    expect(psych?.why.join(" ")).toContain("הפרעות נפשיות");
+    const psychOnly = byKey(mechanicalTracks(base({ directions: ["psychiatric"], diagnoses: [{ kind: "פסיכולוג חינוכי", year: 2025 }] })), "zakaut");
+    expect(psychOnly?.relevance).toBe("info");
   });
 
   it("asks to verify the signer when that is all the document tells us", () => {
@@ -253,6 +258,24 @@ describe("mechanicalTracks", () => {
     expect(late?.relevance).toBe("info");
     expect(late?.deadline?.label).toContain("חלף");
     expect(byKey(mechanicalTracks(onRoute({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut")).toBeUndefined();
+  });
+
+  it("names the work when the findings point somewhere the file cannot yet follow", () => {
+    const t = mechanicalTracks(base({ directions: [], pendingDirections: ["emotional"], exhaustionNote: "מומלץ להשלים X" }));
+    const ex = byKey(t, "exhaustion");
+    expect(ex?.relevance).toBe("primary");
+    expect(ex?.why.join(" ")).toContain("רגשי/התנהגותי");
+    expect(ex?.why.join(" ")).toContain("מומלץ להשלים X");
+    // The committee itself is still not named: the route is not live.
+    expect(byKey(t, "zakaut")).toBeUndefined();
+  });
+
+  it("warns that 57 takes a psychiatrist and nothing else", () => {
+    const z = byKey(mechanicalTracks(base({ directions: ["psychiatric"] })), "zakaut");
+    expect(z?.cautions.join(" ")).toContain("פסיכיאטריה של ילדים ונוער");
+    expect(z?.why.join(" ")).toContain("הפרעות נפשיות");
+    expect(byKey(mechanicalTracks(base({ directions: ["emotional"] })), "zakaut")?.cautions.join(" "))
+      .not.toContain("פסיכיאטריה של ילדים ונוער");
   });
 
   it("does not say the word accommodations before ח, in any track", () => {
@@ -315,17 +338,29 @@ describe("mechanicalTracks", () => {
 });
 
 describe("clinical layer", () => {
-  it("ships with every rule in draft, so nothing clinical reaches a counsellor unreviewed", () => {
+  it("lets nothing clinical reach a counsellor unreviewed", () => {
     expect(CLINICAL_RULES.length).toBeGreaterThan(0);
-    expect(approvedRules()).toEqual([]);
+    for (const r of approvedRules()) expect(r.reviewedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("raises the attendance officer on school refusal, now that the rule is approved", () => {
+    const t = mapSchoolTracks(base({ risk: { schoolRefusal: true } }));
+    const kabas = t.find(x => x.key === "attendance");
+    expect(kabas?.relevance).toBe("primary");
+    expect(kabas?.steps.join(" ")).toContain("קב\"ס");
+    // The cause before the enforcement - the rule says so in its own steps.
+    expect(kabas?.steps.join(" ")).toContain("הטיפול בסיבה קודם לאכיפה");
+    expect(mapSchoolTracks(base()).find(x => x.key === "attendance")).toBeUndefined();
   });
 
   it("requires a review date on every approved rule", () => {
     for (const r of CLINICAL_RULES) if (r.status === "approved") expect(r.reviewedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
-  it("ignores draft rules at runtime: the map is the mechanical map", () => {
-    const input = base({ grade: "ז", risk: { suicidality: true, schoolRefusal: true }, findings: { assessmentKeys: ["פסיכו-דידקטי"], treatmentKeys: [], externalKeys: [] } });
+  it("ignores draft rules at runtime", () => {
+    // Suicidality and the learning-findings promotion are both still drafts, so
+    // neither shows up; school refusal is left out here because its rule is not.
+    const input = base({ grade: "ז", risk: { suicidality: true }, findings: { assessmentKeys: ["פסיכו-דידקטי"], treatmentKeys: [], externalKeys: [] } });
     expect(mapSchoolTracks(input)).toEqual(mechanicalTracks(input));
   });
 
