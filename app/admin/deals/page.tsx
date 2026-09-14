@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HelpTip from "../components/HelpTip";
-import { DEAL_STAGES, DEAL_TYPES, LOST_REASONS, labelOf } from "@/app/lib/crm";
+import { CLOSED_DEAL_STAGES, DEAL_STAGES, DEAL_TYPES, LOST_REASONS, labelOf } from "@/app/lib/crm";
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 
-// עסקאות B2B - טבלה עם כותרות קבועות במקום קנבן (החלטת המשתמש 30/8/26):
-// שלב העסקה הוא דרופדאון בשורה, הסגורות יורדות לטבלה נפרדת למטה, ומכונים
-// מגיעים לכאן אוטומטית מסוכן איתור המכונים ("רוצים" ← עסקה).
+// עסקאות B2B - לוח בעמודות, עמודה לכל סטטוס (בקשה מ-14/9/26). זה הופך את
+// ההחלטה מ-30/8/26 על טבלה עם כותרות קבועות: הטבלה סודרה לפי שם, ומה שרצו
+// לראות הוא איפה כל עסקה עומדת בצינור. בכל כרטיס נשאר דרופדאון הסטטוס - זו
+// הדרך להעביר עסקה בין עמודות. "שלב" נקרא מעכשיו "סטטוס" בכל הממשק; הערך
+// במסד נשאר stage, שינוי שם בשביל תווית היה דורש מיגרציה בלי שום רווח.
+// מכונים מגיעים לכאן אוטומטית מסוכן איתור המכונים ("רוצים" ← עסקה).
 
 type Deal = {
   id: string;
@@ -29,8 +32,6 @@ type Deal = {
   closed_at?: string | null;
 };
 
-const OPEN_STAGES = DEAL_STAGES.filter((s) => s.value !== "closed" && s.value !== "lost");
-
 function fmtDate(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
@@ -51,6 +52,16 @@ const STAGE_CLS: Record<string, string> = {
   lost: "border-red-300 bg-red-50 text-red-800",
 };
 
+// רקע העמודה: אותה משפחת צבעים כמו הסטטוס, חיוורת, כדי שעסקה שעוברת עמודה
+// תיראה במקום אחר גם בזווית העין.
+const COLUMN_CLS: Record<string, string> = {
+  first_contact: "border-stone-200 bg-stone-100/70",
+  negotiation: "border-amber-200 bg-amber-50/60",
+  link_sent: "border-sky-200 bg-sky-50/60",
+  closed: "border-emerald-200 bg-emerald-50/60",
+  lost: "border-red-200 bg-red-50/40",
+};
+
 export default function DealsPage() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
@@ -60,8 +71,7 @@ export default function DealsPage() {
   const [editing, setEditing] = useState<Deal | null>(null);
   const [losing, setLosing] = useState<Deal | null>(null);
 
-  // פילטרים - צד לקוח, הרשימה קטנה.
-  const [stageFilter, setStageFilter] = useState("");
+  // פילטרים - צד לקוח, הרשימה קטנה. אין פילטר סטטוס: כל עמודה היא סטטוס.
   const [typeFilter, setTypeFilter] = useState("");
   const [regionFilter, setRegionFilter] = useState("");
   const [q, setQ] = useState("");
@@ -109,62 +119,97 @@ export default function DealsPage() {
     [typeFilter, regionFilter, q]
   );
 
-  const open = useMemo(() => {
-    const stageRank = Object.fromEntries(DEAL_STAGES.map((s, i) => [s.value, i]));
-    return deals
-      .filter((d) => d.stage !== "closed" && d.stage !== "lost")
-      .filter((d) => (stageFilter ? d.stage === stageFilter : true))
-      .filter(matchesFilters)
-      .slice()
-      // המתקדמות בצינור קודם - הן הכי קרובות לכסף, ושכחה שם הכי יקרה.
-      .sort((a, b) => (stageRank[b.stage] ?? 0) - (stageRank[a.stage] ?? 0));
-  }, [deals, stageFilter, matchesFilters]);
+  // עמודה לכל סטטוס, בסדר הצינור. בתוך עמודה: צעד הבא שעבר מועדו קודם, אחריו
+  // לפי מועד הצעד הבא, ובלי מועד בסוף - כך שהכרטיס העליון הוא מה שצריך לטפל
+  // בו עכשיו, ולא מה שנפתח ראשון או מה שקודם באלף-בית.
+  const columns = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+    const urgency = (d: Deal) => (d.next_step_due && d.next_step_due < today ? 0 : 1);
+    return DEAL_STAGES.map((s) => {
+      const items = deals
+        .filter((d) => d.stage === s.value)
+        .filter(matchesFilters)
+        .slice()
+        .sort((a, b) => {
+          const u = urgency(a) - urgency(b);
+          if (u !== 0) return u;
+          if (a.next_step_due && b.next_step_due) return a.next_step_due.localeCompare(b.next_step_due);
+          if (a.next_step_due) return -1;
+          if (b.next_step_due) return 1;
+          return b.updated_at.localeCompare(a.updated_at);
+        });
+      const value = items.reduce((sum, d) => sum + (Number(d.value_ils) || 0), 0);
+      return { stage: s.value as string, label: s.label as string, items, value };
+    });
+  }, [deals, matchesFilters]);
 
-  const closedWon = useMemo(
-    () => deals.filter((d) => d.stage === "closed").filter(matchesFilters),
-    [deals, matchesFilters]
-  );
-  const lost = useMemo(
-    () => deals.filter((d) => d.stage === "lost").filter(matchesFilters),
-    [deals, matchesFilters]
-  );
-
-  const pipelineValue = open.reduce((sum, d) => sum + (Number(d.value_ils) || 0), 0);
+  const pipelineValue = columns
+    .filter((c) => !(CLOSED_DEAL_STAGES as readonly string[]).includes(c.stage))
+    .reduce((sum, c) => sum + c.value, 0);
   const regionsPresent = Array.from(
     new Set(deals.map((d) => d.region_key).filter((v): v is string => Boolean(v)))
   );
+  const lostReasonsLine = (() => {
+    const lost = deals.filter((d) => d.stage === "lost").filter(matchesFilters);
+    if (lost.length === 0) return "";
+    const byReason = new Map<string, number>();
+    for (const d of lost) {
+      const k = d.lost_reason ?? "unset";
+      byReason.set(k, (byReason.get(k) ?? 0) + 1);
+    }
+    return Array.from(byReason.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${k === "unset" ? "ללא סיבה" : labelOf(LOST_REASONS, k)}: ${n}`)
+      .join(" · ");
+  })();
 
-  const th = "sticky top-0 z-10 bg-stone-100 p-2 text-right text-xs font-black text-stone-500";
-
-  function dealRow(d: Deal, dimmed = false) {
+  function dealCard(d: Deal) {
+    const overdue = Boolean(d.next_step_due && d.next_step_due < new Date().toISOString().slice(0, 10));
+    const finished = d.stage === "closed" || d.stage === "lost";
     return (
-      <tr
+      <div
         key={d.id}
-        className={`border-b border-stone-100 hover:bg-stone-50/60 ${dimmed ? "opacity-70" : ""}`}
+        className={`rounded-xl border border-stone-200 bg-white p-3 shadow-sm ${d.stage === "lost" ? "opacity-70" : ""}`}
       >
-        <td className="p-2 align-top">
-          <button
-            onClick={() => {
-              setEditing(d);
-              setShowForm(true);
-            }}
-            className="text-start text-sm font-black text-stone-800 hover:underline"
-          >
-            {d.title}
-          </button>
+        <button
+          onClick={() => {
+            setEditing(d);
+            setShowForm(true);
+          }}
+          className="block w-full text-start text-sm font-black leading-snug text-stone-800 hover:underline"
+        >
+          {d.title}
+        </button>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-stone-500">
           {d.prospect_id && (
-            <span className="ms-2 rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700">
-              מאיתור מכונים
-            </span>
+            <span className="rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700">מאיתור מכונים</span>
           )}
-        </td>
-        <td className="whitespace-nowrap p-2 align-top text-xs text-stone-500">
-          {labelOf(DEAL_TYPES, d.deal_type ?? "") || "-"}
-        </td>
-        <td className="p-2 align-top">
+          {d.deal_type && <span>{labelOf(DEAL_TYPES, d.deal_type)}</span>}
+          {d.region_key && <span>· {REGION_GROUP_LABELS[d.region_key] ?? d.region_key}</span>}
+          {d.value_ils != null && <span className="font-bold text-teal-700">· {fmtValue(d.value_ils)}</span>}
+        </div>
+        {(d.contact_name || d.contact_info) && (
+          <div className="mt-1.5 text-xs text-stone-600">
+            {d.contact_name && <span className="font-bold">{d.contact_name}</span>}
+            {d.contact_info && <div className="break-words text-stone-400">{d.contact_info}</div>}
+          </div>
+        )}
+        {d.next_step ? (
+          <div className={`mt-2 text-xs ${overdue ? "font-bold text-red-600" : "text-stone-600"}`}>
+            הצעד הבא: {d.next_step}
+            {d.next_step_due ? ` (${fmtDate(d.next_step_due)})` : ""}
+          </div>
+        ) : !finished ? (
+          <div className="mt-2 text-xs font-bold text-amber-600">⚠ אין צעד הבא</div>
+        ) : null}
+        {d.stage === "lost" && d.lost_reason && (
+          <div className="mt-1 text-[11px] font-bold text-red-500">{labelOf(LOST_REASONS, d.lost_reason)}</div>
+        )}
+        <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-stone-100 pt-2">
           <select
             value={d.stage}
             disabled={busy === d.id}
+            aria-label={`סטטוס: ${d.title}`}
             onChange={(e) => {
               const v = e.target.value;
               if (v === "lost") {
@@ -176,7 +221,7 @@ export default function DealsPage() {
               }
               setStage(d, v);
             }}
-            className={`w-40 rounded-lg border px-2 py-1 text-xs font-bold ${STAGE_CLS[d.stage] ?? ""}`}
+            className={`min-w-0 flex-1 rounded-lg border px-1.5 py-1 text-[11px] font-bold ${STAGE_CLS[d.stage] ?? ""}`}
           >
             {DEAL_STAGES.map((s) => (
               <option key={s.value} value={s.value}>
@@ -184,46 +229,15 @@ export default function DealsPage() {
               </option>
             ))}
           </select>
-        </td>
-        <td className="whitespace-nowrap p-2 align-top text-xs font-bold text-teal-700">
-          {fmtValue(d.value_ils)}
-        </td>
-        <td className="p-2 align-top text-xs text-stone-600">
-          {d.contact_name && <div className="font-bold">{d.contact_name}</div>}
-          {d.contact_info && <div className="text-stone-400">{d.contact_info}</div>}
-        </td>
-        <td className="whitespace-nowrap p-2 align-top text-xs text-stone-500">
-          {d.region_key ? (REGION_GROUP_LABELS[d.region_key] ?? d.region_key) : "-"}
-        </td>
-        <td className="p-2 align-top text-xs">
-          {d.next_step ? (
-            <span
-              className={
-                d.next_step_due && d.next_step_due < new Date().toISOString().slice(0, 10)
-                  ? "font-bold text-red-600"
-                  : "text-stone-600"
-              }
-            >
-              {d.next_step}
-              {d.next_step_due ? ` (${fmtDate(d.next_step_due)})` : ""}
-            </span>
-          ) : (
-            <span className="font-bold text-amber-600">⚠ אין צעד הבא</span>
-          )}
-        </td>
-        <td className="whitespace-nowrap p-2 align-top text-[11px] text-stone-400">
-          {fmtDate(d.updated_at)}
-          {d.stage === "lost" && d.lost_reason && (
-            <div className="font-bold text-red-500">{labelOf(LOST_REASONS, d.lost_reason)}</div>
-          )}
-        </td>
-      </tr>
+          <span className="shrink-0 text-[10px] text-stone-400">{fmtDate(d.updated_at)}</span>
+        </div>
+      </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-stone-50">
-      <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+      <div className="mx-auto max-w-[1600px] px-4 py-8 sm:px-6">
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <h1 className="text-2xl font-black text-stone-900">עסקאות B2B</h1>
@@ -243,23 +257,11 @@ export default function DealsPage() {
           שווי פייפליין פתוח: <span className="font-black text-stone-700">{fmtValue(pipelineValue) || "₪0"}</span>
           <span className="mx-2 text-stone-300">·</span>
           מכון שמסומן &quot;רוצים&quot; באיתור המכונים נפתח כאן אוטומטית, ועסקה נסגרת לבד כשמזוהה מנוי
-          מרכז פעיל.
+          מרכז פעיל. להעברת עסקה לעמודה אחרת - לבחור לה סטטוס בתחתית הכרטיס.
         </p>
 
         {/* פילטרים */}
         <div className="mb-3 flex flex-wrap items-center gap-2 text-xs">
-          <select
-            value={stageFilter}
-            onChange={(e) => setStageFilter(e.target.value)}
-            className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
-          >
-            <option value="">כל השלבים הפתוחים</option>
-            {OPEN_STAGES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
           <select
             value={typeFilter}
             onChange={(e) => setTypeFilter(e.target.value)}
@@ -297,77 +299,37 @@ export default function DealsPage() {
         )}
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
 
-        {/* הפתוחות - טבלה עם כותרות קבועות */}
+        {/* לוח: עמודה לכל סטטוס. גולל אופקית כשהמסך צר מחמש עמודות. */}
         {!loading && (
-          <div className="max-h-[60vh] overflow-auto rounded-2xl border border-stone-200 bg-white">
-            <table className="w-full min-w-[900px] text-sm">
-              <thead>
-                <tr>
-                  <th className={th}>שם העסקה</th>
-                  <th className={th}>סוג</th>
-                  <th className={th}>שלב</th>
-                  <th className={th}>שווי</th>
-                  <th className={th}>איש קשר</th>
-                  <th className={th}>אזור</th>
-                  <th className={th}>הצעד הבא</th>
-                  <th className={th}>עודכן</th>
-                </tr>
-              </thead>
-              <tbody>
-                {open.map((d) => dealRow(d))}
-                {open.length === 0 && (
-                  <tr>
-                    <td colSpan={8} className="p-6 text-center text-sm text-stone-400">
-                      אין עסקאות פתוחות{stageFilter || typeFilter || regionFilter || q ? " בסינון הזה" : ""}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
-
-        {/* עסקאות שנסגרו - לקוחות מכונים */}
-        {!loading && closedWon.length > 0 && (
-          <div className="mt-6">
-            <h2 className="mb-2 text-sm font-black text-emerald-800">
-              ✓ עסקאות שנסגרו ({closedWon.length}) - לקוחות פעילים
-            </h2>
-            <div className="overflow-x-auto rounded-2xl border border-emerald-200 bg-white">
-              <table className="w-full min-w-[900px] text-sm">
-                <tbody>{closedWon.map((d) => dealRow(d))}</tbody>
-              </table>
+          <div className="overflow-x-auto pb-2">
+            <div className="grid min-w-[1100px] grid-cols-5 gap-3">
+              {columns.map((c) => (
+                <section
+                  key={c.stage}
+                  className={`flex min-h-[55vh] flex-col rounded-2xl border ${COLUMN_CLS[c.stage] ?? "border-stone-200 bg-stone-100/70"}`}
+                >
+                  <header className="flex items-baseline justify-between gap-2 border-b border-black/5 px-3 py-2.5">
+                    <h2 className="text-sm font-black text-stone-800">{c.label}</h2>
+                    <span className="text-[11px] font-bold text-stone-500">
+                      {c.items.length}
+                      {c.value > 0 ? ` · ${fmtValue(c.value)}` : ""}
+                    </span>
+                  </header>
+                  {c.stage === "lost" && lostReasonsLine && (
+                    <p className="px-3 pt-2 text-[11px] text-stone-500">{lostReasonsLine}</p>
+                  )}
+                  <div className="flex flex-1 flex-col gap-2 p-2">
+                    {c.items.map((d) => dealCard(d))}
+                    {c.items.length === 0 && (
+                      <p className="px-1 py-6 text-center text-xs text-stone-400">
+                        {typeFilter || regionFilter || q ? "אין עסקאות בסינון הזה" : "אין עסקאות"}
+                      </p>
+                    )}
+                  </div>
+                </section>
+              ))}
             </div>
           </div>
-        )}
-
-        {/* אבודות - מקופל */}
-        {!loading && lost.length > 0 && (
-          <details className="mt-4">
-            <summary className="cursor-pointer text-xs font-bold text-stone-400 hover:text-stone-600">
-              עסקאות אבודות ({lost.length})
-            </summary>
-            {(() => {
-              const byReason = new Map<string, number>();
-              for (const d of lost) {
-                const k = d.lost_reason ?? "unset";
-                byReason.set(k, (byReason.get(k) ?? 0) + 1);
-              }
-              const parts = Array.from(byReason.entries()).sort((a, b) => b[1] - a[1]);
-              return (
-                <p className="mt-2 text-xs text-stone-500">
-                  {parts
-                    .map(([k, n]) => `${k === "unset" ? "ללא סיבה" : labelOf(LOST_REASONS, k)}: ${n}`)
-                    .join(" · ")}
-                </p>
-              );
-            })()}
-            <div className="mt-2 overflow-x-auto rounded-2xl border border-stone-200 bg-white opacity-80">
-              <table className="w-full min-w-[900px] text-sm">
-                <tbody>{lost.map((d) => dealRow(d, true))}</tbody>
-              </table>
-            </div>
-          </details>
         )}
 
         {losing && (
@@ -433,6 +395,11 @@ function LostReasonDialog({
 
 function DealForm({ deal, onClose, onSaved }: { deal: Deal | null; onClose: () => void; onSaved: () => void }) {
   const [title, setTitle] = useState(deal?.title ?? "");
+  // הסטטוס לא היה בטופס בכלל, כך שעסקה שנפתחה אוטומטית מאיתור המכונים
+  // אפשר היה לפתוח ולערוך - אבל לא לקבוע לה סטטוס. בעסקה חדשה ברירת המחדל
+  // היא "פנייה ראשונית", כמו שה-API קובע ממילא.
+  const [stage, setStageValue] = useState<string>(deal?.stage ?? "first_contact");
+  const [lostReason, setLostReason] = useState<string>(deal?.lost_reason ?? "");
   const [dealType, setDealType] = useState(deal?.deal_type ?? "center");
   const [value, setValue] = useState(deal?.value_ils != null ? String(deal.value_ils) : "");
   const [owner, setOwner] = useState(deal?.owner ?? "");
@@ -447,11 +414,21 @@ function DealForm({ deal, onClose, onSaved }: { deal: Deal | null; onClose: () =
   async function save(e: React.FormEvent) {
     e.preventDefault();
     if (!title.trim()) return;
+    if (stage === "lost" && !lostReason) {
+      setError("עסקה אבודה צריכה סיבה - בלעדיה אי אפשר לספור בהמשך למה עסקאות נופלות");
+      return;
+    }
     setSaving(true);
     setError("");
     try {
+      // בעריכה הסטטוס נשלח רק אם השתנה. ה-API מאפס את closed_at בכל פעם
+      // שהוא מקבל stage, כך ששמירת הערה על עסקה שנסגרה לפני חודש הייתה
+      // מזיזה את תאריך הסגירה שלה להיום.
+      const stageChanged = !deal || stage !== deal.stage;
       const body = {
         ...(deal ? { id: deal.id } : {}),
+        ...(stageChanged ? { stage } : {}),
+        ...(stage === "lost" ? { lost_reason: lostReason } : {}),
         title: title.trim(),
         deal_type: dealType,
         value_ils: value || null,
@@ -513,6 +490,31 @@ function DealForm({ deal, onClose, onSaved }: { deal: Deal | null; onClose: () =
               placeholder="למשל: מכון שלווה - הצטרפות כמרכז"
               className={field}
             />
+          </div>
+          <div className={stage === "lost" ? "grid grid-cols-2 gap-2" : ""}>
+            <div>
+              <label className={label}>סטטוס</label>
+              <select value={stage} onChange={(e) => setStageValue(e.target.value)} className={`${field} font-bold`}>
+                {DEAL_STAGES.map((s) => (
+                  <option key={s.value} value={s.value}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {stage === "lost" && (
+              <div>
+                <label className={label}>למה העסקה נפלה?</label>
+                <select value={lostReason} onChange={(e) => setLostReason(e.target.value)} className={field}>
+                  <option value="">בחירה…</option>
+                  {LOST_REASONS.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
           <div className="grid grid-cols-3 gap-2">
             <div>

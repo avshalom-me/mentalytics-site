@@ -42,6 +42,11 @@ export async function POST(req: NextRequest) {
         title: title.slice(0, 300),
         deal_type: b.deal_type ? String(b.deal_type) : null,
         stage: VALID_STAGES.includes(b.stage) ? b.stage : "first_contact",
+        // עסקה חדשה יכולה להיפתח ישר כסגורה או אבודה (הטופס מאפשר לבחור
+        // סטטוס). בלי אלה היא הייתה נוצרת בלי תאריך סגירה ובלי סיבה, בניגוד
+        // למה ש-PATCH עושה לאותו מעבר.
+        closed_at: b.stage === "closed" || b.stage === "lost" ? new Date().toISOString() : null,
+        lost_reason: b.stage === "lost" && VALID_LOST_REASONS.includes(b.lost_reason) ? b.lost_reason : null,
         value_ils: b.value_ils != null && b.value_ils !== "" ? Number(b.value_ils) : null,
         owner: b.owner ? String(b.owner).slice(0, 60) : null,
         contact_name: b.contact_name ? String(b.contact_name).slice(0, 120) : null,
