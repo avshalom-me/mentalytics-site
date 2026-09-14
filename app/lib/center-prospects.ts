@@ -36,7 +36,7 @@ export type ProspectRow = {
   answered_at: string | null;
   answer: "yes" | "no" | "maybe" | null;
   // הסטטוס המפורש - מקור האמת מ-30/8/26 (answer נשאר לתאימות בלבד).
-  status: "new" | "contacted" | "later" | "not_interested" | "moved_to_deal";
+  status: ProspectStatus;
   follow_up_at: string | null;
   status_note: string | null;
   deal_id: string | null;
@@ -49,6 +49,26 @@ export type ProspectRow = {
   first_seen_at: string;
   last_seen_at: string;
 };
+
+/**
+ * כל הסטטוסים שמותרים במסד (center_prospects_status_check). שני ערוצי הפנייה
+ * נוספו 14/9/26 לצד "contacted", שנשאר לשורות הקיימות שבהן הערוץ לא ידוע.
+ */
+export type ProspectStatus =
+  | "new"
+  | "contacted"
+  | "contacted_email"
+  | "contacted_phone"
+  | "later"
+  | "not_interested"
+  | "moved_to_deal";
+
+export const PROSPECT_STATUS_VALUES: readonly ProspectStatus[] = [
+  "new", "contacted", "contacted_email", "contacted_phone", "later", "not_interested", "moved_to_deal",
+];
+
+/** "נוצרה פנייה" בכל ערוץ שהוא. כל מקום שבודק contacted צריך לבדוק את כולם. */
+export const CONTACTED_STATUSES: readonly ProspectStatus[] = ["contacted", "contacted_email", "contacted_phone"];
 
 export type ProspectsRun = {
   ok: boolean;
@@ -371,14 +391,24 @@ export async function updateProspect(
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if ("status" in patch && patch.status) {
     update.status = patch.status;
-    // "נוצרה פנייה ראשונה" גוררת סימון פנינו - אין פנייה בלי תאריך.
-    if (patch.status === "contacted") update.contacted_at = new Date().toISOString();
+    // כל סוג של "נוצרה פנייה" גורר תאריך פנייה - אין פנייה בלי תאריך. רק אם
+    // עוד אין: מעבר מ"פנייה ראשונה" ל"פנייה טלפונית" הוא פנייה נוספת, לא
+    // הראשונה, והתאריך המקורי הוא מה ששווה לשמור.
+    if (CONTACTED_STATUSES.includes(patch.status)) {
+      const { data: cur } = await supabaseAdmin
+        .from("center_prospects").select("contacted_at").eq("id", id).maybeSingle();
+      if (!cur?.contacted_at) update.contacted_at = new Date().toISOString();
+    }
     // יציאה ממצב ההמתנה מנקה את התזכורת.
     if (patch.status !== "later") update.follow_up_at = null;
   }
   if ("follow_up_at" in patch) update.follow_up_at = patch.follow_up_at;
   if ("status_note" in patch) update.status_note = patch.status_note;
-  if ("contacted_at" in patch) update.contacted_at = patch.contacted_at;
+  // !== undefined ולא "in": הנתיב מה-API מעביר תמיד את המפתח, גם כשהוא ריק.
+  // עם "in" המפתח הריק דרס את החותמת שנקבעה שורות ספורות למעלה, ובגלל ש-
+  // undefined נופל ב-JSON - בחירת "נוצרה פנייה ראשונה" לא רשמה תאריך אף פעם.
+  // נמדד 14/9/26: שלוש מתוך שש שורות "contacted" בלי contacted_at.
+  if (patch.contacted_at !== undefined) update.contacted_at = patch.contacted_at;
   if ("phone" in patch) update.phone = patch.phone;
   if ("email" in patch) update.email = patch.email;
   if ("notes" in patch) update.notes = patch.notes;
@@ -402,7 +432,7 @@ export async function updateProspect(
 
 export async function moveProspectToDeal(
   id: string,
-  stage: "first_contact" | "negotiation"
+  stage: "first_contact" | "negotiation" | "link_sent"
 ): Promise<{ ok: boolean; dealId?: string; error?: string }> {
   const { data: p } = await supabaseAdmin
     .from("center_prospects")
@@ -423,7 +453,10 @@ export async function moveProspectToDeal(
       contact_name: p.name,
       contact_info: contact || null,
       notes: noteParts.length > 0 ? noteParts.join("\n") : null,
-      next_step: stage === "first_contact" ? "לתאם שיחת היכרות" : "להמשיך משא ומתן",
+      next_step:
+        stage === "first_contact" ? "לתאם שיחת היכרות"
+        : stage === "link_sent" ? "לוודא שההרשמה הושלמה"
+        : "להמשיך משא ומתן",
       prospect_id: p.id,
       region_key: p.region_key,
     })

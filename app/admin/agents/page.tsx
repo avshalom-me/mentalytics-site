@@ -82,7 +82,9 @@ type Prospect = {
   draft_subject: string | null;
   draft_body: string | null;
   draft_sent_at: string | null;
-  status: "new" | "contacted" | "later" | "not_interested" | "moved_to_deal";
+  // מראה של ProspectStatus ב-center-prospects.ts, שמייבא את לקוח ה-service
+  // role ולכן אסור לייבא ממנו לקומפוננטת לקוח. שינוי כאן - שינוי גם שם.
+  status: "new" | "contacted" | "contacted_email" | "contacted_phone" | "later" | "not_interested" | "moved_to_deal";
   follow_up_at: string | null;
   status_note: string | null;
   deal_id: string | null;
@@ -1270,6 +1272,10 @@ function InboxQueue({
 const PROSPECT_STATUSES = [
   { value: "new", label: "לא נגענו", rank: 0 },
   { value: "contacted", label: "נוצרה פנייה ראשונה", rank: 1 },
+  // שני ערוצי הפנייה (14/9/26) באותה דרגה כמו "נוצרה פנייה ראשונה": מבחינת
+  // התהליך שלושתם אותו שלב, והערוץ הוא פרט עליו ולא התקדמות.
+  { value: "contacted_email", label: "בוצעה פנייה במייל", rank: 1 },
+  { value: "contacted_phone", label: "בוצעה פנייה טלפונית", rank: 1 },
   { value: "later", label: "לא כרגע - אולי בעתיד", rank: 2 },
   { value: "moved_to_deal", label: "הועבר לעסקאות ✓", rank: 3 },
   { value: "not_interested", label: "לא מעוניין - לא לפנות שוב", rank: 4 },
@@ -1278,6 +1284,9 @@ const PROSPECT_STATUSES = [
 const PROSPECT_STATUS_RANK: Record<string, number> = Object.fromEntries(
   PROSPECT_STATUSES.map((st) => [st.value, st.rank])
 );
+
+/** "נוצרה פנייה" בכל ערוץ. כל בדיקה של contacted צריכה לכלול את שלושתם. */
+const isContacted = (s: string) => s === "contacted" || s === "contacted_email" || s === "contacted_phone";
 
 // היסטוריית ההתכתבות מול המרכזים, מרכז-מרכז. crm_email_log נכתב עם כתובת
 // הנמען בלבד עד 9/9/26, ולכן "מה נשלח למרכז הזה" פשוט לא היה שאילתה
@@ -1384,11 +1393,14 @@ function ProspectTable({
       await patch(pr.id, { status: "later", follow_up_at: due.toISOString() });
       return;
     }
-    if (next === "deal_first" || next === "deal_negotiation") {
-      const stage = next === "deal_negotiation" ? "negotiation" : "first_contact";
+    if (next === "deal_first" || next === "deal_negotiation" || next === "deal_link_sent") {
+      const stage =
+        next === "deal_negotiation" ? "negotiation" : next === "deal_link_sent" ? "link_sent" : "first_contact";
+      const stageLabel =
+        stage === "negotiation" ? "משא ומתן" : stage === "link_sent" ? "נשלח לינק הרשמה" : "פנייה ראשונית";
       if (
         !window.confirm(
-          `להעביר את ${pr.name} לעסקאות B2B (${stage === "negotiation" ? "משא ומתן" : "פנייה ראשונית"})?\n\nהעסקה תיפתח עם כל הפרטים שנאספו, והמכון יסומן כאן "הועבר לעסקאות".`
+          `להעביר את ${pr.name} לעסקאות B2B (סטטוס: ${stageLabel})?\n\nהעסקה תיפתח עם כל הפרטים שנאספו, והמכון יסומן כאן "הועבר לעסקאות". אפשר לשנות את הסטטוס אחר כך בעמוד העסקאות.`
         )
       )
         return;
@@ -1396,7 +1408,7 @@ function ProspectTable({
       try {
         const j = await postAgents("prospect_to_deal", { id: pr.id, stage });
         if (Array.isArray(j.prospects)) onChanged(j.prospects as Prospect[]);
-        onNotify(`${pr.name} הועבר לעסקאות B2B - העסקה נפתחה בשלב "${stage === "negotiation" ? "משא ומתן" : "פנייה ראשונית"}"`);
+        onNotify(`${pr.name} הועבר לעסקאות B2B - העסקה נפתחה בסטטוס "${stageLabel}"`);
       } catch (e) {
         onNotify(e instanceof Error ? e.message : "ההעברה נכשלה", true);
       } finally {
@@ -1536,7 +1548,7 @@ function ProspectTable({
   const bucketOf = (pr: Prospect): string =>
     pr.status === "new"
       ? "untouched"
-      : pr.status === "contacted" || pr.status === "later"
+      : isContacted(pr.status) || pr.status === "later"
         ? "in_progress"
         : pr.status === "moved_to_deal"
           ? "inside"
@@ -1676,10 +1688,13 @@ function ProspectTable({
                     >
                       <option value="new">לא נגענו</option>
                       <option value="contacted">נוצרה פנייה ראשונה</option>
+                      <option value="contacted_email">בוצעה פנייה במייל</option>
+                      <option value="contacted_phone">בוצעה פנייה טלפונית</option>
                       <option value="later">לא כרגע - אולי בעתיד</option>
                       <option value="not_interested">לא מעוניין - לא לפנות שוב</option>
                       <option value="deal_first">רוצים ← לעסקאות (פנייה ראשונית)</option>
                       <option value="deal_negotiation">רוצים ← לעסקאות (משא ומתן)</option>
+                      <option value="deal_link_sent">רוצים ← לעסקאות (נשלח לינק הרשמה)</option>
                     </select>
                   )}
                   {p.status === "later" && p.follow_up_at && (
@@ -1710,7 +1725,7 @@ function ProspectTable({
                 <td className="whitespace-nowrap p-2 align-top">
                   {p.draft_sent_at ? (
                     <span className="text-[11px] text-stone-400">מייל נשלח</span>
-                  ) : p.contacted_at && (p.status === "new" || p.status === "contacted") ? (
+                  ) : p.contacted_at && (p.status === "new" || isContacted(p.status)) ? (
                     <button
                       onClick={() => makeDraft(p)}
                       disabled={busy === p.id}
