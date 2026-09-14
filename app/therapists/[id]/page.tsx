@@ -200,6 +200,10 @@ export default async function TherapistProfilePage({
   const id = extractTherapistId(param);
   if (!id) notFound();
   const source: "match" | "directory" = sp.from === "match" ? "match" : "directory";
+  // נפתח מהאדמין ("צפייה בעמוד באתר" בכרטיס המטפל): הצוות בודק איך הפרופיל
+  // נראה, לרוב תוך כדי שיחה איתו. זו לא חשיפה, והיא הייתה נכנסת בדיוק
+  // למספרי הצפיות שהמטפל והמרכז רואים ושעליהם מתקבלות החלטות.
+  const fromAdmin = sp.from === "admin";
   // Where "back to the list" returns for a directory visitor: the listing page
   // they came from (region / city / online / center), passed as ?ret=. Only
   // internal listing paths are honoured - never an arbitrary/attacker URL.
@@ -299,7 +303,7 @@ export default async function TherapistProfilePage({
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-10 pb-28 sm:pb-12" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <TrackView therapistId={id} source={source} context={viewerContext} />
+      {!fromAdmin && <TrackView therapistId={id} source={source} context={viewerContext} />}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
       <style>{`
         details summary { list-style: none; }

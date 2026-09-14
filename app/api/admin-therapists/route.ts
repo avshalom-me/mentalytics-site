@@ -65,6 +65,7 @@ type TherapistRow = {
   accepting_new_changed_at: string | null;
   user_id: string | null;
   match_paused_until: string | null;
+  entity_type: string | null;
 };
 
 const PROFILE_PHOTOS_BUCKET = "therapist-certificates";
@@ -140,7 +141,8 @@ async function buildTherapistsResponse(onlyId?: string) {
       accepting_new_patients,
       accepting_new_changed_at,
       user_id,
-      match_paused_until
+      match_paused_until,
+      entity_type
       `
     )
     .order("full_name", { ascending: true });
@@ -377,6 +379,9 @@ async function buildTherapistsResponse(onlyId?: string) {
         // undefined בצד הלקוח נראה בדיוק כמו "לא מקושר".
         user_id: t.user_id ?? null,
         match_paused_until: t.match_paused_until ?? null,
+        // לקישור לעמוד הציבורי: ישות-מרכז מקבלת 404 בכתובת של מטפל (העמוד שלה
+        // הוא עמוד המרכז), ובלי השדה הקישור היה מופיע גם אצלה ומוביל לשגיאה.
+        entity_type: t.entity_type ?? "therapist",
         certificates: certsByTherapist[t.id] ?? [],
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,

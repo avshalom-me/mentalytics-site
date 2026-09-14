@@ -11,6 +11,7 @@ import {
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
+import { therapistPath } from "@/app/lib/therapist-url";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 
@@ -73,6 +74,7 @@ type AdminTherapist = {
   accepting_new_changed_at: string | null;
   user_id: string | null;
   match_paused_until: string | null;
+  entity_type: string;
 };
 
 type EditForm = {
@@ -102,6 +104,40 @@ type EditForm = {
   style_q2: number | null;
   activity_level: number | null;
 };
+
+// קישור לעמוד הציבורי של המטפל/ת, מתוך "אחורי הקלעים" באדמין - כדי לראות תוך
+// כדי שיחה איך הפרופיל מופיע באתר. מוגדר ברמת המודול ולא בתוך הדף: קומפוננטה
+// שמוגדרת בגוף AdminTherapistsPage נבנית מחדש בכל רינדור.
+//
+// העמוד קיים רק כשהוא באמת מוצג לציבור (app/therapists/[id]/page.tsx): סטטוס
+// approved או paying, admin_approved, ולא ישות-מרכז. בכל מצב אחר הכתובת מחזירה
+// 404, אז במקום קישור שבור מוצג למה אין עמוד - וזה בעצמו המידע שצריך בשיחה.
+// הכתובת נבנית ב-therapistPath, אותה פונקציה שהאתר משתמש בה, כדי שלא תעבור
+// הפניה 308. ?from=admin מדלג על ספירת הצפייה בעמוד (TrackView), כדי
+// שבדיקה של הצוות לא תיכנס למספרי החשיפה של המטפל.
+function PublicProfileLink({ t, className = "" }: { t: AdminTherapist; className?: string }) {
+  if (t.entity_type === "center") {
+    return <span className={`text-xs text-stone-400 ${className}`}>ישות מרכז - העמוד הציבורי הוא עמוד המרכז</span>;
+  }
+  const isPublic = (t.status === "approved" || t.status === "paying") && t.admin_approved;
+  if (!isPublic) {
+    return (
+      <span className={`text-xs text-stone-400 ${className}`} title="העמוד הציבורי נפתח רק אחרי אישור הפרופיל">
+        אין עדיין עמוד באתר - ממתין לאישור
+      </span>
+    );
+  }
+  return (
+    <a
+      href={`${therapistPath(t.id, t.full_name)}?from=admin`}
+      target="_blank"
+      rel="noopener noreferrer"
+      className={`inline-flex items-center gap-1 rounded-full border border-teal-200 bg-teal-50 px-2.5 py-0.5 text-xs font-bold text-teal-800 hover:bg-teal-100 ${className}`}
+    >
+      צפייה בעמוד באתר ↗
+    </a>
+  );
+}
 
 function toggleItem(arr: string[], item: string): string[] {
   return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
@@ -1207,7 +1243,10 @@ export default function AdminTherapistsPage() {
 
           <div className="text-right">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold">{therapist.full_name || "ללא שם"}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-2xl font-semibold">{therapist.full_name || "ללא שם"}</h2>
+                <PublicProfileLink t={therapist} />
+              </div>
               <div className="flex flex-wrap items-center gap-2">
                 <span className={`rounded-full px-3 py-1 text-sm font-medium ${
                   therapist.status === "paying" && !therapist.admin_approved ? "bg-orange-100 text-orange-800 border border-orange-400" :
@@ -2173,7 +2212,10 @@ export default function AdminTherapistsPage() {
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 pt-10">
           <div className="w-full max-w-2xl rounded-2xl bg-white p-6 shadow-2xl" dir="rtl">
             <div className="mb-5 flex items-center justify-between">
-              <h2 className="text-xl font-bold">עריכת פרטים — {editingTherapist.full_name}</h2>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="text-xl font-bold">עריכת פרטים - {editingTherapist.full_name}</h2>
+                <PublicProfileLink t={editingTherapist} />
+              </div>
               <button
                 onClick={() => { setEditingTherapist(null); setEditForm(null); setEditBaseline(null); }}
                 className="text-2xl text-stone-400 hover:text-stone-700 leading-none"
