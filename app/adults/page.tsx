@@ -1117,7 +1117,7 @@ export default function AdultsPage() {
         <ul className="mb-5 flex flex-col gap-2">
           {[
             ["🔒", "אנונימי לחלוטין", "בלי שם, בלי פרטים מזהים, בלי הרשמה"],
-            ["⏱️", "כ-6 דקות", "זה הזמן שלוקח לרוב האנשים"],
+            ["⏱️", "2-4 דקות", "זה הזמן שלוקח לרוב האנשים"],
             ["↩️", "עונים רק על מה שרלוונטי", "כל נושא שלא נוגע לך פשוט מדלגים עליו"],
           ].map(([icon, title, desc]) => (
             <li key={title} className="flex items-start gap-3 rounded-xl p-3 text-sm" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
