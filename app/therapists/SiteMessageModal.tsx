@@ -19,6 +19,13 @@ type Props = {
    * contact-therapist. אותו טופס בדיוק, נתיב אחר.
    */
   target?: "therapist" | "center";
+  /**
+   * הנמען הוא מרכז, גם כשהניתוב עובר דרך שורת מטפל (ישות-מרכז, מסלול 2).
+   * target קובע לאן נשלח; זה קובע איך מדברים. עד 14/9/26 הניסוח נגזר מ-target
+   * בלבד, ולכן מי שכתב למרכז רותם - גם מעמוד המרכז עצמו - קרא ש"ההודעה תישלח
+   * ישירות למטפל/ת" ושפרטיו יימסרו "אליו/אליה".
+   */
+  recipientIsCenter?: boolean;
 };
 
 export default function SiteMessageModal({
@@ -28,8 +35,10 @@ export default function SiteMessageModal({
   open,
   onClose,
   target = "therapist",
+  recipientIsCenter = false,
 }: Props) {
   const toCenter = target === "center";
+  const speaksToCenter = toCenter || recipientIsCenter;
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [message, setMessage] = useState("");
@@ -195,7 +204,7 @@ export default function SiteMessageModal({
               </button>
 
               <p className="text-xs text-stone-500 leading-5 mt-2">
-                {toCenter
+                {speaksToCenter
                   ? "ההודעה תישלח ישירות למרכז. פרטי הקשר שלך יימסרו לצוות המרכז כדי שיוכלו לחזור אלייך."
                   : "ההודעה תישלח ישירות למטפל/ת. פרטי הקשר שלך יימסרו אליו/אליה כדי שיוכל/תוכל לחזור אלייך."}
               </p>

@@ -5,6 +5,7 @@ import { CITY_TO_REGION } from "@/app/lib/regions";
 import CardImpression from "@/app/components/CardImpression";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 import { bioSnippet } from "@/app/lib/bio-snippet";
+import CenterMessageButton from "@/app/centers/[slug]/CenterMessageButton";
 
 // Context-aware ordering for the card's city chip: on a city landing page the
 // page's own city shows first (a Kfar-Saba visitor seeing "📍 נתניה" on a
@@ -36,8 +37,10 @@ export default function TherapistResultCard({
 }) {
   // ישות-מרכז: עמוד המטפל שלה מחזיר 404 במכוון, אין לה מגדר ולרוב אין תמונה.
   const isCenter = t.is_center === true;
+  // למרכז אין שורת תואר: שני סוגי המטפלים הראשונים ברשימה ("עו"ס קליני ·
+  // מטפל מיני" אצל מרכז רותם, מתוך תשעה) תיארו מוסד כאילו היה אדם עם מקצוע.
   const type = isCenter
-    ? t.therapist_types.slice(0, 2).join(" · ")
+    ? ""
     : t.therapist_types[0] ? publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const snippet = bioSnippet(t.bio);
@@ -113,7 +116,27 @@ export default function TherapistResultCard({
   // stay indexed, and the CollectionPage/Person JSON-LD on each listing page is
   // unaffected. A therapist's own name query is answered by their profile page,
   // not by a city page's copy of the name.
-  const card = profileHref ? (
+  // ישות-מרכז אמיתית שמקבלת פניות: כפתור הודעה ישירה בתחתית הכרטיס. הכפתור
+  // לא יכול לשבת בתוך ה-Link (כפתור בתוך עוגן אינו HTML תקין, והלחיצה הייתה
+  // גם מנווטת), ולכן המסגרת עוברת לעטיפה, והקישור והכפתור יושבים בתוכה זה
+  // מעל זה. כרטיס מרכז מסונתז (trackable=false) מזהה "center:..." ואין לו
+  // שורה למען אליה - נשאר כרטיס-קישור רגיל.
+  const canMessageCenter = isCenter && t.trackable !== false && t.accepting_new_patients !== false;
+  const card = profileHref && canMessageCenter ? (
+    <div className="group flex flex-col rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
+      style={{ border: cardStyle.border, boxShadow: cardStyle.boxShadow }}>
+      <Link href={profileHref} className="block" style={{ textDecoration: "none" }} data-nosnippet>{Body}</Link>
+      <div style={{ padding: "0 18px 16px" }}>
+        <CenterMessageButton
+          entityId={t.id}
+          centerName={t.full_name}
+          source="directory"
+          label="שליחת הודעה למרכז"
+          className="inline-flex items-center gap-2 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90 bg-[var(--teal)]"
+        />
+      </div>
+    </div>
+  ) : profileHref ? (
     <Link href={profileHref} className={cardClass} style={cardStyle} data-nosnippet>{Body}</Link>
   ) : (
     // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.

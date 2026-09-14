@@ -23,6 +23,7 @@ import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
 import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
+import CenterMessageButton from "@/app/centers/[slug]/CenterMessageButton";
 import { minDwell } from "@/app/lib/min-dwell";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 import {
@@ -2629,6 +2630,19 @@ function KidsMatchSection({ A, score, selection }: {
                       )}
                       <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                         {/* אותה היררכיה כמו במבוגרים - ראו ההערה שם ובקומפוננטה. */}
+                        {t.entity_type === "center" && (
+                          // מרכז לא מקבל וואטסאפ בכרטיס (הקו שלו אינו נייד ואינו משודר מה-API),
+                          // ועד עכשיו לא היה לו שום כפתור פנייה - רק "למה הותאם" ו"פרופיל מלא".
+                          // ההודעה נשלחת למייל המרכז ונספרת כלחיצה מההתאמות, באותו מקום
+                          // ראשון שבו יושב הוואטסאפ של מטפל בודד.
+                          <CenterMessageButton
+                            entityId={t.id}
+                            centerName={t.full_name ?? "המרכז"}
+                            source="match"
+                            label="שליחת הודעה למרכז"
+                            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90 bg-[var(--teal)]"
+                          />
+                        )}
                         {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
                         <button
                           onClick={() => fetchExplanation(t)}

@@ -8,7 +8,7 @@ import SiteMessageModal from "@/app/therapists/SiteMessageModal";
 // טיפול חכם, ממוען לשורת ישות-המרכז (מסלול 2). ההודעה נשלחת למייל המרכז,
 // נספרת בפניות בפורטל ונקלטת כליד ב-CRM - בדיוק כמו פנייה למטפל בודד.
 
-export default function CenterMessageButton({ entityId, centerId, centerName, className, label }: {
+export default function CenterMessageButton({ entityId, centerId, centerName, className, label, source = "profile" }: {
   /** מסלול 2: מזהה שורת ישות-המרכז. הפנייה נספרת גם בסטטיסטיקות הפורטל. */
   entityId?: string;
   /** מסלול 1: מזהה חשבון המרכז. אין שורת ישות, ולכן נתיב contact-center. */
@@ -16,6 +16,12 @@ export default function CenterMessageButton({ entityId, centerId, centerName, cl
   centerName: string;
   className?: string; // דריסת עיצוב מלאה (למשל בפס הדביק או ב-CTA הכהה); בלעדיה - הפיל הלבן המקורי
   label?: string;
+  /**
+   * מאיפה נלחץ: עמוד המרכז (ברירת המחדל), כרטיס במאגר או כרטיס בהתאמות. שלושת
+   * המקורות נספרים בנפרד ואסור לערבב אותם - כפתור שנוסף לכרטיס ורושם "profile"
+   * היה מנפח את עמוד המרכז ומעלים את הכרטיס מהספירה.
+   */
+  source?: "profile" | "directory" | "match";
 }) {
   const targetId = entityId ?? centerId;
   const target = entityId ? "therapist" : "center";
@@ -31,8 +37,9 @@ export default function CenterMessageButton({ entityId, centerId, centerName, cl
         <SiteMessageModal
           therapistId={targetId}
           therapistName={centerName}
-          source="profile"
+          source={source}
           target={target}
+          recipientIsCenter
           open={open}
           onClose={() => setOpen(false)}
         />

@@ -181,13 +181,13 @@ function TherapistCard({
           <div className="flex items-baseline justify-between gap-2">
             <div className="font-black text-stone-900 text-lg leading-tight truncate">{t.full_name}</div>
           </div>
-          {t.therapist_types.length > 0 && (
+          {/* למרכז אין שורת תואר. היא הציגה את שני סוגי המטפלים הראשונים
+              ברשימה - אצל מרכז רותם "עו"ס קליני · מטפל מיני", מתוך תשעה שהוא
+              מציע - כלומר תיאור חלקי ושרירותי של מוסד, שנראה כמו מקצוע של אדם.
+              התיאור של המרכז נמצא בשורת הטקסט שמתחת. */}
+          {!isCenter && t.therapist_types.length > 0 && (
             <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>
-              {/* למרכז אין מגדר - הטיה מגדרית של התואר ("פסיכולוגית קלינית")
-                  על שם של מוסד היא פשוט שגויה. */}
-              {isCenter
-                ? t.therapist_types.slice(0, 2).join(" · ")
-                : publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups)}
+              {publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups)}
             </div>
           )}
           {/* שיוך למרכז - טקסט בלבד: הכרטיס עטוף בקישור, ועוגן בתוך עוגן אינו
@@ -218,10 +218,24 @@ function TherapistCard({
       <div className="px-5 pb-5 flex flex-wrap items-center gap-2 border-t border-stone-100 pt-3">
         {/* מרכז: אין וואטסאפ/חיוג בכרטיס - הטלפון בשורת הישות הוא הקו הפנימי
             ואינו לפרסום (אותה הכרעה כמו בכרטיס ההתאמות). הפנייה מעמוד המרכז. */}
+        {/* פנייה ישירה למרכז מהכרטיס, דרך מודאל ההודעות שכבר מותקן כאן לכל
+            כרטיס: ההודעה נשלחת למייל המרכז ונספרת כלחיצה מהמאגר. רק לישות
+            אמיתית - לכרטיס מרכז מסונתז (מסלול 1) המזהה הוא "center:..." ואינו
+            שורת מטפל שאפשר למען אליה. */}
+        {isCenter && t.trackable !== false && !unavailable && (
+          <button
+            type="button"
+            onClick={() => setMessageOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90" style={{ background: "var(--teal)" }}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            שליחת הודעה למרכז
+          </button>
+        )}
         {isCenter && cardHref && (
           <Link href={cardHref}
-            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white hover:opacity-90"
-            style={{ background: "var(--teal)" }}>
+            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold hover:bg-[var(--teal-pale)]"
+            style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}>
             🏢 לעמוד המרכז
           </Link>
         )}
@@ -270,6 +284,7 @@ function TherapistCard({
         therapistId={t.id}
         therapistName={t.full_name}
         source="directory"
+        recipientIsCenter={isCenter}
         open={messageOpen}
         onClose={() => setMessageOpen(false)}
       />
