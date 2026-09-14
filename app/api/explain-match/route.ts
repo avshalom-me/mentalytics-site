@@ -8,7 +8,7 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // ── Input schema ──────────────────────────────────────────────────────────────
 
 const BodySchema = z.object({
-  questionnaire_type: z.enum(["adult", "child"]),
+  questionnaire_type: z.enum(["adult", "child", "school"]),
   search_mode: z.enum(["single", "combined"]).optional(),
 
   user_summary: z
@@ -41,6 +41,10 @@ const BodySchema = z.object({
     bio: z.string().nullable().optional(),
     // 'center' = מרכז טיפולי (מסלול 2) ולא אדם - משנה כותרת, גוף ולשון.
     entity_type: z.string().nullable().optional(),
+    /** התואר הציבורי כפי שמוצג בכותרת הפרופיל (ראו publicTherapistTitle). */
+    public_title: z.string().nullable().optional(),
+    /** משמש לגזירת public_title בצד השרת כשהלקוח לא שלח אותו. */
+    age_groups: z.array(z.string()).nullable().optional(),
   }),
 
   match_result: z.object({
@@ -74,10 +78,10 @@ function buildTitle(body: Body): string {
   const gender = body.therapist.gender;
   // מרכז טיפולי אינו אדם - כותרת בלשון מוסד, בלי מגדר.
   if (body.therapist.entity_type === "center") {
-    return body.questionnaire_type === "child" ? "למה המרכז הזה הוצע לילדכם" : "למה המרכז הזה הוצע לך";
+    return body.questionnaire_type === "child" ? "למה המרכז הזה הוצע לילדכם" : body.questionnaire_type === "school" ? "למה המרכז הזה מתאים לתלמיד/ה" : "למה המרכז הזה הוצע לך";
   }
   // Child questionnaires are filled by parents — the match is for their child.
-  const forWhom = body.questionnaire_type === "child" ? "לילדכם" : "לך";
+  const forWhom = body.questionnaire_type === "child" ? "לילדכם" : body.questionnaire_type === "school" ? "לתלמיד/ה" : "לך";
   if (isAssessment) {
     if (gender === "נקבה") return `למה המאבחנת הזאת הוצעה ${forWhom}`;
     if (gender === "זכר") return `למה המאבחן הזה הוצע ${forWhom}`;
@@ -145,6 +149,13 @@ function personalityFitLabel(score: number | null | undefined): string | null {
 // gpt-4o-mini follows unreliably).
 function addressingInstruction(body: Body): string {
   const g = body.user_summary?.gender;
+  if (body.questionnaire_type === "school") {
+    const student =
+      g === "נקבה" ? 'על התלמידה כתוב בלשון נקבה: "התלמידה", "היא", "שלה"'
+      : g === "זכר" ? 'על התלמיד כתוב בלשון זכר: "התלמיד", "הוא", "שלו"'
+      : 'על התלמיד/ה כתוב "התלמיד/ה"';
+    return `פנה אל היועצת בלשון נקבה יחיד ("את", "שלך") ובטון מקצועי-עמיתי; ${student}. היא אינה ההורה ואינה מי שבוחרת את המטפל/ת - הרשימה נועדה להעברה להורים.`;
+  }
   if (body.questionnaire_type === "child") {
     const child =
       g === "נקבה" ? 'על הילדה כתוב בלשון נקבה: "ילדתכם", "היא", "שלה"'
@@ -178,6 +189,10 @@ function buildPrompt(body: Body): string {
     user_summary: body.user_summary ?? {},
     therapist: {
       full_name: body.therapist.full_name,
+      // התואר כפי שהמטופל רואה אותו בכותרת הפרופיל. therapist_types נשאר
+      // לצדו כחומר נימוק - בלעדיו ההסבר היה מאבד את "הבעה ויצירה" ולא יכול
+      // להסביר את ההתאמה האמנותית, שהיא בדיוק החוזק של המטפלים האלה.
+      public_title: body.therapist.public_title ?? null,
       therapist_types: body.therapist.therapist_types ?? [],
       training_areas: body.therapist.training_areas ?? [],
       couples_modalities: body.therapist.couples_modalities ?? [],
@@ -237,6 +252,7 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
 
 **למי אתה כותב:**
 שדה addressing שבקלט קובע את צורת הפנייה (יחיד/רבים, זכר/נקבה/ניטרלי) — פעל לפיו במדויק, בכל משפט בהסבר.
+- אם questionnaire_type הוא "school" — את השאלון מילאה יועצת חינוכית או איש/אשת צוות חינוכי במסגרת תפקידם, והמטופל/ת הוא התלמיד/ה. הקוראת היא אשת מקצוע: טון עמיתי ולא מרגיע, בלי לפנות אליה כהורה ובלי לייחס לה את הבחירה במטפל/ת.
 - אם questionnaire_type הוא "child" — את השאלון מילאו הורים על ילדם, וההורים הם שקוראים את ההסבר; המטופל/ת הוא הילד/ה. אסור לנסח כאילו ההורה הוא המטופל (לא "הצרכים שלך" ולא "התהליך הטיפולי שלך" — הצרכים והטיפול הם של הילד/ה). הכשרה בהדרכת הורים או ניסיון בעבודה עם הורים הם יתרון — קשור אותם לליווי של ההורים לצד הטיפול בילד/ה.
 - במצב adult הקורא הוא המטופל עצמו — אדם יחיד.
 
@@ -260,6 +276,7 @@ async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
 **המשימה:** כתוב הסבר בן **שתי פסקאות**, מופרדות בשורה ריקה ("\\n\\n"). כל פסקה 2-4 משפטים.
 
 **פסקה 1 — מה במטפל/ת מתאים לצרכים שעלו**:
+כשאתה נוקב בתואר המקצועי - השתמש ב-therapist.public_title אם הוא קיים, ולא בערך הגולמי מ-therapist_types (שם התואר מנוסח לצורך המערכת ולא לצורך המטופל).
 סנתז מתוך match_reasons, matched_fields ושדות הפרופיל (training_areas, therapist_types, couples_modalities, bio) את ההתאמה המקצועית — אילו תחומי הכשרה/גישות של המטפל/ת עונים על מה שעלה בשאלון (main_needs / recommended_treatment_types / recommended_assessment_types).
 - **כלל עיגון:** קשור כל נקודת חוזק לצורך ספציפי שעלה אצל המשתמש — אל תכתוב שבחים כלליים ("מטפל/ת מנוסה ומקצועי/ת") שאינם נשענים על שדה שסופק.
 

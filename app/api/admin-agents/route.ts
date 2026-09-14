@@ -1,12 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { SEVERITY_RANK, type AgentSeverity } from "@/app/lib/agent-infra";
 import { runDailyDigest } from "@/app/lib/daily-digest";
 import { runWatchdog } from "@/app/lib/watchdog";
 import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
 import { googleAdsConfigured } from "@/app/lib/google-ads";
 import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
-import { sendGiftOffer } from "@/app/lib/gift-offer";
+import { runFinanceRecon } from "@/app/lib/finance-recon";
+import { runRetention } from "@/app/lib/retention";
+import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
+import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
+import { sendCenterNudge } from "@/app/lib/center-nudge-send";
+import { sendGiftOffer, recentGiftOffers } from "@/app/lib/gift-offer";
+import { runCenterProspects, listProspects, updateProspect, addProspectsFromText, moveProspectToDeal } from "@/app/lib/center-prospects";
+import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
+import { placesConfigured } from "@/app/lib/places-search";
+import { runBackup } from "@/app/lib/backup-run";
+import { runQuizFunnel } from "@/app/lib/quiz-funnel";
+import { syncDealReminders } from "@/app/lib/deal-reminders";
+import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
+import { gmailConfigured } from "@/app/lib/gmail";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -17,28 +31,91 @@ export const dynamic = "force-dynamic";
 // הפונקציה לפני שהריצה נרשמת (ממצא ביקורת: ריצה שנהרגה נשארת "רץ..." לנצח).
 export const maxDuration = 300;
 
+// מספר אחד לכל ריצה, לגרף שבעמוד: כמה "תוצרים" הריצה מצאה. מחולץ כאן
+// בשרת מתוך details, כדי שהעמוד לא יקבל את גופי ה-details המלאים של 150
+// ריצות (הדוח היומי לבדו שוקל כמה KB לריצה).
+function runMetric(agent: string, details: unknown): number | null {
+  if (!details || typeof details !== "object") return null;
+  const d = details as Record<string, unknown>;
+  const len = (v: unknown): number | null => (Array.isArray(v) ? v.length : null);
+  switch (agent) {
+    case "watchdog": {
+      const checks = Array.isArray(d.checks) ? (d.checks as { ok?: boolean; skipped?: boolean }[]) : null;
+      if (!checks) return null;
+      return checks.filter((c) => !c.ok && !c.skipped).length;
+    }
+    case "supply_gaps":
+      return (len(d.gift) ?? 0) + (len(d.recruit) ?? 0);
+    case "center_nudge":
+      return len(d.proposals);
+    // לגיבוי אין "ממצאים" - המדד הוא כמה קבצים עלו בפועל.
+    case "backup":
+      return typeof d.uploaded === "number" ? d.uploaded : null;
+    // שירות לקוחות: כמה טיוטות הוכנו בריצה.
+    case "inbox":
+      return typeof d.drafted === "number" ? d.drafted : null;
+    // שאלונים: שיעור ההשלמה של שאלון המבוגרים באחוזים - המדד
+    // היחיד שמסכם את כל המשפך למספר אחד, וכאן גבוה = טוב.
+    case "quiz_funnel": {
+      const fs = Array.isArray(d.funnels)
+        ? (d.funnels as { quiz?: string; recentCompletion?: number }[])
+        : null;
+      const adults = fs?.find((f) => f.quiz === "adults") ?? fs?.[0];
+      return adults?.recentCompletion != null ? Math.round(adults.recentCompletion * 100) : null;
+    }
+    case "daily_digest": {
+      const secs = Array.isArray(d.sections)
+        ? (d.sections as { count?: number }[])
+        : null;
+      if (!secs) return null;
+      return secs.reduce((sum, x) => sum + (Number(x?.count) || 0), 0);
+    }
+    default:
+      return len(d.findings);
+  }
+}
+
 export async function GET() {
   try {
-    const [runsRes, pendingRes, resolvedRes, latestDigestRes] = await Promise.all([
+    const [runsRes, pendingRes, actionCountRes, findingCountRes, resolvedRes, latestDigestRes] =
+      await Promise.all([
       supabaseAdmin
         .from("agent_runs")
-        .select("id, agent, started_at, finished_at, status, mode, summary, error")
+        // details נשלף כדי לחלץ ממנו מדד לגרף ואת הסקירה האחרונה של כל
+        // סוכן - אבל לא מוחזר לדפדפן כמו שהוא (ראו סינון למטה).
+        .select("id, agent, started_at, finished_at, status, mode, summary, error, details")
         .order("started_at", { ascending: false })
-        .limit(30),
+        .limit(150),
       supabaseAdmin
         .from("agent_actions")
         // payload נשלח לעמוד כי הצעת המתנה נערכת שם לפני השליחה (המועמדים
         // והטיוטה האישית לכל אחד יושבים בו).
-        .select("id, agent, action_type, title, body, entity_type, entity_id, entity_label, payload, created_at")
+        .select("id, agent, action_type, kind, title, body, entity_type, entity_id, entity_label, payload, severity, created_at")
         .eq("status", "pending")
         .order("created_at", { ascending: false })
-        .limit(50),
+        // 200 ולא 50: העמוד מקבץ את התור לפי סוג ומקפל את החלק המידעי, ולכן
+        // הוא סופג כמות כזו. עם 50 בלבד הכותרת ספרה את מה שהוחזר, ודחייה
+        // אחת רק שאבה שורה חדשה פנימה - המספר נראה תקוע.
+        .limit(200),
+      // שתי ספירות אמיתיות מהמאגר, לא אורך הרשימה שהוחזרה: פעולות שדורשות
+      // אותך, וממצאים לידיעה. ההפרדה מגיעה מעמודת kind שהסוכן מילא.
       supabaseAdmin
         .from("agent_actions")
-        .select("id, agent, title, status, status_changed_at")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("kind", "action"),
+      supabaseAdmin
+        .from("agent_actions")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "pending")
+        .eq("kind", "finding"),
+      // ההיסטוריה: מה כבר הוכרע ובוצע, לחלק "מה נעשה בעבר" של כל סוכן.
+      supabaseAdmin
+        .from("agent_actions")
+        .select("id, agent, action_type, kind, title, status, status_changed_at, resolution_note")
         .neq("status", "pending")
         .order("status_changed_at", { ascending: false })
-        .limit(10),
+        .limit(80),
       // הדוח האחרון של בקר הבוקר, כולל תוכנו המלא (details) - כך העמוד מציג
       // אותו ישירות בלי מייל ובלי להריץ מחדש (החלטת המשתמש 16/8).
       supabaseAdmin
@@ -56,10 +133,54 @@ export async function GET() {
       ai_summary?: string | null;
     } | null;
 
+    // ריצות: המדד לגרף במקום details המלא; הסקירה האחרונה של כל סוכן
+    // נשמרת בנפרד (details של הריצה התקינה האחרונה בלבד).
+    type RunRow = {
+      id: string; agent: string; started_at: string; finished_at: string | null;
+      status: string; mode: string | null; summary: string | null; error: string | null;
+      details: unknown;
+    };
+    const rawRuns = (runsRes.data ?? []) as RunRow[];
+    const latestDetails: Record<string, { started_at: string; details: unknown }> = {};
+    for (const r of rawRuns) {
+      if (r.agent === "daily_digest") continue; // לדוח היומי יש מסלול משלו
+      if (latestDetails[r.agent]) continue;
+      if (r.status !== "ok" && r.status !== "empty") continue;
+      latestDetails[r.agent] = { started_at: r.started_at, details: r.details ?? null };
+    }
+    const runs = rawRuns.map((r) => ({
+      id: r.id, agent: r.agent, started_at: r.started_at, finished_at: r.finished_at,
+      status: r.status, mode: r.mode, summary: r.summary, error: r.error,
+      metric: runMetric(r.agent, r.details),
+    }));
+
     return NextResponse.json({
       ok: true,
-      runs: runsRes.data ?? [],
-      pending_actions: pendingRes.data ?? [],
+      prospects: await listProspects().catch(() => []),
+      places_configured: placesConfigured(),
+      inbox: await listInbox().catch(() => []),
+      center_history: await loadCenterEmailHistory().catch(() => []),
+      inbox_configured: gmailConfigured(),
+      runs,
+      latest_details: latestDetails,
+      // החמור בראש, ובתוך אותה חומרה - הישן קודם. עד היום התור היה
+      // כרונולוגי בלבד, וממצא קריטי נבלע בין עשרות פריטים שגרתיים.
+      pending_actions: (pendingRes.data ?? []).slice().sort((a, b) => {
+        const rank = (x: { severity?: string | null }) =>
+          SEVERITY_RANK[(x.severity ?? "normal") as AgentSeverity] ?? 2;
+        const d = rank(a) - rank(b);
+        return d !== 0 ? d : String(a.created_at).localeCompare(String(b.created_at));
+      }),
+      // מי כבר קיבל הצעת מתנה בחלון הצינון. הכרטיס מסתיר אותם, אחרת הוא
+      // מציג נמען שהשליחה אליו תיחסם ברגע הלחיצה - אותו מטפל עולה כמועמד
+      // בכמה חיתוכים במקביל.
+      gift_offered_ids: await recentGiftOffers()
+        .then((rows) => Array.from(new Set(rows.map((r) => r.therapist_id))))
+        .catch(() => [] as string[]),
+      // הספירות האמיתיות מהמאגר, מופרדות לפי סוג התוצר.
+      pending_action_total: actionCountRes.count ?? 0,
+      pending_finding_total: findingCountRes.count ?? 0,
+      pending_total: (actionCountRes.count ?? 0) + (findingCountRes.count ?? 0),
       resolved_actions: resolvedRes.data ?? [],
       latest_digest: latestDigestRun
         ? {
@@ -133,6 +254,187 @@ export async function POST(req: NextRequest) {
         ok: true,
         therapist_name: result.therapistName,
         email: result.email,
+        remaining: result.remaining ?? [],
+        still_open: result.stillOpen ?? false,
+        still_short: result.stillShort ?? 0,
+        reoffer_after_days: result.reofferAfterDays ?? null,
+      });
+    }
+    if (body?.action === "deals_run") {
+      const r = await syncDealReminders();
+      return NextResponse.json({ ok: true, ...r });
+    }
+    if (body?.action === "quiz_run") {
+      const r = await runQuizFunnel();
+      return NextResponse.json({ ok: r.ok, funnels: r.funnels, findings: r.findings, error: r.error });
+    }
+    if (body?.action === "inbox_run") {
+      const r = await runInboxAgent();
+      return NextResponse.json({
+        ok: r.ok,
+        configured: r.configured,
+        inserted: r.inserted,
+        drafted: r.drafted,
+        auto_ignored: r.autoIgnored,
+        answered_external: r.answeredExternal,
+        errors: r.errors,
+        error: r.error,
+        inbox: await listInbox().catch(() => []),
+      });
+    }
+    // ייבוא חד-פעמי של דוגמאות מההתכתבות ההיסטורית. קריאה בלבד -
+    // לא שולח כלום ולא משנה פניות קיימות.
+    if (body?.action === "inbox_backfill") {
+      const r = await runInboxBackfill({
+        days: Number(body?.days) || undefined,
+        max: Number(body?.max) || undefined,
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({
+        ok: true,
+        scanned: r.scanned,
+        pairs: r.pairs,
+        imported: r.imported,
+        skipped: r.skipped,
+        errors: r.errors.slice(0, 5),
+        inbox: await listInbox().catch(() => []),
+      });
+    }
+    if (body?.action === "inbox_draft") {
+      const r = await regenerateInboxDraft(String(body?.id ?? ""));
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
+    }
+    // השליחה היחידה במערכת: לחיצת אדמין על פנייה אחת, עם הגוף שעל המסך.
+    if (body?.action === "inbox_send") {
+      const r = await sendInboxReply({
+        id: String(body?.id ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, to: r.to, inbox: await listInbox().catch(() => []) });
+    }
+    if (body?.action === "inbox_status") {
+      const status = body?.status === "new" ? "new" : "ignored";
+      const r = await setInboxStatus(String(body?.id ?? ""), status as "ignored" | "new");
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
+    }
+    if (body?.action === "prospects_run") {
+      const result = await runCenterProspects();
+      return NextResponse.json({
+        ok: result.ok,
+        places_configured: result.placesConfigured,
+        found: result.found,
+        refreshed: result.refreshed,
+        warm_leads: result.warmLeads,
+        calls: result.calls,
+        errors: result.errors,
+        error: result.error,
+      });
+    }
+    // עדכון שורה בטבלת המעקב - פנינו / ענו / תשובה / הערות / מכשולים.
+    // הדבקת רשימה שהמשתמש כבר מחזיק - בלי תלות בחיפוש החיצוני.
+    // "רוצים" - המכון עובר מרשימת החיוג לצינור העסקאות.
+    if (body?.action === "prospect_to_deal") {
+      const id = String(body?.id ?? "");
+      const stage = body?.stage === "negotiation" ? "negotiation" : "first_contact";
+      if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+      const r = await moveProspectToDeal(id, stage);
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, deal_id: r.dealId, prospects: await listProspects() });
+    }
+    if (body?.action === "prospects_add") {
+      const r = await addProspectsFromText(String(body?.text ?? ""));
+      return NextResponse.json({ ok: true, ...r, prospects: await listProspects() });
+    }
+    if (body?.action === "prospect_update") {
+      const id = String(body?.id ?? "");
+      if (!id) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+      const VALID_PROSPECT_STATUSES = ["new", "contacted", "later", "not_interested", "moved_to_deal"];
+      await updateProspect(id, {
+        contacted_at: body?.contacted === true ? new Date().toISOString() : body?.contacted === false ? null : undefined,
+        answer: body?.answer === null || typeof body?.answer === "string" ? body.answer : undefined,
+        status: VALID_PROSPECT_STATUSES.includes(String(body?.status))
+          ? (body.status as "new" | "contacted" | "later" | "not_interested" | "moved_to_deal")
+          : undefined,
+        follow_up_at: typeof body?.follow_up_at === "string" || body?.follow_up_at === null ? body.follow_up_at : undefined,
+        status_note: typeof body?.status_note === "string" ? body.status_note : undefined,
+        notes: typeof body?.notes === "string" ? body.notes : undefined,
+        obstacles: typeof body?.obstacles === "string" ? body.obstacles : undefined,
+        phone: typeof body?.phone === "string" ? body.phone : undefined,
+        email: typeof body?.email === "string" ? body.email : undefined,
+        dismissed: typeof body?.dismissed === "boolean" ? body.dismissed : undefined,
+      });
+      return NextResponse.json({ ok: true, prospects: await listProspects() });
+    }
+    // ג: טיוטה למכון מסוים, רק אחרי ניסיון טלפוני. לא אוטומטי לעולם.
+    if (body?.action === "prospect_draft") {
+      const draft = await requestProspectDraft(String(body?.id ?? ""));
+      return NextResponse.json({
+        ok: true,
+        subject: draft.subject,
+        body: draft.body,
+        source: draft.source,
+        facts: draft.facts,
+        note: draft.note ?? null,
+      });
+    }
+    if (body?.action === "prospect_send") {
+      const r = await sendProspectDraft({
+        id: String(body?.id ?? ""),
+        email: String(body?.email ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, name: r.name, email: r.email });
+    }
+    if (body?.action === "center_nudge_run") {
+      const result = await runCenterNudgeAgent();
+      return NextResponse.json({
+        ok: result.ok,
+        checked: result.checked,
+        proposals: result.proposals,
+        skipped: result.skipped,
+        error: result.error,
+      });
+    }
+    // שליחת נדנוד למרכז: מסלול השליחה היחיד, ורק מקליק מפורש באדמין.
+    if (body?.action === "center_nudge_send") {
+      const result = await sendCenterNudge({
+        actionId: String(body?.id ?? ""),
+        centerId: String(body?.center_id ?? ""),
+        subject: String(body?.subject ?? ""),
+        body: String(body?.body ?? ""),
+      });
+      if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: 400 });
+      return NextResponse.json({ ok: true, center_name: result.centerName, email: result.email });
+    }
+    // הרצת גיבוי ידנית. קיימת כדי שאחרי הקמת אישורי הדרייב אפשר יהיה לדעת
+    // **מיד** אם הם תקינים, במקום לחכות לקרון של 01:00 ולגלות מחר. בטוחה
+    // לחזרה: הגיבוי מצטבר, ולכן הרצה נוספת רק ממשיכה מהמקום שנעצר.
+    if (body?.action === "backup_run") {
+      const result = await runBackup();
+      return NextResponse.json(result);
+    }
+    if (body?.action === "retention_run") {
+      const result = await runRetention();
+      return NextResponse.json({
+        ok: result.ok,
+        findings: result.findings,
+        checked: result.checked,
+        error: result.error,
+      });
+    }
+    if (body?.action === "finance_run") {
+      const result = await runFinanceRecon();
+      return NextResponse.json({
+        ok: result.ok,
+        findings: result.findings,
+        checked: result.checked,
+        error: result.error,
       });
     }
     if (body?.action === "ads_run") {
@@ -184,8 +486,32 @@ export async function POST(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const id = String(body?.id ?? "");
     const status = String(body?.status ?? "");
+
+    // הכרעה קבוצתית: התור מתמלא בממצאים מידעיים (פערי גיוס, התראות), ואין
+    // טעם לדחות 43 שורות אחת-אחת. רק דחייה מותרת בקבוצה - אישור קבוצתי של
+    // הצעות שמובילות לפעולה הוא בדיוק מה שלא רוצים שיקרה בקליק אחד.
+    const ids = Array.isArray(body?.ids) ? body.ids.map((x: unknown) => String(x)).filter(Boolean) : [];
+    if (ids.length > 0) {
+      if (status !== "dismissed") {
+        return NextResponse.json({ ok: false, error: "הכרעה קבוצתית אפשרית רק לדחייה" }, { status: 400 });
+      }
+      const { data, error } = await supabaseAdmin
+        .from("agent_actions")
+        .update({
+          status: "dismissed",
+          status_changed_at: new Date().toISOString(),
+          resolved_by: "admin",
+          resolution_note: body?.note ? String(body.note) : "נדחה בהכרעה קבוצתית",
+        })
+        .in("id", ids)
+        .eq("status", "pending")
+        .select("id");
+      if (error) throw new Error(error.message);
+      return NextResponse.json({ ok: true, dismissed: data?.length ?? 0 });
+    }
+
+    const id = String(body?.id ?? "");
     if (!id || !["approved", "dismissed", "pending"].includes(status)) {
       return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
     }

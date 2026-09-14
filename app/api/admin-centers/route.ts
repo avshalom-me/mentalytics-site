@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
+import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
+import { loadCentersWithReadiness } from "@/app/lib/center-readiness-load";
+import { missingProfileFields } from "@/app/lib/profile-completeness";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
 // מוגן ע"י ה-middleware של האדמין (/api/admin-*).
@@ -54,7 +59,7 @@ export async function GET() {
     // לסמן כשמשהו מחכה לאישור (כולל שורת ישות-המרכז במסלול 2).
     const { data: linked } = await supabaseAdmin
       .from("therapists")
-      .select("center_account_id, status, entity_type")
+      .select("id, center_account_id, status, entity_type")
       .not("center_account_id", "is", null);
     const counts = new Map<string, number>();
     const pendingCounts = new Map<string, number>();
@@ -63,12 +68,161 @@ export async function GET() {
       if (t.entity_type !== "center") counts.set(cid, (counts.get(cid) ?? 0) + 1); // שורת ישות אינה "מטפל משויך"
       if (t.status === "pending") pendingCounts.set(cid, (pendingCounts.get(cid) ?? 0) + 1);
     });
+    // ── מדדי מעורבות לכרטיס המרכז ────────────────────────────────────────
+    // עד 19/8/26 האדמין לא הציג לחיצות/צפיות למרכזים בכלל - התשובה ל"כמה
+    // פניות מכון X ייצר" חייבה כניסה לתצוגת הפרופילים וסיכום ידני. הסכימה:
+    // מסלול 1 = סכום המטפלים המשויכים; מסלול 2 = שורת הישות (שהיא השורה
+    // המקושרת היחידה שם, כך שאותה קבוצה משרתת את שני המסלולים).
+    // "צפיות" = כניסות לפרופיל (match+directory), אותה הגדרה כמו הפורטל,
+    // האדמין-מטפלים והדשבורד. פילוח הערוץ נותן את ההבחנה ממומן/אורגני/ישיר.
+    const byCenter = new Map<string, string>();
+    (linked ?? []).forEach((t) => byCenter.set(t.id as string, t.center_account_id as string));
+    const linkedIds = [...byCenter.keys()];
+
+    type Eng = {
+      views_30: number; clicks_30: number; views_total: number; clicks_total: number;
+      clicks_30_by_channel: { paid: number; organic: number; direct: number; other: number };
+      // "פניות - חלוקה לפי סוגים" (20/8/26): הודעה באתר = ודאית (הטקסט אצלנו),
+      // וואטסאפ/טלפון/מייל = כוונה בלבד. אותה הבחנה כמו עמוד הערבות.
+      clicks_30_by_type: Record<string, number>;
+      // אירועי העמוד הציבורי (analytics_events, מיגרציה 20260820): תנועת
+      // העמוד, לחיצות לאתר המרכז, ולחיצות קשר של מסלול 1 (שאין לו ישות).
+      page_views_30: number; page_views_total: number;
+      website_clicks_30: number; website_clicks_total: number;
+      page_contact_30: number; page_contact_total: number;
+      // הודעות אתר של מסלול 1 (crm_leads.center_account_id) - במסלול 2 הן
+      // כבר בתוך clicks_30_by_type.site_message של הישות, בלי כפילות.
+      site_messages_30: number; site_messages_total: number;
+    };
+    const engByCenter = new Map<string, Eng>();
+    const engOf = (cid: string): Eng => {
+      let e = engByCenter.get(cid);
+      if (!e) engByCenter.set(cid, (e = {
+        views_30: 0, clicks_30: 0, views_total: 0, clicks_total: 0,
+        clicks_30_by_channel: { paid: 0, organic: 0, direct: 0, other: 0 },
+        clicks_30_by_type: {},
+        page_views_30: 0, page_views_total: 0,
+        website_clicks_30: 0, website_clicks_total: 0,
+        page_contact_30: 0, page_contact_total: 0,
+        site_messages_30: 0, site_messages_total: 0,
+      }));
+      return e;
+    };
+
+    const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    if (linkedIds.length > 0) {
+      const [viewRows, clickRows] = await Promise.all([
+        fetchAllRows<{ therapist_id: string; viewed_at: string }>(() =>
+          supabaseAdmin
+            .from("therapist_profile_views")
+            .select("therapist_id, viewed_at")
+            .in("therapist_id", linkedIds)
+            .in("source", ["match", "directory"]),
+        ),
+        fetchAllRows<{ therapist_id: string; clicked_at: string; channel: string | null; click_type: string | null }>(() =>
+          supabaseAdmin
+            .from("therapist_contact_clicks")
+            .select("therapist_id, clicked_at, channel, click_type")
+            .in("therapist_id", linkedIds),
+        ),
+      ]);
+      for (const v of viewRows) {
+        const cid = byCenter.get(v.therapist_id);
+        if (!cid) continue;
+        const e = engOf(cid);
+        e.views_total++;
+        if (v.viewed_at >= cutoff30) e.views_30++;
+      }
+      for (const c of clickRows) {
+        const cid = byCenter.get(c.therapist_id);
+        if (!cid) continue;
+        const e = engOf(cid);
+        e.clicks_total++;
+        if (c.clicked_at >= cutoff30) {
+          e.clicks_30++;
+          const ch = c.channel ?? "";
+          if (ch === "google_paid" || ch === "meta_paid" || ch === "taboola_paid") e.clicks_30_by_channel.paid++;
+          else if (ch === "google_organic") e.clicks_30_by_channel.organic++;
+          else if (ch === "direct") e.clicks_30_by_channel.direct++;
+          else e.clicks_30_by_channel.other++;
+          const ty = c.click_type ?? "other";
+          e.clicks_30_by_type[ty] = (e.clicks_30_by_type[ty] ?? 0) + 1;
+        }
+      }
+    }
+
+    // אירועי העמוד הציבורי + הודעות מסלול 1 - לכל המרכזים (גם בלי מטפלים
+    // מקושרים: מרכז מסלול 1 עם עמוד ציבורי ובלי אף שיוך עדיין נמדד).
+    const [pageEvents, centerLeads] = await Promise.all([
+      fetchAllRows<{ event_type: string; created_at: string; metadata: { center_id?: string } | null }>(() =>
+        supabaseAdmin
+          .from("analytics_events")
+          .select("event_type, created_at, metadata")
+          .in("event_type", ["center_page_view", "center_website_click", "center_contact_click"]),
+      ),
+      fetchAllRows<{ center_account_id: string; created_at: string }>(() =>
+        supabaseAdmin
+          .from("crm_leads")
+          .select("center_account_id, created_at")
+          .not("center_account_id", "is", null)
+          .eq("source", "site_message"),
+      ),
+    ]);
+    for (const ev of pageEvents) {
+      const cid = ev.metadata?.center_id;
+      if (!cid) continue;
+      const e = engOf(cid);
+      const recent = ev.created_at >= cutoff30;
+      if (ev.event_type === "center_page_view") { e.page_views_total++; if (recent) e.page_views_30++; }
+      else if (ev.event_type === "center_website_click") { e.website_clicks_total++; if (recent) e.website_clicks_30++; }
+      else { e.page_contact_total++; if (recent) e.page_contact_30++; }
+    }
+    for (const l of centerLeads) {
+      const e = engOf(l.center_account_id);
+      e.site_messages_total++;
+      if (l.created_at >= cutoff30) e.site_messages_30++;
+    }
+
+    // מוכנות לפי מסלול (center-readiness) - למרכזים פעילים. אותו מקור אמת
+    // כמו סוכן השימור וקרון הנדנודים, כדי שהאדמין יראה בדיוק את אותו מצב.
+    const readinessById = new Map<string, unknown>();
+    try {
+      for (const r of await loadCentersWithReadiness()) {
+        readinessById.set(r.id, {
+          pct: r.readiness.pct,
+          track_label: r.readiness.trackLabel,
+          headline: r.readiness.headline,
+          slots: r.readiness.slots,
+          missing: r.readiness.missingForCenter.map((i) => ({ label: i.label, critical: i.critical, hint: i.hint ?? null })),
+          blocked_on_us: r.readiness.blockedOnUs.map((i) => i.label),
+        });
+      }
+    } catch (e) {
+      console.error("admin-centers: readiness load failed:", e instanceof Error ? e.message : e);
+    }
+
     // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
     // therapist_count שבטבלה, שהוא מספר המטפלים שבתמחור ההצעה).
+    // צוות הניהול לכל מרכז: מאז 9/9/26 הגישה לפורטל נקבעת לפי center_members
+    // ולא לפי user_id בלבד, ו"נכנסו לפורטל" חייב להראות את כל החשבונות.
+    const { data: memberRows } = await supabaseAdmin
+      .from("center_members")
+      .select("center_id, user_id, email, created_at")
+      .order("created_at", { ascending: true });
+    const membersByCenter = new Map<string, { user_id: string; email: string | null }[]>();
+    (memberRows ?? []).forEach((m) => {
+      const cid = m.center_id as string;
+      if (!membersByCenter.has(cid)) membersByCenter.set(cid, []);
+      membersByCenter.get(cid)!.push({ user_id: m.user_id as string, email: (m.email as string | null) ?? null });
+    });
+
     const centers = (data ?? []).map((c) => ({
       ...c,
+      members: (membersByCenter.get(c.id as string) ?? []).map((m) => ({ ...m, is_primary: m.user_id === c.user_id })),
       linked_therapist_count: counts.get(c.id as string) ?? 0,
       pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
+      engagement: engByCenter.get(c.id as string) ?? null,
+      readiness: readinessById.get(c.id as string) ?? null,
     }));
     return NextResponse.json({ ok: true, centers });
   } catch (err) {
@@ -332,15 +486,17 @@ export async function POST(req: NextRequest) {
       if (error) throw error;
       if (syncEntity === "ensure") await ensureCenterEntityRow(id);
       else if (syncEntity === "remove") await removeCenterEntityRow(id);
-      // מסלול 2: שינוי מייל/טלפון המרכז מתפשט לפרטי הקשר של שורת הישות, כדי
-      // שהפניות מההתאמות ימשיכו להגיע למרכז ולא לכתובת ישנה.
+      // מסלול 2: שינוי מייל/טלפון/שם המרכז מתפשט לשורת הישות. השם היה חסר
+      // כאן (ממצא 9 בביקורת 4/8/26): מרכז ששינה שם המשיך להופיע בכרטיס
+      // ההתאמה בשם הישן, כי הכרטיס נבנה מ-full_name של שורת הישות.
       const centerNowEntity =
         update.billing_track === "center_entity" ||
         (update.billing_track === undefined && (center.billing_track as string) === "center_entity");
-      if (centerNowEntity && (body.email !== undefined || body.phone !== undefined)) {
+      if (centerNowEntity && (body.email !== undefined || body.phone !== undefined || update.name !== undefined)) {
         const contactPatch: Record<string, unknown> = {};
         if (body.email !== undefined) contactPatch.email = str(body.email, 200) || null;
         if (body.phone !== undefined) contactPatch.phone = str(body.phone, 30) || null;
+        if (update.name !== undefined) contactPatch.full_name = update.name;
         await supabaseAdmin.from("therapists").update(contactPatch).eq("center_account_id", id).eq("entity_type", "center");
       }
       return NextResponse.json({ ok: true });
@@ -528,6 +684,148 @@ export async function POST(req: NextRequest) {
           ? { status: ours.Status, next_billing: ours.Date_NextBilling ?? null, unit_price: ours.UnitPrice ?? null }
           : null,
       });
+    }
+
+    // פירוט לפי מטפל למרכז אחד - נטען בפתיחת "פירוט" בכרטיס המרכז באדמין.
+    // מסלול 1: שורה לכל מטפל מקושר; מסלול 2: שורת הישות היא השורה היחידה.
+    if (action === "center_engagement") {
+      const { data: mine } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name, status, promotion_source, entity_type, admin_approved, email, phone, online, age_groups, promoted_since, profile_photo_path, regions, therapist_types, training_areas")
+        .eq("center_account_id", id);
+      const rows = mine ?? [];
+      if (rows.length === 0) return NextResponse.json({ ok: true, therapists: [] });
+
+      const ids2 = rows.map((t) => t.id as string);
+      const cutoff = new Date(Date.now() - 30 * 86_400_000).toISOString();
+      const [views2, clicks2, certRows, dirImpr] = await Promise.all([
+        // כולל match_card: זו החשיפה הגדולה מכולן, והיא נעדרה מכאן לגמרי.
+        // בלעדיה הטבלה הראתה "8 פניות מול 0" בלי להסביר שמאחוריהן עומדות
+        // 84 הופעות מול 2 - כלומר פער חשיפה, לא פער איכות (מכון הכרה, 7/9/26).
+        fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null }>(() =>
+          supabaseAdmin
+            .from("therapist_profile_views")
+            .select("therapist_id, viewed_at, source")
+            .in("therapist_id", ids2)
+            .in("source", ["match", "directory", "match_card"]),
+        ),
+        fetchAllRows<{ therapist_id: string; clicked_at: string; click_type: string | null }>(() =>
+          supabaseAdmin
+            .from("therapist_contact_clicks")
+            .select("therapist_id, clicked_at, click_type")
+            .in("therapist_id", ids2),
+        ),
+        supabaseAdmin.from("therapist_certificates").select("therapist_id").in("therapist_id", ids2),
+        // הופעות במאגר הציבורי - נרשמות כאירוע ולא כצפייה, ולכן נעדרו גם הן.
+        fetchAllRows<{ therapist_id: string; created_at: string }>(() =>
+          supabaseAdmin
+            .from("analytics_events")
+            .select("therapist_id, created_at")
+            .eq("event_type", "profile_impression")
+            .in("therapist_id", ids2),
+        ),
+      ]);
+      const certSet = new Set((certRows.data ?? []).map((r) => r.therapist_id as string));
+
+      type Per = {
+        cards_30: number; cards_total: number;
+        dir_impr_30: number; dir_impr_total: number;
+        views_30: number; views_total: number;
+        clicks_30: number; clicks_total: number;
+        by_type_30: Record<string, number>;
+      };
+      const per = new Map<string, Per>();
+      const perOf = (tid: string): Per => {
+        let x = per.get(tid);
+        if (!x) per.set(tid, (x = {
+          cards_30: 0, cards_total: 0, dir_impr_30: 0, dir_impr_total: 0,
+          views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {},
+        }));
+        return x;
+      };
+      for (const v of views2) {
+        const x = perOf(v.therapist_id);
+        // כרטיס בהתאמות הוא חשיפה, לא צפייה. הפרדה ולא איחוד: "נראה 84 פעם
+        // ונפתח 19" הוא משפט אחר לגמרי מ-"103 צפיות".
+        if (v.source === "match_card") {
+          x.cards_total++; if (v.viewed_at >= cutoff) x.cards_30++;
+        } else {
+          x.views_total++; if (v.viewed_at >= cutoff) x.views_30++;
+        }
+      }
+      for (const e of dirImpr) {
+        const x = perOf(e.therapist_id);
+        x.dir_impr_total++; if (e.created_at >= cutoff) x.dir_impr_30++;
+      }
+      for (const cl of clicks2) {
+        const x = perOf(cl.therapist_id);
+        x.clicks_total++;
+        if (cl.clicked_at >= cutoff) {
+          x.clicks_30++;
+          const ty = cl.click_type ?? "other";
+          x.by_type_30[ty] = (x.by_type_30[ty] ?? 0) + 1;
+        }
+      }
+
+      const therapists = rows
+        .map((t) => {
+          const x = per.get(t.id as string) ?? {
+            cards_30: 0, cards_total: 0, dir_impr_30: 0, dir_impr_total: 0,
+            views_30: 0, views_total: 0, clicks_30: 0, clicks_total: 0, by_type_30: {},
+          };
+          // לשורת ישות-מרכז אין "תעודת רישיון" - זה ארגון, לא אדם מוסמך.
+          const missing = missingProfileFields(
+            {
+              full_name: (t.full_name as string) ?? "",
+              profile_photo_path: t.profile_photo_path as string | null,
+              regions: t.regions as string[] | null,
+              therapist_types: t.therapist_types as string[] | null,
+              training_areas: t.training_areas as string[] | null,
+            },
+            t.entity_type === "center" || certSet.has(t.id as string),
+          );
+          return {
+            id: t.id,
+            full_name: (t.full_name as string) || "(ללא שם)",
+            is_entity: t.entity_type === "center",
+            status: t.status,
+            promoted: t.status === "paying",
+            admin_approved: !!t.admin_approved,
+            email: (t.email as string) || null,
+            missing_fields: missing,
+            // דגלי מוכנות: לא "חסר בפרופיל" (שם נבדקת שלמות לאישור) אלא
+            // הסיבות שבגללן מטפל מאושר בכל זאת לא נחשף או לא ניתן לפנייה.
+            // בלעדיהם "0 פניות" נראה כמו כישלון של המטפל, בזמן שהסיבה יכולה
+            // להיות שאין לו טלפון ולכן אין בכרטיס שלו כפתור וואטסאפ בכלל.
+            has_phone: typeof t.phone === "string" && t.phone.trim().length > 0,
+            online: t.online === true,
+            age_groups: Array.isArray(t.age_groups) ? (t.age_groups as string[]) : [],
+            promoted_since: (t.promoted_since as string | null) ?? null,
+            ...x,
+          };
+        })
+        // הישות ראשונה, אחריה לפי לחיצות 30 יום, ובתיקו לפי חשיפה - כדי שמי
+        // שנחשף הרבה ולא הביא פנייה יעלה מעל מי שגם לא נחשף.
+        .sort((a, b) =>
+          (b.is_entity ? 1 : 0) - (a.is_entity ? 1 : 0) ||
+          b.clicks_30 - a.clicks_30 ||
+          (b.cards_30 + b.dir_impr_30) - (a.cards_30 + a.dir_impr_30));
+
+      return NextResponse.json({ ok: true, therapists });
+    }
+
+    // "צפייה בתור מרכז": אותו מטען בדיוק שהפורטל מקבל, דרך אותה פונקציה
+    // (buildCenterPortalPayload). קריאה בלבד - אין כאן שום כתיבה, ואין
+    // התחזות לחשבון: האדמין מזוהה ב-Basic Auth של /api/admin-, והמרכז נטען
+    // לפי id ולא לפי סשן שלו.
+    if (action === "center_portal_preview") {
+      const { data: c } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select(PORTAL_CENTER_COLS)
+        .eq("id", id)
+        .maybeSingle();
+      if (!c) return NextResponse.json({ ok: false, error: "מרכז לא נמצא" }, { status: 404 });
+      return NextResponse.json(await buildCenterPortalPayload(c as unknown as PortalCenter));
     }
 
     return NextResponse.json({ ok: false, error: "unknown action" }, { status: 400 });

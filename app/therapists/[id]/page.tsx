@@ -6,7 +6,7 @@ import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
 import { specialtyToSlug } from "@/app/lib/specialties";
-import { genderTitle, genderTitles } from "@/app/lib/gender-text";
+import { genderTitle, genderTitles, publicTherapistTitle } from "@/app/lib/gender-text";
 import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/therapist-url";
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
@@ -45,17 +45,30 @@ type TherapistRow = {
  * המרכז שהמטפל/ת שייך/ת אליו - רק כשהעמוד הציבורי שלו חי (אותם תנאים
  * שאוכף getPublicCenterBySlug), אחרת הקישור היה מוביל ל-404.
  */
-async function getAffiliatedCenter(centerId: string | null): Promise<{ name: string; slug: string } | null> {
+async function getAffiliatedCenter(
+  centerId: string | null
+): Promise<{ name: string; slug: string; phone: string | null } | null> {
   if (!centerId) return null;
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("name, slug")
+    .select("name, slug, phone, public_phone")
     .eq("id", centerId)
     .eq("status", "active")
     .not("slug", "is", null)
     .or("public_page_enabled.eq.true,billing_track.eq.center_entity")
     .maybeSingle();
-  return data ? { name: data.name as string, slug: data.slug as string } : null;
+  if (!data) return null;
+  // הטלפון הציבורי לפני הטלפון התפעולי: הראשון נבחר להצגה למטופלים,
+  // השני עלול להיות הקו האישי של מי שחתם על המנוי.
+  const clean = (v: unknown): string | null => {
+    const x = typeof v === "string" ? v.trim() : "";
+    return x.length > 0 ? x : null;
+  };
+  return {
+    name: data.name as string,
+    slug: data.slug as string,
+    phone: clean(data.public_phone) ?? clean(data.phone),
+  };
 }
 
 async function getTherapist(id: string): Promise<TherapistRow | null> {
@@ -89,6 +102,9 @@ type SimilarTherapist = {
   regions: string[] | null;
   profile_photo_path: string | null;
   status: string | null;
+  /** נדרש לכלל התואר הציבורי - בלעדיו הכרטיס הזה היה היחיד בעמוד שמציג
+   *  "מטפלת בהבעה ויצירה" בזמן שהכותרת למעלה אומרת "פסיכותרפיסטית". */
+  age_groups: string[] | null;
 };
 
 // Alternatives shown on an unavailable therapist's profile: same professional
@@ -103,7 +119,7 @@ async function getSimilarTherapists(t: TherapistRow, limit = 3): Promise<Similar
 
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, full_name, gender, therapist_types, regions, profile_photo_path, status, accepting_new_patients")
+    .select("id, full_name, gender, therapist_types, regions, profile_photo_path, status, accepting_new_patients, age_groups")
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .eq("accepting_new_patients", true)
@@ -141,7 +157,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   if (!therapist) return { title: "מטפל לא נמצא" };
 
   const name = therapist.full_name ?? "מטפל";
-  const type = genderTitle(therapist.therapist_types?.[0] ?? "מטפל נפשי", therapist.gender);
+  const type = publicTherapistTitle(
+    therapist.therapist_types?.[0] ?? "מטפל נפשי",
+    therapist.gender,
+    therapist.age_groups
+  );
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
   // Stable, crawlable photo URL (see app/therapist-photo/[id]/route.ts). Gives
@@ -220,7 +240,9 @@ export default async function TherapistProfilePage({
   ]);
   const t = therapistRow;
   const name = t.full_name ?? "מטפל";
-  const type = genderTitle(t.therapist_types?.[0] ?? "", t.gender);
+  // הכותרת, ה-H1 ו-jobTitle בסכמה. שורת "הכשרה" בגוף העמוד נשארת על
+  // genderTitles ומציגה את ההסמכה כלשונה - זו כל הנקודה של ההפרדה.
+  const type = publicTherapistTitle(t.therapist_types?.[0] ?? "", t.gender, t.age_groups);
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   // Stable public photo URL (indexable) - replaces the 24h signed URL for both
   // display and structured data. Falls back to the gender avatar when no photo.
@@ -228,8 +250,14 @@ export default async function TherapistProfilePage({
   // Validated: a `phone` holding something that is not a number (one paying
   // therapist has an email address there) yields null, so the button is hidden
   // rather than linking to wa.me/972ZJOURY@GMAIL.COM.
-  const waLink = waLinkFor(t.phone);
-  const telLink = telHref(t.phone);
+  // מטפל/ת של מרכז בלי קו אישי: הקו של המרכז הוא דרך הקשר המהירה, והוא
+  // מסומן ככזה בכפתורים. בלי הנפילה הזו הפרופיל נשאר בלי אף כפתור מהיר -
+  // רק טופס הודעה - וזה מה שקרה לשמעון ערנרייך, מקודם ומשולם, עד 21/8/2026.
+  const ownPhone = (t.phone ?? "").trim();
+  const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
+  const contactPhone = ownPhone || centerPhone;
+  const waLink = waLinkFor(contactPhone);
+  const telLink = telHref(contactPhone);
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -351,6 +379,7 @@ export default async function TherapistProfilePage({
                 telLink={telLink}
                 source={source}
                 mobileSticky
+                viaCenterName={centerPhone ? affiliatedCenter?.name ?? null : null}
               />
             )}
           </div>
@@ -378,7 +407,7 @@ export default async function TherapistProfilePage({
                   <div className="font-extrabold text-stone-900 truncate">{s.full_name}</div>
                   {s.therapist_types?.[0] && (
                     <div className="text-sm font-semibold" style={{ color: "var(--teal)" }}>
-                      {genderTitle(s.therapist_types[0], s.gender)}
+                      {publicTherapistTitle(s.therapist_types[0], s.gender, s.age_groups)}
                     </div>
                   )}
                   {(s.regions?.length ?? 0) > 0 && (
@@ -543,7 +572,17 @@ export default async function TherapistProfilePage({
           city / specialty / online landing pages with descriptive anchors. */}
       {(() => {
         const cityLinks = (t.regions ?? []).filter((c: string) => (CITY_SEO_LIST as readonly string[]).includes(c)).slice(0, 3);
-        const areaLinks = (t.training_areas ?? []).filter((a: string) => (TRAINING_AREAS as readonly string[]).includes(a)).slice(0, 3);
+        // Cities cap at 3 (only one live profile has more, so nothing is lost).
+        // Specialties cap higher: at 3, the "first three areas" rule silently
+        // dropped 304 internal links across 115 profiles - and it hit hardest
+        // exactly where we least want it. טיפול זוגי is our largest demand
+        // cluster (8,480 searches/month, Keyword Planner 8/8/26) and had 28
+        // therapists but only 5 rendered links; טיפול באומנות had 15 and zero.
+        // Profiles are the site's strongest-ranking pages, so this is the
+        // cheapest equity we own.
+        const AREA_LINK_CAP = 8;
+        const allAreas = (t.training_areas ?? []).filter((a: string) => (TRAINING_AREAS as readonly string[]).includes(a));
+        const areaLinks = allAreas.slice(0, AREA_LINK_CAP);
         if (cityLinks.length === 0 && areaLinks.length === 0 && !t.online) return null;
         return (
           <div className="mx-auto mt-10 max-w-5xl border-t border-[var(--line)] pt-6">

@@ -19,7 +19,22 @@ export const ANALYTICS_EVENT_TYPES = [
   "recruit_page_view",
   "therapist_explain_click",
   "matching_click",
+  // שליחת החיפוש בפועל (matching_click = הטופס נפתח). נושא את האזור שנבחר,
+  // שאינו קיים בשום אירוע אחר. מיגרציה: 20260819_match_search_event.sql
+  "match_search",
+  // ⚠️ הוספת סוג חדש דורשת מיגרציה שמרחיבה את ה-CHECK בשם valid_event_type.
+  // ב-30/8/26 התברר שהיו שני CHECK כפולים על הטבלה, מיגרציה הרחיבה רק את
+  // הלא-נכון, והאירוע נדחה יומיים בשקט. נשאר אחד בלבד (20260830).
+  // כמה אפשרויות הוחזרו בפועל - האות שמבדיל "יש מטפלים באזור" מ"היו
+  // אפשרויות על המסך". מיגרציה: 20260827_match_results_event.sql
+  "match_results",
   "match_saved",
+  // אירועי עמוד-מרכז (מיגרציה: 20260820_center_page_events.sql). מסלול 1
+  // בלי שורת ישות - אלה המדדים היחידים של העמוד שלו; במסלול 2 הם נוספים
+  // על therapist_profile_views של הישות (תנועת עמוד מול צפיות התאמה).
+  "center_page_view",
+  "center_website_click",
+  "center_contact_click",
 ] as const;
 
 // תת-הקבוצה שמותרת דרך /api/track (הלקוח). שני הנותרים נכתבים רק בצד

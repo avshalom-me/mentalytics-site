@@ -179,6 +179,53 @@ export async function GET(req: NextRequest) {
       }
       return NextResponse.json({ ok: true, pending_link: { name: liveRow.full_name } });
     }
+
+    // פרופיל שמנוהל ע"י מרכז טיפולי (center_account_id) עם אותו מייל: מוחרג
+    // בכוונה מהשאילתה למעלה - קישור אוטומטי היה מוסר שליטה על פרופיל של
+    // מרכז לכל מי שנרשם ראשון. אבל בלי הענף הזה, מטפל/ת מרכז שנרשמים
+    // נופלים הלאה ומקבלים שורת stub חדשה - פרופיל כפול וריק לצד הפרופיל
+    // האמיתי שנשאר יתום אצל המרכז (דפוס "שמעון ערנרייך", מהכיוון השני).
+    // לכן: אותו מסך "ממתין לקישור" + התראת אדמין, וההחלטה אנושית - באדמין
+    // יש כפתור "קשר חשבון כניסה" שעובד גם כאן.
+    const { data: centerRow } = await supabaseAdmin
+      .from("therapists")
+      .select("id, full_name, center_account_id, therapy_center_accounts(name)")
+      .eq("email", user.email)
+      .is("user_id", null)
+      .not("center_account_id", "is", null)
+      .neq("entity_type", "center")
+      .maybeSingle();
+    if (centerRow) {
+      const rawCenter = (centerRow as Record<string, unknown>).therapy_center_accounts;
+      const centerName =
+        ((Array.isArray(rawCenter) ? rawCenter[0] : rawCenter) as { name?: string } | null)?.name ?? "מרכז טיפולי";
+      const { data: alreadyAlerted } = await supabaseAdmin
+        .from("crm_email_log")
+        .select("id")
+        .eq("template", "therapist_link_request")
+        .eq("entity_id", centerRow.id as string)
+        .limit(1);
+      if (!alreadyAlerted?.length) {
+        const alertTo = alertRecipients();
+        try {
+          await new Resend(process.env.RESEND_API_KEY).emails.send({
+            from: "טיפול חכם <noreply@mentalytics.co.il>",
+            to: alertTo,
+            subject: `🔗 ${centerRow.full_name} (${centerName}) נרשמו - הפרופיל מנוהל ע"י המרכז`,
+            html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+              <p><strong>${String(centerRow.full_name).replace(/</g, "&lt;")}</strong> נרשמו עכשיו עם הכתובת <strong>${String(user.email).replace(/</g, "&lt;")}</strong>.</p>
+              <p>הפרופיל שלהם שייך למרכז <strong>${String(centerName).replace(/</g, "&lt;")}</strong> ולכן לא קושר אוטומטית. הם רואים כרגע מסך "ממתין לקישור" - לא נוצר פרופיל כפול.</p>
+              <p><strong>ההחלטה:</strong> קישור החשבון ייתן למטפל/ת עריכה עצמית לצד עריכת המרכז (המרכז ממשיך לערוך הכל). אם המרכז מעדיף לנהל לבד - אפשר פשוט להשאיר כך וליידע את המטפל/ת.</p>
+              <p>לקישור: באדמין ← מטפלים ← בכרטיס של ${String(centerRow.full_name).replace(/</g, "&lt;")} ← "🔗 קשר חשבון כניסה".</p>
+            </div>`,
+          });
+          await logEmail({ recipient: alertTo.join(","), recipientType: "other", entityId: centerRow.id as string, subject: `קישור חשבון (מרכז) - ${centerRow.full_name}`, template: "therapist_link_request", sentBy: "system" });
+        } catch (e) {
+          console.error("center therapist link-request alert failed:", e);
+        }
+      }
+      return NextResponse.json({ ok: true, pending_link: { name: centerRow.full_name, center: centerName } });
+    }
   }
 
   // ── חשבון של מנהל/ת מרכז טיפולי ─────────────────────────────────────────

@@ -22,7 +22,7 @@ const DEFAULTS: Settings = {
   highlightHeadings: false,
 };
 
-const HIDDEN_ROUTES = ["/adults", "/kids"];
+const HIDDEN_ROUTES = ["/adults", "/kids", "/school"];
 
 export default function AccessibilityWidget() {
   const pathname = usePathname();

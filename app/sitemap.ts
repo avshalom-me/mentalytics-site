@@ -4,12 +4,13 @@ import { ALL_REGIONS, regionToSlug, ONLINE_SLUG, CITY_SEO_LIST } from "@/app/lib
 import { therapistPath } from "@/app/lib/therapist-url";
 import { loadListedCounts, MIN_LISTED_FOR_INDEX, cityIsIndexable } from "@/app/lib/therapist-directory";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
-import { TOPICS, PILOT_CITIES, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
+import { TOPICS, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS, CITY_TOPIC_APPROACHES, slugToCityTopic, onlineTopicSlugs, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import { listPublicCenters } from "@/app/lib/center-public";
 import { SECTIONS, editorialBySection, sectionForTopic, MIN_ARTICLES_FOR_SECTION_INDEX } from "@/app/lib/article-taxonomy";
 import { ASSESSMENTS } from "@/app/lib/assessments";
 import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
 import { BTL_TRACKS } from "@/app/lib/btl-tracks";
+import { revisedAt } from "@/app/lib/page-revised";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -22,24 +23,12 @@ const BASE = "https://www.mentalytics.co.il";
 // freshness nobody observes.
 export const revalidate = 3600;
 
-/**
- * When the copy on the directory landing pages (city / region / topic /
- * specialty / assessment / arrangement / online) last changed.
- *
- * Therapist profiles and community articles carry a real per-row timestamp;
- * these pages are generated from code, so until now half the sitemap went out
- * with no <lastmod> at all - and Google had no reason to re-crawl after a copy
- * fix. That is exactly what happened to the city descriptions rewritten on
- * 6/8/2026: four days later the Haifa SERP snippet was still the pre-fix text.
- *
- * BUMP THIS when the landing-page copy or template actually changes. Do not
- * wire it to `new Date()` - a lastmod that is always "today" is the pattern
- * Google learns to ignore, and then it is worth nothing when it matters.
- */
-const LANDING_COPY_REVISED = new Date("2026-08-10");
+// Every <lastmod> below comes from PAGE_REVISED in app/lib/page-revised.ts,
+// which is checked against git on every push. Read the doctrine there before
+// changing a date, and never wire one to `new Date()`.
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const staticPages: MetadataRoute.Sitemap = [
+  const staticPagesRaw: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
     // /adults and /kids are deliberately absent: both are noindex (they are the
     // quiz flow, not landing pages - see app/adults/layout.tsx). Listing a
@@ -57,6 +46,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/research/therapist-types`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/choosing-therapist`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/kupa-guide`, priority: 0.7, changeFrequency: "monthly" },
+    { url: `${BASE}/research/how-matching-works`, priority: 0.7, changeFrequency: "monthly" },
+    { url: `${BASE}/research/first-session`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/recommended-psychologist`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/faq`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/assessments`, priority: 0.6, changeFrequency: "monthly" },
@@ -80,10 +71,19 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/centers`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/about`, priority: 0.5, changeFrequency: "monthly" },
     { url: `${BASE}/developers`, priority: 0.6, changeFrequency: "monthly" },
+    // The counsellor rubric's doorway. /school itself stays out of the index and
+    // out of this list - it is the instrument, this is the page search should find.
+    { url: `${BASE}/counselors`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/terms`, priority: 0.3, changeFrequency: "yearly" },
     { url: `${BASE}/privacy`, priority: 0.3, changeFrequency: "yearly" },
     { url: `${BASE}/accessibility`, priority: 0.3, changeFrequency: "yearly" },
   ];
+
+  // The homepage URL is BASE with no path, so it looks up as "/".
+  const staticPages: MetadataRoute.Sitemap = staticPagesRaw.map((p) => ({
+    ...p,
+    lastModified: revisedAt(String(p.url).replace(BASE, "") || "/"),
+  }));
 
   // Four independent data sources, fetched concurrently. Every indexability
   // count below comes from the ONE query inside loadListedCounts() - the
@@ -131,6 +131,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     url: `${BASE}/research/topic/${s.slug}`,
     priority: 0.6,
     changeFrequency: "weekly" as const,
+    lastModified: revisedAt(`/research/topic/${s.slug}`),
   }));
 
   // Region + online landing pages (and the region hub) + the para-medical rubric.
@@ -226,7 +227,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   for (const slug of cityTopicSlugs) {
     const topic = slugToCityTopic(slug);
     if (!topic || topic.adsOnly) continue;
-    for (const city of PILOT_CITIES) {
+    for (const city of cityTopicCitiesFor(topic)) {
       const count = counts.count({ ...topic.filter, city });
       if (count >= MIN_CITY_TOPIC) {
         topicPages.push({
@@ -247,11 +248,10 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: c.updated_at ? new Date(c.updated_at) : undefined,
   }));
 
-  // The code-generated landing families all share one copy revision - see
-  // LANDING_COPY_REVISED above for why they get a lastmod at all.
+  // The code-generated landing families all share one copy revision.
   const landingPages: MetadataRoute.Sitemap = [...regionPages, ...topicPages].map((p) => ({
     ...p,
-    lastModified: LANDING_COPY_REVISED,
+    lastModified: revisedAt("@landing-families"),
   }));
 
   return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...landingPages, ...centerPages];

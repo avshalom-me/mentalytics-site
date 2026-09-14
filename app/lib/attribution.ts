@@ -16,8 +16,12 @@ export const CHANNELS = [
   "meta_organic",    // organic Facebook / Instagram (fbclid alone, or social medium)
   "tiktok_paid",     // paid TikTok (utm_medium paid + tiktok source)
   "tiktok_organic",  // organic TikTok (ttclid alone, or tiktok referrer)
+  "taboola_paid",    // Taboola native ads (utm_source=taboola; the platform has no organic side)
   "whatsapp",        // WhatsApp referral or utm_source=whatsapp
   "direct",          // no referrer, no campaign params
+  "ai",              // an AI assistant sent them (ChatGPT, Gemini, Claude, Perplexity, Copilot)
+  "search_other",    // organic search that is not Google (Bing, DuckDuckGo, Walla)
+  "email",           // a link opened from a mail client (Gmail app, Outlook web)
   "referral",        // any other website (incl. organic social)
   "other",           // utm present but source not recognised
 ] as const;
@@ -111,6 +115,79 @@ function isTikTokSource(src: string): boolean {
   return src.includes("tiktok") || src.includes("tik_tok") || src === "tt";
 }
 
+/**
+ * Hosts that mean "an AI assistant handed the user this link".
+ *
+ * Matched on the referrer host, so a link shared FROM a chat lands here too -
+ * which is what we want: either way the assistant is what put us in front of
+ * the person. Kept as full hosts rather than loose substrings, because "ai" or
+ * "chat" as substrings would swallow unrelated domains.
+ */
+const AI_HOSTS = [
+  "chatgpt.com",
+  "chat.openai.com",
+  "openai.com",
+  "gemini.google.com",
+  "bard.google.com",
+  "claude.ai",
+  "perplexity.ai",
+  "copilot.microsoft.com",
+  "you.com",
+  "poe.com",
+  "grok.com",
+  "x.ai",
+] as const;
+
+function isAiReferrer(ref: string): boolean {
+  return AI_HOSTS.some((h) => ref.includes(h));
+}
+
+/**
+ * Google properties that are NOT Google search.
+ *
+ * `ref.includes("google.")` is a substring test, so every Google product that
+ * ever hands a user a link was landing in google_organic - the one number the
+ * owner reads as "is the SEO working". Measured 9/9/2026: the Gmail Android
+ * app (com.google.android.gm) had contributed 25 sessions and accounts.google
+ * one more, i.e. ~3% of organic, all of it therapists opening our own mail.
+ *
+ * They must not fall to `referral` either: that bucket is how the backlink
+ * campaign is read, and 25 sessions of our own email would swamp the handful
+ * of real referring domains. Hence the separate `email` channel.
+ *
+ * Note com.google.android.googlequicksearchbox is deliberately absent - that
+ * IS the Google Search app, and its traffic is organic search.
+ */
+const GOOGLE_MAIL_HOSTS = ["com.google.android.gm", "mail.google."] as const;
+const GOOGLE_NON_SEARCH_HOSTS = [
+  "accounts.google.",
+  "drive.google.",
+  "docs.google.",
+  "calendar.google.",
+  "groups.google.",
+  "sites.google.",
+  "translate.google.",
+] as const;
+
+/**
+ * Search engines other than Google.
+ *
+ * These were landing in `referral` next to the actual backlinks. Bing alone
+ * had sent 8 sessions by 9/9/2026 - small, but it is organic search demand
+ * that was invisible as such, and it is the only way to tell whether Bing
+ * Webmaster Tools is worth registering.
+ */
+const OTHER_SEARCH_HOSTS = [
+  "bing.com",
+  "duckduckgo.com",
+  "search.yahoo.",
+  "search.walla.co.il",
+  "ecosia.org",
+  "search.brave.com",
+  "yandex.",
+  "baidu.com",
+] as const;
+
 /** Derive a single normalized channel from URL params + referrer. */
 function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const src = (params.get("utm_source") || "").trim().toLowerCase();
@@ -121,10 +198,21 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // fbclid is NOT: Meta appends it to organic clicks too (shares, profile-link
   // taps, in-app browser), so it must never imply paid on its own (see below).
   if (params.has("gclid") || params.has("gbraid") || params.has("wbraid")) return "google_paid";
+  // Taboola appends its own click id (tblci) to every paid click. It proves paid
+  // traffic on its own, so a publisher's in-app browser that strips the utm
+  // still lands as Taboola and not as a referral from the publisher's domain.
+  if (params.has("tblci")) return "taboola_paid";
 
   // Explicit UTM tagging - trust the medium to separate paid from organic.
   if (src) {
     if (src === "whatsapp" || src === "wa") return "whatsapp";
+    // utm_source=chatgpt.com is what ChatGPT appends when it tags a link at all
+    if (isAiReferrer(src)) return "ai";
+    // Taboola is paid by definition - there is no organic Taboola - so the medium
+    // is not consulted. Without this line the campaign's traffic landed in
+    // "other" (utm_medium=native is not in PAID_MEDIUMS) and the first native
+    // test would have been unreadable in /admin/attribution.
+    if (src === "taboola") return "taboola_paid";
     if (isGoogleSource(src)) return PAID_MEDIUMS.has(med) ? "google_paid" : "google_organic";
     if (isMetaSource(src)) return PAID_MEDIUMS.has(med) ? "meta_paid" : "meta_organic";
     if (isTikTokSource(src)) return PAID_MEDIUMS.has(med) ? "tiktok_paid" : "tiktok_organic";
@@ -141,7 +229,21 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   // No UTM - infer from the referrer.
   if (!ref) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
+  // BEFORE the google. test, and that order is the whole point: gemini.google.com
+  // contains "google." and was being counted as organic search. Measured 3/9/2026,
+  // Gemini had sent 2 sessions and 6 page views that landed in google_organic, and
+  // ChatGPT 2 more that fell to "other" - so the one channel we most wanted to see
+  // growing was the one channel we could not see at all.
+  if (isAiReferrer(ref)) return "ai";
+  // Mail and the other Google products BEFORE the google. test, for the same
+  // reason the AI check comes first: they all contain "google." and were being
+  // counted as search. Order within the block does not matter; order against
+  // the google. line does.
+  if (GOOGLE_MAIL_HOSTS.some((h) => ref.includes(h))) return "email";
+  if (ref.includes("outlook.") || ref.includes("mail.yahoo.")) return "email";
+  if (GOOGLE_NON_SEARCH_HOSTS.some((h) => ref.includes(h))) return "referral";
   if (ref.includes("google.")) return "google_organic";
+  if (OTHER_SEARCH_HOSTS.some((h) => ref.includes(h))) return "search_other";
   if (ref.includes("facebook.") || ref.includes("instagram.") || ref.includes("fb.")) return "meta_organic";
   if (ref.includes("tiktok.")) return "tiktok_organic";
   return "referral";
@@ -223,7 +325,7 @@ export function captureAttribution(): void {
     // utm_source and is captured normally.
     const hasCampaignSignal =
       params.has("gclid") || params.has("gbraid") || params.has("wbraid") ||
-      params.has("utm_source");
+      params.has("tblci") || params.has("utm_source");
 
     // An expired touch is treated as if it were never there, so this landing
     // gets classified on its own merits instead of inheriting an old campaign.
@@ -431,8 +533,12 @@ export const CHANNEL_LABELS: Record<Channel | "unknown", string> = {
   meta_organic: "Meta - אורגני",
   tiktok_paid: "TikTok - בתשלום",
   tiktok_organic: "TikTok - אורגני",
+  taboola_paid: "טאבולה - בתשלום",
   whatsapp: "וואטסאפ",
   direct: "ישיר",
+  ai: "עוזר AI",
+  search_other: "חיפוש אחר (Bing/DDG)",
+  email: "קישור ממייל",
   referral: "הפניה מאתר אחר",
   other: "אחר",
   unknown: "לא ידוע",

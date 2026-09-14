@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 
 async function getTherapistInfo(
   req: NextRequest,
-): Promise<{ id: string; status: string; created_at: string | null } | null> {
+): Promise<{ id: string; status: string; created_at: string | null; promoted_since: string | null } | null> {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
 
@@ -25,11 +25,18 @@ async function getTherapistInfo(
   // email match without that link proves nothing (emails are not verified).
   const { data } = await supabaseAdmin
     .from("therapists")
-    .select("id, status, created_at")
+    .select("id, status, created_at, promoted_since")
     .eq("user_id", user.id)
     .maybeSingle();
 
-  return data ? { id: data.id, status: data.status, created_at: data.created_at as string | null } : null;
+  return data
+    ? {
+        id: data.id,
+        status: data.status,
+        created_at: data.created_at as string | null,
+        promoted_since: (data.promoted_since as string | null) ?? null,
+      }
+    : null;
 }
 
 type ClickRow = { click_type: string; source: string; clicked_at: string };
@@ -119,47 +126,71 @@ export async function GET(req: NextRequest) {
     // splits (product decision 19/7): all-time exposure, all-time profile
     // entries, and all-time contacts split by acquisition source.
     try {
-      const countViews = (sources: string[]) =>
-        supabaseAdmin
+      // כל ספירה רצה פעמיים: מצטבר, ושוב חתוכה מרגע הקידום. המספר
+      // המצטבר כולל את תקופת החינם - מטפל שצבר מאות צפיות במאגר לפני
+      // שקודם רואה אותן כאילו הקידום ייצר אותן, ומי שאצלו הקידום באמת
+      // עבד לא רואה את זה. שתי השורות יחד עונות על "מה הקידום עשה לי",
+      // וזו השאלה שמכריעה אם להמשיך אחרי חודשי המתנה.
+      const promotedSince = info.promoted_since;
+      const countViews = (sources: string[], since?: string | null) => {
+        let q = supabaseAdmin
           .from("therapist_profile_views")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
           .in("source", sources);
-      const countClicks = (matchOnly: boolean) => {
+        if (since) q = q.gte("viewed_at", since);
+        return q;
+      };
+      const countClicks = (matchOnly: boolean, since?: string | null) => {
         let q = supabaseAdmin
           .from("therapist_contact_clicks")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id);
         if (matchOnly) q = q.eq("source", "match");
+        if (since) q = q.gte("clicked_at", since);
         return q;
       };
       // הודעות שנשלחו דרך טופס האתר — הערוץ היחיד שאנחנו יודעים בוודאות
       // שהגיע ליעד (נשלח מייל). שאר הסוגים הם לחיצות: המטופל לחץ על
       // וואטסאפ/חיוג/מייל, ואין לנו דרך לדעת אם השלים. הדשבורד מציג את
       // ההפרדה כדי שמטפל לא יצפה להודעה שמעולם לא נשלחה.
-      const countMessages = () =>
-        supabaseAdmin
+      const countMessages = (since?: string | null) => {
+        let q = supabaseAdmin
           .from("therapist_contact_clicks")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
           .eq("click_type", "site_message");
+        if (since) q = q.gte("clicked_at", since);
+        return q;
+      };
       // הופעות במאגר המטפלים נרשמות כאירוע analytics ולא כ-profile_view -
       // הכרטיס נראה ברשימה אך לא נפתח. בלעדיהן הדשבורד הראה רק את חשיפת
       // ההתאמות, שהיא מיעוט מהחשיפה בפועל.
-      const countDirectoryImpressions = () =>
-        supabaseAdmin
+      const countDirectoryImpressions = (since?: string | null) => {
+        let q = supabaseAdmin
           .from("analytics_events")
           .select("*", { count: "exact", head: true })
           .eq("therapist_id", info.id)
           .eq("event_type", "profile_impression");
+        if (since) q = q.gte("created_at", since);
+        return q;
+      };
 
-      const [entries, impressions, dirImpressions, contactsTotal, contactsMatch, contactsMessages] = await Promise.all([
+      const [
+        entries, impressions, dirImpressions, contactsTotal, contactsMatch, contactsMessages,
+        pEntries, pImpressions, pDirImpressions, pContacts, pMessages,
+      ] = await Promise.all([
         countViews(["match", "directory"]),
         countViews(["match_card"]),
         countDirectoryImpressions(),
         countClicks(false),
         countClicks(true),
         countMessages(),
+        countViews(["match", "directory"], promotedSince),
+        countViews(["match_card"], promotedSince),
+        countDirectoryImpressions(promotedSince),
+        countClicks(false, promotedSince),
+        countMessages(promotedSince),
       ]);
       const total = contactsTotal.count ?? 0;
       const match = contactsMatch.count ?? 0;
@@ -168,11 +199,23 @@ export async function GET(req: NextRequest) {
       result.match_impressions = { all_time: impressions.count ?? 0 };
       result.directory_impressions = { all_time: dirImpressions.count ?? 0 };
       result.all_time_contacts = { total, match, directory: total - match, messages, clicks: total - messages };
+      // null כשאין תאריך קידום - הדשבורד פשוט לא מציג את השורה השנייה.
+      result.since_promotion = promotedSince
+        ? {
+            since: promotedSince,
+            profile_views: pEntries.count ?? 0,
+            match_impressions: pImpressions.count ?? 0,
+            directory_impressions: pDirImpressions.count ?? 0,
+            contacts: pContacts.count ?? 0,
+            messages: pMessages.count ?? 0,
+          }
+        : null;
     } catch {
       result.profile_views = { all_time: 0 };
       result.match_impressions = { all_time: 0 };
       result.directory_impressions = { all_time: 0 };
       result.all_time_contacts = { total: 0, match: 0, directory: 0, messages: 0, clicks: 0 };
+      result.since_promotion = null;
     }
 
     // Enriched breakdown (by region / issue / age / gender + conversion)

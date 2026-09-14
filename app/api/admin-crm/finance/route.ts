@@ -100,8 +100,12 @@ export async function GET(req: NextRequest) {
 
     const rows = months.map((m) => {
       const monthPayments = payments.filter((p) => monthKey(p.created_at) === m);
+      // 'subscription' = חיוב ההרשמה, 'subscription_renewal' = החידוש החודשי
+      // שמשוקף מ-Sumit ע"י הקרון. שניהם אותה הכנסה מאותו מטפל; ספירת ההרשמה
+      // בלבד הסתירה כל שקל של חידוש. (מונה "משלמים חדשים" למטה עדיין סופר
+      // 'subscription' בלבד, כדי שחידוש לא ייחשב לקוח חדש.)
       const incomeSubs = monthPayments
-        .filter((p) => p.payment_type === "subscription")
+        .filter((p) => p.payment_type === "subscription" || p.payment_type === "subscription_renewal")
         .reduce((s, p) => s + Number(p.amount), 0);
       const incomeQuiz = monthPayments
         .filter((p) => p.payment_type === "quiz")

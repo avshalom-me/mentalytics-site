@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AgentFindings from "../components/AgentFindings";
 
 type Tier = "paid" | "gift" | "free";
 type Therapist = { tier: Tier; full_name: string; regions: string[]; types: string[]; online: boolean };
@@ -96,6 +97,9 @@ function AdsContent({ data }: { data: Data }) {
 
   return (
     <>
+      {/* ממצאי סוכן הפרסום - ליד נתוני הפרסום, לא בתור הפעולות */}
+      <AgentFindings agent="ads" title="ממצאי סוכן הפרסום" limit={10} />
+
       {/* Counts */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         <Stat label="מקודמים בתשלום 💳" value={data.counts.paid} accent="#3D8C8A" />

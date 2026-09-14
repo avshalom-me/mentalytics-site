@@ -6,12 +6,15 @@ import { loadPublicTherapists, countListed } from "@/app/lib/therapist-directory
 import {
   slugToCityTopic,
   isOnlineTopicAllowed,
+  isYouthTopic,
   onlineTopicSlugs,
   MIN_ONLINE_TOPIC,
   TOPICS,
 } from "@/app/lib/topics";
+import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import TopicFaq from "@/app/therapists/TopicFaq";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 
 // Online×topic (phase 3 of the online cluster - see ONLINE_TOPIC_SLUGS in
@@ -133,31 +136,30 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           טיפול מרחוק לפי נושא
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        <p className="mt-2 text-sm text-stone-500">
-          {topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.
+        {/* Quotable intro - see city/[city]/[topic]. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${heading}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ומטפלים בשיחת וידאו מכל מקום בארץ ופנו ישירות. בחינם וללא התחייבות.`}
         </p>
+        <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.</p>
       </div>
 
       {/* Quiz CTA */}
-      <div
-        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
-        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
-      >
-        <div>
-          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>רוצים התאמה מדויקת יותר?</p>
-          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת אונליין.
-            בחינם, אנונימי וללא התחייבות.
-          </p>
-        </div>
-        <Link
-          href="/adults"
-          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
-          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
-        >
-          למילוי השאלון
-        </Link>
-      </div>
+      {/* This box used to be hand-rolled with href="/adults" hardcoded, on a
+          route that carries kids topics too - and the FAQ heading directly
+          below it says "שאלות של הורים". A parent reading a page written for
+          parents was offered the questionnaire that asks about themselves.
+          QuizCta reads the topic instead, which is the whole reason it
+          exists. */}
+      <QuizCta
+        audience={isYouthTopic(topic) ? "youth" : "both"}
+        body={
+          isYouthTopic(topic)
+            ? "ענו על שאלון קצר מבוסס מחקר - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת אונליין. בחינם, אנונימי וללא התחייבות."
+            : "ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת אונליין. בחינם, אנונימי וללא התחייבות."
+        }
+      />
+
+      <TopicFaq topic={topic} title={`${heading} - שאלות של הורים`} />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">

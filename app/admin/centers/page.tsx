@@ -31,7 +31,27 @@ type Center = {
   updated_at: string | null;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   pending_therapist_count: number; // כמה מהם ממתינים לאישור (כולל ישות-המרכז)
+  /** מעורבות מצטברת של המרכז: מסלול 1 = סכום המטפלים, מסלול 2 = שורת הישות. */
+  engagement?: {
+    views_30: number; clicks_30: number; views_total: number; clicks_total: number;
+    clicks_30_by_channel: { paid: number; organic: number; direct: number; other: number };
+    clicks_30_by_type: Record<string, number>;
+    page_views_30: number; page_views_total: number;
+    website_clicks_30: number; website_clicks_total: number;
+    page_contact_30: number; page_contact_total: number;
+    site_messages_30: number; site_messages_total: number;
+  } | null;
+  /** מוכנות לפי מסלול (center-readiness) - רק למרכזים פעילים. */
+  readiness?: {
+    pct: number;
+    track_label: string;
+    headline: string | null;
+    slots: { paid: number; filled: number; promoted: number } | null;
+    missing: { label: string; critical: boolean; hint: string | null }[];
+    blocked_on_us: string[];
+  } | null;
   user_id: string | null;
+  members?: { user_id: string; email: string | null; is_primary: boolean }[];
   slug: string | null;
   public_page_enabled: boolean | null;
   public_description: string | null;
@@ -55,6 +75,72 @@ type TherapistPoolItem = {
   center_account_id: string | null;
   center_name: string | null;
 };
+
+// שורת הפירוט-לפי-מטפל שמחזירה פעולת center_engagement.
+type CenterTherapistRow = {
+  id: string;
+  full_name: string;
+  is_entity: boolean;
+  status: string;
+  promoted: boolean;
+  admin_approved: boolean;
+  email: string | null;
+  missing_fields: string[];
+  /** חשיפה: כרטיס בהתאמות + הופעה במאגר. נפרד מ"צפיות" שהן כניסות לפרופיל. */
+  cards_30: number; cards_total: number;
+  dir_impr_30: number; dir_impr_total: number;
+  views_30: number; views_total: number;
+  clicks_30: number; clicks_total: number;
+  by_type_30: Record<string, number>;
+  /** דגלי מוכנות - למה מטפל מאושר עדיין לא נחשף או לא ניתן לפנייה. */
+  has_phone: boolean;
+  online: boolean;
+  age_groups: string[];
+  promoted_since: string | null;
+};
+
+// אותם שמות סוג-פנייה כמו בעמוד הערבות ובדשבורד המטפל - ודאי מול כוונה.
+const CLICK_TYPE_LABELS: Record<string, string> = {
+  site_message: "הודעות באתר",
+  whatsapp: "וואטסאפ",
+  phone: "טלפון",
+  email: "מייל",
+  other: "אחר",
+};
+function clickTypeParts(byType: Record<string, number>): string {
+  return Object.entries(byType)
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, n]) => `${CLICK_TYPE_LABELS[k] ?? k} ${n}`)
+    .join(" · ");
+}
+
+// למה מטפל מאושר בכל זאת לא נחשף או לא ניתן לפנייה. אלה לא שדות חסרים
+// (יש לזה עמודה משלה) אלא מגבלות שנבחרו: בלי טלפון אין כפתור וואטסאפ ואין
+// חיוג בכרטיס, קבוצת גיל אחת מוציאה מכל שאלון אחר, ומי שאינו אונליין נראה
+// רק לחיפושים מהאזור שלו. במכון הכרה (7/9/26) שלושת אלה הסבירו את מלוא
+// הפער בין 8 פניות ל-0, בלי שאף אחד מהם הופיע במסך.
+function readinessFlags(t: CenterTherapistRow) {
+  const flags: string[] = [];
+  if (!t.is_entity && !t.has_phone) flags.push("אין טלפון");
+  if (!t.online) flags.push("לא אונליין");
+  if (t.age_groups.length > 0 && t.age_groups.length <= 1) flags.push(`גיל: ${t.age_groups[0]}`);
+  if (t.age_groups.length === 0) flags.push("אין קבוצות גיל");
+  if (t.promoted && t.promoted_since) {
+    const days = Math.floor((Date.now() - new Date(t.promoted_since).getTime()) / 86_400_000);
+    if (days <= 14) flags.push(`מקודם ${days} י'`);
+  }
+  if (flags.length === 0) return <span className="text-stone-400">-</span>;
+  return (
+    <span className="inline-flex flex-wrap gap-1">
+      {flags.map((f) => (
+        <span key={f} className="rounded border border-amber-200 bg-amber-50 px-1.5 py-[1px] text-[10.5px] font-semibold text-amber-800">
+          {f}
+        </span>
+      ))}
+    </span>
+  );
+}
 
 const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = {
   draft: { label: "טיוטה", cls: "bg-stone-100 border-stone-300 text-stone-600" },
@@ -155,6 +241,11 @@ export default function AdminCentersPage() {
   const [fPubPhone, setFPubPhone] = useState("");
 
   // ניהול שיוך מטפלים למרכז
+  // פירוט לפי מטפל: נטען בלחיצה, נשמר במפה כדי שפתיחה חוזרת לא תטען שוב.
+  const [detailFor, setDetailFor] = useState<string | null>(null);
+  const [detailRows, setDetailRows] = useState<Record<string, CenterTherapistRow[]>>({});
+  const [detailLoading, setDetailLoading] = useState(false);
+
   const [manageFor, setManageFor] = useState<Center | null>(null);
   const [pool, setPool] = useState<TherapistPoolItem[]>([]);
   const [poolLoading, setPoolLoading] = useState(false);
@@ -203,6 +294,19 @@ export default function AdminCentersPage() {
       return { ok: false };
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function toggleDetail(c: Center) {
+    if (detailFor === c.id) { setDetailFor(null); return; }
+    setDetailFor(c.id);
+    if (!detailRows[c.id]) {
+      setDetailLoading(true);
+      const res = await post({ action: "center_engagement", id: c.id });
+      if (res.ok && Array.isArray(res.therapists)) {
+        setDetailRows((m) => ({ ...m, [c.id]: res.therapists as CenterTherapistRow[] }));
+      }
+      setDetailLoading(false);
     }
   }
 
@@ -399,6 +503,7 @@ export default function AdminCentersPage() {
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
         <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
         <a href="/centers" target="_blank" className="font-bold text-[#0F5468] underline">🔗 עמוד ההסבר למרכזים</a>
+        <a href="/centers/team-guide" target="_blank" className="font-bold text-[#0F5468] underline" title="דף לא מאונדקס לשליחה למרכז: שלושת הצעדים לצירוף מנהל נוסף לפורטל">👥 מדריך למנהל נוסף (לשליחה למרכז)</a>
         <a href="/api/admin-sales-sheet" target="_blank" className="font-bold text-red-700 underline" title="מסמך פנימי לצוות המכירות - מוגש רק דרך האדמין, לא לשליחה ללקוח">🔒 דף הכנה לשיחת מכירה (פנימי - לא לשליחה)</a>
       </div>
 
@@ -488,6 +593,53 @@ export default function AdminCentersPage() {
         );
       })()}
 
+      {/* התצוגה המרוכזת: סך כל המרכזים הפעילים במבט אחד. עד 19/8/26 לא היה
+          שום מקום שעונה על "כמה כל המרכזים ביחד מייצרים" - רק כרטיסים
+          בודדים. מחושב בצד הלקוח מנתוני ה-engagement שכבר בתשובת ה-API. */}
+      {!loading && (() => {
+        // כל הפעילים - גם מרכז בלי אף אירוע עדיין נספר בכותרת; החוסר עצמו מידע.
+        const act = centers.filter((c) => c.status === "active");
+        if (act.length === 0) return null;
+        const zero = {
+          views_30: 0, clicks_30: 0, views_total: 0, clicks_total: 0,
+          clicks_30_by_channel: { paid: 0, organic: 0, direct: 0, other: 0 },
+          clicks_30_by_type: {} as Record<string, number>,
+          page_views_30: 0, page_views_total: 0, website_clicks_30: 0, website_clicks_total: 0,
+          page_contact_30: 0, page_contact_total: 0, site_messages_30: 0, site_messages_total: 0,
+        };
+        const sum = act.reduce(
+          (s, c) => {
+            const e = c.engagement ?? zero;
+            s.v30 += e.views_30; s.c30 += e.clicks_30; s.vt += e.views_total; s.ct += e.clicks_total;
+            s.paid += e.clicks_30_by_channel.paid; s.organic += e.clicks_30_by_channel.organic;
+            s.direct += e.clicks_30_by_channel.direct; s.other += e.clicks_30_by_channel.other;
+            s.pv30 += e.page_views_30; s.web30 += e.website_clicks_30;
+            s.msg30 += e.site_messages_30 + (e.clicks_30_by_type.site_message ?? 0);
+            return s;
+          },
+          { v30: 0, c30: 0, vt: 0, ct: 0, paid: 0, organic: 0, direct: 0, other: 0, pv30: 0, web30: 0, msg30: 0 },
+        );
+        const chParts = [
+          sum.paid > 0 ? `ממומן ${sum.paid}` : null,
+          sum.organic > 0 ? `אורגני ${sum.organic}` : null,
+          sum.direct > 0 ? `ישיר ${sum.direct}` : null,
+          sum.other > 0 ? `אחר ${sum.other}` : null,
+        ].filter(Boolean);
+        return (
+          <div className="mb-6 flex flex-wrap items-center gap-x-6 gap-y-2 rounded-2xl border border-teal-200 bg-teal-50/60 px-5 py-3">
+            <span className="text-sm font-black text-teal-900">📊 כל המרכזים הפעילים ({act.length})</span>
+            <span className="text-sm text-stone-700">30 יום: <b className="text-stone-900">{sum.v30}</b> צפיות · <b className="text-stone-900">{sum.c30}</b> לחיצות ליצירת קשר
+              {sum.c30 > 0 && chParts.length > 0 && <span className="text-stone-500"> ({chParts.join(" · ")})</span>}
+            </span>
+            <span className="text-sm text-stone-700">עמוד ציבורי: <b className="text-stone-900">{sum.pv30}</b> כניסות
+              {sum.web30 > 0 && <> · <b className="text-stone-900">{sum.web30}</b> לחיצות לאתר המרכז</>}
+              {sum.msg30 > 0 && <> · <b className="text-stone-900">{sum.msg30}</b> הודעות</>}
+            </span>
+            <span className="text-xs text-stone-500">מצטבר: {sum.vt} צפיות · {sum.ct} לחיצות</span>
+          </div>
+        );
+      })()}
+
       {/* חלוקה לפי שלב ומסלול: פעילים (לפי מסלול) ← נשלחו וממתינים לתשלום ← טיוטות ← בוטלו.
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
       {!loading && (() => {
@@ -564,11 +716,146 @@ export default function AdminCentersPage() {
             {/* ציר המסע: איפה המרכז עומד בחמשת שלבי המשפך */}
             {c.status !== "cancelled" && <Journey c={c} />}
 
+            {/* מעורבות: התשובה המהירה ל"כמה פניות המרכז ייצר" בלי לפתוח את
+                תצוגת הפרופילים ולסכם ידנית. פילוח הערוץ (ממומן/אורגני/ישיר)
+                מוצג רק כשיש לחיצות בחלון - שורת אפסים אינה מידע. */}
+            {c.engagement && (c.engagement.views_total > 0 || c.engagement.clicks_total > 0 || c.engagement.page_views_total > 0 || c.engagement.site_messages_total > 0) && (
+              <div className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs text-stone-700">
+                <p>
+                  📊 30 יום: <b className="text-stone-900">{c.engagement.views_30}</b> צפיות · <b className="text-stone-900">{c.engagement.clicks_30}</b> לחיצות ליצירת קשר
+                  {c.engagement.clicks_30 > 0 && (() => {
+                    const ch = c.engagement!.clicks_30_by_channel;
+                    const parts = [
+                      ch.paid > 0 ? `ממומן ${ch.paid}` : null,
+                      ch.organic > 0 ? `אורגני ${ch.organic}` : null,
+                      ch.direct > 0 ? `ישיר ${ch.direct}` : null,
+                      ch.other > 0 ? `אחר ${ch.other}` : null,
+                    ].filter(Boolean);
+                    return parts.length > 0 ? <span className="text-stone-500"> ({parts.join(" · ")})</span> : null;
+                  })()}
+                  <span className="text-stone-400"> · מצטבר: {c.engagement.views_total} צפיות, {c.engagement.clicks_total} לחיצות</span>
+                </p>
+                {/* פילוח סוג הפנייה - ודאי (הודעה) מול כוונה (וואטסאפ/טלפון/מייל),
+                    אותה שפה כמו עמוד הערבות. הודעות מסלול 1 מגיעות מ-crm_leads. */}
+                {(() => {
+                  const byType = { ...c.engagement!.clicks_30_by_type };
+                  const trackOneMsgs = c.engagement!.site_messages_30;
+                  if (trackOneMsgs > 0) byType.site_message = (byType.site_message ?? 0) + trackOneMsgs;
+                  const parts = clickTypeParts(byType);
+                  return parts ? <p className="mt-0.5 text-stone-600">פניות לפי סוג: {parts}</p> : null;
+                })()}
+                {(c.engagement.page_views_total > 0 || c.engagement.website_clicks_total > 0 || c.engagement.page_contact_total > 0) && (
+                  <p className="mt-0.5 text-stone-600">
+                    עמוד ציבורי (30 יום): {c.engagement.page_views_30} כניסות
+                    {c.engagement.website_clicks_30 > 0 && <> · {c.engagement.website_clicks_30} לחיצות לאתר המרכז</>}
+                    {c.engagement.page_contact_30 > 0 && <> · {c.engagement.page_contact_30} לחיצות קשר מהעמוד</>}
+                    <span className="text-stone-400"> · מצטבר: {c.engagement.page_views_total} כניסות{c.engagement.website_clicks_total > 0 ? `, ${c.engagement.website_clicks_total} לאתר` : ""}</span>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* מוכנות לפי המסלול שנרכש - אותו מקור אמת כמו סוכן השימור וקרון
+                הנדנודים. "אצלנו" מסומן בנפרד: אסור שחסם שלנו ייראה כאשמתם. */}
+            {c.readiness && (c.readiness.missing.length > 0 || c.readiness.blocked_on_us.length > 0 || c.readiness.headline) && (
+              <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50/50 px-3 py-1.5 text-xs">
+                <p className="font-bold text-stone-800">
+                  🧭 מוכנות: {c.readiness.pct}%
+                  {c.readiness.slots && <span className="font-normal text-stone-600"> · מקומות: {c.readiness.slots.promoted}/{c.readiness.slots.paid} פעילים{c.readiness.slots.filled > c.readiness.slots.promoted ? ` (${c.readiness.slots.filled} מקושרים)` : ""}</span>}
+                </p>
+                {c.readiness.headline && <p className="mt-0.5 font-semibold text-amber-800">{c.readiness.headline}</p>}
+                {c.readiness.missing.length > 0 && (
+                  <p className="mt-0.5 text-stone-600">
+                    חסר אצלם: {c.readiness.missing.map((m) => m.label).join(" · ")}
+                  </p>
+                )}
+                {c.readiness.blocked_on_us.length > 0 && (
+                  <p className="mt-0.5 font-semibold text-red-700">אצלנו: {c.readiness.blocked_on_us.join(" · ")}</p>
+                )}
+              </div>
+            )}
+
+            {/* פירוט לפי מטפל - נפתח בלחיצה. מסלול 1: שורה לכל מטפל; מסלול 2:
+                שורת הישות. עונה על "מי מהמטפלים של המרכז מייצר ומי שקוף". */}
+            {c.status === "active" && (c.linked_therapist_count > 0 || isEntity) && (
+              <div className="mt-2">
+                <button onClick={() => toggleDetail(c)}
+                  className="text-xs font-bold text-indigo-700 hover:underline">
+                  {detailFor === c.id ? "▲ סגירת הפירוט" : "▼ פירוט לפי מטפל (צפיות ופניות)"}
+                </button>
+                {detailFor === c.id && (
+                  detailLoading && !detailRows[c.id] ? (
+                    <p className="mt-1 text-xs text-stone-400">טוען...</p>
+                  ) : (detailRows[c.id] ?? []).length === 0 ? (
+                    <p className="mt-1 text-xs text-stone-400">אין עדיין נתונים</p>
+                  ) : (
+                    <div className="mt-1 overflow-x-auto rounded-lg border border-stone-200">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="bg-stone-50 text-right text-stone-500">
+                            <th className="px-2 py-1.5 font-semibold">מטפל/ת</th>
+                            <th className="px-2 py-1.5 font-semibold">מצב</th>
+                            <th className="px-2 py-1.5 font-semibold">חשיפות 30 י'</th>
+                            <th className="px-2 py-1.5 font-semibold">נכנסו לפרופיל</th>
+                            <th className="px-2 py-1.5 font-semibold">פניות 30 י'</th>
+                            <th className="px-2 py-1.5 font-semibold">לפי סוג</th>
+                            <th className="px-2 py-1.5 font-semibold">מוכנות</th>
+                            <th className="px-2 py-1.5 font-semibold">מצטבר</th>
+                            <th className="px-2 py-1.5 font-semibold">חסר בפרופיל</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(detailRows[c.id] ?? []).map((t) => (
+                            <tr key={t.id} className="border-t border-stone-100">
+                              <td className="px-2 py-1.5 font-bold text-stone-800">
+                                {t.is_entity ? "🏢 " : ""}{t.full_name}
+                              </td>
+                              <td className="px-2 py-1.5">
+                                {t.promoted
+                                  ? <span className="font-bold text-green-700">פעיל/ה בהתאמות</span>
+                                  : t.admin_approved
+                                    ? <span className="text-stone-600">מאושר/ת, לא מקודם/ת</span>
+                                    : <span className="font-bold text-amber-700">ממתין/ה לאישור</span>}
+                              </td>
+                              <td className="px-2 py-1.5 text-stone-700">
+                                <b className="text-stone-900">{t.cards_30 + t.dir_impr_30}</b>
+                                {(t.cards_30 > 0 || t.dir_impr_30 > 0) && (
+                                  <span className="text-stone-400"> ({t.cards_30} התאמה / {t.dir_impr_30} מאגר)</span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5">{t.views_30}</td>
+                              <td className="px-2 py-1.5 font-bold text-stone-900">{t.clicks_30}</td>
+                              <td className="px-2 py-1.5 text-stone-600">{clickTypeParts(t.by_type_30) || "-"}</td>
+                              <td className="px-2 py-1.5">{readinessFlags(t)}</td>
+                              <td className="px-2 py-1.5 text-stone-500">{t.cards_total + t.dir_impr_total} ח' / {t.views_total} צ' / {t.clicks_total} פ'</td>
+                              <td className="px-2 py-1.5 text-amber-700">{t.missing_fields.length > 0 ? t.missing_fields.join(", ") : "✓ מלא"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                      {/* בלי המשפט הזה "0 פניות" נקרא כמו כישלון של המטפל.
+                          המספרים שלנו הם רצפה: מי שראה שם ומספר יכול לחפש
+                          אותו בגוגל ולפנות ישירות, וזה לא עובר דרכנו כלל. */}
+                      <p className="border-t border-stone-200 bg-stone-50 px-2 py-1.5 text-[11px] leading-5 text-stone-500">
+                        <b>חשיפות</b> = כרטיס שהוצג בהתאמות + הופעה במאגר. <b>נכנסו לפרופיל</b> = מי שבאמת פתח את הפרופיל.
+                        <b> פניות</b> = לחיצות ליצירת קשר (טלפון, וואטסאפ, הודעה), ולא אנשים - אותו אדם יכול ללחוץ פעמיים.
+                        {" "}מספר הפניות הוא <b>רצפה ולא התמונה המלאה</b>: חלק ממי שנחשף כאן ממשיך לאתר של המרכז או מחפש את השם בגוגל
+                        ופונה משם ישירות, וזה לא נספר אצלנו. לכן פער בין חשיפות לפניות אינו בהכרח כישלון - אבל פער בין
+                        מטפלים <i>באותו מרכז</i> כן מצביע על ההבדל ביניהם, ועמודת המוכנות מסבירה אותו.
+                      </p>
+                    </div>
+                  )
+                )}
+              </div>
+            )}
+
             {c.status === "active" && c.payer_name && (
               <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
                 משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
                 {c.user_id
-                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל</strong>
+                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל{(c.members?.length ?? 0) > 1 && (
+                      <span className="font-normal text-stone-600"> ({c.members!.length} חשבונות: {c.members!.map((m) => m.email ?? "?").join(", ")})</span>
+                    )}</strong>
                   : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "-"})</span>}
                 {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - ביטול רק דרך ממשק Sumit</strong>}
               </p>
@@ -608,6 +895,15 @@ export default function AdminCentersPage() {
                 <a href={`/centers/${c.slug}`} target="_blank" rel="noopener noreferrer"
                   className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100">
                   🌐 לעמוד הציבורי ↗
+                </a>
+              )}
+              {/* הפורטל הפנימי של המרכז, כפי שהם רואים אותו. יושב לצד העמוד
+                  הציבורי כי אלה שני הצדדים של אותו מוצר: מה שהמטופל רואה ומה
+                  שהלקוח רואה. קריאה בלבד. */}
+              {c.status === "active" && (
+                <a href={`/admin/centers/preview/${c.id}`}
+                  className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 font-bold text-amber-800 hover:bg-amber-100">
+                  👁 הפורטל שלהם (צפייה בתור מרכז)
                 </a>
               )}
               {/* רק במרכז ששילם. בטיוטה שורת-הישות נוצרת אוטומטית עם הבחירה

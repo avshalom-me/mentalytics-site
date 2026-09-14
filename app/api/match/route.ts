@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
@@ -41,7 +42,7 @@ type TherapistRow = {
   phone: string | null;
   profile_photo_path: string | null;
   status: string | null;
-  promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | null (חינמי)
+  promotion_source: string | null; // 'paid' | 'center' | 'manual'/'trial' (מתנה) | 'gift_trial' (חלון מתנה, מתגלגל ל-paid בחיוב הראשון) | null (חינמי)
   match_paused_until: string | null; // הקפאה זמנית מההתאמות בלבד (ראו migration)
   style_q1: number | null;
   style_q2: number | null;
@@ -88,7 +89,13 @@ type NormalizedMatchInput = {
 const WEIGHTS = {
   expertise: 25,       // training_areas
   therapistType: 8,    // therapist_types
-  locationOnline: 10,  // regions + online
+  // מיקום. היה 10 עד 6/9/2026: אז ההפרש בין מקומי לאזור-סמוך היה 8 נקודות
+  // דירוג, בדיוק משקל של קריטריון רך אחד (סוג מטפל 8, חצי מטיפול משולב
+  // 12.5, גיל 15), ולכן מטפל מחדרה עם דינאמי+CBT עקף מטפל מחיפה עם דינאמי
+  // בלבד, על שאלון שהתחיל ב"חיפה". נמדד על 30 יום: כרטיס מקומי הביא פנייה
+  // פי 13 יותר מכרטיס לא-מקומי (29 מ-761 מול 2 מ-695). ב-25 הפער מקומי-סמוך
+  // הוא 21 נקודות, יותר מכל קריטריון בודד. הציון המוצג לא מושפע (ראו למטה).
+  locationOnline: 25,  // regions + online
   gender: 4,           // gender
   cultural: 5,         // cultural_prefs
   arrangements: 3,     // arrangements
@@ -440,8 +447,24 @@ function scoreTherapist(
     }
   }
 
+  // ── מיקום: משפיע על הדירוג, לא על הציון המוצג ────────────────────────────
+  // הציון שהמטופל רואה נמדד על התאמה מקצועית בלבד. שתי סיבות:
+  //
+  // 1) המרחק הוא המידע היחיד שהמטופל מעריך בעצמו בשנייה - הוא רואה "📍 תל
+  //    אביב" על הכרטיס. ההתאמה המקצועית היא מה שהוא לא יכול להעריך, וזה מה
+  //    שיש לנו לתרום. ערבוב השניים למספר אחד מקודד מידע שכבר מולו על המסך
+  //    ומטשטש את מה שאינו.
+  // 2) עד 19/8/2026 בלוק המיקום נכנס למכנה רק כשהמשתמש ביקש מיקום, ולכן אותו
+  //    מטפל בדיוק קיבל 94% אצל מי שלא בחר אזור ו-67% אצל מי שבחר (נמדד).
+  //    המספר לא היה שקרי - הוא ענה על "כמה ממה שביקשת קיבלת" - אבל הוא נקרא
+  //    כ"כמה הוא מתאים לי", והפער הזה הוא מה שהמשתמש רואה.
+  //
+  // locationEarned/locationPossible נצברים בנפרד ומוזרמים ל-rankScore בלבד,
+  // כך שמטפל קרוב עדיין מדורג גבוה יותר - רק שהמספר על הכרטיס לא מושפע.
+  let locationEarned = 0;
+  let locationPossible = 0;
   if (input.city || input.region || input.onlineRequired) {
-    possible += WEIGHTS.locationOnline;
+    locationPossible += WEIGHTS.locationOnline;
 
     // Hard filter: online-only request (no city/region) — exclude non-online therapists
     if (input.onlineRequired && !input.city && !input.region && !therapistOnline) {
@@ -469,7 +492,7 @@ function scoreTherapist(
     const onlineMatch = input.onlineRequired && therapistOnline;
 
     if (inExactCity) {
-      earned += WEIGHTS.locationOnline; // 100% — אותה עיר
+      locationEarned += WEIGHTS.locationOnline; // 100% — אותה עיר
       reasons.push("התאמה מלאה באזור");
     } else if (inSameRegion) {
       // The 60% tier exists to rank "your region" below "your city" - but only
@@ -480,9 +503,14 @@ function scoreTherapist(
       // ranked below therapists an hour away. When no city was named, matching
       // the region IS the exact answer to what was asked, and scores as such.
       const regionIsTheAsk = !input.city;
-      earned += regionIsTheAsk
+      // 0.85 ולא 0.6: כשהמשקל עלה ל-25, 60% היה משאיר פער של 10 נקודות דירוג
+      // בין העיר לשאר האזור - מעל רצועת ה-8 שבה האישיותי מכריע - ומטפל
+      // מקריית מוצקין עם 100% היה נעול מתחת למטפל מחיפה עם 85%, והרשימה
+      // נראית לא מסודרת. ב-85% הפער הוא 4 נקודות: העיר שוברת שוויון, לא
+      // חומה. רבע שעה נסיעה לא צריכה להיות יותר מזה.
+      locationEarned += regionIsTheAsk
         ? WEIGHTS.locationOnline
-        : Math.round(WEIGHTS.locationOnline * 0.6);
+        : Math.round(WEIGHTS.locationOnline * 0.85);
       reasons.push(regionIsTheAsk ? "התאמה מלאה באזור" : "התאמה באזור");
     } else if (inAdjacentRegion || onlineMatch) {
       // Adjacent region and "works online" are independent partial answers and
@@ -498,8 +526,10 @@ function scoreTherapist(
       // 2.8x less often and contacted 4.2x less often than in-area ones. A
       // neighbouring region can be an hour's drive for a weekly session, so it
       // stays in the results as a fallback but must not compete with someone
-      // local. (At a weight of 10 the tier rounds to 2 points, i.e. 20% - the
-      // scale has no finer resolution.)
+      // local. (At a weight of 25 the tier rounds to 4 points. Since 6/9/2026
+      // adjacency is also a separate result group, ordered after everyone in
+      // the requested area - see the sort - so this tier only orders the
+      // out-of-area group among itself.)
       const adjacentPts = inAdjacentRegion ? Math.round(WEIGHTS.locationOnline * 0.15) : 0;
       // An online-only request (no city, no region) has no geography to match
       // against: the hard filter above already dropped everyone who does not
@@ -511,7 +541,7 @@ function scoreTherapist(
       const onlinePts = onlineMatch
         ? (onlineIsTheWholeAsk ? WEIGHTS.locationOnline : Math.round(WEIGHTS.locationOnline * 0.4))
         : 0;
-      earned += Math.max(adjacentPts, onlinePts);
+      locationEarned += Math.max(adjacentPts, onlinePts);
       if (inAdjacentRegion) reasons.push("מטפל/ת מאזור סמוך");
       if (onlineMatch) reasons.push("מציע טיפול אונליין");
     } else if (patientRegion) {
@@ -523,7 +553,14 @@ function scoreTherapist(
 
   if (input.genderPreference) {
     possible += WEIGHTS.gender;
-    if (therapistGender && therapistGender === normalizeText(input.genderPreference)) {
+    // מרכז כישות: לרשומה אין מגדר אחד, כי מאחוריה צוות מעורב. אותו היגיון
+    // של הציון האישיותי - המרכז מעמיד מטפל/ת מתוך הצוות. בלי החריגה הזו
+    // הוא הפסיד את מלוא משקל המגדר בכל שאלון שבו נבחרה העדפה, על סמך שדה
+    // ריק ולא על סמך אי-התאמה אמיתית.
+    if (therapist.entity_type === "center") {
+      earned += WEIGHTS.gender;
+      reasons.push("במרכז מטפלים ומטפלות, בהתאם להעדפה");
+    } else if (therapistGender && therapistGender === normalizeText(input.genderPreference)) {
       earned += WEIGHTS.gender;
       reasons.push("התאמה בהעדפת מגדר");
     }
@@ -558,8 +595,24 @@ function scoreTherapist(
     reasons.push("התאמה בקבוצת גיל");
   }
 
-  const score =
-    possible > 0 ? Math.round((earned / possible) * 100) : 0;
+  // הציון המוצג: התאמה מקצועית בלבד, בלי בלוק המיקום (ראו ההערה שם).
+  //
+  // כשאין *שום* קריטריון מקצועי (חיפוש לפי אזור בלבד, או אונליין בלבד -
+  // מהמאגר ולא מהשאלון) המכנה הוא 0, והנוסחה החזירה **0% לכל מטפל**. זה
+  // נקרא למטופל כ"לא נמצאה שום התאמה" בדיוק במסך שאמור לשכנע אותו לפנות.
+  // במקרה הזה אין מה למדוד מקצועית, ולכן נופלים ל-rankScore - שכולל את
+  // המיקום, וזה בדיוק מה שהציון היה לפני הפיצול (19/8/2026). מסלול השאלון
+  // לא מגיע לכאן: הוא תמיד שולח גילאים ושפה.
+  const professionalScore = possible > 0 ? Math.round((earned / possible) * 100) : null;
+  // ציון הדירוג: כולל מיקום, ולכן מטפל קרוב עדיין מדורג לפני רחוק. אינו מוצג
+  // בשום מקום - בלעדיו הוצאת המיקום מהציון הייתה שוברת את סדר התוצאות.
+  const rankScore =
+    possible + locationPossible > 0
+      ? Math.round(((earned + locationEarned) / (possible + locationPossible)) * 100)
+      : 0;
+  const score = professionalScore ?? rankScore;
+  /** האם המטפל/ת באזור שהתבקש - לתג "באזור שלך" בכרטיס. */
+  const inRequestedArea = locationPossible > 0 && locationEarned >= locationPossible * 0.6;
 
   // ── Personality / style matching ─────────────────────────────────────────
   let personality_score: number | null = null;
@@ -587,6 +640,8 @@ function scoreTherapist(
 
   return {
     score,
+    rankScore,
+    inRequestedArea,
     personality_score,
     reasons,
     normalizedTherapist: {
@@ -768,13 +823,23 @@ export async function POST(req: NextRequest) {
     }
 
     scored.sort((a, b) => {
-      const profDiff = b.result.score - a.result.score;
+      // קודם כל: מי שבאזור שהתבקש, ורק אחריו כל השאר. זו חלוקה לשתי קבוצות
+      // ולא עוד נקודה במשקל, כי משקל לבדו לא סוגר את זה: מטפל מאזור סמוך עם
+      // התאמה מקצועית מלאה (דירוג 68) עדיין עוקף מקומי בינוני (62), והמסך
+      // הראה 95% מחיפה ומתחתיו 98% מחדרה. הלקוח מציג את הקבוצה השנייה תחת
+      // כותרת משלה. כשלא התבקש מיקום כלל, הדגל זהה לכולם ואין השפעה.
+      if (a.result.inRequestedArea !== b.result.inRequestedArea) {
+        return a.result.inRequestedArea ? -1 : 1;
+      }
+      // הדירוג על rankScore (כולל מיקום) ולא על הציון המוצג. מטפל קרוב עדיין
+      // עולה על רחוק - רק שהמספר בכרטיס אינו נושא את ההפרש הזה.
+      const profDiff = b.result.rankScore - a.result.rankScore;
       // Primary: professional score — expertise/location/etc.
       // Personality can only affect ranking when professional scores are within 8 points
       if (Math.abs(profDiff) > 8) return profDiff;
       // Tiebreaker within close range: combined score (personality can tip).
-      const ca = combinedScore(a.result.score, a.result.personality_score);
-      const cb = combinedScore(b.result.score, b.result.personality_score);
+      const ca = combinedScore(a.result.rankScore, a.result.personality_score);
+      const cb = combinedScore(b.result.rankScore, b.result.personality_score);
       if (cb !== ca) return cb - ca;
       // Genuinely tied on match quality → paying customers come first.
       // Deliberately AFTER the quality scores: a paying therapist never
@@ -829,6 +894,19 @@ export async function POST(req: NextRequest) {
           gender: therapist.gender,
           online: therapist.online,
           therapist_types: therapist.therapist_types,
+          // התואר כפי שהוא מוצג בכותרת הפרופיל. מחושב כאן ולא בלקוח כי
+          // age_groups לא משודר החוצה, והכלל חייב לצאת ממקום אחד (ראו
+          // publicTherapistTitle). ישות-מרכז לא מקבלת תואר אישי.
+          public_title:
+            therapist.entity_type === "center"
+              ? null
+              : parseArray(therapist.therapist_types)[0]
+                ? publicTherapistTitle(
+                    parseArray(therapist.therapist_types)[0],
+                    typeof therapist.gender === "string" ? therapist.gender : null,
+                    parseArray(therapist.age_groups),
+                  )
+                : null,
           training_areas: therapist.training_areas,
           couples_modalities: therapist.couples_modalities,
           regions: therapist.regions,
@@ -851,6 +929,9 @@ export async function POST(req: NextRequest) {
           match_score: result.score,
           personality_score: result.personality_score,
           combined_score: combinedScore(result.score, result.personality_score),
+          // המרחק יצא מהציון ולכן חייב להיות גלוי כתג משלו - אחרת המידע פשוט
+          // נעלם מהמטופל במקום לעבור לערוץ ברור יותר.
+          in_requested_area: result.inRequestedArea,
           match_reasons: result.reasons,
         };
       })

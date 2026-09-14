@@ -30,6 +30,11 @@ function checkRateLimit(ip: string): boolean {
 }
 
 function clampScore(x: unknown): number | null {
+  // "לא נמסר ציון" חייב להישאר null ולא 0: Number(null) הוא 0, ו-Number("")
+  // גם כן, ולכן בלי השורה הזו כל צפייה שהגיעה בלי ציון נרשמה כהתאמה 0%.
+  // עמוד המרכז (/centers/[slug]?from=match) מעביר TrackView בלי context,
+  // וכך כל כניסה למרכז מתוך ההתאמות נספרה כציון 0 והורידה את ממוצע המשפך שלו.
+  if (x == null || x === "") return null;
   const n = typeof x === "number" ? x : Number(x);
   if (!Number.isFinite(n)) return null;
   return Math.max(0, Math.min(100, Math.round(n)));

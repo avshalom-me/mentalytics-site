@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { patientInquiryRecipient } from "@/app/lib/therapist-recipient";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 
@@ -72,7 +73,12 @@ export async function POST(req: NextRequest) {
       .in("status", ["approved", "paying"])
       .maybeSingle();
 
-    if (therapistErr || !therapist || !therapist.email) {
+    if (therapistErr || !therapist) {
+      return NextResponse.json({ ok: false, error: "מטפל לא זמין" }, { status: 404 });
+    }
+    // מטפל של מרכז שאין לו כתובת משלו - הפנייה עוברת למרכז במקום להיעלם.
+    const inquiryTarget = await patientInquiryRecipient(therapist.id as string);
+    if (!inquiryTarget.to) {
       return NextResponse.json({ ok: false, error: "מטפל לא זמין" }, { status: 404 });
     }
 
@@ -94,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     await resend.emails.send({
       from: 'טיפול חכם <noreply@mentalytics.co.il>',
-      to: therapist.email,
+      to: inquiryTarget.to,
       replyTo: isValidEmail(contact) ? contact : undefined,
       subject: `פנייה חדשה ממטופל/ת דרך אתר טיפול חכם`,
       html: `

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { genderTitle } from "@/app/lib/gender-text";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { CITY_TO_REGION } from "@/app/lib/regions";
 import CardImpression from "@/app/components/CardImpression";
@@ -38,7 +38,7 @@ export default function TherapistResultCard({
   const isCenter = t.is_center === true;
   const type = isCenter
     ? t.therapist_types.slice(0, 2).join(" · ")
-    : t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : "";
+    : t.therapist_types[0] ? publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups) : "";
   const avatar = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   const snippet = bioSnippet(t.bio);
   // "ret" lets the profile's back link return to THIS listing page (region /
@@ -100,11 +100,24 @@ export default function TherapistResultCard({
       </div>
     </>
   );
+  // data-nosnippet: Google may index and rank this text, but may not quote it
+  // as the search snippet.
+  //
+  // Why: on the city pages Google was picking the card grid as the description,
+  // producing "פסיכולוגים ומטפלים בבאר שבע · רועי בן שימול · אפרת כהן-נוימן · ..."
+  // - a list of names nobody searched for, and on the Haifa page a data dump of
+  // titles and towns. Both pages already carry an intro paragraph and a meta
+  // description written to earn the click; this stops the grid outbidding them.
+  //
+  // Ranking is untouched: nosnippet governs display only, the therapist names
+  // stay indexed, and the CollectionPage/Person JSON-LD on each listing page is
+  // unaffected. A therapist's own name query is answered by their profile page,
+  // not by a city page's copy of the name.
   const card = profileHref ? (
-    <Link href={profileHref} className={cardClass} style={cardStyle}>{Body}</Link>
+    <Link href={profileHref} className={cardClass} style={cardStyle} data-nosnippet>{Body}</Link>
   ) : (
     // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
-    <div className={cardClass} style={cardStyle}>{Body}</div>
+    <div className={cardClass} style={cardStyle} data-nosnippet>{Body}</div>
   );
   // כרטיס מרכז מסלול-1 מסונתז מחשבון המרכז ואין לו שורת מטפל - דיווח חשיפה
   // עליו היה נכשל על ה-FK של analytics_events.

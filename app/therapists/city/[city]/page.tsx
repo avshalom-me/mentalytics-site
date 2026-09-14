@@ -2,13 +2,15 @@ import { notFound } from "next/navigation";
 import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
-import { loadPublicTherapists, countListed, cityIsIndexable } from "@/app/lib/therapist-directory";
+import { loadPublicTherapists, countListed, cityIsIndexable, loadListedCounts } from "@/app/lib/therapist-directory";
 import { slugToCity, regionToSlug, CITY_SEO_LIST, CITY_TO_REGION, REGION_CITIES, ONLINE_SLUG, neighborsOf, CITY_INTRO } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
+import QuizCta from "@/app/therapists/QuizCta";
 import { loadCityArticles } from "@/app/lib/local-articles";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { cityTopicList, cityTopicCitiesFor, MIN_CITY_TOPIC } from "@/app/lib/topics";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -58,6 +60,17 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
   const onlineCount = await countListed({ online: true });
   const { articles: localArticles, scope: articlesScope } = await loadCityArticles(city, region);
 
+  // The topic sub-pages of THIS city, and only the indexable ones. Until 9/9/26
+  // the city page linked sideways (other cities) and up (the region) but never
+  // down, so a city page ranking on page 2 for "פסיכולוג מומלץ בירושלים" passed
+  // nothing to its own kids/youth/anxiety pages - which sat at 2-4 organic
+  // entries each. One in-memory count set, no extra queries per chip.
+  const counts = await loadListedCounts();
+  const topicLinks = cityTopicList()
+    .filter((t) => cityTopicCitiesFor(t).includes(city))
+    .filter((t) => counts.count({ ...t.filter, city }) >= MIN_CITY_TOPIC)
+    .map((t) => ({ slug: t.slug, name: t.name }));
+
   // Adjacent cities first (a real 10-20 minute drive, named explicitly), and
   // only if that is still thin, the wider region. A resident of גני תקווה is
   // served by "קריית אונו, 7 דקות" far better than by "מטפלים נוספים בגוש דן".
@@ -103,6 +116,20 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
     ...(region ? REGION_CITIES[region] ?? [] : []).filter((c) => !neighbors.includes(c)),
   ].filter((c) => c !== city && (CITY_SEO_LIST as readonly string[]).includes(c));
 
+  // Google is demonstrably quoting THIS paragraph for city queries (SERP
+  // screenshot 15/8/26 on "מטפל רגשי בירושלים"), not the meta description.
+  // So it has to BE the sentence we want shown: the clinician-built quiz
+  // first, the verified list second. The treatment phrase stays at the front
+  // because it is the query family these pages rank for.
+  const introLine =
+    `טיפול פסיכולוגי ונפשי ב${inCity.length > 0 ? city : `טווח נסיעה קצר מ${city}`}: ` +
+    "מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, " +
+    "או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות" +
+    (nearbyCityNames.length > 0
+      ? ` (גם בערים הצמודות: ${nearbyCityNames.slice(0, 3).join(", ")})`
+      : region ? ` (גם באזור ${region})` : "") +
+    ". בחינם וללא התחייבות.";
+
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }} />
@@ -115,38 +142,22 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>פסיכולוגים ומטפלים ב{city}</h1>
-        {/* The first body paragraph doubles as Google's fallback snippet, so it
-            leads with what the page is (a list + a quiz) and carries the
-            treatment phrasing, not just the person phrasing. */}
-        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-          {inCity.length > 0
-            ? `רשימת מטפלים לטיפול פסיכולוגי ונפשי ב${city}: פסיכולוגים ומטפלים מאומתים להשוואה ולפנייה ישירה`
-            : `רשימת מטפלים לטיפול פסיכולוגי ונפשי בטווח נסיעה קצר מ${city}`}
-          {nearbyCityNames.length > 0 ? `, וגם בערים הצמודות (${nearbyCityNames.slice(0, 3).join(", ")})` : region ? `, וגם באזור ${region}` : ""}. מי שמעדיף התאמה אישית יכול למלא שאלון קצר - בחינם וללא התחייבות - או לבחור טיפול אונליין.
-        </p>
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>{introLine}</p>
+        {topicLinks.length > 0 && (
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-stone-500">ב{city} לפי תחום:</span>
+            {topicLinks.map((t) => (
+              <Link key={t.slug} href={`/therapists/city/${regionToSlug(city)}/${t.slug}`}
+                className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+                style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>{t.name}</Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Prominent quiz CTA - same offer as the region/online pages, tailored to the city. */}
-      <div
-        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
-        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
-      >
-        <div>
-          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>
-            לא בטוחים מי מתאים לכם?
-          </p>
-          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."}
-          </p>
-        </div>
-        <Link
-          href="/adults"
-          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
-          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
-        >
-          למילוי השאלון
-        </Link>
-      </div>
+      {/* Both audiences land on a city page - see QuizCta. */}
+      <QuizCta body={"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."} />
 
       {inCity.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">

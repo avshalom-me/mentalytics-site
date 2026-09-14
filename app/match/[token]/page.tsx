@@ -4,6 +4,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import MatchReturnTracker from "../MatchReturnTracker";
+import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 
 // Saved-match permalink (the "שלח לעצמך את ההתאמות" feature): anonymous token
 // → the matched therapist list. Restores the ORIGINAL campaign attribution on
@@ -20,7 +21,10 @@ export const metadata: Metadata = {
 type TokenRow = {
   token: string;
   quiz_type: "adults" | "kids";
-  therapist_ids: string[];
+  /** null כשהטוקן נוצר במסך ההמלצות - שם עוד לא רץ חיפוש. */
+  therapist_ids: string[] | null;
+  /** תוויות הטיפול שהומלצו. ללא ממצאים קליניים - ראו המיגרציה. */
+  recommended_treatments: string[] | null;
   treatment_label: string | null;
   channel: string | null;
   utm_source: string | null;
@@ -30,6 +34,14 @@ type TokenRow = {
   expires_at: string;
   visit_count: number;
 };
+
+// תווית הטיפול שנשמרה היא תווית *תצוגה* מהשאלון, ולא בהכרח ערך מדויק מרשימת
+// הגישות (המלצה משולבת נשמרת כ-"א + ב"). לכן ההמרה לעמוד גישה נעשית רק
+// בהתאמה מדויקת, ומי שלא מתאים נשאר טקסט - עדיף מקישור שמוביל ל-404.
+function specialtyHref(label: string): string | null {
+  const clean = label.trim();
+  return SPECIALTY_LIST.includes(clean) ? `/therapists/specialty/${specialtyToSlug(clean)}` : null;
+}
 
 function ExpiredView() {
   return (
@@ -58,7 +70,7 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
 
   const { data } = await supabaseAdmin
     .from("match_tokens")
-    .select("token, quiz_type, therapist_ids, treatment_label, channel, utm_source, utm_medium, utm_campaign, created_at, expires_at, visit_count")
+    .select("token, quiz_type, therapist_ids, recommended_treatments, treatment_label, channel, utm_source, utm_medium, utm_campaign, created_at, expires_at, visit_count")
     .eq("token", token)
     .maybeSingle();
 
@@ -71,11 +83,15 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
     .update({ visit_count: row.visit_count + 1, last_visited_at: new Date().toISOString() })
     .eq("token", token);
 
-  // Load ONLY currently-listed therapists, in the original match order.
-  const all = await loadPublicTherapists();
+  // טוקן שנשמר במסך ההמלצות נושא תוויות טיפול ולא מטפלים - אין מה לטעון,
+  // והעמוד מציג במקום זאת את ההמלצות עם קישור להמשיך לחיפוש.
+  const savedIds = row.therapist_ids ?? [];
+  const recsOnly = savedIds.length === 0 && (row.recommended_treatments?.length ?? 0) > 0;
+
+  const all = recsOnly ? [] : await loadPublicTherapists();
   const byId = new Map(all.map((t) => [t.id, t]));
-  const list = row.therapist_ids.map((id) => byId.get(id)).filter((t): t is NonNullable<typeof t> => Boolean(t));
-  const droppedCount = row.therapist_ids.length - list.length;
+  const list = savedIds.map((id) => byId.get(id)).filter((t): t is NonNullable<typeof t> => Boolean(t));
+  const droppedCount = savedIds.length - list.length;
 
   const savedDate = new Date(row.created_at).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 
@@ -95,11 +111,11 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
           התאמה אישית
         </p>
         <h1 style={{ fontSize: "clamp(1.7rem,3vw,2.3rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
-          ההתאמות השמורות שלך 💚
+          {recsOnly ? "ההמלצות השמורות שלך 💚" : "ההתאמות השמורות שלך 💚"}
         </h1>
         <p className="mt-2 text-stone-600 leading-7">
           נשמרו ב־{savedDate}
-          {row.treatment_label ? <> · על בסיס ההמלצה: <strong>{row.treatment_label}</strong></> : null}
+          {!recsOnly && row.treatment_label ? <> · על בסיס ההמלצה: <strong>{row.treatment_label}</strong></> : null}
         </p>
         {droppedCount > 0 && (
           <p className="mt-1 text-sm text-stone-500">
@@ -108,7 +124,47 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
         )}
       </div>
 
-      {list.length === 0 ? (
+      {recsOnly ? (
+        // מסך ההמלצות השמורות: מה הותאם, וכפתור אחד להמשיך בדיוק מהנקודה
+        // שבה עצרו. זו הסיבה שהטוקן הזה קיים - לתת דרך חזרה למי שקרא, חשב
+        // ועזב, במקום לנסות למנוע ממנו לצאת.
+        <div className="rounded-2xl border p-6" style={{ borderColor: "var(--teal-mid)", background: "var(--teal-pale)" }}>
+          <p className="text-sm font-bold" style={{ color: "var(--teal-dark)" }}>הטיפולים שהותאמו לך בשאלון</p>
+          <ul className="mt-3 space-y-2">
+            {(row.recommended_treatments ?? []).map((t) => {
+              const href = specialtyHref(t);
+              return (
+                <li key={t} className="flex items-start gap-2 text-[15px] font-semibold" style={{ color: "var(--text)" }}>
+                  <span style={{ color: "var(--teal)" }}>•</span>
+                  {href ? (
+                    <Link href={href} className="underline decoration-1 underline-offset-4 hover:opacity-80" style={{ color: "var(--teal-dark)" }}>
+                      {t}
+                    </Link>
+                  ) : (
+                    <span>{t}</span>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          {/* היעד הוא מאגר המטפלים ולא השאלון. הכפתור הזה הוביל ל-/adults,
+              שנפתח במסך האישור המשפטי - כלומר "להמשך" החזיר את מי שכבר קרא
+              את ההמלצות אל תחילת התהליך. הטוקן שומר תוויות טיפול בלבד ולא
+              תשובות, ולכן אי אפשר לחדש את השאלון מאמצעו; מה שכן אפשר, וזה
+              מה שהובטח, הוא להגיע למטפלים. */}
+          <Link
+            href="/therapists"
+            className="mt-5 inline-flex items-center justify-center font-bold text-white transition hover:opacity-95"
+            style={{ background: "var(--teal)", borderRadius: "50px", padding: "13px 28px", fontSize: "15px" }}
+          >
+            🔍 להמשך - מציאת מטפל/ת מתאים/ה
+          </Link>
+          <p className="mt-3 text-xs leading-6 text-stone-500">
+            השאלון עצמו אינו נשמר. הקישור הזה שומר את סוגי הטיפול שהותאמו לך בלבד.
+            אפשר גם <Link href={row.quiz_type === "kids" ? "/kids" : "/adults"} className="font-semibold underline" style={{ color: "var(--teal-dark)" }}>למלא את השאלון מחדש</Link> ולקבל התאמה אישית.
+          </p>
+        </div>
+      ) : list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           המטפלים מהרשימה הזו כבר אינם מוצגים. אפשר <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">למלא שאלון מחודש</Link> או לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link>.
         </div>

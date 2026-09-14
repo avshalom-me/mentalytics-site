@@ -6,7 +6,8 @@ import { ArticleBody } from "@/app/components/ArticleBody";
 import { therapistTypeLabel } from "@/app/lib/therapist-options";
 import { therapistPath } from "@/app/lib/therapist-url";
 import ArticleShell from "@/app/components/ArticleShell";
-import { sectionForTopic } from "@/app/lib/article-taxonomy";
+import { sectionForTopic, quizAudienceForTopic } from "@/app/lib/article-taxonomy";
+import QuizCta from "@/app/therapists/QuizCta";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -43,8 +44,8 @@ type ArticleRow = {
   canonical_url: string | null;
   author_name: string | null;
   therapists:
-    | { full_name: string | null; therapist_types: string[] | null; gender: string | null }
-    | { full_name: string | null; therapist_types: string[] | null; gender: string | null }[]
+    | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }
+    | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }[]
     | null;
 };
 
@@ -52,7 +53,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender, age_groups)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -72,7 +73,7 @@ function authorRole(row: ArticleRow): string {
   const t = Array.isArray(row.therapists) ? row.therapists[0] : row.therapists;
   return (t?.therapist_types ?? [])
     .filter(Boolean)
-    .map((tp) => therapistTypeLabel(tp, t?.gender))
+    .map((tp) => therapistTypeLabel(tp, t?.gender, t?.age_groups ?? null))
     .join(" · ");
 }
 
@@ -207,6 +208,34 @@ export default async function CommunityArticlePage({ params }: { params: Promise
       )}
 
       <ArticleBody body={a.body} />
+
+      {/* The questionnaire, at the end of the article rather than before it.
+          /research/community is the single biggest organic landing family on
+          the site (143 entries in 90 days on 10/9/2026, ahead of the homepage
+          at 110 and the city pages at 73), and the miluim entitlements guide
+          alone brought 115 of those.
+
+          There WAS already a questionnaire card - in ArticleShell's rail - but
+          that rail is `hidden lg:block`, so below 1024px it does not render at
+          all. On a phone the article ended at the author's profile link and
+          nothing else, which is most of the traffic to a mental-health article.
+          This one is in the reading column, so it exists at every width.
+
+          After the body, not before: someone who arrived from a search for
+          "החזר טיפול נפשי מילואים" came to read, and a call to action above the
+          text answers a question they have not asked yet. The topic decides
+          which questionnaire, so a parenting article does not push a parent
+          into the adults flow - the rail's card always offers both. */}
+      <div className="mt-12">
+        <QuizCta
+          audience={quizAudienceForTopic(a.topic)}
+          body={
+            quizAudienceForTopic(a.topic) === "youth"
+              ? "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת. בחינם וללא התחייבות."
+              : "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות."
+          }
+        />
+      </div>
 
       {/* Author attribution - colored name + role + note. A house byline links
           to the homepage instead of a therapist profile. */}

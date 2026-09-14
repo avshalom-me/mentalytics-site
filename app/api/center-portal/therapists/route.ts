@@ -119,11 +119,12 @@ export async function POST(req: NextRequest) {
       await writeAudit(supabaseAdmin, {
         therapistId: created.id,
         actorType: "center",
-        actorId: center.id,
+        // האדם ולא המרכז: עם כמה חברי צוות, "המרכז שינה" כבר לא אומר מי.
+        actorId: center.acting_user_id ?? center.id,
         action: "center_create_profile",
         before: {},
         after: { full_name: fullName },
-        reason: `profile created from center portal (${center.name})`,
+        reason: `profile created from center portal (${center.name}${center.acting_email ? ` by ${center.acting_email}` : ""})`,
       });
 
       return NextResponse.json({ ok: true, id: created.id, created: true });
@@ -170,11 +171,11 @@ export async function POST(req: NextRequest) {
       await writeAudit(supabaseAdmin, {
         therapistId: id,
         actorType: "center",
-        actorId: center.id,
+        actorId: center.acting_user_id ?? center.id,
         action: "center_update_profile",
         before: { status: existing.status },
         after: { fields: Object.keys(update) },
-        reason: `profile updated from center portal (${center.name})`,
+        reason: `profile updated from center portal (${center.name}${center.acting_email ? ` by ${center.acting_email}` : ""})`,
       });
 
       // אם הפרופיל כבר מאושר והמרכז פעיל - לוודא שהקידום במקום (למשל אחרי

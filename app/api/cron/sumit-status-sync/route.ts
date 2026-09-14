@@ -2,9 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "crypto";
 import { Resend } from "resend";
-import { listRecurringForCustomer, cancelSubscription, updateRecurringPrice, SUBSCRIPTION_BASE_PRICE } from "@/app/lib/sumit";
+import {
+  listRecurringForCustomer,
+  cancelSubscription,
+  updateRecurringPrice,
+  SUBSCRIPTION_BASE_PRICE,
+  SUMIT_RECURRING_ACTIVE_STATUSES,
+  SUMIT_RECURRING_CANCELLED_STATUS,
+  type RecurringItem,
+} from "@/app/lib/sumit";
+import { VAT_RATE } from "@/app/lib/crm";
 import { writeAudit } from "@/app/lib/audit";
+import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
+import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 
@@ -40,6 +52,220 @@ async function alertAdminOrphan(
   } catch (e) {
     console.error("alertAdminOrphan: failed to send admin email:", e);
   }
+}
+
+// Sumit returned a standing-order status we have no rule for. NOT a
+// cancellation - see the policy note in pass (1). One alert per therapist per
+// week: the underlying condition (a card that keeps failing) can persist for
+// days, and a daily repeat would train the admin to ignore it.
+async function alertAdminUnknownStatus(
+  therapistId: string,
+  therapistName: string,
+  recurringItemId: string,
+  status: number
+): Promise<boolean> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await supabase
+    .from("therapist_audit_log")
+    .select("id")
+    .eq("therapist_id", therapistId)
+    .eq("action", "sumit_unknown_status")
+    .gte("created_at", weekAgo)
+    .limit(1)
+    .maybeSingle();
+
+  await writeAudit(supabase, {
+    therapistId,
+    actorType: "sumit",
+    action: "sumit_unknown_status",
+    before: null,
+    after: { sumit_recurring: recurringItemId, sumit_status: status },
+    reason: `unknown Sumit status ${status} - promotion left untouched`,
+  });
+
+  if (recent) return false; // כבר התרענו השבוע
+
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: `🔎 סטטוס Sumit לא מוכר (${status}) אצל ${therapistName || "מטפל/ת"}`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>הסנכרון היומי מצא להוראת הקבע של <strong>${therapistName.replace(/</g, "&lt;") || "מטפל/ת"}</strong> סטטוס שאיננו מכירים: <strong>${status}</strong>.</p>
+        <p><strong>לא בוצע שום שינוי</strong> - הקידום נשאר על כנו והוראת הקבע לא בוטלה. הסטטוסים המוכרים: 0 = פעילה, 12 = מתוזמנת, 1 = בוטלה.</p>
+        <p>סטטוס 3, למשל, הוא כשל חיוב זמני ש-Sumit מנסה שוב למחרת - ולרוב הוא נפתר מעצמו. אם הוא נתקע, כדאי לפנות למטפל/ת לעדכון אמצעי תשלום.</p>
+        <p><strong>therapist_id:</strong> ${therapistId}<br/><strong>מזהה הוראת קבע:</strong> ${recurringItemId}</p>
+        <p style="color:#6B807E;font-size:13px;">התראה נוספת על אותו מטפל תישלח לכל היותר בעוד שבוע.</p>
+      </div>`,
+    });
+    return true;
+  } catch (e) {
+    console.error("alertAdminUnknownStatus: failed to send admin email:", e);
+    return false;
+  }
+}
+
+// יותר מהוראת קבע חיה אחת תחת אותו לקוח = הכרטיס מחויב פעמיים בכל חודש.
+// אף מסלול אחר לא רואה את זה: הביטול, ההדחה וסריקת היתומים כולם נשענים על
+// המזהה הרשום אצלנו, וההוראה העודפת היא בדיוק זו שאינה רשומה. הנתונים כבר
+// נשלפו עבור בדיקת הסטטוס, אז הגלאי לא עולה אף קריאת API.
+//
+// מתריעים בלבד, לא מבטלים: הבחירה איזו מהשתיים להשאיר עדינה מדי לאוטומציה -
+// חייבים להשאיר את זו שרשומה אצלנו, אחרת הקרון יראה למחרת מנוי "מבוטל"
+// וידיח מטפל שמשלם. המייל מביא את תאריכי ההתחלה והחיוב האחרון כדי שההכרעה
+// תהיה בעיניים פקוחות. אחת לשבוע לכל מטפל, כדי שלא ייהפך לרעש.
+async function alertAdminDuplicateOrders(
+  therapistId: string,
+  therapistName: string,
+  recordedId: string | null,
+  liveItems: RecurringItem[]
+): Promise<boolean> {
+  const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const { data: recent } = await supabase
+    .from("therapist_audit_log")
+    .select("id")
+    .eq("therapist_id", therapistId)
+    .eq("action", "sumit_duplicate_orders_detected")
+    .gte("created_at", weekAgo)
+    .limit(1)
+    .maybeSingle();
+
+  await writeAudit(supabase, {
+    therapistId,
+    actorType: "sumit",
+    action: "sumit_duplicate_orders_detected",
+    before: null,
+    after: {
+      recorded: recordedId,
+      live: liveItems.map((i) => ({
+        id: String(i.ID),
+        status: i.Status,
+        date_start: i.Date_Start ?? null,
+        date_previous: i.Date_PreviousBilling ?? null,
+      })),
+    },
+    reason: `${liveItems.length} live standing orders at Sumit - the card is billed more than once a month`,
+  });
+
+  if (recent) return false; // כבר התרענו השבוע
+
+  const rows = liveItems
+    .map((i) => {
+      const mine = recordedId && String(i.ID) === String(recordedId);
+      return `<tr>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;"><strong>${i.ID}</strong>${mine ? " ✓" : ""}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${String(i.Date_Start ?? "").slice(0, 10) || "-"}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${String(i.Date_PreviousBilling ?? "").slice(0, 10) || "טרם חויבה"}</td>
+        <td style="padding:6px 10px;border:1px solid #DDE9E8;">${mine ? "<strong>רשומה אצלנו - להשאיר</strong>" : "עודפת - מועמדת לביטול"}</td>
+      </tr>`;
+    })
+    .join("");
+
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: `⚠️ חיוב כפול: ${liveItems.length} הוראות קבע חיות אצל ${therapistName || "מטפל/ת"}`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>ל<strong>${therapistName.replace(/</g, "&lt;") || "מטפל/ת"}</strong> יש ב-Sumit <strong>${liveItems.length} הוראות קבע חיות</strong> במקביל, כלומר הכרטיס מחויב יותר מפעם אחת בחודש.</p>
+        <table style="border-collapse:collapse;font-size:14px;margin:12px 0;">
+          <tr style="background:#F7FAF9;">
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">מזהה</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">התחלה</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">חיוב אחרון</th>
+            <th style="padding:6px 10px;border:1px solid #DDE9E8;">מה לעשות</th>
+          </tr>
+          ${rows}
+        </table>
+        <p><strong>לא בוצע שום ביטול אוטומטי.</strong> יש לבטל ידנית ב-Sumit רק את ההוראות המסומנות כעודפות - ולהשאיר את זו הרשומה אצלנו, אחרת הסנכרון יראה מחר מנוי מבוטל וידיח מטפל שמשלם.</p>
+        <p>בדרך כלל העודפת היא זו עם תאריך ההתחלה המוקדם יותר. שווה גם לבדוק אם מגיע החזר על החיוב הכפול.</p>
+        <p><strong>therapist_id:</strong> ${therapistId}</p>
+        <p style="color:#6B807E;font-size:13px;">התראה נוספת על אותו מטפל תישלח לכל היותר בעוד שבוע.</p>
+      </div>`,
+    });
+    return true;
+  } catch (e) {
+    console.error("alertAdminDuplicateOrders: failed to send admin email:", e);
+    return false;
+  }
+}
+
+// מראה מקומית לחיובים החוזרים של מטפלים. Sumit גובה את החידוש החודשי
+// בשרתים שלה ולא שולחת webhook, ולכן בלי זה מטפל שמשלם כל חודש מופיע אצלנו
+// כשורת תשלום אחת בלבד - זו של ההרשמה - וכל שקל של חידוש נעדר ממסך הכספים
+// ומהדוחות. זה בדיוק התיקון שמסלול המרכזים כבר קיבל; מסלול המטפלים לא.
+//
+// שתי מלכודות שהמסלול הזה חייב לעקוף:
+//  1. החיוב הראשון של הוראת הקבע קורה ב-Date_Start, וב-checkout רגיל הוא כבר
+//     נרשם כ-payment_type='subscription'. רישום נוסף שלו היה מכפיל הכנסה.
+//     היוצא מן הכלל הוא מסלול ההזמנה (gift-trial), שבו לא זזים כספים בהרשמה
+//     ולכן לא נוצרת שורת תשלום כלל - שם דווקא *כן* צריך לרשום אותו.
+//  2. created_at חייב להיות תאריך החיוב ולא זמן הריצה, אחרת חיוב של יולי
+//     נוחת בחודש הנוכחי וכל דוח חודשי מתעוות.
+async function mirrorRenewalCharge(
+  therapistId: string,
+  item: RecurringItem,
+  subAmount: number | null
+): Promise<boolean> {
+  const prev = item.Date_PreviousBilling ? String(item.Date_PreviousBilling).slice(0, 10) : null;
+  const start = item.Date_Start ? String(item.Date_Start).slice(0, 10) : null;
+  if (!prev || !start) return false;
+
+  if (prev === start) {
+    // החיוב הראשון של ההוראה. רושמים רק אם ה-checkout לא רשם אותו.
+    const { data: signup } = await supabase
+      .from("payments")
+      .select("id")
+      .eq("payment_type", "subscription")
+      .eq("reference_id", therapistId)
+      .eq("status", "completed")
+      .limit(1)
+      .maybeSingle();
+    if (signup) return false;
+  }
+
+  // אידמפוטנטיות מול טבלת התשלומים עצמה ולא מול עמודת "חויב לאחרונה":
+  // insert שהצליח בזמן שעדכון העמודה נכשל היה מייצר כפילות בריצה הבאה.
+  const { data: already } = await supabase
+    .from("payments")
+    .select("id")
+    .eq("payment_type", "subscription_renewal")
+    .eq("reference_id", therapistId)
+    .eq("metadata->>sumit_billing_date", prev)
+    .limit(1)
+    .maybeSingle();
+  if (already) return false;
+
+  // מה ש-Sumit חייבה בפועל גובר על המחיר השמור אצלנו. UnitPrice ב-Sumit הוא
+  // כולל מע"מ (שולחים UnitPrice נטו עם VATIncluded:false, ו-Sumit שומרת ברוטו),
+  // בעוד payments.amount הוא נטו ומסוג integer.
+  const gross = Number(item.UnitPrice);
+  const net =
+    Number.isFinite(gross) && gross > 0
+      ? Math.round(gross / (1 + VAT_RATE))
+      : Number(subAmount) || 0;
+  if (net <= 0) {
+    console.error(`renewal mirror: no usable amount for therapist ${therapistId} (UnitPrice=${item.UnitPrice})`);
+    return false;
+  }
+
+  const { error } = await supabase.from("payments").insert({
+    payment_type: "subscription_renewal",
+    reference_id: therapistId,
+    amount: net,
+    status: "completed",
+    created_at: new Date(String(item.Date_PreviousBilling)).toISOString(),
+    metadata: {
+      sumit_billing_date: prev,
+      sumit_recurring_id: String(item.ID),
+      recorded_by: "sumit-status-sync",
+    },
+  });
+  if (error) {
+    console.error(`renewal mirror failed (therapist=${therapistId}, date=${prev}):`, error.message);
+    return false;
+  }
+  return true;
 }
 
 function verifyCron(req: NextRequest): boolean {
@@ -81,8 +307,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
 
+  // דופק ליומן הריצות. הקרון הזה מוריד קידומים, מגלגל מתנות לתשלום
+  // ושולח מיילים ללקוחות - ועד היום לא השאיר שום עקבה שמעידה שהוא בכלל רץ.
+  const runId = await startAgentRun("cron_sumit_sync");
+
   let checked = 0;
   let demoted = 0;
+  // מי הושעה בגלל חיוב שנכשל. מאז 19/8/2026 לא נשלח אליהם מייל אוטומטי,
+  // ולכן בלי הרשימה הזו ההשעיה הייתה קורית בלי שאיש יודע - לא הם ולא אנחנו.
+  const demotedForPayment: { name: string; email: string; reason: string }[] = [];
+  let rolledToPaid = 0;
   let errors = 0;
   let stillActive = 0;
   let softMisses = 0;
@@ -97,17 +331,39 @@ export async function GET(req: NextRequest) {
   let orphansConfirmedInactive = 0; // newly stamped as confirmed-dead this run
   let orphansDeferredByDecay = 0; // confirmed-dead items skipped this run
   let promosReverted = 0;
+  let renewalsRecorded = 0; // חיובי חידוש של מטפלים ששוקפו לטבלת התשלומים
+  let unknownStatuses = 0; // סטטוס Sumit שאיננו מכירים - לא נגענו
+  let unknownStatusAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
+  let duplicateOrdersFound = 0; // מטפלים עם יותר מהוראת קבע חיה אחת
+  let duplicateOrderAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
 
   // -------- (1) Sumit subscription state for paid therapists --------
+  // 'gift_trial' נכלל לצד 'paid': מטפל שהצטרף במסלול ההזמנה הוא לקוח משלם
+  // לכל דבר מרגע החיוב הראשון, ובלי הכללתו כאן הוא היה נשאר מקודם לנצח גם
+  // אחרי שיבטל ב-Sumit. הדילוג בזמן חלון המתנה נעשה בתוך הלולאה.
   const { data: paidTherapists } = await supabase
     .from("therapists")
-    .select("id, full_name, email, admin_approved")
+    .select("id, full_name, email, admin_approved, promotion_source")
     .eq("status", "paying")
-    .eq("promotion_source", "paid");
+    .in("promotion_source", ["paid", "gift_trial"]);
 
   for (const t of paidTherapists ?? []) {
     checked++;
     try {
+      // חלון המתנה: הוראת הקבע קיימת ב-Sumit אבל טרם חייבה, ומצבה שם אינו
+      // ניתן לשיפוט. בלי הדילוג הזה שתי ריצות היו מורידות את הקידום ומבטלות
+      // מנוי תקין יומיים אחרי שהמטפל הצטרף.
+      if (t.promotion_source === "gift_trial") {
+        const { data: pending } = await supabase
+          .from("subscriptions")
+          .select("current_period_end")
+          .eq("therapist_id", t.id)
+          .eq("status", "active")
+          .maybeSingle();
+        if (pending?.current_period_end && new Date(pending.current_period_end).getTime() > Date.now()) {
+          continue;
+        }
+      }
       const items = await listRecurringForCustomer({
         externalIdentifier: t.id,
         includeInactive: true,
@@ -115,7 +371,7 @@ export async function GET(req: NextRequest) {
 
       const { data: sub } = await supabase
         .from("subscriptions")
-        .select("id, morning_token_id, sync_miss_count")
+        .select("id, morning_token_id, sync_miss_count, amount")
         .eq("therapist_id", t.id)
         .eq("status", "active")
         .maybeSingle();
@@ -124,7 +380,31 @@ export async function GET(req: NextRequest) {
         ? items.find((i) => String(i.ID) === sub.morning_token_id)
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
 
-      if (target && target.Status === 0) {
+      // גלאי חיוב כפול. רץ לפני כל שאר ההחלטות ואינו משנה אף אחת מהן - מטפל
+      // עם שתי הוראות חיות הוא עדיין מטפל תקין מבחינת הסטטוס, ולכן בלי
+      // הבדיקה הזו הכפילות שקופה לחלוטין.
+      const liveItems = items.filter((i) =>
+        SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status))
+      );
+      if (liveItems.length > 1) {
+        duplicateOrdersFound++;
+        console.error(
+          `DUPLICATE BILLING: therapist ${t.id} has ${liveItems.length} live Sumit orders: ` +
+            liveItems.map((i) => i.ID).join(", ")
+        );
+        if (
+          await alertAdminDuplicateOrders(
+            t.id,
+            t.full_name ?? "",
+            sub?.morning_token_id ?? null,
+            liveItems
+          )
+        ) {
+          duplicateOrderAlerts++;
+        }
+      }
+
+      if (target && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(target.Status))) {
         // Active at Sumit — healthy. Clear any accumulated miss streak.
         stillActive++;
         if (sub) {
@@ -135,12 +415,49 @@ export async function GET(req: NextRequest) {
           if ((sub.sync_miss_count ?? 0) > 0) patch.sync_miss_count = 0;
           await supabase.from("subscriptions").update(patch).eq("id", sub.id);
         }
+        // מסלול ההזמנה מתגלגל למשלם רגיל: לכאן מגיעים רק אחרי שחלון המתנה
+        // נגמר (בתוכו הלולאה מדלגת) וההוראה פעילה ממש (Status 0 - לא 12,
+        // "מתוזמנת", שפירושה שהחיוב הראשון עוד לא יצא). מרגע זה הוא לקוח
+        // משלם בכל המובנים: דירוג ההתאמות, ספירות המשלמים וערבות ההחזר
+        // (החלטת המשתמש 18/8/26). אם החיוב נכשל, Sumit מבטלת את ההוראה
+        // ומסלול ההורדה שלמטה מטפל בזה.
+        if (t.promotion_source === "gift_trial" && Number(target.Status) === 0) {
+          await supabase.from("therapists").update({ promotion_source: "paid" }).eq("id", t.id);
+          await writeAudit(supabase, {
+            therapistId: t.id,
+            actorType: "cron",
+            action: "promotion_source:gift_trial->paid",
+            before: { promotion_source: "gift_trial" },
+            after: { promotion_source: "paid" },
+          });
+          rolledToPaid++;
+        }
+        if (await mirrorRenewalCharge(t.id, target, sub?.amount ?? null)) renewalsRecorded++;
+        continue;
+      }
+
+      // ── מדיניות הסטטוסים של Sumit ────────────────────────────────────────
+      // 0 = פעילה, 12 = מתוזמנת (חודשי מתנה) — חיות. 1 = בוטלה. כל ערך אחר
+      // הוא מצב ביניים שאיננו מכירים, ו**אסור** לקרוא אותו כביטול: ב-16/8/26
+      // הוראה חזרה עם Status=3 (כשל חיוב זמני), הקוד הישן קרא לזה "ההוראה
+      // מתה", הוריד מטפל משלם מהקידום ולא ביטל דבר ב-Sumit. Sumit ניסתה שוב
+      // למחרת, החיוב עבר, ובינתיים המטפל נרשם מחדש - שתי הוראות קבע וחיוב
+      // כפול. זו בדיוק המדיניות שמסלול המרכזים כבר עובד לפיה (סעיף 5).
+      if (target && Number(target.Status) !== SUMIT_RECURRING_CANCELLED_STATUS) {
+        unknownStatuses++;
+        console.warn(
+          `Sumit sync: unknown status ${target.Status} for therapist ${t.id} ` +
+            `(item ${target.ID}) — leaving the promotion untouched.`
+        );
+        if (await alertAdminUnknownStatus(t.id, t.full_name ?? "", String(target.ID), Number(target.Status))) {
+          unknownStatusAlerts++;
+        }
         continue;
       }
 
       // Not active. Distinguish two cases:
-      //  - `target` present with Status != 0: Sumit AUTHORITATIVELY reports the
-      //    standing order cancelled/suspended/expired. Trust it and demote now.
+      //  - `target` present with Status == 1: Sumit AUTHORITATIVELY reports the
+      //    standing order cancelled. Trust it and demote now.
       //  - `!target`: the item wasn't in the returned list. This is AMBIGUOUS —
       //    a transient empty/partial Sumit read looks identical to a real
       //    cancel here, and demoting on a single miss has torn down genuinely
@@ -197,11 +514,24 @@ export async function GET(req: NextRequest) {
           : `no_active_recurring_at_sumit_after_${MISS_THRESHOLD}_misses`,
       });
 
-      if (t.email) {
+      // תבנית מאושרת (הבהרת 19/8): ההודעה יוצאת, כי שורש תקלת רועי חנין
+      // תוקן - סטטוס ביניים כבר לא נקרא כביטול, ורק ביטול מאושש מגיע לכאן.
+      // הרשימה המרוכזת אלינו נשארת כגיבוי לכל מקרה שנחסם.
+      // מטפל של מרכז - המרכז הוא בעל החשבון ואליו ההודעה מגיעה.
+      const endedTarget = await operationalMailTarget(t.id);
+      if (endedTarget.to && automatedSendAllowed(endedTarget.to, "promotion_ended:payment_failed").allowed) {
         await sendPromotionEndedEmail({
-          to: t.email,
+          to: endedTarget.to,
           name: t.full_name ?? "",
           reason: "payment_failed" as PromotionEndedReason,
+        });
+      } else if (t.email) {
+        demotedForPayment.push({
+          name: t.full_name ?? "(ללא שם)",
+          email: t.email,
+          reason: authoritativeCancel
+            ? `Sumit status=${target!.Status}`
+            : `אין הוראת קבע פעילה ב-Sumit אחרי ${MISS_THRESHOLD} ריצות`,
         });
       }
       demoted++;
@@ -245,9 +575,10 @@ export async function GET(req: NextRequest) {
         reason: "trial_or_manual_expired",
       });
 
-      if (t.email) {
+      const trialTarget = await operationalMailTarget(t.id);
+      if (trialTarget.to && automatedSendAllowed(trialTarget.to, "promotion_ended:trial_expired").allowed) {
         await sendPromotionEndedEmail({
-          to: t.email,
+          to: trialTarget.to,
           name: t.full_name ?? "",
           reason: "trial_expired",
         });
@@ -643,11 +974,50 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // התראה אחת מרוכזת אלינו על מי שהושעה בגלל חיוב שנכשל. המטפל עצמו לא
+  // מקבל דבר אוטומטית - ההחלטה אם ומתי לפנות אליו היא אנושית. הרקע: ב-16/8
+  // כשל חיוב טכני של רועי חנין שלח לו "החיוב נכשל", והוא שילם בהצלחה ארבע
+  // שעות אחר כך.
+  if (demotedForPayment.length > 0) {
+    const rows = demotedForPayment
+      .map(
+        (d) =>
+          `<li><strong>${d.name.replace(/</g, "&lt;")}</strong> (${d.email.replace(/</g, "&lt;")}) - ${d.reason}</li>`,
+      )
+      .join("");
+    try {
+      await resend.emails.send({
+        from: "טיפול חכם <noreply@mentalytics.co.il>",
+        to: ALERT_TO,
+        subject: `⚠️ ${demotedForPayment.length} מטפלים הושעו בגלל חיוב שנכשל`,
+        html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+          <p>הסנכרון היומי השעה את המטפלים הבאים כי אין להם הוראת קבע פעילה ב-Sumit.
+          <strong>לא נשלח אליהם שום מייל</strong> - שליחה אוטומטית לנמענים חיצוניים מושבתת.</p>
+          <ul>${rows}</ul>
+          <p>לפני פנייה כדאי לוודא ב-Sumit שהכשל אמיתי ולא תקלה רגעית: כשל טכני
+          שנפתר מעצמו כעבור שעות קרה כבר בעבר.</p>
+        </div>`,
+      });
+    } catch (mailErr) {
+      console.error("demoted-for-payment alert failed:", mailErr);
+    }
+  }
+
+  await finishAgentRun(runId, {
+    status: errors > 0 ? "error" : "ok",
+    summary:
+      `נבדקו ${checked} מנויים; ${demoted} הורדו, ${trialsExpired} מתנות פגו, ` +
+      `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו`,
+    error: errors > 0 ? `${errors} שגיאות בריצה` : undefined,
+  });
+
   return NextResponse.json({
     checked,
     stillActive,
+    rolledToPaid,
     softMisses,
     demoted,
+    demoted_for_payment: demotedForPayment.length,
     trialsExpired,
     orphansFound,
     orphansCancelled,
@@ -655,6 +1025,11 @@ export async function GET(req: NextRequest) {
     orphansConfirmedInactive,
     orphansDeferredByDecay,
     promosReverted,
+    renewalsRecorded,
+    unknownStatuses,
+    unknownStatusAlerts,
+    duplicateOrdersFound,
+    duplicateOrderAlerts,
     centersChecked,
     centersCancelled,
     centerTherapistsDemoted,

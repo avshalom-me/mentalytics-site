@@ -650,6 +650,16 @@ export default function TherapistProfileEditPage() {
               }
               setForm({...form, therapist_types: v, training_areas: nextTraining});
             }} />
+          {/* בלי ההסבר הזה השינוי נראה כמו באג: המטפל/ת בחרו "מטפל/ת בהבעה
+              ויצירה" ורואים בפרופיל תואר אחר. ההסמכה עצמה ממשיכה להופיע
+              בעמוד תחת "הכשרה". */}
+          {form.therapist_types.includes("מטפל/ת בהבעה ויצירה") &&
+            (form.age_groups.includes("מבוגרים") || form.age_groups.includes("הגיל השלישי")) && (
+            <p className="-mt-2 mb-4 rounded-xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3.5 py-2.5 text-xs leading-6 text-stone-700">
+              💡 מכיוון שסימנת טיפול במבוגרים, בכותרת הפרופיל הציבורי יופיע <strong>&quot;פסיכותרפיסט/ית&quot;</strong> -
+              המונח שמטופלים מחפשים ומכירים. ההסמכה שלך כמטפל/ת בהבעה ויצירה ממשיכה להופיע בעמוד, תחת &quot;הכשרה&quot;.
+            </p>
+          )}
           <CheckboxGroup label="תחומי טיפול" options={TRAINING_AREAS}
             selected={form.training_areas} onChange={v => {
               const hadCouples = form.training_areas.includes("טיפול זוגי");

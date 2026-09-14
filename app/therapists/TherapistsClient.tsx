@@ -4,9 +4,10 @@ import { useState, useRef, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { therapistPath } from "@/app/lib/therapist-url";
-import { genderTitle } from "@/app/lib/gender-text";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { usePageView, useFilterTrack, useImpressionTrack } from "@/app/lib/useTrack";
 import SiteMessageModal from "./SiteMessageModal";
+import QuizCta from "./QuizCta";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
@@ -51,6 +52,8 @@ export type PublicTherapist = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  /** דרוש לכלל התואר הציבורי (ראו publicTherapistTitle ב-gender-text). */
+  age_groups: string[];
   profile_photo_path: string | null;
   profile_photo_url: string | null;
   // Ranking tier for the directory: 0 = paying (paid + center), 1 = gift
@@ -182,7 +185,9 @@ function TherapistCard({
             <div className="mt-1 text-sm font-semibold" style={{ color: "var(--teal)" }}>
               {/* למרכז אין מגדר - הטיה מגדרית של התואר ("פסיכולוגית קלינית")
                   על שם של מוסד היא פשוט שגויה. */}
-              {isCenter ? t.therapist_types.slice(0, 2).join(" · ") : genderTitle(t.therapist_types[0], t.gender)}
+              {isCenter
+                ? t.therapist_types.slice(0, 2).join(" · ")
+                : publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups)}
             </div>
           )}
           {/* שיוך למרכז - טקסט בלבד: הכרטיס עטוף בקישור, ועוגן בתוך עוגן אינו
@@ -302,7 +307,20 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     if (p.get("online") === "1") setOnlineOnly(true);
   }, []);
 
-  // סנכרון הסינון ל-URL (replaceState - בלי להוסיף רשומות היסטוריה).
+  // סנכרון הסינון ל-URL. שני תיקונים (21/8/2026):
+  //
+  // 1. **push במקום replace.** בלי רשומת היסטוריה, "חזור" של הדפדפן אחרי
+  //    סינון לא ביטל את הסינון אלא עזב את המאגר וקפץ לעמוד שממנו נכנסו -
+  //    בדרך כלל דף הבית. עכשיו כל שינוי סינון הוא צעד שאפשר לחזור ממנו.
+  //    שלושת הערכים בדידים (אזור, עיר, אונליין) ואין כאן שדה חופשי, ולכן
+  //    אין סכנה של הצפת ההיסטוריה בהקלדה.
+  // 2. **שמירת ה-state הקיים.** ה-replaceState הקודם דרס אותו ב-null,
+  //    ואיתו את עץ הראוטר של Next (__PRIVATE_NEXTJS_INTERNALS_TREE) - מה
+  //    שהותיר את App Router בלי מצב לשחזר ברשומה הזו.
+  //
+  // הריצה הראשונה מסונכרנת ב-replace: המצב ההתחלתי הוא העמוד שהמשתמש נחת
+  // עליו, לא צעד שהוא עשה, ודחיפה שם הייתה מחייבת שתי לחיצות "חזור" לצאת.
+  const filtersSynced = useRef(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     const set = (k: string, v: string) => { if (v) p.set(k, v); else p.delete(k); };
@@ -310,8 +328,32 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
     set("city", cityFilter);
     set("online", onlineOnly ? "1" : "");
     const qs = p.toString();
-    window.history.replaceState(null, "", window.location.pathname + (qs ? `?${qs}` : ""));
+    const url = window.location.pathname + (qs ? `?${qs}` : "");
+    // הדגל נסגר גם כשאין מה לכתוב: אחרת הריצה על ה-mount (שיוצאת כאן) הייתה
+    // משאירה אותו פתוח, והשינוי הראשון של המשתמש היה נרשם כ-replace - כלומר
+    // הצעד הראשון שלו היה נבלע ולא היה אפשר לחזור ממנו.
+    const isFirstSync = !filtersSynced.current;
+    filtersSynced.current = true;
+    if (url === window.location.pathname + window.location.search) return; // אין שינוי
+    const state = window.history.state ?? {};
+    if (isFirstSync) window.history.replaceState(state, "", url);
+    else window.history.pushState(state, "", url);
   }, [regionFilter, cityFilter, onlineOnly]);
+
+  // "חזור" מחזיר את הסינון שברשומה הקודמת. בלי זה ה-URL היה משתנה
+  // והמסננים על המסך היו נשארים - שתי אמיתות סותרות באותו עמוד.
+  useEffect(() => {
+    const onPop = () => {
+      const p = new URLSearchParams(window.location.search);
+      const region = p.get("region") ?? "";
+      const city = p.get("city") ?? "";
+      setRegionFilter(region && ALL_REGIONS.includes(region) ? region : "");
+      setCityFilter(city && CITY_TO_REGION[city] ? city : "");
+      setOnlineOnly(p.get("online") === "1");
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
 
   const availableCities = useMemo(() => {
     const cities = new Set<string>();
@@ -372,12 +414,30 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
             לאנשי מקצוע ▸
           </Link>
         </div>
-        {isPara && (
+        {isPara ? (
           <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
-            קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה. אפשר לסנן לפי אזור ואונליין.
+            מטפלים פרה-רפואיים שתעודותיהם אומתו: קלינאות תקשורת, ריפוי בעיסוק, תזונה קלינית ופיזיותרפיה.
+            מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או סננו לפי אזור ואונליין ופנו ישירות. בחינם וללא התחייבות.
+          </p>
+        ) : (
+          /* Without this the first <p> on the page is a therapist's own bio,
+             which is what Google would quote as the description of the whole
+             directory. Same sentence as the city pages. */
+          <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+            מאגר המטפלים של טיפול חכם: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את
+            ההתאמה הנכונה עבורכם, או סננו לפי אזור, סוג קושי, גישה טיפולית והסדר קופה ופנו ישירות
+            למטפלים שתעודות ההכשרה שלהם אומתו. בחינם וללא התחייבות.
           </p>
         )}
       </div>
+
+      {/* The paragraph above says "מלאו שאלון מקצועי" and, until 10/9/2026,
+          there was nothing on the page to click: the only button in the header
+          is "לאנשי מקצוע", which is for therapists. The directory took 49
+          organic entries in 90 days, all of them patients reading an
+          instruction they could not follow. Both buttons here on purpose - the
+          directory is the one page that genuinely lands both audiences. */}
+      <QuizCta body="ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות." />
 
       {/* Filters */}
       <div className="mb-7 flex flex-wrap items-center gap-3 p-4 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>

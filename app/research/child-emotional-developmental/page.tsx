@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
-  title: "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה",
+  title: "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים",
   description:
     "כיצד קשיים פיזיולוגיים והתפתחותיים - עצירות תפקודית, קשיי עיבוד חושי, עיכוב שפתי ואתגרים מוטוריים - מקבלים ביטוי כקושי רגשי לכאורה אצל ילדים קטנים.",
   keywords: [
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
     "פרשנות רגשית", "פיזיותרפיה התפתחותית", "ויסות חושי", "ילדים", "התפתחות",
   ],
   openGraph: {
-    title: "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה",
+    title: "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים",
     description:
       "קשיים פיזיולוגיים והתפתחותיים שמתחפשים לקשיים רגשיים אצל ילדים בגיל הרך - מאמר מקצועי של שילת יוגב, פיזיותרפיסטית התפתחותית.",
     locale: "he_IL",
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה",
+  "headline": "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים",
   "description":
     "כיצד קשיים פיזיולוגיים והתפתחותיים - עצירות תפקודית, קשיי עיבוד חושי, עיכוב שפתי ואתגרים מוטוריים - מקבלים ביטוי כקושי רגשי לכאורה אצל ילדים קטנים.",
   "inLanguage": "he",
@@ -67,7 +67,7 @@ const breadcrumbLd = {
   "itemListElement": [
     { "@type": "ListItem", "position": 1, "name": "בית", "item": "https://www.mentalytics.co.il" },
     { "@type": "ListItem", "position": 2, "name": "מאמרים ומידע שימושי", "item": "https://www.mentalytics.co.il/research" },
-    { "@type": "ListItem", "position": 3, "name": "היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה", "item": "https://www.mentalytics.co.il/research/child-emotional-developmental" },
+    { "@type": "ListItem", "position": 3, "name": "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים", "item": "https://www.mentalytics.co.il/research/child-emotional-developmental" },
   ],
 };
 
@@ -75,7 +75,7 @@ export default function ChildEmotionalDevelopmentalPage() {
   return (
     <ArticleShell
       href="/research/child-emotional-developmental"
-      title="גיל הרך ופרשנות רגשית"
+      title="קושי רגשי או פיזיולוגי בגיל הרך"
       sectionSlug="ילדים-ונוער"
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -87,7 +87,7 @@ export default function ChildEmotionalDevelopmentalPage() {
           מידע מקצועי · גיל הרך
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,4vw,2.4rem)", fontWeight: 900, color: "var(--text)", lineHeight: 1.25, letterSpacing: "-.02em", marginBottom: "16px" }}>
-          היבטים פיזיולוגיים בגיל הרך ופרשנות רגשית שגויה
+          קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים
         </h1>
         <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8 }}>
           כיצד קשיים פיזיולוגיים והתפתחותיים מקבלים ביטוי כקושי רגשי לכאורה - ולמה ההכרה בדינמיקה זו חיונית להורים ולאנשי מקצוע כאחד.

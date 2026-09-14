@@ -12,4 +12,43 @@ if [ $status -ne 0 ]; then
   exit $status
 fi
 echo "✓ type-check passed"
+
+# The kids questionnaire's routing logic fails silently when it breaks: a screen
+# skipped by mistake leaves its field at 0, and the scoring reads 0 as a real
+# answer. The suite is pure and takes well under a second, so it runs on every
+# push rather than waiting for someone to remember.
+echo "pre-push: npx vitest run ..."
+npx vitest run
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ Tests failed — push aborted. Fix the failures above and push again."
+  exit $status
+fi
+echo "✓ tests passed"
+
+# A stale sitemap <lastmod> is invisible everywhere except a search result weeks
+# later. It already cost us once: the landing date sat at 10/8 while the fix that
+# stops therapist names being quoted shipped on 22/8, so Google re-crawled some
+# city pages and not others. The comment asking humans to remember did not
+# survive three commits, so the check runs here instead.
+echo "pre-push: node scripts/check-page-revised.mjs ..."
+node scripts/check-page-revised.mjs
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ Sitemap revision dates are stale — push aborted. See above."
+  exit $status
+fi
+
+# A city-facts key that does not match the vocabulary drops that city's
+# sentence without any error; keep the keys honest.
+echo "pre-push: node scripts/check-city-facts.mjs ..."
+node scripts/check-city-facts.mjs
+status=$?
+if [ $status -ne 0 ]; then
+  echo ""
+  echo "❌ city-facts keys do not match regions.ts — push aborted. See above."
+  exit $status
+fi
 exit 0

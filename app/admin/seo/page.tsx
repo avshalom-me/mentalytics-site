@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import OptOutToggle from "./OptOutToggle";
+import ContactDestinations from "@/app/admin/ContactDestinations";
+import OrganicByFamily from "@/app/admin/OrganicByFamily";
 
 // SEO אורגני - פילוח "ביקוש מול חיפוש-שם". השאלה שהעמוד עונה עליה: כמה
 // מהתנועה האורגנית היא אנשים שחיפשו *טיפול* (עיר/גישה/נושא - הנכס שה-SEO
@@ -326,6 +328,14 @@ export default function AdminSeoPage() {
               לתמונה מדויקת - בחרו 30 יום.
             </p>
           </section>
+
+          <OrganicByFamily />
+
+          <ContactDestinations
+            channel="google_organic"
+            title="לאן הלכו הפניות האורגניות"
+            note="מי קיבל בפועל לחיצה ליצירת קשר מתנועה אורגנית, ובאיזה מסלול הוא נמצא."
+          />
 
           <div className="mb-8 grid gap-4 lg:grid-cols-2">
             {/* סוגי נחיתה */}

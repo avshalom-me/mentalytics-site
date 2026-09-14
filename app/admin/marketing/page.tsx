@@ -7,6 +7,12 @@ import {
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
 
+
+// שמות הקמפיינים הממומנים לפי קידומת ה-utm_campaign: g-* בגוגל, tab-* בטאבולה.
+// בלי הקידומת השנייה, שורות הטאבולה חזרו מה-RPC ונזרקו בדרך למסך (9/2026).
+const isPaidCampaign = (campaign: string) => /^(g-|tab-)/.test(campaign);
+import ContactDestinations from "@/app/admin/ContactDestinations";
+
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
 // collapsible sections rather than a wall of text. Read-only.
@@ -42,22 +48,54 @@ type Supply = {
   total: number;
   registered: number;
   paid: number;
+  /** מקודמים דרך מנוי של מרכז - הכנסה, לא מתנה. הופרד מ-trial ב-21/8/2026. */
+  center: number;
   trial: number;
   free: number;
   listed: number;
   paying: number;
+  revenueBearing: number;
   pendingNamed: number;
   incomplete: number;
 };
 
+type CenterTherapistRow = {
+  id: string;
+  name: string;
+  is_entity: boolean;
+  views30: number;
+  contacts30: number;
+  daysSinceContact: number | null;
+};
+type CenterRow = {
+  id: string;
+  name: string;
+  track: string;
+  status: string | null;
+  seats: number | null;
+  monthly: number | null;
+  promoted: number;
+  views30: number;
+  contacts30: number;
+  starving: number;
+  tooNew: number;
+  therapists: CenterTherapistRow[];
+};
+type CentersBlock = {
+  centers: CenterRow[];
+  totals: { centers: number; promoted: number; views30: number; contacts30: number; starving: number; monthly: number } | null;
+};
+
 type Churn = { everPaid: number; active: number; churned: number; pct: number | null };
 
-type StarvingRow = { id: string; name: string; tier: "paid" | "trial"; views30: number; daysSinceContact: number | null };
+type StarvingRow = { id: string; name: string; tier: "paid" | "center" | "trial"; views30: number; daysSinceContact: number | null };
 type Coverage = {
   paidTotal: number;
+  centerTotal: number;
   trialTotal: number;
-  periods: Record<string, { paid: number; trial: number }>;
+  periods: Record<string, { paid: number; center: number; trial: number; paidAds: number; centerAds: number; trialAds: number }>;
   starving: StarvingRow[];
+  tooNew?: number;
 };
 
 type Data = {
@@ -65,6 +103,7 @@ type Data = {
   kpis: Record<string, PeriodKpis>;
   targets: Target[];
   supply: Supply;
+  centers?: CentersBlock;
   churn: Churn;
   coverage: Coverage | null;
   generated_at: string;
@@ -192,7 +231,7 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
 // THE goal metric: does every paying (then promoted) therapist get inquiries?
 // A coverage chip per tier for the selected period, plus the 30-day "starving"
 // list — who to act on (promote harder / point campaigns at their region).
-function CoverageChip({ label, covered, total }: { label: string; covered: number; total: number }) {
+function CoverageChip({ label, covered, total, fromAds }: { label: string; covered: number; total: number; fromAds: number }) {
   const ratio = total > 0 ? covered / total : 1;
   const cls =
     ratio >= 1 ? "bg-green-100 text-green-800 border-green-200"
@@ -204,12 +243,129 @@ function CoverageChip({ label, covered, total }: { label: string; covered: numbe
         {num(covered)}<span className="text-sm font-bold opacity-60"> / {num(total)}</span>
       </div>
       <div className="text-xs font-semibold">{label}</div>
+      <div className="mt-1.5 border-t border-black/10 pt-1 text-[11px] font-semibold opacity-75">
+        מתוכם {num(fromAds)} מגוגל אדס
+      </div>
+    </div>
+  );
+}
+
+// רובריקת המרכזים הטיפוליים - נפרדת לגמרי מ"מקודמים במתנה".
+//
+// למה נפרדת: מרכז הוא **לקוח משלם**. עד 21/8/2026 מטפליו נספרו כמקודמי
+// מתנה (הסינון היה "כל מי שאינו paid"), ולכן מרכז ששילם הוצג כמי שקיבל
+// חשיפה חינם - וגם מדד כיסוי הפניות של הלקוחות המשלמים יצא נמוך מהאמת.
+//
+// שתי רמות: שורה מסכמת לכל מכון, ופירוט מטפליו בלחיצה - כי לשאלה "מה
+// המכון מקבל" יש שתי תשובות שונות: הסך הכולל, ומי בתוכו מייצר ומי שקוף.
+function CentersPanel({ b }: { b: CentersBlock }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!b?.totals || b.centers.length === 0) return null;
+  const t = b.totals;
+  return (
+    <div className="mb-5 rounded-2xl border-2 border-indigo-200 bg-white p-5">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-black text-stone-800">🏢 מרכזים טיפוליים</h2>
+        <span className="text-xs text-stone-400">לקוחות משלמים - נספרים בנפרד ממקודמי מתנה</span>
+      </div>
+      <p className="mb-3 text-xs text-stone-500">
+        {num(t.centers)} מרכזים · {num(t.promoted)} מטפלים מקודמים דרכם
+        {t.monthly > 0 && <> · ₪{num(Math.round(t.monthly))} לחודש</>}
+      </p>
+      <div className="mb-4 flex flex-wrap gap-2">
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5">
+          <div className="text-xl font-black text-indigo-900">{num(t.views30)}</div>
+          <div className="text-xs font-semibold text-stone-600">צפיות פרופיל (30 י׳)</div>
+        </div>
+        <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 px-4 py-2.5">
+          <div className="text-xl font-black text-indigo-900">{num(t.contacts30)}</div>
+          <div className="text-xs font-semibold text-stone-600">לחיצות ליצירת קשר (30 י׳)</div>
+        </div>
+        <div className={`rounded-xl border px-4 py-2.5 ${t.starving > 0 ? "border-red-200 bg-red-50/60" : "border-stone-200 bg-stone-50"}`}>
+          <div className={`text-xl font-black ${t.starving > 0 ? "text-red-700" : "text-stone-500"}`}>{num(t.starving)}</div>
+          <div className="text-xs font-semibold text-stone-600">ללא פנייה מעל 30 יום</div>
+          <div className="text-[10px] text-stone-400">מי שקודם החודש אינו נספר</div>
+        </div>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-stone-200 text-xs text-stone-500">
+            <th className="px-2 py-1.5 text-right font-semibold">מרכז</th>
+            <th className="px-2 py-1.5 text-center font-semibold">מסלול</th>
+            <th className="px-2 py-1.5 text-center font-semibold">מקודמים</th>
+            <th className="px-2 py-1.5 text-center font-semibold">צפיות 30 י׳</th>
+            <th className="px-2 py-1.5 text-center font-semibold">פניות 30 י׳</th>
+            <th className="px-2 py-1.5 text-center font-semibold">שקטים</th>
+          </tr>
+        </thead>
+        <tbody>
+          {b.centers.map((c) => (
+            <Fragment key={c.id}>
+              <tr
+                className="cursor-pointer border-b border-stone-100 hover:bg-stone-50"
+                onClick={() => setOpen(open === c.id ? null : c.id)}
+              >
+                <td className="px-2 py-1.5 font-bold text-stone-800">
+                  <span className="text-stone-400">{open === c.id ? "▾ " : "▸ "}</span>{c.name}
+                </td>
+                <td className="px-2 py-1.5 text-center text-xs text-stone-500">
+                  {c.track === "center_entity" ? "ישות אחת" : `לפי מטפלים${c.seats ? ` (${c.seats})` : ""}`}
+                </td>
+                <td className="px-2 py-1.5 text-center text-stone-700">{num(c.promoted)}</td>
+                <td className="px-2 py-1.5 text-center text-stone-700">{num(c.views30)}</td>
+                <td className="px-2 py-1.5 text-center font-bold text-stone-900">{num(c.contacts30)}</td>
+                <td className={`px-2 py-1.5 text-center font-bold ${c.starving > 0 ? "text-red-600" : "text-stone-300"}`}>
+                  {c.starving > 0 ? num(c.starving) : "—"}
+                  {c.tooNew > 0 && <span className="ms-1 text-[10px] font-semibold text-stone-400">({num(c.tooNew)} חדשים)</span>}
+                </td>
+              </tr>
+              {open === c.id && (
+                <tr className="border-b border-stone-100 bg-stone-50">
+                  <td colSpan={6} className="px-3 py-2">
+                    {c.therapists.length === 0 ? (
+                      <span className="text-xs text-stone-400">אין מטפלים מקודמים</span>
+                    ) : (
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="text-stone-400">
+                            <th className="py-1 text-right font-semibold">מטפל/ת</th>
+                            <th className="py-1 text-center font-semibold">צפיות 30 י׳</th>
+                            <th className="py-1 text-center font-semibold">פניות 30 י׳</th>
+                            <th className="py-1 text-center font-semibold">פנייה אחרונה</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {c.therapists.map((x) => (
+                            <tr key={x.id} className="border-t border-stone-200/70">
+                              <td className="py-1 text-stone-700">{x.is_entity ? "🏢 " : ""}{x.name}</td>
+                              <td className="py-1 text-center text-stone-600">{num(x.views30)}</td>
+                              <td className="py-1 text-center font-bold text-stone-800">{num(x.contacts30)}</td>
+                              <td className="py-1 text-center text-stone-500">
+                                {x.daysSinceContact === null
+                                  ? <span className="font-bold text-red-600">מעולם לא</span>
+                                  : `לפני ${num(x.daysSinceContact)} ימים`}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    )}
+                  </td>
+                </tr>
+              )}
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-2 text-[11px] text-stone-400">
+        לניהול המרכזים עצמם (תמחור, מנוי, שיוך מטפלים) - <a href="/admin/centers" className="font-semibold text-[#3D8C8A] hover:underline">עמוד המרכזים</a>.
+      </p>
     </div>
   );
 }
 
 function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
-  const p = c.periods[periodKey] ?? { paid: 0, trial: 0 };
+  const p = c.periods[periodKey] ?? { paid: 0, center: 0, trial: 0, paidAds: 0, centerAds: 0, trialAds: 0 };
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? c.starving : c.starving.slice(0, 6);
   return (
@@ -220,8 +376,12 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
       </div>
       <p className="mb-3 text-xs text-stone-500">כמה מהמטפלים המוצגים קיבלו לפחות פנייה אחת ({periodLabel} אחרונים).</p>
       <div className="mb-4 flex flex-wrap gap-2">
-        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} />
-        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} />
+        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} fromAds={p.paidAds} />
+        {/* מרכזים בשבב נפרד: עד 21/8/2026 הם נספרו בתוך "מתנה", ולכן מרכז
+            משלם הוצג כמי שקיבל חשיפה חינם - וכיסוי הפניות של הלקוחות
+            המשלמים נראה גרוע ממה שהוא. */}
+        <CoverageChip label={`מטפלי מרכזים · קיבלו פנייה ב${periodLabel}`} covered={p.center} total={c.centerTotal} fromAds={p.centerAds} />
+        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} fromAds={p.trialAds} />
       </div>
       {c.starving.length > 0 ? (
         <>
@@ -243,9 +403,11 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
                   <td className="px-2 py-1.5 font-semibold text-stone-700">{s.name}</td>
                   <td className="px-2 text-center">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${
-                      s.tier === "paid" ? "bg-[#FDF6E3] text-[#A87010] border border-[#D49018]/30" : "bg-[#EAF4F3] text-[#2A6462]"
+                      s.tier === "paid" ? "bg-[#FDF6E3] text-[#A87010] border border-[#D49018]/30"
+                        : s.tier === "center" ? "bg-indigo-50 text-indigo-800 border border-indigo-200"
+                        : "bg-[#EAF4F3] text-[#2A6462]"
                     }`}>
-                      {s.tier === "paid" ? "בתשלום" : "מקודם"}
+                      {s.tier === "paid" ? "בתשלום" : s.tier === "center" ? "מרכז" : "מתנה"}
                     </span>
                   </td>
                   {/* Low views → an exposure problem (region/profile); decent views with
@@ -556,6 +718,8 @@ type AdsData = {
 type CampaignFunnelRow = {
   campaign: string;
   sessions: number;
+  /** Distinct sessions that reached a questionnaire's opening screen (8/9/26). */
+  quiz_started?: number;
   quiz_completed: number;
   viewed_profile: number;
   contacts: number;
@@ -728,11 +892,11 @@ function FunnelsCampaigns() {
             })()}
 
           {/* Per-campaign funnel: billed clicks -> site sessions -> profile view -> contact (by type + source) */}
-          {campFunnel && campFunnel.some((r) => r.campaign.startsWith("g-")) && (
+          {campFunnel && campFunnel.some((r) => isPaidCampaign(r.campaign)) && (
             <div className="mb-5 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
               <h3 className="mb-1 text-base font-black text-stone-800">משפך לפי קמפיין ממומן</h3>
               <p className="mb-3 text-xs text-stone-500">
-                מה עשו מי שהגיעו מכל קמפיין: קליקים בגוגל ← כניסות לאתר ← מילאו שאלון ← צפו בפרופיל ← פנו (לפי סוג ומקור).
+                מה עשו מי שהגיעו מכל קמפיין: קליקים ← כניסות לאתר ← התחילו שאלון ← מילאו שאלון ← צפו בפרופיל ← פנו (לפי סוג ומקור).
               </p>
               <table className="w-full text-sm">
                 <thead>
@@ -740,6 +904,7 @@ function FunnelsCampaigns() {
                     <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
                     <th className="px-2 py-2 text-center font-semibold">קליקים (גוגל)</th>
                     <th className="px-2 py-2 text-center font-semibold">כניסות לאתר</th>
+                    <th className="px-2 py-2 text-center font-semibold">התחילו שאלון</th>
                     <th className="px-2 py-2 text-center font-semibold">מילאו שאלון</th>
                     <th className="px-2 py-2 text-center font-semibold">צפו בפרופיל</th>
                     <th className="px-2 py-2 text-center font-semibold">פנו (אנשים)</th>
@@ -751,7 +916,7 @@ function FunnelsCampaigns() {
                 </thead>
                 <tbody>
                   {campFunnel
-                    .filter((r) => r.campaign.startsWith("g-"))
+                    .filter((r) => isPaidCampaign(r.campaign))
                     .map((r) => {
                       // Billed clicks from Google Ads = the REAL top-of-funnel. Site
                       // "sessions" over-counts (bots + our own setup/test loads that
@@ -775,6 +940,7 @@ function FunnelsCampaigns() {
                             {billed != null ? num(billed) : "—"}
                           </td>
                           <td className="px-2 text-center text-stone-400">{num(r.sessions)}</td>
+                          <td className="px-2 text-center font-semibold text-stone-700">{num(r.quiz_started ?? 0)}</td>
                           <td className="px-2 text-center text-stone-600">{num(r.quiz_completed)}</td>
                           <td className="px-2 text-center text-stone-600">{num(r.viewed_profile)}</td>
                           <td className="px-2 py-1 text-center">
@@ -989,6 +1155,23 @@ function FunnelsCampaigns() {
               <p className="text-sm text-stone-400">אין עדיין פניות מתויגות בקמפיין לטווח זה.</p>
             )}
           </div>
+
+          <ContactDestinations
+            channel="google_paid"
+            showCampaign
+            title="לאן הלכו הפניות מגוגל בתשלום"
+            note="לכל קמפיין - מי קיבל בפועל את הלחיצה, באיזה מסלול הוא נמצא, והאם הלחיצה באה מתוצאות ההתאמה או מעמוד הפרופיל."
+          />
+
+          {/* The two scoped tables above and on /admin/seo cover google_paid and
+              google_organic - 247 of 328 clicks all time. The other 81 (ישיר 42,
+              הפניה 11, פייסבוק 14, ריק 11, אחר 3) appear in neither, and 20 of
+              them came through the matcher. This is the only view whose numbers
+              match what a therapist sees on their own profile page. */}
+          <ContactDestinations
+            title="לאן הלכו הפניות - כל הערוצים"
+            note="התמונה המלאה, בלי סינון ערוץ. זו הטבלה היחידה שמספריה זהים למה שמופיע בעמוד המטפל/ת, ובה נספרות גם פניות מתנועה ישירה, מהפניות ומפייסבוק שלא מופיעות בשתי הטבלאות המסוננות."
+          />
         </>
       )}
     </>
@@ -1340,8 +1523,11 @@ export default function MarketingPage() {
           <>
             {/* KPI row — DATA FIRST */}
             <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+              {/* "כל המטפלים" במפורש: המספר סופר גם חינמיים וגם מרכזים, בעוד
+                  פאנל הכיסוי שמתחתיו סופר משלמים בלבד - בלי התיוג שני המספרים
+                  נראים כסתירה (נשאל בפועל, 19/8/26: "לאן הלכו שאר הפניות?"). */}
               <KpiCard
-                label={`סה״כ פניות (${periodLabel})`}
+                label={`סה״כ פניות - כל המטפלים (${periodLabel})`}
                 value={num(k.contacts)}
                 sub={<Delta cur={k.contacts} prev={k.contactsPrev} unit={periodLabel === "יומיים" ? "היומיים" : "טווח"} />}
               />
@@ -1352,6 +1538,7 @@ export default function MarketingPage() {
 
             {/* Contact coverage of paying therapists — the core goal */}
             {data.coverage && <CoveragePanel c={data.coverage} periodKey={period} periodLabel={periodLabel} />}
+            {data.centers && <CentersPanel b={data.centers} />}
 
             {/* Supply tier breakdown */}
             <SupplyPanel s={data.supply} />
@@ -1403,8 +1590,8 @@ export default function MarketingPage() {
                               {info.explain}
                               {t.metric === "therapists_total" && (
                                 <span className="mt-1 block font-semibold text-[#2A6462]">
-                                  מתוכם {num(data.supply.paid)} בתשלום, {num(data.supply.trial)} מקודמים במתנה,{" "}
-                                  {num(data.supply.free)} חינמיים. ({num(data.supply.incomplete)} הרשמות לא-גמורות לא נספרות.)
+                                  מתוכם {num(data.supply.paid)} בתשלום, {num(data.supply.center)} דרך מרכזים,{" "}
+                                  {num(data.supply.trial)} מקודמים במתנה, {num(data.supply.free)} חינמיים. ({num(data.supply.incomplete)} הרשמות לא-גמורות לא נספרות.)
                                 </span>
                               )}
                               {t.metric === "churn_max_pct" && (

@@ -51,6 +51,15 @@ type StatsResponse = {
   match_impressions?: { all_time: number };
   directory_impressions?: { all_time: number };
   all_time_contacts?: { total: number; match: number; directory: number; messages: number; clicks: number };
+  // אותם מדדים, חתוכים מרגע הקידום. null למי שאין לו תאריך קידום.
+  since_promotion?: {
+    since: string;
+    profile_views: number;
+    match_impressions: number;
+    directory_impressions: number;
+    contacts: number;
+    messages: number;
+  } | null;
   enriched?: EnrichedStatsData;
 };
 
@@ -93,6 +102,10 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
   const totalImpressions = impressionsValue + dirImpressionsValue;
   const conversionPct = totalImpressions > 0 ? Math.round((viewsValue / totalImpressions) * 100) : null;
   const contacts = stats?.all_time_contacts;
+  const promo = stats?.since_promotion ?? null;
+  const promoDate = promo
+    ? new Date(promo.since).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" })
+    : null;
 
   // ── Paying/promoted: cumulative numbers since joining - no period splits
   // (product decision 19/7: the totals tell the real value story; month/week
@@ -101,7 +114,10 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
     return (
       <div className="mb-6 rounded-2xl border border-[#E8E0D8] bg-white p-6">
         <h2 className="text-lg font-extrabold text-stone-900">הפרופיל שלך במספרים</h2>
-        <p className="text-xs text-stone-500 mt-0.5 mb-4">נתונים מצטברים מאז הצטרפותך לאתר</p>
+        <p className="text-xs text-stone-500 mt-0.5 mb-4">
+          נתונים מצטברים מאז הצטרפותך לאתר
+          {promoDate ? `, והשורה השנייה - מאז שהפרופיל שלך קודם (${promoDate})` : ""}
+        </p>
 
         {loadingStats ? (
           <div className="text-sm text-stone-400 py-4 text-center">טוען נתונים...</div>
@@ -128,6 +144,31 @@ function ContactStats({ stats, loadingStats, isPaying }: { stats: StatsResponse 
                 <div className="text-xs text-purple-600 font-semibold mt-1">👁 כניסות לפרופיל</div>
                 <div className="text-[10px] text-purple-500 mt-0.5">נכנסו לעמוד שלך</div>
               </div>
+              {/* המספרים למעלה מצטברים מאז ההצטרפות לאתר, כלומר כוללים גם
+                  את התקופה החינמית. השורה הזו מפרידה את מה שנצבר מאז
+                  הקידום - זה מה שעונה על "מה הקידום עשה לי". */}
+              {promo && (
+                <>
+                  <div className="rounded-xl border border-indigo-100 bg-white p-2 text-center">
+                    <div className="text-sm font-black text-indigo-700">
+                      {promo.match_impressions.toLocaleString("he-IL")}
+                    </div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">מאז הקידום</div>
+                  </div>
+                  <div className="rounded-xl border border-teal-100 bg-white p-2 text-center">
+                    <div className="text-sm font-black text-teal-700">
+                      {promo.directory_impressions.toLocaleString("he-IL")}
+                    </div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">מאז הקידום</div>
+                  </div>
+                  <div className="rounded-xl border border-purple-100 bg-white p-2 text-center">
+                    <div className="text-sm font-black text-purple-700">
+                      {promo.profile_views.toLocaleString("he-IL")}
+                    </div>
+                    <div className="text-[10px] text-stone-500 mt-0.5">מאז הקידום</div>
+                  </div>
+                </>
+              )}
             </div>
             {conversionPct !== null && (
               <div className="text-xs text-stone-500 text-center mb-4">

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { PublicTherapist } from "./TherapistsClient";
+import { publicTypeOverride } from "@/app/lib/gender-text";
 import { REGION_PRICE_RANGE, REGION_PUBLIC_SERVICES } from "@/app/lib/region-public-services";
 import type { LocalArticle } from "@/app/lib/local-articles";
 
@@ -36,7 +37,14 @@ function typeBreakdown(therapists: PublicTherapist[]): { label: string; count: n
   const counts = new Map<string, number>();
   for (const t of therapists) {
     const main = t.therapist_types?.[0];
-    if (main) counts.set(main, (counts.get(main) ?? 0) + 1);
+    if (!main) continue;
+    // הכלל מוחל לכל אדם בנפרד, ואז מקבצים: עיר עם שלושה שמטפלים במבוגרים
+    // ואחת שרק בילדים תציג את שתי הקבוצות נכון. בלי זה השורה הזו הייתה
+    // אומרת "מטפל/ת בהבעה ויצירה" בזמן שכל הכרטיסים באותו עמוד אומרים
+    // "פסיכותרפיסטית". מגדר null בכוונה - זו ספירה ולא אדם, ולכן הצורה
+    // הכוללת.
+    const label = publicTypeOverride(main, null, t.age_groups) ?? main;
+    counts.set(label, (counts.get(label) ?? 0) + 1);
   }
   return [...counts.entries()]
     .map(([label, count]) => ({ label, count }))
@@ -254,7 +262,43 @@ export default function CitySeoSection({
       <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
         {headings[h % headings.length]}
       </h2>
-      <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
+      {/* data-nosnippet: still indexed for ranking, but Google may not quote it.
+          This paragraph kept winning the snippet over the intro line, which is
+          the one written to earn the click. */}
+      <p className="text-[15px] leading-8 text-stone-600 mb-6" data-nosnippet>{statsParagraph}</p>
+
+      {/* One link, three phrasings, picked by the same place hash as the
+          headings. Every landing page claims the questionnaire was built by
+          clinicians and rests on research; this points at the page that
+          substantiates it. Deliberately a LINK and not a repeated block of
+          prose: 25% of a city page's sentences are already identical across
+          places, and a shared paragraph would have pushed that past 40%. */}
+      <p className="text-[15px] leading-8 text-stone-600 mb-6">
+        {h % 3 === 0 ? (
+          <>
+            רוצים לדעת איך ההתאמה נעשית?{" "}
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              כתבנו בפירוט על המודל שמאחורי השאלון
+            </Link>
+            .
+          </>
+        ) : h % 3 === 1 ? (
+          <>
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              איך עובדת ההתאמה בטיפול חכם
+            </Link>{" "}
+            - על מה המודל נשען, מה השאלון מודד, ומה הוא לא עושה.
+          </>
+        ) : (
+          <>
+            לפני שממלאים את השאלון, אפשר לקרוא{" "}
+            <Link href="/research/how-matching-works" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+              מה עומד מאחורי ההתאמה ועל אילו מקורות היא נשענת
+            </Link>
+            .
+          </>
+        )}
+      </p>
 
       {articles.length > 0 && (
         <div className="mb-8">

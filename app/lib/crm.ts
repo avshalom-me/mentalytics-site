@@ -19,15 +19,29 @@ export const LEAD_TYPES = [
   { value: "general", label: "כללי" },
 ] as const;
 
+// תחנות הצינור (הוחלפו 30/8/26; הערכים הישנים מופו במיגרציה). עסקה
+// נעה שמאלה תחנה-תחנה, ו-closed מגיע גם אוטומטית כשמזוהה מנוי פעיל.
 export const DEAL_STAGES = [
-  { value: "inquiry", label: "פנייה" },
-  { value: "meeting", label: "פגישה" },
-  { value: "pilot", label: "פיילוט" },
-  { value: "proposal", label: "הצעה" },
-  { value: "contract", label: "חוזה" },
-  { value: "won", label: "נסגרה ✓" },
+  { value: "first_contact", label: "פנייה ראשונית" },
+  { value: "negotiation", label: "משא ומתן" },
+  { value: "link_sent", label: "נשלח לינק הרשמה" },
+  { value: "closed", label: "הרשמה נסגרה ✓" },
   { value: "lost", label: "אבודה" },
 ] as const;
+
+// למה עסקה נפלה. רשימה סגורה וקצרה - טקסט חופשי לא ניתן לספירה, וזו
+// בדיוק השאלה שרוצים לענות עליה בעוד חצי שנה.
+export const LOST_REASONS = [
+  { value: "price", label: "יקר מדי" },
+  { value: "competitor", label: "הלכו למתחרה" },
+  { value: "not_relevant", label: "לא רלוונטי" },
+  { value: "no_response", label: "הפסיקו להגיב" },
+  { value: "timing", label: "לא בתזמון הנכון" },
+  { value: "other", label: "אחר" },
+] as const;
+
+/** התחנות שמוציאות עסקה מהצינור הפתוח. */
+export const CLOSED_DEAL_STAGES = ["closed", "lost"] as const;
 
 export const DEAL_TYPES = [
   { value: "school", label: "בית ספר / חינוך" },
@@ -37,6 +51,21 @@ export const DEAL_TYPES = [
   { value: "center", label: "מרכז טיפולי" },
   { value: "other", label: "אחר" },
 ] as const;
+
+// שלושת מצבי המשימה. "open" הוא "משימה חדשה" ולא שם חדש בכוונה: כל המשימות
+// הקיימות כבר שמורות ככה, ושינוי שם היה דורש מיגרציית נתונים בשביל תווית.
+export const TASK_STATUSES = [
+  { value: "open", label: "משימה חדשה", cls: "bg-stone-50 border-stone-200 text-stone-600" },
+  { value: "in_progress", label: "בתהליך", cls: "bg-amber-50 border-amber-200 text-amber-700" },
+  { value: "done", label: "בוצע", cls: "bg-teal-50 border-teal-200 text-teal-700" },
+] as const;
+
+/**
+ * מה נחשב משימה חיה. חייב לשמש בכל מקום שסופר או מציג משימות פתוחות -
+ * לפני שהמצב "בתהליך" נוסף, שאילתות סיננו status = "open" בלבד, ומשימה
+ * שמישהו התחיל הייתה נעלמת מתור העבודה ומהמונה בלי שאיש ישים לב.
+ */
+export const ACTIVE_TASK_STATUSES = ["open", "in_progress"] as const;
 
 export const TASK_PRIORITIES = [
   { value: "high", label: "גבוהה", cls: "bg-red-50 border-red-200 text-red-700" },

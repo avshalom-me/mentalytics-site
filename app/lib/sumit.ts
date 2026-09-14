@@ -188,6 +188,10 @@ export async function createSubscription(opts: {
   // promo passes the discounted price here and the daily cron later updates
   // the standing order back to SUBSCRIPTION_BASE_PRICE.
   unitPrice?: number;
+  // "YYYY-MM-DD" - מוגדר רק במסלול ההצטרפות עם חודשי מתנה. הכרטיס נשמר
+  // והוראת הקבע נוצרת עכשיו, אבל החיוב הראשון יוצא בתאריך הזה. אותו
+  // מנגנון בדיוק שכבר עובד אצל המרכזים.
+  firstChargeDate?: string;
 }): Promise<SubscriptionChargeResult> {
   const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
     Customer: {
@@ -211,6 +215,7 @@ export async function createSubscription(opts: {
         // 999 = effectively "until cancelled". We control cancellation via
         // the cancelSubscription endpoint below.
         Recurrence: 999,
+        ...(opts.firstChargeDate ? { Date_Start: opts.firstChargeDate } : {}),
       },
     ],
     VATIncluded: false,
@@ -230,7 +235,12 @@ export async function createSubscription(opts: {
   // just created on its own when the initial charge is declined (observed
   // live on both real declines: item born with Status=1=Cancelled), so
   // there is nothing to clean up remotely.
-  assertChargeSucceeded(charge, "subscription charge");
+  // עם Date_Start עתידי אין תשלום מיידי לוודא: הצלחת המעטפת פירושה
+  // שהוראת הקבע נוצרה והכרטיס נשמר. בלי התנאי הזה כל הצטרפות במסלול
+  // המתנה הייתה נכשלת כאילו הכרטיס נדחה.
+  if (!opts.firstChargeDate) {
+    assertChargeSucceeded(charge, "subscription charge");
+  }
 
   // The standing-order id arrives in RecurringCustomerItemIDs. (An earlier
   // version read a nonexistent `RecurringItemID` wire field - that's why

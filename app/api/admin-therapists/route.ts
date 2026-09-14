@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelSubscription, listRecurringForCustomer, type RecurringItem } from "@/app/lib/sumit";
+import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
+import {
+  cancelSubscription,
+  listRecurringForCustomer,
+  SUMIT_RECURRING_ACTIVE_STATUSES,
+  type RecurringItem,
+} from "@/app/lib/sumit";
 import { writeAudit } from "@/app/lib/audit";
 import {
   sendPromotionEndedEmail,
@@ -37,6 +44,9 @@ type TherapistRow = {
   cogfun_age_groups: string[] | null;
   education: string | null;
   experience: string | null;
+  license_number: string | null;
+  publication_links: string[] | null;
+  price: number | null;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -110,6 +120,9 @@ async function buildTherapistsResponse(onlyId?: string) {
       cogfun_age_groups,
       education,
       experience,
+      license_number,
+      publication_links,
+      price,
       style_q1,
       style_q2,
       activity_level,
@@ -218,9 +231,16 @@ async function buildTherapistsResponse(onlyId?: string) {
   // parallel with URL signing) instead of pulling every row and counting in
   // memory — the views table grows fast during campaigns and blew past the
   // 1000-row cap. Falls back to the row-pull method if the RPC isn't deployed.
-  type Eng = { v30: number; v60: number; vt: number; c30: number; c60: number; ct: number };
+  // ch30 = פילוח ערוץ של הצפיות ב-30 יום. על *צפיות* ולא על פניות, כי אצל
+  // מטפל רעב הפניות אפס ממילא - מקור החשיפה הוא מה שמבדיל בין רעב תקציבי
+  // (הכל מקמפיין) לבין פרופיל שלא מדורג אורגנית.
+  type Eng = {
+    v30: number; v60: number; vt: number; c30: number; c60: number; ct: number;
+    ch30: { paid: number; organic: number; direct: number; other: number };
+  };
   const engByTherapist: Record<string, Eng> = {};
-  const engOf = (id: string): Eng => (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0 });
+  const engOf = (id: string): Eng =>
+    (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0, ch30: { paid: 0, organic: 0, direct: 0, other: 0 } });
   const subByTherapist: Record<
     string,
     { status: string; current_period_end: string | null; promo_reverts_at: string | null }
@@ -236,6 +256,10 @@ async function buildTherapistsResponse(onlyId?: string) {
         contacts_30d: number | string;
         contacts_60d: number | string;
         contacts_total: number | string;
+        views_30d_paid?: number | string;
+        views_30d_organic?: number | string;
+        views_30d_direct?: number | string;
+        views_30d_other?: number | string;
       }>) {
         engByTherapist[row.therapist_id] = {
           v30: Number(row.views_30d) || 0,
@@ -244,6 +268,13 @@ async function buildTherapistsResponse(onlyId?: string) {
           c30: Number(row.contacts_30d) || 0,
           c60: Number(row.contacts_60d) || 0,
           ct: Number(row.contacts_total) || 0,
+          // אופציונליים: אם ה-RPC בגרסה ישנה יותר, הפילוח יוצא אפסים ולא קורס.
+          ch30: {
+            paid: Number(row.views_30d_paid) || 0,
+            organic: Number(row.views_30d_organic) || 0,
+            direct: Number(row.views_30d_direct) || 0,
+            other: Number(row.views_30d_other) || 0,
+          },
         };
       }
     } else {
@@ -334,6 +365,9 @@ async function buildTherapistsResponse(onlyId?: string) {
         cogfun_age_groups: t.cogfun_age_groups ?? [],
         education: t.education ?? "",
         experience: t.experience ?? "",
+        license_number: t.license_number ?? null,
+        publication_links: t.publication_links ?? [],
+        price: t.price ?? null,
         style_q1: t.style_q1 ?? null,
         style_q2: t.style_q2 ?? null,
         activity_level: t.activity_level ?? null,
@@ -361,6 +395,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         contacts_30d: engByTherapist[t.id]?.c30 ?? 0,
         contacts_60d: engByTherapist[t.id]?.c60 ?? 0,
         contacts_total: engByTherapist[t.id]?.ct ?? 0,
+        views_30d_by_channel: engByTherapist[t.id]?.ch30 ?? { paid: 0, organic: 0, direct: 0, other: 0 },
         subscription: subByTherapist[t.id] ?? null,
         center_account_id: t.center_account_id ?? null,
         center_name: t.center_account_id ? centerNameById.get(t.center_account_id) ?? null : null,
@@ -579,8 +614,14 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email, profile_photo_path, regions, therapist_types, training_areas")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      // מטפל של מרכז: הבקשה מגיעה למרכז, כי המרכז הוא היחיד שיכול לערוך
+      // את הפרופיל (ראו therapist-recipient).
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
       }
       const { count: certCount } = await supabaseAdmin
         .from("therapist_certificates")
@@ -594,7 +635,7 @@ export async function PATCH(request: Request) {
           ? body.message.trim().slice(0, 4000)
           : defaultCompletionMessage(missing);
       const sent = await sendTherapistCompletionRequestEmail({
-        to: t.email,
+        to: target.to,
         name: t.full_name ?? "",
         message,
       });
@@ -620,7 +661,7 @@ export async function PATCH(request: Request) {
         after: { missing, message },
         reason: "admin requested profile completion",
       });
-      return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt });
+      return NextResponse.json({ ok: true, id, missing, completion_requested_at: requestedAt, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin-triggered GENERAL message — a free-text note with a custom subject
@@ -633,8 +674,12 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
       }
       const message = typeof body.message === "string" ? body.message.trim().slice(0, 4000) : "";
       const subject = typeof body.subject === "string" ? body.subject.trim().slice(0, 200) : "";
@@ -642,7 +687,7 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ ok: false, error: "message required" }, { status: 400 });
       }
       const sent = await sendTherapistAdminMessageEmail({
-        to: t.email,
+        to: target.to,
         name: t.full_name ?? "",
         subject,
         message,
@@ -660,7 +705,7 @@ export async function PATCH(request: Request) {
         after: { subject, message },
         reason: "admin sent a message to the therapist",
       });
-      return NextResponse.json({ ok: true, id });
+      return NextResponse.json({ ok: true, id, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin-triggered "write an article, get 2 months promoted free" invite —
@@ -673,10 +718,14 @@ export async function PATCH(request: Request) {
         .select("id, full_name, email")
         .eq("id", id)
         .single();
-      if (!t || !t.email) {
-        return NextResponse.json({ ok: false, error: "therapist not found or has no email" }, { status: 404 });
+      if (!t) {
+        return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
       }
-      const sent = await sendArticleInviteEmail({ to: t.email, name: t.full_name ?? "" });
+      const target = await operationalMailTarget(id);
+      if (!target.to) {
+        return NextResponse.json({ ok: false, error: "לא נמצאה כתובת מייל למטפל/ת או למרכז שלו/ה" }, { status: 404 });
+      }
+      const sent = await sendArticleInviteEmail({ to: target.to, name: t.full_name ?? "" });
       if (!sent.ok) {
         return NextResponse.json({ ok: false, error: sent.error || "email failed" }, { status: 502 });
       }
@@ -698,7 +747,7 @@ export async function PATCH(request: Request) {
         after: {},
         reason: "admin invited the therapist to write an article for a promo gift",
       });
-      return NextResponse.json({ ok: true, id, article_invite_sent_at: invitedAt });
+      return NextResponse.json({ ok: true, id, article_invite_sent_at: invitedAt, sent_to: target.to, via_center: target.viaCenter?.name ?? null });
     }
 
     // Admin deletes a single certificate (e.g. the therapist uploaded the wrong
@@ -774,17 +823,26 @@ export async function PATCH(request: Request) {
     // Closes the gap where a standing order is still ACTIVE at Sumit but the
     // local subscription is already 'cancelled' — the status-change cancel
     // paths only look at status='active' subs, so they can never reach it.
-    // Here we check EVERY subscription that carries a Sumit recurring id
-    // (regardless of local status) and cancel any that are still live, so an
-    // admin isn't blind to a charge that keeps running. The daily cron does
-    // the same sweep automatically; this is the immediate, per-therapist
-    // version with a verified cancel.
+    //
+    // ⚠️ הביטול חייב לדלג על מנוי שפעיל אצלנו. הגרסה הקודמת שלפה כל שורת
+    // subscriptions עם מזהה, בלי סינון סטטוס, ולכן אצל מטפל שמשלם עכשיו היא
+    // ביטלה דווקא את הוראת הקבע התקינה שלו: המנוי הפעיל נסגר ב-Sumit, סומן
+    // מקומית כמבוטל, ולמחרת הסנכרון היומי הדיח אותו ושלח לו מייל "הקידום
+    // הסתיים" - מטפל משלם שלא עשה דבר. וגרוע מכך, במקרה של כפילות (שתי
+    // הוראות חיות) זו שנשארה מחייבת היא דווקא העודפת, שאינה רשומה אצלנו.
+    // מכאן: מבטלים אך ורק הוראות של מנויים שכבר אינם פעילים אצלנו. הוראה
+    // ששייכת למנוי פעיל מדווחת בלבד.
     if (body.action === "reconcile_sumit") {
-      const { data: subs } = await supabaseAdmin
+      const { data: allSubs } = await supabaseAdmin
         .from("subscriptions")
         .select("id, status, morning_token_id")
         .eq("therapist_id", id)
         .not("morning_token_id", "is", null);
+
+      // הקישוריות נקבעת לפי *כל* השורות, גם הפעילות — אחרת הוראה תקינה של
+      // מטפל משלם הייתה מדווחת כ"יתומה, בדקו ידנית" ומפחידה לחינם.
+      const subs = (allSubs ?? []).filter((s) => s.status !== "active");
+      const activeSubs = (allSubs ?? []).filter((s) => s.status === "active");
 
       const result = {
         checked: 0,
@@ -793,16 +851,17 @@ export async function PATCH(request: Request) {
         notFound: 0,
         failed: 0,
         unlinkedActive: 0,
+        keptActive: 0,
         details: [] as string[],
       };
 
-      if (!subs || subs.length === 0) {
+      if (subs.length === 0 && activeSubs.length === 0) {
         // No local subs with a token — but there could still be an orphaned
         // standing order at Sumit with no local record. Surface it.
         try {
           const items = await listRecurringForCustomer({ externalIdentifier: id, includeInactive: true });
           for (const item of items) {
-            if (item.Status === 0) {
+            if (SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
               result.unlinkedActive++;
               result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
             }
@@ -833,15 +892,9 @@ export async function PATCH(request: Request) {
           result.details.push(`הוראת קבע ${recurringId}: לא נמצאה ב-Sumit תחת המטפל הזה — ייתכן שאינה מקושרת לחשבון או שזהו מזהה ישן שאינו פעיל.`);
           continue;
         }
-        if (target.Status !== 0) {
+        if (!SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(target.Status))) {
           result.alreadyInactive++;
           result.details.push(`הוראת קבע ${recurringId}: כבר לא פעילה ב-Sumit.`);
-          if (sub.status === "active") {
-            await supabaseAdmin
-              .from("subscriptions")
-              .update({ status: "cancelled", updated_at: new Date().toISOString() })
-              .eq("id", sub.id);
-          }
           continue;
         }
 
@@ -878,10 +931,26 @@ export async function PATCH(request: Request) {
         }
       }
 
-      // Surface any ACTIVE Sumit order not linked to a local sub (true orphan).
-      const localTokens = new Set(subs.map((s) => String(s.morning_token_id)));
+      // הוראות של מנוי שפעיל אצלנו: מדווחות, לא נוגעים בהן.
+      for (const sub of activeSubs) {
+        const recurringId = String(sub.morning_token_id);
+        const item = items.find((i) => String(i.ID) === recurringId);
+        if (item && SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
+          result.keptActive++;
+          result.details.push(`הוראת קבע ${recurringId}: פעילה ב-Sumit ושייכת למנוי הפעיל — לא נגענו בה ✓`);
+        } else if (!item) {
+          result.notFound++;
+          result.details.push(`⚠️ הוראת קבע ${recurringId}: רשומה אצלנו כמנוי פעיל אך לא נמצאה ב-Sumit — בדקו ידנית.`);
+        } else {
+          result.alreadyInactive++;
+          result.details.push(`⚠️ הוראת קבע ${recurringId}: המנוי פעיל אצלנו אך ההוראה כבר אינה פעילה ב-Sumit (סטטוס ${item.Status}) — בדקו ידנית.`);
+        }
+      }
+
+      // Surface any ACTIVE Sumit order not linked to ANY local sub (true orphan).
+      const localTokens = new Set((allSubs ?? []).map((s) => String(s.morning_token_id)));
       for (const item of items) {
-        if (item.Status === 0 && !localTokens.has(String(item.ID))) {
+        if (SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status)) && !localTokens.has(String(item.ID))) {
           result.unlinkedActive++;
           result.details.push(`⚠️ הוראת קבע ${item.ID}: פעילה ב-Sumit אך אינה מקושרת לרשומה מקומית — בדקו ידנית.`);
         }
@@ -1007,14 +1076,32 @@ export async function PATCH(request: Request) {
 
     // עדכון שדות מלאים (עריכה)
     if (body.fields) {
-      const allowed = ["full_name","email","phone","bio","gender","online","therapist_types","training_areas","assessment_types","regions","cultural_prefs","arrangements","accepting_new_patients"];
+      // הרשימה המשותפת ולא רשימה משלנו. כשהיא הייתה כתובה כאן בנפרד היא
+      // נשארה מאחור: תשעה שדות שהמטפל, המרכז וטופס המילוי יכלו לערוך -
+      // ובהם קבוצות גיל ושפות - פשוט לא נשמרו מהאדמין. עכשיו שדה חדש
+      // ב-THERAPIST_EDIT_FIELDS מגיע לכאן מעצמו.
+      // שלושת שדות הסגנון מטופלים בלולאה שמתחת (המרה למספר תקין), ולכן
+      // מוחרגים כאן כדי שלא ייכתבו פעמיים.
+      const STYLE_KEYS = ["style_q1", "style_q2", "activity_level"] as const;
+      const allowed = CENTER_THERAPIST_EDIT_FIELDS.filter(
+        (k) => !(STYLE_KEYS as readonly string[]).includes(k),
+      );
       const update: Record<string, unknown> = {};
       for (const key of allowed) {
         if (key in body.fields) update[key] = body.fields[key];
       }
       // Therapeutic-style answers (1–7 scale). Coerce to a valid smallint or
       // null so an out-of-range/blank value clears the field rather than erroring.
-      for (const key of ["style_q1","style_q2","activity_level"]) {
+      // חובה בכל נתיב כתיבה: הקישורים מרונדרים כעוגנים אמיתיים בפרופיל
+      // הציבורי, ובלי הסינון הזה "javascript:" היה מגיע לשם.
+      if ("publication_links" in update) {
+        update.publication_links = sanitizePublicationLinks(update.publication_links);
+      }
+      if ("price" in update) {
+        const n = Number(update.price);
+        update.price = Number.isFinite(n) && n >= 0 ? n : null;
+      }
+      for (const key of STYLE_KEYS) {
         if (key in body.fields) {
           const n = Number(body.fields[key]);
           update[key] = Number.isInteger(n) && n >= 1 && n <= 7 ? n : null;

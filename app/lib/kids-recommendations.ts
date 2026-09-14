@@ -94,7 +94,11 @@ const TREATMENT_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /(טיפול|תרפיה) בהבעה ויצירה/, key: "טיפול בהבעה ויצירה", label: "טיפול בהבעה ויצירה" },
   { rx: /קבוצה חברתית/, key: "קבוצה חברתית", label: "קבוצה חברתית" },
   { rx: /טיפול ויסות חושי|ריפוי בעיסוק|מרפאה בעיסוק/, key: "ריפוי בעיסוק", label: "ריפוי בעיסוק" },
-  { rx: /קלינאית תקשורת|קלינאי תקשורת/, key: "קלינאית תקשורת", label: "קלינאית תקשורת" },
+  // ה-key נשלח כפילטר מול training_areas, ולכן חייב להיות זהה תו-בתו לערך
+  // שבמסד. שם רשום "קלינאות תקשורת", בעוד מנוע הניקוד כותב "קלינאית" - ולכן
+  // 11 ההפניות לקלינאית חיפשו ערך שאף מטפל אינו נושא, ושני המטפלים שכן
+  // מסומנים נכון מעולם לא הוצעו. התווית נשארת בלשון שההורה קורא.
+  { rx: /קלינא(ות|ית|י) תקשורת/, key: "קלינאות תקשורת", label: "קלינאית תקשורת" },
   { rx: /פיזיותרפיסטית רצפת אגן|פיזיותרפיה.*רצפת אגן/, key: "פיזיותרפיה רצפת אגן", label: "פיזיותרפיה רצפת אגן ילדים" },
   { rx: /טיפול בהתמכר/, key: "טיפול בהתמכרויות", label: "טיפול בהתמכרויות" },
   { rx: /טיפול תעסוקתי/, key: "טיפול תעסוקתי", label: "טיפול תעסוקתי" },
@@ -163,7 +167,16 @@ function classifyReferral(text: string): { kind: RecKind; key: string; label: st
   // Professional-type patterns must run before TREATMENT_PATTERNS in case of
   // overlapping wording (e.g. "טיפול ע"י דיאטנית").
   for (const p of PROFESSIONAL_PATTERNS) if (p.rx.test(text)) return { kind: "professional", key: p.key, label: p.label };
-  for (const p of TREATMENT_PATTERNS) if (p.rx.test(text)) return { kind: "treatment", key: p.key, label: p.label };
+  // "בדיקת שמיעה אצל קלינאית תקשורת או רופא אא\"ג" נותנת את הקלינאית ככתובת
+  // לבדיקה אודיולוגית, לא לטיפול בשפה. EXTERNAL_PATTERNS מכיל בדיוק את ההפניה
+  // הזו ("בדיקת שמיעה") אבל רץ אחרי הטיפולים ולכן לא נבדק. כל עוד המפתח לא
+  // תאם למסד ההפניה הזו החזירה אפס מטפלים וההתנגשות לא הורגשה; מרגע שהמפתח
+  // תוקן, בלעדיה ההורה היה מקבל רשימת קלינאיות במקום הפניה לבדיקה.
+  const isHearingTest = /בדיקת שמיעה/.test(text);
+  for (const p of TREATMENT_PATTERNS) {
+    if (isHearingTest && p.key === "קלינאות תקשורת") continue;
+    if (p.rx.test(text)) return { kind: "treatment", key: p.key, label: p.label };
+  }
   for (const p of EXTERNAL_PATTERNS) if (p.rx.test(text)) return { kind: "external", key: p.key, label: p.label };
   // Fallback: short summary of the text
   const compact = text.replace(/\s+/g, " ").trim().slice(0, 80);

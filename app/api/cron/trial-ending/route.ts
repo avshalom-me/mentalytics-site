@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
+import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { sendTrialEndingEmail, trialEndingVariant, type TrialStats } from "@/app/lib/trial-ending-email";
 import { TRIAL_UPGRADE_OFFER_DAYS } from "@/app/lib/promo";
 import { alertRecipients } from "@/app/lib/alert-recipients";
+import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 
 // סיום תקופת מתנה: דוח כל-התקופה + הצעת שדרוג אישית.
 //   3 ימים לפני הסיום  → המייל המרכזי (trial_ending_notified_at)
@@ -103,11 +106,20 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
 
   for (const t of rows) {
     const daysLeft = daysUntil(t.promoted_until, now);
-    const isReminder = daysLeft <= REMINDER_DAYS;
-    // מחוץ לשני החלונות (למשל 2 ימים) - לא עושים כלום.
-    if (!isReminder && daysLeft !== NOTICE_DAYS) continue;
+    if (daysLeft > NOTICE_DAYS) continue; // עוד מוקדם
+
+    // המייל המרכזי קודם תמיד, גם באיחור.
+    //
+    // התנאי הקודם דרש שוויון מדויק ל-3 ימים. כל עוד הקרון רץ כל יום זה
+    // מדויק, אבל יום אחד שנופל מקפיץ את הספירה מ-4 ל-2, והמייל המרכזי -
+    // זה שנושא את הדוח ואת הצעת השדרוג - לא היה יוצא לעולם. המטפל היה
+    // מקבל רק את התזכורת הרזה של היום האחרון. עם 19 מטפלים שפגים בשני
+    // ימים מרוכזים, קרון אחד שנופל היה עולה ביוקר.
+    const isReminder = Boolean(t.trial_ending_notified_at);
+    // המרכזי כבר יצא, ועוד לא הגענו לחלון התזכורת.
+    if (isReminder && daysLeft > REMINDER_DAYS) continue;
     // כל שלב נשלח פעם אחת בלבד.
-    if (isReminder ? t.trial_ending_reminded_at : t.trial_ending_notified_at) continue;
+    if (isReminder && t.trial_ending_reminded_at) continue;
     if (!t.email) { skipped++; continue; }
 
     const since = t.promoted_since ?? t.promoted_until;
@@ -141,15 +153,27 @@ export async function runTrialEndingNotices(opts: { send: boolean; now?: Date })
       continue;
     }
 
+    // מטפל של מרכז - היעד הוא המרכז, שהוא בעל החשבון והיחיד שיכול לפעול
+    // (ראו therapist-recipient). נפתר לפני התצוגה המקדימה ולא אחריה, אחרת
+    // התצוגה מבטיחה נמען אחד וההרצה האמיתית שולחת לאחר.
+    const target = await operationalMailTarget(t.id);
+
     results.push({
-      name: t.full_name, to: t.email, daysLeft, variant,
+      name: t.full_name, to: target.to ?? t.email, daysLeft, variant,
+      ...(target.viaCenter ? { via_center: target.viaCenter.name } : {}),
       stage: isReminder ? "reminder" : "notice", ...stats,
     });
 
     if (!opts.send) continue;
+    if (!target.to) { skipped++; continue; }
+
+    // תבנית מאושרת (הבהרת 19/8): תזכורת סוף המתנה היא התנהגות ותיקה
+    // שהוחלט עליה - השער חוסם רק תבניות שלא אושרו.
+    const gate = automatedSendAllowed(target.to, "trial_ending");
+    if (!gate.allowed) { skipped++; continue; }
 
     const r = await sendTrialEndingEmail({
-      to: t.email, name: t.full_name ?? "", stats, daysLeft, isReminder,
+      to: target.to, name: t.full_name ?? "", stats, daysLeft, isReminder,
     });
     if (r.ok) {
       sent++;
@@ -207,7 +231,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   const send = req.nextUrl.searchParams.get("send") === "confirm";
+  // דופק ליומן הריצות. שלושת הקרונים ששולחים מייל ללקוחות לא נרשמו בשום
+// מקום, ולכן קרון שהפסיק לרוץ היה כשל שקט לחלוטין - איש לא היה יודע עד
+// שמטפל היה שואל למה לא קיבל הודעה. שומר הלילה בודק את הרישום הזה.
+  const runId = await startAgentRun("cron_trial_ending", send ? "send" : "preview");
   const result = await runTrialEndingNotices({ send });
   const { status, ...body } = result as Record<string, unknown> & { status?: number };
+  await finishAgentRun(runId, {
+    status: result.ok === false ? "error" : "ok",
+    summary: `נבדקו ${result.candidates ?? 0} תקופות מתנה, נשלחו ${(body as { sent?: number }).sent ?? 0}`,
+    error: typeof result.error === "string" ? result.error : undefined,
+  });
   return NextResponse.json(body, { status: status ?? 200 });
 }

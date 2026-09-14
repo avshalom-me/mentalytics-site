@@ -90,6 +90,16 @@ export const SECTIONS: Section[] = [
     directory: [{ href: "/therapists/topic/טיפול-בדיכאון", label: "מטפלים בדיכאון" }],
   },
   {
+    slug: "התמכרויות",
+    name: "התמכרויות",
+    blurb: "טיפול בהתמכרויות - לחומרים, אלכוהול, מסכים והימורים: מה עובד, ואיך עושים את הצעד הראשון.",
+    articleTopics: ["התמכרויות"],
+    directory: [
+      { href: "/therapists/specialty/טיפול-בהתמכרויות", label: "מטפלים בהתמכרויות" },
+      { href: "/adults", label: "שאלון ההכוונה" },
+    ],
+  },
+  {
     slug: "ילדים-ונוער",
     name: "ילדים ונוער",
     blurb: "מתי ילד צריך טיפול רגשי, איך בוחרים מטפל לילד, ומה קורה בגיל ההתבגרות.",
@@ -211,6 +221,13 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
   },
   // ── בחירת טיפול ומטפל ──────────────────────────────────────────────────────
   {
+    slug: "how-matching-works",
+    title: "איך עובדת ההתאמה בטיפול חכם",
+    desc: "על מה המודל נשען, מה השאלון מודד, איך מחושבת ההתאמה - ומה המודל לא עושה.",
+    img: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "בחירת-טיפול-ומטפל",
+  },
+  {
     slug: "recommended-psychologist",
     title: "פסיכולוג מומלץ - איך מוצאים פסיכולוג טוב?",
     desc: "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לכם.",
@@ -244,6 +261,13 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
     title: "הבדל בין CBT לטיפול דינמי",
     desc: "שתי הגישות הנפוצות ביותר - מה ההבדל בפועל, ומי מתאים לאיזה מטופל?",
     img: "https://images.unsplash.com/photo-1490730141103-6cac27aaab94?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "בחירת-טיפול-ומטפל",
+  },
+  {
+    slug: "first-session",
+    title: "הפגישה הראשונה אצל פסיכולוג",
+    desc: "מה קורה בפגישה, מה שואלים, מה אם בוכים או משתתקים, וכמה זה עולה.",
+    img: "https://images.unsplash.com/photo-1714976694810-85add1a29c96?w=600&h=260&fit=crop&auto=format&q=75",
     section: "בחירת-טיפול-ומטפל",
   },
   {
@@ -375,3 +399,23 @@ export function editorialBySection(slug: string): EditorialArticle[] {
  * noindex and stays out of the sitemap.
  */
 export const MIN_ARTICLES_FOR_SECTION_INDEX = 3;
+
+/**
+ * Which questionnaire a piece of content should offer, from its topic.
+ *
+ * The site has two questionnaires and they are not interchangeable: /adults
+ * asks the visitor about themselves, /kids asks a parent about their child.
+ * Sending a parent into the adults flow was measured once already - 22 of the
+ * 50 questionnaire sessions from the kids ad campaign went in that way - which
+ * is why QuizCta exists at all.
+ *
+ * Topics are the therapist-facing vocabulary from the article form, so this
+ * maps them rather than guessing from the title. Anything unrecognised lands
+ * "both" and gets two buttons, which is never wrong, only less pointed.
+ */
+export function quizAudienceForTopic(topic: string | null | undefined): "youth" | "adults" | "both" {
+  const t = (topic ?? "").trim();
+  if (t === "הורות" || t === "טיפול בילדים ונוער") return "youth";
+  if (t === "טיפול במבוגרים") return "adults";
+  return "both";
+}

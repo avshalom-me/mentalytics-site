@@ -14,7 +14,7 @@ import {
 // the client doesn't need to know the taxonomy.
 
 const BodySchema = z.object({
-  questionnaire_type: z.enum(["adult", "child"]),
+  questionnaire_type: z.enum(["adult", "child", "school"]),
   treatment_key: z.string().min(1).max(200),
   treatment_label: z.string().min(1).max(200),
   domain: z.string().max(200).optional(),

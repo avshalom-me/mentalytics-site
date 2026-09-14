@@ -6,6 +6,7 @@ import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
+  LANGUAGES, COUPLES_MODALITIES, COGFUN_AGE_GROUPS,
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
@@ -33,6 +34,9 @@ type AdminTherapist = {
   cogfun_age_groups: string[];
   education: string;
   experience: string;
+  license_number: string | null;
+  publication_links: string[] | null;
+  price: number | null;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -56,6 +60,8 @@ type AdminTherapist = {
   contacts_30d: number;
   contacts_60d: number;
   contacts_total: number;
+  /** פילוח ערוץ של הצפיות ב-30 יום - האבחון של "מאיפה מגיעה החשיפה שלו". */
+  views_30d_by_channel?: { paid: number; organic: number; direct: number; other: number };
   subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
   center_account_id: string | null;
   center_name: string | null;
@@ -83,6 +89,15 @@ type EditForm = {
   regions: string[];
   cultural_prefs: string[];
   arrangements: string[];
+  age_groups: string[];
+  languages: string[];
+  couples_modalities: string[];
+  cogfun_age_groups: string[];
+  education: string;
+  experience: string;
+  license_number: string;
+  publication_links: string;
+  price: string;
   style_q1: number | null;
   style_q2: number | null;
   activity_level: number | null;
@@ -400,6 +415,16 @@ export default function AdminTherapistsPage() {
       regions: [...t.regions],
       cultural_prefs: [...t.cultural_prefs],
       arrangements: [...t.arrangements],
+      age_groups: [...(t.age_groups ?? [])],
+      languages: [...(t.languages ?? [])],
+      couples_modalities: [...(t.couples_modalities ?? [])],
+      cogfun_age_groups: [...(t.cogfun_age_groups ?? [])],
+      education: t.education ?? "",
+      experience: t.experience ?? "",
+      license_number: t.license_number ?? "",
+      // שורה לקישור. הסניטציה בשרת חותכת ריקים ולא-http בכל מקרה.
+      publication_links: (t.publication_links ?? []).join("\n"),
+      price: t.price != null ? String(t.price) : "",
       style_q1: t.style_q1,
       style_q2: t.style_q2,
       activity_level: t.activity_level,
@@ -445,6 +470,19 @@ export default function AdminTherapistsPage() {
       }
     } else {
       Object.assign(changed, editForm);
+    }
+    // שני שדות מוחזקים בטופס כמחרוזת לנוחות העריכה, ונשלחים בצורתם האמיתית.
+    // publication_links נשלח כמערך גם כשהוא ריק, אחרת מחיקת כל הקישורים לא
+    // הייתה מגיעה לשרת בכלל.
+    if ("publication_links" in changed) {
+      changed.publication_links = String(changed.publication_links)
+        .split("\n")
+        .map((x) => x.trim())
+        .filter(Boolean);
+    }
+    if ("price" in changed) {
+      const n = Number(changed.price);
+      changed.price = String(changed.price).trim() === "" || !Number.isFinite(n) ? null : n;
     }
     if (Object.keys(changed).length === 0) {
       setEditingTherapist(null);
@@ -588,11 +626,15 @@ export default function AdminTherapistsPage() {
     }
   }
 
-  // On-demand check of this therapist's standing orders at Sumit. Cancels any
-  // that are still live there (e.g. an order marked 'cancelled' locally but
-  // still charging — the billing leak), so the admin isn't blind to it.
+  // On-demand check of this therapist's standing orders at Sumit. Cancels only
+  // orders whose local subscription is already cancelled (e.g. an order still
+  // charging after we stopped the subscription — the billing leak). An order
+  // belonging to a LIVE subscription is reported and left alone: cancelling it
+  // used to stop a paying customer's billing and get them demoted overnight.
   async function reconcileSumit(id: string) {
-    if (!window.confirm("בדיקה מול Sumit: כל הוראת קבע שעדיין פעילה אצל המטפל תבוטל. להמשיך?")) return;
+    if (!window.confirm(
+      "בדיקה מול Sumit.\n\nיבוטלו רק הוראות קבע שממשיכות לחייב למרות שהמנוי כבר מבוטל אצלנו. מנוי פעיל לא ייגע - הוא רק ידווח.\n\nלהמשיך?"
+    )) return;
     try {
       setReconcilingId(id);
       setError("");
@@ -605,10 +647,11 @@ export default function AdminTherapistsPage() {
       if (!res.ok || !json.ok) throw new Error(json.error || "בדיקת Sumit נכשלה");
       const r = json.reconcile;
       const summary =
-        r.checked === 0 && !r.unlinkedActive
+        r.checked === 0 && !r.unlinkedActive && !r.keptActive
           ? "אין הוראות קבע עם מזהה Sumit לבדיקה."
           : [
               r.cancelled ? `בוטלו עכשיו: ${r.cancelled}` : null,
+              r.keptActive ? `פעילות ותקינות (לא נגענו): ${r.keptActive}` : null,
               r.alreadyInactive ? `כבר לא פעילות: ${r.alreadyInactive}` : null,
               r.notFound ? `לא נמצאו ב-Sumit: ${r.notFound}` : null,
               r.failed ? `נכשלו: ${r.failed}` : null,
@@ -1286,6 +1329,30 @@ export default function AdminTherapistsPage() {
                 </b>
               </span>
               </>); })()}
+              {/* מקור החשיפה, 30 יום תמיד (הפילוח קיים רק לחלון הזה - ראו
+                  ההערה במיגרציה: ייחוס היסטורי מעורבב עם קו השבר של 8/8).
+                  זה מה שמבדיל בין "רעב תקציבי" ל"פרופיל שלא מדורג". */}
+              {(() => {
+                const ch = therapist.views_30d_by_channel;
+                if (!ch) return null;
+                const t30 = ch.paid + ch.organic + ch.direct + ch.other;
+                if (t30 === 0) return null;
+                const parts = [
+                  ch.paid > 0 ? `ממומן ${ch.paid}` : null,
+                  ch.organic > 0 ? `אורגני ${ch.organic}` : null,
+                  ch.direct > 0 ? `ישיר ${ch.direct}` : null,
+                  ch.other > 0 ? `אחר ${ch.other}` : null,
+                ].filter(Boolean);
+                const paidShare = Math.round((ch.paid / t30) * 100);
+                return (
+                  <span className="text-stone-500">
+                    · מקור (30י): {parts.join(" · ")}
+                    {paidShare >= 80 && (
+                      <b className="text-amber-700"> ⚠ {paidShare}% מקמפיין</b>
+                    )}
+                  </span>
+                );
+              })()}
               {therapist.created_at && (
                 <span className="text-stone-500">
                   · נרשם/ה לפני {Math.max(0, Math.floor((Date.now() - new Date(therapist.created_at).getTime()) / 86400000))} ימים
@@ -1621,6 +1688,10 @@ export default function AdminTherapistsPage() {
       </div>
 
       {error && <div className="mb-6 rounded-xl bg-red-50 p-4 text-sm text-red-700">{error}</div>}
+
+      {/* ממצאי סוכן השימור הועברו ל-/admin/agents (20/8/26, בקשת המשתמש):
+          העמוד הזה הוא ניהול תפעולי של מטפלים - אישור, עריכה, קישור חשבון -
+          ורשימת חשיפה/פניות בראשו דחקה את העבודה עצמה מטה. */}
 
       {incompleteCount > 0 && (
         <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm text-amber-900">
@@ -2267,6 +2338,82 @@ export default function AdminTherapistsPage() {
                 selected={editForm.arrangements}
                 onChange={(v) => setEditForm({ ...editForm, arrangements: v })}
               />
+
+              <CheckboxGroup
+                label="קבוצות גיל"
+                options={AGE_GROUPS}
+                selected={editForm.age_groups}
+                onChange={(v) => setEditForm({ ...editForm, age_groups: v })}
+              />
+              <CheckboxGroup
+                label="שפות טיפול"
+                options={LANGUAGES}
+                selected={editForm.languages}
+                onChange={(v) => setEditForm({ ...editForm, languages: v })}
+              />
+              <CheckboxGroup
+                label="גישה זוגית"
+                options={COUPLES_MODALITIES}
+                selected={editForm.couples_modalities}
+                onChange={(v) => setEditForm({ ...editForm, couples_modalities: v })}
+              />
+              <CheckboxGroup
+                label="טיפול COG-FUN - לאילו קבוצות גיל?"
+                options={COGFUN_AGE_GROUPS}
+                selected={editForm.cogfun_age_groups}
+                onChange={(v) => setEditForm({ ...editForm, cogfun_age_groups: v })}
+              />
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block text-sm font-bold text-stone-700">
+                  מספר רישיון
+                  <input
+                    value={editForm.license_number}
+                    onChange={(e) => setEditForm({ ...editForm, license_number: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+                <label className="block text-sm font-bold text-stone-700">
+                  מחיר לפגישה (₪)
+                  <input
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({ ...editForm, price: e.target.value.replace(/[^\d.]/g, "") })}
+                    dir="ltr"
+                    inputMode="decimal"
+                    className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-normal"
+                  />
+                </label>
+              </div>
+              <label className="block text-sm font-bold text-stone-700">
+                השכלה
+                <textarea
+                  value={editForm.education}
+                  onChange={(e) => setEditForm({ ...editForm, education: e.target.value })}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-sm font-bold text-stone-700">
+                ניסיון
+                <textarea
+                  value={editForm.experience}
+                  onChange={(e) => setEditForm({ ...editForm, experience: e.target.value })}
+                  rows={2}
+                  className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-normal"
+                />
+              </label>
+              <label className="block text-sm font-bold text-stone-700">
+                קישורי פרסומים
+                <span className="block text-xs font-normal text-stone-500">קישור אחד בכל שורה</span>
+                <textarea
+                  value={editForm.publication_links}
+                  onChange={(e) => setEditForm({ ...editForm, publication_links: e.target.value })}
+                  rows={3}
+                  dir="ltr"
+                  placeholder="https://..."
+                  className="mt-1 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm font-normal"
+                />
+              </label>
 
               <div className="mt-2 rounded-xl border border-stone-200 bg-stone-50 p-4">
                 <div className="mb-1 text-sm font-bold text-stone-800">סגנון טיפולי (3 שאלות)</div>

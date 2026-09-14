@@ -888,6 +888,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     const r = answers.relationship;
 
     // --- Single/divorced path ---
+    const soloCBT = r.rSingleCBTScale ?? 0;
+    const soloDyn = r.rSingleDynScale ?? 0;
     if (r.rSingle) {
       recs.push({
         id: uid("relationship-single"),
@@ -897,10 +899,16 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         domain: "זוגיות ומשפחה",
         urgent: false,
       });
-    } else if (r.rSingleCBTScale !== undefined && r.rSingleDynScale !== undefined) {
+    } else if (soloCBT > 0 && soloDyn > 0) {
+      // Both scales start at 0 and the screen posts them whether or not they
+      // were touched, so "!== undefined" was true for someone who rated
+      // neither - and the equal-scores tie-break then handed them a dynamic
+      // therapy recommendation built out of two blanks. Since 9/9/2026 a screen
+      // may be left empty on purpose, so the test is a real rating, not a
+      // present key.
       // לא מחפש עזרה עם דפוסים/פרידה, אך ביקש סיוע בתחום הזוגי -
       // CBT אם ציון ממוקד > ציון מעמיק; דינאמי אחרת (כולל שוויון)
-      const useCBT = r.rSingleCBTScale > r.rSingleDynScale;
+      const useCBT = soloCBT > soloDyn;
       recs.push({
         id: uid("relationship-solo-goal"),
         symptomText: useCBT

@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/backup",
+      "schedule": "0 1 * * *"
+    },
+    {
       "path": "/api/cron/cleanup-pending-payments",
       "schedule": "15 6 * * *"
     },
@@ -47,6 +51,30 @@
     {
       "path": "/api/cron/agent-supply-gaps",
       "schedule": "30 5 * * 0"
+    },
+    {
+      "schedule": "15 7 * * *",
+      "path": "/api/cron/agent-finance"
+    },
+    {
+      "schedule": "0 8 * * *",
+      "path": "/api/cron/gift-trial-reminder?send=confirm"
+    },
+    {
+      "schedule": "45 4 * * *",
+      "path": "/api/cron/agent-retention"
+    },
+    {
+      "schedule": "0 9 * * 1",
+      "path": "/api/cron/agent-prospects"
+    },
+    {
+      "schedule": "0 */2 * * *",
+      "path": "/api/cron/agent-inbox"
+    },
+    {
+      "schedule": "15 4 * * *",
+      "path": "/api/cron/agent-quiz"
     }
   ]
 }

@@ -1,0 +1,317 @@
+import { supabaseAdmin } from "./supabaseAdmin";
+import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
+import { fetchAllRows } from "./fetch-all-rows";
+
+// סוכן שימור המטפלים: מזהה לקוח משלם שנמצא במסלול לביטול - לפני שהוא מבטל.
+//
+// ההיגיון העסקי: ביטול כמעט אף פעם לא מגיע בהפתעה. מטפל שמשלם ולא מקבל
+// אף לחיצה ליצירת קשר, או מטפל בחלון המתנה שמתקרב ליום החיוב בלי שום
+// תוצאה - יבטל ברגע ההחלטה הבא שלו. הסוכן מציף את אלה בזמן שעוד אפשר
+// לעשות משהו: לשפר את הפרופיל, לבדוק את הביקוש בחיתוך, או להאריך מתנה.
+//
+// שום מייל לא נשלח למטפל, בשום מצב. ההחלטה של המשתמש (17/8/26): מיילי
+// ביצועים למטפלים רק מזיקים - מזכירים לחלשים לבטל. הממצאים כאן פנימיים
+// בלבד, מוצגים בעמוד המטפלים באדמין, וכל פעולה נעשית בידיים.
+//
+// מטפל שהוקפא מההתאמות במכוון (match_paused_until עתידי) מדולג: אפס
+// לחיצות אצלו הוא תוצאה של החלטה, לא סימן סיכון.
+
+export type RetentionFinding = {
+  key: string;
+  /**
+   * high/medium = לקוח שמשלם כסף. low = מקודם במתנה.
+   *
+   * ההפרדה נדרשה אחרי שהתצוגה ערבבה את השניים (20/8/26): המשתמש ראה
+   * "משה טבול משלם/ת ובלי אף לחיצה" לצד "גונן שש משלם/ת ובלי אף לחיצה"
+   * באותה שורה בדיוק - כשהראשון לקוח משלם בסיכון ביטול והשני קיבל קידום
+   * חינם. גם המילה "משלם/ת" עצמה הייתה שקר אצל השני.
+   */
+  severity: "high" | "medium" | "low";
+  title: string;
+  detail: string;
+};
+
+export type RetentionRun = {
+  ok: boolean;
+  findings: RetentionFinding[];
+  checked: number;
+  error?: string;
+};
+
+// כמה ימי ותק לפני שמתריעים. מטפל שהצטרף אתמול עם אפס לחיצות הוא רעש.
+const MIN_TENURE_DAYS = 14;
+// צניחה: פחות משליש מהלחיצות של התקופה הקודמת, ורק אם היה ממה לצנוח.
+const DROP_RATIO = 1 / 3;
+const DROP_MIN_PREVIOUS = 5;
+
+type TRow = {
+  id: string;
+  full_name: string | null;
+  status: string | null;
+  promotion_source: string | null;
+  promoted_since: string | null;
+  match_paused_until: string | null;
+  center_account_id: string | null;
+  entity_type: string | null;
+};
+
+function nameOf(t: TRow): string {
+  return t.full_name?.trim() || "מטפל/ת ללא שם";
+}
+
+/**
+ * status='paying' הוא דגל *קידום*, לא דגל תשלום: הוא נושא גם את מקודמי
+ * המתנה (trial/manual) וגם את מי שבחלון gift_trial לפני החיוב הראשון.
+ * רק promotion_source='paid' הוא לקוח שמשלם כסף.
+ */
+function isRealPayer(t: TRow): boolean {
+  return t.promotion_source === "paid";
+}
+
+/** תיאור מדויק של המצב לכותרת - לא "משלם/ת" למי שקיבל מתנה. */
+function statusWord(t: TRow): string {
+  if (t.promotion_source === "paid") return "משלם/ת";
+  if (t.promotion_source === "gift_trial") return "לפני החיוב הראשון";
+  return "מקודם/ת במתנה";
+}
+
+function daysAgo(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = Date.now() - new Date(iso).getTime();
+  return Number.isNaN(ms) ? null : Math.floor(ms / 86_400_000);
+}
+
+export async function runRetention(): Promise<RetentionRun> {
+  const empty: RetentionRun = { ok: true, findings: [], checked: 0 };
+  if (!agentEnabled("retention")) return empty;
+
+  const runId = await startAgentRun("retention", "monitor");
+  try {
+    const since60 = new Date(Date.now() - 60 * 86_400_000).toISOString();
+    const now = Date.now();
+    const stamp = new Date().toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+
+    const [therapists, subs, views, clicks] = await Promise.all([
+      fetchAllRows<TRow>(() =>
+        supabaseAdmin
+          .from("therapists")
+          .select("id, full_name, status, promotion_source, promoted_since, match_paused_until, center_account_id, entity_type")
+          .eq("status", "paying")
+          .order("id")
+      ),
+      fetchAllRows<{ therapist_id: string; first_charge_on: string | null }>(() =>
+        supabaseAdmin
+          .from("subscriptions")
+          .select("therapist_id, first_charge_on")
+          .eq("status", "active")
+          .order("id")
+      ),
+      // צפיות ולחיצות ל-60 יום, בשני דליים של 30: האחרון מול הקודם.
+      fetchAllRows<{ therapist_id: string; viewed_at: string }>(() =>
+        supabaseAdmin
+          .from("therapist_profile_views")
+          .select("therapist_id, viewed_at")
+          .gte("viewed_at", since60)
+          .order("viewed_at")
+      ),
+      fetchAllRows<{ therapist_id: string; clicked_at: string }>(() =>
+        supabaseAdmin
+          .from("therapist_contact_clicks")
+          .select("therapist_id, clicked_at")
+          .gte("clicked_at", since60)
+          .order("clicked_at")
+      ),
+    ]);
+
+    const firstChargeByTherapist = new Map<string, string | null>();
+    for (const s of subs) firstChargeByTherapist.set(s.therapist_id, s.first_charge_on);
+
+    // הלקוח של מטפל-מרכז הוא המרכז: ממצא פר-מטפל היה מציף חמש שורות על
+    // לקוח אחד ומפספס את התמונה ("המרכז כולו שקוף"). לכן מטפלי מרכז
+    // נאספים בצד ומקובצים לממצא אחד לכל מרכז, ושורת ישות (מסלול 2)
+    // מסומנת כמרכז ולא כ"מטפל/ת".
+    const centerNames = new Map<string, string>();
+    {
+      const centerIds = [...new Set(therapists.map((t) => t.center_account_id).filter(Boolean) as string[])];
+      if (centerIds.length > 0) {
+        const { data: centerRows } = await supabaseAdmin
+          .from("therapy_center_accounts")
+          .select("id, name")
+          .in("id", centerIds);
+        for (const c of centerRows ?? []) centerNames.set(c.id as string, (c.name as string) ?? "מרכז");
+      }
+    }
+
+    type Buckets = { cur: number; prev: number };
+    const bucket = (rows: { therapist_id: string; at: string }[]): Map<string, Buckets> => {
+      const m = new Map<string, Buckets>();
+      const cutoff = now - 30 * 86_400_000;
+      for (const r of rows) {
+        const b = m.get(r.therapist_id) ?? { cur: 0, prev: 0 };
+        if (new Date(r.at).getTime() >= cutoff) b.cur++;
+        else b.prev++;
+        m.set(r.therapist_id, b);
+      }
+      return m;
+    };
+    const viewsBy = bucket(views.map((v) => ({ therapist_id: v.therapist_id, at: v.viewed_at })));
+    const clicksBy = bucket(clicks.map((c) => ({ therapist_id: c.therapist_id, at: c.clicked_at })));
+
+    const findings: RetentionFinding[] = [];
+    // מטפלי מסלול 1 שקופים (בלי אף לחיצה ב-30 יום) - נאספים לפי מרכז.
+    const silentByCenter = new Map<string, { names: string[]; views: number }>();
+
+    for (const t of therapists) {
+      // הקפאה מכוונת מההתאמות - לא סיכון אלא החלטה.
+      if (t.match_paused_until && new Date(t.match_paused_until).getTime() > now) continue;
+
+      const tenure = daysAgo(t.promoted_since);
+      if (tenure == null || tenure < MIN_TENURE_DAYS) continue;
+
+      const v = viewsBy.get(t.id) ?? { cur: 0, prev: 0 };
+      const c = clicksBy.get(t.id) ?? { cur: 0, prev: 0 };
+
+      // מטפל של מרכז במסלול 1: לא לקוח בפני עצמו. שקט 30 יום נאסף לקיבוץ
+      // פר-מרכז אחרי הלולאה; שאר הבדיקות (מתנה/צניחה) לא רלוונטיות לו -
+      // החיוב על שם המרכז.
+      if (t.center_account_id && t.entity_type !== "center") {
+        if (c.cur === 0) {
+          const key = t.center_account_id;
+          const agg = silentByCenter.get(key) ?? { names: [], views: 0 };
+          agg.names.push(nameOf(t));
+          agg.views += v.cur;
+          silentByCenter.set(key, agg);
+        }
+        continue;
+      }
+      const firstCharge = firstChargeByTherapist.get(t.id) ?? null;
+      const inGiftWindow =
+        t.promotion_source === "gift_trial" && firstCharge != null && new Date(firstCharge).getTime() > now;
+
+      // 1. חלון המתנה בלי אף לחיצה: נקודת הביטול הידועה מראש. ביום החיוב
+      //    המטפל שואל "מה קיבלתי" - ואם התשובה אפס, ההחלטה שלו ידועה.
+      if (inGiftWindow && c.cur + c.prev === 0) {
+        findings.push({
+          key: `retention:gift_risk:${t.id}`,
+          severity: "high",
+          title: `${nameOf(t)} בחלון המתנה בלי אף לחיצה ליצירת קשר`,
+          detail:
+            `החיוב הראשון ב-${String(firstCharge).slice(0, 10)}. עד כה ${v.cur + v.prev} צפיות פרופיל ` +
+            `ואפס לחיצות (נכון ל-${stamp}). מי שמגיע ליום החיוב בלי תוצאות - מבטל. ` +
+            `כדאי לבדוק את הפרופיל ואת הביקוש בחיתוך, או להאריך את חלון המתנה.`,
+        });
+        continue; // בדיקה 2 הייתה מכפילה את אותו ממצא
+      }
+
+      // 2. משלם בלי אף לחיצה ב-30 יום. ההבחנה בגוף: יש חשיפה בלי המרה
+      //    (בעיית פרופיל) מול אין חשיפה בכלל (בעיית ביקוש בחיתוך).
+      if (c.cur === 0) {
+        const exposed = v.cur >= 20;
+        const isCenterEntity = t.entity_type === "center";
+        const payer = isRealPayer(t) || isCenterEntity;
+        findings.push({
+          key: `retention:zero30:${t.id}`,
+          // מקודם במתנה יורד ל-low: אין כאן הכנסה בסיכון. זה עדיין שווה
+          // מבט - מקודמי מתנה תופסים נתח משמעותי מחשיפות ההתאמה, ומתנה
+          // שלא מייצרת כלום היא מועמדת לסיום - אבל זו לא דחיפות של ביטול.
+          severity: payer ? (exposed ? "high" : "medium") : "low",
+          title: isCenterEntity
+            ? `המרכז ${nameOf(t)} (מסלול 2) בלי אף לחיצה ליצירת קשר ב-30 יום`
+            : `${nameOf(t)} ${statusWord(t)} ובלי אף לחיצה ליצירת קשר ב-30 יום`,
+          detail:
+            `${v.cur} צפיות פרופיל ב-30 הימים האחרונים, אפס לחיצות (נכון ל-${stamp}). ` +
+            (exposed
+              ? "יש חשיפה ואין המרה - כנראה משהו בפרופיל עצמו (תמונה, ביו, מחיר)."
+              : "גם החשיפה נמוכה - כנראה הביקוש בחיתוך שלו/ה דל. שווה הצלבה מול עמוד היצע/ביקוש.") +
+            (payer ? "" : " קידום מתנה - אין הכנסה בסיכון; המשמעות היא נתח חשיפה שלא מייצר."),
+        });
+        continue;
+      }
+
+      // 3. צניחה חדה מול התקופה הקודמת - מוקדם יותר מאפס מוחלט.
+      if (c.prev >= DROP_MIN_PREVIOUS && c.cur <= c.prev * DROP_RATIO) {
+        findings.push({
+          key: `retention:drop:${t.id}`,
+          severity: isRealPayer(t) ? "medium" : "low",
+          title: `הלחיצות אצל ${nameOf(t)} צנחו`,
+          detail:
+            `${c.prev} לחיצות ליצירת קשר ב-30 הימים הקודמים, ${c.cur} ב-30 האחרונים ` +
+            `(נכון ל-${stamp}). שווה לבדוק אם משהו השתנה: פרופיל, תחרות בחיתוך, או עונתיות.`,
+        });
+      }
+    }
+
+    // ממצא אחד לכל מרכז שקוף - שם המרכז בכותרת, המטפלים בפירוט.
+    // (המרכזים תמיד משלמים, ולכן נשארים בדחיפות רגילה.)
+    for (const [centerId, agg] of silentByCenter) {
+      const centerName = centerNames.get(centerId) ?? "מרכז";
+      findings.push({
+        key: `retention:center_silent:${centerId}`,
+        severity: agg.names.length >= 2 ? "high" : "medium",
+        title: `${agg.names.length} ממטפלי ${centerName} בלי אף לחיצה ליצירת קשר ב-30 יום`,
+        detail:
+          `${agg.names.join(", ")} - ${agg.views} צפיות פרופיל במצטבר ואפס לחיצות (נכון ל-${stamp}). ` +
+          `המרכז משלם על המקומות האלה; ביום שישאלו "מה קיבלנו" - זו התשובה שהם יראו. ` +
+          `כדאי לבדוק פרופילים חסרים ופיזור אזורים מול הביקוש.`,
+      });
+    }
+
+    // כל המפתחות שנבדקו - כדי שממצא ייסגר מעצמו כשהמצב משתפר.
+    const managedKeys = [
+      ...therapists.flatMap((t) => [
+        `retention:gift_risk:${t.id}`,
+        `retention:zero30:${t.id}`,
+        `retention:drop:${t.id}`,
+      ]),
+      ...[...new Set(therapists.map((t) => t.center_account_id).filter(Boolean) as string[])].map(
+        (cid) => `retention:center_silent:${cid}`,
+      ),
+    ];
+
+    const { recovered } = await syncAgentAlerts(
+      "retention",
+      findings.map((f) => ({
+        actionType: "alert",
+        kind: "finding" as const,
+        title: f.title,
+        body: f.detail,
+        dedupeKey: f.key,
+        payload: { severity: f.severity },
+        // החומרה כבר חושבה למעלה לפי "האם יש כאן הכנסה בסיכון" - עד היום
+        // היא נשמרה ב-payload בלבד ולא השפיעה על סדר התור.
+        severity: f.severity === "high" ? "high" : f.severity === "low" ? "low" : "normal",
+      })),
+      { managedKeys, recoveryNote: "המצב השתפר - הממצא נסגר אוטומטית" }
+    );
+
+    await finishAgentRun(runId, {
+      status: findings.length > 0 ? "ok" : "empty",
+      summary:
+        findings.length > 0
+          ? (() => {
+              const paying = findings.filter((f) => f.severity !== "low").length;
+              const gift = findings.length - paying;
+              const head = `${paying} משלמים בסיכון שימור${gift > 0 ? ` (ועוד ${gift} מקודמי מתנה)` : ""}`;
+              const top = findings.slice(0, 2).map((f) => f.title).join(" · ");
+              return `${head}: ${top}${findings.length > 2 ? " ..." : ""}`;
+            })()
+          : `כל ${therapists.length} המקודמים עם פעילות תקינה`,
+      details: {
+        findings: findings.map((f) => ({ key: f.key, severity: f.severity, title: f.title })),
+        checked: therapists.length,
+        recovered_alerts: recovered,
+      },
+    });
+
+    // כסף קודם: הממצאים נשמרים ומוצגים לפי סדר הדחיפות, כדי שלקוח משלם
+    // בסיכון ביטול לא ייקבר מתחת לעשרה מקודמי-מתנה.
+    const rank: Record<RetentionFinding["severity"], number> = { high: 0, medium: 1, low: 2 };
+    findings.sort((a, b) => rank[a.severity] - rank[b.severity]);
+
+    return { ok: true, findings, checked: therapists.length };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await finishAgentRun(runId, { status: "error", error: msg });
+    return { ...empty, ok: false, error: msg };
+  }
+}

@@ -4,7 +4,8 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { buildDashboardData } from "./work-queue";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
-import { LEAD_TYPES, DEAL_STAGES, labelOf } from "./crm";
+import { LEAD_TYPES, DEAL_STAGES, CLOSED_DEAL_STAGES, labelOf } from "./crm";
+import { syncDealReminders } from "./deal-reminders";
 
 // בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב.
 // מקור הנתונים הוא אותו תור עבודה של לוח הבקרה (work-queue.ts) + תורי
@@ -23,8 +24,8 @@ const MAX_LINES_PER_SECTION = 6;
 
 // שלבי עסקה פתוחים - נגזר מאוצר המילים המשותף, לא רשימה קשיחה (ביקורת).
 const OPEN_DEAL_STAGES = DEAL_STAGES.filter(
-  (s) => s.value !== "won" && s.value !== "lost"
-).map((s) => s.value);
+  (st) => !(CLOSED_DEAL_STAGES as readonly string[]).includes(st.value)
+).map((st) => st.value);
 
 export type DigestSection = {
   key: string;
@@ -84,6 +85,76 @@ async function gatherSections(): Promise<DigestSection[]> {
 
   const q = dash.queue;
   const sections: DigestSection[] = [];
+
+  // תזכורות העסקאות מרועננות לפני בניית הדוח: אחרת ממצא "צעד באיחור"
+  // שנוצר רק בכניסה לעמוד העסקאות לא היה מגיע לדוח הבוקר לעולם.
+  try {
+    await syncDealReminders();
+  } catch (e) {
+    console.error("digest deal reminders failed:", e instanceof Error ? e.message : e);
+  }
+
+  // ממצאים קריטיים ודחופים מכל הסוכנים, בראש הדוח. הלקח מ-match_results:
+  // התראה על אובדן נתונים שקט ישבה יומיים בעמוד הסוכנים בלי שאיש ראה
+  // אותה. דוח הבוקר נקרא כל בוקר - שם מקומה.
+  try {
+    const { data: severe } = await supabaseAdmin
+      .from("agent_actions")
+      .select("agent, title, severity, created_at")
+      .eq("status", "pending")
+      .in("severity", ["critical", "high"])
+      .order("severity", { ascending: true })
+      .order("created_at", { ascending: true })
+      .limit(20);
+    const rows = severe ?? [];
+    if (rows.length > 0) {
+      const criticals = rows.filter((r) => r.severity === "critical").length;
+      sections.push({
+        key: "agent_severe",
+        label: criticals > 0 ? `ממצאים קריטיים מהסוכנים` : "ממצאים דחופים מהסוכנים",
+        count: rows.length,
+        urgent: criticals > 0,
+        lines: rows.slice(0, MAX_LINES_PER_SECTION).map(
+          (r) =>
+            `${r.severity === "critical" ? "🔴" : "🟠"} ${r.title} · ${ageText(r.created_at as string)}`
+        ),
+        link: "/admin/agents",
+      });
+    }
+  } catch (e) {
+    console.error("digest severe section failed:", e instanceof Error ? e.message : e);
+  }
+
+  // פניות מייל שממתינות למענה אצל סוכן שירות הלקוחות. הדוח הוא המקום
+  // שסוגר את הלולאה: טיוטה שמחכה בטאב צדדי נשכחת, ופנייה של לקוח בת
+  // יומיים היא כבר דחופה.
+  try {
+    const { data: inboxOpen } = await supabaseAdmin
+      .from("inbox_messages")
+      .select("from_email, from_name, subject, received_at, status")
+      .in("status", ["new", "drafted"])
+      .order("received_at", { ascending: true })
+      .limit(30);
+    const openRows = inboxOpen ?? [];
+    if (openRows.length > 0) {
+      sections.push({
+        key: "inbox",
+        label: "פניות במייל שממתינות למענה",
+        count: openRows.length,
+        urgent: daysAgo(openRows[0].received_at as string) >= 2,
+        lines: openRows.slice(0, MAX_LINES_PER_SECTION).map((m) => {
+          const who = (m.from_name as string) || (m.from_email as string);
+          const what = (m.subject as string) || "(ללא נושא)";
+          const ready = m.status === "drafted" ? " · טיוטה מוכנה" : "";
+          return `${who} · ${what.slice(0, 60)} · ${ageText(m.received_at as string)}${ready}`;
+        }),
+        link: "/admin/agents?agent=inbox",
+      });
+    }
+  } catch (e) {
+    // דוח הבוקר לא נופל בגלל סקציה אחת - השאר חשוב מכדי להיחסם.
+    console.error("digest inbox section failed:", e instanceof Error ? e.message : e);
+  }
 
   // פניות לחברה בלבד - הפיצול ממדיניות 15/8 חי ב-work-queue, פעם אחת,
   // והספירה/הדחיפות מחושבות שם על הרשימה המלאה (לא על חיתוך תצוגה).

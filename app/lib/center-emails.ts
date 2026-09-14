@@ -265,6 +265,61 @@ export async function sendCenterTherapistInviteEmail(opts: {
  * תזכורת שלמות פרופיל - נשלחת פעם אחת למרכז פעיל שבוע+ אחרי התשלום כשהפרופיל
  * הציבורי עדיין חסר. מפרטת בדיוק מה חסר ומקשרת להקמה/עריכה.
  */
+/**
+ * שולח את טיוטת הנדנוד שהסוכן ניסח ושאישרת באדמין. הטיוטה היא טקסט
+ * רגיל, ונעטפת כאן בתבנית הבית - בדיוק כמו הצעת המתנה למטפלים.
+ */
+export async function sendCenterNudgeEmail(opts: {
+  to: string;
+  subject: string;
+  message: string;
+  // מזהה המרכז - נשמר ביומן כדי שהיסטוריה תהיה של מרכז ולא
+  // של כתובת מייל. שני מרכזים של אותו בעלים חולקים כתובת.
+  centerId?: string;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) return { ok: false, error: "resend not configured" };
+  if (!opts.message?.trim()) return { ok: false, error: "גוף המייל ריק" };
+
+  // הטיוטה כוללת פנייה וחתימה, ולכן היא נכנסת כגוש אחד ולא נעטפת שוב.
+  const safeMessage = escapeHtml(opts.message.trim());
+  const subject = opts.subject?.trim() || "השלמת פרטי המרכז - טיפול חכם";
+
+  const html = `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.7;color:#1a4a5c;direction:rtl;text-align:right;">
+      <div style="text-align:center;padding:4px 0 20px;border-bottom:1px solid #EAF0EE;margin:0 0 22px;">
+        <img src="${SITE_URL}/logo.png" width="150" alt="טיפול חכם" style="display:inline-block;width:150px;max-width:60%;height:auto;border:0;" />
+      </div>
+      <div style="white-space:pre-line;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;text-align:center;">
+        אפשר להשיב ישירות למייל הזה | admin@getmentalytics.com | 055-993-1403<br/>
+        טיפול חכם - Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+
+  try {
+    const { error } = await resendClient.emails.send({ from: FROM, to: opts.to, subject, html });
+    void logEmail({
+      recipient: opts.to,
+      recipientType: "organization",
+      entityId: opts.centerId ?? null,
+      subject,
+      template: "center_readiness_nudge",
+      sentBy: "admin",
+      status: error ? "failed" : "sent",
+      error: error ? String(error.message ?? error) : undefined,
+    });
+    return error ? { ok: false, error: String(error) } : { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "unknown" };
+  }
+}
+
+/** @deprecated הוחלף בטיוטה שהסוכן מנסח + sendCenterNudgeEmail. */
 export async function sendCenterCompletenessNudgeEmail(opts: {
   to: string;
   centerName: string;

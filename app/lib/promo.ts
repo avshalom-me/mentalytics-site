@@ -54,6 +54,46 @@ export const TRIAL_UPGRADE_TOTAL = +(TRIAL_UPGRADE_PRICE * (1 + VAT_RATE)).toFix
 // כמה ימים ההצעה תקפה מרגע שליחת המייל (3 לפני הסיום + חלון חסד אחרי).
 export const TRIAL_UPGRADE_OFFER_DAYS = 10;
 
+// ── מדרגת ההמשך אחרי חודשי המתנה ────────────────────────────────────────
+// מסלול ההזמנה (gift_trial) נפתח בחודשיים ללא תשלום. עד 3/9/26 החיוב
+// הראשון שאחריהם היה כבר המחיר המלא - קפיצה מ-0 ל-140 בבת אחת, בדיוק
+// ברגע שבו המטפל מחליט אם להישאר. עכשיו יש ביניהם מדרגה: חודשיים במחיר
+// מוזל, ואז המחיר המלא.
+//
+// המימוש נשען על אותו מנגנון שכבר מריץ את ה-early-bird ואת הצעת סוף
+// הניסיון: הוראת הקבע נפתחת ב-Sumit במחיר המוזל, השורה ב-subscriptions
+// נושאת promo_reverts_at, וה-cron היומי מעדכן את המחיר ב-Sumit ומאמת
+// שהעדכון תפס. אין כאן קוד גבייה חדש - רק מחיר ותאריך.
+export const GIFT_FOLLOWON_PRICE = 70;
+export const GIFT_FOLLOWON_MONTHS = 2;
+export const GIFT_FOLLOWON_TOTAL = +(GIFT_FOLLOWON_PRICE * (1 + VAT_RATE)).toFixed(2); // 82.60
+
+/**
+ * מתי הוראת הקבע חוזרת למחיר המלא: כמה ימים לפני החיוב השלישי, כלומר
+ * אחרי שני חיובים במחיר המוזל. נמדד מיום החיוב הראשון (סוף חודשי המתנה)
+ * ולא מיום ההצטרפות, אחרת המדרגה הייתה נבלעת בתוך תקופת המתנה.
+ */
+export function giftFollowonRevertDate(firstChargeOn: string | Date): Date {
+  const d = new Date(firstChargeOn);
+  d.setMonth(d.getMonth() + GIFT_FOLLOWON_MONTHS);
+  d.setDate(d.getDate() - 3);
+  return d;
+}
+
+/**
+ * כמה שאלונים אפשר למלא בחינם מאותו דפדפן, לפני התשלום.
+ *
+ * יושב כאן ולא ב-usage.ts כי usage.ts הוא `server-only`, והמספר הזה מופיע גם
+ * בטקסט שהמשתמש קורא (מסך התשלום ושאלות ותשובות בדף הבית). כשהוא היה מוגדר
+ * בשני מקומות, העלאת המכסה מ-5 ל-8 השאירה את המסכים מבטיחים 5 - בדיוק סוג
+ * הפער שמייצר פנייה של "כתוב אחד וקורה אחר".
+ *
+ * 5 → 8 (2/9/2026): המונה אינו מתאפס לעולם, ולכן "חמש פעמים" הוא חמש פעמים
+ * בכל חייו של הדפדפן. הורה שבודק שני ילדים, או מי שחוזר אחרי חודש, מיצה אותן
+ * בלי לחשוב שהוא צורך מכסה.
+ */
+export const MAX_FREE_QUIZZES = 8;
+
 /** ההצעה האישית פעילה עבור המטפל/ת הזה/ו כרגע? */
 export function trialUpgradeActive(upgradeOfferUntil: string | null | undefined, at: Date = new Date()): boolean {
   if (!upgradeOfferUntil) return false;

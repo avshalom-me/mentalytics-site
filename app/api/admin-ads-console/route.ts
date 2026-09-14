@@ -1,0 +1,63 @@
+import { NextRequest, NextResponse } from "next/server";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { buildAdsInsights } from "@/app/lib/ads-insights";
+
+// The ads console: one place where Google-side numbers (cost, CPC, budgets,
+// end dates - synced nightly by the Ads Script) meet site-side truth
+// (sessions, quiz completes, contacts per utm_campaign) and become the only
+// metric that decides anything here: cost per contact per campaign.
+//
+// All analysis lives in app/lib/ads-insights.ts - the SAME engine the ads
+// agent runs every morning at 07:00. This route just serves its payload, so
+// the console can never disagree with the queue about what is wrong.
+
+export const maxDuration = 60;
+
+export async function GET() {
+  try {
+    const insights = await buildAdsInsights();
+    return NextResponse.json(insights.payload);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    console.error("admin-ads-console failed:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}
+
+// Registry editing - the only write surface, and it writes only to the
+// hand-maintained registry table, never to anything Google-side.
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    if (body?.action !== "save_registry" || !Array.isArray(body.rows)) {
+      return NextResponse.json({ error: "bad request" }, { status: 400 });
+    }
+    const numOrNull = (v: unknown) => {
+      if (v === null || v === undefined || v === "") return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
+    const rows = (body.rows as Record<string, unknown>[])
+      .map((r) => ({
+        google_name: typeof r.google_name === "string" ? r.google_name.trim().slice(0, 200) : "",
+        utm_campaign: typeof r.utm_campaign === "string" && r.utm_campaign.trim() ? r.utm_campaign.trim().slice(0, 120) : null,
+        budget_type: r.budget_type === "total" ? "total" : "daily",
+        budget_amount: numOrNull(r.budget_amount),
+        end_date: typeof r.end_date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(r.end_date) ? r.end_date : null,
+        cpc_cap: numOrNull(r.cpc_cap),
+        active: r.active !== false,
+        notes: typeof r.notes === "string" && r.notes.trim() ? r.notes.slice(0, 2000) : null,
+        updated_at: new Date().toISOString(),
+      }))
+      .filter((r) => r.google_name.length > 0);
+    if (rows.length === 0) return NextResponse.json({ error: "no valid rows" }, { status: 400 });
+
+    const { error } = await supabaseAdmin.from("ads_campaign_registry").upsert(rows, { onConflict: "google_name" });
+    if (error) throw new Error(error.message);
+    const { data } = await supabaseAdmin.from("ads_campaign_registry").select("*").order("google_name");
+    return NextResponse.json({ ok: true, registry: data ?? [] });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "unknown";
+    return NextResponse.json({ error: msg }, { status: 500 });
+  }
+}

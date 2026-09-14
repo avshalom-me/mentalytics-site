@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   // Also the fallback description for every /therapists/* page that sets none,
   // so it has to read as an offer and not as a feature list of a search form.
   description:
-    "מאגר מטפלים מאומתים: פסיכולוגים, עו״ס קליניים ומטפלים - סינון לפי אזור, סוג קושי, גישה טיפולית והסדרי קופות. או מלאו שאלון קצר וקבלו התאמה אישית, בחינם.",
+    "מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה, או סננו בעצמכם את מאגר המטפלים שתעודותיהם אומתו לפי אזור, קושי וגישה. בחינם.",
 };
 
 export default function TherapistsLayout({ children }: { children: React.ReactNode }) {

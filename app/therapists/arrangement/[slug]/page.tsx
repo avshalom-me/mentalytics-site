@@ -8,6 +8,7 @@ import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { introPlusOffer } from "@/app/lib/meta-description";
+import QuizCta from "@/app/therapists/QuizCta";
 
 // Funding-route landing pages. See app/lib/arrangements.ts for why this family
 // exists and why it carries editorial content rather than only a filtered list.
@@ -89,12 +90,19 @@ export default async function ArrangementPage({ params }: { params: Promise<{ sl
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>
           {a.searchTitle}
         </h1>
-        {list.length >= MIN_LISTED_FOR_INDEX && (
-          <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו ושציינו שהם עובדים מול ${a.name}${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
-          </p>
-        )}
+        {/* Quotable intro - see city/[city]/[topic]. List first: "who takes
+            my funding" is the intent, so the funded list leads. */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${a.searchTitle}: עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ושציינו שהם עובדים מול ${a.name} ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}, או מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם. בחינם וללא התחייבות.`}
+        </p>
       </div>
+
+      {/* The paragraph above offers the questionnaire; until 10/9/2026 the only
+          link to it on this page sat inside the empty state, which a visitor
+          sees precisely when there is no list. 24 organic entries in 90 days
+          arrived here and could not reach it. Both audiences: a funding route
+          is a question a parent asks as readily as an adult. */}
+      <QuizCta body="ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות." />
 
       <div className="mb-8 grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 rounded-2xl p-6" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>

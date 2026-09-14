@@ -173,6 +173,98 @@ async function freshnessCheck(
   }
 }
 
+// טריות של סוכן: מתי רץ לאחרונה. בלי זה, קרון שהפסיק לרוץ (תקלה בוורסל,
+// מתג שנכבה בטעות, מסלול שנמחק) הוא כשל שקט - הפס באדמין פשוט מציג תאריך
+// ישן, ואף אחד לא מתריע. סוכן שכובה במתג מדלג ולא נכשל, כדי ששני מנגנוני
+// הבטיחות לא יתנגשו.
+function agentFreshnessCheck(agent: string, label: string, maxHours: number): Promise<WatchdogCheck> {
+  const key = `cron_${agent}`;
+  if (!agentEnabled(agent)) {
+    return Promise.resolve(skippedCheck(key, label, "דולג - הסוכן כבוי במתג"));
+  }
+  return freshnessCheck(key, label, async () => {
+    const { data } = await supabaseAdmin
+      .from("agent_runs")
+      .select("started_at")
+      .eq("agent", agent)
+      .order("started_at", { ascending: false })
+      .limit(1);
+    const last = data?.[0]?.started_at;
+    if (!last) return { ok: false, detail: "אין אף ריצה ביומן" };
+    const hours = (Date.now() - new Date(last).getTime()) / 3_600_000;
+    return hours <= maxHours
+      ? { ok: true, detail: "תקין" }
+      : { ok: false, detail: `הריצה האחרונה לפני ${Math.round(hours)} שעות` };
+  });
+}
+
+// פניות מטופלים נרשמות ב-CRM.
+//
+// שלושה מסלולים כותבים ל-crm_leads, ושניים מהם עוטפים את הכתיבה ב-try/catch
+// שכל מטרתו למנוע מכשל CRM להגיע לשולח. ב-8/8/2026 עמודה חסרה (referrer_host)
+// הפילה כל אחת מהן: ההודעה למטפל יצאה, שורת הקליק נרשמה, והליד נעלם
+// ל-console.error. חודש שלם, חמש פניות, עד שקופסת המשוב - המסלול היחיד
+// שמחזיר שגיאה למשתמש - חשפה את זה במקרה.
+//
+// האינווריאנט שנבדק: הודעה למטפל כותבת גם קליק וגם ליד; הודעה למרכז כותבת
+// ליד בלבד. לכן מספר הלידים לעולם אינו אמור להיות קטן ממספר הקליקים.
+// חלון של שבועיים ולא שבוע: הנפח הוא 1-3 הודעות בשבוע, ושבוע שקט לגיטימי
+// היה מייצר אזעקת שווא.
+function leadCaptureCheck(): Promise<WatchdogCheck> {
+  return freshnessCheck("crm_lead_capture", "פניות מטופלים נרשמות ב-CRM", async () => {
+    // רצפה: העמודה החסרה תוקנה ב-9/9/2026, והנזק שלפניה בלתי הפיך. בלי
+    // הרצפה הבדיקה הייתה מתריעה עשרה ימים ברציפות על פניות שכבר אבדו -
+    // רעש על תקלה סגורה, וזה בדיוק מה ששוחק אמון בשומר. השאלה שהבדיקה
+    // שואלת היא "האם הרישום עובד עכשיו", לא "האם הוא נשבר פעם".
+    // מ-23/9/2026 והלאה השורה הזו חסרת השפעה וניתן למחוק אותה.
+    const FIXED_AT = "2026-09-09T12:00:00Z";
+    const windowStart = new Date(Date.now() - 14 * 86_400_000).toISOString();
+    const since = windowStart > FIXED_AT ? windowStart : FIXED_AT;
+    const [msgRes, leadRes] = await Promise.all([
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("id", { count: "exact", head: true })
+        .eq("click_type", "site_message")
+        .gte("clicked_at", since),
+      supabaseAdmin
+        .from("crm_leads")
+        .select("id", { count: "exact", head: true })
+        .eq("source", "site_message")
+        .gte("created_at", since),
+    ]);
+    const sent = msgRes.count ?? 0;
+    const saved = leadRes.count ?? 0;
+    if (sent === 0 && saved === 0) {
+      return { ok: true, detail: "אין פניות בשבועיים האחרונים - אין מה להשוות" };
+    }
+    if (saved < sent) {
+      return {
+        ok: false,
+        detail: `${sent} פניות נשלחו ורק ${saved} נרשמו ב-CRM - הכתיבה נכשלת בשקט`,
+      };
+    }
+    return { ok: true, detail: `${sent} פניות נשלחו, ${saved} נרשמו` };
+  });
+}
+
+async function centerPageCheck(): Promise<WatchdogCheck> {
+  const key = "page_center";
+  const label = "עמוד מרכז ציבורי חי";
+  const { data } = await supabaseAdmin
+    .from("therapy_center_accounts")
+    .select("slug, name, billing_track, public_page_enabled")
+    .eq("status", "active")
+    .not("slug", "is", null)
+    .order("paid_at", { ascending: true });
+  const target = (data ?? []).find(
+    (c) => c.billing_track === "center_entity" || c.public_page_enabled === true,
+  );
+  if (!target) return skippedCheck(key, label, "דולג - אין מרכז פעיל עם עמוד ציבורי");
+  return httpCheck(key, `${label} (${target.name})`, `${SITE}/centers/${target.slug}`, {
+    validate: expectStatusAndContains(String(target.name).slice(0, 12)),
+  });
+}
+
 async function runChecks(): Promise<WatchdogCheck[]> {
   const staffToken = process.env.STAFF_BYPASS_TOKEN ?? "";
 
@@ -255,28 +347,39 @@ async function runChecks(): Promise<WatchdogCheck[]> {
       body: { online: true, limit: 3 },
       validate: matchValidate,
     }),
+    // עמוד מרכז חי: לוקח את המרכז הפעיל הראשון עם עמוד ציבורי ומוודא שהעמוד
+    // עונה ומכיל את שם המרכז. מרכז משלם שהעמוד שלו נופל = מוצר שנעלם בשקט
+    // (לעמודי מסלול 1 אין אף בדיקה אחרת שתתפוס את זה).
+    centerPageCheck(),
     // דריפט constraint האירועים
     eventConstraintCheck(),
+    // פניות שנשלחו אך לא נרשמו - אותה משפחה של כשל שקט
+    leadCaptureCheck(),
     // טריות קרונים. בקר הבוקר: אם כובה במתג - הבדיקה מדלגת במקום להתריע
     // על כיבוי מכוון (ממצא ביקורת: שני מנגנוני הבטיחות התנגשו).
-    agentEnabled("daily_digest")
-      ? freshnessCheck("cron_daily_digest", "בקר הבוקר רץ ביממה האחרונה", async () => {
-          const { data } = await supabaseAdmin
-            .from("agent_runs")
-            .select("started_at")
-            .eq("agent", "daily_digest")
-            .order("started_at", { ascending: false })
-            .limit(1);
-          const last = data?.[0]?.started_at;
-          if (!last) return { ok: false, detail: "אין אף ריצה ביומן" };
-          const hours = (Date.now() - new Date(last).getTime()) / 3_600_000;
-          return hours <= 26
-            ? { ok: true, detail: "תקין" }
-            : { ok: false, detail: `הריצה האחרונה לפני ${Math.round(hours)} שעות` };
-        })
-      : Promise.resolve(
-          skippedCheck("cron_daily_digest", "בקר הבוקר רץ ביממה האחרונה", "דולג - בקר הבוקר כבוי במתג")
-        ),
+    // הסוכנים שומרים זה על זה: כל סוכן יומי נבדק ל-26 שעות, ופערי ההיצע
+    // (שרץ שבועית) ל-8 ימים. השומר עצמו לא מופיע כאן - סוכן לא יכול
+    // להתריע על היעדרות של עצמו, וזה פער מודע.
+    agentFreshnessCheck("daily_digest", "בקר הבוקר רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("ads", "סוכן הפרסום רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("conversions", "סוכן ההמרות רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("finance", "סוכן הכספים רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("retention", "סוכן השימור רץ ביממה האחרונה", 26),
+    // הגיבוי הוא הבדיקה שהכי חשוב שלא תישמט: קבצי ה-Storage אינם מכוסים
+    // בשום גיבוי של Supabase, ולכן כל יום שהוא לא רץ הוא יום בלי עותק.
+    agentFreshnessCheck("backup", "הגיבוי לדרייב רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("center_prospects", "סוכן איתור המכונים רץ השבוע", 8 * 24),
+    agentFreshnessCheck("center_nudge", "סוכן המרכזים רץ ביממה האחרונה", 26),
+    // רץ כל חצי שעה; שלוש שעות בלי ריצה = משהו תקוע, לא סטייה רגילה.
+    agentFreshnessCheck("inbox", "סוכן שירות הלקוחות רץ בשלוש השעות האחרונות", 3),
+    agentFreshnessCheck("supply_gaps", "סוכן פערי ההיצע רץ בשבוע האחרון", 8 * 24),
+    // שלושת הקרונים ששולחים מיילים אמיתיים ללקוחות, ועד עכשיו אף
+    // אחד לא ניטר אותם. קרון שנופל כאן הוא הבטחה שלא מקוימת: מטפל שלא
+    // קיבל התראה לפני סוף המתנה, או חיוב ראשון שהגיע בלי תזכורת השבוע שהובטחה.
+    agentFreshnessCheck("cron_trial_ending", "התראת סוף מתנה רצה ביממה האחרונה", 26),
+    agentFreshnessCheck("cron_gift_reminder", "תזכורת החיוב הראשון רצה ביממה האחרונה", 26),
+    agentFreshnessCheck("cron_sumit_sync", "סנכרון סומיט רץ ביממה האחרונה", 26),
+    agentFreshnessCheck("quiz_funnel", "סוכן השאלונים רץ ביממה האחרונה", 26),
     freshnessCheck("cron_weekly_report", "דוח שבועי נוצר בשבוע האחרון", async () => {
       const { data } = await supabaseAdmin
         .from("weekly_reports")
@@ -308,6 +411,36 @@ async function runChecks(): Promise<WatchdogCheck[]> {
   return Promise.all(promises);
 }
 
+// לא כל בדיקה שנכשלת שווה. בדיקה שמשמעותה "מידע הולך לאיבוד" או "הציון
+// הקליני שגוי" חייבת להיראות אחרת מ-robots.txt שנפל - אחרת הכול נראה זהה,
+// וממצא קריטי יושב יומיים בתור (מה שקרה בפועל עם match_results).
+//
+// הרשימות מכוונות וקצרות: אם חצי מהבדיקות יהיו "קריטי", חזרנו לנקודת
+// ההתחלה. מה שלא מופיע כאן הוא normal, וזו ברירת מחדל לגיטימית.
+const CRITICAL_CHECKS = new Set([
+  "db_event_constraint", // אירועים נדחים בשקט - נתונים אובדים ללא שחזור
+  "crm_lead_capture", // פנייה שאבדה היא אדם שניסה להגיע למטפל, ואין ממנה עותק
+  "api_score_adults", // מנוע הניקוד - פלט שגוי הוא המלצה קלינית שגויה
+  "api_score_kids",
+  "cron_backup", // יום בלי גיבוי = יום בלי עותק לקבצי ה-Storage
+  "page_home", // האתר למטה
+]);
+const HIGH_CHECKS = new Set([
+  "page_adults", // עמודי השאלון - הכניסה היחידה למשפך
+  "page_kids",
+  "api_match_region", // מנוע ההתאמה - בלעדיו השאלון מסתיים בלא כלום
+  "api_match_online",
+  "cron_trial_ending", // הבטחה מפורשת למטפל לפני סוף המתנה
+  "cron_gift_reminder", // הבטחה מפורשת לפני החיוב הראשון
+  "cron_sumit_sync", // קידומים שפגו, גלגול לתשלום, הוראות קבע יתומות
+]);
+
+function checkSeverity(key: string): "critical" | "high" | "normal" {
+  if (CRITICAL_CHECKS.has(key)) return "critical";
+  if (HIGH_CHECKS.has(key)) return "high";
+  return "normal";
+}
+
 export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResult> {
   const mode = opts.send ? "send" : "preview";
   const runId = await startAgentRun("watchdog", mode);
@@ -324,8 +457,11 @@ export async function runWatchdog(opts: { send: boolean }): Promise<WatchdogResu
       "watchdog",
       failures.map((f) => ({
         actionType: "alert",
+        // ממצא: נכון כל עוד הבדיקה נכשלת, ונסגר מעצמו כשהיא חוזרת לעבור.
+        kind: "finding" as const,
         title: `בדיקה לילית נכשלה: ${f.label}`,
         body: f.detail,
+        severity: checkSeverity(f.key),
         dedupeKey: `watchdog:${f.key}`,
       })),
       { managedKeys, recoveryNote: "הבדיקה חזרה לעבור - נסגר אוטומטית" }

@@ -48,6 +48,7 @@ const CHANNEL_COLOR: Record<string, string> = {
   google_paid: "bg-blue-50 border-blue-200 text-blue-800",
   google_organic: "bg-sky-50 border-sky-200 text-sky-800",
   meta_paid: "bg-indigo-50 border-indigo-200 text-indigo-800",
+  taboola_paid: "bg-orange-50 border-orange-200 text-orange-800",
   meta_organic: "bg-violet-50 border-violet-200 text-violet-800",
   whatsapp: "bg-green-50 border-green-200 text-green-800",
   direct: "bg-stone-50 border-stone-200 text-stone-700",

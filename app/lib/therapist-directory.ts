@@ -54,7 +54,7 @@ type TherapistRow = {
 /** slug, שם ולוגו של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
 type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null };
 
-function rowInRegion(regions: string[] | null, region: string): boolean {
+export function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
 }
 
@@ -100,6 +100,9 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     regions: t.regions ?? [],
     cultural_prefs: t.cultural_prefs ?? [],
     arrangements: t.arrangements ?? [],
+    // נטען כבר לסינון, ונשמט כאן עד 20/8/26 - ובלעדיו כרטיסי המאגר לא יכלו
+    // להחיל את כלל התואר הציבורי (הבעה ויצירה + מבוגרים ← פסיכותרפיסט/ית).
+    age_groups: t.age_groups ?? [],
     profile_photo_path: t.profile_photo_path ?? null,
     profile_photo_url,
     tier: tierOf(t),
@@ -242,6 +245,13 @@ export type DirectoryFilter = {
   assessmentType?: string;
   /** Exact value from ARRANGEMENTS - powers /therapists/arrangement/[slug]. */
   arrangement?: string;
+  /**
+   * Exact value from the therapists table ("נקבה" / "זכר"). Powers the
+   * פסיכולוגית city pages: 31% of job-title searches use the feminine form
+   * and no page answered them, while 128 of our 200 approved therapists are
+   * women. A filter, never a ranking - see topics.ts.
+   */
+  gender?: string;
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
   trainingAreasAny?: string[];
   ageGroupsAny?: string[];
@@ -288,6 +298,7 @@ function applyDirectoryFilter(data: TherapistRow[], filter?: DirectoryFilter): T
   );
   if (filter?.online) rows = rows.filter((t) => t.online === true);
   if (filter?.region) rows = rows.filter((t) => rowInRegion(t.regions, filter.region!));
+  if (filter?.gender) rows = rows.filter((t) => t.gender === filter.gender);
   if (filter?.city) rows = rows.filter((t) => (t.regions ?? []).includes(filter.city!));
   if (filter?.citiesAny?.length) {
     const wanted = new Set(filter.citiesAny);

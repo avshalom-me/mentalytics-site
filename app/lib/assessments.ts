@@ -31,6 +31,22 @@ export type AssessmentMeta = {
   whoFor: string;
   /** Who is licensed to perform it. Honest about what the title does not mean. */
   performedBy: string;
+  /**
+   * Who arrives on this page, which decides WHICH questionnaire it offers.
+   *
+   * Until 10/9/2026 the family offered no questionnaire button at all: the
+   * comment in generateMetadata argued that the matching quiz routes to
+   * therapists rather than to diagnosticians, so promising it would mislead.
+   * That was half right. The quiz does not book an assessment - but the kids
+   * questionnaire genuinely decides WHETHER an assessment is needed and WHICH
+   * one, including this exact list (see ASSESSMENT_PATTERNS in
+   * kids-recommendations.ts, which carries all seven values). A parent landing
+   * on "הערכת בשלות לגן" from organic search usually does not yet know if their
+   * child needs one, and that is the question the questionnaire answers.
+   *
+   * So the offer is orientation, never a booking, and the copy says so.
+   */
+  audience: "youth" | "adults" | "both";
   related: { href: string; label: string }[];
 };
 
@@ -46,6 +62,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
       "כשיש פער עקבי בין ההשקעה לתוצאה, כשקושי בקריאה או בחשבון נמשך למרות תרגול, כשלא ברור אם הקושי לימודי או רגשי, או כשנדרשות התאמות מתקדמות לבגרות. שימו לב: לתוספת זמן של 25% אין צורך באבחון כלל.",
     performedBy:
       "פסיכולוג מומחה שהוכשר גם בתחום הדידקטי, או צמד של מאבחן דידקטי ופסיכולוג מומחה שאחראי על האינטגרציה ועל החתימה. בישראל אין רישיון בשם \"מאבחן פסיכודידקטי\" - מה שקובע הוא ההסמכה של מי שמבצע וחותם.",
+    audience: "both", // school-age students and adults seeking bagrut/university accommodations
     related: [
       { href: "/research/psychodidactic", label: "המדריך המלא לאבחון פסיכודידקטי" },
       { href: "/research/assessments", label: "השוואה בין כל סוגי האבחונים" },
@@ -61,6 +78,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
     whoFor:
       "כשטיפול נמשך זמן רב בלי שיפור וגם המטפל וגם המטופל חשים שמשהו חסר, כשצריך אבחנה מבדלת בין מצבים דומים, או לקראת צמתים כמו ועדות רפואיות וחוות דעת.",
     performedBy: "פסיכולוג קליני מומחה, לרוב לאחר הכשרה של כעשר שנות לימודים והתמחות.",
+    audience: "both", // adults and children alike
     related: [
       { href: "/research/psychodiagnostic", label: "מה כולל אבחון פסיכודיאגנוסטי" },
       { href: "/research/assessments", label: "השוואה בין כל סוגי האבחונים" },
@@ -77,6 +95,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
       "חשד לקושי בתקשורת חברתית, דפוסים חזרתיים, קשיי ויסות חושי, או מבוגר שמזהה בעצמו מאפיינים ורוצה בירור מסודר.",
     performedBy:
       "פסיכולוג קליני לילדים, התפתחותי, שיקומי או חינוכי עם הכשרה ייעודית, לצד רכיב רפואי (פסיכיאטר ילדים, נוירולוג ילדים או רופא ילדים התפתחותי).",
+    audience: "both", // its own title says לילדים ולמבוגרים
     related: [
       { href: "/research/autism-assessment", label: "מדריך לאבחון תקשורת ואוטיזם" },
       { href: "/research/social-anxiety", label: "ההבדל בין אוטיזם לחרדה חברתית" },
@@ -92,6 +111,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
     whoFor:
       "כשיש התלבטות אמיתית לגבי המעבר, כשהצוות החינוכי מעלה ספק, כשיש עיכוב התפתחותי ידוע, או כשהילד יליד סוף השנה וההורים מתלבטים לגבי דחיית המעבר.",
     performedBy: "פסיכולוג התפתחותי או פסיכולוג חינוכי.",
+    audience: "youth", // kindergarten and first grade - only a parent ever searches this
     related: [
       { href: "/research/therapy-for-child", label: "מתי ילד צריך טיפול רגשי" },
       { href: "/research/child-emotional-developmental", label: "קשיים פיזיולוגיים שנראים כקושי רגשי" },
@@ -107,6 +127,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
     whoFor:
       "אחרי פגיעת ראש או תאונה, אחרי אירוע נוירולוגי כמו שבץ, כשיש חשד לירידה קוגניטיבית, או לקראת ועדות רפואיות שדורשות הערכה תפקודית.",
     performedBy: "נוירופסיכולוג או פסיכולוג שיקומי.",
+    audience: "both", // after injury or illness, at any age
     related: [
       { href: "/research/assessments", label: "השוואה בין כל סוגי האבחונים" },
       { href: "/research/adhd-adults", label: "אבחון ADHD למבוגרים" },
@@ -122,6 +143,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
     whoFor:
       "כשצריך כיוון לפני תחילת טיפול, כשיש שאלה ספציפית שדורשת מענה מקצועי, או כשרוצים ייעוץ חד-פעמי בלי להיכנס לתהליך אבחון מלא.",
     performedBy: "פסיכולוג קליני או פסיכולוג חינוכי.",
+    audience: "both", // the general one
     related: [
       { href: "/research/assessments", label: "השוואה בין כל סוגי האבחונים" },
       { href: "/research/which-therapy", label: "איזה טיפול מתאים לי" },
@@ -136,6 +158,7 @@ export const ASSESSMENTS: AssessmentMeta[] = [
       "מיפוי כישורים, תחומי עניין, ערכים ומאפייני אישיות ביחס לעולם העבודה, עם המלצות על כיווני תעסוקה או הכשרה. משמש גם בשיקום תעסוקתי ולעיתים נדרש בוועדות של ביטוח לאומי.",
     whoFor: "קושי בבחירת מסלול לימודים או קריירה, שינוי כיוון מקצועי, או שיקום תעסוקתי אחרי פגיעה.",
     performedBy: "פסיכולוג תעסוקתי.",
+    audience: "adults", // career and vocational rehabilitation - not a children's question
     related: [{ href: "/research/assessments", label: "השוואה בין כל סוגי האבחונים" }],
   },
 ];

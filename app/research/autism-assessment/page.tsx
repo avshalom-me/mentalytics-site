@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
-  title: "אבחון תקשורת ואוטיזם - מה הוא כולל ומתי לפנות",
-  description: "מהו אבחון תקשורת (ASD), כיצד הוא מתבצע, מה הכלים המקצועיים שבו ומתי מומלץ לפנות - מדריך מקיף להורים ולמבוגרים.",
+  title: "אבחון אוטיזם (ASD) - איך מתבצע אבחון תקשורת, למי ומתי לפנות",
+  description: "מהו אבחון אוטיזם (אבחון תקשורת ASD), כיצד הוא מתבצע, אילו כלים מקצועיים כלולים בו ומתי מומלץ לפנות - מדריך להורים ולמבוגרים על הרצף.",
   keywords: [
     "אבחון תקשורת", "אבחון אוטיזם", "ASD", "ADOS", "ADI-R",
     "רצף האוטיזם", "קשיים חברתיים", "פסיכולוג קליני", "אבחון ילדים",
   ],
   openGraph: {
-    title: "אבחון תקשורת ואוטיזם - מה הוא כולל ומתי לפנות",
+    title: "אבחון אוטיזם (ASD) - איך מתבצע אבחון תקשורת, למי ומתי לפנות",
     description: "מהו אבחון תקשורת, כיצד הוא מתבצע ומדוע אבחון כפול ומקצועי הוא קריטי - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
     locale: "he_IL",
     type: "article",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "מהו אבחון תקשורת, כיצד הוא מתבצע ומדוע הוא מפתח לשינוי?",
+  "headline": "מהו אבחון אוטיזם ותקשורת (ASD), כיצד הוא מתבצע ומדוע הוא מפתח לשינוי?",
   "description": "מהו אבחון תקשורת (ASD), כיצד הוא מתבצע, מה הכלים המקצועיים שבו ומתי מומלץ לפנות - מדריך מקיף להורים ולמבוגרים.",
   "inLanguage": "he",
   "datePublished": "2026-06-14",
@@ -68,14 +68,51 @@ const breadcrumbLd = {
   ],
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מאבחן?") are deliberately excluded - they are not
+// informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מהו אבחון אוטיזם (אבחון תקשורת)?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "אבחון תקשורת נועד לבחון לעומק האם אדם נמצא על רצף האוטיזם. מטרתו אינה רק אבחנה רשמית אלא מיפוי מדויק של מאפייני התקשורת הייחודיים, הבנת האופן שבו האדם חווה את העולם, והמלצות טיפוליות ממוקדות. האבחון בוחן אינטראקציה חברתית-רגשית, תקשורת מילולית ולא מילולית, ודפוסי התנהגות ותחומי עניין."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "כיצד מתבצע אבחון אוטיזם בישראל?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "האבחון מבוסס על אבחון כפול ומקביל: שתי הערכות עצמאיות ונפרדות על ידי שני אנשי מקצוע מתחומים שונים. הערכה רפואית מבוצעת על ידי פסיכיאטר או נוירולוג ילדים או רופא ילדים מומחה בהתפתחות הילד, והערכה פסיכולוגית על ידי פסיכולוג מוסמך. הסטנדרט הזה נדרש כדי שהממצאים יוכרו על ידי ביטוח לאומי, החינוך והרווחה."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "מתי מומלץ לפנות לאבחון אוטיזם?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "בגיל הרך, כשמזהים עיכוב בשפה, חוסר תגובה לקריאת השם, היעדר קשר עין או קושי במשחק משותף. בגיל בית הספר, כשיש קושי להשתלב חברתית, להבין קודים חברתיים, או התנהגויות נוקשות ותחומי עניין מצומצמים. בגיל ההתבגרות והבגרות, כשאדם חש שונות עמוקה, קושי חברתי מתמשך או תשישות מניסיונות מתמידים להסוות (Masking)."
+        }
+      }
+    ]
+  };
+
 export default function AutismAssessmentPage() {
   return (
     <ArticleShell
       href="/research/autism-assessment"
-      title="אבחון תקשורת ואוטיזם"
+      title="אבחון אוטיזם ותקשורת"
       sectionSlug="אבחונים-והערכות"
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
       {/* Header */}
@@ -84,7 +121,7 @@ export default function AutismAssessmentPage() {
           מידע מקצועי · אבחון תקשורת
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,4vw,2.4rem)", fontWeight: 900, color: "var(--text)", lineHeight: 1.25, letterSpacing: "-.02em", marginBottom: "16px" }}>
-          מהו אבחון תקשורת, כיצד הוא מתבצע ומדוע הוא מפתח לשינוי?
+          מהו אבחון אוטיזם ותקשורת (ASD), כיצד הוא מתבצע ומדוע הוא מפתח לשינוי?
         </h1>
         <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8 }}>
           כשעולה חשד לקושי חברתי, תקשורתי או התנהגותי - אבחון תקשורת מקצועי הוא הכלי היסודי ביותר להבנת המצב ולהתאמת המענה הנכון.

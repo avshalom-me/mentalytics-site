@@ -3,7 +3,8 @@ import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro } from "@/app/lib/specialties";
+import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug, slugToSpecialty, specialtyTitle, specialtyIntro, specialtyQuizAudience } from "@/app/lib/specialties";
+import QuizCta from "@/app/therapists/QuizCta";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -76,38 +77,29 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
       <div className="mb-8">
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי התמחות</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>{heading}</h1>
-        {list.length >= 3 && (
-          <p className="mt-2 text-sm text-stone-500">
-            {`בטיפול חכם מוצגים מטפלים שתעודותיהם אומתו בתחום${onlineHere > 0 ? ", חלקם זמינים גם אונליין" : ""}.`}
-          </p>
-        )}
+        {/* Quotable intro - see city/[city]/[topic]. Replaces a generic line
+            that said only "מוצגים מטפלים שתעודותיהם אומתו". */}
+        <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
+          {`${specialty}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בגישה ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
+        </p>
       </div>
 
-      {/* Quiz CTA - same offer as the city/region pages */}
-      <div
-        className="mb-10 flex flex-col gap-4 rounded-2xl p-6 sm:flex-row sm:items-center sm:justify-between sm:p-7"
-        style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}
-      >
-        <div>
-          <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>
-            לא בטוחים שזו הגישה המתאימה לכם?
-          </p>
-          <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
-            {"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."}
-          </p>
-        </div>
-        <Link
-          href="/adults"
-          className="shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95"
-          style={{ background: "var(--teal)", color: "#fff", borderRadius: "50px", padding: "13px 30px", fontSize: "15px" }}
-        >
-          למילוי השאלון
-        </Link>
-      </div>
+      {/* Quiz CTA - same offer as the city/region pages. It was hand-rolled
+          with href="/adults" hardcoded, which sent whoever searched
+          "הדרכת הורים" - a parent, by definition - into the questionnaire that
+          asks about themselves. QuizCta routes by the specialty instead. */}
+      <QuizCta
+        audience={specialtyQuizAudience(specialty)}
+        body={
+          specialtyQuizAudience(specialty) === "youth"
+            ? "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה מה הילד/ה עובר/ת, נמליץ על סוג הטיפול, ונתאים מטפל/ת."
+            : "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת."
+        }
+      />
 
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
-          עדיין אין מטפלים מוצגים בהתמחות זו. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
+          עדיין אין מטפלים מוצגים בהתמחות זו. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href={specialtyQuizAudience(specialty) === "youth" ? "/kids" : "/adults"} className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
         </div>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

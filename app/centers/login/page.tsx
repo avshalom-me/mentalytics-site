@@ -111,7 +111,7 @@ function CenterLoginContent() {
             {mode === "login" ? "כניסת מרכזים טיפוליים" : mode === "register" ? "הרשמת מרכז לפורטל" : "איפוס סיסמה"}
           </h1>
           <p className="mt-1 text-sm text-stone-500">
-            {mode === "register" ? "הירשמו עם המייל שאיתו קיבלתם את ההצעה" : "פורטל הניהול של המרכז"}
+            {mode === "register" ? "מקימים חשבון מרכז? הירשמו עם המייל שאליו נשלחה ההצעה. מצטרפים לצוות ניהול קיים? הירשמו עם הכתובת שלכם, ומנהל/ת קיים/ת יוסיף/תוסיף אתכם." : "פורטל הניהול של המרכז"}
           </p>
         </div>
 
@@ -148,7 +148,7 @@ function CenterLoginContent() {
         <div className="mt-6 space-y-1.5 text-center text-sm">
           {mode === "login" && (
             <>
-              <p className="text-stone-500">אין עדיין גישה? <button onClick={() => switchMode("register")} className="font-bold" style={{ color: "var(--teal)" }}>הרשמה עם מייל המרכז</button></p>
+              <p className="text-stone-500">אין עדיין גישה? <button onClick={() => switchMode("register")} className="font-bold" style={{ color: "var(--teal)" }}>הרשמה לפורטל</button></p>
               <p><button onClick={() => switchMode("reset")} className="text-stone-400 hover:underline">שכחתי סיסמה</button></p>
             </>
           )}

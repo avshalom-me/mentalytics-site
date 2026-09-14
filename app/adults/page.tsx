@@ -1,15 +1,16 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Fragment } from "react";
 import type {
   QuestionnaireAnswers,
   ScoringResult,
   Recommendation,
 } from "@/app/lib/questionnaire-types";
-import { REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
+import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
@@ -20,7 +21,9 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
-import { trackingOptedOut } from "@/app/lib/track-optout";
+import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
+import { minDwell } from "@/app/lib/min-dwell";
+import { useScreenHistory } from "@/app/lib/useScreenHistory";
 
 // Anonymous viewer context derived from the questionnaire - used for impression
 // tracking and to seed match-attribution params on the profile-page link.
@@ -40,13 +43,9 @@ function normalizeGenderKey(g: string): string | null {
 function normalizeRegionKey(r: string, online: boolean): string | null {
   if (online && !r) return "online";
   if (!r) return null;
-  if (r.includes("גוש דן") || r.includes("שפלה")) return "center";
-  if (r.includes("שרון")) return "sharon";
-  if (r.includes("ירושלים")) return "jerusalem";
-  if (r.includes("חיפה") || r.includes("קריות")) return "haifa";
-  if (r.includes("גליל") || r.includes("עמק")) return "north";
-  if (r.includes("דרום") || r.includes("באר שבע") || r.includes("אשדוד") || r.includes("אשקלון")) return "south";
-  return "other";
+  // המיפוי עצמו עבר ל-regions.ts, כדי שמי שקורא את viewer_region בחזרה
+  // (למשל סוכן פערי ההיצע) יוכל לתרגם את המפתח הגס בחזרה לאזורים אמיתיים.
+  return regionGroupOf(r);
 }
 // Maps internal questionnaire-domain keys to the analytics-issue taxonomy
 // in `app/lib/stats-categories.ts`. Keys must match the union in
@@ -405,34 +404,14 @@ type MatchPrefs = {
 
 export default function AdultsPage() {
   const [screen, setScreenRaw] = useState<Screen>("disclaimer");
-  // One step of history, deliberately not a stack. The questionnaire branches on
-  // answers, so replaying a longer trail would land people on screens their
-  // current answers no longer lead to. Going back consumes the entry, which is
-  // what keeps "back" from turning into a ping-pong between two screens.
-  const [prevScreen, setPrevScreen] = useState<Screen | null>(null);
-  // The domain and addiction cursors advance in the very handler that changes
-  // the screen, so rewinding `screen` alone leaves the cursor one step ahead:
-  // Continue then calls nextDomain() again and the domain in between is never
-  // asked - the report simply comes back missing a whole area of difficulty,
-  // with nothing on screen to say so. Captured inside setScreen because at that
-  // point in the handler the cursors still hold the values that belong to the
-  // screen being left (React has only scheduled the increment, not applied it).
-  const [prevIdx, setPrevIdx] = useState<{ domain: number; addiction: number } | null>(null);
-  const setScreen = (next: Screen) => {
-    if (next !== screen) {
-      setPrevScreen(screen);
-      setPrevIdx({ domain: domainIdx, addiction: addictionIdx });
-    }
-    setScreenRaw(next);
-  };
-  const goBack = prevScreen
-    ? () => {
-        setScreenRaw(prevScreen);
-        if (prevIdx) { setDomainIdx(prevIdx.domain); setAddictionIdx(prevIdx.addiction); }
-        setPrevScreen(null);
-        setPrevIdx(null);
-      }
-    : null;
+  // ההיסטוריה מנוהלת בדפדפן עצמו (useScreenHistory), ולא במחסנית מקבילה.
+  // עד 21/8/2026 מעבר מסך לא נגע בהיסטוריה בכלל, ולכן "חזור" של הדפדפן לא
+  // חזר שאלה אחת אלא עזב את השאלון וקפץ לדף הבית - עם כל התשובות.
+  //
+  // הצילום כולל את שני הסמנים ולא רק את המסך: הם מתקדמים באותו handler
+  // שמחליף את המסך, ולכן שחזור המסך לבדו משאיר אותם צעד קדימה - "המשך"
+  // קורא ל-nextDomain() שוב, והתחום שבאמצע לא נשאל לעולם. הדוח חוזר בלי
+  // תחום קושי שלם ובלי שום סימן על המסך.
   const [agreed, setAgreed] = useState(false);
   const [answers, setAnswers] = useState<QuestionnaireAnswers>({ age: 0, gender: "", domains: [] });
 
@@ -472,6 +451,23 @@ export default function AdultsPage() {
   const [err, setErr] = useState("");
   const [domainIdx, setDomainIdx] = useState(0);
   const [addictionIdx, setAddictionIdx] = useState(0);
+
+  const restoreScreen = (snap: { screen: Screen; domain: number; addiction: number }) => {
+    setScreenRaw(snap.screen);
+    setDomainIdx(snap.domain);
+    setAddictionIdx(snap.addiction);
+  };
+  const { pushScreen, goBack: browserBack } = useScreenHistory(
+    { screen, domain: domainIdx, addiction: addictionIdx },
+    restoreScreen,
+  );
+  const setScreen = (next: Screen) => {
+    if (next !== screen) pushScreen();
+    setScreenRaw(next);
+  };
+  // כפתור החזרה שבתוך העמוד וכפתור החזרה של הדפדפן הם אותו מסלול בדיוק,
+  // כדי ששניהם לא יוכלו להיפרד זה מזה.
+  const goBack = screen !== "disclaimer" ? browserBack : null;
   const [usageAllowed, setUsageAllowed] = useState<boolean | null>(null);
 
   // usageAllowed === false replaces the whole page with the payment block, so
@@ -533,7 +529,14 @@ export default function AdultsPage() {
     // server, which validates it against STAFF_BYPASS_TOKEN. No token literal
     // is shipped in this bundle; this flag only controls the UI optimistically.
     const staffParam = params.get("staff");
-    if (staffParam) localStorage.setItem("staff_token", staffParam);
+    if (staffParam) {
+      localStorage.setItem("staff_token", staffParam);
+      // קישור צוות מנטרל גם מדידה. בלי זה כל שאלון בדיקה של העובדת נספר
+      // כהשלמה אמיתית ומזהם בדיוק את המדדים שמהם נגזרים שיעורי ההמרה
+      // בדשבורד השיווק. נדלק פעם אחת בפתיחת הקישור ולא בכל טעינה, כדי
+      // שכפתור המדידה ב-/admin/seo יישאר הסמכות היחידה להחזיר אותה.
+      setTrackingOptOut(true);
+    }
     if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
       .then(fp => fetch(`/api/usage/check?type=adults&fp=${fp}`))
@@ -591,8 +594,11 @@ export default function AdultsPage() {
     // Attribution rides along so match-card impressions stop landing under the
     // "unknown" channel in the attribution report (they carried no channel/utm).
     const attribution = getAttribution() ?? {};
+    // הבדיקה מעל הלולאה ולא בתוכה: היא אינה תלויה בפריט, וכ-`return` בתוך
+    // לולאה היא אותה מלכודת שהקפיאה את הסבר ה-AI על "טוען" - שורת קוד
+    // שתתווסף אחריה תדולג בשקט במכשירי הצוות.
+    if (trackingOptedOut()) return;
     for (const t of matchResults) {
-      if (trackingOptedOut()) return;
       fetch("/api/track-view", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -715,6 +721,11 @@ export default function AdultsPage() {
   // FROM the occupational screen that would loop the user backwards - so the
   // bridge flips this and the handler advances to the next domain instead.
   const [execReturnsToNextDomain, setExecReturnsToNextDomain] = useState(false);
+  // Whether the executive questionnaire has already been shown in this pass.
+  // The occupational bridge routes into it once and must not offer it again -
+  // and since a screen may now be left blank on purpose, "was it shown" and
+  // "was it answered" are no longer the same question.
+  const [execSeen, setExecSeen] = useState(false);
   const [inRelationship, setInRelationship] = useState(false);
   const [hasChildren, setHasChildren] = useState(false);
   const [noRelationship, setNoRelationship] = useState(false);
@@ -784,13 +795,6 @@ export default function AdultsPage() {
     return (answers.functional?.adhd1Count ?? 0) >= 3 ? "f2-q" : "f2";
   }
 
-  // True when the executive questionnaire was already answered in this pass -
-  // the occupational bridge must not send someone back into a screen they
-  // completed minutes earlier.
-  function allExecAnswered(): boolean {
-    return execScores.length > 0 && execScores.every((v) => v > 0);
-  }
-
   function nextDomain(ao?: QuestionnaireAnswers) {
     const doms = effectiveDomains(answers.domains);
     const next = domainIdx + 1;
@@ -819,6 +823,9 @@ export default function AdultsPage() {
     setScreen("scoring");
     setLoading(true);
     setErr("");
+    // מסך "מעבד תשובות" חלף ברבע שנייה, ולכן קרא כאילו לא נשקל דבר. רצפה
+    // ולא עיכוב - ראו minDwell.
+    const scoringStartedAt = Date.now();
     const fp = await getFingerprint().catch(() => null);
     const staffToken = localStorage.getItem("staff_token") || undefined;
     try {
@@ -832,6 +839,7 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setScoring({ recommendations: json.recommendations });
+      await minDwell(scoringStartedAt);
       setScreen("results");
       // Coarse, anonymous facts alongside the completion - without these the
       // event recorded only quiz_type, so "what did the system recommend, and
@@ -851,6 +859,7 @@ export default function AdultsPage() {
       // trackQuizComplete already reports quiz_complete to GA4, matching the DB
       // event name.)
       setErr(e instanceof Error ? e.message : "שגיאה בניקוד");
+      await minDwell(scoringStartedAt);
       setScreen("results");
     } finally {
       setLoading(false);
@@ -873,6 +882,12 @@ export default function AdultsPage() {
     if (!selectedRec && !combinedTreatments) return;
     setLoading(true);
     setErr("");
+    // שליחת החיפוש בפועל, עם המיקום שנבחר - ראו trackMatchSearch.
+    trackMatchSearch("adults", {
+      region: matchPrefs.region || null,
+      city: matchPrefs.city || null,
+      online: !!matchPrefs.online,
+    });
     try {
       const styleP1 = answers.emotional?.therapistStyleQ1 ?? 0;
       const styleP2 = answers.emotional?.therapistStyleQ2 ?? 0;
@@ -904,6 +919,17 @@ export default function AdultsPage() {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "שגיאה");
       setMatchResults(json.matches ?? []);
+      // כמה אפשרויות באמת הוצגו - ראו trackMatchResults.
+      trackMatchResults("adults", {
+        region: matchPrefs.region || null,
+        city: matchPrefs.city || null,
+        online: !!matchPrefs.online,
+        returned: Array.isArray(json.matches) ? json.matches.length : 0,
+        // כמה מהם באזור שהתבקש - המדד שלפיו נבדק פיצול הקבוצות (6/9/2026).
+        local: !!(matchPrefs.city || matchPrefs.region) && Array.isArray(json.matches)
+          ? json.matches.filter((m: any) => m.in_requested_area).length
+          : undefined,
+      });
       setAddictionCbtFallback(json.addiction_cbt_fallback ?? false);
       setScreen("match-results");
     } catch (e) {
@@ -945,6 +971,9 @@ export default function AdultsPage() {
           therapist: {
             id: t.id,
             full_name: t.full_name,
+            // מגיע ממנוע ההתאמה - כדי שההסבר ינקוב באותו תואר שמופיע
+            // בכותרת הפרופיל שאליו המטופל יגיע.
+            public_title: t.public_title ?? null,
             therapist_types: t.therapist_types ?? [],
             training_areas: t.training_areas ?? [],
             couples_modalities: t.couples_modalities ?? [],
@@ -983,8 +1012,13 @@ export default function AdultsPage() {
     const firstDomain = answers.domains?.[0];
 
     // Fire-and-forget analytics event - captures who clicks and on what.
+    //
+    // התנאי עוטף את השליחה ואינו יוצא מהפונקציה. `return` כאן הפיל את כל
+    // ההסבר: מצב הטעינה כבר נדלק שורה קודם, והיציאה דילגה גם על קריאת
+    // ה-AI וגם על ניקוי הדגל - הכרטיס נתקע על "טוען" לנצח. זה קרה רק
+    // במכשירים שסימנו "אל תספור אותי", כלומר בדיוק אצלנו (24/8/2026).
     try {
-      if (trackingOptedOut()) return;
+      if (!trackingOptedOut()) {
       fetch("/api/track-explain", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1001,6 +1035,7 @@ export default function AdultsPage() {
           viewer_gender: normalizeGenderKey(answers.gender),
         }),
       }).catch(() => {});
+      }
     } catch {}
 
     try {
@@ -1169,7 +1204,7 @@ export default function AdultsPage() {
             ["emotional","/icons/emotional.svg","מורכבויות בתחום הרגשי/האישי","חרדות, מצב רוח, טראומה, שינה, אכילה"],
             ["functional","/icons/functional.svg","סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים","קשיי למידה, ריכוז, כיוון מקצועי"],
             ["relationship","/icons/relationship.png","זוגיות ומשפחה","קשיים זוגיים, הורות, מיניות"],
-            ["addiction","/icons/addiction.svg","קשיי התמכרות","אלכוהול, סמים, מסכים, הימורים"],
+            ["addiction","/icons/addiction.svg","קשיי שימוש יתר","אלכוהול, סמים, מסכים, הימורים"],
           ] as const).map(([id, icon, title, desc]) => {
             const sel = answers.domains.includes(id as any);
             return (
@@ -1240,7 +1275,6 @@ export default function AdultsPage() {
   if (screen === "e2") {
     const m1 = answers.emotional?.maniaScreen1;
     const m2 = answers.emotional?.maniaScreen2;
-    const canContinue = m1 !== undefined && (m1 === false || m2 !== undefined);
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="תחום רגשי" badgeColor="green">
@@ -1265,7 +1299,6 @@ export default function AdultsPage() {
               if (m1 && m2) setScreen("e2-q");
               else setScreen("e3");
             }}
-            nextDisabled={!canContinue}
           />
         </Card>
       </Layout>
@@ -1473,8 +1506,10 @@ export default function AdultsPage() {
           </ul>
           <NavRow
             onBack={() => setScreen("e4")}
+            // Left blank, e4Medical stays undefined and neither chronic-pain
+            // branch in the scorer fires - no finding, which is what a blank
+            // is meant to mean.
             onNext={() => setScreen("e4-q")}
-            nextDisabled={chronic && e.e4Medical === undefined}
           />
         </Card>
       </Layout>
@@ -1778,7 +1813,13 @@ export default function AdultsPage() {
                 setScreen("e10");
                 return;
               }
-              if (!traumaType) return;
+              // No type chosen reads as "no event": the Continue used to be
+              // dead here, which left the screen with no way forward at all.
+              if (!traumaType) {
+                updE({ e9: false });
+                setScreen("e10");
+                return;
+              }
               updE({
                 e9: true,
                 traumaScores,
@@ -1789,7 +1830,6 @@ export default function AdultsPage() {
               });
               setScreen("e10");
             }}
-            nextDisabled={!noTrauma && !traumaType}
           />
         </Card>
       </Layout>
@@ -1817,14 +1857,10 @@ export default function AdultsPage() {
           <ScaleRow key={i} label={q} group={`pm-${i}`} values={[1,2,3,4,5]} value={persMain[i]}
             onChange={(v) => setPersMain((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
-        {/* Both scales are required: an unanswered pair sums to 0, which reads as
-            "below threshold" and silently drops the entire personality block for
-            someone who just told us they do have a recurring difficulty. */}
-        {persMain.some((v) => !v) && (
-          <p className="mt-2 text-xs text-amber-700">יש לדרג את שתי השאלות כדי להמשיך.</p>
-        )}
+        {/* Blank sums to 0, which is under the threshold of 5 and ends the
+            personality block here - the no-difficulty reading a blank is meant
+            to carry. */}
         <NavRow onBack={() => setScreen("e10")}
-          nextDisabled={persMain.some((v) => !v)}
           onNext={() => {
             updE({ persMainScores: persMain });
             const s = persMain[0] + persMain[1];
@@ -1856,22 +1892,21 @@ export default function AdultsPage() {
             </div>
           </div>
         ))}
-        {/* All four are required. Unanswered items default to 0, so skipping the
-            screen produced a total of 0 - read below as "three or more yes" and
-            handed the user an autism-communication referral they never answered
-            for. Blocking Continue is the cheap half of the fix; the scoring side
-            refuses to act on a partial set as well. */}
-        {disQ.some((v) => !v) && (
-          <p className="mt-2 text-xs text-amber-700">יש לענות על כל ארבע השאלות כדי להמשיך.</p>
-        )}
         <NavRow
-          nextDisabled={disQ.some((v) => !v)}
           onNext={() => {
             updE({ disQAnswers: disQ });
             // 1=כן, 2=לא לכל אחד מ-4 פריטים. סכום נמוך = הרבה "כן" = סימני אוטיזם.
             // סכום <= 5 (3+ "כן") → ההפניה היא לאבחון תקשורת, מדלגים על שאלון אישיות.
+            //
+            // This is the one scale in the questionnaire that runs backwards, so
+            // it is also the one place a blank does not mean "no symptom" on its
+            // own: an unanswered item is 0, which drags the total DOWN and lands
+            // inside the autism range. All four must carry a real answer before
+            // the low total is allowed to mean anything - the same rule
+            // questionnaire-score.ts applies with disComplete.
+            const complete = disQ.every((v) => v === 1 || v === 2);
             const total = disQ.reduce((a, b) => a + b, 0);
-            setScreen(total <= 5 ? "therapist-style" : "e10c");
+            setScreen(complete && total <= 5 ? "therapist-style" : "e10c");
           }} />
       </Card>
     </Layout>
@@ -2042,8 +2077,8 @@ export default function AdultsPage() {
             onChange={(v) => setExecScores((p) => { const n = [...p]; n[i] = v; return n; })} />
         ))}
         <NavRow
-          nextDisabled={!allExecAnswered()}
           onNext={() => {
+            setExecSeen(true);
             const a = updF({ execScores });
             if (execReturnsToNextDomain) {
               setExecReturnsToNextDomain(false);
@@ -2052,14 +2087,6 @@ export default function AdultsPage() {
               setScreen("f3");
             }
           }} />
-        {/* Required, for two reasons. A partial set still cleared the >= 12
-            threshold off four items and produced a COG-FUN recommendation; and
-            the occupational bridge decides whether to route here by asking
-            allExecAnswered(), so a screen left half-filled was offered again to
-            someone who had already worked through it. */}
-        {!allExecAnswered() && (
-          <p className="mt-3 text-sm font-semibold text-amber-700">יש לדרג את כל הפריטים כדי להמשיך</p>
-        )}
       </Card>
     </Layout>
   );
@@ -2142,7 +2169,7 @@ export default function AdultsPage() {
               f2Bridge: empBChecked[4],
               f2: empBChecked[4] || (answers.functional?.f2Gate ?? false),
             });
-            if (empBChecked[4] && !allExecAnswered()) {
+            if (empBChecked[4] && !execSeen) {
               setExecReturnsToNextDomain(true);
               setScreen("f2-q");
             } else {
@@ -2230,7 +2257,6 @@ export default function AdultsPage() {
             updR({ rSingleCBTScale, rSingleDynScale });
             setScreen("r1");
           }}
-          nextDisabled={rSingleCBTScale === 0 || rSingleDynScale === 0}
         />
       </Card>
     </Layout>
@@ -2283,7 +2309,8 @@ export default function AdultsPage() {
             else if (hasChildren) { setScreen("r3-conflict"); }
             else { nextDomain(a); }
           }}
-          nextDisabled={coupleScale === 0} />
+          /* Blank stays 0, which is under the threshold of 4, so the couple
+             questionnaire is skipped and no finding is made. */ />
       </Card>
     </Layout>
   );
@@ -2313,7 +2340,8 @@ export default function AdultsPage() {
             const a = updR({ eftScores, dynScores, structScores });
             if (hasChildren) { setScreen("r3-conflict"); } else { nextDomain(a); }
           }}
-          nextDisabled={!eftScores.some(s => s > 0) || !dynScores.some(s => s > 0) || !structScores.some(s => s > 0)} />
+          /* A blank block sums to 0, and the scorer only names a winning
+             approach when the top sum is above 0. */ />
       </Card>
     </Layout>
   );
@@ -2327,10 +2355,6 @@ export default function AdultsPage() {
     const conflict = r.r3Conflict;
     const affects = r.r3AffectsAll;
     const willing = r.r3PartnerWilling;
-    const fullyAnswered =
-      conflict === false ||
-      (conflict === true && affects === false) ||
-      (conflict === true && affects === true && willing !== undefined);
     return (
       <Layout screen={screen} domains={answers.domains} onBack={goBack}>
         <Card badge="זוגיות ומשפחה">
@@ -2360,10 +2384,7 @@ export default function AdultsPage() {
               />
             </div>
           )}
-          <NavRow
-            onNext={() => setScreen("r3-child")}
-            nextDisabled={!fullyAnswered}
-          />
+          <NavRow onNext={() => setScreen("r3-child")} />
         </Card>
       </Layout>
     );
@@ -2434,8 +2455,7 @@ export default function AdultsPage() {
             if (types.length === 0) { nextDomain(); return; }
             setAddictionIdx(0);
             setScreen(addictionScreen(types[0]));
-          }}
-          nextDisabled={(answers.addiction?.types ?? []).length === 0} />
+          }} />
       </Card>
     </Layout>
   );
@@ -2628,7 +2648,12 @@ export default function AdultsPage() {
       sections.push({ key: dom, label: dom, groups: groups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom) });
     }
 
-    const renderGroupCard = (group: RecGroup) => {
+    // isPrimary: ההמלצה הראשונה בכל רובריקה מוצגת כראשית, והשאר כמשניות.
+    // מדוד 19/8/2026: מי שקיבל המלצה אחת המשיך לחיפוש ב-88%, ומי שקיבל
+    // שתיים-שלוש נפל ל-67-68%. הפער עקבי עם עומס בחירה - כמה כפתורים
+    // שווי-משקל דורשים הכרעה, וההכרעה היא שלא נעשתה. התוכן לא הוסתר: כל
+    // ההמלצות עדיין על המסך, רק שאחת מהן מובילה.
+    const renderGroupCard = (group: RecGroup, isPrimary = true) => {
       const firstRec = group.recs[0];
       const allNotes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[]));
       const notes = allNotes.length ? allNotes.join("\n\n") : undefined;
@@ -2669,7 +2694,11 @@ export default function AdultsPage() {
             <button
               type="button"
               onClick={() => { setSelectedRec(firstRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment); }}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-4 py-2 text-sm font-bold text-white transition-colors"
+              className={
+                isPrimary
+                  ? "cta-pulse-soft inline-flex w-full items-center justify-center gap-1.5 rounded-full bg-[var(--teal-dark)] hover:bg-[var(--teal)] px-5 py-3 text-base font-bold text-white shadow-sm transition-colors sm:w-auto"
+                  : "inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[var(--teal-mid)] bg-white px-4 py-2 text-sm font-bold text-[var(--teal-dark)] transition-colors hover:bg-[var(--teal-pale)]"
+              }
             >
               🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
             </button>
@@ -2679,7 +2708,7 @@ export default function AdultsPage() {
               disabled={aiLoading}
               className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold text-white shadow-sm bg-gradient-to-r from-violet-500 via-fuchsia-500 to-rose-400 hover:opacity-90 transition-all disabled:opacity-60"
             >
-              {aiLoading ? "טוען..." : "✦ למה הוצע לי?"}
+              {aiLoading ? "מעבד · כ-20 שניות" : "✦ למה הוצע לי?"}
             </button>
           </div>
           {aiData && (
@@ -2715,7 +2744,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_emotional");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--teal-dark), var(--teal))", border: "1px solid #5AADAB" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#C2DFDE]">חיפוש מתקדם ✦</div>
@@ -2746,7 +2775,7 @@ export default function AdultsPage() {
           setScreen("match-form");
           trackMatchingClick("adults", "combined_relationship");
         }}
-        className="mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
+        className="cta-pulse-soft mt-3 w-full rounded-2xl p-4 text-right transition hover:opacity-95"
         style={{ background: "linear-gradient(120deg, var(--gold-dark), var(--gold))", border: "1px solid #C8961A" }}
       >
         <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-[#FDF6E3]">חיפוש מתקדם ✦</div>
@@ -2762,6 +2791,34 @@ export default function AdultsPage() {
           <div className="mb-4 flex justify-center">
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
+
+          {/* One primary button above the report. Measured 3/9/26 over 30 days:
+              of 122 finishers who never searched, 107 never pressed any
+              per-finding button and left the results screen within ~30s
+              (median). The per-finding buttons stay exactly as they were -
+              this only puts the leading finding's search one tap away, before
+              the report, PDF and article links offer an exit. Target: the
+              urgent finding if there is one, otherwise the first primary. */}
+          {!err && recs.length > 0 && (() => {
+            const topGroup = groups.find((g) => g.urgent) ?? sections[0]?.groups[0];
+            if (!topGroup) return null;
+            const topRec = topGroup.recs[0];
+            return (
+              <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
+                <p className="mb-2.5 text-sm text-[#2a3a4a]">
+                  הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{topGroup.treatmentLabel}</span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => { setSelectedRec(topRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", topGroup.treatment, "top"); }}
+                  className="cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal-dark)] px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal)] sm:w-auto"
+                >
+                  🔍 מצא/י לי מטפל - {topGroup.treatmentLabel} ←
+                </button>
+                <p className="mt-2 text-xs text-gray-500">הדוח המלא, הכלים והאפשרויות הנוספות - למטה</p>
+              </div>
+            );
+          })()}
 
           {/* Summary + demographics + "what now?" */}
           <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-5 mb-4">
@@ -2784,7 +2841,7 @@ export default function AdultsPage() {
                       emotional: "מורכבויות בתחום הרגשי/האישי",
                       functional: "תחומים תפקודיים / תעסוקתיים / אקדמאיים",
                       relationship: "זוגיות ומשפחה",
-                      addiction: "קשיי התמכרות",
+                      addiction: "קשיי שימוש יתר",
                       personal_development: "התפתחות אישית",
                     } as Record<string, string>)[d] ?? d}</span>
                   </div>
@@ -2864,6 +2921,10 @@ export default function AdultsPage() {
                   setSelectedRec({ id: "default", symptomText: "לא נמצאו ממצאים מובהקים", treatment: "טיפול דינאמי", treatmentLabel: "טיפול דינאמי", domain: "מורכבויות בתחום הרגשי/האישי", urgent: false });
                   setCombinedTreatments(null);
                   setScreen("match-form");
+                  // המסלול הזה לא דיווח matching_click, ולכן מי שהגיע ממנו
+                  // נראה במשפך כמי שסיים שאלון ולא חיפש מעולם. נדיר (3 סשנים
+                  // ב-30 יום) אבל מזייף בדיוק את המדד שאנחנו חוקרים.
+                  trackMatchingClick("adults", "טיפול דינאמי");
                 }}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-[var(--teal-dark)] px-3 py-2 text-xs font-bold text-white hover:bg-[var(--teal)] transition-colors"
               >
@@ -2883,7 +2944,7 @@ export default function AdultsPage() {
                 <div className="h-px flex-1 bg-gray-200" />
               </div>
               <div className="space-y-3">
-                {section.groups.map((group) => renderGroupCard(group))}
+                {section.groups.map((group, i) => renderGroupCard(group, i === 0))}
               </div>
               {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
               {section.key === RELATIONSHIP_DOMAIN && showRelationshipCombined && renderCombinedRelationshipButton()}
@@ -2897,6 +2958,24 @@ export default function AdultsPage() {
             מומלץ לפנות לאיש מקצוע מוסמך לצורך הערכה מלאה.
           </div>
           <p className="mt-3 text-center text-xs text-gray-400">טיפול חכם</p>
+
+          {/* שמירת ההמלצות (וואטסאפ / העתקת קישור) הוסרה זמנית ב-19/8/2026 בהחלטת
+              הבעלים: הערך שלה לא הוכח - 14 קישורים בארבעה שבועות, מהם 5 חזרות
+              אמיתיות ו-2 לחיצות ליצירת קשר - והמסך שאליו הובילה שלח את מי שלחץ
+              "להמשך" בחזרה אל האישור המשפטי. הבאג ההוא תוקן ב-/match/[token],
+              והעמוד נשאר חי כי יש כבר קישורים שמורים אצל אנשים. להחזרה: להסיר
+              את ההערה כאן ולייבא שוב את SaveRecommendationsButton.
+          <div className="mt-5 rounded-2xl border p-4 print:hidden" data-html2canvas-ignore="true"
+            style={{ borderColor: "var(--teal-mid)", background: "var(--teal-pale)" }}>
+            <p className="mb-1 text-sm font-bold" style={{ color: "var(--teal-dark)" }}>רוצים לחשוב על זה?</p>
+            <p className="mb-3 text-xs leading-6 text-stone-600">
+              שמרו את ההמלצות ותוכלו לחזור לכאן בכל עת, גם ממכשיר אחר. השאלון עצמו אינו נשמר.
+            </p>
+            <SaveRecommendationsButton
+              quizType="adults"
+              treatments={recommendationGroups.map((g) => g.treatmentLabel)}
+            />
+          </div> */}
 
           {/* Actions */}
           <div className="mt-4 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
@@ -3091,7 +3170,18 @@ export default function AdultsPage() {
         </div>
       )}
       <div className="space-y-4">
-        {(matchResults ?? []).map((t: any) => {
+        {(() => {
+          // שתי קבוצות: באזור שבחרת, ואחריה מחוץ לו. השרת כבר ממיין כך, אבל
+          // הכותרות והתווית נקבעות כאן, ולכן החלוקה נעשית גם כאן במפורש.
+          // בלי מיקום מבוקש אין קבוצות - הכל נחשב "באזור".
+          const all: any[] = matchResults ?? [];
+          const locationAsked = !!(matchPrefs.city || matchPrefs.region);
+          const localCount = locationAsked ? all.filter((m) => m.in_requested_area).length : all.length;
+          const ordered = locationAsked
+            ? [...all.filter((m) => m.in_requested_area), ...all.filter((m) => !m.in_requested_area)]
+            : all;
+          return ordered.map((t: any, idx: number) => {
+          const away = locationAsked && !t.in_requested_area;
           const overall = t.combined_score ?? t.match_score;
           // Same derivation the request body used, so the badge can never claim
           // an approach the search did not actually ask for.
@@ -3104,8 +3194,28 @@ export default function AdultsPage() {
             String(m).trim().toLowerCase() === String(p).trim().toLowerCase()));
           const matchesPref = matchedMods.length > 0;
           return (
+            <Fragment key={t.id}>
+            {locationAsked && idx === 0 && localCount > 0 && localCount < ordered.length && (
+              <div className="flex items-center gap-2 pt-1">
+                <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרת</span>
+                <span className="h-px flex-1 bg-[var(--line)]" />
+              </div>
+            )}
+            {away && idx === localCount && (
+              <div className="pt-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-extrabold text-[var(--text-2)]">מחוץ לאזור שבחרת</span>
+                  <span className="h-px flex-1 bg-[var(--line)]" />
+                </div>
+                <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                  {localCount === 0
+                    ? "לא מצאנו מטפלים באזור שבחרת. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים"
+                    : "מטפלים מאזורים סמוכים"}
+                  {matchPrefs.online ? " ומטפלים שעובדים אונליין" : ""}. ההתאמה המקצועית שלהם מסומנת במילים ולא באחוז, כי המרחק לא נכלל בחישוב.
+                </p>
+              </div>
+            )}
             <div
-              key={t.id}
               className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
             >
               <div className="flex items-stretch gap-4">
@@ -3136,7 +3246,16 @@ export default function AdultsPage() {
                   <p className="mt-0.5 text-xs text-[var(--muted)]">{t.entity_type === "center" ? "מרכז טיפולי" : t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
                   {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
                   {t.regions?.length > 0 && (
-                    <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}</p>
+                    <p className="mt-1.5 text-xs text-[var(--muted)]">
+                      📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}
+                      {/* המרחק יצא מהציון, ולכן הוא מסומן כאן במפורש במקום
+                          להיבלע בתוך אחוז אחד. */}
+                      {t.in_requested_area && (
+                        <span className="ms-1.5 inline-block rounded-full bg-[var(--teal-pale)] px-2 py-0.5 text-[11px] font-bold text-[var(--teal-dark)]">
+                          ✓ באזור שלך
+                        </span>
+                      )}
+                    </p>
                   )}
                   {matchesPref && (
                     <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
@@ -3144,11 +3263,20 @@ export default function AdultsPage() {
                     </div>
                   )}
                 </div>
+                {away ? (
+                  // מחוץ לאזור: מילים במקום אחוז, כדי שהמספר לא יתחרה במספר של
+                  // מי שקרוב (ראו app/lib/match-card-label.ts).
+                  <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
+                    <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
+                    <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
+                    <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!matchPrefs.online, t.online)}</div>
+                  </div>
+                ) : (
                 <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
                   <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
                     {overall}<span className="align-super text-base font-extrabold">%</span>
                   </div>
-                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה"}</div>
+                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה מקצועית"}</div>
                   {t.personality_score != null && (
                     <>
                       <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
@@ -3159,21 +3287,20 @@ export default function AdultsPage() {
                     </>
                   )}
                 </div>
+                )}
               </div>
-              {t.entity_type === "center" && t.personality_score != null && (
+              {/* ההערה מסבירה את הכוכבית שליד המספר האישיותי - ולכרטיס מחוץ
+                  לאזור אין מספר, אז גם לא הערה. */}
+              {t.entity_type === "center" && t.personality_score != null && !away && (
                 <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
                   * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית.
                 </p>
               )}
               <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                {profileHrefForMatch(t) && (
-                  <a
-                    href={profileHrefForMatch(t)!}
-                    className="inline-flex items-center gap-1.5 rounded-full bg-[var(--teal)] px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal-dark)]"
-                  >
-                    פרופיל מלא ←
-                  </a>
-                )}
+                {/* וואטסאפ ראשון ומלא, הפרופיל אחריו כמשני: 14 מתוך 17 הפניות
+                    של מסיימי שאלון הגיעו מהכפתור הזה ורק 3 מהפרופיל (17/8/2026),
+                    בזמן שהפרופיל היה הכפתור הבולט והוואטסאפ הקטן והאחרון. */}
+                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
                 <button
                   onClick={() => fetchExplanation(t)}
                   disabled={explainLoading[t.id]}
@@ -3183,9 +3310,17 @@ export default function AdultsPage() {
                     className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
                     style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
                   >✦</span>
-                  {explainLoading[t.id] ? "טוען..." : "למה הותאמ/ה לי?"}
+                  {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
                 </button>
-                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                {profileHrefForMatch(t) && (
+                  <a
+                    href={profileHrefForMatch(t)!}
+                    className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)]"
+                    style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
+                  >
+                    פרופיל מלא ←
+                  </a>
+                )}
               </div>
               {explainData[t.id] && (
                 <div
@@ -3208,8 +3343,10 @@ export default function AdultsPage() {
                 </div>
               )}
             </div>
+            </Fragment>
           );
-        })}
+          });
+        })()}
       </div>
     </Layout>
   );

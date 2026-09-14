@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import HelpTip from "../components/HelpTip";
+import AgentFindings from "../components/AgentFindings";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE, labelOf } from "@/app/lib/crm";
 
 type MonthRow = {
@@ -287,6 +288,10 @@ export default function FinancePage() {
         {error && (
           <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
         )}
+
+        {/* פערי גבייה שסוכן הכספים מצא - כאן, ליד המספרים שהם מדברים עליהם */}
+        <AgentFindings agent="finance" title="פערים בין קידום לחיוב (מהסוכן)" limit={12} />
+
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
 
         {!loading && current && (

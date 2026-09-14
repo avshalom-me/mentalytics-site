@@ -54,9 +54,26 @@ export function telHref(phone: string | null | undefined): string | null {
 export const WHATSAPP_MESSAGE =
   'שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול';
 
-/** wa.me link with the prewritten message, or null when the number is unusable. */
+/**
+ * האם המספר הוא נייד ישראלי. בצורה הלאומית (בלי האפס המוביל) נייד מתחיל
+ * תמיד ב-5; כל השאר קווי - 02/03/04/08/09 אזוריים, ו-072/073/077 VoIP.
+ */
+export function isMobileNumber(phone: string | null | undefined): boolean {
+  const digits = phoneNationalDigits(phone);
+  return !!digits && digits.startsWith("5");
+}
+
+/**
+ * wa.me link with the prewritten message, or null when the number is unusable.
+ *
+ * **קווי מוחזר כ-null בכוונה (21/8/2026):** אין וואטסאפ למספר נייח, ולכן
+ * הכפתור היה נפתח על שיחה ריקה. אצל מטפלים זה תיאורטי - כל 170 המוצגים
+ * רשמו נייד - אבל מרכזים רושמים מרכזייה: עמוד "מרכז CBT" הציג כפתור
+ * וואטסאפ אל 04-6157797, ומכון הכרה אל 077-8052051. הכפתור פשוט נעלם
+ * עכשיו, וכפתור החיוג - שדווקא עובד - נשאר.
+ */
 export function waLinkFor(phone: string | null | undefined): string | null {
   const digits = phoneNationalDigits(phone);
-  if (!digits) return null;
+  if (!digits || !digits.startsWith("5")) return null;
   return `https://wa.me/972${digits}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 }

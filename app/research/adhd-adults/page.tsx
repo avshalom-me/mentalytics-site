@@ -5,32 +5,77 @@ import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/adhd-adults" },
-  title: "אבחון ADHD למבוגרים",
-  description: "מה כולל אבחון ADHD למבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
+  title: "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים: מי מוסמך, כמה עולה ומה הלאה",
+  description: "מה כולל אבחון הפרעת קשב וריכוז (ADHD) במבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
 };
 
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "אבחון ADHD למבוגרים",
-  "description": "מה כולל אבחון ADHD למבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות.",
+  "headline": "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים",
+  "description": "מה כולל אבחון הפרעת קשב וריכוז במבוגרים, מי עושה אותו, כמה עולה ומה עושים עם התוצאות.",
   "inLanguage": "he",
   "author": { "@type": "Organization", "name": "טיפול חכם" },
   "publisher": { "@type": "Organization", "name": "טיפול חכם", "url": "https://www.mentalytics.co.il" },
   "url": "https://www.mentalytics.co.il/research/adhd-adults",
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מאבחן?") are deliberately excluded - they are not
+// informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מי מוסמך לבצע אבחון הפרעת קשב וריכוז (ADHD) במבוגרים?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "פסיכולוג קליני או חינוכי עם הכשרה באבחון נוירופסיכולוגי הוא הנפוץ ביותר. פסיכיאטר יכול לאבחן וגם לרשום תרופות, אך לרוב האבחון פחות מעמיק. נוירולוג פחות נפוץ לאבחון ADHD בלבד. חשוב: לא כל \"בדיקת ADHD\" מקוונת מהווה אבחון תקף."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "מה כולל אבחון ADHD למבוגרים?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "ראיון קליני מעמיק על תפקוד בעבר ובהווה, שאלונים סטנדרטיים כמו Conners, CAARS ו-Brown, מבחנים קוגניטיביים לבדיקת קשב, זיכרון עבודה ומהירות עיבוד, ושלילת אבחנות אחרות - חרדה, דיכאון והפרעות שינה יכולות לחקות ADHD. לעיתים נוסף דיווח מבן/בת זוג או הורה על ההתנהגות בסביבות שונות."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "כמה עולה אבחון ADHD למבוגרים?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "בשוק הפרטי העלות נעה בין 1,500 ל-4,000 שקלים, תלוי במאבחן ובהיקף האבחון."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "מה עושים אחרי אבחון ADHD?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "פסיכיאטר יכול לרשום טיפול תרופתי, שיעיל מאוד לחלק מהמקרים. CBT ממוקד ADHD עוזר בניהול זמן, ארגון ורגולציה רגשית. אימון (Coaching) מסייע לתפקוד יומיומי. הדוח עצמו פותח דלתות להתאמות בבחינות ובעבודה. אבחון ADHD אינו גזר דין, הוא הסבר וכלי."
+        }
+      }
+    ]
+  };
+
 export default function AdhdAdultsPage() {
   return (
     <ArticleShell
       href="/research/adhd-adults"
-      title="אבחון ADHD למבוגרים"
+      title="אבחון הפרעת קשב וריכוז במבוגרים"
       sectionSlug="אבחונים-והערכות"
     >
-      <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון ADHD למבוגרים" />
+      <ResearchBreadcrumbLd slug="adhd-adults" title="אבחון הפרעת קשב וריכוז (ADHD) במבוגרים" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
 
-      <h1 className="text-3xl font-black text-stone-900 mb-3">אבחון ADHD למבוגרים</h1>
+      <h1 className="text-3xl font-black text-stone-900 mb-3">אבחון הפרעת קשב וריכוז (ADHD) במבוגרים</h1>
       <p className="text-stone-600 leading-7 mb-8">
         רבים מגיעים לאבחון ADHD רק בבגרות - לאחר שנים של תחושת "משהו לא עובד" בלי הסבר. האבחון יכול להיות נקודת מפנה משמעותית.
       </p>

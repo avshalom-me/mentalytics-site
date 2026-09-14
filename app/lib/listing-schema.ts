@@ -1,5 +1,5 @@
 import { therapistPath } from "@/app/lib/therapist-url";
-import { genderTitle } from "@/app/lib/gender-text";
+import { publicTherapistTitle } from "@/app/lib/gender-text";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -28,7 +28,9 @@ export function listingItemSchema(t: PublicTherapist) {
   return {
     "@type": "Person",
     name: t.full_name,
-    jobTitle: t.therapist_types[0] ? genderTitle(t.therapist_types[0], t.gender) : undefined,
+    jobTitle: t.therapist_types[0]
+      ? publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups)
+      : undefined,
     url: `${BASE}${therapistPath(t.id, t.full_name)}`,
   };
 }

@@ -3,14 +3,14 @@ import type { Metadata } from "next";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
-  title: "אבחון פסיכודיאגנוסטי - לראות את התמונה המלאה",
+  title: "אבחון פסיכודיאגנוסטי - אילו מבחנים, כמה מפגשים ומתי כדאי לפנות",
   description: "מהו אבחון פסיכודיאגנוסטי, אילו מבחנים הוא כולל, כמה מפגשים הוא נמשך ומתי כדאי לפנות אליו - ולמה דווקא הוא מזהה דברים שאבחונים ממוקדים יותר מפספסים.",
   keywords: [
     "אבחון פסיכודיאגנוסטי", "אבחון פסיכולוגי", "פסיכולוג קליני", "מבחן רורשאך",
     "אבחון נפשי", "מבנה אישיות", "תוכנית טיפולית", "אבחון מעמיק",
   ],
   openGraph: {
-    title: "אבחון פסיכודיאגנוסטי - לראות את התמונה המלאה",
+    title: "אבחון פסיכודיאגנוסטי - אילו מבחנים, כמה מפגשים ומתי כדאי לפנות",
     description: "מהו האבחון הפסיכולוגי המעמיק ביותר, מה הוא כולל ומתי הוא חיוני - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
     locale: "he_IL",
     type: "article",
@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 const jsonLd = {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "לראות את התמונה המלאה: מהו אבחון פסיכודיאגנוסטי ומתי הוא המפתח לשינוי?",
+  "headline": "מהו אבחון פסיכודיאגנוסטי, אילו מבחנים הוא כולל ומתי הוא המפתח לשינוי?",
   "description": "מהו אבחון פסיכודיאגנוסטי, מה הוא כולל, מתי כדאי לפנות אליו ואיך הוא יכול להיות המפתח לשינוי אמיתי.",
   "inLanguage": "he",
   "datePublished": "2026-06-14",
@@ -68,6 +68,42 @@ const breadcrumbLd = {
   ],
 };
 
+
+// Questions the page answers in its own body, nothing invented: an assistant
+// quoting this page should be quoting what a reader sees. CTA headings that end
+// in a question mark ("מחפשים מאבחן?") are deliberately excluded - they are not
+// informational Q&A and Google's guidelines exclude them.
+const faqLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+      {
+        "@type": "Question",
+        "name": "מהו אבחון פסיכודיאגנוסטי?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "הערכה פסיכולוגית מקיפה ומעמיקה, המבוצעת לרוב על ידי פסיכולוגים קליניים שעברו הכשרה של כעשר שנות לימודים והתמחות. המטרה אינה להדביק תווית או אבחנה רשמית, אלא לשרטט מפה מפורטת של מבנה האישיות ומתוכה להתוות תוכנית טיפולית מותאמת."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "אילו מבחנים כולל אבחון פסיכודיאגנוסטי וכמה מפגשים הוא נמשך?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "האבחון מורכב מסדרה של פגישות, לרוב בין שתיים לארבע, הכוללות ראיון קליני מעמיק, מבחנים אובייקטיביים ומבחני ביצוע כמו מבחני אינטליגנציה וזיכרון ושאלונים עצמיים, ומבחנים השלכתיים כמו רורשאך או מבחני ציורים וסיפורים."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "מתי כדאי לפנות לאבחון פסיכודיאגנוסטי?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "כשיש ערפל טיפולי, כלומר המטופל בטיפול זמן רב ללא שיפור ותחושה שמשהו חסר. לצורך אבחנה מבדלת, כשקשה להבחין בין מצבים נפשיים דומים. לקראת צמתים משמעותיים כמו ועדות רפואיות, קביעת אחוזי נכות, התאמות תעסוקתיות או צבאיות וחוות דעת משפטיות. ואצל ילדים ונוער, לעיתים קרובות עבור ועדות והתאמה למסגרות טיפוליות."
+        }
+      }
+    ]
+  };
+
 export default function PsychodiagnosticPage() {
   return (
     <ArticleShell
@@ -76,6 +112,7 @@ export default function PsychodiagnosticPage() {
       sectionSlug="אבחונים-והערכות"
     >
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\u003c") }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
       {/* Header */}
@@ -84,7 +121,7 @@ export default function PsychodiagnosticPage() {
           מידע מקצועי · אבחון פסיכולוגי
         </p>
         <h1 style={{ fontSize: "clamp(1.8rem,4vw,2.4rem)", fontWeight: 900, color: "var(--text)", lineHeight: 1.25, letterSpacing: "-.02em", marginBottom: "16px" }}>
-          לראות את התמונה המלאה: מהו אבחון פסיכודיאגנוסטי ומתי הוא המפתח לשינוי?
+          מהו אבחון פסיכודיאגנוסטי, אילו מבחנים הוא כולל ומתי הוא המפתח לשינוי?
         </h1>
         <p style={{ fontSize: "15px", color: "var(--text-2)", lineHeight: 1.8 }}>
           כשטיפול שיחתי מרגיש כאילו הוא &ldquo;מדשדש במקום&rdquo; - לעיתים מה שחסר הוא מפה מדויקת של האישיות. זה בדיוק מה שאבחון פסיכודיאגנוסטי מספק.
