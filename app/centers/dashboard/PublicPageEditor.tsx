@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
+import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
 
 // עורך העמוד הציבורי של המרכז - קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
 // תרנדר את הדף המארח). מוצגת בעמוד העריכה /centers/dashboard/profile.
@@ -14,7 +15,12 @@ export type PublicPage = {
   managers: string | null;
   city: string | null;
   website: string | null;
+  /** טלפון לחיוג - מוצג באתר. */
   phone: string | null;
+  /** וואטסאפ עסקי לפניות מטופלים - נייד, מוצג באתר ובכרטיסים. */
+  whatsapp: string | null;
+  /** טלפון איש הקשר של החשבון - פנימי, לקריאה בלבד כאן. */
+  account_phone: string | null;
   founded_year: number | null;
   team_size: number | null;
   address: string | null;
@@ -39,6 +45,7 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
   const [city, setCity] = useState(initial.city ?? "");
   const [website, setWebsite] = useState(initial.website ?? "");
   const [phone, setPhone] = useState(initial.phone ?? "");
+  const [whatsapp, setWhatsapp] = useState(initial.whatsapp ?? "");
   const [slug, setSlug] = useState(initial.slug);
   const [logoPath, setLogoPath] = useState<string | null>(initial.logo_path);
   const [logoPreview, setLogoPreview] = useState<string | null>(initial.logo_url);
@@ -167,6 +174,7 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
           public_city: city,
           public_website: website,
           public_phone: phone,
+          public_whatsapp: whatsapp,
           logo_path: logoPath,
           team_members: team.filter((m) => m.name.trim()).map((m) => ({ name: m.name.trim(), role: m.role.trim(), photo_path: m.photo_path })),
           gallery: gallery.map((g) => ({ path: g.path, caption: g.caption.trim() || null })),
@@ -371,10 +379,33 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון ציבורי</label>
-          <input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr"
+          <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון לחיוג (מוצג באתר)</label>
+          <input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" placeholder="למשל 072-2119500 או 03-1234567"
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+          <p className="mt-1 text-[11.5px] leading-4 text-stone-500">כפתור החיוג בעמוד המרכז. יכול להיות מרכזייה או קו וירטואלי.</p>
         </div>
+      </div>
+
+      {/* שני מספרים שונים לשני כפתורים שונים. עד 15/9/26 היה שדה אחד, ומרכז
+          עם מרכזייה לשיחות לא יכול היה להציג וואטסאפ; ושום דבר לא אמר שהשדה
+          קובע את הכפתור. הבלוק מפריד במפורש בין העסקי (מפורסם) לפרטי (לא). */}
+      <div className="mt-3 rounded-xl border border-green-200 bg-green-50/60 p-3">
+        <label className="mb-1 block text-sm font-semibold text-stone-800">וואטסאפ עסקי לפניות מטופלים (מוצג באתר ובכרטיסים)</label>
+        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="נייד, למשל 052-1234567"
+          className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+        {(() => {
+          const typed = whatsapp.trim();
+          if (typed && !phoneNationalDigits(typed)) return <p className="mt-1 text-[11.5px] font-bold text-red-600">זה לא נראה כמו מספר טלפון.</p>;
+          if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11.5px] font-bold text-red-600">חייב להיות נייד (מתחיל ב-05). לקו נייח או וירטואלי אין וואטסאפ, והשמירה תידחה.</p>;
+          if (!typed && isMobileNumber(phone)) return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">השדה ריק, ולכן כפתור הוואטסאפ משתמש בינתיים בטלפון לחיוג ({phone.trim()}), כי הוא נייד. אפשר להשאיר כך או לרשום כאן מספר אחר.</p>;
+          if (!typed) return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">ריק = אין כפתור וואטסאפ. מטופלים יוכלו לחייג או לשלוח הודעה דרך האתר.</p>;
+          return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">מטופלים שילחצו על &quot;שליחת וואטסאפ&quot; יגיעו למספר הזה, עם הודעת פתיחה מוכנה.</p>;
+        })()}
+        <p className="mt-2 text-[11.5px] leading-4 text-stone-500">
+          זה מספר <b>עסקי</b> שכל גולש רואה. הטלפון שאיתו נרשמתם למנוי
+          {initial.account_phone ? <> (<span dir="ltr">{initial.account_phone}</span>)</> : null}
+          {" "}הוא איש הקשר של החשבון - פנימי, לא מוצג באתר, ולא משמש לוואטסאפ.
+        </p>
       </div>
 
       {/* מידע פרקטי - השאלות האמיתיות של פונה חרד */}

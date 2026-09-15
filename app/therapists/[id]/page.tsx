@@ -11,7 +11,7 @@ import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/ther
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
-import { waLinkFor, telHref } from "@/app/lib/phone";
+import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, telHref } from "@/app/lib/phone";
 import { siteAuthorProfileFields } from "@/app/lib/author";
 
 const BASE_URL = "https://www.mentalytics.co.il";
@@ -47,11 +47,11 @@ type TherapistRow = {
  */
 async function getAffiliatedCenter(
   centerId: string | null
-): Promise<{ name: string; slug: string; phone: string | null } | null> {
+): Promise<{ name: string; slug: string; phone: string | null; whatsapp: string | null } | null> {
   if (!centerId) return null;
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("name, slug, phone, public_phone")
+    .select("name, slug, phone, public_phone, public_whatsapp")
     .eq("id", centerId)
     .eq("status", "active")
     .not("slug", "is", null)
@@ -64,10 +64,14 @@ async function getAffiliatedCenter(
     const x = typeof v === "string" ? v.trim() : "";
     return x.length > 0 ? x : null;
   };
+  const phone = clean(data.public_phone) ?? clean(data.phone);
   return {
     name: data.name as string,
     slug: data.slug as string,
-    phone: clean(data.public_phone) ?? clean(data.phone),
+    phone,
+    // הוואטסאפ העסקי של המרכז (15/9/26), ובלעדיו הקו לחיוג אם הוא נייד - כמו
+    // שהיה. מרכז עם מרכזייה יכול עכשיו לתת למטפלים שלו וואטסאפ בלי קו אישי.
+    whatsapp: centerWhatsAppNumber(data.public_whatsapp as string | null, phone),
   };
 }
 
@@ -259,8 +263,9 @@ export default async function TherapistProfilePage({
   // רק טופס הודעה - וזה מה שקרה לשמעון ערנרייך, מקודם ומשולם, עד 21/8/2026.
   const ownPhone = (t.phone ?? "").trim();
   const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
+  const centerWhatsapp = ownPhone ? null : affiliatedCenter?.whatsapp ?? null;
   const contactPhone = ownPhone || centerPhone;
-  const waLink = waLinkFor(contactPhone);
+  const waLink = ownPhone ? waLinkFor(ownPhone) : waLinkForCenter(centerWhatsapp);
   const telLink = telHref(contactPhone);
 
   const jsonLd = {
@@ -383,7 +388,7 @@ export default async function TherapistProfilePage({
                 telLink={telLink}
                 source={source}
                 mobileSticky
-                viaCenterName={centerPhone ? affiliatedCenter?.name ?? null : null}
+                viaCenterName={centerPhone || centerWhatsapp ? affiliatedCenter?.name ?? null : null}
               />
             )}
           </div>

@@ -77,3 +77,53 @@ export function waLinkFor(phone: string | null | undefined): string | null {
   if (!digits || !digits.startsWith("5")) return null;
   return `https://wa.me/972${digits}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
 }
+
+// ── מרכזים ───────────────────────────────────────────────────────────────────
+
+/** נוסח הפתיחה לוואטסאפ של מרכז - ברבים, כי הנמען הוא צוות ולא אדם. */
+export const CENTER_WHATSAPP_MESSAGE =
+  'שלום, הגעתי אליכם דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי טיפול במרכז';
+
+/**
+ * המספר שכפתור הוואטסאפ של מרכז מוביל אליו, או null כשאין כזה.
+ *
+ * למרכז שני שדות ציבוריים: public_whatsapp (וואטסאפ עסקי, נייד) ו-public_phone
+ * (טלפון לחיוג, לרוב מרכזייה). עד 15/9/2026 היה רק השני, והוואטסאפ נגזר ממנו
+ * אם במקרה היה נייד. הסדר כאן שומר על זה: השדה המפורש קודם, ובלעדיו - הטלפון
+ * לחיוג אם הוא נייד. כך מרכז שרשם נייד בשדה הישן לא מאבד את הכפתור, ומרכז
+ * עם מרכזייה יכול סוף סוף להציג וואטסאפ בלי לוותר על קו החיוג.
+ *
+ * מחזיר את המספר כפי שנשמר (לא מנורמל) - הקישור עצמו נבנה ב-waLinkForCenter.
+ */
+export function centerWhatsAppNumber(
+  publicWhatsapp: string | null | undefined,
+  publicPhone: string | null | undefined,
+): string | null {
+  if (isMobileNumber(publicWhatsapp)) return String(publicWhatsapp).trim();
+  if (isMobileNumber(publicPhone)) return String(publicPhone).trim();
+  return null;
+}
+
+/** קישור wa.me למרכז - כמו waLinkFor, עם נוסח הפתיחה ברבים. */
+export function waLinkForCenter(phone: string | null | undefined): string | null {
+  const digits = phoneNationalDigits(phone);
+  if (!digits || !digits.startsWith("5")) return null;
+  return `https://wa.me/972${digits}?text=${encodeURIComponent(CENTER_WHATSAPP_MESSAGE)}`;
+}
+
+/**
+ * אימות לשמירת וואטסאפ עסקי, משותף לפורטל ולאדמין. ריק = מחיקה (null).
+ * כל דבר שאינו נייד ישראלי נדחה עם הסבר, במקום להישמר ולייצר כפתור שפותח
+ * שיחה ריקה - התקלה שהייתה בעמוד "מרכז CBT" עם 04-6157797 עד 21/8/2026.
+ */
+export function validateCenterWhatsApp(
+  raw: unknown,
+): { ok: true; value: string | null } | { ok: false; error: string } {
+  const v = typeof raw === "string" ? raw.trim().slice(0, 40) : "";
+  if (!v) return { ok: true, value: null };
+  if (!phoneNationalDigits(v)) return { ok: false, error: "וואטסאפ עסקי: זה לא נראה כמו מספר טלפון" };
+  if (!isMobileNumber(v)) {
+    return { ok: false, error: "וואטסאפ עסקי חייב להיות מספר נייד ישראלי (מתחיל ב-05). לקו נייח או וירטואלי אין וואטסאפ" };
+  }
+  return { ok: true, value: v };
+}

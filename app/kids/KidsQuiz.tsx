@@ -2124,6 +2124,7 @@ type KidsMatchResult = {
   email: string | null;
   profile_photo_url: string | null;
   entity_type: string | null; // 'center' = מרכז טיפולי כישות (מסלול 2)
+  center_whatsapp?: string | null; // הוואטסאפ העסקי של המרכז, כשיש (15/9/26)
   profile_slug: string | null; // עמוד הפרופיל הציבורי של המרכז (מסלול 2)
   match_score: number;
   personality_score: number | null;
@@ -2630,11 +2631,12 @@ function KidsMatchSection({ A, score, selection }: {
                       )}
                       <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
                         {/* אותה היררכיה כמו במבוגרים - ראו ההערה שם ובקומפוננטה. */}
+                        {t.entity_type === "center" && t.center_whatsapp && (
+                          <MatchCardWhatsApp therapistId={t.id} phone={t.center_whatsapp} centerMode />
+                        )}
                         {t.entity_type === "center" && (
-                          // מרכז לא מקבל וואטסאפ בכרטיס (הקו שלו אינו נייד ואינו משודר מה-API),
-                          // ועד עכשיו לא היה לו שום כפתור פנייה - רק "למה הותאם" ו"פרופיל מלא".
-                          // ההודעה נשלחת למייל המרכז ונספרת כלחיצה מההתאמות, באותו מקום
-                          // ראשון שבו יושב הוואטסאפ של מטפל בודד.
+                          // הודעה למרכז - למייל המרכז, נספרת כלחיצה מההתאמות. הוואטסאפ של
+                          // המרכז (public_whatsapp, 15/9/26) יושב לפניה כשקיים, כמו אצל מטפל.
                           <CenterMessageButton
                             entityId={t.id}
                             centerName={t.full_name ?? "המרכז"}

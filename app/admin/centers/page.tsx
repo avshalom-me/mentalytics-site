@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
+import { isMobileNumber } from "@/app/lib/phone";
 
 // מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -39,6 +40,7 @@ type Center = {
     page_views_30: number; page_views_total: number;
     website_clicks_30: number; website_clicks_total: number;
     page_contact_30: number; page_contact_total: number;
+    card_contact_30: number; card_contact_total: number;
     site_messages_30: number; site_messages_total: number;
   } | null;
   /** מוכנות לפי מסלול (center-readiness) - רק למרכזים פעילים. */
@@ -59,6 +61,9 @@ type Center = {
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
+  public_whatsapp: string | null;
+  /** טלפון שהוזן בטופס ההצטרפות לחשבונית - פנימי, לקריאה בלבד באדמין. */
+  payer_phone: string | null;
   billing_track: "per_therapist" | "center_entity" | null;
   fixed_monthly_price: number | null;
   discount_amount: number | null;
@@ -239,6 +244,7 @@ export default function AdminCentersPage() {
   const [fPubCity, setFPubCity] = useState("");
   const [fPubWebsite, setFPubWebsite] = useState("");
   const [fPubPhone, setFPubPhone] = useState("");
+  const [fPubWhatsapp, setFPubWhatsapp] = useState("");
 
   // ניהול שיוך מטפלים למרכז
   // פירוט לפי מטפל: נטען בלחיצה, נשמר במפה כדי שפתיחה חוזרת לא תטען שוב.
@@ -339,6 +345,7 @@ export default function AdminCentersPage() {
     setFPubCity(c.public_city ?? "");
     setFPubWebsite(c.public_website ?? "");
     setFPubPhone(c.public_phone ?? "");
+    setFPubWhatsapp(c.public_whatsapp ?? "");
   }
 
   async function save() {
@@ -364,6 +371,7 @@ export default function AdminCentersPage() {
       payload.public_city = fPubCity;
       payload.public_website = fPubWebsite;
       payload.public_phone = fPubPhone;
+      payload.public_whatsapp = fPubWhatsapp;
     }
     // חודשי מתנה נעולים אחרי תשלום; מחיר/מספר-מטפלים ניתנים לעריכה תמיד
     // (במרכז פעיל השרת מפרסם את השינוי ל-Sumit). מרכז מבוטל - עריכת קשר בלבד.
@@ -744,11 +752,13 @@ export default function AdminCentersPage() {
                   const parts = clickTypeParts(byType);
                   return parts ? <p className="mt-0.5 text-stone-600">פניות לפי סוג: {parts}</p> : null;
                 })()}
-                {(c.engagement.page_views_total > 0 || c.engagement.website_clicks_total > 0 || c.engagement.page_contact_total > 0) && (
+                {(c.engagement.page_views_total > 0 || c.engagement.website_clicks_total > 0 || c.engagement.page_contact_total > 0 || c.engagement.card_contact_total > 0) && (
                   <p className="mt-0.5 text-stone-600">
                     עמוד ציבורי (30 יום): {c.engagement.page_views_30} כניסות
                     {c.engagement.website_clicks_30 > 0 && <> · {c.engagement.website_clicks_30} לחיצות לאתר המרכז</>}
                     {c.engagement.page_contact_30 > 0 && <> · {c.engagement.page_contact_30} לחיצות קשר מהעמוד</>}
+                    {/* מסלול 1 בלבד: לישות הלחיצות מהכרטיס נכנסות ל"פניות לפי סוג" למעלה. */}
+                    {c.engagement.card_contact_30 > 0 && <> · {c.engagement.card_contact_30} לחיצות קשר מכרטיס המרכז</>}
                     <span className="text-stone-400"> · מצטבר: {c.engagement.page_views_total} כניסות{c.engagement.website_clicks_total > 0 ? `, ${c.engagement.website_clicks_total} לאתר` : ""}</span>
                   </p>
                 )}
@@ -1006,10 +1016,20 @@ export default function AdminCentersPage() {
               <Field label="אימייל">
                 <input value={fEmail} onChange={(e) => setFEmail(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
               </Field>
-              <Field label="טלפון">
+              <Field label="טלפון איש/אשת הקשר - פנימי, לא מוצג באתר">
                 <input value={fPhone} onChange={(e) => setFPhone(e.target.value)} className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
               </Field>
             </div>
+            {/* שלושה טלפונים לכל מרכז, ורק שניים מהם מפורסמים. הבלבול היה אמיתי
+                (מרכז רותם, 15/9/26): הנייד של הבעלים שמור כאן, הקו לשיחות בשדה
+                הציבורי, והוואטסאפ לא היה קיים כשדה. מה שמפורסם מסומן, ומה שלא - גם. */}
+            {editing !== "new" && editing !== null && (
+              <p className="-mt-1 mb-3 text-[11.5px] leading-4 text-stone-500">
+                הטלפון הזה והמייל שלמעלה הם לתקשורת שלנו עם המרכז ולא מוצגים לגולשים.
+                {editing.payer_phone && editing.payer_phone !== fPhone ? <> טלפון המשלם מטופס ההצטרפות (לחשבונית, גם הוא פנימי): <span dir="ltr">{editing.payer_phone}</span>.</> : null}
+                {" "}מה שמטופלים רואים נמצא למטה, בסקציית העמוד הציבורי: טלפון לחיוג ווואטסאפ עסקי.
+              </p>
+            )}
 
             {!isLockedEditing && (
               <Field label="🎁 חודשי מתנה (0 = בלי מתנה; הכרטיס נשמר מיד והחיוב הראשון יוצא בתום המתנה)">
@@ -1152,11 +1172,22 @@ export default function AdminCentersPage() {
                     <input value={fPubCity} onChange={(e) => setFPubCity(e.target.value)}
                       className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
                   </Field>
-                  <Field label="טלפון ציבורי">
+                  <Field label="טלפון לחיוג - מוצג באתר (יכול להיות מרכזייה)">
                     <input value={fPubPhone} onChange={(e) => setFPubPhone(e.target.value)} dir="ltr"
                       className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
                   </Field>
                 </div>
+                <Field label="וואטסאפ עסקי לפניות מטופלים - נייד בלבד, מוצג באתר ובכרטיסים">
+                  <input value={fPubWhatsapp} onChange={(e) => setFPubWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="052-1234567"
+                    className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                  {(() => {
+                    const typed = fPubWhatsapp.trim();
+                    if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11px] font-bold text-red-600">לא נייד - השמירה תידחה. לקו נייח או וירטואלי אין וואטסאפ.</p>;
+                    if (!typed && isMobileNumber(fPubPhone)) return <p className="mt-1 text-[11px] text-stone-500">ריק, ולכן כפתור הוואטסאפ משתמש בינתיים בטלפון לחיוג ({fPubPhone.trim()}) כי הוא נייד.</p>;
+                    if (!typed) return <p className="mt-1 text-[11px] text-stone-500">ריק = אין כפתור וואטסאפ למרכז. לא להזין כאן את הנייד הפרטי של הבעלים בלי שאישרו שהוא לפניות.</p>;
+                    return null;
+                  })()}
+                </Field>
                 <Field label="אתר המרכז">
                   <input value={fPubWebsite} onChange={(e) => setFPubWebsite(e.target.value)} dir="ltr"
                     placeholder="https://…" className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />

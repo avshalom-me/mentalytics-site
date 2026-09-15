@@ -133,6 +133,9 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     city: center.public_city,
     website: center.public_website,
     phone: center.public_phone,
+    whatsapp: center.public_whatsapp,
+    // פנימי: מוצג בעורך לקריאה בלבד, כדי שיהיה ברור שהוא לא מה שמפורסם.
+    account_phone: center.phone,
     founded_year: center.public_founded_year ?? null,
     team_size: center.public_team_size ?? null,
     address: center.public_address,
@@ -218,7 +221,12 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   // לפי אזור/קושי/גיל היו נחתכים לחודש האחרון בזמן שהחלק העליון הראה
   // מספרים מצטברים - אותה סתירה שדווחה בפרופיל האישי. הקליקים כבר נשלפו
   // ל-6 חודשים לצורך המגמה; עכשיו גם הם ללא חסם, והמגמה עדיין חותכת ל-6.
-  const [clicks, views, dirImpressions] = await Promise.all([
+  // מסלול 1: לחיצות וואטסאפ/טלפון על המרכז עצמו - בעמוד המרכז ובכרטיס המרכז
+  // במאגר - נרשמות ב-analytics_events (center_contact_click), כי אין שורת
+  // ישות לרשום עליה. עד 15/9/26 הן לא הגיעו לפורטל בכלל: המרכז ראה רק את
+  // הלחיצות על המטפלים שלו. מסלול 2 לא צריך את זה - שם הכול על הישות.
+  const CENTER_LEVEL = "center";
+  const [rawClicks, views, dirImpressions, centerEvents] = await Promise.all([
     fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source: string | null }>(() =>
       supabaseAdmin
         .from("therapist_contact_clicks")
@@ -243,7 +251,26 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
         .eq("event_type", "profile_impression")
         .in("therapist_id", statIds),
     ),
+    isEntity
+      ? Promise.resolve([] as { created_at: string; source: string | null; metadata: { type?: string } | null }[])
+      : fetchAllRows<{ created_at: string; source: string | null; metadata: { type?: string } | null }>(() =>
+          supabaseAdmin
+            .from("analytics_events")
+            .select("created_at, source, metadata")
+            .eq("event_type", "center_contact_click")
+            .eq("metadata->>center_id", center.id),
+        ),
   ]);
+  const clicks = [
+    ...rawClicks,
+    ...centerEvents.map((e) => ({
+      therapist_id: CENTER_LEVEL,
+      click_type: e.metadata?.type ?? "phone",
+      clicked_at: e.created_at,
+      // בלי source = נלחץ בעמוד המרכז, שהוא ה"פרופיל" של מרכז.
+      source: e.source === "directory" || e.source === "match" ? e.source : "profile",
+    })),
+  ];
 
   const clicksMonth = clicks.filter((c) => c.clicked_at >= mAgo);
   const clicksWeek = clicks.filter((c) => c.clicked_at >= wAgo);
@@ -396,7 +423,8 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
         ]);
         // צד המרכז נמדד על אותו חלון בדיוק.
         const mineViews = realViews.filter((v) => v.viewed_at >= windowStart).length;
-        const mineClicks = clicks.filter((c) => c.clicked_at >= windowStart).length;
+        // הבנצ'מרק הוא פר-מטפל; לחיצות על המרכז עצמו אינן של אף מטפל ונשארות בחוץ.
+        const mineClicks = clicks.filter((c) => c.clicked_at >= windowStart && c.therapist_id !== CENTER_LEVEL).length;
         const unitCount = isEntity ? 1 : Math.max(1, statIds.length);
         benchmark = {
           days: windowDays,

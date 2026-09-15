@@ -298,11 +298,26 @@ export default function CenterTherapistFormPage() {
               <input value={form.full_name} onChange={e => setForm({...form, full_name: e.target.value})}
                 required className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" />
             </div>
-            <div>
-              <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון (לפניות מטופלים)</label>
-              <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
-                className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" />
-            </div>
+            {/* שורת ישות-מרכז: הטלפון כאן אינו מוצג לאף גולש (ההתאמות והמאגר
+                מוחקים אותו במכוון - הוא הקו הפנימי). התווית "לפניות מטופלים"
+                הבטיחה משהו שלא קורה, ומרכז היה יכול להזין כאן את הוואטסאפ ולא
+                להבין למה שום דבר לא השתנה. למטפל בודד השדה אמיתי ונשאר. */}
+            {isEntity ? (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון</label>
+                <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+                  המספרים שמטופלים רואים - טלפון לחיוג ווואטסאפ עסקי - נקבעים ב
+                  <Link href="/centers/dashboard/profile" className="font-bold text-[var(--teal-dark)] underline">עורך העמוד הציבורי</Link>.
+                  השדה הזה פנימי ואינו מוצג.
+                </p>
+              </div>
+            ) : (
+              <div>
+                <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון (לפניות מטופלים)</label>
+                <input value={form.phone} onChange={e => setForm({...form, phone: e.target.value})}
+                  className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" />
+              </div>
+            )}
             <div>
               <label className="mb-1 block text-sm font-semibold text-stone-700">אימייל (לפניות מטופלים)</label>
               <input type="email" value={form.email} onChange={e => setForm({...form, email: e.target.value})}

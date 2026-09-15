@@ -2,6 +2,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { CITY_TO_REGION, ALL_REGIONS, CITY_SEO_LIST, neighborsOf, CITY_POOL_EXCLUDED } from "@/app/lib/regions";
 import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
+import { centerWhatsAppNumber } from "@/app/lib/phone";
 
 const NEW_THERAPIST_BOOST_DAYS = 7;
 
@@ -49,10 +50,12 @@ type TherapistRow = {
    * מפיל כל insert בשקט).
    */
   synthetic_center?: boolean;
+  /** כרטיס מסונתז בלבד: הוואטסאפ העסקי של המרכז, כבר אחרי כלל הנפילה לאחור. */
+  center_whatsapp?: string | null;
 };
 
-/** slug, שם ולוגו של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
-type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null };
+/** slug, שם, לוגו ווואטסאפ עסקי של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
+type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null; whatsapp: string | null };
 
 export function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
@@ -112,6 +115,15 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     // מטפל ("מצוות X"). בשני המקרים הוא נשלף רק כשלמרכז יש עמוד ציבורי חי.
     center_slug: card?.slug ?? null,
     ...(!isEntity && card?.name ? { center_name: card.name } : {}),
+    // כרטיס מרכז (ישות או מסונתז): הוואטסאפ העסקי (15/9/26) ומזהה החשבון
+    // לרישום הלחיצה. שניהם מגיעים מ-CenterCard; השורה המסונתזת נושאת עותק
+    // משלה למקרה שהמרכז לא נטען לכרטיסים (אותם תנאי סינון, אז בפועל זהה).
+    ...(isEntity
+      ? {
+          center_account_id: t.center_account_id ?? null,
+          center_whatsapp: card?.whatsapp ?? t.center_whatsapp ?? null,
+        }
+      : {}),
     // כרטיס מסלול-1 מסונתז: אין לו שורת מטפל, ולכן אסור לדווח עליו חשיפה.
     ...(t.synthetic_center ? { trackable: false as const } : {}),
   };
@@ -131,7 +143,7 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
 
   const { data } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, slug, logo_path")
+    .select("id, name, slug, logo_path, public_whatsapp, public_phone")
     .in("id", ids)
     .eq("status", "active")
     .not("slug", "is", null)
@@ -150,6 +162,7 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
       slug: (c.slug as string) ?? null,
       name: (c.name as string) ?? null,
       logoUrl: c.logo_path ? signedByPath.get(c.logo_path as string) ?? null : null,
+      whatsapp: centerWhatsAppNumber(c.public_whatsapp as string | null, c.public_phone as string | null),
     });
   }
   return map;
@@ -171,7 +184,7 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
 async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
   const { data: centers } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, slug, public_description")
+    .select("id, name, slug, public_description, public_whatsapp, public_phone")
     .eq("status", "active")
     .eq("public_page_enabled", true)
     .neq("billing_track", "center_entity")
@@ -224,6 +237,7 @@ async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
       accepting_new_patients: true,
       entity_type: "center",
       synthetic_center: true,
+      center_whatsapp: centerWhatsAppNumber(c.public_whatsapp as string | null, c.public_phone as string | null),
     } satisfies TherapistRow];
   });
 }

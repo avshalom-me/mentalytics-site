@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateCenterWhatsApp } from "@/app/lib/phone";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -89,6 +90,12 @@ export async function POST(req: NextRequest) {
   if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
   if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
   if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
+  // וואטסאפ עסקי - נייד בלבד, אחרת הכפתור באתר היה פותח שיחה ריקה.
+  if (body.public_whatsapp !== undefined) {
+    const wa = validateCenterWhatsApp(body.public_whatsapp);
+    if (!wa.ok) return NextResponse.json({ ok: false, error: wa.error }, { status: 400 });
+    update.public_whatsapp = wa.value;
+  }
   if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
   // פרופיל ויזואלי: לוגו + צוות/ראשי-המרכז + גלריית המרכז - self-serve מהפורטל.
   if (body.logo_path !== undefined) update.logo_path = assetPath(body.logo_path);

@@ -3,7 +3,7 @@
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
-import { waLinkFor } from "@/app/lib/phone";
+import { waLinkFor, waLinkForCenter } from "@/app/lib/phone";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import { tfaEvent } from "@/app/lib/taboola";
 
@@ -40,11 +40,14 @@ export { waLinkFor };
 export default function MatchCardWhatsApp({
   therapistId,
   phone,
+  centerMode = false,
 }: {
   therapistId: string;
   phone: string | null | undefined;
+  /** כרטיס מרכז: הודעת הפתיחה ברבים. therapistId הוא שורת הישות, והלחיצה נרשמת עליה. */
+  centerMode?: boolean;
 }) {
-  const href = waLinkFor(phone);
+  const href = centerMode ? waLinkForCenter(phone) : waLinkFor(phone);
   if (!href) return null;
 
   function onClick(e: React.MouseEvent) {

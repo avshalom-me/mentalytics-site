@@ -10,12 +10,19 @@ import { trackCenterEvent } from "@/app/components/CenterTracking";
 // ישות (מסלול 2) → therapist_contact_clicks; חשבון מרכז (מסלול 1) →
 // center_contact_click. keepalive כי הטאפ קופץ מיד לוואטסאפ.
 
-export default function CenterWhatsAppLink({ entityId, centerId, href, className, children }: {
+export default function CenterWhatsAppLink({ entityId, centerId, href, className, children, source = "profile" }: {
+  /** מסלול 2: מזהה שורת ישות-המרכז. */
   entityId?: string;
+  /** מסלול 1: מזהה חשבון המרכז - נרשם כ-center_contact_click. */
   centerId?: string;
   href: string;
   className?: string;
   children: React.ReactNode;
+  /**
+   * מאיפה נלחץ: עמוד המרכז (ברירת מחדל), כרטיס במאגר או כרטיס בהתאמות.
+   * שלושת המקורות נספרים בנפרד ואסור לערבב אותם - ראו project_contact_source_split.
+   */
+  source?: "profile" | "directory" | "match";
 }) {
   function track() {
     if (trackingOptedOut()) return; // מכשיר של הצוות
@@ -28,15 +35,15 @@ export default function CenterWhatsAppLink({ entityId, centerId, href, className
           body: JSON.stringify({
             therapist_id: entityId,
             click_type: "whatsapp",
-            source: "profile",
+            source,
             session_id: getOrCreateSessionId(),
             ...(getAttribution() ?? {}),
           }),
         }).catch(() => {});
       } else if (centerId) {
-        trackCenterEvent("center_contact_click", centerId, { type: "whatsapp" });
+        trackCenterEvent("center_contact_click", centerId, { type: "whatsapp" }, source === "profile" ? undefined : source);
       }
-      gaEvent("generate_lead", { method: "whatsapp", source: "center_page" });
+      gaEvent("generate_lead", { method: "whatsapp", source: source === "profile" ? "center_page" : source });
     } catch { /* מעקב לא חוסם את הפתיחה */ }
   }
   return (

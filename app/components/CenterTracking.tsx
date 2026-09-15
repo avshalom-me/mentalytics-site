@@ -13,6 +13,11 @@ export function trackCenterEvent(
   eventType: "center_page_view" | "center_website_click" | "center_contact_click",
   centerId: string,
   extra?: Record<string, string>,
+  /**
+   * מאיפה נלחץ - "directory"/"match" לכרטיס, ריק לעמוד המרכז. נשמר בעמודת
+   * source של analytics_events; האדמין מפריד לפיו "לחיצות קשר מהעמוד" מ"מהכרטיסים".
+   */
+  source?: string,
 ) {
   if (trackingOptedOut()) return; // מכשיר של הצוות
   try {
@@ -22,6 +27,7 @@ export function trackCenterEvent(
       keepalive: true, // לחיצות אתר/טלפון מנווטות מיד - בלעדיו הבקשה נהרגת
       body: JSON.stringify({
         event_type: eventType,
+        ...(source ? { source } : {}),
         session_id: getOrCreateSessionId(),
         metadata: { center_id: centerId, ...(extra ?? {}) },
         ...(getAttribution() ?? {}),

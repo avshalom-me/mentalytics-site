@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
@@ -863,13 +864,16 @@ export async function POST(req: NextRequest) {
     // מטפל שנחסם). שולפים את ה-slug של המרכזים שהופיעו בתוצאות בבת-אחת.
     const centerSlugById = new Map<string, string>();
     const centerLogoById = new Map<string, string>();
+    // הוואטסאפ העסקי של המרכז לכרטיס ההתאמה (15/9/26). הטלפון של שורת הישות
+    // נשאר מוסתר - הוא הקו הפנימי - אבל למרכז יש עכשיו מספר שנועד להתפרסם.
+    const centerWaById = new Map<string, string>();
     const entityCenterIds = top
       .filter((x) => x.therapist.entity_type === "center" && x.therapist.center_account_id)
       .map((x) => x.therapist.center_account_id as string);
     if (entityCenterIds.length > 0) {
       const { data: slugRows } = await supabaseAdmin
         .from("therapy_center_accounts")
-        .select("id, slug, logo_path")
+        .select("id, slug, logo_path, public_whatsapp, public_phone")
         .in("id", entityCenterIds);
       // הלוגו נכנס לחריץ התמונה של הכרטיס (אחרת מרכז מקבל אווטאר מגדרי).
       const logoRows = (slugRows ?? []).filter((r) => r.logo_path);
@@ -882,7 +886,11 @@ export async function POST(req: NextRequest) {
           if (s.signedUrl) centerLogoById.set(logoRows[i].id as string, s.signedUrl);
         });
       }
-      for (const r of slugRows ?? []) if (r.slug) centerSlugById.set(r.id as string, r.slug as string);
+      for (const r of slugRows ?? []) {
+        if (r.slug) centerSlugById.set(r.id as string, r.slug as string);
+        const wa = centerWhatsAppNumber(r.public_whatsapp as string | null, r.public_phone as string | null);
+        if (wa) centerWaById.set(r.id as string, wa);
+      }
     }
 
     const ranked = await Promise.all(
@@ -923,6 +931,9 @@ export async function POST(req: NextRequest) {
           entity_type: therapist.entity_type, // 'center' → כרטיס מוצג כ"מרכז טיפולי"
           profile_slug: therapist.entity_type === "center" && therapist.center_account_id
             ? (centerSlugById.get(therapist.center_account_id) ?? null)
+            : null,
+          center_whatsapp: therapist.entity_type === "center" && therapist.center_account_id
+            ? (centerWaById.get(therapist.center_account_id) ?? null)
             : null,
           // FREE_REGION_FALLBACK (זמני): מטפל חינמי שנכנס כגיבוי אזורי
           free_fallback: freeFallbackIds.has(therapist.id),

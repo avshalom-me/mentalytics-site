@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { validateCenterWhatsApp } from "@/app/lib/phone";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
@@ -90,6 +91,10 @@ export async function GET() {
       page_views_30: number; page_views_total: number;
       website_clicks_30: number; website_clicks_total: number;
       page_contact_30: number; page_contact_total: number;
+      // לחיצות קשר על כרטיס המרכז במאגר/בהתאמות (15/9/26) - אותו אירוע, עם
+      // source. בלי ההפרדה הן היו מופיעות כ"לחיצות קשר מהעמוד" - עמוד שהגולש
+      // לא ביקר בו.
+      card_contact_30: number; card_contact_total: number;
       // הודעות אתר של מסלול 1 (crm_leads.center_account_id) - במסלול 2 הן
       // כבר בתוך clicks_30_by_type.site_message של הישות, בלי כפילות.
       site_messages_30: number; site_messages_total: number;
@@ -104,6 +109,7 @@ export async function GET() {
         page_views_30: 0, page_views_total: 0,
         website_clicks_30: 0, website_clicks_total: 0,
         page_contact_30: 0, page_contact_total: 0,
+        card_contact_30: 0, card_contact_total: 0,
         site_messages_30: 0, site_messages_total: 0,
       }));
       return e;
@@ -154,10 +160,10 @@ export async function GET() {
     // אירועי העמוד הציבורי + הודעות מסלול 1 - לכל המרכזים (גם בלי מטפלים
     // מקושרים: מרכז מסלול 1 עם עמוד ציבורי ובלי אף שיוך עדיין נמדד).
     const [pageEvents, centerLeads] = await Promise.all([
-      fetchAllRows<{ event_type: string; created_at: string; metadata: { center_id?: string } | null }>(() =>
+      fetchAllRows<{ event_type: string; created_at: string; source: string | null; metadata: { center_id?: string } | null }>(() =>
         supabaseAdmin
           .from("analytics_events")
-          .select("event_type, created_at, metadata")
+          .select("event_type, created_at, source, metadata")
           .in("event_type", ["center_page_view", "center_website_click", "center_contact_click"]),
       ),
       fetchAllRows<{ center_account_id: string; created_at: string }>(() =>
@@ -175,6 +181,7 @@ export async function GET() {
       const recent = ev.created_at >= cutoff30;
       if (ev.event_type === "center_page_view") { e.page_views_total++; if (recent) e.page_views_30++; }
       else if (ev.event_type === "center_website_click") { e.website_clicks_total++; if (recent) e.website_clicks_30++; }
+      else if (ev.source === "directory" || ev.source === "match") { e.card_contact_total++; if (recent) e.card_contact_30++; }
       else { e.page_contact_total++; if (recent) e.page_contact_30++; }
     }
     for (const l of centerLeads) {
@@ -346,12 +353,17 @@ export async function POST(req: NextRequest) {
       if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
       if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
       if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
+      if (body.public_whatsapp !== undefined) {
+        const wa = validateCenterWhatsApp(body.public_whatsapp);
+        if (!wa.ok) return NextResponse.json({ ok: false, error: wa.error }, { status: 400 });
+        update.public_whatsapp = wa.value;
+      }
       if (body.public_page_enabled !== undefined) update.public_page_enabled = !!body.public_page_enabled;
       // ודא slug כשמדליקים את העמוד או עורכים תוכן ציבורי (מרכזים ותיקים בלי slug).
       const touchesPublic =
         body.public_page_enabled !== undefined || body.public_description !== undefined ||
         body.public_managers !== undefined || body.public_city !== undefined ||
-        body.public_website !== undefined || body.public_phone !== undefined;
+        body.public_website !== undefined || body.public_phone !== undefined || body.public_whatsapp !== undefined;
       if (touchesPublic && !center.slug) {
         update.slug = await ensureUniqueCenterSlug((update.name as string) ?? center.name, id);
       }
