@@ -285,6 +285,60 @@ async function gatherSections(): Promise<DigestSection[]> {
     });
   }
 
+  // מסירת פניות מהאתר. מאז 15/9/26 כל מייל פנייה (למטפל/ת, למרכז, לטופס
+  // "צור קשר") נרשם ב-crm_email_log עם התוצאה של Resend, אחרי שפנייה למרכז
+  // רותם מ-14/9 לא הייתה ניתנת לאיתור מהצד שלנו. כאן מצליבים שני דברים:
+  // מייל שנדחה, וליד מהאתר שאין לצדו רישום שליחה בכלל (נתיב שעקף את
+  // הרישום). לידים מלפני תחילת הרישום לא נבדקים - לא היה מה להצליב.
+  try {
+    const INQUIRY_LOG_SINCE = Date.parse("2026-09-15T18:00:00Z");
+    const windowStart = new Date(Math.max(Date.now() - 26 * 3600 * 1000, INQUIRY_LOG_SINCE)).toISOString();
+    const [logRes, leadRes] = await Promise.all([
+      supabaseAdmin
+        .from("crm_email_log")
+        .select("recipient, status, error, created_at")
+        .in("template", ["patient_inquiry", "center_inquiry", "contact_form"])
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: false })
+        .limit(200),
+      supabaseAdmin
+        .from("crm_leads")
+        .select("name, created_at")
+        .in("source", ["site_message", "contact_form"])
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: false })
+        .limit(200),
+    ]);
+    const logs = logRes.data ?? [];
+    const failed = logs.filter((l) => l.status === "failed");
+    const loggedAt = logs.map((l) => Date.parse(l.created_at as string));
+    // הליד נכתב שניות אחרי השליחה, אז "יש רישום" = רשומה כלשהי בטווח 3 דקות.
+    const unlogged = (leadRes.data ?? []).filter((ld) => {
+      const t = Date.parse(ld.created_at as string);
+      return !loggedAt.some((s) => Math.abs(s - t) < 3 * 60 * 1000);
+    });
+    if (failed.length + unlogged.length > 0) {
+      sections.push({
+        key: "inquiry_delivery",
+        label: "פניות מהאתר שלא נמסרו",
+        count: failed.length + unlogged.length,
+        urgent: true,
+        lines: [
+          ...failed.map(
+            (l) =>
+              `❌ המייל ל-${l.recipient} נדחה: ${String(l.error ?? "").slice(0, 80)} · ${ageText(l.created_at as string)}`
+          ),
+          ...unlogged.map(
+            (ld) => `❓ פנייה של ${ld.name ?? "?"} בלי רישום שליחה · ${ageText(ld.created_at as string)}`
+          ),
+        ].slice(0, MAX_LINES_PER_SECTION),
+        link: "/admin/leads",
+      });
+    }
+  } catch (e) {
+    console.error("digest inquiry delivery section failed:", e instanceof Error ? e.message : e);
+  }
+
   return sections;
 }
 

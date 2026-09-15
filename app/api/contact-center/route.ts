@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
+import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
 
 // פנייה דרך האתר אל מרכז טיפולי במסלול 1 (מטפלים בנפרד).
 //
@@ -13,7 +13,6 @@ import { sanitizeAttribution } from "@/app/lib/attribution";
 // כתובת היעד נבחרת בצד השרת בלבד ולעולם אינה מגיעה לדפדפן: הלקוח שולח מזהה
 // מרכז, לא כתובת מייל.
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const VALID_SOURCES = ["match", "directory", "profile"] as const;
 type Source = (typeof VALID_SOURCES)[number];
@@ -102,12 +101,7 @@ export async function POST(req: NextRequest) {
     const centerName = escapeHtml((center.name as string) ?? "המרכז");
     const replyHref = isValidEmail(contact) ? `mailto:${contact}` : `tel:${contact}`;
 
-    await resend.emails.send({
-      from: "טיפול חכם <noreply@mentalytics.co.il>",
-      to,
-      replyTo: isValidEmail(contact) ? contact : undefined,
-      subject: "פנייה חדשה ממטופל/ת דרך אתר טיפול חכם",
-      html: `
+    const html = `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2 style="color: #0F5468;">פנייה חדשה ל${centerName} דרך אתר טיפול חכם</h2>
           <p style="color:#555;">קיבלתם פנייה ממטופל/ת פוטנציאלי/ת דרך עמוד המרכז באתר. מומלץ להגיב מהר ככל האפשר.</p>
@@ -124,11 +118,15 @@ export async function POST(req: NextRequest) {
           </p>
           <p style="margin-top: 8px; font-size: 12px; color: #999;">פנייה זו נשלחה דרך טיפול חכם - mentalytics.co.il</p>
         </div>
-      `,
-    });
+      `;
+    const sent = await sendInquiryEmail(
+      { to, replyTo: isValidEmail(contact) ? contact : undefined, subject: "פנייה חדשה ממטופל/ת דרך אתר טיפול חכם", html },
+      { template: "center_inquiry", recipientType: "organization", entityId: center.id as string },
+    );
 
-    // רישום הליד ב-CRM - best-effort. ההודעה כבר יצאה, וכשל כאן לעולם לא
-    // ייראה לפונה. therapist_id נשאר ריק: הפנייה אל המרכז, לא אל אדם מסוים.
+    // רישום הליד ב-CRM - best-effort, וכשל כאן לעולם לא ייראה לפונה. הליד נכתב
+    // גם כשהמייל נדחה: הפנייה לא הולכת לאיבוד, ודוח הבוקר מצליב אותה מול יומן
+    // המיילים. therapist_id נשאר ריק: הפנייה אל המרכז, לא אל אדם מסוים.
     try {
       const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
         lead_type: "patient",
@@ -147,6 +145,9 @@ export async function POST(req: NextRequest) {
       console.error("crm_leads (center) insert threw:", e);
     }
 
+    if (!sent.ok) {
+      return NextResponse.json({ ok: false, error: INQUIRY_SEND_FAILED_MESSAGE }, { status: 502 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה בשליחה";

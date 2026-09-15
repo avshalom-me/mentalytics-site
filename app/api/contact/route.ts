@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
+import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 // Every submission sends a real email, and Resend's free tier gives the whole
 // site 100 a day. 5/hour is far above what a genuine visitor needs (the busiest
@@ -44,10 +43,9 @@ export async function POST(req: NextRequest) {
     const safeSubject = escapeHtml(String(subject || ""));
     const safeMessage = escapeHtml(String(message));
 
-    await resend.emails.send({
-      from: "טיפול חכם <noreply@mentalytics.co.il>",
+    const sent = await sendInquiryEmail({
       to: "admin@getmentalytics.com",
-      replyTo: email,
+      replyTo: String(email),
       subject: `פנייה חדשה מ-טיפול חכם: ${safeSubject || "ללא נושא"}`,
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -64,10 +62,11 @@ export async function POST(req: NextRequest) {
           <p style="margin-top: 16px; font-size: 12px; color: #999;">נשלח מ-mentalytics-site.vercel.app</p>
         </div>
       `,
-    });
+    }, { template: "contact_form", recipientType: "other" });
 
-    // CRM lead capture — best-effort. The email to admin@ already went out;
-    // the DB row is what makes the inquiry visible (and workable) in the CRM.
+    // CRM lead capture - best-effort. The DB row is what makes the inquiry
+    // visible (and workable) in the CRM, so it is written even if the email
+    // to admin@ was rejected; the morning digest flags that case.
     try {
       const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
         lead_type: "general",
@@ -81,8 +80,11 @@ export async function POST(req: NextRequest) {
       console.error("crm_leads insert threw:", err);
     }
 
+    if (!sent.ok) {
+      return NextResponse.json({ ok: false, error: INQUIRY_SEND_FAILED_MESSAGE }, { status: 502 });
+    }
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    return NextResponse.json({ ok: false, error: e?.message ?? "שגיאה" }, { status: 500 });
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : "שגיאה" }, { status: 500 });
   }
 }

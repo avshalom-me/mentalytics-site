@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { patientInquiryRecipient } from "@/app/lib/therapist-recipient";
 import { buildInquiryEmail, type InquiryAudience } from "@/app/lib/inquiry-email";
+import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
 
 const VALID_SOURCES = ["match", "directory", "profile"] as const;
 type Source = (typeof VALID_SOURCES)[number];
@@ -106,13 +105,17 @@ export async function POST(req: NextRequest) {
       ? ((therapist.center_account_id as string | null) ?? null)
       : (inquiryTarget.viaCenter?.id ?? null);
 
-    await resend.emails.send({
-      from: 'טיפול חכם <noreply@mentalytics.co.il>',
-      to: inquiryTarget.to,
-      replyTo: isValidEmail(contact) ? contact : undefined,
-      subject: email.subject,
-      html: email.html,
-    });
+    // הפונה חייב/ת לדעת אם ההודעה לא יצאה, ולכן כישלון חוזר אליו/ה (למטה).
+    // הלחיצה והליד נרשמים בכל מקרה כדי שהפנייה לא תאבד, ודוח הבוקר מצליב
+    // אותם מול יומן המיילים ומציף פנייה שלא נמסרה.
+    const sent = await sendInquiryEmail(
+      { to: inquiryTarget.to, replyTo: isValidEmail(contact) ? contact : undefined, subject: email.subject, html: email.html },
+      {
+        template: "patient_inquiry",
+        recipientType: isEntity ? "organization" : "therapist",
+        entityId: isEntity ? receivedByCenterId : (therapist.id as string),
+      },
+    );
 
     const sessionId =
       typeof body?.session_id === "string" && body.session_id.length > 0 && body.session_id.length <= 128
@@ -123,8 +126,9 @@ export async function POST(req: NextRequest) {
       .insert({ therapist_id, click_type: "site_message", source: safeSource, session_id: sessionId, ...sanitizeAttribution(body) });
     if (clickErr) console.error("therapist_contact_clicks (site_message) insert failed:", clickErr.message);
 
-    // CRM lead capture — best-effort. The patient's message already went out
-    // above; a failure here must never surface to the sender.
+    // CRM lead capture - best-effort; a failure here must never surface to the
+    // sender. The row is written even when the email was rejected: the lead
+    // must not be lost, and the morning digest flags it against the email log.
     try {
       const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
         lead_type: "patient",
@@ -142,6 +146,9 @@ export async function POST(req: NextRequest) {
       console.error("crm_leads insert threw:", e);
     }
 
+    if (!sent.ok) {
+      return NextResponse.json({ ok: false, error: INQUIRY_SEND_FAILED_MESSAGE }, { status: 502 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "שגיאה בשליחה";
