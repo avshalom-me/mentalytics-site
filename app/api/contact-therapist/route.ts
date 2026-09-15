@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { patientInquiryRecipient } from "@/app/lib/therapist-recipient";
+import { buildInquiryEmail, type InquiryAudience } from "@/app/lib/inquiry-email";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 
@@ -20,15 +21,6 @@ function checkRateLimit(ip: string): boolean {
   if (entry.count >= 5) return false;
   entry.count++;
   return true;
-}
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 function isValidEmail(s: string): boolean {
@@ -68,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     const { data: therapist, error: therapistErr } = await supabaseAdmin
       .from("therapists")
-      .select("id, full_name, email, status, accepting_new_patients")
+      .select("id, full_name, email, status, accepting_new_patients, entity_type, center_account_id")
       .eq("id", therapist_id)
       .in("status", ["approved", "paying"])
       .maybeSingle();
@@ -93,34 +85,33 @@ export async function POST(req: NextRequest) {
 
     const safeSource: Source = VALID_SOURCES.includes(source as Source) ? source : "directory";
 
-    const safeName = escapeHtml(name);
-    const safeContact = escapeHtml(contact);
-    const safeMessage = escapeHtml(msg);
-    const replyHref = isValidEmail(contact) ? `mailto:${contact}` : `tel:${contact}`;
+    // מי קורא את המייל קובע איך מנסחים אותו. ישות-מרכז = המרכז עצמו; תיבת
+    // מרכז שמקבלת פנייה למטפל/ת מסוים/ת חייבת לדעת את מי הפונה בחר/ה.
+    const isEntity = therapist.entity_type === "center";
+    const audience: InquiryAudience = isEntity
+      ? "center"
+      : inquiryTarget.viaCenter
+        ? "center_for_therapist"
+        : "therapist";
+    const email = buildInquiryEmail({
+      audience,
+      recipientName: (therapist.full_name as string | null) ?? inquiryTarget.viaCenter?.name ?? "",
+      senderName: name,
+      senderContact: contact,
+      message: msg,
+    });
+    // תיבת המרכז שקיבלה את ההודעה - נרשמת עכשיו, ברגע השליחה. פורטל המרכז
+    // מציג רק את זה; הודעה שהגיעה לתיבה פרטית של מטפל/ת לא נחשפת למרכז.
+    const receivedByCenterId: string | null = isEntity
+      ? ((therapist.center_account_id as string | null) ?? null)
+      : (inquiryTarget.viaCenter?.id ?? null);
 
     await resend.emails.send({
       from: 'טיפול חכם <noreply@mentalytics.co.il>',
       to: inquiryTarget.to,
       replyTo: isValidEmail(contact) ? contact : undefined,
-      subject: `פנייה חדשה ממטופל/ת דרך אתר טיפול חכם`,
-      html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0F5468;">פנייה חדשה אליך דרך אתר טיפול חכם</h2>
-          <p style="color:#555;">קיבלת פנייה ממטופל/ת פוטנציאלי/ת. מומלץ להגיב מהר ככל האפשר.</p>
-          <table style="width: 100%; border-collapse: collapse; margin-top:16px;">
-            <tr><td style="padding: 8px; font-weight: bold; width: 120px;">שם:</td><td style="padding: 8px;">${safeName}</td></tr>
-            <tr style="background: #f9f9f9;"><td style="padding: 8px; font-weight: bold;">פרטי קשר:</td><td style="padding: 8px;"><a href="${replyHref}">${safeContact}</a></td></tr>
-          </table>
-          <div style="margin-top: 16px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
-            <strong>ההודעה:</strong>
-            <p style="margin-top: 8px; white-space: pre-wrap;">${safeMessage}</p>
-          </div>
-          <p style="margin-top: 24px; font-size: 13px; color: #555;">
-            כדי להשיב — לחצ/י על פרטי הקשר למעלה, או השב/י ישירות למייל זה (אם נשלח ממייל).
-          </p>
-          <p style="margin-top: 8px; font-size: 12px; color: #999;">פנייה זו נשלחה דרך טיפול חכם — mentalytics.co.il</p>
-        </div>
-      `,
+      subject: email.subject,
+      html: email.html,
     });
 
     const sessionId =
@@ -141,6 +132,7 @@ export async function POST(req: NextRequest) {
         contact,
         message: msg,
         therapist_id,
+        received_by_center_id: receivedByCenterId,
         source: "site_message",
         page_source: safeSource,
         ...sanitizeAttribution(body),

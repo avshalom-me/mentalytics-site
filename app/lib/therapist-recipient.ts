@@ -85,6 +85,11 @@ export async function operationalMailTarget(therapistId: string): Promise<Therap
  * למטפל כתובת משלו. הנפילה קיימת כי החלופה גרועה יותר: לי חזן (מרכז שדות)
  * מקודמת ומשולמת, שדה המייל שלה ריק, וכל פנייה אליה נדחתה ב-404
  * "מטפל לא זמין" - המרכז שילם ולא ידע שהוא מפסיד פניות.
+ *
+ * viaCenter כאן = "המייל נוחת בתיבה של המרכז", ולא רק "נפל למרכז". שני מקרים:
+ * הנפילה שלמעלה, וגם מטפל/ת שהמייל ה"אישי" שהוזן לו/ה הוא בעצם תיבת המרכז
+ * (שמעון ערנרייך במכון הכרה). בשניהם קורא המייל הוא צוות המרכז, ולכן שניהם
+ * צריכים לנקוב בשם המטפל/ת שנבחר/ה ולהופיע בפורטל המרכז.
  */
 export async function patientInquiryRecipient(
   therapistId: string,
@@ -97,15 +102,23 @@ export async function patientInquiryRecipient(
   if (!t) return { to: null, viaCenter: null };
 
   const own = clean(t.email);
-  if (own) return { to: own, viaCenter: null };
-  if (!t.center_account_id) return { to: null, viaCenter: null };
+  if (!t.center_account_id) return { to: own, viaCenter: null };
 
   const { data: c } = await supabaseAdmin
     .from("therapy_center_accounts")
     .select("id, name, email, payer_email")
     .eq("id", t.center_account_id as string)
     .maybeSingle();
+  const center = c ? { id: c.id as string, name: c.name as string } : null;
+
+  if (own) {
+    const centerBoxes = [clean(c?.email), clean(c?.payer_email)]
+      .filter((x): x is string => !!x)
+      .map((x) => x.toLowerCase());
+    const isCenterBox = centerBoxes.includes(own.toLowerCase());
+    return { to: own, viaCenter: isCenterBox ? center : null };
+  }
   if (!c) return { to: null, viaCenter: null };
   const to = clean(c.email) ?? clean(c.payer_email);
-  return { to, viaCenter: to ? { id: c.id as string, name: c.name as string } : null };
+  return { to, viaCenter: to ? center : null };
 }

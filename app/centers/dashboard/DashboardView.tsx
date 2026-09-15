@@ -69,7 +69,19 @@ export type PortalData = {
     public_page: PublicPage;
   };
   therapists: TherapistItem[];
+  /** הודעות האתר שהגיעו לתיבת המייל של המרכז (לא הודעות לתיבה פרטית של מטפל/ת). */
+  messages?: PortalMessage[];
   stats: Stats | null;
+};
+
+export type PortalMessage = {
+  id: string;
+  created_at: string;
+  sender_name: string;
+  sender_contact: string;
+  message: string;
+  /** null = ההודעה נשלחה למרכז עצמו. */
+  to_therapist: string | null;
 };
 
 const REGION_LABELS: Record<string, string> = {
@@ -397,6 +409,10 @@ export default function CenterDashboardView({ data, preview = false, justCreated
         </section>
       )}
 
+      {/* הודעות מהאתר - התוכן עצמו. עד 15/9/26 הפורטל הציג כאן רק מונה, והתוכן
+          נשמר רק במייל: מייל שנפל לספאם או נמחק היה אובד למרכז לגמרי. */}
+      <MessagesSection messages={data.messages ?? []} />
+
       {/* סטטיסטיקות מרוכזות - פילוח הפונים */}
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || (stats.clicks_total?.total ?? 0) > 0) && (
         <section className="rounded-2xl border border-stone-200 bg-white p-5">
@@ -565,5 +581,61 @@ function TrendBars({ trend }: { trend: { label: string; clicks: number }[] }) {
         </div>
       ))}
     </div>
+  );
+}
+
+const MESSAGE_PREVIEW_CHARS = 240;
+
+function MessagesSection({ messages }: { messages: PortalMessage[] }) {
+  return (
+    <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+      <h2 className="mb-1 flex items-center gap-2 text-base font-black text-stone-800">
+        <MessageCircle size={17} style={{ color: "var(--teal)" }} /> הודעות שהגיעו דרך האתר
+      </h2>
+      <p className="mb-4 text-xs leading-5 text-stone-500">
+        ההודעות שנשלחו לתיבת המייל של המרכז, מהחדשה לישנה. הודעה שנשלחה ישירות למייל האישי של מטפל/ת מגיעה אליו/אליה בלבד, ולכן לא מופיעה כאן.
+      </p>
+      {messages.length === 0 ? (
+        <p className="rounded-xl bg-stone-50 p-4 text-sm text-stone-500">עדיין לא התקבלו הודעות דרך האתר.</p>
+      ) : (
+        <ul className="space-y-3">
+          {messages.map((m) => <MessageItem key={m.id} m={m} />)}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function MessageItem({ m }: { m: PortalMessage }) {
+  const [open, setOpen] = useState(false);
+  const isMail = m.sender_contact.includes("@");
+  const href = isMail ? `mailto:${m.sender_contact}` : `tel:${m.sender_contact.replace(/[^\d+]/g, "")}`;
+  const when = new Date(m.created_at);
+  const isLong = m.message.length > MESSAGE_PREVIEW_CHARS;
+  const shown = open || !isLong ? m.message : `${m.message.slice(0, MESSAGE_PREVIEW_CHARS).trimEnd()}…`;
+  return (
+    <li className="rounded-xl border border-stone-200 p-4">
+      <div className="mb-1.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-sm font-black text-stone-800">{m.sender_name || "ללא שם"}</span>
+          <a href={href} dir="ltr" className="text-sm font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
+            {m.sender_contact}
+          </a>
+        </div>
+        <time dateTime={m.created_at} className="text-xs tabular-nums text-stone-400">
+          {when.toLocaleDateString("he-IL")} · {when.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" })}
+        </time>
+      </div>
+      <p className="mb-2 text-xs font-bold" style={{ color: "var(--gold-dark)" }}>
+        {m.to_therapist ? `אל: ${m.to_therapist}` : "אל: המרכז"}
+      </p>
+      <p className="whitespace-pre-line text-sm leading-6 text-stone-700">{shown}</p>
+      {isLong && (
+        <button type="button" onClick={() => setOpen((v) => !v)}
+          className="mt-1.5 text-xs font-bold hover:underline" style={{ color: "var(--teal-dark)" }}>
+          {open ? "הצגה מקוצרת" : "הצגת ההודעה המלאה"}
+        </button>
+      )}
+    </li>
   );
 }

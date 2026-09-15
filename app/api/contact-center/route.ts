@@ -136,6 +136,8 @@ export async function POST(req: NextRequest) {
         contact,
         message: msg,
         center_account_id: center.id,
+        // הודעה לעמוד המרכז נוחתת תמיד בתיבת המרכז - מופיעה בפורטל שלו.
+        received_by_center_id: center.id,
         source: "site_message",
         page_source: safeSource,
         ...sanitizeAttribution(body),

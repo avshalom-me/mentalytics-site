@@ -152,6 +152,41 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     gallery: galleryRaw.map((g, i) => ({ path: g.path, caption: g.caption ?? null, url: signedAssets.gallery[i]?.url ?? null })),
   };
 
+  // הודעות האתר שהגיעו לתיבת המרכז. מסוננות לפי received_by_center_id, שנרשם
+  // ברגע השליחה - ולא לפי "למטפל אין כרגע מייל": אחרת מרכז שמוחק את השדה
+  // בפרופיל היה חושף בדיעבד הודעות שנשלחו לתיבה הפרטית של המטפל/ת.
+  // נשלף לפני היציאה המוקדמת: גם מרכז בלי מטפלים מקבל הודעות לעמוד שלו.
+  const { data: messageRows } = await supabaseAdmin
+    .from("crm_leads")
+    .select("id, name, contact, message, therapist_id, created_at")
+    .eq("received_by_center_id", center.id)
+    .eq("source", "site_message")
+    .order("created_at", { ascending: false })
+    .limit(50);
+  const nameById = new Map<string, string>(therapists.map((t) => [t.id, t.full_name ?? ""]));
+  const unknownIds = [...new Set(
+    (messageRows ?? [])
+      .map((m) => m.therapist_id as string | null)
+      .filter((id): id is string => !!id && id !== entity?.id && !nameById.has(id)),
+  )];
+  if (unknownIds.length > 0) {
+    // מטפל/ת שכבר לא ברשימת המרכז - ההודעה עדיין הגיעה לתיבה שלהם.
+    const { data: extra } = await supabaseAdmin.from("therapists").select("id, full_name").in("id", unknownIds);
+    for (const t of extra ?? []) nameById.set(t.id as string, (t.full_name as string | null) ?? "");
+  }
+  const messages = (messageRows ?? []).map((m) => {
+    const tid = m.therapist_id as string | null;
+    return {
+      id: m.id as string,
+      created_at: m.created_at as string,
+      sender_name: (m.name as string | null) ?? "",
+      sender_contact: (m.contact as string | null) ?? "",
+      message: (m.message as string | null) ?? "",
+      // null = למרכז עצמו (עמוד המרכז, או ישות-המרכז במסלול 2)
+      to_therapist: tid && tid !== entity?.id ? (nameById.get(tid) || "מטפל/ת מהצוות") : null,
+    };
+  });
+
   // אין נתונים להצגה - מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
   // שטרם נכנסה להתאמות).
   if (statIds.length === 0) {
@@ -169,6 +204,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
         public_page: publicPage,
       },
       therapists: [],
+      messages,
       stats: null,
       generated_at: new Date().toISOString(),
     });
@@ -474,6 +510,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
       public_page: publicPage,
     },
     therapists: therapistList,
+    messages,
     stats: {
       // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
       listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,
