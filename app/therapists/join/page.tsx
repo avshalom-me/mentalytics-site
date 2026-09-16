@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Sparkles, ArrowLeft, CheckCircle2, ShieldCheck, Users, Brain, BarChart3, MapPin, Activity } from "lucide-react";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import RecruitPageTracker from "@/app/components/RecruitPageTracker";
+import { PLAN_EVIDENCE } from "@/app/lib/plan-evidence";
 
 // Evaluate the promo window per-request instead of baking it into the static
 // HTML at build time - otherwise the "מבצע פתיחה" copy wouldn't disappear on
@@ -193,6 +194,13 @@ export default function TherapistJoinPage() {
             </div>
           </div>
         </div>
+
+        {/* Evidence line - shared with the plan-choice screen */}
+        <p className="mt-4 text-sm leading-7 text-stone-700">
+          {PLAN_EVIDENCE.lead}
+          <strong style={{ color: "var(--teal-dark)" }}>{PLAN_EVIDENCE.stat}</strong>
+          {PLAN_EVIDENCE.rest}
+        </p>
 
         {/* Risk-free guarantee + tax note */}
         <div className="mt-4 rounded-2xl p-5 flex items-start gap-3" style={{ background: "#F0F7F2", border: "1px solid #C8DDD0" }}>

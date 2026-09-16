@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { PLAN_EVIDENCE } from "@/app/lib/plan-evidence";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
 import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
@@ -460,6 +461,13 @@ export default function TherapistProfileEditPage() {
             </button>
           </div>
         </div>
+
+        {/* Evidence line - shared with the /therapists/join plans table */}
+        <p className="mt-5 text-center text-sm leading-7 text-stone-600">
+          {PLAN_EVIDENCE.lead}
+          <strong className="text-[#0F5468]">{PLAN_EVIDENCE.stat}</strong>
+          {PLAN_EVIDENCE.rest}
+        </p>
       </main>
     );
   }
