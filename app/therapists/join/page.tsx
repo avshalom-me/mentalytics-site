@@ -43,7 +43,7 @@ export default function TherapistJoinPage() {
   const promo = isPromoActive();
   return (
     <main
-      className="mx-auto max-w-5xl px-5 pb-20"
+      className="join-page mx-auto max-w-5xl px-5 pb-20"
       dir="rtl"
       style={{ fontFamily: "'Heebo', sans-serif" }}
     >
@@ -52,6 +52,21 @@ export default function TherapistJoinPage() {
           undercount in /admin/recruitment). */}
       <RecruitPageTracker page="therapists-join" />
       <style>{`
+        /* הגדלת הגופנים בעמוד הזה בלבד, פי 1.25. ב-Tailwind 4 כל מחלקת
+           text-* קוראת משתנה (--text-sm וכו'), ולכן הגדרה מחדש כאן מגדילה
+           את כל הטקסט בעמוד בלי לשכתב מחלקות ובלי לגעת בריווח או ברוחב.
+           font-size על main מגדיל את הטקסט שאין לו מחלקת גודל. */
+        .join-page {
+          font-size: 1.25rem;
+          --text-xs: 0.9375rem;
+          --text-sm: 1.09375rem;
+          --text-base: 1.25rem;
+          --text-lg: 1.40625rem;
+          --text-xl: 1.5625rem;
+          --text-2xl: 1.875rem;
+          --text-3xl: 2.34375rem;
+          --text-4xl: 2.8125rem;
+        }
         details summary::-webkit-details-marker { display: none; }
         details[open] .rotate-plus { transform: rotate(45deg); }
         .rotate-plus { transition: transform .25s ease; display:inline-block; }
@@ -77,7 +92,7 @@ export default function TherapistJoinPage() {
             boxShadow: "0 16px 48px rgba(15,84,104,.10)",
           }}
         >
-          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-widest uppercase mb-5"
+          <div className="inline-flex items-center gap-2 rounded-full px-4 py-1.5 text-xs font-semibold tracking-wide uppercase mb-5"
             style={{ background: "var(--teal-pale)", color: "var(--teal-dark)", border: "1px solid var(--teal-mid)" }}>
             <Sparkles size={12} />
             לאנשי מקצוע בתחום הטיפול
@@ -234,7 +249,7 @@ export default function TherapistJoinPage() {
 
       {/* STATS DEEP-DIVE - exclusive to promoted */}
       <section className="mt-12">
-        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-widest uppercase mb-4"
+        <div className="inline-flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold tracking-wide uppercase mb-4"
           style={{ background: "#8B2E0A15", color: "#8B2E0A", border: "1px solid #8B2E0A33" }}>
           <Sparkles size={12} />
           בלעדי למסלול המקודם
