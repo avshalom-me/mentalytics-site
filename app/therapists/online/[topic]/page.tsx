@@ -159,8 +159,6 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
         }
       />
 
-      <TopicFaq topic={topic} title={`${heading} - שאלות של הורים`} />
-
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           כרגע אין מטפלים מוצגים בשילוב הזה. אפשר לראות את{" "}
@@ -174,6 +172,9 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           ))}
         </div>
       )}
+
+      {/* Questions after the cards - see city/[city]/[topic]. */}
+      <TopicFaq topic={topic} title={`${heading} - שאלות של הורים`} />
 
       {/* Prose below the listings: the topic's own intro + what online delivery
           means for THIS topic - the content that separates the page from its

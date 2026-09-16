@@ -143,16 +143,6 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         <p style={{ fontSize: "12px", fontWeight: 700, color: "var(--teal)", textTransform: "uppercase", letterSpacing: ".16em", marginBottom: "8px" }}>לפי עיר</p>
         <h1 style={{ fontSize: "clamp(1.8rem,3vw,2.4rem)", fontWeight: 900, color: "var(--text)", letterSpacing: "-.02em" }}>פסיכולוגים ומטפלים ב{city}</h1>
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>{introLine}</p>
-        {topicLinks.length > 0 && (
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-stone-500">ב{city} לפי תחום:</span>
-            {topicLinks.map((t) => (
-              <Link key={t.slug} href={`/therapists/city/${regionToSlug(city)}/${t.slug}`}
-                className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
-                style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>{t.name}</Link>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Prominent quiz CTA - same offer as the region/online pages, tailored to the city. */}
@@ -192,6 +182,25 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {inCity.length === 0 && nearbyCities.length === 0 && nearbyRegion.length === 0 && (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מטפלים מוצגים ב{city}. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link>, לבחור <Link href={`/therapists/region/${ONLINE_SLUG}`} className="font-semibold text-[#2e7d8c] hover:underline">טיפול אונליין</Link>, או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
+        </div>
+      )}
+
+      {/* The city's topic sub-pages sit BELOW the listings. From 9/9/26 this row
+          was under the intro, and the city page is also the landing page of the
+          paid city campaigns. In the following week the share of those visitors
+          who ever reached a therapist card fell from 68% to 49% (Tel Aviv) and
+          from 69% to 43% (Jerusalem), roughly one in six left through a chip,
+          and contact clicks went from 5 to 0 and from 10 to 1, while campaigns
+          landing on region pages held. The links pass the same equity from
+          here; a visitor who came for a list meets the list first. */}
+      {topicLinks.length > 0 && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="text-sm font-semibold text-stone-500">ב{city} לפי תחום:</span>
+          {topicLinks.map((t) => (
+            <Link key={t.slug} href={`/therapists/city/${regionToSlug(city)}/${t.slug}`}
+              className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+              style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>{t.name}</Link>
+          ))}
         </div>
       )}
 

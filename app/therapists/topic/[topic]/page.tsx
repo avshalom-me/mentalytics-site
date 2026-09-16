@@ -141,8 +141,6 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
         </Link>
       </div>
 
-      <TopicFaq topic={topic} title={`${topic.name} - שאלות של הורים`} />
-
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מטפלים מוצגים בקטגוריה זו. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
@@ -152,6 +150,9 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
           {list.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/topic/${topic.slug}`} />)}
         </div>
       )}
+
+      {/* Questions after the cards - see city/[city]/[topic]. */}
+      <TopicFaq topic={topic} title={`${topic.name} - שאלות של הורים`} />
 
       {/* Explanatory prose lives BELOW the listings: a visitor who came to find
           a therapist sees therapists first; the reading material is for those

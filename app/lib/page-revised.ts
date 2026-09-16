@@ -34,7 +34,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   // one revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
-    date: "2026-09-15",
+    date: "2026-09-16",
     sources: [
       "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
@@ -51,6 +51,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/therapists/online/page.tsx",
       "app/therapists/para-medical/page.tsx",
       "app/therapists/CitySeoSection.tsx",
+      "app/therapists/TopicFaq.tsx",
       "app/components/TherapistResultCard.tsx",
       "app/lib/meta-description.ts",
       "app/lib/topics.ts",

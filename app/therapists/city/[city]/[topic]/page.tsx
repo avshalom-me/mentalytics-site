@@ -158,8 +158,24 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
       />
 
+      {list.length === 0 ? (
+        <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
+          כרגע אין מטפלים מוצגים בשילוב הזה. אפשר לראות את <Link href={`/therapists/city/${regionToSlug(city)}`} className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים {inPhrase(city)}</Link> או <Link href="/therapists/region/אונליין" className="font-semibold text-[#2e7d8c] hover:underline">מטפלים אונליין</Link>.
+        </div>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {list.map((t) => (
+            <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${regionToSlug(city)}/${topic.slug}`} contextCity={city} />
+          ))}
+        </div>
+      )}
+
+      {/* The city note, its verified fact and the questions come AFTER the
+          cards. From 9/9/26 they sat above them, and this page is the landing
+          page of the kids campaign: the share of its visitors who ever reached
+          a therapist card fell from 83% to 38% the following week. */}
       {(cityNote || fact) && (
-        <p className="mb-8 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
+        <p className="mt-10 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
           {cityNote}
           {cityNote && fact ? " " : null}
           {fact && (
@@ -176,18 +192,6 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
         topic={topic}
         title={`${topic.name} ${inPhrase(city)} - ${topic.kind === "audience" ? "שאלות של הורים" : "שאלות נפוצות"}`}
       />
-
-      {list.length === 0 ? (
-        <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
-          כרגע אין מטפלים מוצגים בשילוב הזה. אפשר לראות את <Link href={`/therapists/city/${regionToSlug(city)}`} className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים {inPhrase(city)}</Link> או <Link href="/therapists/region/אונליין" className="font-semibold text-[#2e7d8c] hover:underline">מטפלים אונליין</Link>.
-        </div>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((t) => (
-            <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${regionToSlug(city)}/${topic.slug}`} contextCity={city} />
-          ))}
-        </div>
-      )}
 
       {/* Prose below the listings (see the topic page for the rationale). */}
       {topic.intro && (
