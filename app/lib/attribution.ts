@@ -45,7 +45,7 @@ export type Attribution = {
   referrer_host: string | null;
 };
 
-const STORAGE_KEY = "mnt_attribution";
+export const STORAGE_KEY = "mnt_attribution";
 const UTM_MAX = 120;
 
 /**
@@ -60,8 +60,8 @@ const UTM_MAX = 120;
  * 30 days matches the conversion window Google Ads and Meta both use, so our
  * numbers stay comparable to the platforms' own reporting.
  */
-const ATTRIBUTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const CAPTURED_AT_KEY = "capturedAt";
+export const ATTRIBUTION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+export const CAPTURED_AT_KEY = "capturedAt";
 
 // Raw ad-platform click ids are stored separately from the normalized
 // attribution: they are only needed at conversion time (to upload the
@@ -95,7 +95,7 @@ export function isValidChannel(x: unknown): x is Channel {
   return typeof x === "string" && (CHANNELS as readonly string[]).includes(x);
 }
 
-const PAID_MEDIUMS = new Set([
+export const PAID_MEDIUMS = new Set([
   "cpc", "ppc", "paid", "paidsocial", "paid_social", "paid-social",
   "display", "cpm", "retargeting", "remarketing",
 ]);

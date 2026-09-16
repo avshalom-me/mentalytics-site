@@ -7,6 +7,7 @@ import AccessibilityWidget from "./components/AccessibilityWidget";
 import AttributionTracker from "./components/AttributionTracker";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
+import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -39,6 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="he" dir="rtl">
       <body className={`${heebo.className} min-h-screen`}>
+        {/* ראשון ב-body, לפני הציור הראשון: מסמן מבקר ממומן (html.mnt-paid)
+            כדי שמטפלים חינמיים לא יוצגו לו - ראו app/lib/paid-visitor.ts. */}
+        <script id="paid-visitor" dangerouslySetInnerHTML={{ __html: paidVisitorBootScript() }} />
         <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none">
           דלג לתוכן הראשי
         </a>

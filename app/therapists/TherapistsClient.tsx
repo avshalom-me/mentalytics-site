@@ -10,6 +10,7 @@ import SiteMessageModal from "./SiteMessageModal";
 import CenterWhatsAppLink from "@/app/centers/[slug]/CenterWhatsAppLink";
 import { waLinkForCenter } from "@/app/lib/phone";
 import QuizCta from "./QuizCta";
+import { isPaidVisitor } from "@/app/lib/paid-visitor";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
@@ -63,6 +64,8 @@ export type PublicTherapist = {
   // (always last). The list is grouped by tier and shuffled WITHIN each
   // tier per visit (see shuffleWithinTiers).
   tier?: number;
+  /** חינמי (status approved). מוסתר למבקר ממומן - ראו app/lib/paid-visitor.ts. */
+  free?: boolean;
   // false = "כעת לא זמין/ה לקבלת מטופלים חדשים": card shows a note instead of
   // contact buttons (the server also rejects site messages for them).
   accepting_new_patients: boolean;
@@ -155,6 +158,7 @@ function TherapistCard({
   return (
     <div
       ref={impressionRef}
+      data-tier={t.free ? "free" : "promoted"}
       className="rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)" }}
     >
@@ -318,6 +322,12 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
   const [regionFilter, setRegionFilter] = useState("");
   const [cityFilter, setCityFilter] = useState("");
   const [onlineOnly, setOnlineOnly] = useState(false);
+  // מבקר ממומן לא רואה חינמיים (ההחלטה מ-16/9/26). ה-CSS מסתיר את הכרטיסים
+  // עוד לפני ההידרציה; הסינון כאן מיישר גם את מצב "לא נמצאו" ואת המונים.
+  const [paidVisitor, setPaidVisitor] = useState(false);
+  useEffect(() => {
+    setPaidVisitor(isPaidVisitor());
+  }, []);
   const [paraNoteOpen, setParaNoteOpen] = useState(false);
 
   usePageView(isPara ? "para-medical" : "directory");
@@ -405,6 +415,7 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
   // WITHIN each tier, so any filter - including online-only - keeps paying
   // therapists at the top while rotating who leads inside each tier.
   const filtered = displayList.filter((t) => {
+    if (paidVisitor && t.free) return false;
     if (onlineOnly && !t.online) return false;
     if (regionFilter && !t.regions.some((c) => CITY_TO_REGION[c] === regionFilter)) return false;
     if (cityFilter && !t.regions.includes(cityFilter)) return false;

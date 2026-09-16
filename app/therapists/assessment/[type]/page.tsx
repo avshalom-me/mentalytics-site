@@ -6,6 +6,7 @@ import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/l
 import { ASSESSMENTS, assessmentBySlug } from "@/app/lib/assessments";
 import { ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { introPlusOffer } from "@/app/lib/meta-description";
 import QuizCta from "@/app/therapists/QuizCta";
@@ -171,6 +172,7 @@ export default async function AssessmentPage({ params }: { params: Promise<{ typ
         </div>
       )}
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מאבחנים מוצגים בסוג האבחון הזה. אפשר לעיין ב

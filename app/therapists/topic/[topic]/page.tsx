@@ -8,6 +8,7 @@ import { TOPICS, slugToTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLU
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { sectionForDirectoryHref, editorialBySection } from "@/app/lib/article-taxonomy";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
@@ -141,6 +142,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
         </Link>
       </div>
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מטפלים מוצגים בקטגוריה זו. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.

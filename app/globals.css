@@ -140,3 +140,11 @@ a { text-decoration: none; color: inherit; }
 @media (prefers-reduced-motion: reduce) {
   .cta-pulse, .cta-pulse-soft { animation: none; }
 }
+
+/* מבקר ממומן (html.mnt-paid, ראו app/lib/paid-visitor.ts): מטפלים חינמיים
+   לא מוצגים לו - לא כרטיס, לא סקציה שכולה חינמיים. ההודעה .mnt-paid-only
+   קיימת רק בשבילו, כשאחרי ההסתרה לא נשאר בעמוד מטפל להציג. */
+html.mnt-paid [data-tier="free"] { display: none !important; }
+html.mnt-paid [data-paid-hide] { display: none !important; }
+.mnt-paid-only { display: none; }
+html.mnt-paid .mnt-paid-only { display: block; }

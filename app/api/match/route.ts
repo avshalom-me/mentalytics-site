@@ -76,6 +76,8 @@ type NormalizedMatchInput = {
   region: string | null;
   genderPreference: string | null;
   onlineRequired: boolean;
+  /** מבקר ממומן (מהלקוח, app/lib/paid-visitor.ts) - בלי גיבוי חינמי. */
+  paidVisitor: boolean;
   limit: number;
   styleP1: number | null;
   styleP2: number | null;
@@ -258,6 +260,10 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
   if (!Number.isFinite(limit) || limit <= 0) limit = 10;
   limit = Math.min(limit, 20);
 
+  // מבקר ממומן לא מקבל חינמיים כגיבוי - ההחלטה מ-16/9/26. הדגל מגיע מהלקוח
+  // (isPaidVisitor); זיוף שלו יכול רק להוריד מטפלים מהתוצאות, לא להוסיף.
+  const paidVisitor = parseBoolean(body.paidVisitor ?? body.paid_visitor);
+
   const styleP1 = Number.isInteger(body.styleP1) && body.styleP1 >= 1 && body.styleP1 <= 7 ? body.styleP1 : null;
   const styleP2 = Number.isInteger(body.styleP2) && body.styleP2 >= 1 && body.styleP2 <= 7 ? body.styleP2 : null;
   const styleP3 = Number.isInteger(body.styleP3) && body.styleP3 >= 1 && body.styleP3 <= 7 ? body.styleP3 : null;
@@ -286,6 +292,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     region,
     genderPreference,
     onlineRequired,
+    paidVisitor,
     limit,
     styleP1,
     styleP2,
@@ -697,7 +704,7 @@ export async function POST(req: NextRequest) {
     let freeFallbackRegion: string | null = null;
     let freeFallbackTrigger: "region_empty" | "expertise_gap" | null = null;
     const freeFallbackIds = new Set<string>();
-    if (FREE_REGION_FALLBACK_ENABLED && !input.onlineRequired) {
+    if (FREE_REGION_FALLBACK_ENABLED && !input.onlineRequired && !input.paidVisitor) {
       const patientRegion =
         input.region ?? (input.city ? CITY_TO_REGION[input.city] ?? null : null);
       if (patientRegion) {

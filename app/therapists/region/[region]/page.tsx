@@ -8,6 +8,7 @@ import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { onlineTopicSlugs, slugToCityTopic, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import OnlineEvidenceSection from "@/app/therapists/OnlineEvidenceSection";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
 import QuizCta from "@/app/therapists/QuizCta";
@@ -165,6 +166,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
           : "ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."}
       />
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מטפלים מוצגים {isOnline ? "לטיפול אונליין" : `ב${label}`}. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.

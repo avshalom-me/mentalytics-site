@@ -13,6 +13,7 @@ import {
 } from "@/app/lib/topics";
 import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import TopicFaq from "@/app/therapists/TopicFaq";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
@@ -159,6 +160,7 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
         }
       />
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           כרגע אין מטפלים מוצגים בשילוב הזה. אפשר לראות את{" "}

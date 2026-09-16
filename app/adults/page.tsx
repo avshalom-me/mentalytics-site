@@ -12,6 +12,7 @@ import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-versi
 import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
+import { isPaidVisitor } from "@/app/lib/paid-visitor";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import { buildAdultFacts } from "@/app/lib/explain-facts";
@@ -895,6 +896,8 @@ export default function AdultsPage() {
       const styleP3 = answers.emotional?.therapistStyleQ3 ?? 0;
       const isProfessional = !!selectedRec?.professionalType;
       const body: Record<string, unknown> = {
+        // מבקר ממומן: בלי גיבוי חינמי בתוצאות (app/lib/paid-visitor.ts).
+        paidVisitor: isPaidVisitor(),
         treatmentTypes: isProfessional ? [] : (combinedTreatments ?? (selectedRec?.treatment ? [selectedRec.treatment] : [])),
         requiredTherapistTypes: isProfessional ? [selectedRec!.professionalType!] : undefined,
         city: matchPrefs.city || null,

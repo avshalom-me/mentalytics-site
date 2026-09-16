@@ -9,6 +9,7 @@ import TopicFaq from "@/app/therapists/TopicFaq";
 import { slugToCityTopic, isCityTopicAllowed, isYouthTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, TOPICS } from "@/app/lib/topics";
 import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 import { cityFact } from "@/app/lib/city-facts";
@@ -158,6 +159,7 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
           : `ענו על שאלון קצר מבוסס מחקר - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת ב${city} או אונליין.`}
       />
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           כרגע אין מטפלים מוצגים בשילוב הזה. אפשר לראות את <Link href={`/therapists/city/${regionToSlug(city)}`} className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים {inPhrase(city)}</Link> או <Link href="/therapists/region/אונליין" className="font-semibold text-[#2e7d8c] hover:underline">מטפלים אונליין</Link>.

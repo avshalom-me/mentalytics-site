@@ -39,6 +39,8 @@ export default function TherapistResultCard({
 }) {
   // ישות-מרכז: עמוד המטפל שלה מחזיר 404 במכוון, אין לה מגדר ולרוב אין תמונה.
   const isCenter = t.is_center === true;
+  // חינמי מוסתר למבקר ממומן דרך CSS (html.mnt-paid) - ראו app/lib/paid-visitor.ts.
+  const tier = t.free ? "free" : "promoted";
   // למרכז אין שורת תואר: שני סוגי המטפלים הראשונים ברשימה ("עו"ס קליני ·
   // מטפל מיני" אצל מרכז רותם, מתוך תשעה) תיארו מוסד כאילו היה אדם עם מקצוע.
   const type = isCenter
@@ -129,7 +131,7 @@ export default function TherapistResultCard({
   const centerWaHref = isCenter && t.accepting_new_patients !== false ? waLinkForCenter(t.center_whatsapp) : null;
   const card = profileHref && (canMessageCenter || centerWaHref) ? (
     <div className="group flex flex-col rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
-      style={{ border: cardStyle.border, boxShadow: cardStyle.boxShadow }}>
+      style={{ border: cardStyle.border, boxShadow: cardStyle.boxShadow }} data-tier={tier}>
       <Link href={profileHref} className="block" style={{ textDecoration: "none" }} data-nosnippet>{Body}</Link>
       <div className="flex flex-wrap gap-2" style={{ padding: "0 18px 16px" }}>
         {centerWaHref && (
@@ -155,12 +157,12 @@ export default function TherapistResultCard({
       </div>
     </div>
   ) : profileHref ? (
-    <Link href={profileHref} className={cardClass} style={cardStyle} data-nosnippet>{Body}</Link>
+    <Link href={profileHref} className={cardClass} style={cardStyle} data-nosnippet data-tier={tier}>{Body}</Link>
   ) : (
     // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
-    <div className={cardClass} style={cardStyle} data-nosnippet>{Body}</div>
+    <div className={cardClass} style={cardStyle} data-nosnippet data-tier={tier}>{Body}</div>
   );
   // כרטיס מרכז מסלול-1 מסונתז מחשבון המרכז ואין לו שורת מטפל - דיווח חשיפה
   // עליו היה נכשל על ה-FK של analytics_events.
-  return t.trackable === false ? card : <CardImpression therapistId={t.id}>{card}</CardImpression>;
+  return t.trackable === false ? card : <CardImpression therapistId={t.id} tier={tier}>{card}</CardImpression>;
 }

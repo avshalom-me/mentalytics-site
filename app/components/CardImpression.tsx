@@ -12,12 +12,15 @@ import { useImpressionTrack } from "@/app/lib/useTrack";
 export default function CardImpression({
   therapistId,
   position,
+  tier,
   children,
 }: {
   therapistId: string;
   position?: number;
+  /** free = חינמי, מוסתר למבקר ממומן (app/lib/paid-visitor.ts). על העוטף, כי הוא פריט הרשת. */
+  tier?: "free" | "promoted";
   children: React.ReactNode;
 }) {
   const ref = useImpressionTrack(therapistId, position);
-  return <div ref={ref}>{children}</div>;
+  return <div ref={ref} data-tier={tier}>{children}</div>;
 }

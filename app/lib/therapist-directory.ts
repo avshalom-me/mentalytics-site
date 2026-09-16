@@ -109,6 +109,8 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     profile_photo_path: t.profile_photo_path ?? null,
     profile_photo_url,
     tier: tierOf(t),
+    // חינמי = לא משלם. נפרד מ-tier כי tier 3 (לא מקבל מטופלים) מערבב את שניהם.
+    free: t.status !== "paying",
     accepting_new_patients: t.accepting_new_patients !== false,
     is_center: isEntity,
     // ה-slug משמש לשני דברים: יעד הקישור של כרטיס מרכז, והשיוך הגלוי על כרטיס

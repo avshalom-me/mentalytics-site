@@ -8,6 +8,7 @@ import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
+import { isPaidVisitor } from "@/app/lib/paid-visitor";
 import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
@@ -2333,6 +2334,8 @@ function KidsMatchSection({ A, score, selection }: {
           city: city || null,
           region: city ? (CITY_TO_REGION[city] ?? region ?? null) : (region || null),
           onlineRequired: online,
+          // מבקר ממומן: בלי גיבוי חינמי בתוצאות (app/lib/paid-visitor.ts).
+          paidVisitor: isPaidVisitor(),
           culturalPreferences: cultural,
           arrangements,
           languages: [language || "עברית"],

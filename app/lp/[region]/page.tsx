@@ -68,7 +68,9 @@ export default async function LandingPage({ params }: Params) {
   const place = resolvePlace(slug);
   if (!place) notFound();
 
-  const therapists = await loadPublicTherapists(place.filter);
+  // עמוד נחיתה ממומן מטבעו: חינמיים לא מוצגים בו כלל (ההחלטה מ-16/9/26,
+  // ראו app/lib/paid-visitor.ts). כאן מסננים בשרת - אין מה לנחש מי המבקר.
+  const therapists = (await loadPublicTherapists(place.filter)).filter((t) => !t.free);
   const shown = therapists.slice(0, HOW_MANY_CARDS);
   const total = therapists.length;
   const regionForCard = place.filter.region ?? (place.filter.city ? CITY_TO_REGION[place.filter.city] : undefined);

@@ -8,6 +8,8 @@ import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
 import QuizCta from "@/app/therapists/QuizCta";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
+import { paidHideAttr } from "@/app/lib/paid-visitor";
 import { loadCityArticles } from "@/app/lib/local-articles";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
 import { cityTopicList, cityTopicCitiesFor, MIN_CITY_TOPIC } from "@/app/lib/topics";
@@ -149,6 +151,8 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {/* Both audiences land on a city page - see QuizCta. */}
       <QuizCta body={"ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים, נאתר את הצורך ואת אישיות המטפל, ונתאים לכם מטפל/ת באזורכם או באונליין."} />
 
+      {/* מבקר ממומן: החינמיים מוסתרים (data-tier) - ראו app/lib/paid-visitor.ts. */}
+      <PaidVisitorNotice rows={[...inCity, ...nearbyCities, ...nearbyRegion]} />
       {inCity.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 mb-10">
           {inCity.map((t) => <TherapistResultCard key={t.id} t={t} backHref={`/therapists/city/${cityParam}`} contextCity={city} contextRegion={region ?? undefined} />)}
@@ -156,7 +160,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       )}
 
       {nearbyCities.length > 0 && (
-        <div className="mb-10">
+        <div className="mb-10" {...paidHideAttr(nearbyCities)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים בערים צמודות ל{city}</h2>
           <p className="text-sm text-stone-500 mb-4">
             {nearbyCityNames.length > 0
@@ -170,7 +174,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       )}
 
       {nearbyRegion.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-6" {...paidHideAttr(nearbyRegion)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים נוספים באזור {region}</h2>
           <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) - לרבים מהם נוחות גם לתושבי {city}.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

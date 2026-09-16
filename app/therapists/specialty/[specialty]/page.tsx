@@ -8,6 +8,7 @@ import QuizCta from "@/app/therapists/QuizCta";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
+import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import CouplesDepthSection from "@/app/therapists/CouplesDepthSection";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import { introPlusOffer, therapistOffers } from "@/app/lib/meta-description";
@@ -97,6 +98,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
         }
       />
 
+      <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
         <div className="rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6 text-stone-600">
           עדיין אין מטפלים מוצגים בהתמחות זו. אפשר לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link> או למלא <Link href={specialtyQuizAudience(specialty) === "youth" ? "/kids" : "/adults"} className="font-semibold text-[#2e7d8c] hover:underline">שאלון התאמה</Link>.
