@@ -52,20 +52,23 @@ export default function TherapistJoinPage() {
           undercount in /admin/recruitment). */}
       <RecruitPageTracker page="therapists-join" />
       <style>{`
-        /* הגדלת הגופנים בעמוד הזה בלבד, פי 1.25. ב-Tailwind 4 כל מחלקת
-           text-* קוראת משתנה (--text-sm וכו'), ולכן הגדרה מחדש כאן מגדילה
-           את כל הטקסט בעמוד בלי לשכתב מחלקות ובלי לגעת בריווח או ברוחב.
-           font-size על main מגדיל את הטקסט שאין לו מחלקת גודל. */
+        /* הגדלת הגופנים בעמוד הזה בלבד, פי 1.125 (גוף 18px). ב-Tailwind 4
+           כל מחלקת text-* קוראת משתנה (--text-sm וכו'), ולכן הגדרה מחדש כאן
+           מגדילה את כל הטקסט בעמוד בלי לשכתב מחלקות ובלי לגעת בריווח או
+           ברוחב. font-size על main מגדיל את הטקסט שאין לו מחלקת גודל.
+           המשתנים מוגדרים על .join-page בלבד ולא על :root, ולכן שום עמוד
+           אחר לא מושפע. 18px = הגודל שאתרי המטפלים המודרניים מתכנסים אליו
+           (נמדד 16/9/26: Headway 18, Psychology Today 16-18, betipulnet 16). */
         .join-page {
-          font-size: 1.25rem;
-          --text-xs: 0.9375rem;
-          --text-sm: 1.09375rem;
-          --text-base: 1.25rem;
-          --text-lg: 1.40625rem;
-          --text-xl: 1.5625rem;
-          --text-2xl: 1.875rem;
-          --text-3xl: 2.34375rem;
-          --text-4xl: 2.8125rem;
+          font-size: 1.125rem;
+          --text-xs: 0.84375rem;
+          --text-sm: 0.984375rem;
+          --text-base: 1.125rem;
+          --text-lg: 1.265625rem;
+          --text-xl: 1.40625rem;
+          --text-2xl: 1.6875rem;
+          --text-3xl: 2.109375rem;
+          --text-4xl: 2.53125rem;
         }
         details summary::-webkit-details-marker { display: none; }
         details[open] .rotate-plus { transform: rotate(45deg); }
