@@ -10,7 +10,8 @@ import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
-import { loadCentersWithReadiness } from "@/app/lib/center-readiness-load";
+import { loadCenterHealth } from "@/app/lib/center-health";
+import { buildCallSheetLink } from "@/app/lib/call-sheet-token";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 
 // ניהול מרכזים טיפוליים — הצעות מחיר, קישורי תשלום ומנויים.
@@ -192,20 +193,36 @@ export async function GET() {
 
     // מוכנות לפי מסלול (center-readiness) - למרכזים פעילים. אותו מקור אמת
     // כמו סוכן השימור וקרון הנדנודים, כדי שהאדמין יראה בדיוק את אותו מצב.
+    // הבריאות (center-health) עוטפת את המוכנות: אותה טעינה מחזירה גם את
+    // הדגלים, ההשוואה למשלם פרטי והספירה לאחור לחיוב - מה שהסוכן ודף השיחה
+    // מציגים, בדיוק אותם מספרים.
     const readinessById = new Map<string, unknown>();
+    const healthById = new Map<string, unknown>();
     try {
-      for (const r of await loadCentersWithReadiness()) {
-        readinessById.set(r.id, {
-          pct: r.readiness.pct,
-          track_label: r.readiness.trackLabel,
-          headline: r.readiness.headline,
-          slots: r.readiness.slots,
-          missing: r.readiness.missingForCenter.map((i) => ({ label: i.label, critical: i.critical, hint: i.hint ?? null })),
-          blocked_on_us: r.readiness.blockedOnUs.map((i) => i.label),
+      const report = await loadCenterHealth();
+      const bench = report.benchmark
+        ? { peers: report.benchmark.peers, cards: report.benchmark.cards, list: report.benchmark.list, opens: report.benchmark.opens, contacts: report.benchmark.contacts }
+        : null;
+      for (const h of report.centers) {
+        readinessById.set(h.id, {
+          pct: h.readiness.pct,
+          track_label: h.readiness.trackLabel,
+          headline: h.readiness.headline,
+          slots: h.readiness.slots,
+          missing: h.readiness.missingForCenter.map((i) => ({ label: i.label, critical: i.critical, hint: i.hint ?? null })),
+          blocked_on_us: h.readiness.blockedOnUs.map((i) => i.label),
+        });
+        healthById.set(h.id, {
+          severity: h.severity,
+          days_to_billing: h.daysToBilling,
+          window_days: h.windowDays,
+          per_unit: h.perUnit30,
+          benchmark: bench,
+          flags: h.flags.map((f) => ({ key: f.key, severity: f.severity, owner: f.owner, label: f.label, detail: f.detail, question: f.question })),
         });
       }
     } catch (e) {
-      console.error("admin-centers: readiness load failed:", e instanceof Error ? e.message : e);
+      console.error("admin-centers: health load failed:", e instanceof Error ? e.message : e);
     }
 
     // linked_therapist_count = כמה פרופילי מטפלים משויכים למרכז (שונה מ-
@@ -230,6 +247,7 @@ export async function GET() {
       pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
       engagement: engByCenter.get(c.id as string) ?? null,
       readiness: readinessById.get(c.id as string) ?? null,
+      health: healthById.get(c.id as string) ?? null,
     }));
     return NextResponse.json({ ok: true, centers });
   } catch (err) {
@@ -309,6 +327,14 @@ export async function POST(req: NextRequest) {
           center_name: t.center_account_id ? centerNames.get(t.center_account_id as string) ?? null : null,
         })),
       });
+    }
+
+    // קישור חתום לדף השיחה - לשליחה לעומר בלי סיסמת האדמין. פג תוך שבוע.
+    if (action === "call_sheet_link") {
+      const base = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
+      const centerId = typeof body.center_id === "string" && body.center_id ? body.center_id : undefined;
+      const link = buildCallSheetLink(base, { centerId });
+      return NextResponse.json({ ok: true, url: link.url, expires_at: link.expiresAt });
     }
 
     const id = typeof body.id === "string" ? body.id : "";

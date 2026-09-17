@@ -411,6 +411,24 @@ const AGENTS: AgentMeta[] = [
     chartLabel: "כמה מטפלים בסיכון נמצאו בכל ריצה",
     chartGoodWhenZero: true,
   },
+  {
+    key: "center_health",
+    icon: "🩺",
+    label: "בריאות המרכזים",
+    runAction: "center_health_run",
+    runLabel: "בדוק מרכזים עכשיו",
+    desc: "עובר כל בוקר על המרכזים המשלמים ומסמן מה מונע מהם פניות: מרכז בלי מטפלים כשהחיוב מתקרב, טלפון נייח בלי וואטסאפ, אף מטפל לא אונליין, ביקוש נמוך באזור, כל הפניות למטפל אחד, וחשיפה נמוכה לעומת מטפל פרטי משלם. ממצא אחד לכל מרכז, עם החומרה של הדגל החמור ביותר.",
+    howToRead: [
+      "\"אצלם\" = משהו שהמרכז צריך לעשות (וואטסאפ, אונליין, מטפלים). \"אצלנו\" = בעיה שלנו או של הביקוש - לא נכנסת לשום מייל למרכז.",
+      "ההשוואה היא למטפל פרטי שמשלם בעצמו, על אותם 30 יום. מרכז צעיר משבוע לא נשפט על חשיפה.",
+      "דף השיחה בעמוד המרכזים מדפיס את אותם דגלים כשאלות לשיחה - זה מה ששולחים לעומר.",
+      "הממצא נסגר מעצמו כשהדגלים נעלמים. שום מייל לא יוצא מכאן.",
+    ],
+    schedule: "רץ אוטומטית כל בוקר ב-07:50, לפני דוח הבוקר",
+    chartLabel: "כמה מרכזים עם דגל בכל ריצה",
+    chartGoodWhenZero: true,
+    home: { href: "/admin/centers", label: "עמוד המרכזים" },
+  },
 ];
 
 AGENTS.push({
@@ -487,7 +505,7 @@ const AGENT_GROUPS: { key: string; label: string; keys: string[] }[] = [
     label: "סוכני לקוחות ושימור",
     // פערי היצע כאן כי הוא פונה למטפלים שכבר רשומים אצלנו - הפעלה של מי
     // שבפנים, לא גיוס מבחוץ.
-    keys: ["inbox", "supply_gaps", "center_nudge", "retention"],
+    keys: ["inbox", "supply_gaps", "center_nudge", "center_health", "retention"],
   },
   {
     key: "growth",
@@ -537,6 +555,7 @@ const WATCHDOG_LABELS: Record<string, string> = {
   cron_conversions: "סוכן ההמרות רץ בזמן",
   cron_finance: "סוכן הכספים רץ בזמן",
   cron_retention: "סוכן השימור רץ בזמן",
+  cron_center_health: "סוכן בריאות המרכזים רץ בזמן",
   cron_backup: "הגיבוי לדרייב רץ בזמן",
   cron_supply_gaps: "סוכן פערי ההיצע רץ השבוע",
   cron_weekly_report: "הדוח השבועי נוצר",

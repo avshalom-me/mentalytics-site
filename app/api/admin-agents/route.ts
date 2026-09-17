@@ -9,6 +9,7 @@ import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetention } from "@/app/lib/retention";
+import { runCenterHealth } from "@/app/lib/center-health-agent";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
@@ -423,6 +424,15 @@ export async function POST(req: NextRequest) {
     }
     if (body?.action === "retention_run") {
       const result = await runRetention();
+      return NextResponse.json({
+        ok: result.ok,
+        findings: result.findings,
+        checked: result.checked,
+        error: result.error,
+      });
+    }
+    if (body?.action === "center_health_run") {
+      const result = await runCenterHealth();
       return NextResponse.json({
         ok: result.ok,
         findings: result.findings,

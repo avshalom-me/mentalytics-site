@@ -3,6 +3,7 @@ import { startAgentRun, finishAgentRun, createAgentAction, agentEnabled } from "
 import { supabaseAdmin } from "./supabaseAdmin";
 import { loadCentersWithReadiness } from "./center-readiness-load";
 import { buildCenterNudgeDraft } from "./center-nudge-draft";
+import { loadCenterHealth, healthEmailParagraphs } from "./center-health";
 
 // סוכן המרכזים: עובר על כל מרכז פעיל, מזהה מה חסר לו לפי המסלול שרכש,
 // ומנסח טיוטת מייל - בדיוק כמו סוכן פערי ההיצע מנסח הצעת קידום למטפל.
@@ -45,13 +46,27 @@ export async function runCenterNudgeAgent(): Promise<CenterNudgeRun> {
   try {
     const now = Date.now();
     const centers = await loadCentersWithReadiness();
+    // דגלי הבריאות שבאחריות המרכז (וואטסאפ, אונליין) נכנסים לטיוטה כפסקאות.
+    // דגל שבאחריותנו לעולם לא - healthEmailParagraphs כבר מסנן אותו.
+    const healthById = new Map<string, { paragraphs: string[]; labels: string[] }>();
+    try {
+      for (const h of (await loadCenterHealth()).centers) {
+        healthById.set(h.id, {
+          paragraphs: healthEmailParagraphs(h),
+          labels: h.flags.filter((f) => f.owner === "center" && f.emailParagraph).map((f) => f.label),
+        });
+      }
+    } catch (e) {
+      console.error("center_nudge: health load failed:", e instanceof Error ? e.message : e);
+    }
     const proposals: CenterNudgeProposal[] = [];
     const skipped: { center: string; reason: string }[] = [];
 
     for (const c of centers) {
       const to = c.payerEmail ?? c.email;
 
-      if (c.readiness.missingForCenter.length === 0) {
+      const extras = healthById.get(c.id) ?? { paragraphs: [], labels: [] };
+      if (c.readiness.missingForCenter.length === 0 && extras.paragraphs.length === 0) {
         skipped.push({ center: c.name, reason: "אין פריט פתוח באחריותם" });
         continue;
       }
@@ -88,6 +103,7 @@ export async function runCenterNudgeAgent(): Promise<CenterNudgeRun> {
         readiness: c.readiness,
         token: c.token,
         hasAccount: c.hasAccount,
+        extraBullets: extras.paragraphs,
       });
 
       const proposal: CenterNudgeProposal = {
@@ -97,7 +113,7 @@ export async function runCenterNudgeAgent(): Promise<CenterNudgeRun> {
         to,
         subject,
         draft: body,
-        missing: c.readiness.missingForCenter.map((i) => i.label),
+        missing: [...c.readiness.missingForCenter.map((i) => i.label), ...extras.labels],
         blockedOnUs: c.readiness.blockedOnUs.map((i) => i.label),
       };
       proposals.push(proposal);

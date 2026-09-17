@@ -65,6 +65,10 @@
       "path": "/api/cron/agent-retention"
     },
     {
+      "schedule": "50 4 * * *",
+      "path": "/api/cron/agent-center-health"
+    },
+    {
       "schedule": "0 9 * * 1",
       "path": "/api/cron/agent-prospects"
     },

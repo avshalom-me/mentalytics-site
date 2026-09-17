@@ -2,6 +2,7 @@ import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { sendCenterNudgeEmail } from "./center-emails";
 import { loadCentersWithReadiness } from "./center-readiness-load";
+import { loadCenterHealth, healthEmailParagraphs } from "./center-health";
 
 // מסלול השליחה היחיד של נדנוד מרכז: קליק מפורש באדמין על טיוטה שהסוכן
 // הכין ושאתה קראת. אין קרון ששולח את זה, ולא יהיה.
@@ -43,7 +44,16 @@ export async function sendCenterNudge(opts: {
   const centers = await loadCentersWithReadiness();
   const center = centers.find((c) => c.id === centerId);
   if (!center) return { ok: false, error: "המרכז לא נמצא או שאינו פעיל" };
-  if (center.readiness.missingForCenter.length === 0) {
+  // הזכאות כוללת גם את דגלי הבריאות שבאחריות המרכז - מרכז שהשלים את
+  // המוכנות אבל עדיין בלי וואטסאפ עסקי מקבל את הפסקה הזו, ורק אותה.
+  let healthOpen = 0;
+  try {
+    const h = (await loadCenterHealth()).centers.find((x) => x.id === centerId);
+    healthOpen = h ? healthEmailParagraphs(h).length : 0;
+  } catch {
+    healthOpen = 0;
+  }
+  if (center.readiness.missingForCenter.length === 0 && healthOpen === 0) {
     return { ok: false, error: "לא נשלח: המרכז השלים בינתיים את כל מה שהיה חסר" };
   }
   const to = center.payerEmail ?? center.email;

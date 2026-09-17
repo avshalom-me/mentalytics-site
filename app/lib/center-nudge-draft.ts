@@ -20,6 +20,8 @@ export function buildCenterNudgeDraft(opts: {
   readiness: CenterReadiness;
   token: string | null;
   hasAccount: boolean;
+  /** פסקאות מדגלי הבריאות שבאחריות המרכז (center-health) - למשל וואטסאפ. */
+  extraBullets?: string[];
 }): CenterDraft {
   const { readiness: r } = opts;
   const name = (opts.centerName || "המרכז").trim();
@@ -92,6 +94,8 @@ export function buildCenterNudgeDraft(opts: {
     }
   }
 
+  for (const b of opts.extraBullets ?? []) bullets.push(b);
+
   if (bullets.length > 0) {
     lines.push(bullets.length === 1 ? "מה שנשאר:" : "מה שנשאר לעשות:");
     for (const b of bullets) lines.push(`• ${b}`);
@@ -116,11 +120,15 @@ export function buildCenterNudgeDraft(opts: {
   lines.push("צוות טיפול חכם");
 
   // הנושא מתאר את המצב, בלי מספרים של כסף ובלי אחוזים.
-  const subject = isEntity
-    ? `${name} - כמה פרטים שיעזרו למרכז להיתפס ביותר התאמות`
-    : r.slots && r.slots.filled === 0
-      ? `${name} - אף מטפל/ת עדיין לא מקושר/ת למרכז`
-      : `${name} - נשארו מקומות פנויים במרכז`;
+  // כשהמוכנות מלאה ורק דגלי הבריאות פתוחים (וואטסאפ, אונליין), הנושא לא
+  // מדבר על מקומות פנויים שאין.
+  const subject = r.missingForCenter.length === 0
+    ? `${name} - כמה פרטים שיעזרו לקבל יותר פניות`
+    : isEntity
+      ? `${name} - כמה פרטים שיעזרו למרכז להיתפס ביותר התאמות`
+      : r.slots && r.slots.filled === 0
+        ? `${name} - אף מטפל/ת עדיין לא מקושר/ת למרכז`
+        : `${name} - נשארו מקומות פנויים במרכז`;
 
   return { subject, body: lines.join("\n") };
 }

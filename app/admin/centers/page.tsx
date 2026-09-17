@@ -52,6 +52,15 @@ type Center = {
     missing: { label: string; critical: boolean; hint: string | null }[];
     blocked_on_us: string[];
   } | null;
+  /** בריאות (center-health): דגלים עם פרשנות, השוואה למשלם פרטי, וספירה לאחור לחיוב. */
+  health?: {
+    severity: "critical" | "high" | "normal" | null;
+    days_to_billing: number | null;
+    window_days: number;
+    per_unit: { cards: number; list: number; opens: number; contacts: number } | null;
+    benchmark: { peers: number; cards: number; list: number; opens: number; contacts: number } | null;
+    flags: { key: string; severity: "critical" | "high" | "normal"; owner: "center" | "us"; label: string; detail: string; question: string }[];
+  } | null;
   user_id: string | null;
   members?: { user_id: string; email: string | null; is_primary: boolean }[];
   slug: string | null;
@@ -216,6 +225,18 @@ export default function AdminCentersPage() {
   const [centers, setCenters] = useState<Center[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // קישור חתום לדף השיחה (פג תוך שבוע) - מועתק ללוח, לשליחה לעומר בוואטסאפ.
+  const [shareMsg, setShareMsg] = useState("");
+  async function copyCallSheetLink(centerId?: string) {
+    const j = await post({ action: "call_sheet_link", center_id: centerId ?? null });
+    if (!j.ok || typeof j.url !== "string") return;
+    try {
+      await navigator.clipboard.writeText(j.url);
+      setShareMsg("הקישור לדף השיחה הועתק - תקף שבוע");
+    } catch {
+      setShareMsg(j.url);
+    }
+  }
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [sumitInfo, setSumitInfo] = useState<Record<string, string>>({});
@@ -513,6 +534,9 @@ export default function AdminCentersPage() {
         <a href="/centers" target="_blank" className="font-bold text-[#0F5468] underline">🔗 עמוד ההסבר למרכזים</a>
         <a href="/centers/team-guide" target="_blank" className="font-bold text-[#0F5468] underline" title="דף לא מאונדקס לשליחה למרכז: שלושת הצעדים לצירוף מנהל נוסף לפורטל">👥 מדריך למנהל נוסף (לשליחה למרכז)</a>
         <a href="/api/admin-sales-sheet" target="_blank" className="font-bold text-red-700 underline" title="מסמך פנימי לצוות המכירות - מוגש רק דרך האדמין, לא לשליחה ללקוח">🔒 דף הכנה לשיחת מכירה (פנימי - לא לשליחה)</a>
+        <a href="/admin/centers/call-sheet" target="_blank" className="font-bold text-[#0F5468] underline" title="דף מוכן להדפסה: מספרים, דגלים ושאלות לשיחה עם כל מכון">📋 דף שיחה לכל המכונים</a>
+        <button type="button" onClick={() => copyCallSheetLink()} className="font-bold text-[#0F5468] underline" title="קישור שנפתח בלי סיסמת האדמין ופג אחרי שבוע">🔗 קישור לעומר (7 ימים)</button>
+        {shareMsg && <span className="text-emerald-700">{shareMsg}</span>}
       </div>
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
@@ -782,6 +806,39 @@ export default function AdminCentersPage() {
                 {c.readiness.blocked_on_us.length > 0 && (
                   <p className="mt-0.5 font-semibold text-red-700">אצלנו: {c.readiness.blocked_on_us.join(" · ")}</p>
                 )}
+              </div>
+            )}
+
+            {/* בריאות: שכבת הפרשנות מעל המספרים (center-health) - אותם דגלים
+                שהסוכן מציף בתור ושדף השיחה מדפיס כשאלות. "אצלם" = המרכז צריך
+                לפעול, "אצלנו" = בעיה שלנו או של הביקוש, שלא נכנסת לשום מייל. */}
+            {c.status === "active" && c.health && (
+              <div className={"mt-2 rounded-lg border px-3 py-1.5 text-xs " + (c.health.severity === "critical" ? "border-red-300 bg-red-50/60" : c.health.severity === "high" ? "border-amber-300 bg-amber-50/60" : "border-stone-200 bg-white")}>
+                <p className="flex flex-wrap items-center gap-x-2 gap-y-1 font-bold text-stone-800">
+                  <span>🩺 בריאות</span>
+                  {c.health.days_to_billing !== null && (
+                    <span className={"rounded-full border px-2 py-[1px] text-[10.5px] font-semibold " + (c.health.days_to_billing >= 0 && c.health.days_to_billing <= 14 ? "border-amber-300 bg-amber-50 text-amber-900" : "border-stone-200 bg-stone-50 text-stone-600")}>
+                      {c.health.days_to_billing >= 0 ? "חיוב בעוד " + c.health.days_to_billing + " ימים" : "חיוב פעיל"}
+                    </span>
+                  )}
+                  {c.health.per_unit && c.health.benchmark && (
+                    <span className="font-normal text-stone-600">
+                      למטפל ב-30 יום: {c.health.per_unit.cards} הופעות בשאלון, {c.health.per_unit.contacts} פניות
+                      <span className="text-stone-400"> (משלם פרטי: {c.health.benchmark.cards}, {c.health.benchmark.contacts})</span>
+                    </span>
+                  )}
+                  <a href={"/admin/centers/call-sheet?center=" + c.id} target="_blank" className="font-bold text-indigo-700 hover:underline">📋 דף שיחה</a>
+                  <button type="button" onClick={() => copyCallSheetLink(c.id)} className="font-bold text-indigo-700 hover:underline">🔗 קישור לעומר</button>
+                </p>
+                {c.health.flags.length === 0
+                  ? <p className="mt-0.5 text-stone-500">אין דגלים.</p>
+                  : c.health.flags.map((f) => (
+                    <p key={f.key} className="mt-0.5 text-stone-700">
+                      <span className={"font-bold " + (f.severity === "critical" ? "text-red-700" : f.severity === "high" ? "text-amber-800" : "text-stone-800")}>{f.label}</span>
+                      <span className="text-stone-400"> · {f.owner === "us" ? "אצלנו" : "אצלם"}</span>
+                      {" "}{f.detail}
+                    </p>
+                  ))}
               </div>
             )}
 
