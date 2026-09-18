@@ -12,6 +12,7 @@ import {
   threadAnsweredAfter,
   sendGmailReply,
   gmailSignature,
+  type SignatureOutcome,
 } from "./gmail";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
 
@@ -787,7 +788,7 @@ export async function sendInboxReply(opts: {
   id: string;
   subject: string;
   body: string;
-}): Promise<{ ok: boolean; error?: string; to?: string; signed?: boolean }> {
+}): Promise<{ ok: boolean; error?: string; to?: string; signature?: SignatureOutcome }> {
   const body = opts.body.trim();
   if (!body) return { ok: false, error: "גוף התשובה ריק" };
   if (body.includes("[להשלים") || opts.subject.includes("[להשלים")) {
@@ -829,7 +830,7 @@ export async function sendInboxReply(opts: {
   }
 
   let sentId: string;
-  let signed = false;
+  let signature: SignatureOutcome;
   try {
     const sent = await sendGmailReply({
       threadId: row.gmail_thread_id as string,
@@ -839,7 +840,7 @@ export async function sendInboxReply(opts: {
       body,
     });
     sentId = sent.id;
-    signed = sent.signed;
+    signature = sent.signature;
   } catch (e) {
     await supabaseAdmin
       .from("inbox_messages")
@@ -875,7 +876,7 @@ export async function sendInboxReply(opts: {
   });
   if (logErr) console.error("inbox reply log failed:", logErr.message);
 
-  return { ok: true, to: row.from_email as string, signed };
+  return { ok: true, to: row.from_email as string, signature };
 }
 
 /** סימון ידני: התעלמות (ספאם/לא דורש מענה) או החזרה לתור. */

@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
         body: String(body?.body ?? ""),
       });
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
-      return NextResponse.json({ ok: true, to: r.to, signed: r.signed, inbox: await listInbox().catch(() => []) });
+      return NextResponse.json({ ok: true, to: r.to, signature: r.signature, inbox: await listInbox().catch(() => []) });
     }
     if (body?.action === "inbox_status") {
       const status = body?.status === "new" ? "new" : "ignored";

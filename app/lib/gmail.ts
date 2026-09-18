@@ -1,5 +1,6 @@
 import "server-only";
 import { randomBytes } from "crypto";
+import { dropRepeatedClosing } from "./email-signature";
 
 // לקוח Gmail לתיבת admin@getmentalytics.com, במסלול OAuth פנימי של
 // Workspace - אותו דפוס בדיוק כמו GOOGLE_ADS_REFRESH_TOKEN: אפליקציה
@@ -286,6 +287,9 @@ function senderAddress(): string {
 
 export type GmailSignature = { html: string; text: string; alias: string };
 
+/** מה קרה לחתימה בשליחה: צורפה / לא מוגדרת ב-Gmail / הקריאה נכשלה. */
+export type SignatureOutcome = "attached" | "none" | "failed";
+
 type SendAs = {
   sendAsEmail: string;
   signature?: string;
@@ -419,22 +423,29 @@ export async function sendGmailReply(opts: {
   subject: string;
   inReplyTo: string | null;
   body: string;
-}): Promise<{ id: string; signed: boolean }> {
+}): Promise<{ id: string; signature: SignatureOutcome }> {
   const subject = opts.subject.startsWith("Re:") || opts.subject.startsWith("RE:")
     ? opts.subject
     : `Re: ${opts.subject}`;
   const sender = senderAddress();
 
   // כשל בקריאת החתימה לא עוצר תשובה ללקוח: היא יוצאת בלעדיה, והאדמין
-  // מקבל על כך הודעה (signed=false).
+  // מקבל על כך הודעה. "none" ו-"failed" נפרדים בכוונה: חשבון בלי חתימה
+  // מוגדרת הוא לא תקלה, ולא צריך להיראות כמו תקלה בכל שליחה.
   let signature: GmailSignature | null = null;
+  let outcome: SignatureOutcome = "none";
   try {
     signature = await gmailSignature({ fresh: true });
+    if (signature) outcome = "attached";
   } catch (e) {
+    outcome = "failed";
     console.error("gmail signature load failed:", e instanceof Error ? e.message : e);
   }
-  const textPart = signature ? `${opts.body}\n\n-- \n${signature.text}` : opts.body;
-  const htmlPart = rtlHtmlBody(opts.body) + (signature ? signatureHtml(signature.html) : "");
+  // שורת סיום שהחתימה כבר אומרת ("צוות טיפול חכם") לא יוצאת פעמיים.
+  const body = signature ? dropRepeatedClosing(opts.body, signature.text) : opts.body;
+  // חתימה שהיא לוגו בלבד אין לה ייצוג בטקסט - ואז גם לא מפריד "-- " תלוי.
+  const textPart = signature?.text ? `${body}\n\n-- \n${signature.text}` : body;
+  const htmlPart = rtlHtmlBody(body) + (signature ? signatureHtml(signature.html) : "");
 
   // multipart/alternative: גרסת HTML לכיוון נכון, וגרסת טקסט כגיבוי למי
   // שחוסם HTML. הגבול אקראי כדי שלא יופיע בטעות בתוך גוף ההודעה.
@@ -467,5 +478,5 @@ export async function sendGmailReply(opts: {
     method: "POST",
     body: JSON.stringify({ raw, threadId: opts.threadId }),
   });
-  return { id: j.id, signed: signature != null };
+  return { id: j.id, signature: outcome };
 }

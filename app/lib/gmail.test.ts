@@ -106,13 +106,16 @@ describe("sendGmailReply signature", () => {
   it("attaches the sender's Gmail signature to both parts", async () => {
     sendAs = [{ sendAsEmail: "admin@getmentalytics.com", signature: SIGNATURE_HTML, isPrimary: true, isDefault: true }];
     const res = await sendGmailReply(reply);
-    expect(res).toEqual({ id: "msg-1", signed: true });
+    expect(res).toEqual({ id: "msg-1", signature: "attached" });
 
     const { text, html } = parts(sentRaw!);
-    // The logo has no text form, so its line stays as a blank line.
+    // The draft's closing name is also the signature's first line, so it is
+    // sent once. The logo has no text form, so its line stays as a blank line.
     expect(text).toBe(
-      `${reply.body}\n\n-- \nצוות טיפול חכם\n\nwww.mentalytics.co.il | 050-0000000`
+      "שלום,\nתשובה.\n\nבברכה,\n\n-- \nצוות טיפול חכם\n\nwww.mentalytics.co.il | 050-0000000"
     );
+    expect(text.split("צוות טיפול חכם").length - 1).toBe(1);
+    expect(html.split("צוות טיפול חכם").length - 1).toBe(1);
     // The signature sits after the body's pre-wrap div, never inside it.
     const bodyEnd = html.indexOf("</div>");
     const sigAt = html.indexOf('class="gmail_signature"');
@@ -129,27 +132,39 @@ describe("sendGmailReply signature", () => {
         { sendAsEmail: "admin@getmentalytics.com", signature: SIGNATURE_HTML, isDefault: true },
       ];
       const res = await sendGmailReply(reply);
-      expect(res.signed).toBe(true);
+      expect(res.signature).toBe("attached");
       expect(parts(sentRaw!).html).toContain(SIGNATURE_HTML);
     } finally {
       delete process.env.GMAIL_SENDER;
     }
   });
 
-  it("treats Gmail's empty signature markup as no signature", async () => {
+  // "none" is not a failure: an account without a signature must not look
+  // broken on every send.
+  it("treats Gmail's empty signature markup as no signature, not as a failure", async () => {
     sendAs = [{ sendAsEmail: "admin@getmentalytics.com", signature: "<div><br></div>", isDefault: true }];
     const res = await sendGmailReply(reply);
-    expect(res.signed).toBe(false);
+    expect(res.signature).toBe("none");
     const { text, html } = parts(sentRaw!);
     expect(text).toBe(reply.body);
     expect(html).not.toContain("gmail_signature");
+  });
+
+  it("attaches a logo-only signature to the HTML without a dangling text delimiter", async () => {
+    const logoOnly = '<div><img src="https://example.com/logo.png" width="96"></div>';
+    sendAs = [{ sendAsEmail: "admin@getmentalytics.com", signature: logoOnly, isDefault: true }];
+    const res = await sendGmailReply(reply);
+    expect(res.signature).toBe("attached");
+    const { text, html } = parts(sentRaw!);
+    expect(text).toBe(reply.body);
+    expect(html).toContain(logoOnly);
   });
 
   it("still sends the reply when the signature cannot be read", async () => {
     sendAs = "fail";
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
     const res = await sendGmailReply(reply);
-    expect(res).toEqual({ id: "msg-1", signed: false });
+    expect(res).toEqual({ id: "msg-1", signature: "failed" });
     expect(parts(sentRaw!).text).toBe(reply.body);
     err.mockRestore();
   });

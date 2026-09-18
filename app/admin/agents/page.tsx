@@ -1,5 +1,6 @@
 "use client";
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
+import { repeatedClosingLine } from "@/app/lib/email-signature";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -1059,7 +1060,7 @@ const INBOX_CATEGORY_LABELS: Record<string, string> = {
  * iframe מבודד ולא dangerouslySetInnerHTML: החתימה היא HTML חיצוני, ובלי
  * allow-scripts שום קוד בה לא רץ. allow-same-origin רק כדי למדוד גובה.
  */
-function SignaturePreview({ sig }: { sig: InboxSignature | null }) {
+function SignaturePreview({ sig, body }: { sig: InboxSignature | null; body: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
   if (!sig) return null;
   if (sig.status !== "ok") {
@@ -1075,11 +1076,19 @@ function SignaturePreview({ sig }: { sig: InboxSignature | null }) {
     '<!doctype html><meta charset="utf-8"><body style="margin:0;padding:8px 12px;' +
     "font-family:'Heebo',Arial,sans-serif;font-size:13px;color:#1a4a5c\">" +
     `<div dir="rtl">${sig.html}</div></body>`;
+  // אותו כלל שהשליחה מפעילה (email-signature.ts) - כדי שהמסך לא ייראה
+  // כאילו השם יוצא פעמיים כשבפועל הוא לא.
+  const repeated = repeatedClosingLine(body, sig.text);
   return (
     <div className="mb-2">
       <div className="mb-1 text-[11px] font-bold text-stone-400">
         ✍️ החתימה מ-Gmail מוצמדת אוטומטית מתחת לטיוטה:
       </div>
+      {repeated && (
+        <div className="mb-1 text-[11px] text-stone-500">
+          השורה &quot;{repeated}&quot; שבסוף הטיוטה כבר פותחת את החתימה, ולכן במייל היא תופיע פעם אחת בלבד.
+        </div>
+      )}
       <iframe
         ref={frame}
         title="החתימה שתוצמד"
@@ -1123,7 +1132,11 @@ function InboxCard({
       if (action === "inbox_send") {
         onNotify(
           `התשובה נשלחה אל ${j.to ?? row.from_email}` +
-            (j.signed === false ? " - בלי חתימה (לא נטענה מ-Gmail)" : "")
+            (j.signature === "failed"
+              ? " - בלי חתימה: הקריאה שלה מ-Gmail נכשלה"
+              : j.signature === "none"
+                ? " - בלי חתימה (לא מוגדרת ב-Gmail)"
+                : "")
         );
       } else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
     } catch (e) {
@@ -1203,7 +1216,7 @@ function InboxCard({
             className="mb-2 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm leading-6"
             dir="rtl"
           />
-          <SignaturePreview sig={signature} />
+          <SignaturePreview sig={signature} body={body} />
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() =>
