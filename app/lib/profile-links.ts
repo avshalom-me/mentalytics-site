@@ -54,26 +54,43 @@ const PUBLICATION_HOST_SUFFIXES = [
   "israelhayom.co.il",
   "kan.org.il",
   "n12.co.il",
-  // פלטפורמת מאמרים מקצועית
+  // פלטפורמת מאמרים מקצועית. רק דפי מאמר - ראו PATH_RULES למטה.
   "hebpsy.net",
 ] as const;
 
-/** שם המארח בלי www, באותיות קטנות; null לכתובת לא תקינה או לא http(s). */
-function hostOf(url: string): string | null {
+// דומיינים שמארחים גם פרסומים וגם דפים אישיים של מטפלים. אצלם הדומיין לא
+// מספיק, וגם הנתיב צריך להיות של מאמר. hebpsy.net הוא גם אינדקס מטפלים עם
+// דף אישי ופרטי קשר לכל מטפל (pl.asp, me_list.asp) - בלי הכלל הזה מטפל חינמי
+// היה מקשר לדף הפרסום שלו אצל מתחרה. נמצא ב-18/9/26, שעה אחרי הכלל עצמו.
+const PATH_RULES: Record<string, RegExp> = {
+  "hebpsy.net": /^\/articles\.asp$/i,
+};
+
+/** כתובת http(s) תקינה, או null. */
+function parse(url: string): URL | null {
   try {
     const u = new URL(url.trim());
-    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
-    return u.hostname.toLowerCase().replace(/^www\./, "");
+    return u.protocol === "https:" || u.protocol === "http:" ? u : null;
   } catch {
     return null;
   }
 }
 
+/** שם המארח בלי www, באותיות קטנות; null לכתובת לא תקינה או לא http(s). */
+function hostOf(url: string): string | null {
+  const u = parse(url);
+  return u ? u.hostname.toLowerCase().replace(/^www\./, "") : null;
+}
+
 /** האם הכתובת מובילה לפרסום (ולא לאתר של המטפל). התאמה לפי סיומת דומיין. */
 export function isPublicationLink(url: string): boolean {
+  const u = parse(url);
   const host = hostOf(url);
-  if (!host) return false;
-  return PUBLICATION_HOST_SUFFIXES.some((s) => host === s || host.endsWith(`.${s}`));
+  if (!u || !host) return false;
+  const suffix = PUBLICATION_HOST_SUFFIXES.find((s) => host === s || host.endsWith(`.${s}`));
+  if (!suffix) return false;
+  const pathRule = PATH_RULES[suffix];
+  return pathRule ? pathRule.test(u.pathname) : true;
 }
 
 /**

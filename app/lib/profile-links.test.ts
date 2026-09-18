@@ -33,6 +33,12 @@ describe("isPublicationLink", () => {
     expect(isPublicationLink("https://notynet.co.il/")).toBe(false);
     expect(isPublicationLink("https://mentalytics.co.il.evil.com/")).toBe(false);
   });
+  it("on hebpsy, only article pages count - not a therapist's own page in its directory", () => {
+    expect(isPublicationLink("https://www.hebpsy.net/articles.asp?id=4577")).toBe(true);
+    expect(isPublicationLink("https://www.hebpsy.net/pl.asp?id=12345")).toBe(false);
+    expect(isPublicationLink("https://www.hebpsy.net/me_list.asp")).toBe(false);
+    expect(isPublicationLink("https://www.hebpsy.net/")).toBe(false);
+  });
   it("rejects anything that is not an http(s) URL", () => {
     expect(isPublicationLink("javascript:alert(1)")).toBe(false);
     expect(isPublicationLink("www.ynet.co.il")).toBe(false);
