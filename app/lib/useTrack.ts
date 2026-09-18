@@ -93,7 +93,16 @@ export type QuizCompleteFacts = {
  * created_at would be wrong the moment a deploy is rolled back or a client
  * keeps an old bundle cached and keeps sending v1 events for hours.
  */
-const QUIZ_COMPLETE_SCHEMA = 2;
+/*
+ * Bumped to 3 on 18/9/2026: `treatments` is now the DISTINCT treatments. In v2 it
+ * was one entry per recommendation, cut to five - so "CBT, CBT, CBT, CBT, CBT"
+ * was a common value and whatever ranked sixth (usually טיפול דינאמי) was lost
+ * from 46% of adult records. v2 treatment shares are therefore lower bounds for
+ * everything but CBT and must not be pooled with v3. The full result - every
+ * domain, assessments, the default flag, the questionnaire version - lives on
+ * quiz_treatments v2 (trackQuizResult); this event stays the completion marker.
+ */
+const QUIZ_COMPLETE_SCHEMA = 3;
 
 export function trackQuizComplete(quizType: QuizType, facts?: QuizCompleteFacts) {
   sendTrack("quiz_complete", {
@@ -101,7 +110,7 @@ export function trackQuizComplete(quizType: QuizType, facts?: QuizCompleteFacts)
       v: QUIZ_COMPLETE_SCHEMA,
       quiz_type: quizType,
       ...(facts?.issue ? { issue: facts.issue } : {}),
-      ...(facts?.treatments?.length ? { treatments: facts.treatments.slice(0, 5) } : {}),
+      ...(facts?.treatments?.length ? { treatments: Array.from(new Set(facts.treatments)).slice(0, 5) } : {}),
       ...(facts?.age_band ? { age_band: facts.age_band } : {}),
       ...(facts?.region ? { region: facts.region } : {}),
       ...(facts?.gender ? { gender: facts.gender } : {}),
@@ -113,31 +122,79 @@ export function trackQuizComplete(quizType: QuizType, facts?: QuizCompleteFacts)
 }
 
 /**
- * What a finished questionnaire actually recommended.
+ * The recorded result of a scored questionnaire - one event, one shape, for the
+ * adults, kids and school flows alike.
  *
- * Separate from quiz_complete because the kids flow fires that one on reaching
- * the result screen, before scoring has run - so its completion events have
- * never carried a treatment list, and there was no way to ask what the child
- * questionnaire recommends. Moving quiz_complete after scoring would have fixed
- * the data by redefining "completion" mid-series; this leaves that metric alone
- * and reports the treatments on their own event, once per scored questionnaire.
+ * Carried by the `quiz_treatments` event (the name predates its scope) rather
+ * than by quiz_complete, because the kids flow fires quiz_complete on reaching
+ * the result screen, before scoring has run; moving it would have redefined
+ * "completion" mid-series. quiz_complete stays the funnel marker, this is the
+ * research record, and the two join on session_id.
  *
- * Keys, not display labels - the same strings the matching searches on.
+ * Every field is a key or a bucket - no free text, no answers, no finding text.
+ * A suicidality finding in particular is never part of this record, not even as
+ * an "urgent" flag: see sensitive-findings.ts.
+ *
+ * v2 (18/9/2026) against v1, which was kids-only and carried three key lists:
+ *  - sent for EVERY scored questionnaire, including one that found nothing
+ *    (n_recs 0). v1 skipped those, so they were missing from every denominator.
+ *  - `domains`: all the domains the person selected. quiz_complete.issue records
+ *    only the first, which put relationships at 19% when 49% had selected it.
+ *  - `default_treatments`: keys present only because nothing fired (see
+ *    quiz-result-facts.ts).
+ *  - `qv` / `cv` / `build`: the instrument version that scored it, the one baked
+ *    into this bundle, and the commit. qv != cv means a cached bundle asked the
+ *    questions and a newer server scored them - a mixed-version record.
+ *  - age band, gender and device, so the record stands on its own.
  */
-export function trackQuizTreatments(
-  quizType: QuizType,
-  keys: { treatments?: string[]; assessments?: string[]; professionals?: string[] },
-) {
-  const { treatments = [], assessments = [], professionals = [] } = keys;
-  if (!treatments.length && !assessments.length && !professionals.length) return;
-  sendTrack("quiz_treatments", {
-    metadata: {
-      quiz_type: quizType,
-      ...(treatments.length ? { treatments: treatments.slice(0, 10) } : {}),
-      ...(assessments.length ? { assessments: assessments.slice(0, 10) } : {}),
-      ...(professionals.length ? { professionals: professionals.slice(0, 10) } : {}),
-    },
-  });
+export type QuizResultFacts = {
+  domains?: string[];
+  treatments?: string[];
+  assessments?: string[];
+  professionals?: string[];
+  defaultTreatments?: string[];
+  nRecs: number;
+  age_band?: string | null;
+  gender?: string | null;
+  /** Instrument version reported by the score API. */
+  algo?: string | null;
+};
+
+const QUIZ_RESULT_SCHEMA = 2;
+// Distinct keys per family never approach this; it is a payload guard, and
+// `truncated` records the day it ever bites instead of failing silently again.
+const RESULT_KEYS_CAP = 15;
+
+export function trackQuizResult(quizType: QuizType, facts: QuizResultFacts) {
+  const lists = {
+    domains: uniqueKeys(facts.domains),
+    treatments: uniqueKeys(facts.treatments),
+    assessments: uniqueKeys(facts.assessments),
+    professionals: uniqueKeys(facts.professionals),
+    default_treatments: uniqueKeys(facts.defaultTreatments),
+  };
+  const truncated = Object.values(lists).some((l) => l.length > RESULT_KEYS_CAP);
+  const metadata: Record<string, unknown> = {
+    v: QUIZ_RESULT_SCHEMA,
+    quiz_type: quizType,
+    n_recs: facts.nRecs,
+  };
+  for (const [name, list] of Object.entries(lists)) {
+    if (list.length) metadata[name] = list.slice(0, RESULT_KEYS_CAP);
+  }
+  if (truncated) metadata.truncated = true;
+  if (facts.age_band) metadata.age_band = facts.age_band;
+  if (facts.gender) metadata.gender = facts.gender;
+  if (facts.algo) metadata.qv = facts.algo;
+  if (process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION) metadata.cv = process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION;
+  if (process.env.NEXT_PUBLIC_BUILD_SHA) metadata.build = process.env.NEXT_PUBLIC_BUILD_SHA;
+  const device = deviceBucket();
+  if (device) metadata.device = device;
+  sendTrack("quiz_treatments", { metadata });
+}
+
+function uniqueKeys(list: string[] | undefined): string[] {
+  return Array.from(new Set((list ?? []).filter((k) => typeof k === "string" && k.length > 0)));
 }
 
 /**

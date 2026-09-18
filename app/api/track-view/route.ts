@@ -8,6 +8,7 @@ import {
 } from "@/app/lib/stats-categories";
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
+import { generalizeFinding } from "@/app/lib/sensitive-findings";
 
 // "match_card"   = impression in the match-results list
 // "match"        = entry into the full profile page coming from match results
@@ -85,7 +86,9 @@ export async function POST(req: NextRequest) {
     // Match-flow-only context: which treatment recommendation (and which
     // specific quiz finding) led this visitor to the profile.
     const safeTreatment = safeSource === "directory" ? null : cleanContextText(body?.viewer_treatment, 80);
-    const safeSymptom = safeSource === "directory" ? null : cleanContextText(body?.viewer_symptom, 160);
+    // Pooled server-side as well: a cached bundle or an old link in someone's
+    // history keeps sending the specific wording long after the client stopped.
+    const safeSymptom = safeSource === "directory" ? null : generalizeFinding(cleanContextText(body?.viewer_symptom, 160));
     const safeSessionId = typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128
       ? session_id
       : null;

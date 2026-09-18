@@ -7,9 +7,11 @@ import type {
   Recommendation,
 } from "@/app/lib/questionnaire-types";
 import { REGION_CITIES, CITY_TO_REGION, regionGroupOf } from "@/app/lib/regions";
+import { generalizeFinding } from "@/app/lib/sensitive-findings";
+import { adultResultKeys } from "@/app/lib/quiz-result-facts";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
-import { trackQuizStep, trackQuizComplete, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackQuizResult, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { isPaidVisitor } from "@/app/lib/paid-visitor";
@@ -654,7 +656,10 @@ export default function AdultsPage() {
     // visitor - feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
     const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
     if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
-    if (selectedRec?.symptomText) params.set("sy", selectedRec.symptomText.slice(0, 160));
+    // A suicidality finding is never attached to a visitor - see
+    // sensitive-findings.ts. It is pooled here, before it can reach the URL.
+    const finding = generalizeFinding(selectedRec?.symptomText);
+    if (finding) params.set("sy", finding.slice(0, 160));
     // מרכז (מסלול 2): לעמוד המרכז, עם from=match כדי שהצפייה תיוחס להתאמות.
     // בלי slug אין עמוד — מחזירים null והכרטיס מסתיר את כפתור הפרופיל
     // (עמוד-מטפל חוסם ישויות ב-404, אסור ליפול אליו).
@@ -853,6 +858,16 @@ export default function AdultsPage() {
         treatments: (json.recommendations ?? []).map((r: { treatment: string }) => r.treatment),
         age_band: normalizeAgeBand(a.age),
         gender: normalizeGenderKey(a.gender),
+      });
+      // The research record. `issue` above is only the FIRST domain ticked, which
+      // is how relationships came out at 19% when 49% had selected it - this one
+      // carries all of them, de-duplicated keys, and the instrument version.
+      trackQuizResult("adults", {
+        domains: (a.domains ?? []).map((d: string) => DOMAIN_ISSUE_MAP[d] ?? d),
+        ...adultResultKeys(json.recommendations ?? []),
+        age_band: normalizeAgeBand(a.age),
+        gender: normalizeGenderKey(a.gender),
+        algo: json.algo ?? null,
       });
     } catch (e) {
       // Scoring failed - the user sees an error, not results, so this is NOT a
@@ -1143,7 +1158,8 @@ export default function AdultsPage() {
           <div className="mt-3 leading-relaxed" style={{ color: "var(--text-2)" }}>
             <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
             <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
-            <p className="text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+            <p className="mb-3 text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+            <p className="text-sm">חלק מהנתונים נשמרים לצורך מחקר, אין אף שמירה של נתונים אישיים או נתונים מזהים כלשהם.</p>
           </div>
         </details>
         <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>

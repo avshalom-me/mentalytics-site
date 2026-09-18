@@ -9,6 +9,8 @@ import {
   isStaffBypass,
   MAX_FREE,
 } from "@/app/lib/usage";
+import { bumpResearchCounts } from "@/app/lib/research-counts";
+import { isSuicidalityText } from "@/app/lib/sensitive-findings";
 
 export async function POST(request: NextRequest) {
   try {
@@ -42,9 +44,13 @@ export async function POST(request: NextRequest) {
 
     if (!staff) {
       await consumeUsage(ip, fp, "kids");
+      // See the adults route: the only record of a suicidality finding, kept
+      // as a weekly count with nothing attached.
+      const suicidality = Object.values(result).flat().some((b) => isSuicidalityText(b.txt));
+      await bumpResearchCounts("kids", suicidality ? ["scored", "suicidality"] : ["scored"]);
     }
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, ...result, algo: process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION ?? null });
   } catch {
     return NextResponse.json(
       { ok: false, error: "Invalid request body" },

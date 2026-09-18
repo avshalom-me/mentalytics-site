@@ -5,7 +5,7 @@ import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { downloadResultsPDF } from "@/app/lib/download-pdf";
-import { trackQuizStep, trackQuizComplete, trackQuizTreatments, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { trackQuizStep, trackQuizComplete, trackQuizResult, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { isPaidVisitor } from "@/app/lib/paid-visitor";
@@ -26,6 +26,7 @@ import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatmen
 import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
 import CenterMessageButton from "@/app/centers/[slug]/CenterMessageButton";
 import { minDwell } from "@/app/lib/min-dwell";
+import { kidsResultKeys } from "@/app/lib/quiz-result-facts";
 import { useScreenHistory } from "@/app/lib/useScreenHistory";
 import {
   PAGES,
@@ -280,7 +281,8 @@ function PageConsent({ onNext }: { onNext: () => void }) {
         <div className="mt-3 leading-relaxed" style={{ color: "var(--text-2)" }}>
           <p className="mb-3 text-sm">שאלון זה נועד אך ורק לסייע בהתאמה של סוג הטיפול לקושי המדווח ואינו מהווה אבחון פסיכולוגי, פסיכיאטרי או רפואי מכל סוג שהוא.</p>
           <p className="mb-3 text-sm">המידע המוצג בשאלון הינו כללי בלבד ואינו מחליף ייעוץ מקצועי, אבחון או טיפול על ידי גורמים מוסמכים. השאלון אינו מתיימר לאבחן הפרעות נפשיות, מחלות או כל מצב בריאותי אחר.</p>
-          <p className="text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+          <p className="mb-3 text-sm">המשתמש/ת בשאלון זה מצהיר/ה כי הוא/היא מבין/ה שהתשובות המתקבלות אינן מחייבות מבחינה קלינית, ואין לסמוך עליהן כתחליף לאבחון מקצועי. הגורמים המפעילים את השאלון אינם נושאים בכל אחריות לנזק, ישיר או עקיף, שייגרם כתוצאה מהשימוש בו.</p>
+          <p className="text-sm">חלק מהנתונים נשמרים לצורך מחקר, אין אף שמירה של נתונים אישיים או נתונים מזהים כלשהם.</p>
         </div>
       </details>
       <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
@@ -3044,7 +3046,7 @@ function KidsRecommendationsStrip({
   );
 }
 
-function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void; audience?: Audience }) {
+function PageResult({ A, score, scoreAlgo, restored, scoreError, onRetryScore, onRestart, audience }: { A: Ans; score: KidsScoreResult | null; scoreAlgo?: string | null; restored?: boolean; scoreError: boolean; onRetryScore: () => void; onRestart: () => void; audience?: Audience }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // "report" = the findings report; "match" = the therapist search, on its own
   // screen. Mirrors the adults flow, where picking a recommendation swaps the
@@ -3167,17 +3169,31 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
   // Reported once per scored questionnaire, from the same aggregate the search
   // uses - so the analytics answer the question the search would answer, not a
-  // parallel derivation of it. See trackQuizTreatments for why this is not part
+  // parallel derivation of it. See trackQuizResult for why this is not part
   // of quiz_complete on the kids side.
   const treatmentsReported = useRef(false);
   useEffect(() => {
     if (!score || treatmentsReported.current) return;
     treatmentsReported.current = true;
-    const agg = aggregateForMatch(domainResults.map(d => d.result));
-    trackQuizTreatments(audience === "counselor" ? "school" : "kids", {
-      treatments: agg.treatmentKeys,
-      assessments: agg.assessmentKeys,
-      professionals: agg.professionalKeys,
+    // Coming back from a therapist profile restores this screen from
+    // sessionStorage and remounts it. That is the same result being looked at
+    // again, not a second questionnaire: 20 of the 36 repeat kids "completions"
+    // on record were exactly this, against 6 genuine fresh starts.
+    if (restored) return;
+    const results = domainResults.map(d => d.result);
+    const agg = aggregateForMatch(results);
+    const AREAS: [string, string][] = [["a_emo", "emotional"], ["a_aca", "academic"], ["a_dev", "developmental"], ["a_beh", "behavioral"], ["a_soc", "social"]];
+    const grade = gg(A);
+    trackQuizResult(audience === "counselor" ? "school" : "kids", {
+      // Every area the parent flagged, at any level above "כלל לא".
+      domains: AREAS.filter(([k]) => ["מעט", "הרבה", "הרבה מאוד"].includes(A[k] || "")).map(([, name]) => name),
+      ...kidsResultKeys(results, agg, Object.values(score).flat().some(b => b.isDefault)),
+      // The three grade groups the scorer itself branches on - the kids
+      // equivalent of the adults age band, which used to be the single value
+      // "child" for a toddler and a twelfth-grader alike.
+      age_band: grade === "ga" ? "1-7" : grade === "bv" ? "8-12" : grade === "zy" ? "13-18" : null,
+      gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
+      algo: scoreAlgo ?? null,
     });
   }, [score, domainResults]);
 
@@ -3803,6 +3819,11 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   }, [step]);
   const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
   const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
+  // The instrument version the score API reported, and whether the result on
+  // screen was restored from sessionStorage rather than just scored - both
+  // only feed the recorded result (trackQuizResult).
+  const [scoreAlgo, setScoreAlgo] = useState<string | null>(null);
+  const [restoredResult, setRestoredResult] = useState(false);
   const [itemsError, setItemsError] = useState(false);
   const [scoreError, setScoreError] = useState(false);
 
@@ -3855,7 +3876,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       if (Date.now() - saved.ts > 60 * 60_000) return;
       if (saved.A) setA(saved.A);
       if (saved.step) setStep(saved.step);
-      if (saved.kidsScore) setKidsScore(saved.kidsScore);
+      if (saved.kidsScore) { setKidsScore(saved.kidsScore); setRestoredResult(true); }
     } catch {}
   }, []);
 
@@ -3949,6 +3970,8 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       const d = await r.json();
       if (!d.ok) throw new Error();
       await minDwell(scoringStartedAt);
+      setScoreAlgo(typeof d.algo === "string" ? d.algo : null);
+      setRestoredResult(false);
       setKidsScore({
         emotional: d.emotional,
         academic: d.academic,
@@ -4147,7 +4170,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-refine"       && <PageRefine     {...pageProps} />}
       {step === "p-docs"         && <PageDocs       {...pageProps} />}
 
-      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
+      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreAlgo={scoreAlgo} restored={restoredResult} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
     </main>
   );
 }

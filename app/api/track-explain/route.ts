@@ -62,7 +62,9 @@ export async function POST(req: NextRequest) {
       treatment_key: b.treatment_key,
       treatment_label: b.treatment_label,
       domain: b.domain ?? null,
-      urgent: b.urgent ?? false,
+      // `urgent` is accepted (older bundles still send it) and dropped: four of
+      // the five urgent adult findings are suicidality, so the flag would mark
+      // it per visitor in everything but name. See sensitive-findings.ts.
       viewer_region: isValidRegion(b.viewer_region) ? b.viewer_region : null,
       viewer_issue: isValidIssue(b.viewer_issue) ? b.viewer_issue : null,
       viewer_age_band: isValidAgeBand(b.viewer_age_band) ? b.viewer_age_band : null,

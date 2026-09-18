@@ -9,7 +9,15 @@ import {
 
 type Ans = Record<string, any>;
 type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
-export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; }
+/**
+ * isDefault marks the one referral that is there because NOTHING fired: the
+ * emotional domain was flagged, only low stress came back, and the scorer falls
+ * back to a dynamic therapy. Rendering ignores it. It exists so the recorded
+ * result can tell "recommended because of a finding" from "recommended by
+ * default" - in a list of treatment keys the two are otherwise identical, and
+ * it is why טיפול דינאמי looked like the recommendation for 81% of children.
+ */
+export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; isDefault?: boolean; }
 
 // ── Grade groups ──────────────────────────────────────────────────────────────
 
@@ -535,7 +543,7 @@ function computeResults(A: Ans): KidsBox[] {
     emoStandalones.some(s => s.txt?.startsWith("✅") && s.txt.includes("טיפול") && !s.isLowStress);
   lowStress.forEach(s => boxes.push(s));
   if (lowStress.length > 0 && !hasAnyTherapy && emoGroups.length === 0)
-    boxes.push({ cls: "info", txt: "✅ הפנייה: טיפול פסיכודינאמי" });
+    boxes.push({ cls: "info", txt: "✅ הפנייה: טיפול פסיכודינאמי", isDefault: true });
   otherStands.forEach(s => boxes.push(s));
 
   return boxes;

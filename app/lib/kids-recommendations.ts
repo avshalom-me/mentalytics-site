@@ -11,7 +11,8 @@
 // merges across groups by treatment so identical recommendations collapse.
 
 export type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
-export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; }
+// isDefault: see the definition in kids-score.server.ts.
+export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; isDefault?: boolean; }
 
 export type RecKind = "treatment" | "assessment" | "external" | "professional";
 

@@ -10,6 +10,8 @@ import {
   isStaffBypass,
   MAX_FREE,
 } from "@/app/lib/usage";
+import { bumpResearchCounts } from "@/app/lib/research-counts";
+import { isSuicidalityText } from "@/app/lib/sensitive-findings";
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,9 +49,16 @@ export async function POST(request: NextRequest) {
     // Consume one credit only after a result is successfully produced.
     if (!staff) {
       await consumeUsage(ip, fp, "adults");
+      // General-information counters (no session, no timestamp). This is the
+      // only record that a suicidality finding occurred - it is never stored
+      // against the visitor. Staff runs are excluded like everywhere else.
+      const suicidality = result.recommendations.some((r) => isSuicidalityText(r.symptomText));
+      await bumpResearchCounts("adults", suicidality ? ["scored", "suicidality"] : ["scored"]);
     }
 
-    return NextResponse.json({ ok: true, ...result });
+    // `algo` is the version of the instrument that actually did the scoring;
+    // the client stamps it on the recorded result (see next.config.ts).
+    return NextResponse.json({ ok: true, ...result, algo: process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION ?? null });
   } catch {
     return NextResponse.json(
       { ok: false, error: "Invalid request body" },

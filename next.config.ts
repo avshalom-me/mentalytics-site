@@ -1,4 +1,48 @@
 import type { NextConfig } from "next";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import path from "node:path";
+
+// ── Questionnaire version stamp ──────────────────────────────────────────────
+// Every recorded questionnaire result carries the version of the instrument
+// that produced it, because the instrument keeps changing: thresholds moved, the
+// couples block went from 21 items to 12, the ADHD cut-off from 4 to 3, a blank
+// answer started to mean "absent". Pooling results across those versions without
+// a stamp mixes different instruments, and nothing in the data would show it.
+//
+// A content hash rather than a constant someone bumps by hand, deliberately:
+// QUESTIONNAIRE_ITEMS_VERSION asks to be bumped "in the same commit as any
+// change", and it sat at 2026-08-13 through a month of changes. A hash of the
+// files that define the instrument changes exactly when they do and needs no
+// one to remember. To read a hash back: walk `git log` for these paths and hash
+// each revision the same way.
+//
+// Only the scoring and flow-LOGIC files go in. The two big screen files are left
+// out on purpose - they change for layout reasons weekly and would split the
+// data into versions that are not versions. A flow change made only there is
+// still locatable through the commit stamp recorded next to the hash.
+const QUIZ_INSTRUMENT_FILES = [
+  "app/lib/questionnaire-score.ts",
+  "app/lib/questionnaire-items.server.ts",
+  "app/lib/kids-score.server.ts",
+  "app/lib/kids-recommendations.ts",
+  "app/kids/quiz-logic.ts",
+];
+
+function quizAlgoVersion(): string {
+  const hash = createHash("sha256");
+  for (const file of QUIZ_INSTRUMENT_FILES) {
+    try {
+      // CRLF -> LF so a Windows checkout and the Linux build hash identically;
+      // otherwise a hash computed locally could never be matched to production.
+      hash.update(readFileSync(path.join(process.cwd(), file), "utf8").replace(/\r\n/g, "\n"));
+    } catch {
+      hash.update(`missing:${file}`);
+    }
+    hash.update("\0");
+  }
+  return hash.digest("hex").slice(0, 10);
+}
 
 // Allow next/image to optimize the external images we actually use: Unsplash
 // (research/article hero images) and Supabase Storage signed URLs (therapist
@@ -37,6 +81,14 @@ const nextConfig: NextConfig = {
   // isolated directory; default behaviour is unchanged.
   distDir: process.env.NEXT_DIST_DIR || ".next",
   poweredByHeader: false,
+  // Inlined at build time, server and client alike. The server's copy is the one
+  // that matters for scoring (the score APIs return it); the client's says which
+  // bundle asked the questions - the two differ when a cached bundle talks to a
+  // newer server, and a record where they differ is a mixed-version record.
+  env: {
+    NEXT_PUBLIC_QUIZ_ALGO_VERSION: quizAlgoVersion(),
+    NEXT_PUBLIC_BUILD_SHA: (process.env.VERCEL_GIT_COMMIT_SHA ?? "").slice(0, 7),
+  },
   images: { remotePatterns },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
