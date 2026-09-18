@@ -9,7 +9,7 @@ import {
   isStaffBypass,
   MAX_FREE,
 } from "@/app/lib/usage";
-import { bumpResearchCounts } from "@/app/lib/research-counts";
+import { recordQuizScoring } from "@/app/lib/research-counts";
 import { isSuicidalityText } from "@/app/lib/sensitive-findings";
 
 export async function POST(request: NextRequest) {
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
       // See the adults route: the only record of a suicidality finding, kept
       // as a weekly count with nothing attached.
       const suicidality = Object.values(result).flat().some((b) => isSuicidalityText(b.txt));
-      await bumpResearchCounts("kids", suicidality ? ["scored", "suicidality"] : ["scored"]);
+      recordQuizScoring("kids", suicidality);
     }
 
     return NextResponse.json({ ok: true, ...result, algo: process.env.NEXT_PUBLIC_QUIZ_ALGO_VERSION ?? null });

@@ -10,7 +10,7 @@ import {
   isStaffBypass,
   MAX_FREE,
 } from "@/app/lib/usage";
-import { bumpResearchCounts } from "@/app/lib/research-counts";
+import { recordQuizScoring } from "@/app/lib/research-counts";
 import { isSuicidalityText } from "@/app/lib/sensitive-findings";
 
 export async function POST(request: NextRequest) {
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       // only record that a suicidality finding occurred - it is never stored
       // against the visitor. Staff runs are excluded like everywhere else.
       const suicidality = result.recommendations.some((r) => isSuicidalityText(r.symptomText));
-      await bumpResearchCounts("adults", suicidality ? ["scored", "suicidality"] : ["scored"]);
+      recordQuizScoring("adults", suicidality);
     }
 
     // `algo` is the version of the instrument that actually did the scoring;

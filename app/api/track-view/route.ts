@@ -88,7 +88,9 @@ export async function POST(req: NextRequest) {
     const safeTreatment = safeSource === "directory" ? null : cleanContextText(body?.viewer_treatment, 80);
     // Pooled server-side as well: a cached bundle or an old link in someone's
     // history keeps sending the specific wording long after the client stopped.
-    const safeSymptom = safeSource === "directory" ? null : generalizeFinding(cleanContextText(body?.viewer_symptom, 160));
+    // Pooled before truncation, so a finding cannot slip through by having
+    // its telling word fall past the cut.
+    const safeSymptom = safeSource === "directory" ? null : cleanContextText(generalizeFinding(body?.viewer_symptom), 160);
     const safeSessionId = typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128
       ? session_id
       : null;

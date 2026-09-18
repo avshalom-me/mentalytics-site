@@ -24,9 +24,15 @@ treatments. Joins to everything else on `session_id`.
 | `build` | short commit SHA of the client bundle |
 | `device` | mobile / tablet / desktop |
 | `truncated` | present only if a key list exceeded 15 - should never happen; if it does, the lists are incomplete |
+| `staff` | present (true) on staff test runs - the browser held the staff token. **Exclude these rows from every analysis** |
 
-Not re-sent when the result screen is restored after visiting a therapist
-profile, so one scored questionnaire = one row.
+Written once per **scoring response** (adults: in goScoring; kids and school: in
+fetchScore), never when the result screen mounts. So one scoring = one row: not
+re-sent when the screen is rebuilt after a therapist-profile visit, nor when a
+parent steps back into the questions and forward again (up to 18/9 the kids
+screen did both). Note the kids flow does not re-score on that back-and-forward
+- see "Known defects" - so the row always describes the answers that were
+actually scored.
 
 ### Reading `qv`
 A 10-character SHA-256 over the files that define the instrument
@@ -35,6 +41,11 @@ hash back to a date, walk `git log` over those paths and hash each revision the
 same way. The two large screen files are deliberately outside the hash; a flow
 change made only there is located through `build`.
 
+The hash covers the files, not their behaviour: a comment or a type edit in one
+of them produces a new `qv` with identical scoring. Adjacent `qv` values can be
+merged after reading the diff between them; the reverse (splitting one pooled
+version into two) would be impossible, which is why it errs this way.
+
 ## What is never recorded per visitor: suicidality
 
 A suicidality finding is stored **only** as a weekly count in
@@ -42,6 +53,15 @@ A suicidality finding is stored **only** as a weekly count in
 `metric = 'scored'`): a week, a questionnaire type and a number - no session, no
 timestamp, no demographics. Both count scorings, not people. Suppress any rate
 where `scored < 10`.
+
+Written by `record_quiz_scoring(quiz_type, suicidality)`: one call per scoring,
+after the response is sent, updating **both** rows every time (the suicidality
+row by 0 when there was no finding). The first version (bump_research_count,
+18/9 morning) touched the suicidality row only on suicidal scorings, so the
+row's version stamp (`xmin`, an ordered transaction id) pointed at the latest
+one and could be lined up against the quiz_treatments row written seconds
+later; and it made two API calls instead of one, visible in the gateway logs.
+Staff runs and the school tool are not counted.
 
 Per visitor the finding is pooled into the generic emotional finding
 (`app/lib/sensitive-findings.ts`) before it can reach a URL or a row, and the
@@ -63,6 +83,7 @@ and **must not be added to the live `suicidality` metric**.
 | `quiz_complete`, `region` | all | always empty - the region is chosen later, in the match form |
 | `quiz_complete`, kids | all | fires on reaching the result screen, and **again every time that screen is restored** after a profile visit: 20 of 36 repeat kids completions were this, 6 were genuine restarts. De-duplicate by session |
 | `quiz_treatments` v1 | 13/8 - 18/9 | kids only; **not sent when nothing was found**, so those questionnaires are missing from its denominator; no demographics; cannot tell default טיפול דינאמי from finding-driven |
+| kids result screen | all | a parent who reaches the results, steps **back** into the questions, changes an answer and returns sees the **old** result - the flow re-scores only when there is no score yet. 12 such returns in 11 sessions up to 18/9. Open: re-scoring costs a free-tier credit, so the fix is a product decision |
 | treatment keys | before ~9/9 | `קלינאית תקשורת` and `קלינאות תקשורת` are the same key - normalise to the second |
 
 ## A retrospective asset: `quiz_step`

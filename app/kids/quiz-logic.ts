@@ -17,7 +17,8 @@
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Ans = Record<string, any>;
 export type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
-export interface Box { cls: BoxCls; txt: string; isLowStress?: boolean; }
+// Mirrors KidsBox in kids-score.server.ts; isDefault is explained there.
+export interface Box { cls: BoxCls; txt: string; isLowStress?: boolean; isDefault?: boolean; }
 export interface KidsScoreResult {
   emotional: Box[];
   academic: Box[];

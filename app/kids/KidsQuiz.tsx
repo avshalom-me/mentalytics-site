@@ -3053,7 +3053,7 @@ function KidsRecommendationsStrip({
   );
 }
 
-function PageResult({ A, score, scoreAlgo, restored, scoreError, onRetryScore, onRestart, audience }: { A: Ans; score: KidsScoreResult | null; scoreAlgo?: string | null; restored?: boolean; scoreError: boolean; onRetryScore: () => void; onRestart: () => void; audience?: Audience }) {
+function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void; audience?: Audience }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // "report" = the findings report; "match" = the therapist search, on its own
   // screen. Mirrors the adults flow, where picking a recommendation swaps the
@@ -3174,35 +3174,6 @@ function PageResult({ A, score, scoreAlgo, restored, scoreError, onRetryScore, o
     ];
   }, [score]);
 
-  // Reported once per scored questionnaire, from the same aggregate the search
-  // uses - so the analytics answer the question the search would answer, not a
-  // parallel derivation of it. See trackQuizResult for why this is not part
-  // of quiz_complete on the kids side.
-  const treatmentsReported = useRef(false);
-  useEffect(() => {
-    if (!score || treatmentsReported.current) return;
-    treatmentsReported.current = true;
-    // Coming back from a therapist profile restores this screen from
-    // sessionStorage and remounts it. That is the same result being looked at
-    // again, not a second questionnaire: 20 of the 36 repeat kids "completions"
-    // on record were exactly this, against 6 genuine fresh starts.
-    if (restored) return;
-    const results = domainResults.map(d => d.result);
-    const agg = aggregateForMatch(results);
-    const AREAS: [string, string][] = [["a_emo", "emotional"], ["a_aca", "academic"], ["a_dev", "developmental"], ["a_beh", "behavioral"], ["a_soc", "social"]];
-    const grade = gg(A);
-    trackQuizResult(audience === "counselor" ? "school" : "kids", {
-      // Every area the parent flagged, at any level above "כלל לא".
-      domains: AREAS.filter(([k]) => ["מעט", "הרבה", "הרבה מאוד"].includes(A[k] || "")).map(([, name]) => name),
-      ...kidsResultKeys(results, agg, Object.values(score).flat().some(b => b.isDefault)),
-      // The three grade groups the scorer itself branches on - the kids
-      // equivalent of the adults age band, which used to be the single value
-      // "child" for a toddler and a twelfth-grader alike.
-      age_band: grade === "ga" ? "1-7" : grade === "bv" ? "8-12" : grade === "zy" ? "13-18" : null,
-      gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
-      algo: scoreAlgo ?? null,
-    });
-  }, [score, domainResults]);
 
   type DomainGroup = KidsRecommendationGroup & { domainLabel: string; domainKey: string };
   type DomainBucket = {
@@ -3826,11 +3797,6 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   }, [step]);
   const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
   const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
-  // The instrument version the score API reported, and whether the result on
-  // screen was restored from sessionStorage rather than just scored - both
-  // only feed the recorded result (trackQuizResult).
-  const [scoreAlgo, setScoreAlgo] = useState<string | null>(null);
-  const [restoredResult, setRestoredResult] = useState(false);
   const [itemsError, setItemsError] = useState(false);
   const [scoreError, setScoreError] = useState(false);
 
@@ -3883,7 +3849,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       if (Date.now() - saved.ts > 60 * 60_000) return;
       if (saved.A) setA(saved.A);
       if (saved.step) setStep(saved.step);
-      if (saved.kidsScore) { setKidsScore(saved.kidsScore); setRestoredResult(true); }
+      if (saved.kidsScore) setKidsScore(saved.kidsScore);
     } catch {}
   }, []);
 
@@ -3959,6 +3925,34 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
 
   // Scoring consumes one free-tier credit server-side and refuses (402) once
   // the limit is reached, so the result itself is gated - not just the UI.
+  /**
+   * The research record of a scored questionnaire (trackQuizResult): once per
+   * scoring response, from the answers that were actually scored.
+   *
+   * Recorded here and not when the result screen mounts. That screen remounts
+   * every time a parent steps back into the questions and forward again, and is
+   * rebuilt from sessionStorage after a therapist-profile visit - each of which
+   * re-sent the same result as if it were a new questionnaire.
+   */
+  function recordKidsResult(answers: Ans, scored: KidsScoreResult, algo: string | null) {
+    const DOMAINS = ["emotional", "academic", "developmental", "behavioral", "social"] as const;
+    const AREA_KEY: Record<(typeof DOMAINS)[number], string> = {
+      emotional: "a_emo", academic: "a_aca", developmental: "a_dev", behavioral: "a_beh", social: "a_soc",
+    };
+    const results = DOMAINS.map(k => parseKidsBoxes(scored[k], k));
+    const grade = gg(answers);
+    trackQuizResult(audience === "counselor" ? "school" : "kids", {
+      // Every area flagged at any level above "כלל לא".
+      domains: DOMAINS.filter(k => ["מעט", "הרבה", "הרבה מאוד"].includes(answers[AREA_KEY[k]] || "")),
+      ...kidsResultKeys(results, aggregateForMatch(results), DOMAINS.some(k => scored[k].some(b => b.isDefault))),
+      // The three grade groups the scorer itself branches on - the kids
+      // equivalent of the adults age band.
+      age_band: grade === "ga" ? "1-7" : grade === "bv" ? "8-12" : grade === "zy" ? "13-18" : null,
+      gender: answers.gender === "זכר" ? "m" : answers.gender === "נקבה" ? "f" : null,
+      algo,
+    });
+  }
+
   async function fetchScore(answers: Ans) {
     setScoreError(false);
     setKidsScore(null);
@@ -3977,15 +3971,15 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       const d = await r.json();
       if (!d.ok) throw new Error();
       await minDwell(scoringStartedAt);
-      setScoreAlgo(typeof d.algo === "string" ? d.algo : null);
-      setRestoredResult(false);
-      setKidsScore({
+      const scored: KidsScoreResult = {
         emotional: d.emotional,
         academic: d.academic,
         developmental: d.developmental,
         behavioral: d.behavioral,
         social: d.social,
-      });
+      };
+      setKidsScore(scored);
+      recordKidsResult(answers, scored, typeof d.algo === "string" ? d.algo : null);
     } catch {
       await minDwell(scoringStartedAt);
       setScoreError(true);
@@ -4177,7 +4171,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-refine"       && <PageRefine     {...pageProps} />}
       {step === "p-docs"         && <PageDocs       {...pageProps} />}
 
-      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreAlgo={scoreAlgo} restored={restoredResult} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
+      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
     </main>
   );
 }

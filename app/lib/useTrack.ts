@@ -183,6 +183,14 @@ export function trackQuizResult(quizType: QuizType, facts: QuizResultFacts) {
     if (list.length) metadata[name] = list.slice(0, RESULT_KEYS_CAP);
   }
   if (truncated) metadata.truncated = true;
+  // Staff test runs (the quiz sends this token as _staffToken) are marked rather
+  // than dropped, so a production check can still be read back. The weekly
+  // counters exclude them outright; research queries must exclude staff rows.
+  try {
+    if (localStorage.getItem("staff_token")) metadata.staff = true;
+  } catch {
+    /* storage blocked - treat as a visitor */
+  }
   if (facts.age_band) metadata.age_band = facts.age_band;
   if (facts.gender) metadata.gender = facts.gender;
   if (facts.algo) metadata.qv = facts.algo;
