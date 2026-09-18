@@ -501,7 +501,7 @@ export default async function TherapistProfilePage({
             </section>
           )}
 
-          {/* מטפל חינמי לא מקבל מאיתנו קישור לאתר שלו - רק לפרסומים.
+          {/* מטפל חינמי לא מוציא מאיתנו שום קישור החוצה - רק קישורים לאתר שלנו.
               ראו app/lib/profile-links.ts (החלטת הבעלים 18/9/26). */}
           {shownLinks.length > 0 && (
             <Accordion title="פרסומים מקצועיים">
