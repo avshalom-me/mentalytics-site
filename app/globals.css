@@ -60,7 +60,8 @@ a { text-decoration: none; color: inherit; }
   body { background: white !important; }
 }
 
-/* ── Questionnaire readability (.quiz-shell wraps both /adults and /kids) ─────
+/* ── Questionnaire readability (.quiz-shell wraps /adults, /kids and the saved
+   match list /match/<token>, which shows the same result cards) ─────────────
    Both questionnaires are built almost entirely out of Tailwind's text-xs and
    text-sm, which are 12px and 14px on every viewport - the size users complained
    about on phones, and below the 16px threshold under which iOS Safari zooms the

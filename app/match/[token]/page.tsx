@@ -108,8 +108,10 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
   const savedDate = new Date(row.created_at).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 
   return (
-    // אותו רוחב וריווח כמו מסך התוצאות בשאלון (max-w-2xl px-4), כדי שהכרטיס ייראה זהה.
-    <main className="mx-auto max-w-2xl px-4 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    // אותו רוחב, ריווח וגודלי טקסט בטלפון כמו מסך התוצאות בשאלון (max-w-2xl
+    // px-4, ו-quiz-shell שמגדיל את הטקסט במסך צר - ראו globals.css), כדי
+    // שהכרטיס ייראה זהה.
+    <main className="quiz-shell mx-auto max-w-2xl px-4 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <MatchReturnTracker
         token={token}
         quizType={row.quiz_type}

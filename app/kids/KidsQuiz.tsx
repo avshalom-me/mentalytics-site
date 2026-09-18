@@ -13,6 +13,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
+import MatchResultCard, { MATCH_CARD_BTN, MatchCardProfileLink } from "@/app/components/MatchResultCard";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import {
   parseKidsBoxes,
@@ -2576,109 +2577,63 @@ function KidsMatchSection({ A, score, selection }: {
                         </p>
                       </div>
                     )}
-                    <div
-                      className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-                    >
-                      <div className="flex items-stretch gap-4">
-                        {t.entity_type === "center" && !t.profile_photo_url ? (
-                          // מרכז בלי לוגו - סמל ניטרלי (לא אווטאר מגדרי; gender של ישות ריק)
-                          <div className="flex h-[78px] w-[78px] flex-shrink-0 items-center justify-center self-start rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] text-3xl" aria-hidden>
-                            🏢
-                          </div>
-                        ) : (
-                          <img
-                            src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                            alt={t.full_name ?? ""}
-                            className={`h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl ${
-                              t.entity_type === "center"
-                                ? "border border-[var(--line)] bg-white object-contain p-1" // לוגו מרכז - לא לחתוך
-                                : "object-cover"
-                            }`}
-                          />
-                        )}
-                        <div className="min-w-0 flex-1 text-right">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="text-lg font-extrabold text-[var(--text)]">{t.full_name || "ללא שם"}</h3>
-                            {t.entity_type === "center" && (
-                              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--gold-dark)]">🏢 מרכז טיפולי</span>
-                            )}
-                            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ מאומת</span>
-                          </div>
-                          <p className="mt-0.5 text-xs text-[var(--muted)]">{t.entity_type === "center" ? "מרכז טיפולי" : t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
-                          {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
-                          {regionsArr.length > 0 && (
-                            <p className="mt-1.5 text-xs text-[var(--muted)]">📍 {regionsArr.join(", ")}</p>
+                    <MatchResultCard
+                      name={t.full_name || "ללא שם"}
+                      isCenter={t.entity_type === "center"}
+                      photoUrl={t.profile_photo_url}
+                      gender={t.gender}
+                      subtitle={`${t.entity_type === "center" ? "מרכז טיפולי" : t.gender ?? ""} • ${t.online ? "אונליין" : "פנים אל פנים"}`}
+                      bio={t.bio}
+                      regions={regionsArr}
+                      score={
+                        // מחוץ לאזור: מילים במקום אחוז (ראו app/lib/match-card-label.ts).
+                        away
+                          ? { kind: "words", label: professionalFitLabel(t.match_score), reason: outOfAreaReason(!!online, t.online === true) }
+                          : combined != null
+                            ? { kind: "percent", overall: combined, professional: t.match_score ?? null, personality: t.personality_score ?? null }
+                            : null
+                      }
+                      centerNote={
+                        // אותו כלל כמו במבוגרים: בלי מספר אישיותי אין כוכבית להסביר.
+                        t.entity_type === "center" && t.personality_score != null && !away
+                          ? "* במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לכם מתוכו את המטפל/ת המתאים/ה גם אישיותית."
+                          : null
+                      }
+                      actions={
+                        <>
+                          {/* אותה היררכיה כמו במבוגרים - ראו ההערה שם ובקומפוננטה. */}
+                          {t.entity_type === "center" && t.center_whatsapp && (
+                            <MatchCardWhatsApp therapistId={t.id} phone={t.center_whatsapp} centerMode />
                           )}
-                        </div>
-                        {away ? (
-                          // מחוץ לאזור: מילים במקום אחוז (ראו app/lib/match-card-label.ts).
-                          <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
-                            <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
-                            <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
-                            <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!online, t.online === true)}</div>
-                          </div>
-                        ) : (
-                        <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
-                          <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
-                            {combined}<span className="align-super text-base font-extrabold">%</span>
-                          </div>
-                          <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה מקצועית"}</div>
-                          {t.personality_score != null && (
-                            <>
-                              <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
-                              <div className="flex flex-col gap-0.5">
-                                <span className="text-[10.5px] text-[var(--muted)]">מקצועי <b className="font-extrabold text-[var(--teal-dark)]">{t.match_score}%</b></span>
-                                <span className="text-[10.5px] text-[var(--muted)]">אישיותי <b className="font-extrabold text-[var(--teal-dark)]">{t.personality_score}%{t.entity_type === "center" && "*"}</b></span>
-                              </div>
-                            </>
+                          {t.entity_type === "center" && (
+                            // הודעה למרכז - למייל המרכז, נספרת כלחיצה מההתאמות. הוואטסאפ של
+                            // המרכז (public_whatsapp, 15/9/26) יושב לפניה כשקיים, כמו אצל מטפל.
+                            <CenterMessageButton
+                              entityId={t.id}
+                              centerName={t.full_name ?? "המרכז"}
+                              source="match"
+                              label="שליחת הודעה למרכז"
+                              className={MATCH_CARD_BTN.centerMessage}
+                            />
                           )}
-                        </div>
-                        )}
-                      </div>
-                      {/* אותו כלל כמו במבוגרים: בלי מספר אישיותי אין כוכבית להסביר. */}
-                      {t.entity_type === "center" && t.personality_score != null && !away && (
-                        <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
-                          * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לכם מתוכו את המטפל/ת המתאים/ה גם אישיותית.
-                        </p>
-                      )}
-                      <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                        {/* אותה היררכיה כמו במבוגרים - ראו ההערה שם ובקומפוננטה. */}
-                        {t.entity_type === "center" && t.center_whatsapp && (
-                          <MatchCardWhatsApp therapistId={t.id} phone={t.center_whatsapp} centerMode />
-                        )}
-                        {t.entity_type === "center" && (
-                          // הודעה למרכז - למייל המרכז, נספרת כלחיצה מההתאמות. הוואטסאפ של
-                          // המרכז (public_whatsapp, 15/9/26) יושב לפניה כשקיים, כמו אצל מטפל.
-                          <CenterMessageButton
-                            entityId={t.id}
-                            centerName={t.full_name ?? "המרכז"}
-                            source="match"
-                            label="שליחת הודעה למרכז"
-                            className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90 bg-[var(--teal)]"
-                          />
-                        )}
-                        {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
-                        <button
-                          onClick={() => fetchExplanation(t)}
-                          disabled={explainLoading[t.id]}
-                          className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#EAD9B0] bg-white px-4 py-2 text-[13px] font-bold text-[var(--gold-dark)] transition-colors hover:border-[var(--gold)] hover:bg-[var(--gold-pale)] disabled:opacity-60"
-                        >
-                          <span
-                            className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
-                            style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
-                          >✦</span>
-                          {explainLoading[t.id] ? "מעבד · כ-20 שניות" : isCounselor(A) ? "למה הותאמ/ה לתלמיד/ה?" : "למה הותאמ/ה לי?"}
-                        </button>
-                        {profileHref && (
-                          <a
-                            href={profileHref}
-                            className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)]"
-                            style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
+                          {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                          <button
+                            onClick={() => fetchExplanation(t)}
+                            disabled={explainLoading[t.id]}
+                            className={MATCH_CARD_BTN.explain}
                           >
-                            פרופיל מלא ←
-                          </a>
-                        )}
-                      </div>
+                            <span
+                              className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
+                              style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
+                            >✦</span>
+                            {explainLoading[t.id] ? "מעבד · כ-20 שניות" : isCounselor(A) ? "למה הותאמ/ה לתלמיד/ה?" : "למה הותאמ/ה לי?"}
+                          </button>
+                          {profileHref && (
+                            <MatchCardProfileLink href={profileHref} />
+                          )}
+                        </>
+                      }
+                    >
                       {explainData[t.id] && (
                         <div
                           className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-3.5 text-right"
@@ -2699,7 +2654,7 @@ function KidsMatchSection({ A, score, selection }: {
                           <p className="mt-2 text-[10.5px] text-[var(--faint)]">{explainData[t.id]!.tone_note}</p>
                         </div>
                       )}
-                    </div>
+                    </MatchResultCard>
                     </Fragment>
                   );
                   });

@@ -24,6 +24,7 @@ import QuizPaymentBlock from "@/app/components/QuizPaymentBlock";
 import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
+import MatchResultCard, { MATCH_CARD_BTN, MatchCardProfileLink } from "@/app/components/MatchResultCard";
 import { trackingOptedOut, setTrackingOptOut } from "@/app/lib/track-optout";
 import CenterMessageButton from "@/app/centers/[slug]/CenterMessageButton";
 import { minDwell } from "@/app/lib/min-dwell";
@@ -3237,127 +3238,73 @@ export default function AdultsPage() {
                 </p>
               </div>
             )}
-            <div
-              className="rounded-[18px] border border-[var(--line)] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
-            >
-              <div className="flex items-stretch gap-4">
-                {t.entity_type === "center" && !t.profile_photo_url ? (
-                  // מרכז בלי לוגו - סמל ניטרלי (לא אווטאר מגדרי; gender של ישות ריק)
-                  <div className="flex h-[78px] w-[78px] flex-shrink-0 items-center justify-center self-start rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] text-3xl" aria-hidden>
-                    🏢
-                  </div>
-                ) : (
-                  <img
-                    src={t.profile_photo_url || (t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
-                    alt={t.full_name ?? ""}
-                    className={`h-[78px] w-[78px] flex-shrink-0 self-start rounded-2xl ${
-                      t.entity_type === "center"
-                        ? "border border-[var(--line)] bg-white object-contain p-1" // לוגו מרכז - לא לחתוך
-                        : "object-cover"
-                    }`}
-                  />
-                )}
-                <div className="min-w-0 flex-1 text-right">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-extrabold text-[var(--text)]">{t.full_name || "ללא שם"}</h3>
-                    {t.entity_type === "center" && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--gold-dark)]">🏢 מרכז טיפולי</span>
-                    )}
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ מאומת</span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-[var(--muted)]">{t.entity_type === "center" ? "מרכז טיפולי" : t.gender} • {t.online ? "אונליין" : "פנים אל פנים"}</p>
-                  {t.bio && <p className="mt-1.5 line-clamp-2 text-sm text-[var(--text-2)]">{t.bio}</p>}
-                  {t.regions?.length > 0 && (
-                    <p className="mt-1.5 text-xs text-[var(--muted)]">
-                      📍 {(Array.isArray(t.regions) ? t.regions : [t.regions]).join(", ")}
-                      {/* המרחק יצא מהציון, ולכן הוא מסומן כאן במפורש במקום
-                          להיבלע בתוך אחוז אחד. */}
-                      {t.in_requested_area && (
-                        <span className="ms-1.5 inline-block rounded-full bg-[var(--teal-pale)] px-2 py-0.5 text-[11px] font-bold text-[var(--teal-dark)]">
-                          ✓ באזור שלך
-                        </span>
-                      )}
-                    </p>
-                  )}
-                  {matchesPref && (
-                    <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
-                      ✓ עובד/ת {matchedMods.length > 1 ? "בגישות" : "בגישת"} {matchedMods.join(" ו-")} שהותאמ{matchedMods.length > 1 ? "ו" : "ה"} לך
-                    </div>
-                  )}
+            <MatchResultCard
+              name={t.full_name || "ללא שם"}
+              isCenter={t.entity_type === "center"}
+              photoUrl={t.profile_photo_url}
+              gender={t.gender}
+              subtitle={`${t.entity_type === "center" ? "מרכז טיפולי" : t.gender ?? ""} • ${t.online ? "אונליין" : "פנים אל פנים"}`}
+              bio={t.bio}
+              regions={t.regions?.length > 0 ? (Array.isArray(t.regions) ? t.regions : [t.regions]) : []}
+              inAreaChip={t.in_requested_area ? "✓ באזור שלך" : null}
+              badge={matchesPref && (
+                <div className="mt-2 inline-block rounded-full border border-[var(--teal-mid)] bg-[var(--teal-pale)] px-3 py-1 text-xs font-semibold text-[var(--teal-dark)]">
+                  ✓ עובד/ת {matchedMods.length > 1 ? "בגישות" : "בגישת"} {matchedMods.join(" ו-")} שהותאמ{matchedMods.length > 1 ? "ו" : "ה"} לך
                 </div>
-                {away ? (
-                  // מחוץ לאזור: מילים במקום אחוז, כדי שהמספר לא יתחרה במספר של
-                  // מי שקרוב (ראו app/lib/match-card-label.ts).
-                  <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl border border-[var(--line)] bg-[var(--surface)] px-2 py-3 text-center">
-                    <div className="text-[12.5px] font-extrabold leading-snug text-[var(--teal-dark)]">{professionalFitLabel(t.match_score)}</div>
-                    <div className="my-2 h-px w-2/3 bg-[var(--line)]" />
-                    <div className="text-[11px] font-bold text-[var(--muted)]">{outOfAreaReason(!!matchPrefs.online, t.online)}</div>
-                  </div>
-                ) : (
-                <div className="flex w-[110px] flex-shrink-0 flex-col items-center justify-center rounded-2xl bg-[var(--teal-pale)] px-2 py-3 text-center">
-                  <div className="text-[2.4rem] font-black leading-none tracking-tight text-[var(--teal-dark)]">
-                    {overall}<span className="align-super text-base font-extrabold">%</span>
-                  </div>
-                  <div className="mt-1 text-[10.5px] font-bold text-[var(--teal)]">{t.personality_score != null ? "התאמה כוללת" : "התאמה מקצועית"}</div>
-                  {t.personality_score != null && (
-                    <>
-                      <div className="my-2 h-px w-2/3 bg-[var(--teal-mid)]" />
-                      <div className="flex flex-col gap-0.5">
-                        <span className="text-[10.5px] text-[var(--muted)]">מקצועי <b className="font-extrabold text-[var(--teal-dark)]">{t.match_score}%</b></span>
-                        <span className="text-[10.5px] text-[var(--muted)]">אישיותי <b className="font-extrabold text-[var(--teal-dark)]">{t.personality_score}%{t.entity_type === "center" && "*"}</b></span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                )}
-              </div>
-              {/* ההערה מסבירה את הכוכבית שליד המספר האישיותי - ולכרטיס מחוץ
-                  לאזור אין מספר, אז גם לא הערה. */}
-              {t.entity_type === "center" && t.personality_score != null && !away && (
-                <p className="mt-2 text-[11px] leading-5 text-[var(--muted)]">
-                  * במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית.
-                </p>
               )}
-              <div className="mt-3.5 flex flex-wrap items-center gap-2.5">
-                {/* וואטסאפ ראשון ומלא, הפרופיל אחריו כמשני: 14 מתוך 17 הפניות
-                    של מסיימי שאלון הגיעו מהכפתור הזה ורק 3 מהפרופיל (17/8/2026),
-                    בזמן שהפרופיל היה הכפתור הבולט והוואטסאפ הקטן והאחרון. */}
-                {t.entity_type === "center" && t.center_whatsapp && (
-                  <MatchCardWhatsApp therapistId={t.id} phone={t.center_whatsapp} centerMode />
-                )}
-                {t.entity_type === "center" && (
-                  // הודעה למרכז - למייל המרכז, נספרת כלחיצה מההתאמות. הוואטסאפ של
-                  // המרכז (public_whatsapp, 15/9/26) יושב לפניה כשקיים, כמו אצל מטפל.
-                  <CenterMessageButton
-                    entityId={t.id}
-                    centerName={t.full_name ?? "המרכז"}
-                    source="match"
-                    label="שליחת הודעה למרכז"
-                    className="inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[13px] font-bold text-white transition-opacity hover:opacity-90 bg-[var(--teal)]"
-                  />
-                )}
-                {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
-                <button
-                  onClick={() => fetchExplanation(t)}
-                  disabled={explainLoading[t.id]}
-                  className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#EAD9B0] bg-white px-4 py-2 text-[13px] font-bold text-[var(--gold-dark)] transition-colors hover:border-[var(--gold)] hover:bg-[var(--gold-pale)] disabled:opacity-60"
-                >
-                  <span
-                    className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
-                    style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
-                  >✦</span>
-                  {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
-                </button>
-                {profileHrefForMatch(t) && (
-                  <a
-                    href={profileHrefForMatch(t)!}
-                    className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-4 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)]"
-                    style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
+              score={
+                // מחוץ לאזור: מילים במקום אחוז, כדי שהמספר לא יתחרה במספר של
+                // מי שקרוב (ראו app/lib/match-card-label.ts).
+                away
+                  ? { kind: "words", label: professionalFitLabel(t.match_score), reason: outOfAreaReason(!!matchPrefs.online, t.online) }
+                  : overall != null
+                    ? { kind: "percent", overall, professional: t.match_score ?? null, personality: t.personality_score ?? null }
+                    : null
+              }
+              centerNote={
+                // ההערה מסבירה את הכוכבית שליד המספר האישיותי - ולכרטיס מחוץ
+                // לאזור אין מספר, אז גם לא הערה.
+                t.entity_type === "center" && t.personality_score != null && !away
+                  ? "* במרכז פועל מספר רב של מטפלים - צוות המרכז יתאים לך מתוכו את המטפל/ת המתאים/ה גם אישיותית."
+                  : null
+              }
+              actions={
+                <>
+                  {/* וואטסאפ ראשון ומלא, הפרופיל אחריו כמשני: 14 מתוך 17 הפניות
+                      של מסיימי שאלון הגיעו מהכפתור הזה ורק 3 מהפרופיל (17/8/2026),
+                      בזמן שהפרופיל היה הכפתור הבולט והוואטסאפ הקטן והאחרון. */}
+                  {t.entity_type === "center" && t.center_whatsapp && (
+                    <MatchCardWhatsApp therapistId={t.id} phone={t.center_whatsapp} centerMode />
+                  )}
+                  {t.entity_type === "center" && (
+                    // הודעה למרכז - למייל המרכז, נספרת כלחיצה מההתאמות. הוואטסאפ של
+                    // המרכז (public_whatsapp, 15/9/26) יושב לפניה כשקיים, כמו אצל מטפל.
+                    <CenterMessageButton
+                      entityId={t.id}
+                      centerName={t.full_name ?? "המרכז"}
+                      source="match"
+                      label="שליחת הודעה למרכז"
+                      className={MATCH_CARD_BTN.centerMessage}
+                    />
+                  )}
+                  {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                  <button
+                    onClick={() => fetchExplanation(t)}
+                    disabled={explainLoading[t.id]}
+                    className={MATCH_CARD_BTN.explain}
                   >
-                    פרופיל מלא ←
-                  </a>
-                )}
-              </div>
+                    <span
+                      className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[11px] text-white"
+                      style={{ background: "linear-gradient(135deg,var(--teal),var(--gold))" }}
+                    >✦</span>
+                    {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
+                  </button>
+                  {profileHrefForMatch(t) && (
+                    <MatchCardProfileLink href={profileHrefForMatch(t)!} />
+                  )}
+                </>
+              }
+            >
               {explainData[t.id] && (
                 <div
                   className="mt-3 rounded-2xl bg-[var(--gold-pale)] p-3.5 text-right"
@@ -3378,7 +3325,7 @@ export default function AdultsPage() {
                   <p className="mt-2 text-[10.5px] text-[var(--faint)]">{explainData[t.id]!.tone_note}</p>
                 </div>
               )}
-            </div>
+            </MatchResultCard>
             </Fragment>
           );
           });
