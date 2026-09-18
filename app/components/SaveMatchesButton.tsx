@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { trackMatchSaved } from "@/app/lib/useTrack";
+import { buildSavedMatchScores, type MatchScoreSource } from "@/app/lib/saved-match-scores";
 
 // "שלח לעצמך את ההתאמות" - creates an anonymous permalink (POST /api/match-token,
 // which stores the list + the ORIGINAL attribution) and opens WhatsApp with a
@@ -11,16 +12,27 @@ import { trackMatchSaved } from "@/app/lib/useTrack";
 // Solves the half-of-quiz-completers-never-contact leak: gives a durable,
 // cross-device way back that keeps campaign credit.
 
-type MatchLike = { id: string; full_name?: string | null; entity_type?: string | null };
+type MatchLike = MatchScoreSource & { full_name?: string | null; entity_type?: string | null };
 
 export default function SaveMatchesButton({
   matches,
   quizType,
   treatmentLabel,
+  locationAsked = false,
+  onlineRequested = false,
+  assessment = false,
 }: {
   matches: MatchLike[];
   quizType: "adults" | "kids";
   treatmentLabel?: string | null;
+  /**
+   * מה שמסך התוצאות צריך כדי לחלק לקבוצות, ונשמר עם הטוקן כדי שהרשימה
+   * השמורה תיראה אותו דבר (18/9/26): נבחרה עיר או אזור, סומן אונליין,
+   * ובשאלון הילדים - האם אלה מאבחנים.
+   */
+  locationAsked?: boolean;
+  onlineRequested?: boolean;
+  assessment?: boolean;
 }) {
   const [state, setState] = useState<"idle" | "loading" | "copied" | "error">("idle");
 
@@ -43,6 +55,9 @@ export default function SaveMatchesButton({
           quiz_type: quizType,
           session_id: getOrCreateSessionId(),
           treatment_label: treatmentLabel ?? null,
+          // אחוזי ההתאמה ודגל האזור לכל מטפל - מספרים בלבד, בלי הנימוקים
+          // שנמצאים על אותו אובייקט (ראו app/lib/saved-match-scores.ts).
+          match_scores: buildSavedMatchScores(matches.slice(0, 20), { locationAsked, onlineRequested, assessment }),
           ...(getAttribution() ?? {}),
         }),
       });

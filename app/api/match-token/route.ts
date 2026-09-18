@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomBytes } from "crypto";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
+import { parseSavedMatchScores } from "@/app/lib/saved-match-scores";
 
 // Creates an anonymous saved-match permalink (see match_tokens migration):
 // stores the matched therapist list + the ORIGINAL attribution, so a return
@@ -64,6 +65,9 @@ export async function POST(req: NextRequest) {
         ? body.treatment_label.slice(0, 120)
         : null;
     const attr = sanitizeAttribution(body);
+    // אחוזי ההתאמה שמסך התוצאות הראה, כדי שהרשימה השמורה תיראה כמוהו. מספרים
+    // ודגלים בלבד - הניקוי מעתיק רק את השדות המותרים (ראו saved-match-scores.ts).
+    const matchScores = therapistIds.length > 0 ? parseSavedMatchScores(body?.match_scores, therapistIds) : null;
 
     const token = randomBytes(8).toString("base64url"); // 11 url-safe chars
 
@@ -72,6 +76,7 @@ export async function POST(req: NextRequest) {
       quiz_type: quizType,
       therapist_ids: therapistIds.length > 0 ? therapistIds : null,
       recommended_treatments: recommendedTreatments.length > 0 ? recommendedTreatments : null,
+      match_scores: matchScores,
       treatment_label: treatmentLabel,
       session_id: sessionId,
       channel: attr.channel,

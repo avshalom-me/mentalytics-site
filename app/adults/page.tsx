@@ -3179,6 +3179,8 @@ export default function AdultsPage() {
           matches={matchResults ?? []}
           quizType="adults"
           treatmentLabel={combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel ?? null}
+          locationAsked={!!(matchPrefs.city || matchPrefs.region)}
+          onlineRequested={!!matchPrefs.online}
         />
       )}
       {(matchResults ?? []).length === 0 && (

@@ -1,9 +1,11 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
-import TherapistResultCard from "@/app/components/TherapistResultCard";
 import MatchReturnTracker from "../MatchReturnTracker";
+import SavedMatchCard from "../SavedMatchCard";
+import { parseSavedMatchScores, savedDisplayRows } from "@/app/lib/saved-match-scores";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 
 // Saved-match permalink (the "שלח לעצמך את ההתאמות" feature): anonymous token
@@ -26,6 +28,8 @@ type TokenRow = {
   /** תוויות הטיפול שהומלצו. ללא ממצאים קליניים - ראו המיגרציה. */
   recommended_treatments: string[] | null;
   treatment_label: string | null;
+  /** אחוזי ההתאמה ודגלי האזור ממסך התוצאות. null בטוקן ישן - ראו saved-match-scores.ts. */
+  match_scores: unknown;
   channel: string | null;
   utm_source: string | null;
   utm_medium: string | null;
@@ -70,7 +74,7 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
 
   const { data } = await supabaseAdmin
     .from("match_tokens")
-    .select("token, quiz_type, therapist_ids, recommended_treatments, treatment_label, channel, utm_source, utm_medium, utm_campaign, created_at, expires_at, visit_count")
+    .select("token, quiz_type, therapist_ids, recommended_treatments, treatment_label, match_scores, channel, utm_source, utm_medium, utm_campaign, created_at, expires_at, visit_count")
     .eq("token", token)
     .maybeSingle();
 
@@ -93,12 +97,25 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
   const list = savedIds.map((id) => byId.get(id)).filter((t): t is NonNullable<typeof t> => Boolean(t));
   const droppedCount = savedIds.length - list.length;
 
+  // מסך התוצאות כפי שנראה: קודם מי שבאזור שבחרו, אחריהם השאר, עם האחוז.
+  const scores = parseSavedMatchScores(row.match_scores, savedIds);
+  const { rows, localCount } = savedDisplayRows(list, scores);
+  const locationAsked = scores?.location_asked === true;
+  const onlineRequested = scores?.online_requested === true;
+  const kids = row.quiz_type === "kids";
+  const noun = kids && scores?.assessment ? "מאבחנים" : "מטפלים";
+
   const savedDate = new Date(row.created_at).toLocaleDateString("he-IL", { day: "numeric", month: "long", year: "numeric" });
 
   return (
-    <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
+    // אותו רוחב וריווח כמו מסך התוצאות בשאלון (max-w-2xl px-4), כדי שהכרטיס ייראה זהה.
+    <main className="mx-auto max-w-2xl px-4 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <MatchReturnTracker
         token={token}
+        quizType={row.quiz_type}
+        impressions={rows
+          .filter((r) => r.t.trackable !== false)
+          .map((r) => ({ therapistId: r.t.id, score: r.score ? r.score.combined_score ?? r.score.match_score : null }))}
         seed={{
           channel: (row.channel as never) ?? undefined,
           utm_source: row.utm_source,
@@ -170,9 +187,41 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
           המטפלים מהרשימה הזו כבר אינם מוצגים. אפשר <Link href="/adults" className="font-semibold text-[#2e7d8c] hover:underline">למלא שאלון מחודש</Link> או לעיין ב<Link href="/therapists" className="font-semibold text-[#2e7d8c] hover:underline">כל המטפלים</Link>.
         </div>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {list.map((t) => (
-            <TherapistResultCard key={t.id} t={t} backHref={`/match/${token}`} fromMatch />
+        // אותן שתי קבוצות ואותן כותרות כמו במסך התוצאות של השאלון.
+        <div className="space-y-4">
+          {rows.map(({ t, score, away }, idx) => (
+            <Fragment key={t.id}>
+              {locationAsked && idx === 0 && localCount > 0 && localCount < rows.length && (
+                <div className="flex items-center gap-2 pt-1">
+                  <span className="text-sm font-extrabold text-[var(--teal-dark)]">{kids ? "באזור שבחרתם" : "באזור שבחרת"}</span>
+                  <span className="h-px flex-1 bg-[var(--line)]" />
+                </div>
+              )}
+              {away && idx === localCount && (
+                <div className="pt-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-extrabold text-[var(--text-2)]">{kids ? "מחוץ לאזור שבחרתם" : "מחוץ לאזור שבחרת"}</span>
+                    <span className="h-px flex-1 bg-[var(--line)]" />
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
+                    {localCount === 0
+                      ? `לא מצאנו ${noun} ${kids ? "באזור שבחרתם" : "באזור שבחרת"}. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים`
+                      : `${noun} מאזורים סמוכים`}
+                    {onlineRequested ? (kids ? " וכאלה שעובדים אונליין" : " ומטפלים שעובדים אונליין") : ""}. ההתאמה המקצועית שלהם מסומנת במילים ולא באחוז, כי המרחק לא נכלל בחישוב.
+                  </p>
+                </div>
+              )}
+              <SavedMatchCard
+                t={t}
+                score={score}
+                away={away}
+                locationAsked={locationAsked}
+                onlineRequested={onlineRequested}
+                token={token}
+                quizType={row.quiz_type}
+                treatmentLabel={row.treatment_label}
+              />
+            </Fragment>
           ))}
         </div>
       )}

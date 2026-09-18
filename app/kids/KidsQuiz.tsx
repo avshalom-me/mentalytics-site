@@ -2516,7 +2516,14 @@ function KidsMatchSection({ A, score, selection }: {
           ) : (
             <>
               <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">נמצאו {results.length} {isAssessment ? "מאבחנים" : "מטפלים"}:</div>
-              <SaveMatchesButton matches={results} quizType="kids" treatmentLabel={treatmentLabels.join(" + ") || null} />
+              <SaveMatchesButton
+                matches={results}
+                quizType="kids"
+                treatmentLabel={treatmentLabels.join(" + ") || null}
+                locationAsked={!!(city || region)}
+                onlineRequested={!!online}
+                assessment={isAssessment}
+              />
               <div className="space-y-4">
                 {(() => {
                   // שתי קבוצות, כמו במבוגרים: באזור שבחרתם, ואחריה מחוץ לו.
