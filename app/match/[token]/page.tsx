@@ -98,6 +98,7 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
   return (
     <main className="mx-auto max-w-6xl px-5 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <MatchReturnTracker
+        token={token}
         seed={{
           channel: (row.channel as never) ?? undefined,
           utm_source: row.utm_source,
@@ -171,7 +172,7 @@ export default async function SavedMatchPage({ params }: { params: Promise<{ tok
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {list.map((t) => (
-            <TherapistResultCard key={t.id} t={t} backHref={`/match/${token}`} />
+            <TherapistResultCard key={t.id} t={t} backHref={`/match/${token}`} fromMatch />
           ))}
         </div>
       )}

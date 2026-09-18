@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { visibleProfileLinks } from "@/app/lib/profile-links";
+import { safeReturnPath, isSavedMatchPath } from "@/app/lib/return-path";
 import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
@@ -214,10 +215,10 @@ export default async function TherapistProfilePage({
   // Where "back to the list" returns for a directory visitor: the listing page
   // they came from (region / city / online / center), passed as ?ret=. Only
   // internal listing paths are honoured - never an arbitrary/attacker URL.
-  const directoryBack =
-    typeof sp.ret === "string" && /^\/(therapists|centers)\/[^/]/.test(sp.ret) && !sp.ret.startsWith("//")
-      ? sp.ret
-      : "/therapists";
+  const directoryBack = safeReturnPath(sp.ret) ?? "/therapists";
+  // הגעה מרשימת התאמות שמורה (/match/<token>): "חזרה" מחזיר לרשימה ששמרו,
+  // לא לתחילת השאלון - שם כבר אין את התוצאות.
+  const savedMatchBack = isSavedMatchPath(sp.ret) ? sp.ret : null;
   const viewerContext = source === "match" ? {
     region: sp.r,
     issue: sp.i,
@@ -322,7 +323,7 @@ export default async function TherapistProfilePage({
         .chevron { transition: transform 0.2s; }
       `}</style>
 
-      <ProfileBackLink source={source} fallbackHref={source === "match" ? (sp.a === "child" ? "/kids" : "/adults") : directoryBack} />
+      <ProfileBackLink source={source} fallbackHref={source === "match" ? (savedMatchBack ?? (sp.a === "child" ? "/kids" : "/adults")) : directoryBack} />
 
       {/* Hero - warm teal band, large photo + identity + contact */}
       <div className="rounded-3xl mb-8 p-6 sm:p-8" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
