@@ -156,6 +156,32 @@ async function gatherSections(): Promise<DigestSection[]> {
     console.error("digest inbox section failed:", e instanceof Error ? e.message : e);
   }
 
+  // לקחים מתיקוני טיוטות שממתינים לאישור. כלל שלא אושר לא משפיע על שום
+  // טיוטה, אז לקח שנשכח בתור שקול לתיקון שהלך לאיבוד.
+  try {
+    const { data: lessonRows } = await supabaseAdmin
+      .from("inbox_lessons")
+      .select("rule, created_at")
+      .eq("status", "pending")
+      .order("created_at", { ascending: true })
+      .limit(30);
+    const waiting = lessonRows ?? [];
+    if (waiting.length > 0) {
+      sections.push({
+        key: "inbox_lessons",
+        label: "לקחים מתיקוני טיוטות שממתינים לאישור",
+        count: waiting.length,
+        urgent: false,
+        lines: waiting
+          .slice(0, MAX_LINES_PER_SECTION)
+          .map((l) => `${String(l.rule).slice(0, 90)} · ${ageText(l.created_at as string)}`),
+        link: "/admin/agents?agent=inbox",
+      });
+    }
+  } catch (e) {
+    console.error("digest lessons section failed:", e instanceof Error ? e.message : e);
+  }
+
   // פניות לחברה בלבד - הפיצול ממדיניות 15/8 חי ב-work-queue, פעם אחת,
   // והספירה/הדחיפות מחושבות שם על הרשימה המלאה (לא על חיתוך תצוגה).
   if (q.new_leads_total > 0) {

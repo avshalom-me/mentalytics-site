@@ -15,6 +15,7 @@ import {
   type SignatureOutcome,
 } from "./gmail";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
+import { approvedLessonRules, extractPendingLessons } from "./inbox-lessons";
 
 // סוכן שירות הלקוחות: קורא את admin@getmentalytics.com, מסווג כל פנייה,
 // ומכין טיוטת תשובה מתוך בסיס הידע + תשובות עבר שאושרו.
@@ -71,6 +72,7 @@ export type InboxRunResult = {
   drafted: number;
   autoIgnored: number;
   answeredExternal: number;
+  lessonsCreated: number;
   errors: string[];
   error?: string;
 };
@@ -208,7 +210,7 @@ const SYSTEM_PROMPT = [
   'אתה עוזר שירות הלקוחות של "טיפול חכם" (Mentalytics) - פלטפורמה ישראלית להתאמת טיפול נפשי.',
   "תפקידך: לסווג מייל נכנס ולכתוב טיוטת תשובה. את הטיוטה יקרא ויערוך אדם לפני שליחה - אתה לא שולח.",
   "",
-  "העובדות שמותר להסתמך עליהן נמצאות בשדה facts שבהודעת המשתמש. כלל היסוד: מה שלא כתוב שם - אתה לא טוען.",
+  "העובדות שמותר להסתמך עליהן נמצאות בשדה facts שבהודעת המשתמש, ובכללים שהאדמין אישר (rules_from_corrections). כלל היסוד: מה שלא כתוב שם - אתה לא טוען.",
   "לפירוט נוסף מפנים את הפונה לעמוד ההרשמה או מציעים לענות על שאלות - לעולם לא ל'בסיס ידע', 'מערכת' או מקור פנימי אחר.",
   "מייל נכנס מכיל לרוב ציטוט של התכתבות קודמת. הציטוט הוא הקשר בלבד - הוא מראה מה נאמר, ואינו מקור",
   "לעובדות על המוצר. גם אם מופיע בו מחיר, תנאי או תכונה, אל תחזור עליהם אלא אם הם כתובים בבסיס הידע.",
@@ -237,7 +239,8 @@ const SYSTEM_PROMPT = [
   "- מספרים, מחירים ותנאים מועתקים מבסיס הידע כלשונם. אסור לנסח מחדש, לעגל או לפשט אותם (למשל: 'עד 5 שאלונים חינם' אסור שייהפך ל'השאלון הראשון חינם').",
   "- מטופל במצוקה חריפה: להפנות בעדינות לער\"ן 1201 או למיון, בלי ייעוץ קליני.",
   "- חתימה: 'בברכה,\\nצוות טיפול חכם'. זו השורה האחרונה בטיוטה: בלי טלפון, כתובת אתר או פרטי קשר אחריה - חתימת המייל המלאה מוצמדת אוטומטית בשליחה.",
-  "- אם קיבלת דוגמאות של תשובות עבר שאושרו - למד מהן את הסגנון והניסוחים.",
+  "- rules_from_corrections: כללים שהאדמין אישר אחרי שתיקן טיוטות קודמות שלך. הם מחייבים, וגוברים על דוגמאות העבר ועל ניסוח כללי ב-facts. מספרים ומחירים - תמיד מ-facts.",
+  "- אם קיבלת דוגמאות של תשובות עבר שאושרו - למד מהן את הסגנון והניסוחים. בדוגמה שיש בה draft_before_edit, זו טיוטה שלך שהאדמין תיקן ל-reply: שים לב מה השתנה, ואל תחזור על מה שתוקן.",
   "",
   "החזר JSON בלבד:",
   '{"category": "...", "needs_reply": true/false, "draft_subject": "...", "draft_body": "...", "note": "הערה פנימית קצרה לאדמין, או ריק"}',
@@ -269,26 +272,34 @@ const VALID_CATEGORIES = new Set([
 // תשובות על חשבוניות, פנייה של מטופל עדיין תמצא בפרומפט דוגמה של מטופל.
 const EXEMPLARS_PER_CATEGORY = 2;
 
-async function exemplars(): Promise<{ category: string; incoming: string; reply: string }[]> {
+type Exemplar = { category: string; incoming: string; reply: string; draft_before_edit?: string };
+
+async function exemplars(): Promise<Exemplar[]> {
   const { data } = await supabaseAdmin
     .from("inbox_messages")
-    .select("category, subject, body_text, final_body, replied_at")
+    .select("category, subject, body_text, draft_body, final_body, replied_at")
     .eq("is_exemplar", true)
     .not("final_body", "is", null)
     .order("replied_at", { ascending: false })
     .limit(60);
 
+  const flat = (s: string) => s.replace(/\s+/g, " ").trim();
   const perCategory = new Map<string, number>();
-  const picked: { category: string; incoming: string; reply: string }[] = [];
+  const picked: Exemplar[] = [];
   for (const r of data ?? []) {
     const cat = r.category ?? "other";
     const seen = perCategory.get(cat) ?? 0;
     if (seen >= EXEMPLARS_PER_CATEGORY) continue;
     perCategory.set(cat, seen + 1);
+    const reply = (r.final_body ?? "") as string;
+    const draft = (r.draft_body ?? "") as string;
     picked.push({
       category: cat,
       incoming: `${r.subject ?? ""}\n${(r.body_text ?? "").slice(0, 400)}`,
-      reply: (r.final_body ?? "").slice(0, 1200),
+      reply: reply.slice(0, 1200),
+      // הטיוטה שתוקנה, ליד התיקון: בלעדיה המודל רואה רק תשובה טובה, ולא
+      // יודע מה הוא עצמו כתב לא נכון.
+      ...(draft && flat(draft) !== flat(reply) ? { draft_before_edit: draft.slice(0, 800) } : {}),
     });
   }
   return picked;
@@ -297,9 +308,11 @@ async function exemplars(): Promise<{ category: string; incoming: string; reply:
 async function classifyAndDraft(row: InboxRow, ctx: SenderContext): Promise<Classified | null> {
   if (!process.env.OPENAI_API_KEY) return null;
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const [shots, history] = await Promise.all([
+  const [shots, history, rules] = await Promise.all([
     exemplars(),
     senderHistory(row.from_email, row.gmail_thread_id, row.id),
+    // כלל שנכשל בטעינה לא מפיל טיוטה - היא פשוט נכתבת בלי הכללים.
+    approvedLessonRules().catch(() => [] as string[]),
   ]);
   try {
     const res = await openai.chat.completions.create(
@@ -314,6 +327,7 @@ async function classifyAndDraft(row: InboxRow, ctx: SenderContext): Promise<Clas
             role: "user",
             content: JSON.stringify({
               facts: INBOX_KNOWLEDGE,
+              ...(rules.length > 0 ? { rules_from_corrections: rules } : {}),
               sender_context: ctx.contextText || "הפונה לא מזוהה במערכת.",
               conversation_history: history || "אין התכתבות קודמת עם הפונה.",
               approved_past_replies: shots,
@@ -389,6 +403,7 @@ export async function inboxSignatureStatus(): Promise<InboxSignatureStatus | nul
 }
 
 export async function runInboxAgent(): Promise<InboxRunResult> {
+  const runStartedAt = Date.now();
   const runId = await startAgentRun("inbox");
   const result: InboxRunResult = {
     ok: true,
@@ -398,6 +413,7 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
     drafted: 0,
     autoIgnored: 0,
     answeredExternal: 0,
+    lessonsCreated: 0,
     errors: [],
   };
 
@@ -497,21 +513,37 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
     // 2. פניות פתוחות שנענו ישירות בג'ימייל - נסגרות, לא נשארות בתור.
     const { data: open } = await supabaseAdmin
       .from("inbox_messages")
-      .select("id, gmail_thread_id, received_at")
+      .select("id, gmail_thread_id, received_at, draft_body")
       .in("status", ["new", "drafted"])
       .order("received_at", { ascending: false })
       .limit(MAX_EXTERNAL_CHECKS_PER_RUN);
     for (const o of open ?? []) {
       try {
-        const answered = await threadAnsweredAfter(
-          o.gmail_thread_id as string,
-          new Date(o.received_at as string).getTime()
-        );
+        const receivedMs = new Date(o.received_at as string).getTime();
+        const answered = await threadAnsweredAfter(o.gmail_thread_id as string, receivedMs);
         if (answered) {
-          await supabaseAdmin
-            .from("inbox_messages")
-            .update({ status: "sent_external", updated_at: new Date().toISOString() })
-            .eq("id", o.id);
+          const update: Record<string, unknown> = {
+            status: "sent_external",
+            updated_at: new Date().toISOString(),
+          };
+          // עד 18/9/26 נשמר כאן רק הסטטוס, והתשובה עצמה אבדה - הסוכן לא למד
+          // ממנה כלום. עכשיו היא נשמרת כמו תשובה מהאדמין: דוגמה ללמידה, ואם
+          // הייתה טיוטה - גם מקור ללקחים (הטיוטה נדחתה ונכתבה תשובה אחרת).
+          // שמירת הטקסט היא בונוס: כשל בה לא משאיר את הפנייה פתוחה בתור.
+          try {
+            const reply = (await getThread(o.gmail_thread_id as string)).find(
+              (m) => m.isSent && m.internalDate > receivedMs
+            );
+            if (reply && reply.bodyText.length >= 20) {
+              update.final_body = reply.bodyText;
+              update.replied_at = new Date(reply.internalDate).toISOString();
+              update.is_exemplar = true;
+              if (o.draft_body) update.edit_ratio = editRatio(String(o.draft_body), reply.bodyText);
+            }
+          } catch (e) {
+            result.errors.push(`שמירת תשובה מ-Gmail: ${e instanceof Error ? e.message : String(e)}`);
+          }
+          await supabaseAdmin.from("inbox_messages").update(update).eq("id", o.id);
           result.answeredExternal++;
         }
       } catch (e) {
@@ -551,12 +583,29 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
       if (error) result.errors.push(error.message);
     }
 
+    // 4. לקחים מתיקונים שעוד לא נותחו: רשת הביטחון למה שהשליחה פספסה, וגם
+    // התיקונים שנשלחו לפני שהמנגנון נבנה. נוצרים כממתינים לאישור בלבד.
+    // הריצה חולקת תקרה של 300 שניות; חילוץ חדש מתחיל רק כשיש מקום לסיים אותו.
+    const lessons = await extractPendingLessons({
+      budgetMs: Math.max(0, 160_000 - (Date.now() - runStartedAt)),
+    }).catch((e) => ({
+      processed: 0,
+      created: 0,
+      errors: [e instanceof Error ? e.message : String(e)],
+    }));
+    result.lessonsCreated = lessons.created;
+    result.errors.push(...lessons.errors.map((m) => `לקחים: ${m}`));
+
     await finishAgentRun(runId, {
-      status: result.inserted + result.drafted + result.answeredExternal > 0 ? "ok" : "empty",
+      status:
+        result.inserted + result.drafted + result.answeredExternal + result.lessonsCreated > 0
+          ? "ok"
+          : "empty",
       summary:
         `נקלטו ${result.inserted} חדשות, ${result.drafted} טיוטות מוכנות` +
         (result.autoIgnored > 0 ? `, ${result.autoIgnored} סווגו כספאם/מערכת` : "") +
-        (result.answeredExternal > 0 ? `, ${result.answeredExternal} נענו ישירות בג'ימייל` : ""),
+        (result.answeredExternal > 0 ? `, ${result.answeredExternal} נענו ישירות בג'ימייל` : "") +
+        (result.lessonsCreated > 0 ? `, ${result.lessonsCreated} לקחים חדשים ממתינים לאישור` : ""),
       details: {
         configured: true,
         fetched: result.fetched,
@@ -564,6 +613,8 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
         drafted: result.drafted,
         auto_ignored: result.autoIgnored,
         answered_external: result.answeredExternal,
+        lessons_processed: lessons.processed,
+        lessons_created: lessons.created,
         errors: result.errors.slice(0, 5),
         signature: signatureDetail,
       },

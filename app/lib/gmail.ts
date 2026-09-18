@@ -254,14 +254,25 @@ export async function getThread(threadId: string): Promise<ThreadMessage[]> {
  * החתימה בגוף, ובלי החיתוך הסוכן היה לומד להקליד אותה בטיוטה - בנוסף
  * לחתימה האמיתית שמוצמדת בשליחה.
  */
-function stripQuoted(body: string): string {
+// תווי כיוון בלתי נראים (LRE/RLE/PDF, LRM/RLM, isolates). Gmail בממשק עברי
+// עוטף בהם את שורת הציטוט, ובגללם "On ... wrote:" לא זוהה - השורה נשמרה
+// בסוף התשובות שיובאו כדוגמאות.
+const BIDI_MARKS = /[‎‏‪-‮⁦-⁩]/g;
+
+export function stripQuoted(body: string): string {
   const lines = body.split("\n");
-  const cut = lines.findIndex((l) =>
-    /^--\s*$/.test(l) ||
-    /^\s*>/.test(l) ||
-    /^\s*(On .+ wrote:|בתאריך .+ מאת)/.test(l) ||
-    /^-{2,}\s*Original Message/i.test(l)
-  );
+  const cut = lines.findIndex((raw, i) => {
+    const l = raw.replace(BIDI_MARKS, "");
+    const next = (lines[i + 1] ?? "").replace(BIDI_MARKS, "");
+    return (
+      /^--\s*$/.test(l) ||
+      /^\s*>/.test(l) ||
+      /^\s*(On .+ wrote:|בתאריך .+ מאת)/.test(l) ||
+      // כותרת ציטוט ארוכה נשברת לשתי שורות: "On <תאריך> <שם> <כתובת>" ואז "wrote:".
+      (/^\s*On .*\d{4}/.test(l) && /^\s*wrote:\s*$/.test(next)) ||
+      /^-{2,}\s*Original Message/i.test(l)
+    );
+  });
   return (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
 }
 

@@ -26,6 +26,7 @@ export async function GET(req: NextRequest) {
       drafted: r.drafted,
       auto_ignored: r.autoIgnored,
       answered_external: r.answeredExternal,
+      lessons_created: r.lessonsCreated,
       errors: r.errors.slice(0, 10),
       error: r.error,
     },

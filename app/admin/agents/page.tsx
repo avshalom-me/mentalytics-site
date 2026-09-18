@@ -50,6 +50,20 @@ type InboxItem = {
   replied_at: string | null;
 };
 
+// לקח מתיקון טיוטה (inbox-lessons.ts בשרת).
+type InboxLesson = {
+  id: string;
+  rule: string;
+  why: string | null;
+  conflict: string | null;
+  status: "pending" | "approved" | "rejected" | "retired";
+  source: "correction" | "manual";
+  created_at: string;
+  decided_at: string | null;
+  source_subject: string | null;
+  source_from: string | null;
+};
+
 // החתימה מ-Gmail שמוצמדת לכל תשובה (inboxSignatureStatus בשרת).
 type InboxSignature =
   | { status: "ok"; html: string; text: string; alias: string }
@@ -279,14 +293,15 @@ const AGENTS: AgentMeta[] = [
     label: "שירות לקוחות",
     runAction: "inbox_run",
     runLabel: "בדוק מיילים עכשיו",
-    desc: "קורא כל חצי שעה את המיילים הנכנסים ל-admin@getmentalytics.com, מסווג כל פנייה (מטפל, מטופל, מרכז, ספאם), ומכין טיוטת תשובה מתוך בסיס הידע והתשובות שכבר אישרת בעבר. אתה עורך ושולח - וכל תשובה ששלחת מלמדת את הטיוטות הבאות.",
+    desc: "קורא כל שעתיים את המיילים הנכנסים ל-admin@getmentalytics.com, מסווג כל פנייה (מטפל, מטופל, מרכז, ספאם), ומכין טיוטת תשובה מתוך בסיס הידע, הכללים שאישרת והתשובות שכבר שלחת. אתה עורך ושולח - וכל תיקון שלך בטיוטה נהפך להצעת כלל לאישורך.",
     howToRead: [
       "שום מייל לא יוצא לבד. כל תשובה נשלחת רק מלחיצה שלך, אחרי עריכה אם צריך.",
       "סימון [להשלים] בטיוטה = הסוכן לא ידע עובדה ולא ניחש. השליחה נחסמת עד שתמלא אותו.",
-      "פנייה שענית לה ישירות בג'ימייל נסגרת מעצמה בריצה הבאה - התור לא מצטבר.",
-      "התשובות יוצאות מ-admin@ באותו שרשור, ומופיעות גם בתיקיית הנשלח שלך בג'ימייל.",
+      "תיקון שלך בטיוטה נהפך להצעת כלל ב'לקחים מהתיקונים שלך'. כלל שאישרת חל על כל טיוטה מעכשיו, לא רק על הבאות. תיקון שכבר כתוב בבסיס הידע, או חריג חד-פעמי, לא יוצר כלל.",
+      "פנייה שענית לה ישירות בג'ימייל נסגרת מעצמה בריצה הבאה, והתשובה שלך נשמרת כדוגמה ללמידה.",
+      "התשובות יוצאות מ-admin@ באותו שרשור, עם החתימה שמוגדרת ב-Gmail, ומופיעות גם בתיקיית הנשלח שלך.",
     ],
-    schedule: "רץ אוטומטית כל חצי שעה",
+    schedule: "רץ אוטומטית כל שעתיים",
     chartLabel: "כמה טיוטות הוכנו בכל ריצה",
   },
   {
@@ -1110,11 +1125,13 @@ function InboxCard({
   row,
   signature,
   onChanged,
+  onEditedSend,
   onNotify,
 }: {
   row: InboxItem;
   signature: InboxSignature | null;
   onChanged: (rows: InboxItem[]) => void;
+  onEditedSend: () => void;
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
   const [subject, setSubject] = useState(row.draft_subject ?? `Re: ${row.subject ?? ""}`);
@@ -1130,14 +1147,18 @@ function InboxCard({
       const j = await postAgents(action, { id: row.id, ...extra });
       if (Array.isArray(j.inbox)) onChanged(j.inbox as InboxItem[]);
       if (action === "inbox_send") {
+        const flat = (s: string) => s.replace(/\s+/g, " ").trim();
+        const edited = flat(body) !== flat(row.draft_body ?? "");
         onNotify(
           `התשובה נשלחה אל ${j.to ?? row.from_email}` +
             (j.signature === "failed"
               ? " - בלי חתימה: הקריאה שלה מ-Gmail נכשלה"
               : j.signature === "none"
                 ? " - בלי חתימה (לא מוגדרת ב-Gmail)"
-                : "")
+                : "") +
+            (edited ? ". הסוכן מנתח את התיקון שלך - אם יש בו כלל, הוא יופיע למטה לאישור." : "")
         );
+        if (edited) onEditedSend();
       } else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
     } catch (e) {
       onNotify(e instanceof Error ? e.message : "הפעולה נכשלה", true);
@@ -1256,17 +1277,257 @@ function InboxCard({
   );
 }
 
+/** כלל שממתין לאישור. הטקסט ניתן לעריכה לפני האישור. */
+function PendingLessonCard({
+  lesson,
+  busy,
+  onApprove,
+  onReject,
+}: {
+  lesson: InboxLesson;
+  busy: boolean;
+  onApprove: (rule: string) => void;
+  onReject: () => void;
+}) {
+  const [rule, setRule] = useState(lesson.rule);
+  const edited = rule.trim() !== lesson.rule.trim();
+  return (
+    <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-3">
+      <textarea
+        value={rule}
+        onChange={(e) => setRule(e.target.value)}
+        disabled={busy}
+        rows={Math.min(5, Math.max(2, Math.ceil(rule.length / 90)))}
+        dir="rtl"
+        className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm leading-6 text-stone-800"
+      />
+      {lesson.why && (
+        <p className="mt-1 text-xs leading-5 text-stone-600">
+          <span className="font-bold">מה תוקן:</span> {lesson.why}
+        </p>
+      )}
+      {/* כלל מאושר גובר על בסיס הידע בכל טיוטה - סתירה חייבת להיראות לפני האישור. */}
+      {lesson.conflict && (
+        <p className="mt-1.5 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-xs leading-5 text-rose-900">
+          <span className="font-black">⚠️ שונה ממה שכתוב היום בבסיס הידע:</span>{" "}
+          {lesson.conflict.replace(/[.\s]*$/, ".")} אם תאשר, הכלל
+          יגבור עליו בכל טיוטה. אם זה היה חריג חד-פעמי - עדיף לדחות.
+        </p>
+      )}
+      {(lesson.source_from || lesson.source_subject) && (
+        <p className="mt-0.5 text-[11px] text-stone-400">
+          מקור: התשובה אל {lesson.source_from ?? "פונה"}
+          {lesson.source_subject ? ` · ${lesson.source_subject}` : ""} · {relTime(lesson.created_at)}
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-3">
+        <button
+          onClick={() => onApprove(rule)}
+          disabled={busy || !rule.trim()}
+          className="rounded-full bg-[#3D8C8A] px-4 py-1.5 text-xs font-black text-white hover:bg-[#2A6462] disabled:opacity-50"
+        >
+          {edited ? "אשר עם העריכה" : "אשר כלל"}
+        </button>
+        <button
+          onClick={onReject}
+          disabled={busy}
+          className="text-xs text-stone-500 underline hover:text-stone-700 disabled:opacity-50"
+        >
+          זה לא כלל - דחה
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/** כלל פעיל: נכנס לכל טיוטה. אפשר לערוך או להסיר. */
+function ActiveLessonRow({
+  lesson,
+  busy,
+  onSave,
+  onRetire,
+}: {
+  lesson: InboxLesson;
+  busy: boolean;
+  onSave: (rule: string) => Promise<boolean>;
+  onRetire: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [rule, setRule] = useState(lesson.rule);
+  if (editing) {
+    return (
+      <li className="rounded-lg bg-white p-2">
+        <textarea
+          value={rule}
+          onChange={(e) => setRule(e.target.value)}
+          disabled={busy}
+          rows={2}
+          dir="rtl"
+          className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-6"
+        />
+        <div className="mt-1 flex gap-3">
+          <button
+            onClick={async () => {
+              if (await onSave(rule)) setEditing(false);
+            }}
+            disabled={busy || !rule.trim()}
+            className="text-xs font-bold text-[#2A6462] underline disabled:opacity-50"
+          >
+            שמור
+          </button>
+          <button
+            onClick={() => {
+              setRule(lesson.rule);
+              setEditing(false);
+            }}
+            className="text-xs text-stone-500 underline"
+          >
+            ביטול
+          </button>
+        </div>
+      </li>
+    );
+  }
+  return (
+    <li className="flex items-start gap-3 rounded-lg bg-white px-3 py-2">
+      <span className="flex-1 text-sm leading-6 text-stone-800">
+        {lesson.rule}
+        {lesson.source === "manual" && (
+          <span className="ms-2 text-[11px] text-stone-400">(נכתב ידנית)</span>
+        )}
+      </span>
+      <button onClick={() => setEditing(true)} disabled={busy} className="shrink-0 text-xs text-stone-500 underline">
+        ערוך
+      </button>
+      <button onClick={onRetire} disabled={busy} className="shrink-0 text-xs text-stone-500 underline">
+        הסר
+      </button>
+    </li>
+  );
+}
+
+/**
+ * לקחים מהתיקונים של האדמין. עד 18/9/26 הסוכן למד רק מ-2 התשובות האחרונות
+ * בכל קטגוריה, וכסגנון בלבד - תיקון של עובדה (למשל מדיניות החזרים) לא
+ * הגיע לשום מקום ונשכח. כאן כל תיקון נהפך להצעת כלל, וכלל מאושר נכנס לכל
+ * טיוטה מעכשיו והלאה.
+ */
+function LessonsPanel({
+  lessons,
+  onChanged,
+  onNotify,
+}: {
+  lessons: InboxLesson[];
+  onChanged: (rows: InboxLesson[]) => void;
+  onNotify: (msg: string, isErr?: boolean) => void;
+}) {
+  const pending = lessons.filter((l) => l.status === "pending");
+  const active = lessons.filter((l) => l.status === "approved");
+  const [newRule, setNewRule] = useState("");
+  const [busy, setBusy] = useState("");
+
+  async function act(action: string, extra: Record<string, unknown>, doneMsg: string, key: string) {
+    setBusy(key);
+    try {
+      const j = await postAgents(action, extra);
+      if (Array.isArray(j.lessons)) onChanged(j.lessons as InboxLesson[]);
+      onNotify(doneMsg);
+      return true;
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "הפעולה נכשלה", true);
+      return false;
+    } finally {
+      setBusy("");
+    }
+  }
+
+  return (
+    <div className="rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="mb-1 text-sm font-black text-stone-900">📚 לקחים מהתיקונים שלך</div>
+      <p className="mb-3 text-xs leading-5 text-stone-500">
+        כשאתה מתקן טיוטה ושולח, הסוכן מנסח מהתיקון כלל ומציג אותו כאן. כלל שאישרת נכנס לכל טיוטה
+        מעכשיו והלאה, עד שתסיר אותו. בלי אישור שלך הוא לא משפיע על כלום.
+      </p>
+
+      {pending.length > 0 && (
+        <div className="mb-3 space-y-2">
+          <div className="text-xs font-black text-amber-800">ממתינים לאישור ({pending.length})</div>
+          {pending.map((l) => (
+            <PendingLessonCard
+              key={l.id}
+              lesson={l}
+              busy={busy === l.id}
+              onApprove={(rule) =>
+                act("inbox_lesson", { id: l.id, decision: "approve", rule }, "הכלל אושר - ייכנס לכל טיוטה מעכשיו", l.id)
+              }
+              onReject={() => act("inbox_lesson", { id: l.id, decision: "reject" }, "הכלל נדחה", l.id)}
+            />
+          ))}
+        </div>
+      )}
+
+      {active.length > 0 ? (
+        <Collapse title="כללים פעילים בכל טיוטה" count={active.length}>
+          <ul className="space-y-1.5 p-3">
+            {active.map((l) => (
+              <ActiveLessonRow
+                key={`${l.id}:${l.rule}`}
+                lesson={l}
+                busy={busy === l.id}
+                onSave={(rule) => act("inbox_lesson", { id: l.id, decision: "edit", rule }, "הכלל עודכן", l.id)}
+                onRetire={() => {
+                  if (window.confirm("להסיר את הכלל? טיוטות חדשות לא יקבלו אותו יותר.")) {
+                    void act("inbox_lesson", { id: l.id, decision: "retire" }, "הכלל הוסר", l.id);
+                  }
+                }}
+              />
+            ))}
+          </ul>
+        </Collapse>
+      ) : (
+        pending.length === 0 && (
+          <p className="mb-2 text-xs text-stone-400">עוד אין כללים. הם ייווצרו מהתיקון הבא שלך בטיוטה.</p>
+        )
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <input
+          value={newRule}
+          onChange={(e) => setNewRule(e.target.value)}
+          disabled={busy === "add"}
+          dir="rtl"
+          placeholder="להוסיף כלל בעצמך, למשל: כשמטופל שואל על מחיר טיפול - המחיר נקבע מול המטפל"
+          className="min-w-0 flex-1 rounded-full border border-stone-200 px-4 py-2 text-sm"
+        />
+        <button
+          onClick={async () => {
+            if (await act("inbox_lesson_add", { rule: newRule }, "הכלל נוסף ופעיל", "add")) setNewRule("");
+          }}
+          disabled={busy === "add" || !newRule.trim()}
+          className="shrink-0 rounded-full border border-[#3D8C8A] px-4 py-2 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3] disabled:opacity-50"
+        >
+          הוסף כלל
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function InboxQueue({
   rows,
   configured,
   signature,
+  lessons,
   onChanged,
+  onLessonsChanged,
   onNotify,
 }: {
   rows: InboxItem[];
   configured: boolean;
   signature: InboxSignature | null;
+  lessons: InboxLesson[];
   onChanged: (rows: InboxItem[]) => void;
+  onLessonsChanged: (rows: InboxLesson[]) => void;
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
   const open = rows.filter((r) => r.status === "new" || r.status === "drafted");
@@ -1274,6 +1535,21 @@ function InboxQueue({
     ["sent", "sent_external", "ignored", "superseded"].includes(r.status)
   );
   const [backfilling, setBackfilling] = useState(false);
+
+  // אחרי שליחה של טיוטה שתוקנה, הלקח מחולץ בשרת ברקע (~10 שניות). שתי
+  // בדיקות מאוחרות מביאות אותו לרשימה בלי לרענן את העמוד.
+  function refreshLessonsSoon() {
+    const refresh = async () => {
+      try {
+        const j = await postAgents("inbox_lessons");
+        if (Array.isArray(j.lessons)) onLessonsChanged(j.lessons as InboxLesson[]);
+      } catch {
+        // לא קריטי: הלקח יופיע בטעינה הבאה של העמוד.
+      }
+    };
+    setTimeout(refresh, 15_000);
+    setTimeout(refresh, 45_000);
+  }
 
   async function backfill() {
     if (
@@ -1334,10 +1610,12 @@ function InboxQueue({
             row={r}
             signature={signature}
             onChanged={onChanged}
+            onEditedSend={refreshLessonsSoon}
             onNotify={onNotify}
           />
         ))
       )}
+      <LessonsPanel lessons={lessons} onChanged={onLessonsChanged} onNotify={onNotify} />
       {done.length > 0 && (
         <Collapse title="טופלו לאחרונה" count={done.length}>
           <ul className="space-y-1 text-xs text-stone-600">
@@ -1938,6 +2216,7 @@ export default function AgentsPage() {
   const [centerHistory, setCenterHistory] = useState<CenterHistory[]>([]);
   const [inboxReady, setInboxReady] = useState(true);
   const [inboxSignature, setInboxSignature] = useState<InboxSignature | null>(null);
+  const [lessons, setLessons] = useState<InboxLesson[]>([]);
   const [pending, setPending] = useState<PendingAction[]>([]);
   // מטפלים שקיבלו הצעת מתנה בחלון הצינון (חצי שנה) - נטען מהשרת פעם אחת
   // ומשותף לכל כרטיסי ההצעות, כי אותו מטפל עולה כמועמד בכמה חיתוכים.
@@ -1984,6 +2263,7 @@ export default function AgentsPage() {
           setCenterHistory(j.center_history ?? []);
           setInboxReady(j.inbox_configured !== false);
           setInboxSignature(j.inbox_signature ?? null);
+          setLessons(j.inbox_lessons ?? []);
           setPending(j.pending_actions ?? []);
           setGiftOfferedIds(j.gift_offered_ids ?? []);
           setResolved(j.resolved_actions ?? []);
@@ -2456,7 +2736,9 @@ export default function AgentsPage() {
           rows={inbox}
           configured={inboxReady}
           signature={inboxSignature}
+          lessons={lessons}
           onChanged={setInbox}
+          onLessonsChanged={setLessons}
           onNotify={(msg, isErr) => {
             if (isErr) {
               setActionError(msg);
@@ -2823,7 +3105,9 @@ export default function AgentsPage() {
                 meta.key === "center_prospects"
                   ? prospects.filter((p) => !p.contacted_at).length
                   : meta.key === "inbox"
-                    ? inbox.filter((m) => m.status === "new" || m.status === "drafted").length
+                    ? // פניות שממתינות למענה, וגם לקחים שממתינים לאישור - שניהם מחכים לך.
+                      inbox.filter((m) => m.status === "new" || m.status === "drafted").length +
+                      lessons.filter((l) => l.status === "pending").length
                     : mine.filter((a) => !isFinding(a)).length;
               const finds = meta.key === "center_prospects" || meta.key === "inbox" ? 0 : mine.length - acts;
               const crit = mine.filter((a) => a.severity === "critical").length;

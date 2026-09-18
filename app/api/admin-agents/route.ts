@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { SEVERITY_RANK, type AgentSeverity } from "@/app/lib/agent-infra";
 import { runDailyDigest } from "@/app/lib/daily-digest";
@@ -22,6 +22,13 @@ import { runQuizFunnel } from "@/app/lib/quiz-funnel";
 import { syncDealReminders } from "@/app/lib/deal-reminders";
 import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus, inboxSignatureStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
+import {
+  listLessons,
+  decideLesson,
+  addManualLesson,
+  extractLessonsFor,
+  type LessonDecision,
+} from "@/app/lib/inbox-lessons";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
 // דוח הבוקר. מוגן אוטומטית ב-Basic Auth דרך ה-middleware (קידומת /api/admin-).
@@ -165,6 +172,7 @@ export async function GET() {
       // החתימה שתוצמד לכל תשובה - מוצגת מתחת לטיוטה, כדי שמה שנשלח יהיה
       // מה שרואים לפני השליחה.
       inbox_signature: await inboxSignatureStatus().catch(() => null),
+      inbox_lessons: await listLessons().catch(() => []),
       runs,
       latest_details: latestDetails,
       // החמור בראש, ובתוך אותה חומרה - הישן קודם. עד היום התור היה
@@ -281,9 +289,11 @@ export async function POST(req: NextRequest) {
         drafted: r.drafted,
         auto_ignored: r.autoIgnored,
         answered_external: r.answeredExternal,
+        lessons_created: r.lessonsCreated,
         errors: r.errors,
         error: r.error,
         inbox: await listInbox().catch(() => []),
+        lessons: await listLessons().catch(() => []),
       });
     }
     // ייבוא חד-פעמי של דוגמאות מההתכתבות ההיסטורית. קריאה בלבד -
@@ -317,7 +327,33 @@ export async function POST(req: NextRequest) {
         body: String(body?.body ?? ""),
       });
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      // הלקח מהתיקון מחולץ אחרי שהתשובה חזרה לאדמין, כדי שכפתור השליחה לא
+      // יחכה למודל. אם זה נקטע, הריצה המתוזמנת הבאה משלימה.
+      const sentId = String(body?.id ?? "");
+      after(async () => {
+        const x = await extractLessonsFor(sentId);
+        if (x.error) console.error("lesson extraction failed:", x.error);
+      });
       return NextResponse.json({ ok: true, to: r.to, signature: r.signature, inbox: await listInbox().catch(() => []) });
+    }
+    // לקחים מתיקוני טיוטות: אישור/עריכה/דחייה/הסרה, הוספה ידנית, ורענון הרשימה.
+    if (body?.action === "inbox_lesson") {
+      const decision = String(body?.decision ?? "") as LessonDecision;
+      const r = await decideLesson({
+        id: String(body?.id ?? ""),
+        decision,
+        rule: typeof body?.rule === "string" ? body.rule : undefined,
+      });
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, lessons: await listLessons().catch(() => []) });
+    }
+    if (body?.action === "inbox_lesson_add") {
+      const r = await addManualLesson(String(body?.rule ?? ""));
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, lessons: await listLessons().catch(() => []) });
+    }
+    if (body?.action === "inbox_lessons") {
+      return NextResponse.json({ ok: true, lessons: await listLessons().catch(() => []) });
     }
     if (body?.action === "inbox_status") {
       const status = body?.status === "new" ? "new" : "ignored";

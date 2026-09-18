@@ -17,7 +17,7 @@ process.env.GMAIL_REFRESH_TOKEN = "test-refresh";
 process.env.GMAIL_ACCOUNT = "admin@getmentalytics.com";
 delete process.env.GMAIL_SENDER;
 
-import { sendGmailReply, getThread } from "./gmail";
+import { sendGmailReply, getThread, stripQuoted } from "./gmail";
 
 type SendAs = { sendAsEmail: string; signature?: string; isDefault?: boolean; isPrimary?: boolean };
 
@@ -174,5 +174,29 @@ describe("getThread", () => {
   it("cuts a Gmail-sent reply at the signature delimiter, so it is never learned as body text", async () => {
     const [m] = await getThread("thread-1");
     expect(m.bodyText).toBe("שלום רב,\nהתשובה עצמה.");
+  });
+});
+
+// Replies written in Gmail are now saved as the agent's examples, so the quote
+// of the previous message must not ride along. Both shapes below are taken
+// from real stored examples, where the old cut missed them.
+describe("stripQuoted", () => {
+  it("cuts a Hebrew-UI Gmail quote header wrapped in invisible direction marks", () => {
+    const body =
+      "בודקים את זה ונחזור עם תשובה.\r\n\r\nשיהיה סופ\"ש נעים\r\n\r\n" +
+      "\u202aOn Wed, Aug 19, 2026 at 6:45 PM \u202bעמית תלם\u202c\u200e <amit@example.com> wrote:\u202c\r\n" +
+      "> ההודעה הקודמת";
+    expect(stripQuoted(body)).toBe("בודקים את זה ונחזור עם תשובה.\r\n\r\nשיהיה סופ\"ש נעים");
+  });
+
+  it("cuts a quote header that wrapped onto a second line", () => {
+    const body =
+      "תודה ושוב מצטערים\r\n\r\nOn Mon, Aug 10, 2026 at 8:20 PM Igor B <igor@example.com>\r\nwrote:\r\n> quoted";
+    expect(stripQuoted(body)).toBe("תודה ושוב מצטערים");
+  });
+
+  it("leaves an ordinary body that merely starts a line with 'On' alone", () => {
+    const body = "שלום,\nOn our side everything is fine.\nבברכה";
+    expect(stripQuoted(body)).toBe(body);
   });
 });
