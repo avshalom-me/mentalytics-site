@@ -2,6 +2,7 @@ import { notFound, permanentRedirect } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { visibleProfileLinks } from "@/app/lib/profile-links";
 import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
@@ -38,6 +39,8 @@ type TherapistRow = {
   license_number: string | null;
   publication_links: string[] | null;
   accepting_new_patients: boolean | null;
+  /** 'paying' או 'approved' - קובע אילו קישורים מוצגים (app/lib/profile-links.ts). */
+  status: string | null;
   center_account_id: string | null;
 };
 
@@ -84,7 +87,7 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
       regions, cultural_prefs, arrangements, languages, age_groups,
       phone, email, profile_photo_path, education, experience,
       license_number, publication_links,
-      accepting_new_patients, center_account_id
+      accepting_new_patients, center_account_id, status
     `)
     .eq("id", id)
     .in("status", ["approved", "paying"])
@@ -267,6 +270,8 @@ export default async function TherapistProfilePage({
   const contactPhone = ownPhone || centerPhone;
   const waLink = ownPhone ? waLinkFor(ownPhone) : waLinkForCenter(centerWhatsapp);
   const telLink = telHref(contactPhone);
+
+  const shownLinks = visibleProfileLinks(t.publication_links, t.status === "paying");
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -496,10 +501,12 @@ export default async function TherapistProfilePage({
             </section>
           )}
 
-          {(t.publication_links?.length ?? 0) > 0 && (
+          {/* מטפל חינמי לא מוציא מאיתנו שום קישור החוצה - רק קישורים לאתר שלנו.
+              ראו app/lib/profile-links.ts (החלטת הבעלים 18/9/26). */}
+          {shownLinks.length > 0 && (
             <Accordion title="פרסומים מקצועיים">
               <ul className="list-none space-y-2 p-0">
-                {t.publication_links!.map((u) => {
+                {shownLinks.map((u) => {
                   let host = u;
                   try { host = new URL(u).hostname.replace(/^www\./, ""); } catch { /* show raw */ }
                   return (
