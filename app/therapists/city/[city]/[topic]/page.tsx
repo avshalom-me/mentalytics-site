@@ -100,7 +100,7 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
   // than being printed as the database stores them (masculine canonical form).
   const fem = topic.kind === "gender";
   const cityNote = (() => {
-    if ((topic.kind !== "audience" && topic.kind !== "gender") || list.length === 0) return null;
+    if (topic.kind === "condition" || list.length === 0) return null;
     const freq = new Map<string, number>();
     for (const t of list) for (const p of t.therapist_types ?? []) freq.set(p, (freq.get(p) ?? 0) + 1);
     const professions = [...freq.entries()]
@@ -110,7 +110,12 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
     const ages = ["גיל הרך", "ילדים", "נוער"].filter((a) => list.some((t) => (t.age_groups ?? []).includes(a)));
     const parts: string[] = [];
     if (professions.length) parts.push(`${inPhrase(city)} מוצג${fem ? "ות" : "ים"} ${professions.join(", ")}`);
-    if (ages.length) parts.push(`שמטפל${fem ? "ות" : "ים"} ב${ages.join(", ")}`);
+    // The age clause belongs to the kids/youth pages only. It lists the youth
+    // ages alone, so on the women's pages (9/9/2026) it read "שמטפלות בגיל
+    // הרך, ילדים, נוער" - as if a list that is mostly adult psychotherapists
+    // treated children and nobody else. Fixed 18/9/2026, when the community
+    // pages would have inherited the same sentence.
+    if (topic.kind === "audience" && ages.length) parts.push(`שמטפל${fem ? "ות" : "ים"} ב${ages.join(", ")}`);
     let s = parts.join(" ");
     if (onlineHere > 0) s += fem ? ", וחלקן זמינות גם בשיחת וידאו" : ", וחלקם זמינים גם בשיחת וידאו";
     s += ".";

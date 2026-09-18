@@ -271,6 +271,13 @@ export type DirectoryFilter = {
   /** Topic filters (see app/lib/topics.ts): union WITHIN each list, AND across fields. */
   trainingAreasAny?: string[];
   ageGroupsAny?: string[];
+  /**
+   * Exact values from therapists.cultural_prefs. The field records
+   * FAMILIARITY ("היכרות עם העולם הדתי"), not the therapist's own identity -
+   * which is why the pages built on it are worded "לדתיים" (for religious
+   * people) rather than "דתיים" (religious therapists). See topics.ts.
+   */
+  culturalPrefsAny?: string[];
   category?: "main" | "para";
   centerId?: string;
 };
@@ -332,6 +339,9 @@ function applyDirectoryFilter(data: TherapistRow[], filter?: DirectoryFilter): T
   }
   if (filter?.ageGroupsAny?.length) {
     rows = rows.filter((t) => filter.ageGroupsAny!.some((a) => (t.age_groups ?? []).includes(a)));
+  }
+  if (filter?.culturalPrefsAny?.length) {
+    rows = rows.filter((t) => filter.culturalPrefsAny!.some((p) => (t.cultural_prefs ?? []).includes(p)));
   }
   return rows;
 }
