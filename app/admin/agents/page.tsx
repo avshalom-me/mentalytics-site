@@ -1,7 +1,7 @@
 "use client";
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 // עמוד השליטה בסוכנים - נבנה מחדש 20/8/26 לפי בקשת המשתמש:
 //
@@ -48,6 +48,12 @@ type InboxItem = {
   final_body: string | null;
   replied_at: string | null;
 };
+
+// החתימה מ-Gmail שמוצמדת לכל תשובה (inboxSignatureStatus בשרת).
+type InboxSignature =
+  | { status: "ok"; html: string; text: string; alias: string }
+  | { status: "none" }
+  | { status: "error"; error: string };
 
 type CenterHistory = {
   centerId: string;
@@ -1045,12 +1051,60 @@ const INBOX_CATEGORY_LABELS: Record<string, string> = {
   other: "אחר",
 };
 
+/**
+ * איך תסתיים התשובה בפועל: החתימה מ-Gmail, מתחת לטיוטה. עד 18/9/26 היא
+ * לא יצאה בכלל - Gmail מוסיף חתימה רק בחלון הכתיבה שלו, לא למייל שנשלח
+ * דרך ה-API.
+ *
+ * iframe מבודד ולא dangerouslySetInnerHTML: החתימה היא HTML חיצוני, ובלי
+ * allow-scripts שום קוד בה לא רץ. allow-same-origin רק כדי למדוד גובה.
+ */
+function SignaturePreview({ sig }: { sig: InboxSignature | null }) {
+  const frame = useRef<HTMLIFrameElement>(null);
+  if (!sig) return null;
+  if (sig.status !== "ok") {
+    return (
+      <div className="mb-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+        {sig.status === "none"
+          ? "✍️ לא מוגדרת חתימה ב-Gmail של admin@ - התשובה תצא בלי חתימה. מגדירים ב-Gmail: הגדרות ← כללי ← חתימה."
+          : `✍️ לא הצלחתי לקרוא את החתימה מ-Gmail (${sig.error}). אם זה יימשך בשליחה, התשובה תצא בלי חתימה.`}
+      </div>
+    );
+  }
+  const doc =
+    '<!doctype html><meta charset="utf-8"><body style="margin:0;padding:8px 12px;' +
+    "font-family:'Heebo',Arial,sans-serif;font-size:13px;color:#1a4a5c\">" +
+    `<div dir="rtl">${sig.html}</div></body>`;
+  return (
+    <div className="mb-2">
+      <div className="mb-1 text-[11px] font-bold text-stone-400">
+        ✍️ החתימה מ-Gmail מוצמדת אוטומטית מתחת לטיוטה:
+      </div>
+      <iframe
+        ref={frame}
+        title="החתימה שתוצמד"
+        sandbox="allow-same-origin"
+        srcDoc={doc}
+        onLoad={() => {
+          const el = frame.current;
+          const h = el?.contentDocument?.documentElement.scrollHeight;
+          if (el && h) el.style.height = `${h}px`;
+        }}
+        className="block w-full rounded-xl border border-dashed border-stone-200 bg-white"
+        style={{ height: 72 }}
+      />
+    </div>
+  );
+}
+
 function InboxCard({
   row,
+  signature,
   onChanged,
   onNotify,
 }: {
   row: InboxItem;
+  signature: InboxSignature | null;
   onChanged: (rows: InboxItem[]) => void;
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
@@ -1066,8 +1120,12 @@ function InboxCard({
     try {
       const j = await postAgents(action, { id: row.id, ...extra });
       if (Array.isArray(j.inbox)) onChanged(j.inbox as InboxItem[]);
-      if (action === "inbox_send") onNotify(`התשובה נשלחה אל ${j.to ?? row.from_email}`);
-      else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
+      if (action === "inbox_send") {
+        onNotify(
+          `התשובה נשלחה אל ${j.to ?? row.from_email}` +
+            (j.signed === false ? " - בלי חתימה (לא נטענה מ-Gmail)" : "")
+        );
+      } else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
     } catch (e) {
       onNotify(e instanceof Error ? e.message : "הפעולה נכשלה", true);
     } finally {
@@ -1145,6 +1203,7 @@ function InboxCard({
             className="mb-2 w-full rounded-xl border border-stone-200 px-3 py-2 text-sm leading-6"
             dir="rtl"
           />
+          <SignaturePreview sig={signature} />
           <div className="flex flex-wrap items-center gap-2">
             <button
               onClick={() =>
@@ -1187,11 +1246,13 @@ function InboxCard({
 function InboxQueue({
   rows,
   configured,
+  signature,
   onChanged,
   onNotify,
 }: {
   rows: InboxItem[];
   configured: boolean;
+  signature: InboxSignature | null;
   onChanged: (rows: InboxItem[]) => void;
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
@@ -1258,6 +1319,7 @@ function InboxQueue({
             // מפתח שכולל את מועד הניסוח: טיוטה חדשה מהשרת מחליפה את העריכה המקומית.
             key={`${r.id}:${r.draft_subject ?? ""}:${(r.draft_body ?? "").length}`}
             row={r}
+            signature={signature}
             onChanged={onChanged}
             onNotify={onNotify}
           />
@@ -1862,6 +1924,7 @@ export default function AgentsPage() {
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [centerHistory, setCenterHistory] = useState<CenterHistory[]>([]);
   const [inboxReady, setInboxReady] = useState(true);
+  const [inboxSignature, setInboxSignature] = useState<InboxSignature | null>(null);
   const [pending, setPending] = useState<PendingAction[]>([]);
   // מטפלים שקיבלו הצעת מתנה בחלון הצינון (חצי שנה) - נטען מהשרת פעם אחת
   // ומשותף לכל כרטיסי ההצעות, כי אותו מטפל עולה כמועמד בכמה חיתוכים.
@@ -1907,6 +1970,7 @@ export default function AgentsPage() {
           setInbox(j.inbox ?? []);
           setCenterHistory(j.center_history ?? []);
           setInboxReady(j.inbox_configured !== false);
+          setInboxSignature(j.inbox_signature ?? null);
           setPending(j.pending_actions ?? []);
           setGiftOfferedIds(j.gift_offered_ids ?? []);
           setResolved(j.resolved_actions ?? []);
@@ -2378,6 +2442,7 @@ export default function AgentsPage() {
         <InboxQueue
           rows={inbox}
           configured={inboxReady}
+          signature={inboxSignature}
           onChanged={setInbox}
           onNotify={(msg, isErr) => {
             if (isErr) {

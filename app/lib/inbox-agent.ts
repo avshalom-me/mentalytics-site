@@ -11,6 +11,7 @@ import {
   getMessage,
   threadAnsweredAfter,
   sendGmailReply,
+  gmailSignature,
 } from "./gmail";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
 
@@ -234,7 +235,7 @@ const SYSTEM_PROMPT = [
   "- קצר ולעניין: לענות על מה שנשאל, לא להוסיף מידע שלא התבקש.",
   "- מספרים, מחירים ותנאים מועתקים מבסיס הידע כלשונם. אסור לנסח מחדש, לעגל או לפשט אותם (למשל: 'עד 5 שאלונים חינם' אסור שייהפך ל'השאלון הראשון חינם').",
   "- מטופל במצוקה חריפה: להפנות בעדינות לער\"ן 1201 או למיון, בלי ייעוץ קליני.",
-  "- חתימה: 'בברכה,\\nצוות טיפול חכם'.",
+  "- חתימה: 'בברכה,\\nצוות טיפול חכם'. זו השורה האחרונה בטיוטה: בלי טלפון, כתובת אתר או פרטי קשר אחריה - חתימת המייל המלאה מוצמדת אוטומטית בשליחה.",
   "- אם קיבלת דוגמאות של תשובות עבר שאושרו - למד מהן את הסגנון והניסוחים.",
   "",
   "החזר JSON בלבד:",
@@ -356,6 +357,36 @@ function isOurAddress(email: string): boolean {
   return OUR_DOMAINS.some((d) => email.endsWith(`@${d}`));
 }
 
+export type InboxSignatureStatus =
+  | { status: "ok"; html: string; text: string; alias: string }
+  | { status: "none" }
+  | { status: "error"; error: string };
+
+/**
+ * החתימה שתוצמד לתשובות - לתצוגה המקדימה מתחת לטיוטה באדמין, ולבדיקה
+ * בכל ריצה. null = Gmail לא מוגדר בכלל.
+ */
+export async function inboxSignatureStatus(): Promise<InboxSignatureStatus | null> {
+  if (!gmailConfigured()) return null;
+  // תקרת זמן: עמוד האדמין לא ממתין ל-Gmail איטי בשביל תצוגה מקדימה.
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    const sig = await Promise.race([
+      gmailSignature(),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error("Gmail לא ענה בזמן")), 3000);
+      }),
+    ]);
+    return sig
+      ? { status: "ok", html: sig.html, text: sig.text, alias: sig.alias }
+      : { status: "none" };
+  } catch (e) {
+    return { status: "error", error: e instanceof Error ? e.message : "שגיאה" };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function runInboxAgent(): Promise<InboxRunResult> {
   const runId = await startAgentRun("inbox");
   const result: InboxRunResult = {
@@ -386,6 +417,14 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
       await finishAgentRun(runId, { status: "error", error: msg, details: { configured: true, account } });
       return { ...result, ok: false, error: msg };
     }
+
+    // בדיקת החתימה בכל ריצה: אם הקריאה שלה מ-Gmail נשברת (טוקן, הרשאה),
+    // התשובות מתחילות לצאת בלעדיה - וזה צריך להיראות כאן, לא אצל הנמען.
+    const sig = await inboxSignatureStatus();
+    const signatureDetail =
+      sig?.status === "ok"
+        ? { status: "ok", alias: sig.alias, text: sig.text.slice(0, 300) }
+        : sig;
 
     // 1. קליטה: מה חדש בתיבה שעוד לא אצלנו.
     const ids = await listInboxIds(INGEST_WINDOW_DAYS);
@@ -525,6 +564,7 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
         auto_ignored: result.autoIgnored,
         answered_external: result.answeredExternal,
         errors: result.errors.slice(0, 5),
+        signature: signatureDetail,
       },
     });
     return result;
@@ -747,7 +787,7 @@ export async function sendInboxReply(opts: {
   id: string;
   subject: string;
   body: string;
-}): Promise<{ ok: boolean; error?: string; to?: string }> {
+}): Promise<{ ok: boolean; error?: string; to?: string; signed?: boolean }> {
   const body = opts.body.trim();
   if (!body) return { ok: false, error: "גוף התשובה ריק" };
   if (body.includes("[להשלים") || opts.subject.includes("[להשלים")) {
@@ -789,6 +829,7 @@ export async function sendInboxReply(opts: {
   }
 
   let sentId: string;
+  let signed = false;
   try {
     const sent = await sendGmailReply({
       threadId: row.gmail_thread_id as string,
@@ -798,6 +839,7 @@ export async function sendInboxReply(opts: {
       body,
     });
     sentId = sent.id;
+    signed = sent.signed;
   } catch (e) {
     await supabaseAdmin
       .from("inbox_messages")
@@ -833,7 +875,7 @@ export async function sendInboxReply(opts: {
   });
   if (logErr) console.error("inbox reply log failed:", logErr.message);
 
-  return { ok: true, to: row.from_email as string };
+  return { ok: true, to: row.from_email as string, signed };
 }
 
 /** סימון ידני: התעלמות (ספאם/לא דורש מענה) או החזרה לתור. */

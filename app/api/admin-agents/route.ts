@@ -20,7 +20,7 @@ import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
 import { runQuizFunnel } from "@/app/lib/quiz-funnel";
 import { syncDealReminders } from "@/app/lib/deal-reminders";
-import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus } from "@/app/lib/inbox-agent";
+import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus, inboxSignatureStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
 
 // ה-API של עמוד הסוכנים: יומן ריצות, תור ההצעות, והפעלת תצוגה מקדימה של
@@ -162,6 +162,9 @@ export async function GET() {
       inbox: await listInbox().catch(() => []),
       center_history: await loadCenterEmailHistory().catch(() => []),
       inbox_configured: gmailConfigured(),
+      // החתימה שתוצמד לכל תשובה - מוצגת מתחת לטיוטה, כדי שמה שנשלח יהיה
+      // מה שרואים לפני השליחה.
+      inbox_signature: await inboxSignatureStatus().catch(() => null),
       runs,
       latest_details: latestDetails,
       // החמור בראש, ובתוך אותה חומרה - הישן קודם. עד היום התור היה
@@ -314,7 +317,7 @@ export async function POST(req: NextRequest) {
         body: String(body?.body ?? ""),
       });
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
-      return NextResponse.json({ ok: true, to: r.to, inbox: await listInbox().catch(() => []) });
+      return NextResponse.json({ ok: true, to: r.to, signed: r.signed, inbox: await listInbox().catch(() => []) });
     }
     if (body?.action === "inbox_status") {
       const status = body?.status === "new" ? "new" : "ignored";

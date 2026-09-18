@@ -247,15 +247,125 @@ export async function getThread(threadId: string): Promise<ThreadMessage[]> {
   return out.sort((a, b) => a.internalDate - b.internalDate);
 }
 
-/** חיתוך הציטוט של ההודעה הקודמת מגוף המייל. */
+/**
+ * חיתוך הציטוט של ההודעה הקודמת מגוף המייל - וגם של החתימה, שמתחילה
+ * בשורה "-- " (המפריד הסטנדרטי). תשובה שנשלחה מ-Gmail עצמו נושאת את
+ * החתימה בגוף, ובלי החיתוך הסוכן היה לומד להקליד אותה בטיוטה - בנוסף
+ * לחתימה האמיתית שמוצמדת בשליחה.
+ */
 function stripQuoted(body: string): string {
   const lines = body.split("\n");
   const cut = lines.findIndex((l) =>
+    /^--\s*$/.test(l) ||
     /^\s*>/.test(l) ||
     /^\s*(On .+ wrote:|בתאריך .+ מאת)/.test(l) ||
     /^-{2,}\s*Original Message/i.test(l)
   );
   return (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
+}
+
+// ── חתימה ───────────────────────────────────────────────────────────────
+//
+// למה התשובות מהאדמין יצאו בלי חתימה: Gmail מוסיף את החתימה רק בחלון
+// הכתיבה של הממשק שלו ("included in messages composed ... in the Gmail web
+// UI"). הודעה שנשלחת דרך ה-API היא MIME גולמי שיוצא כמו שהוא, ו-Gmail לא
+// נוגע בה. לכן החתימה נקראת כאן מהגדרות החשבון ומוצמדת בשליחה - והמקור
+// היחיד שלה נשאר Gmail: מה שמשנים שם יוצא גם מכאן. gmail.readonly מספיקה
+// לקריאת ההגדרות, כך שלא נדרש אישור מחדש של הטוקן.
+
+/** כתובת ה-From של התשובות, וממילא הכתובת שהחתימה שלה נבחרת. */
+function senderAddress(): string {
+  // בלי From מפורש התשובה יוצאת עם שם התצוגה של חשבון גוגל ("Admin
+  // Admin") במקום שם המותג. הכתובת היא של החשבון המחובר עצמו, אלא אם
+  // הוגדר כינוי מאומת ב-GMAIL_SENDER ("Send mail as" בהגדרות Gmail).
+  return (
+    (process.env.GMAIL_SENDER ?? "").trim() ||
+    (process.env.GMAIL_ACCOUNT ?? "admin@getmentalytics.com").trim()
+  );
+}
+
+export type GmailSignature = { html: string; text: string; alias: string };
+
+type SendAs = {
+  sendAsEmail: string;
+  signature?: string;
+  isDefault?: boolean;
+  isPrimary?: boolean;
+};
+
+function decodeNumericEntities(v: string): string {
+  const cp = (n: number, raw: string) => {
+    try {
+      return String.fromCodePoint(n);
+    } catch {
+      return raw;
+    }
+  };
+  return v
+    .replace(/&#(\d+);/g, (raw, n) => cp(Number(n), raw))
+    .replace(/&#x([0-9a-f]+);/gi, (raw, h) => cp(parseInt(h, 16), raw))
+    .replace(/&apos;/g, "'");
+}
+
+/** גרסת טקסט של חתימת HTML - לחלק ה-text/plain של ההודעה. */
+function signatureText(html: string): string {
+  // חתימות של Gmail בנויות משורות <div>, ו-stripHtml שובר שורות רק ב-<br>
+  // וב-</p>. ללוגו אין ייצוג בטקסט.
+  const flat = stripHtml(
+    html.replace(/<img\b[^>]*>/gi, "").replace(/<\/(div|tr|li|h[1-6])>/gi, "\n")
+  );
+  return decodeNumericEntities(flat)
+    .split("\n")
+    .map((l) => l.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** חתימה "ריקה" של Gmail היא לפעמים <div><br></div> - זו לא חתימה. */
+function hasSignature(html: string | undefined): boolean {
+  if (!html) return false;
+  return /<img\b/i.test(html) || signatureText(html).length > 0;
+}
+
+// המטמון הוא לתצוגה המקדימה באדמין, שנטענת בכל כניסה לעמוד. השליחה עצמה
+// קוראת טרי, כדי שמה שיוצא יהיה בדיוק מה שמוגדר ב-Gmail באותו רגע.
+let sigCache: { value: GmailSignature | null; at: number } | null = null;
+const SIG_TTL_MS = 2 * 60_000;
+
+/**
+ * החתימה של כתובת השולח כפי שהוגדרה ב-Gmail, או null אם לא הוגדרה.
+ * כינוי בלי חתימה נופל לחתימת ברירת המחדל של החשבון - אחרת הגדרת
+ * GMAIL_SENDER הייתה מעלימה את החתימה בשקט. זורקת אם הקריאה נכשלה.
+ */
+export async function gmailSignature(opts?: { fresh?: boolean }): Promise<GmailSignature | null> {
+  if (!opts?.fresh && sigCache && Date.now() - sigCache.at < SIG_TTL_MS) return sigCache.value;
+  const j = await gmailFetch<{ sendAs?: SendAs[] }>(`/settings/sendAs`);
+  const withSig = (j.sendAs ?? []).filter((a) => hasSignature(a.signature));
+  const sender = senderAddress().toLowerCase();
+  const pick =
+    withSig.find((a) => a.sendAsEmail.toLowerCase() === sender) ??
+    withSig.find((a) => a.isDefault) ??
+    withSig.find((a) => a.isPrimary) ??
+    null;
+  const value = pick
+    ? {
+        html: pick.signature as string,
+        text: signatureText(pick.signature as string),
+        alias: pick.sendAsEmail,
+      }
+    : null;
+  sigCache = { value, at: Date.now() };
+  return value;
+}
+
+/**
+ * החתימה מחוץ ל-div של הגוף: הגוף הוא pre-wrap, ושם כל שבירת שורה במקור
+ * ה-HTML של החתימה הייתה נהפכת לשורה ריקה. dir="rtl" הוא רק ברירת המחדל -
+ * חתימה שנכתבה ב-Gmail נושאת dir משלה, והוא גובר.
+ */
+function signatureHtml(sig: string): string {
+  return `<br><div dir="rtl" class="gmail_signature" data-smartmail="gmail_signature">${sig}</div>`;
 }
 
 // ── שליחת תשובה ─────────────────────────────────────────────────────────
@@ -309,16 +419,22 @@ export async function sendGmailReply(opts: {
   subject: string;
   inReplyTo: string | null;
   body: string;
-}): Promise<{ id: string }> {
+}): Promise<{ id: string; signed: boolean }> {
   const subject = opts.subject.startsWith("Re:") || opts.subject.startsWith("RE:")
     ? opts.subject
     : `Re: ${opts.subject}`;
-  // From מפורש תמיד: בלעדיו התשובה יוצאת עם שם התצוגה של חשבון גוגל
-  // ("Admin Admin") במקום שם המותג. הכתובת היא של החשבון המחובר עצמו,
-  // אלא אם הוגדר כינוי מאומת ב-GMAIL_SENDER ("Send mail as" בהגדרות Gmail).
-  const sender =
-    (process.env.GMAIL_SENDER ?? "").trim() ||
-    (process.env.GMAIL_ACCOUNT ?? "admin@getmentalytics.com").trim();
+  const sender = senderAddress();
+
+  // כשל בקריאת החתימה לא עוצר תשובה ללקוח: היא יוצאת בלעדיה, והאדמין
+  // מקבל על כך הודעה (signed=false).
+  let signature: GmailSignature | null = null;
+  try {
+    signature = await gmailSignature({ fresh: true });
+  } catch (e) {
+    console.error("gmail signature load failed:", e instanceof Error ? e.message : e);
+  }
+  const textPart = signature ? `${opts.body}\n\n-- \n${signature.text}` : opts.body;
+  const htmlPart = rtlHtmlBody(opts.body) + (signature ? signatureHtml(signature.html) : "");
 
   // multipart/alternative: גרסת HTML לכיוון נכון, וגרסת טקסט כגיבוי למי
   // שחוסם HTML. הגבול אקראי כדי שלא יופיע בטעות בתוך גוף ההודעה.
@@ -337,12 +453,12 @@ export async function sendGmailReply(opts: {
     'Content-Type: text/plain; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    b64(opts.body),
+    b64(textPart),
     `--${boundary}`,
     'Content-Type: text/html; charset="UTF-8"',
     "Content-Transfer-Encoding: base64",
     "",
-    b64(rtlHtmlBody(opts.body)),
+    b64(htmlPart),
     `--${boundary}--`,
     "",
   ];
@@ -351,5 +467,5 @@ export async function sendGmailReply(opts: {
     method: "POST",
     body: JSON.stringify({ raw, threadId: opts.threadId }),
   });
-  return { id: j.id };
+  return { id: j.id, signed: signature != null };
 }
