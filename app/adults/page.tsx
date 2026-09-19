@@ -640,32 +640,39 @@ export default function AdultsPage() {
   }, [screen, matchResults, selectedRec, matchPrefs, combinedTreatments, combinedLabels, combinedCouplesModality, combinedNeedsSexualTherapy, addictionCbtFallback, scoring, answers]);
 
   // Build the profile-page link for a given therapist with match-attribution params.
+  // Only facts that are not about health go in the URL (score, age band, gender,
+  // region). Which domain, treatment and finding led here - the part a URL would
+  // hand to GA4, the Ads tag and the request logs - travels separately, through
+  // sessionStorage, on click: see matchViewContext and app/lib/match-view-context.ts.
   function profileHrefForMatch(t: any): string | null {
     const params = new URLSearchParams({ from: "match" });
     const score = t.combined_score ?? t.match_score;
     if (typeof score === "number") params.set("s", String(score));
-    const firstDomain = answers.domains?.[0];
-    const issue = firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] : null;
-    if (issue) params.set("i", issue);
     const age = normalizeAgeBand(answers.age);
     if (age) params.set("a", age);
     const gender = normalizeGenderKey(answers.gender);
     if (gender) params.set("g", gender);
     const region = normalizeRegionKey(matchPrefs.region, matchPrefs.online);
     if (region) params.set("r", region);
-    // Which treatment recommendation (and which specific finding) sent this
-    // visitor - feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
-    const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
-    if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
-    // A suicidality finding is never attached to a visitor - see
-    // sensitive-findings.ts. It is pooled here, before it can reach the URL.
-    const finding = generalizeFinding(selectedRec?.symptomText);
-    if (finding) params.set("sy", finding.slice(0, 160));
     // מרכז (מסלול 2): לעמוד המרכז, עם from=match כדי שהצפייה תיוחס להתאמות.
     // בלי slug אין עמוד — מחזירים null והכרטיס מסתיר את כפתור הפרופיל
     // (עמוד-מטפל חוסם ישויות ב-404, אסור ליפול אליו).
     if (t.entity_type === "center") return t.profile_slug ? `/centers/${t.profile_slug}?from=match` : null;
     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
+  }
+
+  // The same for every card on the screen: which domain, treatment recommendation
+  // and specific finding sent this visitor - the therapist dashboard's "מה הוביל
+  // אותם אליך" breakdown. A suicidality finding is pooled before it can go
+  // anywhere (sensitive-findings.ts).
+  function matchViewContext() {
+    const firstDomain = answers.domains?.[0];
+    const treatmentLabel = combinedLabels?.length ? combinedLabels.join(" + ") : selectedRec?.treatmentLabel;
+    return {
+      issue: firstDomain ? DOMAIN_ISSUE_MAP[firstDomain] : undefined,
+      treatment: treatmentLabel ? treatmentLabel.slice(0, 80) : undefined,
+      symptom: generalizeFinding(selectedRec?.symptomText)?.slice(0, 160),
+    };
   }
 
   const [qItems, setQItems] = useState<Record<string, string[]> | null>(null);
@@ -3300,7 +3307,7 @@ export default function AdultsPage() {
                     {explainLoading[t.id] ? "מעבד · כ-20 שניות" : "למה הותאמ/ה לי?"}
                   </button>
                   {profileHrefForMatch(t) && (
-                    <MatchCardProfileLink href={profileHrefForMatch(t)!} />
+                    <MatchCardProfileLink href={profileHrefForMatch(t)!} therapistId={t.id} context={t.entity_type === "center" ? undefined : matchViewContext()} />
                   )}
                 </>
               }

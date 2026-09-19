@@ -38,22 +38,10 @@ export const MATCH_CARD_BTN = {
     "inline-flex items-center gap-1.5 rounded-full border-[1.5px] border-[#EAD9B0] bg-white px-3 py-2 text-[13px] font-bold text-[var(--gold-dark)] transition-colors hover:border-[var(--gold)] hover:bg-[var(--gold-pale)] disabled:opacity-60 sm:px-4",
 } as const;
 
-/**
- * "פרופיל מלא ←". הצבע בסגנון מוטבע ולא במחלקה: הכלל הגלובלי
- * `a { color: inherit }` ב-globals.css יושב מחוץ לשכבות של Tailwind ולכן גובר
- * על כל מחלקת צבע על קישור - מחלקת text-* כאן הייתה צובעת את הקישור בשחור.
- */
-export function MatchCardProfileLink({ href }: { href: string }) {
-  return (
-    <a
-      href={href}
-      className="inline-flex items-center gap-1.5 rounded-full border-[1.5px] px-3 py-2 text-[13px] font-bold transition-colors hover:bg-[var(--teal-pale)] sm:px-4"
-      style={{ borderColor: "var(--teal-mid)", color: "var(--teal-dark)" }}
-    >
-      פרופיל מלא ←
-    </a>
-  );
-}
+// "פרופיל מלא ←" lives in its own client module (it stashes the match context
+// on click - see app/lib/match-view-context.ts); re-exported so every caller
+// keeps importing it from here.
+export { default as MatchCardProfileLink } from "./MatchCardProfileLink";
 
 export default function MatchResultCard({
   name,

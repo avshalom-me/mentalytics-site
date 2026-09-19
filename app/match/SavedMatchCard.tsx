@@ -52,11 +52,10 @@ export default function SavedMatchCard({
     if (isCenter) return t.center_slug ? `/centers/${t.center_slug}?from=match` : null;
     const params = new URLSearchParams({ from: "match" });
     if (overall != null) params.set("s", String(overall));
-    if (kids) {
-      params.set("i", "child");
-      params.set("a", "child");
-    }
-    if (treatmentLabel) params.set("t", treatmentLabel.slice(0, 80));
+    // `a` stays: the profile reads it to send "back" to /kids. The domain and
+    // the treatment go through sessionStorage on click, never the URL - see
+    // app/lib/match-view-context.ts.
+    if (kids) params.set("a", "child");
     params.set("ret", `/match/${token}`);
     return `${therapistPath(t.id, t.full_name)}?${params.toString()}`;
   })();
@@ -112,7 +111,11 @@ export default function SavedMatchCard({
           )}
           {accepting && !isCenter && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
           {profileHref && (
-            <MatchCardProfileLink href={profileHref} />
+            <MatchCardProfileLink
+              href={profileHref}
+              therapistId={t.id}
+              context={isCenter ? undefined : { issue: kids ? "child" : undefined, treatment: treatmentLabel ? treatmentLabel.slice(0, 80) : undefined }}
+            />
           )}
         </>
       }

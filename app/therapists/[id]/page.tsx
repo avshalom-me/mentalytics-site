@@ -1,4 +1,5 @@
 import { notFound, permanentRedirect } from "next/navigation";
+import { SENSITIVE_PROFILE_PARAMS } from "@/app/lib/match-view-context";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
@@ -219,26 +220,38 @@ export default async function TherapistProfilePage({
   // הגעה מרשימת התאמות שמורה (/match/<token>): "חזרה" מחזיר לרשימה ששמרו,
   // לא לתחילת השאלון - שם כבר אין את התוצאות.
   const savedMatchBack = isSavedMatchPath(sp.ret) ? sp.ret : null;
+  // Only the facts that are not about health come from the URL. Which domain,
+  // treatment and finding led here are handed over through sessionStorage and
+  // read by TrackView itself - see app/lib/match-view-context.ts.
   const viewerContext = source === "match" ? {
     region: sp.r,
-    issue: sp.i,
     age_band: sp.a,
     gender: sp.g,
     match_score: sp.s ? Number(sp.s) : undefined,
-    treatment: sp.t,
-    symptom: sp.sy,
   } : undefined;
   const therapistRow = await getTherapist(id);
   if (!therapistRow) notFound();
 
+  // A link made before 19/9/2026 - in someone's history, or copied and sent on -
+  // still carries the domain, treatment and finding as i / t / sy. Redirecting
+  // here, on the server, means the page that loads (and the page_location GA4
+  // and the Ads tag record) is the clean one; only the request log ever sees
+  // the old URL. The view is then recorded without that context, which is fine.
+  const hasSensitiveParams = SENSITIVE_PROFILE_PARAMS.some((k) => typeof sp[k] === "string" && sp[k]);
+
   // Canonicalize the URL: redirect bare-UUID / mismatched slugs to the
-  // name-slug URL (308), keeping query params so match attribution survives.
+  // name-slug URL (308), keeping query params so match attribution survives -
+  // all but the sensitive ones, which are dropped (see hasSensitiveParams).
   const canonicalSeg = therapistSlug(id, therapistRow.full_name);
   let decodedParam = param;
   try { decodedParam = decodeURIComponent(param); } catch { /* keep raw */ }
-  if (decodedParam !== canonicalSeg) {
+  if (decodedParam !== canonicalSeg || hasSensitiveParams) {
     const qs = new URLSearchParams();
-    for (const [k, v] of Object.entries(sp)) if (typeof v === "string" && v) qs.set(k, v);
+    for (const [k, v] of Object.entries(sp)) {
+      if (typeof v !== "string" || !v) continue;
+      if ((SENSITIVE_PROFILE_PARAMS as readonly string[]).includes(k)) continue;
+      qs.set(k, v);
+    }
     const query = qs.toString();
     // Encode the (Hebrew) slug - a redirect Location header must be ASCII.
     permanentRedirect(`/therapists/${encodeURIComponent(canonicalSeg)}${query ? `?${query}` : ""}`);

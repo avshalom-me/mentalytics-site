@@ -2543,13 +2543,12 @@ function KidsMatchSection({ A, score, selection }: {
                     const params = new URLSearchParams({ from: "match" });
                     const score = t.combined_score ?? t.match_score;
                     if (typeof score === "number") params.set("s", String(score));
-                    params.set("i", "child");
+                    // `a` stays: the profile reads it to send "back" to /kids.
+                    // The domain and the treatment go through sessionStorage on
+                    // click instead of the URL - see app/lib/match-view-context.ts.
                     params.set("a", "child");
                     const r = normalizeKidsRegionKey(region, online);
                     if (r) params.set("r", r);
-                    // Which treatment/assessment recommendation sent this visitor -
-                    // feeds the therapist dashboard's "מה הוביל אותם אליך" breakdown.
-                    if (treatmentLabels.length > 0) params.set("t", treatmentLabels.join(" + ").slice(0, 80));
                     // מרכז: לעמוד המרכז עם from=match; בלי slug - null והכפתור מוסתר
                     // (עמוד-מטפל חוסם ישויות ב-404, אסור ליפול אליו).
                     if (t.entity_type === "center") return t.profile_slug ? `/centers/${t.profile_slug}?from=match` : null;
@@ -2629,7 +2628,14 @@ function KidsMatchSection({ A, score, selection }: {
                             {explainLoading[t.id] ? "מעבד · כ-20 שניות" : isCounselor(A) ? "למה הותאמ/ה לתלמיד/ה?" : "למה הותאמ/ה לי?"}
                           </button>
                           {profileHref && (
-                            <MatchCardProfileLink href={profileHref} />
+                            <MatchCardProfileLink
+                              href={profileHref}
+                              therapistId={t.id}
+                              // Which treatment/assessment recommendation sent this visitor -
+                              // the therapist dashboard's "מה הוביל אותם אליך" breakdown.
+                              // A centre page records its views without context, as before.
+                              context={t.entity_type === "center" ? undefined : { issue: "child", treatment: treatmentLabels.length > 0 ? treatmentLabels.join(" + ").slice(0, 80) : undefined }}
+                            />
                           )}
                         </>
                       }
