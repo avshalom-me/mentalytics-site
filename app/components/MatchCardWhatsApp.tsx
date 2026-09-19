@@ -79,9 +79,10 @@ export default function MatchCardWhatsApp({
       rel="noopener noreferrer"
       onClick={onClick}
       className="inline-flex w-full items-center justify-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90 sm:w-auto"
-      // הצבע במוטבע ולא ב-text-white: הכלל הגלובלי `a { color: inherit }` יושב
-      // מחוץ לשכבות של Tailwind וגובר על מחלקות צבע על קישורים, כך שהטקסט של
-      // הכפתור יצא כהה על הירוק (עד 18/9/26).
+      // הצבע במוטבע כי נכתב כשהכלל הגלובלי `a { color: inherit }` ישב מחוץ
+      // לשכבות של Tailwind וגבר על text-white, כך שהטקסט של הכפתור יצא כהה על
+      // הירוק (עד 18/9/26). מ-19/9/26 הכלל ב-@layer base ומחלקה עובדת גם כאן.
+      // אותו ירוק (#128C42) משמש את כל כפתורי הוואטסאפ באתר.
       style={{ background: "#128C42", color: "#fff" }}
     >
       {waIcon} וואטסאפ

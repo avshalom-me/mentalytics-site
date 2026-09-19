@@ -95,12 +95,13 @@ export default function ContactButtons({
 
   return (
     <>
-      {/* Inline buttons (in the hero) */}
+      {/* Inline buttons (in the hero). WhatsApp green is #128C42, as on the
+          match card: white on Tailwind's green-500 is only 2.2:1. */}
       <div className="mt-6 flex flex-wrap gap-3">
         {waLink && (
           <a href={waLink} target="_blank" rel="noopener noreferrer"
             onClick={() => track(therapistId, "whatsapp", clickSource)}
-            className={`${pill} bg-green-500 text-white hover:bg-green-600`}>
+            className={`${pill} bg-[#128C42] text-white hover:bg-[#0F7A39]`}>
             {wasvg} {waLabel}
           </a>
         )}
@@ -133,7 +134,7 @@ export default function ContactButtons({
             {waLink ? (
               <a href={waLink} target="_blank" rel="noopener noreferrer"
                 onClick={() => track(therapistId, "whatsapp", clickSource)}
-                className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-green-500 text-white py-3 text-[15px] font-extrabold">
+                className="flex-1 inline-flex items-center justify-center gap-2 rounded-full bg-[#128C42] text-white py-3 text-[15px] font-extrabold">
                 {wasvg} {viaCenter ? "וואטסאפ למרכז" : "וואטסאפ"}
               </a>
             ) : null}

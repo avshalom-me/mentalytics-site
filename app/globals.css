@@ -30,7 +30,14 @@ body {
   line-height: 1.6;
 }
 
-a { text-decoration: none; color: inherit; }
+/* Inside @layer base, never outside it. Unlayered CSS beats every layer
+   regardless of specificity, so while this line sat outside it silently
+   cancelled every Tailwind colour and underline class on a link (text-white
+   on the match card's green WhatsApp button rendered dark). In the base layer
+   it still sets the default for a plain link, and a utility on the link wins. */
+@layer base {
+  a { text-decoration: none; color: inherit; }
+}
 
 /* Print styles — quiz PDF export */
 @media print {

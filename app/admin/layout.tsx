@@ -82,8 +82,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                   key={item.href}
                   href={item.href}
                   onClick={onNavigate}
-                  // Inline color overrides the global `a { color: inherit }` rule
-                  // (unlayered CSS beats Tailwind's layered text utilities).
+                  // Inline colour dates from when an unlayered `a { color: inherit }`
+                  // in globals.css beat Tailwind's text utilities (moved into
+                  // @layer base on 19/9/26); a text-* class works here now.
                   style={{ color: active ? "#ffffff" : "#57534e" }}
                   className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
                     active ? "bg-stone-800" : "hover:bg-stone-100"

@@ -3,9 +3,9 @@
 import { stashMatchContext, type SensitiveMatchContext } from "@/app/lib/match-view-context";
 
 /**
- * "פרופיל מלא ←". הצבע בסגנון מוטבע ולא במחלקה: הכלל הגלובלי
- * `a { color: inherit }` ב-globals.css יושב מחוץ לשכבות של Tailwind ולכן גובר
- * על כל מחלקת צבע על קישור - מחלקת text-* כאן הייתה צובעת את הקישור בשחור.
+ * "פרופיל מלא ←". הצבע בסגנון מוטבע כי נכתב כשהכלל `a { color: inherit }`
+ * ב-globals.css ישב מחוץ לשכבות של Tailwind וגבר על כל מחלקת צבע על קישור.
+ * מ-19/9/26 הכלל יושב ב-@layer base, ומחלקת text-* עובדת גם כאן.
  *
  * Client component only for the click: the health-revealing context (which
  * finding and which treatment led here) is handed to the profile through

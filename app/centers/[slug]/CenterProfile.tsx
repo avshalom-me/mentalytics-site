@@ -487,7 +487,7 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                 <div className="mt-4 flex flex-col gap-2.5">
                   {waHref && (
                     <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
-                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-green-500 px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-green-600">
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#128C42] px-5 py-3 text-[15px] font-extrabold text-white transition hover:bg-[#0F7A39]">
                       {WA_SVG} שליחת וואטסאפ
                     </CenterWhatsAppLink>
                   )}
@@ -626,7 +626,7 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
               )}
               {waHref && (
                 <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
-                  className="inline-flex items-center gap-2 rounded-full bg-green-500 px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-green-600">
+                  className="inline-flex items-center gap-2 rounded-full bg-[#128C42] px-8 py-3.5 text-base font-extrabold text-white shadow-[0_10px_28px_rgba(0,0,0,.25)] transition hover:bg-[#0F7A39]">
                   {WA_SVG} שליחת וואטסאפ
                 </CenterWhatsAppLink>
               )}
@@ -660,7 +660,7 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
             )}
             {waHref && (
               <CenterWhatsAppLink entityId={entity?.id} centerId={center.id} href={waHref}
-                className={`inline-flex ${isEntity ? "flex-1" : ""} items-center justify-center gap-1.5 rounded-full bg-green-500 px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-green-600`}>
+                className={`inline-flex ${isEntity ? "flex-1" : ""} items-center justify-center gap-1.5 rounded-full bg-[#128C42] px-4 py-2.5 text-[14px] font-extrabold text-white transition hover:bg-[#0F7A39]`}>
                 {WA_SVG} וואטסאפ
               </CenterWhatsAppLink>
             )}
