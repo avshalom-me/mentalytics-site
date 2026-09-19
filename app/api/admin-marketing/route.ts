@@ -131,6 +131,10 @@ export async function GET() {
       countExplain(iso(d)),
     ]);
 
+    // Traffic sources per period (visitors by source, AI split by assistant). One
+    // RPC per period; each computes its own previous window for the delta.
+    const trafficQs = PERIODS.map((d) => supabaseAdmin.rpc("admin_traffic_sources", { p_days: d }));
+
     // Typed Promise.all groups (kept apart so the period results stay a
     // single count-query type), run concurrently.
     const [
@@ -139,12 +143,14 @@ export async function GET() {
       payingListRes,
       clicksAll,
       views30,
+      trafficRes,
     ] = await Promise.all([
       Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, centerQ, trialQ, freeQ, quizMonthQ, subsQ]),
       Promise.all(periodQs),
       payingListQ,
       clicksAllQ,
       views30Q,
+      Promise.all(trafficQs),
     ]);
 
     if (aiRes.error) throw aiRes.error;
@@ -153,6 +159,13 @@ export async function GET() {
     if (payingListRes.error) throw payingListRes.error;
     for (const r of [totalRes, registeredRes, paidRes, centerRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
+
+    // Non-fatal on purpose: the panel shipped after the dashboard, so a failing
+    // RPC leaves its period null (the panel says so) instead of blanking the page.
+    const traffic: Record<string, unknown> = {};
+    PERIODS.forEach((d, i) => {
+      traffic[`d${d}`] = trafficRes[i].error ? null : trafficRes[i].data ?? null;
+    });
 
     const report = aiRes.data?.[0] ?? null;
     const ai = report
@@ -419,6 +432,8 @@ export async function GET() {
       coverage,
       // רובריקת המרכזים - כללי ופירוט לכל מכון (בקשת המשתמש 21/8/2026).
       centers: centersBlock,
+      // מקורות תנועה מצומצמים (בקשת המשתמש 19/9/2026) - לטבלה שמתחת לפילוח ההיצע.
+      traffic,
       generated_at: new Date().toISOString(),
     });
   } catch (err) {

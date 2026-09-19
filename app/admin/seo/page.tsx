@@ -10,7 +10,11 @@ import OrganicByFamily from "@/app/admin/OrganicByFamily";
 // אמור להביא), וכמה חיפשו *מטפל ספציפי בשמו* ופשוט נחתו על הפרופיל אצלנו.
 // המספר הכולל של "אורגני" מטעה - הוא נשלט ע"י חיפושי שם.
 
-type WeekRow = { week: string; demand: number; home: number; name: number; recruit: number; other: number };
+// ai = מבקרים שהגיעו דרך עוזר AI (ChatGPT, Gemini, Claude, Perplexity...). זו אינה
+// תנועה אורגנית ואינה נכללת בסכומים שלמעלה - היא מוצגת כאן כי זו אותה שאלה
+// ("האם מוצאים אותנו בלי לשלם") בערוץ שצומח לצד החיפוש.
+type WeekRow = { week: string; demand: number; home: number; name: number; recruit: number; other: number; ai?: number };
+type AiSummary = { sessions: number; by_assistant: { assistant: string; sessions: number }[] };
 type KindRow = { kind: string; sessions: number; viewed: number; quiz: number; contacts: number; certain: number };
 type PageRow = { page: string; sessions: number; quiz: number; contacts: number };
 type NameRow = { name: string; status: string; sessions: number };
@@ -28,6 +32,12 @@ type SeoData = {
   name_top: NameRow[];
   name_breadth: { therapists: number; sessions: number };
   funnel: FunnelRow[];
+  ai?: AiSummary;
+};
+
+const AI_COLOR = "#7C3AED";
+const AI_ASSISTANT_LABELS: Record<string, string> = {
+  chatgpt: "ChatGPT", gemini: "Gemini", claude: "Claude", perplexity: "Perplexity", copilot: "Copilot", other: "אחר",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -79,16 +89,16 @@ const rate = (part: number, whole: number) => (whole > 0 ? (100 * part / whole).
 // כמקובל בגרפי זמן גם בעברית - ה-RTL של העמוד היה הופך את כיוון הזמן.
 // (הגרסה הקודמת - עמודות מוערמות - גם קרסה ויזואלית: גובה באחוזים מול הורה
 // בלי גובה מוגדר מתאפס, וכל העמודות נראו שטוחות.)
-type ChartPt = { week: string; demand: number; name: number; home: number; rest: number };
+type ChartPt = { week: string; demand: number; name: number; home: number; rest: number; ai: number };
 
 function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
   if (weeks.length === 0) return null;
   const pts: ChartPt[] = weeks.map((w) => ({
-    week: w.week, demand: w.demand, name: w.name, home: w.home, rest: w.recruit + w.other,
+    week: w.week, demand: w.demand, name: w.name, home: w.home, rest: w.recruit + w.other, ai: w.ai ?? 0,
   }));
   const W = 720, H = 210, padL = 30, padR = 16, padT = 16, padB = 32;
   const innerW = W - padL - padR, innerH = H - padT - padB;
-  const maxY = Math.max(5, ...pts.flatMap((p) => [p.demand, p.name, p.home, p.rest]));
+  const maxY = Math.max(5, ...pts.flatMap((p) => [p.demand, p.name, p.home, p.rest, p.ai]));
   const x = (i: number) => padL + (pts.length === 1 ? innerW / 2 : (i * innerW) / (pts.length - 1));
   const y = (v: number) => padT + innerH * (1 - v / maxY);
   // הנקודה האחרונה היא תמיד שבוע שעדיין רץ, וקו שצולל לשבריר משבוע מלא נקרא
@@ -114,12 +124,27 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
   const series: { get: (p: ChartPt) => number; color: string; width: number; dash?: string }[] = [
     { get: (p) => p.rest, color: "#A8A29E", width: 1.4, dash: "4 3" },
     { get: (p) => p.home, color: "#0284C7", width: 1.8 },
+    { get: (p) => p.ai, color: AI_COLOR, width: 2 },
     { get: (p) => p.name, color: "#D49018", width: 2 },
     { get: (p) => p.demand, color: "#3D8C8A", width: 2.6 },
   ];
+  // סמן מעוין לסדרת ה-AI: הצורה היא קידוד שני לצד הצבע (הסגול קרוב יחסית
+  // לתכלת של עמוד הבית למי שרואה צבעים אחרת), ומבדיל אותה משלוש הסדרות העגולות.
+  const diamond = (cx: number, cy: number, r: number) => `M${cx},${cy - r} L${cx + r},${cy} L${cx},${cy + r} L${cx - r},${cy} Z`;
+  const hasAi = pts.some((p) => p.ai > 0);
+  // רצועת ה-AI: אותו ציר זמן ואותם שוליים אופקיים, קנה מידה אנכי משלה. הקו
+  // שבגרף הראשי נאמן לפרופורציה (AI הוא אחוזים בודדים מהאורגני) ולכן כמעט שטוח;
+  // כאן רואים אם הוא צומח. שני גרפים עם ציר אחד לכל אחד, ולא ציר כפול.
+  const Hs = 92, sPadT = 20, sPadB = 8;
+  const sInnerH = Hs - sPadT - sPadB;
+  const sMax = Math.max(5, ...pts.map((p) => p.ai));
+  const sy = (v: number) => sPadT + sInnerH * (1 - v / sMax);
+  const sSeg = (from: number, to: number) =>
+    pts.slice(from, to + 1).map((p, k) => `${k === 0 ? "M" : "L"}${x(from + k).toFixed(1)},${sy(p.ai).toFixed(1)}`).join(" ");
+  const sArea = `${sSeg(0, solidEnd)} L${x(solidEnd).toFixed(1)},${sy(0).toFixed(1)} L${x(0).toFixed(1)},${sy(0).toFixed(1)} Z`;
   return (
     <div dir="ltr">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="מגמה שבועית של מבקרים אורגניים">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="מגמה שבועית של מבקרים אורגניים ושל מבקרים מעוזרי AI">
         {[0, Math.round(maxY / 2), maxY].map((g) => (
           <g key={g}>
             <line x1={padL} x2={W - padR} y1={y(g)} y2={y(g)} stroke="#E7E5E4" strokeWidth={1} />
@@ -158,6 +183,12 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
                   <title>{`שבוע ${fmt(p.week)}: עמוד הבית ${p.home}${open ? partialNote : ""}`}</title>
                 </circle>
               )}
+              {p.ai > 0 && (
+                <path d={diamond(x(i), y(p.ai), 3.6)} fill={open ? "#fff" : AI_COLOR}
+                  stroke={open ? AI_COLOR : "#fff"} strokeWidth={open ? 1.6 : 1}>
+                  <title>{`שבוע ${fmt(p.week)}: עוזרי AI ${p.ai}${open ? partialNote : ""}`}</title>
+                </path>
+              )}
               <text x={x(i)} y={H - 10} textAnchor="middle" fontSize={10} fill="#A8A29E">
                 {open ? `${fmt(p.week)} · ${daysIn}/7` : fmt(p.week)}
               </text>
@@ -165,6 +196,41 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
           );
         })}
       </svg>
+      {hasAi && (
+        <>
+          <div dir="rtl" className="mt-1 mb-0.5 flex items-center gap-1.5 text-[11px] text-stone-500">
+            <span className="inline-block h-2 w-2 rotate-45" style={{ background: AI_COLOR }} />
+            <span><strong className="text-stone-700">עוזרי AI בלבד</strong> - אותו ציר זמן, קנה מידה משלו (עד {sMax})</span>
+          </div>
+          <svg viewBox={`0 0 ${W} ${Hs}`} className="w-full" role="img" aria-label="מבקרים שהגיעו דרך עוזרי AI, לפי שבוע">
+            {[0, sMax].map((g) => (
+              <g key={g}>
+                <line x1={padL} x2={W - padR} y1={sy(g)} y2={sy(g)} stroke="#E7E5E4" strokeWidth={1} />
+                <text x={padL - 6} y={sy(g) + 3.5} textAnchor="end" fontSize={10} fill="#A8A29E">{g}</text>
+              </g>
+            ))}
+            <path d={sArea} fill={AI_COLOR} opacity={0.08} />
+            <path d={sSeg(0, solidEnd)} fill="none" stroke={AI_COLOR} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+            {partial && (
+              <path d={sSeg(solidEnd, last)} fill="none" stroke={AI_COLOR} strokeWidth={2} strokeDasharray="3 4" opacity={0.5} strokeLinecap="round" />
+            )}
+            {pts.map((p, i) => {
+              if (p.ai === 0) return null;
+              const open = partial && i === last;
+              return (
+                <g key={p.week} opacity={open ? 0.72 : 1}>
+                  <path d={diamond(x(i), sy(p.ai), 4)} fill={open ? "#fff" : AI_COLOR}
+                    stroke={open ? AI_COLOR : "#fff"} strokeWidth={open ? 1.6 : 1}>
+                    <title>{`שבוע ${fmt(p.week)}: ${p.ai} מבקרים דרך עוזרי AI${open ? partialNote : ""}`}</title>
+                  </path>
+                  {/* הספרה בדיו ניטרלית - הזהות נישאת בסמן, לא בצבע הטקסט */}
+                  <text x={x(i)} y={sy(p.ai) - 8} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#44403C">{p.ai}</text>
+                </g>
+              );
+            })}
+          </svg>
+        </>
+      )}
     </div>
   );
 }
@@ -264,6 +330,7 @@ export default function AdminSeoPage() {
               <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-sky-400" /> עמוד הבית</span>
               <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-amber-400" /> חיפוש שם</span>
               <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2.5 w-2.5 rounded-sm bg-stone-300" /> גיוס/אחר</span>
+              <span className="ms-3 inline-flex items-center gap-1"><span className="inline-block h-2 w-2 rotate-45" style={{ background: AI_COLOR }} /> עוזרי AI (לא אורגני)</span>
             </p>
             <WeeklyLineChart weeks={data.weekly} />
             <p className="mt-3 text-[11px] leading-5 text-stone-400">
@@ -272,6 +339,23 @@ export default function AdminSeoPage() {
               רץ: היא מצוירת מקווקו וחלול, והתווית שמתחתיה אומרת כמה ימים מתוך שבעה כבר נספרו - אל
               תשוו אותה לשבועות המלאים שלפניה.
             </p>
+            {data.ai && (
+              <p className="mt-2 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-[11px] leading-5 text-stone-500">
+                <strong className="text-stone-700">הקו הסגול - עוזרי AI:</strong>{" "}
+                {data.ai.sessions > 0 ? (
+                  <>
+                    {data.ai.sessions} מבקרים ב-{days} הימים האחרונים
+                    {" "}({data.ai.by_assistant.map((a) => `${AI_ASSISTANT_LABELS[a.assistant] ?? a.assistant} ${a.sessions}`).join(" · ")}).
+                  </>
+                ) : (
+                  <>אין מבקרים מזוהים ב-{days} הימים האחרונים.</>
+                )}{" "}
+                כל העוזרים יחד, ומבקר נספר פעם אחת - בשבוע שבו הגיע לראשונה דרך עוזר. הקו אינו חלק מהתנועה האורגנית
+                ואינו נכלל במספרים שלמעלה. בגרף הראשי הוא באותו קנה מידה של החיפוש ולכן נמוך; הרצועה שמתחתיו מציגה אותו
+                בקנה מידה משלו. לא נספרים: תשובות ה-AI של גוגל עצמה (נרשמות כחיפוש אורגני), ומי ששמע על האתר מעוזר AI
+                והגיע אחר כך דרך חיפוש או הקלדת הכתובת.
+              </p>
+            )}
           </section>
 
           {/* המשפך המלא - שתי הקבוצות ממירות בערוצים שונים */}

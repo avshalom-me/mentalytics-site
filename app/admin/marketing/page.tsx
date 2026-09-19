@@ -12,6 +12,7 @@ import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/li
 // בלי הקידומת השנייה, שורות הטאבולה חזרו מה-RPC ונזרקו בדרך למסך (9/2026).
 const isPaidCampaign = (campaign: string) => /^(g-|tab-)/.test(campaign);
 import ContactDestinations from "@/app/admin/ContactDestinations";
+import TrafficSourcesPanel, { type TrafficPeriod } from "./TrafficSourcesPanel";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
@@ -106,6 +107,8 @@ type Data = {
   centers?: CentersBlock;
   churn: Churn;
   coverage: Coverage | null;
+  // מפתח לכל תקופה (d2/d7/d30); null כשה-RPC של התקופה נכשל.
+  traffic?: Record<string, TrafficPeriod | null>;
   generated_at: string;
 };
 
@@ -1542,6 +1545,10 @@ export default function MarketingPage() {
 
             {/* Supply tier breakdown */}
             <SupplyPanel s={data.supply} />
+
+            {/* Where the visitors came from - the compact view; the detailed
+                per-channel table stays in /admin/attribution. */}
+            {data.traffic && <TrafficSourcesPanel t={data.traffic[period]} periodLabel={periodLabel} />}
 
             {/* Targets vs actuals — short, one row per metric, click for explanation */}
             <div className="mb-6 overflow-x-auto rounded-2xl border border-stone-200 bg-white p-5">
