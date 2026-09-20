@@ -1536,6 +1536,21 @@ function InboxQueue({
   );
   const [backfilling, setBackfilling] = useState(false);
 
+  const [reviving, setReviving] = useState("");
+
+  async function onRevive(row: InboxItem) {
+    setReviving(row.id);
+    try {
+      const j = await postAgents("inbox_revive", { id: row.id });
+      if (Array.isArray(j.inbox)) onChanged(j.inbox as InboxItem[]);
+      onNotify(`הפנייה של ${row.from_name || row.from_email} חזרה לתור עם טיוטה`);
+    } catch (e) {
+      onNotify(e instanceof Error ? e.message : "ההחזרה נכשלה", true);
+    } finally {
+      setReviving("");
+    }
+  }
+
   // אחרי שליחה של טיוטה שתוקנה, הלקח מחולץ בשרת ברקע (~10 שניות). שתי
   // בדיקות מאוחרות מביאות אותו לרשימה בלי לרענן את העמוד.
   function refreshLessonsSoon() {
@@ -1630,6 +1645,17 @@ function InboxQueue({
                       : "🚫 ללא מענה"}
                 {" · "}
                 {r.from_name || r.from_email} · {r.subject || "(ללא נושא)"} · {relTime(r.received_at)}
+                {/* הסיווג לא יהיה מושלם לעולם. פנייה שנסגרה בטעות חוזרת
+                    לתור עם טיוטה בלחיצה אחת, במקום להישאר אבודה. */}
+                {(r.status === "ignored" || r.status === "superseded") && (
+                  <button
+                    onClick={() => onRevive(r)}
+                    disabled={reviving !== ""}
+                    className="ms-2 font-bold text-sky-700 underline hover:text-sky-900 disabled:opacity-50"
+                  >
+                    {reviving === r.id ? "מנסח..." : "צריך מענה - החזר לתור"}
+                  </button>
+                )}
               </li>
             ))}
           </ul>

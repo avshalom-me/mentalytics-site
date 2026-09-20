@@ -20,7 +20,7 @@ import { placesConfigured } from "@/app/lib/places-search";
 import { runBackup } from "@/app/lib/backup-run";
 import { runQuizFunnel } from "@/app/lib/quiz-funnel";
 import { syncDealReminders } from "@/app/lib/deal-reminders";
-import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus, inboxSignatureStatus } from "@/app/lib/inbox-agent";
+import { runInboxAgent, runInboxBackfill, listInbox, regenerateInboxDraft, sendInboxReply, setInboxStatus, reviveInboxMessage, inboxSignatureStatus } from "@/app/lib/inbox-agent";
 import { gmailConfigured } from "@/app/lib/gmail";
 import {
   listLessons,
@@ -354,6 +354,12 @@ export async function POST(req: NextRequest) {
     }
     if (body?.action === "inbox_lessons") {
       return NextResponse.json({ ok: true, lessons: await listLessons().catch(() => []) });
+    }
+    // פנייה שנסגרה בלי מענה וצריכה בכל זאת תשובה.
+    if (body?.action === "inbox_revive") {
+      const r = await reviveInboxMessage(String(body?.id ?? ""));
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
     }
     if (body?.action === "inbox_status") {
       const status = body?.status === "new" ? "new" : "ignored";

@@ -259,7 +259,16 @@ export async function getThread(threadId: string): Promise<ThreadMessage[]> {
 // בסוף התשובות שיובאו כדוגמאות.
 const BIDI_MARKS = /[‎‏‪-‮⁦-⁩]/g;
 
-export function stripQuoted(body: string): string {
+/**
+ * פיצול המייל למה שנכתב עכשיו ולציטוט שמתחתיו.
+ *
+ * זה לא ניקוי קוסמטי: תשובה בשרשור היא לרוב שתי שורות אדם מעל מאות שורות
+ * ציטוט, ולפעמים הציטוט הוא התראה אוטומטית שלנו. סיווג שמסתכל על הגוף
+ * המלא קורא בעיקר את הציטוט. קרה ב-18/9/26: "לצערי לא יכול, מטפל בשעה
+ * הזאת" (52 תווים) מעל ציטוט של התראת "פנייה חדשה" סווג כמייל אוטומטי
+ * שלא דורש מענה, והפנייה לא הופיעה בתור.
+ */
+export function splitQuoted(body: string): { text: string; quoted: string } {
   const lines = body.split("\n");
   const cut = lines.findIndex((raw, i) => {
     const l = raw.replace(BIDI_MARKS, "");
@@ -273,7 +282,16 @@ export function stripQuoted(body: string): string {
       /^-{2,}\s*Original Message/i.test(l)
     );
   });
-  return (cut > 0 ? lines.slice(0, cut) : lines).join("\n").trim();
+  // cut === 0 הוא העברה (forward) שכולה ציטוט: אין טקסט חדש להפריד.
+  if (cut <= 0) return { text: body.trim(), quoted: "" };
+  return {
+    text: lines.slice(0, cut).join("\n").trim(),
+    quoted: lines.slice(cut).join("\n").trim(),
+  };
+}
+
+export function stripQuoted(body: string): string {
+  return splitQuoted(body).text;
 }
 
 // ── חתימה ───────────────────────────────────────────────────────────────
