@@ -136,6 +136,13 @@ const AI_HOSTS = [
   "poe.com",
   "grok.com",
   "x.ai",
+  // נוספו 20/9/2026, לפני שהם מופיעים בנתונים: עוזר שלא ברשימה נספר כ"אתר
+  // מפנה" או כ"ישיר", ואי אפשר לתקן זאת רטרואקטיבית ממה שנשמר.
+  "meta.ai",
+  "deepseek.com",
+  "mistral.ai",
+  "copilot.cloud.microsoft",
+  "edgeservices.bing.com",
 ] as const;
 
 function isAiReferrer(ref: string): boolean {

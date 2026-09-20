@@ -37,7 +37,8 @@ type SeoData = {
 
 const AI_COLOR = "#7C3AED";
 const AI_ASSISTANT_LABELS: Record<string, string> = {
-  chatgpt: "ChatGPT", gemini: "Gemini", claude: "Claude", perplexity: "Perplexity", copilot: "Copilot", other: "אחר",
+  chatgpt: "ChatGPT", gemini: "Gemini", claude: "Claude", perplexity: "Perplexity", copilot: "Copilot",
+  deepseek: "DeepSeek", mistral: "Mistral", meta: "Meta AI", other: "אחר",
 };
 
 const KIND_LABELS: Record<string, string> = {
@@ -353,7 +354,10 @@ export default function AdminSeoPage() {
                 כל העוזרים יחד, ומבקר נספר פעם אחת - בשבוע שבו הגיע לראשונה דרך עוזר. הקו אינו חלק מהתנועה האורגנית
                 ואינו נכלל במספרים שלמעלה. בגרף הראשי הוא באותו קנה מידה של החיפוש ולכן נמוך; הרצועה שמתחתיו מציגה אותו
                 בקנה מידה משלו. לא נספרים: תשובות ה-AI של גוגל עצמה (נרשמות כחיפוש אורגני), ומי ששמע על האתר מעוזר AI
-                והגיע אחר כך דרך חיפוש או הקלדת הכתובת.
+                והגיע אחר כך דרך חיפוש או הקלדת הכתובת.{" "}
+                <strong className="text-stone-700">אל מול Search Console:</strong> הדוח "תכונות מבוססות-AI גנרטיבי" שם
+                סופר <em>הופעות</em> של האתר בתוך תשובות ה-AI של גוגל (AI Overviews ו-AI Mode), אין בו קליקים כלל, וקליק
+                משם נוחת אצלנו כחיפוש אורגני רגיל. שני המספרים מודדים דברים שונים ולא אמורים להתיישב.
               </p>
             )}
           </section>
