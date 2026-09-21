@@ -1,9 +1,11 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { parseMarkdownTable } from "@/app/lib/article-table";
 
 // Renders an article body written in a small, safe subset of Markdown. Authors
 // (therapists + admin) write plain text; a line starting with "## " / "### "
-// becomes a heading, consecutive "- " / "• " lines become a bullet list, and
+// becomes a heading, consecutive "- " / "• " lines become a bullet list, a
+// block of "| a | b |" rows with a "|---|---|" separator becomes a table, and
 // inline [text](url) / **bold** are supported. Everything is built from parsed
 // React nodes (never dangerouslySetInnerHTML), so author text can't inject HTML.
 // Plain-text bodies with no markers render exactly as before (all paragraphs).
@@ -90,6 +92,60 @@ export function ArticleBody({ body }: { body: string }) {
                 {parseInline(quote)}
               </p>
             </blockquote>
+          );
+        }
+        // Table: a header row, a "|---|" separator, then body rows. The first
+        // column holds the row labels (a comparison reads across), so those
+        // cells are row headers. The wrapper scrolls on its own if a table is
+        // ever wider than a phone, instead of widening the page.
+        const table = parseMarkdownTable(block);
+        if (table) {
+          return (
+            <div key={i} className="my-8 overflow-x-auto rounded-2xl border border-[#DDE9E8]">
+              <table className="w-full border-collapse text-[15px] leading-7 text-stone-700 md:text-[18px] md:leading-8">
+                <thead className="bg-[#F7FAF9]">
+                  <tr>
+                    {table.head.map((h, j) => (
+                      <th
+                        key={j}
+                        scope="col"
+                        className={
+                          j === 0
+                            ? "px-3 py-2 text-start font-bold text-stone-900 md:px-4 md:py-3"
+                            : "border-s border-[#DDE9E8] px-3 py-2 text-start font-bold text-stone-900 md:px-4 md:py-3"
+                        }
+                      >
+                        {parseInline(h)}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {table.rows.map((row, r) => (
+                    <tr key={r}>
+                      {row.map((cell, c) =>
+                        c === 0 ? (
+                          <th
+                            key={c}
+                            scope="row"
+                            className="border-t border-[#DDE9E8] px-3 py-2 text-start align-top font-bold text-stone-900 md:px-4 md:py-3"
+                          >
+                            {parseInline(cell)}
+                          </th>
+                        ) : (
+                          <td
+                            key={c}
+                            className="border-s border-t border-[#DDE9E8] px-3 py-2 align-top md:px-4 md:py-3"
+                          >
+                            {parseInline(cell)}
+                          </td>
+                        )
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           );
         }
         if (block.startsWith("## ")) {

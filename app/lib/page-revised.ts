@@ -68,7 +68,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research": { date: "2026-09-10", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/academic": { date: "2026-08-05", sources: ["app/research/academic/page.tsx"] },
   "/research/adhd-adults": { date: "2026-09-04", sources: ["app/research/adhd-adults/page.tsx"] },
-  "/research/assessments": { date: "2026-08-05", sources: ["app/research/assessments/page.tsx"] },
+  "/research/assessments": { date: "2026-09-21", sources: ["app/research/assessments/page.tsx"] },
   "/research/autism-assessment": { date: "2026-09-04", sources: ["app/research/autism-assessment/page.tsx"] },
   "/research/btl": { date: "2026-08-06", sources: ["app/research/btl/page.tsx", "app/lib/btl-tracks.ts"] },
   "/research/btl/[track]": { date: "2026-08-06", sources: ["app/research/btl/[track]/page.tsx", "app/lib/btl-tracks.ts"] },
