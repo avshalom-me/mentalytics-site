@@ -46,8 +46,8 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   // the snippet sells credentials and the clinician-built quiz, not inventory.
   const description =
     count >= 3
-      ? `טיפול פסיכולוגי ונפשי ב${city}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`
-      : `טיפול פסיכולוגי ונפשי ב${city} והסביבה: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
+      ? `טיפול פסיכולוגי, נפשי ורגשי ב${city}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`
+      : `טיפול פסיכולוגי, נפשי ורגשי ב${city} והסביבה: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   const robots = cityIsIndexable(city, count, pool) ? undefined : { index: false, follow: true };
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -124,7 +124,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
   // first, the verified list second. The treatment phrase stays at the front
   // because it is the query family these pages rank for.
   const introLine =
-    `טיפול פסיכולוגי ונפשי ב${inCity.length > 0 ? city : `טווח נסיעה קצר מ${city}`}: ` +
+    `טיפול פסיכולוגי, נפשי ורגשי ב${inCity.length > 0 ? city : `טווח נסיעה קצר מ${city}`}: ` +
     "מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, " +
     "או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות" +
     (nearbyCityNames.length > 0
@@ -211,8 +211,14 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
       {CITY_INTRO[city] && (
         <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
-          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>טיפול פסיכולוגי ונפשי ב{city}</h2>
-          <p className="text-[15px] leading-8 text-stone-600">{CITY_INTRO[city]}</p>
+          <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>טיפול פסיכולוגי, נפשי ורגשי ב{city}</h2>
+          {/* The questionnaire is carried here as well as at the top - see the
+              same section in region/[region]/page.tsx for why: Google chooses
+              the snippet per query, and for some queries this is the passage. */}
+          <p className="text-[15px] leading-8 text-stone-600">
+            {CITY_INTRO[city]}{" "}
+            לא בטוחים איזה טיפול מתאים לכם? מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם.
+          </p>
         </section>
       )}
 

@@ -17,10 +17,10 @@ export type Topic = {
   name: string;
   /** H1 / <title> in searcher phrasing. */
   searchTitle: string;
-  kind: "condition" | "audience" | "gender" | "community";
+  kind: "condition" | "audience" | "gender" | "community" | "profession";
   intro: string;
   /** Therapist filter - union within each field, intersection across fields. */
-  filter: { trainingAreasAny?: string[]; ageGroupsAny?: string[]; gender?: string; culturalPrefsAny?: string[] };
+  filter: { trainingAreasAny?: string[]; ageGroupsAny?: string[]; gender?: string; culturalPrefsAny?: string[]; therapistTypesAny?: string[] };
   /** How the supply line explains WHO is listed (honesty line). */
   supplyNote: string;
   related: { href: string; label: string }[];
@@ -178,6 +178,44 @@ export const TOPICS: Topic[] = [
       { href: "/adults", label: "✦ שאלון התאמה למבוגרים" },
       { href: "/kids", label: "✦ שאלון התאמה לילדים ונוער" },
       { href: "/research/first-session", label: "הפגישה הראשונה אצל פסיכולוג" },
+    ],
+  },
+  {
+    // "מטפל רגשי בחיפה" ranked 19th on 21/9/2026 while "פסיכולוג בחיפה" ranked
+    // 11th, and the word "רגשי" appeared nowhere in our own copy - only inside
+    // therapist bios. The ads search-term report holds ~440 impressions for this
+    // family ("מטפלת רגשית ירושלים", "טיפול רגשי למבוגרים", "טיפול רגשי"), and the
+    // feminine form is searched as much as the masculine. The kids side was
+    // already covered by the "מטפלים רגשיים לילדים" title tail; adults had no
+    // page at all.
+    //
+    // In everyday Hebrew "מטפל רגשי" means an emotional therapist who is not a
+    // psychologist, so the filter is the other emotional-therapy professions.
+    // That is also what keeps this from being the city page under another name:
+    // a list identical to /city/X with a different title is a doorway. The
+    // owner confirmed building it (21/9/2026). Counsellors (יועצ/ת חינוכי) and
+    // the para-medical professions are deliberately out - neither is what the
+    // query asks for.
+    slug: "מטפל-רגשי",
+    name: "מטפל רגשי",
+    searchTitle: "מטפל רגשי - טיפול רגשי אצל מטפלות ומטפלים מאומתים",
+    kind: "profession",
+    intro:
+      "\"מטפל רגשי\" הוא שם כללי למטפלים בקשיים רגשיים שהכשרתם היא בעבודה סוציאלית קלינית, בטיפול באמנויות - אמנות, דרמה, תנועה ומוזיקה - או בפסיכותרפיה. הם עובדים עם מבוגרים, עם זוגות ועם ילדים. ההבדל מפסיכולוג הוא בסוג ההכשרה ובמה שכל אחד מוסמך לעשות: אבחון פסיכולוגי, למשל, שמור לפסיכולוגים. בטיפול עצמו, מה שמנבא הצלחה יותר מכל הוא הקשר הטיפולי וההתאמה לקושי, ולא התואר. כאן מוצגים מטפלים רגשיים שתעודות ההכשרה שלהם אומתו, לפי עיר.",
+    cityTitleTail: "טיפול רגשי אצל מטפלות ומטפלים מאומתים",
+    faq: [
+      { q: "מה ההבדל בין מטפל רגשי לפסיכולוג?", a: "ההבדל הוא בהכשרה ובמה שכל אחד מוסמך לעשות. פסיכולוג הוא בעל תואר שני בפסיכולוגיה ורישום בפנקס הפסיכולוגים, והוא המוסמך לבצע אבחון פסיכולוגי. \"מטפל רגשי\" הוא שם כללי שכולל עובדים סוציאליים קליניים, מטפלים באמנויות ופסיכותרפיסטים, ולכל אחד מהם הכשרה טיפולית משלו. בטיפול עצמו שתי האפשרויות יכולות לעזור מאוד: מה שמנבא הצלחה יותר מכל הוא הקשר הטיפולי וההתאמה לקושי. אם נדרש אבחון, צריך פסיכולוג. אם נדרש טיפול, שתי האפשרויות פתוחות." },
+      { q: "האם \"מטפל רגשי\" הוא תואר מוגן?", a: "הביטוי עצמו אינו תואר מוגן, בשונה מ\"פסיכולוג\". לכן כדאי לבדוק מה ההכשרה שעומדת מאחוריו: עובד סוציאלי קליני, מטפל באמנויות, פסיכותרפיסט שסיים הכשרה. באתר הזה תעודות ההכשרה של כל המטפלים אומתו, וההכשרה המדויקת של כל אחד מופיעה בכרטיס שלו." },
+      { q: "איזה טיפול רגשי מתאים לי?", a: "זה תלוי בקושי ובמה שנוח לך. טיפול בשיחה מתאים לרוב האנשים. טיפול באמנויות - ציור, תנועה, דרמה או מוזיקה - מתאים במיוחד כשקשה לבטא דברים במילים, ולכן הוא נפוץ גם עם ילדים. עובד סוציאלי קליני מביא לא פעם מבט רחב על המשפחה ועל הסביבה. אם אינך בטוח, השאלון שלנו ממפה את הקושי וממליץ על סוג הטיפול המתאים לפני שמתחילים לחפש מטפל/ת." },
+      { q: "האם מטפל רגשי מטפל גם בילדים?", a: "רבים כן, ובמיוחד מטפלים באמנויות, שעבודה דרך משחק ויצירה מתאימה לילדים באופן טבעי. בכרטיס של כל מטפל מופיע עם אילו גילאים הוא עובד. לחיפוש ממוקד בילדים יש באתר גם עמודים של פסיכולוגים ומטפלים רגשיים לילדים, לפי עיר." },
+      { q: "איך בוחרים מטפל רגשי?", a: "שלושה דברים קובעים יותר מכל השאר: הכשרה שמתאימה לסוג הקושי, ניסיון עם מקרים דומים, ומה שקורה בפגישה הראשונה. השניים הראשונים ניתנים לבדיקה מראש, ואפשר לשאול עליהם ישירות. השלישי מתברר רק בפועל, וסביר לתת לו שתיים או שלוש פגישות לפני שמחליטים." },
+    ],
+    filter: { therapistTypesAny: ['עו"ס קליני', "מטפל/ת בהבעה ויצירה", "מטפל מיני", "קרימינולוג קליני", "פסיכותרפיסט"] },
+    supplyNote: "מוצגים מטפלים רגשיים - עובדים סוציאליים קליניים, מטפלים באמנויות ואנשי טיפול נוספים - שתעודות ההכשרה שלהם אומתו",
+    related: [
+      { href: "/adults", label: "✦ שאלון התאמה למבוגרים" },
+      { href: "/research/therapist-types", label: "סוגי המטפלים - מה ההבדל" },
+      { href: "/research/choosing-therapist", label: "איך בוחרים מטפל/ת" },
     ],
   },
   {
@@ -372,6 +410,7 @@ export const CITY_TOPIC_SLUGS = [
   "פסיכולוגית",
   "פסיכולוג-לדתיים",
   "פסיכולוג-לחרדים",
+  "מטפל-רגשי",
   "פסיכולוג-ילדים",
   "פסיכולוג-לנוער",
   "פסיכולוג-ילדים-ונוער",
@@ -407,7 +446,7 @@ export function cityTopicCitiesFor(topic: Topic): readonly string[] {
   // them is indexed, so a city with two child therapists renders noindex, not
   // a thin indexed page. Condition and approach topics stay on the pilot list
   // until GSC proves the pattern for them too.
-  return topic.kind === "audience" || topic.kind === "gender" || topic.kind === "community"
+  return topic.kind === "audience" || topic.kind === "gender" || topic.kind === "community" || topic.kind === "profession"
     ? CITY_SEO_LIST
     : PILOT_CITIES;
 }

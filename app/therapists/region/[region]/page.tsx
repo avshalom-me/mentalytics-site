@@ -66,7 +66,7 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   // Count-free, like the city pages (owner's call, 14/8/26).
   const description = isOnline
     ? `פסיכולוג אונליין או מטפל רגשי מרחוק: ${CREDENTIALS} שמטפלים בזום או בווידאו, ו${QUIZ}.`
-    : `טיפול פסיכולוגי ונפשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
+    : `טיפול פסיכולוגי, נפשי ורגשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 
@@ -152,7 +152,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
               , ואפשר גם למלא שאלון קצר ולקבל התאמה אישית.
             </>
           ) : (
-            `טיפול פסיכולוגי ונפשי ב${label}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות. בחינם וללא התחייבות.`
+            `טיפול פסיכולוגי, נפשי ורגשי ב${label}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות. בחינם וללא התחייבות.`
           )}
         </p>
       </div>
@@ -200,7 +200,16 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       {!isOnline && REGION_INTRO[r.region] && (
         <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>על אזור {r.region}</h2>
-          <p className="text-[15px] leading-8 text-stone-600">{REGION_INTRO[r.region]}</p>
+          {/* The questionnaire lives in this paragraph too, not only at the top.
+              Google picks the snippet per query: for "מטפל רגשי בחיפה" (21/9/2026)
+              it skipped both the meta description and the opening paragraph and
+              quoted this one, because "קהילת מטפלים... חיפה והקריות" matched the
+              query better - so the result ran without the offer. Whichever
+              passage it picks now, the offer is in it. */}
+          <p className="text-[15px] leading-8 text-stone-600">
+            {REGION_INTRO[r.region]}{" "}
+            לא בטוחים איזה טיפול מתאים לכם? מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם.
+          </p>
         </section>
       )}
 

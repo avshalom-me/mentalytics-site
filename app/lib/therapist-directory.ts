@@ -278,6 +278,13 @@ export type DirectoryFilter = {
    * people) rather than "דתיים" (religious therapists). See topics.ts.
    */
   culturalPrefsAny?: string[];
+  /**
+   * Exact values from therapists.therapist_types. Powers the "מטפל רגשי" pages,
+   * which list the emotional-therapy professions other than psychology (clinical
+   * social workers, arts therapists, psychotherapists). "Any", so a therapist who
+   * is both a psychologist and an arts therapist appears - they do offer it.
+   */
+  therapistTypesAny?: string[];
   category?: "main" | "para";
   centerId?: string;
 };
@@ -342,6 +349,9 @@ function applyDirectoryFilter(data: TherapistRow[], filter?: DirectoryFilter): T
   }
   if (filter?.culturalPrefsAny?.length) {
     rows = rows.filter((t) => filter.culturalPrefsAny!.some((p) => (t.cultural_prefs ?? []).includes(p)));
+  }
+  if (filter?.therapistTypesAny?.length) {
+    rows = rows.filter((t) => filter.therapistTypesAny!.some((p) => (t.therapist_types ?? []).includes(p)));
   }
   return rows;
 }

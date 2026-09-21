@@ -101,8 +101,16 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
   const fem = topic.kind === "gender";
   const cityNote = (() => {
     if (topic.kind === "condition" || list.length === 0) return null;
+    // On a profession page, count only the professions that put a therapist on
+    // it. A clinical social worker who is also an educational counsellor
+    // qualifies through the social work, and counting all their titles printed
+    // "יועצ/ת חינוכי" on a page that deliberately leaves counsellors out.
+    const qualifying = topic.filter.therapistTypesAny ? new Set(topic.filter.therapistTypesAny) : null;
     const freq = new Map<string, number>();
-    for (const t of list) for (const p of t.therapist_types ?? []) freq.set(p, (freq.get(p) ?? 0) + 1);
+    for (const t of list) for (const p of t.therapist_types ?? []) {
+      if (qualifying && !qualifying.has(p)) continue;
+      freq.set(p, (freq.get(p) ?? 0) + 1);
+    }
     const professions = [...freq.entries()]
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
