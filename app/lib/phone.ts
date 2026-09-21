@@ -36,6 +36,10 @@ export function phoneNationalDigits(phone: string | null | undefined): string | 
   let digits = raw.replace(/\D/g, "");
   if (!digits) return null;
 
+  // "00" is the international dialling prefix typed instead of "+" (00972...).
+  // Without this the leading-zero branch below ate one zero and left 13 digits.
+  if (digits.startsWith("00")) digits = digits.slice(2);
+
   // Normalise the country code to national form so callers can prefix 972 once.
   if (digits.startsWith("972")) digits = digits.slice(3);
   else if (digits.startsWith("0")) digits = digits.slice(1);
@@ -64,6 +68,30 @@ export function isMobileNumber(phone: string | null | undefined): boolean {
 }
 
 /**
+ * ספרות מספר זר בצורה בינלאומית (קידומת מדינה בלי "+"), או null.
+ *
+ * מטפל/ת שגר/ה בחו"ל ועובד/ת אונליין רושם/ת מספר מקומי שם - לטם סבוראי עם
+ * +39 (איטליה). phoneNationalDigits מכיר רק מספרים ישראליים, ולכן מ-1/8/2026
+ * שני הכפתורים שלה נעלמו (ולפני כן הקוד הדביק 972 מקדימה ויצר wa.me/972+39...
+ * - קישור מת). היא נשארה שבעה שבועות משלמת בלי שום כפתור וואטסאפ.
+ *
+ * מזהים מספר זר רק לפי קידומת מפורשת ("+" או "00") שאינה 972. בלי קידומת
+ * המספר נחשב ישראלי, כדי לא לפרש בטעות נייד ישראלי שנרשם בלי 0 כמספר זר.
+ * האורך לפי E.164: 8-15 ספרות כולל קידומת המדינה.
+ */
+export function foreignPhoneDigits(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const raw = String(phone).trim();
+  if (!/^[0-9+()\-.\s]+$/.test(raw)) return null;
+  if (!raw.startsWith("+") && !raw.startsWith("00")) return null;
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.startsWith("972")) return null; // ישראלי - המסלול הרגיל
+  if (digits.length < 8 || digits.length > 15) return null;
+  return digits;
+}
+
+/**
  * wa.me link with the prewritten message, or null when the number is unusable.
  *
  * **קווי מוחזר כ-null בכוונה (21/8/2026):** אין וואטסאפ למספר נייח, ולכן
@@ -71,11 +99,21 @@ export function isMobileNumber(phone: string | null | undefined): boolean {
  * רשמו נייד - אבל מרכזים רושמים מרכזייה: עמוד "מרכז CBT" הציג כפתור
  * וואטסאפ אל 04-6157797, ומכון הכרה אל 077-8052051. הכפתור פשוט נעלם
  * עכשיו, וכפתור החיוג - שדווקא עובד - נשאר.
+ *
+ * **מספר זר (21/9/2026)** מקבל קישור וואטסאפ, כי זה הערוץ שמטפל/ת בחו"ל
+ * באמת עונה בו, והוא חינמי למטופל. אין לנו דרך לדעת אם מספר זר הוא נייד,
+ * ומי שרשם/ה מספר זר כקו הקשר היחיד שלו/ה כמעט תמיד רשם/ה נייד. telHref
+ * נשאר ישראלי בלבד בכוונה: שיחה בינלאומית עולה למטופל כסף, ולכן אין כפתור
+ * חיוג למספר זר.
  */
 export function waLinkFor(phone: string | null | undefined): string | null {
   const digits = phoneNationalDigits(phone);
-  if (!digits || !digits.startsWith("5")) return null;
-  return `https://wa.me/972${digits}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+  if (digits && digits.startsWith("5")) {
+    return `https://wa.me/972${digits}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+  }
+  const foreign = foreignPhoneDigits(phone);
+  if (foreign) return `https://wa.me/${foreign}?text=${encodeURIComponent(WHATSAPP_MESSAGE)}`;
+  return null;
 }
 
 // ── מרכזים ───────────────────────────────────────────────────────────────────
