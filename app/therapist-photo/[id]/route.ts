@@ -9,6 +9,11 @@ import { extractTherapistId } from "@/app/lib/therapist-url";
 // לעולם לא תעודות). לא תחת /api - כי robots.txt חוסם /api/.
 //
 // חשוב: לא כאן ה-canonical של הפרופיל - זו רק כתובת התמונה.
+//
+// הדפים מפנים לכאן עם ?v=<גרסת הקובץ> (app/lib/therapist-photo-url.ts), והמטמון
+// למטה נשמר לפי הכתובת המלאה כולל ה-query. בלי הגרסה, מטפל שהחליף תמונה ראה
+// בפרופיל את הישנה עד שעה בדפדפן ועד יום ב-CDN (21/9/26). הפרמטר לא נקרא כאן:
+// התמונה היא תמיד הנוכחית, והגרסה רק מבטיחה שתמונה חדשה היא כתובת חדשה.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

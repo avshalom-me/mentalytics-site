@@ -16,6 +16,7 @@ import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
 import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, telHref } from "@/app/lib/phone";
 import { siteAuthorProfileFields } from "@/app/lib/author";
+import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -174,8 +175,10 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
   // Stable, crawlable photo URL (see app/therapist-photo/[id]/route.ts). Gives
-  // the profile an indexable og:image instead of an expiring signed URL.
-  const ogImage = therapist.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : `${BASE_URL}/logo.svg.png`;
+  // the profile an indexable og:image instead of an expiring signed URL. The
+  // ?v= changes with the photo, so a replaced photo is a new URL - see
+  // app/lib/therapist-photo-url.ts.
+  const ogImage = therapist.profile_photo_path ? therapistPhotoUrl(id, therapist.profile_photo_path, BASE_URL) : `${BASE_URL}/logo.svg.png`;
 
   return {
     title: `${name} - ${type} | טיפול חכם`,
@@ -271,7 +274,7 @@ export default async function TherapistProfilePage({
   const avatarSrc = t.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg";
   // Stable public photo URL (indexable) - replaces the 24h signed URL for both
   // display and structured data. Falls back to the gender avatar when no photo.
-  const photoSrc = t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : avatarSrc;
+  const photoSrc = t.profile_photo_path ? therapistPhotoUrl(id, t.profile_photo_path, BASE_URL) : avatarSrc;
   // Validated: a `phone` holding something that is not a number (one paying
   // therapist has an email address there) yields null, so the button is hidden
   // rather than linking to wa.me/972ZJOURY@GMAIL.COM.
@@ -299,7 +302,7 @@ export default async function TherapistProfilePage({
     ...siteAuthorProfileFields(id),
     "description": t.bio ?? undefined,
     "jobTitle": type || undefined,
-    "image": t.profile_photo_path ? `${BASE_URL}/therapist-photo/${id}` : undefined,
+    "image": t.profile_photo_path ? therapistPhotoUrl(id, t.profile_photo_path, BASE_URL) : undefined,
     // Must match alternates.canonical (the name-slug path). The bare-UUID form
     // used to be emitted here, which 308-redirects - so the structured data
     // pointed at a URL that is not the canonical one.
@@ -425,7 +428,7 @@ export default async function TherapistProfilePage({
                 className="flex items-center gap-4 rounded-2xl bg-white p-4 transition hover:shadow-md"
                 style={{ border: "1px solid var(--line)" }}>
                 <img
-                  src={s.profile_photo_path ? `/therapist-photo/${s.id}` : (s.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
+                  src={s.profile_photo_path ? therapistPhotoUrl(s.id, s.profile_photo_path) : (s.gender === "נקבה" ? "/avatar-female.svg" : "/avatar-male.svg")}
                   alt={s.full_name ?? ""}
                   className="h-16 w-16 rounded-full object-cover object-top flex-shrink-0"
                   style={{ border: "2px solid var(--teal-mid)" }}
