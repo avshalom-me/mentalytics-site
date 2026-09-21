@@ -8,9 +8,10 @@ import { CHANNEL_LABELS } from "@/app/lib/attribution";
 import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/lib/stats-categories";
 
 
-// שמות הקמפיינים הממומנים לפי קידומת ה-utm_campaign: g-* בגוגל, tab-* בטאבולה.
-// בלי הקידומת השנייה, שורות הטאבולה חזרו מה-RPC ונזרקו בדרך למסך (9/2026).
-const isPaidCampaign = (campaign: string) => /^(g-|tab-)/.test(campaign);
+// שמות הקמפיינים הממומנים לפי קידומת ה-utm_campaign: g-* בגוגל, tab-* בטאבולה,
+// fb-* בפייסבוק. קידומת שחסרה כאן זורקת את השורות של אותה פלטפורמה בדרך למסך,
+// למרות שה-RPC מחזיר אותן (כך קרה לטאבולה ב-9/2026).
+const isPaidCampaign = (campaign: string) => /^(g-|tab-|fb-)/.test(campaign);
 import ContactDestinations from "@/app/admin/ContactDestinations";
 import TrafficSourcesPanel, { type TrafficPeriod } from "./TrafficSourcesPanel";
 
