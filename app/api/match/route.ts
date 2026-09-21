@@ -3,6 +3,7 @@ import { centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { toTrainingAreaKey } from "@/app/lib/treatment-aliases";
 import {
   FREE_REGION_FALLBACK_ENABLED,
   coversRegion,
@@ -190,7 +191,9 @@ function intersection(a: string[], b: string[]): string[] {
 }
 
 function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
-  const treatmentTypes = mergeArrays(
+  // מפתח המלצה שאינו תחום בטופס של המטפלים מתורגם לתחום שהם מסמנים - אחרת
+  // אף מטפל לא מקבל עליו ניקוד מומחיות (ראו app/lib/treatment-aliases.ts).
+  const treatmentTypes = uniqueStrings(mergeArrays(
     body.treatmentTypes,
     body.treatment_types,
     body.training_areas,
@@ -200,7 +203,7 @@ function normalizeInput(body: Record<string, any>): NormalizedMatchInput {
     body.treatments,
     body.therapy_types,
     body.therapyTypes
-  );
+  ).map(toTrainingAreaKey));
 
   const diagnosisTypes = mergeArrays(
     body.diagnosisTypes,

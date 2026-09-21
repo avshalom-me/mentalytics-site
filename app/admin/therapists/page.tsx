@@ -6,7 +6,7 @@ import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app
 import {
   THERAPIST_TYPES, TRAINING_AREAS, ASSESSMENT_TYPES,
   CULTURAL_PREFS, AGE_GROUPS, ARRANGEMENTS,
-  LANGUAGES, COUPLES_MODALITIES, COGFUN_AGE_GROUPS,
+  LANGUAGES, COUPLES_MODALITIES, COGFUN_AGE_GROUPS, PLAY_THERAPY_MODALITIES,
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
@@ -14,6 +14,8 @@ import TherapistCrmPanel from "./components/TherapistCrmPanel";
 import { therapistPath } from "@/app/lib/therapist-url";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
+const EXPRESSIVE_AREA = "טיפול בהבעה ויצירה";
+const PLAY_THERAPY_SET = new Set<string>(PLAY_THERAPY_MODALITIES);
 
 type AdminTherapist = {
   id: string;
@@ -2354,7 +2356,11 @@ export default function AdminTherapistsPage() {
                 label="תחומי טיפול"
                 options={TRAINING_AREAS}
                 selected={editForm.training_areas}
-                onChange={(v) => setEditForm({ ...editForm, training_areas: v })}
+                onChange={(v) => setEditForm({
+                  ...editForm,
+                  // בלי "טיפול בהבעה ויצירה" אין גם סוג טיפול בהבעה ויצירה - כמו בשאר העורכים.
+                  training_areas: v.includes(EXPRESSIVE_AREA) ? v : v.filter((a) => !PLAY_THERAPY_SET.has(a)),
+                })}
               />
               <CheckboxGroup
                 label="סוגי אבחון"
@@ -2399,6 +2405,18 @@ export default function AdminTherapistsPage() {
                 selected={editForm.couples_modalities}
                 onChange={(v) => setEditForm({ ...editForm, couples_modalities: v })}
               />
+              {/* סוג הטיפול בהבעה ויצירה (21/9/2026). היה בעורך של המטפל, של המרכז ובטופס
+                  המילוי, ולא כאן - כך שבאדמין נראה כאילו החלוקה נעלמה. הסוגים נשמרים
+                  בתוך training_areas, ולכן הרשימה עובדת ישירות עליה; שאלון הילדים
+                  מחפש לפיהם ("טיפול באומנות" וכו') כשהילד מעדיף אמצעי מסוים. */}
+              {editForm.training_areas.includes(EXPRESSIVE_AREA) && (
+                <CheckboxGroup
+                  label="סוג הטיפול בהבעה ויצירה"
+                  options={PLAY_THERAPY_MODALITIES}
+                  selected={editForm.training_areas}
+                  onChange={(v) => setEditForm({ ...editForm, training_areas: v })}
+                />
+              )}
               <CheckboxGroup
                 label="טיפול COG-FUN - לאילו קבוצות גיל?"
                 options={COGFUN_AGE_GROUPS}
