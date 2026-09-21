@@ -43,6 +43,7 @@ type ArticleRow = {
   image_credit: string | null;
   canonical_url: string | null;
   author_name: string | null;
+  author_bio: string | null;
   therapists:
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }
     | { full_name: string | null; therapist_types: string[] | null; gender: string | null; age_groups: string[] | null }[]
@@ -53,7 +54,7 @@ async function getArticle(slug: string): Promise<ArticleRow | null> {
   const { data, error } = await supabaseAdmin
     .from("therapist_articles")
     .select(
-      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name, therapist_types, gender, age_groups)"
+      "id, title, slug, summary, body, topic, approved_at, created_at, updated_at, therapist_id, image_url, image_alt, image_credit, canonical_url, author_name, author_bio, therapists(full_name, therapist_types, gender, age_groups)"
     )
     .eq("slug", slug)
     .eq("status", "approved")
@@ -110,6 +111,9 @@ export default async function CommunityArticlePage({ params }: { params: Promise
   // A house/editorial byline (e.g. "צוות טיפול חכם") overrides the therapist
   // attribution: no profile link, no professional role, no per-therapist noun.
   const house = a.author_name?.trim() || null;
+  // The author's own bio, when the article carries one, replaces the generic
+  // "מאמר זה נכתב על ידי..." line in the box at the bottom.
+  const bio = a.author_bio?.trim() || null;
   const author = house ?? authorName(a);
   const role = house ? "" : authorRole(a);
   const authorT = Array.isArray(a.therapists) ? a.therapists[0] : a.therapists;
@@ -128,9 +132,11 @@ export default async function CommunityArticlePage({ params }: { params: Promise
     description: metaDescription(a.summary || a.body),
     inLanguage: "he",
     // A house byline ("צוות טיפול חכם") is the organization, not a person.
-    author: house
-      ? { "@type": "Organization", name: author }
-      : { "@type": "Person", name: author },
+    author: {
+      "@type": house ? "Organization" : "Person",
+      name: author,
+      ...(bio ? { description: bio } : {}),
+    },
     publisher: { "@type": "Organization", name: "טיפול חכם", url: BASE_URL },
     url: `${BASE_URL}/research/community/${a.slug}`,
     datePublished: published,
@@ -238,14 +244,21 @@ export default async function CommunityArticlePage({ params }: { params: Promise
       </div>
 
       {/* Author attribution - colored name + role + note. A house byline links
-          to the homepage instead of a therapist profile. */}
+          to the homepage instead of a therapist profile. When the article has
+          an author bio it takes the note's place, and the role line goes too:
+          the bio states the credentials in the author's own words, and showing
+          both said the same title twice. */}
       <div className="mt-12 rounded-2xl border border-[#E8E0D8] bg-[var(--surface)] p-6">
         {house ? (
           <>
             <span className="text-lg font-black text-[#2e7d8c]">{author}</span>
             <p className="mt-2 text-sm text-stone-600 leading-7">
-              מאמר זה נכתב על ידי {author}. טיפול חכם עוזר לכם למצוא את הטיפול והמטפל/ת המתאימים -
-              בחינם ובאנונימיות.
+              {bio ?? (
+                <>
+                  מאמר זה נכתב על ידי {author}. טיפול חכם עוזר לכם למצוא את הטיפול והמטפל/ת המתאימים -
+                  בחינם ובאנונימיות.
+                </>
+              )}
             </p>
             <Link href="/" className="mt-3 inline-block text-sm font-semibold text-[#2e7d8c] hover:underline">
               למציאת מטפל/ת מתאים/ה ←
@@ -256,9 +269,13 @@ export default async function CommunityArticlePage({ params }: { params: Promise
             <Link href={authorHref} className="text-lg font-black text-[#2e7d8c] hover:underline">
               {author}
             </Link>
-            {role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
+            {!bio && role && <p className="mt-1 text-sm font-semibold text-[var(--teal)]">{role}</p>}
             <p className="mt-2 text-sm text-stone-600 leading-7">
-              מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, {authorNoun} באתר טיפול חכם.
+              {bio ?? (
+                <>
+                  מאמר זה נכתב על ידי {author}{role ? `, ${role}` : ""}, {authorNoun} באתר טיפול חכם.
+                </>
+              )}
             </p>
             <Link
               href={authorHref}

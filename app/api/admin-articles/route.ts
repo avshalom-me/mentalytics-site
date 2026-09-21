@@ -50,7 +50,7 @@ export async function GET() {
     supabaseAdmin
       .from("therapist_articles")
       .select(
-        "id, therapist_id, title, slug, summary, body, topic, status, rejection_reason, created_at, approved_at, image_url, image_alt, image_credit, canonical_url, author_name, therapists(full_name)"
+        "id, therapist_id, title, slug, summary, body, topic, status, rejection_reason, created_at, approved_at, image_url, image_alt, image_credit, canonical_url, author_name, author_bio, therapists(full_name)"
       )
       .order("created_at", { ascending: false }),
     supabaseAdmin
@@ -98,6 +98,7 @@ export async function POST(req: NextRequest) {
     image_credit?: unknown;
     canonical_url?: unknown;
     author_name?: unknown;
+    author_bio?: unknown;
     download_location?: unknown;
   };
   try {
@@ -108,6 +109,7 @@ export async function POST(req: NextRequest) {
 
   const therapistId = typeof body.therapist_id === "string" ? body.therapist_id : "";
   const authorName = typeof body.author_name === "string" ? body.author_name.trim() : "";
+  const authorBio = typeof body.author_bio === "string" ? body.author_bio.trim() : "";
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const summary = typeof body.summary === "string" ? body.summary.trim() : "";
   const articleBody = typeof body.body === "string" ? body.body.trim() : "";
@@ -145,6 +147,12 @@ export async function POST(req: NextRequest) {
   if (canonicalUrl && !/^https:\/\//.test(canonicalUrl)) {
     return NextResponse.json({ ok: false, error: "כתובת המקור (canonical) חייבת להיות https" }, { status: 400 });
   }
+  if (authorBio.length > ARTICLE_LIMITS.authorBioMax) {
+    return NextResponse.json(
+      { ok: false, error: `הביו ארוך מדי (עד ${ARTICLE_LIMITS.authorBioMax} תווים)` },
+      { status: 400 }
+    );
+  }
 
   // The attributed therapist must be a real, publicly-listed therapist.
   const { data: therapist } = await supabaseAdmin
@@ -176,6 +184,7 @@ export async function POST(req: NextRequest) {
       image_credit: imageCredit || null,
       canonical_url: canonicalUrl || null,
       author_name: authorName || null,
+      author_bio: authorBio || null,
     })
     .select("id, slug")
     .single();
@@ -207,6 +216,7 @@ export async function PATCH(req: NextRequest) {
     image_credit?: unknown;
     canonical_url?: unknown;
     author_name?: unknown;
+    author_bio?: unknown;
     download_location?: unknown;
   };
   try {
@@ -240,6 +250,16 @@ export async function PATCH(req: NextRequest) {
     if (typeof body.image_alt === "string") update.image_alt = body.image_alt.trim() || null;
     if (typeof body.image_credit === "string") update.image_credit = body.image_credit.trim() || null;
     if (typeof body.author_name === "string") update.author_name = body.author_name.trim() || null;
+    if (typeof body.author_bio === "string") {
+      const bio = body.author_bio.trim();
+      if (bio.length > ARTICLE_LIMITS.authorBioMax) {
+        return NextResponse.json(
+          { ok: false, error: `הביו ארוך מדי (עד ${ARTICLE_LIMITS.authorBioMax} תווים)` },
+          { status: 400 }
+        );
+      }
+      update.author_bio = bio || null;
+    }
     if (typeof body.canonical_url === "string") {
       const c = body.canonical_url.trim();
       if (c && !/^https:\/\//.test(c)) {

@@ -84,7 +84,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  let body: { title?: unknown; summary?: unknown; body?: unknown; topic?: unknown };
+  let body: { title?: unknown; summary?: unknown; body?: unknown; topic?: unknown; author_bio?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
   const articleBody = typeof body.body === "string" ? body.body.trim() : "";
   const topicRaw = typeof body.topic === "string" ? body.topic.trim() : "";
   const topic = (ARTICLE_TOPICS as readonly string[]).includes(topicRaw) ? topicRaw : null;
+  const authorBio = typeof body.author_bio === "string" ? body.author_bio.trim() : "";
 
   if (title.length < ARTICLE_LIMITS.titleMin || title.length > ARTICLE_LIMITS.titleMax) {
     return NextResponse.json(
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
   if (articleBody.length < ARTICLE_LIMITS.bodyMin || articleBody.length > ARTICLE_LIMITS.bodyMax) {
     return NextResponse.json(
       { ok: false, error: `גוף המאמר צריך להיות בין ${ARTICLE_LIMITS.bodyMin} ל-${ARTICLE_LIMITS.bodyMax} תווים` },
+      { status: 400 }
+    );
+  }
+  if (authorBio.length > ARTICLE_LIMITS.authorBioMax) {
+    return NextResponse.json(
+      { ok: false, error: `הביו ארוך מדי (עד ${ARTICLE_LIMITS.authorBioMax} תווים)` },
       { status: 400 }
     );
   }
@@ -140,6 +147,7 @@ export async function POST(req: NextRequest) {
       summary,
       body: articleBody,
       topic,
+      author_bio: authorBio || null,
       status: "pending",
     })
     .select("id, slug")

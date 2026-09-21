@@ -21,6 +21,7 @@ type AdminArticle = {
   image_credit: string | null;
   canonical_url: string | null;
   author_name: string | null;
+  author_bio: string | null;
 };
 
 type TherapistLite = { id: string; full_name: string };
@@ -174,14 +175,14 @@ export default function AdminArticlesPage() {
   const [busy, setBusy] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
   const [editId, setEditId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState({ title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "" });
+  const [editForm, setEditForm] = useState({ title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "", author_bio: "" });
   const [editImage, setEditImage] = useState<ImageValue>(EMPTY_IMAGE);
 
   // Create-form state
   const [showCreate, setShowCreate] = useState(false);
   const [createBusy, setCreateBusy] = useState(false);
   const [createErr, setCreateErr] = useState<string | null>(null);
-  const [createForm, setCreateForm] = useState({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "" });
+  const [createForm, setCreateForm] = useState({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "", author_bio: "" });
   const [createImage, setCreateImage] = useState<ImageValue>(EMPTY_IMAGE);
 
   async function load() {
@@ -233,7 +234,7 @@ export default function AdminArticlesPage() {
       setCreateErr(json.error ?? "שגיאה ביצירת המאמר");
       return;
     }
-    setCreateForm({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "" });
+    setCreateForm({ therapist_id: "", title: "", summary: "", body: "", topic: "", canonical_url: "", author_name: "", author_bio: "" });
     setCreateImage(EMPTY_IMAGE);
     setShowCreate(false);
     await load();
@@ -250,7 +251,7 @@ export default function AdminArticlesPage() {
   function startEdit(a: AdminArticle) {
     setEditId(a.id);
     setOpenId(a.id);
-    setEditForm({ title: a.title, summary: a.summary, body: a.body, topic: a.topic ?? "", canonical_url: a.canonical_url ?? "", author_name: a.author_name ?? "" });
+    setEditForm({ title: a.title, summary: a.summary, body: a.body, topic: a.topic ?? "", canonical_url: a.canonical_url ?? "", author_name: a.author_name ?? "", author_bio: a.author_bio ?? "" });
     setEditImage({
       image_url: a.image_url ?? "",
       image_alt: a.image_alt ?? "",
@@ -328,7 +329,7 @@ export default function AdminArticlesPage() {
             <textarea value={editForm.body} onChange={(e) => setEditForm({ ...editForm, body: e.target.value })}
               rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7" placeholder="גוף המאמר" />
             <p className="text-[11px] text-stone-400 leading-5">
-              עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה. שורה ריקה = פסקה חדשה.
+              עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה · שורות <code>| א | ב |</code> ומתחת לראשונה <code>|---|---|</code> = טבלה. שורה ריקה = פסקה חדשה.
             </p>
             <div>
               <p className="text-xs font-semibold text-stone-600 mb-1">תמונה</p>
@@ -339,6 +340,13 @@ export default function AdminArticlesPage() {
               <input value={editForm.author_name} onChange={(e) => setEditForm({ ...editForm, author_name: e.target.value })}
                 className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder='למשל "צוות טיפול חכם" — מאמר מערכת ללא שיוך למטפל/ת' />
               <p className="text-[11px] text-stone-400 mt-1">אם ממלאים — הבייליין יוצג בשם זה ללא קישור לפרופיל, והמאמר לא יופיע תחת המטפל/ת המשויך/ת. להשאיר ריק כדי לייחס למטפל/ת.</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-stone-600 mb-1">ביו המחבר/ת (אופציונלי)</p>
+              <textarea value={editForm.author_bio} onChange={(e) => setEditForm({ ...editForm, author_bio: e.target.value })}
+                rows={2} maxLength={ARTICLE_LIMITS.authorBioMax}
+                className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder='למשל: ד"ר ..., פסיכולוג/ית קליני/ת. מרצה ל...' />
+              <p className="text-[11px] text-stone-400 mt-1">מוצג בתיבת המחבר בסוף המאמר, במקום השורה הכללית &quot;מאמר זה נכתב על ידי...&quot;. עד {ARTICLE_LIMITS.authorBioMax} תווים.</p>
             </div>
             <div>
               <p className="text-xs font-semibold text-stone-600 mb-1">כתובת מקור מקורית (canonical)</p>
@@ -416,7 +424,7 @@ export default function AdminArticlesPage() {
             rows={12} className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm leading-7"
             placeholder={`גוף המאמר (${ARTICLE_LIMITS.bodyMin}–${ARTICLE_LIMITS.bodyMax} תווים, שורה ריקה = פסקה חדשה)`} />
           <p className="text-[11px] text-stone-400 leading-5">
-            עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה. שורה ריקה = פסקה חדשה.
+            עיצוב (אופציונלי, טוב ל-SEO): <code>## כותרת משנה</code> · <code>### כותרת קטנה</code> · <code>[טקסט](כתובת)</code> קישור · <code>**מודגש**</code> · שורות שמתחילות ב-<code>-</code> = רשימה · שורות <code>| א | ב |</code> ומתחת לראשונה <code>|---|---|</code> = טבלה. שורה ריקה = פסקה חדשה.
           </p>
 
           <div>
@@ -429,6 +437,14 @@ export default function AdminArticlesPage() {
             <input value={createForm.author_name} onChange={(e) => setCreateForm({ ...createForm, author_name: e.target.value })}
               className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder='למשל "צוות טיפול חכם" — מאמר מערכת ללא שיוך למטפל/ת' />
             <p className="text-[11px] text-stone-400 mt-1">אם ממלאים — הבייליין יוצג בשם זה ללא קישור לפרופיל, והמאמר לא יופיע תחת המטפל/ת המשויך/ת (עדיין חובה לבחור מטפל/ת לשיוך פנימי). להשאיר ריק כדי לייחס למטפל/ת.</p>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold text-stone-600 mb-1">ביו המחבר/ת (אופציונלי)</p>
+            <textarea value={createForm.author_bio} onChange={(e) => setCreateForm({ ...createForm, author_bio: e.target.value })}
+              rows={2} maxLength={ARTICLE_LIMITS.authorBioMax}
+              className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm" placeholder='למשל: ד"ר ..., פסיכולוג/ית קליני/ת. מרצה ל...' />
+            <p className="text-[11px] text-stone-400 mt-1">מוצג בתיבת המחבר בסוף המאמר, במקום השורה הכללית &quot;מאמר זה נכתב על ידי...&quot;. עד {ARTICLE_LIMITS.authorBioMax} תווים.</p>
           </div>
 
           <div>

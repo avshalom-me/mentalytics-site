@@ -35,6 +35,7 @@ export default function TherapistArticlesPage() {
   const [topic, setTopic] = useState("");
   const [summary, setSummary] = useState("");
   const [body, setBody] = useState("");
+  const [authorBio, setAuthorBio] = useState("");
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
@@ -87,7 +88,7 @@ export default function TherapistArticlesPage() {
     const res = await fetch("/api/therapists/articles", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({ title, topic, summary, body }),
+      body: JSON.stringify({ title, topic, summary, body, author_bio: authorBio }),
     });
     const json = await res.json();
     if (!json.ok) {
@@ -100,6 +101,7 @@ export default function TherapistArticlesPage() {
     setTopic("");
     setSummary("");
     setBody("");
+    setAuthorBio("");
     await refresh(accessToken);
     setSaving(false);
   }
@@ -184,6 +186,23 @@ export default function TherapistArticlesPage() {
             />
             <p className="mt-1 text-xs text-stone-400">
               {body.length} תווים (מינימום {ARTICLE_LIMITS.bodyMin}) · עיצוב: <code>## כותרת</code>, <code>[טקסט](כתובת)</code> לקישור, <code>**מודגש**</code>, <code>-</code> לרשימה
+            </p>
+          </div>
+
+          <div>
+            <label className="mb-1 block text-sm font-semibold text-stone-700">
+              כמה מילים עליך <span className="text-stone-400 font-normal">(רשות - מוצג בסוף המאמר)</span>
+            </label>
+            <textarea
+              value={authorBio}
+              onChange={(e) => setAuthorBio(e.target.value)}
+              rows={2}
+              maxLength={ARTICLE_LIMITS.authorBioMax}
+              placeholder="לדוגמה: פסיכולוגית קלינית, מתמחה בטיפול בחרדה אצל מבוגרים. מלמדת בתוכנית להכשרת מטפלים."
+              className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
+            />
+            <p className="mt-1 text-xs text-stone-400">
+              הכשרה, תחומי התמחות או מקום עבודה. בלי זה, בסוף המאמר תופיע שורה כללית עם שמך והתואר שלך.
             </p>
           </div>
 

@@ -43,6 +43,9 @@ export const ARTICLE_LIMITS = {
   summaryMax: 300,
   bodyMin: 200,
   bodyMax: 12000,
+  // The author box at the bottom of an article: a line or two of credentials,
+  // not a second article.
+  authorBioMax: 400,
 } as const;
 
 // Hebrew-friendly slug. Keeps Hebrew letters and latin alphanumerics, turns
