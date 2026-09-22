@@ -367,6 +367,26 @@ function scoreTherapist(
     }
   }
 
+  // Hard filter — therapy request: the therapist must offer therapy at all.
+  // The mirror of the filter above. A profile with assessments only (no
+  // therapy area, no couples approach) earns nothing on expertise, yet the
+  // age-group score kept it in the results, and as a local it landed in the
+  // "in your area" group, above out-of-area therapists who do the treatment.
+  // On 22/9/2026 an assessor who takes no therapy patients was offered for
+  // couples therapy and for CBT; all 21 of his match cards in the 30 days to
+  // then came from therapy searches. The quizzes send one kind of request at
+  // a time, so an assessment or a profession search is left alone - there the
+  // assessor is the answer.
+  if (
+    input.treatmentTypes.length > 0 &&
+    input.diagnosisTypes.length === 0 &&
+    input.requiredTherapistTypes.length === 0 &&
+    parseArray(therapist.training_areas).length === 0 &&
+    couplesModalities.length === 0
+  ) {
+    return null;
+  }
+
   let earned = 0;
   let possible = 0;
   const reasons: string[] = [];
