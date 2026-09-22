@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
@@ -9,24 +10,16 @@ export const metadata: Metadata = {
     "אבחון תקשורת", "אבחון אוטיזם", "ASD", "ADOS", "ADI-R",
     "רצף האוטיזם", "קשיים חברתיים", "פסיכולוג קליני", "אבחון ילדים",
   ],
-  openGraph: {
-    title: "אבחון אוטיזם (ASD) - איך מתבצע אבחון תקשורת, למי ומתי לפנות",
-    description: "מהו אבחון תקשורת, כיצד הוא מתבצע ומדוע אבחון כפול ומקצועי הוא קריטי - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=1200&h=630&fit=crop&auto=format&q=80",
-        width: 1200,
-        height: 630,
-        alt: "אבחון תקשורת ואוטיזם - ילד בהערכה מקצועית",
-      },
-    ],
-  },
   alternates: {
     canonical: "https://www.mentalytics.co.il/research/autism-assessment",
   },
+  ...shareMetadata({
+    url: "/research/autism-assessment",
+    title: "אבחון אוטיזם (ASD) - איך מתבצע אבחון תקשורת, למי ומתי לפנות",
+    description: "מהו אבחון תקשורת, כיצד הוא מתבצע ומדוע אבחון כפול ומקצועי הוא קריטי - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
+    image: "https://images.unsplash.com/photo-1516627145497-ae6968895b74?w=1200&h=630&fit=crop&auto=format&q=80",
+    imageAlt: "אבחון תקשורת ואוטיזם - ילד בהערכה מקצועית",
+  }),
 };
 
 const jsonLd = {

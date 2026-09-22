@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
 
@@ -14,25 +15,16 @@ export const metadata: Metadata = {
     "סגנון התקשרות", "גישת ההשלמה", "גישת הדמיון", "אישיות המטפל",
     "פסיכותרפיה", "בחירת מטפל",
   ],
-  openGraph: {
-    title: "הקושי בהתאמה הטיפולית בין מטפל למטופל - מה אומר המחקר?",
-    description:
-      "התאמה אישיותית בין מטפל למטופל - השלמה מול דמיון, צירי שליטה וקרבה, וכיצד הם משפיעים על הצלחת הטיפול. מאת ד\"ר אבשלום גליל, פסיכולוג קליני.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    images: [
-      {
-        url: `${IMG}?w=1200&h=630&fit=crop&auto=format&q=80`,
-        width: 1200,
-        height: 630,
-        alt: "שתי ידיים שלובות - חיבור וברית טיפולית בין מטפל למטופל",
-      },
-    ],
-  },
   alternates: {
     canonical: "https://www.mentalytics.co.il/research/therapist-patient-match",
   },
+  ...shareMetadata({
+    url: "/research/therapist-patient-match",
+    title: "הקושי בהתאמה הטיפולית בין מטפל למטופל - מה אומר המחקר?",
+    description: "התאמה אישיותית בין מטפל למטופל - השלמה מול דמיון, צירי שליטה וקרבה, וכיצד הם משפיעים על הצלחת הטיפול. מאת ד\"ר אבשלום גליל, פסיכולוג קליני.",
+    image: `${IMG}?w=1200&h=630&fit=crop&auto=format&q=80`,
+    imageAlt: "שתי ידיים שלובות - חיבור וברית טיפולית בין מטפל למטופל",
+  }),
 };
 
 const jsonLd = {

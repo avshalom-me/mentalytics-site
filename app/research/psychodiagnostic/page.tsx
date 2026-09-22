@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
@@ -9,24 +10,16 @@ export const metadata: Metadata = {
     "אבחון פסיכודיאגנוסטי", "אבחון פסיכולוגי", "פסיכולוג קליני", "מבחן רורשאך",
     "אבחון נפשי", "מבנה אישיות", "תוכנית טיפולית", "אבחון מעמיק",
   ],
-  openGraph: {
-    title: "אבחון פסיכודיאגנוסטי - אילו מבחנים, כמה מפגשים ומתי כדאי לפנות",
-    description: "מהו האבחון הפסיכולוגי המעמיק ביותר, מה הוא כולל ומתי הוא חיוני - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&h=630&fit=crop&auto=format&q=80",
-        width: 1200,
-        height: 630,
-        alt: "אבחון פסיכודיאגנוסטי - הערכה פסיכולוגית מעמיקה",
-      },
-    ],
-  },
   alternates: {
     canonical: "https://www.mentalytics.co.il/research/psychodiagnostic",
   },
+  ...shareMetadata({
+    url: "/research/psychodiagnostic",
+    title: "אבחון פסיכודיאגנוסטי - אילו מבחנים, כמה מפגשים ומתי כדאי לפנות",
+    description: "מהו האבחון הפסיכולוגי המעמיק ביותר, מה הוא כולל ומתי הוא חיוני - מאמר מקצועי של גונן שש, פסיכולוג קליני מומחה.",
+    image: "https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=1200&h=630&fit=crop&auto=format&q=80",
+    imageAlt: "אבחון פסיכודיאגנוסטי - הערכה פסיכולוגית מעמיקה",
+  }),
 };
 
 const jsonLd = {

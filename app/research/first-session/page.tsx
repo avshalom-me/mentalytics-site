@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 import { AuthorByline } from "@/app/components/AuthorByline";
@@ -32,15 +33,13 @@ export const metadata: Metadata = {
     "האם פסיכולוג חייב בסודיות",
   ],
   alternates: { canonical: URL },
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/first-session",
     title: TITLE,
     description: DESCRIPTION,
-    url: URL,
-    type: "article",
-    locale: "he_IL",
-    siteName: "טיפול חכם",
-    images: [{ url: HERO, width: 1200, height: 630, alt: "פסיכולוגית בפגישה ראשונה עם מטופלת" }],
-  },
+    image: HERO,
+    imageAlt: "פסיכולוגית בפגישה ראשונה עם מטופלת",
+  }),
 };
 
 const articleLd = {

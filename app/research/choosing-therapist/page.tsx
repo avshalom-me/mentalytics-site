@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import QuizCtaBanner from "../QuizCtaBanner";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
@@ -26,14 +27,12 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "https://www.mentalytics.co.il/research/choosing-therapist",
   },
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/choosing-therapist",
     title: "איך למצוא פסיכולוג שמתאים לך - המדריך המלא",
-    description:
-      "מה חשוב לבדוק כשמחפשים פסיכולוג או מטפל: הכשרה, התמחות, גישה טיפולית, כימיה, לוגיסטיקה ועלות - ואיך לזהות מתי כדאי לחפש התאמה אחרת.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-  },
+    description: "מה חשוב לבדוק כשמחפשים פסיכולוג או מטפל: הכשרה, התמחות, גישה טיפולית, כימיה, לוגיסטיקה ועלות - ואיך לזהות מתי כדאי לחפש התאמה אחרת.",
+    image: editorialImage("choosing-therapist"),
+  }),
 };
 
 const jsonLd = {

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import ArticleShell from "@/app/components/ArticleShell";
 import { AuthorByline } from "@/app/components/AuthorByline";
 import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ track: st
     title: t.searchTitle,
     description: t.metaDescription,
     alternates: { canonical: url },
-    openGraph: { title: t.searchTitle, description: t.metaDescription, url, type: "article", locale: "he_IL", siteName: "טיפול חכם" },
+    ...shareMetadata({ url, title: t.searchTitle, description: t.metaDescription }),
   };
 }
 

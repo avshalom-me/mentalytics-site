@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ArticleBody } from "@/app/components/ArticleBody";
 import { therapistTypeLabel } from "@/app/lib/therapist-options";
@@ -94,12 +95,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
     title: a.title,
     description: desc,
     alternates: { canonical },
-    openGraph: {
-      title: a.title,
-      description: desc,
-      url: ownUrl,
-      type: "article",
-    },
+    // og:url stays on this page even when the canonical points elsewhere, so
+    // a share of this page previews this page.
+    ...shareMetadata({ url: ownUrl, title: a.title, description: desc, image: a.image_url, imageAlt: a.image_alt }),
   };
 }
 

@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { FAQS } from "./faqs";
 
 export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/faq" },
   title: "שאלות נפוצות על טיפול נפשי",
   description: "תשובות לשאלות הנפוצות ביותר על טיפול פסיכולוגי - עלות, קופות חולים, משך טיפול, הבדל בין פסיכולוג לפסיכיאטר, חיסיון ועוד.",
+  ...shareMetadata({
+    url: "/research/faq",
+    title: "שאלות נפוצות על טיפול נפשי",
+    description: "תשובות לשאלות הנפוצות ביותר על טיפול פסיכולוגי - עלות, קופות חולים, משך טיפול, הבדל בין פסיכולוג לפסיכיאטר, חיסיון ועוד.",
+    image: editorialImage("faq"),
+  }),
 };
 
 // FAQPage JSON-LD נפלט מה-layout (server) כדי שיהיה ב-HTML הראשוני - הדף עצמו

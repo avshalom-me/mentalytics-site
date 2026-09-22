@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
@@ -7,6 +8,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/therapy-for-child" },
   title: "איך לבחור פסיכולוג לילד?",
   description: "מה חשוב לבדוק כשבוחרים פסיכולוג או מטפל לילד: הכשרה והתמחות, מידת השיתוף של ההורים, התאמה לגיל הילד, ואילו שאלות כדאי לשאול כבר בשיחת ההיכרות.",
+  ...shareMetadata({
+    url: "/research/therapy-for-child",
+    title: "איך לבחור פסיכולוג לילד?",
+    description: "מה חשוב לבדוק כשבוחרים פסיכולוג או מטפל לילד: הכשרה והתמחות, מידת השיתוף של ההורים, התאמה לגיל הילד, ואילו שאלות כדאי לשאול כבר בשיחת ההיכרות.",
+    image: editorialImage("therapy-for-child"),
+  }),
 };
 
 const jsonLd = {

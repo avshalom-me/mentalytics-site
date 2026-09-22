@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
@@ -17,7 +18,12 @@ export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
   alternates: { canonical: "https://www.mentalytics.co.il/research/kupa-guide" },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: "https://www.mentalytics.co.il/research/kupa-guide" },
+  ...shareMetadata({
+    url: "/research/kupa-guide",
+    title: TITLE,
+    description: DESCRIPTION,
+    image: editorialImage("kupa-guide"),
+  }),
 };
 
 const jsonLd = {

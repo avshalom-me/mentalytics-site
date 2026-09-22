@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 
 // Originally added because a client component cannot export `metadata`, and
 // /research/academic had none: no description, no canonical, and a <title> that
@@ -10,12 +11,12 @@ export const metadata: Metadata = {
   description:
     "מאות המחקרים והמקורות האקדמיים שעליהם מבוססים שאלוני ההכוונה של טיפול חכם, עם סטטוס אימות לכל מקור וקישור ל-DOI. ניתן לחיפוש, לסינון לפי נושא ולמיון לפי שנה.",
   alternates: { canonical: "https://www.mentalytics.co.il/research/academic" },
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/academic",
     title: "מאמרים אקדמאיים - המקורות שמאחורי השאלונים",
     description: "המחקרים והמקורות האקדמיים שעליהם מבוססים שאלוני ההכוונה של טיפול חכם.",
-    url: "https://www.mentalytics.co.il/research/academic",
     type: "website",
-  },
+  }),
 };
 
 export default function AcademicLayout({ children }: { children: React.ReactNode }) {

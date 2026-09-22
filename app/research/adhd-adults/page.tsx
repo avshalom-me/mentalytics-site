@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
@@ -7,6 +8,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/adhd-adults" },
   title: "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים: מי מוסמך, כמה עולה ומה הלאה",
   description: "מה כולל אבחון הפרעת קשב וריכוז (ADHD) במבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
+  ...shareMetadata({
+    url: "/research/adhd-adults",
+    title: "אבחון הפרעת קשב וריכוז (ADHD) במבוגרים: מי מוסמך, כמה עולה ומה הלאה",
+    description: "מה כולל אבחון הפרעת קשב וריכוז (ADHD) במבוגרים, מי מוסמך לבצע אותו, כמה הוא עולה וכמה זמן הוא לוקח - וגם מה עושים עם התוצאות אחרי שמקבלים אותן, כולל אפשרויות טיפול.",
+    image: editorialImage("adhd-adults"),
+  }),
 };
 
 const jsonLd = {

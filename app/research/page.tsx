@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
   SECTIONS,
@@ -17,12 +18,12 @@ export const metadata: Metadata = {
   title: "מאמרים ומידע על טיפול נפשי",
   description: HUB_DESCRIPTION,
   alternates: { canonical: `${BASE_URL}/research` },
-  openGraph: {
+  ...shareMetadata({
+    url: `${BASE_URL}/research`,
     title: "מאמרים ומידע על טיפול נפשי",
     description: HUB_DESCRIPTION,
-    url: `${BASE_URL}/research`,
     type: "website",
-  },
+  }),
 };
 
 // Refresh the hub periodically so newly-approved community articles appear.

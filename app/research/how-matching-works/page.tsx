@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import QuizCtaBanner from "../QuizCtaBanner";
 import { siteAuthorRef } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
@@ -37,15 +38,12 @@ export const metadata: Metadata = {
     "מודל התאמה טיפולית",
   ],
   alternates: { canonical: URL },
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/how-matching-works",
     title: TITLE,
-    description:
-      "על מה המודל נשען, מה השאלון מודד, איך מחושבת ההתאמה, ומה המודל לא עושה.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    url: URL,
-  },
+    description: "על מה המודל נשען, מה השאלון מודד, איך מחושבת ההתאמה, ומה המודל לא עושה.",
+    image: editorialImage("how-matching-works"),
+  }),
 };
 
 const jsonLd = {

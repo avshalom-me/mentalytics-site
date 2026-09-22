@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import ArticleShell from "@/app/components/ArticleShell";
 import { AuthorByline } from "@/app/components/AuthorByline";
 import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
@@ -25,7 +26,12 @@ export const metadata: Metadata = {
     "שיקום מקצועי ביטוח לאומי",
   ],
   alternates: { canonical: URL },
-  openGraph: { title: TITLE, description: DESCRIPTION, url: URL, type: "article", locale: "he_IL", siteName: "טיפול חכם" },
+  ...shareMetadata({
+    url: "/research/btl",
+    title: TITLE,
+    description: DESCRIPTION,
+    image: editorialImage("btl"),
+  }),
 };
 
 const articleLd = {

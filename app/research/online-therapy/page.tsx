@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 import { siteAuthorRef, SITE_AUTHOR, SITE_AUTHOR_PATH } from "@/app/lib/author";
@@ -17,6 +18,12 @@ export const metadata: Metadata = {
   title: TITLE,
   description:
     "האם טיפול פסיכולוגי אונליין באמת עובד? מה מראים המחקרים על יעילותו מול טיפול פנים מול פנים, למי הוא פחות מתאים, ואיך בוחרים פסיכולוג אונליין או מטפל לטיפול מרחוק.",
+  ...shareMetadata({
+    url: "/research/online-therapy",
+    title: TITLE,
+    description: "האם טיפול פסיכולוגי אונליין באמת עובד? מה מראים המחקרים על יעילותו מול טיפול פנים מול פנים, למי הוא פחות מתאים, ואיך בוחרים פסיכולוג אונליין או מטפל לטיפול מרחוק.",
+    image: editorialImage("online-therapy"),
+  }),
 };
 
 // Refresh hourly so the live therapist count in the CTA tracks the directory.

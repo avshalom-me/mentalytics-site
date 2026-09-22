@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
   SECTIONS,
@@ -58,7 +59,7 @@ export async function generateMetadata({ params }: { params: Promise<{ topic: st
     description: section.blurb,
     alternates: { canonical: url },
     robots,
-    openGraph: { title: `${section.name} - מאמרים ומידע`, description: section.blurb, url, type: "website" },
+    ...shareMetadata({ url, title: `${section.name} - מאמרים ומידע`, description: section.blurb, type: "website" }),
   };
 }
 

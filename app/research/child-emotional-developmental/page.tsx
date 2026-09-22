@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import ArticleShell from "@/app/components/ArticleShell";
 
 export const metadata: Metadata = {
@@ -10,25 +11,16 @@ export const metadata: Metadata = {
     "גיל הרך", "עיבוד חושי", "עיכוב שפתי", "עצירות תפקודית", "אתגרים מוטוריים",
     "פרשנות רגשית", "פיזיותרפיה התפתחותית", "ויסות חושי", "ילדים", "התפתחות",
   ],
-  openGraph: {
-    title: "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים",
-    description:
-      "קשיים פיזיולוגיים והתפתחותיים שמתחפשים לקשיים רגשיים אצל ילדים בגיל הרך - מאמר מקצועי של שילת יוגב, פיזיותרפיסטית התפתחותית.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    images: [
-      {
-        url: "https://images.unsplash.com/photo-1576765608622-067973a79f53?w=1200&h=630&fit=crop&auto=format&q=80",
-        width: 1200,
-        height: 630,
-        alt: "ילד קטן בהערכה התפתחותית - גיל הרך",
-      },
-    ],
-  },
   alternates: {
     canonical: "https://www.mentalytics.co.il/research/child-emotional-developmental",
   },
+  ...shareMetadata({
+    url: "/research/child-emotional-developmental",
+    title: "קושי רגשי או פיזיולוגי? עצירות, ויסות חושי ועיכוב שפה אצל ילדים",
+    description: "קשיים פיזיולוגיים והתפתחותיים שמתחפשים לקשיים רגשיים אצל ילדים בגיל הרך - מאמר מקצועי של שילת יוגב, פיזיותרפיסטית התפתחותית.",
+    image: "https://images.unsplash.com/photo-1576765608622-067973a79f53?w=1200&h=630&fit=crop&auto=format&q=80",
+    imageAlt: "ילד קטן בהערכה התפתחותית - גיל הרך",
+  }),
 };
 
 const jsonLd = {

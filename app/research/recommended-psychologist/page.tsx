@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import QuizCtaBanner from "../QuizCtaBanner";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
@@ -21,16 +22,12 @@ export const metadata: Metadata = {
     "בחירת פסיכולוג",
   ],
   alternates: { canonical: URL },
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/recommended-psychologist",
     title: "פסיכולוג מומלץ - איך למצוא פסיכולוג טוב שמתאים לכם",
-    description:
-      "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לקושי, לאופי ולנסיבות שלכם.",
-    locale: "he_IL",
-    type: "article",
-    siteName: "טיפול חכם",
-    url: URL,
-    images: [{ url: "https://www.mentalytics.co.il/logo.svg.png", alt: "טיפול חכם" }],
-  },
+    description: "למה 'המלצה על פסיכולוג' היא עניין אישי, ואיך למצוא פסיכולוג טוב שמתאים דווקא לקושי, לאופי ולנסיבות שלכם.",
+    image: editorialImage("recommended-psychologist"),
+  }),
 };
 
 const FAQS = [

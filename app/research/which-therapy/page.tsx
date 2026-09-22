@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import { siteAuthorRef, SITE_AUTHOR_PATH } from "@/app/lib/author";
 import ArticleShell from "@/app/components/ArticleShell";
@@ -11,15 +12,12 @@ export const metadata: Metadata = {
   title: "איזה טיפול פסיכולוגי מתאים לי? - מדריך מבוסס מחקר",
   description:
     "CBT, דינמי, DBT, ACT, EMDR, EFT - מה ההבדל ואיזה מתאים לך? מדריך מקיף מבוסס מחקרים עדכניים על בחירת טיפול פסיכולוגי והתאמה בין מטפל למטופל.",
-  openGraph: {
+  ...shareMetadata({
+    url: "/research/which-therapy",
     title: "איזה טיפול פסיכולוגי מתאים לי?",
-    description:
-      "מדריך מקיף לבחירת סוג הטיפול הנכון - CBT, דינמי, DBT, ACT, EMDR, EFT - לפי הצורך, האישיות, וממצאי המחקר העדכניים.",
-    url: "https://www.mentalytics.co.il/research/which-therapy",
-    type: "article",
-    locale: "he_IL",
-    siteName: "טיפול חכם",
-  },
+    description: "מדריך מקיף לבחירת סוג הטיפול הנכון - CBT, דינמי, DBT, ACT, EMDR, EFT - לפי הצורך, האישיות, וממצאי המחקר העדכניים.",
+    image: editorialImage("which-therapy"),
+  }),
 };
 
 const jsonLd = {

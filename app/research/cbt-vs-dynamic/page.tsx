@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata, editorialImage } from "@/app/lib/share-metadata";
 import { ResearchBreadcrumbLd } from "@/app/components/ResearchBreadcrumbLd";
 import ArticleShell from "@/app/components/ArticleShell";
 
@@ -7,6 +8,12 @@ export const metadata: Metadata = {
   alternates: { canonical: "https://www.mentalytics.co.il/research/cbt-vs-dynamic" },
   title: "הבדל בין CBT לטיפול דינמי - מה ההבדל ומה מתאים לך?",
   description: "CBT מול טיפול דינמי: מה באמת ההבדל בין הגישות, איך נראה מפגש בכל אחת מהן, כמה זמן לוקח כל טיפול, ואיך יודעים איזו גישה מתאימה לקושי שלכם.",
+  ...shareMetadata({
+    url: "/research/cbt-vs-dynamic",
+    title: "הבדל בין CBT לטיפול דינמי - מה ההבדל ומה מתאים לך?",
+    description: "CBT מול טיפול דינמי: מה באמת ההבדל בין הגישות, איך נראה מפגש בכל אחת מהן, כמה זמן לוקח כל טיפול, ואיך יודעים איזו גישה מתאימה לקושי שלכם.",
+    image: editorialImage("cbt-vs-dynamic"),
+  }),
 };
 
 const jsonLd = {
