@@ -260,6 +260,45 @@ describe("mechanicalTracks", () => {
     expect(byKey(mechanicalTracks(onRoute({ zakaut: { status: "decided", decisionReceivedOn: "2026-07-01" } })), "zakaut")).toBeUndefined();
   });
 
+  it("answers בהתלבטות with a deciding aid, and raises the committee to 'consider'", () => {
+    const z = byKey(mechanicalTracks(base({
+      directions: ["emotional", "psychiatric"], schoolTeam: { convened: false },
+      zakaut: { status: "considering" },
+      diagnoses: [{ kind: "פסיכולוג חינוכי", year: 2025 }],
+    })), "zakaut")!;
+    expect(z.relevance).toBe("consider");
+    const items = Object.fromEntries(z.decision!.items.map(i => [i.label, i.ok]));
+    // A school psychologist answers 55 and nothing for 57.
+    expect(items["אבחנה קבילה ל-55 (הפרעות התנהגותיות ורגשיות)"]).toBe(true);
+    expect(items["אבחנה של פסיכיאטר/ית ילדים ונוער ל-57 (הפרעות נפשיות)"]).toBe(false);
+    expect(items["התכנסות הצוות הרב-מקצועי"]).toBe(false);
+    expect(items["הסכמת ההורים לפנייה"]).toBeNull();
+    expect(z.decision!.headline).toMatch(/^כדי להחליט חסר: /);
+    expect(z.decision!.headline).toContain("לוודא: הסכמת ההורים לפנייה");
+  });
+
+  it("asks for a decision a month ahead of 31.3, and 'soon' once that has passed", () => {
+    const early = byKey(mechanicalTracks(onRoute({ zakaut: { status: "considering" } })), "zakaut")!;
+    expect(early.decision!.decideBy).toContain("עד 1.3.2027");
+    expect(early.decision!.deadline).toBe("2027-03-31");
+    const late = byKey(mechanicalTracks(onRoute({ today: "2027-03-15", zakaut: { status: "considering" } })), "zakaut")!;
+    expect(late.decision!.decideBy).toContain("בהקדם");
+    expect(late.decision!.decideBy).toContain("16 ימים");
+  });
+
+  it("gives no deciding aid when the team is not weighing it", () => {
+    expect(byKey(mechanicalTracks(onRoute()), "zakaut")!.decision).toBeUndefined();
+    expect(byKey(mechanicalTracks(onRoute({ zakaut: { status: "in_process" } })), "zakaut")!.decision).toBeUndefined();
+  });
+
+  it("does the same for accommodations, with their own conditions", () => {
+    const h = byKey(mechanicalTracks(base({ grade: "ח", hatamot: { status: "considering" } })), "hatamot")!;
+    expect(h.relevance).toBe("consider");
+    expect(h.decision!.items[0].ok).toBe(false);
+    expect(h.decision!.items[0].label).toContain("1.7.2025");
+    expect(h.decision!.items.map(i => i.label)).toContain("אבחון חדש: חתום לפחות שישה חודשים לפני ההגשה");
+  });
+
   it("names the work when the findings point somewhere the file cannot yet follow", () => {
     const t = mechanicalTracks(base({ directions: [], pendingDirections: ["emotional"], exhaustionNote: "מומלץ להשלים X" }));
     const ex = byKey(t, "exhaustion");

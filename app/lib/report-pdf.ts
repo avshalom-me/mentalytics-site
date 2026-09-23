@@ -199,6 +199,27 @@ function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => 
     }, label));
     out.push({ node: head, keepWithNext: true });
 
+    // "שיקולים להכרעה", when the team is still weighing it: the headline, then
+    // each condition marked met, missing, or to confirm.
+    if (t.decision) {
+      out.push({ node: subHeading("שיקולים להכרעה"), keepWithNext: true });
+      out.push({
+        node: paragraph(t.decision.headline, { font: `700 13px/1.7 ${FONT}`, color: INK, paddingBottom: "6px", textAlign: "start" }),
+        keepWithNext: true,
+      });
+      for (const it of t.decision.items) {
+        out.push({
+          node: bullet(it.label, {
+            marker: it.ok === true ? "✓" : it.ok === false ? "✗" : "?",
+            color: it.ok === false ? "#A83B22" : undefined,
+          }),
+        });
+      }
+      if (t.decision.decideBy) {
+        out.push({ node: paragraph(t.decision.decideBy, { font: `700 12px/1.6 ${FONT}`, color: "#8a5a06", paddingBottom: "12px", textAlign: "start" }) });
+      }
+    }
+
     for (const w of t.why) out.push({ node: bullet(w) });
 
     if (t.deadline) {

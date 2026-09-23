@@ -450,7 +450,49 @@ export interface SchoolTrack {
   officialLinks: { label: string; href: string }[];
   /** Which source and date the facts on this card were verified against. */
   verified: string;
+  /**
+   * Only when the team answered "בהתלבטות": what the map already knows about
+   * each condition for referring, met or not. See TrackDecision.
+   */
+  decision?: TrackDecision;
 }
+
+/**
+ * The deciding aid on a committee the team is still weighing.
+ *
+ * A counsellor who answers "בהתלבטות" does not need the committee explained
+ * again; she needs to know what stands between her and a decision. So each
+ * condition the map can check is listed as met (true) or not (false), and the
+ * one no tool can know - the parents' consent - is null: printed as something
+ * to confirm, never as a verdict.
+ */
+export interface DecisionItem { label: string; ok: boolean | null }
+export interface TrackDecision {
+  items: DecisionItem[];
+  /** One line: what is still missing, then what to confirm. */
+  headline: string;
+  /** When to decide by - a month ahead of the deadline, or "soon" once that is past. */
+  decideBy?: string;
+  /** The statutory deadline itself, when there is one still ahead. ISO. */
+  deadline?: string;
+}
+
+function decisionOf(items: DecisionItem[], extra: { decideBy?: string; deadline?: string } = {}): TrackDecision {
+  const missing = items.filter(i => i.ok === false).map(i => i.label);
+  const confirm = items.filter(i => i.ok === null).map(i => i.label);
+  const parts = [missing.length ? `כדי להחליט חסר: ${missing.join("; ")}` : "כל התנאים שהמערכת בודקת מתקיימים"];
+  if (confirm.length) parts.push(`לוודא: ${confirm.join("; ")}`);
+  return { items, headline: parts.join(". "), ...extra };
+}
+
+/** What a committee route's diagnosis item says, in the committee's own terms. */
+const DIRECTION_DIAGNOSIS: Record<EligibilityDirection, string> = {
+  emotional: "אבחנה קבילה ל-55 (הפרעות התנהגותיות ורגשיות)",
+  psychiatric: "אבחנה של פסיכיאטר/ית ילדים ונוער ל-57 (הפרעות נפשיות)",
+  learning: "אבחנה קבילה ל-58 (לקות למידה רב-בעייתית או AD(H)D)",
+};
+
+const CONSENT_ITEM: DecisionItem = { label: "הסכמת ההורים לפנייה", ok: null };
 
 export interface SchoolTracksInput {
   grade: SchoolGrade;
@@ -459,12 +501,13 @@ export interface SchoolTracksInput {
   diagnoses: Diagnosis[];
   schoolTeam?: { convened: boolean };
   zakaut?: {
-    status: "none" | "in_process" | "decided";
+    /** "considering" is the team weighing a referral - "בהתלבטות". */
+    status: "none" | "considering" | "in_process" | "decided";
     /** ISO date the parents received the decision - the appeal clock runs from here [C]. */
     decisionReceivedOn?: string;
   };
   hatamot?: {
-    status: "none" | "school_level" | "district_submitted" | "district_decided";
+    status: "none" | "considering" | "school_level" | "district_submitted" | "district_decided";
     /** ISO date the district committee's answer was received - the appeal clock runs from here [D]. */
     districtAnswerReceivedOn?: string;
   };
@@ -576,7 +619,8 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     const cautions: string[] = [];
     let relevance: Relevance = "info";
 
-    why.push(`הכיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`);
+    // Under "בהתלבטות" the deciding aid opens with this same line, as its first item.
+    if (zStatus !== "considering") why.push(`הכיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`);
     if (acceptable.length) {
       relevance = "consider";
       why.push(`בתיק מסמך מגורם שאבחנתו קבילה לצורך: ${acceptable.join(", ")} - בתנאי שהאבחנה עצמה כתובה בו`);
@@ -589,6 +633,38 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     }
     if (directions.includes("psychiatric")) cautions.push(PSYCHIATRIC_NOTE);
     if (zStatus === "in_process") why.push("ההליך כבר בעיצומו לפי הדיווח");
+
+    // "בהתלבטות": a team actively weighing a referral is past "מידע", whatever
+    // the file holds - and gets the conditions laid out rather than the
+    // committee explained again.
+    let decision: TrackDecision | undefined;
+    if (zStatus === "considering") {
+      if (relevance === "info") relevance = "consider";
+      const diagnosisItems: DecisionItem[] = directions.map(d => {
+        const states = DIRECTION_CATEGORIES[d].map(c => eligibility[c]);
+        if (states.includes("acceptable")) return { label: DIRECTION_DIAGNOSIS[d], ok: true };
+        if (states.includes("verify_signer")) return { label: `${DIRECTION_DIAGNOSIS[d]} - לבדוק את התמחות החותם/ת`, ok: null };
+        return { label: DIRECTION_DIAGNOSIS[d], ok: false };
+      });
+      const team = input.schoolTeam;
+      const items: DecisionItem[] = [
+        { label: `כיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`, ok: true },
+        // Always met here: the route is live only once both attempts are recorded.
+        { label: "מיצוי אפשרויות: ניסיון טיפולי והתערבות מערכתית", ok: true },
+        ...diagnosisItems,
+        { label: "התכנסות הצוות הרב-מקצועי", ok: team ? team.convened : null },
+        CONSENT_ITEM,
+      ];
+      // A month ahead of the deadline, to leave room for documents and the
+      // parents' signatures. Past that, "soon" - the deadline itself still holds.
+      const by = isoAddDays(win.deadline, -30);
+      const decideBy = !win.open
+        ? undefined
+        : today <= by
+          ? `מומלץ להכריע עד ${formatDateHe(by)} - חודש לפני המועד האחרון, כדי להספיק לאסוף מסמכים וחתימות`
+          : `מומלץ להכריע בהקדם - נותרו ${win.daysLeft} ימים למועד האחרון`;
+      decision = decisionOf(items, { decideBy, deadline: win.open ? win.deadline : undefined });
+    }
 
     const deadline = win.open
       ? { date: win.deadline, label: `הפניה עד ${formatDateHe(win.deadline)} לזכאות בשנת הלימודים ${win.placementYear}`, note: `נותרו ${win.daysLeft} ימים. זהו המועד הסטטוטורי; לרשות המקומית עשוי להיות מועד פנימי מוקדם יותר - לברר מול מחלקת החינוך` }
@@ -611,6 +687,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       cautions,
       officialLinks: [LINKS.zakautPortal, LINKS.admissible, LINKS.zakautKolzchut],
       verified: "פורטל משרד החינוך [B] ותוספת ראשונה [A], כל-זכות [C], 2.9.2026",
+      ...(decision ? { decision } : {}),
     });
   }
 
@@ -696,6 +773,22 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       cautions.push("אבחון ראשון שנערך סמוך להגשה: חייב להיות חתום לפחות שישה חודשים לפני ההגשה, ובתקופה זו מתקיימת התערבות לפי המלצותיו");
     }
 
+    let hDecision: TrackDecision | undefined;
+    if (hStatus === "considering") {
+      if (relevance === "info") relevance = "consider";
+      const floorLabel = `אבחון דידקטי או פסיכו-דידקטי שנערך מ-${formatDateHe(floor)} ואילך`;
+      hDecision = decisionOf([
+        usable.length
+          ? { label: floorLabel, ok: true }
+          : unsure.length
+            ? { label: `${floorLabel} - לבדוק את חודש עריכת האבחון`, ok: null }
+            : { label: floorLabel, ok: false },
+        // Only a new assessment is bound by it; one already usable is not.
+        ...(usable.length ? [] : [{ label: "אבחון חדש: חתום לפחות שישה חודשים לפני ההגשה", ok: null } as DecisionItem]),
+        { label: "ויתור סודיות והסכמת ההורים", ok: null },
+      ]);
+    }
+
     const roundsNote = sy.hebrew === HATAMOT_ROUNDS.circularYear
       ? `מועדי ההגשה לוועדה המחוזית לפי חוזר ${HATAMOT_ROUNDS.circularYear}`
       : `מועדי ההגשה נקבעים מדי שנה בחוזר. בחוזר ${HATAMOT_ROUNDS.circularYear} הם היו: ${HATAMOT_ROUNDS.rounds.map(r => `${r.label} עד ${formatDateHe(r.by)}`).join("; ")}. חוזר ${sy.hebrew} מתפרסם בשפ"ינט`;
@@ -719,6 +812,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       cautions,
       officialLinks: [LINKS.hatamotShefi, LINKS.hatamotCircular],
       verified: 'חוזר התאמות תשפ"ה [D], 2.9.2026',
+      ...(hDecision ? { decision: hDecision } : {}),
     });
   }
 

@@ -237,11 +237,29 @@ describe("buildSchoolSummary", () => {
 });
 
 describe("בהתלבטות - a committee the team is still weighing", () => {
-  it("is reported as said, and reaches the engine as not referred", () => {
-    const A = { ...full, c_zakaut: "considering", c_hatamot: "considering" };
-    expect(toTracksInput(A, TODAY)?.zakaut?.status).toBe("none");
-    expect(toTracksInput(A, TODAY)?.hatamot?.status).toBe("none");
-    expect(buildSchoolSummary(A, [], TODAY).text).toContain("ועדת זכאות ואפיון: בהתלבטות");
+  // An emotional route that is live (both attempts recorded) and no diagnosis.
+  const weighing: Ans = {
+    _audience: "counselor", _grade: "ח", _age: "14", a_emo: "הרבה", aq_tot: 21,
+    c_tried: { shach: "partial", talks: "helped" }, c_team: "no",
+    c_zakaut: "considering", c_diag: [],
+  };
+
+  it("reaches the engine as considering", () => {
+    expect(toTracksInput(weighing, TODAY)?.zakaut?.status).toBe("considering");
+  });
+
+  it("writes what stands between the team and a decision, and the deadline, into the summary", () => {
+    const tracks = mapSchoolTracks(toTracksInput(weighing, TODAY)!);
+    const t = buildSchoolSummary(weighing, tracks, TODAY).text;
+    expect(t).toContain("ועדת זכאות ואפיון: בהתלבטות. כדי להחליט חסר:");
+    expect(t).toContain("אבחנה של פסיכיאטר/ית ילדים ונוער ל-57");
+    expect(t).toContain("התכנסות הצוות הרב-מקצועי");
+    expect(t).toContain("לוודא: הסכמת ההורים לפנייה");
+    expect(t).toContain("מועד אחרון להפניה: 31.3.2027");
+  });
+
+  it("falls back to the bare answer when there is no track to take the reasons from", () => {
+    expect(buildSchoolSummary({ ...full, c_zakaut: "considering" }, [], TODAY).text).toContain("ועדת זכאות ואפיון: בהתלבטות");
   });
 });
 

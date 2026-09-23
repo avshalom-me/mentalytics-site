@@ -558,6 +558,31 @@ const REL_STYLE: Record<SchoolTrack["relevance"], { bg: string; fg: string }> = 
   info: { bg: "var(--surface-2)", fg: "var(--muted)" },
 };
 
+/**
+ * "שיקולים להכרעה" - the deciding aid a committee gets when the team answered
+ * "בהתלבטות". The headline first, since it is the answer to her question;
+ * then each condition, met, missing, or to confirm.
+ */
+function DecisionBox({ d }: { d: NonNullable<SchoolTrack["decision"]> }) {
+  const mark = (ok: boolean | null) => (ok === true ? "✓" : ok === false ? "✗" : "?");
+  const tone = (ok: boolean | null) => (ok === true ? "var(--teal)" : ok === false ? "#A83B22" : "var(--muted)");
+  return (
+    <div className="rounded-xl p-3 mb-3 text-sm" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+      <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שיקולים להכרעה</div>
+      <p className="font-bold mb-2 leading-relaxed" style={{ color: "var(--text)" }}>{d.headline}</p>
+      <ul className="space-y-1">
+        {d.items.map((it, i) => (
+          <li key={i} className="flex gap-2 items-baseline">
+            <span className="font-extrabold flex-shrink-0" style={{ color: tone(it.ok) }} aria-hidden="true">{mark(it.ok)}</span>
+            <span style={{ color: "var(--text-2)" }}>{it.label}</span>
+          </li>
+        ))}
+      </ul>
+      {d.decideBy && <p className="text-xs mt-2 font-semibold" style={{ color: "var(--gold-dark)" }}>{d.decideBy}</p>}
+    </div>
+  );
+}
+
 function TrackCard({ t }: { t: SchoolTrack }) {
   const s = REL_STYLE[t.relevance];
   return (
@@ -566,6 +591,7 @@ function TrackCard({ t }: { t: SchoolTrack }) {
         <h3 className="text-base font-extrabold" style={{ color: "var(--text)" }}>{t.name}</h3>
         <span className="text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap" style={{ background: s.bg, color: s.fg }}>{RELEVANCE_LABELS[t.relevance]}</span>
       </div>
+      {t.decision && <DecisionBox d={t.decision} />}
       <ul className="text-sm space-y-1 mb-2" style={{ color: "var(--text-2)" }}>{t.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
       {t.deadline && (
         <div className="rounded-xl p-3 text-sm mb-2" style={{ background: s.bg, color: "var(--text)" }}>

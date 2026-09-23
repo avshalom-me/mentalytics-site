@@ -150,7 +150,7 @@ export const BULLY_LABELS = { no: "לא", suspected: "חשד", known: "ידוע"
 export const OUTCOME_LABELS: Record<Outcome, string> = { helped: "הועיל", partial: "הועיל חלקית", no_help: "לא הועיל" };
 export const TEAM_LABELS = { yes: "התכנס", no: "לא התכנס", unknown: "לא ידוע" } as const;
 // "בהתלבטות" sits second: the team has not referred yet, and is weighing it.
-// The tracks engine reads it as "none" for now - see toTracksInput.
+// The map answers it with a deciding aid on the track - see TrackDecision.
 export const ZAKAUT_LABELS = { none: "לא הופנה/תה", considering: "בהתלבטות", in_process: "בתהליך", decided: "התקבלה החלטה" } as const;
 export const HATAMOT_LABELS = {
   none: "לא נדון", considering: "בהתלבטות", school_level: "אושרו התאמות בסמכות בית הספר", district_submitted: "הוגש לוועדה המחוזית", district_decided: "התקבלה תשובת הוועדה המחוזית",
@@ -440,10 +440,8 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     diagnoses: f.c_diag ?? [],
     // "not known" is not "did not convene" - the engine must see no answer.
     schoolTeam: f.c_team && f.c_team !== "unknown" ? { convened: f.c_team === "yes" } : undefined,
-    // "בהתלבטות" has not reached the committee, so for dates and documents it
-    // is where "not referred" is. The summary still reports it as said.
-    zakaut: f.c_zakaut ? { status: f.c_zakaut === "considering" ? "none" : f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
-    hatamot: f.c_hatamot ? { status: f.c_hatamot === "considering" ? "none" : f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
+    zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
+    hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
     // What the scoring recommended, in its own keys. Written into the answers
     // by KidsQuiz when the score arrives; absent until then.
@@ -583,9 +581,21 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   }
   if (f.c_diag && !docs.length) docs.push("אין אבחונים או חוות דעת בתיק");
   if (f.c_team) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
-  if (f.c_zakaut) docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
+  // "בהתלבטות" carries what stands between the team and a decision, and the
+  // deadline it is racing - the same line the track's deciding aid opens with.
+  const zDecision = tracks.find(t => t.key === "zakaut")?.decision;
+  if (f.c_zakaut === "considering" && zDecision) {
+    docs.push(`ועדת זכאות ואפיון: בהתלבטות. ${zDecision.headline}${zDecision.deadline ? `. מועד אחרון להפניה: ${formatDateHe(zDecision.deadline)}` : ""}`);
+  } else if (f.c_zakaut) {
+    docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
+  }
   // Not a word about matriculation accommodations before ח' - see hatamotApplies.
-  if (f.c_hatamot && f._grade && hatamotApplies(f._grade)) docs.push(`התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
+  const hDecision = tracks.find(t => t.key === "hatamot")?.decision;
+  if (f.c_hatamot && f._grade && hatamotApplies(f._grade)) {
+    docs.push(f.c_hatamot === "considering" && hDecision
+      ? `התאמות בדרכי היבחנות: בהתלבטות. ${hDecision.headline}`
+      : `התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
+  }
   if (f.c_economic === "yes") docs.push(ECONOMIC_NOTE);
   if (docs.length) sections.push({ title: "אבחונים, ועדות ומשאבים", lines: docs });
 
