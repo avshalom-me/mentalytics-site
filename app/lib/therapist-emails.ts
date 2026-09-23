@@ -580,7 +580,7 @@ export async function sendTherapistRegistrationReceivedEmail(opts: {
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:12px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       <h1 style="color:#0F5468;font-size:22px;margin:0 0 16px;">שלום ${safeName} 👋</h1>
       <p style="margin:0 0 14px;">תודה שהצטרפת לטיפול חכם! 🎉</p>
-      <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר - לטובת המטופלים וגם לטובתך.</p>
+      <p style="margin:0 0 14px;">קלטנו את הפרטים שלך, וצוות טיפול חכם בודק כעת את הפרופיל והתעודות שהעלית לפני הפרסום. הבדיקה נועדה לשמור על אמינות ואיכות המאגר - לטובת המטופלים וגם לטובתך. התעודות משמשות לבדיקה הפנימית בלבד ואינן מוצגות בפרופיל או באתר.</p>
       <p style="margin:0 0 18px;">נעדכן אותך במייל ברגע שהפרופיל יאושר. בינתיים אפשר להיכנס ללוח הבקרה לעדכן או להשלים פרטים.</p>
       <p style="margin:0 0 16px;">
         <a href="${dashboardUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">ללוח הבקרה שלי</a>
@@ -751,6 +751,7 @@ export async function sendTherapistRejectedEmail(opts: {
       <p style="margin:0 0 16px;">תודה שנרשמת לטיפול חכם. לאחר בדיקת הפרטים, הפרופיל שלך עדיין לא אושר לפרסום.</p>
       ${reasonBlock}
       <p style="margin:0 0 16px;">קל לתקן: היכנס/י לעריכת הפרופיל, עדכן/י את הפרטים הנדרשים והעלה/י תעודת רישיון או אישור מקצועי ברורים וקריאים. לאחר השמירה, הפרופיל יישלח שוב לבדיקה אוטומטית.</p>
+      <p style="margin:0 0 16px;">התעודה משמשת לבדיקה הפנימית שלנו בלבד. היא אינה מוצגת בפרופיל, במאגר או בכל מקום אחר באתר.</p>
       <p style="margin:0 0 16px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#fff;text-decoration:none;font-weight:bold;padding:12px 24px;border-radius:10px;">לעריכת הפרופיל שלי</a>
       </p>
