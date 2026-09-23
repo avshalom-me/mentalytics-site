@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
-import { isMobileNumber } from "@/app/lib/phone";
+import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
 
 // מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -1234,12 +1234,13 @@ export default function AdminCentersPage() {
                       className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
                   </Field>
                 </div>
-                <Field label="וואטסאפ עסקי לפניות מטופלים - נייד בלבד, מוצג באתר ובכרטיסים">
-                  <input value={fPubWhatsapp} onChange={(e) => setFPubWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="052-1234567"
+                <Field label="וואטסאפ עסקי לפניות מטופלים - מוצג באתר ובכרטיסים">
+                  <input value={fPubWhatsapp} onChange={(e) => setFPubWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="052-1234567 או 072-2119500"
                     className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
                   {(() => {
                     const typed = fPubWhatsapp.trim();
-                    if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11px] font-bold text-red-600">לא נייד - השמירה תידחה. לקו נייח או וירטואלי אין וואטסאפ.</p>;
+                    if (typed && !phoneNationalDigits(typed)) return <p className="mt-1 text-[11px] font-bold text-red-600">זה לא נראה כמו מספר טלפון ישראלי - השמירה תידחה.</p>;
+                    if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11px] text-stone-500">נייח או וירטואלי: תקין אם הקו מחובר לוואטסאפ עסקי. לוודא עם המרכז, אחרת פונים יגיעו לשיחה בלי מענה.</p>;
                     if (!typed && isMobileNumber(fPubPhone)) return <p className="mt-1 text-[11px] text-stone-500">ריק, ולכן כפתור הוואטסאפ משתמש בינתיים בטלפון לחיוג ({fPubPhone.trim()}) כי הוא נייד.</p>;
                     if (!typed) return <p className="mt-1 text-[11px] text-stone-500">ריק = אין כפתור וואטסאפ למרכז. לא להזין כאן את הנייד הפרטי של הבעלים בלי שאישרו שהוא לפניות.</p>;
                     return null;
