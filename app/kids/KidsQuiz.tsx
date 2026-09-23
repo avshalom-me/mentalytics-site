@@ -38,7 +38,7 @@ import {
   type Ans, type PageId, type KidsScoreResult,
 } from "./quiz-logic";
 import {
-  PageConsentCounselor, PageDemoCounselor, PageRefine, PageDocs, CounselorAddendum, CounselorSafetyNotice, UnknownNotice,
+  PageConsentCounselor, PageDemoCounselor, PageRefine, PageDocs, CounselorAddendum, CounselorSafetyNotice, UnknownNotice, EmotionalAloneNotice,
   CounselorQ1Block, CounselorAcadBlock, CounselorBehBlock, CounselorSocBlock,
   readDrafts, subscribeDrafts, upsertDraft, removeDraft, NO_DRAFTS, type Draft,
 } from "./counselor";
@@ -434,7 +434,13 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   // Was also unlocked by the toilet question on the opening screen, which is gone.
   // The window widens to 12 instead: bed-wetting and encopresis referrals stay
   // clinically relevant well past 7, and that gate was the only way to reach them.
-  const showDev = (age > 0 && age < 12) || grpV === "ga";
+  // A school counsellor sees the developmental domain only in א-ב, and there
+  // with a note to fill it with the parents - its screens are home
+  // observations (toilet training, sensory regulation), and a counsellor of a
+  // 14-year-old who ticked it landed on the toilet-training screen. A
+  // kindergarten teacher sees it as a parent would.
+  const schoolCounselor = isCounselor(A) && A.c_role !== "gan";
+  const showDev = schoolCounselor ? ["א", "ב"].includes(A._grade) : (age > 0 && age < 12) || grpV === "ga";
   // Ages 1–2: only developmental + behavioral domains are relevant - hide the
   // emotional / learning / social options entirely.
   const onlyDevBeh = age >= 1 && age <= 2;
@@ -497,9 +503,10 @@ function PageAreas({ A, setA, onNext, onBack }: { A: Ans; setA: (a: Ans) => void
   ];
 
   // For 1–2 year-olds, show only the developmental + behavioral domains.
-  const visibleAreas = onlyDevBeh
+  const visibleAreas = (onlyDevBeh
     ? areas.filter(a => a.key === "a_dev" || a.key === "a_beh")
-    : areas;
+    : areas
+  ).map(a => (a.key === "a_dev" && schoolCounselor ? { ...a, desc: `${a.desc} · למלא יחד עם ההורים` } : a));
 
   return (
     <div>
@@ -3516,7 +3523,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           <Card>
             <div className="py-4">
               <p className="font-bold text-[#1a2a3a] text-base mb-2">לא נמצאו ממצאים משמעותיים בתחומים שנבדקו</p>
-              {audience === "counselor" && <div className="mb-3"><UnknownNotice A={A} /></div>}
+              {audience === "counselor" && <div className="mb-3 space-y-3"><UnknownNotice A={A} /><EmotionalAloneNotice A={A} /></div>}
               <p className="text-sm text-gray-600 mb-3">
                 ✅ מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.
               </p>
@@ -3555,7 +3562,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           </div>
         )}
 
-        {audience === "counselor" && <div className="mb-4"><UnknownNotice A={A} /></div>}
+        {audience === "counselor" && <div className="mb-4 space-y-3"><UnknownNotice A={A} /><EmotionalAloneNotice A={A} /></div>}
         {audience === "counselor" && hasAnyFindings && (
           <div className="mb-4 rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--surface)", border: "1px solid var(--line)", color: "var(--text-2)" }}>
             בכל כרטיס אפשר לפתוח הסבר על סוג הטיפול או האבחון, ולחפש מטפלים מתאימים באזור. הרשימה נועדה להעברה להורים - הבחירה במטפל/ת היא שלהם.
@@ -3772,7 +3779,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           to the findings, which is what parents actually save. */}
 
       {audience === "counselor" && (
-        <CounselorAddendum A={A} domains={domainResults.map(d => ({ label: d.label, result: d.result }))} />
+        <CounselorAddendum A={A} domains={domainResults.map(d => ({ key: d.key, label: d.label, result: d.result }))} />
       )}
 
       {/* Disclaimer */}
@@ -4123,9 +4130,9 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     saveTimer.current = window.setTimeout(() => upsertDraft({ id: draftId, savedAt: Date.now(), step, A }), 600);
     return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
   }, [audience, draftId, step, A]);
-  function startCounselor() {
+  function startCounselor(role: "school" | "gan") {
     setDraftId(crypto.randomUUID());
-    goNext({ _audience: "counselor" });
+    goNext({ _audience: "counselor", c_role: role });
   }
   function resumeDraft(d: Draft) {
     setDraftId(d.id);

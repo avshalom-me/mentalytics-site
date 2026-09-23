@@ -17,6 +17,7 @@ import {
   SCHOOL_GRADES,
   formatDateHe,
   hatamotApplies,
+  OLD_DIAGNOSIS_YEARS,
   type Diagnosis,
   type DiagnosisKind,
   type EligibilityDirection,
@@ -101,10 +102,18 @@ export const ACA_STEP_LABELS: Record<AcaStepState, string> = {
 };
 
 /** The keys the counsellor screens write into the questionnaire's answers. */
+/** Who is filling in: a school counsellor (א-יב) or a kindergarten teacher (גן חובה and below). */
+export type CounselorRole = "school" | "gan";
+/** The kindergarten years the questionnaire knows, oldest first. */
+export const GAN_GRADES = ["גן", "גן-טרום", "גן3", "פעוט"] as const;
+export type GanGrade = (typeof GAN_GRADES)[number];
+export const GAN_GRADE_LABELS: Record<GanGrade, string> = { "גן": "גן חובה", "גן-טרום": "גן טרום חובה", "גן3": "גן גיל 3", "פעוט": "פעוטון" };
+
 export interface CounselorFields {
   _audience?: "parent" | "counselor";
+  c_role?: CounselorRole;
   _age?: string;
-  _grade?: SchoolGrade;
+  _grade?: SchoolGrade | GanGrade;
   c_duration?: Duration;
   // in the emotional branch (p-q1)
   c_attend?: "regular" | "some" | "frequent" | "refusal" | Unknown;
@@ -282,27 +291,53 @@ export function psychiatricSeverity(A: Ans): boolean {
  * difficulty in a school looks like - so asking for school counselling on top
  * of them would block a route the ladder has already earned.
  */
+/**
+ * An attempt counts toward exhaustion only if it did not suffice. "הועיל" is a
+ * good outcome, and a child whose every intervention helped is not a child
+ * for a committee - that is what מיצוי means.
+ */
+const attemptCounts = (o: Outcome | undefined) => !!o && o !== "helped";
+
 export function missingAttempts(A: Ans, candidates: EligibilityDirection[]): AttemptKind[] {
   const f = A as CounselorFields;
   const tried = f.c_tried ?? {};
   const out: AttemptKind[] = [];
   const ladderDone = candidates.includes("learning") &&
     ACA_STEPS.filter(x => x.core).every(x => f.c_aca_steps?.[x.key] === "done");
-  if (!INTERVENTIONS.some(i => i.kind === "treatment" && tried[i.key]) && !ladderDone) out.push("treatment");
-  if (!INTERVENTIONS.some(i => i.kind === "system" && tried[i.key])) out.push("system");
+  if (!INTERVENTIONS.some(i => i.kind === "treatment" && attemptCounts(tried[i.key])) && !ladderDone) out.push("treatment");
+  if (!INTERVENTIONS.some(i => i.kind === "system" && attemptCounts(tried[i.key]))) out.push("system");
   return out;
 }
 
-export function exhaustionMessage(missing: AttemptKind[]): string {
-  return `מומלץ להשלים ${missing.map(m => ATTEMPT_LABELS[m]).join(" ו")} כדי לסיים מיצוי אפשרויות, ולאחר מכן מומלץ לשקול פנייה לוועדת זכאות ואפיון.`;
+/** The kinds for which something was tried and everything tried helped. */
+function helpedOnlyAttempts(A: Ans): AttemptKind[] {
+  const tried = ((A as CounselorFields).c_tried ?? {}) as Partial<Record<InterventionKey, Outcome>>;
+  return (["treatment", "system"] as const).filter(kind => {
+    const outcomes = INTERVENTIONS.filter(i => i.kind === kind).map(i => tried[i.key]).filter(Boolean);
+    return outcomes.length > 0 && outcomes.every(o => o === "helped");
+  });
+}
+
+export function exhaustionMessage(r: Pick<RouteState, "missing" | "helpedOnly" | "ladderPending">): string {
+  const parts: string[] = [];
+  if (r.missing.length) {
+    parts.push(`מומלץ להשלים ${r.missing.map(m => ATTEMPT_LABELS[m]).join(" ו")} כדי לסיים מיצוי אפשרויות`);
+    if (r.helpedOnly.length) parts.push("התערבות שסומנה 'הועיל' אינה נספרת כמיצוי - מיצוי פירושו ניסיון שלא הספיק");
+  }
+  if (r.ladderPending) parts.push("המסלול הלימודי (58) ייפתח לאחר השלמת הוראה מתקנת ותמיכה מסל השילוב, וכל מה שסומן כנדרש");
+  return `${parts.join(". ")}, ולאחר מכן מומלץ לשקול פנייה לוועדת זכאות ואפיון.`;
 }
 
 export interface RouteState {
   /** Routes the map may name. */
   live: EligibilityDirection[];
-  /** Routes the findings support, waiting only on the attempts below. */
+  /** Routes the findings support, waiting only on the attempts below or on the ladder. */
   pending: EligibilityDirection[];
   missing: AttemptKind[];
+  /** Kinds where everything tried helped - said, so the missing attempt is not a mystery. */
+  helpedOnly: AttemptKind[];
+  /** The learning profile qualifies but the school's own ladder is not complete. */
+  ladderPending: boolean;
 }
 
 /**
@@ -342,12 +377,23 @@ export function eligibilityRoutes(A: Ans): RouteState {
   // Nothing to add for the learning route: its rule is the ladder and the
   // profile, both of which are the counsellor's own answers rather than the
   // engine's reading of them.
-  if (academicOn(A) && acaExhaustionAdequate(A) && acaProfileQualifies(A)) candidates.push("learning");
-  if (!candidates.length) return { live: [], pending: [], missing: [] };
+  const learningProfile = academicOn(A) && acaProfileQualifies(A);
+  if (learningProfile && acaExhaustionAdequate(A)) candidates.push("learning");
+  // The profile is there and the ladder is not: said, rather than nothing.
+  // Silence here left a counsellor who had marked "בתהליך" with no committee
+  // and no idea why.
+  const ladderPending = learningProfile && !acaExhaustionAdequate(A);
+  if (!candidates.length) {
+    return ladderPending
+      ? { live: [], pending: ["learning"], missing: [], helpedOnly: [], ladderPending }
+      : { live: [], pending: [], missing: [], helpedOnly: [], ladderPending: false };
+  }
   const missing = missingAttempts(A, candidates);
+  const helpedOnly = helpedOnlyAttempts(A).filter(k => missing.includes(k));
+  const pendingLadder = ladderPending ? ["learning" as const] : [];
   return missing.length
-    ? { live: [], pending: candidates, missing }
-    : { live: candidates, pending: [], missing: [] };
+    ? { live: [], pending: Array.from(new Set([...candidates, ...pendingLadder])), missing, helpedOnly, ladderPending }
+    : { live: candidates, pending: pendingLadder, missing: [], helpedOnly: [], ladderPending };
 }
 
 export function eligibilityDirections(A: Ans): EligibilityDirection[] {
@@ -389,20 +435,49 @@ export const SCHOOL_TIPS: { key: string; title: string; when: (f: CounselorField
   },
   {
     key: "bully_victim",
-    title: "נפגע/ת מהצקות או מחרם",
-    when: f => f.c_bully_victim === "suspected" || f.c_bully_victim === "known",
+    title: "חשד להצקות או לחרם",
+    when: f => f.c_bully_victim === "suspected",
     lines: [
-      "הטיפול בהצקות הוא מערכתי ולא שיחה בין הנפגע/ת לפוגע/ת: תיעוד, יידוע ההורים, עבודה עם הכיתה ומעקב לאורך זמן.",
+      "חשד מצדיק בירור שקט לפני כל צעד: שיחה עם התלמיד/ה, תצפית בהפסקות ושאלה למחנכ/ת, בלי לנקוב בשמות בכיתה.",
+      "חשוב לוודא שהתלמיד/ה יודע/ת למי לפנות ומתי, ושהמענה אינו תלוי ביוזמה שלו/ה - מי שנפגע/ת לרוב מפסיק/ה לדווח.",
+    ],
+  },
+  {
+    // "ידוע" is a different situation from "חשד": there is an event, and the
+    // school's own procedure applies to it - so the guidance is about that.
+    key: "bully_victim_known",
+    title: "נפגע/ת מהצקות או מחרם - אירוע ידוע",
+    when: f => f.c_bully_victim === "known",
+    lines: [
+      "אירוע ידוע מטופל לפי נוהל האקלים של בית הספר: תיעוד האירוע, יידוע ההורים של שני הצדדים, ותוכנית מענה שנרשמת - הטיפול מערכתי ולא שיחה בין הנפגע/ת לפוגע/ת.",
       "חשוב לוודא שהתלמיד/ה יודע/ת למי לפנות ומתי, ושהמענה אינו תלוי ביוזמה שלו/ה - מי שנפגע/ת לרוב מפסיק/ה לדווח.",
     ],
   },
   {
     key: "bully_perp",
-    title: "מעורבות כפוגע/ת",
-    when: f => f.c_bully_perp === "suspected" || f.c_bully_perp === "known",
+    title: "חשד למעורבות כפוגע/ת",
+    when: f => f.c_bully_perp === "suspected",
     lines: [
-      "עבודה עם הפוגע/ת מתמקדת באחריות ובתיקון ולא בענישה בלבד, לצד בירור מה מחזיק את ההתנהגות.",
+      "חשד מצדיק בירור לפני תגובה: מה בדיוק נצפה, על ידי מי, ובאילו נסיבות - תגובה על חשד שלא אומת פוגעת באמון.",
       "כדאי לבדוק אם מדובר בקושי בוויסות, במאבק על מעמד חברתי, או בדפוס שנלמד מחוץ לבית הספר - לכל אחד מהם מענה אחר.",
+    ],
+  },
+  {
+    key: "bully_perp_known",
+    title: "מעורבות כפוגע/ת - אירוע ידוע",
+    when: f => f.c_bully_perp === "known",
+    lines: [
+      "אירוע ידוע מטופל לפי נוהל האקלים: תיעוד, יידוע ההורים, ותגובה שמתמקדת באחריות ובתיקון ולא בענישה בלבד, לצד בירור מה מחזיק את ההתנהגות.",
+      "כדאי לבדוק אם מדובר בקושי בוויסות, במאבק על מעמד חברתי, או בדפוס שנלמד מחוץ לבית הספר - לכל אחד מהם מענה אחר.",
+    ],
+  },
+  {
+    key: "change",
+    title: "שינוי חד השנה",
+    when: f => f.c_change === "כן",
+    lines: [
+      "שינוי חד לרוב מסמן אירוע: משפחתי, חברתי או בריאותי. כדאי לברר מה קרה לפני שמפרשים את הסימפטומים כקושי מתמשך.",
+      "אם האירוע ידוע, הטיפול בו קודם להפניה; אם לא, שיחה עם ההורים היא הצעד הראשון.",
     ],
   },
   {
@@ -422,10 +497,10 @@ export const ECONOMIC_NOTE =
 
 // ── Engine input ─────────────────────────────────────────────────────────────
 
-export function interventionsTried(A: Ans): number {
-  return Object.values((A.c_tried ?? {}) as Record<string, Outcome | undefined>).filter(Boolean).length;
-}
 
+export function isGanGrade(g: unknown): g is GanGrade {
+  return typeof g === "string" && (GAN_GRADES as readonly string[]).includes(g);
+}
 export function isSchoolGrade(g: unknown): g is SchoolGrade {
   return typeof g === "string" && (SCHOOL_GRADES as readonly string[]).includes(g);
 }
@@ -442,21 +517,32 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     schoolTeam: f.c_team && f.c_team !== "unknown" ? { convened: f.c_team === "yes" } : undefined,
     zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
     hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
-    interventionsTried: interventionsTried(A),
     // What the scoring recommended, in its own keys. Written into the answers
     // by KidsQuiz when the score arrives; absent until then.
     findings: A._findingKeys,
     directions: routes.live,
     pendingDirections: routes.pending,
-    exhaustionNote: routes.missing.length ? exhaustionMessage(routes.missing) : undefined,
-    economicConstraint: f.c_economic === "yes",
+    exhaustionNote: routes.missing.length || routes.ladderPending ? exhaustionMessage(routes) : undefined,
+    duration: f.c_duration,
+    academicSupport: f.c_support && f.c_support !== UNKNOWN ? f.c_support : undefined,
     risk: {
-      // Read from the questionnaire's own screen. An item the counsellor marked
-      // "not known" stored "לא" there, so it never reads as a risk.
-      suicidality: A.q3_sui === "כן",
       schoolRefusal: f.c_attend === "refusal",
+      frequentAbsence: f.c_attend === "frequent",
     },
   };
+}
+
+/**
+ * The emotional part was answered without the parents.
+ *
+ * Its items ask about what happens at home - sleep, eating, night fears,
+ * separation - which a counsellor sees only second-hand. So a blank there is
+ * not the reassurance it would be from a parent, and the summary says so.
+ */
+export function emotionalAloneCaveat(A: Ans): string {
+  const f = A as CounselorFields;
+  if (f.c_fill !== "counselor_alone" || !areaOn(A.a_emo)) return "";
+  return " התחום הרגשי מולא ללא ההורים; סימפטומים שנראים בבית בלבד (שינה, אכילה, חרדות ליליות, היפרדות) עשויים לחסר, ולכן היעדר ממצא בו אינו שולל קושי.";
 }
 
 // ── The summary a counsellor pastes ──────────────────────────────────────────
@@ -483,7 +569,15 @@ export interface SummaryDoc {
   foot: string;
 }
 
-export interface SummaryDomain { label: string; result: KidsDomainResult }
+export interface SummaryDomain { key?: string; label: string; result: KidsDomainResult }
+
+/** The area flag each domain opens with - the level the counsellor herself gave it. */
+const AREA_OF: Record<string, string> = { emotional: "a_emo", academic: "a_aca", developmental: "a_dev", behavioral: "a_beh", social: "a_soc" };
+const AREA_RANK: Record<string, number> = { "הרבה מאוד": 0, "הרבה": 1, "מעט": 2 };
+const areaLevel = (A: Ans, d: SummaryDomain): string | undefined => {
+  const v = d.key ? String(A[AREA_OF[d.key]] ?? "") : "";
+  return v in AREA_RANK ? v : undefined;
+};
 
 export type Section = { title: string; lines: string[] };
 
@@ -505,13 +599,20 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
 
   // רקע
   const bg: string[] = [];
-  if (f._grade) bg.push(`כיתה ${f._grade}${f._age ? `, גיל ${f._age}` : ""}`);
+  // A kindergarten is not "כיתה גן": the gan grades carry their own labels.
+  const gradeLabel = isGanGrade(f._grade) ? GAN_GRADE_LABELS[f._grade] : f._grade ? `כיתה ${f._grade}` : "";
+  if (gradeLabel) bg.push(`${gradeLabel}${f._age ? `, גיל ${f._age}` : ""}`);
   if (f.c_duration) bg.push(`משך הקושי: ${DURATION_LABELS[f.c_duration]}`);
   if (bg.length) sections.push({ title: "רקע", lines: bg });
 
-  // ממצאי השאלון לפי תחום
-  for (const d of domains) {
+  // ממצאי השאלון לפי תחום. The level the counsellor gave the area used to be
+  // read by nothing and printed nowhere on her side; now it opens the domain's
+  // section, and "הרבה מאוד" puts that domain first and marks it.
+  const ordered = [...domains].sort((a, b) => (AREA_RANK[areaLevel(A, a) ?? ""] ?? 9) - (AREA_RANK[areaLevel(A, b) ?? ""] ?? 9));
+  for (const d of ordered) {
     const lines: string[] = [];
+    const level = areaLevel(A, d);
+    if (level) lines.push(`רמת הקושי לפי דיווח היועצת: ${level}${level === "הרבה מאוד" ? " - בולט" : ""}`);
     const symptoms = uniq(d.result.groups.flatMap(g => g.recs.flatMap(r => r.symptoms))).map(stripPrefix).filter(Boolean);
     if (symptoms.length) lines.push(`ממצאים: ${symptoms.join("; ")}`);
     const referrals = uniq(
@@ -523,13 +624,16 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     );
     if (referrals.length) lines.push(`הפניה מומלצת: ${referrals.join("; ")}`);
     for (const w of d.result.standaloneWarnings) lines.push(stripPrefix(w.text));
+    // Flagged by the counsellor, nothing found by the items: that is a finding
+    // too, and a committee reading the summary should see both halves.
+    if (level && lines.length === 1) lines.push("מהפריטים לא עלה ממצא");
     if (lines.length) sections.push({ title: stripPrefix(d.label), lines });
   }
 
   // זווית בית הספר
   const school: string[] = [];
   if (said(f.c_attend, "regular")) school.push(`ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
-  if (f.c_change === "כן") school.push("שינוי חד בהתנהגות או במצב הרוח השנה");
+  if (f.c_change === "כן") school.push("שינוי חד בהתנהגות או במצב הרוח השנה - מצדיק בירור של אירוע לפני הפניה");
   const org = levelLine("קושי בהתארגנות (ציוד, שיעורי בית, זמנים)", f.c_org);
   if (org) school.push(org);
   if (said(f.c_support)) school.push(`תגובה לתמיכה לימודית שניתנה: ${SUPPORT_RESPONSE_LABELS[f.c_support]}`);
@@ -576,8 +680,10 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
 
   // אבחונים, ועדות, משפחה
   const docs: string[] = [];
+  const todayYear = Number(today.slice(0, 4));
   for (const d of f.c_diag ?? []) {
-    docs.push(`${DIAGNOSIS_KIND_LABELS[d.kind]} (${d.year})${d.signedBy ? `, חתום/ה: ${d.signedBy}` : ""}`);
+    const old = todayYear - d.year > OLD_DIAGNOSIS_YEARS ? " - אבחון ישן, יש לוודא עם המפקח/ת או פסיכולוג/ית המסגרת שעדיין קביל" : "";
+    docs.push(`${DIAGNOSIS_KIND_LABELS[d.kind]} (${d.year})${d.signedBy ? `, חתום/ה: ${d.signedBy}` : ""}${old}`);
   }
   if (f.c_diag && !docs.length) docs.push("אין אבחונים או חוות דעת בתיק");
   if (f.c_team) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
@@ -591,7 +697,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   }
   // Not a word about matriculation accommodations before ח' - see hatamotApplies.
   const hDecision = tracks.find(t => t.key === "hatamot")?.decision;
-  if (f.c_hatamot && f._grade && hatamotApplies(f._grade)) {
+  if (f.c_hatamot && isSchoolGrade(f._grade) && hatamotApplies(f._grade)) {
     docs.push(f.c_hatamot === "considering" && hDecision
       ? `התאמות בדרכי היבחנות: בהתלבטות. ${hDecision.headline}`
       : `התאמות בדרכי היבחנות: ${HATAMOT_LABELS[f.c_hatamot]}`);
@@ -614,7 +720,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   const partial = unknowns > 0
     ? ` ${unknowns === 1 ? "פריט אחד סומן" : `${unknowns} פריטים סומנו`} כ"לא ידוע" ונספרו כאילו הקושי אינו קיים, ולכן היעדר ממצא בתחום שלא היה עליו מידע אינו שולל קושי בו.`
     : "";
-  const foot = "הסיכום מבוסס על דיווח הממלא/ת בלבד. הוא אינו אבחון, אינו קובע זכאות ואינו מחליף הערכה מקצועית או החלטת ועדה. אינו מכיל פרטים מזהים." + partial;
+  const foot = "הסיכום מבוסס על דיווח הממלא/ת בלבד. הוא אינו אבחון, אינו קובע זכאות ואינו מחליף הערכה מקצועית או החלטת ועדה. אינו מכיל פרטים מזהים." + partial + emotionalAloneCaveat(A);
 
   const text = [head, meta, "", ...sections.flatMap(s => [s.title, ...s.lines.map(l => `- ${l}`), ""]), foot].join("\n");
   const html = [

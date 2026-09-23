@@ -383,7 +383,9 @@ export function schoolWording(text: string): string {
  * call it inline without a setup line, and so nothing is stored per module.
  */
 export function sw(A: Ans, parentText: string, counselorText?: string): string {
-  if (A._audience !== "counselor") return parentText;
+  // A kindergarten teacher keeps the parent's wording: the child in front
+  // of her is הילד/ה, not התלמיד/ה.
+  if (A._audience !== "counselor" || A.c_role === "gan") return parentText;
   return counselorText ?? schoolWording(parentText);
 }
 

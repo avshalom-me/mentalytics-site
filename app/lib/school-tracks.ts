@@ -494,6 +494,12 @@ const DIRECTION_DIAGNOSIS: Record<EligibilityDirection, string> = {
 
 const CONSENT_ITEM: DecisionItem = { label: "הסכמת ההורים לפנייה", ok: null };
 
+/** A diagnosis older than this is flagged for the supervisor to confirm - the owner's figure. */
+export const OLD_DIAGNOSIS_YEARS = 5;
+/** What a committee expects of the difficulty's history - the owner's figure, said and not enforced. */
+export const DURATION_NOTE_THIS_YEAR = "הקושי דווח מהשנה בלבד. ועדת זכאות מצפה לרוב לקושי מתמשך של 2-3 שנים לאחר התערבות";
+export const DURATION_NOTE_OVER_YEAR = "הקושי דווח מעל שנה. ועדת זכאות מצפה לרוב לקושי מתמשך של 2-3 שנים לאחר התערבות";
+
 export interface SchoolTracksInput {
   grade: SchoolGrade;
   /** ISO date. Pass israelToday() at call sites. */
@@ -513,11 +519,12 @@ export interface SchoolTracksInput {
   };
   /** What the questionnaire's scoring recommended, in its own keys. Read by the clinical rules only. */
   findings?: { assessmentKeys: string[]; treatmentKeys: string[]; externalKeys: string[] };
-  /** Raised by the questionnaire's own screens. Read by the clinical rules only. */
-  risk?: { suicidality?: boolean; abuseIndication?: boolean; schoolRefusal?: boolean };
-  /** From the counsellor's own module. Read by the clinical rules only. */
-  interventionsTried?: number;
-  economicConstraint?: boolean;
+  /** From the attendance answer. Read by the attendance rule. */
+  risk?: { schoolRefusal?: boolean; frequentAbsence?: boolean };
+  /** How long the difficulty has been felt. A committee expects it to have lasted. */
+  duration?: "this_year" | "over_year" | "years";
+  /** How the student responds to the learning support already given. */
+  academicSupport?: "improves" | "partial" | "none" | "not_given";
   /**
    * Which eligibility route the questionnaire's own rubrics point to. Empty -
    * the default - means the map stays silent about committees entirely. See
@@ -634,6 +641,29 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     if (directions.includes("psychiatric")) cautions.push(PSYCHIATRIC_NOTE);
     if (zStatus === "in_process") why.push("ההליך כבר בעיצומו לפי הדיווח");
 
+    // An old diagnosis is still "acceptable" by type and signer - the Schedule
+    // sets no expiry - but a committee may well ask for a current one. The
+    // owner's threshold: five years.
+    const todayYear = Number(today.slice(0, 4));
+    const isOld = (d: Diagnosis) => todayYear - d.year > OLD_DIAGNOSIS_YEARS;
+    const acceptableDocs = (dir: EligibilityDirection) =>
+      diagnoses.filter(d => DIRECTION_CATEGORIES[dir].some(c => diagnosisGate(d, c) === "acceptable"));
+    const oldYears = Array.from(new Set(directions.flatMap(acceptableDocs).filter(isOld).map(d => d.year)));
+    if (oldYears.length) cautions.push(`אבחון משנת ${oldYears.join(", ")} ישן (מעל ${OLD_DIAGNOSIS_YEARS} שנים) - יש לוודא עם המפקח/ת או פסיכולוג/ית המסגרת שעדיין קביל`);
+
+    // A committee expects a difficulty that has lasted through intervention -
+    // the owner's figure is two to three years. Said on the card, not enforced:
+    // an acute psychiatric picture does not wait a year to be referred.
+    if (input.duration === "this_year") cautions.push(DURATION_NOTE_THIS_YEAR);
+    if (input.duration === "over_year") why.push(DURATION_NOTE_OVER_YEAR);
+
+    // The learning route: how the student answers the support already given
+    // is evidence in one direction or the other, and both are said.
+    if (directions.includes("learning")) {
+      if (input.academicSupport === "improves") cautions.push("דווח שהתלמיד/ה משתפר/ת בתמיכה הלימודית הנוכחית - לשקול להמשיך בה לפני פנייה לוועדה");
+      if (input.academicSupport === "not_given") cautions.push("דווח שלא ניתנה תמיכה לימודית, אך סולם המיצוי מסמן הוראה מתקנת ותמיכה מסל השילוב כנעשו - לבדוק את הסתירה לפני ההגשה");
+    }
+
     // "בהתלבטות": a team actively weighing a referral is past "מידע", whatever
     // the file holds - and gets the conditions laid out rather than the
     // committee explained again.
@@ -641,16 +671,34 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     if (zStatus === "considering") {
       if (relevance === "info") relevance = "consider";
       const diagnosisItems: DecisionItem[] = directions.map(d => {
+        const docs = acceptableDocs(d);
+        if (docs.length) {
+          return docs.every(isOld)
+            ? { label: `${DIRECTION_DIAGNOSIS[d]} - האבחון ישן, לוודא שעדיין קביל`, ok: null }
+            : { label: DIRECTION_DIAGNOSIS[d], ok: true };
+        }
         const states = DIRECTION_CATEGORIES[d].map(c => eligibility[c]);
-        if (states.includes("acceptable")) return { label: DIRECTION_DIAGNOSIS[d], ok: true };
         if (states.includes("verify_signer")) return { label: `${DIRECTION_DIAGNOSIS[d]} - לבדוק את התמחות החותם/ת`, ok: null };
         return { label: DIRECTION_DIAGNOSIS[d], ok: false };
       });
+      const durationItem: DecisionItem =
+        input.duration === "years" ? { label: "קושי מתמשך (2-3 שנים לפחות): מספר שנים", ok: true }
+        : input.duration === "over_year" ? { label: "קושי מתמשך (2-3 שנים לפחות): דווח מעל שנה - הוועדה מצפה לרוב ליותר", ok: null }
+        : input.duration === "this_year" ? { label: "קושי מתמשך (2-3 שנים לפחות): דווח קושי מהשנה בלבד", ok: false }
+        : { label: "קושי מתמשך (2-3 שנים לפחות): משך הקושי לא דווח", ok: null };
+      const supportItems: DecisionItem[] = !directions.includes("learning") || !input.academicSupport ? [] : [
+        input.academicSupport === "none" ? { label: "תגובה לתמיכה לימודית: ללא שיפור", ok: true }
+        : input.academicSupport === "partial" ? { label: "תגובה לתמיכה לימודית: שיפור חלקי", ok: true }
+        : input.academicSupport === "improves" ? { label: "תגובה לתמיכה לימודית: משתפר/ת - לשקול להמשיך בתמיכה לפני ועדה", ok: false }
+        : { label: "תגובה לתמיכה לימודית: דווח 'לא ניתנה' - סותר את סולם המיצוי", ok: null },
+      ];
       const team = input.schoolTeam;
       const items: DecisionItem[] = [
         { label: `כיוון שעלה מהשאלון: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`, ok: true },
         // Always met here: the route is live only once both attempts are recorded.
-        { label: "מיצוי אפשרויות: ניסיון טיפולי והתערבות מערכתית", ok: true },
+        { label: "מיצוי אפשרויות: ניסיון טיפולי והתערבות מערכתית שלא הספיקו", ok: true },
+        durationItem,
+        ...supportItems,
         ...diagnosisItems,
         { label: "התכנסות הצוות הרב-מקצועי", ok: team ? team.convened : null },
         CONSENT_ITEM,
@@ -725,8 +773,9 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       name: "מיצוי אפשרויות לפני ועדה",
       relevance: "primary",
       why: [
-        `הממצאים מצביעים על כיוון אפשרי (${pending.map(d => DIRECTION_LABELS[d]).join(", ")}), אך טרם נרשמו ההתערבויות שהוועדה מצפה לראות`,
+        `הממצאים מצביעים על כיוון אפשרי (${pending.map(d => DIRECTION_LABELS[d]).join(", ")}), אך טרם נרשם המיצוי שהוועדה מצפה לראות`,
         ...(input.exhaustionNote ? [input.exhaustionNote] : []),
+        ...(input.duration === "this_year" ? [DURATION_NOTE_THIS_YEAR] : input.duration === "over_year" ? [DURATION_NOTE_OVER_YEAR] : []),
       ],
       documents: ["סיכום ההתערבויות שנוסו ותוצאותיהן"],
       steps: [
@@ -754,7 +803,13 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
     const cautions: string[] = [];
     let relevance: Relevance = "info";
 
-    {
+    if (hStatus === "district_submitted") {
+      // Submitted: nothing to prepare, something to wait for. The appeal clock
+      // starts from the answer, which is why the date is asked once it comes.
+      why.push("הוגש לוועדה המחוזית - ממתינים לתשובה. חלון הערעור (14 או 21 יום) מתחיל מקבלת התשובה");
+      if (grade === "י" || gi > 9) relevance = "consider";
+    } else {
+      if (hStatus === "school_level") why.push("אושרו התאמות בסמכות בית הספר. התאמות שאינן בסמכות בית הספר דורשות הגשה לוועדה המחוזית");
       if (grade === "י") {
         relevance = "consider";
         why.push("כיתה י' היא שנת ההגשה לוועדת ההתאמות המחוזית לקראת הבגרויות");
@@ -799,12 +854,18 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
       relevance,
       why,
       documents: HATAMOT_DOCUMENTS,
-      steps: [
-        "התאמות שבסמכות בית הספר נדונות ומאושרות בוועדה הבית-ספרית, עם אבחון או בלעדיו",
-        "התאמות שאינן בסמכות בית הספר מוגשות לוועדת ההתאמות המחוזית, בשני מועדי הגשה שנתיים",
-        roundsNote,
-        "התאמות החורגות מסמכות שתי הוועדות - ועדת חריגים של אגף הבחינות",
-      ],
+      steps: hStatus === "district_submitted"
+        ? [
+            "לעקוב אחר תשובת הוועדה המחוזית",
+            "עם קבלת התשובה - לעדכן כאן את התאריך, כדי שחלון הערעור יחושב",
+          ]
+        : [
+            // The school-level committee is behind her once she said so.
+            ...(hStatus === "school_level" ? [] : ["התאמות שבסמכות בית הספר נדונות ומאושרות בוועדה הבית-ספרית, עם אבחון או בלעדיו"]),
+            "התאמות שאינן בסמכות בית הספר מוגשות לוועדת ההתאמות המחוזית, בשני מועדי הגשה שנתיים",
+            roundsNote,
+            "התאמות החורגות מסמכות שתי הוועדות - ועדת חריגים של אגף הבחינות",
+          ],
       appeals: [
         { against: "החלטת הוועדה הבית-ספרית", window: "לפי נוהל בית הספר (פרק 6.1 בחוזר)", to: "ערעור בית-ספרי" },
         { against: "החלטת ועדת ההתאמות המחוזית", window: "14 יום מקבלת התשובה במועד הראשון; 21 יום כשההגשה והיבחנות באותו מועד", to: "ועדת ערעורים עליונה" },
@@ -843,7 +904,8 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
 
   // ── אבחון: the prerequisite both committees share ──
   const needsForZakaut = onCommitteeRoute && zStatus !== "decided" && !acceptable.length;
-  const needsForHatamot = hatamotOn && hStatus !== "district_decided" && !usable.length;
+  // Once submitted, the district has the file; asking for an assessment then is noise.
+  const needsForHatamot = hatamotOn && hStatus !== "district_decided" && hStatus !== "district_submitted" && !usable.length;
   if (needsForZakaut || needsForHatamot || (hatamotOn && stale.length)) {
     const why: string[] = [];
     if (needsForZakaut) why.push(`ועדת זכאות ואפיון דורשת אבחנה קבילה של המוגבלות מגורם המופיע בתוספת הראשונה, בהתאם לכיוון שעלה: ${directions.map(d => DIRECTION_LABELS[d]).join(" ו")}`);

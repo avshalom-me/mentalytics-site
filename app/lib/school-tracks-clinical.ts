@@ -56,23 +56,27 @@ export const CLINICAL_RULES: ClinicalRule[] = [
   {
     id: "attendance.school_refusal",
     status: "approved",
-    reviewedOn: "2026-09-10",
-    describe: "סרבנות בית ספר מוסיפה מסלול ביקור סדיר (קב\"ס) לטיפול עכשיו",
-    when: input => input.risk?.schoolRefusal === true,
-    apply: tracks => [
+    reviewedOn: "2026-09-23",
+    describe: "סרבנות בית ספר מוסיפה מסלול ביקור סדיר (קב\"ס) לטיפול עכשיו; היעדרויות תכופות - לשיקול, עם בדיקת סף הדיווח",
+    when: input => input.risk?.schoolRefusal === true || input.risk?.frequentAbsence === true,
+    apply: (tracks, input) => [
       ...tracks,
       {
         key: "attendance",
         name: "ביקור סדיר - קב\"ס",
-        relevance: "primary",
-        why: [
-          "דווחה סרבנות בית ספר. חוק לימוד חובה מטיל על המוסד לדווח על היעדרות ממושכת, והטיפול עובר לקצין/ת ביקור סדיר ברשות המקומית",
-        ],
+        relevance: input.risk?.schoolRefusal ? "primary" : "consider",
+        why: input.risk?.schoolRefusal
+          ? ["דווחה סרבנות בית ספר. חוק לימוד חובה מטיל על המוסד לדווח על היעדרות ממושכת, והטיפול עובר לקצין/ת ביקור סדיר ברשות המקומית"]
+          // Frequent absence is a real trigger under the same law, but the
+          // reporting threshold is the authority's to state, not this map's.
+          : ["דווחו היעדרויות תכופות. חוק לימוד חובה מטיל על המוסד לדווח על היעדרות ממושכת - לבדוק מול הנוהל ברשות אם ההיעדרויות מגיעות לסף הדיווח לקצין/ת ביקור סדיר"],
         documents: ["תיעוד ההיעדרויות והאיחורים", "תיעוד הפעולות שננקטו מול התלמיד/ה ומול ההורים"],
         steps: [
           "לתעד את ההיעדרויות ואת מה שכבר נעשה מולן",
           "ליידע את ההורים ולזמן אותם לשיחה",
-          "לפנות לקצין/ת ביקור סדיר (קב\"ס) ברשות המקומית - הנוהל המדויק נקבע ברשות",
+          input.risk?.schoolRefusal
+            ? "לפנות לקצין/ת ביקור סדיר (קב\"ס) ברשות המקומית - הנוהל המדויק נקבע ברשות"
+            : "לברר מול הרשות המקומית את סף הדיווח לקצין/ת ביקור סדיר, ולפנות אם ההיעדרויות מגיעות אליו",
           "לברר במקביל מה מחזיק את ההיעדרות: חרדה, הצקות, או קושי לימודי - הטיפול בסיבה קודם לאכיפה",
         ],
         appeals: [],
@@ -105,7 +109,6 @@ export const CLINICAL_RULES: ClinicalRule[] = [
  * and none of them is technical.
  */
 export const PENDING_CLINICAL_DECISIONS: string[] = [
-  "מדיניות תחומים במילוי-לבד: אילו דומיינים יועצת יכולה למלא בלי הורה, ואילו מסומנים 'לא הוערך'",
   "נוסח תזכורת חובת הדיווח באינדיקציות לפגיעה",
   "מה מוצג ליועצת מתוך המלצות הטיפול של השאלון, ומה עובר להורים בלבד",
   "האם קושי בהבנה אכן שקול לתחום שני בפרופיל הלימודי, או שרק רמת הקריאה נחשבת (COMP_COUNTS ב-school-report.ts)",

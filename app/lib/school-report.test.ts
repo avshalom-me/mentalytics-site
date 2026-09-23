@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { KidsDomainResult } from "./kids-recommendations";
 import {
-  toTracksInput, buildSchoolSummary, interventionsTried, SCHOOL_DIAGNOSIS_KINDS,
+  toTracksInput, buildSchoolSummary, SCHOOL_DIAGNOSIS_KINDS, emotionalAloneCaveat,
   eligibilityDirections, eligibilityRoutes, acaExhaustionAdequate, acaProfileQualifies,
-  psychiatricSeverity, INTERVENTIONS, type Ans,
+  psychiatricSeverity, exhaustionMessage, INTERVENTIONS, type Ans,
 } from "./school-report";
 import { mapSchoolTracks } from "./school-tracks-engine";
 
@@ -17,7 +17,7 @@ const full: Ans = {
   a_aca: "הרבה", c_support: "partial", c_org: 2,
   a_soc: "הרבה", soc1: "כן", c_isolation: 2, c_bully_victim: "suspected",
   c_fill: "phone_parent",
-  c_tried: { talks: "helped", shach: "no_help" },
+  c_tried: { talks: "partial", shach: "no_help" },
   c_diag: [{ kind: "פסיכיאטר ילדים", year: 2025 }],
   c_team: "yes", c_zakaut: "none", c_hatamot: "none", c_economic: "yes",
 };
@@ -36,12 +36,12 @@ const anxietyDomain: KidsDomainResult = {
 
 describe("eligibilityRoutes - which committee route, if any", () => {
   const worked = { remedial: "done", inclusion: "done" } as const;
-  /** The floor under every referral: one treatment attempt, one system one. */
-  const attempts = { c_tried: { shach: "partial", talks: "helped" } } as const;
+  /** The floor under every referral: one treatment attempt and one system attempt, neither of which sufficed. */
+  const attempts = { c_tried: { shach: "partial", talks: "no_help" } } as const;
+  const nothing = { live: [], pending: [], missing: [], helpedOnly: [], ladderPending: false };
 
   it("opens nothing for a social or a behavioural finding", () => {
-    expect(eligibilityRoutes({ a_soc: "הרבה מאוד", a_beh: "הרבה מאוד", ...attempts }))
-      .toEqual({ live: [], pending: [], missing: [] });
+    expect(eligibilityRoutes({ a_soc: "הרבה מאוד", a_beh: "הרבה מאוד", ...attempts })).toEqual(nothing);
   });
 
   it("opens the emotional route on a real emotional finding, not on a slight one", () => {
@@ -58,7 +58,6 @@ describe("eligibilityRoutes - which committee route, if any", () => {
   });
 
   it("raises 57 even where the opening screen was ticked only 'מעט'", () => {
-    // Suicidality is the finding whatever the area flag said.
     expect(eligibilityDirections({ a_emo: "מעט", q3_sui: "כן", ...attempts })).toEqual(["psychiatric"]);
     expect(psychiatricSeverity({ aq_tot: 20 })).toBe(false);
     expect(psychiatricSeverity({ aq_tot: 21 })).toBe(true);
@@ -75,9 +74,19 @@ describe("eligibilityRoutes - which committee route, if any", () => {
 
   it("needs the school to have worked the learning difficulty as well as the profile", () => {
     const profile = { a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", ...attempts };
-    expect(eligibilityDirections(profile)).toEqual([]);                                  // ladder untouched
+    expect(eligibilityDirections(profile)).toEqual([]);                                             // ladder untouched
     expect(eligibilityDirections({ a_aca: "הרבה", c_aca_steps: worked, ...attempts })).toEqual([]);  // no profile
     expect(eligibilityDirections({ ...profile, c_aca_steps: worked })).toEqual(["learning"]);
+  });
+
+  it("says so, rather than nothing, when the profile is there and the ladder is not", () => {
+    // Silence here left a counsellor who had marked "בתהליך" with no committee and no idea why.
+    const r = eligibilityRoutes({ a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", c_aca_steps: { remedial: "in_progress" }, ...attempts });
+    expect(r.live).toEqual([]);
+    expect(r.pending).toEqual(["learning"]);
+    expect(r.ladderPending).toBe(true);
+    expect(exhaustionMessage(r)).toContain("הוראה מתקנת ותמיכה מסל השילוב");
+    expect(exhaustionMessage(r)).toContain("ולאחר מכן");
   });
 
   it("holds the route back while something the school said was needed is still open", () => {
@@ -95,18 +104,23 @@ describe("eligibilityRoutes - which committee route, if any", () => {
   it("holds every route behind one treatment attempt and one system attempt", () => {
     const finding = { a_emo: "הרבה" };
     expect(eligibilityRoutes(finding)).toMatchObject({ live: [], pending: ["emotional"], missing: ["treatment", "system"] });
-    expect(eligibilityRoutes({ ...finding, c_tried: { talks: "helped" } }))
-      .toMatchObject({ live: [], pending: ["emotional"], missing: ["treatment"] });
-    expect(eligibilityRoutes({ ...finding, c_tried: { shach: "helped" } }))
-      .toMatchObject({ live: [], pending: ["emotional"], missing: ["system"] });
+    expect(eligibilityRoutes({ ...finding, c_tried: { talks: "partial" } })).toMatchObject({ live: [], pending: ["emotional"], missing: ["treatment"] });
+    expect(eligibilityRoutes({ ...finding, c_tried: { shach: "no_help" } })).toMatchObject({ live: [], pending: ["emotional"], missing: ["system"] });
     expect(eligibilityRoutes({ ...finding, ...attempts }).live).toEqual(["emotional"]);
   });
 
+  it("does not count an attempt that helped - exhaustion is an attempt that did not suffice", () => {
+    const r = eligibilityRoutes({ a_emo: "הרבה", c_tried: { shach: "helped", talks: "helped" } });
+    expect(r.live).toEqual([]);
+    expect(r.missing).toEqual(["treatment", "system"]);
+    expect(r.helpedOnly).toEqual(["treatment", "system"]);
+    expect(exhaustionMessage(r)).toContain("'הועיל' אינה נספרת כמיצוי");
+    // One that helped beside one that did not: the one that did not is enough.
+    expect(eligibilityRoutes({ a_emo: "הרבה", c_tried: { shach: "helped", external: "partial", talks: "no_help" } }).live).toEqual(["emotional"]);
+  });
+
   it("counts the academic ladder as the treatment the learning route already had", () => {
-    // Remedial teaching and inclusion support ARE treating a learning
-    // difficulty; asking for school counselling on top of them would block a
-    // route the ladder has earned.
-    const A = { a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", c_aca_steps: worked, c_tried: { talks: "helped" } };
+    const A = { a_aca: "הרבה", dv_read: "5% מהכי נמוכים בכיתה", c_aca_steps: worked, c_tried: { talks: "partial" } };
     expect(eligibilityRoutes(A).live).toEqual(["learning"]);
   });
 
@@ -117,7 +131,7 @@ describe("eligibilityRoutes - which committee route, if any", () => {
     expect(pending.exhaustionNote).toContain("מיצוי אפשרויות");
     expect(pending.exhaustionNote).toContain("ולאחר מכן");
 
-    const live = toTracksInput({ _grade: "ד", a_emo: "הרבה", c_tried: { shach: "partial", talks: "helped" } }, TODAY)!;
+    const live = toTracksInput({ _grade: "ד", a_emo: "הרבה", ...attempts }, TODAY)!;
     expect(live.directions).toEqual(["emotional"]);
     expect(live.exhaustionNote).toBeUndefined();
   });
@@ -134,19 +148,18 @@ describe("toTracksInput", () => {
     const input = toTracksInput(full, TODAY)!;
     expect(input.schoolTeam).toEqual({ convened: true });
     expect(input.zakaut).toEqual({ status: "none", decisionReceivedOn: undefined });
-    expect(input.interventionsTried).toBe(2);
-    expect(input.economicConstraint).toBe(true);
-    expect(input.risk).toEqual({ suicidality: false, schoolRefusal: false });
+    expect(input.risk).toEqual({ schoolRefusal: false, frequentAbsence: true });   // c_attend is "frequent"
+    expect(input.duration).toBe("over_year");
+    expect(input.academicSupport).toBe("partial");
     expect(input.diagnoses).toEqual([{ kind: "פסיכיאטר ילדים", year: 2025 }]);
+    // Nothing the engine does not read travels into it.
+    expect("interventionsTried" in input).toBe(false);
+    expect("economicConstraint" in input).toBe(false);
   });
 
-  it("reads suicidality from the questionnaire's own screen, and refusal from the attendance answer", () => {
-    expect(toTracksInput({ ...full, q3_sui: "כן", c_attend: "refusal" }, TODAY)?.risk).toEqual({ suicidality: true, schoolRefusal: true });
-  });
-
-  it("counts an intervention as tried whatever its outcome", () => {
-    expect(interventionsTried({ c_tried: { talks: "no_help" } })).toBe(1);
-    expect(interventionsTried({})).toBe(0);
+  it("reads refusal and frequent absence from the attendance answer, and nothing from 'not known'", () => {
+    expect(toTracksInput({ ...full, c_attend: "refusal" }, TODAY)?.risk).toEqual({ schoolRefusal: true, frequentAbsence: false });
+    expect(toTracksInput({ ...full, c_attend: "unknown", c_support: "unknown" }, TODAY)).toMatchObject({ risk: { schoolRefusal: false, frequentAbsence: false }, academicSupport: undefined });
   });
 
   it("no longer asks about remedial teaching twice", () => {
@@ -240,7 +253,7 @@ describe("בהתלבטות - a committee the team is still weighing", () => {
   // An emotional route that is live (both attempts recorded) and no diagnosis.
   const weighing: Ans = {
     _audience: "counselor", _grade: "ח", _age: "14", a_emo: "הרבה", aq_tot: 21,
-    c_tried: { shach: "partial", talks: "helped" }, c_team: "no",
+    c_tried: { shach: "partial", talks: "no_help" }, c_team: "no",
     c_zakaut: "considering", c_diag: [],
   };
 
@@ -254,7 +267,9 @@ describe("בהתלבטות - a committee the team is still weighing", () => {
     expect(t).toContain("ועדת זכאות ואפיון: בהתלבטות. כדי להחליט חסר:");
     expect(t).toContain("אבחנה של פסיכיאטר/ית ילדים ונוער ל-57");
     expect(t).toContain("התכנסות הצוות הרב-מקצועי");
-    expect(t).toContain("לוודא: הסכמת ההורים לפנייה");
+    // No duration was given, so it sits with consent under "לוודא".
+    expect(t).toContain("קושי מתמשך (2-3 שנים לפחות): משך הקושי לא דווח");
+    expect(t).toContain("הסכמת ההורים לפנייה");
     expect(t).toContain("מועד אחרון להפניה: 31.3.2027");
   });
 
@@ -269,7 +284,7 @@ describe("what the school gets back for what it reported", () => {
     expect(t).toContain("כלים והכוונה לצוות");
     expect(t).toContain("ויסות בכיתה ובהפסקות");
     expect(t).toContain("בידוד או דחייה חברתית");   // c_isolation is 2 in the fixture
-    expect(t).toContain("נפגע/ת מהצקות או מחרם");   // c_bully_victim is "suspected"
+    expect(t).toContain("חשד להצקות או לחרם");   // c_bully_victim is "suspected"
   });
 
   it("says nothing where nothing was reported", () => {
@@ -279,6 +294,53 @@ describe("what the school gets back for what it reported", () => {
   it("names the public route before the private one when money is the constraint", () => {
     expect(buildSchoolSummary(full, [], TODAY).text).toContain("אפשרויות ציבוריות");
     expect(buildSchoolSummary({ ...full, c_economic: "no" }, [], TODAY).text).not.toContain("אפשרויות ציבוריות");
+  });
+});
+
+describe("what the counsellor herself said about each area", () => {
+  const domains = [
+    { key: "emotional", label: "🔵 תחום רגשי", result: anxietyDomain },
+    { key: "social", label: "🤝 תחום חברתי", result: { groups: [], externalNotes: [], standaloneWarnings: [] } },
+  ];
+
+  it("opens each domain's section with the level she gave it, and says when the items found nothing", () => {
+    const t = buildSchoolSummary({ ...full, a_soc: "מעט" }, [], TODAY, domains).text;
+    expect(t).toContain("תחום רגשי\n- רמת הקושי לפי דיווח היועצת: הרבה");
+    expect(t).toContain("תחום חברתי\n- רמת הקושי לפי דיווח היועצת: מעט\n- מהפריטים לא עלה ממצא");
+  });
+
+  it("puts a domain marked 'הרבה מאוד' first and marks it", () => {
+    const t = buildSchoolSummary({ ...full, a_soc: "הרבה מאוד" }, [], TODAY, domains).text;
+    expect(t.indexOf("תחום חברתי")).toBeLessThan(t.indexOf("תחום רגשי"));
+    expect(t).toContain("רמת הקושי לפי דיווח היועצת: הרבה מאוד - בולט");
+  });
+
+  it("prints no level line for a domain the caller did not key", () => {
+    expect(buildSchoolSummary(full, [], TODAY, [{ label: "🔵 תחום רגשי", result: anxietyDomain }]).text).not.toContain("רמת הקושי לפי דיווח");
+  });
+});
+
+describe("what else the summary now says", () => {
+  it("flags a diagnosis older than five years for the supervisor to confirm", () => {
+    const t = buildSchoolSummary({ ...full, c_diag: [{ kind: "פסיכיאטר ילדים", year: 2019 }] }, [], TODAY).text;
+    expect(t).toContain("(2019) - אבחון ישן, יש לוודא עם המפקח/ת או פסיכולוג/ית המסגרת שעדיין קביל");
+    expect(buildSchoolSummary(full, [], TODAY).text).not.toContain("אבחון ישן");
+  });
+
+  it("names a kindergarten by its own label, not as a class", () => {
+    expect(buildSchoolSummary({ _audience: "counselor", c_role: "gan", _grade: "גן", _age: "5" }, [], TODAY).text).toContain("- גן חובה, גיל 5");
+    expect(buildSchoolSummary(full, [], TODAY).text).toContain("- כיתה ד, גיל 10");
+  });
+
+  it("asks for the event behind a sudden change", () => {
+    expect(buildSchoolSummary(full, [], TODAY).text).toContain("שינוי חד בהתנהגות או במצב הרוח השנה - מצדיק בירור של אירוע לפני הפניה");
+  });
+
+  it("says when the emotional part was answered without the parents, and only then", () => {
+    expect(emotionalAloneCaveat({ c_fill: "counselor_alone", a_emo: "הרבה" })).toContain("התחום הרגשי מולא ללא ההורים");
+    expect(emotionalAloneCaveat({ c_fill: "counselor_alone" })).toBe("");
+    expect(emotionalAloneCaveat({ c_fill: "with_parent", a_emo: "הרבה" })).toBe("");
+    expect(buildSchoolSummary({ ...full, c_fill: "counselor_alone" }, [], TODAY).text).toContain("היעדר ממצא בו אינו שולל קושי");
   });
 });
 

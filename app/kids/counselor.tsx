@@ -54,6 +54,11 @@ import {
   UNKNOWN,
   toTracksInput,
   buildSchoolSummary,
+  emotionalAloneCaveat,
+  isSchoolGrade,
+  isGanGrade,
+  GAN_GRADES,
+  GAN_GRADE_LABELS,
   eligibilityDirections,
   eligibilityRoutes,
   exhaustionMessage,
@@ -61,6 +66,8 @@ import {
   type AcaStepKey,
   type AcaStepState,
   type CounselorFields,
+  type CounselorRole,
+  type GanGrade,
   type Level,
   type Outcome,
   type Unknown,
@@ -129,7 +136,8 @@ export function draftLabel(d: Draft): string {
   const f = d.A as CounselorFields;
   const idx = PAGES.indexOf(d.step as (typeof PAGES)[number]);
   const where = d.step === "p-result" ? "דוח מוכן" : idx > 0 ? `${Math.round((idx / (PAGES.length - 1)) * 100)}%` : "התחלה";
-  return [f._grade ? `כיתה ${f._grade}` : "ללא כיתה", where, `נשמר ${new Date(d.savedAt).toLocaleDateString("he-IL")}`].join(" · ");
+  const grade = isGanGrade(f._grade) ? GAN_GRADE_LABELS[f._grade] : f._grade ? `כיתה ${f._grade}` : "ללא כיתה";
+  return [grade, where, `נשמר ${new Date(d.savedAt).toLocaleDateString("he-IL")}`].join(" · ");
 }
 
 // ── Small pieces ─────────────────────────────────────────────────────────────
@@ -191,8 +199,12 @@ function CounselorBlock({ children }: { children: React.ReactNode }) {
 const setField = (A: Ans, setA: (a: Ans) => void) => <K extends keyof CounselorFields>(k: K, v: CounselorFields[K]) => setA({ ...A, [k]: v });
 
 // ── p-consent (counsellor) ───────────────────────────────────────────────────
-export function PageConsentCounselor({ onStart, drafts, onResume, onDelete }: { onStart: () => void; drafts: Draft[]; onResume: (d: Draft) => void; onDelete: (id: string) => void }) {
+export function PageConsentCounselor({ onStart, drafts, onResume, onDelete }: { onStart: (role: CounselorRole) => void; drafts: Draft[]; onResume: (d: Draft) => void; onDelete: (id: string) => void }) {
   const [agreed, setAgreed] = useState(false);
+  // Chosen before anything else: it decides the grades offered, the wording
+  // (הילד/ה in a kindergarten), which domains appear, and whether the
+  // committee map applies at all - the map is built for א-יב.
+  const [role, setRole] = useState<CounselorRole | null>(null);
   return (
     <div>
       <h1 className="mb-2 text-xl font-black leading-snug" style={{ color: "var(--text)" }}>שאלון מסייע להפניות ליועצות ולצוותי חינוך</h1>
@@ -227,12 +239,27 @@ export function PageConsentCounselor({ onStart, drafts, onResume, onDelete }: { 
           <p className="text-sm">חלק מהנתונים נשמרים לצורך מחקר, אין אף שמירה של נתונים אישיים או נתונים מזהים כלשהם.</p>
         </div>
       </details>
+      <div className="mb-4">
+        <div className="text-sm font-bold mb-2" style={{ color: "var(--text)" }}>מי ממלא/ת?</div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {([["school", "יועץ/ת בית ספר", "כיתות א-יב"], ["gan", "גננת", "מגן חובה ומטה"]] as const).map(([r, label, sub]) => (
+            <button key={r} type="button" onClick={() => setRole(r)}
+              className="rounded-2xl border-2 px-4 py-3 text-start transition-all min-h-[44px]"
+              style={role === r
+                ? { borderColor: "var(--teal)", background: "var(--teal-pale)", color: "var(--teal-dark)" }
+                : { borderColor: "var(--line)", background: "white", color: "var(--text)" }}>
+              <div className="font-bold">{label}</div>
+              <div className="text-xs" style={{ color: "var(--muted)" }}>{sub}</div>
+            </button>
+          ))}
+        </div>
+      </div>
       <label className="flex min-h-[44px] cursor-pointer items-start gap-3 rounded-xl p-4 text-sm hover:opacity-90" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}>
         <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="mt-0.5 h-5 w-5 flex-shrink-0 accent-[#2e7d8c]" />
         <span>אני ממלא/ת את השאלון במסגרת תפקידי המקצועי, לא אזין פרטים מזהים, וקראתי את ההצהרה</span>
       </label>
       <div className="mt-5">
-        <button type="button" disabled={!agreed} onClick={onStart}
+        <button type="button" disabled={!agreed || !role} onClick={() => role && onStart(role)}
           className="w-full rounded-xl bg-[var(--teal-dark)] py-4 text-base font-bold text-white disabled:opacity-40 hover:opacity-90">
           מתחילים ←
         </button>
@@ -262,8 +289,13 @@ export function PageDemoCounselor({ A, setA, onNext, onBack }: ScreenProps) {
   const [showErr, setShowErr] = useState(false);
   const f = A as CounselorFields;
   const age = parseInt(A._age) || 0;
-  const ageValid = age >= 5 && age <= 19;
+  const gan = f.c_role === "gan";
+  const [ageMin, ageMax] = gan ? [1, 7] : [5, 19];
+  const ageValid = age >= ageMin && age <= ageMax;
   const set = setField(A, setA);
+  const gradeOptions: [SchoolGrade | GanGrade, string][] = gan
+    ? GAN_GRADES.map(g => [g, GAN_GRADE_LABELS[g]] as [GanGrade, string])
+    : SCHOOL_GRADES.map(g => [g, g] as [SchoolGrade, string]);
   function handleNext() {
     if (!ageValid || !f._grade || !f.c_duration) { setShowErr(true); return; }
     setShowErr(false);
@@ -273,17 +305,17 @@ export function PageDemoCounselor({ A, setA, onNext, onBack }: ScreenProps) {
     <div>
       <Card>
         <StepTag>שלב 1 מתוך 2</StepTag>
-        <StepQ>קצת על התלמיד/ה</StepQ>
+        <StepQ>{gan ? "קצת על הילד/ה" : "קצת על התלמיד/ה"}</StepQ>
         <StepHint>שלוש שאלות קצרות, ומתחילים</StepHint>
         <div className="mb-5">
           <label className="text-sm font-semibold text-gray-600 block mb-2">גיל</label>
-          <input type="number" min={5} max={19} placeholder="גיל" value={A._age || ""}
+          <input type="number" min={ageMin} max={ageMax} placeholder="גיל" value={A._age || ""}
             onChange={e => setA({ ...A, _age: e.target.value })}
             className="border-2 border-[#d0dae8] rounded-xl px-3 py-2 w-24 focus:border-[var(--teal)] outline-none" />
         </div>
         <div className="mb-5">
           <label className="text-sm font-semibold text-gray-600 block mb-2">כיתה</label>
-          <Choice value={f._grade} options={SCHOOL_GRADES.map(g => [g, g] as [SchoolGrade, string])} onChange={v => set("_grade", v)} />
+          <Choice value={f._grade} options={gradeOptions} onChange={v => set("_grade", v)} />
         </div>
         <div>
           <label className="text-sm font-semibold text-gray-600 block mb-2">מזה כמה זמן הקושי מורגש</label>
@@ -293,7 +325,7 @@ export function PageDemoCounselor({ A, setA, onNext, onBack }: ScreenProps) {
       <NavRow onBack={onBack} onNext={handleNext} />
       {showErr && (
         <p className="text-red-500 text-sm font-semibold mt-3">
-          {!ageValid ? "⛔ יש למלא גיל בין 5 ל-19" : "⛔ יש לבחור כיתה ומשך קושי לפני המשך"}
+          {!ageValid ? `⛔ יש למלא גיל בין ${ageMin} ל-${ageMax}` : gan ? "⛔ יש לבחור גן ומשך קושי לפני המשך" : "⛔ יש לבחור כיתה ומשך קושי לפני המשך"}
         </p>
       )}
     </div>
@@ -429,9 +461,9 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
 
         {/* The findings point somewhere the file cannot follow yet. Said on this
             screen because this is where the missing attempts are ticked. */}
-        {routes.pending.length > 0 && (
+        {isSchoolGrade(A._grade) && routes.pending.length > 0 && (
           <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
-            {exhaustionMessage(routes.missing)}
+            {exhaustionMessage(routes)}
           </div>
         )}
 
@@ -454,7 +486,7 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
           here, on the way out, and travels inside them. */}
       <NavRow
         onBack={onBack}
-        onNext={() => onNext({ ...A, _route: eligibilityRoutes(A).live.length > 0 })}
+        onNext={() => onNext({ ...A, _route: isSchoolGrade(A._grade) && eligibilityRoutes(A).live.length > 0 })}
         nextDisabled={waiting}
         nextLabel={waiting ? "מחשב…" : "לחישוב ←"}
       />
@@ -477,7 +509,7 @@ export function PageDocs({ A, setA, onNext, onBack }: ScreenProps) {
     setAdding({});
   };
   const directions = eligibilityRoutes(A).live;
-  const showHatamot = !!f._grade && hatamotApplies(f._grade);
+  const showHatamot = isSchoolGrade(f._grade) && hatamotApplies(f._grade);
   const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
 
   return (
@@ -624,6 +656,17 @@ function TrackCard({ t }: { t: SchoolTrack }) {
  * she had no information about reads as an absence of difficulty. Said plainly
  * here, because the report cannot say it: the engine never sees the difference.
  */
+/** The emotional part was answered without the parents - see emotionalAloneCaveat. */
+export function EmotionalAloneNotice({ A }: { A: Ans }) {
+  const text = emotionalAloneCaveat(A).trim();
+  if (!text) return null;
+  return (
+    <div className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+      {text}
+    </div>
+  );
+}
+
 export function UnknownNotice({ A }: { A: Ans }) {
   const n = unknownCount(A);
   if (n === 0) return null;
@@ -698,6 +741,16 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
 
   return (
     <div className="mt-8 space-y-6">
+      {/* The committee map is built for א-יב: its deadlines and documents are
+          the school's. A kindergarten has committees of its own with their own
+          calendar, and the map for them is not built yet - said, not implied. */}
+      {!isSchoolGrade(f._grade) && (
+        <div className="rounded-xl p-4 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+          <div className="font-bold mb-1">מפת המסלולים לגיל הרך תתווסף בהמשך</div>
+          המפה כאן בנויה לכיתות א-יב. לגן חובה ולעולים לכיתה א' ועדת הזכאות פועלת במועדים משלה (סיום הדיונים 31.5), ולכן היא לא מוצגת עדיין. הממצאים, הכלים והסיכום להעתקה תקפים.
+        </div>
+      )}
+      {isSchoolGrade(f._grade) && (
       <div>
         <StepTag>מפת המסלולים</StepTag>
         <StepQ>מה רלוונטי עכשיו, ומתי</StepQ>
@@ -714,7 +767,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           // id: the PDF clones this box - the diagram and the timeline are the
           // one part of the report that is a picture rather than text.
           <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
-            <TrackFlow tracks={tracks} showHatamot={!!f._grade && hatamotApplies(f._grade)} />
+            <TrackFlow tracks={tracks} showHatamot={isSchoolGrade(f._grade) && hatamotApplies(f._grade)} />
             <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
               <TrackTimeline tracks={tracks} today={today} />
@@ -723,6 +776,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         )}
         <div className="space-y-3 mt-3">{tracks.map(t => <TrackCard key={t.key} t={t} />)}</div>
       </div>
+      )}
 
       {tips.length > 0 && (
         <div>

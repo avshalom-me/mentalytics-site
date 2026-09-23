@@ -274,7 +274,7 @@ describe("mechanicalTracks", () => {
     expect(items["התכנסות הצוות הרב-מקצועי"]).toBe(false);
     expect(items["הסכמת ההורים לפנייה"]).toBeNull();
     expect(z.decision!.headline).toMatch(/^כדי להחליט חסר: /);
-    expect(z.decision!.headline).toContain("לוודא: הסכמת ההורים לפנייה");
+    expect(z.decision!.headline).toContain("הסכמת ההורים לפנייה");
   });
 
   it("asks for a decision a month ahead of 31.3, and 'soon' once that has passed", () => {
@@ -315,6 +315,40 @@ describe("mechanicalTracks", () => {
     expect(z?.why.join(" ")).toContain("הפרעות נפשיות");
     expect(byKey(mechanicalTracks(base({ directions: ["emotional"] })), "zakaut")?.cautions.join(" "))
       .not.toContain("פסיכיאטריה של ילדים ונוער");
+  });
+
+  it("changes what the accommodations card asks for once the status says the school already acted", () => {
+    const submitted = byKey(mechanicalTracks(base({ grade: "י", hatamot: { status: "district_submitted" } })), "hatamot")!;
+    expect(submitted.why.join(" ")).toContain("ממתינים לתשובה");
+    expect(submitted.steps.join(" ")).not.toContain("מוגשות לוועדת ההתאמות המחוזית");
+    expect(submitted.steps.join(" ")).toContain("לעקוב אחר תשובת הוועדה");
+    // Nothing to prepare, so no prerequisite track either.
+    expect(byKey(mechanicalTracks(base({ grade: "י", hatamot: { status: "district_submitted" } })), "assessment")).toBeUndefined();
+
+    const school = byKey(mechanicalTracks(base({ grade: "י", hatamot: { status: "school_level" } })), "hatamot")!;
+    expect(school.why.join(" ")).toContain("אושרו התאמות בסמכות בית הספר");
+    expect(school.steps.join(" ")).not.toContain("נדונות ומאושרות בוועדה הבית-ספרית");
+  });
+
+  it("weighs the history and the response to support in the deciding aid, and flags an old diagnosis", () => {
+    const z = byKey(mechanicalTracks(base({
+      directions: ["learning"], zakaut: { status: "considering" },
+      duration: "this_year", academicSupport: "improves",
+      diagnoses: [{ kind: "נוירולוג קשב", year: 2019 }],
+    })), "zakaut")!;
+    const items = Object.fromEntries(z.decision!.items.map(i => [i.label, i.ok]));
+    expect(items["קושי מתמשך (2-3 שנים לפחות): דווח קושי מהשנה בלבד"]).toBe(false);
+    expect(items["תגובה לתמיכה לימודית: משתפר/ת - לשקול להמשיך בתמיכה לפני ועדה"]).toBe(false);
+    // Acceptable by type and signer, but old: to confirm, not to count on.
+    expect(items["אבחנה קבילה ל-58 (לקות למידה רב-בעייתית או AD(H)D) - האבחון ישן, לוודא שעדיין קביל"]).toBeNull();
+    expect(z.cautions.join(" ")).toContain("אבחון משנת 2019 ישן (מעל 5 שנים)");
+    expect(z.cautions.join(" ")).toContain("משתפר/ת בתמיכה הלימודית הנוכחית");
+    expect(z.cautions.join(" ")).toContain("הקושי דווח מהשנה בלבד");
+
+    const steady = byKey(mechanicalTracks(base({ directions: ["learning"], zakaut: { status: "considering" }, duration: "years", academicSupport: "none" })), "zakaut")!;
+    const ok = Object.fromEntries(steady.decision!.items.map(i => [i.label, i.ok]));
+    expect(ok["קושי מתמשך (2-3 שנים לפחות): מספר שנים"]).toBe(true);
+    expect(ok["תגובה לתמיכה לימודית: ללא שיפור"]).toBe(true);
   });
 
   it("does not say the word accommodations before ח, in any track", () => {
@@ -380,6 +414,14 @@ describe("clinical layer", () => {
   it("lets nothing clinical reach a counsellor unreviewed", () => {
     expect(CLINICAL_RULES.length).toBeGreaterThan(0);
     for (const r of approvedRules()) expect(r.reviewedOn).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("raises the attendance officer to 'consider' on frequent absence, with the threshold left to the authority", () => {
+    const t = mapSchoolTracks(base({ risk: { frequentAbsence: true } }));
+    const kabas = t.find(x => x.key === "attendance");
+    expect(kabas?.relevance).toBe("consider");
+    expect(kabas?.why.join(" ")).toContain("סף הדיווח");
+    expect(kabas?.steps.join(" ")).toContain("לברר מול הרשות המקומית את סף הדיווח");
   });
 
   it("raises the attendance officer on school refusal, now that the rule is approved", () => {
