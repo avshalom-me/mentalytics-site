@@ -226,6 +226,28 @@ function trackBlocks(tracks: SchoolTrack[], relevanceLabel: (t: SchoolTrack) => 
   return out;
 }
 
+/**
+ * Labelled blank lines, two to a row, each a rule to write on.
+ *
+ * The counsellor rubric is anonymous by construction - no name ever reaches
+ * it - so the printed document leaves room for what she adds by hand: who the
+ * student is at the top, who prepared it and signed at the end. One block, so a
+ * row of blanks is never split across two pages.
+ */
+function blankLines(labels: string[], opts: { topRule?: boolean } = {}): Block {
+  const wrap = el("div", { paddingTop: opts.topRule ? "10px" : "2px", paddingBottom: "20px" });
+  if (opts.topRule) wrap.appendChild(el("div", { height: "1px", background: RULE, marginBottom: "18px" }));
+  const grid = el("div", { display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: "32px", rowGap: "22px" });
+  for (const label of labels) {
+    const row = el("div", { display: "flex", alignItems: "flex-end", gap: "8px" });
+    row.appendChild(el("span", { font: `600 12.5px/1.4 ${FONT}`, color: INK_2, flex: "0 0 auto", whiteSpace: "nowrap" }, `${label}:`));
+    row.appendChild(el("span", { flex: "1 1 auto", height: "18px", borderBottom: `1px solid ${INK_3}` }));
+    grid.appendChild(row);
+  }
+  wrap.appendChild(grid);
+  return { node: wrap };
+}
+
 function subHeading(text: string): HTMLElement {
   return el("div", { font: `700 12px/1.6 ${FONT}`, color: INK, padding: "6px 0 4px" }, text);
 }
@@ -337,6 +359,10 @@ export interface ReportPdfInput {
   todayLabel: string;
   filename: string;
   logoSrc?: string;
+  /** Blank lines under the title, for what the tool deliberately does not collect. */
+  fillIn?: string[];
+  /** Blank lines closing the report proper - after the summary, before the map and the appendix. */
+  signature?: string[];
 }
 
 /**
@@ -350,10 +376,19 @@ export interface ReportPdfInput {
 export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
   const logoSrc = input.logoSrc ?? "/logo-temp.png";
 
+  // The signature closes the report itself - the summary. The map and the
+  // tools that follow are attachments to it, not part of what is being signed,
+  // and a signature printed after them sat alone at the top of the last page
+  // reading as if it belonged to the appendix. The disclaimer above it is kept
+  // with it, so the signature never opens a page on its own.
+  const foot = footBlocks(input.doc.foot);
+  if (input.signature?.length) foot[foot.length - 1].keepWithNext = true;
   const blocks: Block[] = [
     ...titleBlocks(input.doc),
+    ...(input.fillIn?.length ? [blankLines(input.fillIn)] : []),
     ...summaryBlocks(input.doc),
-    ...footBlocks(input.doc.foot),
+    ...foot,
+    ...(input.signature?.length ? [blankLines(input.signature, { topRule: true })] : []),
   ];
   if (input.map && input.map.tracks.length) {
     blocks.push(partHeading("מפת המסלולים"));

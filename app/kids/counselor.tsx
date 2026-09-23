@@ -641,6 +641,9 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         },
         toolGroups,
         toolsIntro: "הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם בבית הספר או בבית בזמן ההמתנה.",
+        // Filled in by hand once printed: the rubric never asks for a name.
+        fillIn: ["שם התלמיד/ה", "בית הספר"],
+        signature: ["נערך על ידי", "תפקיד", "תאריך", "חתימה"],
         todayLabel: formatDateHe(today),
         filename: `דוח-הפניה-${f._grade ? `כיתה-${f._grade}-` : ""}${today}`,
       });
@@ -721,7 +724,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
       <div>
         <StepTag>הדוח לתיק</StepTag>
         <StepQ>לשמירה, להדפסה ולהעתקה</StepQ>
-        <StepHint>ללא פרטים מזהים - את השם משלימים במסמך. ה-PDF הוא הסיכום, מפת המסלולים אחריו והכלים כנספח; ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.</StepHint>
+        <StepHint>ללא פרטים מזהים - את השם משלימים במסמך. ה-PDF הוא הסיכום, מפת המסלולים אחריו והכלים כנספח, עם שורות למילוי שם התלמיד/ה ולחתימה; ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.</StepHint>
         <div className="flex flex-wrap gap-2 mb-3 print:hidden">
           {/* The document, not a photograph of this page: real A4 pages, a
               running header, and a break that can only fall between blocks.
