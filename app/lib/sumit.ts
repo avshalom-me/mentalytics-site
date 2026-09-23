@@ -17,7 +17,7 @@
 //   https://app.sumit.co.il/help/developers/swagger/index.html
 //   https://help.sumit.co.il/he/articles/5833033 (charging with API)
 
-import { SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { SUBSCRIPTION_REGULAR_PRICE, priceWithVat } from "@/app/lib/promo";
 
 const API_BASE = process.env.SUMIT_API_BASE || "https://api.sumit.co.il";
 
@@ -28,8 +28,8 @@ export const QUIZ_BASE_PRICE = 30;
 // Regular monthly price. Single source of truth lives in app/lib/promo.ts so
 // client/server/cron never diverge.
 export const SUBSCRIPTION_BASE_PRICE = SUBSCRIPTION_REGULAR_PRICE;
-export const QUIZ_TOTAL = +(QUIZ_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
-export const SUBSCRIPTION_TOTAL = +(SUBSCRIPTION_BASE_PRICE * (1 + VAT_RATE)).toFixed(2);
+export const QUIZ_TOTAL = priceWithVat(QUIZ_BASE_PRICE);
+export const SUBSCRIPTION_TOTAL = priceWithVat(SUBSCRIPTION_BASE_PRICE);
 
 function credentials() {
   const id = process.env.SUMIT_COMPANY_ID;
@@ -402,38 +402,97 @@ export async function cancelSubscription(opts: {
 //
 // Sumit endpoint POST /billing/recurring/update/ - identifies the order by
 // RecurringCustomerItemID (same field as cancel) and sets a new UnitPrice.
-// Used to auto-revert the early-bird promo (₪90 → ₪140) after 3 cycles
-// without touching the customer's saved card. We re-read the item afterwards
-// and throw unless the new price actually applied - money-critical, so a
-// "success" here must mean the next charge will be at the new amount.
+// Used to auto-revert the early-bird promo (₪90 → ₪140) after 3 cycles, the
+// gift-trial follow-on step, and a centre's price change from the admin, all
+// without touching the customer's saved card.
+//
+// **The price here is gross.** The charge endpoint takes net prices and a
+// VATIncluded:false flag and grosses them itself; the update endpoint has no
+// VATIncluded parameter at all (Sumit's own API schema), and the UnitPrice it
+// writes is the same field that a created order reads back from - which is
+// gross: four live orders on 23/9/2026 read 106.2, 165.2, 283.2 and 826 for
+// 90, 140, 240 and 700 + VAT. Sending the net price would therefore have set
+// the standing order to ₪140 *including* VAT, ₪25.20 a month below the price
+// the therapist agreed to, and the check below - which compared against that
+// same net number - would have reported success. Nothing had been charged
+// wrongly yet: the first revert was due the next morning.
+//
+// Callers keep passing the net price, as everywhere else in the codebase.
 export async function updateRecurringPrice(opts: {
   recurringItemId: number;
   customerExternalId: string;
+  /** Price before VAT, as quoted to the customer and stored in the DB. */
   unitPrice: number;
 }): Promise<void> {
-  await api("/billing/recurring/update/", {
-    Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
-    RecurringCustomerItemID: opts.recurringItemId,
-    UnitPrice: opts.unitPrice,
-  });
+  const gross = priceWithVat(opts.unitPrice);
 
-  const after = await listRecurringForCustomer({
-    externalIdentifier: opts.customerExternalId,
-    includeInactive: true,
-  });
-  const item = after.find((i) => Number(i.ID) === opts.recurringItemId);
-  // 12 = מתוזמנת (חודשי מתנה) — עדכון מחיר עליה תקין; לדרוש דווקא 0 היה
-  // מפיל עריכת מחיר של מרכז בתקופת מתנה למרות שהעדכון הצליח ב-Sumit.
-  if (!item || !SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
-    throw new Error(
-      `Sumit update did not take effect: recurring item ${opts.recurringItemId} not active after update (status=${item?.Status ?? "missing"})`
+  const read = async (phase: "before" | "after update"): Promise<RecurringItem> => {
+    const items = await listRecurringForCustomer({
+      externalIdentifier: opts.customerExternalId,
+      includeInactive: true,
+    });
+    const item = items.find((i) => Number(i.ID) === opts.recurringItemId);
+    // 12 = מתוזמנת (חודשי מתנה) — עדכון מחיר עליה תקין; לדרוש דווקא 0 היה
+    // מפיל עריכת מחיר של מרכז בתקופת מתנה למרות שהעדכון הצליח ב-Sumit.
+    if (!item || !SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
+      throw new Error(
+        `Sumit update did not take effect: recurring item ${opts.recurringItemId} not active (${phase}, status=${item?.Status ?? "missing"})`
+      );
+    }
+    return item;
+  };
+  const readBack = () => read("after update");
+
+  const send = async (price: number) => {
+    await api("/billing/recurring/update/", {
+      Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+      RecurringCustomerItemID: opts.recurringItemId,
+      UnitPrice: price,
+    });
+    return readBack();
+  };
+
+  // Agorot-level comparison: the stored price is the one the card will be
+  // charged, so "close enough" is an agora, not a shekel. A response without a
+  // numeric price tells us nothing either way, and counts as a match - the
+  // same benefit of the doubt the previous check gave it.
+  const matches = (value: unknown, target: number) =>
+    typeof value !== "number" || Math.abs(value - target) <= 0.01;
+
+  const before = await read("before");
+  let item = await send(gross);
+  if (matches(item.UnitPrice, gross)) return;
+
+  // The gross reading above is measured, not documented, so handle the one
+  // other way Sumit could read this field: if it added VAT on top of what we
+  // sent, the order is now above the agreed price. Correct it immediately with
+  // the net price - the same number the create path sends - rather than leave
+  // a customer facing an overcharge until the next cron run.
+  if (matches(item.UnitPrice, priceWithVat(gross))) {
+    console.warn(
+      `Sumit applied VAT to the update of item ${opts.recurringItemId} (read ${item.UnitPrice} for ${gross}); resending ${opts.unitPrice}.`
     );
+    item = await send(opts.unitPrice);
+    if (matches(item.UnitPrice, gross)) return;
   }
-  if (typeof item.UnitPrice === "number" && Math.round(item.UnitPrice) !== Math.round(opts.unitPrice)) {
-    throw new Error(
-      `Sumit update price mismatch: item ${opts.recurringItemId} is ${item.UnitPrice}, expected ${opts.unitPrice}`
-    );
+
+  // Neither reading explains it. Put the order back where it was and fail, so
+  // the caller (cron: keeps promo_reverts_at and retries; admin: shows an
+  // error and does not save) never records a price the order does not have.
+  const original = typeof before.UnitPrice === "number" ? before.UnitPrice : null;
+  if (original != null && !matches(item.UnitPrice, original)) {
+    try {
+      await send(original);
+    } catch (restoreErr) {
+      console.error(
+        `Sumit price restore failed for item ${opts.recurringItemId} (left at ${item.UnitPrice}, was ${original}):`,
+        restoreErr instanceof Error ? restoreErr.message : restoreErr
+      );
+    }
   }
+  throw new Error(
+    `Sumit update price mismatch: item ${opts.recurringItemId} is ${item.UnitPrice}, expected ${gross} (${opts.unitPrice} + VAT)`
+  );
 }
 
 // ---------- Status sync (daily cron polls this) ----------

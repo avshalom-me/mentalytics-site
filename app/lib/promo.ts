@@ -17,12 +17,26 @@
 
 const VAT_RATE = 0.18;
 
+/**
+ * The same price with VAT added, rounded to agorot.
+ *
+ * Every price in this codebase - the constants below, subscriptions.amount,
+ * payments.amount and the copy the therapist reads - is the price *before*
+ * VAT, because that is how the plans are quoted ("₪140 + מע"מ"). Sumit is the
+ * exception: a standing order's UnitPrice is stored gross (an order opened at
+ * 140 + VAT reads back as 165.2), so any value written into that field has to
+ * pass through here. See updateRecurringPrice in sumit.ts.
+ */
+export function priceWithVat(net: number): number {
+  return +(net * (1 + VAT_RATE)).toFixed(2);
+}
+
 export const SUBSCRIPTION_REGULAR_PRICE = 140;
 export const SUBSCRIPTION_PROMO_PRICE = 90;
 export const SUBSCRIPTION_PROMO_MONTHS = 3;
 
-export const SUBSCRIPTION_REGULAR_TOTAL = +(SUBSCRIPTION_REGULAR_PRICE * (1 + VAT_RATE)).toFixed(2); // 165.20
-export const SUBSCRIPTION_PROMO_TOTAL = +(SUBSCRIPTION_PROMO_PRICE * (1 + VAT_RATE)).toFixed(2); // 106.20
+export const SUBSCRIPTION_REGULAR_TOTAL = priceWithVat(SUBSCRIPTION_REGULAR_PRICE); // 165.20
+export const SUBSCRIPTION_PROMO_TOTAL = priceWithVat(SUBSCRIPTION_PROMO_PRICE); // 106.20
 
 // 2026-07-09 23:59:59 Israel (UTC+3 in July) → 20:59:59Z.
 // (One-week extension of the original 2026-07-01 opening window.)
@@ -50,7 +64,7 @@ export function promoRevertDate(signupAt: Date = new Date()): Date {
 // למי שלא קיבל אותה - ולא תישאר פתוחה לנצח.
 export const TRIAL_UPGRADE_PRICE = 60;
 export const TRIAL_UPGRADE_MONTHS = 2;
-export const TRIAL_UPGRADE_TOTAL = +(TRIAL_UPGRADE_PRICE * (1 + VAT_RATE)).toFixed(2); // 70.80
+export const TRIAL_UPGRADE_TOTAL = priceWithVat(TRIAL_UPGRADE_PRICE); // 70.80
 // כמה ימים ההצעה תקפה מרגע שליחת המייל (3 לפני הסיום + חלון חסד אחרי).
 export const TRIAL_UPGRADE_OFFER_DAYS = 10;
 
@@ -66,7 +80,7 @@ export const TRIAL_UPGRADE_OFFER_DAYS = 10;
 // שהעדכון תפס. אין כאן קוד גבייה חדש - רק מחיר ותאריך.
 export const GIFT_FOLLOWON_PRICE = 70;
 export const GIFT_FOLLOWON_MONTHS = 2;
-export const GIFT_FOLLOWON_TOTAL = +(GIFT_FOLLOWON_PRICE * (1 + VAT_RATE)).toFixed(2); // 82.60
+export const GIFT_FOLLOWON_TOTAL = priceWithVat(GIFT_FOLLOWON_PRICE); // 82.60
 
 /**
  * מתי הוראת הקבע חוזרת למחיר המלא: כמה ימים לפני החיוב השלישי, כלומר
