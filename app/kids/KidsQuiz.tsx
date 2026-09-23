@@ -4,7 +4,6 @@ import { useState, useEffect, useMemo, useRef, useSyncExternalStore, Fragment } 
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
-import { downloadResultsPDF } from "@/app/lib/download-pdf";
 import { trackQuizStep, trackQuizComplete, trackQuizResult, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
@@ -77,7 +76,8 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
 }
 
 import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, RequiredNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
-import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits } from "./quiz-logic";
+import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits, scoringKey } from "./quiz-logic";
+import { formatDateHe, israelToday } from "@/app/lib/school-tracks";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
   "פעוט":[1,2],"גן3":[3,3],"גן-טרום":[4,4],"גן":[5,6],
@@ -1509,7 +1509,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
                   <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
-                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתה הצעירה, ניתן לענות על פי התרשמותך הכוללת מהתלמיד/ה באותה תקופה.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">{sw(A, "💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתה הצעירה, ניתן לענות על פי התרשמותך הכוללת מהילד/ה באותה תקופה.")}</div>
                   {[
                     {k:"ag_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},
                     {k:"ag_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},
@@ -1642,7 +1642,7 @@ function PageAcad({ A, setA, onNext, onBack, items, audience }: PageProps) {
                 <SubCard>
                   <div className="text-sm font-bold text-blue-900 mb-2">📋 שאלון רקע התפתחותי</div>
                   <div className="text-xs text-gray-500 mb-2">ענה כן/לא על כל סעיף.</div>
-                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתות הראשונות, ניתן לענות על פי התרשמותך הכוללת מהתלמיד/ה באותה תקופה.</div>
+                  <div className="text-xs text-amber-800 bg-amber-50 border border-amber-300 rounded p-2 mb-3">{sw(A, "💡 אם אינך זוכר/ת פרטים מדויקים מהגן או הכיתות הראשונות, ניתן לענות על פי התרשמותך הכוללת מהילד/ה באותה תקופה.")}</div>
                   {[{k:"dv_h1",q:"א. האם היה קושי בהתפתחות השפתית בגילאי שנה–שנתיים?"},{k:"dv_h2",q:"ב. האם דווח על קשיים בזיהוי אותיות ומספרים בגן או בכיתה א'?"},{k:"dv_h3",q:"ג. האם דווח על קשיים בזכירת צורות וצבעים בגן?"},{k:"dv_h4",q:"ד. האם דווח על קשיים בחריזה או זיהוי צליל פותח בגן?"},{k:"dv_h5",q:"ה. האם דווח על קשיים בביטוי עצמי ואוצר מילים בגן?"}].map(({k,q}) => (
                     <div key={k} className="mb-3"><p className="text-sm text-gray-700 mb-1">{q}</p><YNRow val={A[k]||""} onChange={v => setA({...A,[k]:v})} /></div>
                   ))}
@@ -2067,6 +2067,8 @@ function PageTraits({ A, setA, onNext, onBack }: { A:Ans; setA:(a:Ans)=>void; on
 }
 
 // ── p-result ──────────────────────────────────────────────────────────────────
+/** Shown on the report and printed in the PDF; sw() makes it the student's for a counsellor. */
+const BMI_NOTE = "ה-BMI של הילד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.";
 const GRADE_LABELS: Record<string, string> = {
   "פעוט":"פעוט","גן3":"גן גיל 3","גן-טרום":"גן טרום חובה","גן":"גן חובה",
   "א":"כיתה א","ב":"כיתה ב","ג":"כיתה ג","ד":"כיתה ד","ה":"כיתה ה","ו":"כיתה ו",
@@ -3016,6 +3018,7 @@ function KidsRecommendationsStrip({
 
 function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }: { A: Ans; score: KidsScoreResult | null; scoreError: boolean; onRetryScore: () => void; onRestart: () => void; audience?: Audience }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   // "report" = the findings report; "match" = the therapist search, on its own
   // screen. Mirrors the adults flow, where picking a recommendation swaps the
   // whole screen (results → match-form) instead of revealing a panel further
@@ -3301,6 +3304,60 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
   const allExternalNotes = uniq(byDomain.flatMap(b => b.externalNotes));
 
+  /**
+   * The parent's report as a document - see report-pdf.ts.
+   *
+   * It used to photograph this page and slice the picture into A4 sheets, so a
+   * page break fell wherever the pixels ran out, through the middle of a
+   * sentence, and the PDF carried the buttons, the "what now" strip and the
+   * coloured cards along with the findings. Built instead from the same data
+   * the screen renders: details, findings by domain, the tools as an appendix.
+   */
+  async function saveReportPdf() {
+    setPdfBusy(true);
+    try {
+      const [{ downloadReportPDF }, { buildKidsReportDoc, toolGroupsOf }] = await Promise.all([
+        import("@/app/lib/report-pdf"),
+        import("@/app/lib/kids-report-doc"),
+      ]);
+      const today = israelToday();
+      const dateLabel = formatDateHe(today);
+      const doc = buildKidsReportDoc({
+        dateLabel,
+        details: [
+          ["גיל", String(A._age || "")],
+          ["כיתה", GRADE_LABELS[A._grade] || A._grade || ""],
+          ["מגדר", A.gender || ""],
+          // "מדד" first: a line that opens with a Latin label is laid out left-to-right
+          // and prints as "16.2 :BMI" on a Hebrew page.
+          ...(bmiVal ? [["מדד BMI", `${bmiVal}${bmiAbnormal ? " (אינו תקין)" : ""}`] as [string, string]] : []),
+        ],
+        areas: Object.entries(AREA_LABELS)
+          .filter(([k]) => A[k] && A[k] !== "כלל לא")
+          .map(([k, label]) => [label, String(A[k])] as [string, string]),
+        medicalNote: bmiAbnormal ? BMI_NOTE : undefined,
+        domains: domainResults.map(d => ({ label: d.label, result: d.result })),
+        notes: allExternalNotes,
+        noFindings: hasAnyFindings ? undefined : {
+          title: "לא נמצאו ממצאים משמעותיים בתחומים שנבדקו",
+          line: "מומלץ לפנות לטיפול פסיכודינאמי לצורך עיבוד והבנת הקשיים.",
+        },
+      });
+      await downloadReportPDF({
+        doc,
+        disclaimer: "דוח ממצאים אוטומטי - אינו אבחון",
+        toolGroups: toolGroupsOf(domainResults),
+        toolsIntro: "הכלים שלהלן נלווים לממצאים שבדוח. הם אינם מחליפים טיפול - הם מה שאפשר להתחיל ליישם בבית כבר עכשיו.",
+        todayLabel: dateLabel,
+        filename: `תוצאות-השאלון-ילדים-${today}`,
+      });
+    } catch (e) {
+      console.error("kids PDF failed", e);
+    } finally {
+      setPdfBusy(false);
+    }
+  }
+
   // Match screen - a full screen swap, not a panel below the report. The report
   // is unmounted, so the parent has one thing in front of them and a labelled
   // way back, exactly like the adults match-form.
@@ -3323,7 +3380,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
   return (
     <div id="kids-results-card">
-      {/* Logo - included in the captured PDF report */}
+      {/* Logo on the report screen. The PDF draws its own, on every page. */}
       <div className="mb-4 flex justify-center">
         <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
       </div>
@@ -3420,7 +3477,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
       <div className="mt-4">
         {bmiAbnormal && (
           <div className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm leading-relaxed text-amber-900">
-            ⚕️ ה-BMI של התלמיד/ה אינו בטווח הרגיל למבוגרים. מאחר שאצל ילדים BMI נקבע לפי גיל ומגדר, מומלץ לפנות לרופא/ת הילדים לבירור רפואי בנפרד מהבירור הנפשי.
+            ⚕️ {sw(A, BMI_NOTE)}
           </div>
         )}
 
@@ -3696,17 +3753,15 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
       {/* Actions */}
       <div className="mt-6 flex gap-3 justify-end print:hidden" data-html2canvas-ignore="true">
-        {/* Parents save the screen they just read. A counsellor saves a
-            document instead - see the button inside CounselorAddendum, which
-            has the summary, the map and the tools as data rather than as
-            pixels. Capturing this page for her produced 52 pages of web UI. */}
+        {/* A counsellor's document has its own button inside CounselorAddendum,
+            with the summary, the map and the tools; this one is the parent's. */}
         {audience !== "counselor" && (
           <button
-            onClick={() => downloadResultsPDF("kids-results-card", "תוצאות-השאלון-ילדים", "#ffffff")}
-            data-pdf-trigger="kids-results-card"
+            onClick={saveReportPdf}
+            disabled={pdfBusy}
             className="px-5 py-2 rounded-xl border-2 border-[var(--teal)] text-[var(--teal)] text-sm font-semibold hover:bg-[var(--teal)] hover:text-white transition-all disabled:opacity-60"
           >
-            💾 שמירה כ-PDF
+            {pdfBusy ? "מייצר מסמך…" : "💾 שמירה כ-PDF"}
           </button>
         )}
         <button
@@ -3758,6 +3813,19 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   }, [step]);
   const [kidsItems, setKidsItems] = useState<Record<string, any[]> | null>(null);
   const [kidsScore, setKidsScore] = useState<KidsScoreResult | null>(null);
+  /**
+   * The scoringKey of the last scoring request sent.
+   *
+   * A response is applied only if no newer request has gone out since (see
+   * fetchScore), so whenever a score is on screen this is the key of the
+   * answers it describes - and a screen that wants a score compares it with
+   * the answers in front of it rather than asking whether a score exists.
+   * Asking only that showed a parent who stepped back from the results,
+   * changed an answer and came forward again the result of the old answers.
+   */
+  const scoredFor = useRef<string | null>(null);
+  /** The key of a request still in flight, so the same answers are never scored twice at once. */
+  const inFlight = useRef<string | null>(null);
   const [itemsError, setItemsError] = useState(false);
   const [scoreError, setScoreError] = useState(false);
 
@@ -3810,7 +3878,11 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       if (Date.now() - saved.ts > 60 * 60_000) return;
       if (saved.A) setA(saved.A);
       if (saved.step) setStep(saved.step);
-      if (saved.kidsScore) setKidsScore(saved.kidsScore);
+      if (saved.kidsScore) {
+        setKidsScore(saved.kidsScore);
+        // Restored with the answers it was saved with, so it is current for them.
+        if (saved.A) scoredFor.current = scoringKey(saved.A);
+      }
     } catch {}
   }, []);
 
@@ -3858,12 +3930,10 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     // is in the file, and which documents are worth asking about depends on
     // what was found. Her rubric is free, so nothing is spent by running the
     // scoring a screen sooner - and the report then opens without a wait.
-    if (audience === "counselor") {
-      const i = PAGES.indexOf(step as PageId);
-      // Stepping back into the questionnaire invalidates what was computed from it.
-      if (i >= 0 && i < PAGES.indexOf("p-refine") && kidsScore) { setKidsScore(null); return; }
-      if (step === "p-refine" && !kidsScore) { fetchScore(A); return; }
-    }
+    // Nothing is invalidated on the way back into the questions: coming forward
+    // again with the same answers keeps the score, and with changed ones the
+    // key no longer matches and the answers are scored again.
+    if (audience === "counselor" && step === "p-refine" && scoredFor.current !== scoringKey(A)) { fetchScore(A); return; }
     if (step === "p-result") {
       // trackQuizComplete already reports quiz_complete to GA4 - the inline
       // "quiz_completed" duplicate (a second GA4 name for the same action) is gone.
@@ -3880,7 +3950,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
         age_band: "child",
         gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
       });
-      if (!kidsScore) fetchScore(A);
+      if (scoredFor.current !== scoringKey(A)) fetchScore(A);
     }
   }, [step]);
 
@@ -3915,8 +3985,25 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   }
 
   async function fetchScore(answers: Ans) {
+    const key = scoringKey(answers);
+    // These exact answers are already being scored. A second request would
+    // score them twice and record the one result for research twice.
+    if (inFlight.current === key) return;
+    inFlight.current = key;
+    scoredFor.current = key;
     setScoreError(false);
     setKidsScore(null);
+    // What the last score found no longer describes these answers. Until the
+    // new score lands it must not be read - p-refine waits on exactly this.
+    if (audience === "counselor") {
+      setA(prev => {
+        if (!("_found" in prev) && !("_findingKeys" in prev)) return prev;
+        const next = { ...prev };
+        delete next._found;
+        delete next._findingKeys;
+        return next;
+      });
+    }
     // רצפת זמן למסך העיבוד - ראו minDwell והערה מקבילה בשאלון המבוגרים.
     const scoringStartedAt = Date.now();
     const fp = await getFingerprint().catch(() => null);
@@ -3932,6 +4019,10 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       const d = await r.json();
       if (!d.ok) throw new Error();
       await minDwell(scoringStartedAt);
+      // Superseded: a newer request went out while this one was in flight, and
+      // its answers are the ones on screen. Applying this one - or recording it
+      // for research - would describe answers that no longer exist.
+      if (scoredFor.current !== key) return;
       const scored: KidsScoreResult = {
         emotional: d.emotional,
         academic: d.academic,
@@ -3943,7 +4034,10 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       recordKidsResult(answers, scored, typeof d.algo === "string" ? d.algo : null);
     } catch {
       await minDwell(scoringStartedAt);
+      if (scoredFor.current !== key) return;
       setScoreError(true);
+    } finally {
+      if (inFlight.current === key) inFlight.current = null;
     }
   }
 
@@ -4006,6 +4100,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     setDraftId(d.id);
     setA(d.A);
     setKidsScore(null);
+    scoredFor.current = null;
     pushScreen();
     setStep(d.step);
     setCanGoBack(d.step !== PAGES[0]);
@@ -4129,10 +4224,10 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-beh"          && <PageBeh        {...pageProps} />}
       {step === "p-soc"          && <PageSoc        {...pageProps} />}
       {step === "p-traits"       && <PageTraits     {...pageProps} />}
-      {step === "p-refine"       && <PageRefine     {...pageProps} />}
+      {step === "p-refine"       && <PageRefine     {...pageProps} scoring={Array.isArray(A._found) ? "ready" : scoreError ? "failed" : "pending"} />}
       {step === "p-docs"         && <PageDocs       {...pageProps} />}
 
-      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); setDraftId(null); }} />}
+      {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); scoredFor.current = null; setDraftId(null); }} />}
     </main>
   );
 }

@@ -1,12 +1,12 @@
 /**
- * The counsellor's report as a document, not a photograph of a web page.
+ * A questionnaire report as a document, not a photograph of a web page.
  *
- * downloadResultsPDF captures the results card with html2canvas and slices the
- * bitmap into A4 pages. For a parent's short report that is fine. For a
- * counsellor it produced 52 pages: the whole coloured web UI - hero button,
- * "what now" strip, per-finding cards - reproduced at screen width, text
- * touching both edges, and every page break falling wherever pixel 1123
- * happened to land, which is to say through the middle of a sentence.
+ * downloadResultsPDF captures a results card with html2canvas and slices the
+ * bitmap into A4 pages. For a counsellor that produced 52 pages: the whole
+ * coloured web UI - hero button, "what now" strip, per-finding cards -
+ * reproduced at screen width, text touching both edges, and every page break
+ * falling wherever pixel 1123 happened to land, which is to say through the
+ * middle of a sentence. A parent's report is shorter and got the same cuts.
  *
  * So this builds the document instead. The same data the screen renders is
  * laid out again into real A4 pages: a fixed margin, a running header and
@@ -16,13 +16,21 @@
  * browser is the only thing here that can set Hebrew - but it is handed one
  * finished page at a time rather than a two-metre column to guess at.
  *
- * What the counsellor gets: the referral summary first, the committee map
- * after it, and the practical tools as an appendix. The web-only furniture
- * does not appear at all.
+ * Two reports use it. The counsellor's: the referral summary first, the
+ * committee map after it, the practical tools as an appendix. The parent's: the
+ * findings by domain, then the tools. The web-only furniture appears in
+ * neither - see kids-report-doc.ts for how the parent's is assembled.
  */
 
-import type { SchoolSummary } from "./school-report";
 import type { SchoolTrack } from "./school-tracks";
+
+/** The text of a report, already in sections - what either report builder returns. */
+export interface ReportDoc {
+  head: string;
+  meta: string;
+  sections: { title: string; lines: string[] }[];
+  foot: string;
+}
 
 // ── Page geometry, in CSS pixels at 96dpi ────────────────────────────────────
 const PAGE_W = 794;   // 210mm
@@ -64,8 +72,6 @@ const REL_TONE: Record<string, { fg: string; band: string; border: string }> = {
 const toneFor = (label: string) => REL_TONE[label] ?? REL_TONE["מידע"];
 
 const FONT = "Heebo, system-ui, sans-serif";
-
-export const PDF_DISCLAIMER = "מסמך המלצה אוטומטי להפניות - אינו אבחון";
 
 type Style = Record<string, string>;
 
@@ -130,7 +136,7 @@ function sectionHeading(n: number, text: string): Block {
 
 // ── The pieces of the document ───────────────────────────────────────────────
 
-function titleBlocks(doc: SchoolSummary["doc"]): Block[] {
+function titleBlocks(doc: ReportDoc): Block[] {
   const wrap = el("div", { paddingBottom: "18px" });
   wrap.appendChild(el("div", { font: `800 25px/1.35 ${FONT}`, color: INK, paddingBottom: "6px" }, doc.head));
   wrap.appendChild(el("div", { font: `500 12.5px/1.7 ${FONT}`, color: INK_3 }, doc.meta));
@@ -138,7 +144,7 @@ function titleBlocks(doc: SchoolSummary["doc"]): Block[] {
   return [{ node: wrap, keepWithNext: true }];
 }
 
-function summaryBlocks(doc: SchoolSummary["doc"]): Block[] {
+function summaryBlocks(doc: ReportDoc): Block[] {
   const out: Block[] = [];
   doc.sections.forEach((s, i) => {
     out.push(sectionHeading(i + 1, s.title));
@@ -241,14 +247,11 @@ function toolLines(text: string): { lead: string; items: string[] } {
   return { lead: parts[0], items: parts.slice(1) };
 }
 
-function toolBlocks(groups: ToolGroup[]): Block[] {
+function toolBlocks(groups: ToolGroup[], intro: string): Block[] {
   if (!groups.length) return [];
   const out: Block[] = [partHeading("נספח: כלים מעשיים")];
   out.push({
-    node: paragraph(
-      "הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם בבית הספר או בבית בזמן ההמתנה.",
-      { color: INK_3, font: `500 12.5px/1.7 ${FONT}`, paddingBottom: "16px" },
-    ),
+    node: paragraph(intro, { color: INK_3, font: `500 12.5px/1.7 ${FONT}`, paddingBottom: "16px" }),
   });
   for (const g of groups) {
     out.push({ node: subHeading(g.title), keepWithNext: true });
@@ -269,7 +272,7 @@ function toolBlocks(groups: ToolGroup[]): Block[] {
 
 // ── Page assembly ────────────────────────────────────────────────────────────
 
-function newPage(logoSrc: string): HTMLElement {
+function newPage(logoSrc: string, disclaimer: string): HTMLElement {
   const page = el("div", {
     position: "relative", width: `${PAGE_W}px`, height: `${PAGE_H}px`,
     background: PAPER, direction: "rtl", boxSizing: "border-box", overflow: "hidden",
@@ -285,7 +288,7 @@ function newPage(logoSrc: string): HTMLElement {
   logo.alt = "טיפול חכם";
   Object.assign(logo.style, { height: "30px", width: "auto", display: "block" });
   head.appendChild(logo);
-  head.appendChild(el("div", { font: `700 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "start" }, PDF_DISCLAIMER));
+  head.appendChild(el("div", { font: `700 10.5px/1.4 ${FONT}`, color: INK_3, textAlign: "start" }, disclaimer));
   page.appendChild(head);
   page.appendChild(el("div", {
     position: "absolute", top: `${HEAD_H - 14}px`, insetInlineStart: `${MARGIN_X}px`,
@@ -317,13 +320,20 @@ function stampFooter(page: HTMLElement, n: number, total: number, todayLabel: st
   page.appendChild(foot);
 }
 
-export interface SchoolPdfInput {
-  summary: SchoolSummary;
-  tracks: SchoolTrack[];
-  relevanceLabel: (t: SchoolTrack) => string;
-  /** The live flow diagram + timeline container, cloned into the document. */
-  graphsEl: HTMLElement | null;
+export interface ReportPdfInput {
+  doc: ReportDoc;
+  /** The line beside the logo on every page. */
+  disclaimer: string;
+  /** The counsellor's committee map. A parent's report has none. */
+  map?: {
+    tracks: SchoolTrack[];
+    relevanceLabel: (t: SchoolTrack) => string;
+    /** The live flow diagram + timeline container, cloned into the document. */
+    graphsEl: HTMLElement | null;
+  };
   toolGroups: ToolGroup[];
+  /** The sentence that opens the tools appendix: whose tools, and for when. */
+  toolsIntro: string;
   todayLabel: string;
   filename: string;
   logoSrc?: string;
@@ -337,15 +347,15 @@ export interface SchoolPdfInput {
  * takes the block after it along. The only thing allowed to shrink is a
  * cloned graph too tall to fit, which is scaled rather than cut.
  */
-export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<void> {
+export async function downloadReportPDF(input: ReportPdfInput): Promise<void> {
   const logoSrc = input.logoSrc ?? "/logo-temp.png";
 
   const blocks: Block[] = [
-    ...titleBlocks(input.summary.doc),
-    ...summaryBlocks(input.summary.doc),
-    ...footBlocks(input.summary.doc.foot),
+    ...titleBlocks(input.doc),
+    ...summaryBlocks(input.doc),
+    ...footBlocks(input.doc.foot),
   ];
-  if (input.tracks.length) {
+  if (input.map && input.map.tracks.length) {
     blocks.push(partHeading("מפת המסלולים"));
     blocks.push({
       node: paragraph(
@@ -357,16 +367,16 @@ export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<vo
       // top of a page then left two thirds of it white. The heading keeps its
       // paragraph; the picture may start overleaf, which is what a document does.
     });
-    blocks.push(...graphBlocks(input.graphsEl));
-    blocks.push(...trackBlocks(input.tracks, input.relevanceLabel));
+    blocks.push(...graphBlocks(input.map.graphsEl));
+    blocks.push(...trackBlocks(input.map.tracks, input.map.relevanceLabel));
   }
-  blocks.push(...toolBlocks(input.toolGroups));
+  blocks.push(...toolBlocks(input.toolGroups, input.toolsIntro));
 
   const stage = el("div", {
     position: "fixed", insetInlineStart: "-20000px", top: "0",
     width: `${PAGE_W}px`, direction: "rtl", background: PAPER, zIndex: "-1",
   });
-  stage.dataset.schoolPdfStage = "1";
+  stage.dataset.reportPdfStage = "1";
   document.body.appendChild(stage);
 
   try {
@@ -388,7 +398,7 @@ export async function downloadSchoolReportPDF(input: SchoolPdfInput): Promise<vo
     let body: HTMLElement | null = null;
     let y = 0;
     const open = () => {
-      const page = newPage(logoSrc);
+      const page = newPage(logoSrc, input.disclaimer);
       pages.push(page);
       stage.appendChild(page);
       body = page.querySelector<HTMLElement>("[data-body]");

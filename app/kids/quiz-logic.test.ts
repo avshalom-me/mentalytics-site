@@ -33,6 +33,7 @@ import {
   fillTraits,
   schoolWording,
   sw,
+  scoringKey,
   type Ans,
 } from "./quiz-logic";
 
@@ -435,5 +436,26 @@ describe("score updaters - the totals the server trusts", () => {
   it("treats an unanswered item as zero, which is what the scoring also does", () => {
     const A = updAQ({}, "aq1", 3);
     expect(A.aq_tot).toBe(3);
+  });
+});
+
+describe("scoringKey - whether a score still describes the answers", () => {
+  const A: Ans = { _audience: "counselor", _grade: "ד", a_emo: "הרבה", q1: 4 };
+
+  it("ignores the counsellor's own layer and the facts written back from a score", () => {
+    const k = scoringKey(A);
+    expect(scoringKey({ ...A, c_tried: { talks: "helped" }, c_diag: [] })).toBe(k);
+    expect(scoringKey({ ...A, _found: ["emotional"], _findingKeys: {}, _route: true })).toBe(k);
+  });
+
+  it("changes when anything the scoring reads changes - an item, the grade, the age", () => {
+    const k = scoringKey(A);
+    expect(scoringKey({ ...A, q1: 3 })).not.toBe(k);
+    expect(scoringKey({ ...A, _grade: "ה" })).not.toBe(k);
+    expect(scoringKey({ ...A, _age: "10" })).not.toBe(k);
+  });
+
+  it("does not depend on the order the answers were given in", () => {
+    expect(scoringKey({ q1: 4, a_emo: "הרבה" })).toBe(scoringKey({ a_emo: "הרבה", q1: 4 }));
   });
 });

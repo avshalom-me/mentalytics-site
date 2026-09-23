@@ -332,6 +332,24 @@ export function fillTraits(A: Ans, needs: TraitNeeds = traitNeeds(A)): Ans {
   return out;
 }
 
+// ── What a score was computed from ───────────────────────────────────────────
+/**
+ * The answers the scoring actually reads, as one comparable string.
+ *
+ * A score on screen is current exactly when this matches the answers on
+ * screen. Left out: the counsellor's own layer (c_*), which no scoring rule
+ * reads, and the three facts written back into the answers FROM a score
+ * (_found, _findingKeys, _route) - counting those would make every score
+ * describe answers that no longer exist the moment it lands. Key order does not
+ * matter; the keys are sorted.
+ */
+const SCORE_FACTS = new Set(["_found", "_findingKeys", "_route"]);
+export function scoringKey(A: Ans): string {
+  return JSON.stringify(
+    Object.keys(A).filter(k => !k.startsWith("c_") && !SCORE_FACTS.has(k)).sort().map(k => [k, A[k]]),
+  );
+}
+
 // ── Wording ──────────────────────────────────────────────────────────────────
 /**
  * Parent phrasing to school phrasing, for the labels a counsellor reads.

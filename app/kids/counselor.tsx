@@ -14,7 +14,7 @@
  * components is reachable from /kids.
  */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { CrisisResources } from "@/app/components/CrisisResources";
 import type { KidsDomainResult } from "@/app/lib/kids-recommendations";
 import {
@@ -32,6 +32,7 @@ import {
   type SchoolGrade,
 } from "@/app/lib/school-tracks";
 import { mapSchoolTracks } from "@/app/lib/school-tracks-engine";
+import { toolGroupsOf } from "@/app/lib/kids-report-doc";
 import {
   INTERVENTIONS,
   FILL_MODE_LABELS,
@@ -377,8 +378,22 @@ export function CounselorSafetyNotice() {
  * this one screen, ahead of the score, and the documents question had to guess
  * from the raw answers which route the report would end up naming.
  */
-export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
+export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: ScreenProps & { scoring?: "pending" | "ready" | "failed" }) {
   const f = A as CounselorFields; const set = setField(A, setA);
+  // The questionnaire is scored in the background from the moment this screen
+  // opens, and the route this button decides is read from what that scoring
+  // found. Pressing on before it landed used to fall back to the level ticked
+  // on the opening screen - a guess, on exactly the decision the scoring was
+  // brought forward to make. So the button waits, with two ways out: a scoring
+  // that failed (the report has its own retry), and one that has not answered
+  // in ten seconds.
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    if (scoring !== "pending") return;
+    const t = setTimeout(() => setGaveUp(true), 10_000);
+    return () => clearTimeout(t);
+  }, [scoring]);
+  const waiting = scoring === "pending" && !gaveUp;
   const tried = f.c_tried ?? {};
   const toggleTried = (k: keyof typeof tried) => {
     const next = { ...tried };
@@ -439,7 +454,12 @@ export function PageRefine({ A, setA, onNext, onBack }: ScreenProps) {
           is open depends on the scored findings and on the attempts above, and
           the routing rules are pure functions of the answers. So it is computed
           here, on the way out, and travels inside them. */}
-      <NavRow onBack={onBack} onNext={() => onNext({ ...A, _route: eligibilityRoutes(A).live.length > 0 })} nextLabel="לחישוב ←" />
+      <NavRow
+        onBack={onBack}
+        onNext={() => onNext({ ...A, _route: eligibilityRoutes(A).live.length > 0 })}
+        nextDisabled={waiting}
+        nextLabel={waiting ? "מחשב…" : "לחישוב ←"}
+      />
     </div>
   );
 }
@@ -592,9 +612,6 @@ export function UnknownNotice({ A }: { A: Ans }) {
   );
 }
 
-/** Leading emoji and punctuation off a label the engine wrote for the screen. */
-const stripMarks = (s: string) => s.replace(/^[^\p{L}\p{N}]+/u, "").trim();
-
 export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: string; result: KidsDomainResult }[] }) {
   const f = A as CounselorFields;
   const today = useMemo(() => israelToday(), []);
@@ -606,34 +623,24 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   const [pdf, setPdf] = useState<"idle" | "busy">("idle");
 
-  // The tools become the appendix. Grouped by the finding that produced them,
-  // which is the only thing that makes a list of tips readable - the screen
-  // groups them the same way inside each finding's card.
-  const toolGroups = useMemo(() => {
-    const map = new Map<string, string[]>();
-    for (const d of domains)
-      for (const g of d.result.groups)
-        for (const r of g.recs)
-          for (const t of r.tools) {
-            const key = stripMarks(t.sourceSymptom || g.treatmentLabel) || stripMarks(g.treatmentLabel);
-            const arr = map.get(key) ?? [];
-            const text = stripMarks(t.text);
-            if (text && !arr.includes(text)) arr.push(text);
-            map.set(key, arr);
-          }
-    return Array.from(map, ([title, tools]) => ({ title, tools })).filter(g => g.tools.length > 0);
-  }, [domains]);
+  // The tools become the appendix, grouped by the finding that produced them -
+  // the same grouping the parent's report uses (kids-report-doc.ts).
+  const toolGroups = useMemo(() => toolGroupsOf(domains), [domains]);
 
   const savePdf = async () => {
     setPdf("busy");
     try {
-      const { downloadSchoolReportPDF } = await import("@/app/lib/school-pdf");
-      await downloadSchoolReportPDF({
-        summary,
-        tracks,
-        relevanceLabel: t => RELEVANCE_LABELS[t.relevance],
-        graphsEl: document.getElementById("school-graphs"),
+      const { downloadReportPDF } = await import("@/app/lib/report-pdf");
+      await downloadReportPDF({
+        doc: summary.doc,
+        disclaimer: "מסמך המלצה אוטומטי להפניות - אינו אבחון",
+        map: {
+          tracks,
+          relevanceLabel: t => RELEVANCE_LABELS[t.relevance],
+          graphsEl: document.getElementById("school-graphs"),
+        },
         toolGroups,
+        toolsIntro: "הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם בבית הספר או בבית בזמן ההמתנה.",
         todayLabel: formatDateHe(today),
         filename: `דוח-הפניה-${f._grade ? `כיתה-${f._grade}-` : ""}${today}`,
       });
