@@ -70,7 +70,29 @@ export const EXTERNAL_DIAGNOSER_KEYS = ["נוירולוג קשב", "פסיכיא
  * questionnaire's own vocabulary - its assessment types plus the referral keys
  * above - so the two engines describe the same document with the same word.
  */
-export const DIAGNOSIS_KINDS = [...ASSESSMENT_TYPES, ...EXTERNAL_DIAGNOSER_KEYS] as const;
+/**
+ * What a kindergarten teacher can say the child "already has".
+ *
+ * Early childhood documents come mostly out of a child development institute
+ * and its professions, and the First Schedule cares exactly which profession
+ * and where: a speech therapist's report answers the language-delay category
+ * only when it was written in a development institute [A]. So these kinds name
+ * the signer, and the kindergarten screen offers them instead of the school's
+ * psycho-didactic vocabulary. Stored in drafts as-is - never rename one.
+ */
+export const GAN_DOC_KINDS = [
+  "סיכום מכון התפתחות הילד",
+  "קלינאית תקשורת - מכון התפתחות",
+  "קלינאית תקשורת",
+  "ריפוי בעיסוק",
+  "פסיכולוג התפתחותי",
+  "נוירולוג ילדים והתפתחות",
+  "ועדת אבחון - חוק הסעד",
+  "בדיקת שמיעה - אודיולוגיה",
+  "בדיקת ראייה - רופא עיניים",
+] as const;
+
+export const DIAGNOSIS_KINDS = [...ASSESSMENT_TYPES, ...EXTERNAL_DIAGNOSER_KEYS, ...GAN_DOC_KINDS] as const;
 export type DiagnosisKind = (typeof DIAGNOSIS_KINDS)[number];
 
 // ── The First Schedule: who may diagnose what [A] ────────────────────────────
@@ -233,6 +255,17 @@ const IMPLIED_SIGNERS: Record<DiagnosisKind, ImpliedSigner[]> = {
   "פסיכיאטר ילדים": ["רופא מומחה בפסיכיאטריה של ילדים ונוער"],
   "פסיכולוג חינוכי": ["פסיכולוג חינוכי", "פסיכולוג התפתחותי"],
   "פסיכולוג קליני": ["פסיכולוג קליני"],
+  // A development institute's summary is signed by its physician - which
+  // physician is exactly what the word does not say, so the gate asks.
+  "סיכום מכון התפתחות הילד": ["any-physician"],
+  "קלינאית תקשורת - מכון התפתחות": ["קלינאי תקשורת במכון להתפתחות הילד"],
+  "קלינאית תקשורת": ["קלינאי תקשורת"],
+  "ריפוי בעיסוק": ["מרפא בעיסוק"],
+  "פסיכולוג התפתחותי": ["פסיכולוג התפתחותי"],
+  "נוירולוג ילדים והתפתחות": ["רופא מומחה בנוירולוגיה של הילד ובהתפתחות הילד"],
+  "ועדת אבחון - חוק הסעד": ["ועדת אבחון לפי חוק הסעד"],
+  "בדיקת שמיעה - אודיולוגיה": ["קלינאי תקשורת שהוסמך לאודיולוגיה"],
+  "בדיקת ראייה - רופא עיניים": ["מכון לראייה ירודה או רופא עיניים"],
 };
 
 /** Assessment kinds that can serve a request for exam accommodations [D] §8. */
@@ -251,21 +284,32 @@ export interface Diagnosis {
 
 export type GateResult = "acceptable" | "verify_signer" | "not_acceptable";
 
-/** Would this document be accepted by ועדת זכאות ואפיון as the diagnosis of `category`? */
-export function diagnosisGate(d: Diagnosis, category: DisabilityCategory): GateResult {
-  const rule = ACCEPTABLE_BY_CATEGORY[category];
+/**
+ * Who stands behind a document: the kind's implied signers, with a named
+ * signer filling the wildcard the kind left open. The parts the kind
+ * guarantees (a didactic assessor inside a psycho-didactic report) stay; for a
+ * kind with no wildcard the counsellor's word replaces the assumption.
+ */
+function signersOf(d: Diagnosis): ImpliedSigner[] {
   const implied = IMPLIED_SIGNERS[d.kind];
   const isWildcard = (s: ImpliedSigner) => s === "any-psychologist" || s === "any-physician";
-  // A named signer fills the wildcard the document kind left open; the parts the
-  // kind guarantees (a didactic assessor inside a psycho-didactic report) stay.
-  // For a kind with no wildcard the counsellor's word replaces the assumption.
   const signedBy = d.signedBy;
-  const signers: ImpliedSigner[] = !signedBy
+  return !signedBy
     ? implied
     : implied.some(isWildcard)
       ? implied.map(s => (isWildcard(s) ? signedBy : s))
       : [signedBy];
-  const exact = signers.filter((s): s is DiagnosingBody => s !== "any-psychologist" && s !== "any-physician");
+}
+/** The signers of a document that are known exactly, wildcards left out. */
+export function exactSigners(d: Diagnosis): DiagnosingBody[] {
+  return signersOf(d).filter((s): s is DiagnosingBody => s !== "any-psychologist" && s !== "any-physician");
+}
+
+/** Would this document be accepted by ועדת זכאות ואפיון as the diagnosis of `category`? */
+export function diagnosisGate(d: Diagnosis, category: DisabilityCategory): GateResult {
+  const rule = ACCEPTABLE_BY_CATEGORY[category];
+  const signers = signersOf(d);
+  const exact = exactSigners(d);
 
   if (exact.some(s => rule.bodies.includes(s))) return "acceptable";
   if (rule.combos?.some(combo => combo.every(b => exact.includes(b)))) return "acceptable";
@@ -432,7 +476,14 @@ export type TrackKey =
   | "assessment"
   | "risk_protocol"
   | "attendance"
-  | "exhaustion";
+  | "exhaustion"
+  // The kindergarten map - gan-tracks.ts.
+  | "gan_team"
+  | "dev_center"
+  | "rehab_daycare"
+  | "extra_year"
+  | "first_grade"
+  | "btl";
 
 export type Relevance = "primary" | "consider" | "info";
 
@@ -477,7 +528,7 @@ export interface TrackDecision {
   deadline?: string;
 }
 
-function decisionOf(items: DecisionItem[], extra: { decideBy?: string; deadline?: string } = {}): TrackDecision {
+export function decisionOf(items: DecisionItem[], extra: { decideBy?: string; deadline?: string } = {}): TrackDecision {
   const missing = items.filter(i => i.ok === false).map(i => i.label);
   const confirm = items.filter(i => i.ok === null).map(i => i.label);
   const parts = [missing.length ? `כדי להחליט חסר: ${missing.join("; ")}` : "כל התנאים שהמערכת בודקת מתקיימים"];
@@ -492,7 +543,7 @@ const DIRECTION_DIAGNOSIS: Record<EligibilityDirection, string> = {
   learning: "אבחנה קבילה ל-58 (לקות למידה רב-בעייתית או AD(H)D)",
 };
 
-const CONSENT_ITEM: DecisionItem = { label: "הסכמת ההורים לפנייה", ok: null };
+export const CONSENT_ITEM: DecisionItem = { label: "הסכמת ההורים לפנייה", ok: null };
 
 /** A diagnosis older than this is flagged for the supervisor to confirm - the owner's figure. */
 export const OLD_DIAGNOSIS_YEARS = 5;
@@ -565,6 +616,36 @@ const HATAMOT_DOCUMENTS = [
   "גיליון ציונים, תעודות והערות מילוליות בתעודה - עדויות תומכות",
   "מבחנים מצורפים התואמים את רמת הידע הנדרשת במקצועות ההיבחנות ומשקפים את הקשיים שאותרו",
 ];
+
+/**
+ * השגה על החלטת ועדת זכאות ואפיון: 21 days from receiving the decision, and
+ * the objection committee decides within 21 days of the filing [C] - the same
+ * for a school and for a kindergarten. `who` is the noun the steps use.
+ */
+export function zakautAppealTrack(received: string, today: string, who = "התלמיד"): SchoolTrack {
+  const until = isoAddDays(received, 21);
+  const stillOpen = today <= until;
+  return {
+    key: "zakaut_appeal",
+    name: "השגה על החלטת ועדת זכאות ואפיון",
+    relevance: stillOpen ? "primary" : "info",
+    why: stillOpen
+      ? [`ההחלטה התקבלה ב-${formatDateHe(received)}; חלון ההשגה פתוח עוד ${isoDiffDays(today, until)} ימים`]
+      : [`ההחלטה התקבלה ב-${formatDateHe(received)} וחלון ההשגה של 21 יום נסגר ב-${formatDateHe(until)}`],
+    deadline: stillOpen
+      ? { date: until, label: `הגשת השגה עד ${formatDateHe(until)}` }
+      : { date: until, label: "מועד ההשגה חלף", note: "הדרך שנותרה היא עתירה מנהלית - נדרש ייעוץ משפטי" },
+    documents: ["נימוקי ההשגה", "מסמכים חדשים שלא היו בפני הוועדה, אם יש"],
+    steps: [
+      `ועדת ההשגה מזמינה את ההורים ואת ${who} ומאפשרת להם או לנציג מטעמם להשמיע את דבריהם`,
+      "ועדת ההשגה מחליטה תוך 21 יום מהגשת ההשגה: קבלה, דחייה, או החזרה לדיון בוועדת הזכאות",
+    ],
+    appeals: [{ against: "החלטת ועדת ההשגה", window: "לפי דין - ייעוץ משפטי", to: "עתירה מנהלית לבית המשפט לעניינים מנהליים" }],
+    cautions: [],
+    officialLinks: [LINKS.zakautKolzchut],
+    verified: "כל-זכות [C], 2.9.2026",
+  };
+}
 
 const CATEGORY_LIST = (r: Record<DisabilityCategory, GateResult>, want: GateResult) =>
   DISABILITY_CATEGORIES.filter(c => r[c] === want);
@@ -741,29 +822,7 @@ export function mechanicalTracks(input: SchoolTracksInput): SchoolTrack[] {
 
   // ── השגה על החלטת ועדת זכאות ──
   if (zStatus === "decided" && input.zakaut?.decisionReceivedOn) {
-    const received = input.zakaut.decisionReceivedOn;
-    const until = isoAddDays(received, 21);
-    const stillOpen = today <= until;
-    tracks.push({
-      key: "zakaut_appeal",
-      name: "השגה על החלטת ועדת זכאות ואפיון",
-      relevance: stillOpen ? "primary" : "info",
-      why: stillOpen
-        ? [`ההחלטה התקבלה ב-${formatDateHe(received)}; חלון ההשגה פתוח עוד ${isoDiffDays(today, until)} ימים`]
-        : [`ההחלטה התקבלה ב-${formatDateHe(received)} וחלון ההשגה של 21 יום נסגר ב-${formatDateHe(until)}`],
-      deadline: stillOpen
-        ? { date: until, label: `הגשת השגה עד ${formatDateHe(until)}` }
-        : { date: until, label: "מועד ההשגה חלף", note: "הדרך שנותרה היא עתירה מנהלית - נדרש ייעוץ משפטי" },
-      documents: ["נימוקי ההשגה", "מסמכים חדשים שלא היו בפני הוועדה, אם יש"],
-      steps: [
-        "ועדת ההשגה מזמינה את ההורים ואת התלמיד ומאפשרת להם או לנציג מטעמם להשמיע את דבריהם",
-        "ועדת ההשגה מחליטה תוך 21 יום מהגשת ההשגה: קבלה, דחייה, או החזרה לדיון בוועדת הזכאות",
-      ],
-      appeals: [{ against: "החלטת ועדת ההשגה", window: "לפי דין - ייעוץ משפטי", to: "עתירה מנהלית לבית המשפט לעניינים מנהליים" }],
-      cautions: [],
-      officialLinks: [LINKS.zakautKolzchut],
-      verified: "כל-זכות [C], 2.9.2026",
-    });
+    tracks.push(zakautAppealTrack(input.zakaut.decisionReceivedOn, today));
   }
 
   // ── מיצוי אפשרויות: the findings support a route, the file does not yet ──

@@ -77,6 +77,7 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
 
 import { ob, sb, so, cb, soUnknown, UnknownCellLabel, EQUAL_ROW_STYLE, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, RequiredNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
 import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits, scoringKey } from "./quiz-logic";
+import { isGanGrade } from "@/app/lib/gan-tracks";
 import { formatDateHe, israelToday } from "@/app/lib/school-tracks";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
@@ -272,7 +273,7 @@ function ScaleGate({ A, setA, itemKey, advance }: {
 }
 
 // ── p-emo-intro ──────────────────────────────────────────────────────────────
-function PageEmoIntro({ onNext, onBack }: { onNext: () => void; onBack?: () => void }) {
+function PageEmoIntro({ onNext, onBack, gan = false }: { onNext: () => void; onBack?: () => void; gan?: boolean }) {
   return (
     <div>
       <Card>
@@ -280,7 +281,7 @@ function PageEmoIntro({ onNext, onBack }: { onNext: () => void; onBack?: () => v
         <StepQ>את החלק הזה עדיף למלא יחד עם ההורים</StepQ>
         <div className="rounded-xl p-4 text-sm leading-relaxed" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
           <p className="mb-3">
-            בתחום זה עדיף למלא את השאלון יחד עם ההורים, בטלפון או בפגישה, משום שישנם סימפטומים שמתרחשים בבית ואינם נראים בבית הספר: שינה, אכילה, חרדות ליליות, מצוקה בהיפרדות, ומחשבות שהתלמיד/ה משתף/ת רק בבית.
+            {`בתחום זה עדיף למלא את השאלון יחד עם ההורים, בטלפון או בפגישה, משום שישנם סימפטומים שמתרחשים בבית ואינם נראים ${gan ? "בגן" : "בבית הספר"}: שינה, אכילה, חרדות ליליות, מצוקה בהיפרדות, ומחשבות ש${gan ? "הילד/ה" : "התלמיד/ה"} משתף/ת רק בבית.`}
           </p>
           <p>
             אם אינך יכולה למלא עכשיו יחד איתם, אפשר לענות רק על מה שידוע לך ולסמן <strong>&quot;לא ידוע / לא רלוונטי&quot;</strong> בשאר - התשובות האלה ייחשבו כ&quot;לא&quot;, והדוח יתייחס אליהן בהתאם. אפשר גם לשמור טיוטה ולחזור לכאן אחרי שיחה עם ההורים.
@@ -743,7 +744,7 @@ function PageMQSui({ A, setA, onNext, onBack, audience }: { A:Ans; setA:(a:Ans)=
         <StepQ>האם קיימות מחשבות אובדניות חוזרות?</StepQ>
         <StepHint>או ניסיונות אובדניים בעבר</StepHint>
         <GateYN A={A} setA={setA} itemKey="q3_sui" advance={(nA, v) => { if (v !== "כן") onNext(nA); }} />
-        {A.q3_sui === "כן" && (audience === "counselor" ? <CounselorSafetyNotice /> : <CrisisResources className="mt-4" />)}
+        {A.q3_sui === "כן" && (audience === "counselor" ? <CounselorSafetyNotice gan={isGanGrade(A._grade)} /> : <CrisisResources className="mt-4" />)}
       </Card>
       {/* Answered at all, not answered "כן": a parent who chose "לא" and then
           stepped back onto this screen found no way forward either, and of all
@@ -1446,7 +1447,7 @@ function VisionHearingBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
       <div className="text-xs font-bold text-[var(--teal)] mb-3 pb-1 border-b-2 border-[#e8eef6]">👁️ ראייה ושמיעה</div>
       {isCounselor(A) && (
         <div className="mb-3 rounded-xl p-3 text-xs leading-relaxed" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text-2)" }}>
-          את חלק הרקע הזה כדאי למלא עם ההורים - בדיקות ראייה ושמיעה נעשות מחוץ לבית הספר, ולרוב רק הם יודעים אם ומתי נעשו. אם אינך יודעת, סמני &quot;לא ידוע&quot;.
+          {`את חלק הרקע הזה כדאי למלא עם ההורים - בדיקות ראייה ושמיעה נעשות מחוץ ${isGanGrade(A._grade) ? "לגן" : "לבית הספר"}, ולרוב רק הם יודעים אם ומתי נעשו. אם אינך יודעת, סמני "לא ידוע".`}
         </div>
       )}
       <div className="mb-4">
@@ -4228,7 +4229,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-consent" && audience === "counselor" && <Card><PageConsentCounselor onStart={startCounselor} drafts={drafts} onResume={resumeDraft} onDelete={removeDraft} /></Card>}
       {step === "p-consent" && audience !== "counselor" && <Card><PageConsent onNext={()=>goNext()} /></Card>}
       {step === "p-demo"      && (audience === "counselor" ? <PageDemoCounselor {...pageProps} /> : <PageDemo {...pageProps} />)}
-      {step === "p-emo-intro" && <PageEmoIntro onNext={()=>goNext()} onBack={canGoBack ? goBack : undefined} />}
+      {step === "p-emo-intro" && <PageEmoIntro onNext={()=>goNext()} onBack={canGoBack ? goBack : undefined} gan={isGanGrade(A._grade)} />}
       {step === "p-areas"     && <PageAreas   {...pageProps} />}
       {step === "p-q1"        && <PageQ1      {...pageProps} />}
       {step === "p-q1-pain"   && <PageQ1Pain  {...pageProps} />}

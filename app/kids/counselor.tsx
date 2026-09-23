@@ -32,6 +32,23 @@ import {
   type SchoolGrade,
 } from "@/app/lib/school-tracks";
 import { mapSchoolTracks } from "@/app/lib/school-tracks-engine";
+import { ganTracks, GAN_DIRECTION_LABELS } from "@/app/lib/gan-tracks";
+import {
+  GAN_INTERVENTIONS,
+  GAN_TIPS,
+  GAN_ATTEND_LABELS,
+  GAN_OBSERVATION_LABELS,
+  GAN_SETTING_LABELS,
+  GAN_SETTINGS,
+  TODDLER_SETTINGS,
+  GAN_TEAM_LABELS,
+  DEV_CENTER_LABELS,
+  REHAB_DAYCARE_LABELS,
+  EXTRA_YEAR_LABELS,
+  ganRoutes,
+  ganExhaustionMessage,
+  toGanTracksInput,
+} from "@/app/lib/gan-report";
 import { toolGroupsOf } from "@/app/lib/kids-report-doc";
 import {
   INTERVENTIONS,
@@ -47,6 +64,7 @@ import {
   HATAMOT_LABELS,
   YES_NO_UNKNOWN_LABELS,
   SCHOOL_DIAGNOSIS_KINDS,
+  GAN_DIAGNOSIS_KINDS,
   DIAGNOSIS_KIND_LABELS,
   RELEVANCE_LABELS,
   ACA_STEPS,
@@ -74,7 +92,7 @@ import {
 } from "@/app/lib/school-report";
 import { PAGES, unknownCount, type Ans } from "./quiz-logic";
 import { Card, StepTag, StepQ, StepHint, NavRow, ob } from "./ui";
-import { TrackFlow, TrackTimeline } from "./counselor-map";
+import { TrackFlow, TrackTimeline, GanTrackFlow, GanTimeline } from "./counselor-map";
 
 type ScreenProps = { A: Ans; setA: (a: Ans) => void; onNext: (a: Ans) => void; onBack?: () => void };
 type Entries<T extends string> = [T, string][];
@@ -187,10 +205,10 @@ function Box({ title, children }: { title?: string; children: React.ReactNode })
 }
 
 /** The frame around every in-branch counsellor block, so it reads as one voice across the questionnaire. */
-function CounselorBlock({ children }: { children: React.ReactNode }) {
+function CounselorBlock({ gan = false, children }: { gan?: boolean; children: React.ReactNode }) {
   return (
     <div className="mt-5 rounded-xl p-4 space-y-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
-      <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--teal-dark)" }}>🏫 מה רואים בבית הספר</div>
+      <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--teal-dark)" }}>{gan ? "🧸 מה רואים בגן" : "🏫 מה רואים בבית הספר"}</div>
       {children}
     </div>
   );
@@ -335,9 +353,10 @@ export function PageDemoCounselor({ A, setA, onNext, onBack }: ScreenProps) {
 // ── In-branch blocks ─────────────────────────────────────────────────────────
 export function CounselorQ1Block({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   const f = A as CounselorFields; const set = setField(A, setA);
+  const gan = isGanGrade(f._grade);
   return (
-    <CounselorBlock>
-      <Q label="ביקור סדיר"><ChoiceU value={f.c_attend} options={entries(ATTEND_LABELS)} onChange={v => set("c_attend", v)} /></Q>
+    <CounselorBlock gan={gan}>
+      <Q label={gan ? GAN_OBSERVATION_LABELS.attend : "ביקור סדיר"}><ChoiceU value={f.c_attend} options={entries(gan ? GAN_ATTEND_LABELS : ATTEND_LABELS)} onChange={v => set("c_attend", v)} /></Q>
       <Q label="שינוי חד בהתנהגות או במצב הרוח השנה">
         <ChoiceU value={f.c_change} options={[["כן", "כן"], ["לא", "לא"]]} onChange={v => set("c_change", v as CounselorFields["c_change"])} />
       </Q>
@@ -371,28 +390,32 @@ export function CounselorAcadBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void
 }
 export function CounselorBehBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   const f = A as CounselorFields; const set = setField(A, setA);
+  const gan = isGanGrade(f._grade);
   return (
-    <CounselorBlock>
-      <Q label="קושי בוויסות בכיתה ובהפסקות"><LevelRow value={f.c_regulation} onChange={v => set("c_regulation", v)} /></Q>
-      <Q label="מעורבות כפוגע/ת בהצקות או בחרם"><ChoiceU value={f.c_bully_perp} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_perp", v)} /></Q>
+    <CounselorBlock gan={gan}>
+      <Q label={gan ? GAN_OBSERVATION_LABELS.regulation : "קושי בוויסות בכיתה ובהפסקות"}><LevelRow value={f.c_regulation} onChange={v => set("c_regulation", v)} /></Q>
+      <Q label={gan ? GAN_OBSERVATION_LABELS.bullyPerp : "מעורבות כפוגע/ת בהצקות או בחרם"}><ChoiceU value={f.c_bully_perp} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_perp", v)} /></Q>
     </CounselorBlock>
   );
 }
 export function CounselorSocBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void }) {
   const f = A as CounselorFields; const set = setField(A, setA);
+  const gan = isGanGrade(f._grade);
   return (
-    <CounselorBlock>
-      <Q label="בידוד או דחייה חברתית בכיתה"><LevelRow value={f.c_isolation} onChange={v => set("c_isolation", v)} /></Q>
-      <Q label="נפגע/ת מהצקות או חרם"><ChoiceU value={f.c_bully_victim} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_victim", v)} /></Q>
+    <CounselorBlock gan={gan}>
+      <Q label={gan ? GAN_OBSERVATION_LABELS.isolation : "בידוד או דחייה חברתית בכיתה"}><LevelRow value={f.c_isolation} onChange={v => set("c_isolation", v)} /></Q>
+      <Q label={gan ? GAN_OBSERVATION_LABELS.bullyVictim : "נפגע/ת מהצקות או חרם"}><ChoiceU value={f.c_bully_victim} options={entries(BULLY_LABELS)} onChange={v => set("c_bully_victim", v)} /></Q>
     </CounselorBlock>
   );
 }
 
-export function CounselorSafetyNotice() {
+export function CounselorSafetyNotice({ gan = false }: { gan?: boolean }) {
   return (
     <div className="mt-4 rounded-xl p-4 text-sm leading-relaxed" style={{ background: "#FBEDE9", border: "1px solid #E8C4B8", color: "var(--text)" }}>
       <div className="font-bold mb-1" style={{ color: "#A83B22" }}>נושא בטיחות עלה</div>
-      <p>לפי הנהלים המחייבים בבית הספר יש ליידע מיד את פסיכולוג/ית בית הספר ואת המנהל/ת, ולא להשאיר את התלמיד/ה ללא ליווי. השאלון אינו תחליף להערכת סיכון. אפשר להמשיך במילוי אחרי שהדיווח נעשה.</p>
+      <p>{gan
+        ? "לפי הנהלים המחייבים יש ליידע מיד את פסיכולוג/ית הגן ואת המפקח/ת, ולא להשאיר את הילד/ה ללא ליווי. השאלון אינו תחליף להערכת סיכון. אפשר להמשיך במילוי אחרי שהדיווח נעשה."
+        : "לפי הנהלים המחייבים בבית הספר יש ליידע מיד את פסיכולוג/ית בית הספר ואת המנהל/ת, ולא להשאיר את התלמיד/ה ללא ליווי. השאלון אינו תחליף להערכת סיכון. אפשר להמשיך במילוי אחרי שהדיווח נעשה."}</p>
       <CrisisResources className="mt-3" />
     </div>
   );
@@ -409,7 +432,23 @@ export function CounselorSafetyNotice() {
  * this one screen, ahead of the score, and the documents question had to guess
  * from the raw answers which route the report would end up naming.
  */
-export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: ScreenProps & { scoring?: "pending" | "ready" | "failed" }) {
+type RefineProps = ScreenProps & { scoring?: "pending" | "ready" | "failed" };
+export function PageRefine(props: RefineProps) {
+  return isGanGrade(props.A._grade) ? <PageRefineGan {...props} /> : <PageRefineSchool {...props} />;
+}
+
+/** "לחישוב" waits for the scoring, with two ways out - see PageRefineSchool. */
+function useScoringWait(scoring: "pending" | "ready" | "failed") {
+  const [gaveUp, setGaveUp] = useState(false);
+  useEffect(() => {
+    if (scoring !== "pending") return;
+    const t = setTimeout(() => setGaveUp(true), 10_000);
+    return () => clearTimeout(t);
+  }, [scoring]);
+  return scoring === "pending" && !gaveUp;
+}
+
+function PageRefineSchool({ A, setA, onNext, onBack, scoring = "ready" }: RefineProps) {
   const f = A as CounselorFields; const set = setField(A, setA);
   // The questionnaire is scored in the background from the moment this screen
   // opens, and the route this button decides is read from what that scoring
@@ -418,13 +457,7 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
   // brought forward to make. So the button waits, with two ways out: a scoring
   // that failed (the report has its own retry), and one that has not answered
   // in ten seconds.
-  const [gaveUp, setGaveUp] = useState(false);
-  useEffect(() => {
-    if (scoring !== "pending") return;
-    const t = setTimeout(() => setGaveUp(true), 10_000);
-    return () => clearTimeout(t);
-  }, [scoring]);
-  const waiting = scoring === "pending" && !gaveUp;
+  const waiting = useScoringWait(scoring);
   const tried = f.c_tried ?? {};
   const toggleTried = (k: keyof typeof tried) => {
     const next = { ...tried };
@@ -494,8 +527,88 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
   );
 }
 
-// ── p-docs: what the file holds, once there is a finding to match it against ─
-export function PageDocs({ A, setA, onNext, onBack }: ScreenProps) {
+/**
+ * The kindergarten's p-refine: what was tried in the kindergarten, where the
+ * developmental assessment stands, and the setting the child is in. The
+ * assessment status is asked here, before the scoring, because the map reads
+ * it whatever the findings turn out to be; what the file holds is asked after.
+ */
+function PageRefineGan({ A, setA, onNext, onBack, scoring = "ready" }: RefineProps) {
+  const f = A as CounselorFields; const set = setField(A, setA);
+  const waiting = useScoringWait(scoring);
+  const toddler = f._grade === "פעוט";
+  const tried = f.c_gan_tried ?? {};
+  const toggleTried = (k: keyof typeof tried) => {
+    const next = { ...tried };
+    if (next[k]) delete next[k]; else next[k] = "partial";
+    set("c_gan_tried", next);
+  };
+  const routes = ganRoutes(A);
+  const settings = toddler ? TODDLER_SETTINGS : GAN_SETTINGS;
+  const offered = GAN_INTERVENTIONS.filter(it => !toddler || it.toddler);
+  const missing = [f.c_fill, f.c_setting, f.c_devcenter].filter(x => !x).length;
+  const place = toddler ? "במסגרת" : "בגן";
+
+  return (
+    <div>
+      <Card>
+        <StepTag>לפני החישוב</StepTag>
+        <StepQ>{`מה כבר נעשה ${place}`}</StepQ>
+        <StepHint>מי היה שותף למילוי, מה כבר נוסה ואיפה הבירור עומד. אחרי המסך הזה השאלון מחושב, ורק לפי התוצאה נשאל מה קיים בתיק.</StepHint>
+
+        <Box title="המילוי">
+          <Q label="איך מולא השאלון"><Choice value={f.c_fill} options={entries(FILL_MODE_LABELS)} onChange={v => set("c_fill", v)} /></Q>
+        </Box>
+
+        <Box title={`מה כבר נוסה ${place}`}>
+          <p className="text-xs" style={{ color: "var(--muted)" }}>
+            {toddler
+              ? "סמני מה נוסה; לכל מה שסומן - מה קרה. זה ייכנס לסיכום, ויעזור בבירור ההתפתחותי ובוועדה לקראת הגן."
+              : "סמני מה נוסה; לכל מה שסומן - מה קרה. זה הבסיס ל\"מסמך מיצוי האפשרויות\" שהוועדה דורשת בהפניה ראשונה מגן רגיל."}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {offered.map(it => (
+              <button key={it.key} type="button" className={ob(!!tried[it.key])} onClick={() => toggleTried(it.key)}>{it.label}</button>
+            ))}
+          </div>
+          {offered.filter(it => tried[it.key]).map(it => (
+            <Q key={it.key} label={it.label}>
+              <Choice value={tried[it.key]} options={entries(OUTCOME_LABELS)} onChange={v => set("c_gan_tried", { ...tried, [it.key]: v as Outcome })} />
+            </Q>
+          ))}
+        </Box>
+
+        {routes.pending.length > 0 && (
+          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+            {ganExhaustionMessage(routes)}
+          </div>
+        )}
+
+        <Box title={toddler ? "המסגרת והמשפחה" : "הגן והמשפחה"}>
+          <Q label="המסגרת כיום"><Choice value={f.c_setting} options={settings.map(s => [s, GAN_SETTING_LABELS[s]] as [typeof s, string])} onChange={v => set("c_setting", v)} /></Q>
+          {!toddler && f.c_setting !== "special_gan" && (
+            <Q label="צוות רב-מקצועי בגן (מתי&quot;א)"><Choice value={f.c_team} options={entries(GAN_TEAM_LABELS)} onChange={v => set("c_team", v)} /></Q>
+          )}
+          <Q label="הערכה במכון להתפתחות הילד"><Choice value={f.c_devcenter} options={entries(DEV_CENTER_LABELS)} onChange={v => set("c_devcenter", v)} /></Q>
+          <Q label="מגבלה כלכלית מוכרת במשפחה">
+            <Choice value={f.c_economic} options={entries(YES_NO_UNKNOWN_LABELS)} onChange={v => set("c_economic", v)} />
+            {f.c_economic === "yes" && (
+              <p className="text-xs mt-2" style={{ color: "var(--muted)" }}>המלצות לאפשרויות ציבוריות יופיעו לפני פרטיות.</p>
+            )}
+          </Q>
+        </Box>
+      </Card>
+      {missing > 0 && <p className="text-xs mt-3" style={{ color: "var(--muted)" }}>אפשר להמשיך גם בלי לענות על הכל - מה שלא נענה לא ייכנס לסיכום ולמפה.</p>}
+      {/* In a kindergarten the file is read whatever the findings: an
+          assessment already done, a committee already running, a day-care
+          centre - each moves the map. So p-docs always follows. */}
+      <NavRow onBack={onBack} onNext={() => onNext({ ...A, _route: true })} nextDisabled={waiting} nextLabel={waiting ? "מחשב…" : "לחישוב ←"} />
+    </div>
+  );
+}
+
+/** The file's documents: kind, year and - when known - who signed, which is what the First Schedule reads. */
+function DiagnosisPicker({ A, setA, kinds, note }: { A: Ans; setA: (a: Ans) => void; kinds: DiagnosisKind[]; note: string }) {
   const f = A as CounselorFields; const set = setField(A, setA);
   const thisYear = Number(israelToday().slice(0, 4));
   const years = Array.from({ length: 15 }, (_, i) => thisYear - i);
@@ -508,6 +621,104 @@ export function PageDocs({ A, setA, onNext, onBack }: ScreenProps) {
     set("c_diag", [...diagnoses, d]);
     setAdding({});
   };
+  const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
+  return (
+    <>
+      {diagnoses.length > 0 && (
+        <ul className="flex flex-col gap-2">
+          {diagnoses.map((d, i) => (
+            <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm border border-[var(--line)]">
+              <span>{DIAGNOSIS_KIND_LABELS[d.kind]} ({d.year}){d.signedBy ? ` · ${d.signedBy}` : ""}</span>
+              <button type="button" onClick={() => set("c_diag", diagnoses.filter((_, j) => j !== i))} className="text-xs font-semibold" style={{ color: "var(--muted)" }}>הסרה</button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="grid gap-2 sm:grid-cols-3">
+        <select className={selectCls} value={adding.kind ?? ""} onChange={e => setAdding(a => ({ ...a, kind: (e.target.value || undefined) as DiagnosisKind | undefined }))}>
+          <option value="">סוג האבחון</option>
+          {kinds.map(k => <option key={k} value={k}>{DIAGNOSIS_KIND_LABELS[k]}</option>)}
+        </select>
+        <select className={selectCls} value={adding.year ?? ""} onChange={e => setAdding(a => ({ ...a, year: e.target.value ? Number(e.target.value) : undefined }))}>
+          <option value="">שנה</option>
+          {years.map(y => <option key={y} value={y}>{y}</option>)}
+        </select>
+        <select className={selectCls} value={adding.signedBy ?? ""} onChange={e => setAdding(a => ({ ...a, signedBy: e.target.value || undefined }))}>
+          <option value="">מי חתום/ה (אם ידוע)</option>
+          {DIAGNOSING_BODIES.map(b => <option key={b} value={b}>{b}</option>)}
+        </select>
+      </div>
+      <button type="button" onClick={add} disabled={!adding.kind || !adding.year} className={`${ob(false)} disabled:opacity-40`}>+ הוספה לתיק</button>
+      <p className="text-xs" style={{ color: "var(--muted)" }}>{note}</p>
+    </>
+  );
+}
+
+// ── p-docs: what the file holds, once there is a finding to match it against ─
+export function PageDocs(props: ScreenProps) {
+  return isGanGrade(props.A._grade) ? <PageDocsGan {...props} /> : <PageDocsSchool {...props} />;
+}
+
+/**
+ * The kindergarten's p-docs. The committee sentence appears only when a
+ * direction opened; the documents and the statuses are asked either way,
+ * because in early childhood the file is what moves the map.
+ */
+function PageDocsGan({ A, setA, onNext, onBack }: ScreenProps) {
+  const f = A as CounselorFields; const set = setField(A, setA);
+  const toddler = f._grade === "פעוט";
+  const chova = f._grade === "גן";
+  const directions = ganRoutes(A).live;
+  const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
+
+  return (
+    <div>
+      <Card>
+        <StepTag>אחרי החישוב</StepTag>
+        <StepQ>מה קיים בתיק</StepQ>
+        <StepHint>השאלון חושב. מה שיסומן כאן נבדק מול הגורמים שאבחנתם קבילה לכל כיוון, וקובע אילו מסלולים יופיעו במפה.</StepHint>
+
+        {directions.length > 0 && (
+          <div className="rounded-xl p-3 text-sm leading-relaxed my-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--text)" }}>
+            המערכת זיהתה שיש כיוון אפשרי לוועדת זכאות ואפיון - בודקת את הפרמטרים הקשורים.
+            <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>
+              הכיוון שעלה: {directions.map(d => GAN_DIRECTION_LABELS[d]).join(", ")}.
+            </div>
+            {toddler && <div className="text-xs mt-1" style={{ color: "var(--muted)" }}>הוועדה דנה בילדים מגיל 3; לפעוט/ה המפה מציגה גם את מה שלפניה.</div>}
+          </div>
+        )}
+
+        <Box title="אבחונים והערכות בתיק">
+          <DiagnosisPicker
+            A={A}
+            setA={setA}
+            kinds={GAN_DIAGNOSIS_KINDS}
+            note="מי חתום/ה ואיפה קובעים אם המסמך קביל לוועדה: לעיכוב התפתחותי בתחום השפה קבילה רק הערכה של קלינאי/ת תקשורת במכון להתפתחות הילד. אם לא ידוע, המפה תבקש לבדוק."
+          />
+        </Box>
+
+        <Box title="ועדות ומסלולים">
+          <Q label="ועדת זכאות ואפיון"><Choice value={f.c_zakaut} options={entries(ZAKAUT_LABELS)} onChange={v => set("c_zakaut", v)} /></Q>
+          {f.c_zakaut === "decided" && (
+            <Q label="תאריך קבלת ההחלטה אצל ההורים (לחישוב חלון ההשגה)">
+              <input type="date" className={selectCls} value={f.c_zakaut_on ?? ""} onChange={e => set("c_zakaut_on", e.target.value || undefined)} />
+            </Q>
+          )}
+          {toddler && (
+            <Q label="מעון יום שיקומי"><Choice value={f.c_daycare} options={entries(REHAB_DAYCARE_LABELS)} onChange={v => set("c_daycare", v)} /></Q>
+          )}
+          {chova && (
+            <Q label="השארה בגן חובה שנה נוספת"><Choice value={f.c_extra_year} options={entries(EXTRA_YEAR_LABELS)} onChange={v => set("c_extra_year", v)} /></Q>
+          )}
+        </Box>
+      </Card>
+      <NavRow onBack={onBack} onNext={() => onNext(A)} nextLabel="לדוח ←" />
+    </div>
+  );
+}
+
+function PageDocsSchool({ A, setA, onNext, onBack }: ScreenProps) {
+  const f = A as CounselorFields; const set = setField(A, setA);
   const directions = eligibilityRoutes(A).live;
   const showHatamot = isSchoolGrade(f._grade) && hatamotApplies(f._grade);
   const selectCls = "w-full rounded-xl border-2 border-[#d0dae8] bg-white px-3 py-2 text-sm min-h-[44px]";
@@ -530,32 +741,12 @@ export function PageDocs({ A, setA, onNext, onBack }: ScreenProps) {
         </div>
 
         <Box title="אבחונים וחוות דעת בתיק">
-          {diagnoses.length > 0 && (
-            <ul className="flex flex-col gap-2">
-              {diagnoses.map((d, i) => (
-                <li key={i} className="flex items-center justify-between gap-2 rounded-lg bg-white px-3 py-2 text-sm border border-[var(--line)]">
-                  <span>{DIAGNOSIS_KIND_LABELS[d.kind]} ({d.year}){d.signedBy ? ` · ${d.signedBy}` : ""}</span>
-                  <button type="button" onClick={() => set("c_diag", diagnoses.filter((_, j) => j !== i))} className="text-xs font-semibold" style={{ color: "var(--muted)" }}>הסרה</button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <div className="grid gap-2 sm:grid-cols-3">
-            <select className={selectCls} value={adding.kind ?? ""} onChange={e => setAdding(a => ({ ...a, kind: (e.target.value || undefined) as DiagnosisKind | undefined }))}>
-              <option value="">סוג האבחון</option>
-              {SCHOOL_DIAGNOSIS_KINDS.map(k => <option key={k} value={k}>{DIAGNOSIS_KIND_LABELS[k]}</option>)}
-            </select>
-            <select className={selectCls} value={adding.year ?? ""} onChange={e => setAdding(a => ({ ...a, year: e.target.value ? Number(e.target.value) : undefined }))}>
-              <option value="">שנה</option>
-              {years.map(y => <option key={y} value={y}>{y}</option>)}
-            </select>
-            <select className={selectCls} value={adding.signedBy ?? ""} onChange={e => setAdding(a => ({ ...a, signedBy: e.target.value || undefined }))}>
-              <option value="">מי חתום/ה (אם ידוע)</option>
-              {DIAGNOSING_BODIES.map(b => <option key={b} value={b}>{b}</option>)}
-            </select>
-          </div>
-          <button type="button" onClick={add} disabled={!adding.kind || !adding.year} className={`${ob(false)} disabled:opacity-40`}>+ הוספה לתיק</button>
-          <p className="text-xs" style={{ color: "var(--muted)" }}>החותם/ת קובע/ת אם המסמך קביל לוועדת זכאות: התוספת הראשונה לתיקון 11 מונה התמחות, לא רק מקצוע. אם לא ידוע, המפה תבקש לבדוק.</p>
+          <DiagnosisPicker
+            A={A}
+            setA={setA}
+            kinds={SCHOOL_DIAGNOSIS_KINDS}
+            note="החותם/ת קובע/ת אם המסמך קביל לוועדת זכאות: התוספת הראשונה לתיקון 11 מונה התמחות, לא רק מקצוע. אם לא ידוע, המפה תבקש לבדוק."
+          />
         </Box>
 
         <Box title="ועדות">
@@ -679,14 +870,49 @@ export function UnknownNotice({ A }: { A: Ans }) {
   );
 }
 
+/**
+ * The kindergarten's committee map: the flow and the year drawn when there is
+ * a route to draw, then the cards. With nothing but the kindergarten team on
+ * it, the drawing would be a road nobody is on, and it is left out - the PDF,
+ * which clones the drawing, then has nothing to clone.
+ */
+function GanMap({ A, grade, tracks, today }: { A: Ans; grade: GanGrade; tracks: SchoolTrack[]; today: string }) {
+  const onlyTeam = tracks.every(t => t.key === "gan_team");
+  return (
+    <div>
+      <StepTag>מפת המסלולים לגיל הרך</StepTag>
+      <StepQ>מה רלוונטי עכשיו, ומתי</StepQ>
+      <StepHint>
+        מחושב לתאריך {formatDateHe(today)} לפי הגן ומה שבתיק, מכללי מועדים ומסמכים במקורות רשמיים בלבד. השיפוט המקצועי - מה מצדיק פנייה ובאיזו דחיפות - נשאר בידיך.
+        {tracks.length === 0
+          ? " לפי מה שנמסר אין כרגע מסלול הערכה או ועדה לסמן; הממצאים מטופלים במסגרת ובהפניה לטיפול."
+          : onlyTeam ? " הממצאים שעלו מטופלים בגן ובהפניה לטיפול, ולכן המפה מציגה את התחנה הראשונה בלבד." : ""}
+      </StepHint>
+      {A.q3_sui === "כן" && <CounselorSafetyNotice gan />}
+      {!onlyTeam && tracks.length > 0 && (
+        <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
+          <GanTrackFlow grade={grade} tracks={tracks} />
+          <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
+            <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
+            <GanTimeline grade={grade} tracks={tracks} today={today} />
+          </div>
+        </div>
+      )}
+      <div className="space-y-3 mt-3">{tracks.map(t => <TrackCard key={t.key} t={t} />)}</div>
+    </div>
+  );
+}
+
 export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: string; result: KidsDomainResult }[] }) {
   const f = A as CounselorFields;
   const today = useMemo(() => israelToday(), []);
+  const gan = isGanGrade(f._grade);
   const input = useMemo(() => toTracksInput(A, today), [A, today]);
-  const tracks = useMemo(() => (input ? mapSchoolTracks(input) : []), [input]);
+  const ganInput = useMemo(() => toGanTracksInput(A, today), [A, today]);
+  const tracks = useMemo(() => (input ? mapSchoolTracks(input) : ganInput ? ganTracks(ganInput) : []), [input, ganInput]);
   const summary = useMemo(() => buildSchoolSummary(A, tracks, today, domains), [A, tracks, today, domains]);
   const directions = useMemo(() => eligibilityDirections(A), [A]);
-  const tips = useMemo(() => SCHOOL_TIPS.filter(t => t.when(A as CounselorFields)), [A]);
+  const tips = useMemo(() => (gan ? GAN_TIPS : SCHOOL_TIPS).filter(t => t.when(A as CounselorFields)), [A, gan]);
   const [copied, setCopied] = useState<"idle" | "ok" | "fail">("idle");
   const [pdf, setPdf] = useState<"idle" | "busy">("idle");
 
@@ -707,12 +933,14 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           graphsEl: document.getElementById("school-graphs"),
         },
         toolGroups,
-        toolsIntro: "הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם בבית הספר או בבית בזמן ההמתנה.",
+        toolsIntro: `הכלים שלהלן נלווים לממצאים שבסיכום. הם אינם מחליפים טיפול ואינם חלק מההפניה - הם מה שאפשר להתחיל ליישם ${gan ? "בגן" : "בבית הספר"} או בבית בזמן ההמתנה.`,
         // Filled in by hand once printed: the rubric never asks for a name.
-        fillIn: ["שם התלמיד/ה", "בית הספר"],
+        fillIn: gan ? ["שם הילד/ה", "הגן"] : ["שם התלמיד/ה", "בית הספר"],
         signature: ["נערך על ידי", "תפקיד", "תאריך", "חתימה"],
         todayLabel: formatDateHe(today),
-        filename: `דוח-הפניה-${f._grade ? `כיתה-${f._grade}-` : ""}${today}`,
+        filename: isGanGrade(f._grade)
+          ? `דוח-הפניה-${GAN_GRADE_LABELS[f._grade].replace(/ /g, "-")}-${today}`
+          : `דוח-הפניה-${f._grade ? `כיתה-${f._grade}-` : ""}${today}`,
       });
     } catch (e) {
       console.error("school PDF failed", e);
@@ -741,14 +969,11 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
 
   return (
     <div className="mt-8 space-y-6">
-      {/* The committee map is built for א-יב: its deadlines and documents are
-          the school's. A kindergarten has committees of its own with their own
-          calendar, and the map for them is not built yet - said, not implied. */}
-      {!isSchoolGrade(f._grade) && (
-        <div className="rounded-xl p-4 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
-          <div className="font-bold mb-1">מפת המסלולים לגיל הרך תתווסף בהמשך</div>
-          המפה כאן בנויה לכיתות א-יב. לגן חובה ולעולים לכיתה א' ועדת הזכאות פועלת במועדים משלה (סיום הדיונים 31.5), ולכן היא לא מוצגת עדיין. הממצאים, הכלים והסיכום להעתקה תקפים.
-        </div>
+      {/* The kindergarten map: its own calendar (hearings to 31.5, follow-up to
+          15.7), the development institute before the committee, the day-care
+          centre for a toddler, the extra year in גן חובה - gan-tracks.ts. */}
+      {isGanGrade(f._grade) && (
+        <GanMap A={A} grade={f._grade} tracks={tracks} today={today} />
       )}
       {isSchoolGrade(f._grade) && (
       <div>
@@ -781,8 +1006,8 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
       {tips.length > 0 && (
         <div>
           <StepTag>כלים והכוונה</StepTag>
-          <StepQ>מה אפשר לעשות בבית הספר</StepQ>
-          <StepHint>לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בכיתה.</StepHint>
+          <StepQ>{gan ? "מה אפשר לעשות בגן" : "מה אפשר לעשות בבית הספר"}</StepQ>
+          <StepHint>{gan ? "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בגן." : "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בכיתה."}</StepHint>
           <div className="space-y-3">
             {tips.map(t => (
               <div key={t.key} className="rounded-2xl p-4 border bg-white" style={{ borderColor: "var(--line)" }}>
@@ -797,7 +1022,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
       <div>
         <StepTag>הדוח לתיק</StepTag>
         <StepQ>לשמירה, להדפסה ולהעתקה</StepQ>
-        <StepHint>ללא פרטים מזהים - את השם משלימים במסמך. ה-PDF הוא הסיכום, מפת המסלולים אחריו והכלים כנספח, עם שורות למילוי שם התלמיד/ה ולחתימה; ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.</StepHint>
+        <StepHint>{`ללא פרטים מזהים - את השם משלימים במסמך. ה-PDF הוא הסיכום, מפת המסלולים אחריו והכלים כנספח, עם שורות למילוי שם ${gan ? "הילד/ה" : "התלמיד/ה"} ולחתימה; ההעתקה שומרת על הכותרות והרשימות בוורד ובדוקס.`}</StepHint>
         <div className="flex flex-wrap gap-2 mb-3 print:hidden">
           {/* The document, not a photograph of this page: real A4 pages, a
               running header, and a break that can only fall between blocks.

@@ -3,7 +3,9 @@
 /**
  * The committee map as a picture: a flow of the four stations with this
  * student's live tracks lit up, and the school year as a line with the
- * computed deadlines and today on it.
+ * computed deadlines and today on it. The kindergarten map has its own flow -
+ * the development institute before the committee, the day-care centre beside
+ * it for a toddler, the extra year beside it in גן חובה - on the same year line.
  *
  * Plain HTML and CSS rather than SVG on purpose. The report is captured to
  * PDF by html2canvas, which rasterises inline SVG through an image and loses
@@ -21,6 +23,7 @@ import {
   type Relevance,
   type TrackKey,
 } from "@/app/lib/school-tracks";
+import { ganTimelineMarks, type GanGrade, type TimelineMark } from "@/app/lib/gan-tracks";
 
 type Tone = Relevance | "absent";
 
@@ -53,12 +56,12 @@ function Node({ title, sub, tone, dashed = false }: { title: string; sub?: strin
   );
 }
 
-/** A row of downward arrows, one per column, between two rows of nodes. */
-function Arrows({ cols }: { cols: 1 | 2 }) {
+/** A row of downward arrows, one per column, between two rows of nodes. `hideSecond`: the second column leads nowhere. */
+function Arrows({ cols, hideSecond = false }: { cols: 1 | 2; hideSecond?: boolean }) {
   return (
     <div className={`grid ${cols === 2 ? "grid-cols-2" : "grid-cols-1"} h-6`}>
       {Array.from({ length: cols }).map((_, i) => (
-        <div key={i} className="flex justify-center items-center text-base leading-none" style={{ color: "var(--faint)" }}>↓</div>
+        <div key={i} className="flex justify-center items-center text-base leading-none" style={{ color: "var(--faint)" }}>{hideSecond && i === 1 ? "" : "↓"}</div>
       ))}
     </div>
   );
@@ -111,27 +114,99 @@ export function TrackFlow({ tracks, showHatamot = true }: { tracks: SchoolTrack[
   );
 }
 
+/**
+ * The kindergarten route as a picture.
+ *
+ * The first station is the kindergarten's team (a toddler has none - it is not
+ * yet in the Ministry's system); the prerequisite is the development
+ * institute's assessment, or a psychologist's diagnosis on the emotional
+ * route; then the committee - for a toddler, the one ahead of kindergarten,
+ * beside the rehabilitative day-care centre; in גן חובה, beside the extra
+ * year when it was raised.
+ */
+export function GanTrackFlow({ grade, tracks }: { grade: GanGrade; tracks: SchoolTrack[] }) {
+  const toddler = grade === "פעוט";
+  const chova = grade === "גן";
+  const has = (k: TrackKey) => tracks.some(t => t.key === k);
+  const team = toneOf(tracks, "gan_team");
+  const devCenter = toneOf(tracks, "dev_center");
+  const assessment = toneOf(tracks, "assessment");
+  const committeeKey: TrackKey = chova && has("first_grade") ? "first_grade" : "zakaut";
+  const committee = toneOf(tracks, committeeKey);
+  const appeal = toneOf(tracks, "zakaut_appeal");
+  const side: TrackKey | null = toddler && has("rehab_daycare") ? "rehab_daycare" : chova && has("extra_year") ? "extra_year" : null;
+  const cols = side ? 2 : 1;
+  const sub = (key: TrackKey, fallback: string) => {
+    const t = tracks.find(x => x.key === key);
+    if (!t?.deadline) return fallback;
+    return t.deadline.label.includes("חלף") ? "המועד לשנה זו חלף" : `עד ${formatDateHe(t.deadline.date)}`;
+  };
+  const prerequisite = has("dev_center")
+    ? { title: "הערכה במכון להתפתחות הילד", tone: devCenter, sub: devCenter === "primary" ? "טרם נערכה - מתחילים ברופא/ת הילדים" : devCenter === "consider" ? "ממתינים לתור" : "נערכה או בתהליך" }
+    : has("assessment")
+      ? { title: "אבחנה קבילה", tone: assessment, sub: "חסרה - פסיכולוג/ית או פסיכיאטר/ית" }
+      : { title: "אבחנה קבילה", tone: "absent" as Tone, sub: "קיימת בתיק או שלא נדרשת לפי הממצאים" };
+
+  return (
+    <div className="space-y-0">
+      {!toddler && (
+        <>
+          <Node title="צוות רב-מקצועי בגן (מתי&quot;א)" sub={team === "primary" ? "התחנה הראשונה - טרם דן" : team === "absent" ? "הצוות של גן החינוך המיוחד" : "דן בילד/ה"} tone={team} />
+          <Arrows cols={1} />
+        </>
+      )}
+      <Node title={prerequisite.title} sub={prerequisite.sub} tone={prerequisite.tone} dashed />
+      <Arrows cols={cols} />
+      <div className={`grid gap-3 ${side ? "grid-cols-2" : "grid-cols-1"}`}>
+        <Node
+          title={toddler ? "ועדת זכאות ואפיון - לקראת הגן" : committeeKey === "first_grade" ? "ועדה לקראת כיתה א'" : "ועדת זכאות ואפיון"}
+          sub={sub(committeeKey, "זכאות לשירותי חינוך מיוחדים")}
+          tone={committee}
+        />
+        {side === "rehab_daycare" && <Node title="מעון יום שיקומי" sub="מחצי שנה ועד גיל 3" tone={toneOf(tracks, "rehab_daycare")} />}
+        {side === "extra_year" && <Node title="השארה בגן חובה" sub={sub("extra_year", "חוות דעת שפ\"ח")} tone={toneOf(tracks, "extra_year")} />}
+      </div>
+      <Arrows cols={cols} hideSecond={side === "rehab_daycare"} />
+      <div className={`grid gap-3 ${side ? "grid-cols-2" : "grid-cols-1"}`}>
+        <Node title="השגה" sub={appeal === "absent" ? "אם תידחה: 21 יום" : sub("zakaut_appeal", "21 יום")} tone={appeal} />
+        {side === "rehab_daycare" && <div />}
+        {side === "extra_year" && <Node title="ערעור ברשות, השגה במחוז" sub="לפי הנוהל ברשות" tone="absent" />}
+      </div>
+    </div>
+  );
+}
+
 const MONTHS = ["ספט", "אוק", "נוב", "דצמ", "ינו", "פבר", "מרץ", "אפר", "מאי", "יונ", "יול", "אוג"];
 
 export function TrackTimeline({ tracks, today }: { tracks: SchoolTrack[]; today: string }) {
-  const sy = schoolYear(today);
-  const start = `${sy.start}-09-01`;
-  const span = isoDiffDays(start, `${sy.start + 1}-08-31`);
-  // Right-to-left: the year starts at the right edge, like the page reads.
-  const pct = (iso: string) => Math.min(100, Math.max(0, (isoDiffDays(start, iso) / span) * 100));
   const win = zakautWindow(today);
-
-  type Mark = { iso: string; label: string; tone: "gold" | "teal" };
-  const marks: Mark[] = [
-    { iso: win.deadline, label: "הפניה לוועדת זכאות", tone: "teal" },
+  // Short on purpose: at phone width 31.3 and 15.7 sit about 90px apart in
+  // the same label band, and the full wording - it is on the cards - ran the
+  // two together.
+  const marks: TimelineMark[] = [
+    { iso: win.deadline, label: "הפניה לוועדה", tone: "teal" },
     { iso: win.committeesFinishBy, label: "סיום דיוני הוועדה", tone: "teal" },
-    { iso: win.followUpAfterAssessmentBy, label: "דיון המשך אחרי אבחון", tone: "teal" },
+    { iso: win.followUpAfterAssessmentBy, label: "דיון המשך", tone: "teal" },
   ];
   for (const key of ["zakaut_appeal", "hatamot_appeal"] as const) {
     const t = tracks.find(x => x.key === key);
     if (t?.deadline && t.relevance === "primary") marks.push({ iso: t.deadline.date, label: key === "zakaut_appeal" ? "סוף חלון ההשגה" : "סוף חלון הערעור", tone: "gold" });
   }
   marks.sort((a, b) => (a.iso < b.iso ? -1 : 1));
+  return <YearTimeline marks={marks} today={today} />;
+}
+
+/** The kindergarten year: the team's opening, the referral, the end of the hearings - see ganTimelineMarks. */
+export function GanTimeline({ grade, tracks, today }: { grade: GanGrade; tracks: SchoolTrack[]; today: string }) {
+  return <YearTimeline marks={ganTimelineMarks(grade, tracks, today)} today={today} />;
+}
+
+function YearTimeline({ marks, today }: { marks: TimelineMark[]; today: string }) {
+  const sy = schoolYear(today);
+  const start = `${sy.start}-09-01`;
+  const span = isoDiffDays(start, `${sy.start + 1}-08-31`);
+  // Right-to-left: the year starts at the right edge, like the page reads.
+  const pct = (iso: string) => Math.min(100, Math.max(0, (isoDiffDays(start, iso) / span) * 100));
   const upcoming = marks.filter(m => m.iso >= today).map(m => m.iso)[0];
 
   // Two label bands, fully separate: even marks sit in the upper band with a

@@ -14,6 +14,7 @@ import { unknownCount } from "../kids/quiz-logic";
 import type { KidsDomainResult } from "./kids-recommendations";
 import {
   DIAGNOSIS_KINDS,
+  GAN_DOC_KINDS,
   SCHOOL_GRADES,
   formatDateHe,
   hatamotApplies,
@@ -25,6 +26,32 @@ import {
   type SchoolTrack,
   type SchoolTracksInput,
 } from "./school-tracks";
+import {
+  GAN_GRADES,
+  GAN_GRADE_LABELS,
+  isGanGrade,
+  type ExtraYearStatus,
+  type GanGrade,
+  type GanSetting,
+  type RehabDaycareStatus,
+} from "./gan-tracks";
+import {
+  GAN_INTERVENTIONS,
+  GAN_TIPS,
+  GAN_ATTEND_LABELS,
+  GAN_OBSERVATION_LABELS,
+  GAN_SETTING_LABELS,
+  GAN_TEAM_LABELS,
+  DEV_CENTER_LABELS,
+  REHAB_DAYCARE_LABELS,
+  EXTRA_YEAR_LABELS,
+  type DevCenterAnswer,
+  type GanInterventionKey,
+} from "./gan-report";
+
+// The kindergarten grades live with their engine; re-exported for the screens that import them from here.
+export { GAN_GRADES, GAN_GRADE_LABELS, isGanGrade };
+export type { GanGrade };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type Ans = Record<string, any>;
@@ -104,10 +131,6 @@ export const ACA_STEP_LABELS: Record<AcaStepState, string> = {
 /** The keys the counsellor screens write into the questionnaire's answers. */
 /** Who is filling in: a school counsellor (א-יב) or a kindergarten teacher (גן חובה and below). */
 export type CounselorRole = "school" | "gan";
-/** The kindergarten years the questionnaire knows, oldest first. */
-export const GAN_GRADES = ["גן", "גן-טרום", "גן3", "פעוט"] as const;
-export type GanGrade = (typeof GAN_GRADES)[number];
-export const GAN_GRADE_LABELS: Record<GanGrade, string> = { "גן": "גן חובה", "גן-טרום": "גן טרום חובה", "גן3": "גן גיל 3", "פעוט": "פעוטון" };
 
 export interface CounselorFields {
   _audience?: "parent" | "counselor";
@@ -139,6 +162,12 @@ export interface CounselorFields {
   c_hatamot?: "none" | "considering" | "school_level" | "district_submitted" | "district_decided";
   c_hatamot_on?: string;
   c_economic?: "no" | "yes" | "unknown";
+  // the kindergarten teacher's screens (gan-report.ts)
+  c_gan_tried?: Partial<Record<GanInterventionKey, Outcome>>;
+  c_setting?: GanSetting;
+  c_devcenter?: DevCenterAnswer;
+  c_daycare?: RehabDaycareStatus;
+  c_extra_year?: ExtraYearStatus;
 }
 
 // ── Labels ───────────────────────────────────────────────────────────────────
@@ -167,7 +196,18 @@ export const HATAMOT_LABELS = {
 export const YES_NO_UNKNOWN_LABELS = { no: "לא", yes: "כן", unknown: "לא ידוע" } as const;
 
 /** What a counsellor may say the student already has - the questionnaire's own keys, minus the two with no school meaning. */
-export const SCHOOL_DIAGNOSIS_KINDS: DiagnosisKind[] = DIAGNOSIS_KINDS.filter(k => k !== "אבחון תעסוקתי" && k !== "הערכת בשלות לגן");
+export const SCHOOL_DIAGNOSIS_KINDS: DiagnosisKind[] = DIAGNOSIS_KINDS.filter(
+  k => k !== "אבחון תעסוקתי" && k !== "הערכת בשלות לגן" && !(GAN_DOC_KINDS as readonly string[]).includes(k),
+);
+/**
+ * What a kindergarten teacher may say the child already has: the development
+ * institute's vocabulary first, then the questionnaire's own kinds that mean
+ * something before school.
+ */
+export const GAN_DIAGNOSIS_KINDS: DiagnosisKind[] = [
+  ...GAN_DOC_KINDS,
+  "אבחון קשיי תקשורת ASD", "פסיכיאטר ילדים", "פסיכולוג חינוכי", "פסיכולוג קליני", "הערכה פסיכולוגית", "הערכת בשלות לגן",
+];
 
 export const DIAGNOSIS_KIND_LABELS: Record<DiagnosisKind, string> = {
   "פסיכו-דידקטי": "אבחון פסיכו-דידקטי",
@@ -181,6 +221,15 @@ export const DIAGNOSIS_KIND_LABELS: Record<DiagnosisKind, string> = {
   "פסיכיאטר ילדים": "אבחנה של פסיכיאטר/ית ילדים ונוער",
   "פסיכולוג חינוכי": "חוות דעת של פסיכולוג/ית חינוכי/ת או התפתחותי/ת",
   "פסיכולוג קליני": "חוות דעת של פסיכולוג/ית קליני/ת",
+  "סיכום מכון התפתחות הילד": "סיכום אבחון במכון או ביחידה להתפתחות הילד (רופא/ה)",
+  "קלינאית תקשורת - מכון התפתחות": "הערכת קלינאי/ת תקשורת במכון להתפתחות הילד",
+  "קלינאית תקשורת": "הערכת קלינאי/ת תקשורת (בקהילה או פרטית)",
+  "ריפוי בעיסוק": "הערכת ריפוי בעיסוק",
+  "פסיכולוג התפתחותי": "הערכה של פסיכולוג/ית התפתחותי/ת",
+  "נוירולוג ילדים והתפתחות": "אבחנה של נוירולוג/ית ילדים והתפתחות הילד",
+  "ועדת אבחון - חוק הסעד": "החלטת ועדת אבחון (חוק הסעד) - מוגבלות שכלית התפתחותית",
+  "בדיקת שמיעה - אודיולוגיה": "בדיקת שמיעה אצל קלינאי/ת תקשורת מוסמך/ת לאודיולוגיה",
+  "בדיקת ראייה - רופא עיניים": "בדיקת עיניים (רופא/ת עיניים או מכון לראייה ירודה)",
 };
 
 export const RELEVANCE_LABELS = { primary: "לטיפול עכשיו", consider: "לשיקול", info: "מידע" } as const;
@@ -498,9 +547,6 @@ export const ECONOMIC_NOTE =
 // ── Engine input ─────────────────────────────────────────────────────────────
 
 
-export function isGanGrade(g: unknown): g is GanGrade {
-  return typeof g === "string" && (GAN_GRADES as readonly string[]).includes(g);
-}
 export function isSchoolGrade(g: unknown): g is SchoolGrade {
   return typeof g === "string" && (SCHOOL_GRADES as readonly string[]).includes(g);
 }
@@ -596,6 +642,9 @@ function said<T extends string>(v: T | Unknown | undefined, ...excluded: T[]): v
 export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string, domains: SummaryDomain[] = []): SchoolSummary {
   const f = A as CounselorFields;
   const sections: Section[] = [];
+  // A kindergarten teacher's summary: her name for the child, her place, her
+  // attempts and her statuses. Every school line below is untouched.
+  const gan = isGanGrade(f._grade);
 
   // רקע
   const bg: string[] = [];
@@ -612,7 +661,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   for (const d of ordered) {
     const lines: string[] = [];
     const level = areaLevel(A, d);
-    if (level) lines.push(`רמת הקושי לפי דיווח היועצת: ${level}${level === "הרבה מאוד" ? " - בולט" : ""}`);
+    if (level) lines.push(`רמת הקושי לפי דיווח ${gan ? "הגננת" : "היועצת"}: ${level}${level === "הרבה מאוד" ? " - בולט" : ""}`);
     const symptoms = uniq(d.result.groups.flatMap(g => g.recs.flatMap(r => r.symptoms))).map(stripPrefix).filter(Boolean);
     if (symptoms.length) lines.push(`ממצאים: ${symptoms.join("; ")}`);
     const referrals = uniq(
@@ -632,22 +681,34 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
 
   // זווית בית הספר
   const school: string[] = [];
-  if (said(f.c_attend, "regular")) school.push(`ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
+  if (said(f.c_attend, "regular")) school.push(gan ? `${GAN_OBSERVATION_LABELS.attend}: ${GAN_ATTEND_LABELS[f.c_attend]}` : `ביקור סדיר: ${ATTEND_LABELS[f.c_attend]}`);
   if (f.c_change === "כן") school.push("שינוי חד בהתנהגות או במצב הרוח השנה - מצדיק בירור של אירוע לפני הפניה");
   const org = levelLine("קושי בהתארגנות (ציוד, שיעורי בית, זמנים)", f.c_org);
   if (org) school.push(org);
   if (said(f.c_support)) school.push(`תגובה לתמיכה לימודית שניתנה: ${SUPPORT_RESPONSE_LABELS[f.c_support]}`);
-  const reg = levelLine("קושי בוויסות בכיתה ובהפסקות", f.c_regulation);
+  const reg = levelLine(gan ? GAN_OBSERVATION_LABELS.regulation : "קושי בוויסות בכיתה ובהפסקות", f.c_regulation);
   if (reg) school.push(reg);
-  if (said(f.c_bully_perp, "no")) school.push(`מעורבות כפוגע/ת בהצקות: ${BULLY_LABELS[f.c_bully_perp]}`);
-  const iso = levelLine("בידוד או דחייה חברתית בכיתה", f.c_isolation);
+  if (said(f.c_bully_perp, "no")) school.push(`${gan ? GAN_OBSERVATION_LABELS.bullyPerp : "מעורבות כפוגע/ת בהצקות"}: ${BULLY_LABELS[f.c_bully_perp]}`);
+  const iso = levelLine(gan ? GAN_OBSERVATION_LABELS.isolation : "בידוד או דחייה חברתית בכיתה", f.c_isolation);
   if (iso) school.push(iso);
-  if (said(f.c_bully_victim, "no")) school.push(`נפגע/ת מהצקות או חרם: ${BULLY_LABELS[f.c_bully_victim]}`);
-  if (A.q3_sui === "כן") school.push("דווח על מחשבות אובדניות - הדיווח לגורמים המוסמכים בבית הספר נעשה לפי הנוהל");
-  if (school.length) sections.push({ title: "כפי שנצפה בבית הספר", lines: school });
+  if (said(f.c_bully_victim, "no")) school.push(`${gan ? GAN_OBSERVATION_LABELS.bullyVictim : "נפגע/ת מהצקות או חרם"}: ${BULLY_LABELS[f.c_bully_victim]}`);
+  if (A.q3_sui === "כן") school.push(gan ? "דווח על מחשבות אובדניות - הדיווח לגורמים המוסמכים נעשה לפי הנוהל" : "דווח על מחשבות אובדניות - הדיווח לגורמים המוסמכים בבית הספר נעשה לפי הנוהל");
+  if (school.length) sections.push({ title: gan ? "כפי שנצפה בגן" : "כפי שנצפה בבית הספר", lines: school });
 
-  // התערבויות
-  if (f.c_tried) {
+  // התערבויות - the kindergarten's own list
+  if (gan && f.c_gan_tried) {
+    const tried: string[] = [];
+    const notTried: string[] = [];
+    for (const it of GAN_INTERVENTIONS) {
+      const o = f.c_gan_tried[it.key];
+      if (o) tried.push(`${it.label}: ${OUTCOME_LABELS[o]}`);
+      else notTried.push(it.label);
+    }
+    const lines = tried.length ? [...tried] : ["טרם נוסו התערבויות בגן"];
+    if (tried.length && notTried.length) lines.push(`טרם נוסו: ${notTried.join(", ")}`);
+    sections.push({ title: "התערבויות שנוסו בגן", lines });
+  }
+  if (!gan && f.c_tried) {
     const tried: string[] = [];
     const notTried: string[] = [];
     for (const it of INTERVENTIONS) {
@@ -661,10 +722,10 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   }
 
   // כלים והכוונה
-  const tips = SCHOOL_TIPS.filter(t => t.when(f));
+  const tips = (gan ? GAN_TIPS : SCHOOL_TIPS).filter(t => t.when(f));
   if (tips.length) {
     sections.push({
-      title: "כלים והכוונה לצוות",
+      title: gan ? "כלים והכוונה לצוות הגן" : "כלים והכוונה לצוות",
       lines: tips.flatMap(t => [`${t.title}: ${t.lines[0]}`, t.lines[1]]),
     });
   }
@@ -686,7 +747,9 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     docs.push(`${DIAGNOSIS_KIND_LABELS[d.kind]} (${d.year})${d.signedBy ? `, חתום/ה: ${d.signedBy}` : ""}${old}`);
   }
   if (f.c_diag && !docs.length) docs.push("אין אבחונים או חוות דעת בתיק");
-  if (f.c_team) docs.push(`צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
+  if (gan && f.c_setting) docs.push(`מסגרת נוכחית: ${GAN_SETTING_LABELS[f.c_setting]}`);
+  if (gan && f.c_devcenter) docs.push(`הערכה במכון להתפתחות הילד: ${DEV_CENTER_LABELS[f.c_devcenter]}`);
+  if (f.c_team) docs.push(gan ? `צוות רב-מקצועי בגן (מתי"א): ${GAN_TEAM_LABELS[f.c_team]}` : `צוות רב-מקצועי: ${TEAM_LABELS[f.c_team]}`);
   // "בהתלבטות" carries what stands between the team and a decision, and the
   // deadline it is racing - the same line the track's deciding aid opens with.
   const zDecision = tracks.find(t => t.key === "zakaut")?.decision;
@@ -695,6 +758,8 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   } else if (f.c_zakaut) {
     docs.push(`ועדת זכאות ואפיון: ${ZAKAUT_LABELS[f.c_zakaut]}${f.c_zakaut === "decided" && f.c_zakaut_on ? ` (${formatDateHe(f.c_zakaut_on)})` : ""}`);
   }
+  if (gan && f._grade === "פעוט" && f.c_daycare) docs.push(`מעון יום שיקומי: ${REHAB_DAYCARE_LABELS[f.c_daycare]}`);
+  if (gan && f._grade === "גן" && f.c_extra_year) docs.push(`השארה בגן חובה שנה נוספת: ${EXTRA_YEAR_LABELS[f.c_extra_year]}`);
   // Not a word about matriculation accommodations before ח' - see hatamotApplies.
   const hDecision = tracks.find(t => t.key === "hatamot")?.decision;
   if (f.c_hatamot && isSchoolGrade(f._grade) && hatamotApplies(f._grade)) {
@@ -714,7 +779,7 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
     });
   }
 
-  const head = "סיכום לקראת הפניה - התלמיד/ה";
+  const head = gan ? "סיכום לקראת הפניה - הילד/ה" : "סיכום לקראת הפניה - התלמיד/ה";
   const meta = `נוצר בעזרת "טיפול חכם" ב-${formatDateHe(today)}${f.c_fill ? `, ${FILL_MODE_LABELS[f.c_fill]}` : ""}.`;
   const unknowns = unknownCount(A);
   const partial = unknowns > 0
