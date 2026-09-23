@@ -16,7 +16,7 @@ const full: Ans = {
   c_attend: "frequent", c_change: "כן",
   a_aca: "הרבה", c_support: "partial", c_org: 2,
   a_soc: "הרבה", soc1: "כן", c_isolation: 2, c_bully_victim: "suspected",
-  c_fill: "phone_parent", c_parents: "aware_consent",
+  c_fill: "phone_parent",
   c_tried: { talks: "helped", shach: "no_help" },
   c_diag: [{ kind: "פסיכיאטר ילדים", year: 2025 }],
   c_team: "yes", c_zakaut: "none", c_hatamot: "none", c_economic: "yes",
@@ -233,6 +233,15 @@ describe("buildSchoolSummary", () => {
     expect(bare).toContain("כיתה ח");
     expect(bare).not.toContain("התערבויות");
     expect(bare).not.toContain("תחום");
+  });
+});
+
+describe("בהתלבטות - a committee the team is still weighing", () => {
+  it("is reported as said, and reaches the engine as not referred", () => {
+    const A = { ...full, c_zakaut: "considering", c_hatamot: "considering" };
+    expect(toTracksInput(A, TODAY)?.zakaut?.status).toBe("none");
+    expect(toTracksInput(A, TODAY)?.hatamot?.status).toBe("none");
+    expect(buildSchoolSummary(A, [], TODAY).text).toContain("ועדת זכאות ואפיון: בהתלבטות");
   });
 });
 

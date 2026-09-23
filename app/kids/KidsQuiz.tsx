@@ -75,7 +75,7 @@ function normalizeKidsRegionKey(r: string, online: boolean): string | null {
   return null;
 }
 
-import { ob, sb, so, cb, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, RequiredNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
+import { ob, sb, so, cb, soUnknown, UnknownCellLabel, EQUAL_ROW_STYLE, Card, StepTag, StepQ, StepHint, EqNum, NavRow, countMissing, IncompleteNote, RequiredNote, SubCard, GradeBlock, ScaleRow, YNRow, UnknownOpt } from "./ui";
 import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits, scoringKey } from "./quiz-logic";
 import { formatDateHe, israelToday } from "@/app/lib/school-tracks";
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
@@ -170,12 +170,56 @@ function ItemRow({ A, setA, itemKey, values, noValue, upd, after }: {
     setA(marked);
     after?.(marked);
   };
+  if (isCounselor(A)) {
+    return (
+      <div className="grid w-full gap-2" style={EQUAL_ROW_STYLE}>
+        {values.map(v => (
+          <button key={v} type="button" className={so(A[itemKey] === v && !on)} onClick={() => put(v, false)}>{v}</button>
+        ))}
+        <button type="button" className={soUnknown(on)} onClick={() => put(noValue, true)}><UnknownCellLabel /></button>
+      </div>
+    );
+  }
   return (
     <div className="flex gap-2 flex-wrap">
       {values.map(v => (
         <button key={v} className={so(A[itemKey] === v && !on)} onClick={() => put(v, false)}>{v}</button>
       ))}
-      {isCounselor(A) && <UnknownOpt on={on} onClick={() => put(noValue, true)} />}
+    </div>
+  );
+}
+
+/**
+ * The social screen's three opening yes/no questions.
+ *
+ * For a counsellor they carry "לא ידוע / לא רלוונטי" too, stored as "לא" and
+ * remembered as not known - the same meaning it has on the emotional screens.
+ * `pick` lets a question clear what its "לא" makes irrelevant (soc3 empties
+ * its communication follow-ups). A parent sees the two pills as before.
+ */
+function SocOpening({ A, setA, itemKey, pick }: {
+  A: Ans; setA: (a: Ans) => void; itemKey: string; pick?: (v: string, a: Ans) => Ans;
+}) {
+  const on = isUnknown(A, itemKey);
+  const put = (v: string, unknown: boolean) => {
+    const base = pick ? pick(v, A) : { ...A, [itemKey]: v };
+    setA(unknown ? markUnknown(base, itemKey) : markKnown(base, itemKey));
+  };
+  if (isCounselor(A)) {
+    return (
+      <div className="grid gap-2" style={EQUAL_ROW_STYLE}>
+        {["לא", "כן"].map(o => (
+          <button key={o} type="button" className={so(A[itemKey] === o && !on)} onClick={() => put(o, false)}>{o}</button>
+        ))}
+        <button type="button" className={soUnknown(on)} onClick={() => put("לא", true)}><UnknownCellLabel /></button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex gap-3">
+      {["לא", "כן"].map(o => (
+        <button key={o} className={ob(A[itemKey] === o)} onClick={() => put(o, false)}>{o}</button>
+      ))}
     </div>
   );
 }
@@ -1862,11 +1906,7 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
         {/* soc1 - ביישנות / חרדה חברתית */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">1. האם מגלה סימנים של ביישנות, הימנעות וחשש מאינטראקציות חברתיות?</p>
-          <div className="flex gap-3">
-            {["לא","כן"].map(o => (
-              <button key={o} className={ob(A.soc1===o)} onClick={() => setA({...A, soc1:o})}>{o}</button>
-            ))}
-          </div>
+          <SocOpening A={A} setA={setA} itemKey="soc1" />
           {A.soc1 === "כן" && (
             <div className="mt-4 bg-[#ede0f7] rounded-xl p-4 border border-[#9b59b6]">
               <p className="text-xs text-[#6a3a8a] mb-1 font-semibold">דרג/י את עוצמת החרדה/מצוקה בכל מצב:</p>
@@ -1894,11 +1934,7 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
         {/* soc2 - חיכוכים / מריבות */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">2. האם מגלה סימנים של חיכוכים ומריבות עם בני/בנות גילו?</p>
-          <div className="flex gap-3">
-            {["לא","כן"].map(o => (
-              <button key={o} className={ob(A.soc2===o)} onClick={() => setA({...A, soc2:o})}>{o}</button>
-            ))}
-          </div>
+          <SocOpening A={A} setA={setA} itemKey="soc2" />
           {A.soc2 === "כן" && (
             <div className="mt-3">
               <p className="text-sm font-semibold text-[#4a1a6a] mb-2">מה חומרת הקשיים? [1–6]</p>
@@ -1914,14 +1950,9 @@ function PageSoc({ A, setA, onNext, onBack, items, audience }: { A:Ans; setA:(a:
         {/* soc3 - קשיי תקשורת */}
         <div className="mb-5 bg-[#f3e8ff] border-2 border-[#9b59b6] rounded-xl p-4">
           <p className="text-sm font-bold text-[#4a1a6a] mb-3">3. האם ישנם סימנים לקשיים בתקשורת בינו/ה לבין חבריו/הוריו?</p>
-          <div className="flex gap-3">
-            {["לא","כן"].map(o => (
-              <button key={o} className={ob(A.soc3===o)}
-                onClick={() => setA(o==="לא"
-                  ? {...A, soc3:"לא", soc3_early:"", comm1:"", comm2:"", comm3:"", comm_rep:"", comm_rigid:"", comm_interest:"", comm_sens:""}
-                  : {...A, soc3:"כן"})}>{o}</button>
-            ))}
-          </div>
+          <SocOpening A={A} setA={setA} itemKey="soc3" pick={(o, a) => o === "לא"
+            ? {...a, soc3:"לא", soc3_early:"", comm1:"", comm2:"", comm3:"", comm_rep:"", comm_rigid:"", comm_interest:"", comm_sens:""}
+            : {...a, soc3:"כן"}} />
           {A.soc3 === "כן" && (
             <div className="mt-3 space-y-3">
               <div>

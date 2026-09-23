@@ -36,7 +36,6 @@ import { toolGroupsOf } from "@/app/lib/kids-report-doc";
 import {
   INTERVENTIONS,
   FILL_MODE_LABELS,
-  PARENTS_LABELS,
   DURATION_LABELS,
   LEVEL_LABELS,
   ATTEND_LABELS,
@@ -401,7 +400,7 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
     set("c_tried", next);
   };
   const routes = eligibilityRoutes(A);
-  const missing = [f.c_fill, f.c_parents, f.c_team].filter(x => !x).length;
+  const missing = [f.c_fill, f.c_team].filter(x => !x).length;
 
   return (
     <div>
@@ -412,7 +411,6 @@ export function PageRefine({ A, setA, onNext, onBack, scoring = "ready" }: Scree
 
         <Box title="המילוי">
           <Q label="איך מולא השאלון"><Choice value={f.c_fill} options={entries(FILL_MODE_LABELS)} onChange={v => set("c_fill", v)} /></Q>
-          <Q label="ההורים"><Choice value={f.c_parents} options={entries(PARENTS_LABELS)} onChange={v => set("c_parents", v)} /></Q>
         </Box>
 
         <Box title="מה כבר נוסה בבית הספר">
@@ -633,7 +631,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
       const { downloadReportPDF } = await import("@/app/lib/report-pdf");
       await downloadReportPDF({
         doc: summary.doc,
-        disclaimer: "מסמך המלצה אוטומטי להפניות - אינו אבחון",
+        disclaimer: "מסמך המלצה אוטומטי - אינו אבחון. יש להתייעץ עם אנשי מקצוע רלוונטיים",
         map: {
           tracks,
           relevanceLabel: t => RELEVANCE_LABELS[t.relevance],
@@ -682,11 +680,6 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           {directions.length === 0 && " הממצאים שעלו מטופלים במסגרת בית הספר ובהפניה לטיפול, ולכן המפה מציגה את התחנה הבית-ספרית בלבד."}
         </StepHint>
         {A.q3_sui === "כן" && <CounselorSafetyNotice />}
-        {f.c_parents === "not_aware" && (
-          <div className="rounded-xl p-3 text-sm my-4" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
-            ההורים טרם יודעו: כל הפניה לוועדה או לגורם חוץ מותנית ביידוע ובהסכמת ההורים (בהורים פרודים - שני ההורים).
-          </div>
-        )}
         {/* The diagram and the timeline are the committee route drawn out. With
             no route open they would be drawing a road nobody is on, so they are
             not rendered at all - and the PDF, which clones this box, then has

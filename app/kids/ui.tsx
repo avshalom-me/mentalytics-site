@@ -31,6 +31,33 @@ export const CB_BASE   = "px-4 py-2 min-h-[44px] border-2 rounded-full text-sm f
 export const CB_SEL    = "bg-[var(--teal)] text-white border-[var(--teal)]";
 export const CB_DEF    = "bg-white text-[#3a4a5a] border-[#d0dae8] hover:border-[var(--teal)]";
 
+/**
+ * The "not known" option as one more cell of an answer row, the same size as
+ * the answers beside it. As a free-width pill it took the width of its own
+ * long label and squeezed the numbers next to it into slivers. text-xs and a
+ * tight leading let the label break onto two lines inside an equal cell.
+ */
+export function soUnknown(selected: boolean) {
+  // 10.5px is what .quiz-shell maps to 12px on a phone (globals.css); 11px
+  // would become 13px there, and at 13px "לא רלוונטי" no longer fits a 65px
+  // cell on one line. The near-zero side padding is the rest of that budget.
+  return `min-w-0 px-0.5 py-1.5 min-h-[44px] border-2 rounded-2xl text-[10.5px] sm:text-xs leading-tight font-medium transition-all cursor-pointer ${selected ? SO_SEL : SO_DEF}`;
+}
+/**
+ * The label broken where it reads - after the slash - so it is always two
+ * lines. Left to wrap on its own in a 65px phone cell it broke as
+ * "לא ידוע" / "/ לא" / "רלוונטי" and stretched the whole row to 77px.
+ */
+export function UnknownCellLabel() {
+  return <>לא ידוע /<br />לא רלוונטי</>;
+}
+/**
+ * An answer row for a counsellor: every option an equal cell. auto-fit keeps
+ * the cells equal at any width - on a phone a long row wraps onto a second
+ * line of cells of the same width rather than narrowing any one of them.
+ */
+export const EQUAL_ROW_STYLE = { gridTemplateColumns: "repeat(auto-fit, minmax(64px, 1fr))" } as const;
+
 export function ob(selected: boolean) { return `${BTN_BASE} ${selected ? BTN_SEL : BTN_DEF}`; }
 export function sb(selected: boolean) { return `${SB_BASE} ${selected ? SB_SEL : SB_DEF}`; }
 export function so(selected: boolean) { return `${SO_BASE} ${selected ? SO_SEL : SO_DEF}`; }

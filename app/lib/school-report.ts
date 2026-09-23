@@ -41,7 +41,6 @@ export const UNKNOWN = "unknown";
 export type Unknown = typeof UNKNOWN;
 
 export type FillMode = "counselor_alone" | "with_parent" | "phone_parent";
-export type Parents = "aware_consent" | "aware_no_consent" | "not_aware";
 export type Duration = "this_year" | "over_year" | "years";
 /** כלל לא / מעט / הרבה / הרבה מאוד - the four-point scale the questionnaire uses for its areas. */
 export type Level = 0 | 1 | 2 | 3;
@@ -121,15 +120,14 @@ export interface CounselorFields {
   c_bully_victim?: "no" | "suspected" | "known" | Unknown;
   // the refinement screen (p-refine)
   c_fill?: FillMode;
-  c_parents?: Parents;
   c_tried?: Partial<Record<InterventionKey, Outcome>>;
   /** מיצוי אפשרויות, asked inside the academic branch. See ACA_STEPS. */
   c_aca_steps?: Partial<Record<AcaStepKey, AcaStepState>>;
   c_diag?: Diagnosis[];
   c_team?: "yes" | "no" | "unknown";
-  c_zakaut?: "none" | "in_process" | "decided";
+  c_zakaut?: "none" | "considering" | "in_process" | "decided";
   c_zakaut_on?: string;
-  c_hatamot?: "none" | "school_level" | "district_submitted" | "district_decided";
+  c_hatamot?: "none" | "considering" | "school_level" | "district_submitted" | "district_decided";
   c_hatamot_on?: string;
   c_economic?: "no" | "yes" | "unknown";
 }
@@ -138,11 +136,6 @@ export interface CounselorFields {
 
 export const FILL_MODE_LABELS: Record<FillMode, string> = {
   counselor_alone: "מילוי עצמאי, ללא ההורים", with_parent: "מילוי יחד עם ההורים", phone_parent: "מילוי בשיחת טלפון עם הורה",
-};
-export const PARENTS_LABELS: Record<Parents, string> = {
-  aware_consent: "ההורים מודעים לפנייה והסכימו לתהליך",
-  aware_no_consent: "ההורים מודעים, טרם התקבלה הסכמה",
-  not_aware: "ההורים טרם יודעו",
 };
 export const DURATION_LABELS: Record<Duration, string> = { this_year: "מהשנה", over_year: "מעל שנה", years: "מספר שנים" };
 export const LEVEL_LABELS = ["כלל לא", "מעט", "הרבה", "הרבה מאוד"] as const;
@@ -156,9 +149,11 @@ export const SUPPORT_RESPONSE_LABELS = {
 export const BULLY_LABELS = { no: "לא", suspected: "חשד", known: "ידוע" } as const;
 export const OUTCOME_LABELS: Record<Outcome, string> = { helped: "הועיל", partial: "הועיל חלקית", no_help: "לא הועיל" };
 export const TEAM_LABELS = { yes: "התכנס", no: "לא התכנס", unknown: "לא ידוע" } as const;
-export const ZAKAUT_LABELS = { none: "לא הופנה/תה", in_process: "בתהליך", decided: "התקבלה החלטה" } as const;
+// "בהתלבטות" sits second: the team has not referred yet, and is weighing it.
+// The tracks engine reads it as "none" for now - see toTracksInput.
+export const ZAKAUT_LABELS = { none: "לא הופנה/תה", considering: "בהתלבטות", in_process: "בתהליך", decided: "התקבלה החלטה" } as const;
 export const HATAMOT_LABELS = {
-  none: "לא נדון", school_level: "אושרו התאמות בסמכות בית הספר", district_submitted: "הוגש לוועדה המחוזית", district_decided: "התקבלה תשובת הוועדה המחוזית",
+  none: "לא נדון", considering: "בהתלבטות", school_level: "אושרו התאמות בסמכות בית הספר", district_submitted: "הוגש לוועדה המחוזית", district_decided: "התקבלה תשובת הוועדה המחוזית",
 } as const;
 export const YES_NO_UNKNOWN_LABELS = { no: "לא", yes: "כן", unknown: "לא ידוע" } as const;
 
@@ -445,8 +440,10 @@ export function toTracksInput(A: Ans, today: string): SchoolTracksInput | null {
     diagnoses: f.c_diag ?? [],
     // "not known" is not "did not convene" - the engine must see no answer.
     schoolTeam: f.c_team && f.c_team !== "unknown" ? { convened: f.c_team === "yes" } : undefined,
-    zakaut: f.c_zakaut ? { status: f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
-    hatamot: f.c_hatamot ? { status: f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
+    // "בהתלבטות" has not reached the committee, so for dates and documents it
+    // is where "not referred" is. The summary still reports it as said.
+    zakaut: f.c_zakaut ? { status: f.c_zakaut === "considering" ? "none" : f.c_zakaut, decisionReceivedOn: f.c_zakaut_on || undefined } : undefined,
+    hatamot: f.c_hatamot ? { status: f.c_hatamot === "considering" ? "none" : f.c_hatamot, districtAnswerReceivedOn: f.c_hatamot_on || undefined } : undefined,
     interventionsTried: interventionsTried(A),
     // What the scoring recommended, in its own keys. Written into the answers
     // by KidsQuiz when the score arrives; absent until then.
@@ -512,7 +509,6 @@ export function buildSchoolSummary(A: Ans, tracks: SchoolTrack[], today: string,
   const bg: string[] = [];
   if (f._grade) bg.push(`כיתה ${f._grade}${f._age ? `, גיל ${f._age}` : ""}`);
   if (f.c_duration) bg.push(`משך הקושי: ${DURATION_LABELS[f.c_duration]}`);
-  if (f.c_parents) bg.push(PARENTS_LABELS[f.c_parents]);
   if (bg.length) sections.push({ title: "רקע", lines: bg });
 
   // ממצאי השאלון לפי תחום
