@@ -686,7 +686,10 @@ function TherapistDashboard() {
       {isNew && (
         <div className="mb-6 rounded-2xl bg-blue-50 border border-blue-200 px-5 py-5">
           <h2 className="text-base font-extrabold text-blue-900 mb-1">ברוך הבא! 👋</h2>
-          <p className="text-sm text-blue-800 leading-6 mb-4">כדי להופיע באתר, יש למלא את הפרטים האישיים והמקצועיים ולהעלות תעודה. זה לוקח כמה דקות.</p>
+          <p className="text-sm text-blue-800 leading-6 mb-4">
+            כדי להופיע באתר, יש למלא את הפרטים האישיים והמקצועיים ולהעלות תעודה. זה לוקח כמה דקות.
+            התעודה נבדקת אצלנו בלבד ואינה מוצגת באתר, ומספר רישום בפנקס אינו חובה.
+          </p>
           <Link href="/therapists/dashboard/edit"
             className="inline-block rounded-xl bg-[#2e7d8c] px-6 py-3 text-sm font-bold text-white hover:opacity-90">
             למילוי הפרטים שלי ←

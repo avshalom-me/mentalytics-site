@@ -241,7 +241,7 @@ export default function FillForm({ token, centerName, inviteEmail }: {
               <label className="mb-1 block text-sm font-semibold text-stone-700">תעודה / רישיון (PDF / JPG / PNG)</label>
               <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={e => setCertFile(e.target.files?.[0] ?? null)}
                 className="block w-full text-xs" />
-              <p className="mt-1 text-[11px] text-stone-400">נדרשת לאישור הפרופיל ואינה מוצגת באתר.</p>
+              <p className="mt-1 text-[11px] text-stone-400">נדרשת לאישור הפרופיל, לבדיקה פנימית בלבד. אינה מוצגת באתר.</p>
             </div>
           </div>
           <div className="mt-4 grid gap-4 sm:grid-cols-2">

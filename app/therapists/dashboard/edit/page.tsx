@@ -571,14 +571,14 @@ export default function TherapistProfileEditPage() {
 
           <div className="mt-4">
             <label className="mb-1 block text-sm font-semibold text-stone-700">
-              מספר רישום בפנקס <span className="font-normal text-stone-400">(לא חובה)</span>
+              מספר רישום בפנקס <span className="font-normal text-stone-500">(לא חובה)</span>
             </label>
             <input value={form.license_number} onChange={e => setForm({...form, license_number: e.target.value})}
               dir="ltr" className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="27-131094" />
             <p className="mt-1 text-xs text-stone-500">
-              מוצג בפרופיל ומאפשר למטופלים לאמת אותך מול הפנקס הציבורי. זה אחד מסימני האמון החזקים
-              שיש, ומטופלים רבים בודקים.
+              אפשר להשאיר ריק. השדה אינו נדרש לאישור הפרופיל ואינו משפיע על ההתאמות. אם ימולא, המספר
+              מוצג בפרופיל ומאפשר למטופלים לאמת אותך מול הפנקס הציבורי.
             </p>
           </div>
 
@@ -767,6 +767,10 @@ export default function TherapistProfileEditPage() {
           <div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תעודת רישיון / אישור מקצועי <span className="text-red-500">*</span></label>
             <p className="mb-2 text-xs text-stone-500">יש להוסיף תעודת רישיון מטפל או תעודה המוכיחה את המקצוע</p>
+            <p className="mb-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+              🔒 התעודה נועדה לבדיקה פנימית שלנו בלבד, לפני אישור הפרופיל. היא אינה מוצגת בפרופיל,
+              לא במאגר ולא בשום מקום אחר באתר, ומטופלים אינם רואים אותה.
+            </p>
             {existingCerts.length > 0 && (
               <div className="mb-2 rounded-lg border border-stone-200 bg-stone-50 p-2.5">
                 <div className="mb-1.5 text-xs font-semibold text-stone-600">תעודות שכבר הועלו:</div>
