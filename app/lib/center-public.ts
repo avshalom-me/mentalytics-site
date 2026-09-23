@@ -20,7 +20,7 @@ export type PublicCenter = {
   public_city: string | null;
   public_website: string | null;
   public_phone: string | null;
-  /** וואטסאפ עסקי לפניות מטופלים (נייד). ראו centerWhatsAppNumber ב-phone.ts. */
+  /** וואטסאפ עסקי לפניות מטופלים (נייד, נייח או וירטואלי). ראו centerWhatsAppNumber ב-phone.ts. */
   public_whatsapp: string | null;
   public_founded_year: number | null;
   public_team_size: number | null;

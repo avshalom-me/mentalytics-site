@@ -391,12 +391,14 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
           קובע את הכפתור. הבלוק מפריד במפורש בין העסקי (מפורסם) לפרטי (לא). */}
       <div className="mt-3 rounded-xl border border-green-200 bg-green-50/60 p-3">
         <label className="mb-1 block text-sm font-semibold text-stone-800">וואטסאפ עסקי לפניות מטופלים (מוצג באתר ובכרטיסים)</label>
-        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="נייד, למשל 052-1234567"
+        <input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="למשל 052-1234567 או 072-2119500"
           className="w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
         {(() => {
           const typed = whatsapp.trim();
           if (typed && !phoneNationalDigits(typed)) return <p className="mt-1 text-[11.5px] font-bold text-red-600">זה לא נראה כמו מספר טלפון.</p>;
-          if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11.5px] font-bold text-red-600">חייב להיות נייד (מתחיל ב-05). לקו נייח או וירטואלי אין וואטסאפ, והשמירה תידחה.</p>;
+          // וואטסאפ עסקי עובד גם על קו נייח או וירטואלי (23/9/26, מרכז רותם עם 072).
+          // לא חוסמים - רק מזכירים לוודא שהקו באמת מחובר, אחרת הפונה מגיע לשיחה ריקה.
+          if (typed && !isMobileNumber(typed)) return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">מספר נייח או וירטואלי מתאים כשהוא מחובר לוואטסאפ עסקי. כדאי לוודא שכן, אחרת פונים יגיעו לשיחה בלי מענה.</p>;
           if (!typed && isMobileNumber(phone)) return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">השדה ריק, ולכן כפתור הוואטסאפ משתמש בינתיים בטלפון לחיוג ({phone.trim()}), כי הוא נייד. אפשר להשאיר כך או לרשום כאן מספר אחר.</p>;
           if (!typed) return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">ריק = אין כפתור וואטסאפ. מטופלים יוכלו לחייג או לשלוח הודעה דרך האתר.</p>;
           return <p className="mt-1 text-[11.5px] leading-4 text-stone-600">מטופלים שילחצו על &quot;שליחת וואטסאפ&quot; יגיעו למספר הזה, עם הודעת פתיחה מוכנה.</p>;

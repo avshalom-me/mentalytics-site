@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
   if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
   if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
   if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
-  // וואטסאפ עסקי - נייד בלבד, אחרת הכפתור באתר היה פותח שיחה ריקה.
+  // וואטסאפ עסקי - כל מספר ישראלי, גם נייח או וירטואלי (ראו validateCenterWhatsApp).
   if (body.public_whatsapp !== undefined) {
     const wa = validateCenterWhatsApp(body.public_whatsapp);
     if (!wa.ok) return NextResponse.json({ ok: false, error: wa.error }, { status: 400 });
