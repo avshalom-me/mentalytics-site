@@ -62,11 +62,15 @@ function statsTable(s: TrialStats): string {
       </tr>
       <tr>
         <td style="${label}">הצפיות שלך</td>
-        <td style="${label}">הפניות שלך</td>
+        <td style="${label}">הפניות שלך*</td>
         <td style="${label}">ממוצע מטפל חינמי</td>
-        <td style="${label}">ממוצע פניות חינמי</td>
+        <td style="${label}">ממוצע פניות חינמי*</td>
       </tr>
     </table>
+    <p style="margin:0 0 8px;font-size:12px;color:#888;">
+      * הפניות נספרות כלחיצות על פרטי יצירת הקשר בפרופיל שלך: מספר הטלפון, וואטסאפ או
+      כפתור ההודעה. ייתכן שחלק מהלחיצות לא הבשילו לפנייה בפועל.
+    </p>
     <p style="margin:0 0 20px;font-size:12px;color:#888;">
       הנתונים לכל תקופת הקידום (${s.days} ימים). הממוצע החינמי מחושב לאותו פרק זמן.
     </p>`;
