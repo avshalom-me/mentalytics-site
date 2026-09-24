@@ -98,8 +98,19 @@ type Coverage = {
   periods: Record<string, { paid: number; center: number; trial: number; paidAds: number; centerAds: number; trialAds: number }>;
   /** פניות (לחיצות קשר) בתקופה לפי מי קיבל אותן - מסתכם בדיוק ל"סה״כ פניות". */
   clicks?: Record<string, ClickSplit>;
+  /** אותן פניות, שורה לכל מטפל שקיבל, ממוינות מהרב למעט. */
+  recipients?: Record<string, Recipient[]>;
   starving: StarvingRow[];
   tooNew?: number;
+};
+
+type Recipient = {
+  id: string;
+  name: string;
+  tier: "paid" | "center" | "trial" | "free" | "other";
+  isEntity: boolean;
+  clicks: number;
+  ads: number;
 };
 
 type ClickSplit = {
@@ -389,6 +400,63 @@ function CentersPanel({ b }: { b: CentersBlock }) {
   );
 }
 
+const RECIPIENT_TIER: Record<Recipient["tier"], { label: string; cls: string }> = {
+  paid: { label: "בתשלום", cls: "bg-[#FDF6E3] text-[#A87010] border border-[#D49018]/30" },
+  center: { label: "מרכז", cls: "bg-indigo-50 text-indigo-800 border border-indigo-200" },
+  trial: { label: "מתנה", cls: "bg-[#EAF4F3] text-[#2A6462]" },
+  free: { label: "חינמי", cls: "bg-stone-100 text-stone-600" },
+  other: { label: "לא מוצג", cls: "bg-red-50 text-red-700" },
+};
+
+// למי הגיעו הפניות בתקופה, מטפל-מטפל. סגור כברירת מחדל כדי לא להעמיס על
+// הפאנל, ובפתיחה - עשרת הראשונים. עונה על מה שהמספרים המצטברים לא עונים:
+// האם הפניות מתפזרות, או שמעטים לוקחים את רובן.
+function RecipientsList({ list, periodLabel }: { list: Recipient[]; periodLabel: string }) {
+  const [open, setOpen] = useState(false);
+  const [showAll, setShowAll] = useState(false);
+  const rows = showAll ? list : list.slice(0, 10);
+  return (
+    <div className="mb-4">
+      <button onClick={() => setOpen(!open)} className="text-xs font-semibold text-[#3D8C8A] hover:underline">
+        {open ? "הסתר את רשימת מקבלי הפניות ▴" : `הצג למי הגיעו הפניות (${num(list.length)} מטפלים) ▾`}
+      </button>
+      {open && (
+        <>
+          <table className="mt-2 w-full text-sm">
+            <thead>
+              <tr className="border-b border-stone-200 text-xs text-stone-500">
+                <th className="px-2 py-1.5 text-right font-semibold">מטפל/ת</th>
+                <th className="px-2 py-1.5 text-center font-semibold">מסלול</th>
+                <th className="px-2 py-1.5 text-center font-semibold">פניות ({periodLabel})</th>
+                <th className="px-2 py-1.5 text-center font-semibold">מתוכן מגוגל אדס</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id} className="border-b border-stone-100">
+                  <td className="px-2 py-1.5 font-semibold text-stone-700">{r.isEntity ? "🏢 " : ""}{r.name || "—"}</td>
+                  <td className="px-2 text-center">
+                    <span className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-bold ${RECIPIENT_TIER[r.tier].cls}`}>
+                      {RECIPIENT_TIER[r.tier].label}
+                    </span>
+                  </td>
+                  <td className="px-2 text-center font-bold text-stone-800">{num(r.clicks)}</td>
+                  <td className="px-2 text-center text-stone-600">{r.ads > 0 ? num(r.ads) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {list.length > 10 && (
+            <button onClick={() => setShowAll(!showAll)} className="mt-2 text-xs font-semibold text-[#3D8C8A] hover:underline">
+              {showAll ? "הצג פחות ▴" : `הצג את כל ${num(list.length)} ▾`}
+            </button>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
   const p = c.periods[periodKey] ?? { paid: 0, center: 0, trial: 0, paidAds: 0, centerAds: 0, trialAds: 0 };
   const s = c.clicks?.[periodKey];
@@ -426,6 +494,9 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
           {s.other > 0 && <>, ו-{num(s.other)} למטפלים שאינם מוצגים כרגע באתר</>}.
           <span className="text-stone-400"> הסיווג לפי מצב המטפל היום: פנייה למי שהיה מקודם אז ועבר לחינמי נספרת אצל החינמיים.</span>
         </p>
+      )}
+      {(c.recipients?.[periodKey]?.length ?? 0) > 0 && (
+        <RecipientsList list={c.recipients![periodKey]} periodLabel={periodLabel} />
       )}
       {c.starving.length > 0 ? (
         <>

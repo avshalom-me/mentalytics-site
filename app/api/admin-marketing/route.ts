@@ -120,7 +120,7 @@ export async function GET() {
     // came from Google Ads (they should not: paid visitors see no free therapists).
     const freeListQ = supabaseAdmin
       .from("therapists")
-      .select("id")
+      .select("id, full_name")
       .eq("status", "approved")
       .eq("admin_approved", true);
     const views30Q = fetchAllRows<{ therapist_id: string }>(() =>
@@ -310,8 +310,18 @@ export async function GET() {
       freeAdsLast: string | null;
     };
     const payingById = new Map(payingList.map((t) => [t.id, t]));
-    const freeIdSet = new Set(((freeListRes.data ?? []) as { id: string }[]).map((t) => t.id));
+    const freeRows = (freeListRes.data ?? []) as { id: string; full_name: string | null }[];
+    const freeIdSet = new Set(freeRows.map((t) => t.id));
+    const freeNameById = new Map(freeRows.map((t) => [t.id, t.full_name]));
+    type RecipientTier = "paid" | "center" | "trial" | "free" | "other";
+    // Who received the period's inquiries, one row per therapist - the list
+    // behind the split (collapsed on the page). Answers what the totals cannot:
+    // are the inquiries spread out, or do a few therapists take most of them?
+    // Sums to the same total as the split: same rows, same cutoff, same tiers.
+    type Recipient = { id: string; name: string; tier: RecipientTier; isEntity: boolean; clicks: number; ads: number };
     const clickSplit: Record<string, ClickSplit> = {};
+    const recipients: Record<string, Recipient[]> = {};
+    const otherIds = new Set<string>();
     for (const d of PERIODS) {
       const cutoffMs = Date.parse(cutoffIso.get(d)!);
       const s: ClickSplit = {
@@ -319,19 +329,52 @@ export async function GET() {
         paidAds: 0, centerAds: 0, trialAds: 0, freeAds: 0, otherAds: 0,
         freeAdsLast: null,
       };
+      const byTherapist = new Map<string, Recipient>();
       for (const c of clicksAll) {
         if (Date.parse(c.clicked_at) < cutoffMs) continue;
         const payer = payingById.get(c.therapist_id);
-        const key: "paid" | "center" | "trial" | "free" | "other" =
+        const key: RecipientTier =
           payer ? tierOf(payer) : freeIdSet.has(c.therapist_id) ? "free" : "other";
         s.total++;
         s[key]++;
-        if (c.channel === "google_paid") {
+        const isAds = c.channel === "google_paid";
+        if (isAds) {
           s[`${key}Ads`]++;
           if (key === "free" && (!s.freeAdsLast || Date.parse(c.clicked_at) > Date.parse(s.freeAdsLast))) s.freeAdsLast = c.clicked_at;
         }
+        let r = byTherapist.get(c.therapist_id);
+        if (!r) {
+          r = {
+            id: c.therapist_id,
+            name: (payer ? payer.full_name : freeNameById.get(c.therapist_id)) ?? "",
+            tier: key,
+            isEntity: payer?.entity_type === "center",
+            clicks: 0,
+            ads: 0,
+          };
+          byTherapist.set(c.therapist_id, r);
+          if (key === "other") otherIds.add(c.therapist_id);
+        }
+        r.clicks++;
+        if (isAds) r.ads++;
       }
       clickSplit[`d${d}`] = s;
+      recipients[`d${d}`] = [...byTherapist.values()];
+    }
+    // Names of therapists who received inquiries but are no longer listed - the
+    // lists above only cover the listed ones. Usually none, so usually no query.
+    if (otherIds.size > 0) {
+      const { data: otherRows } = await supabaseAdmin
+        .from("therapists")
+        .select("id, full_name")
+        .in("id", [...otherIds]);
+      const otherName = new Map(((otherRows ?? []) as { id: string; full_name: string | null }[]).map((t) => [t.id, t.full_name]));
+      for (const list of Object.values(recipients)) {
+        for (const r of list) if (r.tier === "other") r.name = otherName.get(r.id) ?? "";
+      }
+    }
+    for (const list of Object.values(recipients)) {
+      list.sort((a, b) => b.clicks - a.clicks || b.ads - a.ads || a.name.localeCompare(b.name, "he"));
     }
 
     // "Starving" = paying/promoted, listed, and no contact in the last 30 days.
@@ -377,6 +420,7 @@ export async function GET() {
       trialTotal: payingList.filter((t) => tierOf(t) === "trial").length,
       periods: coveragePeriods,
       clicks: clickSplit,
+      recipients,
       starving,
       // כמה הוחרגו כ"חדשים מדי" - נאמר במפורש, אחרת המספר נראה כאילו ירד לבד.
       tooNew: payingList.filter((t) => !coveredInWindow(t, 30) && tooNew(t)).length,
