@@ -49,6 +49,48 @@ export const ALL_REGIONS = Object.keys(REGION_CITIES);
 // A short, genuinely distinct paragraph per region - so each landing page has
 // its own unique text (not just a swapped city name), which keeps Google from
 // treating them as near-duplicates. Written to be real and specific, not spun.
+/**
+ * The city pages linked from the homepage and the directory (CityLinks).
+ *
+ * Until 24/9/2026 the homepage - the strongest page on the site, 504 of its
+ * clicks in the last three months - linked to no city page at all, and the
+ * directory linked only through a filter dropdown Google cannot follow. Every
+ * city page was ranking on its own, which is why so many sat on page 2.
+ *
+ * Chosen from Search Console (3 months to 24/9/2026) by search demand and by
+ * supply to show once someone arrives: the four largest cities, the ones
+ * ranking on page 2 with real demand, and Emek Hefer and Rosh HaAyin, which
+ * sat one position from page 1 (11.2 and 10.8). Beer Sheva is left out on
+ * purpose: ~1,500 impressions of demand against 4 therapists - the fix there
+ * is recruiting, and a stronger page would only send more people to a thin
+ * list. Every name must be spelled as REGION_CITIES spells it.
+ */
+export const FEATURED_CITIES: readonly string[] = [
+  "תל אביב", "ירושלים", "חיפה", "רמת גן", "פרדס חנה-כרכור", "הוד השרון", "כפר סבא",
+  "רעננה", "נתניה", "גבעתיים", "פתח תקווה", "קרית אונו", "עמק חפר", "ראש העין",
+];
+
+/**
+ * Regions whose name leads with a city that has its own page - which puts the
+ * two pages in competition for the same search.
+ *
+ * Measured in Search Console on 24/9/2026, for searches containing "בחיפה":
+ * /city/חיפה held position 16.4 on 2,250 impressions and /region/חיפה-והקריות
+ * position 36.7 on 660, with near-identical titles ("...בחיפה" against
+ * "...בחיפה והקריות"). The region page now leads with the Krayot, which it
+ * alone can answer for ("פסיכולוגים בקריות"), and points to the city page as
+ * the Haifa destination. It still lists Haifa therapists, so the label keeps
+ * "אזור חיפה" - dropping Haifa would misdescribe the list.
+ *
+ * `label` replaces the region name in the title, H1, description and opening
+ * paragraph only; the region key itself still drives the data. Jerusalem
+ * shows the same pattern far more weakly (the region page at 48.8), so it is
+ * not listed.
+ */
+export const REGION_SEO_FOCUS: Record<string, { label: string; mainCity: string }> = {
+  "חיפה והקריות": { label: "קריות ואזור חיפה", mainCity: "חיפה" },
+};
+
 export const REGION_INTRO: Record<string, string> = {
   "גוש דן":
     "מטרופולין תל אביב והערים סביבה מרכזים מגוון רחב של מטפלים ופסיכולוגים - מגישות דינמיות וקוגניטיביות-התנהגותיות ועד טיפול בטראומה, זוגיות והורות. הצפיפות הגבוהה מאפשרת בחירה מדויקת של גישה, זמינות ותחום התמחות, וגם פגישות בשעות גמישות.",

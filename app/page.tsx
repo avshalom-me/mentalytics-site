@@ -5,6 +5,7 @@ import ContactForm from "./components/ContactForm";
 import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
 import TooltipAsterisk from "./components/TooltipAsterisk";
 import OutputShowcase from "./components/OutputShowcase";
+import CityLinks from "./components/CityLinks";
 
 export const metadata: Metadata = {
   // absolute → avoids the layout's "%s | טיפול חכם" template double-branding.
@@ -552,6 +553,10 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ─── CITIES ─── Crawlable links to the city pages, low on the page and
+          out of snippets - see CityLinks for both reasons. */}
+      <CityLinks />
 
       {/* ─── CONTACT ─── */}
       <section id="contact" style={{ padding: "80px 24px" }}>

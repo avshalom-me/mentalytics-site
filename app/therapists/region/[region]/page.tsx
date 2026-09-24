@@ -3,7 +3,7 @@ import { listingItemSchema } from "@/app/lib/listing-schema";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { loadPublicTherapists, countListed, MIN_LISTED_FOR_INDEX } from "@/app/lib/therapist-directory";
-import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO } from "@/app/lib/regions";
+import { slugToRegion, regionToSlug, ONLINE_SLUG, ALL_REGIONS, REGION_CITIES, CITY_SEO_LIST, REGION_INTRO, REGION_SEO_FOCUS } from "@/app/lib/regions";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { onlineTopicSlugs, slugToCityTopic, MIN_ONLINE_TOPIC } from "@/app/lib/topics";
 import OnlineEvidenceSection from "@/app/therapists/OnlineEvidenceSection";
@@ -46,7 +46,9 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   const r = resolve(regionParam);
   if (!r) return { title: "אזור לא נמצא" };
   const isOnline = r.kind === "online";
-  const label = isOnline ? "טיפול אונליין" : r.region;
+  // The display label, not the key: see REGION_SEO_FOCUS in regions.ts. The
+  // region key (r.region) still drives the listing and every data lookup.
+  const label = isOnline ? "טיפול אונליין" : (REGION_SEO_FOCUS[r.region]?.label ?? r.region);
   // The head phrase of the whole cluster ("טיפול פסיכולוגי אונליין") belongs in
   // the title - a 3-model SERP panel (5/8/26) found every ranking competitor
   // carries it, and we carried neither it nor "פסיכולוג אונליין" anywhere.
@@ -80,7 +82,9 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
   const list = await loadPublicTherapists(isOnline ? { online: true } : { region: r.region });
   const onlineCount = isOnline ? list.length : await countListed({ online: true });
   const localArticles = await loadLocalArticles(isOnline ? { online: true } : { region: r.region });
-  const label = isOnline ? "טיפול אונליין" : r.region;
+  // The display label, not the key: see REGION_SEO_FOCUS in regions.ts. The
+  // region key (r.region) still drives the listing and every data lookup.
+  const label = isOnline ? "טיפול אונליין" : (REGION_SEO_FOCUS[r.region]?.label ?? r.region);
   const heading = isOnline
     ? "טיפול פסיכולוגי אונליין: מטפלים ופסיכולוגים מאומתים"
     : `פסיכולוגים ומטפלים ב${label}`;
@@ -155,6 +159,22 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
             `טיפול פסיכולוגי, נפשי ורגשי ב${label}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות. בחינם וללא התחייבות.`
           )}
         </p>
+        {/* Where a city has its own page, this region page defers to it - the
+            link tells both the visitor and Google which page answers for the
+            city itself. Out of snippets: this line carries no questionnaire,
+            and the opening paragraph above is the one that should be quoted. */}
+        {!isOnline && REGION_SEO_FOCUS[r.region] && (
+          <p data-nosnippet className="mt-2 text-sm text-stone-500">
+            מחפשים ב{REGION_SEO_FOCUS[r.region].mainCity} עצמה?{" "}
+            <Link
+              href={`/therapists/city/${regionToSlug(REGION_SEO_FOCUS[r.region].mainCity)}`}
+              className="font-semibold hover:underline"
+              style={{ color: "var(--teal-dark)" }}
+            >
+              פסיכולוגים ומטפלים ב{REGION_SEO_FOCUS[r.region].mainCity} ←
+            </Link>
+          </p>
+        )}
       </div>
 
       {/* Prominent quiz CTA - offer the matching quiz as an alternative to

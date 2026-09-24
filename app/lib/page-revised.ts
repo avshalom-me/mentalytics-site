@@ -34,7 +34,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   // one revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
-    date: "2026-09-21",
+    date: "2026-09-24",
     sources: [
       "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
@@ -56,6 +56,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/meta-description.ts",
       "app/lib/topics.ts",
       "app/lib/city-facts.ts",
+      "app/lib/regions.ts",
       // What the listings actually contain (the filters) and how a therapist's
       // title is spelled - both are visible page text, so a change here is a
       // change Google should re-crawl.
@@ -63,8 +64,8 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/gender-text.ts",
     ],
   },
-  "/": { date: "2026-09-10", sources: ["app/page.tsx"] },
-  "/therapists": { date: "2026-09-19", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx"] },
+  "/": { date: "2026-09-24", sources: ["app/page.tsx", "app/components/CityLinks.tsx", "app/lib/regions.ts"] },
+  "/therapists": { date: "2026-09-24", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx", "app/components/CityLinks.tsx"] },
   "/research": { date: "2026-09-22", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/academic": { date: "2026-08-05", sources: ["app/research/academic/page.tsx"] },
   "/research/adhd-adults": { date: "2026-09-22", sources: ["app/research/adhd-adults/page.tsx"] },
