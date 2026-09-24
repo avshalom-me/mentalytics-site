@@ -25,9 +25,12 @@ function periodToDate(period: Period, nowMs: number): string | null {
 // expands them back (app/lib/analytics-event-groups.ts) - so everything below
 // the fetch runs unchanged on either. Both are kept while the grouped path is
 // verified against the legacy one on live data (?impl=legacy|grouped, with
-// ?at= pinning both to the same moment).
+// ?at= pinning both to the same moment). Grouped became the default on
+// 24/9/2026 after 51 comparisons (local and live, week/month/all, ten
+// reference times incl. week and month boundaries) came out identical field
+// for field; ?impl=legacy stays as a fallback and a reference.
 type EventsImpl = "legacy" | "grouped";
-const DEFAULT_EVENTS_IMPL: EventsImpl = "legacy";
+const DEFAULT_EVENTS_IMPL: EventsImpl = "grouped";
 
 type TherapistRow = {
   id: string;
