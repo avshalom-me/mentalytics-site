@@ -33,6 +33,8 @@ type SeoData = {
   name_breadth: { therapists: number; sessions: number };
   funnel: FunnelRow[];
   ai?: AiSummary;
+  /** מתי חושבו הנתונים (עותק לילי); null = חושבו עכשיו, בזמן הטעינה. */
+  computed_at?: string | null;
 };
 
 const AI_COLOR = "#7C3AED";
@@ -289,6 +291,11 @@ export default function AdminSeoPage() {
         הם &quot;מבקרים אורגניים חדשים&quot;, לא כניסות, והם אינם מנופחים ע&quot;י כניסות חוזרות שלך.
       </p>
       <div className="mb-6"><OptOutToggle /></div>
+      {!loading && data?.computed_at && (
+        <p className="-mt-3 mb-5 text-xs text-stone-400">
+          הנתונים חושבו ב-{new Date(data.computed_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} ומתעדכנים כל לילה.
+        </p>
+      )}
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
       {loading && <p className="text-sm text-stone-400 animate-pulse">טוען…</p>}

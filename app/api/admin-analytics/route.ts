@@ -5,16 +5,29 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 // what made this endpoint (and every admin tab that calls it) take 20-30s once
 // analytics_events grew into the tens of thousands of rows.
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { expandEventGroups, type AnalyticsEventRow, type EventGroup } from "@/app/lib/analytics-event-groups";
 
 export const dynamic = "force-dynamic";
 
 type Period = "week" | "month" | "all";
 
-function periodToDate(period: Period): string | null {
+function periodToDate(period: Period, nowMs: number): string | null {
   if (period === "all") return null;
   const ms = period === "week" ? 7 * 86_400_000 : 30 * 86_400_000;
-  return new Date(Date.now() - ms).toISOString();
+  return new Date(nowMs - ms).toISOString();
 }
+
+// ── Where the events come from ────────────────────────────────────────────
+// "legacy" downloads every analytics_events row in the period (46k rows / ~8 MB
+// for a month, 128k / ~22 MB for all time, 47-133 requests) and was most of this
+// endpoint's 5-25 s. "grouped" asks admin_analytics_event_groups for the same
+// events already grouped by the fields this route reads, with a count, and
+// expands them back (app/lib/analytics-event-groups.ts) - so everything below
+// the fetch runs unchanged on either. Both are kept while the grouped path is
+// verified against the legacy one on live data (?impl=legacy|grouped, with
+// ?at= pinning both to the same moment).
+type EventsImpl = "legacy" | "grouped";
+const DEFAULT_EVENTS_IMPL: EventsImpl = "legacy";
 
 type TherapistRow = {
   id: string;
@@ -36,29 +49,49 @@ type TherapistRow = {
 };
 
 export async function GET(req: NextRequest) {
-  const period = (req.nextUrl.searchParams.get("period") ?? "all") as Period;
+  const params = req.nextUrl.searchParams;
+  const period = (params.get("period") ?? "all") as Period;
   const validPeriods: Period[] = ["week", "month", "all"];
   const safePeriod: Period = validPeriods.includes(period) ? period : "all";
-  const since = periodToDate(safePeriod);
+  const implParam = params.get("impl");
+  const impl: EventsImpl = implParam === "legacy" || implParam === "grouped" ? implParam : DEFAULT_EVENTS_IMPL;
+  // ?at= pins the report to one moment - the period's start, an upper bound on
+  // every table, and "this week" - so two runs compare on identical data. Absent,
+  // it is now and there is no upper bound: the report as it always was.
+  const atParam = params.get("at");
+  const atMs = atParam ? Date.parse(atParam) : NaN;
+  const pinned = Number.isFinite(atMs);
+  const nowMs = pinned ? atMs : Date.now();
+  const until = pinned ? new Date(atMs).toISOString() : null;
+  const since = periodToDate(safePeriod, nowMs);
 
   try {
     // Paginated fetches (see fetchAllRows) so counts reflect ALL rows, not just
     // the first 1000. Therapists is ~tens of rows so a single select is fine.
     const [events, views, clicks, therapistsRes] = await Promise.all([
-      fetchAllRows<{ event_type: string; therapist_id: string | null; metadata: Record<string, string>; created_at: string }>(() => {
-        let q = supabaseAdmin
-          .from("analytics_events")
-          .select("event_type, therapist_id, metadata, created_at")
-          .order("created_at", { ascending: true });
-        if (since) q = q.gte("created_at", since);
-        return q;
-      }),
+      impl === "grouped"
+        ? supabaseAdmin
+            .rpc("admin_analytics_event_groups", { p_since: since, p_until: until })
+            .then(({ data, error }) => {
+              if (error) throw new Error(error.message);
+              return expandEventGroups((data ?? []) as EventGroup[]);
+            })
+        : fetchAllRows<AnalyticsEventRow>(() => {
+            let q = supabaseAdmin
+              .from("analytics_events")
+              .select("event_type, therapist_id, metadata, created_at")
+              .order("created_at", { ascending: true });
+            if (since) q = q.gte("created_at", since);
+            if (until) q = q.lt("created_at", until);
+            return q;
+          }),
       fetchAllRows<{ therapist_id: string; viewed_at: string; source?: string; viewer_region?: string; viewer_issue?: string; viewer_age_band?: string; viewer_gender?: string }>(() => {
         let q = supabaseAdmin
           .from("therapist_profile_views")
           .select("therapist_id, viewed_at, source, viewer_region, viewer_issue, viewer_age_band, viewer_gender")
           .order("viewed_at", { ascending: true });
         if (since) q = q.gte("viewed_at", since);
+        if (until) q = q.lt("viewed_at", until);
         return q;
       }),
       fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source?: string }>(() => {
@@ -67,6 +100,7 @@ export async function GET(req: NextRequest) {
           .select("therapist_id, click_type, clicked_at, source")
           .order("clicked_at", { ascending: true });
         if (since) q = q.gte("clicked_at", since);
+        if (until) q = q.lt("clicked_at", until);
         return q;
       }),
       // therapists for the impressions table + profile breakdowns (one fetch)
@@ -179,10 +213,10 @@ export async function GET(req: NextRequest) {
     // השבוע הנוכחי הוא תמיד דלי חלקי (שבועות מעוגנים ליום שני), והצגתו כנקודה
     // רגילה על הגרף נראית כקריסה: יומיים של פניות מול שבועות מלאים. הדגל נותן
     // ל-UI לצייר אותו אחרת ולציין כמה ימים הוא באמת מכסה.
-    const currentWeek = getWeek(new Date().toISOString());
+    const currentWeek = getWeek(new Date(nowMs).toISOString());
     const daysIntoWeek = Math.min(
       7,
-      Math.floor((Date.now() - new Date(currentWeek).getTime()) / 86_400_000) + 1,
+      Math.floor((nowMs - new Date(currentWeek).getTime()) / 86_400_000) + 1,
     );
     const trends = Object.entries(weekBuckets)
       .map(([week, counts]) => ({
