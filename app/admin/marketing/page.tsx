@@ -96,8 +96,18 @@ type Coverage = {
   centerTotal: number;
   trialTotal: number;
   periods: Record<string, { paid: number; center: number; trial: number; paidAds: number; centerAds: number; trialAds: number }>;
+  /** פניות (לחיצות קשר) בתקופה לפי מי קיבל אותן - מסתכם בדיוק ל"סה״כ פניות". */
+  clicks?: Record<string, ClickSplit>;
   starving: StarvingRow[];
   tooNew?: number;
+};
+
+type ClickSplit = {
+  total: number;
+  paid: number; center: number; trial: number; free: number; other: number;
+  paidAds: number; centerAds: number; trialAds: number; freeAds: number; otherAds: number;
+  /** הפנייה האחרונה מגוגל אדס למטפל חינמי (מ-16/9/26 אמור להיות רק היסטוריה). */
+  freeAdsLast?: string | null;
 };
 
 type Data = {
@@ -235,7 +245,13 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
 // THE goal metric: does every paying (then promoted) therapist get inquiries?
 // A coverage chip per tier for the selected period, plus the 30-day "starving"
 // list — who to act on (promote harder / point campaigns at their region).
-function CoverageChip({ label, covered, total, fromAds }: { label: string; covered: number; total: number; fromAds: number }) {
+// The big number counts THERAPISTS, not inquiries - "11 / 20" read as eleven
+// inquiries next to the "70 inquiries" tile, and "where did the rest go?" was
+// asked twice (19/8, 24/9/2026). So the label says "מטפלים" outright, and the
+// inquiries those therapists received sit on their own line underneath.
+function CoverageChip({ label, covered, total, fromAds, clicks, clicksAds }: {
+  label: string; covered: number; total: number; fromAds: number; clicks?: number; clicksAds?: number;
+}) {
   const ratio = total > 0 ? covered / total : 1;
   const cls =
     ratio >= 1 ? "bg-green-100 text-green-800 border-green-200"
@@ -244,12 +260,17 @@ function CoverageChip({ label, covered, total, fromAds }: { label: string; cover
   return (
     <div className={`rounded-xl border px-4 py-2.5 text-center ${cls}`}>
       <div className="text-2xl font-black leading-tight">
-        {num(covered)}<span className="text-sm font-bold opacity-60"> / {num(total)}</span>
+        {num(covered)}<span className="text-sm font-bold opacity-60"> מתוך {num(total)}</span>
       </div>
       <div className="text-xs font-semibold">{label}</div>
       <div className="mt-1.5 border-t border-black/10 pt-1 text-[11px] font-semibold opacity-75">
-        מתוכם {num(fromAds)} מגוגל אדס
+        {num(fromAds)} מהם קיבלו פנייה מגוגל אדס
       </div>
+      {clicks !== undefined && (
+        <div className="text-[11px] font-semibold opacity-75">
+          יחד: {num(clicks)} פניות, {num(clicksAds ?? 0)} מהן מגוגל אדס
+        </div>
+      )}
     </div>
   );
 }
@@ -370,6 +391,7 @@ function CentersPanel({ b }: { b: CentersBlock }) {
 
 function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
   const p = c.periods[periodKey] ?? { paid: 0, center: 0, trial: 0, paidAds: 0, centerAds: 0, trialAds: 0 };
+  const s = c.clicks?.[periodKey];
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? c.starving : c.starving.slice(0, 6);
   return (
@@ -378,15 +400,33 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
         <h2 className="text-base font-black text-stone-800">🎯 כיסוי פניות — מטפלים בתשלום</h2>
         <span className="text-xs text-stone-400">המדד המרכזי: שכל מטפל משלם יקבל פניות</span>
       </div>
-      <p className="mb-3 text-xs text-stone-500">כמה מהמטפלים המוצגים קיבלו לפחות פנייה אחת ({periodLabel} אחרונים).</p>
-      <div className="mb-4 flex flex-wrap gap-2">
-        <CoverageChip label={`בתשלום · קיבלו פנייה ב${periodLabel}`} covered={p.paid} total={c.paidTotal} fromAds={p.paidAds} />
+      <p className="mb-3 text-xs text-stone-500">
+        המספר הגדול בכל כרטיס הוא <strong>מטפלים</strong>, לא פניות: כמה מהמטפלים המוצגים קיבלו לפחות פנייה
+        אחת ({periodLabel} אחרונים). מתחתיו - כמה פניות הם קיבלו יחד.
+      </p>
+      <div className="mb-3 flex flex-wrap gap-2">
+        <CoverageChip label={`מטפלים בתשלום קיבלו פנייה`} covered={p.paid} total={c.paidTotal} fromAds={p.paidAds}
+          clicks={s?.paid} clicksAds={s?.paidAds} />
         {/* מרכזים בשבב נפרד: עד 21/8/2026 הם נספרו בתוך "מתנה", ולכן מרכז
             משלם הוצג כמי שקיבל חשיפה חינם - וכיסוי הפניות של הלקוחות
             המשלמים נראה גרוע ממה שהוא. */}
-        <CoverageChip label={`מטפלי מרכזים · קיבלו פנייה ב${periodLabel}`} covered={p.center} total={c.centerTotal} fromAds={p.centerAds} />
-        <CoverageChip label={`מקודמים (מתנה) · קיבלו פנייה ב${periodLabel}`} covered={p.trial} total={c.trialTotal} fromAds={p.trialAds} />
+        <CoverageChip label={`מטפלי מרכזים קיבלו פנייה`} covered={p.center} total={c.centerTotal} fromAds={p.centerAds}
+          clicks={s?.center} clicksAds={s?.centerAds} />
+        <CoverageChip label={`מקודמים (מתנה) קיבלו פנייה`} covered={p.trial} total={c.trialTotal} fromAds={p.trialAds}
+          clicks={s?.trial} clicksAds={s?.trialAds} />
       </div>
+      {s && (
+        <p className="mb-4 text-xs leading-5 text-stone-600">
+          כל {num(s.total)} הפניות ({periodLabel} אחרונים, כל המטפלים):{" "}
+          <strong>{num(s.paid + s.center + s.trial)}</strong> למטפלים המשלמים שבכרטיסים,{" "}
+          <strong>{num(s.free)}</strong> לחינמיים
+          {" "}({s.freeAds === 0
+            ? "אף אחת מהן לא מגוגל אדס"
+            : `${num(s.freeAds)} מהן מגוגל אדס${s.freeAdsLast ? `, האחרונה ב-${new Date(s.freeAdsLast).toLocaleDateString("he-IL", { day: "numeric", month: "numeric", timeZone: "Asia/Jerusalem" })}` : ""}`})
+          {s.other > 0 && <>, ו-{num(s.other)} למטפלים שאינם מוצגים כרגע באתר</>}.
+          <span className="text-stone-400"> הסיווג לפי מצב המטפל היום: פנייה למי שהיה מקודם אז ועבר לחינמי נספרת אצל החינמיים.</span>
+        </p>
+      )}
       {c.starving.length > 0 ? (
         <>
           <div className="mb-1.5 text-xs font-black text-stone-600">

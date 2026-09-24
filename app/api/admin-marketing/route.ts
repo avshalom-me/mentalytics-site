@@ -115,6 +115,14 @@ export async function GET() {
     const clicksAllQ = fetchAllRows<{ therapist_id: string; clicked_at: string; channel: string | null }>(() =>
       supabaseAdmin.from("therapist_contact_clicks").select("therapist_id, clicked_at, channel")
     );
+    // Listed free therapists - so the coverage panel can also say how many of the
+    // period's inquiries went outside the paying tiers, and whether any of those
+    // came from Google Ads (they should not: paid visitors see no free therapists).
+    const freeListQ = supabaseAdmin
+      .from("therapists")
+      .select("id")
+      .eq("status", "approved")
+      .eq("admin_approved", true);
     const views30Q = fetchAllRows<{ therapist_id: string }>(() =>
       supabaseAdmin
         .from("therapist_profile_views")
@@ -123,10 +131,14 @@ export async function GET() {
         .gte("viewed_at", iso(30))
     );
 
+    // One cutoff per period, shared by the "total inquiries" count and the
+    // per-tier split below - so the split always adds up to the tile's number.
+    const cutoffIso = new Map<number, string>(PERIODS.map((d) => [d, iso(d)]));
+
     // 4 counts per period, in order: contacts, contactsPrev, profileViews, explainClicks.
     const periodQs = PERIODS.flatMap((d) => [
-      countRows("therapist_contact_clicks", "clicked_at", iso(d)),
-      countRows("therapist_contact_clicks", "clicked_at", iso(2 * d), iso(d)),
+      countRows("therapist_contact_clicks", "clicked_at", cutoffIso.get(d)!),
+      countRows("therapist_contact_clicks", "clicked_at", iso(2 * d), cutoffIso.get(d)!),
       countProfileViews(iso(d)),
       countExplain(iso(d)),
     ]);
@@ -144,6 +156,7 @@ export async function GET() {
       clicksAll,
       views30,
       trafficRes,
+      freeListRes,
     ] = await Promise.all([
       Promise.all([aiQ, targetsQ, totalQ, registeredQ, paidQ, centerQ, trialQ, freeQ, quizMonthQ, subsQ]),
       Promise.all(periodQs),
@@ -151,12 +164,14 @@ export async function GET() {
       clicksAllQ,
       views30Q,
       Promise.all(trafficQs),
+      freeListQ,
     ]);
 
     if (aiRes.error) throw aiRes.error;
     if (targetsRes.error) throw targetsRes.error;
     if (subsRes.error) throw subsRes.error;
     if (payingListRes.error) throw payingListRes.error;
+    if (freeListRes.error) throw freeListRes.error;
     for (const r of [totalRes, registeredRes, paidRes, centerRes, trialRes, freeRes, quizMonthRes]) if (r.error) throw r.error;
     for (const r of periodRes) if (r.error) throw r.error;
 
@@ -279,6 +294,46 @@ export async function GET() {
       coveragePeriods[`d${d}`] = p;
     }
 
+    // Inquiries (contact clicks) in the period, split by who received them. The
+    // chips above count THERAPISTS reached; next to "70 inquiries" at the top that
+    // read as 11 + 4 + 12 = 27 inquiries, and "where did the rest go?" was asked
+    // twice (19/8, 24/9/2026). This is the same period's clicks, per tier, adding
+    // up exactly to the tile: same rows, same cutoff (cutoffIso).
+    type ClickSplit = {
+      total: number;
+      paid: number; center: number; trial: number; free: number; other: number;
+      paidAds: number; centerAds: number; trialAds: number; freeAds: number; otherAds: number;
+      // The latest Google Ads inquiry to a free therapist. Since 16/9/2026 paid
+      // visitors see no free therapists, so this should only ever be older than
+      // that; the date tells history from a leak at a glance (30 of them sat in
+      // the 30-day window on 24/9, all from 25/8-15/9).
+      freeAdsLast: string | null;
+    };
+    const payingById = new Map(payingList.map((t) => [t.id, t]));
+    const freeIdSet = new Set(((freeListRes.data ?? []) as { id: string }[]).map((t) => t.id));
+    const clickSplit: Record<string, ClickSplit> = {};
+    for (const d of PERIODS) {
+      const cutoffMs = Date.parse(cutoffIso.get(d)!);
+      const s: ClickSplit = {
+        total: 0, paid: 0, center: 0, trial: 0, free: 0, other: 0,
+        paidAds: 0, centerAds: 0, trialAds: 0, freeAds: 0, otherAds: 0,
+        freeAdsLast: null,
+      };
+      for (const c of clicksAll) {
+        if (Date.parse(c.clicked_at) < cutoffMs) continue;
+        const payer = payingById.get(c.therapist_id);
+        const key: "paid" | "center" | "trial" | "free" | "other" =
+          payer ? tierOf(payer) : freeIdSet.has(c.therapist_id) ? "free" : "other";
+        s.total++;
+        s[key]++;
+        if (c.channel === "google_paid") {
+          s[`${key}Ads`]++;
+          if (key === "free" && (!s.freeAdsLast || Date.parse(c.clicked_at) > Date.parse(s.freeAdsLast))) s.freeAdsLast = c.clicked_at;
+        }
+      }
+      clickSplit[`d${d}`] = s;
+    }
+
     // "Starving" = paying/promoted, listed, and no contact in the last 30 days.
     // Never-contacted first, then longest-since; paid before trial.
     //
@@ -321,6 +376,7 @@ export async function GET() {
       centerTotal: payingList.filter((t) => tierOf(t) === "center").length,
       trialTotal: payingList.filter((t) => tierOf(t) === "trial").length,
       periods: coveragePeriods,
+      clicks: clickSplit,
       starving,
       // כמה הוחרגו כ"חדשים מדי" - נאמר במפורש, אחרת המספר נראה כאילו ירד לבד.
       tooNew: payingList.filter((t) => !coveredInWindow(t, 30) && tooNew(t)).length,
