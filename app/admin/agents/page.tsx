@@ -2,6 +2,7 @@
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 import { repeatedClosingLine } from "@/app/lib/email-signature";
 import { splitQuoted } from "@/app/lib/email-quote";
+import GiftOfferHistory from "@/app/admin/components/GiftOfferHistory";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -3257,6 +3258,8 @@ export default function AgentsPage() {
           {/* לסוכן המרכזים: כל מה שנשלח לכל מרכז, לא רק מה שיצא מהסוכן -
               כדי שלפני שלחיחה אפשר לראות מה המרכז כבר קיבל מאיתנו. */}
           {meta.key === "center_nudge" && <CenterHistoryBlock rows={centerHistory} />}
+          {/* לפערי ההיצע: כל הצעות המתנה ומה כל נמען עשה איתן. נטען רק בפתיחה. */}
+          {meta.key === "supply_gaps" && <GiftOfferHistory />}
         </section>
 
         <Collapse title="יומן הריצות המלא של הסוכן" count={myRuns.length}>
