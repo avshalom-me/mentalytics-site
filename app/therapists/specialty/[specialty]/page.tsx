@@ -7,6 +7,7 @@ import { SPECIALTY_LIST, SPECIALTY_CONTENT, SPECIALTY_DEEP_DIVE, specialtyToSlug
 import QuizCta from "@/app/therapists/QuizCta";
 import { loadArticlesByTopics } from "@/app/lib/local-articles";
 import { ALL_REGIONS, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { onlineTwinFor } from "@/app/lib/online-twin";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import CouplesDepthSection from "@/app/therapists/CouplesDepthSection";
@@ -41,6 +42,7 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
   if (!specialty) notFound();
 
   const list = await loadPublicTherapists({ specialty });
+  const onlineTwin = await onlineTwinFor(specialty);
   const onlineHere = list.filter((t) => t.online).length;
   const heading = specialtyTitle(specialty);
   const content = SPECIALTY_CONTENT[specialty] ?? null;
@@ -218,6 +220,10 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
       <div className="mt-8 pt-6 border-t border-[var(--line)]">
         <h2 className="text-base font-extrabold text-stone-800 mb-3">לפי אזור</h2>
         <div className="flex flex-wrap gap-2">
+          {onlineTwin && (
+            <Link href={onlineTwin.href} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+              style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>🌐 {onlineTwin.label}</Link>
+          )}
           <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
             style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>🌐 טיפול אונליין</Link>
           {ALL_REGIONS.map((reg) => (

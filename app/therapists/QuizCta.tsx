@@ -20,6 +20,8 @@ type Props = {
    * and gets both buttons rather than a guess.
    */
   audience?: "both" | "youth" | "adults";
+  /** Replaces the default heading - e.g. a teen page, where "הילד/ה" is wrong. */
+  heading?: string;
 };
 
 const SHELL =
@@ -28,14 +30,14 @@ const BUTTON =
   "shrink-0 inline-flex items-center justify-center whitespace-nowrap font-bold transition hover:opacity-95";
 const BUTTON_STYLE = { borderRadius: "50px", padding: "13px 30px", fontSize: "15px" } as const;
 
-export default function QuizCta({ body, audience = "both" }: Props) {
+export default function QuizCta({ body, audience = "both", heading }: Props) {
   const youth = audience === "youth";
   const adultsOnly = audience === "adults";
   return (
     <div className={SHELL} style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
       <div>
         <p style={{ fontSize: "1.15rem", fontWeight: 800, color: "var(--teal-dark)" }}>
-          {youth ? "לא בטוחים מה הילד/ה צריכ/ה?" : "לא בטוחים מי מתאים לכם?"}
+          {heading ?? (youth ? "לא בטוחים מה הילד/ה צריכ/ה?" : "לא בטוחים מי מתאים לכם?")}
         </p>
         <p className="mt-1.5 leading-7 text-stone-600" style={{ maxWidth: "48ch" }}>
           {body}

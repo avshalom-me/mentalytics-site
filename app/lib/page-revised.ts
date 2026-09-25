@@ -59,6 +59,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/lib/regions.ts",
       // Every word of the online×topic pages and the online hub's opening.
       "app/lib/online-copy.ts",
+      "app/lib/online-twin.ts",
       // What the listings actually contain (the filters) and how a therapist's
       // title is spelled - both are visible page text, so a change here is a
       // change Google should re-crawl.

@@ -7,6 +7,7 @@ import TopicFaq from "@/app/therapists/TopicFaq";
 import { TOPICS, slugToTopic, cityTopicCitiesFor, MIN_CITY_TOPIC, CITY_TOPIC_SLUGS } from "@/app/lib/topics";
 import { SPECIALTY_LIST, specialtyToSlug } from "@/app/lib/specialties";
 import { regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
+import { onlineTwinFor } from "@/app/lib/online-twin";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
@@ -45,6 +46,7 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
   if (!topic) notFound();
 
   const list = await loadPublicTherapists(topic.filter);
+  const onlineTwin = await onlineTwinFor(topic.slug);
   const onlineHere = list.filter((t) => t.online).length;
 
   // Articles for this topic, resolved through the shared taxonomy (a section
@@ -225,6 +227,10 @@ export default async function TopicPage({ params }: { params: Promise<{ topic: s
             <Link key={t.slug} href={`/therapists/topic/${t.slug}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
               style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>{t.name}</Link>
           ))}
+          {onlineTwin && (
+            <Link href={onlineTwin.href} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+              style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>🌐 {onlineTwin.label}</Link>
+          )}
           <Link href={`/therapists/region/${ONLINE_SLUG}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
             style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}>🌐 טיפול אונליין</Link>
           {SPECIALTY_LIST.slice(0, 8).map((s) => (

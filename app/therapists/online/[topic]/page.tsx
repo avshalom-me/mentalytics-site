@@ -144,7 +144,7 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
           parents was offered the questionnaire that asks about themselves.
           QuizCta reads the topic instead, which is the whole reason it
           exists. */}
-      <QuizCta audience={youth ? "youth" : "both"} body={copy.quiz} />
+      <QuizCta audience={youth ? "youth" : "both"} body={copy.quiz} heading={copy.quizHeading} />
 
       <PaidVisitorNotice rows={list} />
       {list.length === 0 ? (
