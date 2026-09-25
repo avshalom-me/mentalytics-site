@@ -1,6 +1,6 @@
 -- Normalize therapist emails to lowercase so the claim-by-email match (.eq
 -- against the always-lowercased auth email) is reliable. A mixed-case stored
--- email (e.g. an admin-added SUPERHEIMAN@GMAIL.COM) otherwise fails to match
+-- email (e.g. an admin-added THERAPIST@EXAMPLE.COM) otherwise fails to match
 -- its owner's login and would spawn a duplicate row. A BEFORE trigger keeps
 -- every future insert/update lowercase regardless of code path.
 -- Run date: 2026-07-02

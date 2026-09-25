@@ -307,7 +307,7 @@ export async function GET(req: NextRequest) {
   // site_message נספר ככל פנייה אחרת. עד 10/8/26 הוא נשמט מכאן לגמרי, ולכן
   // מטפל שקיבל *הודעה אמיתית* דרך טופס האתר - סוג הפנייה הוודאי היחיד -
   // נספר כ"אפס פניות" וקיבל מייל שמסביר לו איך להשיג פניות. קרה בפועל
-  // לאמיר ירצקי (הודעה ב-26/7 שלא נספרה).
+  // לאחד המטפלים (הודעה ב-26/7 שלא נספרה).
   const clickMap: Record<string, { wa: number; phone: number; email: number; message: number; match: number; directory: number }> = {};
   for (const row of clicks) {
     if (!clickMap[row.therapist_id]) clickMap[row.therapist_id] = { wa: 0, phone: 0, email: 0, message: 0, match: 0, directory: 0 };

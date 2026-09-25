@@ -744,7 +744,7 @@ export default function AdminTherapistsPage() {
     !!t.match_paused_until && new Date(t.match_paused_until).getTime() > Date.now();
 
   // קישור חשבון כניסה לפרופיל חי שלא קושר אוטומטית (הגנת השתלטות חשבון).
-  // מופיע רק כשהפרופיל חי (משלם/מאושר) ובלי user_id - המקרה של "דניאל היימן".
+  // מופיע רק כשהפרופיל חי (משלם/מאושר) ובלי user_id - מקרה שקרה בפועל לאחד המטפלים.
   async function linkAccount(t: AdminTherapist) {
     if (!window.confirm(`לקשר את חשבון הכניסה של ${t.email} לפרופיל של ${t.full_name}?\n\nודאו שזה באמת בעל/ת הפרופיל (למשל פנייה שהגיעה מהמייל הזה).`)) return;
     try {

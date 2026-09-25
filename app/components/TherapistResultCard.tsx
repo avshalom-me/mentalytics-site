@@ -121,7 +121,7 @@ export default function TherapistResultCard({
   // as the search snippet.
   //
   // Why: on the city pages Google was picking the card grid as the description,
-  // producing "פסיכולוגים ומטפלים בבאר שבע · רועי בן שימול · אפרת כהן-נוימן · ..."
+  // producing "פסיכולוגים ומטפלים בבאר שבע · [שם מטפל] · [שם מטפלת] · ..."
   // - a list of names nobody searched for, and on the Haifa page a data dump of
   // titles and towns. Both pages already carry an intro paragraph and a meta
   // description written to earn the click; this stops the grid outbidding them.

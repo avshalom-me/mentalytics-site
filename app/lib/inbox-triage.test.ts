@@ -2,12 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 
 // What the agent is allowed to close without asking.
 //
-// 18/9/26: a therapist replied "לצערי לא יכול, מטפל בשעה הזאת" to a proposed
-// meeting time. His two lines sat above a long quote of our own automatic
+// 18/9/26: a therapist replied in two lines that he could not make a proposed
+// meeting time. The two lines sat above a long quote of our own automatic
 // "פנייה חדשה" notification, the classifier read the thread as an automated
 // message, and the inquiry was closed as needing no reply. It never appeared
-// in the queue. The cases below are shaped on the real messages of that week,
-// with every name and number replaced: this repository is public.
+// in the queue. The cases below keep the shape of the real messages of that
+// week, with invented wording, names and numbers: this repository is public.
 
 vi.mock("server-only", () => ({}));
 
@@ -15,8 +15,8 @@ import { splitQuoted } from "./email-quote";
 import { isCourtesyClosing, mayAutoIgnore, isSameInquiry, type InquiryLike } from "./inbox-triage";
 
 const DECLINED_TIME = [
-  "היי אבשלום, נעים מאד.",
-  "לצערי לא יכול, מטפל בשעה הזאת.",
+  "היי אבשלום, שמחתי לשמוע.",
+  "בשעה הזאת אני תפוס עם מטופל.",
   "",
   "בתאריך יום ו׳, 18 בספט׳ 2026, 10:26, מאת Admin Admin ‏<",
   "admin@getmentalytics.com>:",
@@ -34,7 +34,7 @@ const DECLINED_TIME = [
 describe("splitQuoted", () => {
   it("keeps only what the person wrote now, and hands back the quote separately", () => {
     const { text, quoted } = splitQuoted(DECLINED_TIME);
-    expect(text).toBe("היי אבשלום, נעים מאד.\nלצערי לא יכול, מטפל בשעה הזאת.");
+    expect(text).toBe("היי אבשלום, שמחתי לשמוע.\nבשעה הזאת אני תפוס עם מטופל.");
     expect(quoted).toContain("פנייה חדשה");
     // The new text is a fraction of the mail: classifying the whole body
     // means classifying the quote.
@@ -49,12 +49,12 @@ describe("splitQuoted", () => {
 
 describe("isCourtesyClosing", () => {
   it("accepts a plain sign-off", () => {
-    expect(isCourtesyClosing("מעולה אז יאללה אנסה. תודה")).toBe(true);
+    expect(isCourtesyClosing("סבבה, אז ננסה ככה. תודה")).toBe(true);
     expect(isCourtesyClosing("תודה רבה לכם")).toBe(true);
   });
 
   it("rejects anything that asks, declines or leaves a number", () => {
-    expect(isCourtesyClosing("היי אבשלום, נעים מאד. לצערי לא יכול, מטפל בשעה הזאת.")).toBe(false);
+    expect(isCourtesyClosing("היי אבשלום, שמחתי לשמוע. בשעה הזאת אני תפוס עם מטופל.")).toBe(false);
     expect(isCourtesyClosing("תודה, אפשר לקבוע למחר?")).toBe(false);
     expect(isCourtesyClosing("תודה, תתקשרו אליי 0500000000")).toBe(false);
     expect(isCourtesyClosing("")).toBe(false);
@@ -71,12 +71,12 @@ describe("mayAutoIgnore", () => {
     // The regression: category was "other", not spam or system.
     expect(mayAutoIgnore("other", splitQuoted(DECLINED_TIME).text)).toBe(false);
     expect(
-      mayAutoIgnore("therapist_billing", "היי אבקש ליצור עמי קשר כדי לעדכן אמצעי תשלום עבור המנוי. תודה")
+      mayAutoIgnore("therapist_billing", "שלום, אבקש שתחזרו אליי בעניין החלפת הכרטיס למנוי. תודה")
     ).toBe(false);
   });
 
   it("does close a person's courtesy sign-off", () => {
-    expect(mayAutoIgnore("other", "מעולה אז יאללה אנסה. תודה")).toBe(true);
+    expect(mayAutoIgnore("other", "סבבה, אז ננסה ככה. תודה")).toBe(true);
   });
 });
 
@@ -86,14 +86,14 @@ describe("mayAutoIgnore", () => {
 // and addresses below are invented; the shape is the real one.
 describe("isSameInquiry", () => {
   const REQUEST =
-    "שלום רב, שמי רונית אלון, מטפלת באמנות ומנויה אצלכם בתשלום. עד כה שילמתי על חודשיים. " +
-    "אני מבקשת לבטל את המנוי מאחר ולא קיבלתי אף פנייה בזמן הזה. אודה לכם על טיפול מהיר " +
-    "והחזר מלא על החודשיים, והפסקת הגבייה מאמצעי התשלום שלי. תודה רבה, רונית";
+    "שלום רב, שמי רונית אלון, מטפלת רגשית ומנויה אצלכם בתשלום. המנוי פעיל כבר חודשיים. " +
+    "הייתי רוצה לסיים אותו, כי בתקופה הזאת לא הגיעו אליי פניות. אשמח שתעצרו את החיובים " +
+    "ותבדקו אם אפשר לקבל החזר על התקופה. תודה, רונית";
 
   const studio: InquiryLike = {
     id: "a",
     from_email: "studio@example.com",
-    subject: "ביטול מינוי והחזר",
+    subject: "בקשה לביטול המנוי",
     body_text: REQUEST,
     received_at: "2026-09-22T19:44:51Z",
     sender_therapist_id: "t-paying",
@@ -101,7 +101,7 @@ describe("isSameInquiry", () => {
   const personal: InquiryLike = {
     id: "b",
     from_email: "ronit.personal@example.com",
-    subject: "ביטול מינוי והחזר",
+    subject: "בקשה לביטול המנוי",
     body_text: REQUEST.replace("בתשלום.", "בתשלום, על חשבון studio@example.com."),
     received_at: "2026-09-22T19:46:23Z",
     // Her personal address matched an empty duplicate signup, not the paying record.
@@ -129,7 +129,7 @@ describe("isSameInquiry", () => {
     const one: InquiryLike = {
       id: "c",
       from_email: "first@example.com",
-      subject: "Re: פנייה חדשה מ-טיפול חכם: ביטול מנוי חודשי",
+      subject: "Re: פנייה חדשה מ-טיפול חכם: שאלה על המנוי",
       body_text: "תודה רבה לכם",
       received_at: "2026-09-15T08:00:00Z",
     };
@@ -141,7 +141,7 @@ describe("isSameInquiry", () => {
     const other: InquiryLike = {
       id: "e",
       from_email: "someone.else@example.com",
-      subject: "ביטול מינוי והחזר",
+      subject: "בקשה לביטול המנוי",
       body_text:
         "היי, אני רוצה לבטל את המנוי שלי כי עברתי לעבוד במרפאה ציבורית ואין לי יותר זמן לקליניקה " +
         "הפרטית. אשמח אם תעדכנו אותי מתי הגבייה תיפסק. תודה, יעל",

@@ -739,7 +739,7 @@ export async function POST(req: NextRequest) {
       const [views2, clicks2, certRows, dirImpr] = await Promise.all([
         // כולל match_card: זו החשיפה הגדולה מכולן, והיא נעדרה מכאן לגמרי.
         // בלעדיה הטבלה הראתה "8 פניות מול 0" בלי להסביר שמאחוריהן עומדות
-        // 84 הופעות מול 2 - כלומר פער חשיפה, לא פער איכות (מכון הכרה, 7/9/26).
+        // 84 הופעות מול 2 - כלומר פער חשיפה, לא פער איכות (אחד המכונים, 7/9/26).
         fetchAllRows<{ therapist_id: string; viewed_at: string; source: string | null }>(() =>
           supabaseAdmin
             .from("therapist_profile_views")

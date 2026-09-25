@@ -168,9 +168,9 @@ insert into ads_campaign_registry (google_name, utm_campaign, budget_type, budge
   ('g-haifa', 'g-haifa', 'daily', null, null, null,
    'להשלים תקציב ותקרה מהממשק. 13 מילות מפתח חסרות כולל כל מונחי ה-CBT.'),
   ('g-kids-center', 'g-kids-center', 'daily', null, null, null,
-   'להשלים תקציב. מועמד להרחבה להוד השרון/ראש העין/אריאל (חבצלת לרנר מלין).'),
+   'להשלים תקציב. מועמד להרחבה להוד השרון/ראש העין/אריאל (מטפלת משלמת באזור).'),
   ('g-north-sharon1', 'g-north-sharon', 'daily', 15, null, 7,
    'נצפה CPC ‏₪8.17 ב-28/8 - לוודא שתקרת ה-₪7 באמת נשמרה בהגדרות.'),
   ('g-emek1', 'g-emek', 'daily', 20, null, 7,
-   'CTR ‏0.91% - לוודא שהמיקוד הוא 4 ערים בלבד ולא נפת יזרעאל כולה. מרכז שדות: חיוב מ-17/10.')
+   'CTR ‏0.91% - לוודא שהמיקוד הוא 4 ערים בלבד ולא נפת יזרעאל כולה. מרכז באזור: חיוב מ-17/10.')
 on conflict (google_name) do nothing;

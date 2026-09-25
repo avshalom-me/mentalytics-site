@@ -141,7 +141,7 @@ export async function GET(req: NextRequest) {
   // auto-linking would let whoever registers first seize a live paying profile
   // (the account-takeover fix). Without this branch we'd fall through and
   // create an empty stub, and the real therapist would see a BLANK form
-  // instead of their profile (the "דניאל היימן" case). Return an explicit
+  // instead of their profile (this happened to one live therapist). Return an explicit
   // pending-link state and alert the admin once, so the manual link happens.
   if (!therapist && user.email) {
     const { data: liveRow } = await supabaseAdmin
@@ -185,7 +185,7 @@ export async function GET(req: NextRequest) {
     // בכוונה מהשאילתה למעלה - קישור אוטומטי היה מוסר שליטה על פרופיל של
     // מרכז לכל מי שנרשם ראשון. אבל בלי הענף הזה, מטפל/ת מרכז שנרשמים
     // נופלים הלאה ומקבלים שורת stub חדשה - פרופיל כפול וריק לצד הפרופיל
-    // האמיתי שנשאר יתום אצל המרכז (דפוס "שמעון ערנרייך", מהכיוון השני).
+    // האמיתי שנשאר יתום אצל המרכז (הדפוס של 10/8/2026 שמתואר למטה, מהכיוון השני).
     // לכן: אותו מסך "ממתין לקישור" + התראת אדמין, וההחלטה אנושית - באדמין
     // יש כפתור "קשר חשבון כניסה" שעובד גם כאן.
     const { data: centerRow } = await supabaseAdmin
@@ -233,8 +233,8 @@ export async function GET(req: NextRequest) {
   // אותו חשבון Supabase משמש להתחברות לפורטל המרכזים ולאזור המטפלים. מנהל
   // מרכז שהגיע לכאן (למשל דרך "כניסה למטפלים" בתפריט) קיבל שורת מטפל חדשה
   // שנוצרה אוטומטית למטה, מילא אותה, ובסוף הוצע לו לבחור מסלול ולשלם - על
-  // מנוי שהמרכז שלו כבר שילם עליו. כך נוצר "שמעון ערנרייך" כמטפל עצמאי
-  // במקביל למכון הכרה, עם אותו user_id בדיוק (10/8/2026).
+  // מנוי שהמרכז שלו כבר שילם עליו. כך נוצר מנהל של אחד המרכזים כמטפל עצמאי
+  // במקביל למרכז שלו, עם אותו user_id בדיוק (10/8/2026).
   //
   // מנהל מרכז שרוצה גם פרופיל מטפל אישי מקבל אותו דרך הפורטל (הזמנה
   // ב-/centers/fill), שמשייכת אותו למרכז ומדלגת על בחירת המסלול. לכן כאן לא

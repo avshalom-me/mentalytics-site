@@ -13,7 +13,7 @@
  *     a period, so "מטפלת באמנויות (M.A.) בעלת קליניקה" rendered as
  *     "מטפלת באמנויות (M".
  *   - A greeting opener produced a line that says nothing: "שלום," (5 chars),
- *     "היי, אני אורין" (14 chars).
+ *     "היי, אני דנה" (12 chars).
  *
  * The fix: normalise whitespace first, treat a sentence as ending only at
  * .!? FOLLOWED BY whitespace (which is what leaves abbreviations intact), and

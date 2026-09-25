@@ -5,7 +5,7 @@ describe("safeReturnPath", () => {
   it("allows the internal listing pages", () => {
     expect(safeReturnPath("/therapists/city/תל-אביב")).toBe("/therapists/city/תל-אביב");
     expect(safeReturnPath("/therapists/region/אונליין")).toBe("/therapists/region/אונליין");
-    expect(safeReturnPath("/centers/rotem")).toBe("/centers/rotem");
+    expect(safeReturnPath("/centers/example-center")).toBe("/centers/example-center");
   });
   it("allows a saved match list", () => {
     expect(safeReturnPath("/match/aB3_x-9QkLm")).toBe("/match/aB3_x-9QkLm");

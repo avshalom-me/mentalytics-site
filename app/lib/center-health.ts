@@ -10,8 +10,8 @@ import { loadCentersWithReadiness, type CenterWithReadiness } from "./center-rea
 // למה זה קיים: ב-17/9/26 נכתב לעומר מסמך על חמשת המרכזים, ידנית. כ-60% ממנו
 // היה נגזר מנתונים שכבר יושבים בכרטיס המרכז - מה שחסר היה מה שהופך מספר
 // לבעיה: השוואה למטפל פרטי משלם, הביקוש באזור, וסימון שמצביע על מה לשאול
-// בשיחה. בלי השכבה הזו ממצא "5 ממטפלי שדות בלי לחיצה" ישב בתור מ-4/9 ואיש
-// לא ראה אותו, וציידי המחשבות עברו חמישה שבועות בלי אף מטפל ובלי אף התראה.
+// בשיחה. בלי השכבה הזו ממצא "5 ממטפלי המרכז בלי לחיצה" ישב בתור מ-4/9 ואיש
+// לא ראה אותו, ומרכז אחר עבר חמישה שבועות בלי אף מטפל ובלי אף התראה.
 //
 // המודול הזה הוא מקור אמת יחיד לשלושה צרכנים: כרטיס המרכז באדמין, סוכן
 // הבריאות (ממצא אחד לכל מרכז בתור ובדוח הבוקר), ודף השיחה לעומר. מדד
@@ -386,7 +386,7 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
 
     const flags: HealthFlag[] = [];
 
-    // 1. מסלול 1 בלי אף מטפל - הדגל שאיש לא ראה אצל ציידי המחשבות.
+    // 1. מסלול 1 בלי אף מטפל - הדגל שאיש לא ראה אצל אחד המרכזים.
     if (!isEntity && real.length === 0 && daysActive >= NO_THERAPISTS_HIGH_DAYS) {
       const billingSoon = daysToBilling !== null && daysToBilling <= BILLING_SOON_DAYS;
       const critical = daysActive >= NO_THERAPISTS_CRITICAL_DAYS || billingSoon;
