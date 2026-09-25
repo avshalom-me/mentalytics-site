@@ -8,6 +8,7 @@ import { logEmail } from "@/app/lib/email-log";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 import { ATTRIBUTION_HEADER, sanitizeAttribution, sanitizeClickIds } from "@/app/lib/attribution";
 import { THERAPIST_EDIT_FIELDS } from "@/app/lib/therapist-fields";
+import { normalizePriceField } from "@/app/lib/price-input";
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
 
 export const dynamic = "force-dynamic";
@@ -370,13 +371,11 @@ export async function PATCH(req: NextRequest) {
     update.publication_links = clean;
   }
 
-  // The form sends price as a string; the column is numeric. Empty means "not
-  // stated" rather than zero, and an out-of-range value is dropped rather than
-  // saved - a 5-digit typo would poison the aggregate this field exists for.
-  if ("price" in update) {
-    const n = Number(update.price);
-    update.price = Number.isFinite(n) && n >= 50 && n <= 5000 ? Math.round(n) : null;
-  }
+  // Empty means "not stated" rather than zero. A value that is not one price in
+  // range is refused with a message, not dropped: dropping it made the save look
+  // successful while the price vanished (reported 25/9/2026) - see price-input.ts.
+  const priceError = normalizePriceField(update);
+  if (priceError) return NextResponse.json({ ok: false, error: priceError }, { status: 400 });
 
   if ("license_number" in update) {
     const v = update.license_number;

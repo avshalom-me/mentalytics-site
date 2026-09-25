@@ -11,6 +11,7 @@ import {
   COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
+import { parsePriceInput } from "@/app/lib/price-input";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 // טופס פרופיל מטפל בפורטל המרכז - יצירה ('new') או עריכה (UUID). הפרופיל
@@ -199,12 +200,21 @@ export default function CenterTherapistFormPage() {
       return;
     }
 
-    const { play_therapy_modalities, cogfun_age_groups, price, ...rest } = form;
+    // אותו בודק כמו בשרת (price-input.ts): טווח או ערך מחוץ ל-50-5,000 נעצרים
+    // כאן עם הסבר, במקום להישמר משובשים (300-400 הפך ל-300400).
+    const priceCheck = parsePriceInput(form.price);
+    if (!priceCheck.ok) {
+      setSaveErr(`מחיר למפגש: ${priceCheck.error}`);
+      setSaving(false);
+      return;
+    }
+
+    const { play_therapy_modalities, cogfun_age_groups, ...rest } = form;
     const fields = {
       ...rest,
       training_areas: [...form.training_areas, ...play_therapy_modalities],
       cogfun_age_groups,
-      price: price.trim() ? Number(price) : null, // עמודה מספרית - "" נכשל בעדכון
+      price: priceCheck.value,
     };
 
     const res = await fetch("/api/center-portal/therapists", {
@@ -416,8 +426,12 @@ export default function CenterTherapistFormPage() {
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-stone-700">מחיר למפגש <span className="font-normal text-stone-400">(לא חובה, בשקלים)</span></label>
-                <input value={form.price} onChange={e => setForm({...form, price: e.target.value.replace(/[^0-9]/g, "")})}
+                <input value={form.price} onChange={e => setForm({...form, price: e.target.value})}
                   className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]" dir="ltr" inputMode="numeric" />
+                {(() => {
+                  const check = parsePriceInput(form.price);
+                  return check.ok ? null : <p className="mt-1 text-[11px] font-semibold text-red-600">{check.error}</p>;
+                })()}
                 <p className="mt-1 text-[11px] text-stone-400">אינו מוצג בפרופיל - משמש להתאמה לפי תקציב ולסטטיסטיקה אנונימית.</p>
               </div>
             </div>

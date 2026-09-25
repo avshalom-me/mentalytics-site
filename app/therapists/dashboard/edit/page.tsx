@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { parsePriceInput } from "@/app/lib/price-input";
 import { PLAN_EVIDENCE } from "@/app/lib/plan-evidence";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
@@ -286,9 +287,17 @@ export default function TherapistProfileEditPage() {
     }
     setToken(accessToken);
 
+    const priceCheck = parsePriceInput(form.price);
+    if (!priceCheck.ok) {
+      setSaveErr(`מחיר למפגש: ${priceCheck.error}`);
+      setSaving(false);
+      return;
+    }
+
     const { play_therapy_modalities, cogfun_age_groups, ...rest } = form;
     const patchBody = {
       ...rest,
+      price: priceCheck.value,
       training_areas: [...form.training_areas, ...play_therapy_modalities],
       cogfun_age_groups,
     };
@@ -560,9 +569,15 @@ export default function TherapistProfileEditPage() {
             <label className="mb-1 block text-sm font-semibold text-stone-700">
               מחיר למפגש <span className="font-normal text-stone-400">(לא חובה, בשקלים)</span>
             </label>
-            <input value={form.price} onChange={e => setForm({...form, price: e.target.value.replace(/[^0-9]/g, "")})}
+            {/* בלי סינון תווים בזמן ההקלדה: "300-400" הפך ל-300400 והמחיר נמחק
+                בשקט בשמירה (25/9/2026). הבעיה מוצגת כאן, והשמירה נחסמת עד שיתוקן. */}
+            <input value={form.price} onChange={e => setForm({...form, price: e.target.value})}
               inputMode="numeric" className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none focus:border-[#2e7d8c]"
               placeholder="450" />
+            {(() => {
+              const check = parsePriceInput(form.price);
+              return check.ok ? null : <p className="mt-1 text-xs font-semibold text-red-600">{check.error}</p>;
+            })()}
             <p className="mt-1 text-xs text-stone-500">
               המחיר אינו מוצג בפרופיל. הוא משמש להתאמה טובה יותר למטופלים לפי תקציב, ולסטטיסטיקה מצרפית
               ואנונימית על מחירי טיפול בישראל.

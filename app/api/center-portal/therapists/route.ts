@@ -4,6 +4,7 @@ import { resolveCenter } from "@/app/lib/center-auth";
 import { writeAudit } from "@/app/lib/audit";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
+import { normalizePriceField } from "@/app/lib/price-input";
 
 // ניהול פרופילי מטפלים על-ידי המרכז, מתוך הפורטל. פרופיל שנוצר כאן שייך
 // למרכז (center_account_id מוגדר, user_id ריק) - רק מנהלי המרכז עורכים אותו,
@@ -69,6 +70,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "מרכז במסלול 'מרכז כישות אחת' מיוצג כרובריקה אחת ואינו מוסיף מטפלים בודדים." }, { status: 400 });
       }
       const fields = pickAllowed(body);
+      const createPriceError = normalizePriceField(fields);
+      if (createPriceError) return NextResponse.json({ ok: false, error: createPriceError }, { status: 400 });
       const fullName = typeof fields.full_name === "string" ? fields.full_name.trim() : "";
       if (!fullName) {
         return NextResponse.json({ ok: false, error: "חסר שם המטפל/ת" }, { status: 400 });
@@ -145,6 +148,8 @@ export async function POST(req: NextRequest) {
       }
 
       const update = pickAllowed(body);
+      const priceError = normalizePriceField(update);
+      if (priceError) return NextResponse.json({ ok: false, error: priceError }, { status: 400 });
       // מטפל עם חשבון עצמאי שקושר למרכז: המייל שלו כבול לחשבון ה-Auth שלו
       // ומודר מהעריכה העצמית - מרכז שמשכתב אותו מסיט לידים בלי יכולת שחזור.
       if (existing.user_id) delete update.email;

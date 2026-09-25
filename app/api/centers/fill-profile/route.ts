@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
 import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
+import { normalizePriceField } from "@/app/lib/price-input";
 
 // מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) - אימות בטוקן ההזמנה האישי,
 // בלי חשבון. JSON = יצירת הפרופיל (חד-פעמי); multipart = העלאת תמונה/תעודה
@@ -133,6 +134,8 @@ export async function POST(req: NextRequest) {
     }
     // סניטציה כמו בכל נתיבי הכתיבה - הקישורים מרונדרים כעוגנים בעמוד הציבורי.
     if ("publication_links" in fields) fields.publication_links = sanitizePublicationLinks(fields.publication_links);
+    const priceError = normalizePriceField(fields);
+    if (priceError) return NextResponse.json({ ok: false, error: priceError }, { status: 400 });
     if (Array.isArray(fields.regions) && fields.regions.length > 15) fields.regions = (fields.regions as unknown[]).slice(0, 15);
     const fullName = typeof fields.full_name === "string" ? fields.full_name.trim() : "";
     if (!fullName) return NextResponse.json({ ok: false, error: "חסר שם מלא" }, { status: 400 });
