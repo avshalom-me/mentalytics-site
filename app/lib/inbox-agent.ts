@@ -16,7 +16,7 @@ import {
   type SignatureOutcome,
 } from "./gmail";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
-import { mayAutoIgnore } from "./inbox-triage";
+import { mayAutoIgnore, isSameInquiry } from "./inbox-triage";
 import { approvedLessonRules, extractPendingLessons } from "./inbox-lessons";
 
 // סוכן שירות הלקוחות: קורא את admin@getmentalytics.com, מסווג כל פנייה,
@@ -57,6 +57,14 @@ export type InboxRow = {
   received_at: string;
   sender_therapist_id: string | null;
   sender_therapist_name?: string | null;
+  // אותה פנייה שהגיעה גם מכתובת אחרת (listInbox מסמן, לתצוגה בלבד).
+  same_inquiry?: {
+    id: string;
+    from_email: string;
+    from_name: string | null;
+    status: string;
+    replied_at: string | null;
+  } | null;
   category: string | null;
   status: string;
   draft_subject: string | null;
@@ -192,6 +200,7 @@ async function senderHistory(email: string, threadId: string, excludeId: string)
     const lines = [`[${when}] הפונה כתב/ה: ${(r.body_text ?? "").slice(0, 350)}`];
     if (r.final_body) lines.push(`עניתי: ${(r.final_body as string).slice(0, 350)}`);
     else if (r.status === "superseded") lines.push("(לא נענתה - הוחלפה בהודעה חדשה יותר)");
+    else if (r.status === "duplicate") lines.push("(אותה פנייה נשלחה גם מכתובת אחרת ונענתה שם)");
     else if (r.status === "ignored") lines.push("(לא נענתה)");
     return lines.join("\n");
   };
@@ -800,6 +809,103 @@ export async function runInboxBackfill(opts: { days?: number; max?: number } = {
 // ── פעולות אדמין ────────────────────────────────────────────────────────
 
 /** הפניות לעמוד הסוכן: פתוחות קודם, ואחריהן שנענו לאחרונה. */
+// ── אותה פנייה משתי כתובות ────────────────────────────────────────────────
+// הכלל עצמו (מה נחשב "אותה פנייה") ב-inbox-triage.ts, עם הבדיקות שלו.
+
+const SAME_INQUIRY_COLS =
+  "id, gmail_thread_id, from_email, from_name, subject, body_text, received_at, status, replied_at, sender_therapist_id";
+const SAME_INQUIRY_WINDOW_MS = 72 * 3_600_000;
+
+type SameInquiryCandidate = {
+  id: string;
+  gmail_thread_id: string;
+  from_email: string;
+  from_name: string | null;
+  subject: string | null;
+  body_text: string | null;
+  received_at: string;
+  status: string;
+  replied_at: string | null;
+  sender_therapist_id: string | null;
+};
+
+function windowStart(isoDates: string[]): string {
+  const oldest = Math.min(...isoDates.map((d) => new Date(d).getTime()));
+  return new Date(oldest - SAME_INQUIRY_WINDOW_MS).toISOString();
+}
+
+/**
+ * אחרי שעונים על שרשור: כל פנייה פתוחה בשרשור אחר שהיא אותה פנייה (מכתובת
+ * אחרת) נסגרת כ-duplicate. ההשוואה היא מול כל ההודעות בשרשור שנענה, כי
+ * אותה ראיה ("על חשבון X") יכולה להופיע בהודעה הראשונה ולא בהמשך.
+ * מחזיר את הכתובות שנסגרו - כדי שההודעה אחרי השליחה תגיד מה עוד קרה.
+ */
+async function closeSameInquiries(answered: InboxRow): Promise<string[]> {
+  const { data: threadRows } = await supabaseAdmin
+    .from("inbox_messages")
+    .select(SAME_INQUIRY_COLS)
+    .eq("gmail_thread_id", answered.gmail_thread_id);
+  const conversation = (threadRows ?? []) as SameInquiryCandidate[];
+  if (conversation.length === 0) return [];
+
+  const { data: openRows } = await supabaseAdmin
+    .from("inbox_messages")
+    .select(SAME_INQUIRY_COLS)
+    .in("status", ["new", "drafted"])
+    .neq("gmail_thread_id", answered.gmail_thread_id)
+    .gte("received_at", windowStart(conversation.map((r) => r.received_at)))
+    .limit(100);
+  const dups = ((openRows ?? []) as SameInquiryCandidate[]).filter((o) =>
+    conversation.some((t) => isSameInquiry(o, t))
+  );
+  if (dups.length === 0) return [];
+
+  const { error } = await supabaseAdmin
+    .from("inbox_messages")
+    .update({
+      status: "duplicate",
+      draft_note: `אותה פנייה נענתה בשרשור של ${answered.from_email}`,
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", dups.map((d) => d.id))
+    .in("status", ["new", "drafted"]);
+  if (error) throw new Error(error.message);
+  return dups.map((d) => d.from_email);
+}
+
+/**
+ * לתצוגה: לכל פנייה פתוחה, פנייה זהה מכתובת אחרת (עדיפות לזו שכבר נענתה).
+ * כך כפילות שהגיעה אחרי שכבר ענית - מקרה שהשליחה לא יכלה לסגור - מסומנת
+ * בכרטיס עם כפתור סגירה, במקום להיראות כמו פנייה חדשה.
+ */
+async function markSameInquiries(open: InboxRow[]): Promise<void> {
+  if (open.length === 0) return;
+  const { data } = await supabaseAdmin
+    .from("inbox_messages")
+    .select(SAME_INQUIRY_COLS)
+    .in("status", ["new", "drafted", "sent", "sent_external"])
+    .gte("received_at", windowStart(open.map((r) => r.received_at)))
+    .order("received_at", { ascending: false })
+    .limit(200);
+  const candidates = (data ?? []) as SameInquiryCandidate[];
+  for (const r of open) {
+    const matches = candidates.filter(
+      (c) => c.gmail_thread_id !== r.gmail_thread_id && isSameInquiry(r, c)
+    );
+    const m =
+      matches.find((c) => c.status === "sent" || c.status === "sent_external") ?? matches[0];
+    if (m) {
+      r.same_inquiry = {
+        id: m.id,
+        from_email: m.from_email,
+        from_name: m.from_name,
+        status: m.status,
+        replied_at: m.replied_at,
+      };
+    }
+  }
+}
+
 export async function listInbox(): Promise<InboxRow[]> {
   const { data: openRows } = await supabaseAdmin
     .from("inbox_messages")
@@ -807,12 +913,16 @@ export async function listInbox(): Promise<InboxRow[]> {
     .in("status", ["new", "drafted"])
     .order("received_at", { ascending: false })
     .limit(40);
+  // סימון כפילויות לא מפיל את התור: בלי הסימון התור פשוט נראה כמו קודם.
+  await markSameInquiries((openRows ?? []) as InboxRow[]).catch((e) =>
+    console.error("same-inquiry marking failed:", e instanceof Error ? e.message : e)
+  );
   // שורות שטופלו מוצגות כשורת סיכום בלבד - בלי גוף המייל (עד 20K תווים
   // כל אחת) והטיוטה. אחרת עמוד הסוכנים גורר עשרות אלפי תווים בכל טעינה.
   const { data: doneRows } = await supabaseAdmin
     .from("inbox_messages")
-    .select("id, gmail_message_id, gmail_thread_id, header_message_id, from_email, from_name, subject, received_at, sender_therapist_id, category, status, replied_at")
-    .in("status", ["sent", "sent_external", "ignored", "superseded"])
+    .select("id, gmail_message_id, gmail_thread_id, header_message_id, from_email, from_name, subject, received_at, sender_therapist_id, category, status, replied_at, draft_note")
+    .in("status", ["sent", "sent_external", "ignored", "superseded", "duplicate"])
     .order("received_at", { ascending: false })
     .limit(15);
   const rows = [...(openRows ?? []), ...(doneRows ?? [])] as InboxRow[];
@@ -875,7 +985,13 @@ export async function sendInboxReply(opts: {
   id: string;
   subject: string;
   body: string;
-}): Promise<{ ok: boolean; error?: string; to?: string; signature?: SignatureOutcome }> {
+}): Promise<{
+  ok: boolean;
+  error?: string;
+  to?: string;
+  signature?: SignatureOutcome;
+  closedDuplicates?: string[];
+}> {
   const body = opts.body.trim();
   if (!body) return { ok: false, error: "גוף התשובה ריק" };
   if (body.includes("[להשלים") || opts.subject.includes("[להשלים")) {
@@ -949,7 +1065,22 @@ export async function sendInboxReply(opts: {
       updated_at: new Date().toISOString(),
     })
     .eq("id", opts.id);
-  if (updErr) console.error("inbox reply update failed:", updErr.message);
+  if (updErr) {
+    // המייל כבר יצא. אם הסימון נכשל הפנייה נשארת בתור כאילו לא נענתה -
+    // ניסיון נוסף עם השדות ההכרחיים בלבד, כדי שהיא תרד מהתור מיד.
+    console.error("inbox reply update failed:", updErr.message);
+    const { error: retryErr } = await supabaseAdmin
+      .from("inbox_messages")
+      .update({ status: "sent", replied_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", opts.id);
+    if (retryErr) console.error("inbox reply minimal update failed:", retryErr.message);
+  }
+
+  // אותה פנייה שהגיעה מכתובת אחרת נסגרת עכשיו, ולא נשארת בתור אחרי השליחה.
+  const closedDuplicates = await closeSameInquiries(row as InboxRow).catch((e) => {
+    console.error("closing duplicate inquiries failed:", e instanceof Error ? e.message : e);
+    return [] as string[];
+  });
 
   const { error: logErr } = await supabaseAdmin.from("crm_email_log").insert({
     recipient: row.from_email,
@@ -963,7 +1094,7 @@ export async function sendInboxReply(opts: {
   });
   if (logErr) console.error("inbox reply log failed:", logErr.message);
 
-  return { ok: true, to: row.from_email as string, signature };
+  return { ok: true, to: row.from_email as string, signature, closedDuplicates };
 }
 
 /**
@@ -978,7 +1109,7 @@ export async function reviveInboxMessage(id: string): Promise<{ ok: boolean; err
     .eq("id", id)
     .maybeSingle();
   if (!row) return { ok: false, error: "הפנייה לא נמצאה" };
-  if (!["ignored", "superseded"].includes(row.status as string)) {
+  if (!["ignored", "superseded", "duplicate"].includes(row.status as string)) {
     return { ok: false, error: "הפנייה כבר בתור" };
   }
   const ctx = await senderContext(row.from_email as string);
@@ -1005,7 +1136,8 @@ export async function reviveInboxMessage(id: string): Promise<{ ok: boolean; err
 /** סימון ידני: התעלמות (ספאם/לא דורש מענה) או החזרה לתור. */
 export async function setInboxStatus(
   id: string,
-  status: "ignored" | "new"
+  status: "ignored" | "new" | "duplicate",
+  opts: { duplicateOf?: string } = {}
 ): Promise<{ ok: boolean; error?: string }> {
   const { data: row } = await supabaseAdmin
     .from("inbox_messages")
@@ -1014,9 +1146,13 @@ export async function setInboxStatus(
     .maybeSingle();
   if (!row) return { ok: false, error: "הפנייה לא נמצאה" };
   if (row.status === "sent") return { ok: false, error: "פנייה שנענתה לא משנה סטטוס" };
-  const { error } = await supabaseAdmin
-    .from("inbox_messages")
-    .update({ status, updated_at: new Date().toISOString() })
-    .eq("id", id);
+  const update: Record<string, unknown> = { status, updated_at: new Date().toISOString() };
+  // בכפילות ההערה מסבירה למה הפנייה נסגרה. בלעדיה "טופלו לאחרונה" הציג את
+  // הערת הניסוח הישנה של הסוכן, שלא קשורה לסגירה.
+  if (status === "duplicate") {
+    const of = (opts.duplicateOf ?? "").trim().slice(0, 200);
+    update.draft_note = of ? `אותה פנייה נענתה בשרשור של ${of}` : "אותה פנייה מכתובת אחרת - נענתה בשרשור השני";
+  }
+  const { error } = await supabaseAdmin.from("inbox_messages").update(update).eq("id", id);
   return error ? { ok: false, error: error.message } : { ok: true };
 }

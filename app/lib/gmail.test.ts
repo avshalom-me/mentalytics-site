@@ -184,14 +184,14 @@ describe("stripQuoted", () => {
   it("cuts a Hebrew-UI Gmail quote header wrapped in invisible direction marks", () => {
     const body =
       "בודקים את זה ונחזור עם תשובה.\r\n\r\nשיהיה סופ\"ש נעים\r\n\r\n" +
-      "\u202aOn Wed, Aug 19, 2026 at 6:45 PM \u202bעמית תלם\u202c\u200e <amit@example.com> wrote:\u202c\r\n" +
+      "\u202aOn Wed, Aug 19, 2026 at 6:45 PM \u202bדנה לוי\u202c\u200e <dana@example.com> wrote:\u202c\r\n" +
       "> ההודעה הקודמת";
     expect(stripQuoted(body)).toBe("בודקים את זה ונחזור עם תשובה.\r\n\r\nשיהיה סופ\"ש נעים");
   });
 
   it("cuts a quote header that wrapped onto a second line", () => {
     const body =
-      "תודה ושוב מצטערים\r\n\r\nOn Mon, Aug 10, 2026 at 8:20 PM Igor B <igor@example.com>\r\nwrote:\r\n> quoted";
+      "תודה ושוב מצטערים\r\n\r\nOn Mon, Aug 10, 2026 at 8:20 PM Dan K <dan@example.com>\r\nwrote:\r\n> quoted";
     expect(stripQuoted(body)).toBe("תודה ושוב מצטערים");
   });
 

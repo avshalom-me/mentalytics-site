@@ -334,7 +334,13 @@ export async function POST(req: NextRequest) {
         const x = await extractLessonsFor(sentId);
         if (x.error) console.error("lesson extraction failed:", x.error);
       });
-      return NextResponse.json({ ok: true, to: r.to, signature: r.signature, inbox: await listInbox().catch(() => []) });
+      return NextResponse.json({
+        ok: true,
+        to: r.to,
+        signature: r.signature,
+        closed_duplicates: r.closedDuplicates ?? [],
+        inbox: await listInbox().catch(() => []),
+      });
     }
     // לקחים מתיקוני טיוטות: אישור/עריכה/דחייה/הסרה, הוספה ידנית, ורענון הרשימה.
     if (body?.action === "inbox_lesson") {
@@ -362,8 +368,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
     }
     if (body?.action === "inbox_status") {
-      const status = body?.status === "new" ? "new" : "ignored";
-      const r = await setInboxStatus(String(body?.id ?? ""), status as "ignored" | "new");
+      // רשימה סגורה: כל ערך אחר נופל ל-ignored, כמו קודם.
+      const status: "ignored" | "new" | "duplicate" =
+        body?.status === "new" ? "new" : body?.status === "duplicate" ? "duplicate" : "ignored";
+      const r = await setInboxStatus(String(body?.id ?? ""), status, {
+        duplicateOf: typeof body?.of === "string" ? body.of : undefined,
+      });
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
       return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
     }

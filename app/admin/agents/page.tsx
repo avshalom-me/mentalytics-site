@@ -1,6 +1,7 @@
 "use client";
 import { REGION_GROUP_LABELS } from "@/app/lib/regions";
 import { repeatedClosingLine } from "@/app/lib/email-signature";
+import { splitQuoted } from "@/app/lib/email-quote";
 
 import { useEffect, useRef, useState } from "react";
 
@@ -48,6 +49,15 @@ type InboxItem = {
   draft_note: string | null;
   final_body: string | null;
   replied_at: string | null;
+  gmail_thread_id?: string;
+  // אותה פנייה שהגיעה גם מכתובת אחרת (listInbox בשרת מסמן).
+  same_inquiry?: {
+    id: string;
+    from_email: string;
+    from_name: string | null;
+    status: string;
+    replied_at: string | null;
+  } | null;
 };
 
 // לקח מתיקון טיוטה (inbox-lessons.ts בשרת).
@@ -1077,6 +1087,9 @@ const INBOX_CATEGORY_LABELS: Record<string, string> = {
  */
 function SignaturePreview({ sig, body }: { sig: InboxSignature | null; body: string }) {
   const frame = useRef<HTMLIFrameElement>(null);
+  // שורה אחת כברירת מחדל: עם כמה כרטיסים פתוחים, חתימה מלאה מתחת לכל טיוטה
+  // היא בעיקר חזרה. האזהרות (אין חתימה / לא נקראה / שם כפול) תמיד גלויות.
+  const [open, setOpen] = useState(false);
   if (!sig) return null;
   if (sig.status !== "ok") {
     return (
@@ -1095,48 +1108,111 @@ function SignaturePreview({ sig, body }: { sig: InboxSignature | null; body: str
   // כאילו השם יוצא פעמיים כשבפועל הוא לא.
   const repeated = repeatedClosingLine(body, sig.text);
   return (
-    <div className="mb-2">
-      <div className="mb-1 text-[11px] font-bold text-stone-400">
-        ✍️ החתימה מ-Gmail מוצמדת אוטומטית מתחת לטיוטה:
+    <div className="mb-3">
+      <div className="flex flex-wrap items-center gap-x-2 text-[11px] text-stone-400">
+        <span className="font-bold">✍️ חתימת Gmail תצורף לתשובה</span>
+        <button onClick={() => setOpen(!open)} className="font-bold text-sky-700 underline hover:text-sky-900">
+          {open ? "הסתר" : "הצג"}
+        </button>
+        {repeated && (
+          <span className="text-stone-500">
+            · &quot;{repeated}&quot; כבר פותחת את החתימה, ולכן תופיע במייל פעם אחת
+          </span>
+        )}
       </div>
-      {repeated && (
-        <div className="mb-1 text-[11px] text-stone-500">
-          השורה &quot;{repeated}&quot; שבסוף הטיוטה כבר פותחת את החתימה, ולכן במייל היא תופיע פעם אחת בלבד.
-        </div>
+      {open && (
+        <iframe
+          ref={frame}
+          title="החתימה שתוצמד"
+          sandbox="allow-same-origin"
+          srcDoc={doc}
+          onLoad={() => {
+            const el = frame.current;
+            const h = el?.contentDocument?.documentElement.scrollHeight;
+            if (el && h) el.style.height = `${h}px`;
+          }}
+          className="mt-1.5 block w-full rounded-xl border border-dashed border-stone-200 bg-white"
+          style={{ height: 72 }}
+        />
       )}
-      <iframe
-        ref={frame}
-        title="החתימה שתוצמד"
-        sandbox="allow-same-origin"
-        srcDoc={doc}
-        onLoad={() => {
-          const el = frame.current;
-          const h = el?.contentDocument?.documentElement.scrollHeight;
-          if (el && h) el.style.height = `${h}px`;
-        }}
-        className="block w-full rounded-xl border border-dashed border-stone-200 bg-white"
-        style={{ height: 72 }}
-      />
     </div>
   );
+}
+
+// צבע לפי קטגוריה, כדי שסוג הפנייה ייקרא במבט ולא בקריאה.
+const INBOX_CATEGORY_TONE: Record<string, string> = {
+  therapist_billing: "bg-amber-50 text-amber-800",
+  therapist_cancel: "bg-rose-50 text-rose-700",
+  therapist_profile: "bg-sky-50 text-sky-800",
+  patient: "bg-teal-50 text-teal-800",
+  center: "bg-emerald-50 text-emerald-800",
+};
+
+/**
+ * לתצוגה בלבד: תוכנות מייל שוברות שורות בערך כל 70 תווים, ואז משפט נקטע
+ * באמצע ("מאמצעי התשלום / שלי."). שורה ארוכה שלא נגמרת בפיסוק מתחברת לבאה;
+ * שורות קצרות (ברכה, חתימה) ושורות ריקות נשארות כמו שהן.
+ */
+function reflowEmailText(text: string): string {
+  const out: string[] = [];
+  for (const line of text.replace(/\r\n?/g, "\n").split("\n")) {
+    const prev = out[out.length - 1];
+    const wrapped =
+      prev !== undefined &&
+      prev.trim().length >= 60 &&
+      !/[.!?:;,)\]"'״׳]$/.test(prev.trim()) &&
+      line.trim() !== "";
+    if (wrapped) out[out.length - 1] = `${prev.trimEnd()} ${line.trim()}`;
+    else out.push(line);
+  }
+  return out.join("\n");
+}
+
+/** תאריך קצר ("23.9") - במקום "אתמול" שמעוגל לאחור ומטעה אחרי 47 שעות. */
+function shortDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("he-IL", { day: "numeric", month: "numeric" });
+}
+
+/** כמה זמן הפונה מחכה, כמילים וכצבע: עד יום רגיל, עד שלושה ימים ענבר, מעבר - אדום. */
+function waitingInfo(receivedAt: string): { label: string; tone: string; accent: string } {
+  const hours = (Date.now() - new Date(receivedAt).getTime()) / 3_600_000;
+  if (hours < 24) {
+    const h = Math.max(0, Math.floor(hours));
+    return {
+      label: h < 1 ? "הגיעה עכשיו" : h === 1 ? "ממתינה שעה" : `ממתינה ${h} שעות`,
+      tone: "bg-stone-100 text-stone-600",
+      accent: "border-s-[#3D8C8A]",
+    };
+  }
+  const days = Math.floor(hours / 24);
+  const label = days === 1 ? "ממתינה יום" : `ממתינה ${days} ימים`;
+  return days < 3
+    ? { label, tone: "bg-amber-100 text-amber-800", accent: "border-s-amber-400" }
+    : { label, tone: "bg-rose-100 text-rose-700", accent: "border-s-rose-400" };
 }
 
 function InboxCard({
   row,
   signature,
+  previousReplyAt,
   onChanged,
   onEditedSend,
+  onSent,
   onNotify,
 }: {
   row: InboxItem;
   signature: InboxSignature | null;
+  // מתי ענית לאותו פונה או באותו שרשור קודם לכן, אם בכלל.
+  previousReplyAt: string | null;
   onChanged: (rows: InboxItem[]) => void;
   onEditedSend: () => void;
+  onSent: (info: { to: string; closedDuplicates: string[] }) => void;
   onNotify: (msg: string, isErr?: boolean) => void;
 }) {
   const [subject, setSubject] = useState(row.draft_subject ?? `Re: ${row.subject ?? ""}`);
   const [body, setBody] = useState(row.draft_body ?? "");
   const [showFull, setShowFull] = useState(false);
+  const [showQuoted, setShowQuoted] = useState(false);
   const [busy, setBusy] = useState<"" | "send" | "draft" | "ignore">("");
   const needsFill = body.includes("[להשלים");
 
@@ -1149,6 +1225,7 @@ function InboxCard({
       if (action === "inbox_send") {
         const flat = (s: string) => s.replace(/\s+/g, " ").trim();
         const edited = flat(body) !== flat(row.draft_body ?? "");
+        const closedDuplicates = Array.isArray(j.closed_duplicates) ? (j.closed_duplicates as string[]) : [];
         onNotify(
           `התשובה נשלחה אל ${j.to ?? row.from_email}` +
             (j.signature === "failed"
@@ -1156,10 +1233,15 @@ function InboxCard({
               : j.signature === "none"
                 ? " - בלי חתימה (לא מוגדרת ב-Gmail)"
                 : "") +
+            (closedDuplicates.length > 0
+              ? `. נסגרה גם אותה פנייה מ-${closedDuplicates.join(", ")}`
+              : "") +
             (edited ? ". הסוכן מנתח את התיקון שלך - אם יש בו כלל, הוא יופיע למטה לאישור." : "")
         );
+        onSent({ to: String(j.to ?? row.from_email), closedDuplicates });
         if (edited) onEditedSend();
       } else if (action === "inbox_draft") onNotify("נוסחה טיוטה חדשה");
+      else if (extra?.status === "duplicate") onNotify("הפנייה נסגרה ככפילות");
     } catch (e) {
       onNotify(e instanceof Error ? e.message : "הפעולה נכשלה", true);
     } finally {
@@ -1167,11 +1249,18 @@ function InboxCard({
     }
   }
 
-  const bodyText = row.body_text ?? "";
-  const preview = showFull ? bodyText : bodyText.slice(0, 400);
+  // רק מה שהפונה כתב עכשיו. תשובה בשרשור היא לרוב שתי שורות מעל מאות שורות
+  // ציטוט, והציטוט דחק את מה שחשוב אל מחוץ לתצוגה.
+  const split = splitQuoted(row.body_text ?? "");
+  const newText = reflowEmailText(split.text);
+  const quoted = split.quoted;
+  const shownText = showFull ? newText : newText.slice(0, 900);
+  const waiting = waitingInfo(row.received_at);
+  const same = row.same_inquiry ?? null;
+  const sameAnswered = same != null && (same.status === "sent" || same.status === "sent_external");
 
   return (
-    <div className="rounded-2xl border border-sky-200 bg-white p-4">
+    <div className={`rounded-2xl border border-s-4 border-stone-200 bg-white p-4 shadow-sm ${waiting.accent}`}>
       <div className="mb-1 flex flex-wrap items-center gap-2">
         <span className="text-sm font-black text-stone-900">
           {row.from_name || row.from_email}
@@ -1182,11 +1271,17 @@ function InboxCard({
           </span>
         )}
         {row.category && (
-          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">
+          <span
+            className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+              INBOX_CATEGORY_TONE[row.category] ?? "bg-stone-100 text-stone-600"
+            }`}
+          >
             {INBOX_CATEGORY_LABELS[row.category] ?? row.category}
           </span>
         )}
-        <span className="text-xs text-stone-400">{relTime(row.received_at)}</span>
+        <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${waiting.tone}`}>
+          ⏳ {waiting.label}
+        </span>
         <span className="flex-1" />
         <button
           onClick={() => act("inbox_status", { status: "ignored" }, "לסמן שהפנייה לא דורשת מענה?")}
@@ -1196,13 +1291,77 @@ function InboxCard({
           לא דורש מענה
         </button>
       </div>
-      <div className="mb-2 text-xs font-bold text-stone-500">{row.subject || "(ללא נושא)"}</div>
-      <div className="mb-3 whitespace-pre-line rounded-xl bg-stone-50 p-3 text-sm leading-6 text-stone-700">
-        {preview}
-        {bodyText.length > 400 && (
-          <button onClick={() => setShowFull(!showFull)} className="ms-2 text-xs font-bold text-sky-700 underline">
-            {showFull ? "פחות" : "עוד"}
-          </button>
+      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+        <span className="font-bold text-stone-500">{row.subject || "(ללא נושא)"}</span>
+        {previousReplyAt && (
+          <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] text-stone-500">
+            🧵 המשך התכתבות · ענית ב-{shortDate(previousReplyAt)}
+          </span>
+        )}
+        <span className="text-stone-400">{row.from_email}</span>
+      </div>
+
+      {/* אותה פנייה מכתובת אחרת: אם כבר נענתה - סגירה בלחיצה; אם גם היא
+          פתוחה - מספיק לענות על אחת, השנייה נסגרת בשליחה. */}
+      {same && (
+        <div
+          className={`mb-3 flex flex-wrap items-center gap-2 rounded-xl border px-3 py-2 text-xs leading-5 ${
+            sameAnswered ? "border-amber-200 bg-amber-50 text-amber-900" : "border-sky-100 bg-sky-50 text-sky-900"
+          }`}
+        >
+          <span className="flex-1">
+            {sameAnswered ? (
+              <>
+                ↪️ <b>כבר ענית על אותה פנייה</b> מ-{same.from_email}
+                {same.replied_at ? ` (ב-${shortDate(same.replied_at)})` : ""}. נראה שזה אותו אדם מכתובת אחרת.
+              </>
+            ) : (
+              <>
+                ↔️ אותה פנייה הגיעה גם מ-{same.from_email}. מספיק לענות על אחת - השנייה תיסגר מעצמה בשליחה.
+              </>
+            )}
+          </span>
+          {sameAnswered && (
+            <button
+              onClick={() =>
+                act(
+                  "inbox_status",
+                  { status: "duplicate", of: same.from_email },
+                  "לסגור את הפנייה ככפילות? אפשר להחזיר אותה לתור מ'טופלו לאחרונה'."
+                )
+              }
+              disabled={busy !== ""}
+              className="shrink-0 rounded-full bg-amber-600 px-3 py-1 text-xs font-bold text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              סגור ככפילות
+            </button>
+          )}
+        </div>
+      )}
+
+      <div className="mb-3 rounded-xl bg-stone-50 p-3">
+        <div className="whitespace-pre-line text-sm leading-6 text-stone-800">
+          {shownText || <span className="text-stone-400">(ללא טקסט)</span>}
+          {newText.length > 900 && (
+            <button onClick={() => setShowFull(!showFull)} className="ms-2 text-xs font-bold text-sky-700 underline">
+              {showFull ? "פחות" : "עוד"}
+            </button>
+          )}
+        </div>
+        {quoted && (
+          <>
+            <button
+              onClick={() => setShowQuoted(!showQuoted)}
+              className="mt-2 text-[11px] font-bold text-stone-400 underline hover:text-stone-600"
+            >
+              {showQuoted ? "הסתר את ההתכתבות הקודמת" : "הצג את ההתכתבות הקודמת"}
+            </button>
+            {showQuoted && (
+              <div className="mt-2 max-h-72 overflow-y-auto whitespace-pre-line border-s-2 border-stone-200 ps-3 text-xs leading-5 text-stone-500">
+                {quoted}
+              </div>
+            )}
+          </>
         )}
       </div>
 
@@ -1532,11 +1691,36 @@ function InboxQueue({
 }) {
   const open = rows.filter((r) => r.status === "new" || r.status === "drafted");
   const done = rows.filter((r) =>
-    ["sent", "sent_external", "ignored", "superseded"].includes(r.status)
+    ["sent", "sent_external", "ignored", "superseded", "duplicate"].includes(r.status)
   );
   const [backfilling, setBackfilling] = useState(false);
 
   const [reviving, setReviving] = useState("");
+
+  // אישור שליחה במקום שבו הכרטיס היה: ההודעה בראש העמוד לא נראית כשגוללים
+  // למטה, והכרטיס פשוט נעלם. נמחק מעצמו אחרי כמה שניות.
+  const [justSent, setJustSent] = useState<{ key: number; to: string; closedDuplicates: string[] }[]>([]);
+  function onSent(info: { to: string; closedDuplicates: string[] }) {
+    const key = Date.now() + Math.random();
+    setJustSent((s) => [...s, { key, ...info }]);
+    setTimeout(() => setJustSent((s) => s.filter((x) => x.key !== key)), 12_000);
+  }
+
+  // מתי ענית לאותו פונה (או באותו שרשור) לפני הפנייה הזו - רמז להמשך שיחה.
+  function previousReplyAt(r: InboxItem): string | null {
+    const prev = done.find(
+      (d) =>
+        (d.status === "sent" || d.status === "sent_external") &&
+        d.received_at < r.received_at &&
+        (d.from_email === r.from_email || (r.gmail_thread_id != null && d.gmail_thread_id === r.gmail_thread_id))
+    );
+    return prev ? (prev.replied_at ?? prev.received_at) : null;
+  }
+
+  const oldestOpen = open.reduce<string | null>(
+    (min, r) => (min == null || r.received_at < min ? r.received_at : min),
+    null
+  );
 
   async function onRevive(row: InboxItem) {
     setReviving(row.id);
@@ -1600,23 +1784,30 @@ function InboxQueue({
           הסוכן רץ ומדווח "לא מוגדר" בלי לגעת בכלום.
         </div>
       )}
-      {configured && (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2.5">
-          <span className="text-xs text-stone-600">
-            כדי שהטיוטות יישמעו כמוך כבר מהתחלה, אפשר ללמד את הסוכן מהתשובות שכבר שלחת בתיבה.
+      {open.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+          <span className="font-black text-stone-700">
+            {open.length === 1 ? "פנייה אחת ממתינה לך" : `${open.length} פניות ממתינות לך`}
           </span>
-          <span className="flex-1" />
-          <button
-            onClick={backfill}
-            disabled={backfilling}
-            className="shrink-0 rounded-full border border-[#3D8C8A] px-3.5 py-1.5 text-xs font-bold text-[#2A6462] hover:bg-[#EAF4F3] disabled:opacity-50"
-          >
-            {backfilling ? "מייבא..." : "למד מההתכתבות שלי"}
-          </button>
+          {oldestOpen && open.length > 1 && <span>· הוותיקה: {waitingInfo(oldestOpen).label}</span>}
         </div>
       )}
+      {justSent.map((s) => (
+        <div
+          key={s.key}
+          className="rounded-xl border border-teal-200 bg-teal-50 px-4 py-2.5 text-sm text-teal-900"
+          role="status"
+        >
+          ✓ התשובה ל-{s.to} נשלחה
+          {s.closedDuplicates.length > 0 && (
+            <span className="text-teal-700"> · נסגרה גם אותה פנייה מ-{s.closedDuplicates.join(", ")}</span>
+          )}
+        </div>
+      ))}
       {open.length === 0 ? (
-        <p className="text-sm text-stone-400">אין פניות שממתינות למענה. 🎉</p>
+        justSent.length === 0 && (
+          <p className="rounded-xl bg-stone-50 px-4 py-3 text-sm text-stone-500">אין פניות שממתינות למענה. 🎉</p>
+        )
       ) : (
         open.map((r) => (
           <InboxCard
@@ -1624,8 +1815,10 @@ function InboxQueue({
             key={`${r.id}:${r.draft_subject ?? ""}:${(r.draft_body ?? "").length}`}
             row={r}
             signature={signature}
+            previousReplyAt={previousReplyAt(r)}
             onChanged={onChanged}
             onEditedSend={refreshLessonsSoon}
+            onSent={onSent}
             onNotify={onNotify}
           />
         ))
@@ -1642,12 +1835,14 @@ function InboxQueue({
                     ? "📤 נענתה בג'ימייל"
                     : r.status === "superseded"
                       ? "🔁 הפונה כתב/ה שוב - עונים על ההודעה החדשה"
-                      : "🚫 ללא מענה"}
+                      : r.status === "duplicate"
+                        ? `🔗 ${r.draft_note || "אותה פנייה מכתובת אחרת - נענתה בשרשור השני"}`
+                        : "🚫 ללא מענה"}
                 {" · "}
                 {r.from_name || r.from_email} · {r.subject || "(ללא נושא)"} · {relTime(r.received_at)}
                 {/* הסיווג לא יהיה מושלם לעולם. פנייה שנסגרה בטעות חוזרת
                     לתור עם טיוטה בלחיצה אחת, במקום להישאר אבודה. */}
-                {(r.status === "ignored" || r.status === "superseded") && (
+                {(r.status === "ignored" || r.status === "superseded" || r.status === "duplicate") && (
                   <button
                     onClick={() => onRevive(r)}
                     disabled={reviving !== ""}
@@ -1660,6 +1855,19 @@ function InboxQueue({
             ))}
           </ul>
         </Collapse>
+      )}
+      {/* פעולת הקמה חד-פעמית - בתחתית ובשקט, לא מעל התור. */}
+      {configured && (
+        <div className="flex flex-wrap items-center gap-3 px-1 text-xs text-stone-400">
+          <span>ללמד את הסוכן מהתשובות שכבר שלחת בתיבה (קריאה בלבד):</span>
+          <button
+            onClick={backfill}
+            disabled={backfilling}
+            className="font-bold text-[#2A6462] underline hover:text-[#3D8C8A] disabled:opacity-50"
+          >
+            {backfilling ? "מייבא..." : "למד מההתכתבות שלי"}
+          </button>
+        </div>
       )}
     </div>
   );

@@ -1,6 +1,7 @@
 import "server-only";
 import { randomBytes } from "crypto";
 import { dropRepeatedClosing } from "./email-signature";
+import { splitQuoted, stripQuoted } from "./email-quote";
 
 // לקוח Gmail לתיבת admin@getmentalytics.com, במסלול OAuth פנימי של
 // Workspace - אותו דפוס בדיוק כמו GOOGLE_ADS_REFRESH_TOKEN: אפליקציה
@@ -248,51 +249,11 @@ export async function getThread(threadId: string): Promise<ThreadMessage[]> {
   return out.sort((a, b) => a.internalDate - b.internalDate);
 }
 
-/**
- * חיתוך הציטוט של ההודעה הקודמת מגוף המייל - וגם של החתימה, שמתחילה
- * בשורה "-- " (המפריד הסטנדרטי). תשובה שנשלחה מ-Gmail עצמו נושאת את
- * החתימה בגוף, ובלי החיתוך הסוכן היה לומד להקליד אותה בטיוטה - בנוסף
- * לחתימה האמיתית שמוצמדת בשליחה.
- */
-// תווי כיוון בלתי נראים (LRE/RLE/PDF, LRM/RLM, isolates). Gmail בממשק עברי
-// עוטף בהם את שורת הציטוט, ובגללם "On ... wrote:" לא זוהה - השורה נשמרה
-// בסוף התשובות שיובאו כדוגמאות.
-const BIDI_MARKS = /[‎‏‪-‮⁦-⁩]/g;
-
-/**
- * פיצול המייל למה שנכתב עכשיו ולציטוט שמתחתיו.
- *
- * זה לא ניקוי קוסמטי: תשובה בשרשור היא לרוב שתי שורות אדם מעל מאות שורות
- * ציטוט, ולפעמים הציטוט הוא התראה אוטומטית שלנו. סיווג שמסתכל על הגוף
- * המלא קורא בעיקר את הציטוט. קרה ב-18/9/26: "לצערי לא יכול, מטפל בשעה
- * הזאת" (52 תווים) מעל ציטוט של התראת "פנייה חדשה" סווג כמייל אוטומטי
- * שלא דורש מענה, והפנייה לא הופיעה בתור.
- */
-export function splitQuoted(body: string): { text: string; quoted: string } {
-  const lines = body.split("\n");
-  const cut = lines.findIndex((raw, i) => {
-    const l = raw.replace(BIDI_MARKS, "");
-    const next = (lines[i + 1] ?? "").replace(BIDI_MARKS, "");
-    return (
-      /^--\s*$/.test(l) ||
-      /^\s*>/.test(l) ||
-      /^\s*(On .+ wrote:|בתאריך .+ מאת)/.test(l) ||
-      // כותרת ציטוט ארוכה נשברת לשתי שורות: "On <תאריך> <שם> <כתובת>" ואז "wrote:".
-      (/^\s*On .*\d{4}/.test(l) && /^\s*wrote:\s*$/.test(next)) ||
-      /^-{2,}\s*Original Message/i.test(l)
-    );
-  });
-  // cut === 0 הוא העברה (forward) שכולה ציטוט: אין טקסט חדש להפריד.
-  if (cut <= 0) return { text: body.trim(), quoted: "" };
-  return {
-    text: lines.slice(0, cut).join("\n").trim(),
-    quoted: lines.slice(cut).join("\n").trim(),
-  };
-}
-
-export function stripQuoted(body: string): string {
-  return splitQuoted(body).text;
-}
+// הפרדת הציטוט עברה ל-email-quote.ts כדי שגם עמוד האדמין ישתמש בה. כאן
+// היא ממשיכה להיות זמינה לכל מי שמייבא מ-gmail.ts. חיתוך החתימה ("-- ")
+// חשוב גם כאן: תשובה שנשלחה מ-Gmail נושאת את החתימה בגוף, ובלי החיתוך
+// הסוכן היה לומד להקליד אותה בטיוטה.
+export { splitQuoted, stripQuoted };
 
 // ── חתימה ───────────────────────────────────────────────────────────────
 //
