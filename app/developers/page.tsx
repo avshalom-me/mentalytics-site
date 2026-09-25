@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import {
   Sparkles,
   Rocket,
@@ -14,11 +15,13 @@ export const metadata: Metadata = {
   title: "בית למפתחים בתחום בריאות הנפש והלמידה",
   description:
     "טיפול חכם מזמינה מטפלים, אנשי חינוך, חוקרים, יזמים ומפתחים להצטרף לבית מקצועי חדש לפיתוח כלים דיגיטליים בתחום בריאות הנפש, ההורות והלמידה.",
-  openGraph: {
+  ...shareMetadata({
+    url: "/developers",
     title: "בית למפתחים | טיפול חכם",
     description:
       "חממה לרעיונות מקצועיים בתחום בריאות הנפש והלמידה - מרעיון ראשוני ועד למוצר דיגיטלי שלם.",
-  },
+    type: "website",
+  }),
 };
 
 const BENEFITS = [

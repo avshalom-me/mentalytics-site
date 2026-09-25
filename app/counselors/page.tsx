@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import PageViewTracker from "@/app/components/PageViewTracker";
 
 /**
@@ -22,11 +23,13 @@ export const metadata: Metadata = {
   description:
     "כלי עבודה ליועצת: מיפוי מוקד הקושי של התלמיד/ה בארבעה מסלולים, הפניה מנומקת לטיפול או לאבחון, מפת הוועדות עם המועדים והמסמכים, וטיוטת סיכום להעתקה. בלי פרטים מזהים, בחינם.",
   alternates: { canonical: "https://www.mentalytics.co.il/counselors" },
-  openGraph: {
+  ...shareMetadata({
+    url: "/counselors",
     title: "שאלון מסייע להפניות - ליועצות ולצוותי חינוך | טיפול חכם",
     description:
       "מוקד הקושי בארבעה מסלולים, הפניה מנומקת, מפת ועדות עם מועדים מחושבים, וטיוטת סיכום להפניה - בלי פרטים מזהים.",
-  },
+    type: "website",
+  }),
 };
 
 const OUTPUTS = [

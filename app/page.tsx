@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
+import { shareMetadata } from "@/app/lib/share-metadata";
 import PageViewTracker from "./components/PageViewTracker";
 import ContactForm from "./components/ContactForm";
 import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
@@ -25,6 +26,14 @@ export const metadata: Metadata = {
     "פסיכותרפיה",
   ],
   alternates: { canonical: "https://www.mentalytics.co.il" },
+  // The share text that used to sit in the root layout's default (which every
+  // page inherited - see app/layout.tsx), kept word for word.
+  ...shareMetadata({
+    url: "https://www.mentalytics.co.il",
+    title: "טיפול חכם - הכוונה טיפולית חכמה",
+    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם - לילדים ולמבוגרים.",
+    type: "website",
+  }),
 };
 
 const faqs = [

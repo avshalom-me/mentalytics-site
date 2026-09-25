@@ -8,6 +8,7 @@ import AttributionTracker from "./components/AttributionTracker";
 import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
+import { OG_FALLBACK_IMAGE } from "@/app/lib/share-metadata";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -19,21 +20,21 @@ export const metadata: Metadata = {
   title: { default: "טיפול חכם", template: "%s | טיפול חכם" },
   description: "מערכת הכוונה טיפולית חכמה - מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
   metadataBase: new URL("https://www.mentalytics.co.il"),
+  // Inherited by every page that sets no openGraph of its own, so it must hold
+  // nothing page-specific: no url, no title, no description. It used to carry
+  // the homepage's, and /therapists, /centers, /about, /adults, /kids and the
+  // rest all shared on Facebook AS the homepage (og:url is the share target).
+  // Without them Next fills og:title and og:description from each page's own
+  // title and description, and Facebook takes the page's own URL. The
+  // homepage's share text lives in app/page.tsx; articles use shareMetadata().
   openGraph: {
     siteName: "טיפול חכם",
     locale: "he_IL",
     type: "website",
-    url: "https://www.mentalytics.co.il",
-    title: "טיפול חכם - הכוונה טיפולית חכמה",
-    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם - לילדים ולמבוגרים.",
-    images: [{ url: "/logo.svg.png", width: 512, height: 512, alt: "טיפול חכם" }],
+    images: [OG_FALLBACK_IMAGE],
   },
-  twitter: {
-    card: "summary",
-    title: "טיפול חכם - הכוונה טיפולית חכמה",
-    description: "מלאו שאלון קצר וקבלו המלצות מותאמות אישית על סוג הטיפול והמטפל המתאים לכם.",
-    images: ["/logo.svg.png"],
-  },
+  // Title, description and image are filled per page from the above.
+  twitter: { card: "summary_large_image" },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
