@@ -49,7 +49,7 @@ export default function TherapistResultCard({
   // חינמי מוסתר למבקר ממומן דרך CSS (html.mnt-paid) - ראו app/lib/paid-visitor.ts.
   const tier = t.free ? "free" : "promoted";
   // למרכז אין שורת תואר: שני סוגי המטפלים הראשונים ברשימה ("עו"ס קליני ·
-  // מטפל מיני" אצל מרכז רותם, מתוך תשעה) תיארו מוסד כאילו היה אדם עם מקצוע.
+  // מטפל מיני" אצל אחד המרכזים, מתוך תשעה) תיארו מוסד כאילו היה אדם עם מקצוע.
   const type = isCenter
     ? ""
     : t.therapist_types[0] ? publicTherapistTitle(t.therapist_types[0], t.gender, t.age_groups) : "";

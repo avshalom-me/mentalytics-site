@@ -426,7 +426,7 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
     }
 
     // 3. פניות לישות נשלחות לכתובת שאף אחד מחשבונות הפורטל לא מזוהה איתה.
-    //    זה מה שקרה ברותם ב-15/9: עריכה באדמין העתיקה את מייל איש הקשר על
+    //    זה מה שקרה באחד המרכזים ב-15/9: עריכה באדמין העתיקה את מייל איש הקשר על
     //    תיבת המשרד, והפנייה הבאה הלכה למקום שאיש לא בודק.
     if (isEntity && inquiryEmail && memberEmails.length > 0 && !memberEmails.includes(inquiryEmail)) {
       flags.push({

@@ -277,10 +277,10 @@ export default async function TherapistProfilePage({
   const photoSrc = t.profile_photo_path ? therapistPhotoUrl(id, t.profile_photo_path, BASE_URL) : avatarSrc;
   // Validated: a `phone` holding something that is not a number (one paying
   // therapist has an email address there) yields null, so the button is hidden
-  // rather than linking to wa.me/972ZJOURY@GMAIL.COM.
+  // rather than linking to wa.me/972NAME@EXAMPLE.COM.
   // מטפל/ת של מרכז בלי קו אישי: הקו של המרכז הוא דרך הקשר המהירה, והוא
   // מסומן ככזה בכפתורים. בלי הנפילה הזו הפרופיל נשאר בלי אף כפתור מהיר -
-  // רק טופס הודעה - וזה מה שקרה לשמעון ערנרייך, מקודם ומשולם, עד 21/8/2026.
+  // רק טופס הודעה - וזה מה שקרה למטפל מקודם ומשלם עד 21/8/2026.
   const ownPhone = (t.phone ?? "").trim();
   const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
   const centerWhatsapp = ownPhone ? null : affiliatedCenter?.whatsapp ?? null;

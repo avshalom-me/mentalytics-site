@@ -3,9 +3,9 @@
  *
  * The stored value is whatever the therapist typed into a free-text field, and
  * it is not always a phone number. A paying therapist currently has
- * "ZJOURY@GMAIL.COM" in `phone`; the old inline logic (strip a leading zero,
+ * "NAME@EXAMPLE.COM" in `phone`; the old inline logic (strip a leading zero,
  * strip dashes and spaces, require length >= 8) accepted it and produced
- * `https://wa.me/972ZJOURY@GMAIL.COM` plus `tel:ZJOURY@GMAIL.COM` - two dead
+ * `https://wa.me/972NAME@EXAMPLE.COM` plus `tel:NAME@EXAMPLE.COM` - two dead
  * buttons on a profile someone is paying to have listed.
  *
  * These helpers validate that what is left really is a phone number, and return
@@ -96,8 +96,8 @@ export function foreignPhoneDigits(phone: string | null | undefined): string | n
  *
  * **קווי מוחזר כ-null בכוונה (21/8/2026):** אין וואטסאפ למספר נייח, ולכן
  * הכפתור היה נפתח על שיחה ריקה. אצל מטפלים זה תיאורטי - כל 170 המוצגים
- * רשמו נייד - אבל מרכזים רושמים מרכזייה: עמוד "מרכז CBT" הציג כפתור
- * וואטסאפ אל 04-6157797, ומכון הכרה אל 077-8052051. הכפתור פשוט נעלם
+ * רשמו נייד - אבל מרכזים רושמים מרכזייה: עמוד של מרכז אחד הציג כפתור
+ * וואטסאפ אל קו 04 נייח, ועמוד של מכון אחר אל קו 077. הכפתור פשוט נעלם
  * עכשיו, וכפתור החיוג - שדווקא עובד - נשאר.
  *
  * **מספר זר (21/9/2026)** מקבל קישור וואטסאפ, כי זה הערוץ שמטפל/ת בחו"ל
@@ -132,11 +132,11 @@ export const CENTER_WHATSAPP_MESSAGE =
  * עם מרכזייה יכול סוף סוף להציג וואטסאפ בלי לוותר על קו החיוג.
  *
  * **השדה המפורש מתקבל גם כשהוא נייח או וירטואלי (23/9/2026).** וואטסאפ עסקי
- * נרשם גם על קו נייח (האימות בשיחה קולית), ומרכז רותם ניסה לרשום את הקו שלו,
+ * נרשם גם על קו נייח (האימות בשיחה קולית), ומרכז אחד ניסה לרשום את הקו שלו,
  * 072, ונדחה. מי שממלא את השדה הזה מצהיר שיש במספר וואטסאפ, ולכן סומכים עליו.
  * **הניחוש מהטלפון לחיוג נשאר נייד בלבד:** שם אף אחד לא הצהיר על וואטסאפ,
- * ומרכזייה בלי וואטסאפ פותחת שיחה ריקה - מה שהיה בעמוד "מרכז CBT" עם
- * 04-6157797 עד 21/8/2026.
+ * ומרכזייה בלי וואטסאפ פותחת שיחה ריקה - מה שהיה בעמוד של אחד המרכזים
+ * עד 21/8/2026.
  *
  * מחזיר את המספר כפי שנשמר (לא מנורמל) - הקישור עצמו נבנה ב-waLinkForCenter.
  */

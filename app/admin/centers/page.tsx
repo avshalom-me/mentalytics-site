@@ -1078,7 +1078,7 @@ export default function AdminCentersPage() {
               </Field>
             </div>
             {/* שלושה טלפונים לכל מרכז, ורק שניים מהם מפורסמים. הבלבול היה אמיתי
-                (מרכז רותם, 15/9/26): הנייד של הבעלים שמור כאן, הקו לשיחות בשדה
+                (אצל אחד המרכזים, 15/9/26): הנייד של הבעלים שמור כאן, הקו לשיחות בשדה
                 הציבורי, והוואטסאפ לא היה קיים כשדה. מה שמפורסם מסומן, ומה שלא - גם. */}
             {editing !== "new" && editing !== null && (
               <p className="-mt-1 mb-3 text-[11.5px] leading-4 text-stone-500">
@@ -1235,7 +1235,7 @@ export default function AdminCentersPage() {
                   </Field>
                 </div>
                 <Field label="וואטסאפ עסקי לפניות מטופלים - מוצג באתר ובכרטיסים">
-                  <input value={fPubWhatsapp} onChange={(e) => setFPubWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="052-1234567 או 072-2119500"
+                  <input value={fPubWhatsapp} onChange={(e) => setFPubWhatsapp(e.target.value)} dir="ltr" inputMode="tel" placeholder="052-1234567 או 072-1234567"
                     className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
                   {(() => {
                     const typed = fPubWhatsapp.trim();
