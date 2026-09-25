@@ -475,13 +475,28 @@ export function cityTopicList(): Topic[] {
 // בחרדה", "טיפול זוגי אונליין") while our online hub is one generic page.
 // Supply verified per combo on 5/8/26 (23-105 online therapists each); the
 // gate below is what keeps a future supply dip from publishing a thin page.
+//
+// The youth page was withdrawn on 6/8/26 and restored on 25/9/26 at the owner's
+// request: "טיפול למתבגרים אונליין" was the online query we ranked best for
+// (111 impressions at position 20, landing on the generic hub).
 export const ONLINE_TOPIC_SLUGS = [
   "טיפול-בחרדה",
   "טיפול-בדיכאון",
   "פסיכולוג-ילדים",
+  "פסיכולוג-לנוער",
 ] as const;
 
 export const ONLINE_TOPIC_APPROACHES = ["CBT", "טיפול זוגי"] as const;
+
+type Hyphenated<S extends string> = S extends `${infer A} ${infer B}` ? `${A}-${Hyphenated<B>}` : S;
+/**
+ * Every online×topic slug as a type, so ONLINE_COPY (app/lib/online-copy.ts)
+ * must hold hand-written copy for each one: a slug added here without its own
+ * text fails the build instead of shipping the old one-template page.
+ */
+export type OnlineTopicSlug =
+  | (typeof ONLINE_TOPIC_SLUGS)[number]
+  | Hyphenated<(typeof ONLINE_TOPIC_APPROACHES)[number]>;
 
 export const MIN_ONLINE_TOPIC = MIN_CITY_TOPIC;
 
@@ -493,10 +508,10 @@ export function isOnlineTopicAllowed(topic: Topic): boolean {
 }
 
 /** Every online×topic slug, for static params and the sitemap. */
-export function onlineTopicSlugs(): string[] {
+export function onlineTopicSlugs(): OnlineTopicSlug[] {
   return [
     ...ONLINE_TOPIC_SLUGS,
-    ...ONLINE_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-")),
+    ...ONLINE_TOPIC_APPROACHES.map((a) => a.replace(/\s+/g, "-") as Hyphenated<typeof a>),
   ];
 }
 

@@ -105,15 +105,9 @@ const nextConfig: NextConfig = {
         destination: "/research/btl",
         permanent: true,
       },
-      {
-        // Same day, same reasoning: the youth online page was withdrawn. It
-        // goes to the online hub, which still lists every therapist that page
-        // filtered. Encoded because a redirect destination is an HTTP header
-        // and Hebrew there throws ERR_INVALID_CHAR.
-        source: "/therapists/online/:path(%D7%A4%D7%A1%D7%99%D7%9B%D7%95%D7%9C%D7%95%D7%92-%D7%9C%D7%A0%D7%95%D7%A2%D7%A8)",
-        destination: "/therapists/region/%D7%90%D7%95%D7%A0%D7%9C%D7%99%D7%99%D7%9F",
-        permanent: true,
-      },
+      // The youth online page (/therapists/online/פסיכולוג-לנוער) was withdrawn
+      // the same day with a redirect to the online hub, and restored at the
+      // same address on 25/9/2026 - its redirect is gone so the page serves.
     ];
   },
 };

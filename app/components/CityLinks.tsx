@@ -55,6 +55,15 @@ export default function CityLinks() {
               פסיכולוגים ב{city}
             </Link>
           ))}
+          {/* Not a city, but the answer for anyone without one nearby - and
+              until 25/9/2026 the homepage did not link to the online hub at all. */}
+          <Link
+            href="/therapists/region/אונליין"
+            className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-[var(--teal-pale)]"
+            style={{ border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}
+          >
+            🌐 טיפול פסיכולוגי אונליין
+          </Link>
           <Link
             href="/therapists/region"
             className="rounded-full px-4 py-2 text-sm font-semibold hover:bg-[var(--teal-pale)]"

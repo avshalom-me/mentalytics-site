@@ -14,6 +14,7 @@ import CitySeoSection from "@/app/therapists/CitySeoSection";
 import QuizCta from "@/app/therapists/QuizCta";
 import { loadLocalArticles } from "@/app/lib/local-articles";
 import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { ONLINE_COPY, ONLINE_HUB_DESCRIPTION, ONLINE_HUB_INTRO } from "@/app/lib/online-copy";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -67,7 +68,7 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
     !isOnline && regionCount < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
   // Count-free, like the city pages (owner's call, 14/8/26).
   const description = isOnline
-    ? `פסיכולוג אונליין או מטפל רגשי מרחוק: ${CREDENTIALS} שמטפלים בזום או בווידאו, ו${QUIZ}.`
+    ? ONLINE_HUB_DESCRIPTION
     : `טיפול פסיכולוגי, נפשי ורגשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -117,7 +118,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       const t = slugToCityTopic(slug);
       if (!t || t.adsOnly) continue;
       const n = await countListed({ ...t.filter, online: true });
-      if (n >= MIN_ONLINE_TOPIC) onlineTopics.push({ slug: t.slug, name: t.name });
+      if (n >= MIN_ONLINE_TOPIC) onlineTopics.push({ slug: t.slug, name: ONLINE_COPY[slug].h1 });
     }
   }
 
@@ -147,13 +148,11 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
               {/* The online hub is the strongest organic page in its family
                   (42 entries) and was the only branch here without the
                   quotable sentence. Same shape as the geographic branch below. */}
-              טיפול פסיכולוגי אונליין: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם
-              אומתו ומטפלים בזום או בשיחת וידאו מכל מקום בארץ או בחו"ל ופנו ישירות. בחינם וללא התחייבות.
-              מתלבטים אם טיפול מרחוק בכלל מתאים לכם?{" "}
+              {ONLINE_HUB_INTRO} מתלבטים אם טיפול מרחוק בכלל מתאים לכם?{" "}
               <Link href="/research/online-therapy" className="font-semibold hover:underline" style={{ color: "var(--teal-dark)" }}>
                 כתבנו על מה שהמחקר אומר ולמי זה מתאים
               </Link>
-              , ואפשר גם למלא שאלון קצר ולקבל התאמה אישית.
+              .
             </>
           ) : (
             `טיפול פסיכולוגי, נפשי ורגשי ב${label}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים שתעודות ההכשרה שלהם אומתו ופנו ישירות. בחינם וללא התחייבות.`
@@ -199,7 +198,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
 
       {/* Online×topic children - "טיפול בחרדה אונליין" etc. */}
       {onlineTopics.length > 0 && (
-        <div className="mt-12 pt-8 border-t border-[var(--line)]">
+        <div data-nosnippet className="mt-12 pt-8 border-t border-[var(--line)]">
           <h2 className="text-base font-extrabold text-stone-800 mb-3">טיפול אונליין לפי נושא</h2>
           <div className="flex flex-wrap gap-2">
             {onlineTopics.map((t) => (
@@ -209,7 +208,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
                 className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"
                 style={{ border: "1px solid var(--line)", color: "var(--text-2)" }}
               >
-                {t.name} אונליין
+                {t.name}
               </Link>
             ))}
           </div>
@@ -233,13 +232,20 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </section>
       )}
 
-      <CitySeoSection
-        placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
-        kind={isOnline ? "online" : "region"}
-        therapists={list}
-        regionName={isOnline ? null : r.region}
-        articles={localArticles}
-      />
+      {/* On the online hub the whole section is data-nosnippet: its price and
+          "does it work" answers are exactly what Google would lift for a query
+          like "פסיכולוג אונליין", and the snippet that converts is the
+          questionnaire line at the top (owner, 24-25/9/2026). Region pages
+          keep their current behaviour until the 20/10 measurement. */}
+      <div data-nosnippet={isOnline ? true : undefined}>
+        <CitySeoSection
+          placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
+          kind={isOnline ? "online" : "region"}
+          therapists={list}
+          regionName={isOnline ? null : r.region}
+          articles={localArticles}
+        />
+      </div>
 
       {/* Cities within this region (internal linking → city pages) */}
       {regionCities.length > 0 && (
@@ -283,7 +289,11 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       {/* Evidence block - online page only, at the foot: the listing and the
           quiz serve someone ready to act; this serves the reader still
           deciding, and is what gives the page unique indexable prose. */}
-      {isOnline && <OnlineEvidenceSection />}
+      {isOnline && (
+        <div data-nosnippet>
+          <OnlineEvidenceSection />
+        </div>
+      )}
     </main>
   );
 }

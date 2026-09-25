@@ -95,6 +95,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ul className="flex flex-wrap gap-5 list-none">
                 {[
                   { href: "/therapists", label: "מאגר המטפלים" },
+                  // The online hub had no link from the homepage, the menu or
+                  // the footer (25/9/2026), though online is the paid landing
+                  // that converts best. One sitewide link fixes all three.
+                  { href: "/therapists/region/אונליין", label: "טיפול אונליין" },
                   { href: "/research", label: "מאמרים ומידע" },
                   { href: "/centers", label: "למרכזים טיפוליים" },
                   { href: "/counselors", label: "לצוותי חינוך" },
