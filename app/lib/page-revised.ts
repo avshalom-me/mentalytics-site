@@ -97,8 +97,8 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/about": { date: "2026-09-10", sources: ["app/about/page.tsx"] },
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
-  "/developers": { date: "2026-08-06", sources: ["app/developers/page.tsx"] },
-  "/counselors": { date: "2026-09-09", sources: ["app/counselors/page.tsx"] },
+  "/developers": { date: "2026-09-25", sources: ["app/developers/page.tsx"] },
+  "/counselors": { date: "2026-09-25", sources: ["app/counselors/page.tsx"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
 };
