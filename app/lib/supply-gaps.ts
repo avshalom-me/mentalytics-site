@@ -126,6 +126,9 @@ export type SupplyGap = {
   candidates: GapCandidate[]; // מטפלים חינמיים שמתאימים - יעד ההצעה
   kind: "gift" | "recruit";
   draftEmail: string | null; // טיוטה מוכנה למשלוח ידני אחרי אישור
+  /** האזורים המלאים שבהם הפער נראה בפועל, כשהם צרים מקבוצת האזורים
+   *  ("השפלה והמרכז" בתוך "המרכז והשפלה"). ריק = הפער נמדד על הקבוצה. */
+  observedRegions: string[];
 };
 
 export type SupplyGapsResult = {
@@ -284,6 +287,12 @@ function buildGiftDraft(
   ].join("\n");
 }
 
+/** איפה בתוך הקבוצה הפער נראה, כשזה צר מהקבוצה כולה. שורה ריקה אחרת. */
+function observedLine(g: { observedRegions: string[]; region: string }): string {
+  if (g.observedRegions.length === 0) return "";
+  return `החוסר נמדד ב${g.observedRegions.join(", ")} ולא בכל ${g.region} - הכיסוי והמועמדים למטה מוגבלים לשם.\n`;
+}
+
 /** תיאור ההיצע בחיתוך: כמה יש, כמה צריך, וכמה מזה נשען על מתנה. */
 function supplyLine(g: {
   payingCovering: number;
@@ -341,15 +350,36 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
 
     // צבירה לפי קבוצת אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
     // נספרים לפי סשן כדי שרפרוש לא ייספר כביקוש נוסף.
-    type Agg = { regionKey: string; treatment: string; sessions: Set<string>; events: number; lastSeen: string };
+    // observed = שמות האזורים המלאים שבהם הפער באמת נראה, כשהאות מדויק
+    // מספיק לדעת אותם. הצבירה נשארת בקבוצה הגסה (כי viewer_region נשמר
+    // גס ואין ממה לגזור אזור מלא), אבל הכיסוי נמדד באזורים שנצפו בפועל -
+    // אחרת תת-אזור עשיר מסתיר תת-אזור רעב באותה קבוצה. זה לא תיאורטי:
+    // "המרכז והשפלה" מכיל את גוש דן (17 מקודמים למבוגרים) ואת השפלה (3),
+    // וכך פער ה-CBT בשפלה נמצא 8 מכוסים מתוך יעד 8 והושתק לגמרי, אף
+    // שהוא הפער הנפוץ ביותר באזור (7 מתוך 12 הנפילות לחינמיים).
+    type Agg = {
+      regionKey: string;
+      treatment: string;
+      sessions: Set<string>;
+      events: number;
+      lastSeen: string;
+      observed: Set<string>;
+    };
     const agg = new Map<string, Agg>();
-    const touch = (regionKey: string, treatment: string, sessionKey: string | null, at: string): void => {
+    const touch = (
+      regionKey: string,
+      treatment: string,
+      sessionKey: string | null,
+      at: string,
+      observedRegion?: string
+    ): void => {
       const key = `${regionKey}|${treatmentKey(treatment)}`;
       const prev = agg.get(key);
       if (prev) {
         if (sessionKey) prev.sessions.add(sessionKey);
         else prev.events += 1;
         if (at > prev.lastSeen) prev.lastSeen = at;
+        if (observedRegion) prev.observed.add(observedRegion);
         return;
       }
       agg.set(key, {
@@ -358,6 +388,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         sessions: new Set(sessionKey ? [sessionKey] : []),
         events: sessionKey ? 0 : 1,
         lastSeen: at,
+        observed: new Set(observedRegion ? [observedRegion] : []),
       });
     };
 
@@ -380,7 +411,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // בלי טיפול מפורש - הפער הוא אזורי; נרשם תחת "כללי".
       const list = treatments.length > 0 ? treatments : ["כללי"];
       for (const treatment of list) {
-        touch(regionKey, treatment, null, row.created_at);
+        touch(regionKey, treatment, null, row.created_at, region);
       }
     }
 
@@ -424,10 +455,13 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
 
     // התאמה לקבוצת אזור: מטפל מכסה את הקבוצה אם הוא מכסה אחד מהאזורים שבה.
     // "online" אינו מקום אלא אופן עבודה, ולכן נבדק מול דגל האונליין.
-    const inGapRegion = (t: TherapistRow, regionKey: string): boolean =>
-      regionKey === "online"
-        ? t.online === true
-        : (REGION_GROUPS[regionKey] ?? []).some((r) => coversRegion(t.regions ?? [], r));
+    // observed מצמצם את הבדיקה לאזורים שבהם הפער נראה בפועל; בלעדיו (ביקוש
+    // שהגיע רק מהצפיות, שנשמרות במפתח גס) נבדקת הקבוצה כולה כמקודם.
+    const inGapRegion = (t: TherapistRow, regionKey: string, observed?: Set<string>): boolean => {
+      if (regionKey === "online") return t.online === true;
+      const scope = observed && observed.size > 0 ? [...observed] : (REGION_GROUPS[regionKey] ?? []);
+      return scope.some((r) => coversRegion(t.regions ?? [], r));
+    };
 
     // "all" = המטפל עוסק בכל רכיבי השילוב (ההתאמה האמיתית לבקשת המטופל).
     // "any" = עוסק לפחות באחד מהם - תשובה חלקית, אבל תשובה.
@@ -435,9 +469,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       t: TherapistRow,
       regionKey: string,
       treatment: string,
-      mode: "all" | "any" = "any"
+      mode: "all" | "any" = "any",
+      observed?: Set<string>
     ): boolean => {
-      if (!inGapRegion(t, regionKey)) return false;
+      if (!inGapRegion(t, regionKey, observed)) return false;
       const parts = treatmentParts(treatment);
       if (parts.length === 0 || parts.some((p) => canonicalPart(p) === "כללי")) return true;
       const areas = t.training_areas ?? [];
@@ -461,7 +496,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       }
       const demand = a.events + a.sessions.size;
       if (demand < MIN_EVENTS) continue;
-      const covering = paying.filter((t) => matchesGap(t, a.regionKey, a.treatment));
+      const covering = paying.filter((t) => matchesGap(t, a.regionKey, a.treatment, "any", a.observed));
       const payingCovering = covering.length;
       const paidCovering = covering.filter((t) => PAID_SOURCES.has(t.promotion_source ?? "")).length;
       const giftCovering = payingCovering - paidCovering;
@@ -471,6 +506,11 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       if (payingCovering >= supplyTarget) continue;
 
       const regionLabel = regionGroupLabel(a.regionKey);
+      // מוצג רק כשהוא באמת מצמצם - פער שנראה בכל אזורי הקבוצה (או שהגיע
+      // מהצפיות בלבד) לא צריך הבהרה.
+      const groupRegions = REGION_GROUPS[a.regionKey] ?? [];
+      const narrowedTo =
+        a.observed.size > 0 && a.observed.size < groupRegions.length ? [...a.observed] : [];
 
       // הצעות שכבר בדרך לחיתוך הזה. עד כה הספיקה הצעה אחת כדי
       // להשתיק את החיתוך לגמרי, וזה הגיוני כשהיעד הוא מטפל אחד. כשהיעד
@@ -494,10 +534,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // התאמה מלאה קודמת: מי שעוסק בכל רכיבי השילוב הוא התשובה הנכונה
       // למטופל. רק אם אין כזה עוברים למי שעוסק בחלק ממנו, והטיוטה תאמר
       // את זה במפורש.
-      const fullMatch = freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "all"));
+      const fullMatch = freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "all", a.observed));
       const matching = fullMatch.length > 0
         ? fullMatch
-        : freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "any"));
+        : freePool.filter((t) => matchesGap(t, a.regionKey, a.treatment, "any", a.observed));
       const partialOnly = fullMatch.length === 0;
       const fresh = matching.filter((t) => !offeredRecently.has(t.id));
       // כל המתאימים כבר קיבלו הצעה בחלון הצינון: אין למי להציע, אבל גם אסור
@@ -532,6 +572,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         candidates,
         kind,
         draftEmail: kind === "gift" ? candidates[0].draft : null,
+        observedRegions: narrowedTo,
       });
     }
 
@@ -551,6 +592,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}; ` +
                 `${supplyLine(g)}\n` +
+                observedLine(g) +
                 `מועמדים מתאימים במאגר: ${g.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n` +
                 `הטיוטה ניתנת לעריכה למטה, והמייל יוצא רק בלחיצה שלך.`,
               entityType: "therapist",
@@ -579,7 +621,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
               body:
                 `${g.events} מטופלים חיפשו ${g.treatment} באזור ${g.region}. ` +
                 `${supplyLine(g)} ` +
-                `וגם אין במאגר אף מטפל חינמי מאושר שמתאים. זה אזור/תחום לפרסום גיוס ממוקד.`,
+                `וגם אין במאגר אף מטפל חינמי מאושר שמתאים. זה אזור/תחום לפרסום גיוס ממוקד.\n` +
+                observedLine(g),
               dedupeKey: g.key,
               payload: { region: g.region, treatment: g.treatment },
             }
