@@ -548,11 +548,15 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         therapist_id: t.id,
         full_name: t.full_name ?? "",
         email: t.email ?? "",
+        // הטיוטה היוצאת נוקבת באזור שבו החוסר באמת נמדד ובביקוש שנמדד שם,
+        // ולא בקבוצה כולה: לנמען במודיעין "באזור המרכז והשפלה" נכון אך רחב,
+        // ו"באזור השפלה והמרכז" הוא מה שקרה בפועל. תווית הפער עצמה (g.region)
+        // נשארת גסה, כי היא מפתח הצינון מול הצעות שכבר יצאו.
         draft: buildGiftDraft(
           t.full_name ?? "",
-          a.regionKey,
+          narrowedTo.length > 0 ? narrowedTo.join(", ") : a.regionKey,
           a.treatment,
-          demand,
+          narrowedTo.length > 0 ? a.events : demand,
           partialOnly ? coveredPartOf(t, a.treatment) : undefined
         ),
       }));
