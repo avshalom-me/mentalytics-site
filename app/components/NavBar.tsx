@@ -2,7 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { User, GraduationCap, Menu, X, LogIn } from "lucide-react";
+import EnglishNavBar from "./EnglishNavBar";
+import { isEnglishPath } from "@/app/lib/english-path";
 
 const navLinks = [
   { href: "/about", label: "מי אנחנו" },
@@ -12,10 +15,27 @@ const navLinks = [
   { href: "/therapists", label: "המטפלים שלנו" },
 ];
 
+// Moved here from app/layout.tsx so it can speak the page's language. The
+// AttributionTracker before NavBar renders nothing, so this is still the first
+// focusable element on every page.
+function SkipLink({ english }: { english: boolean }) {
+  return (
+    <a href="#main-content" lang={english ? "en" : undefined}
+      className={`sr-only focus:not-sr-only focus:fixed focus:top-2 ${english ? "focus:left-2" : "focus:right-2"} focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none`}>
+      {english ? "Skip to main content" : "דלג לתוכן הראשי"}
+    </a>
+  );
+}
+
 export default function NavBar() {
   const [open, setOpen] = useState(false);
+  const english = isEnglishPath(usePathname());
+  // The English section (/en) gets its own header, in English and LTR.
+  if (english) return <><SkipLink english /><EnglishNavBar /></>;
 
   return (
+    <>
+    <SkipLink english={false} />
     <header className="print:hidden" style={{ position: "sticky", top: 0, zIndex: 100, background: "rgba(255,255,255,.96)", backdropFilter: "blur(18px)", WebkitBackdropFilter: "blur(18px)", borderBottom: "1px solid var(--line)" }}>
       {/* Topbar */}
       <div style={{ background: "var(--surface)", borderBottom: "1px solid var(--line)", padding: "7px 24px", fontSize: "13px", color: "var(--muted)", display: "flex", alignItems: "center", justifyContent: "flex-start", gap: "8px" }}>
@@ -122,5 +142,6 @@ export default function NavBar() {
         </nav>
       )}
     </header>
+    </>
   );
 }

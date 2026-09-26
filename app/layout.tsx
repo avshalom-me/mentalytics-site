@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Link from "next/link";
 import { Heebo } from "next/font/google";
 import NavBar from "./components/NavBar";
+import SiteFooter from "./components/SiteFooter";
 import AccessibilityWidget from "./components/AccessibilityWidget";
 import AttributionTracker from "./components/AttributionTracker";
 import { Analytics } from "@vercel/analytics/next";
@@ -44,10 +44,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {/* ראשון ב-body, לפני הציור הראשון: מסמן מבקר ממומן (html.mnt-paid)
             כדי שמטפלים חינמיים לא יוצגו לו - ראו app/lib/paid-visitor.ts. */}
         <script id="paid-visitor" dangerouslySetInnerHTML={{ __html: paidVisitorBootScript() }} />
-        <a href="#main-content" className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:right-2 focus:z-[100] focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:shadow-md focus:outline-none">
-          דלג לתוכן הראשי
-        </a>
         <AttributionTracker />
+        {/* NavBar also renders the "skip to main content" link, first thing
+            in the tab order, in the language of the page. */}
         <NavBar />
         <AccessibilityWidget />
 
@@ -89,38 +88,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           'tb_tfa_script');
         `}</Script>
 
-        <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir="rtl">
-          <div className="mx-auto max-w-5xl px-6 py-8">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <span style={{ fontSize: "12px", color: "var(--faint)" }}>© {new Date().getFullYear()} טיפול חכם - Mentalytics</span>
-              <ul className="flex flex-wrap gap-5 list-none">
-                {[
-                  { href: "/therapists", label: "מאגר המטפלים" },
-                  // The online hub had no link from the homepage, the menu or
-                  // the footer (25/9/2026), though online is the paid landing
-                  // that converts best. One sitewide link fixes all three.
-                  { href: "/therapists/region/אונליין", label: "טיפול אונליין" },
-                  { href: "/research", label: "מאמרים ומידע" },
-                  { href: "/centers", label: "למרכזים טיפוליים" },
-                  { href: "/counselors", label: "לצוותי חינוך" },
-                  { href: "/centers/login", label: "כניסה למרכזים" },
-                  { href: "/privacy", label: "מדיניות פרטיות" },
-                  { href: "/terms", label: "תנאי שימוש" },
-                  { href: "/billing-policy", label: "תקנון רכישה" },
-                  { href: "/accessibility", label: "הצהרת נגישות" },
-                ].map(({ href, label }) => (
-                  <li key={href}>
-                    <Link href={href} style={{ fontSize: "12.5px", color: "var(--faint)", transition: "color .18s" }}
-                      className="hover:text-[var(--teal)]">{label}</Link>
-                  </li>
-                ))}
-              </ul>
-              <div style={{ fontSize: "12px", color: "var(--faint)" }} className="flex flex-wrap gap-4">
-                <a href="mailto:admin@getmentalytics.com" className="hover:text-[var(--teal)]">admin@getmentalytics.com</a>
-              </div>
-            </div>
-          </div>
-        </footer>
+        <SiteFooter />
       </body>
     </html>
   );

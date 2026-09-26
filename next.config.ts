@@ -91,7 +91,14 @@ const nextConfig: NextConfig = {
   },
   images: { remotePatterns },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // The one root layout renders <html lang="he"> on every route, so the
+      // English page declares its language here, where a crawler reads it
+      // without running any script (app/en/DocumentLanguage.tsx fixes the
+      // attribute itself only in the browser).
+      { source: "/en", headers: [{ key: "Content-Language", value: "en" }] },
+    ];
   },
   async redirects() {
     return [

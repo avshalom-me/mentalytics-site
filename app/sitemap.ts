@@ -35,6 +35,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // noindex URL here only earns "submitted URL marked noindex" in Search
     // Console and wastes crawl budget.
     { url: `${BASE}/therapists`, priority: 0.8, changeFrequency: "weekly" },
+    // The English page (promoted therapists who work in English). Its list is
+    // live data like the directory's, but its lastmod follows its copy.
+    { url: `${BASE}/en`, priority: 0.7, changeFrequency: "weekly" },
     { url: `${BASE}/research`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/therapist-patient-match`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/online-therapy`, priority: 0.6, changeFrequency: "monthly" },
