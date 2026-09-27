@@ -15,7 +15,12 @@ type Item = { id: string; text: string };
  * Headings without an id get a generated one so the anchors work regardless of
  * how the article was authored.
  */
-export default function ArticleTOC() {
+export default function ArticleTOC({ heading = "בעמוד הזה", label = "תוכן העניינים" }: {
+  /** The small caption above the list. English pages pass their own. */
+  heading?: string;
+  /** Accessible name of the nav landmark. */
+  label?: string;
+} = {}) {
   const [items, setItems] = useState<Item[]>([]);
   const [active, setActive] = useState<string>("");
 
@@ -51,7 +56,7 @@ export default function ArticleTOC() {
   if (items.length < 4) return null;
 
   return (
-    <nav aria-label="תוכן העניינים">
+    <nav aria-label={label}>
       <p
         style={{
           fontSize: "11px",
@@ -61,7 +66,7 @@ export default function ArticleTOC() {
           marginBottom: "10px",
         }}
       >
-        בעמוד הזה
+        {heading}
       </p>
       <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "2px" }}>
         {items.map((it) => {

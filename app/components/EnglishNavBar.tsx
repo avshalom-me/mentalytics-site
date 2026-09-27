@@ -10,6 +10,7 @@ import { User, GraduationCap, Menu, X, LogIn } from "lucide-react";
 const navLinks = [
   { href: "/en#therapists", label: "Therapists" },
   { href: "/en#questionnaire", label: "Questionnaires" },
+  { href: "/en/therapy-for-olim", label: "Guide for olim" },
   { href: "/en#faq", label: "FAQ" },
 ];
 

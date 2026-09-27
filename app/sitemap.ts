@@ -38,6 +38,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The English page (promoted therapists who work in English). Its list is
     // live data like the directory's, but its lastmod follows its copy.
     { url: `${BASE}/en`, priority: 0.7, changeFrequency: "weekly" },
+    { url: `${BASE}/en/therapy-for-olim`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/therapist-patient-match`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/online-therapy`, priority: 0.6, changeFrequency: "monthly" },

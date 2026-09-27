@@ -237,6 +237,11 @@ export default async function EnglishPage() {
             After aliyah or a relocation, work, school meetings and paperwork already happen in a second language.
             Therapy is one place where you should not have to <strong style={{ fontWeight: 700, color: "var(--teal)" }}>translate yourself</strong>.
           </p>
+          <p style={{ marginTop: "22px" }}>
+            <Link href="/en/therapy-for-olim" style={{ fontSize: "15.5px", fontWeight: 700, color: "var(--teal-dark)", textDecoration: "underline", textUnderlineOffset: "3px" }}>
+              Read our guide: therapy for new and veteran olim
+            </Link>
+          </p>
           <div style={{ width: "48px", height: "3px", borderRadius: "2px", background: "var(--gold)", margin: "28px auto 0" }} />
         </div>
       </section>

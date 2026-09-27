@@ -98,6 +98,7 @@ const nextConfig: NextConfig = {
       // without running any script (app/en/DocumentLanguage.tsx fixes the
       // attribute itself only in the browser).
       { source: "/en", headers: [{ key: "Content-Language", value: "en" }] },
+      { source: "/en/:path*", headers: [{ key: "Content-Language", value: "en" }] },
     ];
   },
   async redirects() {

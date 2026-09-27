@@ -30,6 +30,7 @@ const HEBREW_LINKS: FooterLink[] = [
 
 const ENGLISH_LINKS: FooterLink[] = [
   { href: "/en#therapists", label: "Therapists who work in English" },
+  { href: "/en/therapy-for-olim", label: "Guide: therapy for olim" },
   { href: "/", label: "עברית", lang: "he" },
   { href: "/privacy", label: "Privacy policy (Hebrew)" },
   { href: "/terms", label: "Terms of use (Hebrew)" },
