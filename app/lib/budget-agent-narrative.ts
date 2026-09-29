@@ -18,6 +18,9 @@ export function budgetFacts(report: BudgetReport) {
   return {
     month: p.month,
     ceiling: p.ceiling,
+    google_ceiling: p.googleCeiling,
+    other_platforms_this_month: p.otherMonthCost,
+    last_30_days_by_platform: p.lastMonth.byPlatform,
     current_monthly: p.current.monthly,
     plan_monthly: p.plan.monthly,
     plan_seekers: p.plan.seekers,

@@ -51,7 +51,7 @@ describe("the 29/9/2026 figures", () => {
   it("totals the last 30 days across every Google campaign, the paused one included", () => {
     // Taboola's six seekers made the manual figure 79; its spend is not in the
     // database until step 3.
-    expect(p.lastMonth).toEqual({ cost: 4652, seekers: 73, cpl: 64 });
+    expect(p.lastMonth).toEqual({ cost: 4652, seekers: 73, cpl: 64, byPlatform: [] });
   });
 
   it("ranks on 30 days only when at least eight seekers stand behind it", () => {
@@ -117,6 +117,40 @@ describe("splitting ₪3,500 for October", () => {
       "הצפי לאוקטובר: כ-72 פונים ב-₪3,472 (כ-₪44 לפונה), לא כולל g-shfela שעוד אין לו נתונים, " +
         "מול 73 פונים ב-30 הימים האחרונים, שעלו ₪4,652 (₪64 לפונה). התקרה: ₪3,500."
     );
+  });
+});
+
+describe("other platforms, from their invoices", () => {
+  // Taboola in the 30 days to 28/9: $458.63 over 16-29/9 at the 29/9 rate, 13 of its 14 days.
+  const taboola = { label: "טאבולה", cost30: 1308, seekers30: 6, monthCost: 0 };
+
+  it("adds their spend and seekers to the last 30 days, and says so", () => {
+    const p = projectBudget({ campaigns: CAMPAIGNS, ceiling: 3500, month: "2026-10", today: "2026-09-29", otherPlatforms: [taboola] });
+    expect(p.lastMonth).toEqual({
+      cost: 5960,
+      seekers: 79,
+      cpl: 75,
+      byPlatform: [
+        { label: "גוגל", cost: 4652, seekers: 73, cpl: 64 },
+        { label: "טאבולה", cost: 1308, seekers: 6, cpl: 218 },
+      ],
+    });
+    expect(summarySentence(p)).toContain("מול 79 פונים ב-30 הימים האחרונים, שעלו ₪5,960 (₪75 לפונה), מתוכם טאבולה: 6 פונים ב-₪1,308.");
+  });
+
+  it("takes what they already spend in the month off Google's share of the ceiling", () => {
+    const meta = { label: "מטא", cost30: 0, seekers30: 0, monthCost: 1000 };
+    const p = projectBudget({ campaigns: CAMPAIGNS, ceiling: 3500, month: "2026-10", today: "2026-09-29", otherPlatforms: [meta] });
+    expect(p.otherMonthCost).toBe(1000);
+    expect(p.googleCeiling).toBe(2500);
+    expect(p.plan.monthly).toBeLessThanOrEqual(2500);
+    expect(summarySentence(p)).toContain("התקרה: ₪3,500, מתוכה ₪1,000 כבר רשומים בפלטפורמות אחרות, ולגוגל נשארים ₪2,500.");
+  });
+
+  it("leaves Google's ceiling whole when no invoice falls in the month", () => {
+    const p = projectBudget({ campaigns: CAMPAIGNS, ceiling: 3500, month: "2026-10", today: "2026-09-29", otherPlatforms: [taboola] });
+    expect(p.googleCeiling).toBe(3500);
+    expect(p.otherMonthCost).toBe(0);
   });
 });
 

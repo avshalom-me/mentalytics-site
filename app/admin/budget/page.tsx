@@ -10,6 +10,20 @@ import {
   type BudgetDecision,
   type BudgetProjection,
 } from "@/app/lib/budget-agent";
+import {
+  CURRENCIES,
+  PLATFORMS,
+  platformLabel,
+  type PlatformSpendRow,
+  type PlatformWindow,
+} from "@/app/lib/ads-platforms";
+
+type Platforms = {
+  rows: PlatformSpendRow[];
+  last30: PlatformWindow[];
+  month: PlatformWindow[];
+  window: { from: string; to: string };
+};
 
 type Data = {
   today: string;
@@ -20,6 +34,7 @@ type Data = {
   projection: BudgetProjection;
   /** The last day with Google spend in the database. */
   adsDataThrough: string | null;
+  platforms: Platforms;
 };
 
 function nis(n: number | null | undefined): string {
@@ -62,6 +77,8 @@ export default function BudgetPage() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  // Bumped after an invoice is added or removed, to reload the whole report.
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -74,7 +91,7 @@ export default function BudgetPage() {
       })
       .catch(() => setError("שגיאה בטעינה"))
       .finally(() => setLoading(false));
-  }, [month]);
+  }, [month, version]);
 
   const shown = data?.month ?? month;
   const p = data?.projection;
@@ -134,14 +151,20 @@ export default function BudgetPage() {
               <Card
                 label={`תקרה ל${hebrewMonth(p.month)}`}
                 value={data.ceiling ? nis(data.ceiling.value) : "לא הוגדרה"}
-                sub={data.ceiling ? `לפני מע״מ, בתוקף מ-${monthTitle(data.ceiling.since)}` : "בלי תקרה אין הצעת חלוקה"}
+                sub={
+                  !data.ceiling
+                    ? "בלי תקרה אין הצעת חלוקה"
+                    : p.otherMonthCost > 0
+                      ? `לפני מע״מ; ${nis(p.otherMonthCost)} כבר בפלטפורמות אחרות, לגוגל ${nis(p.googleCeiling)}`
+                      : `לפני מע״מ, בתוקף מ-${monthTitle(data.ceiling.since)}`
+                }
                 accent
               />
               <Card
                 label="התקציבים בגוגל היום"
                 value={nis(p.current.monthly)}
                 sub={`${nis(p.current.daily)} ליום × ${p.daysInMonth} ימים`}
-                tone={data.ceiling && p.current.monthly > data.ceiling.value ? "text-red-600" : undefined}
+                tone={p.googleCeiling != null && p.current.monthly > p.googleCeiling ? "text-red-600" : undefined}
               />
               <Card
                 label="לפי ההצעה"
@@ -153,13 +176,15 @@ export default function BudgetPage() {
                 value={nis(p.lastMonth.cost)}
                 sub={`${p.lastMonth.seekers} פונים · ${nis(p.lastMonth.cpl)} לפונה${
                   data.cplTarget ? ` (יעד ${nis(data.cplTarget.value)})` : ""
-                }`}
+                }${p.lastMonth.byPlatform.length ? " · כל הפלטפורמות" : ""}`}
               />
             </div>
 
             <CampaignTable campaigns={p.campaigns} />
 
             <Protections campaigns={p.campaigns} />
+
+            <PlatformSpend platforms={data.platforms} onChanged={() => setVersion((v) => v + 1)} />
 
             <div className="rounded-2xl border border-stone-200 bg-white p-4 text-xs leading-relaxed text-stone-500">
               <div className="mb-1 font-bold text-stone-700">איך ההצעה נבנית</div>
@@ -176,8 +201,8 @@ export default function BudgetPage() {
               <p className="mt-2">
                 פונה = סשן אחד שלחץ ליצירת קשר עם מטפל/ת ממודעה בגוגל. עלויות לפני מע״מ, כפי שגוגל מדווחת (סנכרון לילי
                 {data.adsDataThrough ? `, נתונים עד ${shortDate(data.adsDataThrough)}` : ""}
-                ). התקציבים "היום" הם מה שמוגדר בגוגל לפי הסנכרון האחרון. טאבולה ומטא עוד לא כאן: ההוצאה שלהם לא
-                נשמרת במערכת.
+                ). התקציבים "היום" הם מה שמוגדר בגוגל לפי הסנכרון האחרון. טאבולה ומטא נספרים רק מהחשבוניות שבטבלה
+                &quot;פרסום מחוץ לגוגל&quot;, והתקרה חלה על כל הפרסום יחד.
               </p>
             </div>
           </>
@@ -305,6 +330,216 @@ function Protections({ campaigns }: { campaigns: BudgetCampaignPlan[] }) {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+type SpendForm = {
+  platform: string;
+  campaign_key: string;
+  period_start: string;
+  period_end: string;
+  amount: string;
+  currency: string;
+  vat: string;
+  fx_rate: string;
+  source_ref: string;
+  note: string;
+};
+
+const EMPTY_FORM: SpendForm = {
+  platform: "meta",
+  campaign_key: "",
+  period_start: "",
+  period_end: "",
+  amount: "",
+  currency: "USD",
+  vat: "",
+  fx_rate: "",
+  source_ref: "",
+  note: "",
+};
+
+const INPUT = "w-full rounded-lg border border-stone-200 bg-white px-2 py-1.5 text-sm";
+
+// Spend outside Google. Entered by hand from the invoices, never read from the
+// platforms' own accounts (the owner's decision, 30/9/2026).
+function PlatformSpend({ platforms, onChanged }: { platforms: Platforms; onChanged: () => void }) {
+  const [form, setForm] = useState<SpendForm>(EMPTY_FORM);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const set = (k: keyof SpendForm) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  async function add() {
+    setBusy(true);
+    setMsg("");
+    try {
+      const res = await fetch("/api/admin-ads-platforms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...form, amount: Number(form.amount) }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setMsg(j.error || "השמירה נכשלה");
+        return;
+      }
+      setForm((f) => ({ ...EMPTY_FORM, platform: f.platform, currency: f.currency }));
+      onChanged();
+    } catch {
+      setMsg("השמירה נכשלה");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function remove(row: PlatformSpendRow) {
+    if (!row.id) return;
+    if (!window.confirm(`למחוק את השורה של ${platformLabel(row.platform)} (${row.period_start} עד ${row.period_end})?`)) return;
+    const res = await fetch("/api/admin-ads-platforms", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: row.id }),
+    });
+    const j = await res.json().catch(() => ({ ok: false }));
+    if (!j.ok) setMsg(j.error || "המחיקה נכשלה");
+    else onChanged();
+  }
+
+  const foreign = form.currency !== "ILS";
+
+  return (
+    <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4">
+      <div className="mb-1 text-sm font-black text-stone-700">📄 פרסום מחוץ לגוגל - לפי חשבוניות</div>
+      <p className="mb-3 text-sm leading-relaxed text-stone-600">
+        אין כאן חיבור לחשבון של טאבולה או של מטא, וגם לא יהיה: ההוצאה נכנסת רק מהחשבוניות והקבלות שלהן. מזינים את הסכום
+        לפני מע״מ ואת התקופה שהוא מכסה. דולרים ואירו מומרים לפי השער היציג של בנק ישראל ביום האחרון של התקופה, והשער נשמר
+        עם השורה.
+      </p>
+
+      {platforms.last30.length > 0 && (
+        <ul className="mb-3 space-y-0.5 text-sm text-stone-700">
+          {platforms.last30.map((w) => (
+            <li key={w.platform}>
+              <b>{w.label}</b>, 30 הימים האחרונים ({shortDate(platforms.window.from)}-{shortDate(platforms.window.to)}):{" "}
+              {nis(w.cost)} · {w.seekers} פונים{w.cpl != null ? ` · ${nis(w.cpl)} לפונה` : ""}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {platforms.rows.length > 0 ? (
+        <div className="mb-4 overflow-x-auto">
+          <table className="w-full min-w-[640px] text-xs">
+            <thead>
+              <tr className="border-b border-stone-200 text-stone-400">
+                <th className="px-2 py-1.5 text-start font-bold">פלטפורמה</th>
+                <th className="px-2 py-1.5 text-start font-bold">תקופה</th>
+                <th className="px-2 py-1.5 text-start font-bold">סכום (לפני מע״מ)</th>
+                <th className="px-2 py-1.5 text-start font-bold">בשקלים</th>
+                <th className="px-2 py-1.5 text-start font-bold">חשבונית</th>
+                <th className="px-2 py-1.5 text-start font-bold"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {platforms.rows.map((r) => (
+                <tr key={r.id} className="border-b border-stone-100 last:border-b-0">
+                  <td className="px-2 py-1.5">
+                    <b>{platformLabel(r.platform)}</b>
+                    {r.campaign_key && <span className="text-stone-400"> · {r.campaign_key}</span>}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {shortDate(r.period_start)}-{shortDate(r.period_end)}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    {Number(r.amount_orig).toLocaleString("he-IL")} {r.currency}
+                    {r.currency !== "ILS" && <span className="text-stone-400"> × {Number(r.fx_rate)}</span>}
+                  </td>
+                  <td className="px-2 py-1.5 font-bold">{nis(Number(r.amount_ils))}</td>
+                  <td className="px-2 py-1.5 text-stone-500" title={r.note ?? ""}>
+                    {r.source_ref ?? "—"}
+                  </td>
+                  <td className="px-2 py-1.5">
+                    <button onClick={() => remove(r)} className="text-stone-400 hover:text-red-600" aria-label="מחיקה">
+                      🗑
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="mb-4 text-sm text-stone-400">עוד לא הוזנה אף חשבונית.</p>
+      )}
+
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <label className="text-xs text-stone-500">
+          פלטפורמה
+          <select className={INPUT} value={form.platform} onChange={set("platform")}>
+            {PLATFORMS.map((p) => (
+              <option key={p.key} value={p.key}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-stone-500">
+          מתאריך
+          <input type="date" className={INPUT} value={form.period_start} onChange={set("period_start")} />
+        </label>
+        <label className="text-xs text-stone-500">
+          עד תאריך
+          <input type="date" className={INPUT} value={form.period_end} onChange={set("period_end")} />
+        </label>
+        <label className="text-xs text-stone-500">
+          קמפיין (לא חובה)
+          <input className={INPUT} value={form.campaign_key} onChange={set("campaign_key")} placeholder="למשל tab-tlv" />
+        </label>
+        <label className="text-xs text-stone-500">
+          סכום לפני מע״מ
+          <input type="number" min="0" step="0.01" className={INPUT} value={form.amount} onChange={set("amount")} />
+        </label>
+        <label className="text-xs text-stone-500">
+          מטבע
+          <select className={INPUT} value={form.currency} onChange={set("currency")}>
+            {CURRENCIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="text-xs text-stone-500">
+          מע״מ בחשבונית (לא חובה)
+          <input type="number" min="0" step="0.01" className={INPUT} value={form.vat} onChange={set("vat")} />
+        </label>
+        <label className="text-xs text-stone-500">
+          מספר חשבונית / מקור
+          <input className={INPUT} value={form.source_ref} onChange={set("source_ref")} />
+        </label>
+        {foreign && (
+          <label className="text-xs text-stone-500">
+            שער ידני (רק אם בנק ישראל לא זמין)
+            <input type="number" min="0" step="0.0001" className={INPUT} value={form.fx_rate} onChange={set("fx_rate")} />
+          </label>
+        )}
+        <label className="col-span-2 text-xs text-stone-500 sm:col-span-3">
+          הערה
+          <input className={INPUT} value={form.note} onChange={set("note")} />
+        </label>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button
+          onClick={add}
+          disabled={busy || !form.amount || !form.period_start || !form.period_end}
+          className="rounded-full bg-stone-800 px-5 py-2 text-sm font-bold text-white hover:bg-stone-700 disabled:opacity-40"
+        >
+          {busy ? "שומר…" : "הוספת חשבונית"}
+        </button>
+        {msg && <span className="text-sm text-red-600">{msg}</span>}
+      </div>
     </div>
   );
 }

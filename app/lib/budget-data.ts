@@ -1,12 +1,20 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import {
+  daysInMonth,
   defaultTargetMonth,
   projectBudget,
   summarySentence,
   type BudgetCampaignInput,
   type BudgetProjection,
+  type OtherPlatformInput,
 } from "./budget-agent";
+import {
+  PLATFORMS,
+  platformTotals,
+  type PlatformSpendRow,
+  type PlatformWindow,
+} from "./ads-platforms";
 
 // Everything the budget page and the monthly budget agent read, in one place,
 // so the page and the recommendation in the queue can never disagree.
@@ -47,7 +55,21 @@ export type BudgetReport = {
   projection: BudgetProjection;
   /** The last day with Google spend in the database. */
   adsDataThrough: string | null;
+  /** Spend outside Google, from invoices (ads_platform_spend). */
+  platforms: {
+    /** Invoices whose period ended in the last 120 days or later, newest first. */
+    rows: PlatformSpendRow[];
+    /** The same trailing 30 days as Google's figures. */
+    last30: PlatformWindow[];
+    /** What invoices already place in the target month. */
+    month: PlatformWindow[];
+    window: { from: string; to: string };
+  };
 };
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const shiftDay = (day: string, by: number) =>
+  new Date(Date.parse(`${day}T00:00:00Z`) + by * DAY_MS).toISOString().slice(0, 10);
 
 export function israelToday(): string {
   // en-CA formats as YYYY-MM-DD.
@@ -78,7 +100,15 @@ export async function loadBudgetReport(opts: { month?: string } = {}): Promise<B
   const month =
     opts.month && /^\d{4}-(0[1-9]|1[0-2])$/.test(opts.month) ? opts.month : defaultTargetMonth(today);
 
-  const [registryQ, configQ, statsQ, ceiling, cplTarget, lastDayQ] = await Promise.all([
+  // The trailing window budget_campaign_stats measures Google on: the 30 whole
+  // days before today's UTC date. The other platforms are measured on the same days.
+  const asOf = new Date().toISOString().slice(0, 10);
+  const windowFrom = shiftDay(asOf, -30);
+  const windowTo = shiftDay(asOf, -1);
+  const monthFrom = `${month}-01`;
+  const monthTo = `${month}-${String(daysInMonth(month)).padStart(2, "0")}`;
+
+  const [registryQ, configQ, statsQ, ceiling, cplTarget, lastDayQ, spendQ, seekersQ] = await Promise.all([
     supabaseAdmin
       .from("ads_campaign_registry")
       .select("google_name, utm_campaign, budget_type, budget_amount, active, protected_reason, protected_until"),
@@ -89,10 +119,32 @@ export async function loadBudgetReport(opts: { month?: string } = {}): Promise<B
     targetInForce("ads_budget_month", month),
     targetInForce("cpl_max", month),
     supabaseAdmin.from("ads_campaign_daily").select("date").order("date", { ascending: false }).limit(1),
+    supabaseAdmin
+      .from("ads_platform_spend")
+      .select("*")
+      .gte("period_end", shiftDay(asOf, -120))
+      .order("period_end", { ascending: false })
+      .limit(500),
+    supabaseAdmin.rpc("platform_seekers", {
+      p_from: `${windowFrom}T00:00:00Z`,
+      p_to: `${asOf}T00:00:00Z`,
+    }),
   ]);
   if (registryQ.error) throw new Error(`ads_campaign_registry: ${registryQ.error.message}`);
   if (configQ.error) throw new Error(`ads_campaign_config: ${configQ.error.message}`);
   if (statsQ.error) throw new Error(`budget_campaign_stats: ${statsQ.error.message}`);
+  if (spendQ.error) throw new Error(`ads_platform_spend: ${spendQ.error.message}`);
+  if (seekersQ.error) throw new Error(`platform_seekers: ${seekersQ.error.message}`);
+
+  const spendRows = (spendQ.data ?? []) as PlatformSpendRow[];
+  const seekerRows = (seekersQ.data ?? []) as { channel: string; seekers: number | string }[];
+  const last30 = platformTotals(spendRows, seekerRows, windowFrom, windowTo);
+  const inMonth = platformTotals(spendRows, [], monthFrom, monthTo);
+  const otherPlatforms: OtherPlatformInput[] = PLATFORMS.map((p) => {
+    const w = last30.find((x) => x.platform === p.key);
+    const m = inMonth.find((x) => x.platform === p.key);
+    return { label: p.label, cost30: w?.cost ?? 0, seekers30: w?.seekers ?? 0, monthCost: m?.cost ?? 0 };
+  }).filter((o) => o.cost30 > 0 || o.seekers30 > 0 || o.monthCost > 0);
 
   const stats = new Map(((statsQ.data ?? []) as StatsRow[]).map((s) => [s.utm_campaign, s]));
   const config = new Map(((configQ.data ?? []) as ConfigRow[]).map((c) => [c.campaign_name, c]));
@@ -134,7 +186,7 @@ export async function loadBudgetReport(opts: { month?: string } = {}): Promise<B
     })
     .filter((c) => c.active || stats.has(c.utmCampaign));
 
-  const projection = projectBudget({ campaigns, ceiling: ceiling?.value ?? null, month, today });
+  const projection = projectBudget({ campaigns, ceiling: ceiling?.value ?? null, month, today, otherPlatforms });
   projection.campaigns.sort(
     (a, b) => Number(b.inPlan) - Number(a.inPlan) || b.cost30 - a.cost30 || a.googleName.localeCompare(b.googleName)
   );
@@ -147,5 +199,6 @@ export async function loadBudgetReport(opts: { month?: string } = {}): Promise<B
     sentence: summarySentence(projection),
     projection,
     adsDataThrough: (lastDayQ.data?.[0]?.date as string | undefined) ?? null,
+    platforms: { rows: spendRows, last30, month: inMonth, window: { from: windowFrom, to: windowTo } },
   };
 }

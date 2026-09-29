@@ -54,8 +54,20 @@ export type BudgetProjection = {
   month: string;
   daysInMonth: number;
   ceiling: number | null;
-  /** The trailing 30 days, every Google campaign including paused ones. */
-  lastMonth: { cost: number; seekers: number; cpl: number | null };
+  /** What the ceiling leaves for Google after the other platforms' spend recorded for the month. */
+  googleCeiling: number | null;
+  /** Spend on the other platforms that invoices already place in the target month. */
+  otherMonthCost: number;
+  /**
+   * The trailing 30 days: every Google campaign including paused ones, plus the
+   * other platforms' invoiced spend. byPlatform is empty when Google is alone.
+   */
+  lastMonth: {
+    cost: number;
+    seekers: number;
+    cpl: number | null;
+    byPlatform: { label: string; cost: number; seekers: number; cpl: number | null }[];
+  };
   /** The budgets as set today, over the whole target month. */
   current: { daily: number; monthly: number };
   plan: {
@@ -91,9 +103,12 @@ function daysBetween(from: string, to: string): number {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
 
-/** Cost per seeker the way the 29/9 analysis rounded it: the shekel total first, then the division. */
+/**
+ * Cost per seeker the way the 29/9 analysis rounded it: the shekel total first,
+ * then the division. No spend recorded means unknown, not free.
+ */
 function costPerSeeker(cost: number, seekers: number): number | null {
-  return seekers > 0 ? Math.round(Math.round(cost) / seekers) : null;
+  return seekers > 0 && cost > 0 ? Math.round(Math.round(cost) / seekers) : null;
 }
 
 /**
@@ -120,14 +135,30 @@ export function defaultTargetMonth(today: string): string {
  *    rest, and any campaign without a seeker in 60 days, are candidates to pause.
  *    Nothing is ever raised above what is set today.
  */
+export type OtherPlatformInput = {
+  label: string;
+  /** Invoiced spend prorated into the trailing 30 days, ₪ before VAT. */
+  cost30: number;
+  seekers30: number;
+  /** Invoiced spend prorated into the target month. */
+  monthCost: number;
+};
+
 export function projectBudget(input: {
   campaigns: BudgetCampaignInput[];
   ceiling: number | null;
   month: string;
   today: string;
+  /** Taboola, Meta and the like, from their invoices (ads-platforms.ts). */
+  otherPlatforms?: OtherPlatformInput[];
 }): BudgetProjection {
   const D = daysInMonth(input.month);
   const monthStart = `${input.month}-01`;
+  const others = input.otherPlatforms ?? [];
+  const otherMonthCost = Math.round(others.reduce((s, o) => s + o.monthCost, 0));
+  // The ceiling is for all advertising; what the other platforms already take
+  // in the month comes off Google's share.
+  const googleCeiling = input.ceiling == null ? null : Math.max(0, input.ceiling - otherMonthCost);
 
   const rows: BudgetCampaignPlan[] = input.campaigns.map((c) => {
     const cpl30 = costPerSeeker(c.cost30, c.seekers30);
@@ -159,7 +190,7 @@ export function projectBudget(input: {
   const kept = inPlan.filter((r) => r.isProtected || r.learning);
   const keptMonthly = kept.reduce((s, r) => s + (r.dailyBudget ?? 0) * D, 0);
 
-  if (input.ceiling == null) {
+  if (googleCeiling == null) {
     // No ceiling: report what the current settings buy, recommend nothing.
     for (const r of inPlan) r.proposedDaily = r.dailyBudget ?? 0;
   } else {
@@ -175,7 +206,7 @@ export function projectBudget(input: {
           b.seekers60 - a.seekers60 ||
           a.googleName.localeCompare(b.googleName)
       );
-    let remaining = input.ceiling - keptMonthly;
+    let remaining = googleCeiling - keptMonthly;
     for (const r of candidates) {
       const current = r.dailyBudget ?? 0;
       let daily = r.rate == null ? 0 : Math.min(current, Math.max(0, Math.floor(remaining / D)));
@@ -191,8 +222,21 @@ export function projectBudget(input: {
     r.projectedSeekers = r.rate != null && r.proposedDaily > 0 ? r.projectedCost / r.rate : r.proposedDaily > 0 ? null : 0;
   }
 
-  const lastCost = rows.reduce((s, r) => s + r.cost30, 0);
-  const lastSeekers = rows.reduce((s, r) => s + r.seekers30, 0);
+  const googleCost = rows.reduce((s, r) => s + r.cost30, 0);
+  const googleSeekers = rows.reduce((s, r) => s + r.seekers30, 0);
+  const lastCost = googleCost + others.reduce((s, o) => s + o.cost30, 0);
+  const lastSeekers = googleSeekers + others.reduce((s, o) => s + o.seekers30, 0);
+  const byPlatform = others.length
+    ? [
+        { label: "גוגל", cost: Math.round(googleCost), seekers: googleSeekers, cpl: costPerSeeker(googleCost, googleSeekers) },
+        ...others.map((o) => ({
+          label: o.label,
+          cost: Math.round(o.cost30),
+          seekers: o.seekers30,
+          cpl: costPerSeeker(o.cost30, o.seekers30),
+        })),
+      ]
+    : [];
   const currentDaily = inPlan.reduce((s, r) => s + (r.dailyBudget ?? 0), 0);
   const planDaily = inPlan.reduce((s, r) => s + r.proposedDaily, 0);
   const known = inPlan.filter((r) => r.projectedSeekers != null && r.proposedDaily > 0);
@@ -203,10 +247,13 @@ export function projectBudget(input: {
     month: input.month,
     daysInMonth: D,
     ceiling: input.ceiling,
+    googleCeiling,
+    otherMonthCost,
     lastMonth: {
       cost: Math.round(lastCost),
       seekers: lastSeekers,
       cpl: costPerSeeker(lastCost, lastSeekers),
+      byPlatform,
     },
     current: { daily: currentDaily, monthly: currentDaily * D },
     plan: {
@@ -216,7 +263,7 @@ export function projectBudget(input: {
       cpl: planSeekers > 0 ? Math.round(knownCost / planSeekers) : null,
       unknown: inPlan.filter((r) => r.proposedDaily > 0 && r.projectedSeekers == null).map((r) => r.googleName),
     },
-    overCeiling: input.ceiling != null && keptMonthly > input.ceiling,
+    overCeiling: googleCeiling != null && keptMonthly > googleCeiling,
     campaigns: rows,
   };
 }
@@ -278,10 +325,10 @@ export function budgetRecommendation(p: BudgetProjection): BudgetRecommendation 
         a.googleName.localeCompare(b.googleName)
     );
 
-  if (p.ceiling == null) {
+  if (p.ceiling == null || p.googleCeiling == null) {
     return { needed: false, title: `אין תקרת פרסום ל${month}`, body: summarySentence(p), changes: [] };
   }
-  const needed = p.current.monthly > p.ceiling && changes.length > 0;
+  const needed = p.current.monthly > p.googleCeiling && changes.length > 0;
   if (!needed) {
     return {
       needed: false,
@@ -322,7 +369,11 @@ export function budgetRecommendation(p: BudgetProjection): BudgetRecommendation 
     );
   }
   if (p.overCeiling) lines.push("", "⚠ המוגנים והחדשים לבדם עוברים את התקרה.");
-  lines.push("", "טאבולה ומטא לא נכללים: ההוצאה שלהם עוד לא נשמרת במערכת. שום דבר לא שונה בגוגל - השינוי בידיים שלך.");
+  lines.push(
+    "",
+    "הוצאה בטאבולה ובמטא נספרת רק מהחשבוניות שהוזנו בעמוד התקציב, בלי חיבור לחשבונות עצמם. " +
+      "שום דבר לא שונה בגוגל - השינוי בידיים שלך."
+  );
 
   return {
     needed: true,
@@ -350,9 +401,16 @@ export function narrativeIsFaithful(narrative: string, source: string): boolean 
 /** The sentence the owner asked for, built from the projection alone. */
 export function summarySentence(p: BudgetProjection): string {
   const month = hebrewMonth(p.month);
+  const others = p.lastMonth.byPlatform.slice(1).filter((b) => b.cost > 0 || b.seekers > 0);
   const last = `${p.lastMonth.seekers} פונים ב-30 הימים האחרונים, שעלו ${nis(p.lastMonth.cost)}${
     p.lastMonth.cpl != null ? ` (${nis(p.lastMonth.cpl)} לפונה)` : ""
-  }`;
+  }${others.map((b) => `, מתוכם ${b.label}: ${b.seekers} פונים ב-${nis(b.cost)}`).join("")}`;
+  const ceilingNote =
+    p.ceiling != null && p.otherMonthCost > 0
+      ? ` התקרה: ${nis(p.ceiling)}, מתוכה ${nis(p.otherMonthCost)} כבר רשומים בפלטפורמות אחרות, ולגוגל נשארים ${nis(p.googleCeiling ?? 0)}.`
+      : p.ceiling != null
+        ? ` התקרה: ${nis(p.ceiling)}.`
+        : "";
   const unknown = p.plan.unknown.length
     ? `, לא כולל ${p.plan.unknown.join(", ")} שעוד אין לו נתונים`
     : "";
@@ -361,7 +419,7 @@ export function summarySentence(p: BudgetProjection): string {
   }
   const head = `הצפי ל${month}: כ-${p.plan.seekers} פונים ב-${nis(p.plan.monthly)}${
     p.plan.cpl != null ? ` (כ-${nis(p.plan.cpl)} לפונה)` : ""
-  }${unknown}, מול ${last}. התקרה: ${nis(p.ceiling)}.`;
+  }${unknown}, מול ${last}.${ceilingNote}`;
   return p.overCeiling
     ? `${head} הקמפיינים המוגנים והחדשים לבדם כבר עוברים אותה.`
     : head;
