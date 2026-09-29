@@ -422,7 +422,11 @@ export async function POST(req: NextRequest) {
         notes: typeof body?.notes === "string" ? body.notes : undefined,
         obstacles: typeof body?.obstacles === "string" ? body.obstacles : undefined,
         phone: typeof body?.phone === "string" ? body.phone : undefined,
+        whatsapp: typeof body?.whatsapp === "string" ? body.whatsapp : undefined,
         email: typeof body?.email === "string" ? body.email : undefined,
+        website: typeof body?.website === "string" ? body.website : undefined,
+        address: typeof body?.address === "string" ? body.address : undefined,
+        city: typeof body?.city === "string" ? body.city : undefined,
         dismissed: typeof body?.dismissed === "boolean" ? body.dismissed : undefined,
       });
       return NextResponse.json({ ok: true, prospects: await listProspects() });

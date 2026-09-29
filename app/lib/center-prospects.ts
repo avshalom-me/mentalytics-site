@@ -1,7 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled, createAgentAction } from "./agent-infra";
-import { REGION_GROUPS, REGION_CITIES, REGION_GROUP_LABELS, CITY_TO_REGION, regionGroupOf } from "./regions";
+import { REGION_GROUPS, REGION_CITIES, REGION_GROUP_LABELS } from "./regions";
+import { canonicalCity, prospectRegionGroup, prospectRegionOfCity } from "./prospect-regions";
 import { placesConfigured, searchCentersInCities } from "./places-search";
 
 // סוכן איתור המכונים: בונה ומתחזק רשימת מרכזים טיפוליים שאפשר להפוך
@@ -26,9 +27,15 @@ export type ProspectRow = {
   place_id: string | null;
   center_account_id: string | null;
   city: string | null;
+  // מפתח אזור של רשימת המכונים (PROSPECT_REGION_GROUPS) - "center" כאן הוא גוש
+  // דן בלבד, והשפלה היא "shfela". לא אותו דבר כמו המפתח הגס של האנליטיקה.
   region_key: string | null;
   address: string | null;
+  // טלפון אחד או כמה, מופרדים ב-" / " - כך הם מגיעים מהאתרים ומהגיליון.
   phone: string | null;
+  // רק מספר שפורסם במפורש כוואטסאפ (קישור wa.me או "וואטסאפ" באתר). נייד
+  // לבדו אינו וואטסאפ, ולכן לא נגזר אוטומטית מהטלפון.
+  whatsapp: string | null;
   website: string | null;
   email: string | null;
   gaps_in_region: number;
@@ -87,7 +94,17 @@ const STALE_LEAD_DAYS = Number(process.env.CENTER_LEAD_STALE_DAYS ?? 7);
 const CITIES_PER_REGION = 3;
 
 function normPhone(v: string | null | undefined): string {
-  return (v ?? "").replace(/\D/g, "");
+  const d = (v ?? "").replace(/\D/g, "");
+  // "+972 54-467-2235" ו-"054-4672235" הם אותו מספר.
+  return d.startsWith("972") ? `0${d.slice(3)}` : d;
+}
+
+/** כל מספר בשדה בנפרד - שדה הטלפון יכול להחזיק כמה מספרים מופרדים ב-" / ". */
+function phoneKeys(v: string | null | undefined): string[] {
+  return String(v ?? "")
+    .split(/[/,;]|\s+או\s+/)
+    .map(normPhone)
+    .filter((d) => d.length >= 4);
 }
 
 function normName(v: string): string {
@@ -127,7 +144,7 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
     const allAccounts = accounts ?? [];
     const knownNames = new Set(allAccounts.map((a) => normName(String(a.name ?? ""))));
     const knownPhones = new Set(
-      allAccounts.flatMap((a) => [normPhone(a.phone as string), normPhone(a.payer_phone as string)]).filter(Boolean)
+      allAccounts.flatMap((a) => [...phoneKeys(a.phone as string), ...phoneKeys(a.payer_phone as string)])
     );
     const existingByPlace = new Map((existing ?? []).filter((p) => p.place_id).map((p) => [p.place_id as string, p]));
     const existingByName = new Map((existing ?? []).map((p) => [normName(String(p.name ?? "")), p]));
@@ -233,7 +250,8 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
           source: "places",
           place_id: p.placeId,
           city: p.city,
-          region_key: regionKey,
+          // המפתח העדין (מרכז/שפלה) לתצוגה; הדירוג למעלה נשאר לפי הקבוצה הכללית.
+          region_key: prospectRegionOfCity(p.city) ?? regionKey,
           address: p.address,
           phone: p.phone,
           website: p.website,
@@ -376,13 +394,25 @@ export async function listProspects(): Promise<ProspectRow[]> {
   ];
 }
 
-/** עדכון שורה מהטבלה באדמין. רק שדות המעקב ניתנים לעריכה. */
+/** עדכון שורה מהטבלה באדמין: שדות המעקב, פרטי הקשר והעיר. */
 export async function updateProspect(
   id: string,
   patch: Partial<
     Pick<
       ProspectRow,
-      "contacted_at" | "answer" | "notes" | "obstacles" | "phone" | "email" | "status" | "follow_up_at" | "status_note"
+      | "contacted_at"
+      | "answer"
+      | "notes"
+      | "obstacles"
+      | "phone"
+      | "whatsapp"
+      | "email"
+      | "website"
+      | "address"
+      | "city"
+      | "status"
+      | "follow_up_at"
+      | "status_note"
     >
   > & {
     dismissed?: boolean;
@@ -409,8 +439,18 @@ export async function updateProspect(
   // undefined נופל ב-JSON - בחירת "נוצרה פנייה ראשונה" לא רשמה תאריך אף פעם.
   // נמדד 14/9/26: שלוש מתוך שש שורות "contacted" בלי contacted_at.
   if (patch.contacted_at !== undefined) update.contacted_at = patch.contacted_at;
-  if ("phone" in patch) update.phone = patch.phone;
-  if ("email" in patch) update.email = patch.email;
+  // שדות הקשר: !== undefined מאותה סיבה, ומחרוזת ריקה = מחיקה ולא "".
+  for (const field of ["phone", "whatsapp", "email", "website", "address"] as const) {
+    if (patch[field] !== undefined) update[field] = patch[field]?.trim() || null;
+  }
+  if (patch.city !== undefined) {
+    const typed = patch.city?.trim() || null;
+    // עיר שבמילון נשמרת בכתיב הקנוני וגוררת את האזור. עיר שאינה במילון
+    // נשמרת כפי שהוקלדה, והאזור נשאר כמו שהוא - לא מנחשים.
+    update.city = canonicalCity(typed) ?? typed;
+    const regionKey = prospectRegionOfCity(typed);
+    if (regionKey) update.region_key = regionKey;
+  }
   if ("notes" in patch) update.notes = patch.notes;
   if ("obstacles" in patch) update.obstacles = patch.obstacles;
   if ("answer" in patch) {
@@ -442,7 +482,7 @@ export async function moveProspectToDeal(
   if (!p) return { ok: false, error: "המכון לא נמצא" };
   if (p.deal_id) return { ok: false, error: "המכון כבר בעסקאות" };
 
-  const contact = [p.phone, p.email].filter(Boolean).join(" · ");
+  const contact = [p.phone, p.whatsapp ? `וואטסאפ ${p.whatsapp}` : null, p.email].filter(Boolean).join(" · ");
   const noteParts = [p.notes, p.obstacles ? `מכשולים: ${p.obstacles}` : null].filter(Boolean);
   const { data: deal, error } = await supabaseAdmin
     .from("crm_deals")
@@ -484,60 +524,106 @@ export async function moveProspectToDeal(
 
 export type ParsedProspect = {
   name: string;
+  // אחד או כמה מספרים, מופרדים ב-" / ".
   phone: string | null;
+  email: string | null;
   city: string | null;
   website: string | null;
+  // כל מה שנשאר בשורה אחרי השם: אנשי קשר, כתובת, "דרך טופס באתר" וכו'.
+  notes: string | null;
 };
 
-/** זיהוי טלפון ישראלי בתוך מקטע טקסט. */
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+
+// ערכי מילוי מגיליון שאין בהם מידע. בלי הסינון "לא נמצא" נשמר כעיר (נמדד
+// 28/9/26: 9 מתוך 68 שורות עם "לא נמצא" או "דרך טופס באתר" בשדה העיר).
+const PLACEHOLDER_RE = /^(לא נמצא|לא פורסם|לא ידוע|אין|-+|—+)$/;
+
+/** מספר ישראלי אחד: 9-11 ספרות שמתחילות ב-0, קו 1-800/1-700/1-599, או כוכבית. */
 function looksLikePhone(v: string): boolean {
-  const digits = v.replace(/\D/g, "");
+  const t = v.trim();
+  if (/^\*\d{3,5}$|^\d{3,5}\*$/.test(t)) return true;
+  const digits = t.replace(/\D/g, "");
+  if (/^1(800|700|599)\d{6}$/.test(digits)) return true;
+  if (/^972\d{8,9}$/.test(digits) && /^\+?972/.test(t.replace(/[\s-]/g, ""))) return true;
   return digits.length >= 9 && digits.length <= 11 && /^0/.test(digits);
 }
 
-function looksLikeUrl(v: string): boolean {
-  return /^(https?:\/\/|www\.)/i.test(v.trim()) || /\.(co\.il|com|org|net)(\/|$)/i.test(v.trim());
+/**
+ * מקטע שכולו טלפונים: "03-9040655 / 052-6940094" או "מוקד 5806*". מחזיר את
+ * המספרים, או null אם יש בו משהו שאינו טלפון. עד 28/9/26 צמד כזה נבלע בשם
+ * המכון, כי 19 ספרות אינן "טלפון" - ושדה הטלפון נשאר ריק.
+ */
+function phonesIn(part: string): string[] | null {
+  const pieces = part
+    .replace(/^(טל(פון)?|טל'|נייד|מוקד)[:\s]*/, "")
+    .split(/\s*[/,;]\s*|\s+או\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+  if (pieces.length === 0 || !pieces.every(looksLikePhone)) return null;
+  return pieces;
 }
 
-/** פירוק שורה אחת. הסדר לא חשוב - כל מקטע מזוהה לפי הצורה שלו. */
+function looksLikeUrl(v: string): boolean {
+  const t = v.trim();
+  // מייל מסתיים גם הוא ב-.co.il - בלי הבדיקה הזו office@x.co.il נשמר כאתר
+  // "https://office@x.co.il", שמוביל למקום לא קיים, והמייל עצמו אבד.
+  if (EMAIL_RE.test(t)) return false;
+  return /^(https?:\/\/|www\.)/i.test(t) || /\.(co\.il|org\.il|com|org|net|center)(\/|$)/i.test(t);
+}
+
+/**
+ * פירוק שורה אחת. הסדר לא חשוב - כל מקטע מזוהה לפי הצורה שלו: מייל, טלפונים,
+ * אתר, עיר מהמילון. המקטע הראשון שנשאר הוא השם; השאר נשמר בהערות, לא בשם.
+ */
 export function parseProspectLine(line: string): ParsedProspect | null {
   const raw = line.trim();
   if (!raw) return null;
   // טאב קודם לפסיק: הדבקה מגיליון היא המקרה הנפוץ, ובתוך תא יכול להיות פסיק.
   const parts = (raw.includes("\t") ? raw.split("\t") : raw.split(/\s*[,|]\s*|\s+-\s+/))
     .map((x) => x.trim())
-    .filter(Boolean);
+    .filter((x) => x && !PLACEHOLDER_RE.test(x));
   if (parts.length === 0) return null;
 
-  let phone: string | null = null;
+  const phones: string[] = [];
+  let email: string | null = null;
   let city: string | null = null;
   let website: string | null = null;
   const rest: string[] = [];
 
   for (const part of parts) {
-    if (!phone && looksLikePhone(part)) {
-      phone = part;
+    const mail = part.match(EMAIL_RE);
+    if (!email && mail && part.replace(EMAIL_RE, "").replace(/^(מייל|דוא"ל|email)[:\s]*/i, "").trim() === "") {
+      email = mail[0];
+      continue;
+    }
+    const nums = phonesIn(part);
+    if (nums) {
+      phones.push(...nums);
       continue;
     }
     if (!website && looksLikeUrl(part)) {
-      website = part.startsWith("http") ? part : `https://${part}`;
+      website = /^https?:\/\//i.test(part) ? part : `https://${part}`;
       continue;
     }
-    if (!city && CITY_TO_REGION[part]) {
-      city = part;
+    const canonical = canonicalCity(part);
+    if (!city && canonical) {
+      city = canonical;
       continue;
     }
     rest.push(part);
   }
 
-  const name = rest.join(" - ").trim();
+  const name = rest[0]?.trim();
   if (!name) return null;
-  // עיר שלא ברשימה הקנונית עדיין נשמרת כטקסט, אם היא המקטע האחרון וקצרה.
-  if (!city && rest.length > 1) {
-    const last = rest[rest.length - 1];
-    if (last.length <= 14 && !looksLikePhone(last)) city = last;
-  }
-  return { name, phone, city, website };
+  return {
+    name,
+    phone: phones.length > 0 ? phones.join(" / ") : null,
+    email,
+    city,
+    website,
+    notes: rest.length > 1 ? rest.slice(1).join(" · ") : null,
+  };
 }
 
 export type AddResult = { added: number; duplicates: number; skipped: number; names: string[] };
@@ -550,7 +636,7 @@ export async function addProspectsFromText(text: string): Promise<AddResult> {
   if (parsed.length === 0) return result;
 
   const [{ data: existing }, { data: accounts }, { data: gapActions }] = await Promise.all([
-    supabaseAdmin.from("center_prospects").select("name, phone"),
+    supabaseAdmin.from("center_prospects").select("name, phone, whatsapp"),
     supabaseAdmin.from("therapy_center_accounts").select("name, phone, payer_phone"),
     supabaseAdmin
       .from("agent_actions")
@@ -563,17 +649,14 @@ export async function addProspectsFromText(text: string): Promise<AddResult> {
   const taken = new Set<string>();
   for (const e of existing ?? []) {
     taken.add(normName(String(e.name ?? "")));
-    const ph = normPhone(e.phone as string);
-    if (ph) taken.add(ph);
+    for (const ph of [...phoneKeys(e.phone as string), ...phoneKeys(e.whatsapp as string)]) taken.add(ph);
   }
   for (const a of accounts ?? []) {
     taken.add(normName(String(a.name ?? "")));
-    for (const ph of [normPhone(a.phone as string), normPhone(a.payer_phone as string)]) {
-      if (ph) taken.add(ph);
-    }
+    for (const ph of [...phoneKeys(a.phone as string), ...phoneKeys(a.payer_phone as string)]) taken.add(ph);
   }
 
-  // אותו דירוג כמו במסלול האוטומטי: כמה פערים פתוחים באזור של המכון.
+  // אותו דירוג כמו במסלול האוטומטי: כמה פערים פתוחים בקבוצת האזור של המכון.
   const gapsByRegionLabel = new Map<string, number>();
   for (const a of gapActions ?? []) {
     const label = String(a.title ?? "").split(" באזור ")[1]?.trim();
@@ -587,16 +670,15 @@ export async function addProspectsFromText(text: string): Promise<AddResult> {
 
   for (const p of parsed) {
     const nName = normName(p.name);
-    const nPhone = normPhone(p.phone);
-    if (taken.has(nName) || (nPhone && taken.has(nPhone))) {
+    const nPhones = phoneKeys(p.phone);
+    if (taken.has(nName) || nPhones.some((ph) => taken.has(ph))) {
       result.duplicates++;
       continue;
     }
     taken.add(nName);
-    if (nPhone) taken.add(nPhone);
+    for (const ph of nPhones) taken.add(ph);
 
-    const regionName = p.city ? CITY_TO_REGION[p.city] : null;
-    const regionKey = regionName ? regionGroupOf(regionName) : null;
+    const regionKey = prospectRegionOfCity(p.city);
 
     const { error } = await supabaseAdmin.from("center_prospects").insert({
       name: p.name,
@@ -604,8 +686,10 @@ export async function addProspectsFromText(text: string): Promise<AddResult> {
       city: p.city,
       region_key: regionKey,
       phone: p.phone,
+      email: p.email,
       website: p.website,
-      gaps_in_region: regionKey ? gapsByKey.get(regionKey) ?? 0 : 0,
+      notes: p.notes,
+      gaps_in_region: regionKey ? gapsByKey.get(prospectRegionGroup(regionKey)) ?? 0 : 0,
     });
     if (error) result.skipped++;
     else {

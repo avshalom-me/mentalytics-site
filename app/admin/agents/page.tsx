@@ -1,10 +1,10 @@
 "use client";
-import { REGION_GROUP_LABELS } from "@/app/lib/regions";
+import { PROSPECT_REGION_LABELS } from "@/app/lib/prospect-regions";
 import { repeatedClosingLine } from "@/app/lib/email-signature";
 import { splitQuoted } from "@/app/lib/email-quote";
 import GiftOfferHistory from "@/app/admin/components/GiftOfferHistory";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
 // עמוד השליטה בסוכנים - נבנה מחדש 20/8/26 לפי בקשת המשתמש:
 //
@@ -104,6 +104,7 @@ type Prospect = {
   region_key: string | null;
   address: string | null;
   phone: string | null;
+  whatsapp: string | null;
   website: string | null;
   email: string | null;
   gaps_in_region: number;
@@ -1895,6 +1896,30 @@ const PROSPECT_STATUS_RANK: Record<string, number> = Object.fromEntries(
 /** "נוצרה פנייה" בכל ערוץ. כל בדיקה של contacted צריכה לכלול את שלושתם. */
 const isContacted = (s: string) => s === "contacted" || s === "contacted_email" || s === "contacted_phone";
 
+/** שדה הטלפון יכול להחזיק כמה מספרים ("03-1234567 / 052-1234567") - קישור לכל אחד. */
+const splitPhones = (v: string | null): string[] =>
+  String(v ?? "").split(/\s*\/\s*/).map((x) => x.trim()).filter(Boolean);
+
+/** קישור wa.me דורש מספר בינלאומי בלי אפס מוביל: 054-1234567 → 972541234567. */
+function waLink(v: string): string {
+  const d = v.replace(/\D/g, "");
+  return `https://wa.me/${d.startsWith("0") ? `972${d.slice(1)}` : d}`;
+}
+
+/** חיפוש עיר סלחני: "קרית" ו"קריית", מקף ורווח - אותו דבר. */
+const cityKey = (v: string | null) =>
+  String(v ?? "").replace(/קריית/g, "קרית").replace(/[-־]/g, " ").replace(/\s+/g, " ").trim();
+
+// שדות הקשר שנערכים בשורת העריכה של מכון, לפי הסדר שבו הם מוצגים.
+const PROSPECT_CONTACT_FIELDS = [
+  { key: "phone", label: "טלפון", placeholder: "03-1234567 / 052-1234567", dir: "ltr" },
+  { key: "whatsapp", label: "וואטסאפ", placeholder: "רק אם פורסם כוואטסאפ", dir: "ltr" },
+  { key: "email", label: "מייל", placeholder: "info@example.co.il", dir: "ltr" },
+  { key: "website", label: "אתר", placeholder: "https://...", dir: "ltr" },
+  { key: "city", label: "עיר", placeholder: "למשל: רחובות", dir: "rtl" },
+  { key: "address", label: "כתובת", placeholder: "רחוב ומספר", dir: "rtl" },
+] as const;
+
 // היסטוריית ההתכתבות מול המרכזים, מרכז-מרכז. crm_email_log נכתב עם כתובת
 // הנמען בלבד עד 9/9/26, ולכן "מה נשלח למרכז הזה" פשוט לא היה שאילתה
 // שאפשר לשאול; הקישור נוסף מכאן והלאה והישן מותאם לפי כתובת.
@@ -1965,9 +1990,12 @@ function ProspectTable({
     note: string | null;
   }>({ subject: "", body: "", email: "", source: "template", facts: [], note: null });
 
-  // פילטרים: אזור + דלי סטטוס. מסוננים בצד הלקוח - הרשימה קטנה.
+  // פילטרים: אזור + דלי סטטוס + חיפוש עיר. מסוננים בצד הלקוח - הרשימה קטנה.
   const [regionFilter, setRegionFilter] = useState("");
   const [bucketFilter, setBucketFilter] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+  // המכון שפרטי הקשר שלו פתוחים לעריכה (שורה אחת בכל פעם).
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(id);
@@ -2103,8 +2131,9 @@ function ProspectTable({
             הדבק כאן את הרשימה - שורה לכל מכון
           </div>
           <p className="mb-2 text-[11px] leading-5 text-stone-500">
-            אפשר להדביק ישירות מגיליון, או לכתוב חופשי. הסדר לא משנה - שם, טלפון, עיר ואתר מזוהים
-            לבד. מה שכבר ברשימה או שכבר לקוח שלנו - מדולג.
+            אפשר להדביק ישירות מגיליון, או לכתוב חופשי. הסדר לא משנה - שם, טלפונים, מייל, עיר ואתר
+            מזוהים לבד, ומה שנשאר אחרי השם (אנשי קשר, כתובת) נשמר בהערות. מה שכבר ברשימה או שכבר
+            לקוח שלנו - מדולג.
             <br />
             לדוגמה: <span dir="ltr">מכון שלווה, 03-1234567, רמת גן</span>
           </p>
@@ -2161,13 +2190,25 @@ function ProspectTable({
           ? "inside"
           : "not_interested";
 
-  const regionsPresent = Array.from(
-    new Set(rows.map((r) => r.region_key).filter((v): v is string => Boolean(v)))
+  const countBy = (values: (string | null)[]) => {
+    const m = new Map<string, number>();
+    for (const v of values) if (v) m.set(v, (m.get(v) ?? 0) + 1);
+    return m;
+  };
+  const regionCounts = countBy(rows.map((r) => r.region_key));
+  const regionsPresent = Array.from(regionCounts.keys()).sort((a, b) =>
+    (PROSPECT_REGION_LABELS[a] ?? a).localeCompare(PROSPECT_REGION_LABELS[b] ?? b, "he")
   );
+  const cityCounts = countBy(rows.map((r) => r.city));
+  const citiesPresent = Array.from(cityCounts.keys()).sort((a, b) => a.localeCompare(b, "he"));
 
+  // חיפוש לפי עיר: גם בכתובת, כי מכון עם כמה סניפים רשום בעיר אחת והשאר
+  // מופיעים בכתובת ("(+חיפה, הנביאים 28)") - וחיפוש "חיפה" צריך למצוא אותו.
+  const q = cityKey(cityQuery);
   const visible = rows
     .filter((r) => (regionFilter ? r.region_key === regionFilter : true))
     .filter((r) => (bucketFilter ? bucketOf(r) === bucketFilter : true))
+    .filter((r) => (q ? cityKey(r.city).includes(q) || cityKey(r.address).includes(q) : true))
     .slice()
     .sort((a, b) => {
       const d = (PROSPECT_STATUS_RANK[a.status] ?? 0) - (PROSPECT_STATUS_RANK[b.status] ?? 0);
@@ -2204,22 +2245,48 @@ function ProspectTable({
           <option value="">כל האזורים</option>
           {regionsPresent.map((rk) => (
             <option key={rk} value={rk}>
-              {REGION_GROUP_LABELS[rk] ?? rk}
+              {PROSPECT_REGION_LABELS[rk] ?? rk} ({regionCounts.get(rk)})
             </option>
           ))}
         </select>
+        <div className="relative">
+          <input
+            value={cityQuery}
+            onChange={(e) => setCityQuery(e.target.value)}
+            list="prospect-cities"
+            placeholder="חיפוש לפי עיר"
+            className="w-40 rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
+          />
+          <datalist id="prospect-cities">
+            {citiesPresent.map((c) => (
+              <option key={c} value={c}>
+                {`${c} (${cityCounts.get(c)})`}
+              </option>
+            ))}
+          </datalist>
+          {cityQuery && (
+            <button
+              onClick={() => setCityQuery("")}
+              aria-label="ניקוי החיפוש"
+              className="absolute end-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+            >
+              ×
+            </button>
+          )}
+        </div>
         <span className="text-stone-400">
           {visible.length} מתוך {rows.length}
         </span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-stone-200">
-        <table className="w-full min-w-[980px] text-sm">
+        <table className="w-full min-w-[1100px] text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
               <th className="p-2 text-right font-bold">מרכז</th>
+              <th className="p-2 text-right font-bold">עיר</th>
               <th className="p-2 text-right font-bold">אזור</th>
-              <th className="p-2 text-right font-bold">טלפון</th>
+              <th className="p-2 text-right font-bold">פרטי קשר</th>
               <th className="p-2 text-center font-bold">פערים באזור</th>
               <th className="p-2 text-right font-bold">סטטוס</th>
               <th className="p-2 text-right font-bold">הערות</th>
@@ -2229,8 +2296,8 @@ function ProspectTable({
           </thead>
           <tbody>
             {visible.map((p) => (
+              <Fragment key={p.id}>
               <tr
-                key={p.id}
                 className={`border-b border-stone-100 ${
                   p.status === "not_interested"
                     ? "bg-red-50/70 text-red-900"
@@ -2248,20 +2315,59 @@ function ProspectTable({
                     )}
                     <span className="font-bold text-stone-800">{p.name}</span>
                   </div>
-                  <div className="text-xs text-stone-400">
-                    {[p.city, p.address].filter(Boolean).join(" · ").slice(0, 60)}
-                  </div>
+                  {p.address && <div className="max-w-72 text-xs text-stone-400">{p.address}</div>}
                   {p.website && (
                     <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2A6462] underline">
                       אתר
                     </a>
                   )}
                 </td>
-                <td className="whitespace-nowrap p-2 align-top text-xs text-stone-600">
-                  {p.region_key ? (REGION_GROUP_LABELS[p.region_key] ?? p.region_key) : "-"}
+                <td className="whitespace-nowrap p-2 align-top text-xs font-bold text-stone-700">
+                  {p.city ? (
+                    <button
+                      onClick={() => setCityQuery(p.city ?? "")}
+                      title="להציג את כל המכונים בעיר הזו"
+                      className="hover:text-[#2A6462] hover:underline"
+                    >
+                      {p.city}
+                    </button>
+                  ) : (
+                    <span className="font-normal text-stone-300">-</span>
+                  )}
                 </td>
-                <td className="whitespace-nowrap p-2 align-top text-stone-600">
-                  {p.phone ? <a href={`tel:${p.phone}`} className="font-bold text-[#2A6462]">{p.phone}</a> : "-"}
+                <td className="whitespace-nowrap p-2 align-top text-xs text-stone-600">
+                  {p.region_key ? (PROSPECT_REGION_LABELS[p.region_key] ?? p.region_key) : "-"}
+                </td>
+                <td className="p-2 align-top text-xs text-stone-600">
+                  <div className="flex flex-col gap-0.5">
+                    {splitPhones(p.phone).map((ph) => (
+                      <a key={ph} href={`tel:${ph}`} dir="ltr" className="text-end font-bold text-[#2A6462]">
+                        {ph}
+                      </a>
+                    ))}
+                    {p.whatsapp && (
+                      <a
+                        href={waLink(p.whatsapp)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-bold text-[#128C42]"
+                      >
+                        וואטסאפ <span dir="ltr">{p.whatsapp}</span>
+                      </a>
+                    )}
+                    {p.email && (
+                      <a href={`mailto:${p.email}`} dir="ltr" className="max-w-48 truncate text-end text-stone-500 underline">
+                        {p.email}
+                      </a>
+                    )}
+                    {!p.phone && !p.whatsapp && !p.email && <span className="text-stone-300">אין פרטי קשר</span>}
+                    <button
+                      onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                      className="mt-0.5 self-start text-[11px] text-stone-400 underline hover:text-stone-600"
+                    >
+                      {editingId === p.id ? "סגירת העריכה" : "עריכת פרטים"}
+                    </button>
+                  </div>
                 </td>
                 <td className="p-2 text-center align-top">
                   {p.gaps_in_region > 0 ? (
@@ -2350,6 +2456,35 @@ function ProspectTable({
                   </button>
                 </td>
               </tr>
+              {editingId === p.id && (
+                <tr className="border-b border-stone-200 bg-stone-50">
+                  <td colSpan={9} className="p-3">
+                    <div className="mb-2 text-[11px] leading-5 text-stone-500">
+                      כל שדה נשמר כשיוצאים ממנו. כמה טלפונים - מפרידים ב-&quot; / &quot;. וואטסאפ רק אם המכון
+                      פרסם אותו ככזה. עיר מהרשימה קובעת גם את האזור.
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                      {PROSPECT_CONTACT_FIELDS.map((f) => (
+                        <label key={f.key} className="text-[11px] font-black text-stone-500">
+                          {f.label}
+                          <input
+                            defaultValue={p[f.key] ?? ""}
+                            dir={f.dir}
+                            list={f.key === "city" ? "prospect-cities" : undefined}
+                            placeholder={f.placeholder}
+                            onBlur={(e) => {
+                              const v = e.target.value.trim();
+                              if (v !== (p[f.key] ?? "")) patch(p.id, { [f.key]: v });
+                            }}
+                            className="mt-0.5 w-full rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-normal text-stone-700"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </td>
+                </tr>
+              )}
+              </Fragment>
             ))}
           </tbody>
         </table>

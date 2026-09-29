@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HelpTip from "../components/HelpTip";
 import { CLOSED_DEAL_STAGES, DEAL_STAGES, DEAL_TYPES, LOST_REASONS, labelOf } from "@/app/lib/crm";
-import { REGION_GROUP_LABELS } from "@/app/lib/regions";
+// עסקת מרכז יורשת את region_key של המכון שממנו נפתחה, ולכן התוויות הן של
+// רשימת המכונים - שם "מרכז" ו"שפלה" הם שני אזורים (PROSPECT_REGION_GROUPS).
+import { PROSPECT_REGION_LABELS } from "@/app/lib/prospect-regions";
 
 // עסקאות B2B - לוח בעמודות, עמודה לכל סטטוס (בקשה מ-14/9/26). זה הופך את
 // ההחלטה מ-30/8/26 על טבלה עם כותרות קבועות: הטבלה סודרה לפי שם, ומה שרצו
@@ -185,7 +187,7 @@ export default function DealsPage() {
             <span className="rounded-full bg-teal-50 px-1.5 py-0.5 text-[10px] font-bold text-teal-700">מאיתור מכונים</span>
           )}
           {d.deal_type && <span>{labelOf(DEAL_TYPES, d.deal_type)}</span>}
-          {d.region_key && <span>· {REGION_GROUP_LABELS[d.region_key] ?? d.region_key}</span>}
+          {d.region_key && <span>· {PROSPECT_REGION_LABELS[d.region_key] ?? d.region_key}</span>}
           {d.value_ils != null && <span className="font-bold text-teal-700">· {fmtValue(d.value_ils)}</span>}
         </div>
         {(d.contact_name || d.contact_info) && (
@@ -282,7 +284,7 @@ export default function DealsPage() {
             <option value="">כל האזורים</option>
             {regionsPresent.map((rk) => (
               <option key={rk} value={rk}>
-                {REGION_GROUP_LABELS[rk] ?? rk}
+                {PROSPECT_REGION_LABELS[rk] ?? rk}
               </option>
             ))}
           </select>
