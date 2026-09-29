@@ -21,6 +21,7 @@ import {
   sendArticleInviteEmail,
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
+import { CERT_UPLOAD_FAILED_ACTION, summarizeCertUploadFailures, type CertFailureRow } from "@/app/lib/cert-upload-failures";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 
@@ -165,10 +166,21 @@ async function buildTherapistsResponse(onlyId?: string) {
     .select("therapist_id, status, current_period_end, promo_reverts_at");
   if (onlyId) subsQuery = subsQuery.eq("therapist_id", onlyId);
 
-  const [{ data, error }, { data: certData }, subsRes] = await Promise.all([
+  // Certificate uploads that failed in the therapist's browser (reported via
+  // /api/therapist-cert). Until 29/9/2026 they were invisible - see
+  // app/lib/cert-upload-failures.ts. 90 days back is far more than needed.
+  let certFailQuery = supabaseAdmin
+    .from("therapist_audit_log")
+    .select("therapist_id, created_at, after_state")
+    .eq("action", CERT_UPLOAD_FAILED_ACTION)
+    .gte("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString());
+  if (onlyId) certFailQuery = certFailQuery.eq("therapist_id", onlyId);
+
+  const [{ data, error }, { data: certData }, subsRes, { data: certFailData }] = await Promise.all([
     query,
     certQuery,
     subsQuery,
+    certFailQuery,
   ]);
 
   if (error) {
@@ -196,8 +208,22 @@ async function buildTherapistsResponse(onlyId?: string) {
     file_path: string;
     original_name: string | null;
     content_type: string | null;
+    created_at: string | null;
   };
   const certRows: CertRow[] = (certData ?? []) as CertRow[];
+
+  // Failures after the latest saved certificate only - a later success means
+  // the problem was solved.
+  const latestCertAt: Record<string, string> = {};
+  for (const c of certRows) {
+    if (c.created_at && (!latestCertAt[c.therapist_id] || c.created_at > latestCertAt[c.therapist_id])) {
+      latestCertAt[c.therapist_id] = c.created_at;
+    }
+  }
+  const certFailuresByTherapist = summarizeCertUploadFailures(
+    (certFailData ?? []) as CertFailureRow[],
+    latestCertAt,
+  );
 
   // 24h expiry: the admin tab routinely stays open for hours — a 1h URL made
   // photos/certs silently break mid-session. Sign every photo AND certificate
@@ -383,6 +409,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         // הוא עמוד המרכז), ובלי השדה הקישור היה מופיע גם אצלה ומוביל לשגיאה.
         entity_type: t.entity_type ?? "therapist",
         certificates: certsByTherapist[t.id] ?? [],
+        cert_upload_failures: certFailuresByTherapist[t.id] ?? null,
         status: t.status ?? "",
         manually_promoted: t.manually_promoted ?? false,
         promotion_source: t.promotion_source ?? null,

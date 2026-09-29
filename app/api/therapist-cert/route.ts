@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
+import { writeAudit } from "@/app/lib/audit";
+import { CERT_UPLOAD_FAILED_ACTION, CERT_FAILURE_STAGES, isCertFailureStage } from "@/app/lib/cert-upload-failures";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -92,7 +94,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "יותר מדי העלאות. נסו שוב בעוד דקה." }, { status: 429 });
   }
 
-  let body: { action?: unknown; ext?: unknown; contentType?: unknown; size?: unknown; path?: unknown; name?: unknown };
+  let body: { action?: unknown; ext?: unknown; contentType?: unknown; size?: unknown; path?: unknown; name?: unknown; stage?: unknown; message?: unknown };
   try {
     body = await req.json();
   } catch {
@@ -105,7 +107,7 @@ export async function POST(req: NextRequest) {
     const contentType = typeof body.contentType === "string" ? body.contentType : "";
     const size = typeof body.size === "number" ? body.size : 0;
     if (!ALLOWED_EXT.includes(ext) || (contentType && !ALLOWED_TYPES.includes(contentType))) {
-      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך. אפשר להעלות PDF, JPG או PNG בלבד" }, { status: 400 });
     }
     if (size > MAX_BYTES) {
       return NextResponse.json({ ok: false, error: "הקובץ גדול מ-10MB" }, { status: 400 });
@@ -129,7 +131,7 @@ export async function POST(req: NextRequest) {
     // and only sign-time checked it until now.
     const committedExt = path.split(".").pop()?.toLowerCase() ?? "";
     if (!ALLOWED_EXT.includes(committedExt)) {
-      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך. אפשר להעלות PDF, JPG או PNG בלבד" }, { status: 400 });
     }
     const therapist = await resolveTherapist(user);
     if (!therapist) {
@@ -148,6 +150,39 @@ export async function POST(req: NextRequest) {
       .update({ profile_updated_at: new Date().toISOString() })
       .eq("id", therapist.id);
     return NextResponse.json({ ok: true, path });
+  }
+
+  // The browser reports an upload that did not make it. Until 29/9/2026 a
+  // failure was invisible: one therapist tried six times over three days, the
+  // file never left her phone, and the admin saw only "updated". Recorded in
+  // the audit log, so the admin card and the CRM timeline show the attempts.
+  if (action === "report_failure") {
+    // Lookup only - reporting a failure must never create a therapist row.
+    const { data: therapist } = await supabaseAdmin
+      .from("therapists")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (!therapist) return NextResponse.json({ ok: true, recorded: false });
+
+    const stage = isCertFailureStage(body.stage) ? body.stage : "upload";
+    const message = typeof body.message === "string" ? body.message.slice(0, 300) : "";
+    await writeAudit(supabaseAdmin, {
+      therapistId: therapist.id as string,
+      actorType: "self",
+      actorId: user.id,
+      action: CERT_UPLOAD_FAILED_ACTION,
+      after: {
+        stage,
+        message,
+        ext: typeof body.ext === "string" ? body.ext.slice(0, 10) : null,
+        content_type: typeof body.contentType === "string" ? body.contentType.slice(0, 60) : null,
+        size: typeof body.size === "number" ? body.size : null,
+        user_agent: (req.headers.get("user-agent") ?? "").slice(0, 160),
+      },
+      reason: `${CERT_FAILURE_STAGES[stage]}${message ? `: ${message.slice(0, 120)}` : ""}`,
+    });
+    return NextResponse.json({ ok: true, recorded: true });
   }
 
   return NextResponse.json({ ok: false, error: "invalid action" }, { status: 400 });

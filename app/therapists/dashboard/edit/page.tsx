@@ -12,6 +12,7 @@ import {
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { parsePriceInput } from "@/app/lib/price-input";
+import { uploadCertificate, readFileBytes, PHOTO_UNREADABLE_MESSAGE, type JsonResponse } from "@/app/lib/cert-upload-client";
 import { PLAN_EVIDENCE } from "@/app/lib/plan-evidence";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
@@ -226,46 +227,63 @@ export default function TherapistProfileEditPage() {
     // Storage via a signed URL so the bytes bypass the Vercel function (whose
     // ~4.5MB body cap was returning 413). Photos keep going through the route
     // (which compresses them server-side), with a client downscale as a guard.
+    // The order, the server fallback and the messages live in
+    // app/lib/cert-upload-client.ts (29/9/2026: one therapist's certificate
+    // never left her phone in six attempts, and nobody could see it).
     if (type === "certificate") {
-      const ext = (file.name.split(".").pop() ?? "").toLowerCase();
-      const headers = { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` };
-      const signRes = await fetch("/api/therapist-cert", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ action: "sign", ext, contentType: file.type, size: file.size }),
+      const asJson = async (res: Response): Promise<JsonResponse> => ({
+        ok: res.ok,
+        status: res.status,
+        json: await res.json().catch(() => ({})),
       });
-      const sign = await signRes.json().catch(() => ({}));
-      if (!signRes.ok || !sign.ok) return sign.error ?? `שגיאה בהכנת העלאת תעודה (${signRes.status})`;
-
-      const { error: upErr } = await supabase.storage
-        .from("therapist-certificates")
-        .uploadToSignedUrl(sign.path, sign.token, file, { contentType: file.type || undefined });
-      if (upErr) return `שגיאה בהעלאת תעודה: ${upErr.message}`;
-
-      const commitRes = await fetch("/api/therapist-cert", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ action: "commit", path: sign.path, name: file.name, contentType: file.type, size: file.size }),
+      return uploadCertificate(file, {
+        postCert: async (body) =>
+          asJson(await fetch("/api/therapist-cert", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify(body),
+          })),
+        uploadSigned: (path, signedToken, body, contentType) =>
+          supabase.storage
+            .from("therapist-certificates")
+            .uploadToSignedUrl(path, signedToken, body, { contentType: contentType || undefined }),
+        postServerUpload: async (f) => {
+          const fd = new FormData();
+          fd.append("file", f);
+          fd.append("type", "certificate");
+          return asJson(await fetch("/api/therapist-upload", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: fd,
+          }));
+        },
       });
-      const commit = await commitRes.json().catch(() => ({}));
-      if (!commitRes.ok || !commit.ok) return commit.error ?? `שגיאה בשמירת תעודה (${commitRes.status})`;
+    }
+
+    // Photos: read the file into memory first, like certificates - a photo
+    // that lives in the cloud fails the same way, and used to throw out of
+    // the save instead of explaining what to do.
+    const bytes = await readFileBytes(file);
+    if (!bytes) return PHOTO_UNREADABLE_MESSAGE;
+    const inMemory = new File([bytes], file.name || "photo.jpg", { type: file.type || "image/jpeg" });
+    try {
+      const toSend = await downscaleImage(inMemory);
+      const fd = new FormData();
+      fd.append("file", toSend);
+      fd.append("type", type);
+      const res = await fetch("/api/therapist-upload", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: fd,
+      });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        return json.error ?? `שגיאה בהעלאת תמונה (${res.status})`;
+      }
       return null;
+    } catch {
+      return "העלאת התמונה לא הצליחה. אפשר לנסות שוב או לנסות ממחשב.";
     }
-
-    const toSend = await downscaleImage(file);
-    const fd = new FormData();
-    fd.append("file", toSend);
-    fd.append("type", type);
-    const res = await fetch("/api/therapist-upload", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: fd,
-    });
-    if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      return json.error ?? `שגיאה בהעלאת ${type === "photo" ? "תמונה" : "תעודה"} (${res.status})`;
-    }
-    return null;
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -354,7 +372,10 @@ export default function TherapistProfileEditPage() {
     setIsNew(false);
     if (uploadIssues.length) {
       setSaveMsg("");
-      setSaveErr(`${base} שימו לב: העלאת הקובץ לא הושלמה (${uploadIssues.join("; ")}). אפשר לנסות שוב בכל עת - הפרטים כבר נשמרו.`);
+      // The upload messages are full sentences that say what to do next, so
+      // they stand on their own rather than inside parentheses.
+      const asSentence = (s: string) => (/[.!?]$/.test(s.trim()) ? s.trim() : `${s.trim()}.`);
+      setSaveErr(`${base} שימו לב: ${uploadIssues.map(asSentence).join(" ")} שאר הפרטים כבר נשמרו.`);
     } else {
       setSaveErr("");
       setSaveMsg(base);

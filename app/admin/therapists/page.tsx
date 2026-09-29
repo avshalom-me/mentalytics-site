@@ -11,6 +11,7 @@ import {
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
+import AdminCertUpload from "./components/AdminCertUpload";
 import { therapistPath } from "@/app/lib/therapist-url";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
@@ -51,6 +52,8 @@ type AdminTherapist = {
     content_type: string;
     signed_url: string | null;
   }>;
+  /** ניסיונות העלאת תעודה שנכשלו בדפדפן של המטפל/ת, מאז התעודה האחרונה. */
+  cert_upload_failures?: { count: number; last_at: string; last_error: string | null } | null;
   status: string;
   manually_promoted: boolean;
   promotion_source: string | null;
@@ -1317,6 +1320,16 @@ export default function AdminTherapistsPage() {
                     ⚠️ חסרה תעודה
                   </span>
                 )}
+                {therapist.cert_upload_failures && (
+                  <span
+                    className="rounded-full bg-red-50 px-3 py-1 text-xs font-semibold text-red-800 border border-red-300"
+                    title={therapist.cert_upload_failures.last_error ?? undefined}
+                  >
+                    📵 ניסה/תה להעלות תעודה ונכשל ·{" "}
+                    {therapist.cert_upload_failures.count === 1 ? "פעם אחת" : `${therapist.cert_upload_failures.count} פעמים`}
+                    {" "}· אחרון {new Date(therapist.cert_upload_failures.last_at).toLocaleDateString("he-IL")}
+                  </span>
+                )}
                 {therapist.missing.length > 0 && (
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300">
                     ⚠️ פרופיל לא שלם: {therapist.missing.join(", ")}
@@ -1328,19 +1341,27 @@ export default function AdminTherapistsPage() {
                     ✉️ נשלחה בקשת השלמה · {new Date(therapist.completion_requested_at).toLocaleDateString("he-IL")}
                   </span>
                 )}
-                {therapist.profile_updated_at && (
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-semibold border ${
-                      therapist.completion_requested_at &&
-                      new Date(therapist.profile_updated_at) > new Date(therapist.completion_requested_at)
-                        ? "bg-green-100 text-green-800 border-green-300"
-                        : "bg-stone-100 text-stone-700 border-stone-300"
-                    }`}
-                    title={new Date(therapist.profile_updated_at).toLocaleString("he-IL")}
-                  >
-                    🕐 המטפל/ת עדכנ/ה · {new Date(therapist.profile_updated_at).toLocaleDateString("he-IL")}
-                  </span>
-                )}
+                {therapist.profile_updated_at && (() => {
+                  // ירוק רק כשמה שביקשנו באמת הושלם. עד 29/9/2026 כל שמירה אחרי
+                  // הבקשה צבעה ירוק, גם כשהתעודה - הדבר היחיד שביקשנו - לא הגיעה;
+                  // ועדכון מאותו יום אבל *לפני* הבקשה נראה כמו השלמה.
+                  const updated = new Date(therapist.profile_updated_at);
+                  const requested = therapist.completion_requested_at ? new Date(therapist.completion_requested_at) : null;
+                  const day = updated.toLocaleDateString("he-IL");
+                  const hour = updated.toLocaleTimeString("he-IL", { hour: "2-digit", minute: "2-digit" });
+                  const [cls, text] = !requested
+                    ? ["bg-stone-100 text-stone-700 border-stone-300", `🕐 המטפל/ת עדכנ/ה · ${day}`]
+                    : updated <= requested
+                      ? ["bg-stone-100 text-stone-700 border-stone-300", `🕐 עדכון אחרון לפני הבקשה · ${day} ${hour}`]
+                      : therapist.missing.length === 0
+                        ? ["bg-green-100 text-green-800 border-green-300", `✅ השלים/ה אחרי הבקשה · ${day}`]
+                        : ["bg-amber-100 text-amber-800 border-amber-300", `🕐 עדכנ/ה אחרי הבקשה · ${day} · אבל עדיין חסר`];
+                  return (
+                    <span className={`rounded-full px-3 py-1 text-xs font-semibold border ${cls}`} title={updated.toLocaleString("he-IL")}>
+                      {text}
+                    </span>
+                  );
+                })()}
                 {therapist.article_invite_sent_at && (
                   <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800 border border-amber-300"
                     title={new Date(therapist.article_invite_sent_at).toLocaleString("he-IL")}>
@@ -1509,6 +1530,21 @@ export default function AdminTherapistsPage() {
                   ))}
                 </ul>
               )}
+              <AdminCertUpload
+                therapistId={therapist.id}
+                onUploaded={(cert) => {
+                  const attach = (t: AdminTherapist): AdminTherapist =>
+                    t.id === therapist.id
+                      ? {
+                          ...t,
+                          certificates: [...t.certificates, cert],
+                          cert_upload_failures: null,
+                          missing: missingProfileFields(t, true),
+                        }
+                      : t;
+                  setTherapists((prev) => prev.map(attach));
+                }}
+              />
             </div>
 
             {/* CRM 360°: timeline + internal notes + follow-up tasks + Gmail. */}

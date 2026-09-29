@@ -61,7 +61,7 @@ export async function POST(req: NextRequest) {
     }
     const ext = (file.name.split(".").pop() ?? "").toLowerCase();
     if ((file.type && !ALLOWED_TYPES.includes(file.type)) || !ALLOWED_EXT.includes(ext)) {
-      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך — יש להעלות PDF / JPG / PNG בלבד" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "סוג קובץ לא נתמך. אפשר להעלות PDF, JPG או PNG בלבד" }, { status: 400 });
     }
     uploadBody = await file.arrayBuffer();
     uploadContentType = file.type || "application/octet-stream";

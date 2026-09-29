@@ -29,6 +29,8 @@ const AUDIT_ACTION_LABELS: Record<string, string> = {
   trial_expired: "תקופת ניסיון הסתיימה",
   profile_update: "הפרופיל עודכן",
   delete_cert: "נמחקה תעודה",
+  cert_upload_failed: "ניסיון העלאת תעודה נכשל",
+  admin_upload_cert: "האדמין צירף תעודה בשם המטפל/ת",
 };
 
 function auditTitle(action: string): string {
