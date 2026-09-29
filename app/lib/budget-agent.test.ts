@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
+  budgetRecommendation,
   daysInMonth,
   defaultTargetMonth,
+  narrativeIsFaithful,
+  numbersIn,
   projectBudget,
   summarySentence,
   type BudgetCampaignInput,
@@ -114,6 +117,70 @@ describe("splitting ₪3,500 for October", () => {
       "הצפי לאוקטובר: כ-72 פונים ב-₪3,472 (כ-₪44 לפונה), לא כולל g-shfela שעוד אין לו נתונים, " +
         "מול 73 פונים ב-30 הימים האחרונים, שעלו ₪4,652 (₪64 לפונה). התקרה: ₪3,500."
     );
+  });
+});
+
+describe("the recommendation that goes into the queue", () => {
+  const withEmekProtected = CAMPAIGNS.map((c) =>
+    c.googleName === "g-emek1" ? { ...c, protectedReason: "המקור היחיד של מרכז שמתחיל לשלם", protectedUntil: "2026-11-17" } : c
+  );
+  const p = projectBudget({ campaigns: withEmekProtected, ceiling: 3500, month: "2026-10", today: "2026-09-29" });
+  const rec = budgetRecommendation(p);
+
+  it("asks for a change only when the budgets in Google exceed the ceiling", () => {
+    expect(rec.needed).toBe(true);
+    expect(rec.title).toBe("תקציב אוקטובר: להוריד מ-₪5,177 ל-₪3,472 (כ-72 פונים)");
+  });
+
+  it("lists the pauses first: the bigger budget, then the dearer seeker", () => {
+    expect(rec.changes.map((c) => [c.googleName, c.from, c.to, c.decision])).toEqual([
+      ["g-haifa", 25, 0, "pause"],
+      ["g-kids-center", 15, 0, "pause"],
+      ["g-north-sharon1", 15, 0, "pause"],
+    ]);
+    expect(rec.body).toContain("• להשהות את g-haifa (היום ₪25 ליום; ₪84 לפונה ב-30 יום)");
+    expect(rec.body).toContain("• להשהות את g-kids-center (היום ₪15 ליום; ₪116 לפונה ב-60 יום)");
+  });
+
+  it("says what stays, why a protected campaign stays, and that nothing was changed", () => {
+    expect(rec.body).toContain("ללא שינוי:");
+    expect(rec.body).toContain("Search-patients");
+    expect(rec.body).toContain("g-emek1 (מוגן)");
+    expect(rec.body).toContain("g-tlv (בלמידה)");
+    expect(rec.body).toContain("מוגן = נשאר בתקציב שלו גם כשהוא יקר");
+    expect(rec.body).toContain("שום דבר לא שונה בגוגל");
+    expect(rec.body).not.toContain("—");
+  });
+
+  it("stays quiet when the budgets already fit", () => {
+    const fits = projectBudget({ campaigns: withEmekProtected, ceiling: 6000, month: "2026-10", today: "2026-09-29" });
+    const r = budgetRecommendation(fits);
+    expect(r.needed).toBe(false);
+    expect(r.changes).toEqual([]);
+    expect(r.title).toBe("תקציב אוקטובר: התקציבים בגוגל בתוך התקרה");
+  });
+
+  it("recommends nothing without a ceiling", () => {
+    const none = projectBudget({ campaigns: withEmekProtected, ceiling: null, month: "2026-10", today: "2026-09-29" });
+    expect(budgetRecommendation(none)).toMatchObject({ needed: false, title: "אין תקרת פרסום לאוקטובר", changes: [] });
+  });
+});
+
+describe("the guard on the model's wording", () => {
+  const source = "תקציב אוקטובר: להוריד מ-₪5,177 ל-₪3,472 (כ-72 פונים). ₪84 לפונה ב-30 יום.";
+
+  it("reads numbers the way they are written, without thousands separators", () => {
+    expect(numbersIn(source)).toEqual(["5177", "3472", "72", "84", "30"]);
+  });
+
+  it("accepts wording that only repeats the numbers it was given", () => {
+    expect(narrativeIsFaithful("חיפה יקרה (₪84 לפונה), ולכן היא נעצרת כדי לרדת ל-₪3,472.", source)).toBe(true);
+    expect(narrativeIsFaithful("אין כאן מספרים בכלל.", source)).toBe(true);
+  });
+
+  it("rejects wording with a number that was not in the input", () => {
+    expect(narrativeIsFaithful("זה חוסך כ-₪1,700 בחודש.", source)).toBe(false);
+    expect(narrativeIsFaithful("כ-70 פונים", source)).toBe(false);
   });
 });
 

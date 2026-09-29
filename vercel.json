@@ -79,6 +79,10 @@
     {
       "schedule": "15 4 * * *",
       "path": "/api/cron/agent-quiz"
+    },
+    {
+      "schedule": "30 4 1 * *",
+      "path": "/api/cron/agent-budget"
     }
   ]
 }

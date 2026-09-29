@@ -18,7 +18,8 @@ type Data = {
   cplTarget: { value: number; since: string } | null;
   sentence: string;
   projection: BudgetProjection;
-  adsLastSync: string | null;
+  /** The last day with Google spend in the database. */
+  adsDataThrough: string | null;
 };
 
 function nis(n: number | null | undefined): string {
@@ -35,18 +36,18 @@ function monthTitle(month: string): string {
   return `${hebrewMonth(month)} ${month.slice(0, 4)}`;
 }
 
-// The Google Ads script posts at about 05:00 every night; a day and a bit
-// without one means a night was missed.
-const ADS_SYNC_STALE_MS = 30 * 60 * 60 * 1000;
+// The Google Ads script posts yesterday's spend at about 05:00 every night, so
+// the newest day in the data is normally yesterday (the day before, before
+// 05:00). Older than that means a night was missed.
+const ADS_DATA_STALE_DAYS = 2;
 
-function formatWhen(iso: string): string {
-  return new Date(iso).toLocaleString("he-IL", {
-    timeZone: "Asia/Jerusalem",
-    day: "numeric",
-    month: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
+function daysSince(day: string, today: string): number {
+  return Math.round((Date.parse(`${today}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000);
+}
+
+function shortDate(day: string): string {
+  const [, m, d] = day.split("-").map(Number);
+  return `${d}/${m}`;
 }
 
 const DECISION: Record<BudgetDecision, { label: string; cls: string }> = {
@@ -116,10 +117,10 @@ export default function BudgetPage() {
               <p className="text-lg font-bold leading-relaxed text-teal-900">{data.sentence}</p>
             </div>
 
-            {data.adsLastSync && Date.now() - Date.parse(data.adsLastSync) > ADS_SYNC_STALE_MS && (
+            {data.adsDataThrough && daysSince(data.adsDataThrough, data.today) > ADS_DATA_STALE_DAYS && (
               <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                הסנכרון הלילי מגוגל אדס לא רץ מאז {formatWhen(data.adsLastSync)}, ולכן ההוצאה של הימים האחרונים חסרה כאן.
-                הסקריפט שולח בכל לילה 30 יום אחורה, כך שהריצה הבאה משלימה אותם.
+                נתוני ההוצאה מגוגל אדס מגיעים רק עד {shortDate(data.adsDataThrough)}: הסנכרון הלילי לא הגיע כמה לילות.
+                הסקריפט שולח בכל לילה 30 יום אחורה, כך שהריצה הבאה משלימה את החסר.
               </div>
             )}
 
@@ -174,8 +175,9 @@ export default function BudgetPage() {
               </ol>
               <p className="mt-2">
                 פונה = סשן אחד שלחץ ליצירת קשר עם מטפל/ת ממודעה בגוגל. עלויות לפני מע״מ, כפי שגוגל מדווחת (סנכרון לילי
-                {data.adsLastSync ? `, אחרון ${formatWhen(data.adsLastSync)}` : ""}
-                ). טאבולה ומטא עוד לא כאן: ההוצאה שלהם לא נשמרת במערכת.
+                {data.adsDataThrough ? `, נתונים עד ${shortDate(data.adsDataThrough)}` : ""}
+                ). התקציבים "היום" הם מה שמוגדר בגוגל לפי הסנכרון האחרון. טאבולה ומטא עוד לא כאן: ההוצאה שלהם לא
+                נשמרת במערכת.
               </p>
             </div>
           </>
@@ -224,7 +226,9 @@ function CampaignTable({ campaigns }: { campaigns: BudgetCampaignPlan[] }) {
                   {c.isProtected && (
                     <span
                       className="rounded-full bg-sky-50 px-1.5 text-sky-800"
-                      title={`${c.protectedReason ?? ""}${c.protectedUntil ? ` (עד ${c.protectedUntil})` : ""}`}
+                      title={`מוגן: נשאר בתקציב שלו בכל חלוקה. ${c.protectedReason ?? ""}${
+                        c.protectedUntil ? ` (עד ${shortDate(c.protectedUntil)})` : ""
+                      }`}
                     >
                       🛡️ מוגן
                     </span>
@@ -271,16 +275,32 @@ function CampaignTable({ campaigns }: { campaigns: BudgetCampaignPlan[] }) {
 function Protections({ campaigns }: { campaigns: BudgetCampaignPlan[] }) {
   const list = campaigns.filter((c) => c.isProtected);
   return (
-    <div className="mb-6 rounded-2xl border border-stone-200 bg-white p-4">
-      <div className="mb-2 text-sm font-black text-stone-700">🛡️ קמפיינים מוגנים</div>
+    <div className="mb-6 rounded-2xl border border-sky-100 bg-white p-4">
+      <div className="mb-1 text-sm font-black text-stone-700">🛡️ קמפיינים מוגנים</div>
+      <div className="mb-3 space-y-1 text-sm leading-relaxed text-stone-600">
+        <p>
+          <b>מה זה אומר:</b> ההצעה האוטומטית לא נוגעת בקמפיין מוגן. הוא נשאר בתקציב שמוגדר לו היום, גם כשהעלות לפונה שלו
+          גבוהה, וגם כשבגללו קמפיינים זולים ממנו מקבלים פחות.
+        </p>
+        <p>
+          <b>למה צריך את זה:</b> ההצעה מדרגת לפי עלות לפונה בלבד. היא לא יודעת שבאזור מסוים יש מרכז או מטפל שמשלמים לנו
+          ומקבלים פניות רק מהקמפיין הזה. הגנה היא הדרך להכניס את הידיעה הזו לחישוב, עם הסיבה.
+        </p>
+        <p>
+          <b>עד מתי:</b> להגנה יש תאריך סיום, ואחריו הקמפיין חוזר להיות מדורג כמו כולם. הוספה או הסרה של הגנה נעשות כרגע
+          ידנית, לא מהעמוד הזה.
+        </p>
+      </div>
       {list.length === 0 ? (
-        <p className="text-sm text-stone-400">אין. קמפיין מוגן נשאר בתקציב שלו גם כשהוא יקר, למשל כשהוא המקור היחיד של מרכז משלם.</p>
+        <p className="text-sm text-stone-400">כרגע אין קמפיין מוגן.</p>
       ) : (
         <ul className="space-y-1 text-sm text-stone-700">
           {list.map((c) => (
             <li key={c.googleName}>
               <b>{c.googleName}</b>: {c.protectedReason}
-              <span className="text-stone-400">{c.protectedUntil ? ` · עד ${c.protectedUntil}` : " · עד שיבוטל"}</span>
+              <span className="text-stone-400">
+                {c.protectedUntil ? ` · עד ${shortDate(c.protectedUntil)}` : " · עד שיבוטל"}
+              </span>
             </li>
           ))}
         </ul>

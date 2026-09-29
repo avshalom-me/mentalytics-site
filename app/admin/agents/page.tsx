@@ -409,6 +409,24 @@ const AGENTS: AgentMeta[] = [
     home: { href: "/admin/ads", label: "עמוד הפרסום" },
   },
   {
+    key: "budget",
+    icon: "🧮",
+    label: "תקציב הפרסום",
+    runAction: "budget_run",
+    runLabel: "חשב המלצה עכשיו",
+    desc: "פעם בחודש משווה את התקציבים שמוגדרים בגוגל לתקרה החודשית, וכשהם עוברים אותה - מציע חלוקה שנכנסת בה: מה להשאיר, מה להוריד ומה להשהות, וכמה פונים זה צפוי להביא.",
+    howToRead: [
+      "ההמלצה מגיעה לתור ולדוח הבוקר. היא לא משנה כלום בגוגל - את השינוי עושים ידנית, אחרי שקראת.",
+      "\"פונה\" = סשן שלחץ ליצירת קשר עם מטפל/ת ממודעה בגוגל. הדירוג הוא לפי עלות לפונה: 30 יום כשיש לפחות 8 פונים, אחרת 60.",
+      "\"מוגן\" = קמפיין שנשאר בתקציב שלו גם כשהוא יקר, כי יש סיבה שהמספרים לא רואים (למשל המקור היחיד של מרכז שמתחיל לשלם). \"בלמידה\" = פחות מ-30 יום מההוצאה הראשונה.",
+      "שורת \"למה\" נכתבת על ידי מודל שפה ונזרקת אם הופיע בה מספר שלא היה בנתונים. כל המספרים עצמם מחושבים בקוד.",
+      "כשהתקציבים בגוגל כבר בתוך התקרה, ההמלצה נסגרת מעצמה בריצה הבאה.",
+    ],
+    schedule: "רץ אוטומטית ב-1 לכל חודש ב-07:30, לפני דוח הבוקר",
+    chartLabel: "כמה פונים צפויים בחודש לפי ההמלצה",
+    home: { href: "/admin/budget", label: "עמוד תקציב הפרסום" },
+  },
+  {
     key: "conversions",
     icon: "📈",
     label: "המרות לגוגל",
@@ -554,7 +572,7 @@ const AGENT_GROUPS: { key: string; label: string; keys: string[] }[] = [
   {
     key: "growth",
     label: "סוכני שיווק ומכירות",
-    keys: ["ads", "conversions", "deals", "center_prospects"],
+    keys: ["ads", "budget", "conversions", "deals", "center_prospects"],
   },
 ];
 
@@ -3154,6 +3172,39 @@ export default function AgentsPage() {
           >
             הקם פעולות המרה בחשבון (חד-פעמי)
           </button>
+        </div>
+      );
+    }
+
+    // תקציב - מה הוגדר בגוגל מול התקרה, ומה ההצעה. הסוכן לא מחפש "פערים",
+    // ולכן בלי המקרה הזה הנוסח הכללי למטה היה כותב "הכול תקין" ליד המלצה פתוחה.
+    if (meta.key === "budget") {
+      if (!stored || !d) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
+      const n = (v: unknown) => (typeof v === "number" ? `₪${Math.round(v).toLocaleString("he-IL")}` : "—");
+      const changes = Array.isArray(d.changes)
+        ? (d.changes as { googleName: string; from: number; to: number; decision: string }[])
+        : [];
+      return (
+        <div className="space-y-2 text-sm text-stone-600">
+          <p>
+            תקרה {n(d.ceiling)} · בגוגל היום {n(d.current_monthly)} · לפי ההצעה {n(d.plan_monthly)}
+            {typeof d.plan_seekers === "number" && ` (כ-${d.plan_seekers} פונים)`}
+            <span className="text-xs text-stone-400"> · {when}</span>
+          </p>
+          {changes.length === 0 ? (
+            <p>אין מה לשנות: התקציבים בגוגל בתוך התקרה.</p>
+          ) : (
+            <ul className="space-y-1 text-xs">
+              {changes.map((c) => (
+                <li key={c.googleName}>
+                  {c.decision === "pause" ? "להשהות" : "להוריד"} את <b>{c.googleName}</b>: {n(c.from)} ← {n(c.to)} ליום
+                </li>
+              ))}
+            </ul>
+          )}
+          <a href="/admin/budget" className="text-xs font-bold text-teal-700 hover:underline">
+            הפירוט המלא בעמוד תקציב הפרסום
+          </a>
         </div>
       );
     }

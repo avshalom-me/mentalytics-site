@@ -6,6 +6,7 @@ import { runWatchdog } from "@/app/lib/watchdog";
 import { runConversionsSync, setupConversionActions } from "@/app/lib/google-ads-conversions";
 import { googleAdsConfigured } from "@/app/lib/google-ads";
 import { runAdsMonitor } from "@/app/lib/ads-monitor";
+import { runBudgetAgent } from "@/app/lib/budget-run";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetention } from "@/app/lib/retention";
@@ -71,6 +72,9 @@ function runMetric(agent: string, details: unknown): number | null {
       const adults = fs?.find((f) => f.quiz === "adults") ?? fs?.[0];
       return adults?.recentCompletion != null ? Math.round(adults.recentCompletion * 100) : null;
     }
+    // תקציב: כמה פונים צפויים בחודש לפי ההמלצה.
+    case "budget":
+      return typeof d.plan_seekers === "number" ? d.plan_seekers : null;
     case "daily_digest": {
       const secs = Array.isArray(d.sections)
         ? (d.sections as { count?: number }[])
@@ -507,6 +511,10 @@ export async function POST(req: NextRequest) {
         checked: result.checked,
         error: result.error,
       });
+    }
+    if (body?.action === "budget_run") {
+      const result = await runBudgetAgent({ mode: "manual" });
+      return NextResponse.json(result, { status: result.ok ? 200 : 500 });
     }
     if (body?.action === "ads_run") {
       const result = await runAdsMonitor();

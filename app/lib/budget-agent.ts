@@ -232,6 +232,121 @@ export function hebrewMonth(month: string): string {
 
 const nis = (n: number) => `₪${Math.round(n).toLocaleString("he-IL")}`;
 
+export type BudgetChange = {
+  googleName: string;
+  from: number;
+  to: number;
+  decision: "reduce" | "pause";
+  rate: number | null;
+  rateWindow: 30 | 60 | null;
+  noisy: boolean;
+};
+
+export type BudgetRecommendation = {
+  /** There is something to change in Google: the budgets set today exceed the ceiling. */
+  needed: boolean;
+  title: string;
+  body: string;
+  changes: BudgetChange[];
+};
+
+/**
+ * The monthly recommendation as it goes into the agents' queue: what to change
+ * in Google, campaign by campaign, and what stays. Deterministic - the model
+ * later adds a short "why", never a number.
+ */
+export function budgetRecommendation(p: BudgetProjection): BudgetRecommendation {
+  const month = hebrewMonth(p.month);
+  const inPlan = p.campaigns.filter((c) => c.inPlan);
+  const changes: BudgetChange[] = inPlan
+    .filter((c) => c.proposedDaily !== (c.dailyBudget ?? 0))
+    .map((c) => ({
+      googleName: c.googleName,
+      from: c.dailyBudget ?? 0,
+      to: c.proposedDaily,
+      decision: c.proposedDaily === 0 ? ("pause" as const) : ("reduce" as const),
+      rate: c.rate,
+      rateWindow: c.rateWindow,
+      noisy: c.noisy,
+    }))
+    // Pauses first; then the bigger budget; then the dearer seeker; then by name.
+    .sort(
+      (a, b) =>
+        (a.decision === b.decision ? 0 : a.decision === "pause" ? -1 : 1) ||
+        b.from - a.from ||
+        (b.rate ?? 1e9) - (a.rate ?? 1e9) ||
+        a.googleName.localeCompare(b.googleName)
+    );
+
+  if (p.ceiling == null) {
+    return { needed: false, title: `אין תקרת פרסום ל${month}`, body: summarySentence(p), changes: [] };
+  }
+  const needed = p.current.monthly > p.ceiling && changes.length > 0;
+  if (!needed) {
+    return {
+      needed: false,
+      title: `תקציב ${month}: התקציבים בגוגל בתוך התקרה`,
+      body: summarySentence(p),
+      changes: [],
+    };
+  }
+
+  const why = (c: BudgetChange) =>
+    c.rate == null
+      ? "אף פונה ב-60 יום"
+      : `${nis(c.rate)} לפונה ב-${c.rateWindow} יום${c.noisy ? ", על מעט נתונים" : ""}`;
+  const lines: string[] = [summarySentence(p), "", "מה לשנות בגוגל:"];
+  for (const c of changes) {
+    lines.push(
+      c.decision === "pause"
+        ? `• להשהות את ${c.googleName} (היום ${nis(c.from)} ליום; ${why(c)})`
+        : `• להוריד את ${c.googleName} מ-${nis(c.from)} ל-${nis(c.to)} ליום (${why(c)})`
+    );
+  }
+  const kept = inPlan.filter((c) => c.proposedDaily > 0 && c.proposedDaily === (c.dailyBudget ?? 0));
+  if (kept.length) {
+    lines.push(
+      "",
+      `ללא שינוי: ${kept
+        .map((c) => `${c.googleName}${c.isProtected ? " (מוגן)" : c.learning ? " (בלמידה)" : ""}`)
+        .join(", ")}.`
+    );
+  }
+  const guarded = inPlan.filter((c) => c.isProtected);
+  if (guarded.length) {
+    lines.push(
+      "",
+      `מוגן = נשאר בתקציב שלו גם כשהוא יקר, כי יש סיבה שהמספרים לא רואים: ${guarded
+        .map((c) => `${c.googleName} - ${c.protectedReason}`)
+        .join("; ")}.`
+    );
+  }
+  if (p.overCeiling) lines.push("", "⚠ המוגנים והחדשים לבדם עוברים את התקרה.");
+  lines.push("", "טאבולה ומטא לא נכללים: ההוצאה שלהם עוד לא נשמרת במערכת. שום דבר לא שונה בגוגל - השינוי בידיים שלך.");
+
+  return {
+    needed: true,
+    title: `תקציב ${month}: להוריד מ-${nis(p.current.monthly)} ל-${nis(p.plan.monthly)} (כ-${p.plan.seekers} פונים)`,
+    body: lines.join("\n"),
+    changes,
+  };
+}
+
+/** Every number in a text, as written but without thousands separators. */
+export function numbersIn(text: string): string[] {
+  return (text.match(/\d[\d,]*(?:\.\d+)?/g) ?? []).map((n) => n.replace(/,/g, ""));
+}
+
+/**
+ * The guard on the model's wording: it may only repeat numbers it was given.
+ * A single number that appears nowhere in the input throws the wording away,
+ * and the recommendation goes out without it.
+ */
+export function narrativeIsFaithful(narrative: string, source: string): boolean {
+  const allowed = new Set(numbersIn(source));
+  return numbersIn(narrative).every((n) => allowed.has(n));
+}
+
 /** The sentence the owner asked for, built from the projection alone. */
 export function summarySentence(p: BudgetProjection): string {
   const month = hebrewMonth(p.month);
