@@ -82,14 +82,30 @@ lastMonthCost, avgCplBefore, avgCplAfter }`, וה-narrative רק מלביש על
 OpenAI, Anthropic, Taboola, Resend, livedns. חלק מהן מגיעות ל-avshalom@getmentalytics.com (לפי הבעלים, 29/9). מגוגל מגיעים
 לתיבה רק דוחות DMARC והתראות אבטחה.
 
+**עדכון 29/9 בלילה (הבעלים ביצע את שכבה א):** הכינוי `billing@` קיים ועובד (מייל בדיקה נקלט ב-admin@). גוגל, Vercel ו-Supabase
+הוחלפו ל-billing@. בגוגל, Ads, Workspace והדומיין getmentalytics.com הם פרופיל תשלומים אחד, ו-billing@ נוסף בו כ-payments user
+**בלי הרשאות** עם All payments email (משתמש בלי הרשאות לא צריך חשבון גוגל, ולכן כינוי עובד). ההזמנה שגוגל שלחה ל-billing@
+ממתינה ללחיצת Accept (בתוקף עד 13/10); בלעדיה לא יגיעו חשבוניות.
+
 **התוכנית, בארבעה חלקים:**
 
 1. **ניתוב והפרדה (בלי קוד, כ-40 דקות של הבעלים בממשק של גוגל).** שלוש שכבות, מהיציבה לפחות יציבה:
    - **א. כתובת יעד ייעודית, `billing@getmentalytics.com`, כינוי (alias) של admin@.** ב-Admin console: Directory ← Users ← admin@ ←
-     Alternate email addresses. בלי רישיון נוסף ובלי תיבה חדשה. אחר כך מחליפים בכל ספק את "billing email" לכתובת הזו
-     (Google Ads דרך פרופיל התשלומים, Vercel, Supabase, OpenAI, Anthropic, Taboola, Resend, livedns). חשבוניות מגיעות ישר
-     ל-admin@ ומוענות ל-billing@, בלי העברה בכלל, ובלי לנחש כתובות שולחים.
+     Alternate email addresses. בלי רישיון נוסף ובלי תיבה חדשה. אחר כך מחליפים בכל ספק את "billing email" לכתובת הזו:
+     גוגל (Billing ← Payment accounts ← Settings ← Manage users), Vercel (Invoice Email Recipient, בתחתית עמוד Billing),
+     Supabase (Billing ← Email Recipient ← Additional emails). חשבוניות מגיעות ישר ל-admin@ ומוענות ל-billing@, בלי העברה בכלל.
+     **ספקים בלי שדה שעובד (נבדק 29/9), ומה הוחלט:**
+     - **OpenAI:** יש שדה Billing email, אבל קבלות לא נשלחות אליו (בקשת פיצ'ר פתוחה מ-2024). **נדחה לבקשת הבעלים.**
+       כשיחזור: למשוך עלות מ-Costs API של OpenAI, זה אמין יותר מקבלות.
+     - **Anthropic (Claude Max):** הקבלה מגיעה לג'ימייל האישי של הבעלים ב-18 לחודש, מ-`invoice+statements@mail.anthropic.com`.
+       **נדחה לבקשת הבעלים.** כשיחזור: העברה לפי השולח הזה מהג'ימייל האישי (שכבה ב).
+     - **Taboola:** אין שדה; הקבלות הולכות לכתובת ההתחברות avshalom@. הבעלים כנראה לא ממשיך איתם, והחיוב האחרון (1/10)
+       נרשם ידנית (שלב 3).
+     - Resend חינמי. livedns (mentalytics.co.il) = חיוב שנתי, לא חובה.
+     כל מה שלא מגיע במייל נתפס בדף האשראי (שלב 5), כך שלסוכן יש שני מקורות לכל הוצאה.
    - **ב. העברה מ-avshalom@ רק למה שנשאר.** ספקים שקשורים לכתובת ההתחברות ואי אפשר להחליף להם billing email.
+     **נדחה (29/9):** אחרי ההחלטות למעלה אין כרגע ספק פעיל שדורש העברה. כשיהיה: במייל מועבר ה-To נשאר הכתובת
+     המקורית, ולכן ב-admin@ מסמנים אותו לפי השולח ולא לפי `to:billing@`.
      בתיבה avshalom@: Settings ← Forwarding and POP/IMAP ← Add a forwarding address ← admin@. גוגל שולחת קוד אימות ל-admin@
      (המייל ייקלט שם כהודעת מערכת; את הקישור לוחצים ידנית). רק אחר כך אפשר מסנן שמעביר.
      **גישת ביקורת-קודם:** קודם מסנן ש**רק מסמן** (`subject:(invoice OR receipt OR חשבונית OR קבלה OR "payment received" OR statement)`
