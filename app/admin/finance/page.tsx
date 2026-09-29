@@ -9,9 +9,14 @@ type MonthRow = {
   month: string;
   income_subscriptions: number;
   income_quiz: number;
+  income_site: number;
   income_total: number;
+  income_source: "sumit" | "site";
+  income_after_refunds: number;
+  site_gap: number | null;
   expenses_total: number;
   refunds_total: number;
+  refunds_sumit: number;
   ad_spend: number;
   rnd_total: number;
   new_paying: number;
@@ -87,6 +92,7 @@ export default function FinancePage() {
   const [recurring, setRecurring] = useState<Recurring[]>([]);
   const [targets, setTargets] = useState<Target[]>([]);
   const [cumulative, setCumulative] = useState(0);
+  const [sumitLastSync, setSumitLastSync] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -119,6 +125,7 @@ export default function FinancePage() {
           setRecurring(j.recurring ?? []);
           setTargets(j.targets);
           setCumulative(j.cumulative_net);
+          setSumitLastSync(j.sumit_last_sync ?? null);
         } else setError(j.error || "שגיאה בטעינה");
       })
       .catch(() => setError("שגיאה בטעינה"))
@@ -281,7 +288,8 @@ export default function FinancePage() {
           </a>
         </div>
         <p className="mb-5 text-sm text-stone-500">
-          הכנסות נקראות אוטומטית מהחיובים (לפני מע"מ). הוצאה מוזנת כאן פעם אחת ונוצרת כטיוטה ב-Sumit —
+          הכנסות והחזרים נקראים אוטומטית מהחשבוניות והזיכויים ש-Sumit הפיקה (לפני מע"מ, סנכרון יומי).
+          הוצאה מוזנת כאן פעם אחת ונוצרת כטיוטה ב-Sumit -
           שם מאשרים אותה לספרים, והרו"ח רואה הכול במקום הרגיל שלו.
         </p>
 
@@ -298,9 +306,20 @@ export default function FinancePage() {
           <>
             {/* This-month cards */}
             <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
-              <Card label="הכנסות החודש" value={ils(current.income_total)} sub={`מנויים ${ils(current.income_subscriptions)} · שאלונים ${ils(current.income_quiz)}`} accent />
+              <Card
+                label="הכנסות החודש"
+                value={ils(current.income_total)}
+                sub={`מנויים ${ils(current.income_subscriptions)} · שאלונים ${ils(current.income_quiz)}${
+                  current.refunds_total > 0 ? ` · אחרי החזרים ${ils(current.income_after_refunds)}` : ""
+                }`}
+                accent
+              />
               <Card label="הוצאות החודש" value={ils(current.expenses_total)} sub={current.rnd_total > 0 ? `מתוכן מו"פ ${ils(current.rnd_total)}` : undefined} />
-              <Card label="החזרים החודש" value={ils(current.refunds_total)} />
+              <Card
+                label="החזרים החודש"
+                value={ils(current.refunds_total)}
+                sub={current.refunds_sumit > 0 ? `מהם זיכויים ב-Sumit ${ils(current.refunds_sumit)}` : undefined}
+              />
               <Card
                 label="מאזן החודש"
                 value={ils(current.net)}
@@ -342,7 +361,7 @@ export default function FinancePage() {
             )}
 
             {/* Month table */}
-            <div className="mb-8 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
+            <div className="mb-2 overflow-x-auto rounded-2xl border border-stone-200 bg-white">
               <table className="w-full min-w-[640px] text-sm">
                 <thead>
                   <tr className="border-b border-stone-200 text-xs text-stone-400">
@@ -361,7 +380,17 @@ export default function FinancePage() {
                   {months.map((m) => (
                     <tr key={m.month} className="border-b border-stone-100 last:border-b-0">
                       <td className="px-4 py-2.5 font-bold text-stone-700">{monthLabel(m.month)}</td>
-                      <td className="px-4 py-2.5 text-emerald-700">{ils(m.income_total)}</td>
+                      <td className="px-4 py-2.5 text-emerald-700">
+                        {ils(m.income_total)}
+                        {m.site_gap != null && Math.abs(m.site_gap) >= 1 && (
+                          <div
+                            className="text-[11px] font-normal text-amber-700"
+                            title="ההכנסה בטבלה היא סכום חשבוניות המס ש-Sumit הפיקה בחודש, לפני מע״מ. האתר רשם בזמן החיוב סכום אחר: חיוב שנעשה ישירות ב-Sumit, או חיוב של היום שעוד לא סונכרן."
+                          >
+                            האתר רשם {ils(m.income_site)}
+                          </div>
+                        )}
+                      </td>
                       <td className="px-4 py-2.5">{ils(m.expenses_total)}</td>
                       <td className="px-4 py-2.5">{m.refunds_total > 0 ? ils(m.refunds_total) : "—"}</td>
                       <td className="px-4 py-2.5">{m.ad_spend > 0 ? ils(m.ad_spend) : "—"}</td>
@@ -384,6 +413,7 @@ export default function FinancePage() {
                 </tbody>
               </table>
             </div>
+            <SumitSyncNote lastSync={sumitLastSync} />
 
             {/* Add expense */}
             <div className="mb-2 flex items-center gap-2 text-sm font-black text-stone-500">
@@ -653,5 +683,39 @@ function Card({
       <div className={`text-xl font-black ${tone ?? (accent ? "text-teal-700" : "text-stone-900")}`}>{value}</div>
       {sub && <div className="mt-0.5 text-[11px] text-stone-400">{sub}</div>}
     </div>
+  );
+}
+
+// The daily cron copies Sumit's documents; income from June 2026 depends on
+// that copy, so a copy that stopped must be visible here, not discovered later.
+const SUMIT_SYNC_STALE_MS = 48 * 60 * 60 * 1000;
+
+function SumitSyncNote({ lastSync }: { lastSync: string | null }) {
+  if (!lastSync) {
+    return (
+      <p className="mb-8 text-xs text-amber-700">
+        מסמכי Sumit עוד לא סונכרנו, ולכן ההכנסות מוצגות לפי רישומי האתר בלבד.
+      </p>
+    );
+  }
+  const at = new Date(lastSync);
+  const when = at.toLocaleString("he-IL", {
+    timeZone: "Asia/Jerusalem",
+    day: "numeric",
+    month: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  if (Date.now() - at.getTime() > SUMIT_SYNC_STALE_MS) {
+    return (
+      <p className="mb-8 text-xs font-bold text-red-600">
+        ⚠ הסנכרון מ-Sumit לא רץ מאז {when}. ההכנסות וההחזרים של הימים האחרונים חסרים בטבלה.
+      </p>
+    );
+  }
+  return (
+    <p className="mb-8 text-xs text-stone-400">
+      מיוני 2026 ההכנסות וההחזרים הם חשבוניות המס והזיכויים ש-Sumit הפיקה (לפני מע״מ). סנכרון אחרון: {when}.
+    </p>
   );
 }

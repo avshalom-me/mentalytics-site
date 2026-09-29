@@ -536,3 +536,78 @@ export async function listRecurringForCustomer(opts: {
   );
   return data.RecurringItems ?? [];
 }
+
+// ---------- Accounting documents (read-only) ----------
+//
+// /accounting/documents/list/ returns the documents Sumit actually issued - the
+// books - as opposed to the standing orders above. It is the only place a
+// credit note shows up: a refund never passes through the charge flow, so
+// `payments` has never recorded one. Nothing here issues, sends or cancels a
+// document.
+//
+// Two traps, both measured on the live account on 29/9/2026:
+// - Without Paging the endpoint returns 10 documents, and says nothing about it.
+// - DocumentValue includes VAT, and it is negative on a credit.
+
+export interface SumitListedDocument {
+  DocumentID: number;
+  DocumentNumber?: number | null;
+  // Accounting_Typed_DocumentType, numeric on the wire like Status.
+  Type: number;
+  // "2026-09-18T00:00:00" - the day printed on the document.
+  Date?: string | null;
+  Currency?: number | null;
+  // In the document's currency / in shekels. The same number for a shekel
+  // document, which every document on this account has been so far.
+  DocumentValue?: number | null;
+  CompanyValue?: number | null;
+  CustomerID?: number | null;
+  IsDraft?: boolean | null;
+  [k: string]: unknown;
+}
+
+const DOCUMENTS_PAGE_SIZE = 200;
+
+export async function listDocuments(opts: {
+  /** "YYYY-MM-DD", inclusive. */
+  dateFrom: string;
+  /** "YYYY-MM-DD". */
+  dateTo: string;
+  /** Each page is one quota-counted call. */
+  maxPages?: number;
+}): Promise<{ documents: SumitListedDocument[]; calls: number; truncated: boolean }> {
+  const maxPages = opts.maxPages ?? 5;
+  const byId = new Map<number, SumitListedDocument>();
+  let calls = 0;
+  let start = 0;
+  let truncated = false;
+  for (;;) {
+    calls++;
+    const data = await api<{ Documents?: SumitListedDocument[] | null; HasNextPage?: boolean }>(
+      "/accounting/documents/list/",
+      {
+        DateFrom: opts.dateFrom,
+        DateTo: opts.dateTo,
+        IncludeDrafts: false,
+        Paging: { StartIndex: start, PageSize: DOCUMENTS_PAGE_SIZE },
+      }
+    );
+    const page = data.Documents ?? [];
+    let fresh = 0;
+    for (const d of page) {
+      if (typeof d.DocumentID === "number" && !byId.has(d.DocumentID)) {
+        byId.set(d.DocumentID, d);
+        fresh++;
+      }
+    }
+    // A page that adds nothing new means the paging did not move; stop rather
+    // than spend the quota re-reading it.
+    if (!data.HasNextPage || fresh === 0) break;
+    if (calls >= maxPages) {
+      truncated = true;
+      break;
+    }
+    start += page.length;
+  }
+  return { documents: [...byId.values()], calls, truncated };
+}

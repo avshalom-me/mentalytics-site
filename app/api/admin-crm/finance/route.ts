@@ -4,13 +4,18 @@ import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, labelOf } from "@/app/lib/crm";
 import { createSumitExpenseDraft } from "@/app/lib/sumit-expense";
 import { materializeRecurringExpenses, nextOccurrence } from "@/app/lib/recurring-expenses";
+import { monthIncome, monthlySumitTotals } from "@/app/lib/sumit-documents";
 
 // Finance overview + expense ledger.
 //
-// Income is read live from `payments` (mirrored from Sumit by the charge
-// flow — completed rows only, amounts are ₪ before VAT). Expenses/refunds
-// come from the manual ledger. Nothing here ever writes toward Sumit; the
-// books of record stay in Sumit, this screen is the management view.
+// Income, from June 2026 on, is Sumit's own books: the tax invoices and credit
+// notes it issued, copied daily into `sumit_documents` (monthIncome in
+// sumit-documents.ts). A refund is made in Sumit and never reaches `payments`,
+// so until 29/9/2026 this screen counted every refunded month as income. The
+// site's own records (`payments`, mirrored by the charge flow, ₪ before VAT)
+// still give the breakdown by product, the months before June, and a check
+// against Sumit. Expenses and hand-entered refunds come from the manual ledger.
+// Nothing here ever writes toward Sumit; this screen is the management view.
 
 type PaymentRow = { payment_type: string; reference_id: string; amount: number; status: string; created_at: string };
 type ExpenseRow = {
@@ -31,6 +36,18 @@ function monthKey(iso: string): string {
   return iso.slice(0, 7); // YYYY-MM
 }
 
+// A timestamp's month on the Israeli calendar. Sumit dates its documents by the
+// Israeli day, so a charge at 01:00 on the 1st belongs to the new month; read
+// in UTC it landed in the previous one, and the check against Sumit showed a
+// ₪90 gap in September that was only the clock.
+const IL_MONTH = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit" });
+function monthKeyIL(iso: string): string {
+  const parts = IL_MONTH.formatToParts(new Date(iso));
+  const year = parts.find((p) => p.type === "year")?.value;
+  const month = parts.find((p) => p.type === "month")?.value;
+  return year && month ? `${year}-${month}` : monthKey(iso);
+}
+
 export async function GET(req: NextRequest) {
   try {
     const monthsBack = Math.min(Number(req.nextUrl.searchParams.get("months") ?? 6), 24);
@@ -40,17 +57,20 @@ export async function GET(req: NextRequest) {
     since.setUTCHours(0, 0, 0, 0);
     const sinceIso = since.toISOString();
     const sinceDate = sinceIso.slice(0, 10);
+    // A day earlier, so a charge in the first Israeli hours of the first month
+    // (still the previous day in UTC) is fetched; the month filter places it.
+    const paymentsFromIso = new Date(since.getTime() - 24 * 60 * 60 * 1000).toISOString();
 
     // Recurring templates whose month has arrived become real rows before we read.
     await materializeRecurringExpenses();
 
-    const [payments, expenses, allFirstPayments, targetsRes, recurringRes, recurringRefs] = await Promise.all([
+    const [payments, expenses, allFirstPayments, targetsRes, recurringRes, recurringRefs, sumitDocs, sumitLast] = await Promise.all([
       fetchAllRows<PaymentRow>(() =>
         supabaseAdmin
           .from("payments")
           .select("payment_type, reference_id, amount, status, created_at")
           .eq("status", "completed")
-          .gte("created_at", sinceIso)
+          .gte("created_at", paymentsFromIso)
       ),
       fetchAllRows<ExpenseRow>(() =>
         supabaseAdmin
@@ -75,12 +95,27 @@ export async function GET(req: NextRequest) {
       fetchAllRows<{ recurring_id: string }>(() =>
         supabaseAdmin.from("expenses").select("recurring_id").not("recurring_id", "is", null)
       ),
+      fetchAllRows<{ kind: string; doc_date: string; value_net: number }>(() =>
+        supabaseAdmin
+          .from("sumit_documents")
+          .select("kind, doc_date, value_net")
+          .in("kind", ["charge", "credit"])
+          .gte("doc_date", sinceDate)
+      ),
+      // When the daily copy last ran, so a stalled sync shows on the screen.
+      supabaseAdmin
+        .from("sumit_documents")
+        .select("synced_at")
+        .order("synced_at", { ascending: false })
+        .limit(1)
+        .maybeSingle(),
     ]);
+    const sumitByMonth = monthlySumitTotals(sumitDocs);
 
     const firstPaymentMonth = new Map<string, string>();
     for (const p of allFirstPayments) {
       if (!firstPaymentMonth.has(p.reference_id)) {
-        firstPaymentMonth.set(p.reference_id, monthKey(p.created_at));
+        firstPaymentMonth.set(p.reference_id, monthKeyIL(p.created_at));
       }
     }
     const newPayingByMonth = new Map<string, number>();
@@ -99,7 +134,7 @@ export async function GET(req: NextRequest) {
     }
 
     const rows = months.map((m) => {
-      const monthPayments = payments.filter((p) => monthKey(p.created_at) === m);
+      const monthPayments = payments.filter((p) => monthKeyIL(p.created_at) === m);
       // 'subscription' = חיוב ההרשמה, 'subscription_renewal' = החידוש החודשי
       // שמשוקף מ-Sumit ע"י הקרון. שניהם אותה הכנסה מאותו מטפל; ספירת ההרשמה
       // בלבד הסתירה כל שקל של חידוש. (מונה "משלמים חדשים" למטה עדיין סופר
@@ -117,7 +152,7 @@ export async function GET(req: NextRequest) {
         .reduce((s, p) => s + Number(p.amount), 0);
 
       const monthExpenses = expenses.filter((e) => monthKey(e.expense_date) === m);
-      const refunds = monthExpenses
+      const manualRefunds = monthExpenses
         .filter((e) => REFUND_CATEGORIES.includes(e.category))
         .reduce((s, e) => s + Number(e.amount), 0);
       const expensesTotal = monthExpenses
@@ -131,16 +166,31 @@ export async function GET(req: NextRequest) {
         .reduce((s, e) => s + Number(e.amount), 0);
 
       const newPaying = newPayingByMonth.get(m) ?? 0;
-      const income = incomeSubs + incomeQuiz + incomeCenters;
+      const siteIncome = incomeSubs + incomeQuiz + incomeCenters;
+      const books = monthIncome({
+        month: m,
+        siteIncome,
+        manualRefunds,
+        sumit: sumitByMonth.get(m) ?? null,
+      });
+      const income = books.income;
+      const refunds = books.refunds;
 
       return {
         month: m,
+        // The site's records by product; from June 2026 they need not add up
+        // to income_total, which is Sumit's (the difference is site_gap).
         income_subscriptions: incomeSubs,
         income_quiz: incomeQuiz,
         income_centers: incomeCenters,
+        income_site: siteIncome,
         income_total: income,
+        income_source: books.source,
+        income_after_refunds: income - refunds,
+        site_gap: books.site_gap,
         expenses_total: expensesTotal,
         refunds_total: refunds,
+        refunds_sumit: books.refunds_sumit,
         ad_spend: adSpend,
         rnd_total: rndTotal,
         new_paying: newPaying,
@@ -167,6 +217,7 @@ export async function GET(req: NextRequest) {
       months: rows,
       expenses: expenses.slice(0, 500),
       cumulative_net: cumulativeNet,
+      sumit_last_sync: (sumitLast.data as { synced_at: string } | null)?.synced_at ?? null,
       targets: targetsRes.data ?? [],
       recurring,
     });

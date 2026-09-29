@@ -19,6 +19,7 @@ import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapi
 import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 import { demoteCenterTherapists } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
+import { syncSumitDocuments } from "@/app/lib/sumit-documents";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -298,7 +299,8 @@ function verifyCron(req: NextRequest): boolean {
 // Pass (1) scales with paying therapists (fine: revenue scales with them);
 // pass (3) used to scale with ALL-TIME cancelled subscriptions, which only
 // ever grows — that unbounded term is what the decay schedule in pass (3)
-// now caps.
+// now caps. Pass (6), the accounting documents, is one call a day whatever
+// the number of customers.
 export async function GET(req: NextRequest) {
   if (!process.env.CRON_SECRET) {
     return NextResponse.json({ error: "server misconfigured" }, { status: 503 });
@@ -1004,11 +1006,29 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // -------- (6) Sumit's accounting documents → sumit_documents --------
+  // מקור האמת להכנסה בפועל, כולל זיכויים - החזרים נעשים ב-Sumit ולא עוברים
+  // דרך אף מסלול שכותב ל-payments (sumit-documents.ts). קריאת API אחת ביום.
+  // קריאה בלבד מול Sumit, ובסוף הריצה בכוונה: כשל כאן נספר ונרשם, ולא נוגע
+  // באף אחד מהמעברים שלמעלה.
+  let documentsSynced = 0;
+  try {
+    const docs = await syncSumitDocuments(supabase);
+    documentsSynced = docs.upserted;
+    if (docs.truncated) {
+      console.warn(`sumit documents sync: stopped after ${docs.calls} pages (${docs.from}..${docs.to})`);
+    }
+  } catch (err) {
+    errors++;
+    console.error("sumit documents sync failed:", err instanceof Error ? err.message : err);
+  }
+
   await finishAgentRun(runId, {
     status: errors > 0 ? "error" : "ok",
     summary:
       `נבדקו ${checked} מנויים; ${demoted} הורדו, ${trialsExpired} מתנות פגו, ` +
-      `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו`,
+      `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו; ` +
+      `${documentsSynced} מסמכי Sumit סונכרנו`,
     error: errors > 0 ? `${errors} שגיאות בריצה` : undefined,
   });
 
@@ -1036,6 +1056,7 @@ export async function GET(req: NextRequest) {
     centerTherapistsDemoted,
     centerChargesRecorded,
     centerOrphansFound,
+    documentsSynced,
     errors,
   });
 }
