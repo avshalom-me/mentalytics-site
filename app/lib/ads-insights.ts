@@ -21,9 +21,10 @@ const LOOKBACK_DAYS = 7;
 // כמה אחורה מחפשים את הפנייה האחרונה של קמפיין. בצורת ארוכה מזה כבר לא
 // צריכה מספר מדויק כדי להיות ברורה, והחלון הקצר שומר את השאילתה זולה.
 const DRY_WINDOW_DAYS = 45;
-// תקציב חודשי מתוכנן לפרסום (₪) - נקבע ל-3,500 ב-30/8/26. ניתן לעקוף
-// בסביבה (ADS_MONTHLY_BUDGET) בלי דיפלוי.
-const MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
+// תקציב חודשי מתוכנן לפרסום (₪, לפני מע"מ). מקור האמת הוא plan_targets
+// (מדד ads_budget_month, אותה שורה שעמוד /admin/budget קורא). זה רק הגיבוי
+// כשאין שם שורה: 3,500 שנקבע ב-30/8/26, או ADS_MONTHLY_BUDGET בסביבה.
+const FALLBACK_MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
 // יעד עלות ללחיצת פנייה כשאין אבן דרך בתוכנית העסקית.
 const FALLBACK_MAX_CPL = Number(process.env.ADS_MAX_CPL ?? 250);
 
@@ -126,8 +127,29 @@ async function maxCplTarget(): Promise<{ value: number; fromPlan: boolean }> {
   return { value: FALLBACK_MAX_CPL, fromPlan: false };
 }
 
+// The monthly ceiling in force this month, read the same way as cpl_max: the
+// latest milestone that has already started.
+async function monthlyBudgetTarget(): Promise<number> {
+  try {
+    const { data } = await supabaseAdmin
+      .from("plan_targets")
+      .select("target")
+      .eq("metric", "ads_budget_month")
+      .eq("scenario", "base")
+      .lte("month", new Date().toISOString().slice(0, 8) + "01")
+      .order("month", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const n = Number(data?.target);
+    if (Number.isFinite(n) && n > 0) return n;
+  } catch {
+    /* ממשיכים עם הגיבוי */
+  }
+  return FALLBACK_MONTHLY_BUDGET;
+}
+
 export async function buildAdsInsights(): Promise<AdsInsights> {
-  const [registryQ, configQ, dailyQ, kwStatusQ, syncQ, site7Q, site30Q, cplTarget] = await Promise.all([
+  const [registryQ, configQ, dailyQ, kwStatusQ, syncQ, site7Q, site30Q, cplTarget, MONTHLY_BUDGET] = await Promise.all([
     supabaseAdmin.from("ads_campaign_registry").select("*").order("google_name"),
     supabaseAdmin.from("ads_campaign_config").select("*"),
     supabaseAdmin
@@ -139,6 +161,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     supabaseAdmin.rpc("ads_console_site_stats", { p_days: 7 }),
     supabaseAdmin.rpc("ads_console_site_stats", { p_days: 30 }),
     maxCplTarget(),
+    monthlyBudgetTarget(),
   ]);
   for (const q of [registryQ, configQ, dailyQ, kwStatusQ, syncQ, site7Q, site30Q]) {
     if (q && typeof q === "object" && "error" in q && q.error) throw new Error(String(q.error.message));
