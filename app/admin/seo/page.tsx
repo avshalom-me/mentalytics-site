@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import OptOutToggle from "./OptOutToggle";
 import ContactDestinations from "@/app/admin/ContactDestinations";
 import OrganicByFamily from "@/app/admin/OrganicByFamily";
+import { ageInHebrew } from "@/app/lib/admin-seo-cache";
 
 // SEO אורגני - פילוח "ביקוש מול חיפוש-שם". השאלה שהעמוד עונה עליה: כמה
 // מהתנועה האורגנית היא אנשים שחיפשו *טיפול* (עיר/גישה/נושא - הנכס שה-SEO
@@ -33,8 +34,10 @@ type SeoData = {
   name_breadth: { therapists: number; sessions: number };
   funnel: FunnelRow[];
   ai?: AiSummary;
-  /** מתי חושבו הנתונים (עותק לילי); null = חושבו עכשיו, בזמן הטעינה. */
+  /** מתי חושבו הנתונים (העותק המתוזמן); null = חושבו עכשיו, בזמן הטעינה. */
   computed_at?: string | null;
+  /** העותק ישן מדי והחישוב החי נכשל - מוצג באזהרה כתומה. */
+  stale?: boolean;
 };
 
 const AI_COLOR = "#7C3AED";
@@ -224,7 +227,7 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
                 <g key={p.week} opacity={open ? 0.72 : 1}>
                   <path d={diamond(x(i), sy(p.ai), 4)} fill={open ? "#fff" : AI_COLOR}
                     stroke={open ? AI_COLOR : "#fff"} strokeWidth={open ? 1.6 : 1}>
-                    <title>{`שבוע ${fmt(p.week)}: ${p.ai} מבקרים דרך עוזרי AI${open ? partialNote : ""}`}</title>
+                    <title>{`שבוע ${fmt(p.week)}: ${p.ai} ביקורים דרך עוזרי AI${open ? partialNote : ""}`}</title>
                   </path>
                   {/* הספרה בדיו ניטרלית - הזהות נישאת בסמן, לא בצבע הטקסט */}
                   <text x={x(i)} y={sy(p.ai) - 8} textAnchor="middle" fontSize={10.5} fontWeight={700} fill="#44403C">{p.ai}</text>
@@ -286,16 +289,32 @@ export default function AdminSeoPage() {
         <strong> ביקוש אמיתי לטיפול</strong> - הנכס שה-SEO אמור לייצר. הסיווג לפי הנגיעה הראשונה של כל מבקר.
       </p>
       <p className="mb-4 max-w-3xl rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-500">
-        <strong>&quot;מבקר&quot; = דפדפן, לא ביקור.</strong> המזהה נשמר בדפדפן ללא תפוגה, ולכן מי שנכנס
-        עשרות פעמים נספר <strong>פעם אחת</strong> - בשבוע שבו נכנס לראשונה דרך גוגל. לכן המספרים כאן
-        הם &quot;מבקרים אורגניים חדשים&quot;, לא כניסות, והם אינם מנופחים ע&quot;י כניסות חוזרות שלך.
+        <strong>מה נספר:</strong> ביקורים שהגיעו מחיפוש רגיל בגוגל, לפי הדף הראשון שבו הביקור נחת. ביקור חדש
+        מתחיל אחרי 30 דקות בלי פעילות, ולכן מי שחוזר נספר שוב (גם חזרה ישירה, עד 30 יום מהכניסה מגוגל).{" "}
+        <strong>עד 8/8/2026 היה מזהה אחד לכל דפדפן, בלי תפוגה,</strong> ומי שחזר נספר פעם אחת בלבד - לכן
+        המספרים מלפני התאריך הזה נמוכים יותר ואינם ברי השוואה למה שאחריו.
       </p>
       <div className="mb-6"><OptOutToggle /></div>
-      {!loading && data?.computed_at && (
-        <p className="-mt-3 mb-5 text-xs text-stone-400">
-          הנתונים חושבו ב-{new Date(data.computed_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })} ומתעדכנים כל לילה.
-        </p>
-      )}
+      {!loading && data && (() => {
+        const when = data.computed_at
+          ? new Date(data.computed_at).toLocaleString("he-IL", { timeZone: "Asia/Jerusalem", day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })
+          : "";
+        if (data.computed_at && data.stale) {
+          return (
+            <p className="-mt-3 mb-5 max-w-3xl rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+              <strong>הנתונים ישנים:</strong> חושבו {ageInHebrew(data.computed_at)} ({when}), והחישוב העדכני לא הצליח -
+              כנראה בסיס הנתונים עמוס כרגע. ייתכן שחסרות השעות האחרונות. כדאי לנסות שוב בעוד כמה דקות.
+            </p>
+          );
+        }
+        return (
+          <p className="-mt-3 mb-5 text-xs text-stone-400">
+            {data.computed_at
+              ? <>הנתונים חושבו {ageInHebrew(data.computed_at)} ({when}) ומתעדכנים כל 6 שעות.</>
+              : <>הנתונים חושבו עכשיו.</>}
+          </p>
+        );
+      })()}
 
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>}
       {loading && <p className="text-sm text-stone-400 animate-pulse">טוען…</p>}
@@ -342,6 +361,9 @@ export default function AdminSeoPage() {
             </p>
             <WeeklyLineChart weeks={data.weekly} />
             <p className="mt-3 text-[11px] leading-5 text-stone-400">
+              <strong className="text-stone-500">כל נקודה היא שבוע:</strong> מיום שני ב-03:00 עד יום שני שאחריו ב-03:00
+              (שעון ישראל; בחורף ב-02:00), והתאריך על הציר הוא יום שני שפותח אותו. הגרף מציג את כל השבועות מההתחלה
+              בלי קשר לבורר הימים, והכרטיסים שמעליו סופרים רק את {days} הימים האחרונים.{" "}
               הקו הירקרק (ביקוש) הוא המדד היחיד שאומר אם ה-SEO עובד. הקו הענברי (חיפושי שם) יגדל עם כל מטפל
               שמצטרף - גם בלי שום שיפור בדירוג. הזמן זורם משמאל לימין. הנקודה האחרונה היא שבוע שעדיין
               רץ: היא מצוירת מקווקו וחלול, והתווית שמתחתיה אומרת כמה ימים מתוך שבעה כבר נספרו - אל
@@ -352,13 +374,13 @@ export default function AdminSeoPage() {
                 <strong className="text-stone-700">הקו הסגול - עוזרי AI:</strong>{" "}
                 {data.ai.sessions > 0 ? (
                   <>
-                    {data.ai.sessions} מבקרים ב-{days} הימים האחרונים
+                    {data.ai.sessions} ביקורים ב-{days} הימים האחרונים
                     {" "}({data.ai.by_assistant.map((a) => `${AI_ASSISTANT_LABELS[a.assistant] ?? a.assistant} ${a.sessions}`).join(" · ")}).
                   </>
                 ) : (
                   <>אין מבקרים מזוהים ב-{days} הימים האחרונים.</>
                 )}{" "}
-                כל העוזרים יחד, ומבקר נספר פעם אחת - בשבוע שבו הגיע לראשונה דרך עוזר. הקו אינו חלק מהתנועה האורגנית
+                כל העוזרים יחד, וביקור נספר פעם אחת - בשבוע שבו התחיל. הקו אינו חלק מהתנועה האורגנית
                 ואינו נכלל במספרים שלמעלה. בגרף הראשי הוא באותו קנה מידה של החיפוש ולכן נמוך; הרצועה שמתחתיו מציגה אותו
                 בקנה מידה משלו. לא נספרים: תשובות ה-AI של גוגל עצמה (נרשמות כחיפוש אורגני), ומי ששמע על האתר מעוזר AI
                 והגיע אחר כך דרך חיפוש או הקלדת הכתובת.{" "}

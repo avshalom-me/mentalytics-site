@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { seoCacheFreshness } from "@/app/lib/admin-seo-cache";
 
 // פילוח SEO אורגני (/admin/seo). כל החישוב ב-RPC אחד בצד ה-DB
 // (admin_seo_overview) - ראו את המתודולוגיה במיגרציה. מוגן ע"י middleware
@@ -14,13 +15,17 @@ type AiWeekly = {
   by_assistant?: { assistant: string; sessions: number }[];
 };
 
-// עותק לילי (admin_report_cache, מתמלא ע"י refresh_admin_seo_cache ב-pg_cron
-// ב-03:30). חישוב חי של 90 יום לקח 2.5 שניות בממוצע ו-10 שניות בריצה קרה - מעל
+// עותק (admin_report_cache, מתמלא ע"י refresh_admin_seo_cache ב-pg_cron כל 6
+// שעות). חישוב חי של 90 יום לקח 2.5 שניות בממוצע ו-10 שניות בריצה קרה - מעל
 // מגבלת 8 השניות של PostgREST, וזו ה-ERROR שחלפה בניסיון חוזר (23/9/2026).
-// העותק הוא הפלט של אותן שתי פונקציות בדיוק. עותק חסר או ישן מ-36 שעות (הלילה
-// נכשל) - חישוב חי כמו קודם. ?live=1 מכריח חישוב חי, להשוואה.
-const CACHE_MAX_AGE_MS = 36 * 3_600_000;
+// העותק הוא הפלט של אותן שתי פונקציות בדיוק.
+//
+// עותק חסר או ישן (ראו admin-seo-cache.ts) - חישוב חי. אם גם החישוב החי נכשל
+// (בסיס הנתונים תקוע, וזה בדיוק המצב שבו גם הריצה המתוזמנת נופלת) - עדיף
+// העותק הישן עם סימון "ישן" על עמוד שגיאה. ?live=1 מכריח חישוב חי, להשוואה,
+// וכשל שלו הוא שגיאה גלויה: מי שביקש נתון חי לא צריך לקבל ישן בלי לדעת.
 
+// העותק בכל גיל, או null אם חסר. ההחלטה אם הוא טרי היא של הקורא.
 async function readCached(days: number): Promise<{ seo: unknown; ai: unknown; computedAt: string } | null> {
   const keys = [`seo_overview:${days}`, `ai_weekly:${days}`];
   const { data, error } = await supabaseAdmin
@@ -31,7 +36,6 @@ async function readCached(days: number): Promise<{ seo: unknown; ai: unknown; co
   const seo = data.find((r) => r.key === keys[0]);
   const ai = data.find((r) => r.key === keys[1]);
   if (!seo || !ai) return null;
-  if (Date.now() - Date.parse(seo.computed_at as string) > CACHE_MAX_AGE_MS) return null;
   return { seo: seo.data, ai: ai.data, computedAt: seo.computed_at as string };
 }
 
@@ -42,27 +46,42 @@ export async function GET(req: NextRequest) {
     const forceLive = req.nextUrl.searchParams.get("live") === "1";
 
     const cached = forceLive ? null : await readCached(days);
+    const useCopy = cached !== null && seoCacheFreshness(cached.computedAt) === "fresh";
     let seoData: unknown;
     let aiData: unknown;
-    if (cached) {
+    // null = חושב עכשיו. אחרת: מתי חושב העותק שמוצג.
+    let computedAt: string | null = null;
+    let stale = false;
+    if (cached && useCopy) {
       seoData = cached.seo;
       aiData = cached.ai;
+      computedAt = cached.computedAt;
     } else {
-      // שני ה-RPC רצים במקביל. סדרת ה-AI נוספה אחרי שהעמוד כבר עבד, ולכן
-      // כישלון שלה לא מפיל אותו: הגרף פשוט מוצג בלי הקו.
-      const [seo, aiRes] = await Promise.all([
-        supabaseAdmin.rpc("admin_seo_overview", { p_days: days }),
-        supabaseAdmin.rpc("admin_ai_weekly", { p_days: days }),
-      ]);
-      if (seo.error) throw seo.error;
-      seoData = seo.data;
-      aiData = aiRes.error ? null : aiRes.data;
+      try {
+        // שני ה-RPC רצים במקביל. סדרת ה-AI נוספה אחרי שהעמוד כבר עבד, ולכן
+        // כישלון שלה לא מפיל אותו: הגרף פשוט מוצג בלי הקו.
+        const [seo, aiRes] = await Promise.all([
+          supabaseAdmin.rpc("admin_seo_overview", { p_days: days }),
+          supabaseAdmin.rpc("admin_ai_weekly", { p_days: days }),
+        ]);
+        if (seo.error) throw seo.error;
+        seoData = seo.data;
+        aiData = aiRes.error ? null : aiRes.data;
+      } catch (err) {
+        // אין עותק (או שביקשו חי במפורש) - השגיאה אמיתית.
+        if (!cached) throw err;
+        seoData = cached.seo;
+        aiData = cached.ai;
+        computedAt = cached.computedAt;
+        stale = true;
+      }
     }
 
     const data = (seoData ?? {}) as { weekly?: WeekRow[] } & Record<string, unknown>;
     const ai = (aiData ?? null) as AiWeekly | null;
-    // מתי חושבו הנתונים - העמוד מציג את זה. null = חושב עכשיו.
-    data.computed_at = cached ? cached.computedAt : null;
+    // מתי חושבו הנתונים - העמוד מציג את זה, ומסמן בכתום כשהם ישנים.
+    data.computed_at = computedAt;
+    data.stale = stale;
 
     if (ai) {
       // מיזוג לפי תחילת השבוע. שני ה-RPC גוזרים אותה באותו date_trunc('week'),
