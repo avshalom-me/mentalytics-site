@@ -79,19 +79,41 @@ lastMonthCost, avgCplBefore, avgCplAfter }`, וה-narrative רק מלביש על
 
 **מה יש היום:** החיבור ל-Gmail עובד בפרודקשן (108 הודעות נקלטו, ריצה אחרונה 29/9). בתיבת admin@ מגיעות
 חשבוניות Sumit (44), חשבוניות מ-paperless.tax (ליהי), KSP. **לא מגיעות לשם:** Google Ads, Vercel, Supabase,
-OpenAI, Anthropic, Taboola, Resend, livedns. הן הולכות לתיבות אחרות (כנראה avshalom84@gmail.com). מגוגל מגיעים
+OpenAI, Anthropic, Taboola, Resend, livedns. חלק מהן מגיעות ל-avshalom@getmentalytics.com (לפי הבעלים, 29/9). מגוגל מגיעים
 לתיבה רק דוחות DMARC והתראות אבטחה.
 
 **התוכנית, בארבעה חלקים:**
 
-1. **ניתוב (בלי קוד, 20 דקות של הבעלים).** בתיבה הפרטית: מסנן `from:(ads-noreply@google.com OR
-   payments-noreply@google.com OR invoice+statements@vercel.com OR billing@supabase OR noreply@openai.com OR
-   anthropic.com OR taboola.com OR resend.com OR livedns.co.il) AND (חשבונית OR receipt OR invoice OR statement OR payment)`
-   → העברה אוטומטית ל-admin@getmentalytics.com. תיבה אחת, בלי OAuth נוסף, בלי לגעת בסיסמאות.
-   חלופה: תיבה שנייה ב-`gmail.ts` (`GMAIL_ACCOUNTS`), יקר יותר ובלי יתרון.
-2. **קליטה.** בסוכן השירות (`inbox-agent.ts`) קטגוריה חדשה `billing`: רשימת שולחים + ביטוי בנושא
-   (`חשבונית|קבלה|invoice|receipt|statement|payment`). הודעת billing לא מקבלת טיוטת מענה ולא נספרת בפניות.
-   `getMessage` ב-`gmail.ts` צריך להחזיר גם קבצים מצורפים (PDF בלבד, עד 5MB, בלי שום הרצה).
+1. **ניתוב והפרדה (בלי קוד, כ-40 דקות של הבעלים בממשק של גוגל).** שלוש שכבות, מהיציבה לפחות יציבה:
+   - **א. כתובת יעד ייעודית, `billing@getmentalytics.com`, כינוי (alias) של admin@.** ב-Admin console: Directory ← Users ← admin@ ←
+     Alternate email addresses. בלי רישיון נוסף ובלי תיבה חדשה. אחר כך מחליפים בכל ספק את "billing email" לכתובת הזו
+     (Google Ads דרך פרופיל התשלומים, Vercel, Supabase, OpenAI, Anthropic, Taboola, Resend, livedns). חשבוניות מגיעות ישר
+     ל-admin@ ומוענות ל-billing@, בלי העברה בכלל, ובלי לנחש כתובות שולחים.
+   - **ב. העברה מ-avshalom@ רק למה שנשאר.** ספקים שקשורים לכתובת ההתחברות ואי אפשר להחליף להם billing email.
+     בתיבה avshalom@: Settings ← Forwarding and POP/IMAP ← Add a forwarding address ← admin@. גוגל שולחת קוד אימות ל-admin@
+     (המייל ייקלט שם כהודעת מערכת; את הקישור לוחצים ידנית). רק אחר כך אפשר מסנן שמעביר.
+     **גישת ביקורת-קודם:** קודם מסנן ש**רק מסמן** (`subject:(invoice OR receipt OR חשבונית OR קבלה OR "payment received" OR statement)`
+     ← תווית `fin-candidates`, בלי העברה). אחרי שבוע רואים ב-`label:fin-candidates` מי השולחים בפועל, ומחליפים ל**מסנן העברה לפי שולח**.
+     לעולם לא העברה לפי מילת מפתח בלבד: היא תעביר גם מייל אישי, וההעברה פועלת רק על מייל חדש ולא על העבר.
+     דרוש: הגדרת Admin `Automatic forwarding` פעילה (ברירת מחדל). דפי בנק ואשראי לא עוברים במייל אלא בהעלאה ידנית לאדמין.
+   - **ג. הפרדה בתוך admin@: תוויות + "דלג על תיבת הדואר".** תוויות בשמות לטיניים, כי הקוד ייקרא אותן:
+     `fin/expenses`, `fin/income`, `system`. מסננים (Gmail ← Filters):
+
+     | תנאי | פעולה |
+     |---|---|
+     | `to:billing@getmentalytics.com` | תווית `fin/expenses`, Skip the Inbox |
+     | `from:(paperless.tax OR ksp.co.il)` | תווית `fin/expenses`, Skip the Inbox (שולחים שכבר נראו בתיבה) |
+     | `from:sumit.co.il` | תווית `fin/income`, Skip the Inbox, Mark as read |
+     | `from:(noreply-dmarc-support@google.com OR dmarcreport@microsoft.com)` | תווית `system`, Skip the Inbox, Mark as read |
+
+     התיבה הנכנסת נשארת עם אנשים בלבד, וסוכן שירות הלקוחות ממשיך לקרוא `in:inbox` (`gmail.ts`, `listInboxIds`) בלי שינוי.
+     **סדר חשוב:** קודם מסמנים בלבד ומשאירים בתיבה. רק אחרי שהקליטה לפי תווית (סעיף 2) עובדת מפעילים "Skip the Inbox",
+     אחרת הסוכן מפסיק לראות את המיילים לפני שיש מי שיקלוט אותם.
+2. **קליטה.** `listByLabel(label, newerThanDays)` ב-`gmail.ts` (אותה הרשאה `gmail.readonly`, שאילתה `label:fin-expenses newer_than:Nd`,
+   או `labelIds` אחרי `labels.list`). קטגוריה חדשה `billing` בטבלת `inbox_messages` שמוקצית **לפי שולח או תווית, לפני המודל**:
+   הודעת billing לא מקבלת טיוטת מענה, לא נספרת בפניות, ותוכנה לא נשלח ל-OpenAI. היום אין סינון כזה: כ-60% מהנקלט (65 מתוך 109:
+   דוחות DMARC, התראות סומית, התראות מערכת) עובר סיווג במודל ורק אחר כך נסגר כ-`system`. `getMessage` צריך להחזיר גם את כותרת
+   `To` (מקור ההודעה: avshalom@, billing@ או admin@) וקבצים מצורפים (PDF בלבד, עד 5MB, בלי שום הרצה).
 3. **חילוץ.** טבלה חדשה `invoice_extractions`: `inbox_message_id, vendor_key, vendor_name, doc_type
    (invoice/receipt/credit/statement), doc_number, amount, currency, vat, period_start, period_end, confidence,
    raw_json, matched_expense_id, status (pending/approved/rejected)`. קודם מפענחים דטרמיניסטיים לשולחים
