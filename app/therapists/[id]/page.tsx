@@ -1,4 +1,5 @@
 import { notFound, permanentRedirect } from "next/navigation";
+import { cache } from "react";
 import { SENSITIVE_PROFILE_PARAMS } from "@/app/lib/match-view-context";
 import Link from "next/link";
 import type { Metadata } from "next";
@@ -81,7 +82,9 @@ async function getAffiliatedCenter(
   };
 }
 
-async function getTherapist(id: string): Promise<TherapistRow | null> {
+// cache(): generateMetadata and the page ask for the same row in one request -
+// one query instead of two.
+const getTherapist = cache(async (id: string): Promise<TherapistRow | null> => {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(`
@@ -96,13 +99,17 @@ async function getTherapist(id: string): Promise<TherapistRow | null> {
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .neq("entity_type", "center") // עמוד ישות-מרכז אינו פרופיל מטפל ציבורי (404)
-    .single();
+    .maybeSingle();
 
-  if (error || !data) return null;
+  // שאילתה שלא נענתה אינה מטפל שלא קיים. עד 29/9/2026 שני המקרים הפכו
+  // ל-notFound(): בתקיעת בסיס הנתונים באותו לילה 58 פרופילים של מטפלים
+  // פעילים ענו "מטפל לא נמצא" במשך שש שעות, למבקרים ולזחלן של גוגל. שגיאה
+  // נזרקת = תקלה זמנית (500), שגוגל מנסה שוב ולא מוחק מהאינדקס.
+  if (error) throw new Error(`therapist lookup failed: ${error.message}`);
   // Photos are served via the stable /therapist-photo/<id> route (indexable),
   // so no signed URL is generated here.
-  return data as TherapistRow;
-}
+  return (data as TherapistRow | null) ?? null;
+});
 
 type SimilarTherapist = {
   id: string;

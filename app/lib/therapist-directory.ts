@@ -1,4 +1,6 @@
+import { cache } from "react";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
 import { CITY_TO_REGION, ALL_REGIONS, CITY_SEO_LIST, neighborsOf, CITY_POOL_EXCLUDED } from "@/app/lib/regions";
 import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
@@ -73,7 +75,7 @@ function tierOf(t: TherapistRow): number {
   return 2; // approved free
 }
 
-async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): Promise<PublicTherapist> {
+function toPublicTherapist(t: TherapistRow, centerCards?: Map<string, CenterCard>): PublicTherapist {
   const isEntity = t.entity_type === "center";
   // גם למטפל בודד - שם ה-slug של המרכז מזינים את השיוך "מצוות X".
   const card = t.center_account_id ? centerCards?.get(t.center_account_id) : undefined;
@@ -84,10 +86,12 @@ async function signRow(t: TherapistRow, centerCards?: Map<string, CenterCard>): 
     // מקבל אווטאר מגדרי, כלומר פרצוף של אדם על ישות עסקית.
     profile_photo_url = card?.logoUrl ?? null;
   } else if (t.profile_photo_path) {
-    const { data: signed, error: signedError } = await supabaseAdmin.storage
-      .from(PROFILE_PHOTOS_BUCKET)
-      .createSignedUrl(t.profile_photo_path, 60 * 60 * 24);
-    if (!signedError && signed?.signedUrl) profile_photo_url = signed.signedUrl;
+    // הכתובת היציבה שנשמרת ב-CDN, כמו בעמוד הפרופיל. עד 29/9/2026 כל בנייה
+    // של עמוד רשימה חתמה כאן כל תמונה בנפרד מול Supabase - עד כ-200 בקשות
+    // לבנייה אחת של המאגר, והן היו רוב העומס בפרצים שהפילו את בסיס הנתונים
+    // בלילה שבין 28 ל-29/9. הכתובת החתומה גם השתנתה בכל בנייה, ולכן הדפדפן
+    // לא יכול היה לשמור את התמונה במטמון.
+    profile_photo_url = therapistPhotoUrl(t.id, t.profile_photo_path);
   }
   return {
     id: t.id,
@@ -143,13 +147,16 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
   const map = new Map<string, CenterCard>();
   if (ids.length === 0) return map;
 
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from("therapy_center_accounts")
     .select("id, name, slug, logo_path, public_whatsapp, public_phone")
     .in("id", ids)
     .eq("status", "active")
     .not("slug", "is", null)
     .or("public_page_enabled.eq.true,billing_track.eq.center_entity");
+  // כמו ב-fetchListedRows: בנייה שנכשלת משאירה את הגרסה הקודמת, בנייה
+  // "מוצלחת" בלי מרכזים הייתה מפרסמת כרטיסים בלי השיוך ובלי הוואטסאפ.
+  if (error) throw new Error(`center cards query failed: ${error.message}`);
   const withLogo = (data ?? []).filter((c) => c.logo_path);
   const signedByPath = new Map<string, string>();
   if (withLogo.length > 0) {
@@ -183,23 +190,26 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
  * מסלול-2): במסלול 1 המרכז כבר מיוצג ברשימה דרך המטפלים שלו, וכרטיס נוסף מעל
  * מנוי פרטי מלא היה מטה את ההוגנות.
  */
-async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
-  const { data: centers } = await supabaseAdmin
+// cache(): עמוד עיר טוען רשימות לעיר, לערים הסמוכות ולאזור - אותם מרכזים שלוש פעמים.
+const loadTrack1CenterRows = cache(async (): Promise<TherapistRow[]> => {
+  const { data: centers, error: centersError } = await supabaseAdmin
     .from("therapy_center_accounts")
     .select("id, name, slug, public_description, public_whatsapp, public_phone")
     .eq("status", "active")
     .eq("public_page_enabled", true)
     .neq("billing_track", "center_entity")
     .not("slug", "is", null);
+  if (centersError) throw new Error(`track-1 centers query failed: ${centersError.message}`);
   if (!centers || centers.length === 0) return [];
 
-  const { data: members } = await supabaseAdmin
+  const { data: members, error: membersError } = await supabaseAdmin
     .from("therapists")
     .select("center_account_id, regions, online")
     .in("center_account_id", centers.map((c) => c.id as string))
     .in("status", ["approved", "paying"])
     .eq("admin_approved", true)
     .neq("entity_type", "center");
+  if (membersError) throw new Error(`track-1 center members query failed: ${membersError.message}`);
 
   const byCenter = new Map<string, { regions: Set<string>; online: boolean; count: number }>();
   for (const m of members ?? []) {
@@ -242,7 +252,7 @@ async function loadTrack1CenterRows(): Promise<TherapistRow[]> {
       center_whatsapp: centerWhatsAppNumber(c.public_whatsapp as string | null, c.public_phone as string | null),
     } satisfies TherapistRow];
   });
-}
+});
 
 // Loads publicly-listed therapists (paying + approved, admin-vetted), ordered
 // promoted-first with a new-therapist boost and a daily rotation within each
@@ -291,7 +301,17 @@ export type DirectoryFilter = {
 
 // The single directory query (no photo signing). Every loader and counter in
 // this file starts from this fetch; the filters are applied in memory.
-async function fetchListedRows(): Promise<TherapistRow[]> {
+//
+// cache(): a city page asks for it six times in one render (its own list, the
+// neighbouring cities, the region, three counts) - now one query per render.
+// Callers only filter the array, they never modify it or its rows.
+//
+// A failed query throws instead of returning []. Until 29/9/2026 it returned
+// an empty list, so a rebuild during a database stall PUBLISHED the empty
+// result: "no therapists here", a noindex tag (the counts said 0), and a
+// sitemap without the landing pages - each cached for minutes to an hour. A
+// throw fails the rebuild, and the page keeps serving its last good version.
+const fetchListedRows = cache(async (): Promise<TherapistRow[]> => {
   const { data, error } = await supabaseAdmin
     .from("therapists")
     .select(
@@ -305,9 +325,9 @@ async function fetchListedRows(): Promise<TherapistRow[]> {
     // המטפל שלה מחזיר 404 במכוון (app/therapists/[id]/page.tsx).
     .order("full_name", { ascending: true });
 
-  if (error || !data) return [];
-  return data as TherapistRow[];
-}
+  if (error) throw new Error(`therapist directory query failed: ${error.message}`);
+  return (data ?? []) as TherapistRow[];
+});
 
 // The pure in-memory half of the query above. Split out so callers that need
 // MANY counts (the sitemap needs ~40) can fetch once and count repeatedly,
@@ -542,10 +562,10 @@ export async function loadPublicTherapists(
   // 'paying' + promotion_source 'center'), כלומר מיד אחרי המנויים הפרטיים
   // ובתוך אותה רוטציה יומית - בדיוק "אחד המקומות הראשונים בתורנות".
   const centerCards = await loadCenterCards(ordered);
-  const signed = await Promise.all(ordered.map((t) => signRow(t, centerCards)));
+  const cards = ordered.map((t) => toPublicTherapist(t, centerCards));
   // בעמוד המרכז עצמו השיוך מיותר: כל כרטיס היה אומר "מצוות X" בזמן שהמבקר
   // כבר נמצא בעמוד של X, וגם מקשר חזרה לעמוד שהוא עומד בו.
   return filter?.centerId
-    ? signed.map(({ center_name: _omit, ...rest }) => rest)
-    : signed;
+    ? cards.map(({ center_name: _omit, ...rest }) => rest)
+    : cards;
 }
