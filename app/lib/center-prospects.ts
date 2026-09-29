@@ -44,6 +44,10 @@ export type ProspectRow = {
   answer: "yes" | "no" | "maybe" | null;
   // הסטטוס המפורש - מקור האמת מ-30/8/26 (answer נשאר לתאימות בלבד).
   status: ProspectStatus;
+  // מתי הסטטוס השתנה לאחרונה, והרשימה המלאה (29/9/26). נכתבים בכל מסלול
+  // שמשנה סטטוס - מהטבלה, בהעברה לעסקאות, ובליד פנימי שהסוכן מעביר לבד.
+  status_changed_at: string | null;
+  status_history: StatusStamp[] | null;
   follow_up_at: string | null;
   status_note: string | null;
   deal_id: string | null;
@@ -67,12 +71,23 @@ export type ProspectStatus =
   | "contacted_email"
   | "contacted_phone"
   | "later"
+  // "לא רלוונטי כרגע - לעבודה בהמשך" (29/9/26): כמו later אבל בלי תאריך
+  // חזרה ובלי תזכורת - חונה בצד עד שמישהו יחליט לחזור אליו.
+  | "not_relevant_now"
   | "not_interested"
   | "moved_to_deal";
 
 export const PROSPECT_STATUS_VALUES: readonly ProspectStatus[] = [
-  "new", "contacted", "contacted_email", "contacted_phone", "later", "not_interested", "moved_to_deal",
+  "new", "contacted", "contacted_email", "contacted_phone", "later", "not_relevant_now", "not_interested", "moved_to_deal",
 ];
+
+export type StatusStamp = { status: ProspectStatus; at: string };
+
+/** חותמת לשינוי סטטוס: מתי, ומה נוסף להיסטוריה (עד 30 אחרונים). */
+export function stampStatus(history: unknown, status: ProspectStatus, at: string) {
+  const prev = Array.isArray(history) ? (history as StatusStamp[]) : [];
+  return { status_changed_at: at, status_history: [...prev, { status, at }].slice(-30) };
+}
 
 /** "נוצרה פנייה" בכל ערוץ שהוא. כל מקום שבודק contacted צריך לבדוק את כולם. */
 export const CONTACTED_STATUSES: readonly ProspectStatus[] = ["contacted", "contacted_email", "contacted_phone"];
@@ -297,7 +312,7 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
     for (const a of warm) {
       const { data: pr } = await supabaseAdmin
         .from("center_prospects")
-        .select("id, name, phone, email, region_key, notes, deal_id")
+        .select("id, name, phone, email, region_key, notes, deal_id, status_history")
         .eq("center_account_id", a.id as string)
         .maybeSingle();
       if (!pr || pr.deal_id) continue;
@@ -325,7 +340,12 @@ export async function runCenterProspects(): Promise<ProspectsRun> {
       }
       await supabaseAdmin
         .from("center_prospects")
-        .update({ status: "moved_to_deal", deal_id: deal.id, updated_at: nowIso })
+        .update({
+          status: "moved_to_deal",
+          deal_id: deal.id,
+          updated_at: nowIso,
+          ...stampStatus(pr.status_history, "moved_to_deal", nowIso),
+        })
         .eq("id", pr.id);
     }
 
@@ -418,22 +438,25 @@ export async function updateProspect(
     dismissed?: boolean;
   }
 ): Promise<void> {
-  const update: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  const nowIso = new Date().toISOString();
+  const update: Record<string, unknown> = { updated_at: nowIso };
   if ("status" in patch && patch.status) {
     update.status = patch.status;
+    const { data: cur } = await supabaseAdmin
+      .from("center_prospects").select("status, contacted_at, status_history").eq("id", id).maybeSingle();
+    // חותמת רק כשהסטטוס באמת השתנה - שמירה חוזרת של אותו סטטוס אינה אירוע.
+    if (cur && cur.status !== patch.status) Object.assign(update, stampStatus(cur.status_history, patch.status, nowIso));
     // כל סוג של "נוצרה פנייה" גורר תאריך פנייה - אין פנייה בלי תאריך. רק אם
     // עוד אין: מעבר מ"פנייה ראשונה" ל"פנייה טלפונית" הוא פנייה נוספת, לא
     // הראשונה, והתאריך המקורי הוא מה ששווה לשמור.
-    if (CONTACTED_STATUSES.includes(patch.status)) {
-      const { data: cur } = await supabaseAdmin
-        .from("center_prospects").select("contacted_at").eq("id", id).maybeSingle();
-      if (!cur?.contacted_at) update.contacted_at = new Date().toISOString();
-    }
+    if (CONTACTED_STATUSES.includes(patch.status) && !cur?.contacted_at) update.contacted_at = nowIso;
     // יציאה ממצב ההמתנה מנקה את התזכורת.
     if (patch.status !== "later") update.follow_up_at = null;
   }
-  if ("follow_up_at" in patch) update.follow_up_at = patch.follow_up_at;
-  if ("status_note" in patch) update.status_note = patch.status_note;
+  // !== undefined ולא "in" (אותה מלכודת כמו contacted_at למטה): בלי זה המפתח
+  // הריק מה-API דרס את ה-null שלמעלה, ויציאה מ"אולי בעתיד" לא ניקתה תזכורת.
+  if (patch.follow_up_at !== undefined) update.follow_up_at = patch.follow_up_at;
+  if (patch.status_note !== undefined) update.status_note = patch.status_note;
   // !== undefined ולא "in": הנתיב מה-API מעביר תמיד את המפתח, גם כשהוא ריק.
   // עם "in" המפתח הריק דרס את החותמת שנקבעה שורות ספורות למעלה, ובגלל ש-
   // undefined נופל ב-JSON - בחירת "נוצרה פנייה ראשונה" לא רשמה תאריך אף פעם.
@@ -511,6 +534,7 @@ export async function moveProspectToDeal(
       deal_id: deal.id,
       follow_up_at: null,
       updated_at: new Date().toISOString(),
+      ...stampStatus(p.status_history, "moved_to_deal", new Date().toISOString()),
     })
     .eq("id", id);
   if (updErr) return { ok: false, error: updErr.message };

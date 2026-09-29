@@ -17,7 +17,7 @@ vi.mock("./agent-infra", () => ({
 }));
 vi.mock("./places-search", () => ({ placesConfigured: () => false, searchCentersInCities: vi.fn() }));
 
-import { parseProspectLine } from "./center-prospects";
+import { parseProspectLine, stampStatus } from "./center-prospects";
 import { canonicalCity, prospectRegionGroup, prospectRegionOfCity } from "./prospect-regions";
 
 describe("parseProspectLine", () => {
@@ -91,5 +91,22 @@ describe("prospect regions", () => {
     expect(canonicalCity("לא נמצא")).toBeNull();
     expect(prospectRegionOfCity("דרך טופס באתר")).toBeNull();
     expect(prospectRegionOfCity(null)).toBeNull();
+  });
+});
+
+describe("stampStatus", () => {
+  it("records when the status changed and appends to the history", () => {
+    const first = stampStatus(null, "contacted_phone", "2026-09-28T09:00:00.000Z");
+    expect(first.status_changed_at).toBe("2026-09-28T09:00:00.000Z");
+    expect(first.status_history).toEqual([{ status: "contacted_phone", at: "2026-09-28T09:00:00.000Z" }]);
+    const second = stampStatus(first.status_history, "not_relevant_now", "2026-09-29T10:00:00.000Z");
+    expect(second.status_history.map((h) => h.status)).toEqual(["contacted_phone", "not_relevant_now"]);
+  });
+
+  it("keeps only the last 30 changes", () => {
+    const long = Array.from({ length: 30 }, (_, i) => ({ status: "new" as const, at: `2026-01-${String(i + 1).padStart(2, "0")}` }));
+    const next = stampStatus(long, "later", "2026-09-29");
+    expect(next.status_history).toHaveLength(30);
+    expect(next.status_history[29]).toEqual({ status: "later", at: "2026-09-29" });
   });
 });

@@ -117,7 +117,17 @@ type Prospect = {
   draft_sent_at: string | null;
   // מראה של ProspectStatus ב-center-prospects.ts, שמייבא את לקוח ה-service
   // role ולכן אסור לייבא ממנו לקומפוננטת לקוח. שינוי כאן - שינוי גם שם.
-  status: "new" | "contacted" | "contacted_email" | "contacted_phone" | "later" | "not_interested" | "moved_to_deal";
+  status:
+    | "new"
+    | "contacted"
+    | "contacted_email"
+    | "contacted_phone"
+    | "later"
+    | "not_relevant_now"
+    | "not_interested"
+    | "moved_to_deal";
+  status_changed_at: string | null;
+  status_history: { status: string; at: string }[] | null;
   follow_up_at: string | null;
   status_note: string | null;
   deal_id: string | null;
@@ -1885,9 +1895,46 @@ const PROSPECT_STATUSES = [
   { value: "contacted_email", label: "בוצעה פנייה במייל", rank: 1 },
   { value: "contacted_phone", label: "בוצעה פנייה טלפונית", rank: 1 },
   { value: "later", label: "לא כרגע - אולי בעתיד", rank: 2 },
-  { value: "moved_to_deal", label: "הועבר לעסקאות ✓", rank: 3 },
-  { value: "not_interested", label: "לא מעוניין - לא לפנות שוב", rank: 4 },
+  // בלי תאריך חזרה ובלי תזכורת (29/9/26) - חונה בצד, מתחת לפעילים.
+  { value: "not_relevant_now", label: "לא רלוונטי כרגע - לעבודה בהמשך", rank: 3 },
+  { value: "moved_to_deal", label: "הועבר לעסקאות ✓", rank: 4 },
+  { value: "not_interested", label: "לא מעוניין - לא לפנות שוב", rank: 5 },
 ] as const;
+
+const statusLabel = (s: string) => PROSPECT_STATUSES.find((st) => st.value === s)?.label ?? s;
+
+/** כל שינויי הסטטוס של מכון, לתיבת הרמז שעל החותמת. */
+const statusHistoryTitle = (p: Prospect) =>
+  (p.status_history ?? [])
+    .map((h) => `${new Date(h.at).toLocaleDateString("he-IL")} - ${statusLabel(h.status)}`)
+    .join("\n");
+
+/** נרמול לחיפוש: בלי גרשיים ומקפים, "קריית"="קרית", אותיות קטנות. */
+const searchNorm = (v: string | null | undefined) =>
+  String(v ?? "")
+    .toLowerCase()
+    .replace(/[״"׳'`]/g, "")
+    .replace(/קריית/g, "קרית")
+    .replace(/[-־–]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+/** כל מילות החיפוש מופיעות במכון - בשם, במיקום, בהערות או בפרטי הקשר. */
+function prospectMatches(p: Prospect, tokens: string[]): boolean {
+  if (tokens.length === 0) return true;
+  const text = searchNorm(
+    [p.name, p.city, p.address, p.notes, p.status_note, p.obstacles, p.email, p.website,
+      PROSPECT_REGION_LABELS[p.region_key ?? ""], statusLabel(p.status)].join(" ")
+  );
+  // טלפון מחפשים בספרות בלבד: "0547" מוצא את "054-7..." ו-"*5806" את "*5806".
+  const digits = [p.phone, p.whatsapp].join(" ").replace(/[^\d*]/g, " ");
+  const compactDigits = digits.replace(/\s+/g, "");
+  return tokens.every((t) => {
+    const td = t.replace(/[^\d*]/g, "");
+    if (td.length >= 3 && td.length === t.replace(/\s/g, "").length) return compactDigits.includes(td) || digits.includes(td);
+    return text.includes(t);
+  });
+}
 
 const PROSPECT_STATUS_RANK: Record<string, number> = Object.fromEntries(
   PROSPECT_STATUSES.map((st) => [st.value, st.rank])
@@ -1905,10 +1952,6 @@ function waLink(v: string): string {
   const d = v.replace(/\D/g, "");
   return `https://wa.me/${d.startsWith("0") ? `972${d.slice(1)}` : d}`;
 }
-
-/** חיפוש עיר סלחני: "קרית" ו"קריית", מקף ורווח - אותו דבר. */
-const cityKey = (v: string | null) =>
-  String(v ?? "").replace(/קריית/g, "קרית").replace(/[-־]/g, " ").replace(/\s+/g, " ").trim();
 
 // שדות הקשר שנערכים בשורת העריכה של מכון, לפי הסדר שבו הם מוצגים.
 const PROSPECT_CONTACT_FIELDS = [
@@ -1993,9 +2036,27 @@ function ProspectTable({
   // פילטרים: אזור + דלי סטטוס + חיפוש עיר. מסוננים בצד הלקוח - הרשימה קטנה.
   const [regionFilter, setRegionFilter] = useState("");
   const [bucketFilter, setBucketFilter] = useState("");
-  const [cityQuery, setCityQuery] = useState("");
+  // חיפוש חופשי (29/9/26) - מחליף את חיפוש העיר ומכסה גם אותו.
+  const [query, setQuery] = useState("");
   // המכון שפרטי הקשר שלו פתוחים לעריכה (שורה אחת בכל פעם).
   const [editingId, setEditingId] = useState<string | null>(null);
+  // הסדר המוצג, קפוא בין שינויי סינון - ראה ההסבר ליד filterKey למטה.
+  const orderRef = useRef<{ key: string; ids: string[]; seen: Set<string> } | null>(null);
+  const [reorderTick, setReorderTick] = useState(0);
+  // הפילטרים נדבקים מתחת ל-NavBar, שגובהו משתנה (שורה עליונה, מובייל) -
+  // לכן נמדד בזמן ריצה ולא נקבע כמספר.
+  const [stickyTop, setStickyTop] = useState(0);
+  useEffect(() => {
+    const header = Array.from(document.querySelectorAll("header")).find(
+      (h) => getComputedStyle(h).position === "sticky"
+    );
+    if (!header) return;
+    const measure = () => setStickyTop(Math.round(header.getBoundingClientRect().height));
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(header);
+    return () => ro.disconnect();
+  }, []);
 
   async function patch(id: string, body: Record<string, unknown>) {
     setBusy(id);
@@ -2180,15 +2241,17 @@ function ProspectTable({
     );
   }
 
-  // דלי הסינון: "בתהליך" = נוצרה פנייה או ממתין לעתיד; "בפנים" = בעסקאות.
+  // דלי הסינון: "בתהליך" = נוצרה פנייה או ממתין לתאריך חזרה; "בפנים" = בעסקאות.
   const bucketOf = (pr: Prospect): string =>
     pr.status === "new"
       ? "untouched"
       : isContacted(pr.status) || pr.status === "later"
         ? "in_progress"
-        : pr.status === "moved_to_deal"
-          ? "inside"
-          : "not_interested";
+        : pr.status === "not_relevant_now"
+          ? "parked"
+          : pr.status === "moved_to_deal"
+            ? "inside"
+            : "not_interested";
 
   const countBy = (values: (string | null)[]) => {
     const m = new Map<string, number>();
@@ -2202,13 +2265,13 @@ function ProspectTable({
   const cityCounts = countBy(rows.map((r) => r.city));
   const citiesPresent = Array.from(cityCounts.keys()).sort((a, b) => a.localeCompare(b, "he"));
 
-  // חיפוש לפי עיר: גם בכתובת, כי מכון עם כמה סניפים רשום בעיר אחת והשאר
-  // מופיעים בכתובת ("(+חיפה, הנביאים 28)") - וחיפוש "חיפה" צריך למצוא אותו.
-  const q = cityKey(cityQuery);
-  const visible = rows
+  // החיפוש עובר על שם, עיר, כתובת (שם כתובים הסניפים), הערות, טלפונים ומייל.
+  // כמה מילים = כולן חייבות להופיע, בכל סדר ובכל שדה.
+  const tokens = searchNorm(query).split(" ").filter(Boolean);
+  const fresh = rows
     .filter((r) => (regionFilter ? r.region_key === regionFilter : true))
     .filter((r) => (bucketFilter ? bucketOf(r) === bucketFilter : true))
-    .filter((r) => (q ? cityKey(r.city).includes(q) || cityKey(r.address).includes(q) : true))
+    .filter((r) => prospectMatches(r, tokens))
     .slice()
     .sort((a, b) => {
       const d = (PROSPECT_STATUS_RANK[a.status] ?? 0) - (PROSPECT_STATUS_RANK[b.status] ?? 0);
@@ -2220,74 +2283,126 @@ function ProspectTable({
       return (b.gaps_in_region ?? 0) - (a.gaps_in_region ?? 0);
     });
 
+  // הסדר קפוא בין שינויי סינון. עד 29/9/26 כל שינוי סטטוס מיין מחדש את
+  // הטבלה: מכון שסומן "נוצרה פנייה" קפץ לקבוצה אחרת, ובסינון לפי סטטוס הוא
+  // נעלם - והיה צריך לחפש אותו שוב. עכשיו השורה נשארת במקומה (עם הסטטוס
+  // החדש) עד שמשנים סינון, מחפשים, או לוחצים "סידור מחדש". מכונים חדשים
+  // שנוספו (הדבקה) כן מסדרים מחדש, כי אין להם מקום בסדר הקיים.
+  const filterKey = [bucketFilter, regionFilter, tokens.join(" "), reorderTick].join("|");
+  const snap = orderRef.current;
+  if (!snap || snap.key !== filterKey || rows.some((r) => !snap.seen.has(r.id))) {
+    orderRef.current = { key: filterKey, ids: fresh.map((r) => r.id), seen: new Set(rows.map((r) => r.id)) };
+  }
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const visible = (orderRef.current?.ids ?? [])
+    .map((id) => byId.get(id))
+    .filter((r): r is Prospect => Boolean(r));
+  const orderStale = visible.length !== fresh.length || visible.some((r, i) => fresh[i]?.id !== r.id);
+
+  // מספור רץ לפי הסדר המוצג. מכון שעבר לעסקאות יוצא מהספירה, והמספרים
+  // שאחריו זזים - כך המספר האחרון הוא תמיד כמה מכונים עוד פתוחים לעבודה.
+  const numbers = new Map<string, number>();
+  for (const r of visible) if (r.status !== "moved_to_deal") numbers.set(r.id, numbers.size + 1);
+
+  const filtersActive = Boolean(bucketFilter || regionFilter || query);
+
   return (
     <div className="space-y-3">
       {pasteBox}
 
-      {/* פילטרים */}
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <select
-          value={bucketFilter}
-          onChange={(e) => setBucketFilter(e.target.value)}
-          className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
-        >
-          <option value="">כל הסטטוסים</option>
-          <option value="untouched">לא נגענו</option>
-          <option value="in_progress">בתהליך</option>
-          <option value="inside">בפנים (בעסקאות)</option>
-          <option value="not_interested">לא מעוניין</option>
-        </select>
-        <select
-          value={regionFilter}
-          onChange={(e) => setRegionFilter(e.target.value)}
-          className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
-        >
-          <option value="">כל האזורים</option>
-          {regionsPresent.map((rk) => (
-            <option key={rk} value={rk}>
-              {PROSPECT_REGION_LABELS[rk] ?? rk} ({regionCounts.get(rk)})
-            </option>
-          ))}
-        </select>
-        <div className="relative">
-          <input
-            value={cityQuery}
-            onChange={(e) => setCityQuery(e.target.value)}
-            list="prospect-cities"
-            placeholder="חיפוש לפי עיר"
-            className="w-40 rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
-          />
-          <datalist id="prospect-cities">
-            {citiesPresent.map((c) => (
-              <option key={c} value={c}>
-                {`${c} (${cityCounts.get(c)})`}
+      {/* פילטרים - דביקים מתחת ל-NavBar, כך שנשארים בגלילה */}
+      <div
+        className="sticky z-[60] -mx-2 border-b border-stone-200 bg-white/95 px-2 py-2 backdrop-blur"
+        style={{ top: stickyTop }}
+      >
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <div className="relative">
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              list="prospect-cities"
+              placeholder="חיפוש: שם, עיר, הערה, טלפון..."
+              aria-label="חיפוש מכונים"
+              className="w-64 rounded-lg border border-stone-300 bg-white px-2 py-1.5 font-bold text-stone-700"
+            />
+            <datalist id="prospect-cities">
+              {citiesPresent.map((c) => (
+                <option key={c} value={c}>
+                  {`${c} (${cityCounts.get(c)})`}
+                </option>
+              ))}
+            </datalist>
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="ניקוי החיפוש"
+                className="absolute end-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <select
+            value={bucketFilter}
+            onChange={(e) => setBucketFilter(e.target.value)}
+            aria-label="סינון לפי סטטוס"
+            className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
+          >
+            <option value="">כל הסטטוסים</option>
+            <option value="untouched">לא נגענו</option>
+            <option value="in_progress">בתהליך</option>
+            <option value="parked">לא רלוונטי כרגע</option>
+            <option value="inside">בפנים (בעסקאות)</option>
+            <option value="not_interested">לא מעוניין</option>
+          </select>
+          <select
+            value={regionFilter}
+            onChange={(e) => setRegionFilter(e.target.value)}
+            aria-label="סינון לפי אזור"
+            className="rounded-lg border border-stone-200 bg-white px-2 py-1.5 font-bold text-stone-600"
+          >
+            <option value="">כל האזורים</option>
+            {regionsPresent.map((rk) => (
+              <option key={rk} value={rk}>
+                {PROSPECT_REGION_LABELS[rk] ?? rk} ({regionCounts.get(rk)})
               </option>
             ))}
-          </datalist>
-          {cityQuery && (
+          </select>
+          <span className="text-stone-400">
+            {visible.length} מתוך {rows.length} · {numbers.size} פתוחים לעבודה
+          </span>
+          {orderStale && (
             <button
-              onClick={() => setCityQuery("")}
-              aria-label="ניקוי החיפוש"
-              className="absolute end-2 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600"
+              onClick={() => setReorderTick((t) => t + 1)}
+              title="סטטוסים השתנו מאז הסידור האחרון - לסדר את הרשימה מחדש לפי הסינון"
+              className="rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 font-bold text-amber-800 hover:bg-amber-100"
             >
-              ×
+              ↻ סידור מחדש
+            </button>
+          )}
+          {filtersActive && (
+            <button
+              onClick={() => {
+                setQuery("");
+                setBucketFilter("");
+                setRegionFilter("");
+              }}
+              className="text-stone-400 underline hover:text-stone-600"
+            >
+              ניקוי סינון
             </button>
           )}
         </div>
-        <span className="text-stone-400">
-          {visible.length} מתוך {rows.length}
-        </span>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-stone-200">
         <table className="w-full min-w-[1100px] text-sm">
           <thead>
             <tr className="border-b border-stone-200 bg-stone-50 text-xs text-stone-500">
-              <th className="p-2 text-right font-bold">מרכז</th>
-              <th className="p-2 text-right font-bold">עיר</th>
-              <th className="p-2 text-right font-bold">אזור</th>
-              <th className="p-2 text-right font-bold">פרטי קשר</th>
-              <th className="p-2 text-center font-bold">פערים באזור</th>
+              <th className="w-10 p-2 text-center font-bold">#</th>
+              <th className="p-2 text-right font-bold">שם המכון</th>
+              <th className="p-2 text-right font-bold">מיקום</th>
+              <th className="p-2 text-right font-bold">פרטים</th>
               <th className="p-2 text-right font-bold">סטטוס</th>
               <th className="p-2 text-right font-bold">הערות</th>
               <th className="p-2 text-right font-bold">מכשולים</th>
@@ -2295,197 +2410,214 @@ function ProspectTable({
             </tr>
           </thead>
           <tbody>
-            {visible.map((p) => (
-              <Fragment key={p.id}>
-              <tr
-                className={`border-b border-stone-100 ${
-                  p.status === "not_interested"
-                    ? "bg-red-50/70 text-red-900"
-                    : p.status === "moved_to_deal"
-                      ? "bg-emerald-50/40"
-                      : ""
-                }`}
-              >
-                <td className="p-2 align-top">
-                  <div className="flex items-center gap-1.5">
-                    {p.source === "internal_lead" && (
-                      <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-black text-red-700">
-                        ליד חם
-                      </span>
-                    )}
-                    <span className="font-bold text-stone-800">{p.name}</span>
-                  </div>
-                  {p.address && <div className="max-w-72 text-xs text-stone-400">{p.address}</div>}
-                  {p.website && (
-                    <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-xs text-[#2A6462] underline">
-                      אתר
-                    </a>
-                  )}
-                </td>
-                <td className="whitespace-nowrap p-2 align-top text-xs font-bold text-stone-700">
-                  {p.city ? (
-                    <button
-                      onClick={() => setCityQuery(p.city ?? "")}
-                      title="להציג את כל המכונים בעיר הזו"
-                      className="hover:text-[#2A6462] hover:underline"
-                    >
-                      {p.city}
-                    </button>
-                  ) : (
-                    <span className="font-normal text-stone-300">-</span>
-                  )}
-                </td>
-                <td className="whitespace-nowrap p-2 align-top text-xs text-stone-600">
-                  {p.region_key ? (PROSPECT_REGION_LABELS[p.region_key] ?? p.region_key) : "-"}
-                </td>
-                <td className="p-2 align-top text-xs text-stone-600">
-                  <div className="flex flex-col gap-0.5">
-                    {splitPhones(p.phone).map((ph) => (
-                      <a key={ph} href={`tel:${ph}`} dir="ltr" className="text-end font-bold text-[#2A6462]">
-                        {ph}
-                      </a>
-                    ))}
-                    {p.whatsapp && (
-                      <a
-                        href={waLink(p.whatsapp)}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-bold text-[#128C42]"
-                      >
-                        וואטסאפ <span dir="ltr">{p.whatsapp}</span>
-                      </a>
-                    )}
-                    {p.email && (
-                      <a href={`mailto:${p.email}`} dir="ltr" className="max-w-48 truncate text-end text-stone-500 underline">
-                        {p.email}
-                      </a>
-                    )}
-                    {!p.phone && !p.whatsapp && !p.email && <span className="text-stone-300">אין פרטי קשר</span>}
-                    <button
-                      onClick={() => setEditingId(editingId === p.id ? null : p.id)}
-                      className="mt-0.5 self-start text-[11px] text-stone-400 underline hover:text-stone-600"
-                    >
-                      {editingId === p.id ? "סגירת העריכה" : "עריכת פרטים"}
-                    </button>
-                  </div>
-                </td>
-                <td className="p-2 text-center align-top">
-                  {p.gaps_in_region > 0 ? (
-                    <span className="rounded-full bg-[#EAF4F3] px-2 py-0.5 text-xs font-black text-[#2A6462]">
-                      {p.gaps_in_region}
-                    </span>
-                  ) : (
-                    <span className="text-xs text-stone-300">-</span>
-                  )}
-                </td>
-                <td className="p-2 align-top">
-                  {p.status === "moved_to_deal" ? (
-                    <a
-                      href="/admin/deals"
-                      className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-200"
-                    >
-                      בעסקאות ✓
-                    </a>
-                  ) : (
-                    <select
-                      value={p.status}
-                      disabled={busy === p.id}
-                      onChange={(e) => changeStatus(p, e.target.value)}
-                      className={`w-44 rounded-lg border px-2 py-1 text-xs font-bold ${
-                        p.status === "not_interested"
-                          ? "border-red-300 bg-red-50 text-red-800"
-                          : p.status === "later"
-                            ? "border-amber-300 bg-amber-50 text-amber-900"
-                            : "border-stone-200 bg-white text-stone-700"
-                      }`}
-                    >
-                      <option value="new">לא נגענו</option>
-                      <option value="contacted">נוצרה פנייה ראשונה</option>
-                      <option value="contacted_email">בוצעה פנייה במייל</option>
-                      <option value="contacted_phone">בוצעה פנייה טלפונית</option>
-                      <option value="later">לא כרגע - אולי בעתיד</option>
-                      <option value="not_interested">לא מעוניין - לא לפנות שוב</option>
-                      <option value="deal_first">רוצים ← לעסקאות (פנייה ראשונית)</option>
-                      <option value="deal_negotiation">רוצים ← לעסקאות (משא ומתן)</option>
-                      <option value="deal_link_sent">רוצים ← לעסקאות (נשלח לינק הרשמה)</option>
-                    </select>
-                  )}
-                  {p.status === "later" && p.follow_up_at && (
-                    <div className="mt-1 text-[10px] font-bold text-amber-700">
-                      ⏰ תזכורת: {new Date(p.follow_up_at).toLocaleDateString("he-IL")}
-                    </div>
-                  )}
-                  {p.status === "not_interested" && p.status_note && (
-                    <div className="mt-1 max-w-44 text-[10px] leading-4 text-red-700">{p.status_note}</div>
-                  )}
-                </td>
-                <td className="p-2 align-top">
-                  <input
-                    defaultValue={p.notes ?? ""}
-                    onBlur={(e) => e.target.value !== (p.notes ?? "") && patch(p.id, { notes: e.target.value })}
-                    placeholder="מה נאמר"
-                    className="w-40 rounded-lg border border-stone-200 px-2 py-1 text-xs"
-                  />
-                </td>
-                <td className="p-2 align-top">
-                  <input
-                    defaultValue={p.obstacles ?? ""}
-                    onBlur={(e) => e.target.value !== (p.obstacles ?? "") && patch(p.id, { obstacles: e.target.value })}
-                    placeholder="מה חוסם"
-                    className="w-36 rounded-lg border border-stone-200 px-2 py-1 text-xs"
-                  />
-                </td>
-                <td className="whitespace-nowrap p-2 align-top">
-                  {p.draft_sent_at ? (
-                    <span className="text-[11px] text-stone-400">מייל נשלח</span>
-                  ) : p.contacted_at && (p.status === "new" || isContacted(p.status)) ? (
-                    <button
-                      onClick={() => makeDraft(p)}
-                      disabled={busy === p.id}
-                      className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
-                    >
-                      טיוטה
-                    </button>
-                  ) : null}
-                  <button
-                    onClick={() => patch(p.id, { dismissed: true })}
-                    disabled={busy === p.id}
-                    className="ms-1 text-[11px] text-stone-400 underline hover:text-stone-600"
+            {visible.map((p) => {
+              const field = /תחום: ([^·]+)/.exec(p.notes ?? "")?.[1]?.trim();
+              const num = numbers.get(p.id);
+              return (
+                <Fragment key={p.id}>
+                  <tr
+                    className={`border-b border-stone-100 ${
+                      p.status === "not_interested"
+                        ? "bg-red-50/70 text-red-900"
+                        : p.status === "moved_to_deal"
+                          ? "bg-emerald-50/40"
+                          : p.status === "not_relevant_now"
+                            ? "bg-stone-50 text-stone-500"
+                            : ""
+                    }`}
                   >
-                    הסר
-                  </button>
-                </td>
-              </tr>
-              {editingId === p.id && (
-                <tr className="border-b border-stone-200 bg-stone-50">
-                  <td colSpan={9} className="p-3">
-                    <div className="mb-2 text-[11px] leading-5 text-stone-500">
-                      כל שדה נשמר כשיוצאים ממנו. כמה טלפונים - מפרידים ב-&quot; / &quot;. וואטסאפ רק אם המכון
-                      פרסם אותו ככזה. עיר מהרשימה קובעת גם את האזור.
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
-                      {PROSPECT_CONTACT_FIELDS.map((f) => (
-                        <label key={f.key} className="text-[11px] font-black text-stone-500">
-                          {f.label}
-                          <input
-                            defaultValue={p[f.key] ?? ""}
-                            dir={f.dir}
-                            list={f.key === "city" ? "prospect-cities" : undefined}
-                            placeholder={f.placeholder}
-                            onBlur={(e) => {
-                              const v = e.target.value.trim();
-                              if (v !== (p[f.key] ?? "")) patch(p.id, { [f.key]: v });
-                            }}
-                            className="mt-0.5 w-full rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-normal text-stone-700"
-                          />
-                        </label>
-                      ))}
-                    </div>
-                  </td>
-                </tr>
-              )}
-              </Fragment>
-            ))}
+                    <td className="p-2 text-center align-top text-xs font-black text-stone-400">
+                      {num ?? <span className="text-emerald-600">✓</span>}
+                    </td>
+                    <td className="p-2 align-top">
+                      <div className="flex items-center gap-1.5">
+                        {p.source === "internal_lead" && (
+                          <span className="rounded-full bg-red-100 px-1.5 py-0.5 text-[10px] font-black text-red-700">
+                            ליד חם
+                          </span>
+                        )}
+                        <span className="font-bold text-stone-800">{p.name}</span>
+                      </div>
+                      {field && <div className="mt-0.5 max-w-60 text-xs text-stone-400">{field}</div>}
+                    </td>
+                    <td className="p-2 align-top text-xs">
+                      {p.city ? (
+                        <button
+                          onClick={() => setQuery(p.city ?? "")}
+                          title="להציג את כל המכונים בעיר הזו"
+                          className="font-bold text-stone-700 hover:text-[#2A6462] hover:underline"
+                        >
+                          {p.city}
+                        </button>
+                      ) : (
+                        <span className="text-stone-300">עיר לא ידועה</span>
+                      )}
+                      {p.region_key && (
+                        <span className="ms-1.5 rounded-full bg-stone-100 px-1.5 py-0.5 text-[10px] font-bold text-stone-500">
+                          {PROSPECT_REGION_LABELS[p.region_key] ?? p.region_key}
+                        </span>
+                      )}
+                      {p.address && <div className="mt-0.5 max-w-60 leading-5 text-stone-400">{p.address}</div>}
+                      {p.gaps_in_region > 0 && (
+                        <div className="mt-0.5 text-[10px] font-bold text-[#2A6462]">
+                          {p.gaps_in_region} פערי גיוס באזור
+                        </div>
+                      )}
+                    </td>
+                    <td className="p-2 align-top text-xs text-stone-600">
+                      <div className="flex flex-col gap-0.5">
+                        {splitPhones(p.phone).map((ph) => (
+                          <a key={ph} href={`tel:${ph}`} dir="ltr" className="text-end font-bold text-[#2A6462]">
+                            {ph}
+                          </a>
+                        ))}
+                        {p.whatsapp && (
+                          <a
+                            href={waLink(p.whatsapp)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-bold text-[#128C42]"
+                          >
+                            וואטסאפ <span dir="ltr">{p.whatsapp}</span>
+                          </a>
+                        )}
+                        {p.email && (
+                          <a href={`mailto:${p.email}`} dir="ltr" className="max-w-48 truncate text-end text-stone-500 underline">
+                            {p.email}
+                          </a>
+                        )}
+                        {p.website && (
+                          <a href={p.website} target="_blank" rel="noopener noreferrer" className="text-[#2A6462] underline">
+                            אתר
+                          </a>
+                        )}
+                        {!p.phone && !p.whatsapp && !p.email && <span className="text-stone-300">אין פרטי קשר</span>}
+                        <button
+                          onClick={() => setEditingId(editingId === p.id ? null : p.id)}
+                          className="mt-0.5 self-start text-[11px] text-stone-400 underline hover:text-stone-600"
+                        >
+                          {editingId === p.id ? "סגירת העריכה" : "עריכת פרטים"}
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-2 align-top">
+                      {p.status === "moved_to_deal" ? (
+                        <a
+                          href="/admin/deals"
+                          className="inline-block rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-black text-emerald-800 hover:bg-emerald-200"
+                        >
+                          בעסקאות ✓
+                        </a>
+                      ) : (
+                        <select
+                          value={p.status}
+                          disabled={busy === p.id}
+                          onChange={(e) => changeStatus(p, e.target.value)}
+                          className={`w-48 rounded-lg border px-2 py-1 text-xs font-bold ${
+                            p.status === "not_interested"
+                              ? "border-red-300 bg-red-50 text-red-800"
+                              : p.status === "later"
+                                ? "border-amber-300 bg-amber-50 text-amber-900"
+                                : p.status === "not_relevant_now"
+                                  ? "border-stone-300 bg-stone-100 text-stone-600"
+                                  : "border-stone-200 bg-white text-stone-700"
+                          }`}
+                        >
+                          <option value="new">לא נגענו</option>
+                          <option value="contacted">נוצרה פנייה ראשונה</option>
+                          <option value="contacted_email">בוצעה פנייה במייל</option>
+                          <option value="contacted_phone">בוצעה פנייה טלפונית</option>
+                          <option value="later">לא כרגע - אולי בעתיד (עם תזכורת)</option>
+                          <option value="not_relevant_now">לא רלוונטי כרגע - לעבודה בהמשך</option>
+                          <option value="not_interested">לא מעוניין - לא לפנות שוב</option>
+                          <option value="deal_first">רוצים ← לעסקאות (פנייה ראשונית)</option>
+                          <option value="deal_negotiation">רוצים ← לעסקאות (משא ומתן)</option>
+                          <option value="deal_link_sent">רוצים ← לעסקאות (נשלח לינק הרשמה)</option>
+                        </select>
+                      )}
+                      {p.status_changed_at && (
+                        <div className="mt-1 text-[10px] text-stone-400" title={statusHistoryTitle(p)}>
+                          🕓 {statusLabel(p.status)} · {new Date(p.status_changed_at).toLocaleDateString("he-IL")}
+                        </div>
+                      )}
+                      {p.status === "later" && p.follow_up_at && (
+                        <div className="mt-1 text-[10px] font-bold text-amber-700">
+                          ⏰ תזכורת: {new Date(p.follow_up_at).toLocaleDateString("he-IL")}
+                        </div>
+                      )}
+                      {p.status === "not_interested" && p.status_note && (
+                        <div className="mt-1 max-w-48 text-[10px] leading-4 text-red-700">{p.status_note}</div>
+                      )}
+                    </td>
+                    <td className="p-2 align-top">
+                      <textarea
+                        defaultValue={p.notes ?? ""}
+                        onBlur={(e) => e.target.value !== (p.notes ?? "") && patch(p.id, { notes: e.target.value })}
+                        placeholder="מה נאמר"
+                        rows={2}
+                        className="w-56 rounded-lg border border-stone-200 px-2 py-1 text-xs leading-5"
+                      />
+                    </td>
+                    <td className="p-2 align-top">
+                      <input
+                        defaultValue={p.obstacles ?? ""}
+                        onBlur={(e) => e.target.value !== (p.obstacles ?? "") && patch(p.id, { obstacles: e.target.value })}
+                        placeholder="מה חוסם"
+                        className="w-32 rounded-lg border border-stone-200 px-2 py-1 text-xs"
+                      />
+                    </td>
+                    <td className="whitespace-nowrap p-2 align-top">
+                      {p.draft_sent_at ? (
+                        <span className="text-[11px] text-stone-400">מייל נשלח</span>
+                      ) : p.contacted_at && (p.status === "new" || isContacted(p.status)) ? (
+                        <button
+                          onClick={() => makeDraft(p)}
+                          disabled={busy === p.id}
+                          className="rounded-full border border-stone-300 px-2.5 py-1 text-[11px] font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
+                        >
+                          טיוטה
+                        </button>
+                      ) : null}
+                      <button
+                        onClick={() => patch(p.id, { dismissed: true })}
+                        disabled={busy === p.id}
+                        className="ms-1 text-[11px] text-stone-400 underline hover:text-stone-600"
+                      >
+                        הסר
+                      </button>
+                    </td>
+                  </tr>
+                  {editingId === p.id && (
+                    <tr className="border-b border-stone-200 bg-stone-50">
+                      <td colSpan={8} className="p-3">
+                        <div className="mb-2 text-[11px] leading-5 text-stone-500">
+                          כל שדה נשמר כשיוצאים ממנו. כמה טלפונים - מפרידים ב-&quot; / &quot;. וואטסאפ רק אם המכון
+                          פרסם אותו ככזה. עיר מהרשימה קובעת גם את האזור.
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                          {PROSPECT_CONTACT_FIELDS.map((f) => (
+                            <label key={f.key} className="text-[11px] font-black text-stone-500">
+                              {f.label}
+                              <input
+                                defaultValue={p[f.key] ?? ""}
+                                dir={f.dir}
+                                list={f.key === "city" ? "prospect-cities" : undefined}
+                                placeholder={f.placeholder}
+                                onBlur={(e) => {
+                                  const v = e.target.value.trim();
+                                  if (v !== (p[f.key] ?? "")) patch(p.id, { [f.key]: v });
+                                }}
+                                className="mt-0.5 w-full rounded-lg border border-stone-200 bg-white px-2 py-1 text-xs font-normal text-stone-700"
+                              />
+                            </label>
+                          ))}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -3358,7 +3490,7 @@ export default function AgentsPage() {
               <span className="rounded-full bg-[#2e7d8c] px-2.5 py-0.5 text-sm font-bold text-white">{acts}</span>
             )}
           </h3>
-          <AgentQueue meta={meta} />
+          {AgentQueue({ meta })}
         </section>
 
         {/* סקירה אחרונה + גרף, זה לצד זה במסך רחב */}
@@ -3581,7 +3713,7 @@ export default function AgentsPage() {
         </div>
 
         {/* דף הסוכן הנבחר */}
-        {selectedMeta && <AgentDetail meta={selectedMeta} />}
+        {selectedMeta && AgentDetail({ meta: selectedMeta })}
 
         {/* הסבר המודל - זמין תמיד, מקופל */}
         <div className="mt-6">
