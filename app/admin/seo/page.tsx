@@ -5,6 +5,7 @@ import OptOutToggle from "./OptOutToggle";
 import ContactDestinations from "@/app/admin/ContactDestinations";
 import OrganicByFamily from "@/app/admin/OrganicByFamily";
 import { ageInHebrew } from "@/app/lib/admin-seo-cache";
+import { daysCounted } from "@/app/lib/seo-week";
 
 // SEO אורגני - פילוח "ביקוש מול חיפוש-שם". השאלה שהעמוד עונה עליה: כמה
 // מהתנועה האורגנית היא אנשים שחיפשו *טיפול* (עיר/גישה/נושא - הנכס שה-SEO
@@ -112,7 +113,7 @@ function WeeklyLineChart({ weeks }: { weeks: WeekRow[] }) {
   // ירידה דרסטית. לכן הקטע האחרון מקווקו, הסמן חלול, והתווית אומרת כמה ימים
   // באמת נספרו.
   const last = pts.length - 1;
-  const daysIn = Math.min(7, Math.max(1, Math.ceil((Date.now() - new Date(pts[last].week + "T00:00:00").getTime()) / 86_400_000)));
+  const daysIn = daysCounted(pts[last].week);
   const partial = pts.length > 1 && daysIn < 7;
   const solidEnd = partial ? last - 1 : last;
   const seg = (get: (p: ChartPt) => number, from: number, to: number) =>
