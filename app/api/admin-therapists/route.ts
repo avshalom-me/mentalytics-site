@@ -24,6 +24,8 @@ import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profil
 import { CERT_UPLOAD_FAILED_ACTION, summarizeCertUploadFailures, type CertFailureRow } from "@/app/lib/cert-upload-failures";
 import { promoteCenterTherapists } from "@/app/lib/center-promotion";
 import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
+import { guaranteePauseBlock, pauseSourceBlock, type GuaranteeState } from "@/app/lib/match-pause";
+import { guaranteeStateFor } from "@/app/lib/guarantee";
 
 type TherapistRow = {
   id: string;
@@ -491,33 +493,40 @@ export async function PATCH(request: Request) {
     // הקפאה/שחרור זמני ממערכת ההתאמות בלבד. days=0 משחרר.
     // מכוון: אין מייל, אין שינוי בדגלים הציבוריים, ואין השפעה על המאגר -
     // המטפל/ת ממשיך/ה להופיע ולהיות מדורג/ת שם כרגיל. ההקפאה פגה מעצמה.
+    // מי מותר ולמה: app/lib/match-pause.ts (משותף לכפתורים באדמין).
     if (body.action === "set_match_pause") {
       const rawDays = Number(body.days);
       const days = Number.isFinite(rawDays) ? Math.max(0, Math.min(90, Math.floor(rawDays))) : 0;
       const until = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
       const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 200) : null;
 
-      const { data: before } = await supabaseAdmin
+      const { data: before, error: beforeErr } = await supabaseAdmin
         .from("therapists")
-        .select("match_paused_until, promotion_source")
+        .select("match_paused_until, status, promotion_source")
         .eq("id", id)
-        .single();
+        .maybeSingle();
+      if (beforeErr) return NextResponse.json({ ok: false, error: beforeErr.message }, { status: 500 });
+      if (!before) return NextResponse.json({ ok: false, error: "מטפל/ת לא נמצא/ה" }, { status: 404 });
 
-      // ההקפאה מותרת אך ורק למקודמי-מתנה (trial/manual). מי ששילם קנה חשיפה,
-      // ובנוסף זכאי להחזר מלא אם לא הגיעה אליו פנייה תוך GUARANTEE_DAYS -
-      // הקפאה שלו מדכאת בדיוק את מה שנמכר לו ואף מייצרת לנו את חבות ההחזר.
-      // מרכז משלם ('center') נכלל באיסור מאותה סיבה.
-      if (until && before?.promotion_source !== "manual" && before?.promotion_source !== "trial") {
-        const isPaid = before?.promotion_source === "paid" || before?.promotion_source === "center";
-        return NextResponse.json(
-          {
-            ok: false,
-            error: isPaid
-              ? "אפשר להקפיא רק מטפלים שמקודמים במתנה. מטפל/ת שמשלם/ת רכש/ה את החשיפה - והקפאה עלולה גם ליצור עילה להחזר לפי ערבות הפניות."
-              : "אפשר להקפיא רק מטפלים שמקודמים במתנה (מטפל חינמי ממילא אינו במערכת ההתאמות).",
-          },
-          { status: 409 },
-        );
+      // שחרור מותר תמיד; את ההקפאה בודקים - קודם המסלול, ואז (למשלם/ת
+      // פרטי/ת) חלון ערבות הפניות. כשאי אפשר לבדוק את החלון - לא מקפיאים.
+      if (until) {
+        const sourceBlock = pauseSourceBlock(before);
+        if (sourceBlock) return NextResponse.json({ ok: false, error: sourceBlock }, { status: 409 });
+        if (before.promotion_source === "paid") {
+          let guarantee: GuaranteeState | null;
+          try {
+            guarantee = await guaranteeStateFor(id);
+          } catch (e) {
+            console.error("set_match_pause: guarantee check failed:", e instanceof Error ? e.message : e);
+            return NextResponse.json(
+              { ok: false, error: "לא הצלחנו לבדוק את חלון ערבות הפניות, ולכן לא הקפאנו. נסו שוב בעוד רגע." },
+              { status: 503 },
+            );
+          }
+          const guaranteeBlock = guaranteePauseBlock(guarantee);
+          if (guaranteeBlock) return NextResponse.json({ ok: false, error: guaranteeBlock }, { status: 409 });
+        }
       }
 
       const { error } = await supabaseAdmin
@@ -530,7 +539,7 @@ export async function PATCH(request: Request) {
         therapistId: id,
         actorType: "admin",
         action: "set_match_pause",
-        before: { match_paused_until: before?.match_paused_until ?? null },
+        before: { match_paused_until: before.match_paused_until ?? null, promotion_source: before.promotion_source },
         after: { match_paused_until: until },
         reason: until
           ? `admin paused from matching for ${days}d${reason ? `: ${reason}` : ""}`

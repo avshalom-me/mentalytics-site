@@ -18,6 +18,7 @@ import {
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
 import { mayAutoIgnore, isSameInquiry } from "./inbox-triage";
 import { approvedLessonRules, extractPendingLessons } from "./inbox-lessons";
+import { inboxPauseContext } from "./match-pause";
 
 // סוכן שירות הלקוחות: קורא את admin@getmentalytics.com, מסווג כל פנייה,
 // ומכין טיוטת תשובה מתוך בסיס הידע + תשובות עבר שאושרו.
@@ -92,6 +93,8 @@ export type InboxRunResult = {
 type SenderContext = {
   therapistId: string | null;
   contextText: string; // מוזרק לפרומפט; ריק אם הפונה לא זוהה
+  /** הערה לאדמין בלבד, מוצמדת ל-draft_note ולא נכנסת לפרומפט. */
+  adminNote: string | null;
 };
 
 async function senderContext(email: string): Promise<SenderContext> {
@@ -105,7 +108,7 @@ async function senderContext(email: string): Promise<SenderContext> {
     .order("created_at", { ascending: true })
     .limit(5);
   const t = (matches ?? []).find((m) => m.promotion_source) ?? (matches ?? [])[0];
-  if (!t) return { therapistId: null, contextText: "" };
+  if (!t) return { therapistId: null, contextText: "", adminNote: null };
 
   const lines = [
     `הפונה מזוהה במערכת: ${t.full_name ?? "ללא שם"} (${t.entity_type === "center" ? "מרכז טיפולי" : "מטפל/ת"}).`,
@@ -140,9 +143,11 @@ async function senderContext(email: string): Promise<SenderContext> {
   if (t.accepting_new_patients === false) {
     lines.push("סימן/ה שאינו/ה מקבל/ת מטופלים חדשים, ולכן אינו/ה מוצג/ת בהתאמות.");
   }
-  if (t.match_paused_until && new Date(t.match_paused_until as string) > new Date()) {
-    lines.push("מוקפא/ת זמנית מההתאמות לבקשתו/ה.");
-  }
+  // הקפאה מההתאמות היא החלטה שקטה שלנו, לא בקשה של המטפל/ת. היא לא נכנסת
+  // לפרומפט: המודל מקבל הוראה ניטרלית, והאדמין את העובדה (inboxPauseContext).
+  const pause = inboxPauseContext(t.match_paused_until as string | null);
+  if (pause) lines.push(pause.promptLine);
+  const adminNote = pause?.adminNote ?? null;
 
   // נתוני חשיפה של 30 יום. מספרים בלבד, בלי שום פרט על המטופלים עצמם.
   const since = new Date(Date.now() - 30 * 86_400_000).toISOString();
@@ -173,7 +178,7 @@ async function senderContext(email: string): Promise<SenderContext> {
       "עליהם במפורש - מטפל שלא ביקש נתונים לא אמור לקבל דוח ביצועים."
   );
 
-  return { therapistId: t.id as string, contextText: lines.join("\n") };
+  return { therapistId: t.id as string, contextText: lines.join("\n"), adminNote };
 }
 
 /**
@@ -375,6 +380,7 @@ async function classifyAndDraft(
     if (/בסיס הידע|knowledge base|בינה מלאכותית|מודל שפה/i.test(draftBody)) {
       note = (note ? note + " · " : "") + "⚠️ נוסח פנימי דלף לטיוטה - לתקן לפני שליחה";
     }
+    if (ctx.adminNote) note = (note ? note + " · " : "") + ctx.adminNote;
     return {
       category,
       needs_reply: p.needs_reply !== false && category !== "spam" && category !== "system",

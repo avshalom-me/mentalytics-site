@@ -1,7 +1,8 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
-import { GUARANTEE_DAYS } from "./crm";
+import { guaranteeWindow, type GuaranteeSubscription } from "./guarantee-window";
+import type { GuaranteeState } from "./match-pause";
 
 // The money-back guarantee tracker. A paying (Sumit-subscribed) therapist is
 // entitled to a full refund if no patient inquiry ("פנייה") arrived within
@@ -26,6 +27,9 @@ import { GUARANTEE_DAYS } from "./crm";
 // המנוי הפעיל הוא העוגן הנכון כי הוא לא מתאפס בהשעיה (אותו morning_token_id
 // ואותו created_at). נפילה למנוי המוקדם ביותר קורית רק כשאין פעיל - כך
 // מטפל שעזב באמת וחזר כעבור חודשים מקבל עוגן לפי המנוי החדש ולא הישן.
+//
+// החישוב עצמו ב-guarantee-window.ts (טהור), כדי שהמעקב כאן והבדיקה לפני
+// הקפאה מההתאמות (guaranteeStateFor למטה) יחשבו את אותו חלון.
 
 export type GuaranteeRisk = "expired_no_contact" | "at_risk" | "watch" | "ok";
 
@@ -72,39 +76,14 @@ export async function computeGuarantee(): Promise<GuaranteeRow[]> {
     .in("therapist_id", ids);
   if (subsErr) throw new Error(subsErr.message);
 
-  // Earliest subscription per therapist = the original signup, even if a
-  // later row exists after a cancel/resubscribe.
-  const firstSub = new Map<string, string>();
-  const firstActiveSub = new Map<string, string>();
+  const subsByTherapist = new Map<string, GuaranteeSubscription[]>();
   for (const s of subs ?? []) {
-    const prev = firstSub.get(s.therapist_id);
-    if (!prev || s.created_at < prev) firstSub.set(s.therapist_id, s.created_at);
-    if (s.status === "active") {
-      const prevActive = firstActiveSub.get(s.therapist_id);
-      if (!prevActive || s.created_at < prevActive) firstActiveSub.set(s.therapist_id, s.created_at);
-    }
+    const arr = subsByTherapist.get(s.therapist_id);
+    if (arr) arr.push(s);
+    else subsByTherapist.set(s.therapist_id, [s]);
   }
 
-  // פער של פחות משעה בין המנוי לקידום הוא הרצף הרגיל של הרשמה אחת
-  // (שתי הכתיבות קורות באותו מסלול) - לא הפסקה שראוי לסמן.
-  const INTERRUPTION_MIN_MS = 60 * 60 * 1000;
-
-  const windows = paying.map((t) => {
-    const subStart = firstActiveSub.get(t.id) ?? firstSub.get(t.id) ?? null;
-    const candidates = [t.promoted_since, subStart].filter(
-      (v): v is string => typeof v === "string" && v.length > 0
-    );
-    const startIso: string =
-      candidates.length > 0
-        ? candidates.reduce((a, b) => (a < b ? a : b))
-        : t.created_at;
-    const start = new Date(startIso);
-    const end = new Date(start.getTime() + GUARANTEE_DAYS * 24 * 60 * 60 * 1000);
-    const interrupted =
-      !!t.promoted_since &&
-      new Date(t.promoted_since).getTime() - start.getTime() > INTERRUPTION_MIN_MS;
-    return { t, start, end, interrupted };
-  });
+  const windows = paying.map((t) => ({ t, ...guaranteeWindow(t, subsByTherapist.get(t.id) ?? []) }));
 
   const minStart = windows.reduce(
     (min, w) => (w.start < min ? w.start : min),
@@ -174,4 +153,41 @@ export async function computeGuarantee(): Promise<GuaranteeRow[]> {
   };
   rows.sort((a, b) => order[a.risk] - order[b.risk] || a.days_left - b.days_left);
   return rows;
+}
+
+/**
+ * חלון הערבות של מטפל/ת אחד/ת - לבדיקה לפני הקפאה מההתאמות. null כשהערבות
+ * לא חלה (רק משלם/ת פרטי/ת, status='paying' + promotion_source='paid', כמו
+ * ב-computeGuarantee). את הפניות סופרים רק כשהחלון עוד פתוח.
+ *
+ * זורק בשגיאת מסד: מי שקורא/ת חייב/ת להחליט במפורש מה עושים כשאי אפשר
+ * לדעת (בהקפאה - לא מקפיאים).
+ */
+export async function guaranteeStateFor(therapistId: string, now: Date = new Date()): Promise<GuaranteeState | null> {
+  const { data: t, error } = await supabaseAdmin
+    .from("therapists")
+    .select("status, promotion_source, promoted_since, created_at")
+    .eq("id", therapistId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!t || t.status !== "paying" || t.promotion_source !== "paid") return null;
+
+  const { data: subs, error: subsErr } = await supabaseAdmin
+    .from("subscriptions")
+    .select("status, created_at")
+    .eq("therapist_id", therapistId);
+  if (subsErr) throw new Error(subsErr.message);
+
+  const { start, end } = guaranteeWindow(t, subs ?? []);
+  if (now.getTime() > end.getTime()) {
+    return { open: false, windowEnd: end.toISOString(), contacts: null };
+  }
+  const { count, error: clicksErr } = await supabaseAdmin
+    .from("therapist_contact_clicks")
+    .select("id", { count: "exact", head: true })
+    .eq("therapist_id", therapistId)
+    .gte("clicked_at", start.toISOString())
+    .lte("clicked_at", end.toISOString());
+  if (clicksErr) throw new Error(clicksErr.message);
+  return { open: true, windowEnd: end.toISOString(), contacts: count ?? 0 };
 }

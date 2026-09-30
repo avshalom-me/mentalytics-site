@@ -10,6 +10,7 @@ import {
 } from "@/app/lib/therapist-options";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
+import { canPauseFromMatching } from "@/app/lib/match-pause";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
 import AdminCertUpload from "./components/AdminCertUpload";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -721,23 +722,26 @@ export default function AdminTherapistsPage() {
   const ENG_LABEL = engWindow === "30" ? "30 ימים אחרונים" : engWindow === "60" ? "60 ימים אחרונים" : 'סה"כ מאז ההרשמה';
 
   // הקפאה זמנית מההתאמות. שקטה לחלוטין: אין מייל, והמאגר הציבורי לא מושפע.
+  // מי מותר: app/lib/match-pause.ts - מקודמי מתנה ומשלמים פרטיים.
   async function setMatchPause(t: AdminTherapist, days: number) {
     const label = days === 0 ? `לשחרר את ${t.full_name} להתאמות?` :
-      `להקפיא את ${t.full_name} מההתאמות ל-${days} ימים?\n\nהמטפל/ת ימשיך/תמשיך להופיע במאגר הציבורי כרגיל ולא יקבל/תקבל שום הודעה. ההקפאה תפוג מעצמה.`;
+      `להקפיא את ${t.full_name} מההתאמות ל-${days} ימים?\n\nהמטפל/ת ימשיך/תמשיך להופיע במאגר הציבורי כרגיל ולא יקבל/תקבל שום הודעה. ההקפאה תפוג מעצמה.` +
+      (t.promotion_source === "paid" ? "\n\nמשלם/ת: החיוב ממשיך כרגיל - ההקפאה לא נוגעת במנוי." : "");
     if (!window.confirm(label)) return;
     try {
       setActionLoadingId(t.id);
-      setError("");
       const res = await fetch("/api/admin-therapists", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: t.id, action: "set_match_pause", days }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => ({}));
       if (!res.ok || !json.ok) throw new Error(json.error || "הפעולה נכשלה");
       setTherapists((prev) => prev.map((x) => (x.id === t.id ? { ...x, match_paused_until: json.match_paused_until } : x)));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+      // התראה ולא setError: שגיאה בעמוד הזה מחליפה את כל רשימת המטפלים,
+      // וסירוב להקפיא (למשל בגלל ערבות הפניות) הוא הסבר, לא תקלה.
+      window.alert(err instanceof Error ? err.message : "הפעולה נכשלה");
     } finally {
       setActionLoadingId(null);
     }
@@ -1375,6 +1379,7 @@ export default function AdminTherapistsPage() {
               <div className="mb-3 rounded-lg border border-sky-300 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
                 ❄️ <strong>מוקפא/ת ממערכת ההתאמות</strong> עד {new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} -
                 לא מופיע/ה בתוצאות השאלון. במאגר הציבורי מופיע/ה ומדורג/ת כרגיל, ולא נשלחה הודעה.
+                {therapist.promotion_source === "paid" && " החיוב ממשיך כרגיל."}
               </div>
             )}
 
@@ -1576,33 +1581,32 @@ export default function AdminTherapistsPage() {
                   {therapist.article_invite_sent_at ? "🎁 שלח שוב הצעת מאמר" : "🎁 הזמן לכתוב מאמר"}
                 </button>
               )}
-              {/* הקפאה מההתאמות - שקטה ופגה מעצמה. אך ורק למקודמי-מתנה:
-                  מי ששילם רכש את החשיפה (וגם מכוסה בערבות הפניות). */}
-              {therapist.status === "paying" &&
-               (therapist.promotion_source === "trial" || therapist.promotion_source === "manual") && (
-                pauseActive(therapist) ? (
+              {/* הקפאה מההתאמות - שקטה ופגה מעצמה. מקודמי מתנה ומשלמים
+                  פרטיים (app/lib/match-pause.ts); למשלם/ת השרת בודק גם את
+                  חלון ערבות הפניות. שחרור מוצג לכל הקפאה פעילה, גם אם המסלול
+                  השתנה מאז - כדי שהקפאה לא תיתקע בלי כפתור. */}
+              {pauseActive(therapist) ? (
+                <button type="button" disabled={isBusy}
+                  className="rounded-xl border border-sky-400 bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 disabled:opacity-50"
+                  onClick={() => setMatchPause(therapist, 0)}
+                  title={`מוקפא/ת מההתאמות עד ${new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} - לחיצה משחררת מיד`}>
+                  ❄️ מוקפא/ת עד {new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} · שחרר
+                </button>
+              ) : canPauseFromMatching(therapist) && (
+                <>
                   <button type="button" disabled={isBusy}
-                    className="rounded-xl border border-sky-400 bg-sky-100 px-4 py-2 text-sm font-bold text-sky-900 disabled:opacity-50"
-                    onClick={() => setMatchPause(therapist, 0)}
-                    title={`מוקפא/ת מההתאמות עד ${new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} - לחיצה משחררת מיד`}>
-                    ❄️ מוקפא/ת עד {new Date(therapist.match_paused_until!).toLocaleDateString("he-IL")} · שחרר
+                    className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
+                    onClick={() => setMatchPause(therapist, 7)}
+                    title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
+                    ❄️ הקפא שבוע
                   </button>
-                ) : (
-                  <>
-                    <button type="button" disabled={isBusy}
-                      className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
-                      onClick={() => setMatchPause(therapist, 7)}
-                      title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
-                      ❄️ הקפא שבוע
-                    </button>
-                    <button type="button" disabled={isBusy}
-                      className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
-                      onClick={() => setMatchPause(therapist, 14)}
-                      title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
-                      ❄️ שבועיים
-                    </button>
-                  </>
-                )
+                  <button type="button" disabled={isBusy}
+                    className="rounded-xl border border-sky-300 bg-white px-3 py-2 text-sm font-medium text-sky-800 disabled:opacity-50"
+                    onClick={() => setMatchPause(therapist, 14)}
+                    title="הקפאה מתוצאות השאלון בלבד. המאגר הציבורי לא מושפע ולא נשלחת הודעה.">
+                    ❄️ שבועיים
+                  </button>
+                </>
               )}
               {therapist.status === "paying" && !therapist.admin_approved && (
                 <button type="button" disabled={isBusy}
