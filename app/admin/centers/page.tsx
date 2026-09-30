@@ -303,6 +303,33 @@ export default function AdminCentersPage() {
 
   useEffect(load, [load]);
 
+  // הורדת כל המרכזים כקובץ אקסל. נבנה כאן בדפדפן מהרשימה שכבר נטענה - בלי
+  // שאילתה נוספת למסד - והקוד שלו נטען רק בלחיצה, לא בכל כניסה לעמוד.
+  const [exporting, setExporting] = useState(false);
+  async function downloadXlsx() {
+    setExporting(true);
+    setError("");
+    try {
+      const [{ buildCentersXlsx, centersExportFileName }, { XLSX_MIME }] = await Promise.all([
+        import("@/app/lib/centers-export"),
+        import("@/app/lib/xlsx-writer"),
+      ]);
+      const url = URL.createObjectURL(new Blob([buildCentersXlsx(centers)], { type: XLSX_MIME }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = centersExportFileName();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      console.error("centers xlsx export failed", e);
+      setError("יצירת קובץ האקסל נכשלה - נסו לרענן את העמוד");
+    } finally {
+      setExporting(false);
+    }
+  }
+
   async function post(payload: Record<string, unknown>): Promise<{ ok: boolean; [k: string]: unknown }> {
     setBusy(true);
     setError("");
@@ -520,9 +547,19 @@ export default function AdminCentersPage() {
     <main className="mx-auto max-w-5xl px-6 py-10 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
       <div className="mb-2 flex flex-wrap items-center justify-between gap-4">
         <h1 className="text-3xl font-black text-stone-900">מרכזים טיפוליים</h1>
-        <button onClick={openNew} className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-bold text-white hover:bg-stone-700">
-          + הצעה למרכז חדש
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={downloadXlsx}
+            disabled={loading || exporting || centers.length === 0}
+            title="כל המרכזים במערכת, בלי קשר לסינון שמוצג: שורה לכל מרכז ועמודה לכל פרט (פרטי קשר, מחיר ותשלום, העמוד הציבורי, מוכנות ומעורבות)"
+            className="rounded-xl border border-stone-300 bg-white px-4 py-2 text-sm font-bold text-stone-700 hover:bg-stone-50 disabled:opacity-40"
+          >
+            {exporting ? "מכין קובץ…" : "📥 הורדה לאקסל"}
+          </button>
+          <button onClick={openNew} className="rounded-xl bg-stone-800 px-4 py-2 text-sm font-bold text-white hover:bg-stone-700">
+            + הצעה למרכז חדש
+          </button>
+        </div>
       </div>
       <p className="mb-3 text-sm text-stone-500 max-w-3xl">
         יוצרים הצעה עם המחיר לכל מטפל ומספר המטפלים שסגרתם בשיחת ההתאמה, שולחים למרכז במייל (או מעתיקים את הקישור).
