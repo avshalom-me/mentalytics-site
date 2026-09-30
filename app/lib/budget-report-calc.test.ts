@@ -68,6 +68,31 @@ describe("runwayMonths", () => {
     expect(runwayMonths(null, -8000)).toBeNull();
     expect(runwayMonths(60000, 500)).toBeNull();
   });
+
+  it("counts loan payments, which leave the account though they are not an expense", () => {
+    // A ₪2,000 monthly loss and ₪4,000 of loan payments: ₪6,000 leaves each month.
+    const loans = [
+      { remaining: 12000, monthlyPayment: 1000 },
+      { remaining: 30000, monthlyPayment: 3000 },
+    ];
+    expect(runwayMonths(20000, -2000, loans)).toBeCloseTo(3 + 2000 / 6000, 6);
+  });
+
+  it("stops paying a loan once it is paid off", () => {
+    // ₪1,500 a month while the loan runs (two payments), then ₪500:
+    // 5,000 → 3,500 → 2,000 → 1,500 → 1,000 → 500 → 0.
+    expect(runwayMonths(5000, -500, [{ remaining: 2000, monthlyPayment: 1000 }])).toBe(6);
+  });
+
+  it("pays what remains of a loan as its last payment", () => {
+    // 1,000, 1,000, then 500: 2,500 → 1,500 → 500 → 0.
+    expect(runwayMonths(2500, 0, [{ remaining: 2500, monthlyPayment: 1000 }])).toBe(3);
+  });
+
+  it("has nothing to count when the cash outlasts the loans", () => {
+    // ₪500 down a month for three months, then ₪500 up.
+    expect(runwayMonths(9000, 500, [{ remaining: 3000, monthlyPayment: 1000 }])).toBeNull();
+  });
 });
 
 describe("giftFunnel", () => {

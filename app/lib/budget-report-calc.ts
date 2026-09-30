@@ -58,13 +58,33 @@ export function anomalies(before: WindowStats, after: WindowStats, minClicks = 3
   return out;
 }
 
+export type Loan = { remaining: number; monthlyPayment: number };
+
 /**
- * Months of cash left at the given monthly result. Null when there is no cash
- * figure, or when the month is not losing money (then there is no runway to count).
+ * Months of cash left, counted month by month: each month adds the operating
+ * result (negative = a loss) and pays every loan still running, the last
+ * payment being what remains of it. Paying back a loan is not an expense, but
+ * it leaves the account, so it counts here and not in the result. Null when
+ * there is no cash figure, or when the cash lasts past ten years (then there
+ * is no runway to count).
  */
-export function runwayMonths(cash: number | null, monthlyNet: number): number | null {
-  if (cash == null || monthlyNet >= 0) return null;
-  return Math.max(0, cash / -monthlyNet);
+export function runwayMonths(cash: number | null, monthlyNet: number, loans: Loan[] = []): number | null {
+  if (cash == null) return null;
+  if (cash <= 0) return 0;
+  const left = loans.map((l) => Math.max(0, l.remaining));
+  let balance = cash;
+  for (let month = 0; month < 120; month++) {
+    let paid = 0;
+    loans.forEach((l, i) => {
+      const payment = Math.min(left[i], Math.max(0, l.monthlyPayment));
+      left[i] -= payment;
+      paid += payment;
+    });
+    const change = monthlyNet - paid;
+    if (change < 0 && balance + change <= 0) return month + balance / -change;
+    balance += change;
+  }
+  return null;
 }
 
 export type GiftOfferRow = { therapist_id: string; sent_at: string };

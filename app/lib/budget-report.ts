@@ -681,7 +681,7 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
     const [y, m] = s.today.split("-").map(Number);
     return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
   })();
-  const [docsQ, recurringQ, cashQ] = await Promise.all([
+  const [docsQ, recurringQ, cashQ, loansQ] = await Promise.all([
     supabaseAdmin
       .from("sumit_documents")
       .select("kind, doc_date, value_net")
@@ -689,6 +689,7 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
       .gte("doc_date", `${lastMonth}-01`)
       .lte("doc_date", `${lastMonth}-${String(daysInMonth(lastMonth)).padStart(2, "0")}`),
     supabaseAdmin.from("recurring_expenses").select("start_date, months_total, amount, active, category, vendor"),
+    // The latest balance the owner gave; "month" holds the day it was true on.
     supabaseAdmin
       .from("plan_targets")
       .select("month, target")
@@ -696,9 +697,15 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
       .order("month", { ascending: false })
       .limit(1)
       .maybeSingle(),
+    supabaseAdmin
+      .from("finance_loans")
+      .select("label, remaining, monthly_payment, as_of")
+      .eq("active", true)
+      .order("label"),
   ]);
   if (docsQ.error) throw new Error(`sumit_documents: ${docsQ.error.message}`);
   if (recurringQ.error) throw new Error(`recurring_expenses: ${recurringQ.error.message}`);
+  if (loansQ.error) throw new Error(`finance_loans: ${loansQ.error.message}`);
 
   const lastIncome = monthIncome({
     month: lastMonth,
@@ -735,7 +742,36 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
   const ads = s.base.ceiling?.value ?? s.base.projection.current.monthly;
   const net = mrrMonth - fixed - ads;
   const cash = cashQ.data ? Number(cashQ.data.target) : null;
-  const runway = runwayMonths(cash, net);
+  const cashDay = cashQ.data ? String(cashQ.data.month) : null;
+  const fullDate = (day: string) => `${shortDate(day)}/${day.slice(0, 4)}`;
+
+  // Paying back a loan is not an expense, so it stays out of the deficit; it
+  // still leaves the account, so the runway pays it until the loan is done.
+  const loans = (loansQ.data ?? [])
+    .map((l) => ({
+      label: String(l.label),
+      remaining: Number(l.remaining) || 0,
+      monthlyPayment: Number(l.monthly_payment) || 0,
+      asOf: String(l.as_of),
+    }))
+    .filter((l) => l.remaining > 0 && l.monthlyPayment > 0);
+  const loanPayments = loans.reduce((a, l) => a + Math.min(l.remaining, l.monthlyPayment), 0);
+  const cashChange = net - loanPayments;
+  const runway = runwayMonths(cash, net, loans);
+  // The month that falls a number of months after a day: whole calendar months
+  // first (30/9 + 8 = 30/5, where 8 × 30.44 days would reach 1/6), then the
+  // fraction in days. For a loan's last payment, and for the cash running out.
+  const monthAfter = (day: string, months: number) => {
+    const [y, m, d] = day.split("-").map(Number);
+    const whole = Math.floor(months);
+    const index = y * 12 + (m - 1) + whole;
+    const ty = Math.floor(index / 12);
+    const tm = (index % 12) + 1;
+    const date = new Date(Date.UTC(ty, tm - 1, Math.min(d, daysInMonth(`${ty}-${String(tm).padStart(2, "0")}`))));
+    date.setUTCDate(date.getUTCDate() + Math.round((months - whole) * 30.44));
+    const key = date.toISOString().slice(0, 7);
+    return `${hebrewMonth(key)} ${key.slice(0, 4)}`;
+  };
 
   return {
     n: 11,
@@ -744,12 +780,15 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
     status: cash == null ? "partial" : "ok",
     summary:
       `הכנסה חודשית קבועה היום ${nis(mrrNow)}; ב${hebrewMonth(s.base.month)} ${nis(mrrMonth)}. ` +
-      `הוצאה חודשית ${nis(fixed + ads)} (קבועות ${nis(fixed)} + פרסום ${nis(ads)}), ולכן ${net >= 0 ? "עודף" : "גירעון"} של ${nis(Math.abs(net))} בחודש. ` +
-      (runway != null
-        ? `ביתרה של ${nis(cash)} זה מספיק לכ-${runway.toFixed(1)} חודשים.`
+      `הוצאה חודשית ${nis(fixed + ads)} (קבועות ${nis(fixed)} + פרסום ${nis(ads)}), ולכן ${net >= 0 ? "עודף" : "גירעון"} של ${nis(Math.abs(net))} בחודש` +
+      (loans.length
+        ? `; עם החזרי הלוואות (${nis(loanPayments)}) המזומן ${cashChange >= 0 ? "עולה" : "יורד"} ב-${nis(Math.abs(cashChange))} בחודש. `
+        : ". ") +
+      (runway != null && cashDay
+        ? `ביתרה של ${nis(cash)} (נכון ל-${fullDate(cashDay)}) זה מספיק לכ-${runway.toFixed(1)} חודשים, כלומר עד ${monthAfter(cashDay, runway)} בערך.`
         : cash == null
           ? "ל-runway חסרה יתרת המזומנים."
-          : ""),
+          : `בקצב הזה היתרה של ${nis(cash)} לא נגמרת בעשר השנים הקרובות.`),
     table: {
       head: ["שורה", "₪ לחודש"],
       rows: [
@@ -759,6 +798,13 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
         ["הוצאות קבועות רשומות", nis(fixed)],
         [s.base.ceiling ? "פרסום (התקרה)" : "פרסום (התקציבים בגוגל)", nis(ads)],
         [net >= 0 ? "עודף חודשי" : "גירעון חודשי", nis(Math.abs(net))],
+        ...(loans.length
+          ? [
+              ["החזרי הלוואות", nis(loanPayments)],
+              [cashChange >= 0 ? "עלייה חודשית במזומן" : "ירידה חודשית במזומן", nis(Math.abs(cashChange))],
+            ]
+          : []),
+        ...(cash != null && cashDay ? [[`יתרת מזומנים ב-${fullDate(cashDay)}`, nis(cash)]] : []),
       ],
     },
     notes: [
@@ -766,7 +812,16 @@ async function chapterMrr(s: Shared): Promise<ReportChapter> {
       "ההוצאות הקבועות הן רק מה שרשום בעמוד הכספים. רשימת ההוצאות שכנראה חסרות: סעיף ה בתוכנית.",
       ...(cash == null
         ? ["כדי לחשב runway צריך יתרת מזומנים: שורה ב-plan_targets עם metric = cash_balance. היא לא נשלפת מהבנק."]
-        : [`יתרת מזומנים נכון ל-${String(cashQ.data?.month ?? "").slice(0, 7)}.`]),
+        : [
+            `ה-runway מניח שהחודש של ${hebrewMonth(s.base.month)} חוזר על עצמו: בלי מטפלים חדשים, בלי ביטולים ובלי הוצאות שלא רשומות. יתרת המזומנים וההלוואות לפי הבעלים, לא מהבנק; יתרה חדשה = שורה חדשה ב-plan_targets (metric = cash_balance) עם היום שלה.`,
+          ]),
+      ...(loans.length
+        ? ["החזר הלוואה הוא לא הוצאה, ולכן הוא לא בגירעון; הוא כן יוצא מהעו״ש, ולכן הוא ב-runway עד שההלוואה נגמרת."]
+        : []),
+      ...loans.map((l) => {
+        const payments = Math.ceil(l.remaining / l.monthlyPayment);
+        return `${l.label}: נותרו ${nis(l.remaining)} (נכון ל-${fullDate(l.asOf)}), ${nis(l.monthlyPayment)} בחודש - כ-${payments} תשלומים, עד ${monthAfter(l.asOf, payments)} בערך.`;
+      }),
     ],
   };
 }
