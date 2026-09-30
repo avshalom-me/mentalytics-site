@@ -39,6 +39,11 @@ export type BudgetCampaignPlan = BudgetCampaignInput & {
   rateWindow: 30 | 60 | null;
   /** Fewer than NOISE_SEEKERS seekers behind the rate. */
   noisy: boolean;
+  /**
+   * The cost per seeker the forecast uses: the rate itself, or for a noisy one,
+   * the rate pulled toward the account's average (forecastRate below).
+   */
+  forecastRate: number | null;
   learning: boolean;
   isProtected: boolean;
   /** Takes part in the split: active, with a daily budget. */
@@ -175,6 +180,7 @@ export function projectBudget(input: {
       rate,
       rateWindow,
       noisy: rate != null && seekersBehind < NOISE_SEEKERS,
+      forecastRate: null,
       learning: inPlan && (c.firstSpend == null || daysBetween(c.firstSpend, input.today) < LEARNING_DAYS),
       isProtected:
         !!c.protectedReason?.trim() && (c.protectedUntil == null || c.protectedUntil >= monthStart),
@@ -217,13 +223,26 @@ export function projectBudget(input: {
     }
   }
 
-  for (const r of rows) {
-    r.projectedCost = r.proposedDaily * D;
-    r.projectedSeekers = r.rate != null && r.proposedDaily > 0 ? r.projectedCost / r.rate : r.proposedDaily > 0 ? null : 0;
-  }
-
   const googleCost = rows.reduce((s, r) => s + r.cost30, 0);
   const googleSeekers = rows.reduce((s, r) => s + r.seekers30, 0);
+  // A rate from a handful of seekers makes a wild forecast: g-shfela's first
+  // day, ₪3 for one seeker, forecast 103 seekers a month on 30/9/2026. For the
+  // forecast (not the ranking), a noisy rate is pulled toward the account's own
+  // cost per seeker, as if NOISE_SEEKERS more seekers had come at that average.
+  const accountRate = googleSeekers > 0 && googleCost > 0 ? googleCost / googleSeekers : null;
+  for (const r of rows) {
+    if (r.rate == null) r.forecastRate = null;
+    else if (!r.noisy || accountRate == null) r.forecastRate = r.rate;
+    else {
+      const cost = r.rateWindow === 30 ? r.cost30 : r.cost60;
+      const seekers = r.rateWindow === 30 ? r.seekers30 : r.seekers60;
+      r.forecastRate = (cost + NOISE_SEEKERS * accountRate) / (seekers + NOISE_SEEKERS);
+    }
+    r.projectedCost = r.proposedDaily * D;
+    r.projectedSeekers =
+      r.forecastRate != null && r.proposedDaily > 0 ? r.projectedCost / r.forecastRate : r.proposedDaily > 0 ? null : 0;
+  }
+
   const lastCost = googleCost + others.reduce((s, o) => s + o.cost30, 0);
   const lastSeekers = googleSeekers + others.reduce((s, o) => s + o.seekers30, 0);
   const byPlatform = others.length

@@ -100,9 +100,11 @@ describe("splitting ₪3,500 for October", () => {
     expect(p.plan.monthly).toBe(112 * 31);
   });
 
-  it("projects the seekers from each campaign's own rate", () => {
-    // tlv 775/30 + online 930/44 + jerusalem 775/45 + sharon 372/69 + emek 310/156
-    expect(p.plan.seekers).toBe(72);
+  it("projects the seekers from each campaign's rate, pulling the noisy ones toward the account's", () => {
+    // online 930/44 + jerusalem 775/45 + sharon 372/69 are measured on 8+ seekers.
+    // tlv (6 seekers) and emek (2) are noisy: (cost + 8 x 63.7) / (seekers + 8),
+    // so tlv 775/49.2 and emek 310/82.3 instead of 775/30 and 310/156.
+    expect(p.plan.seekers).toBe(63);
     expect(p.plan.unknown).toEqual(["g-shfela"]);
     expect(p.overCeiling).toBe(false);
   });
@@ -112,9 +114,9 @@ describe("splitting ₪3,500 for October", () => {
   });
 
   it("says it in one sentence", () => {
-    // ₪44 a seeker = the ₪3,162 whose seekers can be projected (g-shfela's ₪310 cannot) over 71.6 seekers.
+    // ₪50 a seeker = the ₪3,162 whose seekers can be projected (g-shfela's ₪310 cannot) over 63.2 seekers.
     expect(summarySentence(p)).toBe(
-      "הצפי לאוקטובר: כ-72 פונים ב-₪3,472 (כ-₪44 לפונה), לא כולל g-shfela שעוד אין לו נתונים, " +
+      "הצפי לאוקטובר: כ-63 פונים ב-₪3,472 (כ-₪50 לפונה), לא כולל g-shfela שעוד אין לו נתונים, " +
         "מול 73 פונים ב-30 הימים האחרונים, שעלו ₪4,652 (₪64 לפונה). התקרה: ₪3,500."
     );
   });
@@ -163,7 +165,7 @@ describe("the recommendation that goes into the queue", () => {
 
   it("asks for a change only when the budgets in Google exceed the ceiling", () => {
     expect(rec.needed).toBe(true);
-    expect(rec.title).toBe("תקציב אוקטובר: להוריד מ-₪5,177 ל-₪3,472 (כ-72 פונים)");
+    expect(rec.title).toBe("תקציב אוקטובר: להוריד מ-₪5,177 ל-₪3,472 (כ-63 פונים)");
   });
 
   it("lists the pauses first: the bigger budget, then the dearer seeker", () => {
@@ -219,6 +221,19 @@ describe("the guard on the model's wording", () => {
 });
 
 describe("edges", () => {
+  it("does not forecast a new campaign's first lucky day into a month", () => {
+    // g-shfela on 30/9/2026: ₪3 and one seeker in its first day. Taken at face
+    // value, ₪10 a day for 31 days would be 103 seekers.
+    const campaigns = CAMPAIGNS.map((c) =>
+      c.googleName === "g-shfela" ? { ...c, firstSpend: "2026-09-29", cost30: 3, cost60: 3, seekers30: 1, seekers60: 1 } : c
+    );
+    const p = projectBudget({ campaigns, ceiling: 3500, month: "2026-10", today: "2026-09-30" });
+    const shfela = p.campaigns.find((c) => c.googleName === "g-shfela")!;
+    expect(shfela.rate).toBe(3);
+    expect(shfela.forecastRate).toBeCloseTo((3 + 8 * (4655 / 74)) / 9, 5);
+    expect(shfela.projectedSeekers).toBeLessThan(6);
+  });
+
   it("lets a protection lapse at the end of its date", () => {
     const campaigns = CAMPAIGNS.map((c) =>
       c.googleName === "g-kids-center" ? { ...c, protectedReason: "until September only", protectedUntil: "2026-09-30" } : c
