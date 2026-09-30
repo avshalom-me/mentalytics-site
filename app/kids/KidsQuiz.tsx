@@ -20,6 +20,7 @@ import {
   aggregateForMatch,
   findingExternalKeys,
   foundDomains,
+  mainFinding,
   type KidsRecommendationGroup,
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
@@ -2810,6 +2811,12 @@ function GroupCard({
     if (!list.includes(t.text)) list.push(t.text);
     toolsBySymptom.set(key, list);
   }
+  // What the list below shows, not allTools.length: two referrals out of one
+  // finding each carry that finding's tools, so a grade-8 psycho-didactic card
+  // read "4 כלים" over a list of two. A single entry goes without a number -
+  // "1 כלים" is not Hebrew, and "one tool" would undersell an entry that is
+  // itself a list of practices (the stress one holds eight).
+  const toolCount = Array.from(toolsBySymptom.values()).reduce((n, list) => n + list.length, 0);
 
   const isAssessment = group.kind === "assessment";
   const isExternal = group.kind === "external";
@@ -2953,10 +2960,10 @@ function GroupCard({
         </div>
       )}
 
-      {allTools.length > 0 && (
+      {toolCount > 0 && (
         <details className="mt-3" open={group.urgent}>
           <summary className="cursor-pointer select-none list-none rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-900 transition hover:bg-amber-100">
-            🛠 {allTools.length} כלים מעשיים להתמודדות - אפשר להתחיל כבר עכשיו »
+            🛠 {toolCount === 1 ? "כלים מעשיים" : `${toolCount} כלים מעשיים`} להתמודדות - אפשר להתחיל כבר עכשיו »
           </summary>
           <div className="mt-2 space-y-3 rounded-xl border border-amber-200 bg-amber-50/50 p-3">
             {Array.from(toolsBySymptom.entries()).map(([symptom, tools]) => (
@@ -3493,16 +3500,17 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
       {/* One primary button above the report - same reasoning as the adults
           screen (3/9/26): 24 of the 36 sessions that stopped dead on a results
           screen were parents. The per-finding buttons are untouched; this
-          puts the first actionable finding one tap away, before the tools,
-          PDF and notes offer an exit. Assessment and professional referrals
+          puts the leading actionable finding one tap away, before the tools,
+          PDF and notes offer an exit - urgent first, then the area rated
+          hardest (see mainFinding). Assessment and professional referrals
           keep their own verb and colour so the promise matches the button
           the parent would otherwise have found lower down. */}
       {hasAnyFindings && (() => {
-        // מורים אחרונים בסדר: כשיש גם ממצא טיפולי או אבחוני, הוא הכפתור
-        // הראשי; מורה הוא הממצא המרכזי רק כשהקושי לימודי בלבד.
-        const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0);
-        const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0] ?? bucket.teachers[0]) : null;
-        if (!bucket || !g) return null;
+        // מורים אחרונים בסדר (ראו mainFinding): כשיש גם ממצא טיפולי או אבחוני באותה
+        // רמה, הוא הכפתור הראשי; מורה הוא הממצא המרכזי רק כשהקושי לימודי בלבד.
+        const top = mainFinding(byDomain, A);
+        if (!top) return null;
+        const { domainKey, group: g } = top;
         const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : g.kind === "teacher" ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת";
         const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : g.kind === "teacher" ? "bg-sky-800 hover:bg-sky-700" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
         return (
@@ -3512,7 +3520,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             </p>
             <button
               type="button"
-              onClick={() => { trackQuizStep(audience === "counselor" ? "school" : "kids", "results-top-cta", 100); selectGroup(bucket.key, g); }}
+              onClick={() => { trackQuizStep(audience === "counselor" ? "school" : "kids", "results-top-cta", 100); selectGroup(domainKey, g); }}
               className={`cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors sm:w-auto ${tone}`}
             >
               {verb} - {g.treatmentLabel} ←
