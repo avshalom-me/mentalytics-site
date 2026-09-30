@@ -7,6 +7,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { visibleProfileLinks } from "@/app/lib/profile-links";
 import { safeReturnPath, isSavedMatchPath } from "@/app/lib/return-path";
 import { GUEST_ARTICLES_BY_THERAPIST } from "@/app/lib/article-taxonomy";
+import { articleTeaser, isHouseByline } from "@/app/lib/article-byline";
 import { CITY_TO_REGION, CITY_SEO_LIST, regionToSlug, ONLINE_SLUG } from "@/app/lib/regions";
 import { TRAINING_AREAS } from "@/app/lib/therapist-options";
 import { specialtyToSlug } from "@/app/lib/specialties";
@@ -150,20 +151,58 @@ async function getSimilarTherapists(t: TherapistRow, limit = 3): Promise<Similar
   return candidates.slice(0, limit);
 }
 
-type ArticleLink = { slug: string; title: string; summary: string; topic: string | null };
+type ArticleLink = { href: string; title: string; teaser: string; topic: string | null };
 
-async function getTherapistArticles(id: string): Promise<ArticleLink[]> {
-  const { data } = await supabaseAdmin
+// "מאמרים מאת": מאמרי הקהילה של המטפל/ת, ואחריהם מאמרי אורח שיושבים כעמודי
+// עריכה (GUEST_ARTICLES_BY_THERAPIST) - סקציה אחת, לא שתיים באותה כותרת.
+//
+// מאמר מערכת שמשויך לפרופיל רק לשלמות הנתונים ("צוות טיפול חכם") לא שייך
+// לכאן. עד 30/9/26 סוננה כל שורה עם author_name, וכך נעלמו גם המאמרים שבהם
+// השדה מכיל את שם המטפל/ת עצמו/ה - רובם. ההבחנה עכשיו ב-isHouseByline.
+async function getTherapistArticles(id: string, therapistName: string | null): Promise<ArticleLink[]> {
+  const guest: ArticleLink[] = (GUEST_ARTICLES_BY_THERAPIST[id] ?? []).map((g) => ({
+    href: g.href,
+    title: g.title,
+    teaser: g.desc,
+    topic: null,
+  }));
+
+  const { data, error } = await supabaseAdmin
     .from("therapist_articles")
-    .select("slug, title, summary, topic")
+    .select("slug, title, summary, topic, author_name")
     .eq("therapist_id", id)
     .eq("status", "approved")
-    // House/editorial pieces (author_name set) are backed by a therapist_id for
-    // integrity but are NOT the therapist's own work - keep them off the profile.
-    .is("author_name", null)
     .order("approved_at", { ascending: false })
     .limit(20);
-  return (data ?? []) as ArticleLink[];
+  // סקציה משנית: תקלה בה לא מפילה את הפרופיל, רק מסתירה אותה בטעינה הזו.
+  if (error) {
+    console.error("profile articles lookup failed:", error.message);
+    return guest;
+  }
+  const own = ((data ?? []) as { slug: string; title: string; summary: string | null; topic: string | null; author_name: string | null }[])
+    .filter((a) => !isHouseByline(a.author_name, therapistName));
+
+  // לשורה שמתחת לכותרת: מאמר בלי תקציר מקבל את פתיחת הגוף. הגוף נשלף רק
+  // למאמרים האלה - לא לכולם - כי הפרופיל נטען מחדש בכל כניסה.
+  const needBody = own.filter((a) => !(a.summary ?? "").trim()).map((a) => a.slug);
+  const bodyBySlug = new Map<string, string>();
+  if (needBody.length > 0) {
+    const { data: bodies } = await supabaseAdmin
+      .from("therapist_articles")
+      .select("slug, body")
+      .in("slug", needBody);
+    for (const b of (bodies ?? []) as { slug: string; body: string | null }[]) bodyBySlug.set(b.slug, b.body ?? "");
+  }
+
+  return [
+    ...own.map((a) => ({
+      href: `/research/community/${a.slug}`,
+      title: a.title,
+      teaser: articleTeaser(a.summary, bodyBySlug.get(a.slug)),
+      topic: a.topic,
+    })),
+    ...guest,
+  ];
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
@@ -269,7 +308,7 @@ export default async function TherapistProfilePage({
 
   const unavailable = therapistRow.accepting_new_patients === false;
   const [articles, similar, affiliatedCenter] = await Promise.all([
-    getTherapistArticles(id),
+    getTherapistArticles(id, therapistRow.full_name),
     unavailable ? getSimilarTherapists(therapistRow) : Promise.resolve([]),
     getAffiliatedCenter(therapistRow.center_account_id),
   ]);
@@ -552,34 +591,19 @@ export default async function TherapistProfilePage({
             </Accordion>
           )}
 
-          {/* Guest articles this therapist wrote that live as editorial pages
-              (not therapist_articles rows) - see GUEST_ARTICLES_BY_THERAPIST. */}
-          {(GUEST_ARTICLES_BY_THERAPIST[id] ?? []).length > 0 && (
-            <section>
-              <SectionTitle>מאמרים מאת {name}</SectionTitle>
-              <div className="space-y-3">
-                {(GUEST_ARTICLES_BY_THERAPIST[id] ?? []).map((art) => (
-                  <Link key={art.href} href={art.href}
-                    className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
-                    <h3 className="font-bold text-stone-900 text-[15px]">{art.title}</h3>
-                    <p className="mt-1 text-sm text-stone-500 leading-6">{art.desc}</p>
-                  </Link>
-                ))}
-              </div>
-            </section>
-          )}
-
-          {/* Articles written by / attributed to this therapist */}
+          {/* Articles this therapist wrote: community pieces and editorial guest
+              pages, in one section (see getTherapistArticles). */}
           {articles.length > 0 && (
             <section>
               <SectionTitle>מאמרים מאת {name}</SectionTitle>
               <div className="space-y-3">
                 {articles.map((art) => (
-                  <Link key={art.slug} href={`/research/community/${art.slug}`}
+                  <Link key={art.href} href={art.href}
                     className="block rounded-2xl border border-[#E8E0D8] bg-white p-4 transition hover:shadow-md">
                     {art.topic && <div className="text-xs font-bold text-[#2e7d8c] mb-1">{art.topic}</div>}
                     <h3 className="font-bold text-stone-900 text-[15px]">{art.title}</h3>
-                    {art.summary && <p className="mt-1 text-sm text-stone-500 leading-6 line-clamp-2">{art.summary}</p>}
+                    {art.teaser && <p className="mt-1 text-sm text-stone-500 leading-6 line-clamp-2">{art.teaser}</p>}
+                    <span className="mt-2 inline-block text-[13px] font-semibold text-[#2e7d8c]">לקריאת המאמר ←</span>
                   </Link>
                 ))}
               </div>
