@@ -97,11 +97,11 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/research/therapy-types": { date: "2026-09-22", sources: ["app/research/therapy-types/page.tsx"] },
   "/research/topic/[topic]": { date: "2026-09-22", sources: ["app/research/topic/[topic]/page.tsx", "app/lib/article-taxonomy.ts"] },
   "/research/which-therapy": { date: "2026-09-22", sources: ["app/research/which-therapy/page.tsx"] },
-  "/about": { date: "2026-09-10", sources: ["app/about/page.tsx"] },
+  "/about": { date: "2026-09-30", sources: ["app/about/page.tsx", "app/lib/team.ts"] },
   "/accessibility": { date: "2026-07-26", sources: ["app/accessibility/page.tsx"] },
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-09-25", sources: ["app/developers/page.tsx"] },
-  "/counselors": { date: "2026-09-25", sources: ["app/counselors/page.tsx"] },
+  "/counselors": { date: "2026-09-30", sources: ["app/counselors/page.tsx", "app/lib/team.ts"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
 };

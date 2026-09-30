@@ -1,69 +1,19 @@
 import Image from "next/image";
 import type { Metadata } from "next";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import { team } from "@/app/lib/team";
 
 export const metadata: Metadata = {
   title: "מי אנחנו",
   description: "הכירו את הצוות מאחורי טיפול חכם - מערכת הכוונה טיפולית מבוססת מחקר שפותחה על ידי פסיכולוגים קליניים, לעזור לכם למצוא את המטפל הנכון.",
 };
 
-type TeamMember = {
-  name: string;
-  role: string;
-  img: string;
-  bullets: string[];
-};
-
-const team: TeamMember[] = [
-  {
-    name: 'ד"ר אבשלום גליל',
-    role: 'מייסד ויו״ר החברה',
-    img: "/team/avshalom.jpg",
-    bullets: [
-      "פסיכולוג קליני וחינוכי – מומחה מדריך",
-      "דוקטורט בפסיכולוגיה קלינית ומדעי המוח (אוניברסיטת בר-אילן)",
-      "מרצה וחוקר באוניברסיטת אריאל, במגמה הקלינית והתעסוקתית",
-      "מרצה לאבחון והערכה במוסדות אקדמאיים",
-    ],
-  },
-  {
-    name: "גונן שש",
-    role: "חבר הצוות המקצועי המפתח",
-    img: "/team/gonen.jpg",
-    bullets: ["פסיכולוג קליני מומחה", "מרצה בתחום האבחון הפסיכולוגי", "פסיכולוג מאבחן במגזר הפרטי והציבורי"],
-  },
-  {
-    name: "שילת יוגב",
-    role: "חברת הצוות המקצועי המפתח",
-    img: "/team/shilat.jpeg",
-    bullets: ["מנהלת מרכז טיפולי לילדים ומבוגרים במשך כעשור", "פיזיותרפיסטית ילדים"],
-  },
-  {
-    name: "יוחאי ברוקנר",
-    role: "חבר הצוות המקצועי המפתח",
-    img: "/team/yochai.jpg",
-    bullets: [
-      "פסיכולוג בהתמחות חינוכית ותעסוקתית",
-      "בעל ניסיון בתחום היזמות החברתית",
-    ],
-  },
-  {
-    name: "עומר סבו",
-    role: "רכזת פיתוח ומחקר",
-    img: "/team/omer.jpeg",
-    bullets: [
-      "סטודנטית לתואר שני בפסיכולוגיה התפתחותית",
-      "ניסיון בעולמות הסטארטאפ ויזמות חברתית",
-      "היכרות מעמיקה עם עולם הטיפול",
-    ],
-  },
-];
-
 const BASE = "https://www.mentalytics.co.il";
 
 /**
- * AboutPage + Person entities, built FROM the `team` array above - never
- * restated by hand, so the schema cannot drift from what the page displays.
+ * AboutPage + Person entities, built FROM the shared `team` list
+ * (app/lib/team.ts) - never restated by hand, so the schema cannot drift from
+ * what the page displays.
  *
  * Why this exists: a therapy-matching site is squarely YMYL, where Google
  * weighs who stands behind the advice. The credentials were already on the

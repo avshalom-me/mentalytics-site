@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { shareMetadata } from "@/app/lib/share-metadata";
+import { team } from "@/app/lib/team";
 import PageViewTracker from "@/app/components/PageViewTracker";
 
 /**
@@ -32,6 +34,10 @@ export const metadata: Metadata = {
   }),
 };
 
+// Who developed the questionnaire, in the owner's words. Used twice - under the
+// button and in "על מה זה מבוסס" - so the two cannot drift apart.
+const BUILT_BY = "פסיכולוגים חינוכיים וקליניים יחד עם חוקרים בתחום פסיכולוגיה ומדעי המוח";
+
 const OUTPUTS = [
   {
     title: "מוקד הקושי, לפי מסלול",
@@ -39,7 +45,7 @@ const OUTPUTS = [
   },
   {
     title: "הפניה מנומקת, עם הסבר",
-    body: "לכל ממצא מוצע סוג הטיפול או האבחון המתאים לו, עם הסבר קצר למה דווקא הוא. אפשר גם לחפש מטפלים באזור - הרשימה נועדה להעברה להורים, והבחירה נשארת שלהם.",
+    body: "לכל ממצא מוצע סוג הטיפול או האבחון המתאים לו, עם הסבר קצר למה דווקא הוא. ההמלצות מכסות מגוון רחב של מענים: פסיכולוגיה וטיפול, ריפוי בעיסוק, קלינאות תקשורת, הוראה מתקנת, פיזיותרפיה ועוד. אפשר גם לחפש מטפלים באזור - הרשימה נועדה להעברה להורים, והבחירה נשארת שלהם.",
   },
   {
     title: "מפת הוועדות, עם התאריכים שלך",
@@ -103,6 +109,33 @@ export default function CounselorsPage() {
           </Link>
           <span className="text-sm" style={{ color: "var(--muted)" }}>בחינם · בלי הרשמה · בלי פרטים מזהים</span>
         </div>
+
+        {/* Who is behind it. Right under the button, because it is the next thing a
+            counsellor asks before opening a tool that will suggest a referral.
+            One credential each, taken from the list /about is built from. */}
+        <div className="mt-12 pt-8" style={{ borderTop: "1px solid var(--line)" }}>
+          <p className="text-sm font-bold" style={{ color: "var(--teal)" }}>מי בנה את השאלון</p>
+          <p className="mt-2 leading-relaxed" style={{ color: "var(--text-2)" }}>
+            השאלון נבנה על ידי אנשי מקצוע במשך מספר שנים: {BUILT_BY}.
+          </p>
+          <ul className="mt-5 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+            {team.map((m) => (
+              <li key={m.name} className="flex items-center gap-3">
+                <span
+                  className="relative h-12 w-12 flex-shrink-0 overflow-hidden rounded-full"
+                  style={{ border: "1px solid var(--line)", background: "var(--surface)" }}
+                >
+                  {/* Some of the photos are tall portraits: aim the crop at the face, not the middle. */}
+                  <Image src={m.img} alt="" fill sizes="48px" className="object-cover" style={{ objectPosition: "50% 25%" }} />
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-sm font-extrabold" style={{ color: "var(--text)" }}>{m.name}</span>
+                  <span className="block text-[13px] leading-snug" style={{ color: "var(--text-2)" }}>{m.bullets[0]}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </section>
 
       {/* What comes out of it */}
@@ -125,7 +158,7 @@ export default function CounselorsPage() {
         <h2 className="text-2xl font-black sm:text-3xl" style={{ color: "var(--text)" }}>על מה זה מבוסס</h2>
         <div className="mt-6 space-y-4 leading-relaxed" style={{ color: "var(--text-2)" }}>
           <p>
-            זהו שאלון ההפניה של טיפול חכם לילדים ולנוער - שאלון אדפטיבי שפותח על ידי פסיכולוג קליני, שהורים ממלאים על ילדיהם -
+            זהו שאלון ההפניה של טיפול חכם לילדים ולנוער - שאלון אדפטיבי שהורים ממלאים על ילדיהם, שפותח על ידי {BUILT_BY} -
             מנקודת המבט של בית הספר. אותם תחומים ואותה הסתעפות, ובכל תחום נוספות שאלות על מה שרואים בכיתה: ביקור סדיר,
             התארגנות, ויסות, מעמד חברתי והצקות, ותגובה לתמיכה שכבר ניתנה. לפני הדוח מסך אחד שמדייק את ההפניה - מה כבר נוסה
             בבית הספר, מה כבר יש בתיק, ואילו ועדות התקיימו.
