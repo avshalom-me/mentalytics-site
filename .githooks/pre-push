@@ -35,6 +35,14 @@ echo "✓ tests passed"
 echo "pre-push: node scripts/check-page-revised.mjs ..."
 node scripts/check-page-revised.mjs
 status=$?
+# Exit 2 is the script refusing to date anything from a shallow clone. Nothing
+# was found stale, so do not say it was - that claim is what sends people to
+# change dates that are correct.
+if [ $status -eq 2 ]; then
+  echo ""
+  echo "❌ Sitemap revision dates could not be checked — push aborted. See above."
+  exit $status
+fi
 if [ $status -ne 0 ]; then
   echo ""
   echo "❌ Sitemap revision dates are stale — push aborted. See above."
