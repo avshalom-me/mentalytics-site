@@ -388,7 +388,7 @@ Sumit לא דוחפים webhooks לאירועי תשלום ישירות. הם כ
 | F3 | מטפל manually_promoted לא יכול לעבור לתשלום אמיתי (`create-subscription` חוסם כל `status='paying'` בלי לבדוק `manually_promoted`). זו התנהגות מכוונת (לא לתקן — מטפל מקודם לא אמור לשלם). | 🟢 |
 | F4 | ✅ **נפתר (17/6/26):** מיילים אוטומטיים פעילים — קידום/הורדה/ברוכים-הבאים/דחייה + התראת אדמין על הוראת קבע יתומה. | ✅ |
 | F5 | Rate limit `new Map()` לא עמיד ב-cold start של Vercel serverless. לעבור ל-Vercel KV / Supabase counter בעתיד. | 🟡 |
-| F6 | סיסמת אדמין `naomi2026` חלשה. לעבור ל-Supabase Auth עם role בעתיד. | 🟠 |
+| F6 | סיסמת האדמין חלשה. לעבור ל-Supabase Auth עם role בעתיד. | 🟠 |
 | F7 | שמות עמודות `morning_token_id` ו-`morning_document_id` שורדים מהאינטגרציה הישנה. אפשר לבצע migration לשמות עם `sumit_*` בעתיד. | 🟡 |
 
 ---
