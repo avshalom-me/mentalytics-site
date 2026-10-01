@@ -1,0 +1,523 @@
+{
+  "page:p-acad|ag": [
+    "noa-3",
+    "ella-2",
+    "ben-3"
+  ],
+  "page:p-acad|dv": [
+    "yoav-5",
+    "mika-6",
+    "tal-6"
+  ],
+  "page:p-acad|gan": [
+    "gan-language",
+    "gan-autism",
+    "gan-chova-eligible"
+  ],
+  "page:p-acad|tyb": [
+    "maya-10",
+    "yael-12",
+    "amit-10"
+  ],
+  "page:p-acad|zh": [
+    "noam-8"
+  ],
+  "page:p-aq": [
+    "noam-8",
+    "maya-10",
+    "itai-1",
+    "shira-4"
+  ],
+  "page:p-areas|gan": [
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional",
+    "gan-chova-eligible"
+  ],
+  "page:p-areas|school": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "page:p-areas|toddler": [
+    "gan-toddler",
+    "gan-rehab"
+  ],
+  "page:p-beh": [
+    "yoav-5",
+    "omer-9",
+    "gan-toddler",
+    "gan-autism"
+  ],
+  "page:p-bq": [
+    "maya-10",
+    "omer-9"
+  ],
+  "page:p-consent": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "page:p-demo|gan": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional"
+  ],
+  "page:p-demo|school": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "page:p-dev-sensory": [
+    "itai-1",
+    "gan-toddler",
+    "gan-autism",
+    "gan-chova-eligible"
+  ],
+  "page:p-dev-toilet": [
+    "itai-1",
+    "adam-2",
+    "gan-toddler",
+    "gan-autism"
+  ],
+  "page:p-docs|gan": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional"
+  ],
+  "page:p-docs|school": [
+    "noam-8",
+    "maya-10",
+    "dana-11",
+    "omer-9"
+  ],
+  "page:p-emo-intro|gan": [
+    "gan-chova-emotional",
+    "gan-pending"
+  ],
+  "page:p-emo-intro|school": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-eq|o12": [
+    "dana-11"
+  ],
+  "page:p-eq|u12": [
+    "mika-6"
+  ],
+  "page:p-mq": [
+    "dana-11",
+    "shira-4"
+  ],
+  "page:p-mq-sui": [
+    "dana-11",
+    "shira-4"
+  ],
+  "page:p-oq": [
+    "lior-7",
+    "shira-4"
+  ],
+  "page:p-pq": [
+    "yael-12"
+  ],
+  "page:p-q1": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q1-pain": [
+    "noam-8",
+    "maya-10",
+    "itai-1",
+    "shira-4"
+  ],
+  "page:p-q10": [
+    "roni-8",
+    "gili-5"
+  ],
+  "page:p-q10-par": [
+    "gili-5"
+  ],
+  "page:p-q2": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q3": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q4": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q4-b": [
+    "omer-9"
+  ],
+  "page:p-q4-ctrl": [
+    "mika-6"
+  ],
+  "page:p-q4-g": [
+    "omer-9",
+    "mika-6"
+  ],
+  "page:p-q4-s": [
+    "omer-9"
+  ],
+  "page:p-q4-types": [
+    "omer-9",
+    "mika-6"
+  ],
+  "page:p-q5": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q6": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q7": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q8": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q9": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "itai-1"
+  ],
+  "page:p-q9-adhd": [
+    "yoav-5"
+  ],
+  "page:p-refine|gan": [
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional",
+    "gan-chova-eligible"
+  ],
+  "page:p-refine|school": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "page:p-refine|toddler": [
+    "gan-toddler",
+    "gan-rehab"
+  ],
+  "page:p-result|gan": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional"
+  ],
+  "page:p-result|school": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "page:p-soc": [
+    "yoav-5",
+    "lior-7",
+    "roni-8",
+    "gili-5"
+  ],
+  "page:p-tq": [
+    "adam-2"
+  ],
+  "page:p-traits|bv": [
+    "yoav-5",
+    "shira-4",
+    "mika-6",
+    "tal-6"
+  ],
+  "page:p-traits|ga": [
+    "itai-1",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional"
+  ],
+  "page:p-traits|zy": [
+    "maya-10",
+    "lior-7"
+  ],
+  "ref:CBT": [
+    "maya-10",
+    "lior-7",
+    "omer-9",
+    "shira-4"
+  ],
+  "ref:CPT": [
+    "adam-2"
+  ],
+  "ref:DBT": [
+    "omer-9"
+  ],
+  "ref:EMDR": [
+    "adam-2"
+  ],
+  "ref:דיאטנ/ית קליני/ת": [
+    "dana-11",
+    "mika-6"
+  ],
+  "ref:הדרכת הורים": [
+    "mika-6",
+    "gili-5",
+    "gan-pending"
+  ],
+  "ref:הדרכת הורים טיפולית": [
+    "gan-pending"
+  ],
+  "ref:הוראה מתקנת": [
+    "yoav-5",
+    "noa-3",
+    "ella-2",
+    "mika-6"
+  ],
+  "ref:טיפול COG-FUN לקשיי קשב וריכוז": [
+    "noam-8",
+    "yoav-5",
+    "yael-12",
+    "ben-3"
+  ],
+  "ref:טיפול בהבעה ויצירה": [
+    "itai-1"
+  ],
+  "ref:טיפול בהפרעות אכילה": [
+    "dana-11",
+    "mika-6"
+  ],
+  "ref:טיפול דינאמי": [
+    "noam-8",
+    "lior-7",
+    "dana-11",
+    "adam-2"
+  ],
+  "ref:יועצת בית ספר": [
+    "noam-8",
+    "amit-10"
+  ],
+  "ref:נוירולוג קשב": [
+    "noam-8",
+    "yoav-5",
+    "tal-6",
+    "yael-12"
+  ],
+  "ref:נמצאו סימני קושי בתקשורת - מומלץ להיוועץ עם יועצת/פסיכולוג": [
+    "gan-language"
+  ],
+  "ref:פיזיותרפיה רצפת אגן": [
+    "itai-1",
+    "adam-2",
+    "gan-toddler",
+    "gan-chova-eligible"
+  ],
+  "ref:פנייה לתוכנית ההתנהגותית במסגרת": [
+    "omer-9"
+  ],
+  "ref:פסיכו-דידקטי": [
+    "noam-8",
+    "maya-10",
+    "ella-2",
+    "mika-6"
+  ],
+  "ref:פסיכולוג מסגרת": [
+    "gan-language"
+  ],
+  "ref:פסיכיאטר ילדים": [
+    "dana-11",
+    "omer-9",
+    "yael-12"
+  ],
+  "ref:קבוצה חברתית": [
+    "lior-7"
+  ],
+  "ref:קלינאות תקשורת": [
+    "noa-3",
+    "gan-language"
+  ],
+  "ref:רופא משפחה": [
+    "dana-11"
+  ],
+  "ref:ריפוי בעיסוק": [
+    "yoav-5",
+    "itai-1",
+    "ella-2",
+    "tal-6"
+  ],
+  "ref:תוכנית התנהגותית": [
+    "yoav-5",
+    "omer-9",
+    "gan-toddler",
+    "gan-autism"
+  ],
+  "ref:תוכנית חיזוקים": [
+    "tal-6",
+    "ben-3"
+  ],
+  "tip:gan:bully_perp": [
+    "gan-toddler"
+  ],
+  "tip:gan:bully_perp_known": [
+    "gan-behavior"
+  ],
+  "tip:gan:bully_victim": [
+    "gan-autism"
+  ],
+  "tip:gan:bully_victim_known": [
+    "gan-language"
+  ],
+  "tip:gan:change": [
+    "gan-pending"
+  ],
+  "tip:gan:isolation": [
+    "gan-autism"
+  ],
+  "tip:gan:regulation": [
+    "gan-toddler",
+    "gan-autism",
+    "gan-behavior"
+  ],
+  "tip:school:bully_perp": [
+    "yoav-5"
+  ],
+  "tip:school:bully_perp_known": [
+    "omer-9"
+  ],
+  "tip:school:bully_victim": [
+    "roni-8"
+  ],
+  "tip:school:bully_victim_known": [
+    "lior-7"
+  ],
+  "tip:school:change": [
+    "maya-10",
+    "itai-1",
+    "dana-11",
+    "adam-2"
+  ],
+  "tip:school:isolation": [
+    "lior-7"
+  ],
+  "tip:school:org": [
+    "noam-8",
+    "yoav-5",
+    "noa-3",
+    "tal-6"
+  ],
+  "tip:school:regulation": [
+    "yoav-5",
+    "omer-9"
+  ],
+  "track:gan:assessment": [
+    "gan-chova-emotional"
+  ],
+  "track:gan:btl": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-eligible"
+  ],
+  "track:gan:dev_center": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-eligible"
+  ],
+  "track:gan:exhaustion": [
+    "gan-pending"
+  ],
+  "track:gan:extra_year": [
+    "gan-chova-emotional",
+    "gan-chova-eligible"
+  ],
+  "track:gan:first_grade": [
+    "gan-chova-eligible"
+  ],
+  "track:gan:gan_team": [
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional",
+    "gan-chova-eligible"
+  ],
+  "track:gan:rehab_daycare": [
+    "gan-toddler",
+    "gan-rehab"
+  ],
+  "track:gan:zakaut": [
+    "gan-toddler",
+    "gan-language",
+    "gan-autism",
+    "gan-chova-emotional"
+  ],
+  "track:gan:zakaut_appeal": [
+    "gan-chova-eligible"
+  ],
+  "track:school:assessment": [
+    "noam-8",
+    "maya-10",
+    "omer-9",
+    "adam-2"
+  ],
+  "track:school:attendance": [
+    "maya-10",
+    "dana-11",
+    "omer-9"
+  ],
+  "track:school:exhaustion": [
+    "yoav-5",
+    "noa-3",
+    "itai-1",
+    "lior-7"
+  ],
+  "track:school:hatamot": [
+    "noam-8",
+    "maya-10",
+    "omer-9",
+    "yael-12"
+  ],
+  "track:school:hatamot_appeal": [
+    "dana-11"
+  ],
+  "track:school:school_team": [
+    "noam-8",
+    "maya-10",
+    "yoav-5",
+    "noa-3"
+  ],
+  "track:school:zakaut": [
+    "noam-8",
+    "maya-10",
+    "omer-9",
+    "adam-2"
+  ],
+  "track:school:zakaut_appeal": [
+    "dana-11"
+  ]
+}

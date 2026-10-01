@@ -189,7 +189,7 @@ function LevelRow({ value, onChange }: { value?: Level | Unknown; onChange: (v: 
 }
 function Q({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div data-review-id={`q:${label}`} data-review-label={label}>
       <div className="text-sm font-semibold mb-2" style={{ color: "var(--text)" }}>{label}</div>
       {children}
     </div>
@@ -197,7 +197,7 @@ function Q({ label, children }: { label: string; children: React.ReactNode }) {
 }
 function Box({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
-    <div className="bg-[var(--surface)] rounded-xl p-3 sm:p-5 mt-3 border border-[var(--line)] space-y-4">
+    <div data-review-id={title ? `box:${title}` : undefined} data-review-label={title} className="bg-[var(--surface)] rounded-xl p-3 sm:p-5 mt-3 border border-[var(--line)] space-y-4">
       {title && <div className="text-sm font-bold" style={{ color: "var(--teal-dark)" }}>{title}</div>}
       {children}
     </div>
@@ -207,7 +207,7 @@ function Box({ title, children }: { title?: string; children: React.ReactNode })
 /** The frame around every in-branch counsellor block, so it reads as one voice across the questionnaire. */
 function CounselorBlock({ gan = false, children }: { gan?: boolean; children: React.ReactNode }) {
   return (
-    <div className="mt-5 rounded-xl p-4 space-y-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
+    <div data-review-id="school-block" data-review-label={gan ? "מה רואים בגן" : "מה רואים בבית הספר"} className="mt-5 rounded-xl p-4 space-y-4" style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)" }}>
       <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--teal-dark)" }}>{gan ? "🧸 מה רואים בגן" : "🏫 מה רואים בבית הספר"}</div>
       {children}
     </div>
@@ -411,7 +411,7 @@ export function CounselorSocBlock({ A, setA }: { A: Ans; setA: (a: Ans) => void 
 
 export function CounselorSafetyNotice({ gan = false }: { gan?: boolean }) {
   return (
-    <div className="mt-4 rounded-xl p-4 text-sm leading-relaxed" style={{ background: "#FBEDE9", border: "1px solid #E8C4B8", color: "var(--text)" }}>
+    <div data-review-id="notice:safety" data-review-label="הודעת הבטיחות" className="mt-4 rounded-xl p-4 text-sm leading-relaxed" style={{ background: "#FBEDE9", border: "1px solid #E8C4B8", color: "var(--text)" }}>
       <div className="font-bold mb-1" style={{ color: "#A83B22" }}>נושא בטיחות עלה</div>
       <p>{gan
         ? "לפי הנהלים המחייבים יש ליידע מיד את פסיכולוג/ית הגן ואת המפקח/ת, ולא להשאיר את הילד/ה ללא ליווי. השאלון אינו תחליף להערכת סיכון. אפשר להמשיך במילוי אחרי שהדיווח נעשה."
@@ -790,7 +790,7 @@ function DecisionBox({ d }: { d: NonNullable<SchoolTrack["decision"]> }) {
   const mark = (ok: boolean | null) => (ok === true ? "✓" : ok === false ? "✗" : "?");
   const tone = (ok: boolean | null) => (ok === true ? "var(--teal)" : ok === false ? "#A83B22" : "var(--muted)");
   return (
-    <div className="rounded-xl p-3 mb-3 text-sm" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+    <div data-review-part="decision" className="rounded-xl p-3 mb-3 text-sm" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
       <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שיקולים להכרעה</div>
       <p className="font-bold mb-2 leading-relaxed" style={{ color: "var(--text)" }}>{d.headline}</p>
       <ul className="space-y-1">
@@ -806,33 +806,39 @@ function DecisionBox({ d }: { d: NonNullable<SchoolTrack["decision"]> }) {
   );
 }
 
-function TrackCard({ t }: { t: SchoolTrack }) {
+/**
+ * One station on the map. Exported for the atlas of the review mode, which
+ * lays every card out side by side. The data-review-* attributes here and
+ * elsewhere in this file are what a reviewer note is anchored to, and mean
+ * nothing to anyone else.
+ */
+export function TrackCard({ t }: { t: SchoolTrack }) {
   const s = REL_STYLE[t.relevance];
   return (
-    <div className="rounded-2xl p-4 sm:p-5 border bg-white" style={{ borderColor: "var(--line)" }}>
+    <div data-review-id={`track:${t.key}`} data-review-label={`מסלול: ${t.name}`} className="rounded-2xl p-4 sm:p-5 border bg-white" style={{ borderColor: "var(--line)" }}>
       <div className="flex items-start justify-between gap-3 mb-2">
         <h3 className="text-base font-extrabold" style={{ color: "var(--text)" }}>{t.name}</h3>
         <span className="text-xs font-bold px-3 py-1 rounded-full whitespace-nowrap" style={{ background: s.bg, color: s.fg }}>{RELEVANCE_LABELS[t.relevance]}</span>
       </div>
       {t.decision && <DecisionBox d={t.decision} />}
-      <ul className="text-sm space-y-1 mb-2" style={{ color: "var(--text-2)" }}>{t.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
+      <ul data-review-part="why" className="text-sm space-y-1 mb-2" style={{ color: "var(--text-2)" }}>{t.why.map((w, i) => <li key={i}>{w}</li>)}</ul>
       {t.deadline && (
-        <div className="rounded-xl p-3 text-sm mb-2" style={{ background: s.bg, color: "var(--text)" }}>
+        <div data-review-part="deadline" className="rounded-xl p-3 text-sm mb-2" style={{ background: s.bg, color: "var(--text)" }}>
           <div className="font-bold" style={{ color: s.fg }}>📅 {t.deadline.label}</div>
           {t.deadline.note && <div className="text-xs mt-1" style={{ color: "var(--text-2)" }}>{t.deadline.note}</div>}
         </div>
       )}
       {t.cautions.length > 0 && (
-        <ul className="text-sm space-y-1 mb-2" style={{ color: "#A83B22" }}>{t.cautions.map((c, i) => <li key={i}>⚠️ {c}</li>)}</ul>
+        <ul data-review-part="cautions" className="text-sm space-y-1 mb-2" style={{ color: "#A83B22" }}>{t.cautions.map((c, i) => <li key={i}>⚠️ {c}</li>)}</ul>
       )}
       <details className="text-sm">
         <summary className="cursor-pointer font-semibold" style={{ color: "var(--teal-dark)" }}>צעדים, מסמכים וערר</summary>
         <div className="mt-2 space-y-3" style={{ color: "var(--text-2)" }}>
-          {t.steps.length > 0 && <div><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>צעדים</div><ol className="list-decimal ps-5 space-y-1">{t.steps.map((x, i) => <li key={i}>{x}</li>)}</ol></div>}
-          {t.documents.length > 0 && <div><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>מסמכים</div><ul className="list-disc ps-5 space-y-1">{t.documents.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
-          {t.appeals.length > 0 && <div><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>ערר</div><ul className="list-disc ps-5 space-y-1">{t.appeals.map((a, i) => <li key={i}>על {a.against}: {a.window}, אל {a.to}</li>)}</ul></div>}
+          {t.steps.length > 0 && <div data-review-part="steps"><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>צעדים</div><ol className="list-decimal ps-5 space-y-1">{t.steps.map((x, i) => <li key={i}>{x}</li>)}</ol></div>}
+          {t.documents.length > 0 && <div data-review-part="documents"><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>מסמכים</div><ul className="list-disc ps-5 space-y-1">{t.documents.map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+          {t.appeals.length > 0 && <div data-review-part="appeals"><div className="font-bold text-xs mb-1" style={{ color: "var(--text)" }}>ערר</div><ul className="list-disc ps-5 space-y-1">{t.appeals.map((a, i) => <li key={i}>על {a.against}: {a.window}, אל {a.to}</li>)}</ul></div>}
           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs">{t.officialLinks.map(l => <a key={l.href} href={l.href} target="_blank" rel="noopener noreferrer" className="underline" style={{ color: "var(--teal)" }}>{l.label}</a>)}</div>
-          <div className="text-xs" style={{ color: "var(--muted)" }}>אומת מול: {t.verified}</div>
+          <div data-review-part="verified" className="text-xs" style={{ color: "var(--muted)" }}>אומת מול: {t.verified}</div>
         </div>
       </details>
     </div>
@@ -852,7 +858,7 @@ export function EmotionalAloneNotice({ A }: { A: Ans }) {
   const text = emotionalAloneCaveat(A).trim();
   if (!text) return null;
   return (
-    <div className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+    <div data-review-id="notice:alone" data-review-label="הערה על מילוי בלי ההורים" className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
       {text}
     </div>
   );
@@ -862,7 +868,7 @@ export function UnknownNotice({ A }: { A: Ans }) {
   const n = unknownCount(A);
   if (n === 0) return null;
   return (
-    <div className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
+    <div data-review-id="notice:unknown" data-review-label="הודעה על פריטים שסומנו לא ידוע" className="rounded-xl p-3 text-sm leading-relaxed" style={{ background: "var(--gold-pale)", border: "1px solid var(--line)", color: "var(--text)" }}>
       סימנת <strong>{n === 1 ? "פריט אחד" : `${n} פריטים`}</strong> כ&quot;לא ידוע&quot;. הממצאים למטה מבוססים על מה שכן נמסר,
       ופריט שלא היה לך מידע עליו נספר כאילו הקושי אינו קיים. לכן היעדר ממצא בתחום שלא הכרת אינו אומר שאין שם קושי -
       אם התחום רלוונטי, כדאי להשלים את המידע עם ההורים ולמלא שוב.
@@ -890,7 +896,7 @@ function GanMap({ A, grade, tracks, today }: { A: Ans; grade: GanGrade; tracks: 
       </StepHint>
       {A.q3_sui === "כן" && <CounselorSafetyNotice gan />}
       {!onlyTeam && tracks.length > 0 && (
-        <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
+        <div id="school-graphs" data-review-id="map" data-review-label="תרשים המסלולים וציר השנה" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
           <GanTrackFlow grade={grade} tracks={tracks} />
           <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
             <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
@@ -991,7 +997,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
         {directions.length > 0 && tracks.length > 0 && (
           // id: the PDF clones this box - the diagram and the timeline are the
           // one part of the report that is a picture rather than text.
-          <div id="school-graphs" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
+          <div id="school-graphs" data-review-id="map" data-review-label="תרשים המסלולים וציר השנה" className="rounded-2xl p-4 sm:p-5 mb-4 bg-white border" style={{ borderColor: "var(--line)" }}>
             <TrackFlow tracks={tracks} showHatamot={isSchoolGrade(f._grade) && hatamotApplies(f._grade)} />
             <div className="mt-6 pt-4" style={{ borderTop: "1px solid var(--line)" }}>
               <div className="text-xs font-bold mb-1" style={{ color: "var(--muted)" }}>שנת הלימודים {schoolYear(today).label}</div>
@@ -1010,7 +1016,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
           <StepHint>{gan ? "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בגן." : "לצד ההפניה ולא במקומה, לפי מה שדיווחת שנצפה בכיתה."}</StepHint>
           <div className="space-y-3">
             {tips.map(t => (
-              <div key={t.key} className="rounded-2xl p-4 border bg-white" style={{ borderColor: "var(--line)" }}>
+              <div key={t.key} data-review-id={`tip:${t.key}`} data-review-label={`כלי לצוות: ${t.title}`} className="rounded-2xl p-4 border bg-white" style={{ borderColor: "var(--line)" }}>
                 <div className="text-sm font-extrabold mb-1" style={{ color: "var(--text)" }}>{t.title}</div>
                 <p className="text-sm leading-relaxed" style={{ color: "var(--text-2)" }}>{t.lines[0]} {t.lines[1]}</p>
               </div>
@@ -1036,7 +1042,7 @@ export function CounselorAddendum({ A, domains }: { A: Ans; domains: { label: st
             {copied === "ok" ? "הועתק ✓" : copied === "fail" ? "ההעתקה נכשלה - סמני והעתיקי ידנית" : "העתקת הסיכום"}
           </button>
         </div>
-        <pre dir="rtl" className="whitespace-pre-wrap rounded-2xl p-4 sm:p-5 text-sm leading-relaxed bg-white border font-[inherit]" style={{ borderColor: "var(--line)", color: "var(--text)" }}>{summary.text}</pre>
+        <pre dir="rtl" data-review-id="summary" data-review-label="הדוח לתיק" className="whitespace-pre-wrap rounded-2xl p-4 sm:p-5 text-sm leading-relaxed bg-white border font-[inherit]" style={{ borderColor: "var(--line)", color: "var(--text)" }}>{summary.text}</pre>
       </div>
     </div>
   );

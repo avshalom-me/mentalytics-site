@@ -60,6 +60,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin/articles", label: "מאמרים", icon: "📝" },
       { href: "/admin/reports", label: "דוחות", icon: "📬" },
+      { href: "/admin/school-review", label: "ביקורת שאלון היועצות", icon: "🔎" },
     ],
   },
 ];

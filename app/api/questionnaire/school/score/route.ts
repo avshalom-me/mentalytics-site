@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoreKidsQuestionnaire } from "@/app/lib/kids-score.server";
 import { bumpAndCheckIpDaily, getIp } from "@/app/lib/usage";
+import { isActiveReviewToken } from "@/app/lib/school-review.server";
 
 // The counsellor rubric scores with the kids engine, free of the parent
 // paywall: a counsellor works through a caseload, and a referral channel is
@@ -13,7 +14,13 @@ export async function POST(request: NextRequest) {
     if (!body || typeof body !== "object") {
       return NextResponse.json({ ok: false, error: "Invalid request body" }, { status: 400 });
     }
-    if (!(await bumpAndCheckIpDaily(getIp(request)))) {
+    // A reviewer in the review mode opens two dozen prepared cases in a
+    // sitting and re-scores each time an answer is changed, which is the daily
+    // cap of a whole office. The token in their personal link lifts the cap for
+    // them and for nobody else; a request without one never reaches the
+    // database to ask.
+    const reviewing = await isActiveReviewToken((body as Record<string, unknown>)._reviewToken);
+    if (!reviewing && !(await bumpAndCheckIpDaily(getIp(request)))) {
       return NextResponse.json({ ok: false, error: "Daily limit reached" }, { status: 429 });
     }
     const result = scoreKidsQuestionnaire(body);

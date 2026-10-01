@@ -79,6 +79,14 @@ import { ob, sb, so, cb, soUnknown, UnknownCellLabel, EQUAL_ROW_STYLE, Card, Ste
 import { isUnknown, markUnknown, markKnown, sw, fillMissing, traitKeys, fillTraits, scoringKey } from "./quiz-logic";
 import { isGanGrade } from "@/app/lib/gan-tracks";
 import { formatDateHe, israelToday } from "@/app/lib/school-tracks";
+import dynamic from "next/dynamic";
+import { reviewActive, reviewToken } from "./review/session";
+
+// The review mode of /school: a layer for a professional reviewer, on top of
+// the questionnaire (app/kids/review). Loaded only when a reviewer opened their
+// personal link, so a counsellor never downloads it and a parent cannot reach
+// it at all.
+const ReviewLayer = dynamic(() => import("./review/ReviewLayer"), { ssr: false });
 // ── Age/grade mismatch helper ─────────────────────────────────────────────────
 const GRADE_AGE: Record<string, [number, number]> = {
   "פעוט":[1,2],"גן3":[3,3],"גן-טרום":[4,4],"גן":[5,6],
@@ -2820,7 +2828,7 @@ function GroupCard({
     : "text-[var(--teal)]";
 
   return (
-    <div className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[var(--teal)]" : ""}`}>
+    <div data-review-id={`finding:${group.treatmentKey}`} data-review-label={`${group.domainLabel} · ${group.treatmentLabel}`} className={`rounded-2xl border p-5 mb-3 ${accent} ${selected ? "ring-2 ring-[var(--teal)]" : ""}`}>
       <div className={`mb-1 text-[10px] font-bold uppercase tracking-wider ${labelTone}`}>
         {group.domainLabel}
         {group.urgent && " ⚠️"}
@@ -2898,7 +2906,7 @@ function GroupCard({
       )}
 
       {explanation && (
-        <div className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
+        <div data-review-part="explain" className="mt-3 rounded-xl border border-violet-200 bg-gradient-to-br from-violet-50 to-fuchsia-50 p-3 text-right">
           <p className="text-xs font-bold text-violet-900 mb-2">✦ {explanation.title}</p>
           <p className="text-xs text-gray-700 mb-2 leading-relaxed whitespace-pre-line">{explanation.explanation}</p>
           <p className="text-[10px] text-gray-400 mb-3">{explanation.evidence_note}</p>
@@ -3590,7 +3598,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           const combinedALabels = uniq(b.assessments.map(g => g.treatmentLabel));
 
           return (
-            <section key={b.key} className="mt-7">
+            <section key={b.key} data-review-id={`domain:${b.key}`} data-review-label={b.label} className="mt-7">
               <div className="flex items-center gap-2 mb-3">
                 <div className="h-px flex-1 bg-gray-200" />
                 <span className="text-sm font-bold text-[var(--teal-dark)] px-3 py-1 rounded-full bg-[var(--teal-pale)] border border-[var(--teal-mid)] whitespace-nowrap">
@@ -3603,6 +3611,8 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
               {b.standaloneWarnings.map((w, i) => (
                 <div
                   key={`w-${i}`}
+                  data-review-id={`warning:${b.key}`}
+                  data-review-label={`${b.label} · אזהרה`}
                   className={`mb-3 rounded-xl border p-4 text-sm leading-relaxed ${
                     w.urgent
                       ? "border-red-400 bg-red-50 text-red-900"
@@ -3836,7 +3846,17 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
   // is judged by without anything having changed for a parent.
   const quizType = audience === "counselor" ? ("school" as const) : ("kids" as const);
 
+  // A reviewer going over the questionnaire is not a counsellor at work:
+  // nothing they open is counted or recorded for research, and the layer they
+  // work in is mounted for them alone. reviewActive() is read where it
+  // matters rather than held in state, so the very first step event - fired
+  // before any state could be set - is already left out.
+  const inReview = () => audience === "counselor" && reviewActive();
+  const [reviewing, setReviewing] = useState(false);
+  useEffect(() => { if (inReview()) setReviewing(true); }, [audience]);
+
   useEffect(() => {
+    if (inReview()) return;
     const idx = PAGES.indexOf(step as typeof PAGES[number]);
     const pct = idx >= 0 ? Math.round(((idx + 1) / PAGES.length) * 100) : 0;
     (window as any).gtag?.("event", "quiz_step", { quiz_type: quizType, step, progress: pct });
@@ -3984,7 +4004,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       // The cost is that the domain profile is not available yet, so kids
       // events carry the demographic facts only - the treatment side of the
       // question is answered by the adults flow, which scores before it fires.
-      trackQuizComplete(quizType, {
+      if (!inReview()) trackQuizComplete(quizType, {
         issue: "child",
         age_band: "child",
         gender: A.gender === "זכר" ? "m" : A.gender === "נקבה" ? "f" : null,
@@ -4005,6 +4025,8 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
    * re-sent the same result as if it were a new questionnaire.
    */
   function recordKidsResult(answers: Ans, scored: KidsScoreResult, algo: string | null) {
+    // An invented case opened by a reviewer is not a questionnaire result.
+    if (inReview()) return;
     const DOMAINS = ["emotional", "academic", "developmental", "behavioral", "social"] as const;
     const AREA_KEY: Record<(typeof DOMAINS)[number], string> = {
       emotional: "a_emo", academic: "a_aca", developmental: "a_dev", behavioral: "a_beh", social: "a_soc",
@@ -4051,7 +4073,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       const r = await fetch(audience === "counselor" ? "/api/questionnaire/school/score" : "/api/questionnaire/kids/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...answers, _fp: fp, _staffToken: staffToken }),
+        body: JSON.stringify({ ...answers, _fp: fp, _staffToken: staffToken, _reviewToken: inReview() ? reviewToken() ?? undefined : undefined }),
       });
       if (r.status === 402) { setPaymentRequired(true); return; }
       if (!r.ok) throw new Error();
@@ -4143,6 +4165,29 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     pushScreen();
     setStep(d.step);
     setCanGoBack(d.step !== PAGES[0]);
+  }
+
+  // The review layer's two ways into the questionnaire: open a prepared state
+  // on a screen, or move to a screen with the answers as they are. Opening a
+  // state detaches any draft, so a reviewer's case can never overwrite one.
+  function reviewLoad(answers: Ans, to: string) {
+    setDraftId(null);
+    setA(answers);
+    setKidsScore(null);
+    scoredFor.current = null;
+    setScoreError(false);
+    pushScreen();
+    setStep(to);
+    setCanGoBack(to !== PAGES[0]);
+    // The scoring is started by the step changing; opening a second case onto
+    // the screen already showing changes no step, so it is started here.
+    if (to === "p-result" || to === "p-refine") fetchScore(answers);
+  }
+  function reviewJump(to: string) {
+    if (to === step) return;
+    pushScreen();
+    setStep(to);
+    setCanGoBack(to !== PAGES[0]);
   }
 
   const progress = Math.round(((PAGES.indexOf(step as PageId) + 1) / PAGES.length) * 100);
@@ -4267,6 +4312,8 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       {step === "p-docs"         && <PageDocs       {...pageProps} />}
 
       {step === "p-result" && <PageResult A={A} score={kidsScore} scoreError={scoreError} audience={audience} onRetryScore={()=>fetchScore(A)} onRestart={()=>{ setA({}); setStep("p-consent"); setKidsScore(null); scoredFor.current = null; setDraftId(null); }} />}
+
+      {reviewing && <ReviewLayer bridge={{ step, A, score: kidsScore, scoreError, load: reviewLoad, jump: reviewJump, setA }} />}
     </main>
   );
 }
