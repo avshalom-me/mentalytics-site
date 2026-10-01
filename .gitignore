@@ -56,3 +56,7 @@ docs/sales-centers.pdf
 # GSC service-account key - must never enter the (public) repo
 gsc-sa*.json
 *-service-account*.json
+
+# Python bytecode (scripts/statements, docs/ads-images)
+__pycache__/
+*.pyc
