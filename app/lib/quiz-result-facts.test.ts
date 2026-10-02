@@ -38,7 +38,7 @@ describe("adultResultKeys", () => {
   });
 
   it("reports nothing found as zero recommendations, not as an absent record", () => {
-    expect(adultResultKeys([])).toEqual({ treatments: [], assessments: [], professionals: [], defaultTreatments: [], nRecs: 0 });
+    expect(adultResultKeys([])).toEqual({ treatments: [], assessments: [], professionals: [], teachers: [], defaultTreatments: [], nRecs: 0 });
   });
 });
 
