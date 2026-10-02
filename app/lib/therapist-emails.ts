@@ -829,6 +829,64 @@ export async function sendTherapistCompletionRequestEmail(opts: {
   return { ok: r.ok, error: r.error };
 }
 
+// ── תזכורת אחרונה לנרשמים שלא מילאו את הפרופיל ───────────────────────────
+// נוסח שאושר ע"י המשתמש מילה במילה ב-2/10/2026 (כולל "מאות רבות" ו-7 ימים).
+// המייל מבטיח שני דברים, ושניהם נאכפים בקוד (app/lib/final-signup-reminder.ts):
+//   1. לא יישלחו תזכורות נוספות - final_reminder_sent_at חוסם כל תזכורת השלמה.
+//   2. בעוד 7 ימים ההרשמה נסגרת - signup_archived_at, הפיך ולא מחיקה.
+// לכן אין לשנות כאן את הניסוח בלי לשנות את ההתנהגות, ולהפך.
+// הנמענים האלה לא מילאו שם, ולכן הפנייה היא "שלום," בלי שם.
+export const SIGNUP_FINAL_REMINDER_SUBJECT =
+  "תזכורת אחרונה: הפרופיל שלך בטיפול חכם עדיין לא הושלם";
+
+export function signupFinalReminderHtml(): string {
+  const editUrl = `${SITE_URL}/therapists/dashboard/edit`;
+  const p = (text: string) =>
+    `<p style="margin:0 0 16px;font-size:15px;color:#1a4a5c;">${text}</p>`;
+  return `<!doctype html>
+<html dir="rtl" lang="he">
+  <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
+    <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
+      ${EMAIL_LOGO_HEADER}
+      <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום,</h1>
+      ${p("<strong>זו תזכורת אחרונה מאיתנו בנושא, ולא יישלחו תזכורות נוספות.</strong>")}
+      ${p("נרשמת לטיפול חכם, אבל הפרופיל שלך עדיין לא הושלם, ולכן הוא לא מוצג למטופלים. עכשיו, אחרי החגים, זה זמן טוב להשלים אותו: זו התקופה שבה הרבה אנשים מתחילים לחפש טיפול.")}
+      ${p("באתר כבר רשומים מאות מטפלים, ובכל חודש יש עשרות אלפי חשיפות של כרטיסי מטפלים ומאות רבות של פניות של מטופלים.")}
+      ${p("ההשלמה לוקחת כמה דקות: תיאור קצר, תמונה, תחומי טיפול ותעודה מקצועית. אחרי אישור התעודה הפרופיל עולה למאגר, ללא עלות.")}
+      <div style="text-align:center;margin:6px 0 20px;">
+        <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">להשלמת הפרופיל ←</a>
+      </div>
+      <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
+      ${p("במידה וההרשמה לא רלוונטית עבורך, בעוד 7 ימים נסיר את הפרופיל שלך מהמערכת.")}
+      ${p("צוות טיפול חכם")}
+      <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
+      <p style="margin:0;font-size:12px;color:#888;text-align:center;">
+        לכל שאלה: admin@getmentalytics.com | 055-993-1403<br/>
+        טיפול חכם - Mentalytics
+      </p>
+    </div>
+  </body>
+</html>`;
+}
+
+export async function sendSignupFinalReminderEmail(opts: {
+  to: string;
+}): Promise<{ ok: boolean; skipped?: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    return { ok: false, error: "resend not configured" };
+  }
+  // דרך שער המכסה היומי של מיילים המוניים, כמו כל תזכורת השלמה.
+  const r = await sendBulkEmail({
+    from: FROM,
+    to: opts.to,
+    subject: SIGNUP_FINAL_REMINDER_SUBJECT,
+    html: signupFinalReminderHtml(),
+    replyTo: "admin@getmentalytics.com",
+  });
+  if (!r.ok && !r.skipped) console.error("sendSignupFinalReminderEmail: send error:", r.error);
+  return { ok: r.ok, skipped: r.skipped, error: r.error };
+}
+
 // Admin-triggered personal invitation to write an article for the site in
 // exchange for two months of promoted-tier exposure, free. Explains the offer,
 // links to the article composer in the therapist's personal area, and includes

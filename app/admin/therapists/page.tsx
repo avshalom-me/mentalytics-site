@@ -74,6 +74,8 @@ type AdminTherapist = {
   center_name: string | null;
   missing: string[];
   completion_requested_at: string | null;
+  /** ההרשמה נסגרה שבוע אחרי התזכורת האחרונה (הפיך). ראו app/lib/final-signup-reminder.ts. */
+  signup_archived_at?: string | null;
   profile_updated_at: string | null;
   article_invite_sent_at: string | null;
   accepting_new_patients: boolean;
@@ -1158,8 +1160,11 @@ export default function AdminTherapistsPage() {
     ? []
     : therapists.filter((t) => t.status === "rejected" && !isStub(t)).sort(byLatestActivity);
   const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
+  // הרשמה שנסגרה (שבוע אחרי התזכורת האחרונה, והפרופיל נשאר ריק) יוצאת מהטאב:
+  // אין יותר מה לעשות איתה, והיא רק ניפחה את המונה. היא לא נמחקה - מי שחוזר
+  // וממלא שם כבר אינו isStub, ומופיע מחדש בתור הרגיל.
   const signups = therapists
-    .filter(isStub)
+    .filter((t) => isStub(t) && !t.signup_archived_at)
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
   // Partial profiles: the form WAS saved but required items are still missing
   // (certificate / last name / regions / types / areas — and the optional photo).

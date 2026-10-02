@@ -83,6 +83,10 @@
     {
       "schedule": "30 4 1 * *",
       "path": "/api/cron/agent-budget"
+    },
+    {
+      "schedule": "0 6 * * *",
+      "path": "/api/cron/final-signup-reminder?send=confirm"
     }
   ]
 }

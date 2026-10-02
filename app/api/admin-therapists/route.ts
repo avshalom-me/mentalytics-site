@@ -61,6 +61,7 @@ type TherapistRow = {
   admin_approved: boolean | null;
   created_at: string | null;
   completion_requested_at: string | null;
+  signup_archived_at: string | null;
   profile_updated_at: string | null;
   article_invite_sent_at: string | null;
   center_account_id: string | null;
@@ -138,6 +139,7 @@ async function buildTherapistsResponse(onlyId?: string) {
       admin_approved,
       created_at,
       completion_requested_at,
+      signup_archived_at,
       profile_updated_at,
       article_invite_sent_at,
       center_account_id,
@@ -419,6 +421,7 @@ async function buildTherapistsResponse(onlyId?: string) {
         admin_approved: t.admin_approved ?? false,
         created_at: t.created_at ?? null,
         completion_requested_at: t.completion_requested_at ?? null,
+        signup_archived_at: t.signup_archived_at ?? null,
         profile_updated_at: t.profile_updated_at ?? null,
         article_invite_sent_at: t.article_invite_sent_at ?? null,
         accepting_new_patients: t.accepting_new_patients !== false,
@@ -652,11 +655,21 @@ export async function PATCH(request: Request) {
     if (body.action === "request_completion") {
       const { data: t } = await supabaseAdmin
         .from("therapists")
-        .select("id, full_name, email, profile_photo_path, regions, therapist_types, training_areas")
+        .select("id, full_name, email, profile_photo_path, regions, therapist_types, training_areas, final_reminder_sent_at")
         .eq("id", id)
         .single();
       if (!t) {
         return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
+      }
+      // התזכורת האחרונה (app/lib/final-signup-reminder.ts) מבטיחה במפורש שלא
+      // יישלחו תזכורות נוספות. כל עוד הפרופיל ריק ההבטחה נאכפת גם כאן, כדי
+      // שלחיצה ידנית או "שלח לכולם" לא יפרו אותה. מי שמילא את הפרופיל בינתיים
+      // כבר נמצא בשיחה אחרת איתנו (פרטים חסרים לאישור), ושם פנייה מותרת.
+      if (t.final_reminder_sent_at && !(t.full_name ?? "").trim()) {
+        return NextResponse.json(
+          { ok: false, error: "למטפל/ת הזה/ו נשלחה כבר תזכורת אחרונה, והובטח שלא יישלחו נוספות." },
+          { status: 409 }
+        );
       }
       // מטפל של מרכז: הבקשה מגיעה למרכז, כי המרכז הוא היחיד שיכול לערוך
       // את הפרופיל (ראו therapist-recipient).
