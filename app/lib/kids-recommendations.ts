@@ -10,11 +10,15 @@
 // The transform groups consecutive boxes that share a symptom block, then
 // merges across groups by treatment so identical recommendations collapse.
 
+import { TEACHER_REFERRAL_KEYS, isRemedialTeacherKey } from "./teacher-options";
+
 export type BoxCls = "info" | "warn" | "danger" | "purple" | "ok";
 // isDefault: see the definition in kids-score.server.ts.
 export interface KidsBox { cls: BoxCls; txt: string; isLowStress?: boolean; isDefault?: boolean; }
 
-export type RecKind = "treatment" | "assessment" | "external" | "professional";
+// "teacher" (2/10/2026): המלצה למורה מקצועי/ת - הוראה מתקנת או תגבור. נענית
+// מטבלת המורים (/api/match-teachers), לא ממנוע המטפלים.
+export type RecKind = "treatment" | "assessment" | "external" | "professional" | "teacher";
 
 export interface KidsRecommendation {
   id: string;
@@ -114,6 +118,18 @@ const PROFESSIONAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /דיאטנית קלינית|דיאטנ\/?ית קליני\/?ת/, key: "דיאטנ/ית קליני/ת", label: "דיאטנ/ית קליני/ת" },
 ];
 
+// Teachers (ענף המורים, 2/10/2026): referrals answered from the teachers table.
+// The key carries the subject and the kind of teacher, so the search needs no
+// translation table - see teacherSearchFromKey in teacher-options.ts. Order
+// matters: the subject-specific patterns come before the generic one.
+const TEACHER_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
+  { rx: /הוראה מתקנת[^.\n]*(חשבון|מתמטיקה)/, key: TEACHER_REFERRAL_KEYS.remedialMath, label: "מורה להוראה מתקנת בחשבון" },
+  { rx: /הוראה מתקנת[^.\n]*(קריאה|כתיבה)/, key: TEACHER_REFERRAL_KEYS.remedialReading, label: "מורה להוראה מתקנת בקריאה וכתיבה" },
+  { rx: /הוראה מתקנת/, key: TEACHER_REFERRAL_KEYS.remedialGeneric, label: "הוראה מתקנת" },
+  { rx: /תגבור פרטי במתמטיקה|מורה פרטי\/?ת? למתמטיקה/, key: TEACHER_REFERRAL_KEYS.tutorMath, label: "מורה פרטי/ת למתמטיקה" },
+  { rx: /תגבור פרטי באנגלית|מורה פרטי\/?ת? לאנגלית/, key: TEACHER_REFERRAL_KEYS.tutorEnglish, label: "מורה פרטי/ת לאנגלית" },
+];
+
 // External referrals - clinicians/doctors not in our DB (no search button)
 const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /נוירולוג|רופא ילדים המומחה בקשיי קשב/, key: "נוירולוג קשב", label: "פנייה לנוירולוג / רופא ילדים מומחה בקשיי קשב" },
@@ -129,11 +145,8 @@ const EXTERNAL_PATTERNS: { rx: RegExp; key: string; label: string }[] = [
   { rx: /פסיכולוג קליני/, key: "פסיכולוג קליני", label: "פנייה לפסיכולוג קליני" },
   { rx: /תוכנית התנהגותית/, key: "תוכנית התנהגותית", label: "תוכנית התנהגותית במסגרת החינוכית" },
   { rx: /תוכנית חיזוקים/, key: "תוכנית חיזוקים", label: "תוכנית חיזוקים בית-ספרית" },
-  // External for now: remedial teaching is delivered through the school or a
-  // private tutor, and there are no remedial teachers in the directory yet.
-  // When that supply exists this moves to PROFESSIONAL_PATTERNS so the card can
-  // search for one.
-  { rx: /הוראה מתקנת/, key: "הוראה מתקנת", label: "הוראה מתקנת" },
+  // "הוראה מתקנת" moved to TEACHER_PATTERNS on 2/10/2026: there is a teachers
+  // table now, and the card searches it.
   { rx: /שעות שילוב/, key: "שעות שילוב", label: "בדיקת זכאות לשעות שילוב" },
   { rx: /התאמות.*בגרויות|התאמות במבחנים|התאמות בבחינות/, key: "התאמות בחינה", label: "בדיקת התאמות בבחינות" },
   { rx: /הערכת סיכון/, key: "הערכת סיכון", label: "הערכת סיכון דחופה" },
@@ -168,6 +181,9 @@ function classifyReferral(text: string): { kind: RecKind; key: string; label: st
   // Professional-type patterns must run before TREATMENT_PATTERNS in case of
   // overlapping wording (e.g. "טיפול ע"י דיאטנית").
   for (const p of PROFESSIONAL_PATTERNS) if (p.rx.test(text)) return { kind: "professional", key: p.key, label: p.label };
+  // Teachers before treatments: a remedial-teaching line never names a therapy,
+  // but the generic fallback below must not swallow it as "external" either.
+  for (const p of TEACHER_PATTERNS) if (p.rx.test(text)) return { kind: "teacher", key: p.key, label: p.label };
   // "בדיקת שמיעה אצל קלינאית תקשורת או רופא אא\"ג" נותנת את הקלינאית ככתובת
   // לבדיקה אודיולוגית, לא לטיפול בשפה. EXTERNAL_PATTERNS מכיל בדיוק את ההפניה
   // הזו ("בדיקת שמיעה") אבל רץ אחרי הטיפולים ולכן לא נבדק. כל עוד המפתח לא
@@ -466,6 +482,9 @@ export interface KidsAggregatedRecommendations {
   assessmentLabels: string[];
   professionalKeys: string[];
   professionalLabels: string[];
+  /** ענף המורים: מפתחות כמו "הוראה מתקנת - חשבון" (ראו TEACHER_REFERRAL_KEYS). */
+  teacherKeys: string[];
+  teacherLabels: string[];
 }
 
 export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRecommendations {
@@ -475,6 +494,8 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
   const assessmentLabels = new Map<string, string>();
   const professionalKeys = new Set<string>();
   const professionalLabels = new Map<string, string>();
+  const teacherKeys = new Set<string>();
+  const teacherLabels = new Map<string, string>();
 
   for (const d of domains) {
     for (const g of d.groups) {
@@ -495,6 +516,9 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
       } else if (g.kind === "professional") {
         professionalKeys.add(g.treatmentKey);
         professionalLabels.set(g.treatmentKey, g.treatmentLabel);
+      } else if (g.kind === "teacher") {
+        teacherKeys.add(g.treatmentKey);
+        teacherLabels.set(g.treatmentKey, g.treatmentLabel);
       }
     }
   }
@@ -505,5 +529,23 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
     assessmentLabels: Array.from(assessmentKeys).map(k => assessmentLabels.get(k) || k),
     professionalKeys: Array.from(professionalKeys),
     professionalLabels: Array.from(professionalKeys).map(k => professionalLabels.get(k) || k),
+    teacherKeys: Array.from(teacherKeys),
+    teacherLabels: Array.from(teacherKeys).map(k => teacherLabels.get(k) || k),
   };
+}
+
+/**
+ * The "external" keys the counsellor's tracks engine reads (school-tracks).
+ *
+ * The engine calls dietitian-style referrals "professional" and the tracks
+ * input calls them external - same list, two vocabularies. Remedial teaching
+ * is added under its old generic key: the clinical rule
+ * hatamot.learning_findings_promote (approved 10/9/2026) looks for exactly
+ * "הוראה מתקנת", and until 2/10/2026 that branch could never fire because
+ * externals were dropped before they reached it.
+ */
+export function findingExternalKeys(agg: KidsAggregatedRecommendations): string[] {
+  const keys = [...agg.professionalKeys];
+  if (agg.teacherKeys.some(isRemedialTeacherKey) && !keys.includes("הוראה מתקנת")) keys.push("הוראה מתקנת");
+  return keys;
 }

@@ -17,9 +17,12 @@ import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
 import {
   parseKidsBoxes,
   aggregateForMatch,
+  findingExternalKeys,
   type KidsRecommendationGroup,
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
+import TeacherMatchSection from "./TeacherMatchSection";
+import type { TeacherGradeGroup } from "@/app/lib/teacher-options";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
@@ -2190,7 +2193,8 @@ type KidsMatchResult = {
 type MatchSelection = {
   keys: string[];
   labels: string[];
-  kind: "treatment" | "assessment" | "professional";
+  // "teacher" = ענף המורים: המסך מחליף ל-TeacherMatchSection (טבלת המורים).
+  kind: "treatment" | "assessment" | "professional" | "teacher";
 };
 
 function KidsMatchSection({ A, score, selection }: {
@@ -2805,6 +2809,7 @@ function GroupCard({
   const isAssessment = group.kind === "assessment";
   const isExternal = group.kind === "external";
   const isProfessional = group.kind === "professional";
+  const isTeacher = group.kind === "teacher";
   const noAction = group.treatmentKey === "_no_action";
 
   // Color theme per kind
@@ -2816,6 +2821,8 @@ function GroupCard({
         ? "border-purple-200 bg-purple-50/70"
         : isProfessional
           ? "border-emerald-200 bg-emerald-50/70"
+          : isTeacher
+            ? "border-sky-200 bg-sky-50/70"
           : isExternal
             ? "border-amber-200 bg-amber-50/70"
             : "border-[var(--teal-mid)] bg-white";
@@ -2824,6 +2831,7 @@ function GroupCard({
     : noAction ? "text-gray-500"
     : isAssessment ? "text-purple-700"
     : isProfessional ? "text-emerald-700"
+    : isTeacher ? "text-sky-800"
     : isExternal ? "text-amber-800"
     : "text-[var(--teal)]";
 
@@ -2864,10 +2872,12 @@ function GroupCard({
                   ? "bg-purple-700"
                   : isProfessional
                     ? "bg-emerald-700"
+                    : isTeacher
+                      ? "bg-sky-800"
                     : "bg-[var(--teal-dark)]"
               }`}
             >
-              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} - {group.treatmentLabel} ←
+              {isAssessment ? "🔎 חיפוש מאבחן/ת" : isProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : isTeacher ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת"} - {group.treatmentLabel} ←
             </button>
           ) : (
             <div className="inline-block rounded-xl bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900">
@@ -2879,16 +2889,17 @@ function GroupCard({
             if (!cb) return null;
             const sAssessment = s.kind === "assessment";
             const sProfessional = s.kind === "professional";
+            const sTeacher = s.kind === "teacher";
             return (
               <button
                 key={s.treatmentKey}
                 type="button"
                 onClick={cb}
                 className={`cta-pulse-soft inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold text-white transition hover:opacity-90 ${
-                  sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : "bg-[var(--teal-dark)]"
+                  sAssessment ? "bg-purple-700" : sProfessional ? "bg-emerald-700" : sTeacher ? "bg-sky-800" : "bg-[var(--teal-dark)]"
                 }`}
               >
-                {sAssessment ? "🔎 חיפוש מאבחן/ת" : sProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת"} - {s.treatmentLabel} ←
+                {sAssessment ? "🔎 חיפוש מאבחן/ת" : sProfessional ? "👩‍⚕️ חיפוש איש/ת מקצוע" : sTeacher ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת"} - {s.treatmentLabel} ←
               </button>
             );
           })}
@@ -3193,6 +3204,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
     treatments: DomainGroup[];
     assessments: DomainGroup[];
     professionals: DomainGroup[];
+    teachers: DomainGroup[]; // ענף המורים - הוראה מתקנת / תגבור, נענה מטבלת המורים
     externals: DomainGroup[];
     informational: DomainGroup[]; // symptoms with no actionable referral (low-stress etc.)
     standaloneWarnings: typeof domainResults[number]["result"]["standaloneWarnings"];
@@ -3208,6 +3220,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         treatments: groups.filter(g => g.kind === "treatment" && g.treatmentKey !== "_no_action"),
         assessments: groups.filter(g => g.kind === "assessment"),
         professionals: groups.filter(g => g.kind === "professional"),
+        teachers: groups.filter(g => g.kind === "teacher"),
         externals: groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
         informational: groups.filter(g => g.treatmentKey === "_no_action"),
         standaloneWarnings: d.result.standaloneWarnings,
@@ -3217,7 +3230,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
   }, [domainResults]);
 
   const hasAnyFindings = byDomain.some(b =>
-    b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
+    b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
   );
 
   /**
@@ -3232,7 +3245,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
     const out: { key: string; label: string; domainLabel: string; urgent: boolean; combined: boolean }[] = [];
     for (const b of byDomain) {
       const seen = new Set<string>();
-      for (const g of [...b.treatments, ...b.assessments, ...b.professionals]) {
+      for (const g of [...b.treatments, ...b.assessments, ...b.professionals, ...b.teachers]) {
         const key = `${b.key}::${g.kind}::${g.treatmentKey}`;
         if (seen.has(key)) continue;
         seen.add(key);
@@ -3280,17 +3293,18 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
       }
       return { keys, labels, kind: kindStr };
     }
-    const indMatch = selectedKey.match(/^(.+?)::(treatment|assessment|external|professional)::(.+)$/);
+    const indMatch = selectedKey.match(/^(.+?)::(treatment|assessment|external|professional|teacher)::(.+)$/);
     if (indMatch) {
       const [, domainKey, , treatmentKey] = indMatch;
       const bucket = byDomain.find(b => b.key === domainKey);
       if (!bucket) return null;
-      const all = [...bucket.treatments, ...bucket.assessments, ...bucket.professionals];
+      const all = [...bucket.treatments, ...bucket.assessments, ...bucket.professionals, ...bucket.teachers];
       const group = all.find(g => g.treatmentKey === treatmentKey);
       if (!group) return null;
       const apiKind: MatchSelection["kind"] =
         group.kind === "assessment" ? "assessment" :
         group.kind === "professional" ? "professional" :
+        group.kind === "teacher" ? "teacher" :
         "treatment";
       return { keys: [group.treatmentKey], labels: [group.treatmentLabel], kind: apiKind };
     }
@@ -3420,7 +3434,17 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           onSelect={openMatch}
           onBack={backToReport}
         />
-        <KidsMatchSection A={A} score={score} selection={activeSelection} />
+        {activeSelection.kind === "teacher" ? (
+          // ענף המורים: אותו מסך, מאגר אחר. שכבת הגיל הלימודית של הילד/ה
+          // (acadGg) היא הסינון; בגן אין מורים ולכן null = בלי סינון.
+          <TeacherMatchSection
+            referralKey={activeSelection.keys[0] ?? ""}
+            gradeGroup={(() => { const g = acadGg(A); return g === "gan" ? null : (g as TeacherGradeGroup); })()}
+            quizType={isCounselor(A) ? "school" : "kids"}
+          />
+        ) : (
+          <KidsMatchSection A={A} score={score} selection={activeSelection} />
+        )}
       </div>
     );
   }
@@ -3440,11 +3464,13 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           keep their own verb and colour so the promise matches the button
           the parent would otherwise have found lower down. */}
       {hasAnyFindings && (() => {
-        const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0);
-        const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0]) : null;
+        // מורים אחרונים בסדר: כשיש גם ממצא טיפולי או אבחוני, הוא הכפתור
+        // הראשי; מורה הוא הממצא המרכזי רק כשהקושי לימודי בלבד.
+        const bucket = byDomain.find((b) => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0);
+        const g = bucket ? (bucket.treatments[0] ?? bucket.assessments[0] ?? bucket.professionals[0] ?? bucket.teachers[0]) : null;
         if (!bucket || !g) return null;
-        const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : "🔍 חיפוש מטפל/ת";
-        const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
+        const verb = g.kind === "assessment" ? "🔎 חיפוש מאבחן/ת" : g.kind === "professional" ? "👩‍⚕️ חיפוש איש/ת מקצוע" : g.kind === "teacher" ? "🎓 חיפוש מורה" : "🔍 חיפוש מטפל/ת";
+        const tone = g.kind === "assessment" ? "bg-purple-700 hover:bg-purple-600" : g.kind === "professional" ? "bg-emerald-700 hover:bg-emerald-600" : g.kind === "teacher" ? "bg-sky-800 hover:bg-sky-700" : "bg-[var(--teal-dark)] hover:bg-[var(--teal)]";
         return (
           <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
             <p className="mb-2.5 text-sm text-[#2a3a4a]">
@@ -3514,7 +3540,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             </div>
             <div className="flex items-start gap-2.5">
               <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
-              <span>כשמוכנים - לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן"</span> בממצא הרלוונטי ביותר עבורכם</span>
+              <span>כשמוכנים - לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן/מורה"</span> בממצא הרלוונטי ביותר עבורכם</span>
             </div>
           </div>
         </div>
@@ -3583,6 +3609,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             b.treatments.length > 0 ||
             b.assessments.length > 0 ||
             b.professionals.length > 0 ||
+            b.teachers.length > 0 ||
             b.externals.length > 0 ||
             b.informational.length > 0 ||
             b.standaloneWarnings.length > 0;
@@ -3737,9 +3764,43 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                 </div>
               )}
 
+              {/* Teachers (ענף המורים) - "מענה לימודי": הוראה מתקנת / תגבור.
+                  אחרי הטיפולים והאבחונים בכוונה - כשיש גם ממצא קליני, הוא
+                  קודם; מורה הוא התשובה כשהקושי לימודי וממוקד. */}
+              {b.teachers.length > 0 && (
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
+                  <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 pr-1">🎓 מענה לימודי</div>
+                  <p className="text-xs text-gray-500 mb-2 px-1">
+                    מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. אם אחרי כמה חודשים של הוראה סדירה אין שיפור - חוזרים לדוח ובודקים את ההמלצה לאבחון.
+                  </p>
+                  {b.teachers.map((g, idx) => {
+                    if (b.teachers.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
+                    const explainKey = `${b.key}::${g.treatmentKey}`;
+                    const siblings = b.teachers.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
+                    return (
+                      <GroupCard
+                        forCounselor={audience === "counselor"}
+                        key={g.recs[0].id}
+                        group={g}
+                        onSelect={() => selectGroup(b.key, g)}
+                        selected={
+                          selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
+                          siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
+                        }
+                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
+                        explanation={recExplain[explainKey]}
+                        explanationLoading={recExplainLoading[explainKey]}
+                        siblings={siblings.length > 0 ? siblings : undefined}
+                        onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+
               {/* Externals - no search button */}
               {b.externals.length > 0 && (
-                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-amber-800 mb-2 pr-1">🩺 פניות נוספות</div>
                   <p className="text-xs text-gray-500 mb-2 px-1">פניות לאנשי מקצוע שאינם נכללים במערכת ההתאמה - יש לפנות אליהם בנפרד.</p>
                   {b.externals.map(g => (
@@ -3756,7 +3817,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
 
               {/* Informational symptoms (no actionable referral) */}
               {b.informational.length > 0 && (
-                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.externals.length > 0 ? "mt-5" : ""}>
+                <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.teachers.length > 0 || b.externals.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 pr-1">📊 ממצאים נוספים</div>
                   {b.informational.map(g => (
                     <GroupCard
@@ -3977,7 +4038,7 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
     const agg = aggregateForMatch(parsed.map(d => d.result));
     // The engine calls them professionals; the tracks input calls the same
     // referrals external. Same list, two vocabularies.
-    const keys = { assessmentKeys: agg.assessmentKeys, treatmentKeys: agg.treatmentKeys, externalKeys: agg.professionalKeys };
+    const keys = { assessmentKeys: agg.assessmentKeys, treatmentKeys: agg.treatmentKeys, externalKeys: findingExternalKeys(agg) };
     setA(prev => {
       if (JSON.stringify(prev._found) === JSON.stringify(found) && JSON.stringify(prev._findingKeys) === JSON.stringify(keys)) return prev;
       return { ...prev, _found: found, _findingKeys: keys };

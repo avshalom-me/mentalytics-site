@@ -12,7 +12,7 @@
  * neither can drift from the screens without the test saying so.
  */
 
-import { aggregateForMatch, parseKidsBoxes } from "@/app/lib/kids-recommendations";
+import { aggregateForMatch, findingExternalKeys, parseKidsBoxes } from "@/app/lib/kids-recommendations";
 import { eligibilityRoutes, isSchoolGrade } from "@/app/lib/school-report";
 import type { Ans, KidsScoreResult } from "../quiz-logic";
 
@@ -33,7 +33,7 @@ export function withScoredFacts(A: Ans, score: KidsScoreResult): Ans {
   const next: Ans = {
     ...A,
     _found: found,
-    _findingKeys: { assessmentKeys: agg.assessmentKeys, treatmentKeys: agg.treatmentKeys, externalKeys: agg.professionalKeys },
+    _findingKeys: { assessmentKeys: agg.assessmentKeys, treatmentKeys: agg.treatmentKeys, externalKeys: findingExternalKeys(agg) },
   };
   return { ...next, _route: routeOf(next) };
 }

@@ -655,6 +655,13 @@ const REF_EMOTIONAL_LEARNING_DV =
 const REF_SCHOOL_SHILUV =
   "יש לבנות תוכנית חיזוקים. כדאי לבדוק עם יועצת בית הספר זכאות לשעות שילוב במסגרת הכיתתית";
 
+// ענף המורים (2/10/2026): לצד תוכנית החיזוקים / התוכנית הבית-ספרית בקריאה,
+// הוראה מתקנת בקריאה וכתיבה - דרך בית הספר או באופן פרטי. אותו היגיון כמו
+// בחשבון (הוראה מתקנת לפני אבחון), ורק בענפים שההמלצה בהם היא פדגוגית
+// ולא קלינית. שורה נפרדת, כדי שהכרטיס שלה יוכל לחפש מורה.
+const REF_REMEDIAL_READING =
+  "מומלצת הוראה מתקנת בקריאה וכתיבה, דרך בית הספר או באופן פרטי.";
+
 const COUNSELOR_FOOTER_AG_DV =
   "📌 ניתן להיוועץ גם עם יועצת בית הספר לתיאום בין הבית למסגרת החינוכית";
 const COUNSELOR_FOOTER_ZHTYB =
@@ -807,7 +814,7 @@ function gradeMathAG(math: string, f: Findings) {
     addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." +
       MATH_REMEDIAL_REVIEW + " " + PSYCHODIDACTIC_NOTE_AG);
   } else if (tier === "30%") {
-    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת בחשבון, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_AG);
 }
@@ -826,7 +833,7 @@ function gradeMathDV(math: string, hasReadingOrAdhd: boolean, f: Findings) {
   } else if (tier === "10%") {
     addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
   } else if (tier === "30%") {
-    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת, דרך בית הספר או באופן פרטי.");
+    addRef(f, "נמצאו קשיים קלים בחשבון - מומלצת הוראה מתקנת ממוקדת בחשבון, דרך בית הספר או באופן פרטי.");
   }
   addTool(f, ACAD_TOOLS_MATH_DV);
 }
@@ -850,6 +857,7 @@ function readingFlowAG(A: Ans, adhd: AdhdEmitter, f: Findings) {
       addRef(f, "יש לבחון פנייה לקלינאית תקשורת");
     } else if (motiv === "לא") {
       addRef(f, "יש לבנות תוכנית חיזוקים");
+      addRef(f, REF_REMEDIAL_READING);
       addTool(f, ACAD_TOOLS_CHIZUK);
       if (emoMotSum(A, "ag", "") >= 7) {
         addRef(f, REF_EMOTIONAL_LEARNING_AG);
@@ -863,8 +871,10 @@ function readingFlowAG(A: Ans, adhd: AdhdEmitter, f: Findings) {
       const smotiv = A.ag_speech_motiv;
       if (smotiv === "כן") {
         addRef(f, REF_SCHOOL_SHILUV);
+        addRef(f, REF_REMEDIAL_READING);
       } else if (smotiv === "לא") {
         addRef(f, REF_SCHOOL_SHILUV);
+        addRef(f, REF_REMEDIAL_READING);
         addTool(f, ACAD_TOOLS_CHIZUK);
         if (emoMotSum(A, "ag", "s") >= 7) {
           addRef(f, REF_EMOTIONAL_LEARNING_AG);
@@ -893,6 +903,7 @@ function readingFlowDV(A: Ans, adhd: AdhdEmitter, f: Findings) {
       addTool(f, ACAD_TOOLS_CHIZUK);
     } else if (motiv === "לא") {
       addRef(f, "יש לבנות תוכנית חיזוקים");
+      addRef(f, REF_REMEDIAL_READING);
       addTool(f, ACAD_TOOLS_CHIZUK);
       if (emoMotSum(A, "dv", "") >= 7) {
         addRef(f, REF_EMOTIONAL_LEARNING_DV);
@@ -906,8 +917,10 @@ function readingFlowDV(A: Ans, adhd: AdhdEmitter, f: Findings) {
       const smotiv = A.dv_speech_motiv;
       if (smotiv === "כן") {
         addRef(f, "יש לבנות תוכנית בית-ספרית - אם אין שיפור לאחר כחודשיים יש לפנות לאבחון פסיכודידקטי");
+        addRef(f, REF_REMEDIAL_READING);
       } else if (smotiv === "לא") {
         addRef(f, "יש לבנות תוכנית בית-ספרית - אם אין שיפור לאחר כחודשיים יש לפנות לאבחון פסיכודידקטי");
+        addRef(f, REF_REMEDIAL_READING);
         addTool(f, ACAD_TOOLS_CHIZUK);
         if (emoMotSum(A, "dv", "s") >= 7) {
           addRef(f, REF_EMOTIONAL_LEARNING_DV);
@@ -1036,14 +1049,19 @@ function computeZHTYBAcad(A: Ans, ga: "zh" | "tyb", boxes: KidsBox[], adhd: Adhd
   const SEVERE_MATH_ENG = ["10%", "20%"];
   const mathSevere = SEVERE_MATH_ENG.includes(math);
   const engSevere = SEVERE_MATH_ENG.includes(eng);
+  // ענף המורים (2/10/2026): קושי במתמטיקה או באנגלית שאינו מלווה בקשיים
+  // ברבי-מלל או בקשב אינו סיבה לאבחון - והוא בדיוק המקרה של תגבור פרטי.
+  // עד כה הכרטיס הזה נשאר בלי שום הפניה (רק כלים); עכשיו יש לו מורה לחפש.
   if (math !== "לא") {
     addSym(f, "נמצאו סימנים לקשיים במתמטיקה");
     if (mathSevere && (verbalPos || adhdPos)) addRef(f, "הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");
+    else addRef(f, "מומלץ תגבור פרטי במתמטיקה (מורה פרטי/ת) - חלוקה בין זמן בית לזמן בית ספר, לצד התגבורים של בית הספר.");
     addTool(f, isTyb ? ACAD_TOOLS_MATH_HIGH : ACAD_TOOLS_MATH_MID);
   }
   if (eng !== "לא") {
     addSym(f, "נמצאו סימנים לקשיים באנגלית");
     if (engSevere && (verbalPos || adhdPos)) addRef(f, "הפנייה לאבחון פסיכודידקטי לבירור קשיי הלמידה הכוללים");
+    else addRef(f, "מומלץ תגבור פרטי באנגלית (מורה פרטי/ת לאנגלית) - חלוקה בין זמן בית לזמן בית ספר, לצד התגבורים של בית הספר.");
     addTool(f, ACAD_TOOLS_ENG);
   }
   if (adhdYn) adhd.emit(ga);
