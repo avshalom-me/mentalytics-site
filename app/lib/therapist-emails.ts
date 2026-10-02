@@ -849,15 +849,19 @@ export function signupFinalReminderHtml(): string {
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.6;color:#1a4a5c;direction:rtl;text-align:right;">
       ${EMAIL_LOGO_HEADER}
       <h1 style="color:#0F5468;font-size:21px;margin:0 0 16px;">שלום,</h1>
-      ${p("<strong>זו תזכורת אחרונה מאיתנו בנושא, ולא יישלחו תזכורות נוספות.</strong>")}
       ${p("נרשמת לטיפול חכם, אבל הפרופיל שלך עדיין לא הושלם, ולכן הוא לא מוצג למטופלים. עכשיו, אחרי החגים, זה זמן טוב להשלים אותו: זו התקופה שבה הרבה אנשים מתחילים לחפש טיפול.")}
       ${p("באתר כבר רשומים מאות מטפלים, ובכל חודש יש עשרות אלפי חשיפות של כרטיסי מטפלים ומאות רבות של פניות של מטופלים.")}
-      ${p("ההשלמה לוקחת כמה דקות: תיאור קצר, תמונה, תחומי טיפול ותעודה מקצועית. אחרי אישור התעודה הפרופיל עולה למאגר, ללא עלות.")}
+      ${p("ההשלמה לוקחת כמה דקות: תיאור קצר, תמונה, תחומי טיפול ותעודה מקצועית. אחרי אישור התעודה הפרופיל עולה לאתר, באחד משני מסלולים לבחירתך:")}
+      <ul style="margin:0 0 16px;padding:0 20px 0 0;font-size:15px;color:#1a4a5c;">
+        <li style="margin:0 0 8px;"><strong>המסלול החינמי:</strong> דף פרופיל אישי במאגר המטפלים, ללא עלות.</li>
+        <li style="margin:0;"><strong>המסלול המקודם</strong> (₪${SUBSCRIPTION_BASE_PRICE} + מע"מ לחודש): הופעה ראשונה בתוצאות החיפוש, והצגה למטופלים במערכת ההתאמה של השאלון. אם לא התקבלה פנייה מתאימה בחודשיים הראשונים, ניתן לקבל החזר כספי מלא.</li>
+      </ul>
       <div style="text-align:center;margin:6px 0 20px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">להשלמת הפרופיל ←</a>
       </div>
       <p style="margin:0 0 16px;font-size:13px;color:#6b7280;text-align:center;">הקישור מוביל ישירות לעריכת הפרופיל. תתבקש/י להתחבר תחילה - עם חשבון Google או עם המייל והסיסמה שאיתם נרשמת.</p>
       ${p("במידה וההרשמה לא רלוונטית עבורך, בעוד 7 ימים נסיר את הפרופיל שלך מהמערכת.")}
+      ${p("<strong>זו תזכורת אחרונה מאיתנו בנושא, ולא יישלחו תזכורות נוספות.</strong>")}
       ${p("צוות טיפול חכם")}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
       <p style="margin:0;font-size:12px;color:#888;text-align:center;">
