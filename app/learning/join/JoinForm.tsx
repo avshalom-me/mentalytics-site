@@ -116,16 +116,16 @@ export default function JoinForm() {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-bold text-[var(--text-2)]">
+          <label htmlFor="tj-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
             תעודה / אישור הכשרה * <span className="font-normal text-[var(--muted)]">(PDF, JPG, PNG; לא מוצג להורים)</span>
           </label>
-          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setCert(e.target.files?.[0] ?? null)} className="text-sm" />
+          <input id="tj-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(e) => setCert(e.target.files?.[0] ?? null)} className="text-sm" />
         </div>
         <div>
-          <label className="mb-1 block text-sm font-bold text-[var(--text-2)]">
+          <label htmlFor="tj-photo" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
             תמונה <span className="font-normal text-[var(--muted)]">(מומלץ; מוצגת להורים)</span>
           </label>
-          <input type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="text-sm" />
+          <input id="tj-photo" type="file" accept="image/*" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} className="text-sm" />
         </div>
       </div>
 

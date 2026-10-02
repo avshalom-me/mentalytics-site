@@ -3,10 +3,13 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 import { isBotRequest } from "@/app/lib/bot-detect";
 import { CITY_TO_REGION, ALL_REGIONS } from "@/app/lib/regions";
-import { matchTeachers, type TeacherRow } from "@/app/lib/teacher-match";
+import { matchTeachers, teacherSupplyForKeys, type TeacherRow } from "@/app/lib/teacher-match";
 import {
   TEACHER_GRADE_KEYS,
   TEACHER_SUBJECT_KEYS,
+  TEACHER_LISTED_STATES,
+  TEACHER_LANGUAGES,
+  TEACHER_REFERRAL_KEYS,
   teacherSearchFromKey,
   subjectLabel,
   gradeGroupLabel,
@@ -15,6 +18,7 @@ import {
   type TeacherSubject,
 } from "@/app/lib/teacher-options";
 import { TEACHER_PUBLIC_COLUMNS, teacherPhotoUrl } from "@/app/lib/teachers.server";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 // חיפוש מורים מתוך תוצאות שאלון הילדים. נפרד לגמרי מ-/api/match: קורא את
 // teachers בלבד ומחזיר כרטיסים בלבד.
@@ -26,6 +30,46 @@ import { TEACHER_PUBLIC_COLUMNS, teacherPhotoUrl } from "@/app/lib/teachers.serv
 // אינם נרשמים. ההופעות והלחיצות נרשמות מהלקוח, ב-/api/teacher-event.
 
 export const dynamic = "force-dynamic";
+
+/**
+ * כל המורים המוצגים. fetchAllRows: מעבר ל-1000 שורות, select רגיל היה מחזיר
+ * תת-קבוצה שרירותית בלי שגיאה, ומורים היו נעלמים מהחיפוש.
+ */
+function loadListedTeachers(): Promise<TeacherRow[]> {
+  return fetchAllRows<TeacherRow>(
+    () =>
+      supabaseAdmin
+        .from("teachers")
+        .select(TEACHER_PUBLIC_COLUMNS)
+        .in("listing_state", [...TEACHER_LISTED_STATES])
+        .order("id") as unknown as { range: (from: number, to: number) => PromiseLike<{ data: TeacherRow[] | null; error: { message: string } | null }> },
+  );
+}
+
+const KNOWN_KEYS = new Set<string>(Object.values(TEACHER_REFERRAL_KEYS));
+
+/**
+ * שער ההיצע (ראו teacherSupplyForKeys): לכל מפתח המלצה שבדוח - האם יש מורה
+ * להציע. מסך התוצאות של שאלון הילדים שואל פעם אחת, ומציג את כפתור "חיפוש
+ * מורה" רק למפתחות שחזרו true. לא נרשם כביקוש: זו לא פעולה של ההורה.
+ */
+export async function GET(req: NextRequest) {
+  const rl = rateLimit("match-teachers-supply", clientIp(req), 120, 60_000);
+  if (!rl.ok) return tooManyRequests(rl.retryAfterSeconds, "Too many requests");
+  const sp = req.nextUrl.searchParams;
+  const keys = Array.from(new Set((sp.get("keys") ?? "").split("|").map((k) => k.trim()).filter((k) => KNOWN_KEYS.has(k)))).slice(0, 5);
+  const gradeRaw = sp.get("gradeGroup");
+  const gradeGroup = (TEACHER_GRADE_KEYS as string[]).includes(gradeRaw ?? "") ? (gradeRaw as TeacherGradeGroup) : null;
+  if (keys.length === 0) return NextResponse.json({ ok: true, available: {} });
+  try {
+    const available = teacherSupplyForKeys(await loadListedTeachers(), keys, gradeGroup);
+    // בלי מטמון: מורה שאושר/ה עכשיו פותח/ת את הכפתור בדוח הבא, לא בעוד דקה.
+    return NextResponse.json({ ok: true, available }, { headers: { "Cache-Control": "no-store" } });
+  } catch (e) {
+    console.error("match-teachers supply read failed:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ ok: false, error: "שגיאה" }, { status: 500 });
+  }
+}
 
 export async function POST(req: NextRequest) {
   const rl = rateLimit("match-teachers", clientIp(req), 60, 60_000);
@@ -49,13 +93,17 @@ export async function POST(req: NextRequest) {
   const regionRaw = typeof body.region === "string" ? body.region : null;
   const region = city ? (CITY_TO_REGION[city] ?? null) : regionRaw && ALL_REGIONS.includes(regionRaw) ? regionRaw : null;
   const onlineRequired = body.onlineRequired === true;
-  const language = typeof body.language === "string" && body.language ? body.language.slice(0, 20) : "עברית";
+  const language = (TEACHER_LANGUAGES as readonly string[]).includes(String(body.language)) ? String(body.language) : "עברית";
   const genderPreference = body.genderPreference === "זכר" || body.genderPreference === "נקבה" ? body.genderPreference : null;
   const limit = Math.max(1, Math.min(Number(body.limit) || 10, 20));
 
-  const { data, error } = await supabaseAdmin.from("teachers").select(TEACHER_PUBLIC_COLUMNS).in("listing_state", ["trial", "paying"]).limit(1000);
-  if (error) return NextResponse.json({ ok: false, error: "שגיאה בחיפוש" }, { status: 500 });
-  const rows = (data ?? []) as unknown as TeacherRow[];
+  let rows: TeacherRow[];
+  try {
+    rows = await loadListedTeachers();
+  } catch (e) {
+    console.error("match-teachers read failed:", e instanceof Error ? e.message : e);
+    return NextResponse.json({ ok: false, error: "שגיאה בחיפוש" }, { status: 500 });
+  }
   const matches = matchTeachers(rows, { subject, remedial, gradeGroup, city, region, onlineRequired, language, genderPreference, limit });
 
   if (body.noTrack !== true && !isBotRequest(req)) {

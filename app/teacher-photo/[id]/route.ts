@@ -3,7 +3,10 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { TEACHER_FILES_BUCKET } from "@/app/lib/teachers.server";
 
 // תמונת מורה: /teacher-photo/<id>. אותו דפוס כמו /therapist-photo - הבאקט
-// פרטי, מוגש רק שדה התמונה (לעולם לא התעודה), ורק למורה שמוצג/ת בפומבי.
+// פרטי, ומוגש רק שדה התמונה (לעולם לא התעודה). התמונה מוגשת גם למורה
+// שממתין/ה לאישור או נמצא/ת בארכיון: המורה רואה אותה בפרופיל שלו/ה, והאדמין
+// רואה אותה בתור האישורים. הכתובת נושאת מזהה אקראי (uuid) שאינו מתפרסם בשום
+// מקום לפני שהמורה מוצג/ת; מורה שנדחה/תה - התמונה שלו/ה לא מוגשת.
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";

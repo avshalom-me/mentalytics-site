@@ -2,10 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { cancelSubscription } from "@/app/lib/sumit";
 import { teacherStats, emptyTeacherStats, TEACHER_FILES_BUCKET, teacherPhotoUrl, teacherLinkUrl, teacherNote } from "@/app/lib/teachers.server";
-import { sendTeacherApprovedEmail, sendTeacherRejectedEmail } from "@/app/lib/teacher-emails";
+import { sendTeacherApprovedEmail, sendTeacherRejectedEmail, type TeacherEmailResult } from "@/app/lib/teacher-emails";
 import { trialEndFor, extendedTrialEnd, israelDate } from "@/app/lib/teacher-trial";
 import { teacherEmailPreview } from "@/app/lib/teacher-email-templates";
-import { qualificationAllowsRemedial, qualificationLabel, TEACHER_QUALIFICATION_KEYS } from "@/app/lib/teacher-options";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import { qualificationAllowsRemedial, qualificationLabel, hasActiveStandingOrder, TEACHER_QUALIFICATION_KEYS, TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
 
 // ניהול המורים באדמין. Basic Auth + שומר CSRF של ה-middleware מכסים את כל
 // /api/admin-*. כל פעולה שמשנה מצב נרשמת בהיסטוריה של המורה (crm_notes עם
@@ -13,7 +14,7 @@ import { qualificationAllowsRemedial, qualificationLabel, TEACHER_QUALIFICATION_
 
 export const dynamic = "force-dynamic";
 
-const activeSubscription = (t: Record<string, unknown>) => !!t.sumit_recurring_id && !t.sumit_cancelled_at;
+const activeSubscription = hasActiveStandingOrder;
 
 export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
@@ -54,7 +55,37 @@ export async function GET(req: NextRequest) {
     const days = Math.max(1, Math.min(Number(sp.get("days")) || 30, 365));
     const { data, error } = await supabaseAdmin.rpc("teacher_search_demand", { p_days: days });
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ ok: true, days, demand: data ?? [] });
+    // כמה דוחות של השאלון כללו המלצה למורה. זה הביקוש שקיים גם לפני שיש חיפושים
+    // (כפתור החיפוש מופיע רק כשיש מורה להציע), ולכן זה המספר שמגייסים לפיו בהתחלה.
+    // נספר מהרשומה המחקרית (quiz_treatments), בלי ריצות בדיקה של הצוות.
+    const recommended: Record<string, number> = {};
+    try {
+      const since = new Date(Date.now() - days * 86_400_000).toISOString();
+      const events = await fetchAllRows<{ metadata: { teachers?: unknown; staff?: unknown } | null }>(() =>
+        supabaseAdmin
+          .from("analytics_events")
+          .select("metadata")
+          .eq("event_type", "quiz_treatments")
+          .gte("created_at", since)
+          .not("metadata->teachers", "is", null)
+          .order("created_at"),
+      );
+      for (const e of events) {
+        if (e.metadata?.staff) continue;
+        const keys = Array.isArray(e.metadata?.teachers) ? e.metadata.teachers : [];
+        for (const k of keys) if (typeof k === "string") recommended[k] = (recommended[k] ?? 0) + 1;
+      }
+    } catch (e) {
+      console.error("teacher recommendation counts failed:", e instanceof Error ? e.message : e);
+    }
+    return NextResponse.json({
+      ok: true,
+      days,
+      demand: data ?? [],
+      recommended: Object.entries(recommended)
+        .map(([key, reports]) => ({ key, reports }))
+        .sort((a, b) => b.reports - a.reports),
+    });
   }
 
   const { data, error } = await supabaseAdmin.from("teachers").select("*").order("created_at", { ascending: false }).limit(1000);
@@ -68,7 +99,7 @@ export async function GET(req: NextRequest) {
     return {
       ...rest,
       has_certificate: !!certificate_path,
-      photo_url: teacherPhotoUrl({ id: String(r.id), photo_path: (photo_path as string | null) ?? null }),
+      photo_url: r.listing_state === "rejected" ? null : teacherPhotoUrl({ id: String(r.id), photo_path: (photo_path as string | null) ?? null }),
       edit_url: teacherLinkUrl(String(edit_token)),
       pay_url: teacherLinkUrl(String(edit_token), "pay"),
       stats: stats[String(r.id)] ?? emptyTeacherStats(),
@@ -93,7 +124,10 @@ export async function PATCH(req: NextRequest) {
   const nowIso = now.toISOString();
   const update: Record<string, unknown> = { updated_at: nowIso };
   const emailTo = { id, email: String(t.email), full_name: String(t.full_name), edit_token: String(t.edit_token) };
-  let mail: { status: string; error?: string } | null = null;
+  let mail: TeacherEmailResult | null = null;
+  // המייל למורה יוצא רק אחרי שהשורה עודכנה: מייל "הפרופיל אושר" על שורה
+  // שהעדכון שלה נכשל הוא הבטחה שאף אחד לא מקיים.
+  let sendMail: (() => Promise<TeacherEmailResult>) | null = null;
   let note = "";
 
   switch (action) {
@@ -105,8 +139,10 @@ export async function PATCH(req: NextRequest) {
       }
       // אישור = תחילת 90 ימי הניסיון. מורה שתקופת הניסיון שלו/ה עוד רצה (אישור
       // מחדש אחרי דחייה) שומר/ת את תאריך הסיום; אחרת מתחילה תקופה חדשה, ושני
-      // המיילים של סופה יישלחו שוב בבוא הזמן.
-      const keep = !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
+      // המיילים של סופה יישלחו שוב בבוא הזמן. חזרה מהארכיון היא תמיד תקופה
+      // חדשה - זה מה שהכפתור "החזרה למאגר (ניסיון חדש)" אומר, גם כשהארכיון
+      // היה ידני והתאריך הישן עוד לא עבר.
+      const keep = t.listing_state !== "archived" && !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
       const trialEndsAt = keep ? String(t.trial_ends_at) : trialEndFor(now).toISOString();
       Object.assign(update, {
         listing_state: activeSubscription(t) ? "paying" : "trial",
@@ -119,7 +155,7 @@ export async function PATCH(req: NextRequest) {
         ...(keep ? {} : { trial_ending_notified_at: null, trial_last_day_notified_at: null }),
       });
       note = `אושר/ה להצגה. ניסיון עד ${israelDate(new Date(trialEndsAt))}.`;
-      if (body.send_email === true) mail = await sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt });
+      if (body.send_email === true) sendMail = () => sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt });
       break;
     }
     case "reject": {
@@ -127,7 +163,7 @@ export async function PATCH(req: NextRequest) {
       const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 300) : "";
       Object.assign(update, { listing_state: "rejected", reject_reason: reason || null });
       note = `נדחה/תה.${reason ? ` סיבה: ${reason}` : ""}`;
-      if (body.send_email === true) mail = await sendTeacherRejectedEmail(emailTo, reason || null);
+      if (body.send_email === true) sendMail = () => sendTeacherRejectedEmail(emailTo, reason || null);
       break;
     }
     case "archive": {
@@ -214,7 +250,7 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     case "resend_approval": {
-      if (!t.trial_ends_at || !["trial", "paying"].includes(String(t.listing_state))) {
+      if (!t.trial_ends_at || !(TEACHER_LISTED_STATES as readonly string[]).includes(String(t.listing_state))) {
         return NextResponse.json({ ok: false, error: "המורה אינו/ה מוצג/ת כרגע" }, { status: 400 });
       }
       mail = await sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: String(t.trial_ends_at) });
@@ -227,6 +263,7 @@ export async function PATCH(req: NextRequest) {
 
   const { error } = await supabaseAdmin.from("teachers").update(update).eq("id", id);
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+  if (sendMail) mail = await sendMail();
   if (note) await teacherNote(id, `${note}${mail ? ` מייל: ${mail.status}${mail.error ? ` (${mail.error})` : ""}` : ""}`);
   return NextResponse.json({ ok: true, mail });
 }

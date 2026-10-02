@@ -75,10 +75,21 @@ export const TEACHER_LISTING_STATES = [
   { key: "rejected", label: "נדחה/תה", cls: "bg-red-50 border-red-200 text-red-700" },
 ] as const;
 export type TeacherListingState = (typeof TEACHER_LISTING_STATES)[number]["key"];
-export const TEACHER_LISTING_STATE_KEYS = TEACHER_LISTING_STATES.map((s) => s.key) as TeacherListingState[];
 
-/** המצבים שבהם מורה מוצג/ת להורים. */
+/** המצבים שבהם מורה מוצג/ת להורים. כל שאילתה ש"מי מוצג" תלוי בה קוראת מכאן. */
 export const TEACHER_LISTED_STATES: readonly TeacherListingState[] = ["trial", "paying"];
+
+/**
+ * הוראת קבע פעילה ב-Sumit: יש מזהה, והיא לא בוטלה. מקום אחד לכלל הזה - הקרון,
+ * האדמין, הפרופיל וההרשמה לתשלום שואלים כולם את אותה שאלה, ותשובה שונה באחד
+ * מהם פירושה מורה משלם/ת שעובר/ת לארכיון, או חיוב כפול.
+ */
+export function hasActiveStandingOrder(t: { sumit_recurring_id?: unknown; sumit_cancelled_at?: unknown }): boolean {
+  return !!t.sumit_recurring_id && !t.sumit_cancelled_at;
+}
+
+/** שפות ההוראה שאפשר לבחור - בטופס המורה ובחיפוש של ההורה. */
+export const TEACHER_LANGUAGES = ["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"] as const;
 
 // ── המודל המסחרי ────────────────────────────────────────────────────────────
 //
@@ -88,15 +99,13 @@ export const TEACHER_LISTED_STATES: readonly TeacherListingState[] = ["trial", "
 // עובר/ת לארכיון ויוצא/ת מהמאגר. הלוגיקה עצמה ב-teacher-trial.ts.
 //
 // המחיר כאן הוא *ברוטו* - שונה מכל שאר המחירים בקוד, שהם לפני מע"מ. הסיבה:
-// 60 כולל מע"מ אינו מספר שלם לפני מע"מ (50.85), וטבלאות המטפלים מחזיקות
-// amount שלם. לכן ענף המורים לא כותב ל-payments/subscriptions, ו-Sumit
+// 60 כולל מע"מ אינו מספר שלם לפני מע"מ (50.85 במע"מ של 18%), וטבלאות המטפלים
+// מחזיקות amount שלם. לכן ענף המורים לא כותב ל-payments/subscriptions, ו-Sumit
 // מקבל את המחיר עם VATIncluded:true.
 export const TEACHER_TRIAL_DAYS = 90;
 /** היום בתוך הניסיון שבו יוצא המייל הראשון להרשמה. */
 export const TEACHER_PAY_EMAIL_DAY = 85;
 export const TEACHER_PRICE_GROSS = 60;
-export const TEACHER_VAT_RATE = 0.18;
-export const TEACHER_PRICE_NET = +(TEACHER_PRICE_GROSS / (1 + TEACHER_VAT_RATE)).toFixed(2); // 50.85
 
 // ── מפתחות ההמלצה בשאלון הילדים ──────────────────────────────────────────
 //

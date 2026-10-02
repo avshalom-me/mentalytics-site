@@ -13,8 +13,11 @@ import {
   gradeGroupLabel,
   qualificationLabel,
   qualificationAllowsRemedial,
+  teacherSearchFromKey,
+  TEACHER_REFERRAL_KEYS,
 } from "@/app/lib/teacher-options";
 import { trialDaysLeft } from "@/app/lib/teacher-trial";
+import { teacherSupplyForKeys } from "@/app/lib/teacher-match";
 import { TEACHER_EMAIL_PREVIEWS } from "@/app/lib/teacher-email-templates";
 import { TEACHER_RECRUITMENT_CHANNELS, teacherCampaign, teacherJoinUrl } from "@/app/lib/teacher-recruitment";
 
@@ -71,6 +74,14 @@ type Teacher = {
 type Note = { id: string; body: string; author: string | null; created_at: string };
 type DemandRow = { subject: string; remedial: boolean; region: string; searches: number; empty_searches: number; avg_returned: number };
 
+/** ההמלצות שהשאלון מפיק - לכל אחת כפתור חיפוש משלה בדוח של ההורים. */
+const SUPPLY_KEYS = [
+  TEACHER_REFERRAL_KEYS.remedialMath,
+  TEACHER_REFERRAL_KEYS.remedialReading,
+  TEACHER_REFERRAL_KEYS.tutorMath,
+  TEACHER_REFERRAL_KEYS.tutorEnglish,
+];
+
 const TABS: { key: string; label: string; states: string[] }[] = [
   { key: "pending", label: "ממתינים לאישור", states: ["pending"] },
   { key: "listed", label: "מוצגים (ניסיון + משלמים)", states: ["trial", "paying"] },
@@ -96,6 +107,7 @@ export default function AdminTeachersPage() {
   const [notes, setNotes] = useState<Record<string, Note[]>>({});
   const [newNote, setNewNote] = useState("");
   const [demand, setDemand] = useState<DemandRow[] | null>(null);
+  const [recommended, setRecommended] = useState<{ key: string; reports: number }[]>([]);
   const [panel, setPanel] = useState<"" | "demand" | "channels" | "emails">("");
 
   const load = useCallback(() => {
@@ -126,7 +138,10 @@ export default function AdminTeachersPage() {
     if (p === "demand" && demand === null) {
       fetch("/api/admin-teachers?demand=1&days=30")
         .then((r) => r.json())
-        .then((j) => setDemand(j.ok ? j.demand : []))
+        .then((j) => {
+          setDemand(j.ok ? j.demand : []);
+          setRecommended(j.ok && Array.isArray(j.recommended) ? j.recommended : []);
+        })
         .catch(() => setDemand([]));
     }
   }
@@ -140,6 +155,8 @@ export default function AdminTeachersPage() {
     const states = TABS.find((t) => t.key === tab)?.states ?? [];
     return rows.filter((r) => states.includes(r.listing_state));
   }, [rows, tab]);
+  // שער ההיצע, כפי שההורים רואים אותו: לאיזו המלצה יש כבר מורה להציע.
+  const supply = useMemo(() => teacherSupplyForKeys(rows, SUPPLY_KEYS, null), [rows]);
   const signupsByCampaign = useMemo(() => {
     const c: Record<string, number> = {};
     for (const r of rows) if (r.signup_utm_campaign) c[r.signup_utm_campaign] = (c[r.signup_utm_campaign] ?? 0) + 1;
@@ -229,9 +246,21 @@ export default function AdminTeachersPage() {
           <HelpTip id="teachers" />
         </div>
         <p className="mb-4 text-sm text-stone-500">
-          {TEACHER_TRIAL_DAYS} ימי ניסיון מהאישור, בלי תשלום. ביום ה-{TEACHER_PAY_EMAIL_DAY} יוצא מייל להרשמה ({TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ), ביום האחרון מייל נוסף,
+          {TEACHER_TRIAL_DAYS} ימי ניסיון מהאישור, בלי תשלום. ביום ה-{TEACHER_PAY_EMAIL_DAY} יוצא מייל להרשמה ({TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ), ביום האחרון מייל נוסף,
           ולמחרת מי שלא נרשם/ה עובר/ת לארכיון. המורים מוצגים רק בתוצאות שאלון הילדים.
         </p>
+
+        <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 text-xs leading-5 text-stone-600">
+          <span className="font-bold text-stone-800">כפתור &quot;חיפוש מורה&quot; בדוח של ההורים</span> מופיע רק להמלצה שיש לה לפחות מורה מוצג/ת אחד/ת
+          (לפי תחום, סוג מורה ושכבת הגיל של הילד/ה). עד אז ההמלצה מוצגת בלי חיפוש, כדי שהורים לא יגיעו למאגר ריק.
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {SUPPLY_KEYS.map((k) => (
+              <span key={k} className={`rounded-full px-2 py-0.5 font-bold ${supply[k] ? "bg-emerald-50 text-emerald-700" : "bg-stone-100 text-stone-500"}`}>
+                {supply[k] ? "✓" : "✗"} {teacherSearchFromKey(k).label}
+              </span>
+            ))}
+          </div>
+        </div>
 
         <div className="mb-4 flex flex-wrap gap-2">
           <button onClick={() => togglePanel("demand")} className={`${btn} ${panel === "demand" ? "bg-stone-200" : "bg-white"}`}>📊 ביקוש: מה הורים מחפשים</button>
@@ -241,8 +270,22 @@ export default function AdminTeachersPage() {
 
         {panel === "demand" && (
           <div className="mb-5 rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="mb-2 text-sm font-black text-stone-800">דוחות שכללו המלצה למורה ב-30 הימים האחרונים</div>
+            <p className="mb-2 text-xs text-stone-500">
+              כמה הורים קיבלו מהשאלון כל אחת מההמלצות. זה הביקוש שקיים גם לפני שיש מורים, ולפיו כדאי להתחיל לגייס. הספירה מתחילה ביום שהענף עלה לאוויר.
+            </p>
+            {demand !== null && recommended.length === 0 && <p className="mb-4 text-xs text-stone-400">עדיין לא נרשמו דוחות כאלה.</p>}
+            {recommended.length > 0 && (
+              <div className="mb-4 flex flex-wrap gap-1.5 text-xs">
+                {recommended.map((r) => (
+                  <span key={r.key} className="rounded-full bg-stone-100 px-2.5 py-1 font-bold text-stone-700">
+                    {teacherSearchFromKey(r.key).label}: {r.reports}
+                  </span>
+                ))}
+              </div>
+            )}
             <div className="mb-2 text-sm font-black text-stone-800">חיפושי מורים ב-30 הימים האחרונים</div>
-            <p className="mb-3 text-xs text-stone-500">כל חיפוש של הורה מתוך תוצאות השאלון. "חזרו ריקים" = לא נמצא אף מורה. זו הרשימה שלפיה כדאי לגייס: תחום ואזור שמחפשים בהם ואין בהם מורים.</p>
+            <p className="mb-3 text-xs text-stone-500">כל חיפוש של הורה מתוך תוצאות השאלון. &quot;חזרו ריקים&quot; = לא נמצא אף מורה. זו הרשימה שלפיה כדאי לגייס: תחום ואזור שמחפשים בהם ואין בהם מורים.</p>
             {demand === null && <p className="text-xs text-stone-400">טוען…</p>}
             {demand !== null && demand.length === 0 && <p className="text-xs text-stone-400">עדיין לא נרשמו חיפושים.</p>}
             {demand !== null && demand.length > 0 && (
@@ -378,7 +421,7 @@ export default function AdminTeachersPage() {
                       {t.stats?.contacts_30d ?? 0}
                       <span className="text-xs font-bold text-stone-400"> / {t.stats?.contacts_total ?? 0}</span>
                     </div>
-                    <div className="text-[11px] text-stone-400">פניות 30 יום / סה"כ</div>
+                    <div className="text-[11px] text-stone-400">פניות 30 יום / סה״כ</div>
                     <div className="mt-1 text-xs text-stone-500">{t.stats?.impressions_30d ?? 0} הופעות ב-30 יום</div>
                   </div>
                 </div>
@@ -433,7 +476,7 @@ export default function AdminTeachersPage() {
                   {t.trial_ends_at && (t.listing_state === "trial" || t.listing_state === "paying") && (
                     <button disabled={isBusy} onClick={() => run(t.id, "resend_approval", {}, "לשלוח שוב את מייל האישור?")} className={btn}>מייל אישור שוב</button>
                   )}
-                  <a href={gmailSearchUrl(t.email)} target="_blank" rel="noopener noreferrer" className={btn}>ג'ימייל ↗</a>
+                  <a href={gmailSearchUrl(t.email)} target="_blank" rel="noopener noreferrer" className={btn}>ג׳ימייל ↗</a>
                   <button onClick={() => { const next = open ? null : t.id; setOpenId(next); setNewNote(""); if (next) loadNotes(next); }} className={btn}>{open ? "סגירה" : "פרטים והיסטוריה"}</button>
                   <button disabled={isBusy} onClick={() => remove(t)} className="ms-auto rounded-full px-3 py-1 text-xs font-bold text-red-400 hover:bg-red-50 disabled:opacity-50">מחיקה</button>
                 </div>
@@ -446,7 +489,7 @@ export default function AdminTeachersPage() {
                       <div><b>הצהרת היעדר הרשעה:</b> {t.declared_no_record ? "כן" : "לא"} · <b>מקור:</b> {t.signup_source}</div>
                       {t.bio && <div className="whitespace-pre-line rounded-lg bg-white p-2 text-stone-700">{t.bio}</div>}
                       <div className="text-stone-400">
-                        פנייה אחרונה: {fmtDate(t.stats?.last_contact_at ?? null)} · הופעות סה"כ {t.stats?.impressions_total ?? 0} · צפיות בפרופיל ב-30 יום {t.stats?.profile_views_30d ?? 0}
+                        פנייה אחרונה: {fmtDate(t.stats?.last_contact_at ?? null)} · הופעות סה״כ {t.stats?.impressions_total ?? 0} · צפיות בפרופיל ב-30 יום {t.stats?.profile_views_30d ?? 0}
                       </div>
                     </div>
                     <div>

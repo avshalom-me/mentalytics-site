@@ -5,6 +5,7 @@ import {
   TEACHER_SUBJECTS,
   TEACHER_GRADE_GROUPS,
   TEACHER_QUALIFICATIONS,
+  TEACHER_LANGUAGES,
   qualificationAllowsRemedial,
 } from "@/app/lib/teacher-options";
 
@@ -52,8 +53,6 @@ export const EMPTY_TEACHER_FORM: TeacherForm = {
   experience_years: "",
 };
 
-const LANGS = ["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"];
-
 export const field = "w-full rounded-xl border border-[var(--line)] bg-white px-3 py-2.5 text-sm outline-none focus:border-[var(--teal)]";
 export const label = "mb-1 block text-sm font-bold text-[var(--text-2)]";
 
@@ -88,6 +87,7 @@ export default function TeacherProfileFields({
   setForm,
   emailLocked = false,
   qualificationLocked = false,
+  remedialVerified = false,
 }: {
   form: TeacherForm;
   setForm: (next: TeacherForm) => void;
@@ -95,41 +95,45 @@ export default function TeacherProfileFields({
   emailLocked?: boolean;
   /** אחרי האישור ההכשרה היא מה שאומת מול התעודה, ולכן היא נעולה לעריכה. */
   qualificationLocked?: boolean;
+  /** הסימון "הוראה מתקנת" כפי שהוא שמור (ואומת). אחרי האישור אפשר רק להסיר אותו. */
+  remedialVerified?: boolean;
 }) {
-  const remedialAllowed = qualificationAllowsRemedial(form.qualification) && (!qualificationLocked || form.remedial);
+  // לפי מה ששמור ולא לפי התיבה עצמה: תיבה שננעלת ברגע שמבטלים אותה לא משאירה
+  // דרך להתחרט לפני השמירה.
+  const remedialAllowed = qualificationAllowsRemedial(form.qualification) && (!qualificationLocked || remedialVerified);
   const set = (patch: Partial<TeacherForm>) => setForm({ ...form, ...patch });
 
   return (
     <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label className={label}>שם מלא *</label>
-          <input value={form.full_name} onChange={(e) => set({ full_name: e.target.value })} required className={field} />
+          <label htmlFor="tf-name" className={label}>שם מלא *</label>
+          <input id="tf-name" autoComplete="name" value={form.full_name} onChange={(e) => set({ full_name: e.target.value })} required className={field} />
         </div>
         <div>
-          <label className={label}>מגדר</label>
-          <select value={form.gender} onChange={(e) => set({ gender: e.target.value as TeacherForm["gender"] })} className={field}>
+          <label htmlFor="tf-gender" className={label}>מגדר</label>
+          <select id="tf-gender" value={form.gender} onChange={(e) => set({ gender: e.target.value as TeacherForm["gender"] })} className={field}>
             <option value="">-- לא לציין --</option>
             <option value="נקבה">נקבה</option>
             <option value="זכר">זכר</option>
           </select>
         </div>
         <div>
-          <label className={label}>מייל *</label>
-          <input type="email" value={form.email} onChange={(e) => set({ email: e.target.value })} required disabled={emailLocked} className={`${field} disabled:opacity-60`} />
+          <label htmlFor="tf-email" className={label}>מייל *</label>
+          <input id="tf-email" type="email" autoComplete="email" dir="ltr" value={form.email} onChange={(e) => set({ email: e.target.value })} required disabled={emailLocked} className={`${field} disabled:opacity-60`} />
         </div>
         <div>
-          <label className={label}>טלפון נייד * <span className="font-normal text-[var(--muted)]">(ההורים פונים בוואטסאפ)</span></label>
-          <input type="tel" value={form.phone} onChange={(e) => set({ phone: e.target.value })} required className={field} />
+          <label htmlFor="tf-phone" className={label}>טלפון נייד * <span className="font-normal text-[var(--muted)]">(ההורים פונים בוואטסאפ)</span></label>
+          <input id="tf-phone" type="tel" autoComplete="tel" dir="ltr" value={form.phone} onChange={(e) => set({ phone: e.target.value })} required className={field} />
         </div>
       </div>
 
       <div>
-        <div className={label}>תחומי הוראה *</div>
-        <div className="flex flex-wrap gap-2">
+        <div id="tf-subjects" className={label}>תחומי הוראה *</div>
+        <div role="group" aria-labelledby="tf-subjects" className="flex flex-wrap gap-2">
           {TEACHER_SUBJECTS.map((s) => (
-            <label key={s.key} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${form.subjects.includes(s.key) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
-              <input type="checkbox" className="hidden" checked={form.subjects.includes(s.key)} onChange={() => set({ subjects: toggle(form.subjects, s.key) })} />
+            <label key={s.key} className={`cursor-pointer rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1.5 text-sm ${form.subjects.includes(s.key) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
+              <input type="checkbox" className="sr-only" checked={form.subjects.includes(s.key)} onChange={() => set({ subjects: toggle(form.subjects, s.key) })} />
               {s.label}
             </label>
           ))}
@@ -137,11 +141,11 @@ export default function TeacherProfileFields({
       </div>
 
       <div>
-        <div className={label}>שכבות גיל *</div>
-        <div className="flex flex-wrap gap-2">
+        <div id="tf-grades" className={label}>שכבות גיל *</div>
+        <div role="group" aria-labelledby="tf-grades" className="flex flex-wrap gap-2">
           {TEACHER_GRADE_GROUPS.map((g) => (
-            <label key={g.key} className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm ${form.grade_groups.includes(g.key) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
-              <input type="checkbox" className="hidden" checked={form.grade_groups.includes(g.key)} onChange={() => set({ grade_groups: toggle(form.grade_groups, g.key) })} />
+            <label key={g.key} className={`cursor-pointer rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1.5 text-sm ${form.grade_groups.includes(g.key) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
+              <input type="checkbox" className="sr-only" checked={form.grade_groups.includes(g.key)} onChange={() => set({ grade_groups: toggle(form.grade_groups, g.key) })} />
               {g.label}
             </label>
           ))}
@@ -149,11 +153,12 @@ export default function TeacherProfileFields({
       </div>
 
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
-        <div className={label}>הכשרה *</div>
+        <label htmlFor="tf-qualification" className={label}>הכשרה *</label>
         {qualificationLocked && (
           <p className="mb-2 text-xs text-[var(--muted)]">ההכשרה אומתה מול התעודה. לשינוי שלה (למשל אחרי השלמת תעודה נוספת) - כתבו לנו.</p>
         )}
         <select
+          id="tf-qualification"
           disabled={qualificationLocked}
           value={form.qualification}
           onChange={(e) => {
@@ -170,12 +175,12 @@ export default function TeacherProfileFields({
         </select>
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
-            <label className={label}>המוסד שהעניק את התעודה / התואר</label>
-            <input disabled={qualificationLocked} value={form.institution} onChange={(e) => set({ institution: e.target.value })} className={`${field} disabled:opacity-60`} placeholder="למשל: לוינסקי-וינגייט, דוד ילין, בית ברל" />
+            <label htmlFor="tf-institution" className={label}>המוסד שהעניק את התעודה / התואר</label>
+            <input id="tf-institution" disabled={qualificationLocked} value={form.institution} onChange={(e) => set({ institution: e.target.value })} className={`${field} disabled:opacity-60`} placeholder="למשל: לוינסקי-וינגייט, דוד ילין, בית ברל" />
           </div>
           <div>
-            <label className={label}>שנת סיום</label>
-            <input disabled={qualificationLocked} inputMode="numeric" value={form.qualification_year} onChange={(e) => set({ qualification_year: e.target.value.replace(/\D/g, "").slice(0, 4) })} className={`${field} disabled:opacity-60`} />
+            <label htmlFor="tf-year" className={label}>שנת סיום</label>
+            <input id="tf-year" disabled={qualificationLocked} inputMode="numeric" value={form.qualification_year} onChange={(e) => set({ qualification_year: e.target.value.replace(/\D/g, "").slice(0, 4) })} className={`${field} disabled:opacity-60`} />
           </div>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -184,8 +189,8 @@ export default function TeacherProfileFields({
             יש לי תעודת הוראה
           </label>
           <div className="flex items-center gap-2 text-sm">
-            <span>שנות ניסיון בהוראה:</span>
-            <input inputMode="numeric" value={form.experience_years} onChange={(e) => set({ experience_years: e.target.value.replace(/\D/g, "").slice(0, 2) })} className={`${field} w-20`} />
+            <label htmlFor="tf-experience">שנות ניסיון בהוראה:</label>
+            <input id="tf-experience" inputMode="numeric" value={form.experience_years} onChange={(e) => set({ experience_years: e.target.value.replace(/\D/g, "").slice(0, 2) })} className={`${field} w-20`} />
           </div>
         </div>
         <label className={`mt-3 flex items-start gap-2 text-sm ${remedialAllowed ? "" : "opacity-50"}`}>
@@ -194,7 +199,9 @@ export default function TeacherProfileFields({
             <strong>אני מורה להוראה מתקנת (מותאמת)</strong>
             <span className="block text-xs text-[var(--muted)]">
               {remedialAllowed
-                ? "השאלון מפנה להוראה מתקנת כשזוהה קושי ממוקד בקריאה, בכתיבה או בחשבון. הסימון מאומת מול התעודה."
+                ? qualificationLocked && !form.remedial
+                  ? "שמירה בלי הסימון תסיר את הפרופיל מהחיפושים של הוראה מתקנת. החזרת הסימון אחר כך נעשית דרכנו."
+                  : "השאלון מפנה להוראה מתקנת כשזוהה קושי ממוקד בקריאה, בכתיבה או בחשבון. הסימון מאומת מול התעודה."
                 : qualificationLocked
                   ? "הפרופיל אושר לתגבור פרטי. לרישום כהוראה מתקנת נדרש אימות של תעודה מתאימה - כתבו לנו."
                   : "זמין רק עם תעודת הוראה מתקנת, תואר בחינוך מיוחד או תואר שני בלקויות למידה. עם הכשרה אחרת הפרופיל מוצג לתגבור פרטי."}
@@ -214,25 +221,25 @@ export default function TeacherProfileFields({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <div className={label}>שפות הוראה</div>
-          <div className="flex flex-wrap gap-2">
-            {LANGS.map((l) => (
-              <label key={l} className={`cursor-pointer rounded-full border px-3 py-1 text-xs ${form.languages.includes(l) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
-                <input type="checkbox" className="hidden" checked={form.languages.includes(l)} onChange={() => set({ languages: toggle(form.languages, l) })} />
+          <div id="tf-languages" className={label}>שפות הוראה</div>
+          <div role="group" aria-labelledby="tf-languages" className="flex flex-wrap gap-2">
+            {TEACHER_LANGUAGES.map((l) => (
+              <label key={l} className={`cursor-pointer rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1 text-xs ${form.languages.includes(l) ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"}`}>
+                <input type="checkbox" className="sr-only" checked={form.languages.includes(l)} onChange={() => set({ languages: toggle(form.languages, l) })} />
                 {l}
               </label>
             ))}
           </div>
         </div>
         <div>
-          <label className={label}>מחיר לשיעור <span className="font-normal text-[var(--muted)]">(מוצג להורים)</span></label>
-          <input value={form.price_text} onChange={(e) => set({ price_text: e.target.value })} className={field} placeholder='למשל: 150-180 ש"ח לשעה' maxLength={60} />
+          <label htmlFor="tf-price" className={label}>מחיר לשיעור <span className="font-normal text-[var(--muted)]">(מוצג להורים)</span></label>
+          <input id="tf-price" value={form.price_text} onChange={(e) => set({ price_text: e.target.value })} className={field} placeholder='למשל: 150-180 ש"ח לשעה' maxLength={60} />
         </div>
       </div>
 
       <div>
-        <label className={label}>כמה מילים על עצמך <span className="font-normal text-[var(--muted)]">(מוצג להורים; עד 1,200 תווים)</span></label>
-        <textarea value={form.bio} onChange={(e) => set({ bio: e.target.value.slice(0, 1200) })} rows={5} className={field} placeholder="ניסיון, גישה, עם אילו קשיים עבדת, איך נראה שיעור" />
+        <label htmlFor="tf-bio" className={label}>כמה מילים על עצמך <span className="font-normal text-[var(--muted)]">(מוצג להורים; עד 1,200 תווים)</span></label>
+        <textarea id="tf-bio" value={form.bio} onChange={(e) => set({ bio: e.target.value.slice(0, 1200) })} rows={5} className={field} placeholder="ניסיון, גישה, עם אילו קשיים עבדת, איך נראה שיעור" />
       </div>
     </div>
   );

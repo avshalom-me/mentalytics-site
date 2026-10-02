@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { matchTeachers, isTeacherListed, type TeacherRow, type TeacherMatchInput } from "./teacher-match";
-import { teacherSearchFromKey, TEACHER_REFERRAL_KEYS, qualificationAllowsRemedial } from "./teacher-options";
+import { matchTeachers, isTeacherListed, teacherSupplyForKeys, type TeacherRow, type TeacherMatchInput } from "./teacher-match";
+import { teacherSearchFromKey, TEACHER_REFERRAL_KEYS, qualificationAllowsRemedial, hasActiveStandingOrder } from "./teacher-options";
 
 const NOW = new Date("2026-10-02T10:00:00Z");
 
@@ -60,6 +60,15 @@ describe("teacher referral keys", () => {
   });
 });
 
+describe("an active standing order", () => {
+  it("needs an id and no cancellation - the one rule the cron, the admin and the checkout share", () => {
+    expect(hasActiveStandingOrder({ sumit_recurring_id: "123", sumit_cancelled_at: null })).toBe(true);
+    expect(hasActiveStandingOrder({ sumit_recurring_id: "123", sumit_cancelled_at: "2026-12-01T00:00:00Z" })).toBe(false);
+    expect(hasActiveStandingOrder({ sumit_recurring_id: null, sumit_cancelled_at: null })).toBe(false);
+    expect(hasActiveStandingOrder({})).toBe(false);
+  });
+});
+
 describe("who is listed", () => {
   it("trial and paying are listed; pending, archived and rejected are not", () => {
     for (const s of ["trial", "paying"]) expect(isTeacherListed(row({ listing_state: s }), NOW)).toBe(true);
@@ -68,6 +77,51 @@ describe("who is listed", () => {
   it("a pause with a future date hides the teacher, a past one does not", () => {
     expect(isTeacherListed(row({ paused_until: "2026-10-09T00:00:00Z" }), NOW)).toBe(false);
     expect(isTeacherListed(row({ paused_until: "2026-09-01T00:00:00Z" }), NOW)).toBe(true);
+  });
+});
+
+describe("the supply gate: is there anyone to show for a referral", () => {
+  const K = TEACHER_REFERRAL_KEYS;
+  const all = [K.remedialMath, K.remedialReading, K.tutorMath, K.tutorEnglish];
+
+  it("an empty directory offers no search at all", () => {
+    expect(teacherSupplyForKeys([], all, "ag", NOW)).toEqual({ [K.remedialMath]: false, [K.remedialReading]: false, [K.tutorMath]: false, [K.tutorEnglish]: false });
+  });
+  it("one remedial maths teacher opens remedial maths and maths tutoring, and nothing else", () => {
+    const rows = [row({ subjects: ["math"], remedial: true, grade_groups: ["ag", "dv"] })];
+    expect(teacherSupplyForKeys(rows, all, "ag", NOW)).toEqual({ [K.remedialMath]: true, [K.remedialReading]: false, [K.tutorMath]: true, [K.tutorEnglish]: false });
+  });
+  it("a tutor does not open a remedial referral", () => {
+    const rows = [row({ subjects: ["math"], remedial: false })];
+    expect(teacherSupplyForKeys(rows, [K.remedialMath, K.tutorMath], "ag", NOW)).toEqual({ [K.remedialMath]: false, [K.tutorMath]: true });
+  });
+  it("respects the child's grade group, and ignores it when there is none", () => {
+    const rows = [row({ subjects: ["english"], remedial: false, grade_groups: ["tyb"] })];
+    expect(teacherSupplyForKeys(rows, [K.tutorEnglish], "zh", NOW)[K.tutorEnglish]).toBe(false);
+    expect(teacherSupplyForKeys(rows, [K.tutorEnglish], "tyb", NOW)[K.tutorEnglish]).toBe(true);
+    expect(teacherSupplyForKeys(rows, [K.tutorEnglish], null, NOW)[K.tutorEnglish]).toBe(true);
+  });
+  it("counts only teachers who are shown right now", () => {
+    const hidden = [
+      row({ listing_state: "pending" }),
+      row({ listing_state: "archived" }),
+      row({ paused_until: "2026-10-09T00:00:00Z" }),
+    ];
+    expect(teacherSupplyForKeys(hidden, [K.remedialMath], "ag", NOW)[K.remedialMath]).toBe(false);
+  });
+  it("agrees with the search itself: a key is open exactly when a location-free search returns someone", () => {
+    const rows = [
+      row({ id: "a", subjects: ["math"], remedial: true, grade_groups: ["ag"] }),
+      row({ id: "b", subjects: ["english"], remedial: false, grade_groups: ["zh", "tyb"], languages: ["אנגלית"] }),
+    ];
+    for (const grade of ["ag", "dv", "zh", "tyb"] as const) {
+      const supply = teacherSupplyForKeys(rows, all, grade, NOW);
+      for (const key of all) {
+        const s = teacherSearchFromKey(key);
+        const found = matchTeachers(rows, input({ subject: s.subject, remedial: s.remedial, gradeGroup: grade, language: "" }), NOW).length > 0;
+        expect(supply[key], `${key} / ${grade}`).toBe(found);
+      }
+    }
   });
 });
 
@@ -115,6 +169,23 @@ describe("matchTeachers", () => {
     expect(ids).toContain("online-far");
     expect(out.find((m) => m.teacher.id === "same-city")!.inRequestedArea).toBe(true);
     expect(out.find((m) => m.teacher.id === "neighbour")!.inRequestedArea).toBe(false);
+  });
+
+  it("says why a teacher outside the area is there: a neighbouring region, or online", () => {
+    // המסך כותב את התווית לפי הסיבות האלה, ולא לפי מה שההורה סימן בטופס.
+    const rows = [
+      row({ id: "online-far", regions: ["אילת"], online: true }),
+      row({ id: "neighbour", regions: ["תל אביב"] }),
+      row({ id: "neighbour-online", regions: ["תל אביב"], online: true }),
+    ];
+    const out = matchTeachers(rows, input({ city: "כפר סבא", region: "דרום השרון" }), NOW);
+    const reasons = (id: string) => out.find((m) => m.teacher.id === id)!.reasons;
+    expect(reasons("online-far")).toContain("אונליין");
+    expect(reasons("online-far")).not.toContain("אזור סמוך");
+    expect(reasons("neighbour")).toContain("אזור סמוך");
+    expect(reasons("neighbour")).not.toContain("אונליין");
+    expect(reasons("neighbour-online")).toEqual(expect.arrayContaining(["אזור סמוך", "אונליין"]));
+    for (const m of out) expect(m.inRequestedArea).toBe(false);
   });
 
   it("online-only request keeps online teachers only", () => {

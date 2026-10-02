@@ -8,7 +8,7 @@
 // ניסיון, ואז סבב יומי כדי שאף מורה לא יתקע תמיד אחרון/ה.
 
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
-import type { TeacherGradeGroup, TeacherSubject } from "@/app/lib/teacher-options";
+import { teacherSearchFromKey, type TeacherGradeGroup, type TeacherSubject } from "@/app/lib/teacher-options";
 
 export type TeacherRow = {
   id: string;
@@ -170,4 +170,34 @@ export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now:
     return dailyRotation(a.teacher.id, day) - dailyRotation(b.teacher.id, day);
   });
   return scored.slice(0, Math.max(1, Math.min(input.limit || 10, 20)));
+}
+
+/**
+ * שער ההיצע: לכל מפתח המלצה - האם יש במאגר לפחות מורה מוצג/ת אחד/ת שמתאים/ה
+ * לו (תחום, סוג מורה ושכבת גיל), בלי קשר למיקום ולשפה.
+ *
+ * כפתור "חיפוש מורה" בדוח של ההורה מופיע רק כשהתשובה חיובית. בלי השער,
+ * הכפתור הראשי של הדוח היה מוביל למאגר ריק בכל התקופה שבין העלאת הענף
+ * לבין גיוס המורים הראשונים - וההמלצה עצמה (הוראה מתקנת, תגבור) נכונה גם
+ * כשאין לנו מורה להציע. עד שיש היצע, הכרטיס מוצג כפנייה נוספת בלי חיפוש,
+ * כפי שהוראה מתקנת הוצגה לפני הענף.
+ */
+export function teacherSupplyForKeys(
+  rows: Pick<TeacherRow, "subjects" | "remedial" | "grade_groups" | "listing_state" | "paused_until">[],
+  keys: string[],
+  gradeGroup: TeacherGradeGroup | null,
+  now: Date = new Date(),
+): Record<string, boolean> {
+  const listed = rows.filter((t) => isTeacherListed(t, now));
+  const out: Record<string, boolean> = {};
+  for (const key of keys) {
+    const search = teacherSearchFromKey(key);
+    out[key] = listed.some(
+      (t) =>
+        (!search.subject || t.subjects.includes(search.subject)) &&
+        (!search.remedial || t.remedial) &&
+        (!gradeGroup || t.grade_groups.includes(gradeGroup)),
+    );
+  }
+  return out;
 }

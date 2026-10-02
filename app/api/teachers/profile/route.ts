@@ -12,6 +12,7 @@ import {
   TEACHER_QUALIFICATION_KEYS,
   TEACHER_PRICE_GROSS,
   qualificationAllowsRemedial,
+  hasActiveStandingOrder,
 } from "@/app/lib/teacher-options";
 
 // הפרופיל של המורה המחובר/ת (לפי העוגייה): GET לקריאה, כולל נתוני הופעות
@@ -54,7 +55,7 @@ const FIELD_LABELS: Record<string, string> = {
 function view(t: Record<string, unknown>) {
   const state = String(t.listing_state);
   const trialEndsAt = (t.trial_ends_at as string | null) ?? null;
-  const subscribed = !!t.sumit_recurring_id && !t.sumit_cancelled_at;
+  const subscribed = hasActiveStandingOrder(t);
   const phase = state === "trial" ? trialPhase(trialEndsAt) : null;
   return {
     id: t.id,
@@ -77,7 +78,8 @@ function view(t: Record<string, unknown>) {
     teaching_certificate: t.teaching_certificate,
     experience_years: t.experience_years,
     has_certificate: !!t.certificate_path,
-    photo_url: teacherPhotoUrl({ id: String(t.id), photo_path: (t.photo_path as string | null) ?? null }),
+    // תמונה של מורה שנדחה/תה אינה מוגשת (ראו /teacher-photo), ולכן גם לא מקושרת.
+    photo_url: state === "rejected" ? null : teacherPhotoUrl({ id: String(t.id), photo_path: (t.photo_path as string | null) ?? null }),
     listing_state: state,
     /** אחרי האישור ההכשרה נעולה לעריכה - שינוי שלה עובר דרכנו. */
     qualification_locked: !!t.approved_at,

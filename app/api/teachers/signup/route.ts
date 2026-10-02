@@ -172,9 +172,13 @@ export async function POST(req: NextRequest) {
   const flooded = (recent ?? 0) > DAILY_SIGNUP_EMAIL_CAP;
   const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
+  // ממתינים לשליחה לפני שהתשובה יוצאת: ב-Vercel הפונקציה נעצרת ברגע שהתשובה
+  // נשלחה, ובקשה ל-Resend שעוד באוויר נופלת - והמייל הזה נושא את הקישור
+  // האישי. allSettled: מייל שנכשל לא מפיל הרשמה שכבר נשמרה.
+  const mails: Promise<unknown>[] = [];
   if (!flooded) {
     // אלינו: מורה חדש/ה ממתין/ה לאימות (נמען פנימי - מותר תמיד).
-    void sendOpsEmail({
+    mails.push(sendOpsEmail({
       template: "teacher_signup_admin",
       subject: `מורה חדש/ה נרשם/ה למענה הלימודי: ${b.full_name}`,
       html: `<div dir="rtl" style="font-family:Heebo,Arial,sans-serif;line-height:1.7">
@@ -185,15 +189,16 @@ export async function POST(req: NextRequest) {
         הכשרה: ${escapeHtml(qualificationLabel(b.qualification))}${b.institution ? ` (${escapeHtml(b.institution)})` : ""}</p>
         <p><a href="${site}/admin/teachers">לאישור באדמין ←</a></p>
       </div>`,
-    });
-    void sendTeacherSignupReceivedEmail({ id: created.id, email: b.email, full_name: b.full_name, edit_token: token });
+    }));
+    mails.push(sendTeacherSignupReceivedEmail({ id: created.id, email: b.email, full_name: b.full_name, edit_token: token }));
   } else if ((recent ?? 0) === DAILY_SIGNUP_EMAIL_CAP + 1) {
-    void sendOpsEmail({
+    mails.push(sendOpsEmail({
       template: "teacher_signup_flood",
       subject: `מענה לימודי: יותר מ-${DAILY_SIGNUP_EMAIL_CAP} הרשמות מורים ביממה - המיילים הושהו`,
       html: `<div dir="rtl" style="font-family:Heebo,Arial,sans-serif;line-height:1.7"><p>ההרשמות ממשיכות להישמר וממתינות באדמין, אבל מיילי הקליטה וההתראות הושהו עד שהקצב ירד. כדאי לבדוק אם אלה הרשמות אמיתיות.</p><p><a href="${site}/admin/teachers">לעמוד המורים ←</a></p></div>`,
-    });
+    }));
   }
+  await Promise.allSettled(mails);
 
   // הקישור האישי מוצג פעם אחת במסך הסיום (גיבוי למייל שנחת בספאם).
   const res = NextResponse.json({ ok: true, id: created.id, link: teacherLinkUrl(token) });

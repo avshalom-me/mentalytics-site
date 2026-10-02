@@ -48,6 +48,15 @@ interface SumitEnvelope<T> {
   Data: T;
 }
 
+/**
+ * Sumit answered and refused the request (envelope Status != 0): nothing was
+ * created on their side. Distinct from an HTTP failure or a dropped
+ * connection, after which a standing order may or may not exist - a caller
+ * that retries has to know which of the two happened. Same message as before;
+ * `instanceof Error` still holds.
+ */
+export class SumitBusinessError extends Error {}
+
 async function api<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: "POST",
@@ -63,7 +72,7 @@ async function api<T>(path: string, body: Record<string, unknown>): Promise<T> {
   const env = (await res.json()) as SumitEnvelope<T>;
   if (env.Status !== 0) {
     const msg = env.UserErrorMessage || env.TechnicalErrorDetails || `status=${env.Status}`;
-    throw new Error(`Sumit ${path} business error: ${msg}`);
+    throw new SumitBusinessError(`Sumit ${path} business error: ${msg}`);
   }
   return env.Data;
 }

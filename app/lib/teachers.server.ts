@@ -5,6 +5,8 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { slugify } from "@/app/lib/articles";
 import type { TeacherRow } from "@/app/lib/teacher-match";
 
+import { TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
+
 export { teacherLinkUrl } from "@/app/lib/teacher-options";
 
 // עזרי שרת לענף המורים: הזדהות המורה (עוגייה), טעינה לפי טוקן/slug, יצירת
@@ -113,7 +115,7 @@ export async function loadListedTeacherBySlug(rawSlug: string): Promise<TeacherR
     .from("teachers")
     .select(TEACHER_PUBLIC_COLUMNS)
     .eq("slug", slug)
-    .in("listing_state", ["trial", "paying"])
+    .in("listing_state", [...TEACHER_LISTED_STATES])
     .maybeSingle();
   if (!data) return null;
   const row = data as unknown as TeacherRow;

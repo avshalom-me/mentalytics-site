@@ -22,7 +22,7 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 import TeacherMatchSection from "./TeacherMatchSection";
-import type { TeacherGradeGroup } from "@/app/lib/teacher-options";
+import { isRemedialTeacherKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
 import { getTreatmentArticle, getTreatmentArticleHref } from "@/app/lib/treatment-articles";
@@ -3211,6 +3211,28 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
     externalNotes: string[];
   };
 
+  // ענף המורים - שער ההיצע. כפתור "חיפוש מורה" מופיע רק להמלצה שיש לה במאגר
+  // לפחות מורה מוצג/ת אחד/ת (לפי תחום, סוג מורה ושכבת גיל). עד שהתשובה מגיעה,
+  // וכל עוד היא שלילית, הכרטיס מוצג כמו שהוראה מתקנת הוצגה לפני הענף: פנייה
+  // נוספת, בלי חיפוש. כך הכפתור הראשי של הדוח לעולם לא מוביל למאגר ריק.
+  const teacherKeysInReport = useMemo(
+    () => uniq(domainResults.flatMap(d => d.result.groups.filter(g => g.kind === "teacher").map(g => g.treatmentKey))).join("|"),
+    [domainResults],
+  );
+  const teacherGrade = acadGg(A);
+  const [teacherSupply, setTeacherSupply] = useState<Record<string, boolean>>({});
+  useEffect(() => {
+    if (!teacherKeysInReport) return;
+    let cancelled = false;
+    const q = new URLSearchParams({ keys: teacherKeysInReport });
+    if (teacherGrade !== "gan") q.set("gradeGroup", teacherGrade);
+    fetch(`/api/match-teachers?${q.toString()}`)
+      .then(r => r.json())
+      .then(j => { if (!cancelled && j?.ok && j.available) setTeacherSupply(j.available); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [teacherKeysInReport, teacherGrade]);
+
   const byDomain: DomainBucket[] = useMemo(() => {
     return domainResults.map(d => {
       const groups = d.result.groups.map(g => ({ ...g, domainLabel: d.label, domainKey: d.key }));
@@ -3220,14 +3242,18 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
         treatments: groups.filter(g => g.kind === "treatment" && g.treatmentKey !== "_no_action"),
         assessments: groups.filter(g => g.kind === "assessment"),
         professionals: groups.filter(g => g.kind === "professional"),
-        teachers: groups.filter(g => g.kind === "teacher"),
-        externals: groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
+        teachers: groups.filter(g => g.kind === "teacher" && teacherSupply[g.treatmentKey]),
+        externals: [
+          ...groups.filter(g => g.kind === "external" && g.treatmentKey !== "_no_action"),
+          // המלצה למורה שעדיין אין לה היצע במאגר: פנייה נוספת, בלי כפתור חיפוש.
+          ...groups.filter(g => g.kind === "teacher" && !teacherSupply[g.treatmentKey]).map(g => ({ ...g, kind: "external" as const })),
+        ],
         informational: groups.filter(g => g.treatmentKey === "_no_action"),
         standaloneWarnings: d.result.standaloneWarnings,
         externalNotes: d.result.externalNotes,
       };
     });
-  }, [domainResults]);
+  }, [domainResults, teacherSupply]);
 
   const hasAnyFindings = byDomain.some(b =>
     b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0 || b.externals.length > 0 || b.informational.length > 0 || b.standaloneWarnings.length > 0
@@ -3585,7 +3611,10 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           read the recommendation, then navigated BACK to the city directory to
           browse manually rather than clicking a card.
         */}
-        {hasAnyFindings && !selectedKey && audience !== "counselor" && (
+        {/* דוח שההמלצה היחידה בו היא מורה, ועדיין אין מורה להציע: אין מה לבחור,
+            ולכן אין רמז. בכל דוח אחר הרמז נשאר כפי שהיה. */}
+        {hasAnyFindings && !selectedKey && audience !== "counselor" &&
+          !(teacherKeysInReport && !byDomain.some(b => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 || b.teachers.length > 0)) && (
           <div
             className="mb-4 flex items-start gap-2 rounded-xl p-3 text-sm leading-relaxed"
             style={{ background: "var(--teal-pale)", border: "1px solid var(--teal-mid)", color: "var(--teal-dark)" }}
@@ -3775,7 +3804,12 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
                   <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 ps-1">🎓 מענה לימודי</div>
                   <p className="text-xs text-gray-500 mb-2 ps-1 pe-1">
-                    מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. אם אחרי כמה חודשים של הוראה סדירה אין שיפור - חוזרים לדוח ובודקים את ההמלצה לאבחון.
+                    מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל.{" "}
+                    {/* ההפניה לאבחון קיימת רק בכרטיסי ההוראה המתקנת (א׳-ו׳); בדוח של
+                        תגבור בלבד אין המלצה כזו לחזור אליה. */}
+                    {b.teachers.some(g => isRemedialTeacherKey(g.treatmentKey))
+                      ? "אם אחרי כמה חודשים של הוראה סדירה אין שיפור - חוזרים לדוח ובודקים את ההמלצה לאבחון."
+                      : "אם אחרי כמה חודשים של שיעורים סדירים אין שיפור - כדאי להתייעץ עם יועצת בית הספר על בירור נוסף."}
                   </p>
                   {b.teachers.map((g, idx) => {
                     if (b.teachers.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;

@@ -6,7 +6,7 @@ import MatchResultCard from "@/app/components/MatchResultCard";
 import TeacherContactButtons, { useTeacherImpressions } from "@/app/learning/TeacherContactButtons";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { trackingOptedOut } from "@/app/lib/track-optout";
-import { teacherPath, teacherSearchFromKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
+import { teacherPath, teacherSearchFromKey, TEACHER_LANGUAGES, type TeacherGradeGroup } from "@/app/lib/teacher-options";
 
 // מסך חיפוש המורים בתוך שאלון הילדים - המקבילה של KidsMatchSection לכרטיס
 // מסוג "teacher". קורא ל-/api/match-teachers (טבלת המורים בלבד), ומציג
@@ -38,9 +38,20 @@ type TeacherCard = {
   price_text: string | null;
   match_score: number;
   in_requested_area: boolean;
+  /** הסיבות שהשרת חישב: "באזור שלכם", "אזור סמוך", "אונליין" ועוד. */
+  match_reasons: string[];
 };
 
-const LANGS = ["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"];
+/**
+ * למה מורה שמחוץ לאזור מופיע/ה בכל זאת. נקבע לפי מה שהשרת חישב ולא לפי
+ * הטופס: מורה מאילת שמלמד/ת אונליין מוצע/ת גם להורה שלא סימן אונליין, ואז
+ * "אזור סמוך" היה פשוט לא נכון.
+ */
+function awayReason(t: TeacherCard): { nearby: boolean; label: string } {
+  const nearby = (t.match_reasons ?? []).includes("אזור סמוך");
+  if (!nearby) return { nearby, label: "אונליין" };
+  return { nearby, label: t.online ? "אזור סמוך, גם אונליין" : "אזור סמוך" };
+}
 
 export default function TeacherMatchSection({
   referralKey,
@@ -63,7 +74,7 @@ export default function TeacherMatchSection({
   const [results, setResults] = useState<TeacherCard[]>([]);
   // האזור שהחיפוש האחרון רץ עליו - הכותרות נקבעות לפיו ולא לפי הטופס, שהמשתמש
   // יכול לשנות אחרי שהתוצאות כבר על המסך.
-  const [searchedWith, setSearchedWith] = useState<{ located: boolean; online: boolean } | null>(null);
+  const [searchedWith, setSearchedWith] = useState<{ located: boolean } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -102,7 +113,7 @@ export default function TeacherMatchSection({
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "שגיאה בחיפוש");
       setResults(data.matches || []);
-      setSearchedWith({ located: !!(city || region), online });
+      setSearchedWith({ located: !!(city || region) });
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה בחיפוש");
@@ -116,6 +127,14 @@ export default function TeacherMatchSection({
   const away = results.filter((m) => !m.in_requested_area);
   const ordered = located ? [...local, ...away] : results;
   const localCount = located ? local.length : results.length;
+  const awayNearby = away.some((t) => awayReason(t).nearby);
+  const awayOnlineOnly = away.some((t) => !awayReason(t).nearby);
+  const awayKinds =
+    awayNearby && awayOnlineOnly
+      ? "מורים מאזורים סמוכים, ומורים שמלמדים אונליין"
+      : awayNearby
+        ? "מורים מאזורים סמוכים"
+        : "מורים שמלמדים אונליין";
 
   return (
     <div>
@@ -140,15 +159,15 @@ export default function TeacherMatchSection({
             </label>
           </div>
           <div className="mb-4">
-            <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">אזור מגורים</label>
-            <select value={region} onChange={(e) => { setRegion(e.target.value); setCity(""); }} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm mb-2">
+            <label htmlFor="tm-region" className="block text-sm font-semibold text-[#2a3a5a] mb-1">אזור מגורים</label>
+            <select id="tm-region" value={region} onChange={(e) => { setRegion(e.target.value); setCity(""); }} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm mb-2">
               <option value="">-- בחר אזור --</option>
               {ALL_REGIONS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
             {region && (
               <>
-                <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">עיר</label>
-                <select value={city} onChange={(e) => setCity(e.target.value)} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
+                <label htmlFor="tm-city" className="block text-sm font-semibold text-[#2a3a5a] mb-1">עיר</label>
+                <select id="tm-city" value={city} onChange={(e) => setCity(e.target.value)} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
                   <option value="">-- כל האזור --</option>
                   {(REGION_CITIES[region] ?? []).map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
@@ -162,17 +181,17 @@ export default function TeacherMatchSection({
           </div>
           <div className="mb-4 grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">שפת ההוראה</label>
-              <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
-                {LANGS.map((l) => <option key={l} value={l}>{l}</option>)}
+              <label htmlFor="tm-language" className="block text-sm font-semibold text-[#2a3a5a] mb-1">שפת ההוראה</label>
+              <select id="tm-language" value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
+                {TEACHER_LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
-              <div className="text-sm font-semibold text-[#2a3a5a] mb-2">העדפת מגדר</div>
-              <div className="flex gap-4">
+              <div id="tm-gender" className="text-sm font-semibold text-[#2a3a5a] mb-2">העדפת מגדר</div>
+              <div role="radiogroup" aria-labelledby="tm-gender" className="flex gap-4">
                 {(["", "זכר", "נקבה"] as const).map((g) => (
                   <label key={g} className="flex items-center gap-1.5 text-sm cursor-pointer">
-                    <input type="radio" checked={gender === g} onChange={() => setGender(g)} />
+                    <input type="radio" name="tm-gender" checked={gender === g} onChange={() => setGender(g)} />
                     {g || "ללא העדפה"}
                   </label>
                 ))}
@@ -215,8 +234,7 @@ export default function TeacherMatchSection({
                             <span className="h-px flex-1 bg-[var(--line)]" />
                           </div>
                           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                            {localCount === 0 ? "לא מצאנו מורים באזור שבחרתם. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים" : "מורים מאזורים סמוכים"}
-                            {searchedWith.online ? " וכאלה שמלמדים אונליין" : ""}.
+                            {localCount === 0 ? `לא מצאנו מורים באזור שבחרתם. אלה האפשרויות הקרובות ביותר: ${awayKinds}.` : `${awayKinds}.`}
                           </p>
                         </div>
                       )}
@@ -238,7 +256,7 @@ export default function TeacherMatchSection({
                         }
                         score={
                           isAway
-                            ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: t.online && searchedWith.online ? "אונליין" : "אזור סמוך" }
+                            ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: awayReason(t).label }
                             : { kind: "percent", overall: t.match_score, professional: null, personality: null }
                         }
                         actions={

@@ -22,6 +22,10 @@ describe("the day-85 email", () => {
     expect(trialEndingSubject(END)).toContain("31 בדצמבר 2026");
     expect(text(html)).toContain("תקופת הניסיון מסתיימת ב- 31 בדצמבר 2026");
   });
+  it("states no duration: the same email goes out after an extension or a return from the archive", () => {
+    expect(text(html)).not.toContain("שלושה חודשים");
+    expect(text(html)).toContain("מוצג להורים מאז שאושר, בלי תשלום");
+  });
   it("states the price including VAT, no commitment, and that nothing is charged before the end", () => {
     const t = text(html);
     expect(t).toContain(`${TEACHER_PRICE_GROSS} ש"ח לחודש, כולל מע"מ`);
@@ -42,7 +46,7 @@ describe("the day-85 email", () => {
     expect(text(html)).toContain("הוא הוצג 46 פעמים להורים, ו-7 הורים לחצו כדי ליצור איתך קשר");
     expect(text(trialEndingHtml(T, { impressions: 12, contacts: 1 }))).toContain("הוצג 12 פעמים להורים, והורה אחד לחץ");
     expect(text(trialEndingHtml(T, { impressions: 1, contacts: 0 }))).toContain("הוא הוצג פעם אחת להורים שחיפשו מורה");
-    expect(text(trialEndingHtml(T, { impressions: 0, contacts: 2 }))).toContain("אושר 2 הורים לחצו");
+    expect(text(trialEndingHtml(T, { impressions: 0, contacts: 2 }))).toContain("עד היום 2 הורים לחצו");
     // בלי הופעות ובלי פניות - אין שורת מספרים בכלל.
     const none = text(trialEndingHtml(T, { impressions: 0, contacts: 0 }));
     expect(none).not.toContain("הוצג");

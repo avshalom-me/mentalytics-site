@@ -6,6 +6,8 @@ import { listRecurringForCustomer, SUMIT_RECURRING_ACTIVE_STATUSES } from "@/app
 import { sendTeacherTrialEndingEmail, sendTeacherTrialLastDayEmail } from "@/app/lib/teacher-emails";
 import { teacherStats, teacherNote, emptyTeacherStats } from "@/app/lib/teachers.server";
 import { planTrialActions, israelDate, israelEndOfDay, sumitCheckDue, type TrialRow } from "@/app/lib/teacher-trial";
+import { hasActiveStandingOrder, TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 // הקרון היומי של ענף המורים (09:20 בשעון ישראל בקיץ, 08:20 בחורף).
 //
@@ -27,6 +29,20 @@ export const maxDuration = 120;
 
 const SUMIT_CHECKS_PER_RUN = 5;
 
+/**
+ * כמה מיילים למורים יוצאים בריצה אחת. מכסת Resend היומית (100) משותפת לכל
+ * האתר, ומחזור של מורים שאושרו באותו יום מגיע ליום ה-85 באותו בוקר; בלי תקרה
+ * הוא היה אוכל את המכסה של מיילי ההרשמה והפניות. מה שנדחה יוצא מחר: המייל
+ * של יום 85 נשלח בכל אחד מחמשת הימים שלפני הסוף, ומייל היום האחרון דוחה את
+ * סוף הניסיון ליום שבו הוא יוצא. לכן מיילי היום האחרון קודמים בתור.
+ */
+const MAX_TEACHER_EMAILS_PER_RUN = 25;
+/** Resend מגביל לשתי בקשות בשנייה. */
+const EMAIL_GAP_MS = 600;
+const ACTION_ORDER = { last_day_email: 0, archive: 1, pay_email: 2 } as const;
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
 type Row = {
   id: string;
   full_name: string;
@@ -42,7 +58,7 @@ type Row = {
   sumit_verified_at: string | null;
 };
 
-const subscribed = (r: Row) => !!r.sumit_recurring_id && !r.sumit_cancelled_at;
+const subscribed = (r: Row) => hasActiveStandingOrder(r);
 
 export async function GET(req: NextRequest) {
   if (!cronAuthorized(req)) return NextResponse.json({ ok: false, error: "unauthorized" }, { status: 401 });
@@ -52,13 +68,20 @@ export async function GET(req: NextRequest) {
   const today = israelDate(now);
   const lines: string[] = [];
 
-  const { data, error } = await supabaseAdmin
-    .from("teachers")
-    .select("id, full_name, email, edit_token, listing_state, trial_ends_at, trial_ending_notified_at, trial_last_day_notified_at, sumit_recurring_id, sumit_cancelled_at, sumit_first_charge_on, sumit_verified_at")
-    .in("listing_state", ["trial", "paying"])
-    .limit(1000);
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-  const rows = (data ?? []) as Row[];
+  // fetchAllRows ולא select רגיל: מעבר ל-1000 שורות PostgREST חותך בשקט, ומורה
+  // שנפל מחוץ לחיתוך לא היה מקבל מייל ולא עובר לארכיון.
+  let rows: Row[];
+  try {
+    rows = await fetchAllRows<Row>(() =>
+      supabaseAdmin
+        .from("teachers")
+        .select("id, full_name, email, edit_token, listing_state, trial_ends_at, trial_ending_notified_at, trial_last_day_notified_at, sumit_recurring_id, sumit_cancelled_at, sumit_first_charge_on, sumit_verified_at")
+        .in("listing_state", [...TEACHER_LISTED_STATES])
+        .order("id"),
+    );
+  } catch (e) {
+    return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
+  }
   const byId = new Map(rows.map((r) => [r.id, r]));
 
   // ── 1. תקופות הניסיון ─────────────────────────────────────────────────────
@@ -72,17 +95,28 @@ export async function GET(req: NextRequest) {
       hasActiveSubscription: subscribed(r),
     })),
     now,
-  );
+  ).sort((a, b) => ACTION_ORDER[a.kind] - ACTION_ORDER[b.kind]);
   const stats = await teacherStats(plan.map((a) => a.id));
   let payEmails = 0;
   let lastDayEmails = 0;
   let archived = 0;
   let stopped = false;
+  let emailSlotsUsed = 0;
+  let deferred = 0;
 
   for (const action of plan) {
     const r = byId.get(action.id)!;
     const s = stats[r.id] ?? emptyTeacherStats();
     const numbers = `${s.impressions_total} הופעות, ${s.contacts_total} פניות`;
+
+    if (action.kind !== "archive") {
+      if (emailSlotsUsed >= MAX_TEACHER_EMAILS_PER_RUN) {
+        deferred++;
+        continue;
+      }
+      if (send && emailSlotsUsed > 0) await sleep(EMAIL_GAP_MS);
+      emailSlotsUsed++;
+    }
 
     if (action.kind === "pay_email") {
       if (!send) {
@@ -155,6 +189,10 @@ export async function GET(req: NextRequest) {
     lines.push(`📦 ${r.full_name}: הניסיון נגמר, עבר/ה לארכיון. ${numbers}.${action.withoutLastDayEmail ? " ⚠️ מייל היום האחרון לא יצא שלושה ימים רצופים." : ""}`);
   }
 
+  if (deferred > 0) {
+    lines.push(`⏳ ${deferred} מיילים למורים נדחו למחר: התקרה היא ${MAX_TEACHER_EMAILS_PER_RUN} בריצה, כדי לא לכלות את מכסת המיילים היומית של האתר.`);
+  }
+
   // ── 2. אימות הוראות קבע מול Sumit ─────────────────────────────────────────
   const dueForCheck = (stopped ? [] : rows)
     .filter((r) => r.listing_state === "paying" && subscribed(r) && /^\d+$/.test(String(r.sumit_recurring_id)) && sumitCheckDue(r.sumit_first_charge_on, r.sumit_verified_at, now))
@@ -180,7 +218,7 @@ export async function GET(req: NextRequest) {
         await supabaseAdmin.from("teachers").update({ sumit_verified_at: nowIso }).eq("id", r.id);
         continue;
       }
-      const trialLive = !!r.trial_ends_at && r.trial_ends_at > nowIso;
+      const trialLive = !!r.trial_ends_at && new Date(r.trial_ends_at) > now;
       await supabaseAdmin
         .from("teachers")
         .update({

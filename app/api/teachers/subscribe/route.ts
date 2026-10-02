@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
-import { createTeacherSubscription, SumitPaymentDeclinedError } from "@/app/lib/sumit";
+import { createTeacherSubscription, SumitPaymentDeclinedError, SumitBusinessError } from "@/app/lib/sumit";
 import { createAgentAction } from "@/app/lib/agent-infra";
 import { loadTeacherFromRequest, crossSiteWrite, teacherNote } from "@/app/lib/teachers.server";
 import { sendTeacherPaymentConfirmedEmail } from "@/app/lib/teacher-emails";
 import { israelDate } from "@/app/lib/teacher-trial";
-import { TEACHER_PRICE_GROSS } from "@/app/lib/teacher-options";
+import { TEACHER_PRICE_GROSS, hasActiveStandingOrder } from "@/app/lib/teacher-options";
 
 // ההרשמה לתשלום של מורה: 60 ש"ח לחודש כולל מע"מ, ללא התחייבות. הכרטיס עובר
 // ישירות ל-Sumit מהדפדפן (טוקן חד-פעמי), וכאן נפתחת הוראת הקבע. אם תקופת
@@ -28,7 +28,7 @@ function firstCharge(trialEndsAt: string | null): { date: string; deferred: bool
   return { date: today, deferred: false };
 }
 
-const subscribed = (t: Record<string, unknown>) => !!t.sumit_recurring_id && !t.sumit_cancelled_at;
+const subscribed = hasActiveStandingOrder;
 const payable = (t: Record<string, unknown>) => ["trial", "paying", "archived"].includes(String(t.listing_state)) && !subscribed(t);
 
 export async function GET(req: NextRequest) {
@@ -95,6 +95,22 @@ export async function POST(req: NextRequest) {
     }
     const unlock = () => supabaseAdmin.from("teachers").update({ subscribe_lock_at: null }).eq("id", id);
 
+    // קריאה מחדש, עכשיו כשהמנעול בידינו: השורה שנקראה למעלה נקראה לפניו, ובקשה
+    // מקבילה שסיימה בינתיים (ושחררה את המנעול) כבר פתחה הוראת קבע.
+    const { data: fresh, error: freshError } = await supabaseAdmin
+      .from("teachers")
+      .select("sumit_recurring_id, sumit_cancelled_at")
+      .eq("id", id)
+      .maybeSingle();
+    if (freshError || !fresh) {
+      await unlock();
+      return NextResponse.json({ ok: false, error: "שגיאה בהרשמה. אנא נסו שוב." }, { status: 500 });
+    }
+    if (subscribed(fresh)) {
+      await unlock();
+      return NextResponse.json({ ok: false, error: "כבר קיימת הוראת קבע פעילה" }, { status: 409 });
+    }
+
     let charge;
     try {
       charge = await createTeacherSubscription({
@@ -107,11 +123,24 @@ export async function POST(req: NextRequest) {
         firstChargeDate: fc.deferred ? fc.date : undefined,
       });
     } catch (e) {
-      await unlock();
       if (e instanceof SumitPaymentDeclinedError) {
+        await unlock();
         return NextResponse.json({ ok: false, error: "הכרטיס לא אושר. אפשר לנסות כרטיס אחר." }, { status: 400 });
       }
-      throw e;
+      if (e instanceof SumitBusinessError) {
+        // Sumit ענה וסירב - שום דבר לא נפתח, ואפשר לנסות שוב מיד.
+        await unlock();
+        throw e;
+      }
+      // אין תשובה מ-Sumit (שגיאת רשת, 5xx): ייתכן שהוראת הקבע נפתחה. המנעול
+      // נשאר עד שיפוג, כדי שניסיון מיידי נוסף לא יפתח הוראה שנייה, ואנחנו
+      // רואים את זה בהיסטוריה של המורה.
+      const detail = e instanceof Error ? e.message.slice(0, 200) : String(e);
+      await teacherNote(id, `ניסיון הרשמה לתשלום: אין תשובה ברורה מ-Sumit (${detail}). לבדוק ב-Sumit אם נפתחה הוראת קבע ללקוח teacher:${id}.`);
+      return NextResponse.json(
+        { ok: false, error: "לא התקבל אישור מחברת הסליקה. לפני ניסיון נוסף אנא המתינו כמה דקות - או כתבו לנו ונבדוק." },
+        { status: 502 },
+      );
     }
     const recurringId = charge.RecurringItemID ? String(charge.RecurringItemID) : null;
     if (!recurringId) {
@@ -156,7 +185,8 @@ export async function POST(req: NextRequest) {
     }
 
     await teacherNote(id, `נרשם/ה לתשלום (${before} → paying). הוראת קבע ${recurringId}, חיוב ראשון ${fc.date}${fc.deferred ? " (נדחה לסוף הניסיון)" : ""}.`);
-    void sendTeacherPaymentConfirmedEmail({ id, email, full_name: name, edit_token: String(t.edit_token) }, fc.date);
+    // ממתינים לשליחה: ב-Vercel בקשה שעוד באוויר נופלת כשהתשובה יוצאת.
+    await sendTeacherPaymentConfirmedEmail({ id, email, full_name: name, edit_token: String(t.edit_token) }, fc.date);
     return NextResponse.json({ ok: true, first_charge_date: fc.date, deferred: fc.deferred, amount_gross: TEACHER_PRICE_GROSS });
   } catch (e) {
     console.error("teacher subscribe failed:", e instanceof Error ? e.message : e);

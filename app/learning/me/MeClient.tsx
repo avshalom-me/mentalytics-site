@@ -102,7 +102,7 @@ function LinkRequest({ invalidLink }: { invalidLink: boolean }) {
         </p>
       ) : (
         <form onSubmit={submit} className="space-y-3">
-          <input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} placeholder="המייל שאיתו נרשמת" className="w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm outline-none focus:border-[var(--teal)]" dir="ltr" />
+          <input type="email" required autoComplete="email" aria-label="המייל שאיתו נרשמת" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="המייל שאיתו נרשמת" className="w-full rounded-xl border border-[var(--line)] px-3 py-2.5 text-sm outline-none focus:border-[var(--teal)]" dir="ltr" />
           {error && <p className="text-sm text-red-600">{error}</p>}
           <button type="submit" disabled={busy} className="w-full rounded-full bg-[var(--teal)] px-6 py-2.5 text-sm font-bold text-white disabled:opacity-50">
             {busy ? "שולחים..." : "שליחת הקישור למייל"}
@@ -208,14 +208,14 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
           )}
           {state === "trial" && !profile.subscribed && profile.trial_phase === "free" && (
             <p>
-              תקופת הניסיון עד <strong>{hebDate(profile.trial_ends_at)}</strong>, ללא תשלום. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-{price} ש"ח לחודש
-              כולל מע"מ, ללא התחייבות. עד אז אין צורך לעשות דבר.
+              תקופת הניסיון עד <strong>{hebDate(profile.trial_ends_at)}</strong>, ללא תשלום. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-{price} ש״ח לחודש
+              כולל מע״מ, ללא התחייבות. עד אז אין צורך לעשות דבר.
             </p>
           )}
           {state === "trial" && !profile.subscribed && profile.trial_phase !== "free" && (
             <p>
               תקופת הניסיון מסתיימת {profile.trial_phase === "last_day" ? <strong>היום</strong> : <>ב-<strong>{hebDate(profile.trial_ends_at)}</strong></>}. כדי להמשיך
-              להופיע להורים: {price} ש"ח לחודש כולל מע"מ, ללא התחייבות. בלי הרשמה, הפרופיל יעבור לארכיון.
+              להופיע להורים: {price} ש״ח לחודש כולל מע״מ, ללא התחייבות. בלי הרשמה, הפרופיל יעבור לארכיון.
             </p>
           )}
           {state === "paying" && (
@@ -223,7 +223,7 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
               המנוי פעיל{profile.first_charge_on ? `; החיוב הראשון ${hebDate(`${profile.first_charge_on}T12:00:00Z`)}` : ""}. לביטול - בהודעת מייל ל-admin@getmentalytics.com.
             </p>
           )}
-          {state === "archived" && <p>תקופת הניסיון הסתיימה, והפרופיל נמצא בארכיון ואינו מוצג להורים. אפשר להפעיל אותו מחדש בכל רגע: {price} ש"ח לחודש כולל מע"מ, ללא התחייבות.</p>}
+          {state === "archived" && <p>תקופת הניסיון הסתיימה, והפרופיל נמצא בארכיון ואינו מוצג להורים. אפשר להפעיל אותו מחדש בכל רגע: {price} ש״ח לחודש כולל מע״מ, ללא התחייבות.</p>}
           {state === "rejected" && <p>הפרופיל לא אושר. אם יש בידך תעודה שלא צורפה, אפשר להעלות אותה כאן ולכתוב לנו.</p>}
           {profile.paused_until && new Date(profile.paused_until) > new Date() && <p className="text-amber-700">הפרופיל אינו מוצג זמנית, עד {hebDate(profile.paused_until)}.</p>}
         </div>
@@ -257,26 +257,26 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
             </div>
           ))}
           <p className="col-span-2 text-xs leading-5 text-[var(--muted)] sm:col-span-4">
-            "הופעה" = הפרופיל הוצג להורה בתוצאות השאלון. "פנייה" = לחיצה על וואטסאפ או חיוג, מהכרטיס או מהפרופיל. ההורים פונים ישירות אליך, ולכן השיחה עצמה לא נמדדת.
+            &quot;הופעה&quot; = הפרופיל הוצג להורה בתוצאות השאלון. &quot;פנייה&quot; = לחיצה על וואטסאפ או חיוג, מהכרטיס או מהפרופיל. ההורים פונים ישירות אליך, ולכן השיחה עצמה לא נמדדת.
           </p>
         </section>
       )}
 
       <form onSubmit={save} className="space-y-6 rounded-3xl border border-[var(--line)] bg-white p-6">
         <h2 className="text-lg font-black text-[var(--text)]">עריכת הפרופיל</h2>
-        <TeacherProfileFields form={form} setForm={setForm} emailLocked qualificationLocked={profile.qualification_locked} />
+        <TeacherProfileFields form={form} setForm={setForm} emailLocked qualificationLocked={profile.qualification_locked} remedialVerified={profile.remedial} />
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label className="mb-1 block text-sm font-bold text-[var(--text-2)]">
+            <label htmlFor="tme-photo" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
               תמונה {profile.photo_url && <span className="font-normal text-emerald-700">(קיימת)</span>}
             </label>
-            <input type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("photo", f); }} className="text-sm" />
+            <input id="tme-photo" type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("photo", f); }} className="text-sm" />
           </div>
           <div>
-            <label className="mb-1 block text-sm font-bold text-[var(--text-2)]">
+            <label htmlFor="tme-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
               תעודה {profile.has_certificate ? <span className="font-normal text-emerald-700">(קיימת)</span> : <span className="font-normal text-amber-700">(חסרה)</span>}
             </label>
-            <input type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("certificate", f); }} className="text-sm" />
+            <input id="tme-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("certificate", f); }} className="text-sm" />
           </div>
         </div>
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}

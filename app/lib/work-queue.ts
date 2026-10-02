@@ -4,6 +4,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { computeGuarantee } from "./guarantee";
 import { missingProfileFields } from "./profile-completeness";
 import { fetchAllRows } from "./fetch-all-rows";
+import { TEACHER_LISTED_STATES } from "./teacher-options";
 
 // תור העבודה היומי - חולץ מ-admin-crm/dashboard כדי שמקור אחד ישרת גם את
 // לוח הבקרה וגם את דוח הבוקר של הסוכנים (עיקרון "לכל מספר בית אחד").
@@ -165,7 +166,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
     supabaseAdmin
       .from("teachers")
       .select("id", { count: "exact", head: true })
-      .in("listing_state", ["trial", "paying"]),
+      .in("listing_state", [...TEACHER_LISTED_STATES]),
     supabaseAdmin
       .from("teachers")
       .select("id", { count: "exact", head: true })
