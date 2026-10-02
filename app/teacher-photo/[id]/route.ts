@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from("teachers")
     .select("photo_path")
     .eq("id", id)
-    .in("listing_state", ["trial", "paying", "pending", "expired"])
+    .in("listing_state", ["trial", "paying", "pending", "archived"])
     .maybeSingle();
   if (error) return unavailable();
   if (!data?.photo_path) return new NextResponse("not found", { status: 404 });
@@ -36,6 +36,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     headers: {
       "Content-Type": upstream.headers.get("content-type") ?? "image/webp",
       "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800",
+      // המורים אינם חלק מהאתר המאונדקס - גם לא התמונות שלהם.
+      "X-Robots-Tag": "noindex",
     },
   });
 }

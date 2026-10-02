@@ -97,6 +97,10 @@ const nextConfig: NextConfig = {
       // English page declares its language here, where a crawler reads it
       // without running any script (app/en/DocumentLanguage.tsx fixes the
       // attribute itself only in the browser).
+      // ענף המורים ("מענה לימודי") אינו חלק מהאתר המאונדקס - החלטת הבעלים,
+      // 2/10/2026. ה-layout של /learning כבר מגדיר noindex; הכותרת כאן תופסת
+      // גם עמוד שישכח, וגם תשובות שאינן HTML.
+      { source: "/learning/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       { source: "/en", headers: [{ key: "Content-Language", value: "en" }] },
       { source: "/en/:path*", headers: [{ key: "Content-Language", value: "en" }] },
     ];

@@ -61,9 +61,9 @@ describe("teacher referral keys", () => {
 });
 
 describe("who is listed", () => {
-  it("trial and paying are listed; pending, expired, paused and rejected are not", () => {
+  it("trial and paying are listed; pending, archived and rejected are not", () => {
     for (const s of ["trial", "paying"]) expect(isTeacherListed(row({ listing_state: s }), NOW)).toBe(true);
-    for (const s of ["pending", "expired", "paused", "rejected"]) expect(isTeacherListed(row({ listing_state: s }), NOW)).toBe(false);
+    for (const s of ["pending", "archived", "rejected"]) expect(isTeacherListed(row({ listing_state: s }), NOW)).toBe(false);
   });
   it("a pause with a future date hides the teacher, a past one does not", () => {
     expect(isTeacherListed(row({ paused_until: "2026-10-09T00:00:00Z" }), NOW)).toBe(false);
@@ -86,11 +86,11 @@ describe("matchTeachers", () => {
     expect(out[0].score).toBe(100);
   });
 
-  it("a tutoring request accepts remedial teachers too, and ranks them above plain tutors", () => {
+  it("a tutoring request accepts tutors and remedial teachers alike, both as a full fit", () => {
     const rows = [row({ id: "tutor", remedial: false }), row({ id: "remedial", remedial: true })];
     const out = matchTeachers(rows, input({ remedial: false }), NOW);
-    expect(out.map((m) => m.teacher.id)).toEqual(["remedial", "tutor"]);
-    expect(out[1].score).toBeLessThan(100);
+    expect(out.map((m) => m.teacher.id).sort()).toEqual(["remedial", "tutor"]);
+    for (const m of out) expect(m.score).toBe(100);
   });
 
   it("without a location everyone is in the requested area", () => {

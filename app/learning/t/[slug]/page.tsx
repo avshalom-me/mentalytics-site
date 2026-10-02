@@ -28,9 +28,9 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-24" dir="rtl">
       <TeacherProfileView teacherId={t.id} quizType={sp.q === "school" ? "school" : fromMatch ? "kids" : null} />
-      <a href={fromMatch ? "/kids" : "/"} className="mb-6 inline-block text-sm font-bold text-[var(--teal-dark)]">
-        ← {fromMatch ? "חזרה לתוצאות השאלון" : "לדף הבית"}
-      </a>
+      {fromMatch && (
+        <p className="mb-6 text-xs text-[var(--muted)]">הפרופיל נפתח בכרטיסייה חדשה. תוצאות השאלון נשארו פתוחות בכרטיסייה הקודמת.</p>
+      )}
 
       <div className="rounded-3xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
         <div className="flex flex-col items-start gap-5 sm:flex-row">
@@ -57,7 +57,7 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
         </div>
 
         <div className="mt-5 flex flex-wrap items-center gap-2">
-          <TeacherContactButtons teacherId={t.id} phone={t.phone} ctx={{ source: "profile", quizType: fromMatch ? "kids" : null }} />
+          <TeacherContactButtons teacherId={t.id} phone={t.phone} ctx={{ source: "profile", quizType: sp.q === "school" ? "school" : fromMatch ? "kids" : null }} />
         </div>
 
         {t.bio && <p className="mt-6 whitespace-pre-line text-[15px] leading-7 text-[var(--text-2)]">{t.bio}</p>}

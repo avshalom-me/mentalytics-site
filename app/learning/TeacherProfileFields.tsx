@@ -87,13 +87,16 @@ export default function TeacherProfileFields({
   form,
   setForm,
   emailLocked = false,
+  qualificationLocked = false,
 }: {
   form: TeacherForm;
   setForm: (next: TeacherForm) => void;
   /** בעריכה המייל הוא מזהה הרשומה ואינו ניתן לשינוי מהטופס. */
   emailLocked?: boolean;
+  /** אחרי האישור ההכשרה היא מה שאומת מול התעודה, ולכן היא נעולה לעריכה. */
+  qualificationLocked?: boolean;
 }) {
-  const remedialAllowed = qualificationAllowsRemedial(form.qualification);
+  const remedialAllowed = qualificationAllowsRemedial(form.qualification) && (!qualificationLocked || form.remedial);
   const set = (patch: Partial<TeacherForm>) => setForm({ ...form, ...patch });
 
   return (
@@ -147,7 +150,11 @@ export default function TeacherProfileFields({
 
       <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-4">
         <div className={label}>הכשרה *</div>
+        {qualificationLocked && (
+          <p className="mb-2 text-xs text-[var(--muted)]">ההכשרה אומתה מול התעודה. לשינוי שלה (למשל אחרי השלמת תעודה נוספת) - כתבו לנו.</p>
+        )}
         <select
+          disabled={qualificationLocked}
           value={form.qualification}
           onChange={(e) => {
             const q = e.target.value;
@@ -164,16 +171,16 @@ export default function TeacherProfileFields({
         <div className="mt-3 grid gap-3 sm:grid-cols-3">
           <div className="sm:col-span-2">
             <label className={label}>המוסד שהעניק את התעודה / התואר</label>
-            <input value={form.institution} onChange={(e) => set({ institution: e.target.value })} className={field} placeholder="למשל: לוינסקי-וינגייט, דוד ילין, בית ברל" />
+            <input disabled={qualificationLocked} value={form.institution} onChange={(e) => set({ institution: e.target.value })} className={`${field} disabled:opacity-60`} placeholder="למשל: לוינסקי-וינגייט, דוד ילין, בית ברל" />
           </div>
           <div>
             <label className={label}>שנת סיום</label>
-            <input inputMode="numeric" value={form.qualification_year} onChange={(e) => set({ qualification_year: e.target.value.replace(/\D/g, "").slice(0, 4) })} className={field} />
+            <input disabled={qualificationLocked} inputMode="numeric" value={form.qualification_year} onChange={(e) => set({ qualification_year: e.target.value.replace(/\D/g, "").slice(0, 4) })} className={`${field} disabled:opacity-60`} />
           </div>
         </div>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={form.teaching_certificate} onChange={(e) => set({ teaching_certificate: e.target.checked })} />
+            <input type="checkbox" disabled={qualificationLocked} checked={form.teaching_certificate} onChange={(e) => set({ teaching_certificate: e.target.checked })} />
             יש לי תעודת הוראה
           </label>
           <div className="flex items-center gap-2 text-sm">
@@ -188,7 +195,9 @@ export default function TeacherProfileFields({
             <span className="block text-xs text-[var(--muted)]">
               {remedialAllowed
                 ? "השאלון מפנה להוראה מתקנת כשזוהה קושי ממוקד בקריאה, בכתיבה או בחשבון. הסימון מאומת מול התעודה."
-                : "זמין רק עם תעודת הוראה מתקנת, תואר בחינוך מיוחד או תואר שני בלקויות למידה. עם הכשרה אחרת הפרופיל מוצג לתגבור פרטי."}
+                : qualificationLocked
+                  ? "הפרופיל אושר לתגבור פרטי. לרישום כהוראה מתקנת נדרש אימות של תעודה מתאימה - כתבו לנו."
+                  : "זמין רק עם תעודת הוראה מתקנת, תואר בחינוך מיוחד או תואר שני בלקויות למידה. עם הכשרה אחרת הפרופיל מוצג לתגבור פרטי."}
             </span>
           </span>
         </label>

@@ -4,14 +4,21 @@ import { useEffect, useState } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
 import MatchResultCard from "@/app/components/MatchResultCard";
 import TeacherContactButtons, { useTeacherImpressions } from "@/app/learning/TeacherContactButtons";
+import { getOrCreateSessionId } from "@/app/lib/session";
+import { trackingOptedOut } from "@/app/lib/track-optout";
 import { teacherPath, teacherSearchFromKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
-import { trackMatchingClick, trackMatchSearch, trackMatchResults, type QuizType } from "@/app/lib/useTrack";
 
 // מסך חיפוש המורים בתוך שאלון הילדים - המקבילה של KidsMatchSection לכרטיס
 // מסוג "teacher". קורא ל-/api/match-teachers (טבלת המורים בלבד), ומציג
 // כרטיסים באותה צורה שההורים כבר מכירים: "באזור שבחרתם" ואחריה הסביבה.
-// אין כאן ציון אישיותי ואין "למה הותאם לי": ההתאמה היא תחום, סוג מורה,
-// שכבת גיל ומרחק, וזה נאמר בכרטיס במילים.
+//
+// בכוונה אין כאן אף אירוע של analytics_events (matching_click, match_search,
+// match_results): הם מזינים את מדדי ההיצע של המטפלים, וחיפוש מורה שחוזר
+// ריק היה נספר שם כמחסור במטפלים. הביקוש למורים נרשם בשרת ב-teacher_searches,
+// וההופעות והלחיצות ב-teacher_events.
+//
+// אין כאן ציון אישיותי ואין "למה הותאם לי": ההתאמה היא תחום, סוג מורה, שכבת
+// גיל ומרחק, וזה נאמר בכרטיס במילים.
 
 type TeacherCard = {
   id: string;
@@ -31,8 +38,9 @@ type TeacherCard = {
   price_text: string | null;
   match_score: number;
   in_requested_area: boolean;
-  match_reasons: string[];
 };
+
+const LANGS = ["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"];
 
 export default function TeacherMatchSection({
   referralKey,
@@ -42,7 +50,7 @@ export default function TeacherMatchSection({
   /** מפתח ההמלצה, למשל "הוראה מתקנת - חשבון". */
   referralKey: string;
   gradeGroup: TeacherGradeGroup | null;
-  quizType: QuizType;
+  quizType: "kids" | "school";
 }) {
   const search = teacherSearchFromKey(referralKey);
   const [open, setOpen] = useState(false);
@@ -53,21 +61,25 @@ export default function TeacherMatchSection({
   const [language, setLanguage] = useState("עברית");
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState<TeacherCard[]>([]);
-  const [searched, setSearched] = useState(false);
+  // האזור שהחיפוש האחרון רץ עליו - הכותרות נקבעות לפיו ולא לפי הטופס, שהמשתמש
+  // יכול לשנות אחרי שהתוצאות כבר על המסך.
+  const [searchedWith, setSearchedWith] = useState<{ located: boolean; online: boolean } | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     setResults([]);
-    setSearched(false);
+    setSearchedWith(null);
     setError("");
   }, [referralKey]);
 
-  useTeacherImpressions(results.map((t) => t.id), { source: "match", quizType: quizType === "adults" ? null : quizType, subject: search.subject });
+  // יועצת שמעיינת בתוצאות אינה הורה שמחפש מורה - ההופעות אצלה לא נספרות למורה,
+  // כמו שהן לא נספרות למטפלים בשאלון היועצות.
+  const ctx = { source: "match" as const, quizType, subject: search.subject };
+  useTeacherImpressions(quizType === "school" ? [] : results.map((t) => t.id), ctx);
 
   async function doMatch() {
     setLoading(true);
     setError("");
-    trackMatchSearch(quizType, { region: region || null, city: city || null, online }, "teacher");
     try {
       const res = await fetch("/api/match-teachers", {
         method: "POST",
@@ -81,24 +93,16 @@ export default function TeacherMatchSection({
           genderPreference: gender || null,
           language,
           limit: 10,
+          quizType,
+          sessionId: getOrCreateSessionId(),
+          // מכשיר של הצוות: החיפוש לא נרשם כביקוש.
+          noTrack: trackingOptedOut(),
         }),
       });
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "שגיאה בחיפוש");
-      const matches: TeacherCard[] = data.matches || [];
-      setResults(matches);
-      trackMatchResults(
-        quizType,
-        {
-          region: region || null,
-          city: city || null,
-          online,
-          returned: matches.length,
-          local: city || region ? matches.filter((m) => m.in_requested_area).length : undefined,
-        },
-        "teacher",
-      );
-      setSearched(true);
+      setResults(data.matches || []);
+      setSearchedWith({ located: !!(city || region), online });
       setOpen(false);
     } catch (e) {
       setError(e instanceof Error ? e.message : "שגיאה בחיפוש");
@@ -107,21 +111,18 @@ export default function TeacherMatchSection({
     }
   }
 
-  const locationAsked = !!(city || region);
+  const located = !!searchedWith?.located;
   const local = results.filter((m) => m.in_requested_area);
   const away = results.filter((m) => !m.in_requested_area);
-  const ordered = locationAsked ? [...local, ...away] : results;
-  const localCount = locationAsked ? local.length : results.length;
+  const ordered = located ? [...local, ...away] : results;
+  const localCount = located ? local.length : results.length;
 
   return (
     <div>
       {!open ? (
         <button
           type="button"
-          onClick={() => {
-            setOpen(true);
-            trackMatchingClick(quizType, `teacher:${referralKey}`);
-          }}
+          onClick={() => setOpen(true)}
           className="w-full py-4 rounded-2xl text-white font-bold text-base shadow-md transition hover:opacity-90 active:scale-95"
           style={{ background: "linear-gradient(135deg,#1d5f8a,#2f88b8)" }}
         >
@@ -130,7 +131,7 @@ export default function TeacherMatchSection({
       ) : (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
           <h3 className="font-bold text-[var(--teal-dark)] text-lg mb-1">מציאת {search.label}</h3>
-          <p className="text-xs text-gray-500 mb-4">מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל של הילד/ה. ההורים פונים ישירות למורה.</p>
+          <p className="text-xs text-gray-500 mb-4">מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. הפנייה היא ישירות למורה.</p>
 
           <div className="mb-4">
             <label className="flex items-center gap-2 text-sm font-semibold text-[#2a3a5a] cursor-pointer">
@@ -163,7 +164,7 @@ export default function TeacherMatchSection({
             <div>
               <label className="block text-sm font-semibold text-[#2a3a5a] mb-1">שפת ההוראה</label>
               <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full rounded-xl border border-[#c8d0e8] bg-white px-3 py-2 text-sm">
-                {["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"].map((l) => <option key={l} value={l}>{l}</option>)}
+                {LANGS.map((l) => <option key={l} value={l}>{l}</option>)}
               </select>
             </div>
             <div>
@@ -185,7 +186,7 @@ export default function TeacherMatchSection({
         </div>
       )}
 
-      {searched && (
+      {searchedWith && (
         <div className="mt-5">
           {results.length === 0 ? (
             <div className="rounded-2xl bg-sky-50 px-5 py-6 text-center text-sm leading-6 text-[#2a3a5a]">
@@ -194,14 +195,14 @@ export default function TeacherMatchSection({
             </div>
           ) : (
             <>
-              <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">נמצאו {results.length} מורים:</div>
+              <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">{results.length === 1 ? "נמצא/ה מורה אחד/ת:" : `נמצאו ${results.length} מורים:`}</div>
               <div className="space-y-4">
                 {ordered.map((t, idx) => {
-                  const isAway = locationAsked && !t.in_requested_area;
+                  const isAway = located && !t.in_requested_area;
                   const href = t.slug ? `${teacherPath(t.slug)}?from=match${quizType === "school" ? "&q=school" : ""}` : null;
                   return (
                     <div key={t.id}>
-                      {locationAsked && idx === 0 && localCount > 0 && localCount < ordered.length && (
+                      {located && idx === 0 && localCount > 0 && localCount < ordered.length && (
                         <div className="mb-3 flex items-center gap-2 pt-1">
                           <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרתם</span>
                           <span className="h-px flex-1 bg-[var(--line)]" />
@@ -214,7 +215,8 @@ export default function TeacherMatchSection({
                             <span className="h-px flex-1 bg-[var(--line)]" />
                           </div>
                           <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                            {localCount === 0 ? "לא מצאנו מורים באזור שבחרתם. אלה האפשרויות הקרובות ביותר" : "מורים מאזורים סמוכים"}{online ? " וכאלה שמלמדים אונליין" : ""}.
+                            {localCount === 0 ? "לא מצאנו מורים באזור שבחרתם. אלה האפשרויות הקרובות ביותר, מאזורים סמוכים" : "מורים מאזורים סמוכים"}
+                            {searchedWith.online ? " וכאלה שמלמדים אונליין" : ""}.
                           </p>
                         </div>
                       )}
@@ -223,22 +225,29 @@ export default function TeacherMatchSection({
                         isCenter={false}
                         photoUrl={t.photo_url}
                         gender={t.gender}
-                        subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} · ${t.subject_labels.join(", ")} · ${t.online ? "אונליין" : "פנים אל פנים"}`}
+                        subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} • ${t.subject_labels.join(", ")} • ${t.online ? "גם אונליין" : "פנים אל פנים"}`}
                         bio={t.bio}
                         regions={t.regions}
-                        inAreaChip={locationAsked && t.in_requested_area ? "✓ באזור שלכם" : null}
+                        inAreaChip={located && t.in_requested_area ? "✓ באזור שלכם" : null}
                         badge={
                           <p className="mt-1.5 text-xs text-[var(--muted)]">
-                            🎓 {t.qualification_label}{t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}{t.price_text ? ` · ${t.price_text}` : ""}
+                            🎓 {t.qualification_label}
+                            {t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}
+                            {t.price_text ? ` · ${t.price_text}` : ""}
                           </p>
                         }
-                        score={isAway ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: "מחוץ לאזור" } : { kind: "percent", overall: t.match_score, professional: null, personality: null }}
+                        score={
+                          isAway
+                            ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: t.online && searchedWith.online ? "אונליין" : "אזור סמוך" }
+                            : { kind: "percent", overall: t.match_score, professional: null, personality: null }
+                        }
                         actions={
                           <>
-                            <TeacherContactButtons teacherId={t.id} phone={t.phone} ctx={{ source: "match", quizType: quizType === "adults" ? null : quizType, subject: search.subject }} />
+                            <TeacherContactButtons teacherId={t.id} phone={t.phone} ctx={ctx} />
                             {href && (
-                              <a href={href} className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-[var(--line)] bg-white px-4 py-2 text-[13px] font-bold text-[var(--text-2)] hover:border-[var(--teal)]">
-                                פרופיל מלא ←
+                              // כרטיסייה חדשה: דוח השאלון נשאר פתוח מאחור, ואין מה לשחזר בחזרה.
+                              <a href={href} target="_blank" rel="noopener" className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-[var(--line)] bg-white px-4 py-2 text-[13px] font-bold text-[var(--text-2)] hover:border-[var(--teal)]">
+                                פרופיל מלא ↗
                               </a>
                             )}
                           </>

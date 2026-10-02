@@ -1,13 +1,15 @@
 import "server-only";
 import { randomBytes } from "node:crypto";
+import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { slugify } from "@/app/lib/articles";
-import { TEACHER_TRIAL_DAYS } from "@/app/lib/teacher-options";
 import type { TeacherRow } from "@/app/lib/teacher-match";
 
-// עזרי שרת לענף המורים: טעינה לפי טוקן/slug, יצירת טוקן ו-slug, וסטטיסטיקה
-// לכרטיס המורה ולאדמין. כל כתיבה למסד עוברת דרך ה-service role - לטבלת
-// teachers אין שום מדיניות ציבורית.
+export { teacherLinkUrl } from "@/app/lib/teacher-options";
+
+// עזרי שרת לענף המורים: הזדהות המורה (עוגייה), טעינה לפי טוקן/slug, יצירת
+// טוקן ו-slug, וסטטיסטיקה לכרטיס המורה ולאדמין. כל כתיבה למסד עוברת דרך
+// ה-service role - לטבלת teachers אין שום מדיניות ציבורית.
 
 export const TEACHER_FILES_BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET || "therapist-certificates";
 
@@ -19,6 +21,74 @@ export function newEditToken(): string {
   return randomBytes(24).toString("base64url");
 }
 
+// ── הזדהות המורה ────────────────────────────────────────────────────────────
+//
+// למורה אין חשבון: הקישור האישי (/learning/k/<token>) הוא המפתח. הטוקן עצמו
+// לא נשאר בכתובת של אף עמוד - ה-route של הקישור שם אותו בעוגיית HttpOnly
+// ומפנה ל-/learning/me. הסיבה: ה-layout טוען GA4, Google Ads, טאבולה ו-
+// Vercel Analytics, וכולם רושמים את כתובת העמוד. טוקן קבוע בכתובת היה
+// נשלח לארבעתם בכל כניסה של המורה לפרופיל.
+
+export const TEACHER_COOKIE = "mnt_teacher";
+const COOKIE_MAX_AGE = 180 * 24 * 60 * 60;
+
+export function setTeacherCookie(res: NextResponse, token: string): NextResponse {
+  res.cookies.set(TEACHER_COOKIE, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: COOKIE_MAX_AGE,
+  });
+  return res;
+}
+
+function cookieValue(req: Request, name: string): string | null {
+  const header = req.headers.get("cookie") ?? "";
+  for (const part of header.split(";")) {
+    const i = part.indexOf("=");
+    if (i < 0) continue;
+    if (part.slice(0, i).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(i + 1).trim());
+      } catch {
+        return null;
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * בקשת כתיבה שהגיעה מאתר אחר. העוגייה היא SameSite=Lax, כך שדפדפן עדכני
+ * ממילא לא מצרף אותה ל-POST חוצה-אתרים; זו שכבה שנייה, באותו כלל של
+ * ה-middleware של האדמין: Origin קיים וזר - נדחה.
+ */
+export function crossSiteWrite(req: Request): boolean {
+  const method = req.method.toUpperCase();
+  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return false;
+  const origin = req.headers.get("origin");
+  if (!origin) return false;
+  try {
+    return new URL(origin).host !== req.headers.get("host");
+  } catch {
+    return true;
+  }
+}
+
+export async function loadTeacherByToken(token: string | null | undefined) {
+  if (!token || token.length < 20 || token.length > 120) return null;
+  const { data } = await supabaseAdmin.from("teachers").select("*").eq("edit_token", token).maybeSingle();
+  return (data as Record<string, unknown> | null) ?? null;
+}
+
+/** המורה שמחובר/ת בבקשה הזו (לפי העוגייה), או null. */
+export async function loadTeacherFromRequest(req: Request) {
+  return loadTeacherByToken(cookieValue(req, TEACHER_COOKIE));
+}
+
+// ── slug ─────────────────────────────────────────────────────────────────────
+
 /** slug ייחודי מהשם; בהתנגשות מוסיפים ספרות. */
 export async function uniqueTeacherSlug(fullName: string): Promise<string> {
   const base = slugify(fullName) || "teacher";
@@ -28,18 +98,6 @@ export async function uniqueTeacherSlug(fullName: string): Promise<string> {
     if (!data) return candidate;
   }
   return `${base}-${Date.now().toString(36)}`;
-}
-
-export function trialEndDate(from: Date = new Date()): Date {
-  const d = new Date(from);
-  d.setDate(d.getDate() + TEACHER_TRIAL_DAYS);
-  return d;
-}
-
-export async function loadTeacherByToken(token: string) {
-  if (!token || token.length > 120) return null;
-  const { data } = await supabaseAdmin.from("teachers").select("*").eq("edit_token", token).maybeSingle();
-  return (data as Record<string, unknown> | null) ?? null;
 }
 
 export async function loadListedTeacherBySlug(rawSlug: string): Promise<TeacherRow | null> {
@@ -63,41 +121,45 @@ export async function loadListedTeacherBySlug(rawSlug: string): Promise<TeacherR
   return row;
 }
 
+// ── סטטיסטיקה ────────────────────────────────────────────────────────────────
+
 export type TeacherStats = {
   impressions_30d: number;
   contacts_30d: number;
+  profile_views_30d: number;
   impressions_total: number;
   contacts_total: number;
   last_contact_at: string | null;
 };
 
-function emptyStats(): TeacherStats {
-  return { impressions_30d: 0, contacts_30d: 0, impressions_total: 0, contacts_total: 0, last_contact_at: null };
+export function emptyTeacherStats(): TeacherStats {
+  return { impressions_30d: 0, contacts_30d: 0, profile_views_30d: 0, impressions_total: 0, contacts_total: 0, last_contact_at: null };
 }
 
-/** הופעות ולחיצות קשר, לכל המורים שהתבקשו, בשאילתה אחת. */
+/**
+ * הופעות ולחיצות קשר לכל המורים שהתבקשו. הספירה נעשית ב-SQL
+ * (teacher_event_stats): קריאת השורות עצמן נחתכת ב-1000 בשקט, וכל חיפוש
+ * כותב עד עשר שורות הופעה.
+ */
 export async function teacherStats(teacherIds: string[]): Promise<Record<string, TeacherStats>> {
   const out: Record<string, TeacherStats> = {};
-  for (const id of teacherIds) out[id] = emptyStats();
-  if (teacherIds.length === 0) return out;
-  const since30 = new Date(Date.now() - 30 * 86400000).toISOString();
-  const { data } = await supabaseAdmin
-    .from("teacher_events")
-    .select("teacher_id, event_type, created_at")
-    .in("teacher_id", teacherIds)
-    .order("created_at", { ascending: false })
-    .limit(20000);
-  for (const e of (data ?? []) as { teacher_id: string; event_type: string; created_at: string }[]) {
-    const s = out[e.teacher_id];
-    if (!s) continue;
-    const recent = e.created_at >= since30;
-    if (e.event_type === "impression") {
-      s.impressions_total++;
-      if (recent) s.impressions_30d++;
-    } else if (e.event_type === "whatsapp" || e.event_type === "phone") {
-      s.contacts_total++;
-      if (recent) s.contacts_30d++;
-      if (!s.last_contact_at) s.last_contact_at = e.created_at;
+  for (const id of teacherIds) out[id] = emptyTeacherStats();
+  for (let i = 0; i < teacherIds.length; i += 500) {
+    const chunk = teacherIds.slice(i, i + 500);
+    const { data, error } = await supabaseAdmin.rpc("teacher_event_stats", { p_ids: chunk });
+    if (error) {
+      console.error("teacher_event_stats failed:", error.message);
+      continue;
+    }
+    for (const r of (data ?? []) as (TeacherStats & { teacher_id: string })[]) {
+      out[r.teacher_id] = {
+        impressions_30d: Number(r.impressions_30d) || 0,
+        contacts_30d: Number(r.contacts_30d) || 0,
+        profile_views_30d: Number(r.profile_views_30d) || 0,
+        impressions_total: Number(r.impressions_total) || 0,
+        contacts_total: Number(r.contacts_total) || 0,
+        last_contact_at: r.last_contact_at ?? null,
+      };
     }
   }
   return out;
@@ -106,4 +168,13 @@ export async function teacherStats(teacherIds: string[]): Promise<Record<string,
 /** כתובת התמונה הציבורית (דרך ה-route שלנו, לא signed URL). */
 export function teacherPhotoUrl(t: { id: string; photo_path: string | null }): string | null {
   return t.photo_path ? `/teacher-photo/${t.id}?v=${encodeURIComponent(t.photo_path.split("/").pop() ?? "")}` : null;
+}
+
+/** רישום שורה בהיסטוריה של המורה (crm_notes) - מוצג באדמין. לא מפיל את הקריאה. */
+export async function teacherNote(teacherId: string, body: string, author = "system"): Promise<void> {
+  try {
+    await supabaseAdmin.from("crm_notes").insert({ entity_type: "teacher", entity_id: teacherId, body: body.slice(0, 4000), author });
+  } catch (e) {
+    console.error("teacherNote failed:", e instanceof Error ? e.message : e);
+  }
 }

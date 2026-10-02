@@ -827,9 +827,16 @@ function gradeMathDV(math: string, hasReadingOrAdhd: boolean, f: Findings) {
     // Maths alongside a reading or attention difficulty is a different finding:
     // there the assessment is warranted on the combination, not on the maths,
     // so it leads and the remedial teaching rides along as a note.
-    addRef(f, hasReadingOrAdhd
-      ? "הפנייה לאבחון פסיכודידקטי לבירור קשיי החשבון בשילוב הקשיים הנוספים.\nלצד האבחון מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי."
-      : "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+    // The remedial teaching is its own referral line since 2/10/2026, not a
+    // note under the assessment: a note cannot carry a search, and there are
+    // teachers to search for now. The assessment still comes first, in the
+    // report and in the scorer.
+    if (hasReadingOrAdhd) {
+      addRef(f, "הפנייה לאבחון פסיכודידקטי לבירור קשיי החשבון בשילוב הקשיים הנוספים.");
+      addRef(f, "לצד האבחון מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי.");
+    } else {
+      addRef(f, "נמצאו קשיים משמעותיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
+    }
   } else if (tier === "10%") {
     addRef(f, "נמצאו קשיים בחשבון - מומלצת הוראה מתקנת בחשבון, דרך בית הספר או באופן פרטי." + MATH_REMEDIAL_REVIEW);
   } else if (tier === "30%") {

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import JoinForm from "./JoinForm";
-import { TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS } from "@/app/lib/teacher-options";
+import { TEACHER_PAY_EMAIL_DAY, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS } from "@/app/lib/teacher-options";
 
 // דף ההצטרפות למורים. בכוונה לא "דף שיווק": טון עובדתי, מה זה, למי זה,
 // מה התנאים, ומה נדרש כדי להתקבל. נפתח רק מקישור ישיר (ראו layout).
@@ -40,9 +40,9 @@ export default function TeacherJoinPage() {
         <div className="rounded-2xl border border-[var(--gold)] bg-[var(--gold-pale)] p-5">
           <h2 className="mb-2 text-base font-black text-[var(--gold-dark)]">התנאים</h2>
           <ul className="space-y-1.5 text-sm leading-6 text-[var(--text)]">
-            <li>• {TEACHER_TRIAL_DAYS} ימי ניסיון מרגע האישור: ללא תשלום, ללא התחייבות, ללא כרטיס אשראי</li>
-            <li>• אחר כך: {TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ, ללא התחייבות, ביטול בכל עת</li>
-            <li>• בלי תשלום בסוף הניסיון הפרופיל יורד מהמאגר. הנתונים נשמרים, ואפשר לחזור</li>
+            <li>• {TEACHER_TRIAL_DAYS} יום מרגע האישור: ללא תשלום, ללא התחייבות, ללא כרטיס אשראי</li>
+            <li>• ביום ה-{TEACHER_PAY_EMAIL_DAY} נשלח מייל. מי שרוצה להישאר במאגר ממשיך/ה ב-{TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ, ללא התחייבות, ביטול בכל עת</li>
+            <li>• מי שלא ממשיך/ה: הפרופיל עובר לארכיון בסוף התקופה. שום דבר לא נמחק, ואפשר לחזור</li>
           </ul>
         </div>
       </section>

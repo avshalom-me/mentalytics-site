@@ -60,16 +60,18 @@ export function qualificationAllowsRemedial(key: string | null | undefined): boo
  *   pending  - נרשם/ה, ממתין/ה לאימות ההכשרה באדמין
  *   trial    - אושר/ה; מופיע/ה בתוצאות; תקופת הניסיון רצה עד trial_ends_at
  *   paying   - הוראת קבע פעילה (או סימון ידני של האדמין); מופיע/ה
- *   expired  - תקופת הניסיון נגמרה בלי תשלום; לא מופיע/ה
- *   paused   - הקפאה ידנית; לא מופיע/ה
+ *   archived - תקופת הניסיון נגמרה בלי הרשמה לתשלום; בארכיון, לא מופיע/ה.
+ *              הפיך: הרשמה לתשלום מהקישור האישי מחזירה למאגר.
  *   rejected - לא אושר/ה
+ *
+ * הקפאה ידנית אינה מצב אלא תאריך (paused_until), כמו אצל המטפלים: היא
+ * פגה מעצמה, והמצב שמתחתיה נשמר.
  */
 export const TEACHER_LISTING_STATES = [
   { key: "pending", label: "ממתין/ה לאישור", cls: "bg-amber-50 border-amber-200 text-amber-800" },
   { key: "trial", label: "בתקופת ניסיון", cls: "bg-blue-50 border-blue-200 text-blue-800" },
   { key: "paying", label: "משלם/ת", cls: "bg-emerald-50 border-emerald-200 text-emerald-800" },
-  { key: "expired", label: "הניסיון הסתיים", cls: "bg-stone-100 border-stone-200 text-stone-600" },
-  { key: "paused", label: "מוקפא/ת", cls: "bg-stone-100 border-stone-200 text-stone-500" },
+  { key: "archived", label: "בארכיון", cls: "bg-stone-100 border-stone-200 text-stone-600" },
   { key: "rejected", label: "נדחה/תה", cls: "bg-red-50 border-red-200 text-red-700" },
 ] as const;
 export type TeacherListingState = (typeof TEACHER_LISTING_STATES)[number]["key"];
@@ -80,25 +82,21 @@ export const TEACHER_LISTED_STATES: readonly TeacherListingState[] = ["trial", "
 
 // ── המודל המסחרי ────────────────────────────────────────────────────────────
 //
-// החלטת הבעלים (2/10/2026): שלושה חודשים חינם בלי התחייבות ובלי כרטיס
-// אשראי, ואחריהם נשאר/ת במאגר רק מי שמשלם/ת 60 ש"ח לחודש כולל מע"מ.
+// החלטת הבעלים (2/10/2026): 90 ימי ניסיון מהאישור, בלי תשלום, בלי התחייבות
+// ובלי כרטיס אשראי - ובלי שום בקשת תשלום בדרך. ביום ה-85 יוצא מייל להרשמה
+// (60 ש"ח לחודש כולל מע"מ), ביום האחרון מייל נוסף, ולמחרת מי שלא נרשם/ה
+// עובר/ת לארכיון ויוצא/ת מהמאגר. הלוגיקה עצמה ב-teacher-trial.ts.
 //
 // המחיר כאן הוא *ברוטו* - שונה מכל שאר המחירים בקוד, שהם לפני מע"מ. הסיבה:
 // 60 כולל מע"מ אינו מספר שלם לפני מע"מ (50.85), וטבלאות המטפלים מחזיקות
 // amount שלם. לכן ענף המורים לא כותב ל-payments/subscriptions, ו-Sumit
 // מקבל את המחיר עם VATIncluded:true.
 export const TEACHER_TRIAL_DAYS = 90;
+/** היום בתוך הניסיון שבו יוצא המייל הראשון להרשמה. */
+export const TEACHER_PAY_EMAIL_DAY = 85;
 export const TEACHER_PRICE_GROSS = 60;
 export const TEACHER_VAT_RATE = 0.18;
 export const TEACHER_PRICE_NET = +(TEACHER_PRICE_GROSS / (1 + TEACHER_VAT_RATE)).toFixed(2); // 50.85
-
-/**
- * האם מורה שתקופת הניסיון שלו/ה נגמרה בלי תשלום עדיין מוצג/ת כגיבוי כשאין
- * אף מורה רשום/ה באזור. כבוי לפי החלטת הבעלים ("רק מי שמשלם יישאר במאגר");
- * הפאנל (GPT, Gemini) המליץ על שכבה חינמית מוגבלת כדי לשמור כיסוי - אם
- * הבעלים יחליט כך, זה המתג.
- */
-export const TEACHER_EXPIRED_FALLBACK = false;
 
 // ── מפתחות ההמלצה בשאלון הילדים ──────────────────────────────────────────
 //
@@ -153,6 +151,16 @@ export function qualificationLabel(key: string | null | undefined): string {
 }
 export function listingStateLabel(key: string): string {
   return TEACHER_LISTING_STATES.find((s) => s.key === key)?.label ?? key;
+}
+
+/**
+ * הקישור האישי של מורה, כפי שהוא נשלח במייל ומועתק מהאדמין. הכתובת הזו
+ * לא מציגה עמוד: היא שמה עוגייה ומפנה לפרופיל (או להרשמה לתשלום).
+ * ראו app/learning/k/[token]/route.ts.
+ */
+export function teacherLinkUrl(token: string, to?: "pay"): string {
+  const site = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
+  return `${site}/learning/k/${encodeURIComponent(token)}${to ? `?to=${to}` : ""}`;
 }
 
 /** עמוד הפרופיל של מורה. תחת /learning, מחוץ לכל ניווט של האתר ובלי אינדוקס. */

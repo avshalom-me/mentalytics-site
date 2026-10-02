@@ -251,15 +251,11 @@ export function trackMatchingClick(
 export function trackMatchSearch(
   quizType: QuizType,
   opts: { region: string | null; city?: string | null; online: boolean },
-  // "teacher" = חיפוש מורה מתוך שאלון הילדים (ענף המורים). בלי הערך, חיפוש
-  // מטפלים כמו תמיד - כך שום דוח קיים לא משתנה.
-  provider?: "teacher",
 ) {
   sendTrack("match_search", {
     source: sourceOf(quizType),
     metadata: {
       quiz_type: quizType,
-      ...(provider ? { provider } : {}),
       region: opts.region || null,
       city: opts.city || null,
       online: opts.online,
@@ -280,13 +276,11 @@ export function trackMatchSearch(
 export function trackMatchResults(
   quizType: QuizType,
   opts: { region: string | null; city?: string | null; online: boolean; returned: number; local?: number },
-  provider?: "teacher",
 ) {
   sendTrack("match_results", {
     source: sourceOf(quizType),
     metadata: {
       quiz_type: quizType,
-      ...(provider ? { provider } : {}),
       region: opts.region || null,
       city: opts.city || null,
       online: opts.online,

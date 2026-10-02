@@ -22,7 +22,7 @@ function allowed(ip: string): boolean {
 }
 
 const STAGES = new Set(["config", "tokenize", "subscribe", "exception"]);
-const SOURCES = new Set(["center_join", "quiz", "gift_join"]);
+const SOURCES = new Set(["center_join", "quiz", "gift_join", "teacher_pay"]);
 
 export async function POST(req: NextRequest) {
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";

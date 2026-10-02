@@ -52,6 +52,7 @@ type Dashboard = {
     partials_count: number;
     partials_never_reminded_count: number;
     pending_articles_count: number;
+    pending_teachers_count: number;
   };
   plan: {
     targets: PlanTarget[];
@@ -129,7 +130,8 @@ export default function AdminDashboardPage() {
     q.new_leads.length === 0 &&
     q.failed_payments.length === 0 &&
     q.partials_never_reminded_count === 0 &&
-    q.pending_articles_count === 0;
+    q.pending_articles_count === 0 &&
+    !q.pending_teachers_count;
 
   return (
     <div className="min-h-screen bg-stone-50">
@@ -252,6 +254,15 @@ export default function AdminDashboardPage() {
                   action={{ label: "למטפלים", href: "/admin/therapists" }}
                 />
               ))}
+
+              {q!.pending_teachers_count > 0 && (
+                <QueueRow
+                  tone="amber"
+                  icon="🎓"
+                  title={`${q!.pending_teachers_count} מורים ממתינים לאימות ההכשרה (מענה לימודי)`}
+                  action={{ label: "לאישור", href: "/admin/teachers" }}
+                />
+              )}
 
               {q!.partials_never_reminded_count > 0 && (
                 <QueueRow

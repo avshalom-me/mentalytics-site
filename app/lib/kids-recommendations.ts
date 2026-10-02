@@ -539,10 +539,15 @@ export function aggregateForMatch(domains: KidsDomainResult[]): KidsAggregatedRe
  *
  * The engine calls dietitian-style referrals "professional" and the tracks
  * input calls them external - same list, two vocabularies. Remedial teaching
- * is added under its old generic key: the clinical rule
- * hatamot.learning_findings_promote (approved 10/9/2026) looks for exactly
- * "הוראה מתקנת", and until 2/10/2026 that branch could never fire because
- * externals were dropped before they reached it.
+ * moved from "external" to "teacher" on 2/10/2026, so it is passed on here
+ * under its old generic key: hatamot.learning_findings_promote (approved
+ * 10/9/2026) looks for exactly "הוראה מתקנת".
+ *
+ * That branch of the rule still cannot fire today, for two reasons that were
+ * true before this change as well: the rule applies to grades ח-ט, where the
+ * scorer never recommends remedial teaching (only in א-ו); and the rule's
+ * other external key, "נוירולוג קשב", is a true external referral, which
+ * aggregateForMatch has always dropped. Both are for the owner to decide.
  */
 export function findingExternalKeys(agg: KidsAggregatedRecommendations): string[] {
   const keys = [...agg.professionalKeys];

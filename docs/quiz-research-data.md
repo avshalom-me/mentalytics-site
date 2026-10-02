@@ -16,6 +16,7 @@ treatments. Joins to everything else on `session_id`.
 | `n_recs` | recommendations before de-duplication. **0 = the questionnaire found nothing**; the row is still written |
 | `domains` | every domain the person selected (adults: emotional, functional, relationship, addiction, personal; kids: emotional, academic, developmental, behavioral, social) |
 | `treatments` / `assessments` / `professionals` | distinct keys - the same strings the therapist match searches on |
+| `teachers` | kids only, from 2/10/2026: the teacher referrals (`הוראה מתקנת - חשבון`, `הוראה מתקנת - קריאה וכתיבה`, `מורה פרטי - מתמטיקה`, `מורה פרטי - אנגלית`). Before that date remedial teaching was an external referral and appeared in no list, only in `n_recs`; tutoring in grades ז-יב produced no referral at all, so `n_recs` for a maths-only or English-only teenager rose from 0 to 1 on that date |
 | `default_treatments` | subset of `treatments` that is there only because nothing fired (adults: the `emotional-default` recommendation; kids: the low-stress fallback to טיפול דינאמי). "Recommended X because of a finding" = in `treatments` and not here |
 | `age_band` | adults: 18-30 / 31-45 / 46-60 / 60+. kids: 1-7 / 8-12 / 13-18 - the three grade groups the scorer itself branches on |
 | `gender` | m / f / other |

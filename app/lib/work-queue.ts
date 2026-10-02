@@ -74,6 +74,8 @@ export type DashboardData = {
     partials_count: number;
     partials_never_reminded_count: number;
     pending_articles_count: number;
+    /** מורים (ענף "מענה לימודי") שנרשמו וממתינים לאימות ההכשרה. */
+    pending_teachers_count: number;
   };
   plan: {
     targets: Record<string, unknown>[];
@@ -110,6 +112,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
     planTargetsRes,
     guarantee,
     teachersListedRes,
+    teachersPendingRes,
   ] = await Promise.all([
     // fetchAllRows: both tables will pass the 1000-row PostgREST cap as the
     // therapist base grows toward the 950 plan target.
@@ -163,6 +166,10 @@ export async function buildDashboardData(): Promise<DashboardData> {
       .from("teachers")
       .select("id", { count: "exact", head: true })
       .in("listing_state", ["trial", "paying"]),
+    supabaseAdmin
+      .from("teachers")
+      .select("id", { count: "exact", head: true })
+      .eq("listing_state", "pending"),
   ]);
 
   const therapists = therapistsRes;
@@ -243,6 +250,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
       partials_count: partials.length,
       partials_never_reminded_count: partialsNeverReminded.length,
       pending_articles_count: pendingArticlesRes.count ?? 0,
+      pending_teachers_count: teachersPendingRes.count ?? 0,
     },
     plan: {
       targets: (planTargetsRes.data ?? []) as Record<string, unknown>[],

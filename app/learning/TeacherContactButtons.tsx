@@ -66,7 +66,9 @@ export default function TeacherContactButtons({ teacherId, phone, ctx, showPhone
   const onClick = (type: "whatsapp" | "phone") => (e: React.MouseEvent) => {
     e.stopPropagation();
     sendTeacherEvent(type, [teacherId], ctx);
-    gaEvent("generate_lead", { method: type, source: `teacher_${ctx.source}` });
+    // אירוע משלו ולא generate_lead: ההמרה "פנייה למטפל" ב-GA4 וב-Google Ads
+    // נשענת על generate_lead, ופנייה למורה לא אמורה לשנות את מה שהיא סופרת.
+    gaEvent("teacher_contact", { method: type, source: ctx.source });
   };
   return (
     <>

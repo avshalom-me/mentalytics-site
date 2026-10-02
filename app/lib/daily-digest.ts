@@ -286,6 +286,10 @@ async function gatherSections(): Promise<DigestSection[]> {
     approvalItems += q.pending_review_count;
     approvalLines.push(`${q.pending_review_count} פרופילים חדשים ממתינים לבדיקה`);
   }
+  if (q.pending_teachers_count > 0) {
+    approvalItems += q.pending_teachers_count;
+    approvalLines.push(`${q.pending_teachers_count} מורים ממתינים לאימות ההכשרה`);
+  }
   if (q.pending_articles_count > 0) {
     approvalItems += q.pending_articles_count;
     approvalLines.push(`${q.pending_articles_count} מאמרים ממתינים לאישור`);

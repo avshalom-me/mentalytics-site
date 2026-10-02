@@ -3592,7 +3592,11 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
           >
             <span aria-hidden="true">👇</span>
             <span>
-              <b>השלב הבא:</b> בחרו סוג טיפול מהמלצות שלמטה, ונציג לכם מטפלים מתאימים באזורכם.
+              <b>השלב הבא:</b>{" "}
+              {/* דוח שכל מה שאפשר לחפש בו הוא מורה - לא מבטיחים בו מטפלים. */}
+              {byDomain.some(b => b.teachers.length > 0) && !byDomain.some(b => b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0)
+                ? "בחרו בהמלצה שלמטה, ונציג לכם מורים מתאימים באזורכם."
+                : "בחרו סוג טיפול מהמלצות שלמטה, ונציג לכם מטפלים מתאימים באזורכם."}
             </span>
           </div>
         )}
@@ -3769,14 +3773,16 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                   קודם; מורה הוא התשובה כשהקושי לימודי וממוקד. */}
               {b.teachers.length > 0 && (
                 <div className={b.treatments.length > 0 || b.assessments.length > 0 || b.professionals.length > 0 ? "mt-5" : ""}>
-                  <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 pr-1">🎓 מענה לימודי</div>
-                  <p className="text-xs text-gray-500 mb-2 px-1">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-sky-800 mb-2 ps-1">🎓 מענה לימודי</div>
+                  <p className="text-xs text-gray-500 mb-2 ps-1 pe-1">
                     מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. אם אחרי כמה חודשים של הוראה סדירה אין שיפור - חוזרים לדוח ובודקים את ההמלצה לאבחון.
                   </p>
                   {b.teachers.map((g, idx) => {
                     if (b.teachers.slice(0, idx).some(prev => hasSameSymptoms(prev, g))) return null;
-                    const explainKey = `${b.key}::${g.treatmentKey}`;
                     const siblings = b.teachers.slice(idx + 1).filter(s => hasSameSymptoms(g, s));
+                    // בלי "למה הוצע לי?": ההסבר שם נכתב ע"י מודל שהפרומפט שלו
+                    // מתאר טיפול, והוא היה קורא למורה "מטפל/ת". ההסבר כאן הוא
+                    // הממצא עצמו והערת המעקב שמתחתיו.
                     return (
                       <GroupCard
                         forCounselor={audience === "counselor"}
@@ -3787,9 +3793,6 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
                           selectedKey === `${b.key}::${g.kind}::${g.treatmentKey}` ||
                           siblings.some(s => selectedKey === `${b.key}::${s.kind}::${s.treatmentKey}`)
                         }
-                        onExplain={() => fetchRecExplain(b.key, b.label, g)}
-                        explanation={recExplain[explainKey]}
-                        explanationLoading={recExplainLoading[explainKey]}
                         siblings={siblings.length > 0 ? siblings : undefined}
                         onSelectSiblings={siblings.length > 0 ? siblings.map(s => () => selectGroup(b.key, s)) : undefined}
                       />
