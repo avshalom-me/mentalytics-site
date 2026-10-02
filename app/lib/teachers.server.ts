@@ -42,7 +42,14 @@ export async function loadTeacherByToken(token: string) {
   return (data as Record<string, unknown> | null) ?? null;
 }
 
-export async function loadListedTeacherBySlug(slug: string): Promise<TeacherRow | null> {
+export async function loadListedTeacherBySlug(rawSlug: string): Promise<TeacherRow | null> {
+  // ה-slug עברי, והפרמטר מגיע מקודד (%D7...). בלי הפענוח אף מורה לא נמצא/ה.
+  let slug = rawSlug;
+  try {
+    slug = decodeURIComponent(rawSlug);
+  } catch {
+    /* keep raw */
+  }
   if (!slug || slug.length > 200) return null;
   const { data } = await supabaseAdmin
     .from("teachers")
