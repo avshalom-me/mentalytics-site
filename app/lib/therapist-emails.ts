@@ -854,8 +854,9 @@ export function signupFinalReminderHtml(): string {
       ${p("ההשלמה לוקחת כמה דקות: תיאור קצר, תמונה, תחומי טיפול ותעודה מקצועית. אחרי אישור התעודה הפרופיל עולה לאתר, באחד משני מסלולים לבחירתך:")}
       <ul style="margin:0 0 16px;padding:0 20px 0 0;font-size:15px;color:#1a4a5c;">
         <li style="margin:0 0 8px;"><strong>המסלול החינמי:</strong> דף פרופיל אישי במאגר המטפלים, ללא עלות.</li>
-        <li style="margin:0;"><strong>המסלול המקודם</strong> (₪${SUBSCRIPTION_BASE_PRICE} + מע"מ לחודש): הופעה ראשונה בתוצאות החיפוש, והצגה למטופלים במערכת ההתאמה של השאלון. אם לא התקבלה פנייה מתאימה בחודשיים הראשונים, ניתן לקבל החזר כספי מלא.</li>
+        <li style="margin:0;"><strong>המסלול המקודם</strong> (₪${SUBSCRIPTION_BASE_PRICE} + מע"מ לחודש): הופעה ראשונה בתוצאות החיפוש, והצגה למטופלים במערכת ההתאמה של השאלון. אם לא התקבלה פנייה מתאימה בחודשיים הראשונים, ניתן לקבל החזר כספי מלא*.</li>
       </ul>
+      <p style="margin:-6px 0 18px;font-size:12.5px;color:#6b7280;">* פנייה מתאימה בקליניקה = מבוסס על אמון מול המטפל/ת.</p>
       <div style="text-align:center;margin:6px 0 20px;">
         <a href="${editUrl}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">להשלמת הפרופיל ←</a>
       </div>
