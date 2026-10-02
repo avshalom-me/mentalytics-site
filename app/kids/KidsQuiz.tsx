@@ -3566,7 +3566,7 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             </div>
             <div className="flex items-start gap-2.5">
               <span className="flex-shrink-0 rounded-full bg-white px-2 py-0.5 text-xs font-bold text-[var(--teal-dark)] border border-[var(--teal-mid)]">3</span>
-              <span>כשמוכנים - לחצו על <span className="font-semibold text-[var(--teal-dark)]">"חיפוש מטפל/מאבחן/מורה"</span> בממצא הרלוונטי ביותר עבורכם</span>
+              <span>כשמוכנים - לחצו על <span className="font-semibold text-[var(--teal-dark)]">{byDomain.some(b => b.teachers.length > 0) ? "\"חיפוש מטפל/מאבחן/מורה\"" : "\"חיפוש מטפל/מאבחן\""}</span> בממצא הרלוונטי ביותר עבורכם</span>
             </div>
           </div>
         </div>
