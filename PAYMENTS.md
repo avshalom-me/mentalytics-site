@@ -247,7 +247,7 @@ ALTER TABLE my_new_table ENABLE ROW LEVEL SECURITY;
 | `RESEND_API_KEY` | שליחת מיילים (טופס יצירת קשר) |
 | `OPENAI_API_KEY` | סוכן AI לסיכום חיבור מטפל-מטופל |
 | `ADMIN_USERNAME` | אדמין UI |
-| `ADMIN_PASSWORD` | אדמין UI. ⚠️ סיסמה נוכחית חלשה — מומלץ להחליף למחרוזת אקראית 32+ תווים |
+| `ADMIN_PASSWORD` | אדמין UI. הוחלפה ב-2/10/2026. הערך נשמר רק ב-Vercel וב-`.env.local`, ולא נכתב במסמכים, בקוד או בהודעות קומיט. אותיות אנגליות, ספרות ומקפים בלבד: ה-middleware מפענח עם `atob`, וסיסמה בעברית לא תתאים |
 
 ---
 
@@ -388,7 +388,7 @@ Sumit לא דוחפים webhooks לאירועי תשלום ישירות. הם כ
 | F3 | מטפל manually_promoted לא יכול לעבור לתשלום אמיתי (`create-subscription` חוסם כל `status='paying'` בלי לבדוק `manually_promoted`). זו התנהגות מכוונת (לא לתקן — מטפל מקודם לא אמור לשלם). | 🟢 |
 | F4 | ✅ **נפתר (17/6/26):** מיילים אוטומטיים פעילים — קידום/הורדה/ברוכים-הבאים/דחייה + התראת אדמין על הוראת קבע יתומה. | ✅ |
 | F5 | Rate limit `new Map()` לא עמיד ב-cold start של Vercel serverless. לעבור ל-Vercel KV / Supabase counter בעתיד. | 🟡 |
-| F6 | סיסמת האדמין חלשה. לעבור ל-Supabase Auth עם role בעתיד. | 🟠 |
+| F6 | האדמין מוגן ב-Basic Auth עם סיסמה משותפת אחת (הוחלפה ב-2/10/2026). לעבור ל-Supabase Auth עם role בעתיד. | 🟡 |
 | F7 | שמות עמודות `morning_token_id` ו-`morning_document_id` שורדים מהאינטגרציה הישנה. אפשר לבצע migration לשמות עם `sumit_*` בעתיד. | 🟡 |
 
 ---
