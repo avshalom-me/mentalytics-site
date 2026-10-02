@@ -34,11 +34,12 @@ export interface KidsReportInput {
   noFindings?: { title: string; line: string };
 }
 
-/** The screen's four referral headings, in its order, as a document names them. */
+/** The screen's referral headings, in its order, as a document names them. */
 const KIND_LINES = [
   ["treatment", "טיפול מומלץ"],
   ["assessment", "אבחון מומלץ"],
   ["professional", "פנייה לאיש/ת מקצוע"],
+  ["teacher", "מענה לימודי מומלץ"],
   ["external", "פנייה נוספת"],
 ] as const;
 

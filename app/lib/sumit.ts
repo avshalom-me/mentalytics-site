@@ -272,6 +272,77 @@ export async function createSubscription(opts: {
   return charge;
 }
 
+// ---------- Teacher subscription (ענף המורים, "מענה לימודי") ----------
+//
+// אותו endpoint, שלושה הבדלים: הלקוח מזוהה כ-`teacher:<id>` כדי שלא יתערבב
+// עם מטפל שיש לו אותו מזהה-חיצוני; המחיר נשלח *ברוטו* עם VATIncluded:true,
+// כי 60 ש"ח כולל מע"מ אינו מספר שלם לפני מע"מ (ראו teacher-options.ts);
+// ו-Date_Start דחוי לסוף תקופת הניסיון כשהמורה משלם/ת לפני שהיא נגמרה -
+// אותו מנגנון של חודשי המתנה אצל המרכזים ובמסלול ההזמנה.
+export async function createTeacherSubscription(opts: {
+  teacherId: string;
+  teacherName: string;
+  teacherEmail: string;
+  teacherPhone?: string;
+  singleUseToken: string;
+  /** המחיר כולל מע"מ. */
+  grossPrice: number;
+  /** "YYYY-MM-DD" - החיוב הראשון, כשהניסיון עוד רץ. */
+  firstChargeDate?: string;
+}): Promise<SubscriptionChargeResult> {
+  const externalId = `teacher:${opts.teacherId}`;
+  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
+    Customer: {
+      ExternalIdentifier: externalId,
+      SearchMode: 0,
+      Name: opts.teacherName,
+      EmailAddress: opts.teacherEmail,
+      Phone: opts.teacherPhone || null,
+    },
+    SingleUseToken: opts.singleUseToken,
+    Items: [
+      {
+        Item: {
+          Name: "מנוי חודשי - מענה לימודי | טיפול חכם",
+          SKU: "TEACHER-MONTHLY",
+          Duration_Months: 1,
+        },
+        Quantity: 1,
+        UnitPrice: opts.grossPrice,
+        Recurrence: 999,
+        ...(opts.firstChargeDate ? { Date_Start: opts.firstChargeDate } : {}),
+      },
+    ],
+    VATIncluded: true,
+    UpdateCustomerByEmail: true,
+    UpdateCustomerByEmail_AttachDocument: true,
+    SendCopyToOrganization: true,
+    PreventStandingOrder: false,
+  });
+  if (!opts.firstChargeDate) {
+    assertChargeSucceeded(charge, "teacher subscription charge");
+  }
+  if (
+    !charge.RecurringItemID &&
+    Array.isArray(charge.RecurringCustomerItemIDs) &&
+    charge.RecurringCustomerItemIDs.length > 0
+  ) {
+    charge.RecurringItemID = charge.RecurringCustomerItemIDs[0];
+  }
+  if (!charge.RecurringItemID) {
+    try {
+      const items = await listRecurringForCustomer({ externalIdentifier: externalId, includeInactive: false });
+      const newest = items
+        .filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)))
+        .sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+      if (newest) charge.RecurringItemID = newest.ID;
+    } catch (e) {
+      console.error("createTeacherSubscription: failed to resolve RecurringItemID:", e);
+    }
+  }
+  return charge;
+}
+
 // ---------- Therapy-center subscription ----------
 //
 // Same recurring/charge endpoint as therapist subscriptions, with two

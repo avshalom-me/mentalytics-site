@@ -109,6 +109,7 @@ export async function buildDashboardData(): Promise<DashboardData> {
     quizCompleteMonthRes,
     planTargetsRes,
     guarantee,
+    teachersListedRes,
   ] = await Promise.all([
     // fetchAllRows: both tables will pass the 1000-row PostgREST cap as the
     // therapist base grows toward the 950 plan target.
@@ -158,6 +159,10 @@ export async function buildDashboardData(): Promise<DashboardData> {
       .gte("created_at", startOfMonthIso()),
     supabaseAdmin.from("plan_targets").select("*").order("month", { ascending: true }),
     computeGuarantee(),
+    supabaseAdmin
+      .from("teachers")
+      .select("id", { count: "exact", head: true })
+      .in("listing_state", ["trial", "paying"]),
   ]);
 
   const therapists = therapistsRes;
@@ -244,7 +249,8 @@ export async function buildDashboardData(): Promise<DashboardData> {
       actuals: {
         therapists_total: paying.length + approvedFree.length,
         questionnaires_month: quizCompleteMonthRes.count ?? 0,
-        teachers_total: 0,
+        // מורים שמוצגים כרגע (ניסיון + משלמים) - ענף המורים, מ-2/10/2026.
+        teachers_total: teachersListedRes.count ?? 0,
       },
     },
   };

@@ -1,0 +1,176 @@
+// מנוע ההתאמה למורים - טהור, בלי מסד ובלי רשת, כדי שאפשר יהיה לבדוק אותו.
+//
+// הרבה יותר פשוט ממנוע המטפלים (11 משקולות, אישיות, גישות): כאן ההתאמה
+// המקצועית היא תחום + סוג מורה + שכבת גיל, והמיקום מסודר באותה סכימה
+// שההורים כבר מכירים מכרטיסי המטפלים - קודם "באזור שבחרתם", אחר כך
+// אזורים סמוכים ואונליין. בתוך קבוצה: ציון מקצועי, ואז משלמים לפני
+// ניסיון, ואז סבב יומי כדי שאף מורה לא יתקע תמיד אחרון/ה.
+
+import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
+import type { TeacherGradeGroup, TeacherSubject } from "@/app/lib/teacher-options";
+
+export type TeacherRow = {
+  id: string;
+  full_name: string;
+  gender: string | null;
+  slug: string | null;
+  subjects: string[];
+  remedial: boolean;
+  grade_groups: string[];
+  regions: string[];
+  online: boolean;
+  languages: string[];
+  listing_state: string;
+  paused_until: string | null;
+  bio: string | null;
+  phone: string | null;
+  price_text: string | null;
+  qualification: string | null;
+  photo_path: string | null;
+  experience_years: number | null;
+};
+
+export type TeacherMatchInput = {
+  subject: TeacherSubject | null;
+  remedial: boolean;
+  gradeGroup: TeacherGradeGroup | null;
+  city: string | null;
+  region: string | null;
+  onlineRequired: boolean;
+  language: string;
+  genderPreference: string | null;
+  limit: number;
+};
+
+export type TeacherMatch = {
+  teacher: TeacherRow;
+  /** ההתאמה המקצועית באחוזים (בלי מרחק), כמו match_score אצל מטפלים. */
+  score: number;
+  /** דירוג פנימי שכולל מיקום - למיון בלבד. */
+  rankScore: number;
+  inRequestedArea: boolean;
+  reasons: string[];
+};
+
+const WEIGHTS = {
+  subject: 40,
+  remedial: 25,
+  grade: 20,
+  gender: 5,
+  location: 25,
+} as const;
+
+/**
+ * זרע יומי לסבב: אותו סדר לכל ההורים באותו יום, סדר אחר מחר. מונע מצב שבו
+ * מורה שנרשם/ה ראשון/ה תמיד מופיע/ה ראשון/ה בין שווים.
+ */
+function dailyRotation(id: string, day: string): number {
+  let h = 0;
+  const s = `${day}:${id}`;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
+  return h / 4294967296;
+}
+
+export function isTeacherListed(t: Pick<TeacherRow, "listing_state" | "paused_until">, now: Date): boolean {
+  if (t.listing_state !== "trial" && t.listing_state !== "paying") return false;
+  if (t.paused_until && new Date(t.paused_until).getTime() > now.getTime()) return false;
+  return true;
+}
+
+function scoreOne(t: TeacherRow, input: TeacherMatchInput): TeacherMatch | null {
+  const reasons: string[] = [];
+  let earned = 0;
+  let possible = 0;
+
+  // שפה: סינון קשה. מורה בלי שפות = עברית.
+  const langs = t.languages?.length ? t.languages : ["עברית"];
+  if (input.language && !langs.includes(input.language)) return null;
+
+  // תחום: סינון קשה כשנשאל תחום (הורה שחיפש מורה לאנגלית לא רוצה מורה לחשבון).
+  if (input.subject) {
+    possible += WEIGHTS.subject;
+    if (!t.subjects.includes(input.subject)) return null;
+    earned += WEIGHTS.subject;
+    reasons.push("תחום מתאים");
+  }
+
+  // הוראה מתקנת: כשנדרשת - סינון קשה. כשלא נדרשת - מורה להוראה מתקנת
+  // מקבל/ת את הנקודות כבונוס, כי הכשרה כזו מתאימה גם לתגבור.
+  possible += WEIGHTS.remedial;
+  if (input.remedial) {
+    if (!t.remedial) return null;
+    earned += WEIGHTS.remedial;
+    reasons.push("הוראה מתקנת");
+  } else if (t.remedial) {
+    earned += WEIGHTS.remedial;
+    reasons.push("גם הוראה מתקנת");
+  } else {
+    earned += WEIGHTS.remedial * 0.6;
+  }
+
+  // שכבת גיל: סינון קשה כשנשאלה.
+  if (input.gradeGroup) {
+    possible += WEIGHTS.grade;
+    if (!t.grade_groups.includes(input.gradeGroup)) return null;
+    earned += WEIGHTS.grade;
+    reasons.push("שכבת הגיל מתאימה");
+  }
+
+  if (input.genderPreference) {
+    possible += WEIGHTS.gender;
+    if (t.gender === input.genderPreference) {
+      earned += WEIGHTS.gender;
+      reasons.push("העדפת מגדר");
+    }
+  }
+
+  // מיקום - אותה סכימה כמו אצל המטפלים: עיר 100%, אותו אזור 85%, אזור סמוך
+  // 15%, אונליין 40% (100% כשכל הבקשה היא אונליין). לא נכנס לציון המוצג.
+  const locationAsked = !!(input.city || input.region || input.onlineRequired);
+  let locationEarned = 0;
+  const locationPossible = locationAsked ? WEIGHTS.location : 0;
+  if (locationAsked) {
+    const requestedRegion = input.city ? (CITY_TO_REGION[input.city] ?? input.region) : input.region;
+    const teacherRegions = new Set(t.regions.map((c) => CITY_TO_REGION[c]).filter(Boolean));
+    let geo = 0;
+    if (input.city && t.regions.includes(input.city)) geo = 1;
+    else if (requestedRegion && teacherRegions.has(requestedRegion)) geo = input.city ? 0.85 : 1;
+    else if (requestedRegion && (REGION_NEIGHBORS[requestedRegion] ?? []).some((r) => teacherRegions.has(r))) geo = 0.15;
+    let online = 0;
+    if (t.online) online = input.city || input.region ? 0.4 : 1;
+    if (!input.onlineRequired) online = Math.min(online, 0.4);
+    const best = Math.max(geo, online);
+    if (best === 0) return null; // לא באזור, לא סמוך, לא אונליין
+    locationEarned = WEIGHTS.location * best;
+    if (geo >= 0.85) reasons.push("באזור שלכם");
+    else if (geo > 0) reasons.push("אזור סמוך");
+    if (t.online && online >= geo) reasons.push("אונליין");
+  }
+
+  const score = possible > 0 ? Math.round((earned / possible) * 100) : 100;
+  const rankScore = possible + locationPossible > 0 ? ((earned + locationEarned) / (possible + locationPossible)) * 100 : 100;
+  const inRequestedArea = !locationAsked || locationEarned >= 0.6 * locationPossible;
+  return { teacher: t, score, rankScore, inRequestedArea, reasons };
+}
+
+function commercialRank(state: string): number {
+  return state === "paying" ? 0 : state === "trial" ? 1 : 2;
+}
+
+export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now: Date = new Date()): TeacherMatch[] {
+  const day = now.toISOString().slice(0, 10);
+  const scored: TeacherMatch[] = [];
+  for (const t of rows) {
+    if (!isTeacherListed(t, now)) continue;
+    const m = scoreOne(t, input);
+    if (m) scored.push(m);
+  }
+  scored.sort((a, b) => {
+    if (a.inRequestedArea !== b.inRequestedArea) return a.inRequestedArea ? -1 : 1;
+    if (Math.abs(a.rankScore - b.rankScore) > 0.5) return b.rankScore - a.rankScore;
+    const c = commercialRank(a.teacher.listing_state) - commercialRank(b.teacher.listing_state);
+    if (c !== 0) return c;
+    return dailyRotation(a.teacher.id, day) - dailyRotation(b.teacher.id, day);
+  });
+  return scored.slice(0, Math.max(1, Math.min(input.limit || 10, 20)));
+}

@@ -234,7 +234,7 @@ export const DIAGNOSIS_KIND_LABELS: Record<DiagnosisKind, string> = {
 
 export const RELEVANCE_LABELS = { primary: "לטיפול עכשיו", consider: "לשיקול", info: "מידע" } as const;
 
-export const KIND_LABELS = { treatment: "טיפול", assessment: "אבחון", professional: "איש מקצוע", external: "פנייה" } as const;
+export const KIND_LABELS = { treatment: "טיפול", assessment: "אבחון", professional: "איש מקצוע", teacher: "מורה", external: "פנייה" } as const;
 
 // ── Which eligibility route, if any ──────────────────────────────────────────
 

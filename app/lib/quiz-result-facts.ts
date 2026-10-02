@@ -28,6 +28,8 @@ export type ResultKeys = {
   treatments: string[];
   assessments: string[];
   professionals: string[];
+  /** ענף המורים: מפתחות ההמלצה למורה (שאלון הילדים בלבד; מבוגרים - תמיד ריק). */
+  teachers: string[];
   /** Subset of `treatments` that no finding-driven recommendation also produced. */
   defaultTreatments: string[];
   /** Recommendations before de-duplication. 0 = the questionnaire found nothing. */
@@ -62,6 +64,7 @@ export function adultResultKeys(recs: AdultRec[]): ResultKeys {
     treatments: [...treatments],
     assessments: [...assessments],
     professionals: [...professionals],
+    teachers: [],
     defaultTreatments: [...fromDefault].filter((t) => !fromFinding.has(t)),
     nRecs: recs.length,
   };
@@ -75,7 +78,7 @@ export function adultResultKeys(recs: AdultRec[]): ResultKeys {
  */
 export function kidsResultKeys(
   domains: KidsDomainResult[],
-  keys: { treatmentKeys: string[]; assessmentKeys: string[]; professionalKeys: string[] },
+  keys: { treatmentKeys: string[]; assessmentKeys: string[]; professionalKeys: string[]; teacherKeys?: string[] },
   defaultReferralEmitted: boolean,
 ): ResultKeys {
   let nRecs = 0;
@@ -102,6 +105,7 @@ export function kidsResultKeys(
     treatments: [...new Set(keys.treatmentKeys)],
     assessments: [...new Set(keys.assessmentKeys)],
     professionals: [...new Set(keys.professionalKeys)],
+    teachers: [...new Set(keys.teacherKeys ?? [])],
     defaultTreatments: onlyByDefault && keys.treatmentKeys.includes(KIDS_DEFAULT_KEY) ? [KIDS_DEFAULT_KEY] : [],
     nRecs,
   };
