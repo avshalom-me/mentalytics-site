@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runWeeklyReport } from "@/app/api/cron/weekly-report/route";
+import { runWeeklyReport } from "@/app/lib/admin-report";
 
 export const dynamic = "force-dynamic";
 // Must match the cron route (runReport uses a reasoning LLM that takes ~150-180s

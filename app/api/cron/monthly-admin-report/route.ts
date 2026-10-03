@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { runReport } from "@/app/api/cron/weekly-report/route";
+import { runReport } from "@/app/lib/admin-report";
 import { cronAuthorized } from "@/app/lib/cron-auth";
 
 export const dynamic = "force-dynamic";

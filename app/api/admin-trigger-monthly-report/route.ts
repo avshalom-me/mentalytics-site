@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { runReport } from "@/app/api/cron/weekly-report/route";
+import { runReport } from "@/app/lib/admin-report";
 
 export const dynamic = "force-dynamic";
 // Same reasoning-LLM path as the weekly report (~150-180s); 120 timed out. Match
