@@ -71,6 +71,9 @@ export default function TeacherDirectSearch({ supply }: { supply: Supply }) {
     setPreview(new URLSearchParams(window.location.search).get("preview") === "1");
   }, []);
 
+  // תחום בלי אף מורה מוצג אפור ולא נבחר, כדי שלא יוביל לחיפוש ריק.
+  const hasTeachers = (key: TeacherSubject) => preview || supply.subjects.includes(key);
+
   const ctx = { source: "direct" as const, quizType: null, subject: searched?.subject || null };
   useTeacherImpressions(results.map((t) => t.id), ctx);
 
@@ -84,7 +87,9 @@ export default function TeacherDirectSearch({ supply }: { supply: Supply }) {
     setUnderstood(found);
     if (found.length === 0) return;
     setUsedText(true);
-    if (parsed.subject) setSubject(parsed.subject);
+    // תחום שזוהה אבל אין בו מורים נשאר לא מסומן: הכפתור שלו אפור, וסימון
+    // שאי אפשר לראות או לבטל היה שולח את ההורה לחיפוש ריק.
+    if (parsed.subject && hasTeachers(parsed.subject)) setSubject(parsed.subject);
     if (parsed.remedial !== null) setRemedialOnly(parsed.remedial);
     if (parsed.gradeGroup) setGradeGroup(parsed.gradeGroup);
     if (parsed.city) {
@@ -168,8 +173,6 @@ export default function TeacherDirectSearch({ supply }: { supply: Supply }) {
     );
   }
 
-  // תחום בלי אף מורה מוצג אפור ולא נבחר, כדי שלא יוביל לחיפוש ריק.
-  const hasTeachers = (key: TeacherSubject) => preview || supply.subjects.includes(key);
   const someSubjectsEmpty = TEACHER_SUBJECTS.some((s) => !hasTeachers(s.key));
 
   return (
