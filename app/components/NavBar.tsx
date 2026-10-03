@@ -5,7 +5,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { User, GraduationCap, Menu, X, LogIn } from "lucide-react";
 import EnglishNavBar from "./EnglishNavBar";
+import LearningNavBar from "./LearningNavBar";
 import { isEnglishPath } from "@/app/lib/english-path";
+import { isLearningPath } from "@/app/lib/learning-door";
 
 const navLinks = [
   { href: "/about", label: "מי אנחנו" },
@@ -29,9 +31,12 @@ function SkipLink({ english }: { english: boolean }) {
 
 export default function NavBar() {
   const [open, setOpen] = useState(false);
-  const english = isEnglishPath(usePathname());
+  const pathname = usePathname();
+  const english = isEnglishPath(pathname);
   // The English section (/en) gets its own header, in English and LTR.
   if (english) return <><SkipLink english /><EnglishNavBar /></>;
+  // "לימוד חכם" (/learning) - the teachers' door has its own name, logo and links.
+  if (isLearningPath(pathname)) return <><SkipLink english={false} /><LearningNavBar /></>;
 
   return (
     <>

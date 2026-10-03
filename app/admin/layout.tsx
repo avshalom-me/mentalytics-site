@@ -22,7 +22,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     items: [
       { href: "/admin/therapists", label: "מטפלים", icon: "👥" },
       { href: "/admin/centers", label: "מרכזים טיפוליים", icon: "🏥" },
-      { href: "/admin/teachers", label: "מורים (מענה לימודי)", icon: "🎓" },
+      { href: "/admin/teachers", label: "מורים (לימוד חכם)", icon: "🎓" },
       { href: "/admin/leads", label: "לידים ופניות", icon: "📥" },
       { href: "/admin/guarantee", label: "תקופת ביטחון", icon: "🛡️" },
       { href: "/admin/deals", label: "עסקאות B2B", icon: "🤝" },

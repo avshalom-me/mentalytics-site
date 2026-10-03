@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { matchTeachers, isTeacherListed, teacherSupplyForKeys, type TeacherRow, type TeacherMatchInput } from "./teacher-match";
+import { matchTeachers, isTeacherListed, teacherSupplyForKeys, teacherDoorSupply, type TeacherRow, type TeacherMatchInput } from "./teacher-match";
 import { teacherSearchFromKey, TEACHER_REFERRAL_KEYS, qualificationAllowsRemedial, hasActiveStandingOrder } from "./teacher-options";
 
 const NOW = new Date("2026-10-02T10:00:00Z");
@@ -206,5 +206,105 @@ describe("matchTeachers", () => {
   it("respects the limit", () => {
     const rows = Array.from({ length: 30 }, (_, i) => row({ id: `t${i}` }));
     expect(matchTeachers(rows, input({ limit: 5 }), NOW)).toHaveLength(5);
+  });
+});
+
+// ההבטחה לבעלים (3/10/2026), כפי שנוסחה לו: "אף מורה לא מדולגת, והמרחק נשאר
+// ראשון. ההתאמה לקושי משנה את הסדר רק בין מורות מאותו אזור." הדוגמה שלו:
+// חיפוש בתל אביב, ומורה מתאימה יותר בבאר שבע.
+describe("the difficulties in the background: a preference inside the area, never a filter", () => {
+  const TLV = { city: "תל אביב", region: "גוש דן" };
+
+  it("the owner's example: a Tel Aviv search does not skip the Tel Aviv teacher for one in Beer Sheva", () => {
+    const rows = [
+      row({ id: "beer-sheva-expert", regions: ["באר שבע"], expertise: ["attention"] }),
+      row({ id: "beer-sheva-expert-online", regions: ["באר שבע"], online: true, expertise: ["attention"] }),
+      row({ id: "tel-aviv-plain", regions: ["תל אביב"] }),
+    ];
+    const out = matchTeachers(rows, input({ ...TLV, needs: ["attention"] }), NOW);
+    const ids = out.map((m) => m.teacher.id);
+    // באר שבע אינה אזור סמוך לגוש דן: בלי אונליין המורה משם לא מוצגת בכלל,
+    // ועם אונליין היא מוצגת אחרי המורה מתל אביב, מחוץ לאזור.
+    expect(ids).toEqual(["tel-aviv-plain", "beer-sheva-expert-online"]);
+    expect(out[0].inRequestedArea).toBe(true);
+    expect(out[1].inRequestedArea).toBe(false);
+  });
+
+  it("inside the area, the teacher with the matching experience comes first - even over the exact city", () => {
+    const rows = [
+      row({ id: "same-city-plain", regions: ["תל אביב"] }),
+      row({ id: "same-region-expert", regions: ["רמת גן"], expertise: ["attention"] }),
+    ];
+    const out = matchTeachers(rows, input({ ...TLV, needs: ["attention"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["same-region-expert", "same-city-plain"]);
+    expect(out[0].needsMatched).toEqual(["attention"]);
+    expect(out[1].needsMatched).toEqual([]);
+    // בלי קשיים שצוינו הסדר חוזר להיות מרחק בלבד.
+    expect(matchTeachers(rows, input(TLV), NOW).map((m) => m.teacher.id)).toEqual(["same-city-plain", "same-region-expert"]);
+  });
+
+  it("nobody is dropped for lacking the experience", () => {
+    const rows = [row({ id: "plain" }), row({ id: "expert", expertise: ["literacy"] })];
+    const out = matchTeachers(rows, input({ needs: ["literacy"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["expert", "plain"]);
+  });
+
+  it("the score the parent sees reflects it: full only with the declared experience", () => {
+    const rows = [row({ id: "plain" }), row({ id: "expert", expertise: ["literacy"] })];
+    const out = matchTeachers(rows, input({ needs: ["literacy"] }), NOW);
+    const score = (id: string) => out.find((m) => m.teacher.id === id)!.score;
+    expect(score("expert")).toBe(100);
+    expect(score("plain")).toBeLessThan(100);
+    // בלי קשיים שצוינו שניהם התאמה מלאה, כמו לפני השינוי.
+    for (const m of matchTeachers(rows, input({}), NOW)) expect(m.score).toBe(100);
+  });
+
+  it("in a tutoring search, verified remedial training outranks experience that was only declared", () => {
+    const rows = [
+      row({ id: "tutor-plain", remedial: false }),
+      row({ id: "tutor-declared", remedial: false, expertise: ["attention"] }),
+      row({ id: "remedial-plain", remedial: true }),
+      row({ id: "remedial-declared", remedial: true, expertise: ["attention"] }),
+    ];
+    const out = matchTeachers(rows, input({ remedial: false, needs: ["attention"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["remedial-declared", "remedial-plain", "tutor-declared", "tutor-plain"]);
+    expect(out.map((m) => m.needCredit)).toEqual([1, 0.8, 0.6, 0]);
+  });
+
+  it("several difficulties: the more of them covered, the earlier", () => {
+    const rows = [
+      row({ id: "one", expertise: ["attention"] }),
+      row({ id: "both", expertise: ["attention", "literacy"] }),
+      row({ id: "none" }),
+    ];
+    const out = matchTeachers(rows, input({ needs: ["attention", "literacy"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["both", "one", "none"]);
+  });
+
+  it("the hard filters are untouched by it", () => {
+    const rows = [row({ id: "wrong-subject", subjects: ["english"], expertise: ["attention"] }), row({ id: "right-subject" })];
+    const out = matchTeachers(rows, input({ needs: ["attention"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["right-subject"]);
+  });
+
+  it("a paying teacher does not jump over a better fit", () => {
+    const rows = [
+      row({ id: "paying-plain", listing_state: "paying" }),
+      row({ id: "trial-expert", listing_state: "trial", expertise: ["numeracy"] }),
+    ];
+    const out = matchTeachers(rows, input({ needs: ["numeracy"] }), NOW);
+    expect(out.map((m) => m.teacher.id)).toEqual(["trial-expert", "paying-plain"]);
+  });
+});
+
+describe("the door's supply", () => {
+  it("counts teachers shown right now, and the subjects they cover", () => {
+    const rows = [
+      row({ subjects: ["math", "english"] }),
+      row({ subjects: ["math"], listing_state: "archived" }),
+      row({ subjects: ["reading_writing"], paused_until: "2026-12-01T00:00:00Z" }),
+    ];
+    expect(teacherDoorSupply(rows, NOW)).toEqual({ total: 1, subjects: ["math", "english"] });
+    expect(teacherDoorSupply([], NOW)).toEqual({ total: 0, subjects: [] });
   });
 });

@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { LEARNING_DOOR_PUBLIC, LEARNING_PRIVATE_SEGMENTS } from "./app/lib/learning-door";
 
 // ── Questionnaire version stamp ──────────────────────────────────────────────
 // Every recorded questionnaire result carries the version of the instrument
@@ -73,6 +74,8 @@ const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
 ];
 
+const NOINDEX_HEADER = [{ key: "X-Robots-Tag", value: "noindex, nofollow" }];
+
 const nextConfig: NextConfig = {
   // Parallel Claude/dev sessions share this folder, and .next is stateful:
   // a build while another session's dev server runs reuses that server's
@@ -97,10 +100,13 @@ const nextConfig: NextConfig = {
       // English page declares its language here, where a crawler reads it
       // without running any script (app/en/DocumentLanguage.tsx fixes the
       // attribute itself only in the browser).
-      // ענף המורים ("מענה לימודי") אינו חלק מהאתר המאונדקס - החלטת הבעלים,
-      // 2/10/2026. ה-layout של /learning כבר מגדיר noindex; הכותרת כאן תופסת
-      // גם עמוד שישכח, וגם תשובות שאינן HTML.
-      { source: "/learning/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      // "לימוד חכם" (/learning), ענף המורים. האזורים הפרטיים - הפרופיל והתשלום
+      // של המורה, הקישור האישי ועמודי הפרופיל - אינם מאונדקסים אף פעם. הדלת
+      // עצמה (/learning, /learning/join) סגורה כל עוד LEARNING_DOOR_PUBLIC כבוי
+      // (החלטת הבעלים מ-3/10/2026 פתחה אותה; המתג קובע מתי). הכותרת כאן תופסת
+      // גם עמוד ששכח את המטא, וגם תשובות שאינן HTML.
+      ...LEARNING_PRIVATE_SEGMENTS.map((segment) => ({ source: `/learning/${segment}/:path*`, headers: NOINDEX_HEADER })),
+      ...(LEARNING_DOOR_PUBLIC ? [] : [{ source: "/learning/:path*", headers: NOINDEX_HEADER }]),
       { source: "/en", headers: [{ key: "Content-Language", value: "en" }] },
       { source: "/en/:path*", headers: [{ key: "Content-Language", value: "en" }] },
     ];

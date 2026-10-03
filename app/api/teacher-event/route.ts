@@ -11,7 +11,8 @@ import { TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
 
 const VALID_TYPES = ["impression", "whatsapp", "phone", "profile_view"] as const;
 type EventType = (typeof VALID_TYPES)[number];
-const VALID_SOURCES = ["match", "profile"] as const;
+// match = תוצאות חיפוש מתוך השאלון; direct = תוצאות החיפוש הישיר בדלת "לימוד חכם".
+const VALID_SOURCES = ["match", "profile", "direct"] as const;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(req: NextRequest) {

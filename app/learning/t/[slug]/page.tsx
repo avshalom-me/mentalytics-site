@@ -7,14 +7,15 @@ import TeacherProfileView from "./TeacherProfileView";
 
 // עמוד הפרופיל של מורה. מוצג רק למורה שמופיע/ה כרגע (ניסיון/משלם/ת ולא
 // מוקפא/ת) - אחרת 404, בלי להסגיר אם הוא/היא קיים/ת. noindex מה-layout.
-// הכתובת מגיעה רק מכרטיס בתוצאות שאלון הילדים.
+// הכתובת מגיעה מכרטיס תוצאה: בשאלון הילדים (from=match) או בחיפוש הישיר
+// של "לימוד חכם" (from=direct).
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await params;
   const t = await loadListedTeacherBySlug(slug);
-  return { title: t ? `${t.full_name} | מענה לימודי` : "מורה", robots: { index: false, follow: false } };
+  return { title: t ? `${t.full_name} | לימוד חכם` : "מורה", robots: { index: false, follow: false } };
 }
 
 export default async function TeacherProfilePage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | undefined>> }) {
@@ -23,6 +24,7 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
   const t = await loadListedTeacherBySlug(slug);
   if (!t) notFound();
   const fromMatch = sp.from === "match";
+  const fromDirect = sp.from === "direct";
   const photo = teacherPhotoUrl(t);
   const focusGroups = focusesBySubject(t.subjects, t.focuses ?? []);
   const expertise = t.expertise ?? [];
@@ -32,8 +34,10 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-24" dir="rtl">
       <TeacherProfileView teacherId={t.id} quizType={sp.q === "school" ? "school" : fromMatch ? "kids" : null} />
-      {fromMatch && (
-        <p className="mb-6 text-xs text-[var(--muted)]">הפרופיל נפתח בכרטיסייה חדשה. תוצאות השאלון נשארו פתוחות בכרטיסייה הקודמת.</p>
+      {(fromMatch || fromDirect) && (
+        <p className="mb-6 text-xs text-[var(--muted)]">
+          הפרופיל נפתח בכרטיסייה חדשה. {fromMatch ? "תוצאות השאלון" : "תוצאות החיפוש"} נשארו פתוחות בכרטיסייה הקודמת.
+        </p>
       )}
 
       <div className="rounded-3xl border border-[var(--line)] bg-white p-6 shadow-sm sm:p-8">
@@ -119,7 +123,8 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
       <p className="mt-6 text-xs leading-6 text-[var(--muted)]">
         מורה עצמאי/ת. טיפול חכם אימתה את ההכשרה המוצהרת מול תעודה, ואינה צד לשיעורים, לתשלום או לתוכנם.
         מוקדי ההוראה והניסיון עם קשיים מסוימים הם לפי הצהרת המורה, ולא אומתו.
-        המורה אינו/ה מטפל/ת ואינו/ה מאבחן/ת; לקושי רגשי או לבירור אבחוני, ראו את שאר ההמלצות בדוח השאלון.
+        המורה אינו/ה מטפל/ת ואינו/ה מאבחן/ת; לקושי רגשי או לבירור אבחוני,{" "}
+        {fromMatch ? "ראו את שאר ההמלצות בדוח השאלון." : "פונים לאנשי המקצוע המתאימים."}
       </p>
     </main>
   );

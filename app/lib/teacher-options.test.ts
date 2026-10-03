@@ -9,6 +9,7 @@ import {
   lessonSettingsText,
   sanitizeTeacherExtras,
   teachesInPerson,
+  teacherSearchLabel,
 } from "./teacher-options";
 
 // שלוש הרובריקות שנוספו לטופס המורה ב-3/10/2026. הניקוי הוא המקום היחיד שבו
@@ -83,5 +84,14 @@ describe("הצגה", () => {
     expect(lessonSettingsText({ lesson_settings: [], online: true, regions: ["חיפה"] })).toBe("פנים אל פנים, אונליין");
     expect(lessonSettingsText({ lesson_settings: null, online: true, regions: [] })).toBe("אונליין");
     expect(lessonSettingsText({ online: false, regions: [] })).toBe("");
+  });
+});
+
+describe("teacherSearchLabel - the heading of a direct search", () => {
+  it("names the teacher kind and the subject", () => {
+    expect(teacherSearchLabel("reading_writing", true)).toBe("מורה להוראה מתקנת בקריאה וכתיבה");
+    expect(teacherSearchLabel("english", false)).toBe("מורה פרטי/ת לאנגלית");
+    expect(teacherSearchLabel(null, true)).toBe("מורה להוראה מתקנת");
+    expect(teacherSearchLabel(null, false)).toBe("מורה");
   });
 });

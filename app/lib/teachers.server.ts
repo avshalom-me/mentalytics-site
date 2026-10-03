@@ -3,9 +3,10 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { slugify } from "@/app/lib/articles";
-import type { TeacherRow } from "@/app/lib/teacher-match";
+import { teacherDoorSupply, type TeacherRow } from "@/app/lib/teacher-match";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
-import { TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
+import { TEACHER_LISTED_STATES, type TeacherSubject } from "@/app/lib/teacher-options";
 
 export { teacherLinkUrl } from "@/app/lib/teacher-options";
 
@@ -121,6 +122,32 @@ export async function loadListedTeacherBySlug(rawSlug: string): Promise<TeacherR
   const row = data as unknown as TeacherRow;
   if (row.paused_until && new Date(row.paused_until).getTime() > Date.now()) return null;
   return row;
+}
+
+// ── ההיצע של הדלת הציבורית ──────────────────────────────────────────────────
+
+type SupplyRow = Pick<TeacherRow, "subjects" | "listing_state" | "paused_until">;
+
+/**
+ * כמה מורים מוצגים כרגע, ובאילו תחומים - לעמוד /learning. החיפוש הישיר מוצג
+ * רק כשיש את מי להציג. שגיאת קריאה נחשבת כמאגר ריק: העמוד עולה בלי טופס
+ * החיפוש במקום ליפול.
+ */
+export async function loadDoorSupply(): Promise<{ total: number; subjects: TeacherSubject[] }> {
+  try {
+    const rows = await fetchAllRows<SupplyRow>(
+      () =>
+        supabaseAdmin
+          .from("teachers")
+          .select("subjects, listing_state, paused_until")
+          .in("listing_state", [...TEACHER_LISTED_STATES])
+          .order("id") as unknown as { range: (from: number, to: number) => PromiseLike<{ data: SupplyRow[] | null; error: { message: string } | null }> },
+    );
+    return teacherDoorSupply(rows);
+  } catch (e) {
+    console.error("loadDoorSupply failed:", e instanceof Error ? e.message : e);
+    return { total: 0, subjects: [] };
+  }
 }
 
 // ── סטטיסטיקה ────────────────────────────────────────────────────────────────

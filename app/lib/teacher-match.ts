@@ -4,11 +4,15 @@
 // המקצועית היא תחום + סוג מורה + שכבת גיל (שלושתם סינון קשה, ולכן מי
 // שמופיע/ה מתאים/ה מקצועית במלואו/ה), והמיקום מסודר באותה סכימה
 // שההורים כבר מכירים מכרטיסי המטפלים - קודם "באזור שבחרתם", אחר כך
-// אזורים סמוכים ואונליין. בתוך קבוצה: ציון מקצועי, ואז משלמים לפני
-// ניסיון, ואז סבב יומי כדי שאף מורה לא יתקע תמיד אחרון/ה.
+// אזורים סמוכים ואונליין. בתוך קבוצה: מי שמתאים/ה לקשיים שצוינו (needs),
+// אחר כך ציון מקצועי, משלמים לפני ניסיון, וסבב יומי כדי שאף מורה לא
+// יתקע תמיד אחרון/ה.
+//
+// הסדר הזה הוא הבטחה לבעלים (3/10/2026): המרחק קודם לכול. ההתאמה לקושי
+// משנה את הסדר רק בין מורים מאותה קבוצת אזור, ואף מורה לא נושר/ת בגללה.
 
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
-import { teacherSearchFromKey, type TeacherGradeGroup, type TeacherSubject } from "@/app/lib/teacher-options";
+import { TEACHER_SUBJECT_KEYS, teacherSearchFromKey, type TeacherGradeGroup, type TeacherSubject } from "@/app/lib/teacher-options";
 
 export type TeacherRow = {
   id: string;
@@ -29,7 +33,11 @@ export type TeacherRow = {
   qualification: string | null;
   photo_path: string | null;
   experience_years: number | null;
-  /** שלוש הרובריקות מ-3/10/2026 (ראו teacher-options). מוצגות בכרטיס ובפרופיל; המנוע עדיין לא מדרג לפיהן. */
+  /**
+   * שלוש הרובריקות מ-3/10/2026 (ראו teacher-options). מוצגות בכרטיס ובפרופיל.
+   * expertise משתתף בדירוג כשהחיפוש נושא needs; focuses ו-lesson_settings
+   * מוצגים בלבד.
+   */
   expertise: string[];
   focuses: string[];
   lesson_settings: string[];
@@ -45,6 +53,12 @@ export type TeacherMatchInput = {
   language: string;
   genderPreference: string | null;
   limit: number;
+  /**
+   * הקשיים שברקע, במפתחות של TEACHER_EXPERTISE: מה שההורה סימן בחיפוש הישיר,
+   * או מה ששאלון הילדים כבר זיהה (teacher-needs.ts). העדפה ולא סינון - מורה
+   * בלי ניסיון מתאים עדיין מופיע/ה, אחרי מי שיש לו/ה. הקורא מנקה את הרשימה.
+   */
+  needs?: readonly string[];
 };
 
 export type TeacherMatch = {
@@ -55,6 +69,10 @@ export type TeacherMatch = {
   rankScore: number;
   inRequestedArea: boolean;
   reasons: string[];
+  /** הקשיים שצוינו ושהמורה הצהיר/ה על ניסיון בהם (מפתחות expertise). */
+  needsMatched: string[];
+  /** 0-1: כמה מהקשיים שצוינו מכוסים. 0 כשלא צוינו קשיים. למיון ולציון. */
+  needCredit: number;
 };
 
 const WEIGHTS = {
@@ -62,8 +80,16 @@ const WEIGHTS = {
   remedial: 25,
   grade: 20,
   gender: 5,
+  needs: 20,
   location: 25,
 } as const;
+
+/**
+ * כמה קושי אחד מכוסה אצל מורה. הכשרה שאומתה מול תעודה (remedial: הוראה
+ * מתקנת, חינוך מיוחד או תואר שני בלקויות למידה) שוקלת יותר מניסיון שהמורה
+ * רק הצהיר/ה עליו, ושניהם יחד הם הכיסוי המלא.
+ */
+const NEED_CREDIT = { verifiedAndDeclared: 1, verified: 0.8, declared: 0.6 } as const;
 
 /**
  * זרע יומי לסבב: אותו סדר לכל ההורים באותו יום, סדר אחר מחר. מונע מצב שבו
@@ -125,6 +151,24 @@ function scoreOne(t: TeacherRow, input: TeacherMatchInput): TeacherMatch | null 
     }
   }
 
+  // הקשיים שברקע: העדפה, לא סינון. נכנסים לציון המוצג (מורה בלי ניסיון
+  // מתאים לא יוצג כ-100%) וקובעים את הסדר בתוך קבוצת האזור.
+  const needs = input.needs ?? [];
+  const needsMatched: string[] = [];
+  let needCredit = 0;
+  if (needs.length > 0) {
+    possible += WEIGHTS.needs;
+    let covered = 0;
+    for (const need of needs) {
+      const declared = (t.expertise ?? []).includes(need);
+      if (declared) needsMatched.push(need);
+      covered += declared && t.remedial ? NEED_CREDIT.verifiedAndDeclared : t.remedial ? NEED_CREDIT.verified : declared ? NEED_CREDIT.declared : 0;
+    }
+    needCredit = covered / needs.length;
+    earned += WEIGHTS.needs * needCredit;
+    if (needsMatched.length > 0) reasons.push("ניסיון עם הקושי שצוין");
+  }
+
   // מיקום - אותה סכימה כמו אצל המטפלים: עיר 100%, אותו אזור 85%, אזור סמוך
   // 15%, אונליין 40% (100% כשכל הבקשה היא אונליין). לא נכנס לציון המוצג.
   const locationAsked = !!(input.city || input.region || input.onlineRequired);
@@ -151,7 +195,7 @@ function scoreOne(t: TeacherRow, input: TeacherMatchInput): TeacherMatch | null 
   const score = possible > 0 ? Math.round((earned / possible) * 100) : 100;
   const rankScore = possible + locationPossible > 0 ? ((earned + locationEarned) / (possible + locationPossible)) * 100 : 100;
   const inRequestedArea = !locationAsked || locationEarned >= 0.6 * locationPossible;
-  return { teacher: t, score, rankScore, inRequestedArea, reasons };
+  return { teacher: t, score, rankScore, inRequestedArea, reasons, needsMatched, needCredit };
 }
 
 function commercialRank(state: string): number {
@@ -168,6 +212,9 @@ export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now:
   }
   scored.sort((a, b) => {
     if (a.inRequestedArea !== b.inRequestedArea) return a.inRequestedArea ? -1 : 1;
+    // בתוך קבוצת האזור: קודם מי שמכסה יותר מהקשיים שצוינו, ורק אחר כך המרחק
+    // המדויק (העיר עצמה מול שאר האזור).
+    if (Math.abs(a.needCredit - b.needCredit) > 0.01) return b.needCredit - a.needCredit;
     if (Math.abs(a.rankScore - b.rankScore) > 0.5) return b.rankScore - a.rankScore;
     const c = commercialRank(a.teacher.listing_state) - commercialRank(b.teacher.listing_state);
     if (c !== 0) return c;
@@ -186,6 +233,22 @@ export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now:
  * כשאין לנו מורה להציע. עד שיש היצע, הכרטיס מוצג כפנייה נוספת בלי חיפוש,
  * כפי שהוראה מתקנת הוצגה לפני הענף.
  */
+/**
+ * ההיצע של הדלת הציבורית (/learning): כמה מורים מוצגים כרגע, ובאילו תחומים.
+ * החיפוש הישיר מוצג רק כשיש את מי להציג, מאותה סיבה ששער ההיצע קיים בדוח
+ * השאלון: טופס חיפוש מעל מאגר ריק הוא דלת שנפתחת לקיר.
+ */
+export function teacherDoorSupply(
+  rows: Pick<TeacherRow, "subjects" | "listing_state" | "paused_until">[],
+  now: Date = new Date(),
+): { total: number; subjects: TeacherSubject[] } {
+  const listed = rows.filter((t) => isTeacherListed(t, now));
+  return {
+    total: listed.length,
+    subjects: TEACHER_SUBJECT_KEYS.filter((s) => listed.some((t) => t.subjects.includes(s))),
+  };
+}
+
 export function teacherSupplyForKeys(
   rows: Pick<TeacherRow, "subjects" | "remedial" | "grade_groups" | "listing_state" | "paused_until">[],
   keys: string[],

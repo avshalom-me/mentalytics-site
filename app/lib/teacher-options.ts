@@ -254,6 +254,16 @@ export function teacherSearchFromKey(key: string): TeacherSearch {
   }
 }
 
+/**
+ * הכותרת של חיפוש שאינו נשען על מפתח המלצה: החיפוש הישיר בדלת "לימוד חכם",
+ * שבו ההורה בוחר תחום וסוג מורה בעצמו.
+ */
+export function teacherSearchLabel(subject: TeacherSubject | null, remedial: boolean): string {
+  const label = TEACHER_SUBJECTS.find((s) => s.key === subject)?.label;
+  if (remedial) return label ? `מורה להוראה מתקנת ב${label}` : "מורה להוראה מתקנת";
+  return label ? `מורה פרטי/ת ל${label}` : "מורה";
+}
+
 export function isRemedialTeacherKey(key: string): boolean {
   return teacherSearchFromKey(key).remedial;
 }

@@ -7,7 +7,8 @@ import { trackingOptedOut } from "@/app/lib/track-optout";
 import { gaEvent } from "@/app/lib/gtag";
 import { phoneNationalDigits, foreignPhoneDigits, telHref } from "@/app/lib/phone";
 
-// כפתורי הקשר עם מורה - בכרטיס התוצאה בשאלון הילדים ובעמוד הפרופיל.
+// כפתורי הקשר עם מורה - בכרטיס התוצאה (בשאלון הילדים ובחיפוש הישיר של
+// "לימוד חכם") ובעמוד הפרופיל.
 // וואטסאפ עם הודעת פתיחה (לנייד או למספר זר) וחיוג (ישראלי בלבד), כמו אצל
 // מטפלים; הלחיצה נרשמת ב-teacher_events, לא בטבלאות המטפלים.
 
@@ -21,7 +22,7 @@ export function teacherWaLink(phone: string | null | undefined): string | null {
   return null;
 }
 
-export type TeacherEventContext = { source: "match" | "profile"; quizType?: "kids" | "school" | null; subject?: string | null };
+export type TeacherEventContext = { source: "match" | "profile" | "direct"; quizType?: "kids" | "school" | null; subject?: string | null };
 
 export function sendTeacherEvent(eventType: "impression" | "whatsapp" | "phone" | "profile_view", teacherIds: string[], ctx: TeacherEventContext) {
   if (trackingOptedOut() || teacherIds.length === 0) return;

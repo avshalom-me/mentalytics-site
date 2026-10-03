@@ -102,6 +102,8 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   "/centers": { date: "2026-08-06", sources: ["app/centers/page.tsx"] },
   "/developers": { date: "2026-09-25", sources: ["app/developers/page.tsx"] },
   "/counselors": { date: "2026-09-30", sources: ["app/counselors/page.tsx", "app/lib/team.ts"] },
+  "/learning": { date: "2026-10-03", sources: ["app/learning/page.tsx", "app/learning/TeacherDirectSearch.tsx"] },
+  "/learning/join": { date: "2026-10-03", sources: ["app/learning/join/page.tsx"] },
   "/privacy": { date: "2026-07-26", sources: ["app/privacy/page.tsx"] },
   "/terms": { date: "2026-07-26", sources: ["app/terms/page.tsx"] },
 };

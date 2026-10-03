@@ -1,38 +1,45 @@
 import type { Metadata } from "next";
 import JoinForm from "./JoinForm";
 import { TEACHER_PAY_EMAIL_DAY, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS } from "@/app/lib/teacher-options";
+import { LEARNING_BRAND, learningRobots } from "@/app/lib/learning-door";
+import { shareMetadata } from "@/app/lib/share-metadata";
 
-// דף ההצטרפות למורים. בכוונה לא "דף שיווק": טון עובדתי, מה זה, למי זה,
-// מה התנאים, ומה נדרש כדי להתקבל. נפתח רק מקישור ישיר (ראו layout).
+// דף ההצטרפות למורים של "לימוד חכם". בכוונה לא "דף שיווק": טון עובדתי, מה
+// זה, למי זה, מה התנאים, ומה נדרש כדי להתקבל. מורים מגיעים אליו מקישור
+// ישיר בגיוס, מהדלת (/learning), וכשהדלת פתוחה - גם מחיפוש.
+
+const TITLE = `הצטרפות מורים ל${LEARNING_BRAND}: הוראה מתקנת ומורים פרטיים`;
+const DESCRIPTION = `מאגר מורים להוראה מתקנת ומורים פרטיים. ההכשרה נבדקת מול תעודה, והורים פונים ישירות. ${TEACHER_TRIAL_DAYS} יום ללא תשלום, ואחריהם ${TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ, בלי התחייבות.`;
 
 export const metadata: Metadata = {
-  title: "הצטרפות מורים למענה הלימודי",
-  robots: { index: false, follow: false },
+  title: TITLE,
+  description: DESCRIPTION,
+  alternates: { canonical: "https://www.mentalytics.co.il/learning/join" },
+  robots: learningRobots(),
+  ...shareMetadata({ url: "/learning/join", title: `${TITLE} | טיפול חכם`, description: DESCRIPTION, type: "website" }),
 };
 
 export default function TeacherJoinPage() {
   return (
     <main className="mx-auto max-w-3xl px-5 py-12 pb-24" dir="rtl">
-      <div className="mb-8 text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo.svg" alt="טיפול חכם" style={{ height: "48px", width: "auto", display: "inline-block" }} />
-        <div className="mt-2 text-sm font-bold text-[var(--teal-dark)]">מענה לימודי</div>
-      </div>
+      {/* הלוגו בכותרת העליונה (LearningNavBar); כאן רק למי העמוד. */}
+      <p className="mb-3 text-sm font-bold text-[var(--teal)]">{LEARNING_BRAND} · למורים</p>
 
       <h1 className="mb-4 text-3xl font-black leading-tight text-[var(--text)] sm:text-4xl">
         מורים להוראה מתקנת ומורים פרטיים: הצטרפות למאגר
       </h1>
       <p className="mb-6 text-lg leading-8 text-[var(--text-2)]">
-        הורים ממלאים בטיפול חכם שאלון מקיף על ילדם. כשהשאלון מזהה קושי לימודי ממוקד - למשל קושי בחשבון
-        בכיתה ג׳, קושי בקריאה עם רקע שפתי, או קושי באנגלית בתיכון - הוא ממליץ על הוראה מתקנת או על תגבור,
-        ומציג להורים מורים מתאימים לפי התחום, שכבת הגיל ואזור המגורים. ההורים פונים ישירות אליכם.
+        הורים מגיעים למורים של {LEARNING_BRAND} בשתי דרכים. חלקם ממלאים בטיפול חכם שאלון מקיף על ילדם: כשהשאלון מזהה
+        קושי לימודי ממוקד - למשל קושי בחשבון בכיתה ג׳, קושי בקריאה עם רקע שפתי, או קושי באנגלית בתיכון - הוא ממליץ על
+        הוראה מתקנת או על תגבור, ומציג מורים מתאימים. אחרים מחפשים מורה ישירות, לפי התחום, שכבת הגיל ואזור המגורים.
+        בשני המקרים ההורים פונים ישירות אליכם.
       </p>
 
       <section className="mb-8 grid gap-4 sm:grid-cols-2">
         <div className="rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-5">
           <h2 className="mb-2 text-base font-black text-[var(--teal-dark)]">מה מקבלים</h2>
           <ul className="space-y-1.5 text-sm leading-6 text-[var(--text-2)]">
-            <li>• פניות של הורים שהשאלון כבר זיהה אצל ילדם את הקושי המדויק שאתם מלמדים</li>
+            <li>• פניות של הורים שמחפשים את מה שאתם מלמדים: מהשאלון, שכבר זיהה את הקושי, ומהחיפוש הישיר</li>
             <li>• פרופיל עם ההכשרה, התחומים, שכבות הגיל והאזורים שלכם</li>
             <li>• נתונים: כמה פעמים הפרופיל הופיע, וכמה הורים פנו</li>
           </ul>

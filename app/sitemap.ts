@@ -11,6 +11,7 @@ import { ASSESSMENTS } from "@/app/lib/assessments";
 import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
 import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 import { revisedAt } from "@/app/lib/page-revised";
+import { LEARNING_DOOR_PUBLIC } from "@/app/lib/learning-door";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -78,6 +79,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The counsellor rubric's doorway. /school itself stays out of the index and
     // out of this list - it is the instrument, this is the page search should find.
     { url: `${BASE}/counselors`, priority: 0.6, changeFrequency: "monthly" },
+    // "לימוד חכם", the teachers' door: the parents' page and the teachers' join
+    // page. Listed only once the door is open - while it is closed both are
+    // noindex, and a noindex URL here is "submitted URL marked noindex". The
+    // teacher profiles under /learning/t stay out either way.
+    ...(LEARNING_DOOR_PUBLIC
+      ? [
+          { url: `${BASE}/learning`, priority: 0.6, changeFrequency: "weekly" as const },
+          { url: `${BASE}/learning/join`, priority: 0.4, changeFrequency: "monthly" as const },
+        ]
+      : []),
     { url: `${BASE}/terms`, priority: 0.3, changeFrequency: "yearly" },
     { url: `${BASE}/privacy`, priority: 0.3, changeFrequency: "yearly" },
     { url: `${BASE}/accessibility`, priority: 0.3, changeFrequency: "yearly" },

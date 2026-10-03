@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 // עמוד ההרשמה לתשלום הוא רכיב לקוח, ולכן הכותרת וה-landmark יושבים כאן.
 export const metadata: Metadata = {
-  title: "הרשמה לתשלום | מענה לימודי",
+  title: "הרשמה לתשלום | לימוד חכם",
   robots: { index: false, follow: false },
 };
 

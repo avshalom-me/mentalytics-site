@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { ALL_REGIONS, REGION_CITIES, CITY_TO_REGION } from "@/app/lib/regions";
-import MatchResultCard from "@/app/components/MatchResultCard";
-import TeacherContactButtons, { useTeacherImpressions } from "@/app/learning/TeacherContactButtons";
+import { useTeacherImpressions } from "@/app/learning/TeacherContactButtons";
+import TeacherResults, { type TeacherCard } from "@/app/learning/TeacherResults";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { trackingOptedOut } from "@/app/lib/track-optout";
-import { teacherPath, teacherSearchFromKey, TEACHER_LANGUAGES, type TeacherGradeGroup } from "@/app/lib/teacher-options";
+import { teacherSearchFromKey, TEACHER_LANGUAGES, type TeacherGradeGroup } from "@/app/lib/teacher-options";
+import { needLabel, type TeacherNeed } from "@/app/lib/teacher-needs";
 
 // מסך חיפוש המורים בתוך שאלון הילדים - המקבילה של KidsMatchSection לכרטיס
 // מסוג "teacher". קורא ל-/api/match-teachers (טבלת המורים בלבד), ומציג
@@ -17,55 +18,23 @@ import { teacherPath, teacherSearchFromKey, TEACHER_LANGUAGES, type TeacherGrade
 // ריק היה נספר שם כמחסור במטפלים. הביקוש למורים נרשם בשרת ב-teacher_searches,
 // וההופעות והלחיצות ב-teacher_events.
 //
-// אין כאן ציון אישיותי ואין "למה הותאם לי": ההתאמה היא תחום, סוג מורה, שכבת
-// גיל ומרחק, וזה נאמר בכרטיס במילים.
-
-type TeacherCard = {
-  id: string;
-  full_name: string;
-  gender: string | null;
-  slug: string | null;
-  photo_url: string | null;
-  bio: string | null;
-  phone: string | null;
-  regions: string[];
-  online: boolean;
-  remedial: boolean;
-  subject_labels: string[];
-  grade_labels: string[];
-  qualification_label: string;
-  /** ניסיון מוצהר עם מאפייני למידה, בתוויות קצרות. לפי המורה, לא מאומת. */
-  expertise_labels: string[];
-  /** איפה מתקיים השיעור, במילים: "בבית התלמיד, אונליין". */
-  lesson_text: string;
-  experience_years: number | null;
-  price_text: string | null;
-  match_score: number;
-  in_requested_area: boolean;
-  /** הסיבות שהשרת חישב: "באזור שלכם", "אזור סמוך", "אונליין" ועוד. */
-  match_reasons: string[];
-};
-
-/**
- * למה מורה שמחוץ לאזור מופיע/ה בכל זאת. נקבע לפי מה שהשרת חישב ולא לפי
- * הטופס: מורה מאילת שמלמד/ת אונליין מוצע/ת גם להורה שלא סימן אונליין, ואז
- * "אזור סמוך" היה פשוט לא נכון.
- */
-function awayReason(t: TeacherCard): { nearby: boolean; label: string } {
-  const nearby = (t.match_reasons ?? []).includes("אזור סמוך");
-  if (!nearby) return { nearby, label: "אונליין" };
-  return { nearby, label: t.online ? "אזור סמוך, גם אונליין" : "אזור סמוך" };
-}
+// הכרטיסים עצמם ב-TeacherResults, שמשותף גם לחיפוש הישיר בדלת "לימוד חכם".
 
 export default function TeacherMatchSection({
   referralKey,
   gradeGroup,
   quizType,
+  needs = [],
 }: {
   /** מפתח ההמלצה, למשל "הוראה מתקנת - חשבון". */
   referralKey: string;
   gradeGroup: TeacherGradeGroup | null;
   quizType: "kids" | "school";
+  /**
+   * הקשיים שהשאלון כבר זיהה (teacher-needs.ts). מורים עם ניסיון מתאים
+   * מופיעים ראשונים בתוך האזור. לא סינון, ושום שאלה לא נוספה בשבילם.
+   */
+  needs?: TeacherNeed[];
 }) {
   const search = teacherSearchFromKey(referralKey);
   const [open, setOpen] = useState(false);
@@ -107,6 +76,7 @@ export default function TeacherMatchSection({
           onlineRequired: online,
           genderPreference: gender || null,
           language,
+          needs,
           limit: 10,
           quizType,
           sessionId: getOrCreateSessionId(),
@@ -127,18 +97,6 @@ export default function TeacherMatchSection({
   }
 
   const located = !!searchedWith?.located;
-  const local = results.filter((m) => m.in_requested_area);
-  const away = results.filter((m) => !m.in_requested_area);
-  const ordered = located ? [...local, ...away] : results;
-  const localCount = located ? local.length : results.length;
-  const awayNearby = away.some((t) => awayReason(t).nearby);
-  const awayOnlineOnly = away.some((t) => !awayReason(t).nearby);
-  const awayKinds =
-    awayNearby && awayOnlineOnly
-      ? "מורים מאזורים סמוכים, ומורים שמלמדים אונליין"
-      : awayNearby
-        ? "מורים מאזורים סמוכים"
-        : "מורים שמלמדים אונליין";
 
   return (
     <div>
@@ -154,7 +112,10 @@ export default function TeacherMatchSection({
       ) : (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
           <h3 className="font-bold text-[var(--teal-dark)] text-lg mb-1">מציאת {search.label}</h3>
-          <p className="text-xs text-gray-500 mb-4">מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. הפנייה היא ישירות למורה.</p>
+          <p className="text-xs text-gray-500 mb-4">
+            מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. הפנייה היא ישירות למורה.
+            {needs.length > 0 && ` בתוך האזור שתבחרו יוצגו ראשונים מורים שהצהירו על ניסיון עם מה שעלה בשאלון: ${needs.map((n) => needLabel(n, true)).join(", ")}.`}
+          </p>
 
           <div className="mb-4">
             <label className="flex items-center gap-2 text-sm font-semibold text-[#2a3a5a] cursor-pointer">
@@ -211,84 +172,18 @@ export default function TeacherMatchSection({
 
       {searchedWith && (
         <div className="mt-5">
-          {results.length === 0 ? (
-            <div className="rounded-2xl bg-sky-50 px-5 py-6 text-center text-sm leading-6 text-[#2a3a5a]">
-              <p className="font-bold">לא נמצאו מורים מתאימים לפי הפרמטרים שנבחרו.</p>
-              <p className="mt-1 text-xs text-gray-500">המאגר של המענה הלימודי חדש ועדיין נבנה. אפשר לנסות בלי עיר, או לסמן אונליין. ההמלצה עצמה תקפה גם דרך בית הספר.</p>
-            </div>
-          ) : (
-            <>
-              <div className="text-sm font-bold text-[var(--teal-dark)] mb-3">{results.length === 1 ? "נמצא/ה מורה אחד/ת:" : `נמצאו ${results.length} מורים:`}</div>
-              <div className="space-y-4">
-                {ordered.map((t, idx) => {
-                  const isAway = located && !t.in_requested_area;
-                  const href = t.slug ? `${teacherPath(t.slug)}?from=match${quizType === "school" ? "&q=school" : ""}` : null;
-                  return (
-                    <div key={t.id}>
-                      {located && idx === 0 && localCount > 0 && localCount < ordered.length && (
-                        <div className="mb-3 flex items-center gap-2 pt-1">
-                          <span className="text-sm font-extrabold text-[var(--teal-dark)]">באזור שבחרתם</span>
-                          <span className="h-px flex-1 bg-[var(--line)]" />
-                        </div>
-                      )}
-                      {isAway && idx === localCount && (
-                        <div className="mb-3 pt-3">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-extrabold text-[var(--text-2)]">מחוץ לאזור שבחרתם</span>
-                            <span className="h-px flex-1 bg-[var(--line)]" />
-                          </div>
-                          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">
-                            {localCount === 0 ? `לא מצאנו מורים באזור שבחרתם. אלה האפשרויות הקרובות ביותר: ${awayKinds}.` : `${awayKinds}.`}
-                          </p>
-                        </div>
-                      )}
-                      <MatchResultCard
-                        name={t.full_name}
-                        isCenter={false}
-                        photoUrl={t.photo_url}
-                        gender={t.gender}
-                        subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} • ${t.subject_labels.join(", ")} • ${t.lesson_text || (t.online ? "גם אונליין" : "פנים אל פנים")}`}
-                        bio={t.bio}
-                        regions={t.regions}
-                        inAreaChip={located && t.in_requested_area ? "✓ באזור שלכם" : null}
-                        badge={
-                          <>
-                            <p className="mt-1.5 text-xs text-[var(--muted)]">
-                              🎓 {t.qualification_label}
-                              {t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}
-                              {t.price_text ? ` · ${t.price_text}` : ""}
-                            </p>
-                            {t.expertise_labels?.length > 0 && (
-                              <p className="mt-1 text-xs text-[var(--muted)]">ניסיון מוצהר: {t.expertise_labels.join(" · ")}</p>
-                            )}
-                          </>
-                        }
-                        score={
-                          isAway
-                            ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: awayReason(t).label }
-                            : { kind: "percent", overall: t.match_score, professional: null, personality: null }
-                        }
-                        actions={
-                          <>
-                            <TeacherContactButtons teacherId={t.id} phone={t.phone} ctx={ctx} />
-                            {href && (
-                              // כרטיסייה חדשה: דוח השאלון נשאר פתוח מאחור, ואין מה לשחזר בחזרה.
-                              <a href={href} target="_blank" rel="noopener" className="inline-flex items-center gap-1 rounded-full border-[1.5px] border-[var(--line)] bg-white px-4 py-2 text-[13px] font-bold text-[var(--text-2)] hover:border-[var(--teal)]">
-                                פרופיל מלא ↗
-                              </a>
-                            )}
-                          </>
-                        }
-                      />
-                    </div>
-                  );
-                })}
+          <TeacherResults
+            results={results}
+            located={located}
+            ctx={ctx}
+            profileQuery={`from=match${quizType === "school" ? "&q=school" : ""}`}
+            empty={
+              <div className="rounded-2xl bg-sky-50 px-5 py-6 text-center text-sm leading-6 text-[#2a3a5a]">
+                <p className="font-bold">לא נמצאו מורים מתאימים לפי הפרמטרים שנבחרו.</p>
+                <p className="mt-1 text-xs text-gray-500">המאגר של לימוד חכם חדש ועדיין נבנה. אפשר לנסות בלי עיר, או לסמן אונליין. ההמלצה עצמה תקפה גם דרך בית הספר.</p>
               </div>
-              <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-                המורים עצמאיים. טיפול חכם אימתה את ההכשרה המוצהרת מול תעודה, ואינה צד לשיעורים או לתשלום.
-              </p>
-            </>
-          )}
+            }
+          />
         </div>
       )}
     </div>

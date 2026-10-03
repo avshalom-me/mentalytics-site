@@ -16,14 +16,20 @@ import {
   qualificationLabel,
   expertiseLabel,
   lessonSettingsText,
+  teacherSearchLabel,
   type TeacherGradeGroup,
   type TeacherSubject,
 } from "@/app/lib/teacher-options";
+import { sanitizeNeeds } from "@/app/lib/teacher-needs";
 import { TEACHER_PUBLIC_COLUMNS, teacherPhotoUrl } from "@/app/lib/teachers.server";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
-// חיפוש מורים מתוך תוצאות שאלון הילדים. נפרד לגמרי מ-/api/match: קורא את
-// teachers בלבד ומחזיר כרטיסים בלבד.
+// חיפוש מורים: מתוך תוצאות שאלון הילדים (לפי מפתח ההמלצה), ומהדלת הציבורית
+// "לימוד חכם" (direct: ההורה בוחר תחום וסוג מורה בעצמו). נפרד לגמרי מ-
+// /api/match: קורא את teachers בלבד ומחזיר כרטיסים בלבד.
+//
+// הטקסט החופשי שהורה כותב בדלת לא מגיע לכאן: הוא מפוענח בדפדפן
+// (teacher-query-parse.ts), ומה שנשלח הוא הבחירות בלבד.
 //
 // הדבר היחיד שנכתב כאן הוא שורת ביקוש ב-teacher_searches (מה חופש, איפה,
 // וכמה חזרו) - הנתון שלפיו מגייסים מורים. הוא לא נכתב ל-analytics_events:
@@ -84,11 +90,16 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "בקשה לא תקינה" }, { status: 400 });
   }
 
-  // המפתח של ההמלצה (למשל "הוראה מתקנת - חשבון") קובע תחום וסוג מורה.
-  const referralKey = typeof body.key === "string" ? body.key.slice(0, 80) : "";
+  // מהשאלון: המפתח של ההמלצה (למשל "הוראה מתקנת - חשבון") קובע תחום וסוג מורה.
+  // מהדלת הציבורית (direct): התחום וסוג המורה הם מה שההורה בחר.
+  const direct = body.direct === true;
+  const referralKey = !direct && typeof body.key === "string" ? body.key.slice(0, 80) : "";
   const fromKey = teacherSearchFromKey(referralKey);
-  const subject: TeacherSubject | null = (TEACHER_SUBJECT_KEYS as string[]).includes(fromKey.subject ?? "") ? fromKey.subject : null;
-  const remedial = fromKey.remedial;
+  const asked = direct ? body.subject : fromKey.subject;
+  const subject: TeacherSubject | null = (TEACHER_SUBJECT_KEYS as string[]).includes(String(asked ?? "")) ? (asked as TeacherSubject) : null;
+  const remedial = direct ? body.remedial === true : fromKey.remedial;
+  // הקשיים שברקע: מה שסומן בדלת, או מה שהשאלון כבר זיהה. העדפה, לא סינון.
+  const needs = sanitizeNeeds(body.needs);
   const gradeRaw = typeof body.gradeGroup === "string" ? body.gradeGroup : null;
   const gradeGroup = (TEACHER_GRADE_KEYS as string[]).includes(gradeRaw ?? "") ? (gradeRaw as TeacherGradeGroup) : null;
   const city = typeof body.city === "string" && CITY_TO_REGION[body.city] ? body.city : null;
@@ -106,7 +117,7 @@ export async function POST(req: NextRequest) {
     console.error("match-teachers read failed:", e instanceof Error ? e.message : e);
     return NextResponse.json({ ok: false, error: "שגיאה בחיפוש" }, { status: 500 });
   }
-  const matches = matchTeachers(rows, { subject, remedial, gradeGroup, city, region, onlineRequired, language, genderPreference, limit });
+  const matches = matchTeachers(rows, { subject, remedial, gradeGroup, city, region, onlineRequired, language, genderPreference, limit, needs });
 
   if (body.noTrack !== true && !isBotRequest(req)) {
     const locationAsked = !!(city || region);
@@ -120,15 +131,18 @@ export async function POST(req: NextRequest) {
       online: onlineRequired,
       returned: matches.length,
       local_count: locationAsked ? matches.filter((m) => m.inRequestedArea).length : null,
-      quiz_type: body.quizType === "school" ? "school" : "kids",
+      quiz_type: direct ? "direct" : body.quizType === "school" ? "school" : "kids",
       session_id: typeof body.sessionId === "string" && body.sessionId.length <= 128 ? body.sessionId : null,
+      needs,
+      // האם ההורה נעזר בשדה הכתיבה החופשית. הטקסט עצמו לא מגיע לשרת.
+      used_text: direct && body.usedText === true,
     });
     if (logError) console.error("teacher_searches insert failed:", logError.message);
   }
 
   return NextResponse.json({
     ok: true,
-    search: { subject, remedial, gradeGroup, city, region, onlineRequired, label: fromKey.label },
+    search: { subject, remedial, gradeGroup, city, region, onlineRequired, needs, label: direct ? teacherSearchLabel(subject, remedial) : fromKey.label },
     matches: matches.map((m) => ({
       id: m.teacher.id,
       full_name: m.teacher.full_name,
@@ -143,8 +157,10 @@ export async function POST(req: NextRequest) {
       subject_labels: m.teacher.subjects.map(subjectLabel),
       grade_labels: m.teacher.grade_groups.map(gradeGroupLabel),
       qualification_label: qualificationLabel(m.teacher.qualification),
-      // ניסיון מוצהר (לא מאומת) ומקום השיעור - מוצגים בכרטיס, לא משפיעים על הסדר.
+      // ניסיון מוצהר (לא מאומת) ומקום השיעור - מוצגים בכרטיס. need_labels הם
+      // מתוכו: מה שמתאים לקשיים שצוינו בחיפוש, ולכן קידם את המורה בסדר.
       expertise_labels: (m.teacher.expertise ?? []).map((k) => expertiseLabel(k, true)),
+      need_labels: m.needsMatched.map((k) => expertiseLabel(k, true)),
       lesson_text: lessonSettingsText(m.teacher),
       experience_years: m.teacher.experience_years,
       price_text: m.teacher.price_text,

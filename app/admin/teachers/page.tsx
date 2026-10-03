@@ -249,7 +249,7 @@ export default function AdminTeachersPage() {
     <div className="min-h-screen bg-stone-50">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
         <div className="mb-1 flex items-center gap-2">
-          <h1 className="text-2xl font-black text-stone-900">מורים - מענה לימודי</h1>
+          <h1 className="text-2xl font-black text-stone-900">מורים - לימוד חכם</h1>
           <HelpTip id="teachers" />
         </div>
         <p className="mb-4 text-sm text-stone-500">

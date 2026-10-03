@@ -22,6 +22,7 @@ import {
   type KidsDomainResult,
 } from "@/app/lib/kids-recommendations";
 import TeacherMatchSection from "./TeacherMatchSection";
+import { needsFromKidsReport } from "@/app/lib/teacher-needs";
 import { isRemedialTeacherKey, type TeacherGradeGroup } from "@/app/lib/teacher-options";
 import { buildKidsFacts } from "@/app/lib/explain-facts";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -3467,6 +3468,9 @@ function PageResult({ A, score, scoreError, onRetryScore, onRestart, audience }:
             referralKey={activeSelection.keys[0] ?? ""}
             gradeGroup={(() => { const g = acadGg(A); return g === "gan" ? null : (g as TeacherGradeGroup); })()}
             quizType={isCounselor(A) ? "school" : "kids"}
+            // מה שהשאלון כבר זיהה (קשב, רקע שפתי, חומרת הקושי) קובע מי מהמורים
+            // באזור מופיע ראשון. בלי שאלות נוספות - החלטת הבעלים, 3/10/2026.
+            needs={needsFromKidsReport(A, score, acadGg(A))}
           />
         ) : (
           <KidsMatchSection A={A} score={score} selection={activeSelection} />
