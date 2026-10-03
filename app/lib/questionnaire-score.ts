@@ -88,26 +88,40 @@ function allAnswered(arr: number[] | undefined): boolean {
   return (arr?.length ?? 0) > 0 && (arr ?? []).every((v) => v > 0);
 }
 
-// ===== EMOTIONAL TREATMENT RESOLVER =====
-// Based on combined therapistStyleQ1 + therapistStyleQ2 (2-14 range)
-// >= 12 → CBT, 7-11 → mixed (returns CBT as primary), 2-6 → dynamic
+// ===== WHERE THE STYLE ANSWERS LEAN =====
+// The first two questions of the "therapist-style" screen, as they are asked:
+//   Q1: 1 = prefers immediate, practical relief ... 7 = seeks deep insight
+//   Q2: 1 = prefers an open, free space ... 7 = needs a clear frame, tools, tasks
+// The two run in opposite directions - a high Q1 leans dynamic, a high Q2 leans
+// CBT - so Q1 is reversed before they are added: practical = (8 - Q1) + Q2,
+// range 2-14. >= 12 → CBT, 7-11 → mixed, 2-6 → dynamic.
+//
+// In the first version (30/3/2026) Q1 was labelled the other way round on the
+// screen (1 = insight, 7 = practical relief), so a plain Q1 + Q2 was right. On
+// 12/4/2026 (c198e17) the Q1 label was turned to the natural "1 = disagree,
+// 7 = agree" - on the screen, in the therapist forms and in the personality
+// match - and this sum was left as it was. From then until 3/10/2026 it added
+// an insight answer to a structure answer: Q1=7,Q2=1 (the clearest dynamic
+// profile) and Q1=1,Q2=7 (the clearest CBT profile) both came out "mixed",
+// "CBT only" meant agreeing with both statements and "dynamic only" meant
+// disagreeing with both.
+//
+// Both answers are needed. With one or both missing there is nothing to lean
+// on ("none"), and each finding falls back to its own default.
 
-function resolveEmotionalTreatment(q1: number, q2: number): {
-  treatment: string;
-  treatmentLabel: string;
-  mixed: boolean;
-} {
-  const total = q1 + q2;
-  if (total >= 12) {
-    return { treatment: "CBT", treatmentLabel: "CBT", mixed: false };
-  } else if (total >= 7) {
-    return { treatment: "CBT", treatmentLabel: "CBT", mixed: true };
-  } else if (total >= 2) {
-    return { treatment: "טיפול דינאמי", treatmentLabel: "טיפול דינאמי", mixed: false };
-  }
-  // No style answers provided → default to dynamic
-  return { treatment: "טיפול דינאמי", treatmentLabel: "טיפול דינאמי", mixed: false };
+type StyleLean = "cbt" | "mixed" | "dynamic" | "none";
+
+function styleLean(q1: number, q2: number): StyleLean {
+  const answered = (v: number) => Number.isFinite(v) && v >= 1 && v <= 7;
+  if (!answered(q1) || !answered(q2)) return "none";
+  const practical = 8 - q1 + q2;
+  if (practical >= 12) return "cbt";
+  if (practical >= 7) return "mixed";
+  return "dynamic";
 }
+
+const CBT = "CBT";
+const DYNAMIC = "טיפול דינאמי";
 
 // ===== MAIN SCORING FUNCTION =====
 
@@ -138,11 +152,24 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
   }
 
-  const styleQ1 = answers.emotional?.therapistStyleQ1 ?? 0;
-  const styleQ2 = answers.emotional?.therapistStyleQ2 ?? 0;
-
-  const { treatment: emotTreatment, treatmentLabel: emotLabel, mixed } =
-    resolveEmotionalTreatment(styleQ1, styleQ2);
+  // Where each emotional finding takes its treatment from (the owner's decision,
+  // 3/10/2026):
+  //   by the style lean - low mood, elevated mood, reality testing:
+  //                       cbt / mixed → CBT, dynamic / none → טיפול דינאמי
+  //   CBT first         - general anxiety, social anxiety: always CBT, and when
+  //                       the lean is mixed or dynamic "גם טיפול דינאמי" is added
+  //   always dynamic    - sleep (the finding itself sends to a physician), the
+  //                       communication-assessment finding, and the default
+  //   fixed by symptom  - everything else (OCD, pain, trauma, eating,
+  //                       personality ...), as before
+  const lean = styleLean(
+    answers.emotional?.therapistStyleQ1 ?? 0,
+    answers.emotional?.therapistStyleQ2 ?? 0,
+  );
+  const byStyle = lean === "cbt" || lean === "mixed" ? CBT : DYNAMIC;
+  // An anxiety finding went out as CBT. With a dynamic lean that is CBT against
+  // the person's own preference, so the dynamic option is offered beside it.
+  let anxietyGotCbt = false;
 
   // ===== EMOTIONAL DOMAIN =====
   if (answers.domains.includes("emotional") && answers.emotional) {
@@ -154,8 +181,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-suicidal"),
         symptomText: "נמצאו סימנים של אובדנות.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: byStyle,
+        treatmentLabel: byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: true,
         notes: "יש לפנות בהקדם לפסיכיאטר לשם הערכת סיכון.",
@@ -165,8 +192,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-severe"),
         symptomText: "נמצאו סימנים מובהקים של מצב רוח ירוד.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: byStyle,
+        treatmentLabel: byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "מומלץ לפנות במקביל לפסיכיאטר לבירור התאמה לטיפול תרופתי.",
@@ -175,8 +202,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("mood-mild"),
         symptomText: "נמצאו סימנים אפשריים של מצב רוח ירוד.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: byStyle,
+        treatmentLabel: byStyle,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
@@ -200,8 +227,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("mania"),
           symptomText: "נמצאו סימנים של מצב רוח מרומם/רוגזני.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: byStyle,
+          treatmentLabel: byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
@@ -228,8 +255,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           id: uid("prodrome-suicidal"),
           symptomText:
             'נמצאו סימנים לקשיים סביב בוחן מציאות/שיפוט שאינו תקין, כולל סימני אובדנות.',
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: byStyle,
+          treatmentLabel: byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: true,
           notes: 'ייעוץ אצל רופא פסיכיאטר ופנייה לטיפול רגשי ע"י פסיכולוג קליני (עדיפות).',
@@ -239,8 +266,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           id: uid("prodrome"),
           symptomText:
             "נמצאו סימנים לקשיים סביב בוחן מציאות/שיפוט שאינו תקין.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: byStyle,
+          treatmentLabel: byStyle,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
           notes: 'ייעוץ אצל רופא פסיכיאטר ופנייה לטיפול רגשי ע"י פסיכולוג קליני (עדיפות).',
@@ -277,23 +304,27 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // --- E4: Anxiety (GAD7) ---
     // 9 פריטים × סקאלת 1-3 (טווח 9-27)
     // > 15 = חרדה כללית מובהקת | > 12 = סימני מתח קלים
+    // חרדה כללית וחרדה חברתית: CBT קודם, תמיד. הנטייה מתשובות הסגנון קובעת
+    // רק אם מוצע לצידו גם טיפול דינאמי (ראו anxietyGotCbt).
     const gad7Total = sum(e.gad7Scores);
     const gad7Complete = allAnswered(e.gad7Scores);
     if (gad7Total > 15) {
+      anxietyGotCbt = true;
       recs.push({
         id: uid("gad7-severe"),
         symptomText: "נמצאו קשיים בניהול חרדה ומתח.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: CBT,
+        treatmentLabel: CBT,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
     } else if (gad7Total > 12) {
+      anxietyGotCbt = true;
       recs.push({
         id: uid("gad7-mild"),
         symptomText: "נמצאו סימנים קלים של מתח.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: CBT,
+        treatmentLabel: CBT,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
@@ -317,13 +348,14 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // Social anxiety
     // המשתמש אישר חרדה חברתית - לפחות "low" תמיד יוקפץ, גם אם לא דורגה חומרה
     if (e.socialAnxiety) {
+      anxietyGotCbt = true;
       const sev = e.socialSeverity ?? 0;
       if (sev >= 4) {
         recs.push({
           id: uid("social-anxiety-high"),
           symptomText: "נמצאו קשיים בתחום החרדה החברתית - בעוצמה גבוהה.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: CBT,
+          treatmentLabel: CBT,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
@@ -331,8 +363,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("social-anxiety-low"),
           symptomText: "נמצאו קשיים בתחום החרדה החברתית.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: CBT,
+          treatmentLabel: CBT,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
@@ -441,6 +473,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // פריטים 0-1 (קושי בהירדמות / איכות השינה) = הפרעות שינה קלות → טיפים
     // פריטים 2-4 (שינה מרובה / סהרוריות / ביעותים) = פתולוגיים יותר → נוירולוג
     // פריט 5 (נזלת כרונית) = הפניה לאף-אוזן-גרון
+    // שינה היא קודם כל עניין לרופא, ולאו דווקא לטיפול; ההפניה לטיפול שלצד
+    // הממצא היא תמיד טיפול דינאמי, בלי קשר לתשובות הסגנון (החלטת הבעלים, 3/10/2026).
     const sleepItems = e.sleepItems ?? [];
     const hasSleepNeuro = sleepItems[2] || sleepItems[3] || sleepItems[4];
     const hasSleepMild = sleepItems[0] || sleepItems[1];
@@ -448,8 +482,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("sleep-neuro"),
         symptomText: "נמצאו סימנים להפרעת שינה.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: DYNAMIC,
+        treatmentLabel: DYNAMIC,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "התייעצות עם רופא המשפחה או נוירולוג.",
@@ -458,8 +492,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("sleep-mild"),
         symptomText: "דווחו קשיי שינה קלים.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: DYNAMIC,
+        treatmentLabel: DYNAMIC,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "מומלץ לאמץ היגיינת שינה: שעות שינה קבועות, הימנעות מקפאין אחר הצהריים, צמצום מסכים שעה לפני השינה, וחשיפה לאור טבעי בבוקר.",
@@ -484,8 +518,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("sleep-ent"),
         symptomText: "דווח על נזלת כרונית מרובה.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: DYNAMIC,
+        treatmentLabel: DYNAMIC,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
         notes: "התייעצות עם רופא משפחה או רופא אף-אוזן-גרון.",
@@ -599,8 +633,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("comm-diagnosis"),
           symptomText: "נמצאו סימנים לקשיים בתקשורת הבינאישית.",
-          treatment: emotTreatment,
-          treatmentLabel: emotLabel,
+          treatment: DYNAMIC,
+          treatmentLabel: DYNAMIC,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
           notes: "אבחון תקשורת למבוגרים.",
@@ -694,21 +728,34 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       recs.push({
         id: uid("emotional-default"),
         symptomText: "נמצאו סימנים כלליים בתחום הרגשי.",
-        treatment: emotTreatment,
-        treatmentLabel: emotLabel,
+        treatment: DYNAMIC,
+        treatmentLabel: DYNAMIC,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
     }
 
-    // For mixed style: also offer a dynamic option alongside CBT-tagged recs
-    if (mixed) {
+    // "גם טיפול דינאמי" - the dynamic option beside the rest. As before, it is
+    // offered when the style lean is mixed; and now also when the lean is
+    // dynamic and an anxiety finding went out as CBT all the same.
+    //
+    // Two things it must not do. It must not say "בנוסף לגישה CBT" when no CBT
+    // was recommended (a trauma-only or eating-only report used to say exactly
+    // that), so the wording follows what is in the report. And it is left out
+    // when dynamic therapy is already the recommendation and there is no CBT
+    // for it to stand beside - the default finding, sleep, or the communication
+    // finding on their own - where it would only repeat the card above it.
+    const emotionalNow = recs.filter((r) => r.domain === EMO);
+    const hasCbt = emotionalNow.some((r) => r.treatment === CBT);
+    const hasDynamic = emotionalNow.some((r) => r.treatment === DYNAMIC);
+    const offerDynamicToo = lean === "mixed" || (lean === "dynamic" && anxietyGotCbt);
+    if (offerDynamicToo && (hasCbt || !hasDynamic)) {
       recs.push({
         id: uid("emotional-dynamic-mixed"),
-        symptomText: "בנוסף לגישה CBT, מומלץ גם טיפול דינאמי.",
-        treatment: "טיפול דינאמי",
-        treatmentLabel: "טיפול דינאמי",
-        domain: "מורכבויות בתחום הרגשי/האישי",
+        symptomText: hasCbt ? "בנוסף לגישה CBT, מומלץ גם טיפול דינאמי." : "בנוסף, מומלץ גם טיפול דינאמי.",
+        treatment: DYNAMIC,
+        treatmentLabel: DYNAMIC,
+        domain: EMO,
         urgent: false,
       });
     }
