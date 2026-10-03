@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { isEnglishPath } from "@/app/lib/english-path";
-import { LEARNING_BRAND, LEARNING_DOOR_PUBLIC } from "@/app/lib/learning-door";
+import { LEARNING_BRAND } from "@/app/lib/learning-door";
 
 // Moved out of app/layout.tsx (27/9/2026) so it can follow the route: the
 // layout is a server component and cannot know which page it wraps, and the
@@ -20,10 +20,6 @@ const HEBREW_LINKS: FooterLink[] = [
   { href: "/research", label: "מאמרים ומידע" },
   { href: "/centers", label: "למרכזים טיפוליים" },
   { href: "/counselors", label: "לצוותי חינוך" },
-  // "לימוד חכם", the teachers' door (/learning). The owner asked for a link
-  // that is there but not prominent (3/10/2026), so it lives here and nowhere
-  // in the navigation - and only once the door is open to search engines.
-  ...(LEARNING_DOOR_PUBLIC ? [{ href: "/learning", label: `${LEARNING_BRAND} - מורים והוראה מתקנת` }] : []),
   { href: "/centers/login", label: "כניסה למרכזים" },
   { href: "/privacy", label: "מדיניות פרטיות" },
   { href: "/terms", label: "תנאי שימוש" },
@@ -32,6 +28,14 @@ const HEBREW_LINKS: FooterLink[] = [
   // The English page's one sitewide link, so it is not an orphan.
   { href: "/en", label: "English", lang: "en" },
 ];
+
+// "לימוד חכם", the teachers' door (/learning). The owner asked for a link that
+// is there but not prominent (3/10/2026), so it lives here and nowhere in the
+// navigation. It appears only when the layout says so: the door has to be open
+// to search engines, and the date agreed with the owner has to have passed -
+// see learningFooterLinkLive in app/lib/learning-door.ts.
+const LEARNING_LINK: FooterLink = { href: "/learning", label: `${LEARNING_BRAND} - מורים והוראה מתקנת` };
+const LEARNING_LINK_AFTER = "/counselors";
 
 const ENGLISH_LINKS: FooterLink[] = [
   { href: "/en#therapists", label: "Therapists who work in English" },
@@ -42,9 +46,12 @@ const ENGLISH_LINKS: FooterLink[] = [
   { href: "/accessibility", label: "Accessibility statement (Hebrew)" },
 ];
 
-export default function SiteFooter() {
+export default function SiteFooter({ learningLink = false }: { learningLink?: boolean }) {
   const english = isEnglishPath(usePathname());
-  const links = english ? ENGLISH_LINKS : HEBREW_LINKS;
+  const hebrew = learningLink
+    ? HEBREW_LINKS.flatMap((link) => (link.href === LEARNING_LINK_AFTER ? [link, LEARNING_LINK] : [link]))
+    : HEBREW_LINKS;
+  const links = english ? ENGLISH_LINKS : hebrew;
   return (
     <footer className="print:hidden" style={{ background: "var(--surface)", borderTop: "1px solid var(--line)" }} dir={english ? "ltr" : "rtl"} lang={english ? "en" : undefined}>
       <div className="mx-auto max-w-5xl px-6 py-8">

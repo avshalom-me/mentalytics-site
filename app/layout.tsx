@@ -9,6 +9,7 @@ import { Analytics } from "@vercel/analytics/next";
 import Script from "next/script";
 import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
 import { OG_FALLBACK_IMAGE } from "@/app/lib/share-metadata";
+import { learningFooterLinkLive } from "@/app/lib/learning-door";
 
 const heebo = Heebo({
   subsets: ["hebrew"],
@@ -88,7 +89,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           'tb_tfa_script');
         `}</Script>
 
-        <SiteFooter />
+        {/* The footer's link to "לימוד חכם" is decided here, on the server, so the
+            HTML and the hydrated footer always agree - see learningFooterLinkLive. */}
+        <SiteFooter learningLink={learningFooterLinkLive()} />
       </body>
     </html>
   );
