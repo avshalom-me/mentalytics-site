@@ -47,7 +47,7 @@ function daysUntil(iso: string, now: Date): number {
   return Math.ceil((new Date(iso).getTime() - now.getTime()) / 86_400_000);
 }
 
-export async function runTrialEndingNotices(opts: { send: boolean; now?: Date }) {
+async function runTrialEndingNotices(opts: { send: boolean; now?: Date }) {
   const now = opts.now ?? new Date();
   const horizonIso = new Date(now.getTime() + (NOTICE_DAYS + 1) * 86_400_000).toISOString();
 

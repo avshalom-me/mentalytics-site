@@ -187,7 +187,7 @@ function buildEmailHtml(flagged: Flagged[], totalPromoted: number, monthLabel: s
 
 // ── Main ─────────────────────────────────────────────────────────────────────
 
-export async function runLowEngagementReminder(now: Date = new Date()): Promise<{
+async function runLowEngagementReminder(now: Date = new Date()): Promise<{
   ok: boolean;
   month: string;
   flagged: number;
