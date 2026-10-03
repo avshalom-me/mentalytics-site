@@ -6,6 +6,12 @@ import {
   TEACHER_GRADE_GROUPS,
   TEACHER_QUALIFICATIONS,
   TEACHER_LANGUAGES,
+  TEACHER_EXPERTISE,
+  TEACHER_EXPERTISE_MAX,
+  TEACHER_FOCUSES,
+  TEACHER_LESSON_SETTINGS,
+  focusKeysFor,
+  teachesInPerson,
   qualificationAllowsRemedial,
 } from "@/app/lib/teacher-options";
 
@@ -19,10 +25,15 @@ export type TeacherForm = {
   phone: string;
   gender: "" | "זכר" | "נקבה";
   subjects: string[];
+  /** מוקדי ההוראה בתוך התחומים שסומנו (TEACHER_FOCUSES). */
+  focuses: string[];
   remedial: boolean;
   grade_groups: string[];
+  /** ניסיון עם מאפייני למידה (TEACHER_EXPERTISE), עד שלושה. */
+  expertise: string[];
+  /** איפה מתקיים השיעור (TEACHER_LESSON_SETTINGS). "אונליין" נגזר מכאן. */
+  lesson_settings: string[];
   regions: string[];
-  online: boolean;
   languages: string[];
   price_text: string;
   bio: string;
@@ -39,10 +50,12 @@ export const EMPTY_TEACHER_FORM: TeacherForm = {
   phone: "",
   gender: "",
   subjects: [],
+  focuses: [],
   remedial: false,
   grade_groups: [],
+  expertise: [],
+  lesson_settings: [],
   regions: [],
-  online: false,
   languages: ["עברית"],
   price_text: "",
   bio: "",
@@ -60,6 +73,13 @@ function toggle(arr: string[], v: string): string[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
+/** תגית בחירה. אותו מראה כמו תגיות התחומים והשכבות שמעליה. */
+function chip(on: boolean, blocked = false): string {
+  return `rounded-full border focus-within:ring-2 focus-within:ring-[var(--teal)] px-3 py-1.5 text-sm ${
+    on ? "border-[var(--teal)] bg-[var(--teal-pale)] font-bold text-[var(--teal-dark)]" : "border-[var(--line)]"
+  } ${blocked ? "cursor-not-allowed opacity-45" : "cursor-pointer"}`;
+}
+
 export function toApiPayload(f: TeacherForm) {
   return {
     full_name: f.full_name.trim(),
@@ -67,10 +87,15 @@ export function toApiPayload(f: TeacherForm) {
     phone: f.phone.trim(),
     gender: f.gender || null,
     subjects: f.subjects,
+    // מוקד של תחום שהוסר לא נשלח: הוא כבר לא מוצג בטופס, ואי אפשר לבטל אותו.
+    focuses: f.focuses.filter((k) => focusKeysFor(f.subjects).includes(k)),
     remedial: f.remedial,
     grade_groups: f.grade_groups,
-    regions: f.regions,
-    online: f.online,
+    expertise: f.expertise,
+    lesson_settings: f.lesson_settings,
+    // ערים רק למי שמלמד/ת פנים אל פנים; בחירה שנשארה מוסתרת לא נשמרת.
+    regions: teachesInPerson(f.lesson_settings) ? f.regions : [],
+    online: f.lesson_settings.includes("online"),
     languages: f.languages.length ? f.languages : ["עברית"],
     price_text: f.price_text.trim() || null,
     bio: f.bio.trim() || null,
@@ -139,6 +164,29 @@ export default function TeacherProfileFields({
           ))}
         </div>
       </div>
+
+      {form.subjects.length > 0 && (
+        <div>
+          <div className={label}>
+            מוקדי ההוראה שלך בכל תחום <span className="font-normal text-[var(--muted)]">(מוצג להורים)</span>
+          </div>
+          <div className="space-y-3">
+            {TEACHER_SUBJECTS.filter((s) => form.subjects.includes(s.key)).map((s) => (
+              <div key={s.key} role="group" aria-labelledby={`tf-focus-${s.key}`}>
+                <div id={`tf-focus-${s.key}`} className="mb-1.5 text-xs font-bold text-[var(--muted)]">{s.label}</div>
+                <div className="flex flex-wrap gap-2">
+                  {TEACHER_FOCUSES[s.key].map((f) => (
+                    <label key={f.key} className={chip(form.focuses.includes(f.key))}>
+                      <input type="checkbox" className="sr-only" checked={form.focuses.includes(f.key)} onChange={() => set({ focuses: toggle(form.focuses, f.key) })} />
+                      {f.label}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div>
         <div id="tf-grades" className={label}>שכבות גיל *</div>
@@ -211,12 +259,44 @@ export default function TeacherProfileFields({
       </div>
 
       <div>
-        <div className={label}>איפה מלמדים</div>
-        <label className="mb-3 flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={form.online} onChange={(e) => set({ online: e.target.checked })} />
-          שיעורים אונליין
-        </label>
-        <RegionCityPicker selected={form.regions} onChange={(v) => set({ regions: v })} maxCities={6} />
+        <div id="tf-expertise" className={label}>עם אילו קשיים יש לך ניסיון ממוקד ומתמשך בהוראה?</div>
+        <p className="mb-2 text-xs leading-5 text-[var(--muted)]">
+          אפשר לסמן עד שלושה. הסימון מוצג להורים בפרופיל. אם אין מוקד מיוחד, אפשר להשאיר ריק.
+        </p>
+        <div role="group" aria-labelledby="tf-expertise" className="flex flex-wrap gap-2">
+          {TEACHER_EXPERTISE.map((e) => {
+            const on = form.expertise.includes(e.key);
+            // אחרי שלושה, השאר נעולים עד שמסירים אחד - כך אי אפשר לסמן הכול.
+            const blocked = !on && form.expertise.length >= TEACHER_EXPERTISE_MAX;
+            return (
+              <label key={e.key} className={chip(on, blocked)}>
+                <input type="checkbox" className="sr-only" checked={on} disabled={blocked} onChange={() => set({ expertise: toggle(form.expertise, e.key) })} />
+                {e.label}
+              </label>
+            );
+          })}
+        </div>
+        {form.expertise.length >= TEACHER_EXPERTISE_MAX && (
+          <p className="mt-2 text-xs text-[var(--muted)]" role="status">נבחרו שלושה. כדי להחליף, מסירים אחד מהם.</p>
+        )}
+      </div>
+
+      <div>
+        <div id="tf-settings" className={label}>איפה מתקיים השיעור *</div>
+        <div role="group" aria-labelledby="tf-settings" className="mb-3 flex flex-wrap gap-2">
+          {TEACHER_LESSON_SETTINGS.map((s) => (
+            <label key={s.key} className={chip(form.lesson_settings.includes(s.key))}>
+              <input type="checkbox" className="sr-only" checked={form.lesson_settings.includes(s.key)} onChange={() => set({ lesson_settings: toggle(form.lesson_settings, s.key) })} />
+              {s.label}
+            </label>
+          ))}
+        </div>
+        {teachesInPerson(form.lesson_settings) && (
+          <>
+            <div className="mb-2 text-xs font-bold text-[var(--muted)]">הערים שבהן מתקיימים השיעורים פנים אל פנים *</div>
+            <RegionCityPicker selected={form.regions} onChange={(v) => set({ regions: v })} maxCities={6} />
+          </>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

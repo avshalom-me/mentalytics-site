@@ -34,6 +34,10 @@ type TeacherCard = {
   subject_labels: string[];
   grade_labels: string[];
   qualification_label: string;
+  /** ניסיון מוצהר עם מאפייני למידה, בתוויות קצרות. לפי המורה, לא מאומת. */
+  expertise_labels: string[];
+  /** איפה מתקיים השיעור, במילים: "בבית התלמיד, אונליין". */
+  lesson_text: string;
   experience_years: number | null;
   price_text: string | null;
   match_score: number;
@@ -243,16 +247,21 @@ export default function TeacherMatchSection({
                         isCenter={false}
                         photoUrl={t.photo_url}
                         gender={t.gender}
-                        subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} • ${t.subject_labels.join(", ")} • ${t.online ? "גם אונליין" : "פנים אל פנים"}`}
+                        subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} • ${t.subject_labels.join(", ")} • ${t.lesson_text || (t.online ? "גם אונליין" : "פנים אל פנים")}`}
                         bio={t.bio}
                         regions={t.regions}
                         inAreaChip={located && t.in_requested_area ? "✓ באזור שלכם" : null}
                         badge={
-                          <p className="mt-1.5 text-xs text-[var(--muted)]">
-                            🎓 {t.qualification_label}
-                            {t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}
-                            {t.price_text ? ` · ${t.price_text}` : ""}
-                          </p>
+                          <>
+                            <p className="mt-1.5 text-xs text-[var(--muted)]">
+                              🎓 {t.qualification_label}
+                              {t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}
+                              {t.price_text ? ` · ${t.price_text}` : ""}
+                            </p>
+                            {t.expertise_labels?.length > 0 && (
+                              <p className="mt-1 text-xs text-[var(--muted)]">ניסיון מוצהר: {t.expertise_labels.join(" · ")}</p>
+                            )}
+                          </>
                         }
                         score={
                           isAway

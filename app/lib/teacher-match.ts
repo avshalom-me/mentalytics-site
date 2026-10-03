@@ -29,6 +29,10 @@ export type TeacherRow = {
   qualification: string | null;
   photo_path: string | null;
   experience_years: number | null;
+  /** שלוש הרובריקות מ-3/10/2026 (ראו teacher-options). מוצגות בכרטיס ובפרופיל; המנוע עדיין לא מדרג לפיהן. */
+  expertise: string[];
+  focuses: string[];
+  lesson_settings: string[];
 };
 
 export type TeacherMatchInput = {

@@ -13,10 +13,16 @@ import {
   TEACHER_SUBJECT_KEYS,
   TEACHER_GRADE_KEYS,
   TEACHER_QUALIFICATION_KEYS,
+  TEACHER_EXPERTISE_MAX,
   qualificationAllowsRemedial,
+  sanitizeTeacherExtras,
+  teachesInPerson,
   subjectLabel,
   gradeGroupLabel,
   qualificationLabel,
+  expertiseLabel,
+  focusesBySubject,
+  lessonSettingsText,
 } from "@/app/lib/teacher-options";
 import { newEditToken, uniqueTeacherSlug, setTeacherCookie, teacherLinkUrl, crossSiteWrite } from "@/app/lib/teachers.server";
 
@@ -43,6 +49,11 @@ const Body = z.object({
   grade_groups: z.array(z.enum(TEACHER_GRADE_KEYS as [string, ...string[]])).min(1).max(4),
   regions: z.array(z.string()).max(6),
   online: z.boolean(),
+  // שלוש הרובריקות (3/10/2026). הערכים עצמם מנוקים ב-sanitizeTeacherExtras;
+  // כאן רק הגבולות, ובראשם שלושה מאפייני למידה לכל היותר.
+  expertise: z.array(z.string().max(40)).max(TEACHER_EXPERTISE_MAX).optional(),
+  focuses: z.array(z.string().max(40)).max(40).optional(),
+  lesson_settings: z.array(z.string().max(40)).max(3).optional(),
   languages: z.array(z.string().max(20)).max(7).optional(),
   price_text: z.string().trim().max(60).optional().nullable(),
   bio: z.string().trim().max(1200).optional().nullable(),
@@ -61,6 +72,9 @@ const FIELD_LABELS: Record<string, string> = {
   phone: "טלפון",
   subjects: "תחומי הוראה",
   grade_groups: "שכבות גיל",
+  expertise: "ניסיון עם קשיים (עד שלושה)",
+  focuses: "מוקדי ההוראה",
+  lesson_settings: "איפה מתקיים השיעור",
   qualification: "הכשרה",
   qualification_year: "שנת סיום",
   experience_years: "שנות ניסיון",
@@ -94,12 +108,25 @@ export async function POST(req: NextRequest) {
   if (!phoneNationalDigits(b.phone) && !foreignPhoneDigits(b.phone)) {
     return NextResponse.json({ ok: false, error: "מספר הטלפון אינו תקין" }, { status: 400 });
   }
-  if (!b.online && b.regions.length === 0) {
-    return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת, או לסמן הוראה אונליין" }, { status: 400 });
-  }
+  const extras = sanitizeTeacherExtras(b, b.subjects);
   const regions = b.regions.filter((c) => ALL_CITIES.has(c)).slice(0, 6);
-  if (!b.online && regions.length === 0) {
-    return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת, או לסמן הוראה אונליין" }, { status: 400 });
+  let online = b.online;
+  if (b.lesson_settings === undefined) {
+    // טופס שנטען לפני הרובריקה (דף פתוח בזמן פריסה) שולח רק online וערים.
+    // מה שידוע נשמר, והכלל הישן חל: עיר אחת לפחות, או אונליין.
+    if (!b.online && regions.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת, או לסמן הוראה אונליין" }, { status: 400 });
+    }
+    if (b.online) extras.lesson_settings = ["online"];
+  } else {
+    if (extras.lesson_settings.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור איפה מתקיים השיעור" }, { status: 400 });
+    }
+    if (teachesInPerson(extras.lesson_settings) && regions.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת לשיעורים פנים אל פנים" }, { status: 400 });
+    }
+    // "אונליין" נקבע מהרובריקה ולא מהשדה הישן, כדי שהשניים לא יסתרו.
+    online = extras.lesson_settings.includes("online");
   }
   // הוראה מתקנת רק עם הכשרה שמתאימה לה. הסימון עצמו נבדק שוב באישור באדמין.
   const remedial = b.remedial && qualificationAllowsRemedial(b.qualification);
@@ -132,7 +159,10 @@ export async function POST(req: NextRequest) {
         remedial,
         grade_groups: b.grade_groups,
         regions,
-        online: b.online,
+        online,
+        expertise: extras.expertise,
+        focuses: extras.focuses,
+        lesson_settings: extras.lesson_settings,
         languages: b.languages?.length ? b.languages : ["עברית"],
         price_text: b.price_text || null,
         bio: b.bio || null,
@@ -185,8 +215,10 @@ export async function POST(req: NextRequest) {
         <p><strong>${escapeHtml(b.full_name)}</strong> (${escapeHtml(b.email)}, ${escapeHtml(b.phone)})</p>
         <p>תחומים: ${b.subjects.map(subjectLabel).join(", ")}${remedial ? " · הוראה מתקנת" : ""}<br/>
         שכבות: ${b.grade_groups.map(gradeGroupLabel).join(", ")}<br/>
-        ערים: ${escapeHtml(regions.join(", ") || "-")}${b.online ? " · אונליין" : ""}<br/>
-        הכשרה: ${escapeHtml(qualificationLabel(b.qualification))}${b.institution ? ` (${escapeHtml(b.institution)})` : ""}</p>
+        ערים: ${escapeHtml(regions.join(", ") || "-")} · שיעור: ${escapeHtml(lessonSettingsText({ lesson_settings: extras.lesson_settings, online, regions }) || "-")}<br/>
+        הכשרה: ${escapeHtml(qualificationLabel(b.qualification))}${b.institution ? ` (${escapeHtml(b.institution)})` : ""}<br/>
+        ניסיון מוצהר: ${escapeHtml(extras.expertise.map((k) => expertiseLabel(k, true)).join(", ") || "-")}<br/>
+        מוקדים: ${escapeHtml(focusesBySubject(b.subjects, extras.focuses).map((g) => `${g.label}: ${g.focuses.join(", ")}`).join("; ") || "-")}</p>
         <p><a href="${site}/admin/teachers">לאישור באדמין ←</a></p>
       </div>`,
     }));

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadListedTeacherBySlug, teacherPhotoUrl } from "@/app/lib/teachers.server";
-import { subjectLabel, gradeGroupLabel, qualificationLabel } from "@/app/lib/teacher-options";
+import { subjectLabel, gradeGroupLabel, qualificationLabel, expertiseLabel, focusesBySubject, lessonSettingsText } from "@/app/lib/teacher-options";
 import TeacherContactButtons from "../../TeacherContactButtons";
 import TeacherProfileView from "./TeacherProfileView";
 
@@ -24,6 +24,10 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
   if (!t) notFound();
   const fromMatch = sp.from === "match";
   const photo = teacherPhotoUrl(t);
+  const focusGroups = focusesBySubject(t.subjects, t.focuses ?? []);
+  const expertise = t.expertise ?? [];
+  // ערים, ואחריהן איפה מתקיים השיעור: "חיפה, נשר · בבית התלמיד, אונליין".
+  const where = [t.regions.join(", "), lessonSettingsText(t)].filter(Boolean).join(" · ");
 
   return (
     <main className="mx-auto max-w-3xl px-5 py-10 pb-24" dir="rtl">
@@ -50,9 +54,7 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
               {t.remedial ? "מורה להוראה מתקנת" : "מורה פרטי/ת"} · {t.subjects.map(subjectLabel).join(", ")}
             </p>
             <p className="mt-1 text-sm text-[var(--muted)]">{t.grade_groups.map(gradeGroupLabel).join(" · ")}</p>
-            <p className="mt-1 text-sm text-[var(--muted)]">
-              📍 {t.regions.join(", ")}{t.online ? `${t.regions.length ? " · " : ""}אונליין` : ""}
-            </p>
+            {where && <p className="mt-1 text-sm text-[var(--muted)]">📍 {where}</p>}
           </div>
         </div>
 
@@ -63,6 +65,32 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
         {t.bio && <p className="mt-6 whitespace-pre-line text-[15px] leading-7 text-[var(--text-2)]">{t.bio}</p>}
 
         <dl className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+          {focusGroups.length > 0 && (
+            <div className="rounded-xl bg-[var(--surface)] p-3 sm:col-span-2">
+              <dt className="text-xs font-bold text-[var(--muted)]">מוקדי הוראה</dt>
+              <dd className="font-semibold text-[var(--text)]">
+                {focusGroups.map((g) => (
+                  <div key={g.subject}>
+                    <span className="font-normal text-[var(--text-2)]">{g.label}:</span> {g.focuses.join(", ")}
+                  </div>
+                ))}
+              </dd>
+            </div>
+          )}
+          {expertise.length > 0 && (
+            <div className="rounded-xl bg-[var(--surface)] p-3 sm:col-span-2">
+              <dt className="text-xs font-bold text-[var(--muted)]">
+                ניסיון בהוראה לתלמידים עם <span className="font-normal">(לפי הצהרת המורה)</span>
+              </dt>
+              <dd className="font-semibold text-[var(--text)]">
+                <ul className="list-inside list-disc">
+                  {expertise.map((k) => (
+                    <li key={k}>{expertiseLabel(k)}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          )}
           <div className="rounded-xl bg-[var(--surface)] p-3">
             <dt className="text-xs font-bold text-[var(--muted)]">הכשרה</dt>
             <dd className="font-semibold text-[var(--text)]">{qualificationLabel(t.qualification)}</dd>
@@ -90,6 +118,7 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
 
       <p className="mt-6 text-xs leading-6 text-[var(--muted)]">
         מורה עצמאי/ת. טיפול חכם אימתה את ההכשרה המוצהרת מול תעודה, ואינה צד לשיעורים, לתשלום או לתוכנם.
+        מוקדי ההוראה והניסיון עם קשיים מסוימים הם לפי הצהרת המורה, ולא אומתו.
         המורה אינו/ה מטפל/ת ואינו/ה מאבחן/ת; לקושי רגשי או לבירור אבחוני, ראו את שאר ההמלצות בדוח השאלון.
       </p>
     </main>

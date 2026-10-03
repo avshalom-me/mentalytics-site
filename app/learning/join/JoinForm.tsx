@@ -4,6 +4,7 @@ import { useState } from "react";
 import { getAttribution } from "@/app/lib/attribution";
 import TeacherProfileFields, { EMPTY_TEACHER_FORM, toApiPayload, type TeacherForm } from "../TeacherProfileFields";
 import { uploadTeacherCertificate, uploadTeacherPhoto } from "../teacher-upload-client";
+import { teachesInPerson } from "@/app/lib/teacher-options";
 
 // טופס ההצטרפות: שמירה (JSON), ואז העלאת התעודה והתמונה. בלי חשבון - השרת
 // מזהה את המורה בעוגייה שהוא שם בתשובת ההרשמה, והקישור האישי נשלח במייל
@@ -29,7 +30,8 @@ export default function JoinForm() {
     if (form.subjects.length === 0) return setError("יש לבחור לפחות תחום הוראה אחד");
     if (form.grade_groups.length === 0) return setError("יש לבחור לפחות שכבת גיל אחת");
     if (!form.qualification) return setError("יש לבחור הכשרה");
-    if (!form.online && form.regions.length === 0) return setError("יש לבחור לפחות עיר אחת, או לסמן אונליין");
+    if (form.lesson_settings.length === 0) return setError("יש לבחור איפה מתקיים השיעור");
+    if (teachesInPerson(form.lesson_settings) && form.regions.length === 0) return setError("יש לבחור לפחות עיר אחת לשיעורים פנים אל פנים");
     if (!cert) return setError("יש לצרף תעודה או אישור הכשרה (PDF או תמונה)");
     if (!noRecord || !terms) return setError("יש לאשר את שתי ההצהרות");
     setBusy(true);

@@ -11,8 +11,11 @@ import {
   TEACHER_GRADE_KEYS,
   TEACHER_QUALIFICATION_KEYS,
   TEACHER_PRICE_GROSS,
+  TEACHER_EXPERTISE_MAX,
   qualificationAllowsRemedial,
   hasActiveStandingOrder,
+  sanitizeTeacherExtras,
+  teachesInPerson,
 } from "@/app/lib/teacher-options";
 
 // הפרופיל של המורה המחובר/ת (לפי העוגייה): GET לקריאה, כולל נתוני הופעות
@@ -32,6 +35,9 @@ const Patch = z.object({
   grade_groups: z.array(z.enum(TEACHER_GRADE_KEYS as [string, ...string[]])).min(1).max(4).optional(),
   regions: z.array(z.string()).max(6).optional(),
   online: z.boolean().optional(),
+  expertise: z.array(z.string().max(40)).max(TEACHER_EXPERTISE_MAX).optional(),
+  focuses: z.array(z.string().max(40)).max(40).optional(),
+  lesson_settings: z.array(z.string().max(40)).max(3).optional(),
   languages: z.array(z.string().max(20)).max(7).optional(),
   price_text: z.string().trim().max(60).nullable().optional(),
   bio: z.string().trim().max(1200).nullable().optional(),
@@ -47,6 +53,9 @@ const FIELD_LABELS: Record<string, string> = {
   phone: "טלפון",
   subjects: "תחומי הוראה",
   grade_groups: "שכבות גיל",
+  expertise: "ניסיון עם קשיים (עד שלושה)",
+  focuses: "מוקדי ההוראה",
+  lesson_settings: "איפה מתקיים השיעור",
   qualification: "הכשרה",
   qualification_year: "שנת סיום",
   experience_years: "שנות ניסיון",
@@ -69,6 +78,9 @@ function view(t: Record<string, unknown>) {
     grade_groups: t.grade_groups,
     regions: t.regions,
     online: t.online,
+    expertise: t.expertise ?? [],
+    focuses: t.focuses ?? [],
+    lesson_settings: t.lesson_settings ?? [],
     languages: t.languages,
     price_text: t.price_text,
     bio: t.bio,
@@ -143,10 +155,38 @@ export async function PATCH(req: NextRequest) {
     fields.remedial = wantsRemedial && qualificationAllowsRemedial(qualification);
   }
 
-  const online = typeof fields.online === "boolean" ? fields.online : !!teacher.online;
+  // שלוש הרובריקות: מנוקות מול התחומים כפי שיהיו אחרי השמירה, כך שמוקד של
+  // תחום שהוסר עכשיו נושר איתו גם אם הטופס לא שלח את המוקדים.
+  const sent = { expertise: "expertise" in fields, focuses: "focuses" in fields, settings: "lesson_settings" in fields };
+  const subjects = (fields.subjects as string[] | undefined) ?? ((teacher.subjects as string[] | null) ?? []);
+  const extras = sanitizeTeacherExtras(
+    {
+      expertise: sent.expertise ? fields.expertise : teacher.expertise,
+      focuses: sent.focuses ? fields.focuses : teacher.focuses,
+      lesson_settings: sent.settings ? fields.lesson_settings : teacher.lesson_settings,
+    },
+    subjects,
+  );
+  if (sent.expertise) fields.expertise = extras.expertise;
+  if (sent.focuses || "subjects" in fields) fields.focuses = extras.focuses;
+
   const regions = Array.isArray(fields.regions) ? (fields.regions as string[]) : ((teacher.regions as string[] | null) ?? []);
-  if (!online && regions.length === 0) {
-    return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת, או לסמן הוראה אונליין" }, { status: 400 });
+  if (sent.settings) {
+    if (extras.lesson_settings.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור איפה מתקיים השיעור" }, { status: 400 });
+    }
+    if (teachesInPerson(extras.lesson_settings) && regions.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת לשיעורים פנים אל פנים" }, { status: 400 });
+    }
+    fields.lesson_settings = extras.lesson_settings;
+    // "אונליין" נקבע מהרובריקה ולא מהשדה הישן, כדי שהשניים לא יסתרו.
+    fields.online = extras.lesson_settings.includes("online");
+  } else {
+    // טופס שנטען לפני הרובריקה: הכלל הישן - עיר אחת לפחות, או אונליין.
+    const online = typeof fields.online === "boolean" ? fields.online : !!teacher.online;
+    if (!online && regions.length === 0) {
+      return NextResponse.json({ ok: false, error: "יש לבחור לפחות עיר אחת, או לסמן הוראה אונליין" }, { status: 400 });
+    }
   }
   fields.updated_at = new Date().toISOString();
 

@@ -91,6 +91,115 @@ export function hasActiveStandingOrder(t: { sumit_recurring_id?: unknown; sumit_
 /** שפות ההוראה שאפשר לבחור - בטופס המורה ובחיפוש של ההורה. */
 export const TEACHER_LANGUAGES = ["עברית", "אנגלית", "ערבית", "רוסית", "צרפתית", "ספרדית", "אמהרית"] as const;
 
+// ── שלוש הרובריקות להתאמה מדויקת ────────────────────────────────────────────
+//
+// אושרו ע"י הבעלים ב-3/10/2026, לפני שהתחיל גיוס המורים: מה שמורה לא הצהיר/ה
+// עליו, שום חיפוש לא יוכל למצוא אחר כך. שלושתן נאספות בטופס ומוצגות להורים.
+// מנוע ההתאמה עדיין לא מדרג לפיהן - זו החלטה נפרדת של הבעלים.
+
+/**
+ * ניסיון ממוקד עם מאפייני למידה. הצהרה עצמית של המורה ולא הכשרה שאומתה מול
+ * תעודה, ולכן היא מוצגת להורים כ"ניסיון מוצהר". ההגבלה לשלושה היא ההגנה מפני
+ * סימון של הכול: מי שמסמן/ת הכול לא אומר/ת דבר.
+ *
+ * המפתחות שונים בכוונה ממפתחות התחומים (literacy ולא reading_writing), כדי
+ * ששני המערכים לא יתבלבלו בשאילתה או בסינון.
+ */
+export const TEACHER_EXPERTISE = [
+  { key: "literacy", label: "קשיי קריאה וכתיבה מתמשכים, כולל דיסלקסיה ודיסגרפיה", short: "קשיי קריאה וכתיבה" },
+  { key: "language", label: "קשיי שפה שמשפיעים על קריאה, הבנה או הבעה", short: "קשיי שפה" },
+  { key: "numeracy", label: "קשיים מתמשכים בחשבון, כולל דיסקלקוליה", short: "קשיי חשבון" },
+  { key: "attention", label: "קשיי קשב וריכוז בזמן למידה", short: "קשב וריכוז" },
+  { key: "executive", label: "קשיי התארגנות, תכנון וניהול משימות", short: "התארגנות ותכנון" },
+  { key: "avoidance", label: "הימנעות, תסכול וחוסר ביטחון סביב למידה", short: "הימנעות ותסכול" },
+] as const;
+export type TeacherExpertise = (typeof TEACHER_EXPERTISE)[number]["key"];
+export const TEACHER_EXPERTISE_KEYS = TEACHER_EXPERTISE.map((e) => e.key) as TeacherExpertise[];
+export const TEACHER_EXPERTISE_MAX = 3;
+
+/**
+ * מוקדי ההוראה בתוך כל תחום. "קריאה וכתיבה" ו"מתמטיקה" רחבים מדי בשביל הורה
+ * שמחפש רכישת קריאה לכיתה א׳ או חמש יחידות. המפתח נושא את קידומת התחום, כך
+ * שמוקד נשאר שייך לתחום שלו גם כשהוא לבדו במערך.
+ */
+export const TEACHER_FOCUSES: Record<TeacherSubject, readonly { key: string; label: string }[]> = {
+  reading_writing: [
+    { key: "rw_acquisition", label: "רכישת קריאה" },
+    { key: "rw_fluency", label: "שטף ודיוק בקריאה" },
+    { key: "rw_comprehension", label: "הבנת הנקרא" },
+    { key: "rw_spelling", label: "כתיב" },
+    { key: "rw_writing", label: "הבעה בכתב" },
+  ],
+  math: [
+    { key: "math_basics", label: "יסודות החשבון" },
+    { key: "math_middle", label: "מתמטיקה בחטיבת הביניים" },
+    { key: "math_3u", label: "תיכון, 3 יחידות" },
+    { key: "math_4u", label: "תיכון, 4 יחידות" },
+    { key: "math_5u", label: "תיכון, 5 יחידות" },
+  ],
+  english: [
+    { key: "en_reading", label: "רכישת קריאה באנגלית" },
+    { key: "en_vocab_grammar", label: "אוצר מילים ודקדוק" },
+    { key: "en_3u", label: "תיכון, 3 יחידות" },
+    { key: "en_4u", label: "תיכון, 4 יחידות" },
+    { key: "en_5u", label: "תיכון, 5 יחידות" },
+  ],
+  hebrew: [
+    { key: "he_comprehension", label: "הבנת הנקרא" },
+    { key: "he_writing", label: "הבעה בכתב" },
+    { key: "he_bagrut", label: "לשון לבגרות" },
+  ],
+  learning_strategies: [
+    { key: "ls_organization", label: "התארגנות ושיעורי בית" },
+    { key: "ls_exams", label: "הכנה למבחנים" },
+    { key: "ls_texts", label: "קריאה וסיכום של טקסטים" },
+  ],
+};
+
+/** איפה מתקיים השיעור. כאן מקור האמת לאונליין; העמודה online נגזרת ממנו. */
+export const TEACHER_LESSON_SETTINGS = [
+  { key: "student_home", label: "בבית התלמיד" },
+  { key: "teacher_place", label: "אצל המורה" },
+  { key: "online", label: "אונליין" },
+] as const;
+export type TeacherLessonSetting = (typeof TEACHER_LESSON_SETTINGS)[number]["key"];
+export const TEACHER_LESSON_SETTING_KEYS = TEACHER_LESSON_SETTINGS.map((s) => s.key) as TeacherLessonSetting[];
+
+export type TeacherExtras = { expertise: string[]; focuses: string[]; lesson_settings: string[] };
+
+/** רק ערכים מוכרים, בלי כפילויות, ובסדר הרשימה שבקוד ולא בסדר הלחיצות. */
+function knownStrings(value: unknown, allowed: readonly string[]): string[] {
+  if (!Array.isArray(value)) return [];
+  const given = new Set(value.filter((v): v is string => typeof v === "string"));
+  return allowed.filter((k) => given.has(k));
+}
+
+/** המוקדים שמותרים למי שמלמד/ת את התחומים האלה, בסדר התחומים. */
+export function focusKeysFor(subjects: readonly string[]): string[] {
+  return TEACHER_SUBJECT_KEYS.filter((s) => subjects.includes(s)).flatMap((s) => TEACHER_FOCUSES[s].map((f) => f.key));
+}
+
+/**
+ * מנקה את שלוש הרובריקות לפני שמירה: רק מפתחות מוכרים, לכל היותר שלושה
+ * מאפייני למידה, ומוקדים רק של תחומים שהמורה מלמד/ת (מוקד של תחום שהוסר
+ * נושר איתו). מקום אחד, כדי שההרשמה והעריכה לא יסחפו זו מזו.
+ */
+export function sanitizeTeacherExtras(
+  input: { expertise?: unknown; focuses?: unknown; lesson_settings?: unknown },
+  subjects: readonly string[],
+): TeacherExtras {
+  return {
+    expertise: knownStrings(input.expertise, TEACHER_EXPERTISE_KEYS).slice(0, TEACHER_EXPERTISE_MAX),
+    focuses: knownStrings(input.focuses, focusKeysFor(subjects)),
+    lesson_settings: knownStrings(input.lesson_settings, TEACHER_LESSON_SETTING_KEYS),
+  };
+}
+
+/** שיעור פנים אל פנים - אצל המורה או בבית התלמיד. מחייב לפחות עיר אחת. */
+export function teachesInPerson(settings: readonly string[]): boolean {
+  return settings.includes("student_home") || settings.includes("teacher_place");
+}
+
 // ── המודל המסחרי ────────────────────────────────────────────────────────────
 //
 // החלטת הבעלים (2/10/2026): 90 ימי ניסיון מהאישור, בלי תשלום, בלי התחייבות
@@ -160,6 +269,47 @@ export function qualificationLabel(key: string | null | undefined): string {
 }
 export function listingStateLabel(key: string): string {
   return TEACHER_LISTING_STATES.find((s) => s.key === key)?.label ?? key;
+}
+export function expertiseLabel(key: string, short = false): string {
+  const e = TEACHER_EXPERTISE.find((x) => x.key === key);
+  return e ? (short ? e.short : e.label) : key;
+}
+export function lessonSettingLabel(key: string): string {
+  return TEACHER_LESSON_SETTINGS.find((s) => s.key === key)?.label ?? key;
+}
+
+/**
+ * המוקדים של מורה, מקובצים לפי תחום ובסדר התחומים; תחום בלי מוקדים לא חוזר.
+ * כך מוצג "קריאה וכתיבה: רכישת קריאה, כתיב" ולא רשימה שטוחה, שבה "הבנת הנקרא"
+ * של עברית ושל קריאה נראים אותו דבר.
+ */
+export function focusesBySubject(
+  subjects: readonly string[],
+  focuses: readonly string[],
+): { subject: TeacherSubject; label: string; focuses: string[] }[] {
+  return TEACHER_SUBJECTS.filter((s) => subjects.includes(s.key))
+    .map((s) => ({
+      subject: s.key,
+      label: s.label,
+      focuses: TEACHER_FOCUSES[s.key].filter((f) => focuses.includes(f.key)).map((f) => f.label),
+    }))
+    .filter((g) => g.focuses.length > 0);
+}
+
+/**
+ * "איפה מתקיים השיעור" במילים. שורה בלי הרובריקה (lesson_settings ריק) נופלת
+ * חזרה למה שהיה ידוע קודם - ערים ואונליין - כדי שלא תוצג כמי שאינו/ה מלמד/ת
+ * בשום מקום.
+ */
+export function lessonSettingsText(t: {
+  lesson_settings?: readonly string[] | null;
+  online?: boolean | null;
+  regions?: readonly string[] | null;
+}): string {
+  const settings = TEACHER_LESSON_SETTING_KEYS.filter((k) => (t.lesson_settings ?? []).includes(k));
+  if (settings.length > 0) return settings.map(lessonSettingLabel).join(", ");
+  const legacy = [(t.regions ?? []).length > 0 ? "פנים אל פנים" : "", t.online ? "אונליין" : ""].filter(Boolean);
+  return legacy.join(", ");
 }
 
 /**

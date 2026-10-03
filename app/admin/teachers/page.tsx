@@ -13,6 +13,9 @@ import {
   gradeGroupLabel,
   qualificationLabel,
   qualificationAllowsRemedial,
+  expertiseLabel,
+  focusesBySubject,
+  lessonSettingsText,
   teacherSearchFromKey,
   TEACHER_REFERRAL_KEYS,
 } from "@/app/lib/teacher-options";
@@ -39,6 +42,10 @@ type Teacher = {
   grade_groups: string[];
   regions: string[];
   online: boolean;
+  /** שלוש הרובריקות מ-3/10/2026. ניסיון ומוקדים הם הצהרת המורה, לא מאומתים. */
+  expertise: string[] | null;
+  focuses: string[] | null;
+  lesson_settings: string[] | null;
   languages: string[];
   price_text: string | null;
   bio: string | null;
@@ -486,6 +493,12 @@ export default function AdminTeachersPage() {
                     <div className="space-y-1 text-stone-600">
                       <div><b>מייל:</b> {t.email} · <b>טלפון:</b> {t.phone || "-"}</div>
                       <div><b>שפות:</b> {t.languages?.join(", ")} · <b>מחיר:</b> {t.price_text || "-"}</div>
+                      <div><b>שיעור:</b> {lessonSettingsText(t) || "-"}</div>
+                      <div><b>ניסיון מוצהר:</b> {(t.expertise ?? []).map((k) => expertiseLabel(k, true)).join(", ") || "-"}</div>
+                      <div>
+                        <b>מוקדי הוראה:</b>{" "}
+                        {focusesBySubject(t.subjects, t.focuses ?? []).map((g) => `${g.label}: ${g.focuses.join(", ")}`).join("; ") || "-"}
+                      </div>
                       <div><b>הצהרת היעדר הרשעה:</b> {t.declared_no_record ? "כן" : "לא"} · <b>מקור:</b> {t.signup_source}</div>
                       {t.bio && <div className="whitespace-pre-line rounded-lg bg-white p-2 text-stone-700">{t.bio}</div>}
                       <div className="text-stone-400">

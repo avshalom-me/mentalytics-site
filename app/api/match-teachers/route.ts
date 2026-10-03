@@ -14,6 +14,8 @@ import {
   subjectLabel,
   gradeGroupLabel,
   qualificationLabel,
+  expertiseLabel,
+  lessonSettingsText,
   type TeacherGradeGroup,
   type TeacherSubject,
 } from "@/app/lib/teacher-options";
@@ -141,6 +143,9 @@ export async function POST(req: NextRequest) {
       subject_labels: m.teacher.subjects.map(subjectLabel),
       grade_labels: m.teacher.grade_groups.map(gradeGroupLabel),
       qualification_label: qualificationLabel(m.teacher.qualification),
+      // ניסיון מוצהר (לא מאומת) ומקום השיעור - מוצגים בכרטיס, לא משפיעים על הסדר.
+      expertise_labels: (m.teacher.expertise ?? []).map((k) => expertiseLabel(k, true)),
+      lesson_text: lessonSettingsText(m.teacher),
       experience_years: m.teacher.experience_years,
       price_text: m.teacher.price_text,
       match_score: m.score,

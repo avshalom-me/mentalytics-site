@@ -13,8 +13,11 @@ type Profile = {
   gender: string | null;
   slug: string | null;
   subjects: string[];
+  focuses: string[];
   remedial: boolean;
   grade_groups: string[];
+  expertise: string[];
+  lesson_settings: string[];
   regions: string[];
   online: boolean;
   languages: string[];
@@ -51,10 +54,14 @@ function toForm(p: Profile): TeacherForm {
     phone: p.phone ?? "",
     gender: (p.gender as TeacherForm["gender"]) || "",
     subjects: p.subjects ?? [],
+    focuses: p.focuses ?? [],
     remedial: !!p.remedial,
     grade_groups: p.grade_groups ?? [],
+    expertise: p.expertise ?? [],
+    // פרופיל שנשמר לפני הרובריקה: מה שכבר ידוע (אונליין) הוא הבחירה ההתחלתית,
+    // והשמירה הבאה תבקש להשלים אם השיעור אצל המורה או בבית התלמיד.
+    lesson_settings: p.lesson_settings?.length ? p.lesson_settings : p.online ? ["online"] : [],
     regions: p.regions ?? [],
-    online: !!p.online,
     languages: p.languages?.length ? p.languages : ["עברית"],
     price_text: p.price_text ?? "",
     bio: p.bio ?? "",

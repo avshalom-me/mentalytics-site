@@ -17,7 +17,7 @@ export const TEACHER_FILES_BUCKET = process.env.SUPABASE_THERAPIST_FILES_BUCKET 
 
 /** העמודות שכרטיס התוצאה והפרופיל הציבורי צריכים. בלי מייל ובלי טוקן. */
 export const TEACHER_PUBLIC_COLUMNS =
-  "id, full_name, gender, slug, subjects, remedial, grade_groups, regions, online, languages, listing_state, paused_until, bio, phone, price_text, qualification, photo_path, experience_years";
+  "id, full_name, gender, slug, subjects, remedial, grade_groups, regions, online, languages, listing_state, paused_until, bio, phone, price_text, qualification, photo_path, experience_years, expertise, focuses, lesson_settings";
 
 export function newEditToken(): string {
   return randomBytes(24).toString("base64url");

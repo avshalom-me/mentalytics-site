@@ -24,6 +24,9 @@ function row(over: Partial<TeacherRow>): TeacherRow {
     qualification: "remedial_cert",
     photo_path: null,
     experience_years: null,
+    expertise: [],
+    focuses: [],
+    lesson_settings: [],
     ...over,
   };
 }
