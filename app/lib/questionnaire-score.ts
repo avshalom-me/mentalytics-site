@@ -94,7 +94,7 @@ function allAnswered(arr: number[] | undefined): boolean {
 //   Q2: 1 = prefers an open, free space ... 7 = needs a clear frame, tools, tasks
 // The two run in opposite directions - a high Q1 leans dynamic, a high Q2 leans
 // CBT - so Q1 is reversed before they are added: practical = (8 - Q1) + Q2,
-// range 2-14. >= 12 → CBT, 7-11 → mixed, 2-6 → dynamic.
+// range 2-14, 8 in the middle. >= 12 → CBT, 7-11 → mixed, 2-6 → dynamic.
 //
 // In the first version (30/3/2026) Q1 was labelled the other way round on the
 // screen (1 = insight, 7 = practical relief), so a plain Q1 + Q2 was right. On
@@ -106,22 +106,51 @@ function allAnswered(arr: number[] | undefined): boolean {
 // "CBT only" meant agreeing with both statements and "dynamic only" meant
 // disagreeing with both.
 //
-// Both answers are needed. With one or both missing there is nothing to lean
-// on ("none"), and each finding falls back to its own default.
+// Both answers are needed. With one or both missing there is no score (null),
+// nothing to lean on ("none"), and each finding falls back to its own default.
+
+function practicalScore(q1: number, q2: number): number | null {
+  const answered = (v: number) => Number.isFinite(v) && v >= 1 && v <= 7;
+  if (!answered(q1) || !answered(q2)) return null;
+  return 8 - q1 + q2;
+}
 
 type StyleLean = "cbt" | "mixed" | "dynamic" | "none";
 
-function styleLean(q1: number, q2: number): StyleLean {
-  const answered = (v: number) => Number.isFinite(v) && v >= 1 && v <= 7;
-  if (!answered(q1) || !answered(q2)) return "none";
-  const practical = 8 - q1 + q2;
-  if (practical >= 12) return "cbt";
-  if (practical >= 7) return "mixed";
+const CBT_ONLY_FROM = 12;
+const DYNAMIC_UP_TO = 6;
+
+function styleLean(practical: number | null): StyleLean {
+  if (practical === null) return "none";
+  if (practical >= CBT_ONLY_FROM) return "cbt";
+  if (practical > DYNAMIC_UP_TO) return "mixed";
   return "dynamic";
 }
 
+// General and social anxiety: CBT gets a head start over dynamic therapy (the
+// owner's decision, 3/10/2026). The cut under which a finding turns to dynamic
+// therapy moves down by this many points, so it takes a markedly dynamic lean -
+// 4 or less, as far from the middle as "CBT only" is on the other side - for an
+// anxiety finding to go out as dynamic therapy. Either way it is one method.
+const ANXIETY_CBT_HEAD_START = 2;
+
 const CBT = "CBT";
 const DYNAMIC = "טיפול דינאמי";
+
+// One symptom can send out more than one card: low mood (the urgent card and
+// the regular one), eating (treatment and dietitian), sleep (the sleep finding
+// and the chronic-rhinitis one, both asked on the sleep screen) and trauma
+// (EMDR, CPT and more). Every other finding is a symptom of its own, and so is
+// the default when nothing was found.
+const ONE_SYMPTOM_FAMILIES = ["mood-", "eating-", "sleep-", "trauma-"];
+
+function symptomCount(findings: Recommendation[]): number {
+  const symptoms = new Set<string>();
+  for (const r of findings) {
+    symptoms.add(ONE_SYMPTOM_FAMILIES.find((family) => r.id.startsWith(family)) ?? r.id);
+  }
+  return symptoms.size;
+}
 
 // ===== MAIN SCORING FUNCTION =====
 
@@ -156,20 +185,22 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
   // 3/10/2026):
   //   by the style lean - low mood, elevated mood, reality testing:
   //                       cbt / mixed → CBT, dynamic / none → טיפול דינאמי
-  //   CBT first         - general anxiety, social anxiety: always CBT, and when
-  //                       the lean is mixed or dynamic "גם טיפול דינאמי" is added
+  //   CBT ahead         - general anxiety, social anxiety: CBT, unless the lean
+  //                       is markedly dynamic (see ANXIETY_CBT_HEAD_START)
   //   always dynamic    - sleep (the finding itself sends to a physician), the
   //                       communication-assessment finding, and the default
   //   fixed by symptom  - everything else (OCD, pain, trauma, eating,
   //                       personality ...), as before
-  const lean = styleLean(
+  // Each of these is one method per symptom. CBT and dynamic therapy stand side
+  // by side only in a report with several symptoms - see the end of the block.
+  const practical = practicalScore(
     answers.emotional?.therapistStyleQ1 ?? 0,
     answers.emotional?.therapistStyleQ2 ?? 0,
   );
+  const lean = styleLean(practical);
   const byStyle = lean === "cbt" || lean === "mixed" ? CBT : DYNAMIC;
-  // An anxiety finding went out as CBT. With a dynamic lean that is CBT against
-  // the person's own preference, so the dynamic option is offered beside it.
-  let anxietyGotCbt = false;
+  const forAnxiety =
+    practical !== null && practical <= DYNAMIC_UP_TO - ANXIETY_CBT_HEAD_START ? DYNAMIC : CBT;
 
   // ===== EMOTIONAL DOMAIN =====
   if (answers.domains.includes("emotional") && answers.emotional) {
@@ -304,27 +335,25 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // --- E4: Anxiety (GAD7) ---
     // 9 פריטים × סקאלת 1-3 (טווח 9-27)
     // > 15 = חרדה כללית מובהקת | > 12 = סימני מתח קלים
-    // חרדה כללית וחרדה חברתית: CBT קודם, תמיד. הנטייה מתשובות הסגנון קובעת
-    // רק אם מוצע לצידו גם טיפול דינאמי (ראו anxietyGotCbt).
+    // חרדה כללית וחרדה חברתית: שיטה אחת לסימפטום, עם יתרון ל-CBT. טיפול דינאמי
+    // רק כשתשובות הסגנון נוטות אליו באופן מובהק (ראו forAnxiety).
     const gad7Total = sum(e.gad7Scores);
     const gad7Complete = allAnswered(e.gad7Scores);
     if (gad7Total > 15) {
-      anxietyGotCbt = true;
       recs.push({
         id: uid("gad7-severe"),
         symptomText: "נמצאו קשיים בניהול חרדה ומתח.",
-        treatment: CBT,
-        treatmentLabel: CBT,
+        treatment: forAnxiety,
+        treatmentLabel: forAnxiety,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
     } else if (gad7Total > 12) {
-      anxietyGotCbt = true;
       recs.push({
         id: uid("gad7-mild"),
         symptomText: "נמצאו סימנים קלים של מתח.",
-        treatment: CBT,
-        treatmentLabel: CBT,
+        treatment: forAnxiety,
+        treatmentLabel: forAnxiety,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
       });
@@ -348,14 +377,13 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     // Social anxiety
     // המשתמש אישר חרדה חברתית - לפחות "low" תמיד יוקפץ, גם אם לא דורגה חומרה
     if (e.socialAnxiety) {
-      anxietyGotCbt = true;
       const sev = e.socialSeverity ?? 0;
       if (sev >= 4) {
         recs.push({
           id: uid("social-anxiety-high"),
           symptomText: "נמצאו קשיים בתחום החרדה החברתית - בעוצמה גבוהה.",
-          treatment: CBT,
-          treatmentLabel: CBT,
+          treatment: forAnxiety,
+          treatmentLabel: forAnxiety,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
@@ -363,8 +391,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         recs.push({
           id: uid("social-anxiety-low"),
           symptomText: "נמצאו קשיים בתחום החרדה החברתית.",
-          treatment: CBT,
-          treatmentLabel: CBT,
+          treatment: forAnxiety,
+          treatmentLabel: forAnxiety,
           domain: "מורכבויות בתחום הרגשי/האישי",
           urgent: false,
         });
@@ -470,11 +498,12 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     }
 
     // --- E7: Sleep ---
-    // פריטים 0-1 (קושי בהירדמות / איכות השינה) = הפרעות שינה קלות → טיפים
+    // פריטים 0-1 (קושי בהירדמות / איכות השינה) = הפרעות שינה קלות → רופא משפחה + טיפים
     // פריטים 2-4 (שינה מרובה / סהרוריות / ביעותים) = פתולוגיים יותר → נוירולוג
     // פריט 5 (נזלת כרונית) = הפניה לאף-אוזן-גרון
-    // שינה היא קודם כל עניין לרופא, ולאו דווקא לטיפול; ההפניה לטיפול שלצד
-    // הממצא היא תמיד טיפול דינאמי, בלי קשר לתשובות הסגנון (החלטת הבעלים, 3/10/2026).
+    // שינה היא קודם כל עניין לרופא, ולאו דווקא לטיפול - ולכן כל אחד משלושת
+    // הממצאים מפנה לרופא; ההפניה לטיפול שלצד הממצא היא תמיד טיפול דינאמי,
+    // בלי קשר לתשובות הסגנון (החלטת הבעלים, 3/10/2026).
     const sleepItems = e.sleepItems ?? [];
     const hasSleepNeuro = sleepItems[2] || sleepItems[3] || sleepItems[4];
     const hasSleepMild = sleepItems[0] || sleepItems[1];
@@ -496,7 +525,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
         treatmentLabel: DYNAMIC,
         domain: "מורכבויות בתחום הרגשי/האישי",
         urgent: false,
-        notes: "מומלץ לאמץ היגיינת שינה: שעות שינה קבועות, הימנעות מקפאין אחר הצהריים, צמצום מסכים שעה לפני השינה, וחשיפה לאור טבעי בבוקר.",
+        notes: "התייעצות עם רופא המשפחה. במקביל, מומלץ לאמץ היגיינת שינה: שעות שינה קבועות, הימנעות מקפאין אחר הצהריים, צמצום מסכים שעה לפני השינה, וחשיפה לאור טבעי בבוקר.",
         tools: [
           "כלים בסיסיים לשיפור איכות השינה:",
           "",
@@ -735,21 +764,21 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       });
     }
 
-    // "גם טיפול דינאמי" - the dynamic option beside the rest. As before, it is
-    // offered when the style lean is mixed; and now also when the lean is
-    // dynamic and an anxiety finding went out as CBT all the same.
+    // "גם טיפול דינאמי" - the dynamic option beside the rest, offered on a mixed
+    // style lean. A second method is for a report with several symptoms (the
+    // owner's decision, 3/10/2026): one symptom gets one method, so with a
+    // single symptom the line stays out, whatever the lean.
     //
-    // Two things it must not do. It must not say "בנוסף לגישה CBT" when no CBT
-    // was recommended (a trauma-only or eating-only report used to say exactly
+    // Two more things it must not do. It must not say "בנוסף לגישה CBT" when no
+    // CBT was recommended (a trauma-and-eating report used to say exactly
     // that), so the wording follows what is in the report. And it is left out
     // when dynamic therapy is already the recommendation and there is no CBT
-    // for it to stand beside - the default finding, sleep, or the communication
-    // finding on their own - where it would only repeat the card above it.
+    // for it to stand beside, where it would only repeat the card above it.
     const emotionalNow = recs.filter((r) => r.domain === EMO);
     const hasCbt = emotionalNow.some((r) => r.treatment === CBT);
     const hasDynamic = emotionalNow.some((r) => r.treatment === DYNAMIC);
-    const offerDynamicToo = lean === "mixed" || (lean === "dynamic" && anxietyGotCbt);
-    if (offerDynamicToo && (hasCbt || !hasDynamic)) {
+    const severalSymptoms = symptomCount(emotionalNow) >= 2;
+    if (lean === "mixed" && severalSymptoms && (hasCbt || !hasDynamic)) {
       recs.push({
         id: uid("emotional-dynamic-mixed"),
         symptomText: hasCbt ? "בנוסף לגישה CBT, מומלץ גם טיפול דינאמי." : "בנוסף, מומלץ גם טיפול דינאמי.",
