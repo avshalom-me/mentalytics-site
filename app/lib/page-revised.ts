@@ -34,7 +34,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
   // one revision date. This is the entry that was wrong on 29/8; it lives here
   // rather than as a lone constant in sitemap.ts so the same check covers it.
   "@landing-families": {
-    date: "2026-09-29",
+    date: "2026-10-04",
     sources: [
       "app/therapists/city/[city]/page.tsx",
       "app/therapists/city/[city]/[topic]/page.tsx",
@@ -68,7 +68,7 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
     ],
   },
   "/": { date: "2026-09-25", sources: ["app/page.tsx", "app/components/CityLinks.tsx", "app/lib/regions.ts"] },
-  "/therapists": { date: "2026-09-25", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx", "app/components/CityLinks.tsx"] },
+  "/therapists": { date: "2026-10-04", sources: ["app/therapists/page.tsx", "app/therapists/TherapistsClient.tsx", "app/components/CityLinks.tsx"] },
   "/en": { date: "2026-09-27", sources: ["app/en/page.tsx", "app/en/EnglishDirectory.tsx", "app/lib/english-labels.ts", "app/lib/english-directory.ts"] },
   "/en/therapy-for-olim": { date: "2026-09-27", sources: ["app/en/therapy-for-olim/page.tsx", "app/en/therapy-for-olim/figures.tsx"] },
   "/research": { date: "2026-09-22", sources: ["app/research/page.tsx", "app/lib/article-taxonomy.ts"] },
