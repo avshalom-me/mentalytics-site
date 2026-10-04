@@ -16,7 +16,7 @@ import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/ther
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
-import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, telHref } from "@/app/lib/phone";
+import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, isSamePhoneLine, telHref } from "@/app/lib/phone";
 import { siteAuthorProfileFields } from "@/app/lib/author";
 import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
 
@@ -327,7 +327,20 @@ export default async function TherapistProfilePage({
   // מטפל/ת של מרכז בלי קו אישי: הקו של המרכז הוא דרך הקשר המהירה, והוא
   // מסומן ככזה בכפתורים. בלי הנפילה הזו הפרופיל נשאר בלי אף כפתור מהיר -
   // רק טופס הודעה - וזה מה שקרה למטפל מקודם ומשלם עד 21/8/2026.
-  const ownPhone = (t.phone ?? "").trim();
+  const typedPhone = (t.phone ?? "").trim();
+  // מטפל/ת שהמרכז מילא עבורם בפורטל את הקו של המרכז עצמו בשדה הטלפון (מכון
+  // הכרה, 26/8/2026) אין להם קו אישי: זה אותו קו, אותה מרכזייה. בלי הזיהוי הזה
+  // הקו נחשב "שלהם": וואטסאפ המרכז נעלם (077 אינו נייד, ולמטפל פרטי אין
+  // וואטסאפ מקו כזה), והחיוג מוצג כאילו מדובר במטפל/ת עצמם - בלי "למרכז" ובלי
+  // ההסבר שהקו מתאם את הפגישות. כך הם נראים כמו מטפל/ת של מרכז בלי טלפון.
+  // רק כשהקו אינו נייד: מי שנרשם עם נייד של המרכז (מרכז שדות) כבר מקבל
+  // וואטסאפ וחיוג עובדים, ואין סיבה לשנות להם את הנוסח.
+  const typedIsCenterLine =
+    !!affiliatedCenter &&
+    !waLinkFor(typedPhone) &&
+    (isSamePhoneLine(typedPhone, affiliatedCenter.phone) ||
+      isSamePhoneLine(typedPhone, affiliatedCenter.whatsapp));
+  const ownPhone = typedIsCenterLine ? "" : typedPhone;
   const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
   const centerWhatsapp = ownPhone ? null : affiliatedCenter?.whatsapp ?? null;
   const contactPhone = ownPhone || centerPhone;

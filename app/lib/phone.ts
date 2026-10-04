@@ -68,6 +68,19 @@ export function isMobileNumber(phone: string | null | undefined): boolean {
 }
 
 /**
+ * האם שני המספרים הם אותו קו, בלי קשר לאופן שבו נכתבו (077-805-2051,
+ * +972 77 805 2051, 0778052051). שניהם חייבים להיות מספרים תקינים: ריק,
+ * אימייל או הערה לעולם אינם "אותו קו" כמו מספר אחר.
+ */
+export function isSamePhoneLine(
+  a: string | null | undefined,
+  b: string | null | undefined,
+): boolean {
+  const x = phoneNationalDigits(a);
+  return !!x && x === phoneNationalDigits(b);
+}
+
+/**
  * ספרות מספר זר בצורה בינלאומית (קידומת מדינה בלי "+"), או null.
  *
  * מטפל/ת שגר/ה בחו"ל ועובד/ת אונליין רושם/ת מספר מקומי שם - למשל מספר עם

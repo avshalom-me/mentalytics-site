@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   centerWhatsAppNumber,
+  isSamePhoneLine,
   validateCenterWhatsApp,
   waLinkForCenter,
   waLinkFor,
@@ -38,6 +39,28 @@ describe("a centre's business WhatsApp", () => {
 
   it("keeps falling back to a mobile dialling number", () => {
     expect(centerWhatsAppNumber(null, "0551234567")).toBe("0551234567");
+  });
+});
+
+// A centre's portal asks for each therapist's phone, and a centre with a
+// switchboard types its own line there. That is not a line of the therapist's.
+describe("is the same line", () => {
+  it("recognises one number written three ways", () => {
+    expect(isSamePhoneLine("077-805-2051", "0778052051")).toBe(true);
+    expect(isSamePhoneLine("+972 77 805 2051", "077-8052051")).toBe(true);
+    expect(isSamePhoneLine("972778052051", "(077) 8052051")).toBe(true);
+  });
+
+  it("tells two different lines apart", () => {
+    expect(isSamePhoneLine("077-8052051", "077-8052052")).toBe(false);
+    expect(isSamePhoneLine("052-1234567", "072-1234567")).toBe(false);
+  });
+
+  it("never calls empty, a note or an email the same line", () => {
+    expect(isSamePhoneLine("", "")).toBe(false);
+    expect(isSamePhoneLine(null, null)).toBe(false);
+    expect(isSamePhoneLine("077-8052051", null)).toBe(false);
+    expect(isSamePhoneLine("office@example.com", "office@example.com")).toBe(false);
   });
 });
 
