@@ -135,8 +135,11 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
 
           {/* Expert deep-dive (theory, techniques, structure) - technique lists
               collapsed so the page stays calm; fully server-rendered for SEO. */}
+          {/* The id is the target of "פירוט על כל אחת מהגישות" in the couples
+              guide above; scroll-mt keeps the first line clear of the sticky
+              header. */}
           {deepDive && (
-            <div className="mt-6">
+            <div id="deep-dive" className="mt-6 scroll-mt-24">
               {deepDive.sections.map((sec, si) =>
                 sec.collapsible ? (
                   <details key={si} className="mt-3 rounded-xl px-4 py-3" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>

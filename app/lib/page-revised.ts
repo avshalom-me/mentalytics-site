@@ -51,6 +51,9 @@ export const PAGE_REVISED: Record<string, PageRevision> = {
       "app/therapists/online/page.tsx",
       "app/therapists/para-medical/page.tsx",
       "app/therapists/CitySeoSection.tsx",
+      // The guide below the listing on the couples specialty page - most of
+      // that page's prose.
+      "app/therapists/CouplesDepthSection.tsx",
       "app/therapists/TopicFaq.tsx",
       "app/components/TherapistResultCard.tsx",
       "app/lib/meta-description.ts",
