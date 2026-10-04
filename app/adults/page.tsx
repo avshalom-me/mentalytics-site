@@ -3294,7 +3294,7 @@ export default function AdultsPage() {
                       className={MATCH_CARD_BTN.centerMessage}
                     />
                   )}
-                  {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                  {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} centerLine={t.center_line} />}
                   <button
                     onClick={() => fetchExplanation(t)}
                     disabled={explainLoading[t.id]}

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { centerWhatsAppNumber } from "@/app/lib/phone";
+import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 import { publicTherapistTitle } from "@/app/lib/gender-text";
 import { CITY_TO_REGION, REGION_NEIGHBORS } from "@/app/lib/regions";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
@@ -923,6 +923,33 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // מטפל/ת של מרכז בלי קו אישי שמתאים לוואטסאפ (טלפון ריק, או הקו של המרכז
+    // עצמו שאינו נייד): הכרטיס מציע את הוואטסאפ של המרכז, מסומן "למרכז", כמו
+    // בפרופיל ובמאגר. אותם תנאי סינון כמו ב-loadCenterCards: רק מרכז פעיל
+    // עם עמוד ציבורי, ורק משדות הקשר הציבוריים שלו.
+    const memberCenterIds = [...new Set(
+      top
+        .filter((x) => x.therapist.entity_type !== "center" && x.therapist.center_account_id)
+        .map((x) => x.therapist.center_account_id as string),
+    )];
+    const centerLineById = new Map<string, { phone: string | null; whatsapp: string | null }>();
+    if (memberCenterIds.length > 0) {
+      const { data: memberCenters } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .select("id, public_whatsapp, public_phone")
+        .in("id", memberCenterIds)
+        .eq("status", "active")
+        .not("slug", "is", null)
+        .or("public_page_enabled.eq.true,billing_track.eq.center_entity");
+      for (const r of memberCenters ?? []) {
+        const phone = typeof r.public_phone === "string" && r.public_phone.trim() ? r.public_phone.trim() : null;
+        centerLineById.set(r.id as string, {
+          phone,
+          whatsapp: centerWhatsAppNumber(r.public_whatsapp as string | null, r.public_phone as string | null),
+        });
+      }
+    }
+
     const ranked = await Promise.all(
       top.map(async ({ therapist, result }) => {
         const photoUrl = await buildSignedPhotoUrl(therapist.profile_photo_path);
@@ -964,6 +991,9 @@ export async function POST(req: NextRequest) {
             : null,
           center_whatsapp: therapist.entity_type === "center" && therapist.center_account_id
             ? (centerWaById.get(therapist.center_account_id) ?? null)
+            : null,
+          center_line: therapist.entity_type !== "center" && therapist.center_account_id
+            ? centerLineFor(therapist.phone, centerLineById.get(therapist.center_account_id) ?? null)
             : null,
           // FREE_REGION_FALLBACK (זמני): מטפל חינמי שנכנס כגיבוי אזורי
           free_fallback: freeFallbackIds.has(therapist.id),

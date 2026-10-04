@@ -4,7 +4,7 @@ import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
 import { CITY_TO_REGION, ALL_REGIONS, CITY_SEO_LIST, neighborsOf, CITY_POOL_EXCLUDED } from "@/app/lib/regions";
 import { isParaMedical, isMainListed } from "@/app/lib/therapist-options";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
-import { centerWhatsAppNumber } from "@/app/lib/phone";
+import { centerLineFor, centerWhatsAppNumber } from "@/app/lib/phone";
 
 const NEW_THERAPIST_BOOST_DAYS = 7;
 
@@ -57,7 +57,14 @@ type TherapistRow = {
 };
 
 /** slug, שם, לוגו ווואטסאפ עסקי של מרכז - לכרטיס המרכז במאגר ולשיוך על כרטיס מטפל. */
-type CenterCard = { slug: string | null; name: string | null; logoUrl: string | null; whatsapp: string | null };
+type CenterCard = {
+  slug: string | null;
+  name: string | null;
+  logoUrl: string | null;
+  whatsapp: string | null;
+  /** הטלפון הציבורי לחיוג בלבד - לא הטלפון התפעולי של החשבון. */
+  phone: string | null;
+};
 
 export function rowInRegion(regions: string[] | null, region: string): boolean {
   return (regions ?? []).some((c) => CITY_TO_REGION[c] === region || c === region);
@@ -93,6 +100,10 @@ function toPublicTherapist(t: TherapistRow, centerCards?: Map<string, CenterCard
     // לא יכול היה לשמור את התמונה במטמון.
     profile_photo_url = therapistPhotoUrl(t.id, t.profile_photo_path);
   }
+  // מטפל/ת של מרכז בלי קו אישי שמתאים (טלפון ריק, או הקו של המרכז עצמו שאינו
+  // נייד): הכרטיס מציג את הקו הציבורי של המרכז, מסומן "למרכז", כמו בפרופיל.
+  // רק מהשדות הציבוריים של המרכז - אף פעם לא הטלפון התפעולי של החשבון.
+  const centerLine = !isEntity && card ? centerLineFor(t.phone, { phone: card.phone, whatsapp: card.whatsapp }) : null;
   return {
     id: t.id,
     full_name: (t.full_name ?? "").trim(),
@@ -121,6 +132,7 @@ function toPublicTherapist(t: TherapistRow, centerCards?: Map<string, CenterCard
     // מטפל ("מצוות X"). בשני המקרים הוא נשלף רק כשלמרכז יש עמוד ציבורי חי.
     center_slug: card?.slug ?? null,
     ...(!isEntity && card?.name ? { center_name: card.name } : {}),
+    ...(centerLine ? { center_line: centerLine } : {}),
     // כרטיס מרכז (ישות או מסונתז): הוואטסאפ העסקי (15/9/26) ומזהה החשבון
     // לרישום הלחיצה. שניהם מגיעים מ-CenterCard; השורה המסונתזת נושאת עותק
     // משלה למקרה שהמרכז לא נטען לכרטיסים (אותם תנאי סינון, אז בפועל זהה).
@@ -172,6 +184,7 @@ async function loadCenterCards(rows: TherapistRow[]): Promise<Map<string, Center
       name: (c.name as string) ?? null,
       logoUrl: c.logo_path ? signedByPath.get(c.logo_path as string) ?? null : null,
       whatsapp: centerWhatsAppNumber(c.public_whatsapp as string | null, c.public_phone as string | null),
+      phone: typeof c.public_phone === "string" && c.public_phone.trim() ? c.public_phone.trim() : null,
     });
   }
   return map;

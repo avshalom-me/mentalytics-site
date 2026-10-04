@@ -16,7 +16,7 @@ import { therapistPath, therapistSlug, extractTherapistId } from "@/app/lib/ther
 import ContactButtons from "./ContactButtons";
 import TrackView from "./TrackView";
 import ProfileBackLink from "./ProfileBackLink";
-import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, isSamePhoneLine, telHref } from "@/app/lib/phone";
+import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, centerLineFor, telHref } from "@/app/lib/phone";
 import { siteAuthorProfileFields } from "@/app/lib/author";
 import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
 
@@ -328,21 +328,13 @@ export default async function TherapistProfilePage({
   // מסומן ככזה בכפתורים. בלי הנפילה הזו הפרופיל נשאר בלי אף כפתור מהיר -
   // רק טופס הודעה - וזה מה שקרה למטפל מקודם ומשלם עד 21/8/2026.
   const typedPhone = (t.phone ?? "").trim();
-  // מטפל/ת שהמרכז מילא עבורם בפורטל את הקו של המרכז עצמו בשדה הטלפון (מכון
-  // הכרה, 26/8/2026) אין להם קו אישי: זה אותו קו, אותה מרכזייה. בלי הזיהוי הזה
-  // הקו נחשב "שלהם": וואטסאפ המרכז נעלם (077 אינו נייד, ולמטפל פרטי אין
-  // וואטסאפ מקו כזה), והחיוג מוצג כאילו מדובר במטפל/ת עצמם - בלי "למרכז" ובלי
-  // ההסבר שהקו מתאם את הפגישות. כך הם נראים כמו מטפל/ת של מרכז בלי טלפון.
-  // רק כשהקו אינו נייד: מי שנרשם עם נייד של המרכז (מרכז שדות) כבר מקבל
-  // וואטסאפ וחיוג עובדים, ואין סיבה לשנות להם את הנוסח.
-  const typedIsCenterLine =
-    !!affiliatedCenter &&
-    !waLinkFor(typedPhone) &&
-    (isSamePhoneLine(typedPhone, affiliatedCenter.phone) ||
-      isSamePhoneLine(typedPhone, affiliatedCenter.whatsapp));
-  const ownPhone = typedIsCenterLine ? "" : typedPhone;
-  const centerPhone = ownPhone ? null : affiliatedCenter?.phone ?? null;
-  const centerWhatsapp = ownPhone ? null : affiliatedCenter?.whatsapp ?? null;
+  // מי אין לו קו אישי שמתאים (טלפון ריק, או הקו של המרכז עצמו שאינו נייד -
+  // מכון הכרה, 26/8/2026) מקבל את הקו של המרכז, מסומן "למרכז". הכלל ב-centerLineFor,
+  // והוא אותו כלל בכרטיסי המאגר ובכרטיסי ההתאמות.
+  const centerLine = affiliatedCenter ? centerLineFor(typedPhone, affiliatedCenter) : null;
+  const ownPhone = centerLine ? "" : typedPhone;
+  const centerPhone = centerLine?.phone ?? null;
+  const centerWhatsapp = centerLine?.whatsapp ?? null;
   const contactPhone = ownPhone || centerPhone;
   const waLink = ownPhone ? waLinkFor(ownPhone) : waLinkForCenter(centerWhatsapp);
   const telLink = telHref(contactPhone);

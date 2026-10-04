@@ -3,7 +3,7 @@
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { gaEvent } from "@/app/lib/gtag";
-import { waLinkFor, waLinkForCenter } from "@/app/lib/phone";
+import { waLinkFor, waLinkForCenter, type CenterLine } from "@/app/lib/phone";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import { tfaEvent } from "@/app/lib/taboola";
 
@@ -41,13 +41,23 @@ export default function MatchCardWhatsApp({
   therapistId,
   phone,
   centerMode = false,
+  centerLine = null,
 }: {
   therapistId: string;
   phone: string | null | undefined;
   /** כרטיס מרכז: הודעת הפתיחה ברבים. therapistId הוא שורת הישות, והלחיצה נרשמת עליה. */
   centerMode?: boolean;
+  /**
+   * מטפל/ת של מרכז שאין להם קו אישי לוואטסאפ (טלפון ריק, או הקו של המרכז עצמו
+   * שאינו נייד): הוואטסאפ של המרכז, מסומן "למרכז". הלחיצה נרשמת על המטפל/ת,
+   * כמו בפרופיל. ראו centerLineFor.
+   */
+  centerLine?: CenterLine | null;
 }) {
-  const href = centerMode ? waLinkForCenter(phone) : waLinkFor(phone);
+  const viaCenter = !centerMode && centerLine != null;
+  const href = centerMode || viaCenter
+    ? waLinkForCenter(viaCenter ? centerLine.whatsapp : phone)
+    : waLinkFor(phone);
   if (!href) return null;
 
   function onClick(e: React.MouseEvent) {
@@ -85,7 +95,7 @@ export default function MatchCardWhatsApp({
       // אותו ירוק (#128C42) משמש את כל כפתורי הוואטסאפ באתר.
       style={{ background: "#128C42", color: "#fff" }}
     >
-      {waIcon} וואטסאפ
+      {waIcon} {viaCenter ? "וואטסאפ למרכז" : "וואטסאפ"}
     </a>
   );
 }

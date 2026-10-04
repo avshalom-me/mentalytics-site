@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  centerLineFor,
   centerWhatsAppNumber,
   isSamePhoneLine,
   validateCenterWhatsApp,
@@ -61,6 +62,42 @@ describe("is the same line", () => {
     expect(isSamePhoneLine(null, null)).toBe(false);
     expect(isSamePhoneLine("077-8052051", null)).toBe(false);
     expect(isSamePhoneLine("office@example.com", "office@example.com")).toBe(false);
+  });
+});
+
+describe("the line a center member is reached on", () => {
+  const center = { phone: "077-8052051", whatsapp: "077-8052051" };
+
+  it("is the center's line when the therapist has no phone of their own", () => {
+    expect(centerLineFor("", center)).toEqual(center);
+    expect(centerLineFor(null, center)).toEqual(center);
+    expect(centerLineFor("   ", center)).toEqual(center);
+  });
+
+  it("is the center's line when their phone field holds the center's own non-mobile line", () => {
+    expect(centerLineFor("077-8052051", center)).toEqual(center);
+    expect(centerLineFor("0778052051", { phone: null, whatsapp: "077-805-2051" })).toEqual({
+      phone: null,
+      whatsapp: "077-805-2051",
+    });
+  });
+
+  it("stays the therapist's own when it is a mobile, even the center's mobile", () => {
+    expect(centerLineFor("054-1234567", center)).toBeNull();
+    // A centre whose public line is a mobile and whose members used it: it already worked.
+    expect(centerLineFor("055-4337580", { phone: "055-4337580", whatsapp: "055-4337580" })).toBeNull();
+    expect(centerLineFor("+39 333 123 4567", center)).toBeNull();
+  });
+
+  it("stays the therapist's own when it is some other landline or not a number", () => {
+    expect(centerLineFor("03-1234567", center)).toBeNull();
+    expect(centerLineFor("office@example.com", center)).toBeNull();
+  });
+
+  it("is nothing when the center has no public line to offer", () => {
+    expect(centerLineFor("", null)).toBeNull();
+    expect(centerLineFor("", { phone: "", whatsapp: null })).toBeNull();
+    expect(centerLineFor("077-8052051", { phone: null, whatsapp: null })).toBeNull();
   });
 });
 

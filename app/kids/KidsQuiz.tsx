@@ -14,6 +14,7 @@ import QuizFeedbackBox from "@/app/components/QuizFeedbackBox";
 import SaveMatchesButton from "@/app/components/SaveMatchesButton";
 import MatchResultCard, { MATCH_CARD_BTN, MatchCardProfileLink } from "@/app/components/MatchResultCard";
 import MatchCardWhatsApp from "@/app/components/MatchCardWhatsApp";
+import type { CenterLine } from "@/app/lib/phone";
 import {
   parseKidsBoxes,
   aggregateForMatch,
@@ -2182,6 +2183,8 @@ type KidsMatchResult = {
   profile_photo_url: string | null;
   entity_type: string | null; // 'center' = מרכז טיפולי כישות (מסלול 2)
   center_whatsapp?: string | null; // הוואטסאפ העסקי של המרכז, כשיש (15/9/26)
+  /** מטפל/ת של מרכז בלי קו אישי לוואטסאפ: הקו הציבורי של המרכז (ראו centerLineFor). */
+  center_line?: CenterLine | null;
   profile_slug: string | null; // עמוד הפרופיל הציבורי של המרכז (מסלול 2)
   match_score: number;
   personality_score: number | null;
@@ -2669,7 +2672,7 @@ function KidsMatchSection({ A, score, selection }: {
                               className={MATCH_CARD_BTN.centerMessage}
                             />
                           )}
-                          {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+                          {t.entity_type !== "center" && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} centerLine={t.center_line} />}
                           <button
                             onClick={() => fetchExplanation(t)}
                             disabled={explainLoading[t.id]}

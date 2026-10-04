@@ -174,6 +174,40 @@ export function waLinkForCenter(phone: string | null | undefined): string | null
   return `https://wa.me/972${digits}?text=${encodeURIComponent(CENTER_WHATSAPP_MESSAGE)}`;
 }
 
+/** הקו הציבורי של מרכז: טלפון לחיוג ווואטסאפ (כל אחד מהם יכול להיות ריק). */
+export type CenterLine = { phone: string | null; whatsapp: string | null };
+
+/**
+ * הקו שבו מטפל/ת של מרכז מקבלים פניות כשאין להם קו אישי שמתאים - מקור אמת
+ * יחיד לפרופיל, לכרטיסי המאגר ולכרטיסי ההתאמות, כדי שלא יתפצלו.
+ *
+ * אין להם קו אישי כש:
+ *  - שדה הטלפון ריק, או
+ *  - הוא קו שאינו נייד וזהה לקו של המרכז עצמו. מרכז שמילא בפורטל את המרכזייה
+ *    שלו בשדה הטלפון של מטפליו (מכון הכרה, 26/8/2026) לא נתן להם קו משלהם, וקו
+ *    077 גם לא יכול להיות וואטסאפ אישי (ראו waLinkFor).
+ *
+ * נייד, או מספר זר, נשאר של המטפל/ת - גם אם הוא זהה לנייד של המרכז (מרכז שדות):
+ * הוא כבר עובד, ואין סיבה לשנות לו את הנוסח. קו נייח אחר שלהם נשאר גם הוא
+ * שלהם. מחזיר null גם כשלמרכז אין שום קו ציבורי.
+ */
+export function centerLineFor(
+  ownPhone: string | null | undefined,
+  center: { phone?: string | null; whatsapp?: string | null } | null | undefined,
+): CenterLine | null {
+  if (!center) return null;
+  const phone = (center.phone ?? "").trim() || null;
+  const whatsapp = (center.whatsapp ?? "").trim() || null;
+  if (!phone && !whatsapp) return null;
+
+  const own = (ownPhone ?? "").trim();
+  if (own) {
+    if (waLinkFor(own)) return null;
+    if (!isSamePhoneLine(own, phone) && !isSamePhoneLine(own, whatsapp)) return null;
+  }
+  return { phone, whatsapp };
+}
+
 /**
  * אימות לשמירת וואטסאפ עסקי, משותף לפורטל ולאדמין. ריק = מחיקה (null).
  * כל מספר ישראלי מתקבל - נייד, נייח או וירטואלי (וואטסאפ עסקי עובד גם על

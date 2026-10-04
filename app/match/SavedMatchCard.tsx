@@ -109,7 +109,7 @@ export default function SavedMatchCard({
               className={MATCH_CARD_BTN.centerMessage}
             />
           )}
-          {accepting && !isCenter && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} />}
+          {accepting && !isCenter && <MatchCardWhatsApp therapistId={t.id} phone={t.phone} centerLine={t.center_line} />}
           {profileHref && (
             <MatchCardProfileLink
               href={profileHref}
