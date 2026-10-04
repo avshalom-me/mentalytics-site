@@ -12,6 +12,7 @@ import { adultResultKeys } from "@/app/lib/quiz-result-facts";
 import { getFingerprint } from "@/app/lib/fingerprint";
 import { QUESTIONNAIRE_ITEMS_VERSION } from "@/app/lib/questionnaire-items-version";
 import { trackQuizStep, trackQuizComplete, trackQuizResult, trackTherapistExplain, trackMatchingClick, trackMatchSearch, trackMatchResults } from "@/app/lib/useTrack";
+import { leadingGroups, EMOTIONAL_DOMAIN, RELATIONSHIP_DOMAIN } from "@/app/lib/results-leads";
 import { professionalFitLabel, outOfAreaReason } from "@/app/lib/match-card-label";
 import { getAttribution } from "@/app/lib/attribution";
 import { isPaidVisitor } from "@/app/lib/paid-visitor";
@@ -2653,8 +2654,6 @@ export default function AdultsPage() {
     // Group the result cards into rubric sections so each domain is visually
     // separate. The combined-search buttons live inside their respective domain
     // section only and never mix domains.
-    const EMOTIONAL_DOMAIN = "מורכבויות בתחום הרגשי/האישי";
-    const RELATIONSHIP_DOMAIN = "זוגיות ומשפחה";
     const DOMAIN_SECTIONS: { key: string; label: string }[] = [
       { key: EMOTIONAL_DOMAIN, label: "🧠 התחום הרגשי" },
       { key: "זוגיות ומשפחה", label: "💑 זוגיות ומשפחה" },
@@ -2820,29 +2819,51 @@ export default function AdultsPage() {
             <img src="/logo-temp.png" alt="טיפול חכם" style={{ height: "46px", width: "auto" }} />
           </div>
 
-          {/* One primary button above the report. Measured 3/9/26 over 30 days:
+          {/* The search button above the report. Measured 3/9/26 over 30 days:
               of 122 finishers who never searched, 107 never pressed any
               per-finding button and left the results screen within ~30s
               (median). The per-finding buttons stay exactly as they were -
               this only puts the leading finding's search one tap away, before
               the report, PDF and article links offer an exit. Target: the
-              urgent finding if there is one, otherwise the first primary. */}
+              urgent finding if there is one, otherwise the first primary - and
+              beside it the relationship finding, when the report has both an
+              emotional and a relationship section (app/lib/results-leads.ts). */}
           {!err && recs.length > 0 && (() => {
-            const topGroup = groups.find((g) => g.urgent) ?? sections[0]?.groups[0];
-            if (!topGroup) return null;
-            const topRec = topGroup.recs[0];
+            const leads = leadingGroups(groups, sections);
+            if (leads.length === 0) return null;
+            const searchButton = (group: RecGroup) => (
+              <button
+                type="button"
+                onClick={() => { setSelectedRec(group.recs[0]); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", group.treatment, "top"); }}
+                className="cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal-dark)] px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal)] sm:w-auto"
+              >
+                🔍 מצא/י לי מטפל - {group.treatmentLabel} ←
+              </button>
+            );
             return (
               <div className="mb-4 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-center">
-                <p className="mb-2.5 text-sm text-[#2a3a4a]">
-                  הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{topGroup.treatmentLabel}</span>
-                </p>
-                <button
-                  type="button"
-                  onClick={() => { setSelectedRec(topRec); setCombinedTreatments(null); setScreen("match-form"); trackMatchingClick("adults", topGroup.treatment, "top"); }}
-                  className="cta-pulse inline-flex w-full items-center justify-center gap-2 rounded-full bg-[var(--teal-dark)] px-6 py-3.5 text-base font-bold text-white shadow-sm transition-colors hover:bg-[var(--teal)] sm:w-auto"
-                >
-                  🔍 מצא/י לי מטפל - {topGroup.treatmentLabel} ←
-                </button>
+                {leads.length === 1 ? (
+                  <>
+                    <p className="mb-2.5 text-sm text-[#2a3a4a]">
+                      הממצא המרכזי: <span className="font-semibold text-[#1a2a3a]">{leads[0].treatmentLabel}</span>
+                    </p>
+                    {searchButton(leads[0])}
+                  </>
+                ) : (
+                  <>
+                    <p className="mb-3 text-sm text-[#2a3a4a]">הממצאים המרכזיים, לפי התחומים שסימנת:</p>
+                    <div className="flex flex-col gap-3.5">
+                      {leads.map((group) => (
+                        <div key={group.treatment}>
+                          <p className="mb-1.5 text-xs font-semibold text-[var(--teal-dark)]">
+                            {sections.find((s) => s.groups.includes(group))?.label}
+                          </p>
+                          {searchButton(group)}
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
                 <p className="mt-2 text-xs text-gray-500">הדוח המלא, הכלים והאפשרויות הנוספות - למטה</p>
               </div>
             );
