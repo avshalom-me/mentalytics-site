@@ -10,6 +10,7 @@ import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
+import { CENTER_FOCUS_MAX } from "@/app/lib/center-title";
 import { loadCenterHealth } from "@/app/lib/center-health";
 import { buildCallSheetLink } from "@/app/lib/call-sheet-token";
 import { missingProfileFields } from "@/app/lib/profile-completeness";
@@ -377,6 +378,7 @@ export async function POST(req: NextRequest) {
       if (body.public_description !== undefined) update.public_description = str(body.public_description, 5000) || null;
       if (body.public_managers !== undefined) update.public_managers = str(body.public_managers, 500) || null;
       if (body.public_city !== undefined) update.public_city = str(body.public_city, 80) || null;
+      if (body.public_focus !== undefined) update.public_focus = str(body.public_focus, CENTER_FOCUS_MAX) || null;
       if (body.public_website !== undefined) update.public_website = str(body.public_website, 300) || null;
       if (body.public_phone !== undefined) update.public_phone = str(body.public_phone, 40) || null;
       if (body.public_whatsapp !== undefined) {
@@ -388,7 +390,7 @@ export async function POST(req: NextRequest) {
       // ודא slug כשמדליקים את העמוד או עורכים תוכן ציבורי (מרכזים ותיקים בלי slug).
       const touchesPublic =
         body.public_page_enabled !== undefined || body.public_description !== undefined ||
-        body.public_managers !== undefined || body.public_city !== undefined ||
+        body.public_managers !== undefined || body.public_city !== undefined || body.public_focus !== undefined ||
         body.public_website !== undefined || body.public_phone !== undefined || body.public_whatsapp !== undefined;
       if (touchesPublic && !center.slug) {
         update.slug = await ensureUniqueCenterSlug((update.name as string) ?? center.name, id);

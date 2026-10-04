@@ -18,6 +18,8 @@ export type PublicCenter = {
   public_description: string | null;
   public_managers: string | null;
   public_city: string | null;
+  /** תחום העיסוק של המרכז בכמה מילים; מחליף את "מרכז טיפולי" בכותרת. ראו center-title.ts. */
+  public_focus: string | null;
   public_website: string | null;
   public_phone: string | null;
   /** וואטסאפ עסקי לפניות מטופלים (נייד, נייח או וירטואלי). ראו centerWhatsAppNumber ב-phone.ts. */
@@ -44,7 +46,7 @@ export type PublicCenter = {
 // email/payer_email נשלפים רק כדי לגזור מהם has_contact_email - הם מוסרים
 // מהאובייקט המוחזר ולא מגיעים לעמוד.
 const PUBLIC_COLS =
-  "id, name, slug, billing_track, public_description, public_managers, public_city, public_website, public_phone, public_whatsapp, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery, email, payer_email";
+  "id, name, slug, billing_track, public_description, public_managers, public_city, public_focus, public_website, public_phone, public_whatsapp, public_founded_year, public_team_size, public_address, public_hours, public_accessibility, public_director, public_faq, num_locations, logo_path, team_members, gallery, email, payer_email";
 
 // slug ייחודי מתוך שם המרכז. אם ה-slug הבסיסי תפוס ע"י מרכז אחר - מוסיפים
 // סיומת מספרית. excludeId מאפשר לשמור על ה-slug של המרכז עצמו בעדכון.

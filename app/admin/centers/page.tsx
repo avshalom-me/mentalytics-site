@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
+import { centerPageTitle, CENTER_FOCUS_MAX } from "@/app/lib/center-title";
 
 // מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -68,6 +69,8 @@ type Center = {
   public_description: string | null;
   public_managers: string | null;
   public_city: string | null;
+  /** תחום המרכז - מחליף את "מרכז טיפולי" בכותרת העמוד הציבורי (center-title.ts). */
+  public_focus: string | null;
   public_website: string | null;
   public_phone: string | null;
   public_whatsapp: string | null;
@@ -263,6 +266,7 @@ export default function AdminCentersPage() {
   const [fPubDesc, setFPubDesc] = useState("");
   const [fPubManagers, setFPubManagers] = useState("");
   const [fPubCity, setFPubCity] = useState("");
+  const [fPubFocus, setFPubFocus] = useState("");
   const [fPubWebsite, setFPubWebsite] = useState("");
   const [fPubPhone, setFPubPhone] = useState("");
   const [fPubWhatsapp, setFPubWhatsapp] = useState("");
@@ -370,7 +374,7 @@ export default function AdminCentersPage() {
     setFGift("0");
     setFPricePerTherapist(""); setFTherapistCount("");
     setFBillingTrack("per_therapist"); setFFixedPrice(""); setFDiscount(""); setFLocations("1");
-    setFPubEnabled(false); setFPubDesc(""); setFPubManagers(""); setFPubCity(""); setFPubWebsite(""); setFPubPhone("");
+    setFPubEnabled(false); setFPubDesc(""); setFPubManagers(""); setFPubCity(""); setFPubFocus(""); setFPubWebsite(""); setFPubPhone("");
   }
 
   function openEdit(c: Center) {
@@ -391,6 +395,7 @@ export default function AdminCentersPage() {
     setFPubDesc(c.public_description ?? "");
     setFPubManagers(c.public_managers ?? "");
     setFPubCity(c.public_city ?? "");
+    setFPubFocus(c.public_focus ?? "");
     setFPubWebsite(c.public_website ?? "");
     setFPubPhone(c.public_phone ?? "");
     setFPubWhatsapp(c.public_whatsapp ?? "");
@@ -417,6 +422,7 @@ export default function AdminCentersPage() {
       payload.public_description = fPubDesc;
       payload.public_managers = fPubManagers;
       payload.public_city = fPubCity;
+      payload.public_focus = fPubFocus;
       payload.public_website = fPubWebsite;
       payload.public_phone = fPubPhone;
       payload.public_whatsapp = fPubWhatsapp;
@@ -1260,6 +1266,13 @@ export default function AdminCentersPage() {
                 <Field label="שמות המנהלים / הצוות">
                   <input value={fPubManagers} onChange={(e) => setFPubManagers(e.target.value)}
                     placeholder="ד״ר כהן, גב׳ לוי…" className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                </Field>
+                <Field label={'תחום המרכז - מופיע בכותרת העמוד בגוגל במקום "מרכז טיפולי"'}>
+                  <input value={fPubFocus} onChange={(e) => setFPubFocus(e.target.value)} maxLength={CENTER_FOCUS_MAX}
+                    placeholder="למשל: טיפול זוגי ומיני" className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm" />
+                  <p className="mt-1 text-[11px] text-stone-500">
+                    הכותרת בגוגל: <span className="font-bold text-stone-700">{centerPageTitle(fName.trim() || "שם המרכז", fPubFocus, fPubCity)} | טיפול חכם</span>
+                  </p>
                 </Field>
                 <div className="grid grid-cols-2 gap-3">
                   <Field label="עיר / כתובת">

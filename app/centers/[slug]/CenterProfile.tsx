@@ -2,6 +2,7 @@ import Link from "next/link";
 import { MapPin, Globe, Phone, BadgeCheck, Clock, Accessibility, Languages, Handshake, Navigation, ArrowLeft } from "lucide-react";
 import { treatmentExplainer } from "@/app/lib/treatment-explainers";
 import type { PublicCenter } from "@/app/lib/center-public";
+import { centerKind } from "@/app/lib/center-title";
 import { telHref as telHrefFor, centerWhatsAppNumber, waLinkForCenter } from "@/app/lib/phone";
 import { therapistPath } from "@/app/lib/therapist-url";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
@@ -256,9 +257,11 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                 </div>
               )}
             </div>
-            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--teal-pale)] py-1.5 text-[13px] font-extrabold uppercase tracking-[.16em] text-[var(--teal)]" style={{ paddingInline: "18px" }}>
+            {/* text-balance: בטלפון השורה נשברת לשתיים כשתחום המרכז והעיר ארוכים
+                יחד, ובלי איזון נשארת מילה יתומה בשורה השנייה. */}
+            <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--teal-pale)] py-1.5 text-[13px] font-extrabold uppercase tracking-[.16em] text-[var(--teal)] text-balance" style={{ paddingInline: "18px" }}>
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-              מרכז טיפולי{center.public_city ? ` · ${center.public_city}` : ""}
+              {centerKind(center.public_focus)}{center.public_city ? ` · ${center.public_city}` : ""}
             </p>
             <h1 className="text-[clamp(2.4rem,4.5vw,3.6rem)] font-black leading-[1.07] tracking-tight text-[var(--text)]">{center.name}</h1>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[16px] text-[var(--text-2)]">

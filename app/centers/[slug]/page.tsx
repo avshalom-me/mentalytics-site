@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { getPublicCenterBySlug, signCenterAssets } from "@/app/lib/center-public";
 import { loadPublicTherapists } from "@/app/lib/therapist-directory";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { centerPageTitle } from "@/app/lib/center-title";
 import CenterProfile from "./CenterProfile";
 
 // עמוד מרכז ציבורי (SEO). שני המסלולים מרונדרים ב-CenterProfile (עיצוב
@@ -42,12 +43,12 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const center = await getPublicCenterBySlug(slug);
   if (!center) return { title: "מרכז לא נמצא", robots: { index: false, follow: false } };
 
-  const cityPart = center.public_city ? ` ב${center.public_city}` : "";
   // בלי "| טיפול חכם" - תבנית ה-layout כבר מוסיפה את המותג (אחרת הוא מוכפל).
-  const title = `${center.name} - מרכז טיפולי${cityPart}`;
+  // תחום המרכז (public_focus), כשיש, מחליף את "מרכז טיפולי" - ראו center-title.ts.
+  const title = centerPageTitle(center.name, center.public_focus, center.public_city);
   const description =
     (center.public_description?.trim()?.slice(0, 155)) ||
-    `${center.name} - מרכז טיפולי${cityPart}. הכירו את המרכז והצוות, וקבעו התאמה אישית דרך טיפול חכם.`;
+    `${title}. הכירו את המרכז והצוות, וקבעו התאמה אישית דרך טיפול חכם.`;
   const url = `${BASE}/centers/${center.slug}`;
   return {
     title,
