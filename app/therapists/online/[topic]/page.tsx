@@ -134,7 +134,10 @@ export default async function OnlineTopicPage({ params }: { params: Promise<{ to
         <p className="mt-3 text-stone-600 leading-8" style={{ maxWidth: "60ch" }}>
           {copy.intro}
         </p>
-        <p data-nosnippet className="mt-2 text-sm text-stone-500">{topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.</p>
+        {/* On a div: Google ignores data-nosnippet on a <p>. */}
+        <div data-nosnippet>
+          <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}, שמטפלים גם בשיחת וידאו - מכל מקום בארץ או בחו&quot;ל.</p>
+        </div>
       </div>
 
       {/* Quiz CTA */}

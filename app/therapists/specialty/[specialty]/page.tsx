@@ -192,8 +192,10 @@ export default async function SpecialtyPage({ params }: { params: Promise<{ spec
             </ul>
           </div>
 
+          {/* Out of snippets, like the same block on the city pages (see
+              CitySeoSection): a heading and names, with no questionnaire line. */}
           {communityArticles.length > 0 && (
-            <div className="mt-6">
+            <div className="mt-6" data-nosnippet>
               <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>מאמרים ממטפלים בנושא</h3>
               <ul className="space-y-2">
                 {communityArticles.map((a) => (

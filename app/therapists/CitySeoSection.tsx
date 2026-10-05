@@ -266,8 +266,12 @@ export default function CitySeoSection({
       </h2>
       {/* data-nosnippet: still indexed for ranking, but Google may not quote it.
           This paragraph kept winning the snippet over the intro line, which is
-          the one written to earn the click. */}
-      <p className="text-[15px] leading-8 text-stone-600 mb-6" data-nosnippet>{statsParagraph}</p>
+          the one written to earn the click. On a <div>, not on the <p>: Google
+          honours the attribute only on span, div and section, and while it sat
+          on the <p> this paragraph was quoted on five city and region pages. */}
+      <div data-nosnippet>
+        <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
+      </div>
 
       {/* One link, three phrasings, picked by the same place hash as the
           headings. Every landing page claims the questionnaire was built by
@@ -302,8 +306,12 @@ export default function CitySeoSection({
         )}
       </p>
 
+      {/* Out of snippets for the same reason as the paragraph above. With the
+          listing hidden, this block is the next passage on the page that answers
+          "מטפלים ב[עיר]" - a heading, then names - and it carries no
+          questionnaire line. Still indexed, and its links still count. */}
       {articles.length > 0 && (
-        <div className="mb-8">
+        <div className="mb-8" data-nosnippet>
           <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>
             {kind === "online"
               ? "מאמרים ממטפלים שמטפלים אונליין"

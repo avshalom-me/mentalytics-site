@@ -67,9 +67,30 @@ export default function TherapistResultCard({
   const contactSource = fromMatch ? "match" : "directory";
   const cardClass = "group block rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5";
   const cardStyle = { border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)", textDecoration: "none" } as const;
+  // data-nosnippet: Google may index and rank this text, but may not quote it
+  // as the search snippet.
+  //
+  // Why: on the city pages Google was picking the card grid as the description,
+  // producing "פסיכולוגים ומטפלים בבאר שבע · [שם מטפל] · [שם מטפלת] · ..."
+  // - a list of names nobody searched for, and on the Haifa page a data dump of
+  // titles and towns. Both pages already carry an intro paragraph and a meta
+  // description written to earn the click; this stops the grid outbidding them.
+  //
+  // WHERE it sits is the whole point: Google honours the attribute only on
+  // <span>, <div> and <section>. From 22/8 to 5/10/2026 it sat on the <Link>
+  // that wraps Body, which Google ignores, so nothing was hidden. On 5/10 a
+  // search for a sentence that exists only inside a card quoted it from nine of
+  // our pages, and "מטפל בפרדס חנה" showed card names where the questionnaire
+  // line belongs - with the page last crawled on 29/9, so not a stale snapshot.
+  // It is now on the divs below. Do not move it back to the link, or onto a <p>.
+  //
+  // Ranking is untouched: nosnippet governs display only, the therapist names
+  // stay indexed, and the CollectionPage/Person JSON-LD on each listing page is
+  // unaffected. A therapist's own name query is answered by their profile page,
+  // not by a city page's copy of the name.
   const Body = (
     <>
-      <div style={{ height: "260px", overflow: "hidden", background: "var(--surface)", position: "relative" }}>
+      <div data-nosnippet style={{ height: "260px", overflow: "hidden", background: "var(--surface)", position: "relative" }}>
         {isCenter && !t.profile_photo_url ? (
           // אווטאר מגדרי על ישות עסקית הוא פשוט שגוי - סמל ניטרלי במקומו.
           <div className="flex h-full w-full items-center justify-center" style={{ background: "var(--teal-pale)" }}>
@@ -87,7 +108,7 @@ export default function TherapistResultCard({
           </span>
         )}
       </div>
-      <div style={{ padding: "16px 18px" }}>
+      <div data-nosnippet style={{ padding: "16px 18px" }}>
         {/* A listing card is an item, not a section of the page. This was an
             <h2>, which meant the online page told Google it had 118 sections,
             111 of them a person's name - the heading outline is supposed to be
@@ -117,19 +138,8 @@ export default function TherapistResultCard({
       </div>
     </>
   );
-  // data-nosnippet: Google may index and rank this text, but may not quote it
-  // as the search snippet.
-  //
-  // Why: on the city pages Google was picking the card grid as the description,
-  // producing "פסיכולוגים ומטפלים בבאר שבע · [שם מטפל] · [שם מטפלת] · ..."
-  // - a list of names nobody searched for, and on the Haifa page a data dump of
-  // titles and towns. Both pages already carry an intro paragraph and a meta
-  // description written to earn the click; this stops the grid outbidding them.
-  //
-  // Ranking is untouched: nosnippet governs display only, the therapist names
-  // stay indexed, and the CollectionPage/Person JSON-LD on each listing page is
-  // unaffected. A therapist's own name query is answered by their profile page,
-  // not by a city page's copy of the name.
+  // data-nosnippet lives on the divs inside Body, not on the link or the wrapper
+  // below - the note above Body says why.
   // ישות-מרכז אמיתית שמקבלת פניות: כפתור הודעה ישירה בתחתית הכרטיס. הכפתור
   // לא יכול לשבת בתוך ה-Link (כפתור בתוך עוגן אינו HTML תקין, והלחיצה הייתה
   // גם מנווטת), ולכן המסגרת עוברת לעטיפה, והקישור והכפתור יושבים בתוכה זה
@@ -142,8 +152,8 @@ export default function TherapistResultCard({
   const card = profileHref && (canMessageCenter || centerWaHref) ? (
     <div className="group flex flex-col rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: cardStyle.border, boxShadow: cardStyle.boxShadow }} data-tier={tier}>
-      <Link href={profileHref} className="block" style={{ textDecoration: "none" }} data-nosnippet>{Body}</Link>
-      <div className="flex flex-wrap gap-2" style={{ padding: "0 18px 16px" }}>
+      <Link href={profileHref} className="block" style={{ textDecoration: "none" }}>{Body}</Link>
+      <div data-nosnippet className="flex flex-wrap gap-2" style={{ padding: "0 18px 16px" }}>
         {centerWaHref && (
           <CenterWhatsAppLink
             entityId={t.trackable !== false ? t.id : undefined}
@@ -167,10 +177,10 @@ export default function TherapistResultCard({
       </div>
     </div>
   ) : profileHref ? (
-    <Link href={profileHref} className={cardClass} style={cardStyle} data-nosnippet data-tier={tier}>{Body}</Link>
+    <Link href={profileHref} className={cardClass} style={cardStyle} data-tier={tier}>{Body}</Link>
   ) : (
     // ישות בלי slug: אין יעד תקף, ועדיף כרטיס לא-לחיץ מקישור ל-404.
-    <div className={cardClass} style={cardStyle} data-nosnippet data-tier={tier}>{Body}</div>
+    <div className={cardClass} style={cardStyle} data-tier={tier}>{Body}</div>
   );
   // כרטיס מרכז מסלול-1 מסונתז מחשבון המרכז ואין לו שורת מטפל - דיווח חשיפה
   // עליו היה נכשל על ה-FK של analytics_events.

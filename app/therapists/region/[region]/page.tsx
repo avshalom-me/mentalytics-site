@@ -161,18 +161,21 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         {/* Where a city has its own page, this region page defers to it - the
             link tells both the visitor and Google which page answers for the
             city itself. Out of snippets: this line carries no questionnaire,
-            and the opening paragraph above is the one that should be quoted. */}
+            and the opening paragraph above is the one that should be quoted.
+            The attribute is on a div because Google ignores it on a <p>. */}
         {!isOnline && REGION_SEO_FOCUS[r.region] && (
-          <p data-nosnippet className="mt-2 text-sm text-stone-500">
-            מחפשים ב{REGION_SEO_FOCUS[r.region].mainCity} עצמה?{" "}
-            <Link
-              href={`/therapists/city/${regionToSlug(REGION_SEO_FOCUS[r.region].mainCity)}`}
-              className="font-semibold hover:underline"
-              style={{ color: "var(--teal-dark)" }}
-            >
-              פסיכולוגים ומטפלים ב{REGION_SEO_FOCUS[r.region].mainCity} ←
-            </Link>
-          </p>
+          <div data-nosnippet>
+            <p className="mt-2 text-sm text-stone-500">
+              מחפשים ב{REGION_SEO_FOCUS[r.region].mainCity} עצמה?{" "}
+              <Link
+                href={`/therapists/city/${regionToSlug(REGION_SEO_FOCUS[r.region].mainCity)}`}
+                className="font-semibold hover:underline"
+                style={{ color: "var(--teal-dark)" }}
+              >
+                פסיכולוגים ומטפלים ב{REGION_SEO_FOCUS[r.region].mainCity} ←
+              </Link>
+            </p>
+          </div>
         )}
       </div>
 
