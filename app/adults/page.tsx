@@ -494,7 +494,10 @@ export default function AdultsPage() {
   // logic as the inline version that used to live inside `if (screen === "results")`.
   type RecGroup = { treatment: string; treatmentLabel: string; recs: Recommendation[]; urgent: boolean };
   const recommendationGroups = useMemo<RecGroup[]>(() => {
-    const recs = scoring?.recommendations ?? [];
+    // External referrals (Recommendation.external) have no search, so they are
+    // not groups here: every consumer of this list - the search buttons, the
+    // leading finding, the strip above the match form - is about searching.
+    const recs = (scoring?.recommendations ?? []).filter((r) => !r.external);
     const groups: RecGroup[] = [];
     for (const rec of recs) {
       if (rec.urgent) {
@@ -502,6 +505,19 @@ export default function AdultsPage() {
         continue;
       }
       const existing = groups.find(g => !g.urgent && g.treatment === rec.treatment);
+      if (existing) existing.recs.push(rec);
+      else groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: false });
+    }
+    return groups;
+  }, [scoring]);
+
+  // The findings the site refers elsewhere (see Recommendation.external): shown
+  // in their domain's section after the searchable cards, with their notes and no
+  // search button.
+  const externalGroups = useMemo<RecGroup[]>(() => {
+    const groups: RecGroup[] = [];
+    for (const rec of (scoring?.recommendations ?? []).filter((r) => r.external)) {
+      const existing = groups.find(g => g.treatment === rec.treatment);
       if (existing) existing.recs.push(rec);
       else groups.push({ treatment: rec.treatment, treatmentLabel: rec.treatmentLabel, recs: [rec], urgent: false });
     }
@@ -972,7 +988,9 @@ export default function AdultsPage() {
     trackTherapistExplain(t.id, "adults");
     setExplainLoading(prev => ({ ...prev, [t.id]: true }));
     try {
-      const recommendedTreatments = scoring?.recommendations.map(r => r.treatment) ?? [];
+      // Searchable recommendations only: an external referral is not something
+      // this therapist could be a match for, so the explainer must not hear it.
+      const recommendedTreatments = scoring?.recommendations.filter(r => !r.external).map(r => r.treatment) ?? [];
       // The couples approach this search was run for (EFT / דינאמי / מבני), if
       // any. Joined because the endpoint takes a single string; on a tie both
       // approaches earned the bonus, so the explainer is told about both.
@@ -2661,19 +2679,27 @@ export default function AdultsPage() {
       { key: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים", label: "📚 תחום תפקודי / תעסוקתי / אקדמי" },
       { key: "התפתחות אישית", label: "🌱 התפתחות אישית" },
     ];
-    const sections: { key: string; label: string; groups: RecGroup[] }[] = [];
+    const sections: { key: string; label: string; groups: RecGroup[]; external: RecGroup[] }[] = [];
     const seenDomains = new Set<string>();
     for (const d of DOMAIN_SECTIONS) {
       const gs = groups.filter((g) => (g.recs[0]?.domain ?? "") === d.key);
-      if (gs.length) { sections.push({ ...d, groups: gs }); seenDomains.add(d.key); }
+      const ext = externalGroups.filter((g) => (g.recs[0]?.domain ?? "") === d.key);
+      if (gs.length || ext.length) { sections.push({ ...d, groups: gs, external: ext }); seenDomains.add(d.key); }
     }
     // Append any domains not in the known list so nothing is ever dropped.
-    for (const g of groups) {
+    for (const g of [...groups, ...externalGroups]) {
       const dom = g.recs[0]?.domain ?? "אחר";
       if (seenDomains.has(dom)) continue;
       seenDomains.add(dom);
-      sections.push({ key: dom, label: dom, groups: groups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom) });
+      sections.push({
+        key: dom,
+        label: dom,
+        groups: groups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom),
+        external: externalGroups.filter((x) => (x.recs[0]?.domain ?? "אחר") === dom),
+      });
     }
+    // A section with only external findings has nothing to lead the report with.
+    const searchableSections = sections.filter((s) => s.groups.length > 0);
 
     // isPrimary: ההמלצה הראשונה בכל רובריקה מוצגת כראשית, והשאר כמשניות.
     // מדוד 19/8/2026: מי שקיבל המלצה אחת המשיך לחיפוש ב-88%, ומי שקיבל
@@ -2759,6 +2785,33 @@ export default function AdultsPage() {
       );
     };
 
+    // A finding the site sends elsewhere (Recommendation.external): the finding,
+    // the referral in the notes, and no search or explanation button - there is
+    // nobody on the site to search for. Quieter than a searchable card, so the
+    // eye still lands on the main suggestion first.
+    const renderExternalCard = (group: RecGroup) => {
+      const notes = Array.from(new Set(group.recs.map((r) => r.notes).filter(Boolean) as string[])).join("\n\n");
+      return (
+        <div key={`external-${group.treatment}`} className="rounded-2xl border border-stone-200 bg-stone-50 p-5 mb-3">
+          <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-stone-500">
+            הפנייה חיצונית · {group.treatmentLabel}
+          </div>
+          {group.recs.length === 1 ? (
+            <p className="font-semibold text-[#1a2a3a] text-sm leading-relaxed">{group.recs[0].symptomText}</p>
+          ) : (
+            <ul className="space-y-1">
+              {group.recs.map((r) => (
+                <li key={r.id} className="flex items-start gap-2 text-sm font-semibold text-[#1a2a3a] leading-relaxed">
+                  <span className="mt-1 text-stone-400">•</span>{r.symptomText}
+                </li>
+              ))}
+            </ul>
+          )}
+          {notes && <div className="mt-2 whitespace-pre-line text-xs text-gray-600 leading-relaxed">{notes}</div>}
+        </div>
+      );
+    };
+
     const renderCombinedButton = () => (
       <button
         type="button"
@@ -2829,7 +2882,7 @@ export default function AdultsPage() {
               beside it the relationship finding, when the report has both an
               emotional and a relationship section (app/lib/results-leads.ts). */}
           {!err && recs.length > 0 && (() => {
-            const leads = leadingGroups(groups, sections);
+            const leads = leadingGroups(groups, searchableSections);
             if (leads.length === 0) return null;
             const searchButton = (group: RecGroup) => (
               <button
@@ -2897,7 +2950,7 @@ export default function AdultsPage() {
                 ))}
               </div>
             </div>
-            {recs.length > 0 && (
+            {groups.length > 0 && (
               <div className="rounded-2xl border p-5" style={{ background: "var(--teal-pale)", borderColor: "var(--teal-mid)" }}>
                 <p className="mb-3 text-xs font-bold uppercase tracking-wider text-[var(--teal-dark)]">מה עכשיו?</p>
                 <div className="flex flex-col gap-2.5 text-sm text-[#2a3a4a]">
@@ -2994,6 +3047,7 @@ export default function AdultsPage() {
               </div>
               <div className="space-y-3">
                 {section.groups.map((group, i) => renderGroupCard(group, i === 0))}
+                {section.external.map(renderExternalCard)}
               </div>
               {section.key === EMOTIONAL_DOMAIN && showCombined && renderCombinedButton()}
               {section.key === RELATIONSHIP_DOMAIN && showRelationshipCombined && renderCombinedRelationshipButton()}

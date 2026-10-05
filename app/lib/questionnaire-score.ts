@@ -10,6 +10,59 @@ import type {
 // others already fired.
 const COGFUN = "טיפול COG-FUN לקשיי קשב וריכוז";
 
+// COG-FUN is an EXTERNAL referral here, not a match (the owner's decision,
+// 5/10/2026): a finding shown with this sentence and no search button, the way
+// the neurologist/psychiatrist referral is. On that date 2 therapists listed it,
+// none of them paying and only one of them for adults, while it was recommended
+// in 29 of the 300 adult results recorded since 18/9. It goes back to being a
+// match when there are enough therapists - drop `external` from its three
+// recommendations below.
+const COGFUN_EXTERNAL_NOTE =
+  "ניתן לפנות גם למרפא/ת בעיסוק שעבר/ה הכשרה בגישת COG-FUN - גישה קוגניטיבית-תפקודית לקשיי קשב ולקשיים בתפקודים הניהוליים.";
+
+/**
+ * Whether the questionnaire may end in "אבחון תעסוקתי" as a search.
+ *
+ * The owner's rule (5/10/2026): with nobody to send a visitor to, recommend
+ * only the treatment, until there are occupational assessors. On that date 6
+ * were registered, 1 of them paying (in person, Gush Dan only) and 3 more
+ * reachable for adults as free fallback. A probe of the live match API (paying
+ * pool) returned him first for Tel Aviv, followed by therapists who do not
+ * assess; Haifa, Jerusalem and online returned only therapists who do not
+ * assess. While this is false the assessment verdict becomes the
+ * "טיפול תעסוקתי" card and the note that says to seek an assessment stays on
+ * it, as the disability branch already does.
+ *
+ * BEFORE flipping it to true: the adults page sends an assessment search as a
+ * treatment (treatmentTypes), which is a soft preference - unrelated therapists
+ * fill the list at 38%, and since 22/9/2026 a profile with no therapy area
+ * (assessor only) is dropped. The kids flow sends diagnosisTypes, which filters
+ * properly; the adults flow must do the same first.
+ */
+export const OCCUPATIONAL_ASSESSMENT_OFFERED = false;
+
+const isOccupationalTreatment = (r: Pick<Recommendation, "treatment">) =>
+  r.treatment === "טיפול תעסוקתי" || r.treatment === "אבחון תעסוקתי";
+
+/**
+ * The occupational checklists' verdict when it is "assessment" rather than
+ * "see an occupational psychologist". Whether that ends in an assessor search or
+ * in the treatment card is OCCUPATIONAL_ASSESSMENT_OFFERED's call; the note that
+ * tells the person to seek an assessment is the same either way.
+ */
+function occupationalAssessmentVerdict(notes: string): Recommendation {
+  const treatment = OCCUPATIONAL_ASSESSMENT_OFFERED ? "אבחון תעסוקתי" : "טיפול תעסוקתי";
+  return {
+    id: uid("employment-assess"),
+    symptomText: "מדווחים קשיים בתחום התעסוקתי.",
+    treatment,
+    treatmentLabel: treatment,
+    domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
+    urgent: false,
+    notes,
+  };
+}
+
 // ===== HELPERS =====
 
 let _idCounter = 0;
@@ -681,6 +734,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
       const NF_NOTE = "נוירופידבק הוא טיפול מבוסס-ביופידבק של גלי מוח שנמצא יעיל לקשיי קשב במחקרים מבוקרים, כחלופה או כתוספת לטיפול תרופתי.";
       const cogfunFromAttention = adhd1 >= 3 && efCount >= 2;
       if (cogfunFromAttention) {
+        // External: the neurologist/psychiatrist referral and COG-FUN sit
+        // together on one card without a search button (see COGFUN_EXTERNAL_NOTE).
         recs.push({
           id: uid("adhd-att"),
           symptomText: "ישנם סימנים לקשיי ריכוז וקשב, כולל קשיים בתפקודים הניהוליים (ארגון, שכחה).",
@@ -688,7 +743,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: NEUROLOGIST_NOTE,
+          external: true,
+          notes: `${NEUROLOGIST_NOTE} ${COGFUN_EXTERNAL_NOTE}`,
         });
       }
       if (adhd1 >= 3) {
@@ -759,6 +815,10 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
     if (f.f2) {
       const execTotal = sum(f.execScores);
       if (execTotal >= 12) {
+        // When the attention block already raised COG-FUN, its card carries the
+        // COG-FUN sentence and the neurologist referral; the two findings share
+        // one external card, so the sentences are not said twice.
+        const alreadyReferred = recs.some((r) => r.treatment === COGFUN);
         recs.push({
           id: uid("exec-func"),
           symptomText: "נמצאו סימנים של קשיים בתפקודים הניהוליים.",
@@ -766,7 +826,8 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
-          notes: "כדאי לפנות גם לרופא נוירולוג.",
+          external: true,
+          notes: alreadyReferred ? undefined : `${COGFUN_EXTERNAL_NOTE} כדאי לפנות גם לרופא נוירולוג.`,
         });
       } else if (!allAnswered(f.execScores) && !recs.some((r) => r.treatment === COGFUN)) {
         // Not when the attention block already produced a COG-FUN card. Since
@@ -782,11 +843,12 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
           treatmentLabel: "COG-FUN",
           domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
           urgent: false,
+          external: true,
           // "קשב או התארגנות": since 13/8/2026 this screen is also reached
           // automatically after a positive attention block and from the
           // occupational planning/deadlines item, not only by answering yes to
           // the organisation gate.
-          notes: "דווחו קשיי קשב או התארגנות, אך שאלון האפיון לא מולא. מומלץ המשך בירור לאפיון הקושי ועוצמתו.",
+          notes: `דווחו קשיי קשב או התארגנות, אך שאלון האפיון לא מולא. מומלץ המשך בירור לאפיון הקושי ועוצמתו. ${COGFUN_EXTERNAL_NOTE}`,
         });
       }
     }
@@ -827,15 +889,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             notes: "יש לפנות לפסיכולוג תעסוקתי עבור ייעוץ בתחום.",
           });
         } else {
-          recs.push({
-            id: uid("employment-assess"),
-            symptomText: "מדווחים קשיים בתחום התעסוקתי.",
-            treatment: "אבחון תעסוקתי",
-            treatmentLabel: "אבחון תעסוקתי",
-            domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
-            urgent: false,
-            notes: "יש לפנות לאבחון תעסוקתי להבנת מרכיבי החוזק והחולשה.",
-          });
+          recs.push(occupationalAssessmentVerdict("יש לפנות לאבחון תעסוקתי להבנת מרכיבי החוזק והחולשה."));
         }
       } else if (empType) {
         // career-change, burnout, other → questionnaire B
@@ -858,15 +912,7 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
             notes: "יש לפנות לפסיכולוג תעסוקתי עבור ייעוץ בתחום.",
           });
         } else {
-          recs.push({
-            id: uid("employment-assess"),
-            symptomText: "מדווחים קשיים בתחום התעסוקתי.",
-            treatment: "אבחון תעסוקתי",
-            treatmentLabel: "אבחון תעסוקתי",
-            domain: "סימני שאלה לגבי התחומים התפקודיים, התעסוקתיים או האקדמאיים",
-            urgent: false,
-            notes: "יש לפנות לאבחון תעסוקתי.",
-          });
+          recs.push(occupationalAssessmentVerdict("יש לפנות לאבחון תעסוקתי."));
         }
         if (empType === "burnout") {
           recs.push({
@@ -1357,7 +1403,15 @@ export function scoreQuestionnaire(answers: QuestionnaireAnswers): ScoringResult
 
   const sorted = [...recs].sort((a, b) => {
     if (a.urgent !== b.urgent) return a.urgent ? -1 : 1;
-    return domainOrder.indexOf(a.domain) - domainOrder.indexOf(b.domain);
+    const byDomain = domainOrder.indexOf(a.domain) - domainOrder.indexOf(b.domain);
+    if (byDomain !== 0) return byDomain;
+    // Within the functional domain the occupational recommendation leads (the
+    // owner's rule, 5/10/2026): the screen marks the first card of a section as
+    // the main one, and it used to be whichever block the questionnaire asked
+    // first - the attention block - so a person with an occupational finding saw
+    // neurofeedback or COG-FUN as the main suggestion. The sort is stable, so
+    // every other order is as the blocks produced it.
+    return Number(isOccupationalTreatment(b)) - Number(isOccupationalTreatment(a));
   });
 
   return {

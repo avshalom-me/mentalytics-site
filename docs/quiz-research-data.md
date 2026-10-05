@@ -106,3 +106,14 @@ therapist. Validation against clinicians needs no user data at all (vignettes).
 
 The population is self-selected and heavily paid-traffic (young, female, central
 Israel), and only completers are recorded.
+
+## Changes to what the adults questionnaire recommends
+
+Each of these moves a share on a given date without any change in the population.
+Compare across them only through `qv`.
+
+| from | change | effect on the record |
+|---|---|---|
+| 5/10/2026 | COG-FUN is an **external referral**: the recommendation carries `external: true` and the screen shows it without a search button (the owner's decision - 2 therapists listed it, none paying, one for adults, while it was recommended in 29 of the 300 adult results of 18/9-5/10) | the key `טיפול COG-FUN לקשיי קשב וריכוז` is still listed in `treatments` - the questionnaire still refers people to it - but nobody can search for it, so `matching_click` for it stops. "Recommended COG-FUN" is not "offered a COG-FUN therapist" from this date |
+| 5/10/2026 | the occupational checklists' **assessment verdict** is the `טיפול תעסוקתי` card while `OCCUPATIONAL_ASSESSMENT_OFFERED` (questionnaire-score.ts) is false. On the date 6 occupational assessors were registered, 1 paying (in person, Gush Dan), and outside that area an assessment search returned therapists who do not assess | `assessments` holds no `אבחון תעסוקתי` for adults from this date and `treatments` holds `טיפול תעסוקתי` in its place. Of the 300 adult results of 18/9-5/10, 15 carried the assessment |
+| 5/10/2026 | in the functional section the occupational recommendation is listed **first** | order only - no change in any list. `leading` / "main finding" analyses that took the first card of the section see the occupational one instead of neurofeedback or COG-FUN |

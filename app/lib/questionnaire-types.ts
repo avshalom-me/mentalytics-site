@@ -158,6 +158,13 @@ export type Recommendation = {
   couplesModalities?: string[];
   needsSexualTherapy?: boolean;     // שילוב טיפול מיני
   professionalType?: string;        // אם מוגדר - חיפוש קשיח לפי therapist_types (למשל דיאטנית קלינית)
+  /**
+   * A referral the site does not match to a therapist - there are not enough of
+   * that kind listed yet - so it is shown as a finding with its notes and NO
+   * search button, the way the neurologist/psychiatrist referral is. `treatment`
+   * stays the key the finding is recorded under in the research record.
+   */
+  external?: boolean;
 };
 
 export type ScoringResult = {
