@@ -1,18 +1,23 @@
 import "server-only";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
+import type { CenterStopReason } from "@/app/lib/center-gift";
 
 // קידום/הורדה אוטומטיים של מטפלי מרכז - החוליה שמחברת את התשלום של המרכז
 // למאגר ההתאמות:
 //
-//   מטפל משויך למרכז פעיל (ששילם) ⇒ status='paying', promotion_source='center'
+//   מטפל משויך למרכז פעיל ⇒ status='paying', promotion_source='center'
 //   ⇒ נכנס למערכת ההתאמות (בכפוף ל-admin_approved, כמו כל מטפל).
+//
+// "מרכז פעיל" = שילם, או שהאדמין נתן לו קידום מתנה (center-gift.ts). כאן אין
+// הבדל בין השניים: שניהם status='active'.
 //
 // promotion_source='center' הוא ערך רביעי לצד 'paid'/'manual'/'trial', ובכוונה
 // אינו מטופל על-ידי ה-cron של Sumit (שמסנן על 'paid' ועל trial/manual עם
 // promoted_until) - מחזור החיים שלו מנוהל כולו כאן:
-//   קידום:  שיוך מטפל למרכז פעיל · תשלום מרכז · אישור אדמין למטפל משויך
-//   הורדה:  ניתוק מהמרכז · ביטול מנוי המרכז (אדמין/סנכרון Sumit)
+//   קידום:  שיוך מטפל למרכז פעיל · תשלום מרכז · קידום מתנה למרכז · אישור
+//           אדמין למטפל משויך
+//   הורדה:  ניתוק מהמרכז · עצירת המרכז (אדמין / סנכרון Sumit / סוף המתנה)
 //
 // מטפל עם מנוי אישי (promotion_source='paid') לעולם לא נגרר לכאן - המנוי
 // האישי שלו גובר, וה-cron של Sumit ממשיך לנהל אותו.
@@ -173,4 +178,46 @@ export async function demoteCenterTherapists(
     demoted++;
   }
   return demoted;
+}
+
+// עוצר מרכז פעיל, משלם או בקידום מתנה: מסמן אותו cancelled עם הסיבה, מנקה את
+// שדות המתנה ומוריד את מטפליו מההתאמות. שום פרט של המרכז לא נמחק - הפרופילים,
+// העמוד הציבורי, חשבון הפורטל והתמחור נשארים, ואפשר להחזיר אותו (קידום מתנה,
+// או פתיחת ההצעה מחדש לתשלום).
+//
+// לא נוגע ב-Sumit: מי שקורא אחראי לבטל את הוראת הקבע ולאמת את הביטול *לפני*
+// הקריאה לכאן, אחרת מרכז שסומן כעצור ממשיך להיות מחויב.
+//
+// giftEndedBy - לקרון שעוצר מתנה שנגמרה: העצירה תקפה רק אם המרכז עדיין
+// בקידום מתנה שתאריך הסיום שלה עבר. בלי התנאי הזה, מתנה שהאדמין האריך שנייה
+// אחרי שהקרון קרא את הרשימה הייתה נעצרת בכל זאת.
+//
+// מחזיר כמה מטפלים הורדו, או null אם העצירה לא חלה - המרכז כבר לא פעיל, או
+// שהמתנה שלו הוארכה בינתיים (מרוץ מול פעולה מקבילה). במקרה כזה לא נעשה דבר.
+export async function stopActiveCenter(
+  centerId: string,
+  reason: CenterStopReason,
+  auditReason: string,
+  opts: { giftEndedBy?: string } = {},
+): Promise<number | null> {
+  const now = new Date().toISOString();
+  let update = supabaseAdmin
+    .from("therapy_center_accounts")
+    .update({
+      status: "cancelled",
+      cancelled_at: now,
+      cancel_reason: reason,
+      gift_granted_at: null,
+      gift_until: null,
+      updated_at: now,
+    })
+    .eq("id", centerId)
+    .eq("status", "active");
+  if (opts.giftEndedBy) {
+    update = update.not("gift_granted_at", "is", null).lte("gift_until", opts.giftEndedBy);
+  }
+  const { data, error } = await update.select("id");
+  if (error) throw new Error(`stopActiveCenter(${centerId}): ${error.message}`);
+  if (!data || data.length === 0) return null;
+  return demoteCenterTherapists({ centerId }, auditReason);
 }

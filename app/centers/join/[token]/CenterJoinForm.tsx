@@ -14,6 +14,8 @@ export type CenterOffer = {
   contact_name: string | null;
   billing_track: "per_therapist" | "center_entity";
   gift_months: number;
+  /** למרכז כבר יש חשבון ניהול (הצעה שנפתחה מחדש אחרי שהמנוי נעצר). */
+  has_account?: boolean;
   price_per_therapist: number;
   therapist_count: number;
   per_therapist_with_vat: number;
@@ -191,8 +193,16 @@ export default function CenterJoinForm({ offer }: { offer: CenterOffer }) {
             <><br />קבלה על החיוב הראשון נשלחה למייל שהזנתם.</>
           )}
         </p>
-        {/* הקמת חשבון מיידית - קישור לפי הטוקן הסודי, בלי המתנה לקישור ידני */}
-        <CenterAccountSetup token={offer.token} centerName={offer.name} defaultEmail={payerEmail.trim()} />
+        {offer.has_account ? (
+          // מרכז שחוזר אחרי שהמנוי שלו נעצר: החשבון, הפרופילים והעמוד נשארו.
+          <p className="mt-4 text-sm leading-6 text-stone-600">
+            חשבון הניהול של המרכז כבר קיים -{" "}
+            <a href="/centers/dashboard" className="font-bold underline" style={{ color: "var(--teal-dark)" }}>כניסה לפורטל</a>
+          </p>
+        ) : (
+          // הקמת חשבון מיידית - קישור לפי הטוקן הסודי, בלי המתנה לקישור ידני
+          <CenterAccountSetup token={offer.token} centerName={offer.name} defaultEmail={payerEmail.trim()} />
+        )}
       </div>
     );
   }

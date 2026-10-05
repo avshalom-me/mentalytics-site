@@ -4,11 +4,16 @@ import { useCallback, useEffect, useState } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
 import { centerPageTitle, CENTER_FOCUS_MAX } from "@/app/lib/center-title";
+import { CENTER_GIFT_MAX_MONTHS, giftDaysLeft, giftUntilFromMonths, isCenterOnGift, stopReasonLabel } from "@/app/lib/center-gift";
 
 // מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
 // את הקישור ושולחים למרכז ← המרכז ממלא אשראי בדף ההצטרפות ← המנוי מופיע
-// כאן כפעיל, עם ביטול וסנכרון מול Sumit.
+// כאן כפעיל, עם עצירה וסנכרון מול Sumit.
+//
+// שני מצבים בלי חיוב (center-gift.ts): "קידום מתנה" - המרכז באוויר בלי כרטיס,
+// לתקופה או בלי תאריך סיום, כמו קידום מתנה של מטפל; ו"מנוי נעצר" - המרכז
+// לא באוויר וכל הפרטים שלו שמורים, ואפשר להחזיר אותו במתנה או בתשלום.
 
 type Center = {
   id: string;
@@ -29,6 +34,12 @@ type Center = {
   sumit_recurring_id: string | null;
   paid_at: string | null;
   cancelled_at: string | null;
+  /** למה המנוי נעצר: admin / sumit / gift_ended. ריק אצל מרכז שנעצר לפני 5/10/26. */
+  cancel_reason: string | null;
+  /** קידום מתנה: מלא + status=active = באוויר בלי הוראת קבע ובלי חיוב. */
+  gift_granted_at: string | null;
+  /** סוף קידום המתנה; ריק = בלי תאריך סיום. */
+  gift_until: string | null;
   created_at: string;
   updated_at: string | null;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
@@ -163,8 +174,15 @@ const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = 
   draft: { label: "טיוטה", cls: "bg-stone-100 border-stone-300 text-stone-600" },
   sent: { label: "הצעה נשלחה", cls: "bg-blue-50 border-blue-300 text-blue-800" },
   active: { label: "מנוי פעיל", cls: "bg-green-50 border-green-300 text-green-800" },
-  cancelled: { label: "בוטל", cls: "bg-red-50 border-red-300 text-red-700" },
+  cancelled: { label: "מנוי נעצר", cls: "bg-orange-50 border-orange-300 text-orange-800" },
 };
+// מרכז בקידום מתנה הוא status=active, אבל במסך הוא שלב בפני עצמו: פעיל בלי חיוב.
+const GIFT_STATUS_LABEL = { label: "🎁 קידום מתנה", cls: "bg-purple-50 border-purple-300 text-purple-800" };
+
+// השלב של המרכז במסך: הסטטוס שלו, כשמרכז פעיל בקידום מתנה מופרד ממרכז משלם.
+// כל מרכז שייך לשלב אחד בדיוק, ולכן הסינון והקבוצות לא חופפים.
+type Stage = Center["status"] | "gift";
+const stageOf = (c: Center): Stage => (isCenterOnGift(c) ? "gift" : c.status);
 
 function fmtDate(iso: string | null): string {
   if (!iso) return "-";
@@ -207,7 +225,25 @@ function nextStepHint(c: Center): Hint | null {
     return { tone: "info", text: `💳 טרם התקבל תשלום - הכרטיס לא נמסר · הקישור אצל המרכז${ago}.` };
   }
   if (c.status === "active") {
-    if (!c.user_id) return { tone: "act", text: "שולם ✓ אך טרם הוקם חשבון הניהול - שלחו למרכז שוב את קישור ההצטרפות (משמש גם להקמת החשבון)." };
+    const onGift = isCenterOnGift(c);
+    // קידום מתנה שעומד להסתיים קודם לכל השאר: בסוף התקופה המרכז יורד מהאוויר
+    // לבד, והמרכז לא מקבל על זה מייל - השורה הזו היא התזכורת.
+    const giftLeft = giftDaysLeft(c);
+    if (giftLeft !== null && giftLeft <= 14) {
+      return {
+        tone: "act",
+        text: giftLeft > 0
+          ? `🎁 קידום המתנה מסתיים ב-${fmtDate(c.gift_until)} (עוד ${giftLeft} ימים) · בסוף התקופה המרכז יורד מהאוויר לבד, והפרטים נשמרים. אפשר להאריך את המתנה, או לעצור ולפתוח את ההצעה מחדש לתשלום.`
+          : `🎁 קידום המתנה הסתיים ב-${fmtDate(c.gift_until)} · המרכז יירד מהאוויר בסנכרון היומי הקרוב, והפרטים נשמרים. אפשר להאריך את המתנה כבר עכשיו.`,
+      };
+    }
+    if (!c.user_id)
+      return {
+        tone: "act",
+        text: onGift
+          ? "🎁 בקידום מתנה, אך טרם הוקם חשבון הניהול - שלחו למרכז את קישור ההצטרפות: אצל מרכז במתנה הוא משמש רק להקמת החשבון, ולא מבקש תשלום."
+          : "שולם ✓ אך טרם הוקם חשבון הניהול - שלחו למרכז שוב את קישור ההצטרפות (משמש גם להקמת החשבון).",
+      };
     if (c.pending_therapist_count > 0)
       return {
         tone: "act",
@@ -217,9 +253,23 @@ function nextStepHint(c: Center): Hint | null {
       };
     if (!isEntity && c.linked_therapist_count === 0)
       return { tone: "info", text: "אין עדיין פרופילי מטפלים - המרכז מזמין מטפלים מהפורטל, או שייכו כאן ידנית." };
+    if (onGift)
+      return {
+        tone: "ok",
+        text: c.gift_until
+          ? `✓ באוויר · קידום מתנה עד ${fmtDate(c.gift_until)}, בלי כרטיס ובלי חיוב.`
+          : "✓ באוויר · קידום מתנה בלי תאריך סיום, בלי כרטיס ובלי חיוב.",
+      };
     const today = new Date().toISOString().slice(0, 10);
     const inGift = c.billing_starts_at && c.billing_starts_at > today;
     return { tone: "ok", text: inGift ? `✓ באוויר · בתקופת מתנה - חיוב ראשון ${fmtDate(c.billing_starts_at)}.` : "✓ באוויר · חיוב חודשי פעיל." };
+  }
+  if (c.status === "cancelled") {
+    const why = stopReasonLabel(c.cancel_reason);
+    return {
+      tone: "info",
+      text: `⏸ המנוי נעצר${c.cancelled_at ? ` ב-${fmtDate(c.cancelled_at)}` : ""}${why ? ` (${why})` : ""} · המרכז לא באוויר, וכל הפרטים שלו שמורים. להחזרה: קידום מתנה, או פתיחת ההצעה מחדש לתשלום.`,
+    };
   }
   return null;
 }
@@ -244,7 +294,7 @@ export default function AdminCentersPage() {
   const [copied, setCopied] = useState<string | null>(null);
   const [sumitInfo, setSumitInfo] = useState<Record<string, string>>({});
   // תפריט הסינון העליון: שלב במשפך + מסלול חיוב.
-  const [stageFilter, setStageFilter] = useState<"all" | Center["status"]>("all");
+  const [stageFilter, setStageFilter] = useState<"all" | Stage>("all");
   const [trackFilter, setTrackFilter] = useState<"all" | "per_therapist" | "center_entity">("all");
 
   // טופס יצירה/עריכה
@@ -277,6 +327,10 @@ export default function AdminCentersPage() {
   const [detailRows, setDetailRows] = useState<Record<string, CenterTherapistRow[]>>({});
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // חלון קידום המתנה: לאיזה מרכז, וכמה חודשים נבחרו.
+  const [giftFor, setGiftFor] = useState<Center | null>(null);
+  const [giftMonths, setGiftMonths] = useState(1);
+
   const [manageFor, setManageFor] = useState<Center | null>(null);
   const [pool, setPool] = useState<TherapistPoolItem[]>([]);
   const [poolLoading, setPoolLoading] = useState(false);
@@ -286,11 +340,11 @@ export default function AdminCentersPage() {
   // נועל את גלילת העמוד שמאחורי המודל - בלעדיו, גלילה עם העכבר מעל הרקע
   // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
   useEffect(() => {
-    if (!editing && !manageFor) return;
+    if (!editing && !manageFor && !giftFor) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [editing, manageFor]);
+  }, [editing, manageFor, giftFor]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -483,13 +537,121 @@ export default function AdminCentersPage() {
       setError("אי אפשר למחוק מרכז פעיל - בטלו קודם את המנוי");
       return;
     }
-    if (!confirm(`למחוק לצמיתות את "${c.name}"? הטיוטה, קישור ההצטרפות והפרופיל (אם נוצר) יימחקו. פעולה בלתי הפיכה.`)) return;
+    // הצעה שנפתחה מחדש היא טיוטה של מרכז שכבר היה פעיל: יש לו חשבון פורטל
+    // ופרופילים. מחיקה שלה אינה "מחיקת טיוטה" רגילה, והאישור אומר את זה.
+    const wasLive = !!c.user_id || c.linked_therapist_count > 0;
+    const warning = wasLive
+      ? `\n\nשימו לב: זה מרכז שכבר היה פעיל${c.user_id ? ", עם חשבון פורטל" : ""}${c.linked_therapist_count > 0 ? ` ו-${c.linked_therapist_count} פרופילים משויכים` : ""}. המחיקה מוחקת את פרטי המרכז ומנתקת את הפרופילים ממנו.`
+      : "";
+    if (!confirm(`למחוק לצמיתות את "${c.name}"? הטיוטה, קישור ההצטרפות והפרופיל (אם נוצר) יימחקו. פעולה בלתי הפיכה.${warning}`)) return;
     await post({ action: "delete", id: c.id });
+  }
+
+  // שורת "Sumit: ..." שבכרטיס מתארת את מצב החיוב ברגע שנשאלה. אחרי עצירה,
+  // קידום מתנה או פתיחת ההצעה מחדש היא כבר לא נכונה, ולכן נמחקת.
+  function forgetSumitInfo(id: string) {
+    setSumitInfo((prev) => {
+      if (!(id in prev)) return prev;
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  }
+
+  // עצירת מנוי: המרכז יורד מהאוויר וכל הפרטים שלו נשמרים. מרכז משלם - הוראת
+  // הקבע מבוטלת ב-Sumit; מרכז בקידום מתנה - רק המתנה מסתיימת.
+  async function stopSubscription(c: Center) {
+    const onGift = isCenterOnGift(c);
+    const offAir = trackOf(c) === "center_entity"
+      ? "• המרכז יורד מהאוויר: הכרטיס שלו יוצא מההתאמות, והעמוד הציבורי נסגר."
+      : "• המרכז יורד מהאוויר: העמוד הציבורי נסגר, ומטפליו יוצאים מההתאמות (ונשארים במאגר בלי קידום).";
+    const lines = [
+      onGift ? `לסיים את קידום המתנה של "${c.name}" ולעצור את המרכז?` : `לעצור את המנוי של "${c.name}"?`,
+      "",
+      onGift
+        ? "• למרכז אין הוראת קבע, ולכן אין מה לבטל ב-Sumit."
+        : "• הוראת הקבע ב-Sumit מבוטלת, ולא יהיו חיובים נוספים.",
+      offAir,
+      "• כל הפרטים נשמרים: הפרופילים, העמוד הציבורי, חשבון הפורטל והתמחור.",
+      "• מהמערכת שלנו לא נשלח מייל למרכז.",
+      "",
+      onGift
+        ? "אפשר להחזיר אותו בכל רגע: קידום מתנה, או פתיחת ההצעה מחדש לתשלום."
+        : "אפשר להחזיר אותו בכל רגע: קידום מתנה, או פתיחת ההצעה מחדש לתשלום (המרכז יזין כרטיס מחדש).",
+    ];
+    if (!confirm(lines.join("\n"))) return;
+    const j = await post({ action: "stop_subscription", id: c.id });
+    if (!j.ok) return;
+    forgetSumitInfo(c.id);
+    alert(`המנוי של "${c.name}" נעצר, והפרטים שמורים. המרכז מופיע עכשיו תחת "מנוי נעצר".`);
+  }
+
+  // קידום מתנה: המרכז באוויר בלי כרטיס ובלי חיוב. months=null = בלי תאריך סיום.
+  // שגיאה מוצגת בתוך החלון (הוא נשאר פתוח); הצלחה סוגרת אותו.
+  async function grantGift(c: Center, months: number | null) {
+    // מרכז משלם: ביטול הוראת הקבע אינו הפיך (הכרטיס השמור הולך לאיבוד), ולכן
+    // אישור נפרד מעבר לאזהרה שבחלון.
+    if (c.status === "active" && !isCenterOnGift(c) &&
+      !confirm(`הוראת הקבע של "${c.name}" ב-Sumit תבוטל עכשיו, והכרטיס השמור לא יחויב.\n\nכדי לעבור לתשלום בסוף המתנה המרכז יצטרך להזין כרטיס מחדש. להמשיך?`)) return;
+    const j = await post({ action: "grant_gift", id: c.id, months });
+    if (!j.ok) return;
+    setGiftFor(null);
+    forgetSumitInfo(c.id);
+    const until = typeof j.gift_until === "string" ? ` עד ${fmtDate(j.gift_until)}` : " בלי תאריך סיום";
+    const cancelled = Array.isArray(j.cancelled_orders) ? j.cancelled_orders.length : 0;
+    const promoted = Number(j.promoted) || 0;
+    alert(
+      [
+        `קידום המתנה של "${c.name}" פעיל${until}.`,
+        cancelled > 0 ? "הוראת הקבע ב-Sumit בוטלה, והביטול אומת." : null,
+        promoted > 0 ? `${promoted} פרופילים נכנסו להתאמות.` : null,
+      ].filter(Boolean).join("\n"),
+    );
+  }
+
+  // פתיחת ההצעה מחדש לתשלום: מרכז שהמנוי שלו נעצר חוזר לטיוטות, עם אותו קישור
+  // הצטרפות ואותו תמחור. חודשי המתנה שבהצעה נקבעים כאן מחדש, כדי שמרכז שכבר
+  // קיבל אותם פעם לא יקבל אותם שוב בלי החלטה.
+  async function reopenOffer(c: Center) {
+    const answer = prompt(
+      [
+        `פתיחת ההצעה של "${c.name}" מחדש לתשלום.`,
+        "",
+        "המרכז חוזר לטיוטות, עם אותו קישור הצטרפות ואותו תמחור. כשיזין כרטיס בקישור הוא חוזר לאוויר עם כל מה שהיה לו: הפרופילים, העמוד הציבורי וחשבון הפורטל.",
+        "",
+        "כמה חודשי מתנה בהצעה המחודשת? (0 = החיוב הראשון ביום הזנת הכרטיס)",
+      ].join("\n"),
+      "0",
+    );
+    if (answer === null) return;
+    const months = Number(answer.trim() || "0");
+    if (!Number.isInteger(months) || months < 0 || months > 12) {
+      setError("חודשי מתנה בהצעה: מספר שלם בין 0 ל-12");
+      return;
+    }
+    const j = await post({ action: "reopen_offer", id: c.id, gift_months: months });
+    if (!j.ok) return;
+    forgetSumitInfo(c.id);
+    alert(`ההצעה של "${c.name}" נפתחה מחדש ונמצאת בטיוטות. אפשר לערוך אותה, ואז לשלוח במייל או להעתיק את הקישור למרכז.`);
   }
 
   async function syncSumit(c: Center) {
     const j = await post({ action: "sync_sumit", id: c.id });
     if (j.ok) {
+      // מרכז בקידום מתנה: אין לו הוראת קבע, ולכן השאלה היחידה היא אם נשארה
+      // ב-Sumit הוראה חיה שתחייב את הכרטיס שלו.
+      if (j.gift) {
+        const live = Array.isArray(j.live_orders)
+          ? (j.live_orders as { id: number; status: number; next_billing: string | null }[])
+          : [];
+        setSumitInfo((prev) => ({
+          ...prev,
+          [c.id]: live.length === 0
+            ? "Sumit: אין הוראת קבע חיה - המרכז לא יחויב."
+            : `⚠️ Sumit: נמצאה הוראת קבע חיה למרות קידום המתנה (${live.map((o) => `${o.id}${o.next_billing ? `, חיוב הבא ${fmtDate(o.next_billing)}` : ""}`).join(" · ")}). בטלו אותה בממשק Sumit.`,
+        }));
+        return;
+      }
       const s = j.sumit as { status: number; next_billing: string | null; unit_price: number | null } | null;
       // 0=פעילה · 12=מתוזמנת (חודשי מתנה, טרם חויב) · 1=מבוטלת · אחר=לבדוק
       const statusLabel = s?.status === 0 ? "פעיל" : s?.status === 12 ? "מתוזמן (בתקופת מתנה)" : s?.status === 1 ? "מבוטל" : `סטטוס ${s?.status} - לבדוק`;
@@ -571,6 +733,8 @@ export default function AdminCentersPage() {
         יוצרים הצעה עם המחיר לכל מטפל ומספר המטפלים שסגרתם בשיחת ההתאמה, שולחים למרכז במייל (או מעתיקים את הקישור).
         המרכז רואה את הסכום החודשי הכולל וממלא פרטי אשראי. אפשר להגדיר חודשי מתנה -
         הכרטיס נשמר מיד והחיוב הראשון יוצא רק בתום המתנה.
+        {" "}בכל כרטיס מרכז יש גם <strong>&quot;קידום מתנה&quot;</strong> (המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה שתבחרו)
+        ו<strong>&quot;עצירת מנוי&quot;</strong> (החיוב נפסק והמרכז יורד מהאוויר, וכל הפרטים שלו נשמרים).
       </p>
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
         <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
@@ -593,7 +757,9 @@ export default function AdminCentersPage() {
 
       {/* פס סיכום עסקי: MRR מהפעילים, מי בחודשי מתנה ומתי החיוב הקרוב, ופוטנציאל במשפך */}
       {!loading && centers.length > 0 && (() => {
-        const active = centers.filter((c) => c.status === "active");
+        // רק מרכזים משלמים: מרכז בקידום מתנה פעיל בלי חיוב, ואינו הכנסה.
+        const active = centers.filter((c) => stageOf(c) === "active");
+        const onGiftCount = centers.filter((c) => stageOf(c) === "gift").length;
         const sent = centers.filter((c) => c.status === "sent");
         const mrr = active.reduce((s, c) => s + centerMonthlyPricing(c).monthlyTotal, 0);
         const sentPotential = sent.reduce((s, c) => s + centerMonthlyPricing(c).monthlyTotal, 0);
@@ -606,7 +772,7 @@ export default function AdminCentersPage() {
             <div className="rounded-2xl border border-teal-200 bg-teal-50/60 p-4">
               <div className="text-2xl font-black text-[#0F5468]">₪{ils(mrr)}</div>
               <div className="text-xs font-bold text-stone-600">MRR ממרכזים פעילים</div>
-              <div className="text-[11px] text-stone-400">לפני מע"מ · {active.length} מרכזים</div>
+              <div className="text-[11px] text-stone-400">לפני מע"מ · {active.length} מרכזים{onGiftCount > 0 ? ` · ועוד ${onGiftCount} בקידום מתנה, בלי חיוב` : ""}</div>
             </div>
             <div className="rounded-2xl border border-stone-200 bg-white p-4">
               <div className="text-2xl font-black text-stone-800">₪{ils(paidNow)}</div>
@@ -630,19 +796,20 @@ export default function AdminCentersPage() {
       {/* תפריט סינון עליון: שלב במשפך + מסלול. דביק, כדי שהמעבר בין תצוגות
           יישאר בהישג יד גם כשהרשימה מתארכת. */}
       {!loading && centers.length > 0 && (() => {
-        const stages: { key: "all" | Center["status"]; label: string }[] = [
+        const stages: { key: "all" | Stage; label: string }[] = [
           { key: "all", label: "הכל" },
-          { key: "active", label: "✅ פעילים" },
+          { key: "active", label: "✅ מנוי פעיל" },
+          { key: "gift", label: "🎁 קידום מתנה" },
           { key: "sent", label: "✉️ ממתינות לתשלום" },
           { key: "draft", label: "📝 טיוטות" },
-          { key: "cancelled", label: "⏸️ בוטלו" },
+          { key: "cancelled", label: "⏸️ מנוי נעצר" },
         ];
         const tracks: { key: "all" | "per_therapist" | "center_entity"; label: string }[] = [
           { key: "all", label: "כל המסלולים" },
           { key: "center_entity", label: "🏢 מסלול 2 - מרכז כישות" },
           { key: "per_therapist", label: "👥 מסלול 1 - מטפלים בנפרד" },
         ];
-        const stageCount = (k: "all" | Center["status"]) => (k === "all" ? centers.length : centers.filter((c) => c.status === k).length);
+        const stageCount = (k: "all" | Stage) => (k === "all" ? centers.length : centers.filter((c) => stageOf(c) === k).length);
         const trackCount = (k: "all" | "per_therapist" | "center_entity") => (k === "all" ? centers.length : centers.filter((c) => trackOf(c) === k).length);
         return (
           <div className="sticky top-0 z-40 mb-6 rounded-2xl border border-stone-200 bg-white/95 px-3 py-2.5 shadow-sm backdrop-blur">
@@ -719,12 +886,13 @@ export default function AdminCentersPage() {
           כך רואים במבט אחד מי בפנים, מי באמצע המשפך, ומה עוד לא יצא. */}
       {!loading && (() => {
         const match = (c: Center) => trackFilter === "all" || trackOf(c) === trackFilter;
-        const allGroups: { key: string; stage: Center["status"]; title: string; items: Center[] }[] = [
-          { key: "active2", stage: "active", title: "🏢 מנויים פעילים - מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => c.status === "active" && trackOf(c) === "center_entity" && match(c)) },
-          { key: "active1", stage: "active", title: "👥 מנויים פעילים - מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => c.status === "active" && trackOf(c) === "per_therapist" && match(c)) },
+        const allGroups: { key: string; stage: Stage; title: string; items: Center[] }[] = [
+          { key: "active2", stage: "active", title: "🏢 מנויים פעילים - מסלול 2 (מרכז כישות אחת)", items: centers.filter((c) => stageOf(c) === "active" && trackOf(c) === "center_entity" && match(c)) },
+          { key: "active1", stage: "active", title: "👥 מנויים פעילים - מסלול 1 (מטפלים בנפרד)", items: centers.filter((c) => stageOf(c) === "active" && trackOf(c) === "per_therapist" && match(c)) },
+          { key: "gift", stage: "gift", title: "🎁 קידום מתנה - באוויר, בלי כרטיס ובלי חיוב", items: centers.filter((c) => stageOf(c) === "gift" && match(c)) },
           { key: "sent", stage: "sent", title: "✉️ הצעות שנשלחו - ממתינות לתשלום", items: centers.filter((c) => c.status === "sent" && match(c)) },
           { key: "draft", stage: "draft", title: "📝 טיוטות - טרם נשלחו", items: centers.filter((c) => c.status === "draft" && match(c)) },
-          { key: "cancelled", stage: "cancelled", title: "⏸️ בוטלו", items: centers.filter((c) => c.status === "cancelled" && match(c)) },
+          { key: "cancelled", stage: "cancelled", title: "⏸️ מנוי נעצר - לא באוויר, הפרטים שמורים", items: centers.filter((c) => c.status === "cancelled" && match(c)) },
         ];
         const groups = allGroups.filter((g) => (stageFilter === "all" || g.stage === stageFilter) && g.items.length > 0);
         if (groups.length === 0 && centers.length > 0) {
@@ -737,11 +905,22 @@ export default function AdminCentersPage() {
           <span className="rounded-full border border-stone-200 bg-stone-100 px-2 py-0.5 text-xs font-bold text-stone-500">{group.items.length}</span>
         </div>
       {group.items.map((c) => {
-        const st = STATUS_LABELS[c.status];
+        const onGift = isCenterOnGift(c);
+        const giftLeft = giftDaysLeft(c);
+        const st = onGift ? GIFT_STATUS_LABEL : STATUS_LABELS[c.status];
         const isEntity = c.billing_track === "center_entity";
         const p = centerMonthlyPricing(c);
         const total = p.monthlyTotal;
         const priced = isEntity ? total > 0 : (Number(c.price_per_therapist) > 0 && Number(c.therapist_count) > 0);
+        // קידום מתנה אפשרי מכל מצב, ולכן הכפתור מוגדר פעם אחת ומשובץ בכל
+        // קבוצת כפתורים במקום שלו.
+        const giftButton = (
+          <button onClick={() => { setGiftMonths(1); setError(""); setGiftFor(c); }} disabled={busy}
+            title="המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה שתבחרו - כמו קידום מתנה של מטפל"
+            className="rounded-full border border-purple-300 bg-purple-50 px-3 py-1 font-bold text-purple-800 hover:bg-purple-100 disabled:opacity-40">
+            🎁 {onGift ? "שינוי תקופת המתנה" : "קידום מתנה"}
+          </button>
+        );
         return (
           <div key={c.id} className="mb-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -755,9 +934,20 @@ export default function AdminCentersPage() {
                   ) : (
                     <span className="rounded-full bg-indigo-50 border border-indigo-300 px-2.5 py-0.5 text-xs font-bold text-indigo-800">👥 מסלול 1 · מטפלים בנפרד</span>
                   )}
-                  {c.gift_months > 0 && (
-                    <span className="rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800">
+                  {/* חודשי המתנה שבהצעה בתשלום (הכרטיס נשמר, החיוב הראשון נדחה).
+                      לא מוצג אצל מרכז בקידום מתנה או מרכז שנעצר: שם הוא רק
+                      היה מתבלבל עם קידום המתנה, שהוא בלי כרטיס בכלל. */}
+                  {c.gift_months > 0 && !onGift && c.status !== "cancelled" && (
+                    <span title="חודשי מתנה בהצעה בתשלום: המרכז מזין כרטיס, והחיוב הראשון נדחה"
+                      className="rounded-full bg-amber-50 border border-amber-300 px-2.5 py-0.5 text-xs font-bold text-amber-800">
                       🎁 {c.gift_months} חודשי מתנה
+                    </span>
+                  )}
+                  {onGift && (
+                    <span className={`rounded-full border px-2.5 py-0.5 text-xs font-bold ${giftLeft !== null && giftLeft <= 14 ? "border-amber-300 bg-amber-50 text-amber-900" : "border-purple-200 bg-white text-purple-800"}`}>
+                      {c.gift_until
+                        ? `עד ${fmtDate(c.gift_until)}${giftLeft !== null ? (giftLeft > 0 ? ` · עוד ${giftLeft} ימים` : " · הסתיים") : ""}`
+                        : "בלי תאריך סיום"}
                     </span>
                   )}
                 </div>
@@ -769,7 +959,15 @@ export default function AdminCentersPage() {
                 </p>
               </div>
               <div className="text-left">
-                {c.status === "active" ? (
+                {onGift ? (
+                  <>
+                    <div className="text-xl font-black text-purple-700">בלי חיוב</div>
+                    <div className="text-xs text-stone-500">
+                      קידום מתנה, בלי כרטיס
+                      {priced && <> · מחיר ההצעה ₪{ils(total)} + מע&quot;מ/חודש</>}
+                    </div>
+                  </>
+                ) : c.status === "active" ? (
                   <>
                     <div className="text-xl font-black text-green-700">₪{Number(c.agreed_monthly_price ?? total).toLocaleString("he-IL")} <span className="text-xs font-normal">+ מע&quot;מ/חודש</span></div>
                     <div className="text-xs text-stone-500">
@@ -959,17 +1157,33 @@ export default function AdminCentersPage() {
               </div>
             )}
 
-            {c.status === "active" && c.payer_name && (
-              <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
-                משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
-                {c.user_id
-                  ? <strong className="text-green-700"> · ✓ נכנסו לפורטל{(c.members?.length ?? 0) > 1 && (
-                      <span className="font-normal text-stone-600"> ({c.members!.length} חשבונות: {c.members!.map((m) => m.email ?? "?").join(", ")})</span>
-                    )}</strong>
-                  : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "-"})</span>}
-                {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - ביטול רק דרך ממשק Sumit</strong>}
-              </p>
-            )}
+            {/* מצב הפורטל זהה למרכז משלם ולמרכז במתנה; מה שלפניו שונה - מי משלם,
+                או ממתי ועד מתי המתנה. */}
+            {(() => {
+              if (c.status !== "active" || (!onGift && !c.payer_name)) return null;
+              const portal = c.user_id
+                ? <strong className="text-green-700"> · ✓ נכנסו לפורטל{(c.members?.length ?? 0) > 1 && (
+                    <span className="font-normal text-stone-600"> ({c.members!.length} חשבונות: {c.members!.map((m) => m.email ?? "?").join(", ")})</span>
+                  )}</strong>
+                : <span className="text-amber-600"> · טרם נכנסו לפורטל (מייל כניסה: {c.email || c.payer_email || "-"})</span>;
+              if (onGift) {
+                return (
+                  <p className="mt-2 rounded-lg bg-purple-50/60 border border-purple-100 px-3 py-1.5 text-xs text-stone-600">
+                    🎁 קידום מתנה מ-{fmtDate(c.gift_granted_at)}
+                    {c.gift_until ? <> עד {fmtDate(c.gift_until)}</> : <> · בלי תאריך סיום</>}
+                    {" "}· אין הוראת קבע ואין חיוב
+                    {portal}
+                  </p>
+                );
+              }
+              return (
+                <p className="mt-2 rounded-lg bg-green-50/60 border border-green-100 px-3 py-1.5 text-xs text-stone-600">
+                  משלם: {c.payer_name} ({c.payer_email}) · שולם {fmtDate(c.paid_at)}
+                  {portal}
+                  {!c.sumit_recurring_id && <strong className="text-red-600"> · ⚠️ חסר מזהה הוראת קבע - &quot;עצירת מנוי&quot; תבטל כל הוראה חיה שתימצא ב-Sumit</strong>}
+                </p>
+              );
+            })()}
 
             {/* "מה עכשיו?" - כולל את חיווי התשלום המפורש (בלעדיו היה צריך
                 להסיק מהסטטוס, ושורת-הישות של מסלול 2 יצרה רושם הפוך). */}
@@ -1045,6 +1259,7 @@ export default function AdminCentersPage() {
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכה
                   </button>
+                  {giftButton}
                   <button onClick={() => del(c)} disabled={busy}
                     title="מחיקת הטיוטה מהמערכת"
                     className="rounded-full border border-red-200 px-3 py-1 text-red-600 hover:bg-red-50 disabled:opacity-40">
@@ -1057,23 +1272,35 @@ export default function AdminCentersPage() {
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכת פרטים
                   </button>
-                  <button onClick={() => syncSumit(c)} disabled={busy}
-                    className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
-                    🔄 סטטוס מ-Sumit
-                  </button>
-                  {c.sumit_recurring_id && (
-                    <button
-                      onClick={() => {
-                        if (confirm(`לבטל את המנוי של ${c.name}? הוראת הקבע ב-Sumit תבוטל והחיובים ייפסקו.`)) {
-                          post({ action: "cancel_subscription", id: c.id });
-                        }
-                      }}
-                      disabled={busy}
-                      className="rounded-full border border-red-300 bg-red-50 px-3 py-1 font-bold text-red-700 hover:bg-red-100"
-                    >
-                      ביטול מנוי
+                  {/* מרכז במתנה שמעולם לא הזין כרטיס אינו לקוח ב-Sumit - אין מה לשאול שם. */}
+                  {(!onGift || c.paid_at) && (
+                    <button onClick={() => syncSumit(c)} disabled={busy}
+                      title={onGift ? "בודק שלא נשארה ב-Sumit הוראת קבע חיה שתחייב את המרכז" : undefined}
+                      className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
+                      🔄 סטטוס מ-Sumit
                     </button>
                   )}
+                  {giftButton}
+                  {/* עצירה שומרת את כל הפרטים. מוצגת גם כשחסר מזהה הוראת קבע:
+                      השרת מבטל כל הוראה חיה שהוא מוצא ב-Sumit למרכז הזה. */}
+                  <button onClick={() => stopSubscription(c)} disabled={busy}
+                    title="המרכז יורד מהאוויר, וכל הפרטים שלו נשמרים. אפשר להחזיר אותו במתנה או בתשלום."
+                    className="rounded-full border border-red-300 bg-red-50 px-3 py-1 font-bold text-red-700 hover:bg-red-100 disabled:opacity-40">
+                    ⏸ {onGift ? "סיום המתנה ועצירה" : "עצירת מנוי (הפרטים נשמרים)"}
+                  </button>
+                </>
+              )}
+              {c.status === "cancelled" && (
+                <>
+                  {giftButton}
+                  <button onClick={() => reopenOffer(c)} disabled={busy}
+                    title="המרכז חוזר לטיוטות עם אותו קישור הצטרפות ואותו תמחור; כשיזין כרטיס הוא חוזר לאוויר"
+                    className="rounded-full border border-teal-400 bg-teal-600 px-3 py-1 font-bold text-white hover:bg-teal-700 disabled:opacity-40">
+                    ↩️ פתיחת ההצעה מחדש לתשלום
+                  </button>
+                  <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
+                    עריכת פרטים
+                  </button>
                 </>
               )}
             </div>
@@ -1219,7 +1446,9 @@ export default function AdminCentersPage() {
                 </div>
                 {isActiveEditing && (
                   <p className="mb-2 text-[11px] leading-4 text-amber-600">
-                    ⚠️ שינוי המחיר במרכז פעיל יעדכן מיד את הסכום החודשי בהוראת הקבע ב-Sumit (מהחיוב הבא). לא ניתן להחליף מסלול חיוב במרכז פעיל.
+                    {isCenterOnGift(editing as Center)
+                      ? "המרכז בקידום מתנה: אין הוראת קבע, ולכן המחיר נשמר כמחיר ההצעה בלבד ולא נגבה. לא ניתן להחליף מסלול חיוב במרכז פעיל."
+                      : "⚠️ שינוי המחיר במרכז פעיל יעדכן מיד את הסכום החודשי בהוראת הקבע ב-Sumit (מהחיוב הבא). לא ניתן להחליף מסלול חיוב במרכז פעיל."}
                   </p>
                 )}
               </>
@@ -1315,6 +1544,89 @@ export default function AdminCentersPage() {
         </div>
       )}
 
+      {/* חלון קידום מתנה - אותו רעיון כמו "שדרוג למסלול המקודם" של מטפל:
+          1-12 חודשים, או בלי תאריך סיום. שגיאה מוצגת כאן בתוך החלון, כי
+          ההודעה שבראש העמוד מוסתרת מאחוריו. */}
+      {giftFor && (() => {
+        const c = giftFor;
+        const already = isCenterOnGift(c);
+        const hasOrder = c.status === "active" && !already;
+        const today = new Date().toISOString().slice(0, 10);
+        const firstCharge = c.billing_starts_at && c.billing_starts_at > today ? c.billing_starts_at : null;
+        // "חודש אחד", "חודשיים", "3 חודשים" - ולא "1 חודש".
+        const period = giftMonths === 1 ? "חודש אחד" : giftMonths === 2 ? "חודשיים" : `${giftMonths} חודשים`;
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" dir="rtl"
+            onClick={() => { if (!busy) setGiftFor(null); }}>
+            <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-lg font-black text-stone-900">
+                🎁 {already ? "שינוי תקופת המתנה" : "קידום מתנה"} - {c.name}
+              </h3>
+              <p className="mb-3 text-sm leading-6 text-stone-600">
+                המרכז באוויר בלי כרטיס אשראי ובלי חיוב: בהתאמות, בעמוד הציבורי ובפורטל, כמו מרכז משלם.
+                בסוף התקופה הוא יורד מהאוויר לבד, הפרטים שלו נשמרים, ואנחנו מקבלים על כך מייל. למרכז לא נשלח מייל.
+              </p>
+
+              {hasOrder && (
+                <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  ⚠️ למרכז יש הוראת קבע ב-Sumit{firstCharge ? ` (חיוב ראשון ב-${fmtDate(firstCharge)})` : ""}.
+                  קידום המתנה <strong>מבטל אותה</strong>, והכרטיס השמור לא יחויב. כדי לעבור לתשלום בסוף המתנה
+                  המרכז יצטרך להזין כרטיס מחדש.
+                </p>
+              )}
+              {already && (
+                <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+                  המתנה הנוכחית: {c.gift_until ? `עד ${fmtDate(c.gift_until)}` : "בלי תאריך סיום"}. התקופה החדשה נספרת מהיום ומחליפה אותה.
+                </p>
+              )}
+              {c.status === "cancelled" && (
+                <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+                  המרכז חוזר לאוויר מיד, עם הפרופילים, העמוד הציבורי וחשבון הפורטל שהיו לו.
+                </p>
+              )}
+              {(c.status === "draft" || c.status === "sent") && (
+                <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+                  המרכז עולה לאוויר בלי לעבור בדף התשלום.
+                  {!c.user_id && <> אחר כך שלחו לו את קישור ההצטרפות: אצל מרכז במתנה הוא משמש רק להקמת חשבון הניהול, ולא מבקש תשלום.</>}
+                </p>
+              )}
+
+              <label className="mb-2 block text-sm font-semibold text-stone-800">מספר חודשי קידום במתנה</label>
+              <div className="grid grid-cols-6 gap-2">
+                {Array.from({ length: CENTER_GIFT_MAX_MONTHS }, (_, k) => k + 1).map((m) => (
+                  <button key={m} type="button" onClick={() => setGiftMonths(m)}
+                    className={`rounded-xl border px-0 py-3 text-sm font-bold transition ${
+                      giftMonths === m
+                        ? "border-indigo-600 bg-indigo-600 text-white"
+                        : "border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+                    }`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+              <p className="mt-2 text-xs text-stone-500">
+                {period} מהיום: המתנה מסתיימת ב-<span className="font-bold text-stone-700">{fmtDate(giftUntilFromMonths(giftMonths))}</span>.
+              </p>
+
+              {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+
+              <button type="button" disabled={busy} onClick={() => grantGift(c, giftMonths)}
+                className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-40">
+                {busy ? "מעדכן…" : `קידום מתנה ל${giftMonths <= 2 ? "" : "-"}${period}`}
+              </button>
+              <button type="button" disabled={busy} onClick={() => grantGift(c, null)}
+                className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-40">
+                קידום מתנה בלי תאריך סיום
+              </button>
+              <button type="button" disabled={busy} onClick={() => setGiftFor(null)}
+                className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-40">
+                ביטול
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* מודל: ניהול שיוך מטפלים למרכז */}
       {manageFor && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-4" dir="rtl">
@@ -1397,7 +1709,10 @@ function Journey({ c }: { c: Center }) {
   const steps: { label: string; done: boolean; title?: string }[] = [
     { label: "הצעה", done: true, title: `נוצרה ${fmtDate(c.created_at)}` },
     { label: "נשלחה", done: c.status !== "draft" },
-    { label: "תשלום", done: !!c.paid_at, title: c.paid_at ? `שולם ${fmtDate(c.paid_at)}` : undefined },
+    // מרכז בקידום מתנה עלה לאוויר בלי לשלם: במקום "תשלום" השלב שלו הוא המתנה.
+    isCenterOnGift(c)
+      ? { label: "קידום מתנה", done: true, title: `מ-${fmtDate(c.gift_granted_at)}${c.gift_until ? ` עד ${fmtDate(c.gift_until)}` : ", בלי תאריך סיום"}` }
+      : { label: "תשלום", done: !!c.paid_at, title: c.paid_at ? `שולם ${fmtDate(c.paid_at)}` : undefined },
     { label: "חשבון פורטל", done: !!c.user_id },
     {
       label: isEntity ? "פרופיל מאושר" : "מטפלים באוויר",

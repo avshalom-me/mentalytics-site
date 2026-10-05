@@ -18,6 +18,13 @@ function fmtDate(iso: string | null): string {
 }
 
 function billingText(h: CenterHealth): string {
+  // מרכז בקידום מתנה: אין חיוב. מה שחשוב לשיחה הוא מתי המתנה נגמרת.
+  if (h.onGift) {
+    if (!h.giftUntil) return "קידום מתנה, בלי תאריך סיום";
+    return h.daysToGiftEnd !== null && h.daysToGiftEnd > 0
+      ? `קידום מתנה עד ${fmtDate(h.giftUntil)} (עוד ${h.daysToGiftEnd} ימים)`
+      : `קידום מתנה עד ${fmtDate(h.giftUntil)}`;
+  }
   if (!h.billingStartsAt) return "";
   if (h.daysToBilling === null) return "";
   if (h.daysToBilling < 0) return `חיוב פעיל מ-${fmtDate(h.billingStartsAt)}`;
@@ -114,7 +121,7 @@ export default function CenterCallSheet({
                     <tr key={c.id}>
                       <td><strong>{c.name}</strong></td>
                       <td className="n">{c.track === "center_entity" ? "2" : "1"}</td>
-                      <td className="n">{fmtDate(c.billingStartsAt)}</td>
+                      <td className="n">{c.onGift ? (c.giftUntil ? `מתנה עד ${fmtDate(c.giftUntil)}` : "מתנה") : fmtDate(c.billingStartsAt)}</td>
                       <td className="n">{c.track === "center_entity" ? "-" : `${c.slots?.promoted ?? 0}/${c.slots?.paid ?? 0}`}</td>
                       <td className="n">{c.totals.cards}</td>
                       <td className="n">{c.totals.list}</td>

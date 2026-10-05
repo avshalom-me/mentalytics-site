@@ -114,9 +114,10 @@ describe("the columns", () => {
 });
 
 describe("rows", () => {
-  it("come in the order the admin page lists centres: active track 2, active track 1, sent, draft, cancelled", () => {
+  it("come in the order the admin page lists centres: active track 2, active track 1, gift, sent, draft, stopped", () => {
     const rows = [
-      center({ name: "בוטל", status: "cancelled" }),
+      center({ name: "נעצר", status: "cancelled" }),
+      center({ name: "במתנה", status: "active", billing_track: "center_entity", gift_granted_at: "2026-10-05T10:00:00Z" }),
       center({ name: "טיוטה א", status: "draft" }),
       center({ name: "נשלח", status: "sent" }),
       center({ name: "פעיל מסלול 1 - ראשון", status: "active" }),
@@ -129,10 +130,11 @@ describe("rows", () => {
       "פעיל מסלול 2",
       "פעיל מסלול 1 - ראשון",
       "פעיל מסלול 1 - שני",
+      "במתנה",
       "נשלח",
       "טיוטה א",
       "טיוטה ב",
-      "בוטל",
+      "נעצר",
     ]);
   });
 
@@ -154,11 +156,40 @@ describe("identity and status", () => {
     expect(cell([center({ status: "sent" })], "סטטוס")).toBe("הצעה נשלחה");
     expect(cell([center({ status: "active" })], "סטטוס")).toBe("מנוי פעיל");
     expect(cell([center({ status: "draft" })], "סטטוס")).toBe("טיוטה");
-    expect(cell([center({ status: "cancelled" })], "סטטוס")).toBe("בוטל");
+    expect(cell([center({ status: "cancelled" })], "סטטוס")).toBe("מנוי נעצר");
     expect(cell([center({ billing_track: "center_entity" })], "מסלול")).toBe("מסלול 2 - מרכז כישות");
     expect(cell([center({ billing_track: "per_therapist" })], "מסלול")).toBe("מסלול 1 - מטפלים בנפרד");
     // An old or empty track is track 1, as on the page.
     expect(cell([center({ billing_track: null })], "מסלול")).toBe("מסלול 1 - מטפלים בנפרד");
+  });
+
+  it("tells a centre on a gift promotion from a paying one", () => {
+    const gift = center({ status: "active", gift_granted_at: "2026-10-05T10:00:00Z", gift_until: "2026-12-05T10:00:00Z" });
+    expect(cell([gift], "סטטוס")).toBe("קידום מתנה");
+    expect(cell([gift], "קידום מתנה מתאריך")).toBeCloseTo(46300 + 13 / 24, 7);
+    expect(cell([gift], "קידום מתנה עד")).toBeCloseTo(46361 + 12 / 24, 7);
+    // A gift with no end date: the status says gift, the end date stays empty.
+    const open = center({ status: "active", gift_granted_at: "2026-10-05T10:00:00Z", gift_until: null });
+    expect(cell([open], "סטטוס")).toBe("קידום מתנה");
+    expect(cell([open], "קידום מתנה עד")).toBeNull();
+    // A paying centre has neither.
+    expect(cell([center({ status: "active" })], "קידום מתנה מתאריך")).toBeNull();
+  });
+
+  it("does not call a stopped centre a gift, whatever dates were left on its row", () => {
+    const stopped = center({ status: "cancelled", gift_granted_at: "2026-09-05T10:00:00Z", gift_until: "2026-10-05T10:00:00Z", cancel_reason: "gift_ended", cancelled_at: "2026-10-06T06:45:00Z" });
+    expect(cell([stopped], "סטטוס")).toBe("מנוי נעצר");
+    expect(cell([stopped], "קידום מתנה מתאריך")).toBeNull();
+    expect(cell([stopped], "קידום מתנה עד")).toBeNull();
+    expect(cell([stopped], "סיבת העצירה")).toBe("תקופת המתנה הסתיימה");
+  });
+
+  it("says why a subscription stopped, and nothing for a centre that is not stopped", () => {
+    expect(cell([center({ status: "cancelled", cancel_reason: "admin" })], "סיבת העצירה")).toBe("נעצר מהאדמין");
+    expect(cell([center({ status: "cancelled", cancel_reason: "sumit" })], "סיבת העצירה")).toBe("הוראת הקבע בוטלה ב-Sumit");
+    // Stopped before the reason was kept.
+    expect(cell([center({ status: "cancelled" })], "סיבת העצירה")).toBeNull();
+    expect(cell([center({ status: "active", cancel_reason: "admin" })], "סיבת העצירה")).toBeNull();
   });
 
   it("keeps an unknown status readable instead of dropping it", () => {
@@ -217,7 +248,7 @@ describe("offer and price", () => {
 
   it("carries the gift months, locations, discount and the agreed price as numbers", () => {
     const c = center({ gift_months: 2, num_locations: 3, discount_amount: 75.5, agreed_monthly_price: 1500 });
-    expect(cell([c], "חודשי מתנה")).toBe(2);
+    expect(cell([c], "חודשי מתנה בהצעה")).toBe(2);
     expect(cell([c], "מספר מיקומים")).toBe(3);
     expect(cell([c], 'הנחה (₪ לחודש, לפני מע"מ)')).toBe(75.5);
     expect(cell([c], 'מחיר חודשי שסוכם (₪, לפני מע"מ)')).toBe(1500);
@@ -244,7 +275,7 @@ describe("dates", () => {
 
   it("leave the cell empty for a missing or unreadable date", () => {
     const c = center({ cancelled_at: null, paid_at: "garbage" });
-    expect(cell([c], "בוטל בתאריך")).toBeNull();
+    expect(cell([c], "נעצר בתאריך")).toBeNull();
     expect(cell([c], "שולם בתאריך")).toBeNull();
     expect(cell([c], "תחילת חיוב")).toBeNull();
   });

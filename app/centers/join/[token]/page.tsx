@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
+import { isCenterOnGift } from "@/app/lib/center-gift";
 import CenterJoinForm, { type CenterOffer } from "./CenterJoinForm";
 import CenterAccountSetup from "./CenterAccountSetup";
 
@@ -21,7 +22,7 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
 
   const { data: center } = await supabaseAdmin
     .from("therapy_center_accounts")
-    .select("id, name, contact_name, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, discount_amount, num_locations, gift_months, billing_starts_at, user_id, payer_email")
+    .select("id, name, contact_name, email, status, billing_track, price_per_therapist, therapist_count, fixed_monthly_price, discount_amount, num_locations, gift_months, billing_starts_at, user_id, payer_email, gift_granted_at, gift_until")
     .eq("token", token)
     .maybeSingle();
 
@@ -41,13 +42,25 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
   }
 
   if (center.status === "active") {
+    // מרכז בקידום מתנה פעיל בלי שהזין אמצעי תשלום: הקישור משמש אותו רק להקמת
+    // חשבון הניהול, ואסור שיקרא כאן "פרטי התשלום נקלטו".
+    const onGift = isCenterOnGift(center);
+    const giftEnds = onGift && center.gift_until
+      ? new Date(center.gift_until as string).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })
+      : null;
     return (
       <Shell>
         <div className="rounded-3xl border border-green-200 bg-green-50 p-10 text-center shadow-sm">
           <div className="text-4xl mb-3">✅</div>
-          <h1 className="text-xl font-black text-stone-900 mb-2">המנוי של {center.name} פעיל</h1>
+          <h1 className="text-xl font-black text-stone-900 mb-2">
+            {onGift ? `הפרופיל של ${center.name} פעיל באתר` : `המנוי של ${center.name} פעיל`}
+          </h1>
           <p className="text-sm leading-6 text-stone-600">
-            פרטי התשלום נקלטו בהצלחה{center.billing_starts_at ? ` - החיוב הראשון ב-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}` : ""}.
+            {onGift ? (
+              <>המרכז מופיע באתר במסגרת תקופת מתנה, ללא תשלום{giftEnds ? `, עד ${giftEnds}` : ""}.</>
+            ) : (
+              <>פרטי התשלום נקלטו בהצלחה{center.billing_starts_at ? ` - החיוב הראשון ב-${new Date(center.billing_starts_at + "T00:00:00").toLocaleDateString("he-IL")}` : ""}.</>
+            )}
           </p>
           {center.user_id ? (
             <p className="mt-3 text-sm leading-6 text-stone-600">
@@ -56,8 +69,9 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
               <br />לשאלות: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
             </p>
           ) : (
-            // שולם אך טרם הוקם חשבון ניהול - הקמה עצמית לפי הטוקן (הגעה מהמייל)
-            <CenterAccountSetup token={token} centerName={center.name} defaultEmail={center.payer_email ?? undefined} />
+            // פעיל אך טרם הוקם חשבון ניהול - הקמה עצמית לפי הטוקן (הגעה מהמייל).
+            // למרכז בקידום מתנה אין משלם, ולכן ברירת המחדל היא מייל איש הקשר.
+            <CenterAccountSetup token={token} centerName={center.name} defaultEmail={center.payer_email ?? center.email ?? undefined} />
           )}
         </div>
       </Shell>
@@ -110,6 +124,8 @@ export default async function CenterJoinPage({ params }: { params: Promise<{ tok
     contact_name: center.contact_name,
     billing_track: billingTrack,
     gift_months: center.gift_months ?? 0,
+    // הצעה שנפתחה מחדש למרכז שכבר היה פעיל: חשבון הניהול שלו קיים, ואין מה להקים.
+    has_account: !!center.user_id,
     price_per_therapist: p.pricePerTherapist,
     therapist_count: p.therapistCount,
     per_therapist_with_vat: p.perTherapistWithVat,

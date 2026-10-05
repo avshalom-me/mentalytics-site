@@ -1,4 +1,5 @@
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
+import { isCenterOnGift, stopReasonLabel } from "@/app/lib/center-gift";
 import { buildXlsx, toExcelSerial, type XlsxColumn, type XlsxKind, type XlsxSheet, type XlsxValue } from "@/app/lib/xlsx-writer";
 
 // The centres export behind "הורדה לאקסל" on /admin/centers: one row per centre,
@@ -68,6 +69,10 @@ export type ExportCenter = {
   billing_starts_at: string | null;
   paid_at: string | null;
   cancelled_at: string | null;
+  // Optional so a list loaded before these columns existed still exports.
+  cancel_reason?: string | null;
+  gift_granted_at?: string | null;
+  gift_until?: string | null;
   payer_name: string | null;
   payer_email: string | null;
   payer_phone: string | null;
@@ -114,8 +119,13 @@ const STATUS_LABEL: Record<string, string> = {
   draft: "טיוטה",
   sent: "הצעה נשלחה",
   active: "מנוי פעיל",
-  cancelled: "בוטל",
+  cancelled: "מנוי נעצר",
 };
+// An active centre on a gift promotion (no card, no charge) is its own stage on
+// the admin page, with its own badge.
+const GIFT_STATUS_LABEL = "קידום מתנה";
+const statusLabel = (c: ExportCenter) =>
+  isCenterOnGift(c) ? GIFT_STATUS_LABEL : STATUS_LABEL[c.status] ?? str(c.status);
 const TRACK_LABEL = { per_therapist: "מסלול 1 - מטפלים בנפרד", center_entity: "מסלול 2 - מרכז כישות" } as const;
 const CLICK_TYPE_LABEL: Record<string, string> = {
   site_message: "הודעות באתר",
@@ -212,7 +222,7 @@ const SECTIONS: Def[][] = [
   // The centre
   [
     { header: "שם המרכז", width: 28, value: (c) => str(c.name) },
-    { header: "סטטוס", width: 13, value: (c) => STATUS_LABEL[c.status] ?? str(c.status) },
+    { header: "סטטוס", width: 13, value: (c) => statusLabel(c) },
     { header: "מסלול", width: 24, value: (c) => (isEntity(c) ? TRACK_LABEL.center_entity : TRACK_LABEL.per_therapist) },
     { header: "איש/אשת קשר", width: 18, value: (c) => str(c.contact_name) },
     { header: "אימייל", width: 28, value: (c) => str(c.email) },
@@ -223,7 +233,8 @@ const SECTIONS: Def[][] = [
   ],
   // The offer and its price
   [
-    { header: "חודשי מתנה", width: 10, kind: "int", value: (c) => num(c.gift_months) },
+    // The gift months inside a paid offer: the card is saved, the first charge is put off.
+    { header: "חודשי מתנה בהצעה", width: 10, kind: "int", value: (c) => num(c.gift_months) },
     { header: 'מחיר למטפל (₪, לפני מע"מ)', width: 18, kind: "money", value: (c) => (isEntity(c) ? null : num(c.price_per_therapist)) },
     { header: "מספר מטפלים בהצעה", width: 12, kind: "int", value: (c) => (isEntity(c) ? null : num(c.therapist_count)) },
     { header: 'מחיר חודשי קבוע (₪, לפני מע"מ)', width: 18, kind: "money", value: (c) => (isEntity(c) ? num(c.fixed_monthly_price) : null) },
@@ -237,7 +248,12 @@ const SECTIONS: Def[][] = [
   [
     { header: "תחילת חיוב", width: 13, kind: "date", value: (c) => toExcelSerial(c.billing_starts_at ?? null, TIME_ZONE) },
     { header: "שולם בתאריך", width: 17, kind: "datetime", value: (c) => when(c.paid_at) },
-    { header: "בוטל בתאריך", width: 17, kind: "datetime", value: (c) => when(c.cancelled_at) },
+    { header: "נעצר בתאריך", width: 17, kind: "datetime", value: (c) => when(c.cancelled_at) },
+    { header: "סיבת העצירה", width: 24, value: (c) => (c.status === "cancelled" ? stopReasonLabel(c.cancel_reason) : null) },
+    // A gift promotion: on air with no card and no charge. An empty end date on
+    // a centre whose status says "קידום מתנה" means a gift with no end.
+    { header: "קידום מתנה מתאריך", width: 17, kind: "datetime", value: (c) => (isCenterOnGift(c) ? when(c.gift_granted_at) : null) },
+    { header: "קידום מתנה עד", width: 17, kind: "datetime", value: (c) => (isCenterOnGift(c) ? when(c.gift_until) : null) },
     { header: "שם המשלם", width: 20, value: (c) => str(c.payer_name) },
     { header: "אימייל המשלם", width: 28, value: (c) => str(c.payer_email) },
     { header: "טלפון המשלם", width: 16, value: (c) => str(c.payer_phone) },
@@ -356,12 +372,13 @@ const DEFS: (Def & { band: 0 | 1 })[] = SECTIONS.flatMap((section, i) =>
 );
 
 // The order the admin page lists them in: active subscriptions (track 2, then
-// track 1), then sent offers, drafts, cancelled. Within a stage the loaded order
-// (newest first) is kept.
+// track 1), gift promotions, then sent offers, drafts, stopped. Within a stage
+// the loaded order (newest first) is kept.
 function stageRank(c: ExportCenter): number {
+  if (isCenterOnGift(c)) return 2;
   if (c.status === "active") return isEntity(c) ? 0 : 1;
   const i = ["sent", "draft", "cancelled"].indexOf(c.status);
-  return i === -1 ? 5 : 2 + i;
+  return i === -1 ? 6 : 3 + i;
 }
 
 export const CENTERS_SHEET_NAME = "מרכזים";

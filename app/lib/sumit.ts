@@ -478,6 +478,31 @@ export async function cancelSubscription(opts: {
   }
 }
 
+// ---------- Cancel every live standing order of a customer ----------
+//
+// For "this customer must not be charged again": a centre whose subscription
+// the admin stops, or turns into a gift. cancelSubscription() above takes the
+// one order id we have on file. That is not enough here - an order we do not
+// have on file (a duplicate, or a centre saved without its id) would keep
+// charging the card of a customer we have just told is no longer billed.
+//
+// Reads what is live at Sumit (0 = charging, 12 = scheduled) and cancels each
+// one through cancelSubscription, which re-reads and throws if the order
+// survived. Returns the ids it cancelled; an empty list means nothing was
+// live. Throws on the first failure, leaving the rest untouched - the caller
+// must not record the customer as stopped.
+export async function cancelLiveOrdersForCustomer(customerExternalId: string): Promise<number[]> {
+  const items = await listRecurringForCustomer({
+    externalIdentifier: customerExternalId,
+    includeInactive: true,
+  });
+  const live = items.filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)));
+  for (const item of live) {
+    await cancelSubscription({ recurringItemId: Number(item.ID), customerExternalId });
+  }
+  return live.map((i) => Number(i.ID));
+}
+
 // ---------- Update the price of an existing standing order ----------
 //
 // Sumit endpoint POST /billing/recurring/update/ - identifies the order by

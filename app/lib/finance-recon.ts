@@ -17,6 +17,8 @@ import { computeGuarantee } from "./guarantee";
 //   1. מטפל בתקופת ניסיון (promotion_source='trial') - מקודם בלי מנוי.
 //   2. מטפל משלם (promotion_source='paid') עם מנוי פעיל.
 //   3. מטפל של מרכז (promotion_source='center') - המרכז מחויב, לא הוא.
+//   4. מרכז בקידום מתנה (gift_granted_at מלא) - פעיל בלי הוראת חיוב, בכוונה,
+//      עד תאריך הסיום של המתנה.
 
 export type FinanceFinding = {
   key: string;
@@ -37,6 +39,9 @@ export type FinanceRun = {
 const RENEWAL_GRACE_DAYS = 4;
 // מרכז מחויב חודשית. 40 יום = מחזור שלם ועוד מרווח, כלומר חיוב שנפל.
 const CENTER_BILLING_MAX_DAYS = 40;
+// קידום מתנה של מרכז נעצר בקרון היומי שאחרי תאריך הסיום. יומיים = הקרון כבר
+// היה אמור לרוץ פעמיים, כלומר הוא לא עצר את המרכז.
+const CENTER_GIFT_GRACE_DAYS = 2;
 
 type TherapistRow = {
   id: string;
@@ -71,6 +76,8 @@ type CenterRow = {
   sumit_miss_count: number | null;
   gift_months: number | null;
   paid_at: string | null;
+  gift_granted_at: string | null;
+  gift_until: string | null;
 };
 
 function daysSince(iso: string | null): number | null {
@@ -115,7 +122,7 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
         supabaseAdmin
           .from("therapy_center_accounts")
           .select(
-            "id, name, status, sumit_recurring_id, agreed_monthly_price, price_per_therapist, fixed_monthly_price, billing_track, billing_starts_at, last_billed_on, sumit_miss_count, gift_months, paid_at"
+            "id, name, status, sumit_recurring_id, agreed_monthly_price, price_per_therapist, fixed_monthly_price, billing_track, billing_starts_at, last_billed_on, sumit_miss_count, gift_months, paid_at, gift_granted_at, gift_until"
           )
           .order("id")
       ),
@@ -207,6 +214,23 @@ export async function runFinanceRecon(): Promise<FinanceRun> {
     for (const c of centers) {
       if (c.status !== "active") continue;
       const label = c.name?.trim() || "מרכז ללא שם";
+
+      // מרכז בקידום מתנה (center-gift.ts) פעיל בלי הוראת חיוב בכוונה, ולכן אף
+      // אחת מבדיקות החיוב שלמטה לא חלה עליו. מה שכן יכול לדלוף אצלו: מתנה
+      // שהתאריך שלה עבר והמרכז נשאר באוויר - כלומר הקרון שעוצר אותה לא רץ
+      // או נכשל, והשירות ממשיך בחינם בלי שמישהו החליט על כך.
+      if (c.gift_granted_at) {
+        const over = daysSince(c.gift_until);
+        if (over != null && over >= CENTER_GIFT_GRACE_DAYS) {
+          findings.push({
+            key: `fin:center_gift_expired:${c.id}`,
+            severity: "medium",
+            title: `קידום המתנה של ${label} הסתיים והמרכז נשאר באוויר`,
+            detail: `המתנה הייתה בתוקף עד ${c.gift_until?.slice(0, 10)} (לפני ${over} ימים) ואין הוראת חיוב. לעצור את המרכז, להאריך את המתנה, או לפתוח הצעה לתשלום.`,
+          });
+        }
+        continue;
+      }
       // "עוד לא התחיל להיות מחויב" נקבע לפי תאריך תחילת החיוב ולא לפי
       // paid_at: מרכז בחודשי מתנה כן משלים את הקמת אמצעי התשלום, ולכן
       // paid_at מסומן אצלו למרות שאין עדיין מה לגבות. בדיקה לפי paid_at

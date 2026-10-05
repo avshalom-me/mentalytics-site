@@ -4,6 +4,7 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { CITY_TO_REGION } from "./regions";
 import { centerWhatsAppNumber } from "./phone";
 import { loadCentersWithReadiness, type CenterWithReadiness } from "./center-readiness-load";
+import { giftDaysLeft } from "./center-gift";
 
 // "בריאות מרכז": שכבת הפרשנות מעל המספרים שכבר יש באדמין.
 //
@@ -24,6 +25,7 @@ import { loadCentersWithReadiness, type CenterWithReadiness } from "./center-rea
 export type HealthSeverity = "critical" | "high" | "normal";
 export type HealthOwner = "center" | "us";
 export type HealthFlagKey =
+  | "gift_ending"
   | "no_therapists"
   | "no_whatsapp"
   | "inquiry_recipient"
@@ -65,8 +67,14 @@ export type CenterHealth = {
   trackLabel: string;
   paidAt: string | null;
   billingStartsAt: string | null;
-  /** ימים עד תחילת החיוב; שלילי = החיוב כבר התחיל; null = לא ידוע. */
+  /** ימים עד תחילת החיוב; שלילי = החיוב כבר התחיל; null = לא ידוע, או מרכז בקידום מתנה (אין חיוב). */
   daysToBilling: number | null;
+  /** מרכז בקידום מתנה: פעיל בלי הוראת קבע ובלי חיוב (center-gift.ts). */
+  onGift: boolean;
+  /** סוף קידום המתנה; null = לא במתנה, או מתנה בלי תאריך סיום. */
+  giftUntil: string | null;
+  /** ימים עד סוף המתנה; 0 או פחות = התקופה עברה והקרון הבא יעצור את המרכז. */
+  daysToGiftEnd: number | null;
   /** ימים מאז שהמרכז התחיל לצבור חשיפה (מטפל ראשון מקודם / שורת הישות / התשלום). */
   daysActive: number;
   /** חלון המדידה של המרכז: 30 יום, או פחות אם המרכז צעיר יותר. */
@@ -110,6 +118,10 @@ const NO_THERAPISTS_HIGH_DAYS = 14;
 const NO_THERAPISTS_CRITICAL_DAYS = 30;
 // כשהחיוב הראשון בעוד פחות משבועיים, מרכז בלי מטפלים הוא שיחה דחופה.
 const BILLING_SOON_DAYS = 14;
+// קידום מתנה שמסתיים: בסוף התקופה המרכז יורד מהאוויר לבד. שבועיים לפני כן
+// זה דגל, ושלושה ימים לפני כן זה קריטי - כבר אין זמן לשיחה נינוחה.
+const GIFT_ENDING_HIGH_DAYS = 14;
+const GIFT_ENDING_CRITICAL_DAYS = 3;
 // מתחת לזה חיפושים באזור ב-30 יום, אף פרופיל לא יביא פניות - הבעיה בביקוש.
 const LOW_DEMAND_SEARCHES = 30;
 // ריכוז: מספיק פניות כדי שיהיה משמעותי, ורוב מוחלט למטפל אחד.
@@ -162,6 +174,8 @@ type CenterExtra = {
   email: string | null;
   payer_email: string | null;
   therapist_count: number | null;
+  gift_granted_at: string | null;
+  gift_until: string | null;
 };
 
 type TRow = {
@@ -199,7 +213,7 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
     supabaseAdmin
       .from("therapy_center_accounts")
       .select(
-        "id, billing_track, billing_starts_at, paid_at, public_page_enabled, public_phone, public_whatsapp, email, payer_email, therapist_count"
+        "id, billing_track, billing_starts_at, paid_at, public_page_enabled, public_phone, public_whatsapp, email, payer_email, therapist_count, gift_granted_at, gift_until"
       )
       .in("id", ids),
     supabaseAdmin.from("center_members").select("center_id, email").in("center_id", ids),
@@ -341,15 +355,26 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
     const promoted = real.filter((t) => t.status === "paying");
 
     // עוגן: מתי המרכז התחיל להיות מוצג. לא התאריך המוקדם ביותר של הפעילות -
-    // פרופיל שהיה במאגר לפני המרכז היה גורר את החלון אחורה.
+    // פרופיל שהיה במאגר לפני המרכז היה גורר את החלון אחורה. מרכז שעלה לאוויר
+    // בקידום מתנה בלי ששילם אי פעם נמדד מהיום שקיבל אותה.
+    const activeSince = x?.paid_at ?? x?.gift_granted_at ?? null;
     const anchorIso = isEntity
-      ? entity?.promoted_since ?? entity?.created_at ?? x?.paid_at ?? null
-      : promoted.map((t) => t.promoted_since ?? t.created_at ?? "").filter(Boolean).sort()[0] ?? x?.paid_at ?? null;
+      ? entity?.promoted_since ?? entity?.created_at ?? activeSince
+      : promoted.map((t) => t.promoted_since ?? t.created_at ?? "").filter(Boolean).sort()[0] ?? activeSince;
     const daysActive = anchorIso ? Math.max(0, daysBetween(anchorIso)) : 0;
     const sinceIso = anchorIso && anchorIso > cutoff ? anchorIso : cutoff;
     const windowDays = Math.min(WINDOW_DAYS, Math.max(1, daysActive || WINDOW_DAYS));
 
     const daysToBilling = x?.billing_starts_at ? -daysBetween(x.billing_starts_at) : null;
+
+    // קידום מתנה: כל המרכזים כאן פעילים, ולכן gift_granted_at מלא = במתנה.
+    const onGift = !!x?.gift_granted_at;
+    const giftUntil = onGift ? x?.gift_until ?? null : null;
+    const daysToGiftEnd = giftDaysLeft({
+      status: "active",
+      gift_granted_at: x?.gift_granted_at ?? null,
+      gift_until: x?.gift_until ?? null,
+    });
 
     const rows: TherapistHealthRow[] = (isEntity && entity ? [entity] : promoted).map((t) => ({
       id: t.id,
@@ -385,6 +410,25 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
     const memberEmails = membersByCenter.get(c.id) ?? [];
 
     const flags: HealthFlag[] = [];
+
+    // 0. קידום מתנה שמסתיים בקרוב. בסוף התקופה הקרון עוצר את המרכז לבד, ולכן
+    //    ההחלטה (להאריך, או להציע תשלום) צריכה להתקבל לפני התאריך. באחריותנו:
+    //    המרכז לא מקבל על זה מייל, ולכן הדגל הוא התזכורת היחידה.
+    if (daysToGiftEnd !== null && giftUntil && daysToGiftEnd <= GIFT_ENDING_HIGH_DAYS) {
+      const endDate = new Date(giftUntil).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
+      flags.push({
+        key: "gift_ending",
+        severity: daysToGiftEnd <= GIFT_ENDING_CRITICAL_DAYS ? "critical" : "high",
+        owner: "us",
+        label: daysToGiftEnd > 0 ? "קידום המתנה מסתיים בקרוב" : "קידום המתנה הסתיים",
+        detail:
+          daysToGiftEnd > 0
+            ? `קידום המתנה מסתיים ב-${endDate} (בעוד ${daysToGiftEnd} ימים). בסוף התקופה המרכז יורד מהאוויר לבד, והפרטים שלו נשמרים.`
+            : `קידום המתנה הסתיים ב-${endDate}. המרכז יירד מהאוויר בסנכרון היומי הקרוב, והפרטים שלו נשמרים.`,
+        question: "לסגור עם המרכז לפני התאריך: המשך בתשלום, או הארכת המתנה. מעבר לתשלום נעשה במסך המרכזים: עצירת המנוי, פתיחת ההצעה מחדש, והמרכז מזין כרטיס בקישור ההצטרפות.",
+        emailParagraph: null,
+      });
+    }
 
     // 1. מסלול 1 בלי אף מטפל - הדגל שאיש לא ראה אצל אחד המרכזים.
     if (!isEntity && real.length === 0 && daysActive >= NO_THERAPISTS_HIGH_DAYS) {
@@ -507,6 +551,9 @@ export async function loadCenterHealth(): Promise<CenterHealthReport> {
       paidAt: x?.paid_at ?? null,
       billingStartsAt: x?.billing_starts_at ?? null,
       daysToBilling,
+      onGift,
+      giftUntil,
+      daysToGiftEnd,
       daysActive,
       windowDays,
       units,

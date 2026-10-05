@@ -82,6 +82,7 @@ export async function runCenterHealth(): Promise<CenterHealthRun> {
           center_name: h.name,
           flags: h.flags.map((f) => ({ key: f.key, severity: f.severity, owner: f.owner, label: f.label })),
           days_to_billing: h.daysToBilling,
+          days_to_gift_end: h.daysToGiftEnd,
         },
         dedupeKey: `center_health:${h.id}`,
       })),

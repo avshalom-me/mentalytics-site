@@ -5,10 +5,11 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
 import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelSubscription, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
+import { cancelLiveOrdersForCustomer, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
-import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow } from "@/app/lib/center-promotion";
+import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow, stopActiveCenter } from "@/app/lib/center-promotion";
+import { CENTER_GIFT_MAX_MONTHS, giftUntilFromMonths, isCenterOnGift } from "@/app/lib/center-gift";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 import { CENTER_FOCUS_MAX } from "@/app/lib/center-title";
 import { loadCenterHealth } from "@/app/lib/center-health";
@@ -47,6 +48,37 @@ const str = (v: unknown, max: number) => (typeof v === "string" ? v.trim().slice
 // הנחה (₪ קבוע לחודש) ומספר מיקומים (מכפיל מחיר) — חלים על שני המסלולים.
 function parseDiscount(v: unknown): number { const n = Number(v); return isNaN(n) || n < 0 ? 0 : Math.round(n * 100) / 100; }
 function parseLocations(v: unknown): number { const n = Math.floor(Number(v)); return isNaN(n) || n < 1 ? 1 : Math.min(n, 100); }
+
+// מסיים את החיוב של מרכז לפני מעבר ל"בלי חיוב" (עצירת מנוי, קידום מתנה):
+// מבטל ב-Sumit כל הוראת קבע חיה של המרכז, ומאמת כל ביטול. לא רק את המזהה
+// הרשום אצלנו - הוראה כפולה, או מרכז שנשמר בלי מזהה, היו ממשיכים לחייב כרטיס
+// של מרכז שסימנו כעצור או כמתנה.
+//
+// הקריאה ל-Sumit נעשית רק כשייתכן שיש הוראה: מזהה רשום, או מרכז פעיל שאינו
+// במתנה. הצעה שטרם שולמה ומרכז במתנה אינם מחזיקים הוראה, ותקלה ב-Sumit לא
+// צריכה לחסום אותם.
+//
+// כשל = תשובת שגיאה מוכנה, והקורא חייב לעצור בלי לשנות דבר: מרכז שסומן כעצור
+// בזמן שההוראה שלו חיה ממשיך להיות מחויב בלי שאף מנגנון יראה את זה.
+async function endCenterBilling(
+  action: string,
+  center: { id: string; status: string; sumit_recurring_id: string | null; gift_granted_at?: string | null },
+): Promise<{ ok: true; cancelled: number[] } | { ok: false; response: NextResponse }> {
+  const mayHaveOrder = !!center.sumit_recurring_id || (center.status === "active" && !isCenterOnGift(center));
+  if (!mayHaveOrder) return { ok: true, cancelled: [] };
+  try {
+    return { ok: true, cancelled: await cancelLiveOrdersForCustomer(`center:${center.id}`) };
+  } catch (e) {
+    console.error(`admin-centers ${action}: ending billing at Sumit failed for center=${center.id}:`, e instanceof Error ? e.message : e);
+    return {
+      ok: false,
+      response: NextResponse.json(
+        { ok: false, error: "הבדיקה מול Sumit נכשלה: לא הצלחנו לוודא שלמרכז אין הוראת קבע חיה, או לבטל אותה. לא בוצע שום שינוי. נסו שוב; אם זה חוזר, בטלו את ההוראה בממשק Sumit ואז נסו שוב." },
+        { status: 502 },
+      ),
+    };
+  }
+}
 
 export async function GET() {
   try {
@@ -415,7 +447,7 @@ export async function POST(req: NextRequest) {
         body.fixed_monthly_price !== undefined ||
         body.discount_amount !== undefined || body.num_locations !== undefined;
       if (touchesPricing && center.status === "cancelled") {
-        return NextResponse.json({ ok: false, error: "אי אפשר לעדכן תמחור למרכז מבוטל" }, { status: 400 });
+        return NextResponse.json({ ok: false, error: "אי אפשר לעדכן תמחור כשהמנוי עצור - פתחו את ההצעה מחדש לתשלום, ואז עדכנו" }, { status: 400 });
       }
       if (touchesPricing) {
         const currentTrack = (center.billing_track as string) ?? "per_therapist";
@@ -493,7 +525,9 @@ export async function POST(req: NextRequest) {
           discount_amount: effDiscount,
         }).monthlyTotal;
 
-        if (center.status === "active") {
+        // מרכז בקידום מתנה פעיל בלי הוראת קבע: אין מה לפרסם ל-Sumit, והמחיר
+        // נשמר כמחיר ההצעה בלבד (הוא ייגבה רק אם המרכז יעבור לתשלום).
+        if (center.status === "active" && !isCenterOnGift(center)) {
           const oldTotal = Number(center.agreed_monthly_price) || 0;
           // רצפת מחיר: בלעדיה הנחה שגויה (או גדולה מהבסיס) דוחפת UnitPrice=0
           // ל-Sumit, השירות ממשיך והגבייה נעצרת בשקט. subscribe כבר חוסם ≤0.
@@ -676,26 +710,143 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, token: newToken });
     }
 
-    if (action === "cancel_subscription") {
-      if (center.status !== "active" || !center.sumit_recurring_id) {
-        return NextResponse.json({ ok: false, error: "אין מנוי פעיל לביטול" }, { status: 400 });
+    // עצירת מנוי: המרכז יורד מהאוויר, וכל מה שהוזן נשמר - הפרופילים, העמוד
+    // הציבורי, חשבון הפורטל והתמחור. מרכז משלם: קודם מבוטלת (ומאומתת) הוראת
+    // הקבע ב-Sumit. מרכז בקידום מתנה: אין הוראה, רק המתנה מסתיימת. מטפלי
+    // המרכז יוצאים מההתאמות (ונשארים במאגר החינמי אם אושרו). לא נשלח מייל.
+    // "cancel_subscription" הוא השם הקודם של הפעולה, ונשאר כדי שלשונית אדמין
+    // שנפתחה לפני הפריסה לא תיכשל.
+    if (action === "stop_subscription" || action === "cancel_subscription") {
+      if (center.status !== "active") {
+        return NextResponse.json({ ok: false, error: "המרכז אינו פעיל - אין מנוי לעצור" }, { status: 400 });
       }
-      // cancelSubscription מאמת מול Sumit שההוראה באמת בוטלה — זורק אם לא.
-      await cancelSubscription({
-        recurringItemId: Number(center.sumit_recurring_id),
-        customerExternalId: `center:${center.id}`,
-      });
-      await supabaseAdmin
+      const wasGift = isCenterOnGift(center);
+      const billing = await endCenterBilling(action, center);
+      if (!billing.ok) return billing.response;
+      const demoted = await stopActiveCenter(
+        id,
+        "admin",
+        wasGift ? "center gift ended by admin" : "center subscription stopped by admin",
+      );
+      console.log(`admin-centers: center=${id} (${center.name}) stopped by admin; was_gift=${wasGift} cancelled_orders=[${billing.cancelled.join(",")}]`);
+      return NextResponse.json({ ok: true, demoted: demoted ?? 0, cancelled_orders: billing.cancelled });
+    }
+
+    // קידום מתנה: המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה (1-12 חודשים) או
+    // בלי תאריך סיום - כמו קידום מתנה של מטפל. אפשרי מכל מצב: הצעה שטרם
+    // שולמה, מנוי שנעצר, מרכז משלם (הוראת הקבע מבוטלת קודם, כמו אצל מטפל
+    // משלם שמקבל מתנה), ומרכז שכבר במתנה (שינוי התקופה, נספרת מהיום). בסוף
+    // התקופה הקרון היומי עוצר את המרכז. לא נשלח מייל למרכז.
+    if (action === "grant_gift") {
+      let months: number | null = null;
+      if (body.months !== null && body.months !== undefined) {
+        const n = Number(body.months);
+        if (!Number.isInteger(n) || n < 1 || n > CENTER_GIFT_MAX_MONTHS) {
+          return NextResponse.json(
+            { ok: false, error: `חודשי מתנה: 1-${CENTER_GIFT_MAX_MONTHS}, או בלי תאריך סיום` },
+            { status: 400 },
+          );
+        }
+        months = n;
+      }
+      const wasGift = isCenterOnGift(center);
+      const billing = await endCenterBilling(action, center);
+      if (!billing.ok) return billing.response;
+
+      const now = new Date();
+      const giftUntil = months === null ? null : giftUntilFromMonths(months, now);
+      const { error } = await supabaseAdmin
         .from("therapy_center_accounts")
-        .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .update({
+          status: "active",
+          // שינוי תקופה של מתנה קיימת לא מזיז את היום שבו היא התחילה.
+          gift_granted_at: wasGift ? center.gift_granted_at : now.toISOString(),
+          gift_until: giftUntil,
+          // אין יותר הוראת קבע ואין חיוב צפוי. בלי הניקוי הזה הקרון היה קורא
+          // את ההוראה המבוטלת ועוצר את המרכז למחרת, ודוחות הכסף היו סופרים
+          // הכנסה שלא תגיע.
+          sumit_recurring_id: null,
+          sumit_miss_count: 0,
+          billing_starts_at: null,
+          agreed_monthly_price: null,
+          last_billed_on: null,
+          cancelled_at: null,
+          cancel_reason: null,
+          updated_at: now.toISOString(),
+        })
+        .eq("id", id);
+      if (error) throw error;
+      // מסלול 2: בלי שורת הישות אין מה לקדם. היא אמורה להיות קיימת מיצירת ההצעה.
+      if ((center.billing_track as string) === "center_entity") await ensureCenterEntityRow(id);
+      // מטפלים מאושרים שמשויכים למרכז נכנסים להתאמות מיד.
+      const promoted = await promoteCenterTherapists(id);
+      console.log(`admin-centers: gift granted to center=${id} (${center.name}); months=${months ?? "no end"} until=${giftUntil ?? "-"} was=${center.status}${wasGift ? "/gift" : ""} cancelled_orders=[${billing.cancelled.join(",")}]`);
+      return NextResponse.json({ ok: true, gift_until: giftUntil, promoted, cancelled_orders: billing.cancelled });
+    }
+
+    // פתיחת ההצעה מחדש לתשלום: מרכז שהמנוי שלו נעצר חוזר להיות הצעה פתוחה
+    // (טיוטה), עם אותו קישור הצטרפות ואותו תמחור. משם הכול כמו כל הצעה:
+    // עריכה, שליחה במייל, והמרכז מזין כרטיס בדף ההצטרפות. חשבון הפורטל,
+    // הפרופילים והעמוד הציבורי נשארים מחוברים, ולכן ברגע התשלום המרכז חוזר
+    // לאוויר כמו שהיה.
+    if (action === "reopen_offer") {
+      if (center.status !== "cancelled") {
+        return NextResponse.json({ ok: false, error: "אפשר לפתוח מחדש רק הצעה של מרכז שהמנוי שלו נעצר" }, { status: 400 });
+      }
+      const gift = Number(body.gift_months ?? 0);
+      if (!Number.isInteger(gift) || gift < 0 || gift > 12) {
+        return NextResponse.json({ ok: false, error: "חודשי מתנה: 0-12" }, { status: 400 });
+      }
+      const { error } = await supabaseAdmin
+        .from("therapy_center_accounts")
+        .update({
+          status: "draft",
+          // חודשי המתנה שבהצעה נקבעים מחדש: מרכז שכבר קיבל אותם פעם לא
+          // אמור לקבל אותם שוב בלי שמישהו החליט על כך.
+          gift_months: gift,
+          // מחזור חיוב חדש: שום דבר מהמחזור הקודם לא נשאר על השורה, אחרת
+          // ההצעה נראית "שולמה" והבדיקות הכספיות מתריעות על חיוב שלא קיים.
+          // החיובים שנגבו בפועל נשארים ב-payments וב-Sumit.
+          paid_at: null,
+          billing_starts_at: null,
+          agreed_monthly_price: null,
+          sumit_recurring_id: null,
+          sumit_document_id: null,
+          sumit_miss_count: 0,
+          last_billed_on: null,
+          cancelled_at: null,
+          cancel_reason: null,
+          gift_granted_at: null,
+          gift_until: null,
+          updated_at: new Date().toISOString(),
+        })
         .eq("id", id)
-        .throwOnError();
-      // מטפלי המרכז יוצאים ממערכת ההתאמות (נשארים במאגר החינמי אם אושרו).
-      const demoted = await demoteCenterTherapists({ centerId: id }, "center subscription cancelled by admin");
-      return NextResponse.json({ ok: true, demoted });
+        .eq("status", "cancelled"); // מרוץ מול פעולה מקבילה
+      if (error) throw error;
+      if ((center.billing_track as string) === "center_entity") await ensureCenterEntityRow(id);
+      console.log(`admin-centers: offer reopened for center=${id} (${center.name}); gift_months=${gift}`);
+      return NextResponse.json({ ok: true, status: "draft" });
     }
 
     if (action === "sync_sumit") {
+      // מרכז בקידום מתנה לא אמור להחזיק אף הוראה חיה. אם יש כזו, הכרטיס שלו
+      // יחויב בזמן שהמסך מציג "בלי חיוב" - מחזירים אותה כדי שהמסך יתריע.
+      // ההוראה האחרונה שלו היא זו שבוטלה כשקיבל את המתנה, ולכן אסור להעביר
+      // אותו במסלול הרגיל שלמטה: הוא היה קורא אותה כ"בוטלה ב-Sumit" ועוצר
+      // את המרכז. מרכז שמעולם לא הזין כרטיס אינו לקוח ב-Sumit - אין מה לשאול.
+      if (isCenterOnGift(center)) {
+        const giftItems = center.paid_at
+          ? await listRecurringForCustomer({ externalIdentifier: `center:${center.id}`, includeInactive: true })
+          : [];
+        return NextResponse.json({
+          ok: true,
+          sumit: null,
+          gift: true,
+          live_orders: giftItems
+            .filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)))
+            .map((i) => ({ id: Number(i.ID), status: Number(i.Status), next_billing: i.Date_NextBilling ?? null })),
+        });
+      }
       // מצב חי מ-Sumit: חיוב הבא, מחיר, וסטטוס ההוראה. אם בוטלה בצד Sumit —
       // מעדכנים גם אצלנו.
       const items = await listRecurringForCustomer({
@@ -710,11 +861,7 @@ export async function POST(req: NextRequest) {
       // מרכז בתקופת מתנה בכל לחיצה על "סטטוס מ-Sumit" - אותו באג שהיה ב-cron.
       const isLive = ours ? SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(ours.Status)) : false;
       if (ours && ours.Status === SUMIT_RECURRING_CANCELLED_STATUS && center.status === "active") {
-        await supabaseAdmin
-          .from("therapy_center_accounts")
-          .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-          .eq("id", id);
-        await demoteCenterTherapists({ centerId: id }, "center standing order cancelled at Sumit (sync)");
+        await stopActiveCenter(id, "sumit", "center standing order cancelled at Sumit (sync)");
       } else if (ours && !isLive && ours.Status !== SUMIT_RECURRING_CANCELLED_STATUS) {
         console.warn(`admin-centers sync_sumit: unknown Sumit status ${ours.Status} for center ${id} - not cancelling`);
       }

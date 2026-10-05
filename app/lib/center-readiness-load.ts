@@ -19,6 +19,7 @@ export type CenterWithReadiness = {
   payerEmail: string | null;
   token: string | null;
   hasAccount: boolean;
+  /** מתי המרכז עלה לאוויר: יום התשלום, ולמרכז שלא שילם - היום שבו קיבל קידום מתנה. */
   paidAt: string | null;
   monthlyValue: number;
   readiness: CenterReadiness;
@@ -34,12 +35,13 @@ type CenterRow = CenterRowForReadiness & {
   user_id: string | null;
   token: string | null;
   paid_at: string | null;
+  gift_granted_at: string | null;
   price_per_therapist: number | string | null;
   fixed_monthly_price: number | string | null;
 };
 
 const CENTER_COLUMNS =
-  "id, name, status, email, payer_email, user_id, token, paid_at, billing_track, therapist_count, " +
+  "id, name, status, email, payer_email, user_id, token, paid_at, gift_granted_at, billing_track, therapist_count, " +
   "price_per_therapist, fixed_monthly_price, public_page_enabled, logo_path, public_description, " +
   "team_members, gallery, public_director, public_founded_year, public_team_size, public_address, " +
   "public_hours, public_faq";
@@ -158,7 +160,7 @@ export async function loadCentersWithReadiness(): Promise<CenterWithReadiness[]>
       payerEmail: c.payer_email,
       token: c.token,
       hasAccount: !!c.user_id,
-      paidAt: c.paid_at,
+      paidAt: c.paid_at ?? c.gift_granted_at,
       monthlyValue,
       readiness,
     };

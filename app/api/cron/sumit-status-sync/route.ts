@@ -17,7 +17,7 @@ import { automatedSendAllowed } from "@/app/lib/automated-email-guard";
 import { operationalMailTarget } from "@/app/lib/therapist-recipient";
 import { sendPromotionEndedEmail, PromotionEndedReason } from "@/app/lib/therapist-emails";
 import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
-import { demoteCenterTherapists } from "@/app/lib/center-promotion";
+import { stopActiveCenter } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 import { syncSumitDocuments } from "@/app/lib/sumit-documents";
 
@@ -940,21 +940,16 @@ export async function GET(req: NextRequest) {
         continue;
       }
 
-      await supabase
-        .from("therapy_center_accounts")
-        .update({
-          status: "cancelled",
-          cancelled_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
-        .eq("id", c.id)
-        .eq("status", "active"); // מרוץ מול פעולת אדמין מקבילה
-      centersCancelled++;
-
-      centerTherapistsDemoted += await demoteCenterTherapists(
-        { centerId: c.id as string },
+      // עוצר את המרכז ומוריד את מטפליו. null = המרכז כבר לא פעיל (פעולת אדמין
+      // מקבילה), ואז אין מה לספור ואין על מה להתריע.
+      const demotedCount = await stopActiveCenter(
+        c.id as string,
+        "sumit",
         "center standing order cancelled at Sumit (cron sync)",
       );
+      if (demotedCount === null) continue;
+      centersCancelled++;
+      centerTherapistsDemoted += demotedCount;
 
       // התראה לאדמין — ביטול מנוי מרכז הוא אירוע עסקי שדורש מעקב אנושי.
       try {
@@ -964,7 +959,8 @@ export async function GET(req: NextRequest) {
           subject: `⚠️ מנוי המרכז "${c.name}" בוטל ב-Sumit`,
           html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
             <p>הסנכרון היומי זיהה שהוראת הקבע של המרכז <strong>${String(c.name).replace(/</g, "&lt;")}</strong> אינה פעילה יותר ב-Sumit (ככל הנראה חיובים שנכשלו).</p>
-            <p>המרכז סומן כמבוטל ומטפליו הוסרו ממערכת ההתאמות. מומלץ ליצור קשר עם המרכז לעדכון אמצעי תשלום ולחדש את המנוי.</p>
+            <p>המנוי סומן כעצור ומטפלי המרכז הוסרו ממערכת ההתאמות. כל הפרטים של המרכז נשמרו.</p>
+            <p>לחידוש: ליצור קשר עם המרכז, ובמסך המרכזים באדמין ללחוץ "פתיחת ההצעה מחדש לתשלום" - המרכז מזין כרטיס בקישור ההצטרפות וחוזר לאוויר.</p>
             <p><strong>center_id:</strong> ${c.id}<br/><strong>מזהה הוראת קבע:</strong> ${c.sumit_recurring_id}</p>
           </div>`,
         });
@@ -974,6 +970,56 @@ export async function GET(req: NextRequest) {
     } catch (err) {
       errors++;
       console.error(`Center sync failed for center ${c.id}:`, err);
+    }
+  }
+
+  // -------- (5ב) Centre gifts that ran out --------
+  // מרכז בקידום מתנה (center-gift.ts) פעיל בלי הוראת קבע, ולכן הסעיף שלמעלה
+  // לא רואה אותו בכלל. כשתאריך הסיום עובר - המרכז נעצר: יורד מהאוויר, מטפליו
+  // יוצאים מההתאמות, וכל הפרטים שלו נשמרים. זה המקביל של סעיף (2) למטפלים,
+  // בהבדל אחד: למרכז לא נשלח מייל (אין תבנית מאושרת), רק התראה אלינו, כדי
+  // שמישהו יחליט אם להאריך או להציע תשלום. מתנה בלי תאריך סיום לא נוגעים בה.
+  let centerGiftsEnded = 0;
+  const giftCutoff = new Date().toISOString();
+  const { data: endedGifts } = await supabase
+    .from("therapy_center_accounts")
+    .select("id, name, gift_until")
+    .eq("status", "active")
+    .not("gift_granted_at", "is", null)
+    .not("gift_until", "is", null)
+    .lte("gift_until", giftCutoff);
+
+  for (const c of endedGifts ?? []) {
+    try {
+      // giftEndedBy: העצירה חלה רק אם המתנה עדיין פגה ברגע הכתיבה - מתנה
+      // שהאדמין האריך אחרי שהרשימה נקראה לא נעצרת.
+      const demotedCount = await stopActiveCenter(
+        c.id as string,
+        "gift_ended",
+        "center gift period ended (cron)",
+        { giftEndedBy: giftCutoff },
+      );
+      if (demotedCount === null) continue; // נעצר, או שהמתנה הוארכה בינתיים
+      centerGiftsEnded++;
+      centerTherapistsDemoted += demotedCount;
+      try {
+        await resend.emails.send({
+          from: "טיפול חכם <noreply@mentalytics.co.il>",
+          to: ALERT_TO,
+          subject: `🎁 קידום המתנה של המרכז "${c.name}" הסתיים`,
+          html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+            <p>תקופת קידום המתנה של המרכז <strong>${String(c.name).replace(/</g, "&lt;")}</strong> הסתיימה (${String(c.gift_until).slice(0, 10)}).</p>
+            <p>המרכז ירד מהאוויר: מטפליו יצאו ממערכת ההתאמות והעמוד הציבורי נסגר. <strong>כל הפרטים נשמרו</strong>, ולמרכז לא נשלח מייל.</p>
+            <p>להחזרה, במסך המרכזים באדמין: קידום מתנה נוסף, או פתיחת ההצעה מחדש לתשלום (המרכז מזין כרטיס בקישור ההצטרפות).</p>
+            <p><strong>center_id:</strong> ${c.id}</p>
+          </div>`,
+        });
+      } catch (mailErr) {
+        console.error("center gift-ended alert email failed:", mailErr);
+      }
+    } catch (err) {
+      errors++;
+      console.error(`Center gift expiry failed for center ${c.id}:`, err);
     }
   }
 
@@ -1028,6 +1074,7 @@ export async function GET(req: NextRequest) {
     summary:
       `נבדקו ${checked} מנויים; ${demoted} הורדו, ${trialsExpired} מתנות פגו, ` +
       `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו; ` +
+      (centerGiftsEnded > 0 ? `${centerGiftsEnded} מתנות מרכז הסתיימו; ` : "") +
       `${documentsSynced} מסמכי Sumit סונכרנו`,
     error: errors > 0 ? `${errors} שגיאות בריצה` : undefined,
   });
@@ -1056,6 +1103,7 @@ export async function GET(req: NextRequest) {
     centerTherapistsDemoted,
     centerChargesRecorded,
     centerOrphansFound,
+    centerGiftsEnded,
     documentsSynced,
     errors,
   });

@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 process.env.SUMIT_COMPANY_ID = process.env.SUMIT_COMPANY_ID || "1";
 process.env.SUMIT_API_KEY = process.env.SUMIT_API_KEY || "test-key";
 
-import { updateRecurringPrice } from "./sumit";
+import { cancelLiveOrdersForCustomer, updateRecurringPrice } from "./sumit";
 
 const ITEM_ID = 2059972492;
 const CUSTOMER = "therapist-under-test";
@@ -93,5 +93,90 @@ describe("updateRecurringPrice", () => {
     await expect(
       updateRecurringPrice({ recurringItemId: ITEM_ID, customerExternalId: CUSTOMER, unitPrice: 140 })
     ).rejects.toThrow(/not active \(before/);
+  });
+});
+
+/**
+ * A fake Sumit holding several standing orders of one customer. A cancel flips
+ * the order to status 1 unless it is listed in `stuck` - the case where Sumit
+ * accepts the request and the order stays alive.
+ */
+function fakeSumitOrders(orders: { ID: number; Status: number }[], stuck: number[] = []) {
+  const state = orders.map((o) => ({ ...o }));
+  const cancelCalls: number[] = [];
+  const fetchMock = vi.fn(async (url: string, init: { body: string }) => {
+    const path = new URL(url).pathname;
+    const body = JSON.parse(init.body);
+    let data: unknown;
+    if (path === "/billing/recurring/cancel/") {
+      const id = body.RecurringCustomerItemID as number;
+      cancelCalls.push(id);
+      const order = state.find((o) => o.ID === id);
+      if (order && !stuck.includes(id)) order.Status = 1;
+      data = {};
+    } else if (path === "/billing/recurring/listforcustomer/") {
+      // The function has to ask for inactive orders too, or a cancelled one
+      // would simply vanish from the list and "not found" would pass for "dead".
+      expect(body.IncludeInactive).toBe(true);
+      data = { RecurringItems: state.map((o) => ({ ...o })) };
+    } else {
+      throw new Error(`unexpected path ${path}`);
+    }
+    return {
+      ok: true,
+      json: async () => ({ Status: 0, UserErrorMessage: null, TechnicalErrorDetails: null, Data: data }),
+    };
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return { state, cancelCalls };
+}
+
+describe("cancelLiveOrdersForCustomer", () => {
+  it("cancels a charging order and a scheduled one, and leaves a dead one alone", async () => {
+    // 0 = charging, 12 = scheduled (gift months, first charge still ahead), 1 = cancelled.
+    const sumit = fakeSumitOrders([
+      { ID: 101, Status: 1 },
+      { ID: 102, Status: 0 },
+      { ID: 103, Status: 12 },
+    ]);
+
+    const cancelled = await cancelLiveOrdersForCustomer("center:under-test");
+
+    expect(cancelled).toEqual([102, 103]);
+    expect(sumit.cancelCalls).toEqual([102, 103]);
+    expect(sumit.state.every((o) => o.Status === 1)).toBe(true);
+  });
+
+  it("does nothing, and says so, when no order is alive", async () => {
+    const sumit = fakeSumitOrders([{ ID: 101, Status: 1 }]);
+
+    expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([]);
+    expect(sumit.cancelCalls).toEqual([]);
+  });
+
+  it("returns an empty list for a customer with no orders at all", async () => {
+    fakeSumitOrders([]);
+    expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([]);
+  });
+
+  it("fails when Sumit accepts the cancel and the order stays alive", async () => {
+    // The caller must not record the centre as stopped: its card would keep
+    // being charged with nothing left to notice.
+    fakeSumitOrders([{ ID: 102, Status: 12 }], [102]);
+
+    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/did not take effect/);
+  });
+
+  it("stops at the first order it could not cancel", async () => {
+    const sumit = fakeSumitOrders(
+      [
+        { ID: 102, Status: 0 },
+        { ID: 103, Status: 0 },
+      ],
+      [102],
+    );
+
+    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/102/);
+    expect(sumit.cancelCalls).toEqual([102]);
   });
 });
