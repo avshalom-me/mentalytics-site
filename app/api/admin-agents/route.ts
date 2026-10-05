@@ -319,7 +319,8 @@ export async function POST(req: NextRequest) {
       });
     }
     if (body?.action === "inbox_draft") {
-      const r = await regenerateInboxDraft(String(body?.id ?? ""));
+      // click_report: לצרף את דוח הלחיצות של הפונה גם אם הסוכן לא זיהה שהוא שאל עליהן.
+      const r = await regenerateInboxDraft(String(body?.id ?? ""), { clickReport: body?.click_report === true });
       if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
       return NextResponse.json({ ok: true, inbox: await listInbox().catch(() => []) });
     }

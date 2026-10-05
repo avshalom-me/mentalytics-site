@@ -26,7 +26,7 @@ export const INQUIRY_SEND_FAILED_MESSAGE =
   "ההודעה לא נשלחה בגלל תקלה זמנית. אפשר לנסות שוב בעוד רגע, או ליצור קשר בטלפון או בוואטסאפ.";
 
 export async function sendInquiryEmail(
-  mail: { to: string; replyTo?: string; subject: string; html: string },
+  mail: { to: string; replyTo?: string; subject: string; html: string; text?: string },
   record: {
     template: InquiryEmailTemplate;
     recipientType: NonNullable<EmailLogEntry["recipientType"]>;
@@ -52,6 +52,7 @@ export async function sendInquiryEmail(
       to: mail.to,
       subject: mail.subject,
       html: mail.html,
+      ...(mail.text ? { text: mail.text } : {}),
       ...(mail.replyTo ? { replyTo: mail.replyTo } : {}),
     });
     if (error) {

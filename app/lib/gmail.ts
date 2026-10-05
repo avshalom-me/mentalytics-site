@@ -94,6 +94,11 @@ export type InboundMessage = {
   headerMessageId: string | null;
   fromEmail: string;
   fromName: string | null;
+  /**
+   * כתובת ה-Reply-To, אם יש. טופס באתר שולח אלינו מהכתובת של האתר עם Reply-To
+   * של הגולש - כך מזהים שהמייל הוא פנייה של אדם ולא התראה (site-inquiry.ts).
+   */
+  replyTo: string | null;
   subject: string;
   bodyText: string;
   receivedAt: string; // ISO
@@ -122,14 +127,26 @@ export async function listInboxIds(newerThanDays: number, max = 50): Promise<{ i
  * האם יצאה מאיתנו תשובה בשרשור אחרי רגע נתון. קריאה אחת לשרשור
  * (ורק לשרשורים של פניות פתוחות) - מזהה "נענה ישירות בג'ימייל",
  * כדי שפנייה שענית מחוץ למערכת לא תישאר תקועה בתור לנצח.
+ *
+ * to (אופציונלי): נספרת רק תשובה שנשלחה לכתובת הזו. נדרש לפניות שהגיעו דרך
+ * טופס באתר: כל ההתראות של הטופס יוצאות מאותו שולח, ו-Gmail עלול לאגד שתיים
+ * מהן לשרשור אחד - ואז תשובה לגולש אחד לא אומרת שענינו לשני.
  */
-export async function threadAnsweredAfter(threadId: string, afterMs: number): Promise<boolean> {
+export async function threadAnsweredAfter(threadId: string, afterMs: number, to?: string): Promise<boolean> {
+  const want = (to ?? "").trim().toLowerCase();
   const j = await gmailFetch<{
-    messages?: { labelIds?: string[]; internalDate?: string }[];
-  }>(`/threads/${threadId}?format=minimal`);
-  return (j.messages ?? []).some(
-    (m) => (m.labelIds ?? []).includes("SENT") && Number(m.internalDate ?? 0) > afterMs
-  );
+    messages?: {
+      labelIds?: string[];
+      internalDate?: string;
+      payload?: { headers?: { name: string; value: string }[] };
+    }[];
+  }>(`/threads/${threadId}?format=${want ? "metadata&metadataHeaders=To" : "minimal"}`);
+  return (j.messages ?? []).some((m) => {
+    if (!(m.labelIds ?? []).includes("SENT") || Number(m.internalDate ?? 0) <= afterMs) return false;
+    if (!want) return true;
+    const sentTo = (m.payload?.headers ?? []).find((h) => h.name.toLowerCase() === "to")?.value ?? "";
+    return sentTo.toLowerCase().includes(want);
+  });
 }
 
 function decodeB64Url(data: string): string {
@@ -140,7 +157,7 @@ function decodeB64Url(data: string): string {
   }
 }
 
-function stripHtml(html: string): string {
+export function stripHtml(html: string): string {
   return html
     .replace(/<style[\s\S]*?<\/style>/gi, " ")
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
@@ -189,12 +206,15 @@ export async function getMessage(id: string): Promise<InboundMessage | null> {
   const from = parseFrom(headers["from"] ?? "");
   if (!from.email) return null;
   const body = extractBody(raw.payload).slice(0, 20_000);
+  // כמה כתובות ב-Reply-To: הראשונה. ריק = אין כותרת כזו.
+  const replyTo = parseFrom((headers["reply-to"] ?? "").split(",")[0] ?? "").email;
   return {
     id: raw.id,
     threadId: raw.threadId,
     headerMessageId: headers["message-id"] ?? null,
     fromEmail: from.email,
     fromName: from.name,
+    replyTo: replyTo || null,
     subject: (headers["subject"] ?? "").slice(0, 500),
     bodyText: body,
     receivedAt: new Date(Number(raw.internalDate ?? Date.now())).toISOString(),
@@ -214,6 +234,8 @@ export type ThreadMessage = {
   id: string;
   fromEmail: string;
   fromName: string | null;
+  /** כותרת ה-To כפי שהיא, באותיות קטנות - לזיהוי למי נשלחה תשובה שלנו. */
+  to: string;
   subject: string;
   bodyText: string;
   internalDate: number;
@@ -238,6 +260,7 @@ export async function getThread(threadId: string): Promise<ThreadMessage[]> {
       id: raw.id,
       fromEmail: from.email,
       fromName: from.name,
+      to: (headers["to"] ?? "").toLowerCase(),
       subject: (headers["subject"] ?? "").slice(0, 500),
       // הציטוט של ההתכתבות הקודמת נחתך: בדוגמה הוא רעש שמסתיר את מה
       // שנכתב בפועל, ומנפח כל דוגמה פי כמה.

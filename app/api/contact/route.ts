@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
+import { buildContactFormEmail } from "@/app/lib/site-inquiry";
 
 
 // Every submission sends a real email, and Resend's free tier gives the whole
@@ -10,15 +11,6 @@ import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry
 // sources) and far below what it takes to drain the allowance.
 const CONTACT_LIMIT = 5;
 const CONTACT_WINDOW_MS = 60 * 60_000;
-
-function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,30 +30,21 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error: "כתובת מייל לא תקינה" }, { status: 400 });
     }
 
-    const safeName    = escapeHtml(String(name));
-    const safeEmail   = escapeHtml(String(email));
-    const safeSubject = escapeHtml(String(subject || ""));
-    const safeMessage = escapeHtml(String(message));
-
+    // המייל נבנה ב-site-inquiry.ts, יחד עם הכלל שלפיו סוכן השירות מזהה אותו
+    // כפנייה של גולש (שולח שלנו + Reply-To של הגולש + תחילית הנושא). שינוי
+    // בנושא או במבנה נעשה שם, כדי שהפנייה לא תיעלם מהתור של הסוכן.
+    const mail = buildContactFormEmail({
+      name: String(name),
+      email: String(email).trim(),
+      subject: subject ? String(subject) : "",
+      message: String(message),
+    });
     const sent = await sendInquiryEmail({
       to: "admin@getmentalytics.com",
-      replyTo: String(email),
-      subject: `פנייה חדשה מ-טיפול חכם: ${safeSubject || "ללא נושא"}`,
-      html: `
-        <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #0F5468;">פנייה חדשה מהאתר</h2>
-          <table style="width: 100%; border-collapse: collapse;">
-            <tr><td style="padding: 8px; font-weight: bold; width: 120px;">שם:</td><td style="padding: 8px;">${safeName}</td></tr>
-            <tr style="background: #f9f9f9;"><td style="padding: 8px; font-weight: bold;">מייל:</td><td style="padding: 8px;"><a href="mailto:${safeEmail}">${safeEmail}</a></td></tr>
-            <tr><td style="padding: 8px; font-weight: bold;">נושא:</td><td style="padding: 8px;">${safeSubject || "ללא נושא"}</td></tr>
-          </table>
-          <div style="margin-top: 16px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
-            <strong>הודעה:</strong>
-            <p style="margin-top: 8px; white-space: pre-wrap;">${safeMessage}</p>
-          </div>
-          <p style="margin-top: 16px; font-size: 12px; color: #999;">נשלח מ-mentalytics-site.vercel.app</p>
-        </div>
-      `,
+      replyTo: String(email).trim(),
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
     }, { template: "contact_form", recipientType: "other" });
 
     // CRM lead capture - best-effort. The DB row is what makes the inquiry

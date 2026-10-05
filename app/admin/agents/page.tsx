@@ -51,6 +51,8 @@ type InboxItem = {
   final_body: string | null;
   replied_at: string | null;
   gmail_thread_id?: string;
+  /** הפנייה הגיעה דרך טופס באתר (contact / developers); ריק = מייל ישיר. */
+  via_form?: string | null;
   // אותה פנייה שהגיעה גם מכתובת אחרת (listInbox בשרת מסמן).
   same_inquiry?: {
     id: string;
@@ -1300,6 +1302,16 @@ function InboxCard({
             מזוהה: {row.sender_therapist_name}
           </span>
         )}
+        {/* פנייה מטופס באתר מגיעה לתיבה מהכתובת של האתר עצמו. כאן היא מוצגת על
+            שם הגולש, והתשובה נשלחת לכתובת שהוא מילא בטופס. */}
+        {row.via_form && (
+          <span
+            title="הפנייה נשלחה דרך טופס באתר, ולא במייל ישיר. התשובה נשלחת אל הכתובת שהפונה מילא בטופס."
+            className="rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700"
+          >
+            📝 {row.via_form === "developers" ? "טופס בית למפתחים" : "טופס צור קשר"}
+          </span>
+        )}
         {row.category && (
           <span
             className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
@@ -1447,6 +1459,22 @@ function InboxCard({
               className="rounded-full border border-stone-300 px-4 py-2 text-sm font-bold text-stone-600 hover:border-stone-500 disabled:opacity-50"
             >
               {busy === "draft" ? "מנסח..." : "נסח מחדש"}
+            </button>
+            {/* הסוכן מצרף את דוח הלחיצות לבד כשהפונה שואל על הפער בין הלחיצות
+                לפניות שקיבל. הכפתור הוא למקרה שהוא לא זיהה את השאלה. */}
+            <button
+              onClick={() =>
+                act(
+                  "inbox_draft",
+                  { click_report: true },
+                  "לנסח טיוטה חדשה ולצרף אליה את דוח הלחיצות של הפונה (כל לחיצה בחודשיים האחרונים)? הטיוטה הנוכחית והעריכות שלך יוחלפו."
+                )
+              }
+              disabled={busy !== ""}
+              title="לכל לחיצה: תאריך, שעה, איזה כפתור, איפה באתר ואיך הגולש הגיע. הרשימה נבנית מהנתונים, ומתאימה רק לפונה שזוהה במערכת."
+              className="rounded-full border border-stone-300 px-4 py-2 text-sm font-bold text-stone-600 hover:border-stone-500 disabled:opacity-50"
+            >
+              📊 נסח מחדש עם דוח לחיצות
             </button>
           </div>
         </>

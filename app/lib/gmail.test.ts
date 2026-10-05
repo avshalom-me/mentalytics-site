@@ -17,7 +17,7 @@ process.env.GMAIL_REFRESH_TOKEN = "test-refresh";
 process.env.GMAIL_ACCOUNT = "admin@getmentalytics.com";
 delete process.env.GMAIL_SENDER;
 
-import { sendGmailReply, getThread, stripQuoted } from "./gmail";
+import { sendGmailReply, getThread, getMessage, threadAnsweredAfter, stripQuoted } from "./gmail";
 
 type SendAs = { sendAsEmail: string; signature?: string; isDefault?: boolean; isPrimary?: boolean };
 
@@ -174,6 +174,86 @@ describe("getThread", () => {
   it("cuts a Gmail-sent reply at the signature delimiter, so it is never learned as body text", async () => {
     const [m] = await getThread("thread-1");
     expect(m.bodyText).toBe("שלום רב,\nהתשובה עצמה.");
+  });
+});
+
+// An inquiry sent through a form on the site reaches the mailbox from the
+// site's own address, with the visitor in Reply-To. Two things follow, and both
+// are pinned here: the Reply-To must be read (it is the only sign that a person
+// wrote), and "we replied in this thread" must mean "we replied to that
+// visitor", because every form notification comes from the same sender and
+// Gmail may put two of them in one thread.
+describe("site-form inquiries in the mailbox", () => {
+  let requested = "";
+
+  function stub(body: unknown) {
+    requested = "";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: string | URL | Request) => {
+        const url = String(input);
+        if (url.startsWith("https://oauth2.googleapis.com/token")) {
+          return respond({ access_token: "access", expires_in: 3600 });
+        }
+        requested = url;
+        return respond(body);
+      })
+    );
+  }
+
+  const message = (headers: { name: string; value: string }[]) => ({
+    id: "m-1",
+    threadId: "thread-9",
+    internalDate: "1000",
+    payload: {
+      headers,
+      mimeType: "text/plain",
+      body: { data: Buffer.from("שלום", "utf-8").toString("base64url") },
+    },
+  });
+
+  it("reads the Reply-To address of a message", async () => {
+    stub(
+      message([
+        { name: "From", value: "טיפול חכם <noreply@mentalytics.co.il>" },
+        { name: "Reply-To", value: "Dana Levi <Dana@Example.com>" },
+        { name: "Subject", value: "פנייה חדשה" },
+      ])
+    );
+    const m = await getMessage("m-1");
+    expect(m?.fromEmail).toBe("noreply@mentalytics.co.il");
+    expect(m?.replyTo).toBe("dana@example.com");
+  });
+
+  it("has no Reply-To for an ordinary email", async () => {
+    stub(message([{ name: "From", value: "Dana <dana@example.com>" }]));
+    expect((await getMessage("m-1"))?.replyTo).toBeNull();
+  });
+
+  const sentTo = (to: string, at = "2000") => ({
+    messages: [{ labelIds: ["SENT"], internalDate: at, payload: { headers: [{ name: "To", value: to }] } }],
+  });
+
+  it("does not count a reply that went to another visitor in the same thread", async () => {
+    stub(sentTo("Yoav <yoav@example.com>"));
+    expect(await threadAnsweredAfter("thread-9", 1000, "dana@example.com")).toBe(false);
+    expect(requested).toContain("format=metadata&metadataHeaders=To");
+  });
+
+  it("counts a reply that went to the visitor, whatever the case of the address", async () => {
+    stub(sentTo("Dana Levi <Dana@Example.com>"));
+    expect(await threadAnsweredAfter("thread-9", 1000, "dana@example.com")).toBe(true);
+  });
+
+  it("does not count a reply sent before the inquiry arrived", async () => {
+    stub(sentTo("dana@example.com", "500"));
+    expect(await threadAnsweredAfter("thread-9", 1000, "dana@example.com")).toBe(false);
+  });
+
+  it("keeps counting any reply in the thread of an ordinary email", async () => {
+    stub({ messages: [{ labelIds: ["SENT"], internalDate: "2000" }] });
+    expect(await threadAnsweredAfter("thread-9", 1000)).toBe(true);
+    expect(requested).toContain("format=minimal");
   });
 });
 

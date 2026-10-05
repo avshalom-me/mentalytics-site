@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
+import { SITE_FORM_SUBJECT_PREFIX } from "@/app/lib/site-inquiry";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -34,7 +35,10 @@ export async function POST(req: NextRequest) {
       from: "טיפול חכם — בית למפתחים <noreply@mentalytics.co.il>",
       to: "admin@getmentalytics.com",
       replyTo: email,
-      subject: `פנייה חדשה לבית למפתחים: ${safe.name}`,
+      // התחילית היא חלק מהכלל שלפיו סוכן השירות מזהה את המייל כפנייה של
+      // גולש (site-inquiry.ts), ולכן היא מוגדרת שם ולא כאן. נושא מייל הוא טקסט:
+      // השם נכנס בלי escape של HTML, ובלי שורות חדשות.
+      subject: `${SITE_FORM_SUBJECT_PREFIX.developers} ${String(name).replace(/[\r\n]+/g, " ").trim()}`,
       html: `
         <div dir="rtl" style="font-family: Arial, sans-serif; max-width: 640px; margin: 0 auto;">
           <div style="background: linear-gradient(135deg,#5B3FE3 0%,#C13ABF 50%,#22D3EE 100%); padding: 24px; border-radius: 12px; color: white;">
