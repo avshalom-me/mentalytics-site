@@ -35,12 +35,14 @@ export const team: TeamMember[] = [
     bullets: ["מנהלת מרכז טיפולי לילדים ומבוגרים במשך כעשור", "פיזיותרפיסטית ילדים"],
   },
   {
-    name: "יוחאי ברוקנר",
+    name: "נדב הירש",
     role: "חבר הצוות המקצועי המפתח",
-    img: "/team/yochai.jpg",
+    img: "/team/nadav.jpg",
+    // The first bullet is the one credential /counselors shows next to the photo.
     bullets: [
-      "פסיכולוג בהתמחות חינוכית ותעסוקתית",
-      "בעל ניסיון בתחום היזמות החברתית",
+      "פסיכולוג חינוכי מומחה",
+      "תואר שני בפסיכולוגיה קלינית",
+      "רכז תחום חינוך מיוחד בשירות פסיכולוגי אור יהודה",
     ],
   },
   {
