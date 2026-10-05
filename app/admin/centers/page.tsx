@@ -12,8 +12,9 @@ import { CENTER_GIFT_MAX_MONTHS, giftDaysLeft, giftUntilFromMonths, isCenterOnGi
 // כאן כפעיל, עם עצירה וסנכרון מול Sumit.
 //
 // שני מצבים בלי חיוב (center-gift.ts): "קידום מתנה" - המרכז באוויר בלי כרטיס,
-// לתקופה או בלי תאריך סיום, כמו קידום מתנה של מטפל; ו"מנוי נעצר" - המרכז
-// לא באוויר וכל הפרטים שלו שמורים, ואפשר להחזיר אותו במתנה או בתשלום.
+// לתקופה או בלי תאריך סיום, כמו קידום מתנה של מטפל; ו"ארכיון" - המנוי נעצר,
+// המרכז והפרופילים שלו מוסתרים מהאתר וכל הפרטים שמורים. מהארכיון מחזירים
+// אותו בחידוש המנוי מהכרטיס ש-Sumit שומר לו, במתנה, או בהצעה חדשה לתשלום.
 
 type Center = {
   id: string;
@@ -174,7 +175,7 @@ const STATUS_LABELS: Record<Center["status"], { label: string; cls: string }> = 
   draft: { label: "טיוטה", cls: "bg-stone-100 border-stone-300 text-stone-600" },
   sent: { label: "הצעה נשלחה", cls: "bg-blue-50 border-blue-300 text-blue-800" },
   active: { label: "מנוי פעיל", cls: "bg-green-50 border-green-300 text-green-800" },
-  cancelled: { label: "מנוי נעצר", cls: "bg-orange-50 border-orange-300 text-orange-800" },
+  cancelled: { label: "📦 בארכיון", cls: "bg-stone-100 border-stone-400 text-stone-700" },
 };
 // מרכז בקידום מתנה הוא status=active, אבל במסך הוא שלב בפני עצמו: פעיל בלי חיוב.
 const GIFT_STATUS_LABEL = { label: "🎁 קידום מתנה", cls: "bg-purple-50 border-purple-300 text-purple-800" };
@@ -268,7 +269,7 @@ function nextStepHint(c: Center): Hint | null {
     const why = stopReasonLabel(c.cancel_reason);
     return {
       tone: "info",
-      text: `⏸ המנוי נעצר${c.cancelled_at ? ` ב-${fmtDate(c.cancelled_at)}` : ""}${why ? ` (${why})` : ""} · המרכז לא באוויר, וכל הפרטים שלו שמורים. להחזרה: קידום מתנה, או פתיחת ההצעה מחדש לתשלום.`,
+      text: `📦 בארכיון${c.cancelled_at ? ` מ-${fmtDate(c.cancelled_at)}` : ""}${why ? ` (${why})` : ""} · המרכז והפרופילים שלו לא מוצגים באתר, וכל הפרטים שמורים. להחזרה: חידוש המנוי מהכרטיס השמור, קידום מתנה, או פתיחת ההצעה מחדש לתשלום.`,
     };
   }
   return null;
@@ -331,6 +332,14 @@ export default function AdminCentersPage() {
   const [giftFor, setGiftFor] = useState<Center | null>(null);
   const [giftMonths, setGiftMonths] = useState(1);
 
+  // חלון חידוש המנוי מהכרטיס השמור: המרכז, הכרטיס ש-Sumit מחזיק לו (נטען
+  // בפתיחה), תאריך החיוב הראשון, והאישור שהמרכז ביקש לחזור.
+  type SavedCard = { last_digits: string | null; expiration_month: number | null; expiration_year: number | null; expired: boolean };
+  const [resumeFor, setResumeFor] = useState<Center | null>(null);
+  const [resumeCard, setResumeCard] = useState<{ loading: boolean; card: SavedCard | null; today: string; error: string }>({ loading: false, card: null, today: "", error: "" });
+  const [resumeDate, setResumeDate] = useState("");
+  const [resumeConfirmed, setResumeConfirmed] = useState(false);
+
   const [manageFor, setManageFor] = useState<Center | null>(null);
   const [pool, setPool] = useState<TherapistPoolItem[]>([]);
   const [poolLoading, setPoolLoading] = useState(false);
@@ -340,11 +349,11 @@ export default function AdminCentersPage() {
   // נועל את גלילת העמוד שמאחורי המודל - בלעדיו, גלילה עם העכבר מעל הרקע
   // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
   useEffect(() => {
-    if (!editing && !manageFor && !giftFor) return;
+    if (!editing && !manageFor && !giftFor && !resumeFor) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [editing, manageFor, giftFor]);
+  }, [editing, manageFor, giftFor, resumeFor]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -558,41 +567,40 @@ export default function AdminCentersPage() {
     });
   }
 
-  // עצירת מנוי: המרכז יורד מהאוויר וכל הפרטים שלו נשמרים. מרכז משלם - הוראת
-  // הקבע מבוטלת ב-Sumit; מרכז בקידום מתנה - רק המתנה מסתיימת.
+  // עצירת מנוי: המרכז עובר לארכיון - הוא והפרופילים שלו מוסתרים מהאתר, וכל
+  // הפרטים נשמרים. מרכז משלם - הוראת הקבע מבוטלת ב-Sumit (הכרטיס נשאר שמור
+  // שם); מרכז בקידום מתנה - רק המתנה מסתיימת.
   async function stopSubscription(c: Center) {
     const onGift = isCenterOnGift(c);
     const offAir = trackOf(c) === "center_entity"
-      ? "• המרכז יורד מהאוויר: הכרטיס שלו יוצא מההתאמות, והעמוד הציבורי נסגר."
-      : "• המרכז יורד מהאוויר: העמוד הציבורי נסגר, ומטפליו יוצאים מההתאמות (ונשארים במאגר בלי קידום).";
+      ? "• המרכז עובר לארכיון: הוא יוצא מתוצאות ההתאמה, והעמוד הציבורי שלו מוסתר מהאתר ומגוגל."
+      : "• המרכז עובר לארכיון: העמוד הציבורי שלו וכל הפרופילים של המטפלים שלו מוסתרים מהמאגר, מההתאמות ומגוגל.";
     const lines = [
-      onGift ? `לסיים את קידום המתנה של "${c.name}" ולעצור את המרכז?` : `לעצור את המנוי של "${c.name}"?`,
+      onGift ? `לסיים את קידום המתנה של "${c.name}" ולהעביר את המרכז לארכיון?` : `לעצור את המנוי של "${c.name}"?`,
       "",
       onGift
         ? "• למרכז אין הוראת קבע, ולכן אין מה לבטל ב-Sumit."
-        : "• הוראת הקבע ב-Sumit מבוטלת, ולא יהיו חיובים נוספים.",
+        : "• הוראת הקבע ב-Sumit מבוטלת, ולא יהיו חיובים נוספים. כרטיס האשראי עצמו נשאר שמור ב-Sumit.",
       offAir,
-      "• כל הפרטים נשמרים: הפרופילים, העמוד הציבורי, חשבון הפורטל והתמחור.",
+      "• שום דבר לא נמחק: הפרופילים, העמוד הציבורי, חשבון הפורטל והתמחור נשמרים.",
       "• מהמערכת שלנו לא נשלח מייל למרכז.",
       "",
-      onGift
-        ? "אפשר להחזיר אותו בכל רגע: קידום מתנה, או פתיחת ההצעה מחדש לתשלום."
-        : "אפשר להחזיר אותו בכל רגע: קידום מתנה, או פתיחת ההצעה מחדש לתשלום (המרכז יזין כרטיס מחדש).",
+      "אפשר להחזיר אותו בכל רגע: חידוש המנוי מהכרטיס השמור (בלי להזין אותו שוב), קידום מתנה, או פתיחת ההצעה מחדש לתשלום.",
     ];
     if (!confirm(lines.join("\n"))) return;
     const j = await post({ action: "stop_subscription", id: c.id });
     if (!j.ok) return;
     forgetSumitInfo(c.id);
-    alert(`המנוי של "${c.name}" נעצר, והפרטים שמורים. המרכז מופיע עכשיו תחת "מנוי נעצר".`);
+    alert(`"${c.name}" עבר לארכיון, והפרטים שמורים.`);
   }
 
   // קידום מתנה: המרכז באוויר בלי כרטיס ובלי חיוב. months=null = בלי תאריך סיום.
   // שגיאה מוצגת בתוך החלון (הוא נשאר פתוח); הצלחה סוגרת אותו.
   async function grantGift(c: Center, months: number | null) {
-    // מרכז משלם: ביטול הוראת הקבע אינו הפיך (הכרטיס השמור הולך לאיבוד), ולכן
-    // אישור נפרד מעבר לאזהרה שבחלון.
+    // מרכז משלם: הוראת הקבע מבוטלת, ולכן אישור נפרד מעבר לאזהרה שבחלון.
+    // הכרטיס עצמו נשאר שמור ב-Sumit, ואפשר לחדש ממנו את החיוב אחר כך.
     if (c.status === "active" && !isCenterOnGift(c) &&
-      !confirm(`הוראת הקבע של "${c.name}" ב-Sumit תבוטל עכשיו, והכרטיס השמור לא יחויב.\n\nכדי לעבור לתשלום בסוף המתנה המרכז יצטרך להזין כרטיס מחדש. להמשיך?`)) return;
+      !confirm(`הוראת הקבע של "${c.name}" ב-Sumit תבוטל עכשיו, והכרטיס לא יחויב.\n\nהכרטיס נשאר שמור ב-Sumit: אם המרכז ירצה להמשיך בסוף המתנה, אפשר לחדש ממנו את החיוב בלי להזין אותו שוב. החיוב לא יתחדש לבד. להמשיך?`)) return;
     const j = await post({ action: "grant_gift", id: c.id, months });
     if (!j.ok) return;
     setGiftFor(null);
@@ -605,6 +613,59 @@ export default function AdminCentersPage() {
         `קידום המתנה של "${c.name}" פעיל${until}.`,
         cancelled > 0 ? "הוראת הקבע ב-Sumit בוטלה, והביטול אומת." : null,
         promoted > 0 ? `${promoted} פרופילים נכנסו להתאמות.` : null,
+      ].filter(Boolean).join("\n"),
+    );
+  }
+
+  // חידוש המנוי מהכרטיס השמור. בפתיחה נשאל Sumit איזה כרטיס הוא מחזיק למרכז
+  // (קריאה בלבד), כדי שיהיה ברור מה יחויב לפני שמאשרים. הקריאה לא עוברת דרך
+  // post(): היא לא משנה דבר, ואין סיבה לטעון מחדש את כל הרשימה בגללה.
+  async function openResume(c: Center) {
+    setError("");
+    setResumeFor(c);
+    setResumeConfirmed(false);
+    setResumeDate("");
+    setResumeCard({ loading: true, card: null, today: "", error: "" });
+    try {
+      const res = await fetch("/api/admin-centers", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "saved_card", id: c.id }),
+      });
+      const j = await res.json();
+      if (!j.ok) {
+        setResumeCard({ loading: false, card: null, today: "", error: j.error ?? "שגיאה" });
+        return;
+      }
+      const today = typeof j.today === "string" ? j.today : new Date().toISOString().slice(0, 10);
+      setResumeCard({ loading: false, card: (j.card as SavedCard | null) ?? null, today, error: "" });
+      // מרכז בקידום מתנה שעוד לא נגמר: ברירת המחדל היא חיוב ראשון ביום שהמתנה
+      // נגמרת, כך שהוא לא מפסיד את מה שנשאר ממנה. אחרת - היום.
+      const giftEnd = isCenterOnGift(c) && c.gift_until
+        ? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(c.gift_until))
+        : "";
+      setResumeDate(giftEnd > today ? giftEnd : today);
+    } catch {
+      setResumeCard({ loading: false, card: null, today: "", error: "שגיאת רשת" });
+    }
+  }
+
+  // שגיאה מוצגת בתוך החלון (הוא נשאר פתוח); הצלחה סוגרת אותו.
+  async function resumeSubscription(c: Center) {
+    const j = await post({ action: "resume_subscription", id: c.id, first_charge_on: resumeDate, confirmed: resumeConfirmed });
+    if (!j.ok) return;
+    setResumeFor(null);
+    forgetSumitInfo(c.id);
+    const digits = typeof j.card_last_digits === "string" && j.card_last_digits ? ` (מסתיים ב-${j.card_last_digits})` : "";
+    const promoted = Number(j.promoted) || 0;
+    alert(
+      [
+        `המנוי של "${c.name}" חודש מהכרטיס השמור${digits}.`,
+        j.immediate
+          ? `הכרטיס חויב היום ב-₪${ils(centerMonthlyPricing(c).monthlyTotalWithVat)} כולל מע"מ, ומכאן מדי חודש.`
+          : `החיוב הראשון ב-${fmtDate(String(j.first_charge_on))}. עד אז המרכז באוויר בלי חיוב.`,
+        promoted > 0 ? `${promoted} פרופילים חזרו להתאמות.` : null,
+        j.recurring_id_missing ? "⚠️ Sumit לא החזיר מזהה להוראת הקבע - בדקו אותה בממשק Sumit." : null,
       ].filter(Boolean).join("\n"),
     );
   }
@@ -734,7 +795,8 @@ export default function AdminCentersPage() {
         המרכז רואה את הסכום החודשי הכולל וממלא פרטי אשראי. אפשר להגדיר חודשי מתנה -
         הכרטיס נשמר מיד והחיוב הראשון יוצא רק בתום המתנה.
         {" "}בכל כרטיס מרכז יש גם <strong>&quot;קידום מתנה&quot;</strong> (המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה שתבחרו)
-        ו<strong>&quot;עצירת מנוי&quot;</strong> (החיוב נפסק והמרכז יורד מהאוויר, וכל הפרטים שלו נשמרים).
+        ו<strong>&quot;עצירת מנוי&quot;</strong> (החיוב נפסק והמרכז עובר לארכיון: מוסתר מהאתר, וכל הפרטים שלו נשמרים.
+        מהארכיון אפשר לחדש את המנוי מהכרטיס השמור, בלי שהמרכז מזין אותו שוב).
       </p>
       <div className="mb-6 flex flex-wrap gap-4 text-xs">
         <a href="/prospectus-centers.pdf" target="_blank" className="font-bold text-[#0F5468] underline">📄 פרוספקט למרכזים (PDF לשליחה)</a>
@@ -802,7 +864,7 @@ export default function AdminCentersPage() {
           { key: "gift", label: "🎁 קידום מתנה" },
           { key: "sent", label: "✉️ ממתינות לתשלום" },
           { key: "draft", label: "📝 טיוטות" },
-          { key: "cancelled", label: "⏸️ מנוי נעצר" },
+          { key: "cancelled", label: "📦 ארכיון" },
         ];
         const tracks: { key: "all" | "per_therapist" | "center_entity"; label: string }[] = [
           { key: "all", label: "כל המסלולים" },
@@ -892,7 +954,7 @@ export default function AdminCentersPage() {
           { key: "gift", stage: "gift", title: "🎁 קידום מתנה - באוויר, בלי כרטיס ובלי חיוב", items: centers.filter((c) => stageOf(c) === "gift" && match(c)) },
           { key: "sent", stage: "sent", title: "✉️ הצעות שנשלחו - ממתינות לתשלום", items: centers.filter((c) => c.status === "sent" && match(c)) },
           { key: "draft", stage: "draft", title: "📝 טיוטות - טרם נשלחו", items: centers.filter((c) => c.status === "draft" && match(c)) },
-          { key: "cancelled", stage: "cancelled", title: "⏸️ מנוי נעצר - לא באוויר, הפרטים שמורים", items: centers.filter((c) => c.status === "cancelled" && match(c)) },
+          { key: "cancelled", stage: "cancelled", title: "📦 ארכיון - המנוי נעצר, לא מוצג באתר, הפרטים שמורים", items: centers.filter((c) => c.status === "cancelled" && match(c)) },
         ];
         const groups = allGroups.filter((g) => (stageFilter === "all" || g.stage === stageFilter) && g.items.length > 0);
         if (groups.length === 0 && centers.length > 0) {
@@ -921,6 +983,15 @@ export default function AdminCentersPage() {
             🎁 {onGift ? "שינוי תקופת המתנה" : "קידום מתנה"}
           </button>
         );
+        // חידוש החיוב מהכרטיס ש-Sumit שומר למרכז. רלוונטי רק למי שכבר מסר כרטיס
+        // פעם (payer_email נשאר על השורה גם אחרי עצירה ופתיחה מחדש).
+        const resumeButton = c.payer_email ? (
+          <button onClick={() => openResume(c)} disabled={busy}
+            title="נוצרת הוראת קבע חדשה מהכרטיס ש-Sumit שומר למרכז, בלי שהמרכז מזין אותו שוב. רק אחרי שהמרכז ביקש לחזור."
+            className="rounded-full border border-teal-400 bg-teal-600 px-3 py-1 font-bold text-white hover:bg-teal-700 disabled:opacity-40">
+            {onGift ? "💳 מעבר לתשלום מהכרטיס השמור" : "▶️ חידוש המנוי מהכרטיס השמור"}
+          </button>
+        ) : null;
         return (
           <div key={c.id} className="mb-4 rounded-2xl border border-stone-200 bg-white p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1259,6 +1330,7 @@ export default function AdminCentersPage() {
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
                     עריכה
                   </button>
+                  {resumeButton}
                   {giftButton}
                   <button onClick={() => del(c)} disabled={busy}
                     title="מחיקת הטיוטה מהמערכת"
@@ -1280,11 +1352,12 @@ export default function AdminCentersPage() {
                       🔄 סטטוס מ-Sumit
                     </button>
                   )}
+                  {onGift && resumeButton}
                   {giftButton}
                   {/* עצירה שומרת את כל הפרטים. מוצגת גם כשחסר מזהה הוראת קבע:
                       השרת מבטל כל הוראה חיה שהוא מוצא ב-Sumit למרכז הזה. */}
                   <button onClick={() => stopSubscription(c)} disabled={busy}
-                    title="המרכז יורד מהאוויר, וכל הפרטים שלו נשמרים. אפשר להחזיר אותו במתנה או בתשלום."
+                    title="המרכז עובר לארכיון: מוסתר מהאתר, וכל הפרטים שלו נשמרים. אפשר להחזיר אותו בחידוש המנוי, במתנה או בהצעה חדשה."
                     className="rounded-full border border-red-300 bg-red-50 px-3 py-1 font-bold text-red-700 hover:bg-red-100 disabled:opacity-40">
                     ⏸ {onGift ? "סיום המתנה ועצירה" : "עצירת מנוי (הפרטים נשמרים)"}
                   </button>
@@ -1292,10 +1365,11 @@ export default function AdminCentersPage() {
               )}
               {c.status === "cancelled" && (
                 <>
+                  {resumeButton}
                   {giftButton}
                   <button onClick={() => reopenOffer(c)} disabled={busy}
-                    title="המרכז חוזר לטיוטות עם אותו קישור הצטרפות ואותו תמחור; כשיזין כרטיס הוא חוזר לאוויר"
-                    className="rounded-full border border-teal-400 bg-teal-600 px-3 py-1 font-bold text-white hover:bg-teal-700 disabled:opacity-40">
+                    title="למרכז שאין לו כרטיס שמור, או שרוצה לשלם בכרטיס אחר: חוזר לטיוטות עם אותו קישור הצטרפות ואותו תמחור, וכשיזין כרטיס הוא חוזר לאוויר"
+                    className="rounded-full border border-teal-300 bg-teal-50 px-3 py-1 font-bold text-teal-800 hover:bg-teal-100 disabled:opacity-40">
                     ↩️ פתיחת ההצעה מחדש לתשלום
                   </button>
                   <button onClick={() => openEdit(c)} className="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-50">
@@ -1563,15 +1637,15 @@ export default function AdminCentersPage() {
                 🎁 {already ? "שינוי תקופת המתנה" : "קידום מתנה"} - {c.name}
               </h3>
               <p className="mb-3 text-sm leading-6 text-stone-600">
-                המרכז באוויר בלי כרטיס אשראי ובלי חיוב: בהתאמות, בעמוד הציבורי ובפורטל, כמו מרכז משלם.
-                בסוף התקופה הוא יורד מהאוויר לבד, הפרטים שלו נשמרים, ואנחנו מקבלים על כך מייל. למרכז לא נשלח מייל.
+                המרכז באוויר בלי חיוב: בהתאמות, בעמוד הציבורי ובפורטל, כמו מרכז משלם.
+                בסוף התקופה הוא עובר לארכיון לבד (מוסתר מהאתר, והפרטים נשמרים), ואנחנו מקבלים על כך מייל. למרכז לא נשלח מייל.
               </p>
 
               {hasOrder && (
                 <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
                   ⚠️ למרכז יש הוראת קבע ב-Sumit{firstCharge ? ` (חיוב ראשון ב-${fmtDate(firstCharge)})` : ""}.
-                  קידום המתנה <strong>מבטל אותה</strong>, והכרטיס השמור לא יחויב. כדי לעבור לתשלום בסוף המתנה
-                  המרכז יצטרך להזין כרטיס מחדש.
+                  קידום המתנה <strong>מבטל אותה</strong>, והכרטיס לא יחויב. הכרטיס עצמו נשאר שמור ב-Sumit:
+                  אם המרכז ירצה להמשיך בסוף המתנה, אפשר לחדש ממנו את החיוב בלי להזין אותו שוב. החיוב לא יתחדש לבד.
                 </p>
               )}
               {already && (
@@ -1621,6 +1695,90 @@ export default function AdminCentersPage() {
               <button type="button" disabled={busy} onClick={() => setGiftFor(null)}
                 className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-40">
                 ביטול
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* חלון חידוש המנוי מהכרטיס השמור. הפעולה מחייבת כרטיס של לקוח, ולכן:
+          מוצג הכרטיס שיחויב, הסכום והתאריך, והכפתור נפתח רק אחרי סימון
+          שהמרכז ביקש לחזור. שגיאה מוצגת כאן בתוך החלון. */}
+      {resumeFor && (() => {
+        const c = resumeFor;
+        const gifted = isCenterOnGift(c);
+        const p = centerMonthlyPricing(c);
+        const { loading: cardLoading, card, today, error: cardError } = resumeCard;
+        const usable = !!card && !card.expired;
+        const immediate = !!resumeDate && resumeDate === today;
+        const maxDate = today ? new Date(new Date(today + "T00:00:00Z").getTime() + 366 * 86_400_000).toISOString().slice(0, 10) : undefined;
+        const expiry = card && card.expiration_month && card.expiration_year
+          ? `${String(card.expiration_month).padStart(2, "0")}/${card.expiration_year}`
+          : null;
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" dir="rtl"
+            onClick={() => { if (!busy) setResumeFor(null); }}>
+            <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-lg font-black text-stone-900">
+                {gifted ? "💳 מעבר לתשלום מהכרטיס השמור" : "▶️ חידוש המנוי מהכרטיס השמור"} - {c.name}
+              </h3>
+              <p className="mb-3 text-sm leading-6 text-stone-600">
+                ביטול הוראת קבע לא מוחק את הכרטיס: הוא נשאר שמור ב-Sumit תחת המרכז. כאן נוצרת ממנו הוראת קבע חדשה,
+                בלי שהמרכז מזין אותו שוב. המרכז והפרופילים שלו חוזרים לאוויר מיד.
+              </p>
+
+              <div className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-sm leading-6 text-stone-700">
+                {cardLoading ? (
+                  <span className="text-stone-400">בודק מול Sumit איזה כרטיס שמור...</span>
+                ) : cardError ? (
+                  <span className="text-red-700">{cardError}</span>
+                ) : !card ? (
+                  <span className="text-red-700">ב-Sumit אין כרטיס שמור למרכז הזה. סגרו את החלון ובחרו &quot;פתיחת ההצעה מחדש לתשלום&quot;, והמרכז יזין כרטיס בקישור ההצטרפות.</span>
+                ) : (
+                  <>
+                    <div>כרטיס שמור ב-Sumit: <strong>{card.last_digits ? `מסתיים ב-${card.last_digits}` : "כרטיס אשראי"}</strong>{expiry && <> · תוקף {expiry}</>}</div>
+                    {card.expired && (
+                      <div className="font-bold text-red-700">הכרטיס פג תוקף, ולכן אי אפשר לחדש ממנו. פתחו את ההצעה מחדש לתשלום, והמרכז יזין כרטיס חדש.</div>
+                    )}
+                    <div>סכום: <strong>₪{ils(p.monthlyTotal)}</strong> + מע&quot;מ לחודש (₪{ils(p.monthlyTotalWithVat)} כולל מע&quot;מ)</div>
+                  </>
+                )}
+              </div>
+
+              {usable && (
+                <>
+                  <label className="mb-1 block text-sm font-semibold text-stone-800">חיוב ראשון</label>
+                  <input type="date" value={resumeDate} min={today} max={maxDate}
+                    onChange={(e) => setResumeDate(e.target.value)}
+                    className="w-44 rounded-lg border border-stone-300 px-3 py-2 text-sm" dir="ltr" />
+                  <p className="mt-1 text-xs leading-5 text-stone-500">
+                    {immediate
+                      ? "הכרטיס יחויב היום, ומכאן מדי חודש."
+                      : resumeDate
+                        ? `הכרטיס יחויב לראשונה ב-${fmtDate(resumeDate)}. עד אז המרכז באוויר בלי חיוב.`
+                        : "בחרו תאריך."}
+                    {gifted && c.gift_until && <> קידום המתנה הנוכחי נגמר ב-{fmtDate(c.gift_until)}, והוא מסתיים עם המעבר לתשלום.</>}
+                  </p>
+
+                  <label className="mt-3 flex cursor-pointer items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                    <input type="checkbox" checked={resumeConfirmed} onChange={(e) => setResumeConfirmed(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-amber-600" />
+                    <span><strong>המרכז ביקש לחדש את המנוי</strong>, ויודע שהכרטיס השמור יחויב בסכום הזה מדי חודש עד לביטול.</span>
+                  </label>
+                </>
+              )}
+
+              {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+
+              {usable && (
+                <button type="button" disabled={busy || !resumeConfirmed || !resumeDate} onClick={() => resumeSubscription(c)}
+                  className="mt-4 w-full rounded-xl bg-teal-700 px-4 py-3 text-sm font-bold text-white hover:bg-teal-800 disabled:opacity-40">
+                  {busy ? "מחדש…" : immediate ? `חידוש המנוי וחיוב ₪${ils(p.monthlyTotalWithVat)} היום` : "חידוש המנוי"}
+                </button>
+              )}
+              <button type="button" disabled={busy} onClick={() => setResumeFor(null)}
+                className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-40">
+                {usable ? "ביטול" : "סגירה"}
               </button>
             </div>
           </div>

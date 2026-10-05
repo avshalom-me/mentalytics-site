@@ -6,6 +6,7 @@ import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, L
 import { type PublicPage } from "./PublicPageEditor";
 import InvitePanel from "./InvitePanel";
 import MembersPanel from "./MembersPanel";
+import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 
 // דשבורד פורטל המרכז: הראשי מציג סטטיסטיקות ונתונים בלבד - כל השינויים
 // והעריכות מרוכזים באזור עריכה נפרד (/centers/dashboard/profile), כמו אצל
@@ -144,6 +145,15 @@ export default function CenterDashboardView({ data, preview = false, justCreated
           <LogOut size={15} /> התנתקות
         </button>}
       </div>
+
+      {/* מרכז בארכיון (המנוי נעצר): בלי השורה הזו הפורטל נראה כמו תמיד, רק
+          שכל הפעולות נעלמו וכל פרופיל מסומן "לא מוצג", בלי שום הסבר. */}
+      {center.status === "cancelled" && (
+        <div className="mb-6 rounded-2xl border border-stone-300 bg-stone-50 px-5 py-3 text-sm leading-6 text-stone-700">
+          <strong>המנוי של המרכז אינו פעיל כרגע.</strong> המרכז והפרופילים שלו אינם מוצגים באתר, וכל הפרטים שמורים.
+          לחידוש המנוי: <a href="mailto:admin@getmentalytics.com" className="font-bold underline">admin@getmentalytics.com</a>
+        </div>
+      )}
 
       {/* הכיוון ההפוך לשורה שבדשבורד המטפל: אותו חשבון מחזיק גם פרופיל אישי,
           וללא זה אין באתר מעבר בין שני האזורים. */}
@@ -326,6 +336,9 @@ export default function CenterDashboardView({ data, preview = false, justCreated
                         <span className="rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-xs font-bold text-teal-800">מאושר</span>
                       ) : t.status === "rejected" ? (
                         <span className="rounded-full bg-red-50 border border-red-200 px-2 py-0.5 text-xs font-bold text-red-700" title="ערכו את הפרופיל ושמרו - יישלח שוב לבדיקה">נדחה - לתיקון</span>
+                      ) : t.status === THERAPIST_ARCHIVED_STATUS ? (
+                        // המנוי של המרכז אינו פעיל: הפרופיל שמור ומוסתר, וחוזר עם המרכז.
+                        <span className="rounded-full bg-stone-100 border border-stone-300 px-2 py-0.5 text-xs font-bold text-stone-600" title="הפרופיל שמור. הוא יחזור להופיע כשהמנוי של המרכז יחודש.">לא מוצג - המנוי אינו פעיל</span>
                       ) : (
                         <span className="rounded-full bg-stone-100 border border-stone-200 px-2 py-0.5 text-xs text-stone-500">ממתין לאישור</span>
                       )}

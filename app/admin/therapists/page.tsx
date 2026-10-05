@@ -11,6 +11,7 @@ import {
 import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import { canPauseFromMatching } from "@/app/lib/match-pause";
+import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
 import AdminCertUpload from "./components/AdminCertUpload";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -1141,6 +1142,10 @@ export default function AdminTherapistsPage() {
   }
 
   const isListed = (t: AdminTherapist) => t.admin_approved && (t.status === "approved" || t.status === "paying");
+  // פרופיל שהוסתר יחד עם המרכז שלו (המרכז בארכיון). הוא לא "דורש טיפול" ולא
+  // "נדחה": אין מה לעשות איתו כאן, והוא חוזר לבד כשהמרכז חוזר. מוצג ברשימת
+  // המאושרים עם תג משלו, כדי שבכניסה מכרטיס המרכז עדיין יראו את הפרופילים.
+  const isArchived = (t: AdminTherapist) => t.status === THERAPIST_ARCHIVED_STATUS;
   const allFiltered = hasActiveFilter ? therapists.filter((t) => !isStub(t) && matchesFilters(t)) : null;
   // Newest activity first: a fresh signup or a renewed/completed profile jumps
   // to the top of the review queue (the API returns alphabetical order).
@@ -1155,11 +1160,11 @@ export default function AdminTherapistsPage() {
   // action queue, and mixing them in "דורש טיפול" buried the real work.
   const pending = hasActiveFilter
     ? []
-    : therapists.filter((t) => !isListed(t) && !isStub(t) && t.status !== "rejected").sort(byLatestActivity);
+    : therapists.filter((t) => !isListed(t) && !isArchived(t) && !isStub(t) && t.status !== "rejected").sort(byLatestActivity);
   const rejected = hasActiveFilter
     ? []
     : therapists.filter((t) => t.status === "rejected" && !isStub(t)).sort(byLatestActivity);
-  const approved = (hasActiveFilter ? allFiltered! : therapists.filter(isListed));
+  const approved = (hasActiveFilter ? allFiltered! : therapists.filter((t) => isListed(t) || isArchived(t)));
   // הרשמה שנסגרה (שבוע אחרי התזכורת האחרונה, והפרופיל נשאר ריק) יוצאת מהטאב:
   // אין יותר מה לעשות איתה, והיא רק ניפחה את המונה. היא לא נמחקה - מי שחוזר
   // וממלא שם כבר אינו isStub, ומופיע מחדש בתור הרגיל.
@@ -1169,7 +1174,7 @@ export default function AdminTherapistsPage() {
   // Partial profiles: the form WAS saved but required items are still missing
   // (certificate / last name / regions / types / areas — and the optional photo).
   const partials = therapists
-    .filter((t) => !isStub(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0)
+    .filter((t) => !isStub(t) && !isArchived(t) && t.status !== "rejected" && missingProfileFields(t, t.certificates.length > 0).length > 0)
     .sort((a, b) => (b.created_at ?? "").localeCompare(a.created_at ?? ""));
 
   // A live search/filter jumps straight to the results (approved) table so the
@@ -1267,12 +1272,15 @@ export default function AdminTherapistsPage() {
                   therapist.status === "paying" ? "bg-yellow-100 text-yellow-800 border border-yellow-400" :
                   therapist.status === "approved" ? "bg-green-100 text-green-800" :
                   therapist.status === "rejected" ? "bg-red-100 text-red-800" :
+                  isArchived(therapist) ? "bg-stone-200 text-stone-700 border border-stone-400" :
                   "bg-gray-100 text-gray-700"
-                }`}>
+                }`}
+                  title={isArchived(therapist) ? "המרכז של הפרופיל בארכיון, ולכן הפרופיל מוסתר מהמאגר, מההתאמות ומגוגל. הוא חוזר לאוויר כשהמרכז חוזר, או כשמנתקים אותו מהמרכז." : undefined}>
                   {therapist.status === "paying" && !therapist.admin_approved ? "💳 שילם — ממתין לאישור" :
                    therapist.status === "paying" ? "★ מקודם" :
                    therapist.status === "approved" ? "מאושר (חינמי)" :
-                   therapist.status === "rejected" ? "נדחה" : "ממתין לאישור"}
+                   therapist.status === "rejected" ? "נדחה" :
+                   isArchived(therapist) ? "📦 בארכיון עם המרכז - מוסתר" : "ממתין לאישור"}
                 </span>
                 {therapist.status === "paying" && therapist.promotion_source === "paid" && (
                   <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-semibold text-blue-800 border border-blue-300">
@@ -1631,7 +1639,7 @@ export default function AdminTherapistsPage() {
                   🔗 קשר חשבון כניסה
                 </button>
               )}
-              {therapist.status !== "approved" && therapist.status !== "paying" && (
+              {therapist.status !== "approved" && therapist.status !== "paying" && !isArchived(therapist) && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-green-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => updateStatus(therapist.id, "approved")}>
@@ -1680,20 +1688,25 @@ export default function AdminTherapistsPage() {
                   {therapist.completion_requested_at ? "✉️ שלח שוב בקשת השלמה" : "✉️ בקש השלמה"}
                 </button>
               )}
-              <button type="button" disabled={isBusy}
-                className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
-                onClick={() => {
-                  setRejectReason("");
-                  setRejectNotify(true);
-                  setRejectFor(therapist);
-                }}>
-                {isBusy ? "מעדכן..." : "דחה"}
-              </button>
-              <button type="button" disabled={isBusy}
-                className="rounded-xl bg-gray-500 px-4 py-2 text-sm text-white disabled:opacity-50"
-                onClick={() => updateStatus(therapist.id, "pending")}>
-                {isBusy ? "מעדכן..." : "החזר להמתנה"}
-              </button>
+              {/* פרופיל בארכיון לא משנה סטטוס מכאן (השרת מסרב): הוא חוזר עם המרכז. */}
+              {!isArchived(therapist) && (
+                <>
+                  <button type="button" disabled={isBusy}
+                    className="rounded-xl bg-red-600 px-4 py-2 text-sm text-white disabled:opacity-50"
+                    onClick={() => {
+                      setRejectReason("");
+                      setRejectNotify(true);
+                      setRejectFor(therapist);
+                    }}>
+                    {isBusy ? "מעדכן..." : "דחה"}
+                  </button>
+                  <button type="button" disabled={isBusy}
+                    className="rounded-xl bg-gray-500 px-4 py-2 text-sm text-white disabled:opacity-50"
+                    onClick={() => updateStatus(therapist.id, "pending")}>
+                    {isBusy ? "מעדכן..." : "החזר להמתנה"}
+                  </button>
+                </>
+              )}
               <button type="button" disabled={reconcilingId === therapist.id}
                 className="rounded-xl border border-amber-400 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800 disabled:opacity-50"
                 onClick={() => reconcileSumit(therapist.id)}>
@@ -2018,6 +2031,8 @@ export default function AdminTherapistsPage() {
                                     ? "bg-green-100 text-green-800"
                                     : t.status === "rejected"
                                     ? "bg-red-100 text-red-800"
+                                    : isArchived(t)
+                                    ? "bg-stone-200 text-stone-700"
                                     : "bg-gray-100 text-gray-700"
                                 }`}
                               >
@@ -2029,6 +2044,8 @@ export default function AdminTherapistsPage() {
                                   ? "מאושר"
                                   : t.status === "rejected"
                                   ? "נדחה"
+                                  : isArchived(t)
+                                  ? "📦 בארכיון"
                                   : "ממתין"}
                               </span>
                               {t.missing.length > 0 && (

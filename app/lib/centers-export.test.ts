@@ -156,7 +156,7 @@ describe("identity and status", () => {
     expect(cell([center({ status: "sent" })], "סטטוס")).toBe("הצעה נשלחה");
     expect(cell([center({ status: "active" })], "סטטוס")).toBe("מנוי פעיל");
     expect(cell([center({ status: "draft" })], "סטטוס")).toBe("טיוטה");
-    expect(cell([center({ status: "cancelled" })], "סטטוס")).toBe("מנוי נעצר");
+    expect(cell([center({ status: "cancelled" })], "סטטוס")).toBe("בארכיון");
     expect(cell([center({ billing_track: "center_entity" })], "מסלול")).toBe("מסלול 2 - מרכז כישות");
     expect(cell([center({ billing_track: "per_therapist" })], "מסלול")).toBe("מסלול 1 - מטפלים בנפרד");
     // An old or empty track is track 1, as on the page.
@@ -178,7 +178,7 @@ describe("identity and status", () => {
 
   it("does not call a stopped centre a gift, whatever dates were left on its row", () => {
     const stopped = center({ status: "cancelled", gift_granted_at: "2026-09-05T10:00:00Z", gift_until: "2026-10-05T10:00:00Z", cancel_reason: "gift_ended", cancelled_at: "2026-10-06T06:45:00Z" });
-    expect(cell([stopped], "סטטוס")).toBe("מנוי נעצר");
+    expect(cell([stopped], "סטטוס")).toBe("בארכיון");
     expect(cell([stopped], "קידום מתנה מתאריך")).toBeNull();
     expect(cell([stopped], "קידום מתנה עד")).toBeNull();
     expect(cell([stopped], "סיבת העצירה")).toBe("תקופת המתנה הסתיימה");

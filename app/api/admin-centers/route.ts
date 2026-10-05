@@ -5,10 +5,10 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
 import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelLiveOrdersForCustomer, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES } from "@/app/lib/sumit";
+import { cancelLiveOrdersForCustomer, createCenterSubscription, getSavedPaymentMethod, listRecurringForCustomer, updateRecurringPrice, SumitPaymentDeclinedError, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES, type SavedPaymentMethod } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
-import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow, stopActiveCenter } from "@/app/lib/center-promotion";
+import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow, restoreArchivedTherapists, stopActiveCenter } from "@/app/lib/center-promotion";
 import { CENTER_GIFT_MAX_MONTHS, giftUntilFromMonths, isCenterOnGift } from "@/app/lib/center-gift";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 import { CENTER_FOCUS_MAX } from "@/app/lib/center-title";
@@ -79,6 +79,25 @@ async function endCenterBilling(
       ),
     };
   }
+}
+
+// התאריך של היום בישראל (YYYY-MM-DD). Sumit מפרש תאריך חיוב ראשון לפי שעון
+// ישראל, ו"היום" של האדמין הוא היום הזה - לא התאריך ב-UTC של השרת.
+function israelDate(d: Date = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+}
+
+// הכרטיס ש-Sumit מחזיק למרכז, או null. מרכז שמעולם לא הזין כרטיס אינו לקוח
+// ב-Sumit, ושם השאלה עצמה חוזרת כשגיאה - גם זה "אין כרטיס".
+async function centerSavedCard(center: {
+  id: string;
+  paid_at?: string | null;
+  payer_email?: string | null;
+  sumit_recurring_id?: string | null;
+}): Promise<SavedPaymentMethod | null> {
+  if (!center.paid_at && !center.payer_email && !center.sumit_recurring_id) return null;
+  const card = await getSavedPaymentMethod(`center:${center.id}`);
+  return card && card.isCard ? card : null;
 }
 
 export async function GET() {
@@ -388,6 +407,9 @@ export async function POST(req: NextRequest) {
       }
       // מסירים שורת ישות-מרכז (אם נוצרה) ומנתקים מטפלים משויכים לפני המחיקה.
       await supabaseAdmin.from("therapists").delete().eq("center_account_id", id).eq("entity_type", "center");
+      // פרופילים שהוסתרו יחד עם המרכז (ארכיון) חוזרים קודם ל-'approved': בלי
+      // מרכז אין מי שיחזיר אותם, והם היו נשארים מוסתרים לתמיד.
+      await restoreArchivedTherapists({ centerId: id }, `center deleted (center=${id})`);
       await supabaseAdmin.from("therapists").update({ center_account_id: null }).eq("center_account_id", id);
       const { error } = await supabaseAdmin.from("therapy_center_accounts").delete().eq("id", id);
       if (error) throw error;
@@ -605,7 +627,19 @@ export async function POST(req: NextRequest) {
         .select("id")
         .eq("center_account_id", id)
         .neq("entity_type", "center");
-      const removedIds = (currentLinked ?? []).map((t) => t.id).filter((tid) => !idsSet.includes(tid));
+      const currentIds = (currentLinked ?? []).map((t) => t.id as string);
+      const removedIds = currentIds.filter((tid) => !idsSet.includes(tid));
+      const addedIds = idsSet.filter((tid) => !currentIds.includes(tid));
+
+      // מרכז בארכיון: כל הפרופילים שלו מוסתרים יחד איתו. שיוך של מטפל חדש
+      // היה מסתיר פרופיל שמופיע היום במאגר בלי שמישהו התכוון לכך, ולכן מותר
+      // רק לנתק. מטפל שנותק עומד בפני עצמו וחוזר למאגר.
+      if (center.status === "cancelled" && addedIds.length > 0) {
+        return NextResponse.json(
+          { ok: false, error: "המרכז בארכיון, ואפשר רק לנתק ממנו מטפלים. כדי לשייך מטפלים חדשים החזירו קודם את המרכז (קידום מתנה או חידוש המנוי)." },
+          { status: 400 },
+        );
+      }
 
       // נתק מטפלים שהיו משויכים למרכז ואינם ברשימה החדשה.
       let unassign = supabaseAdmin
@@ -616,9 +650,12 @@ export async function POST(req: NextRequest) {
       if (idsSet.length > 0) unassign = unassign.not("id", "in", `(${idsSet.join(",")})`);
       await unassign.throwOnError();
 
-      // מטפל שנותק מאבד את קידום המרכז (רק promotion_source='center').
+      // מטפל שנותק מאבד את קידום המרכז (רק promotion_source='center'). ומי
+      // שהוסתר יחד עם המרכז (ארכיון) ונותק ממנו עומד עכשיו בפני עצמו, וחוזר
+      // למאגר כמטפל חינמי.
       if (removedIds.length > 0) {
         await demoteCenterTherapists({ therapistIds: removedIds }, `unlinked from center ${id}`);
+        await restoreArchivedTherapists({ therapistIds: removedIds }, `unlinked from center ${id}`);
       }
 
       // שייך את הנבחרים (דורס שיוך קודם למרכז אחר — שיוך יחיד).
@@ -628,6 +665,13 @@ export async function POST(req: NextRequest) {
           .update({ center_account_id: id })
           .in("id", idsSet)
           .throwOnError();
+      }
+
+      // מי שהגיע לכאן ממרכז אחר שבארכיון כבר אינו שייך לו, ואין סיבה שיישאר
+      // מוסתר. רק המצורפים החדשים: פרופילים של המרכז הזה שהוסתרו איתו נשארים
+      // מוסתרים עד שהוא עצמו חוזר לאוויר (למשל הצעה שנפתחה מחדש וטרם שולמה).
+      if (addedIds.length > 0) {
+        await restoreArchivedTherapists({ therapistIds: addedIds }, `linked to center ${id}`);
       }
 
       // מרכז פעיל ⇒ מטפלים מאושרים שזה עתה שויכו נכנסים להתאמות מיד.
@@ -827,6 +871,235 @@ export async function POST(req: NextRequest) {
       if ((center.billing_track as string) === "center_entity") await ensureCenterEntityRow(id);
       console.log(`admin-centers: offer reopened for center=${id} (${center.name}); gift_months=${gift}`);
       return NextResponse.json({ ok: true, status: "draft" });
+    }
+
+    // הכרטיס ש-Sumit מחזיק למרכז, לקריאה בלבד: ארבע הספרות האחרונות והתוקף,
+    // כדי שלפני חידוש המנוי יהיה ברור איזה כרטיס יחויב. שום דבר לא נשמר אצלנו.
+    if (action === "saved_card") {
+      let card: SavedPaymentMethod | null = null;
+      try {
+        card = await centerSavedCard(center);
+      } catch (e) {
+        console.error(`admin-centers saved_card: Sumit read failed for center=${center.id}:`, e instanceof Error ? e.message : e);
+        return NextResponse.json({ ok: false, error: "הקריאה מ-Sumit נכשלה - נסו שוב בעוד רגע." }, { status: 502 });
+      }
+      return NextResponse.json({
+        ok: true,
+        card: card
+          ? { last_digits: card.lastDigits, expiration_month: card.expirationMonth, expiration_year: card.expirationYear, expired: card.expired }
+          : null,
+        today: israelDate(),
+      });
+    }
+
+    // חידוש המנוי מהכרטיס השמור: מרכז שהמנוי שלו נעצר (או שנמצא בקידום מתנה)
+    // חוזר לחיוב בלי להזין כרטיס שוב. ביטול הוראת קבע ב-Sumit לא מוחק את
+    // הכרטיס - הוא נשאר שמור תחת הלקוח - ומהכרטיס הזה נוצרת הוראת קבע חדשה.
+    // אומת חי ב-5/10/2026 (הוראה מתוזמנת נוצרה מכרטיס שמור, ובוטלה).
+    //
+    // זו פעולה שמחייבת כרטיס של לקוח, ולכן: היא נעשית רק מהאדמין, רק אחרי
+    // שהמרכז ביקש לחזור (confirmed), ואף פעם לא כשכבר יש למרכז הוראה חיה.
+    // חיוב ראשון היום = חיוב מיידי; תאריך עתידי = הכרטיס יחויב לראשונה בתאריך.
+    if (action === "resume_subscription") {
+      const onGift = isCenterOnGift(center);
+      if (center.status === "active" && !onGift) {
+        return NextResponse.json({ ok: false, error: "למרכז כבר יש מנוי פעיל" }, { status: 400 });
+      }
+      if (body.confirmed !== true) {
+        return NextResponse.json({ ok: false, error: "חסר אישור שהמרכז ביקש לחדש את המנוי" }, { status: 400 });
+      }
+
+      const today = israelDate();
+      const latest = israelDate(new Date(Date.now() + 366 * 86_400_000));
+      let firstChargeOn = today;
+      if (typeof body.first_charge_on === "string" && body.first_charge_on.trim()) {
+        const d = body.first_charge_on.trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(d) || isNaN(new Date(d + "T00:00:00Z").getTime()) || d < today || d > latest) {
+          return NextResponse.json({ ok: false, error: "תאריך החיוב הראשון: מהיום ועד שנה קדימה" }, { status: 400 });
+        }
+        firstChargeOn = d;
+      }
+      const immediate = firstChargeOn === today;
+
+      const billingTrack = (center.billing_track as string) ?? "per_therapist";
+      const therapistCount = Math.floor(Number(center.therapist_count) || 0);
+      const monthlyTotal = centerMonthlyPricing({
+        billing_track: billingTrack,
+        price_per_therapist: Number(center.price_per_therapist) || 0,
+        therapist_count: therapistCount,
+        fixed_monthly_price: center.fixed_monthly_price as number | null,
+        num_locations: center.num_locations as number | null,
+        discount_amount: center.discount_amount as number | null,
+      }).monthlyTotal;
+      if (monthlyTotal <= 0) {
+        return NextResponse.json({ ok: false, error: "למרכז אין מחיר חודשי - עדכנו את התמחור לפני חידוש המנוי" }, { status: 400 });
+      }
+      const payerEmail = ((center.payer_email as string | null) ?? (center.email as string | null) ?? "").trim();
+      if (!payerEmail) {
+        return NextResponse.json({ ok: false, error: "חסר מייל לחשבונית - הוסיפו אימייל למרכז" }, { status: 400 });
+      }
+
+      const externalId = `center:${center.id}`;
+      // הכרטיס השמור, ושאין כבר הוראה חיה. שתי קריאות ל-Sumit לפני שנוגעים בכסף.
+      let card: SavedPaymentMethod | null;
+      let liveIds: number[];
+      try {
+        card = await centerSavedCard(center);
+        const items = await listRecurringForCustomer({ externalIdentifier: externalId, includeInactive: true });
+        liveIds = items.filter((i) => !SUMIT_RECURRING_ENDED_STATUSES.includes(Number(i.Status))).map((i) => Number(i.ID));
+      } catch (e) {
+        console.error(`admin-centers resume_subscription: Sumit read failed for center=${center.id}:`, e instanceof Error ? e.message : e);
+        return NextResponse.json({ ok: false, error: "הקריאה מ-Sumit נכשלה - לא בוצע שום שינוי. נסו שוב בעוד רגע." }, { status: 502 });
+      }
+      if (!card) {
+        return NextResponse.json(
+          { ok: false, error: "ב-Sumit אין כרטיס שמור למרכז הזה. פתחו את ההצעה מחדש לתשלום, והמרכז יזין כרטיס בקישור ההצטרפות." },
+          { status: 400 },
+        );
+      }
+      if (card.expired) {
+        return NextResponse.json(
+          { ok: false, error: `הכרטיס השמור${card.lastDigits ? ` (מסתיים ב-${card.lastDigits})` : ""} פג תוקף ב-${card.expirationMonth}/${card.expirationYear}. פתחו את ההצעה מחדש לתשלום, והמרכז יזין כרטיס חדש.` },
+          { status: 400 },
+        );
+      }
+      if (liveIds.length > 0) {
+        return NextResponse.json(
+          { ok: false, error: `כבר קיימת ב-Sumit הוראת קבע חיה למרכז הזה (${liveIds.join(", ")}). לא נוצרה הוראה נוספת - בדקו את מצב המרכז לפני שמנסים שוב.` },
+          { status: 409 },
+        );
+      }
+
+      // מנעול כפילות: אותה שורת pending שדף ההצטרפות משתמש בה, כך שלחיצה
+      // כפולה (או חידוש במקביל להזנת כרטיס בדף ההצטרפות) לא יוצרת שתי הוראות.
+      await supabaseAdmin
+        .from("payments")
+        .update({ status: "failed" })
+        .eq("payment_type", "center_subscription")
+        .eq("reference_id", center.id)
+        .eq("status", "pending")
+        .lt("created_at", new Date(Date.now() - 60_000).toISOString());
+      const { data: payment, error: paymentErr } = await supabaseAdmin
+        .from("payments")
+        .insert({
+          payment_type: "center_subscription",
+          reference_id: center.id,
+          amount: monthlyTotal,
+          status: "pending",
+          metadata: {
+            center_name: center.name,
+            billing_track: billingTrack,
+            monthly_total: monthlyTotal,
+            first_charge_on: firstChargeOn,
+            payer_email: payerEmail,
+            recorded_by: "admin-resume-saved-card",
+          },
+        })
+        .select("id")
+        .single();
+      if (paymentErr || !payment) {
+        if (paymentErr?.code === "23505") {
+          return NextResponse.json({ ok: false, error: "תשלום למרכז הזה כבר בתהליך - המתינו דקה ורעננו" }, { status: 409 });
+        }
+        throw paymentErr ?? new Error("payment lock failed");
+      }
+
+      let result;
+      try {
+        result = await createCenterSubscription({
+          centerId: center.id as string,
+          centerName: center.name as string,
+          payerName: ((center.payer_name as string | null) ?? "").trim() || (center.name as string),
+          payerEmail,
+          payerPhone: (center.payer_phone as string | null) ?? undefined,
+          companyNumber: (center.payer_company_number as string | null) ?? undefined,
+          // בלי טוקן: Sumit מחייב את הכרטיס השמור של הלקוח.
+          unitPrice: monthlyTotal,
+          therapistCount,
+          firstChargeDate: immediate ? undefined : firstChargeOn,
+        });
+      } catch (err) {
+        await supabaseAdmin.from("payments").update({ status: "failed" }).eq("id", payment.id);
+        // חיוב שנכשל לא אמור להשאיר הוראה חיה, אבל המרכז נשאר לא-פעיל ואף
+        // מנגנון לא היה רואה הוראה כזו. מוודאים, ומבטלים אם נשארה.
+        try {
+          const left = await cancelLiveOrdersForCustomer(externalId);
+          if (left.length > 0) console.error(`admin-centers resume_subscription: cancelled ${left.join(", ")} left behind by a failed resume for center=${center.id}`);
+        } catch (cleanupErr) {
+          console.error(`CRITICAL admin-centers resume_subscription: could not verify that no order was left for center=${center.id}:`, cleanupErr instanceof Error ? cleanupErr.message : cleanupErr);
+        }
+        if (err instanceof SumitPaymentDeclinedError) {
+          console.warn(`admin-centers resume_subscription: saved card declined for center=${center.id}${err.declineCode ? ` code=${err.declineCode}` : ""}`);
+          return NextResponse.json(
+            { ok: false, error: "החיוב מהכרטיס השמור נדחה על ידי חברת האשראי, והמנוי לא חודש. אפשר לפתוח את ההצעה מחדש לתשלום, כדי שהמרכז יזין כרטיס אחר." },
+            { status: 402 },
+          );
+        }
+        console.error(`admin-centers resume_subscription: Sumit call failed for center=${center.id}:`, err instanceof Error ? err.message : err);
+        return NextResponse.json({ ok: false, error: "יצירת הוראת הקבע ב-Sumit נכשלה, והמנוי לא חודש. נסו שוב בעוד רגע." }, { status: 502 });
+      }
+
+      const sumitRecurringId = (result.RecurringItemID ?? null) as number | null;
+      const sumitDocumentId = (result.DocumentID ?? null) as number | null;
+      const now = new Date();
+      try {
+        await supabaseAdmin
+          .from("therapy_center_accounts")
+          .update({
+            status: "active",
+            agreed_monthly_price: monthlyTotal,
+            billing_starts_at: firstChargeOn,
+            sumit_recurring_id: sumitRecurringId ? String(sumitRecurringId) : null,
+            sumit_document_id: sumitDocumentId ? String(sumitDocumentId) : null,
+            sumit_miss_count: 0,
+            last_billed_on: null,
+            paid_at: now.toISOString(),
+            cancelled_at: null,
+            cancel_reason: null,
+            gift_granted_at: null,
+            gift_until: null,
+            updated_at: now.toISOString(),
+          })
+          .eq("id", id)
+          .throwOnError();
+        if (immediate) {
+          await supabaseAdmin
+            .from("payments")
+            .update({ status: "completed", morning_document_id: sumitDocumentId ? String(sumitDocumentId) : null })
+            .eq("id", payment.id)
+            .throwOnError();
+        } else {
+          // לא עבר כסף עכשיו - שורת ה-pending שימשה רק כמנעול כפילות. החיוב
+          // עצמו יירשם בסנכרון היומי, ביום שבו Sumit יגבה אותו.
+          await supabaseAdmin.from("payments").delete().eq("id", payment.id).throwOnError();
+        }
+      } catch (dbErr) {
+        console.error(
+          `CRITICAL admin-centers resume_subscription: Sumit order created but local DB write failed - ` +
+            `center=${center.id} payment=${payment.id} sumitRecurringId=${sumitRecurringId} ` +
+            `err=${dbErr instanceof Error ? dbErr.message : dbErr}`,
+        );
+        return NextResponse.json(
+          { ok: false, error: `הוראת הקבע נוצרה ב-Sumit (${sumitRecurringId ?? "מזהה לא ידוע"}) אבל הרישום אצלנו נכשל. אל תלחצו שוב: המרכז עדיין לא מסומן כפעיל, וצריך להשלים את הרישום ידנית.` },
+          { status: 500 },
+        );
+      }
+      if (!sumitRecurringId) {
+        console.error(`WARNING admin-centers resume_subscription: no Sumit RecurringItemID for center=${center.id} (document=${sumitDocumentId})`);
+      }
+
+      // המרכז פעיל שוב: הפרופילים שהוסתרו איתו חוזרים, והמאושרים מקודמים.
+      const promoted = await promoteCenterTherapists(id);
+      console.log(`admin-centers: subscription resumed from the saved card for center=${id} (${center.name}); first_charge_on=${firstChargeOn} immediate=${immediate} total=${monthlyTotal} order=${sumitRecurringId} was=${center.status}${onGift ? "/gift" : ""}`);
+      return NextResponse.json({
+        ok: true,
+        first_charge_on: firstChargeOn,
+        immediate,
+        monthly_total: monthlyTotal,
+        promoted,
+        card_last_digits: card.lastDigits,
+        recurring_id_missing: !sumitRecurringId,
+      });
     }
 
     if (action === "sync_sumit") {

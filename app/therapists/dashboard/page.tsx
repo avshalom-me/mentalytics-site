@@ -11,6 +11,7 @@ import CenterOwnerNotice from "@/app/therapists/CenterOwnerNotice";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
+import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 
 type Profile = {
   id: string;
@@ -431,6 +432,10 @@ function TherapistDashboard() {
     ? { text: "מאושר - מופיע בדף המטפלים", color: "bg-green-100 text-green-800" }
     : profile?.status === "rejected"
     ? { text: "נדחה", color: "bg-red-100 text-red-800" }
+    // פרופיל של מטפל/ת במרכז שהמנוי שלו נעצר: מוסתר יחד עם המרכז, וחוזר איתו.
+    // בלי השורה הזו הוא היה נקרא "ממתין לאישור", כאילו משהו תלוי במטפל/ת.
+    : profile?.status === THERAPIST_ARCHIVED_STATUS
+    ? { text: "לא מוצג כרגע - המנוי של המרכז אינו פעיל", color: "bg-stone-100 text-stone-700 border border-stone-300" }
     : { text: "ממתין לאישור", color: "bg-yellow-100 text-yellow-800" };
 
   // "What to improve" - prioritized, actionable suggestions tied to profile

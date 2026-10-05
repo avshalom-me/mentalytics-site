@@ -22,7 +22,8 @@ import {
 } from "@/app/lib/therapist-emails";
 import { missingProfileFields, defaultCompletionMessage } from "@/app/lib/profile-completeness";
 import { CERT_UPLOAD_FAILED_ACTION, summarizeCertUploadFailures, type CertFailureRow } from "@/app/lib/cert-upload-failures";
-import { promoteCenterTherapists } from "@/app/lib/center-promotion";
+import { syncCenterTherapists } from "@/app/lib/center-promotion";
+import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import { guaranteePauseBlock, pauseSourceBlock, type GuaranteeState } from "@/app/lib/match-pause";
 import { guaranteeStateFor } from "@/app/lib/guarantee";
@@ -1192,6 +1193,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: "Therapist not found" }, { status: 404 });
     }
 
+    // פרופיל שהוסתר יחד עם המרכז שלו (ארכיון) לא משנה סטטוס מכאן: אישור ידני
+    // היה מחזיר אותו למאגר בזמן שהמרכז עצמו מוסתר, וקידום ידני היה משאיר אותו
+    // באוויר אחרי שהמרכז נעצר. הוא חוזר כשהמרכז חוזר, או כשמנתקים אותו ממנו.
+    if (before.status === THERAPIST_ARCHIVED_STATUS) {
+      return NextResponse.json(
+        { ok: false, error: "הפרופיל בארכיון יחד עם המרכז שלו. הוא חוזר לאוויר כשהמרכז חוזר (קידום מתנה או חידוש המנוי), או כשמנתקים אותו מהמרכז במסך המרכזים." },
+        { status: 400 },
+      );
+    }
+
     // Optional expiry date for trial promotions. Admin can pass null/omit
     // for an indefinite manual promotion, or a future date for a trial.
     const promotedUntilRaw = body?.promoted_until;
@@ -1390,9 +1401,10 @@ export async function PATCH(request: Request) {
     // מטפל של מרכז פעיל שאושר זה עתה — נכנס מיד למערכת ההתאמות
     // (status='paying', promotion_source='center'). ההורדה הסימטרית קורית
     // בניתוק מהמרכז / ביטול מנוי המרכז.
+    // מרכז בארכיון: הפרופיל שאושר זה עתה מוסתר יחד איתו, ולא נשאר במאגר החינמי.
     if (status === "approved" && before.center_account_id) {
       try {
-        await promoteCenterTherapists(before.center_account_id as string);
+        await syncCenterTherapists(before.center_account_id as string);
       } catch (e) {
         console.error(`admin-therapists: center promotion after approval failed for ${id}:`, e instanceof Error ? e.message : e);
       }

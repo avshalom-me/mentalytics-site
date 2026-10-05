@@ -370,7 +370,9 @@ export async function createCenterSubscription(opts: {
   payerEmail: string;
   payerPhone?: string;
   companyNumber?: string; // ח.פ / עוסק מורשה - מודפס על החשבונית
-  singleUseToken: string;
+  // הטוקן החד-פעמי של הכרטיס שהוזן בדף ההצטרפות. בלעדיו ההוראה נוצרת מהכרטיס
+  // ש-Sumit כבר מחזיק ללקוח (חידוש מנוי שנעצר) - ראו getSavedPaymentMethod.
+  singleUseToken?: string;
   unitPrice: number;      // הסכום החודשי הכולל שסוכם, לפני מע"מ (לפי מסלול המרכז)
   therapistCount?: number; // מספר המטפלים (מסלול 1) - מודפס בשם הפריט; 0/ריק במסלול 2 (מרכז כישות)
   firstChargeDate?: string; // "YYYY-MM-DD"; מוגדר רק כשיש חודשי מתנה
@@ -387,7 +389,10 @@ export async function createCenterSubscription(opts: {
       Phone: opts.payerPhone || null,
       CompanyNumber: opts.companyNumber || null,
     },
-    SingleUseToken: opts.singleUseToken,
+    // בלי טוקן השדה לא נשלח בכלל, ו-Sumit מחייב את אמצעי התשלום השמור של
+    // הלקוח ("Leave this empty to use the customer payment method"). אומת חי
+    // ב-5/10/2026: הוראה מתוזמנת נוצרה כך מכרטיס שמור, ובוטלה.
+    ...(opts.singleUseToken ? { SingleUseToken: opts.singleUseToken } : {}),
     Items: [
       {
         Item: {
@@ -424,12 +429,15 @@ export async function createCenterSubscription(opts: {
   }
   if (!charge.RecurringItemID) {
     try {
+      // 12 = מתוזמנת (חיוב ראשון בעתיד) - חיה בדיוק כמו 0; סינון על 0 בלבד לא
+      // היה מוצא הוראה שנוצרה עם תאריך חיוב ראשון עתידי. includeInactive כדי
+      // שהוראה מתוזמנת תיכלל ברשימה גם אם Sumit אינו מונה אותה כ"פעילה".
       const items = await listRecurringForCustomer({
         externalIdentifier: externalId,
-        includeInactive: false,
+        includeInactive: true,
       });
       const newest = items
-        .filter((i) => i.Status === 0)
+        .filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)))
         .sort((a, b) => Number(b.ID) - Number(a.ID))[0];
       if (newest) charge.RecurringItemID = newest.ID;
     } catch (e) {
@@ -525,6 +533,63 @@ export async function cancelLiveOrdersForCustomer(customerExternalId: string): P
     );
   }
   return cancelled;
+}
+
+// ---------- The card Sumit holds for a customer (read-only) ----------
+//
+// Sumit keeps the card a customer paid with on the customer, not on the
+// standing order: cancelling the order leaves the card where it was. Measured
+// on 5/10/2026 on a centre whose order had been cancelled two months earlier -
+// the card was still saved, and a new standing order could be created from it
+// with no card entered again (createCenterSubscription without a token).
+//
+// That is what lets a stopped centre come back without typing its card a
+// second time. Returns only what is safe to show an admin - the last four
+// digits and the expiry. The token and every other field stay inside this
+// function, and nothing here is written to our database. null = Sumit holds
+// no active payment method for this customer.
+export interface SavedPaymentMethod {
+  /** A credit card (type 1 in Sumit's enum: 0 other, 1 credit card, 2 direct debit). */
+  isCard: boolean;
+  lastDigits: string | null;
+  expirationMonth: number | null;
+  expirationYear: number | null;
+  /** The card's last month has passed: a charge on it will be declined. */
+  expired: boolean;
+}
+
+/** A card is good through the last day of its expiry month. */
+export function cardExpired(month: number | null, year: number | null, now: Date = new Date()): boolean {
+  if (!month || !year) return false; // unknown expiry: let Sumit decide
+  const thisYear = now.getFullYear();
+  const thisMonth = now.getMonth() + 1;
+  return year < thisYear || (year === thisYear && month < thisMonth);
+}
+
+export async function getSavedPaymentMethod(
+  customerExternalId: string,
+  now: Date = new Date(),
+): Promise<SavedPaymentMethod | null> {
+  const data = await api<{ PaymentMethod?: Record<string, unknown> | null }>(
+    "/billing/paymentmethods/getforcustomer/",
+    {
+      Customer: { ExternalIdentifier: customerExternalId, SearchMode: 0 },
+      IncludeInactive: false,
+    }
+  );
+  const pm = data?.PaymentMethod;
+  if (!pm) return null;
+  const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const expirationMonth = num(pm.CreditCard_ExpirationMonth);
+  const expirationYear = num(pm.CreditCard_ExpirationYear);
+  const digits = typeof pm.CreditCard_LastDigits === "string" ? pm.CreditCard_LastDigits.replace(/\D/g, "").slice(-4) : "";
+  return {
+    isCard: Number(pm.Type) === 1,
+    lastDigits: digits || null,
+    expirationMonth,
+    expirationYear,
+    expired: cardExpired(expirationMonth, expirationYear, now),
+  };
 }
 
 // ---------- Update the price of an existing standing order ----------

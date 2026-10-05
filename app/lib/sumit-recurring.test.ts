@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 process.env.SUMIT_COMPANY_ID = process.env.SUMIT_COMPANY_ID || "1";
 process.env.SUMIT_API_KEY = process.env.SUMIT_API_KEY || "test-key";
 
-import { cancelLiveOrdersForCustomer, updateRecurringPrice } from "./sumit";
+import { cancelLiveOrdersForCustomer, cardExpired, createCenterSubscription, getSavedPaymentMethod, updateRecurringPrice } from "./sumit";
 
 const ITEM_ID = 2059972492;
 const CUSTOMER = "therapist-under-test";
@@ -230,5 +230,119 @@ describe("cancelLiveOrdersForCustomer", () => {
     stuck.length = 0; // Sumit recovers
     expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([102]);
     expect(sumit.state.every((o) => o.Status === 1)).toBe(true);
+  });
+});
+
+describe("the card Sumit holds for a customer", () => {
+  // What /billing/paymentmethods/getforcustomer/ returned for a centre whose
+  // order had been cancelled two months earlier (5/10/2026), with invented values.
+  const SUMIT_METHOD = {
+    ID: 2230278560,
+    CustomerID: 2230278558,
+    CreditCard_Number: null,
+    CreditCard_LastDigits: "4321",
+    CreditCard_ExpirationMonth: 5,
+    CreditCard_ExpirationYear: 2029,
+    CreditCard_CVV: null,
+    CreditCard_CitizenID: "000000000",
+    CreditCard_CardMask: "XXXXXXXXXXXX4321",
+    CreditCard_Token: "secret-token-that-must-not-leave",
+    Type: 1,
+  };
+  function fakeMethod(method: unknown) {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: { body: string }) => {
+      expect(new URL(url).pathname).toBe("/billing/paymentmethods/getforcustomer/");
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, json: async () => ({ Status: 0, UserErrorMessage: null, TechnicalErrorDetails: null, Data: { PaymentMethod: method } }) };
+    }));
+    return bodies;
+  }
+  const NOW = new Date("2026-10-05T10:00:00Z");
+
+  it("is reported by its last four digits and expiry, and nothing else", async () => {
+    fakeMethod(SUMIT_METHOD);
+
+    const card = await getSavedPaymentMethod("center:under-test", NOW);
+
+    expect(card).toEqual({ isCard: true, lastDigits: "4321", expirationMonth: 5, expirationYear: 2029, expired: false });
+    // The token, the mask and the owner's ID stay inside the function.
+    expect(JSON.stringify(card)).not.toMatch(/secret-token|XXXX|000000000/);
+  });
+
+  it("asks only for the active method of that customer", async () => {
+    const bodies = fakeMethod(SUMIT_METHOD);
+    await getSavedPaymentMethod("center:under-test", NOW);
+    expect(bodies[0].Customer).toEqual({ ExternalIdentifier: "center:under-test", SearchMode: 0 });
+    expect(bodies[0].IncludeInactive).toBe(false);
+  });
+
+  it("is null when Sumit holds no payment method", async () => {
+    fakeMethod(null);
+    expect(await getSavedPaymentMethod("center:under-test", NOW)).toBeNull();
+  });
+
+  it("says so when the saved method is not a credit card", async () => {
+    fakeMethod({ ...SUMIT_METHOD, Type: 2, CreditCard_LastDigits: null, CreditCard_ExpirationMonth: null, CreditCard_ExpirationYear: null });
+    expect(await getSavedPaymentMethod("center:under-test", NOW)).toMatchObject({ isCard: false, lastDigits: null, expired: false });
+  });
+
+  it("is expired once its last month has passed", async () => {
+    fakeMethod({ ...SUMIT_METHOD, CreditCard_ExpirationMonth: 9, CreditCard_ExpirationYear: 2026 });
+    expect((await getSavedPaymentMethod("center:under-test", NOW))?.expired).toBe(true);
+  });
+
+  it("is good through the last day of its expiry month", () => {
+    const oct = new Date("2026-10-31T20:00:00Z");
+    expect(cardExpired(10, 2026, oct)).toBe(false);
+    expect(cardExpired(9, 2026, oct)).toBe(true);
+    expect(cardExpired(1, 2027, oct)).toBe(false);
+    expect(cardExpired(12, 2025, oct)).toBe(true);
+    // No expiry on file: not ours to refuse - Sumit decides when it charges.
+    expect(cardExpired(null, null, oct)).toBe(false);
+  });
+});
+
+describe("a centre's standing order", () => {
+  function fakeCharge(data: Record<string, unknown>) {
+    const bodies: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: { body: string }) => {
+      expect(new URL(url).pathname).toBe("/billing/recurring/charge/");
+      bodies.push(JSON.parse(init.body));
+      return { ok: true, json: async () => ({ Status: 0, UserErrorMessage: null, TechnicalErrorDetails: null, Data: data }) };
+    }));
+    return bodies;
+  }
+  const BASE = { centerId: "under-test", centerName: "מרכז לדוגמה", payerName: "מרכז לדוגמה", payerEmail: "office@example.org", unitPrice: 240 };
+
+  it("is created from the card typed in the join form when a token is given", async () => {
+    const bodies = fakeCharge({ Payment: { ValidPayment: true }, DocumentID: 7, RecurringCustomerItemIDs: [555] });
+
+    const result = await createCenterSubscription({ ...BASE, singleUseToken: "tok_1" });
+
+    expect(bodies[0].SingleUseToken).toBe("tok_1");
+    expect(result.RecurringItemID).toBe(555);
+  });
+
+  it("is created from the card Sumit already holds when no token is given", async () => {
+    // What Sumit answered on 5/10/2026 for an order scheduled 30 days ahead
+    // from a saved card: no payment, no document, one order id.
+    const bodies = fakeCharge({ Payment: null, DocumentID: null, CustomerID: 1, DocumentDownloadURL: null, RecurringCustomerItemIDs: [2409756195] });
+
+    const result = await createCenterSubscription({ ...BASE, firstChargeDate: "2026-11-04" });
+
+    // The field is absent, not null or empty: that is what makes Sumit fall
+    // back to the customer's saved payment method.
+    expect("SingleUseToken" in bodies[0]).toBe(false);
+    expect("PaymentMethod" in bodies[0]).toBe(false);
+    expect((bodies[0].Customer as { ExternalIdentifier: string }).ExternalIdentifier).toBe("center:under-test");
+    expect((bodies[0].Items as { Date_Start?: string }[])[0].Date_Start).toBe("2026-11-04");
+    expect(result.RecurringItemID).toBe(2409756195);
+  });
+
+  it("fails when an immediate charge on the saved card is declined", async () => {
+    fakeCharge({ Payment: { ValidPayment: false, Status: "004", StatusDescription: "סירוב" }, DocumentID: null, RecurringCustomerItemIDs: [] });
+
+    await expect(createCenterSubscription({ ...BASE })).rejects.toThrow(/payment declined/);
   });
 });

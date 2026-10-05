@@ -119,7 +119,7 @@ const STATUS_LABEL: Record<string, string> = {
   draft: "טיוטה",
   sent: "הצעה נשלחה",
   active: "מנוי פעיל",
-  cancelled: "מנוי נעצר",
+  cancelled: "בארכיון",
 };
 // An active centre on a gift promotion (no card, no charge) is its own stage on
 // the admin page, with its own badge.
@@ -372,7 +372,7 @@ const DEFS: (Def & { band: 0 | 1 })[] = SECTIONS.flatMap((section, i) =>
 );
 
 // The order the admin page lists them in: active subscriptions (track 2, then
-// track 1), gift promotions, then sent offers, drafts, stopped. Within a stage
+// track 1), gift promotions, then sent offers, drafts, the archive. Within a stage
 // the loaded order (newest first) is kept.
 function stageRank(c: ExportCenter): number {
   if (isCenterOnGift(c)) return 2;
