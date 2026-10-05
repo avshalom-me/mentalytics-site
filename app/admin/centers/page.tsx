@@ -1,10 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { centerMonthlyPricing, ilCurrency as ils } from "@/app/lib/center-pricing";
 import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
 import { centerPageTitle, CENTER_FOCUS_MAX } from "@/app/lib/center-title";
 import { CENTER_GIFT_MAX_MONTHS, giftDaysLeft, giftUntilFromMonths, isCenterOnGift, stopReasonLabel } from "@/app/lib/center-gift";
+import {
+  buildCenterGiftEmail,
+  buildCenterStopEmail,
+  centerNoticeAddresses,
+  CENTER_NOTICE_ROLE_LABELS,
+  type CenterNoticeAddress,
+  type CenterNoticeEmail,
+} from "@/app/lib/center-notice-emails";
 
 // מרכזים טיפוליים - הצעות מחיר, קישורי תשלום ומנויים.
 // זרימה: יוצרים הצעה (מסלולים + מחיר חודשי מותאם + חודשי מתנה) ← מעתיקים
@@ -45,6 +53,8 @@ type Center = {
   updated_at: string | null;
   linked_therapist_count: number; // כמה פרופילי מטפלים משויכים למרכז
   pending_therapist_count: number; // כמה מהם ממתינים לאישור (כולל ישות-המרכז)
+  /** כמה פרופילים (כולל שורת הישות) מוצגים באתר כשהמרכז פעיל. 0 = לא יוצג גם במתנה. */
+  displayable_profile_count?: number;
   /** מעורבות מצטברת של המרכז: מסלול 1 = סכום המטפלים, מסלול 2 = שורת הישות. */
   engagement?: {
     views_30: number; clicks_30: number; views_total: number; clicks_total: number;
@@ -328,9 +338,15 @@ export default function AdminCentersPage() {
   const [detailRows, setDetailRows] = useState<Record<string, CenterTherapistRow[]>>({});
   const [detailLoading, setDetailLoading] = useState(false);
 
-  // חלון קידום המתנה: לאיזה מרכז, וכמה חודשים נבחרו.
+  // חלון קידום המתנה: לאיזה מרכז, וכמה חודשים נבחרו (null = בלי תאריך סיום).
   const [giftFor, setGiftFor] = useState<Center | null>(null);
-  const [giftMonths, setGiftMonths] = useState(1);
+  const [giftMonths, setGiftMonths] = useState<number | null>(1);
+
+  // חלון עצירת המנוי, והמייל למרכז בשני החלונות (עצירה, קידום מתנה): לאילו
+  // מכתובות המרכז הוא נשלח. רשימה ריקה = לא נשלח מייל. אף מייל לא יוצא למרכז
+  // בלי סימון כאן (החלטת הבעלים: שום מייל ללקוח בלי אישור מפורש).
+  const [stopFor, setStopFor] = useState<Center | null>(null);
+  const [mailTo, setMailTo] = useState<string[]>([]);
 
   // חלון חידוש המנוי מהכרטיס השמור: המרכז, הכרטיס ש-Sumit מחזיק לו (נטען
   // בפתיחה), תאריך החיוב הראשון, והאישור שהמרכז ביקש לחזור.
@@ -349,11 +365,11 @@ export default function AdminCentersPage() {
   // נועל את גלילת העמוד שמאחורי המודל - בלעדיו, גלילה עם העכבר מעל הרקע
   // הכהה (מחוץ לכרטיס הלבן) מזיזה את דף האדמין שמתחת במקום את תוכן המודל.
   useEffect(() => {
-    if (!editing && !manageFor && !giftFor && !resumeFor) return;
+    if (!editing && !manageFor && !giftFor && !resumeFor && !stopFor) return;
     const prev = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => { document.body.style.overflow = prev; };
-  }, [editing, manageFor, giftFor, resumeFor]);
+  }, [editing, manageFor, giftFor, resumeFor, stopFor]);
 
   const load = useCallback(() => {
     setLoading(true);
@@ -567,31 +583,51 @@ export default function AdminCentersPage() {
     });
   }
 
+  // ברירת המחדל למייל למרכז: הכתובת הראשונה שלו (איש הקשר, ואם אין - כתובת
+  // החשבוניות). הסימון נשאר גלוי בחלון, עם הכתובת, ואפשר להסיר אותו.
+  function defaultMailTo(c: Center): string[] {
+    const first = centerNoticeAddresses(c)[0];
+    return first ? [first.address] : [];
+  }
+
+  // מה קרה למייל, להודעה שאחרי הפעולה. כשל בשליחה לא מבטל את הפעולה עצמה,
+  // ולכן הוא חייב להיאמר במפורש: אחרת נשארים בטוחים שהמרכז קיבל הודעה.
+  function mailOutcomeLine(j: { [k: string]: unknown }): string {
+    const m = j.email as { sent: boolean; to: string[]; error?: string } | null | undefined;
+    if (!m) return "למרכז לא נשלח מייל.";
+    return m.sent
+      ? `מייל נשלח למרכז, אל ${m.to.join(", ")}.`
+      : `⚠️ המייל למרכז לא נשלח (${m.error ?? "שגיאה"}). הפעולה עצמה בוצעה, וצריך לעדכן את המרכז בדרך אחרת.`;
+  }
+
+  function openStop(c: Center) {
+    setError("");
+    // לסיום של קידום מתנה אין מייל למרכז: הנוסח שאושר מדבר על הוראת קבע.
+    setMailTo(isCenterOnGift(c) ? [] : defaultMailTo(c));
+    setStopFor(c);
+  }
+
+  function openGift(c: Center) {
+    setError("");
+    setGiftMonths(1);
+    // בלי סימון מראש כשהמייל עלול לא להתאים: שינוי תקופה של מתנה קיימת (זו לא
+    // מתנה חדשה), ומרכז בלי פרופיל מאושר (הוא לא יופיע בהתאמות, והמייל אומר
+    // שהוא מופיע).
+    setMailTo(isCenterOnGift(c) || !(c.displayable_profile_count ?? 0) ? [] : defaultMailTo(c));
+    setGiftFor(c);
+  }
+
   // עצירת מנוי: המרכז עובר לארכיון - הוא והפרופילים שלו מוסתרים מהאתר, וכל
   // הפרטים נשמרים. מרכז משלם - הוראת הקבע מבוטלת ב-Sumit (הכרטיס נשאר שמור
-  // שם); מרכז בקידום מתנה - רק המתנה מסתיימת.
+  // שם), ואפשר לשלוח לו על כך מייל; מרכז בקידום מתנה - רק המתנה מסתיימת.
+  // שגיאה מוצגת בתוך החלון (הוא נשאר פתוח); הצלחה סוגרת אותו.
   async function stopSubscription(c: Center) {
-    const onGift = isCenterOnGift(c);
-    const offAir = trackOf(c) === "center_entity"
-      ? "• המרכז עובר לארכיון: הוא יוצא מתוצאות ההתאמה, והעמוד הציבורי שלו מוסתר מהאתר ומגוגל."
-      : "• המרכז עובר לארכיון: העמוד הציבורי שלו וכל הפרופילים של המטפלים שלו מוסתרים מהמאגר, מההתאמות ומגוגל.";
-    const lines = [
-      onGift ? `לסיים את קידום המתנה של "${c.name}" ולהעביר את המרכז לארכיון?` : `לעצור את המנוי של "${c.name}"?`,
-      "",
-      onGift
-        ? "• למרכז אין הוראת קבע, ולכן אין מה לבטל ב-Sumit."
-        : "• הוראת הקבע ב-Sumit מבוטלת, ולא יהיו חיובים נוספים. כרטיס האשראי עצמו נשאר שמור ב-Sumit.",
-      offAir,
-      "• שום דבר לא נמחק: הפרופילים, העמוד הציבורי, חשבון הפורטל והתמחור נשמרים.",
-      "• מהמערכת שלנו לא נשלח מייל למרכז.",
-      "",
-      "אפשר להחזיר אותו בכל רגע: חידוש המנוי מהכרטיס השמור (בלי להזין אותו שוב), קידום מתנה, או פתיחת ההצעה מחדש לתשלום.",
-    ];
-    if (!confirm(lines.join("\n"))) return;
-    const j = await post({ action: "stop_subscription", id: c.id });
+    const to = isCenterOnGift(c) ? [] : mailTo;
+    const j = await post({ action: "stop_subscription", id: c.id, send_email: to.length > 0, email_to: to });
     if (!j.ok) return;
+    setStopFor(null);
     forgetSumitInfo(c.id);
-    alert(`"${c.name}" עבר לארכיון, והפרטים שמורים.`);
+    alert([`"${c.name}" עבר לארכיון, והפרטים שמורים.`, mailOutcomeLine(j)].join("\n"));
   }
 
   // קידום מתנה: המרכז באוויר בלי כרטיס ובלי חיוב. months=null = בלי תאריך סיום.
@@ -601,7 +637,7 @@ export default function AdminCentersPage() {
     // הכרטיס עצמו נשאר שמור ב-Sumit, ואפשר לחדש ממנו את החיוב אחר כך.
     if (c.status === "active" && !isCenterOnGift(c) &&
       !confirm(`הוראת הקבע של "${c.name}" ב-Sumit תבוטל עכשיו, והכרטיס לא יחויב.\n\nהכרטיס נשאר שמור ב-Sumit: אם המרכז ירצה להמשיך בסוף המתנה, אפשר לחדש ממנו את החיוב בלי להזין אותו שוב. החיוב לא יתחדש לבד. להמשיך?`)) return;
-    const j = await post({ action: "grant_gift", id: c.id, months });
+    const j = await post({ action: "grant_gift", id: c.id, months, send_email: mailTo.length > 0, email_to: mailTo });
     if (!j.ok) return;
     setGiftFor(null);
     forgetSumitInfo(c.id);
@@ -613,6 +649,7 @@ export default function AdminCentersPage() {
         `קידום המתנה של "${c.name}" פעיל${until}.`,
         cancelled > 0 ? "הוראת הקבע ב-Sumit בוטלה, והביטול אומת." : null,
         promoted > 0 ? `${promoted} פרופילים נכנסו להתאמות.` : null,
+        mailOutcomeLine(j),
       ].filter(Boolean).join("\n"),
     );
   }
@@ -977,7 +1014,7 @@ export default function AdminCentersPage() {
         // קידום מתנה אפשרי מכל מצב, ולכן הכפתור מוגדר פעם אחת ומשובץ בכל
         // קבוצת כפתורים במקום שלו.
         const giftButton = (
-          <button onClick={() => { setGiftMonths(1); setError(""); setGiftFor(c); }} disabled={busy}
+          <button onClick={() => openGift(c)} disabled={busy}
             title="המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה שתבחרו - כמו קידום מתנה של מטפל"
             className="rounded-full border border-purple-300 bg-purple-50 px-3 py-1 font-bold text-purple-800 hover:bg-purple-100 disabled:opacity-40">
             🎁 {onGift ? "שינוי תקופת המתנה" : "קידום מתנה"}
@@ -1356,7 +1393,7 @@ export default function AdminCentersPage() {
                   {giftButton}
                   {/* עצירה שומרת את כל הפרטים. מוצגת גם כשחסר מזהה הוראת קבע:
                       השרת מבטל כל הוראה חיה שהוא מוצא ב-Sumit למרכז הזה. */}
-                  <button onClick={() => stopSubscription(c)} disabled={busy}
+                  <button onClick={() => openStop(c)} disabled={busy}
                     title="המרכז עובר לארכיון: מוסתר מהאתר, וכל הפרטים שלו נשמרים. אפשר להחזיר אותו בחידוש המנוי, במתנה או בהצעה חדשה."
                     className="rounded-full border border-red-300 bg-red-50 px-3 py-1 font-bold text-red-700 hover:bg-red-100 disabled:opacity-40">
                     ⏸ {onGift ? "סיום המתנה ועצירה" : "עצירת מנוי (הפרטים נשמרים)"}
@@ -1627,8 +1664,17 @@ export default function AdminCentersPage() {
         const hasOrder = c.status === "active" && !already;
         const today = new Date().toISOString().slice(0, 10);
         const firstCharge = c.billing_starts_at && c.billing_starts_at > today ? c.billing_starts_at : null;
-        // "חודש אחד", "חודשיים", "3 חודשים" - ולא "1 חודש".
-        const period = giftMonths === 1 ? "חודש אחד" : giftMonths === 2 ? "חודשיים" : `${giftMonths} חודשים`;
+        // "חודש אחד", "חודשיים", "3 חודשים" - ולא "1 חודש". null = בלי תאריך סיום.
+        const period = giftMonths === null ? null : giftMonths === 1 ? "חודש אחד" : giftMonths === 2 ? "חודשיים" : `${giftMonths} חודשים`;
+        const giftUntil = giftMonths === null ? null : giftUntilFromMonths(giftMonths);
+        const displayable = (c.displayable_profile_count ?? 0) > 0;
+        const giftMail = buildCenterGiftEmail({
+          centerName: c.name,
+          contactName: c.contact_name,
+          giftUntil,
+          hasPortalAccount: !!c.user_id,
+          token: c.token,
+        });
         return (
           <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" dir="rtl"
             onClick={() => { if (!busy) setGiftFor(null); }}>
@@ -1638,7 +1684,7 @@ export default function AdminCentersPage() {
               </h3>
               <p className="mb-3 text-sm leading-6 text-stone-600">
                 המרכז באוויר בלי חיוב: בהתאמות, בעמוד הציבורי ובפורטל, כמו מרכז משלם.
-                בסוף התקופה הוא עובר לארכיון לבד (מוסתר מהאתר, והפרטים נשמרים), ואנחנו מקבלים על כך מייל. למרכז לא נשלח מייל.
+                בסוף התקופה הוא עובר לארכיון לבד (מוסתר מהאתר, והפרטים נשמרים), ואנחנו מקבלים על כך מייל.
               </p>
 
               {hasOrder && (
@@ -1646,11 +1692,13 @@ export default function AdminCentersPage() {
                   ⚠️ למרכז יש הוראת קבע ב-Sumit{firstCharge ? ` (חיוב ראשון ב-${fmtDate(firstCharge)})` : ""}.
                   קידום המתנה <strong>מבטל אותה</strong>, והכרטיס לא יחויב. הכרטיס עצמו נשאר שמור ב-Sumit:
                   אם המרכז ירצה להמשיך בסוף המתנה, אפשר לחדש ממנו את החיוב בלי להזין אותו שוב. החיוב לא יתחדש לבד.
+                  המייל למרכז מדבר על המתנה בלבד, ואינו מזכיר את הוראת הקבע.
                 </p>
               )}
               {already && (
                 <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
                   המתנה הנוכחית: {c.gift_until ? `עד ${fmtDate(c.gift_until)}` : "בלי תאריך סיום"}. התקופה החדשה נספרת מהיום ומחליפה אותה.
+                  בשינוי תקופה המייל למרכז אינו מסומן מראש.
                 </p>
               )}
               {c.status === "cancelled" && (
@@ -1661,7 +1709,12 @@ export default function AdminCentersPage() {
               {(c.status === "draft" || c.status === "sent") && (
                 <p className="mb-3 rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
                   המרכז עולה לאוויר בלי לעבור בדף התשלום.
-                  {!c.user_id && <> אחר כך שלחו לו את קישור ההצטרפות: אצל מרכז במתנה הוא משמש רק להקמת חשבון הניהול, ולא מבקש תשלום.</>}
+                </p>
+              )}
+              {!displayable && (
+                <p className="mb-3 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                  ⚠️ למרכז אין עדיין פרופיל מאושר, ולכן גם במתנה הוא לא יופיע בתוצאות ההתאמה עד שימלא פרופיל ויאושר.
+                  במייל כתוב שהמרכז מופיע בתוצאות ההתאמה, ולכן המייל לא מסומן מראש.
                 </p>
               )}
 
@@ -1678,21 +1731,117 @@ export default function AdminCentersPage() {
                   </button>
                 ))}
               </div>
+              {/* "בלי תאריך סיום" הוא בחירה כמו מספר החודשים, ולא כפתור ביצוע
+                  נפרד: כך המייל שמוצג למטה הוא תמיד המייל שיישלח. */}
+              <button type="button" onClick={() => setGiftMonths(null)}
+                className={`mt-2 w-full rounded-xl border px-4 py-2.5 text-sm font-bold transition ${
+                  giftMonths === null
+                    ? "border-indigo-600 bg-indigo-600 text-white"
+                    : "border-indigo-300 bg-indigo-50 text-indigo-800 hover:bg-indigo-100"
+                }`}>
+                בלי תאריך סיום
+              </button>
               <p className="mt-2 text-xs text-stone-500">
-                {period} מהיום: המתנה מסתיימת ב-<span className="font-bold text-stone-700">{fmtDate(giftUntilFromMonths(giftMonths))}</span>.
+                {giftUntil
+                  ? <>{period} מהיום: המתנה מסתיימת ב-<span className="font-bold text-stone-700">{fmtDate(giftUntil)}</span>.</>
+                  : "המתנה נמשכת עד שעוצרים אותה או מעבירים את המרכז לתשלום."}
               </p>
+
+              <div className="mt-3">
+                <CenterMailChoice
+                  title="מייל למרכז על המתנה"
+                  addresses={centerNoticeAddresses(c)}
+                  selected={mailTo}
+                  onChange={setMailTo}
+                  mail={giftMail}
+                  disabled={busy}
+                  note={!c.user_id ? (
+                    <p className="mt-1 text-xs leading-5 text-stone-500">
+                      למרכז אין חשבון ניהול, ולכן המייל כולל קישור להקמתו (קישור ההצטרפות: אצל מרכז במתנה הוא לא מבקש תשלום).
+                      בלי המייל, שלחו לו את הקישור בעצמכם.
+                    </p>
+                  ) : undefined}
+                />
+              </div>
 
               {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
 
               <button type="button" disabled={busy} onClick={() => grantGift(c, giftMonths)}
                 className="mt-4 w-full rounded-xl bg-indigo-600 px-4 py-3 text-sm font-bold text-white hover:bg-indigo-700 disabled:opacity-40">
-                {busy ? "מעדכן…" : `קידום מתנה ל${giftMonths <= 2 ? "" : "-"}${period}`}
-              </button>
-              <button type="button" disabled={busy} onClick={() => grantGift(c, null)}
-                className="mt-2 w-full rounded-xl border border-stone-300 bg-white px-4 py-2.5 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-40">
-                קידום מתנה בלי תאריך סיום
+                {busy
+                  ? "מעדכן…"
+                  : `${period ? `קידום מתנה ל${giftMonths !== null && giftMonths <= 2 ? "" : "-"}${period}` : "קידום מתנה בלי תאריך סיום"}${mailTo.length > 0 ? " ושליחת המייל" : ""}`}
               </button>
               <button type="button" disabled={busy} onClick={() => setGiftFor(null)}
+                className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-40">
+                ביטול
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* חלון עצירת המנוי. מחליף את חלון האישור של הדפדפן, כי כאן גם בוחרים
+          אם לשלוח למרכז מייל ולאן, ורואים את המייל לפני הלחיצה. שגיאה מוצגת
+          כאן בתוך החלון. */}
+      {stopFor && (() => {
+        const c = stopFor;
+        const onGift = isCenterOnGift(c);
+        const isEntity = trackOf(c) === "center_entity";
+        const stopMail = buildCenterStopEmail({
+          centerName: c.name,
+          contactName: c.contact_name,
+          billingTrack: c.billing_track,
+          hasPortalAccount: !!c.user_id,
+        });
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" dir="rtl"
+            onClick={() => { if (!busy) setStopFor(null); }}>
+            <div className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-2 text-lg font-black text-stone-900">
+                ⏸ {onGift ? "סיום קידום המתנה" : "עצירת המנוי"} - {c.name}
+              </h3>
+              <ul className="mb-3 list-disc space-y-1.5 ps-5 text-sm leading-6 text-stone-600">
+                <li>
+                  {onGift
+                    ? "למרכז אין הוראת קבע, ולכן אין מה לבטל ב-Sumit."
+                    : "הוראת הקבע ב-Sumit מבוטלת, ולא יהיו חיובים נוספים. כרטיס האשראי עצמו נשאר שמור ב-Sumit."}
+                </li>
+                <li>
+                  {isEntity
+                    ? "המרכז עובר לארכיון: הוא יוצא מתוצאות ההתאמה, והעמוד הציבורי שלו מוסתר מהאתר ומגוגל."
+                    : "המרכז עובר לארכיון: העמוד הציבורי שלו וכל הפרופילים של המטפלים שלו מוסתרים מהמאגר, מההתאמות ומגוגל."}
+                </li>
+                <li>שום דבר לא נמחק: הפרופילים, העמוד הציבורי, חשבון הפורטל והתמחור נשמרים.</li>
+                <li>אפשר להחזיר אותו בכל רגע: חידוש המנוי מהכרטיס השמור (בלי להזין אותו שוב), קידום מתנה, או פתיחת ההצעה מחדש לתשלום.</li>
+              </ul>
+
+              {onGift ? (
+                <p className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
+                  בסיום של קידום מתנה לא נשלח מייל למרכז.
+                </p>
+              ) : (
+                <CenterMailChoice
+                  title="מייל למרכז על העצירה"
+                  addresses={centerNoticeAddresses(c)}
+                  selected={mailTo}
+                  onChange={setMailTo}
+                  mail={stopMail}
+                  disabled={busy}
+                />
+              )}
+
+              {error && <p className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{error}</p>}
+
+              <button type="button" disabled={busy} onClick={() => stopSubscription(c)}
+                className="mt-4 w-full rounded-xl bg-red-600 px-4 py-3 text-sm font-bold text-white hover:bg-red-700 disabled:opacity-40">
+                {busy
+                  ? "עוצר…"
+                  : onGift
+                    ? "סיום המתנה והעברה לארכיון"
+                    : mailTo.length > 0 ? "עצירת המנוי ושליחת המייל" : "עצירת המנוי בלי מייל"}
+              </button>
+              <button type="button" disabled={busy} onClick={() => setStopFor(null)}
                 className="mt-2 w-full rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-600 hover:bg-stone-100 disabled:opacity-40">
                 ביטול
               </button>
@@ -1895,6 +2044,63 @@ function Journey({ c }: { c: Center }) {
           </span>
         </span>
       ))}
+    </div>
+  );
+}
+
+// המייל למרכז בחלון העצירה ובחלון המתנה: לאילו מכתובות המרכז הוא נשלח, ומה
+// כתוב בו. אף מייל לא יוצא בלי סימון כאן. הטקסט שמוצג הוא הטקסט שנשלח: אותו
+// בילדר (center-notice-emails.ts) בונה את התצוגה כאן ואת המייל בשרת.
+function CenterMailChoice({ title, addresses, selected, onChange, mail, note, disabled }: {
+  title: string;
+  addresses: CenterNoticeAddress[];
+  selected: string[];
+  onChange: (next: string[]) => void;
+  mail: CenterNoticeEmail;
+  note?: ReactNode;
+  disabled?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  if (addresses.length === 0) {
+    return (
+      <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2">
+        <p className="text-xs leading-5 text-stone-600">
+          למרכז אין כתובת מייל, ולכן לא יישלח אליו מייל. אפשר להוסיף כתובת ב&quot;עריכת פרטים&quot;.
+        </p>
+        {note}
+      </div>
+    );
+  }
+  const toggle = (address: string) =>
+    onChange(selected.includes(address) ? selected.filter((a) => a !== address) : [...selected, address]);
+  return (
+    <div className="rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5">
+      <div className="mb-1 text-sm font-semibold text-stone-800">{title}</div>
+      {addresses.map((a) => (
+        <label key={a.address} className="flex cursor-pointer items-center gap-2 py-0.5 text-sm text-stone-700">
+          <input type="checkbox" checked={selected.includes(a.address)} disabled={disabled}
+            onChange={() => toggle(a.address)} className="h-4 w-4 shrink-0 accent-teal-700" />
+          <span>
+            לשלוח אל <span dir="ltr" className="font-semibold">{a.address}</span>{" "}
+            <span className="text-xs text-stone-500">({CENTER_NOTICE_ROLE_LABELS[a.role]})</span>
+          </span>
+        </label>
+      ))}
+      <p className="mt-1 text-xs leading-5 text-stone-500">
+        {selected.length === 0 ? "לא יישלח מייל למרכז." : "המייל יוצא עם הלחיצה על הכפתור שלמטה."}
+      </p>
+      {note}
+      <button type="button" onClick={() => setOpen((v) => !v)} className="mt-1 text-xs font-bold text-teal-800 underline">
+        {open ? "הסתרת המייל" : "הצגת המייל"}
+      </button>
+      {open && (
+        <div className="mt-2 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs leading-6 text-stone-700">
+          <div className="mb-1.5 border-b border-stone-100 pb-1.5">
+            <span className="text-stone-500">נושא:</span> <strong>{mail.subject}</strong>
+          </div>
+          <div className="whitespace-pre-line break-words">{mail.text}</div>
+        </div>
+      )}
     </div>
   );
 }

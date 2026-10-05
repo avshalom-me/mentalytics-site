@@ -6,10 +6,11 @@ import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
 import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { cancelLiveOrdersForCustomer, createCenterSubscription, getSavedPaymentMethod, listRecurringForCustomer, updateRecurringPrice, SumitPaymentDeclinedError, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES, type SavedPaymentMethod } from "@/app/lib/sumit";
-import { sendCenterProposalEmail } from "@/app/lib/center-emails";
+import { sendCenterProposalEmail, sendCenterGiftEmail, sendCenterStopEmail } from "@/app/lib/center-emails";
+import { pickCenterNoticeAddresses } from "@/app/lib/center-notice-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow, restoreArchivedTherapists, stopActiveCenter } from "@/app/lib/center-promotion";
-import { CENTER_GIFT_MAX_MONTHS, giftUntilFromMonths, isCenterOnGift } from "@/app/lib/center-gift";
+import { CENTER_GIFT_MAX_MONTHS, giftUntilFromMonths, isCenterOnGift, THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import { ensureUniqueCenterSlug } from "@/app/lib/center-public";
 import { CENTER_FOCUS_MAX } from "@/app/lib/center-title";
 import { loadCenterHealth } from "@/app/lib/center-health";
@@ -81,6 +82,33 @@ async function endCenterBilling(
   }
 }
 
+// המייל למרכז על עצירת המנוי או על קידום מתנה יוצא רק כשהאדמין סימן אותו
+// בחלון (send_email), ורק לכתובות של המרכז עצמו (email_to). נבדק לפני כל
+// שינוי: בקשה לשלוח לכתובת שאינה רשומה על המרכז נעצרת כאן, ולא אחרי שהמנוי
+// כבר נעצר או שהמתנה כבר ניתנה.
+type CenterEmailRequest = { send: false } | { send: true; to: string[] } | { send: "refused"; response: NextResponse };
+
+function requestedCenterEmail(
+  body: Record<string, unknown>,
+  center: { email?: string | null; payer_email?: string | null },
+): CenterEmailRequest {
+  if (body.send_email !== true) return { send: false };
+  const to = pickCenterNoticeAddresses(center, body.email_to);
+  if (!to) {
+    return {
+      send: "refused",
+      response: NextResponse.json(
+        { ok: false, error: "המייל למרכז סומן לשליחה, אבל הכתובת חסרה או אינה רשומה על המרכז. לא בוצע שום שינוי. רעננו את הדף ונסו שוב." },
+        { status: 400 },
+      ),
+    };
+  }
+  return { send: true, to };
+}
+
+// מה שחוזר לאדמין על המייל: נשלח או לא, לאן, ואם נכשל - למה. null = לא התבקש.
+type CenterEmailOutcome = { sent: boolean; to: string[]; error?: string } | null;
+
 // התאריך של היום בישראל (YYYY-MM-DD). Sumit מפרש תאריך חיוב ראשון לפי שעון
 // ישראל, ו"היום" של האדמין הוא היום הזה - לא התאריך ב-UTC של השרת.
 function israelDate(d: Date = new Date()): string {
@@ -114,14 +142,21 @@ export async function GET() {
     // לסמן כשמשהו מחכה לאישור (כולל שורת ישות-המרכז במסלול 2).
     const { data: linked } = await supabaseAdmin
       .from("therapists")
-      .select("id, center_account_id, status, entity_type")
+      .select("id, center_account_id, status, entity_type, admin_approved")
       .not("center_account_id", "is", null);
     const counts = new Map<string, number>();
     const pendingCounts = new Map<string, number>();
+    // כמה פרופילים של המרכז (כולל שורת הישות) מוצגים באתר כשהמרכז פעיל:
+    // מאושרים, מקודמים, או כאלה שהוסתרו איתו בארכיון. 0 = מרכז שגם אם יעלה
+    // לאוויר לא יוצג בשום מקום, ומייל שאומר "המרכז מוצג באתר" לא יהיה נכון.
+    const displayableCounts = new Map<string, number>();
     (linked ?? []).forEach((t) => {
       const cid = t.center_account_id as string;
       if (t.entity_type !== "center") counts.set(cid, (counts.get(cid) ?? 0) + 1); // שורת ישות אינה "מטפל משויך"
       if (t.status === "pending") pendingCounts.set(cid, (pendingCounts.get(cid) ?? 0) + 1);
+      if (t.admin_approved && ["approved", "paying", THERAPIST_ARCHIVED_STATUS].includes(String(t.status))) {
+        displayableCounts.set(cid, (displayableCounts.get(cid) ?? 0) + 1);
+      }
     });
     // ── מדדי מעורבות לכרטיס המרכז ────────────────────────────────────────
     // עד 19/8/26 האדמין לא הציג לחיצות/צפיות למרכזים בכלל - התשובה ל"כמה
@@ -298,6 +333,7 @@ export async function GET() {
       members: (membersByCenter.get(c.id as string) ?? []).map((m) => ({ ...m, is_primary: m.user_id === c.user_id })),
       linked_therapist_count: counts.get(c.id as string) ?? 0,
       pending_therapist_count: pendingCounts.get(c.id as string) ?? 0,
+      displayable_profile_count: displayableCounts.get(c.id as string) ?? 0,
       engagement: engByCenter.get(c.id as string) ?? null,
       readiness: readinessById.get(c.id as string) ?? null,
       health: healthById.get(c.id as string) ?? null,
@@ -757,8 +793,13 @@ export async function POST(req: NextRequest) {
 
     // עצירת מנוי: המרכז יורד מהאוויר, וכל מה שהוזן נשמר - הפרופילים, העמוד
     // הציבורי, חשבון הפורטל והתמחור. מרכז משלם: קודם מבוטלת (ומאומתת) הוראת
-    // הקבע ב-Sumit. מרכז בקידום מתנה: אין הוראה, רק המתנה מסתיימת. מטפלי
-    // המרכז יוצאים מההתאמות (ונשארים במאגר החינמי אם אושרו). לא נשלח מייל.
+    // הקבע ב-Sumit. מרכז בקידום מתנה: אין הוראה, רק המתנה מסתיימת. המרכז
+    // והפרופילים שלו עוברים לארכיון (מוסתרים מהאתר).
+    //
+    // מייל למרכז יוצא רק אם האדמין סימן אותו (send_email), ורק על עצירה של
+    // מנוי בתשלום: הנוסח שאושר מדבר על הוראת הקבע ועל הכרטיס השמור, ולסיום
+    // של קידום מתנה אין נוסח מאושר. כשל בשליחה לא מבטל את העצירה - הוא חוזר
+    // בתשובה, והאדמין רואה שהמייל לא יצא.
     // "cancel_subscription" הוא השם הקודם של הפעולה, ונשאר כדי שלשונית אדמין
     // שנפתחה לפני הפריסה לא תיכשל.
     if (action === "stop_subscription" || action === "cancel_subscription") {
@@ -766,6 +807,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ ok: false, error: "המרכז אינו פעיל - אין מנוי לעצור" }, { status: 400 });
       }
       const wasGift = isCenterOnGift(center);
+      const mail = requestedCenterEmail(body, center);
+      if (mail.send === "refused") return mail.response;
+      if (mail.send && wasGift) {
+        return NextResponse.json(
+          { ok: false, error: "המרכז בקידום מתנה, ולסיום של מתנה אין מייל למרכז (הנוסח שאושר מדבר על הוראת קבע). לא בוצע שום שינוי. רעננו את הדף ונסו שוב." },
+          { status: 400 },
+        );
+      }
       const billing = await endCenterBilling(action, center);
       if (!billing.ok) return billing.response;
       const demoted = await stopActiveCenter(
@@ -773,15 +822,32 @@ export async function POST(req: NextRequest) {
         "admin",
         wasGift ? "center gift ended by admin" : "center subscription stopped by admin",
       );
-      console.log(`admin-centers: center=${id} (${center.name}) stopped by admin; was_gift=${wasGift} cancelled_orders=[${billing.cancelled.join(",")}]`);
-      return NextResponse.json({ ok: true, demoted: demoted ?? 0, cancelled_orders: billing.cancelled });
+      // null = העצירה לא חלה (פעולה מקבילה כבר שינתה את המרכז), ואז אין על מה להודיע.
+      let email: CenterEmailOutcome = null;
+      if (mail.send && demoted !== null) {
+        const sent = await sendCenterStopEmail({
+          to: mail.to,
+          centerId: id,
+          centerName: center.name as string,
+          contactName: (center.contact_name as string | null) ?? null,
+          billingTrack: (center.billing_track as string | null) ?? null,
+          hasPortalAccount: !!center.user_id,
+        });
+        email = { sent: sent.ok, to: mail.to, ...(sent.ok ? {} : { error: sent.error ?? "unknown" }) };
+      }
+      console.log(`admin-centers: center=${id} (${center.name}) stopped by admin; was_gift=${wasGift} cancelled_orders=[${billing.cancelled.join(",")}] email=${email ? (email.sent ? "sent" : "failed") : "none"}`);
+      return NextResponse.json({ ok: true, demoted: demoted ?? 0, cancelled_orders: billing.cancelled, email });
     }
 
     // קידום מתנה: המרכז באוויר בלי כרטיס ובלי חיוב, לתקופה (1-12 חודשים) או
     // בלי תאריך סיום - כמו קידום מתנה של מטפל. אפשרי מכל מצב: הצעה שטרם
     // שולמה, מנוי שנעצר, מרכז משלם (הוראת הקבע מבוטלת קודם, כמו אצל מטפל
     // משלם שמקבל מתנה), ומרכז שכבר במתנה (שינוי התקופה, נספרת מהיום). בסוף
-    // התקופה הקרון היומי עוצר את המרכז. לא נשלח מייל למרכז.
+    // התקופה הקרון היומי עוצר את המרכז.
+    //
+    // מייל למרכז יוצא רק אם האדמין סימן אותו (send_email). הוא מדבר על המתנה
+    // בלבד, גם כשהמתנה מבטלת הוראת קבע (החלטת הבעלים, 5/10/2026). כשל בשליחה
+    // לא מבטל את המתנה - הוא חוזר בתשובה, והאדמין רואה שהמייל לא יצא.
     if (action === "grant_gift") {
       let months: number | null = null;
       if (body.months !== null && body.months !== undefined) {
@@ -795,6 +861,8 @@ export async function POST(req: NextRequest) {
         months = n;
       }
       const wasGift = isCenterOnGift(center);
+      const mail = requestedCenterEmail(body, center);
+      if (mail.send === "refused") return mail.response;
       const billing = await endCenterBilling(action, center);
       if (!billing.ok) return billing.response;
 
@@ -825,8 +893,21 @@ export async function POST(req: NextRequest) {
       if ((center.billing_track as string) === "center_entity") await ensureCenterEntityRow(id);
       // מטפלים מאושרים שמשויכים למרכז נכנסים להתאמות מיד.
       const promoted = await promoteCenterTherapists(id);
-      console.log(`admin-centers: gift granted to center=${id} (${center.name}); months=${months ?? "no end"} until=${giftUntil ?? "-"} was=${center.status}${wasGift ? "/gift" : ""} cancelled_orders=[${billing.cancelled.join(",")}]`);
-      return NextResponse.json({ ok: true, gift_until: giftUntil, promoted, cancelled_orders: billing.cancelled });
+      let email: CenterEmailOutcome = null;
+      if (mail.send) {
+        const sent = await sendCenterGiftEmail({
+          to: mail.to,
+          centerId: id,
+          centerName: center.name as string,
+          contactName: (center.contact_name as string | null) ?? null,
+          giftUntil,
+          hasPortalAccount: !!center.user_id,
+          token: center.token as string,
+        });
+        email = { sent: sent.ok, to: mail.to, ...(sent.ok ? {} : { error: sent.error ?? "unknown" }) };
+      }
+      console.log(`admin-centers: gift granted to center=${id} (${center.name}); months=${months ?? "no end"} until=${giftUntil ?? "-"} was=${center.status}${wasGift ? "/gift" : ""} cancelled_orders=[${billing.cancelled.join(",")}] email=${email ? (email.sent ? "sent" : "failed") : "none"}`);
+      return NextResponse.json({ ok: true, gift_until: giftUntil, promoted, cancelled_orders: billing.cancelled, email });
     }
 
     // פתיחת ההצעה מחדש לתשלום: מרכז שהמנוי שלו נעצר חוזר להיות הצעה פתוחה

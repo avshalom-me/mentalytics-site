@@ -2,6 +2,13 @@ import "server-only";
 import { Resend } from "resend";
 import { logEmail } from "./email-log";
 import { buildCenterProposalEmail } from "./center-proposal-email";
+import {
+  buildCenterGiftEmail,
+  buildCenterStopEmail,
+  CENTER_GIFT_EMAIL_TEMPLATE,
+  CENTER_STOP_EMAIL_TEMPLATE,
+  type CenterNoticeEmail,
+} from "./center-notice-emails";
 import { centerMonthlyPricing, ilCurrency } from "./center-pricing";
 
 // מיילים למרכזים טיפוליים. נפרד מ-therapist-emails כי הנמען והתוכן שונים
@@ -196,6 +203,77 @@ export async function sendCenterWelcomeEmail(opts: {
     console.error("sendCenterWelcomeEmail: throw:", msg);
     return { ok: false, error: msg };
   }
+}
+
+// שליחה ורישום של מייל על שינוי במנוי המרכז (עצירה / קידום מתנה). הנוסח נבנה
+// ב-center-notice-emails.ts. נשלח רק מפעולת אדמין שבה המייל סומן במפורש -
+// אין לזה קריאה מקרון. "השב" מגיע אלינו, כי המייל מזמין את המרכז לכתוב לנו.
+async function sendCenterNotice(opts: {
+  to: string[];
+  centerId: string;
+  template: string;
+  mail: CenterNoticeEmail;
+}): Promise<{ ok: boolean; error?: string }> {
+  if (!process.env.RESEND_API_KEY) {
+    console.warn(`sendCenterNotice(${opts.template}): RESEND_API_KEY not configured, skipping`);
+    return { ok: false, error: "resend not configured" };
+  }
+  if (opts.to.length === 0) return { ok: false, error: "אין כתובת לשליחה" };
+
+  const log = (error?: string) => {
+    for (const recipient of opts.to) {
+      void logEmail({
+        recipient,
+        recipientType: "organization",
+        entityId: opts.centerId,
+        subject: opts.mail.subject,
+        template: opts.template,
+        sentBy: "admin",
+        status: error ? "failed" : "sent",
+        error,
+      });
+    }
+  };
+
+  try {
+    const { error } = await resendClient.emails.send({
+      from: FROM,
+      to: opts.to,
+      replyTo: "admin@getmentalytics.com",
+      subject: opts.mail.subject,
+      html: opts.mail.html,
+      text: opts.mail.text,
+    });
+    if (error) {
+      const msg = String(error.message ?? error);
+      console.error(`sendCenterNotice(${opts.template}): resend error:`, msg);
+      log(msg);
+      return { ok: false, error: msg };
+    }
+    log();
+    return { ok: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "unknown";
+    console.error(`sendCenterNotice(${opts.template}): throw:`, msg);
+    log(msg);
+    return { ok: false, error: msg };
+  }
+}
+
+/** מייל 1: המנוי בתשלום נעצר (הוראת הקבע בוטלה, המרכז בארכיון, הכול שמור). */
+export async function sendCenterStopEmail(
+  opts: { to: string[]; centerId: string } & Parameters<typeof buildCenterStopEmail>[0],
+): Promise<{ ok: boolean; error?: string }> {
+  const { to, centerId, ...mail } = opts;
+  return sendCenterNotice({ to, centerId, template: CENTER_STOP_EMAIL_TEMPLATE, mail: buildCenterStopEmail(mail) });
+}
+
+/** מייל 2: המרכז קיבל קידום מתנה. מדבר על המתנה בלבד. */
+export async function sendCenterGiftEmail(
+  opts: { to: string[]; centerId: string } & Parameters<typeof buildCenterGiftEmail>[0],
+): Promise<{ ok: boolean; error?: string }> {
+  const { to, centerId, ...mail } = opts;
+  return sendCenterNotice({ to, centerId, template: CENTER_GIFT_EMAIL_TEMPLATE, mail: buildCenterGiftEmail(mail) });
 }
 
 /**

@@ -15,6 +15,8 @@ const CENTER_TEMPLATES = [
   "center_completeness_nudge",
   "center_therapist_invite",
   "center_invite_reminder",
+  "center_subscription_stopped",
+  "center_gift_granted",
 ];
 
 // שמות קריאים, כי "center_readiness_nudge" לא אומר כלום למי שקורא.
@@ -25,6 +27,8 @@ const TEMPLATE_LABELS: Record<string, string> = {
   center_completeness_nudge: "נדנוד השלמה (גרסה ישנה)",
   center_therapist_invite: "הזמנת מטפל להצטרף",
   center_invite_reminder: "תזכורת להזמנת מטפלים",
+  center_subscription_stopped: "המנוי נעצר (נשלח מהאדמין)",
+  center_gift_granted: "קידום מתנה (נשלח מהאדמין)",
 };
 
 export type CenterEmailRow = {
