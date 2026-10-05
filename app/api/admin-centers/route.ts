@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
 import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelLiveOrdersForCustomer, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS } from "@/app/lib/sumit";
+import { cancelLiveOrdersForCustomer, listRecurringForCustomer, updateRecurringPrice, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES } from "@/app/lib/sumit";
 import { sendCenterProposalEmail } from "@/app/lib/center-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
 import { promoteCenterTherapists, demoteCenterTherapists, ensureCenterEntityRow, removeCenterEntityRow, stopActiveCenter } from "@/app/lib/center-promotion";
@@ -50,9 +50,10 @@ function parseDiscount(v: unknown): number { const n = Number(v); return isNaN(n
 function parseLocations(v: unknown): number { const n = Math.floor(Number(v)); return isNaN(n) || n < 1 ? 1 : Math.min(n, 100); }
 
 // מסיים את החיוב של מרכז לפני מעבר ל"בלי חיוב" (עצירת מנוי, קידום מתנה):
-// מבטל ב-Sumit כל הוראת קבע חיה של המרכז, ומאמת כל ביטול. לא רק את המזהה
-// הרשום אצלנו - הוראה כפולה, או מרכז שנשמר בלי מזהה, היו ממשיכים לחייב כרטיס
-// של מרכז שסימנו כעצור או כמתנה.
+// מבטל ב-Sumit כל הוראת קבע של המרכז שעוד יכולה לחייב, ומאמת שכולן הסתיימו.
+// לא רק את המזהה הרשום אצלנו - הוראה כפולה, או מרכז שנשמר בלי מזהה, היו
+// ממשיכים לחייב כרטיס של מרכז שסימנו כעצור או כמתנה. ולא רק הוראה "פעילה":
+// גם הוראה שהושבתה אחרי כשל חיוב או שממתינה לניסיון חוזר מבוטלת.
 //
 // הקריאה ל-Sumit נעשית רק כשייתכן שיש הוראה: מזהה רשום, או מרכז פעיל שאינו
 // במתנה. הצעה שטרם שולמה ומרכז במתנה אינם מחזיקים הוראה, ותקלה ב-Sumit לא
@@ -842,8 +843,10 @@ export async function POST(req: NextRequest) {
           ok: true,
           sumit: null,
           gift: true,
+          // כל הוראה שלא הסתיימה, לא רק פעילה: גם הוראה שהושבתה אחרי כשל
+          // חיוב או שממתינה לניסיון חוזר עוד יכולה לחייב את הכרטיס.
           live_orders: giftItems
-            .filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)))
+            .filter((i) => !SUMIT_RECURRING_ENDED_STATUSES.includes(Number(i.Status)))
             .map((i) => ({ id: Number(i.ID), status: Number(i.Status), next_billing: i.Date_NextBilling ?? null })),
         });
       }

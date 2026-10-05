@@ -486,21 +486,45 @@ export async function cancelSubscription(opts: {
 // have on file (a duplicate, or a centre saved without its id) would keep
 // charging the card of a customer we have just told is no longer billed.
 //
-// Reads what is live at Sumit (0 = charging, 12 = scheduled) and cancels each
-// one through cancelSubscription, which re-reads and throws if the order
-// survived. Returns the ids it cancelled; an empty list means nothing was
-// live. Throws on the first failure, leaving the rest untouched - the caller
-// must not record the customer as stopped.
+// "Live" here is wider than SUMIT_RECURRING_ACTIVE_STATUSES: it is every order
+// that has not ended (SUMIT_RECURRING_ENDED_STATUSES below). An order disabled
+// after a failed payment (3), in its grace period (11) or waiting for a retry
+// (14) is not charging today, and may charge tomorrow - one in status 3 did,
+// on 16/8/2026, which is why the daily sync refuses to read it as cancelled.
+// Leaving such an order behind would charge a customer we had told is stopped.
+//
+// Cancels each one, then re-reads the customer once and throws if any of them
+// is still not ended, so a result always means the card will not be charged
+// again. Returns the ids it cancelled; an empty list means nothing was live.
+// On a failure the caller must not record the customer as stopped; orders
+// cancelled before the failure stay cancelled, and a second call finishes the
+// rest.
 export async function cancelLiveOrdersForCustomer(customerExternalId: string): Promise<number[]> {
-  const items = await listRecurringForCustomer({
-    externalIdentifier: customerExternalId,
-    includeInactive: true,
-  });
-  const live = items.filter((i) => SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(i.Status)));
+  const read = () =>
+    listRecurringForCustomer({ externalIdentifier: customerExternalId, includeInactive: true });
+  const mayCharge = (i: RecurringItem) => !SUMIT_RECURRING_ENDED_STATUSES.includes(Number(i.Status));
+
+  const live = (await read()).filter(mayCharge);
+  if (live.length === 0) return [];
+
   for (const item of live) {
-    await cancelSubscription({ recurringItemId: Number(item.ID), customerExternalId });
+    // Same request as cancelSubscription; the check comes once, after all of them.
+    await api("/billing/recurring/cancel/", {
+      Customer: { ExternalIdentifier: customerExternalId, SearchMode: 0 },
+      RecurringCustomerItemID: Number(item.ID),
+    });
   }
-  return live.map((i) => Number(i.ID));
+
+  const cancelled = live.map((i) => Number(i.ID));
+  const survivors = (await read()).filter((i) => cancelled.includes(Number(i.ID)) && mayCharge(i));
+  if (survivors.length > 0) {
+    throw new Error(
+      `Sumit cancel did not take effect: ${survivors
+        .map((i) => `recurring item ${i.ID} (status=${i.Status})`)
+        .join(", ")} still alive for ${customerExternalId}`
+    );
+  }
+  return cancelled;
 }
 
 // ---------- Update the price of an existing standing order ----------
@@ -623,6 +647,14 @@ export interface RecurringItem {
 // "מבוטל" (ה-cron ביטל מנוי אמיתי בגלל זה). ביטול-אוטומטי מותר רק על 1.
 export const SUMIT_RECURRING_ACTIVE_STATUSES: readonly number[] = [0, 12];
 export const SUMIT_RECURRING_CANCELLED_STATUS = 1;
+// The statuses after which Sumit will not charge an order again, from Sumit's
+// own enum (RecurringCustomerItemStatus in the swagger): Cancelled (1),
+// FinishedExpired (9), CancelledByCustomer (13). The rest of the enum can
+// still charge: Active (0), PendingForFirstPayment (12), and the three
+// in-between ones - DisabledFailedBillingPayment (3), GracePeriod (11),
+// PendingRetry (14). Used where the question is "can this card still be
+// charged", which is stricter than "is this order active".
+export const SUMIT_RECURRING_ENDED_STATUSES: readonly number[] = [1, 9, 13];
 
 export async function listRecurringForCustomer(opts: {
   externalIdentifier: string;

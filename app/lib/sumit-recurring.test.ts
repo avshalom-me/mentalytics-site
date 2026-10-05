@@ -104,6 +104,7 @@ describe("updateRecurringPrice", () => {
 function fakeSumitOrders(orders: { ID: number; Status: number }[], stuck: number[] = []) {
   const state = orders.map((o) => ({ ...o }));
   const cancelCalls: number[] = [];
+  let listCalls = 0;
   const fetchMock = vi.fn(async (url: string, init: { body: string }) => {
     const path = new URL(url).pathname;
     const body = JSON.parse(init.body);
@@ -118,6 +119,7 @@ function fakeSumitOrders(orders: { ID: number; Status: number }[], stuck: number
       // The function has to ask for inactive orders too, or a cancelled one
       // would simply vanish from the list and "not found" would pass for "dead".
       expect(body.IncludeInactive).toBe(true);
+      listCalls++;
       data = { RecurringItems: state.map((o) => ({ ...o })) };
     } else {
       throw new Error(`unexpected path ${path}`);
@@ -128,7 +130,7 @@ function fakeSumitOrders(orders: { ID: number; Status: number }[], stuck: number
     };
   });
   vi.stubGlobal("fetch", fetchMock);
-  return { state, cancelCalls };
+  return { state, cancelCalls, get listCalls() { return listCalls; } };
 }
 
 describe("cancelLiveOrdersForCustomer", () => {
@@ -147,11 +149,31 @@ describe("cancelLiveOrdersForCustomer", () => {
     expect(sumit.state.every((o) => o.Status === 1)).toBe(true);
   });
 
-  it("does nothing, and says so, when no order is alive", async () => {
-    const sumit = fakeSumitOrders([{ ID: 101, Status: 1 }]);
+  it("also cancels an order that is not charging today and may charge tomorrow", async () => {
+    // 3 = disabled after a failed payment, 11 = grace period, 14 = waiting for
+    // a retry. None is "active", and each can still charge the card.
+    const sumit = fakeSumitOrders([
+      { ID: 201, Status: 3 },
+      { ID: 202, Status: 11 },
+      { ID: 203, Status: 14 },
+    ]);
+
+    expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([201, 202, 203]);
+    expect(sumit.state.every((o) => o.Status === 1)).toBe(true);
+  });
+
+  it("leaves alone every order Sumit says has ended", async () => {
+    // 1 = cancelled, 9 = finished, 13 = cancelled by the customer.
+    const sumit = fakeSumitOrders([
+      { ID: 301, Status: 1 },
+      { ID: 302, Status: 9 },
+      { ID: 303, Status: 13 },
+    ]);
 
     expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([]);
     expect(sumit.cancelCalls).toEqual([]);
+    // One read, and no second one: there was nothing to verify.
+    expect(sumit.listCalls).toBe(1);
   });
 
   it("returns an empty list for a customer with no orders at all", async () => {
@@ -159,24 +181,54 @@ describe("cancelLiveOrdersForCustomer", () => {
     expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([]);
   });
 
+  it("reads the customer once before and once after, however many orders it cancels", async () => {
+    // Every call to Sumit is metered, so the check is one read for all of them.
+    const sumit = fakeSumitOrders([
+      { ID: 102, Status: 0 },
+      { ID: 103, Status: 12 },
+    ]);
+
+    await cancelLiveOrdersForCustomer("center:under-test");
+
+    expect(sumit.listCalls).toBe(2);
+    expect(sumit.cancelCalls).toHaveLength(2);
+  });
+
   it("fails when Sumit accepts the cancel and the order stays alive", async () => {
     // The caller must not record the centre as stopped: its card would keep
     // being charged with nothing left to notice.
     fakeSumitOrders([{ ID: 102, Status: 12 }], [102]);
 
-    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/did not take effect/);
+    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/did not take effect.*102/);
   });
 
-  it("stops at the first order it could not cancel", async () => {
+  it("names every order that survived, and has still cancelled the others", async () => {
+    const sumit = fakeSumitOrders(
+      [
+        { ID: 102, Status: 0 },
+        { ID: 103, Status: 0 },
+        { ID: 104, Status: 14 },
+      ],
+      [102, 104],
+    );
+
+    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/102 \(status=0\).*104 \(status=14\)/);
+    expect(sumit.state.find((o) => o.ID === 103)?.Status).toBe(1);
+  });
+
+  it("finishes the job on a second call after a partial failure", async () => {
+    const stuck = [102];
     const sumit = fakeSumitOrders(
       [
         { ID: 102, Status: 0 },
         { ID: 103, Status: 0 },
       ],
-      [102],
+      stuck,
     );
+    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow();
 
-    await expect(cancelLiveOrdersForCustomer("center:under-test")).rejects.toThrow(/102/);
-    expect(sumit.cancelCalls).toEqual([102]);
+    stuck.length = 0; // Sumit recovers
+    expect(await cancelLiveOrdersForCustomer("center:under-test")).toEqual([102]);
+    expect(sumit.state.every((o) => o.Status === 1)).toBe(true);
   });
 });
