@@ -17,7 +17,7 @@ import {
   type SignatureOutcome,
 } from "./gmail";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
-import { mayAutoIgnore, isSameInquiry } from "./inbox-triage";
+import { automatedMailReason, mayAutoIgnore, isSameInquiry } from "./inbox-triage";
 import { approvedLessonRules, extractPendingLessons } from "./inbox-lessons";
 import { inboxPauseContext } from "./match-pause";
 import { isOurEmailAddress, parseSiteInquiry, SITE_FORM_LABELS, type SiteForm } from "./site-inquiry";
@@ -753,7 +753,15 @@ export type IncomingInquiry = {
   subject: string;
   bodyText: string;
   viaForm: SiteForm | null;
+  /**
+   * למה המייל הוא בוודאות של מכונה (התראת חיוב, דוח DMARC, no-reply), או null.
+   * מייל כזה נשמר כסגור ולא מגיע לתור, גם כשמודל השפה לא זמין.
+   */
+  automated: string | null;
 };
+
+/** ההערה שמסבירה לאדמין למה פנייה נסגרה בלי טיוטה ובלי מודל. */
+const closedByRule = (reason: string) => `נסגר לפי כלל קבוע, בלי המודל: ${reason}`;
 
 /**
  * מה נקלט מהודעה שהגיעה לתיבה, ועל שם מי. null = לא נקלטת.
@@ -764,7 +772,14 @@ export type IncomingInquiry = {
  */
 export async function incomingFromMessage(msg: InboundMessage): Promise<IncomingInquiry | null> {
   if (!isOurAddress(msg.fromEmail)) {
-    return { fromEmail: msg.fromEmail, fromName: msg.fromName, subject: msg.subject, bodyText: msg.bodyText, viaForm: null };
+    return {
+      fromEmail: msg.fromEmail,
+      fromName: msg.fromName,
+      subject: msg.subject,
+      bodyText: msg.bodyText,
+      viaForm: null,
+      automated: automatedMailReason({ from_email: msg.fromEmail, subject: msg.subject, auto_header: msg.autoHeader }),
+    };
   }
   const inquiry = parseSiteInquiry(msg);
   if (!inquiry) return null;
@@ -778,6 +793,8 @@ export async function incomingFromMessage(msg: InboundMessage): Promise<Incoming
     subject: inquiry.subject || `פנייה דרך ${SITE_FORM_LABELS[inquiry.form]}`,
     bodyText: lead?.message ?? inquiry.message,
     viaForm: inquiry.form,
+    // פנייה מטופס היא של אדם: היא לא נסגרת לפי כלל, גם אם הכתובת שהוקלדה נראית כמו מכונה.
+    automated: null,
   };
 }
 
@@ -886,12 +903,17 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
             body_text: incoming.bodyText,
             received_at: msg.receivedAt,
             ...(incoming.viaForm ? { via_form: incoming.viaForm } : {}),
+            // מייל של מכונה נשמר כסגור (כדי שלא ייקרא שוב בכל ריצה), ולא נכנס לתור.
+            ...(incoming.automated
+              ? { status: "ignored", category: "system", draft_note: closedByRule(incoming.automated) }
+              : {}),
           });
           if (error) {
             // מרוץ בין שתי ריצות על אותה הודעה נבלם ב-unique; זו לא שגיאה.
             if (!error.message.includes("duplicate")) result.errors.push(error.message);
           } else {
             result.inserted++;
+            if (incoming.automated) result.autoIgnored++;
           }
         } catch (e) {
           result.errors.push(e instanceof Error ? e.message : String(e));
@@ -915,14 +937,17 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
       if (threads.length > 0) {
         const { data: inThreads } = await supabaseAdmin
           .from("inbox_messages")
-          .select("gmail_thread_id, received_at, from_email")
+          .select("gmail_thread_id, received_at, from_email, status, category")
           .in("gmail_thread_id", threads);
         const stale = (openRows ?? []).filter((r) =>
           (inThreads ?? []).some(
             (x) =>
               x.gmail_thread_id === r.gmail_thread_id &&
               (x.received_at as string) > (r.received_at as string) &&
-              (!r.via_form || x.from_email === r.from_email)
+              (!r.via_form || x.from_email === r.from_email) &&
+              // מייל של מכונה באותו שרשור (מענה אוטומטי של "אני בחופשה", הודעת
+              // אי-מסירה) אינו "הפונה כתב שוב", ולא מוריד את הפנייה מהתור.
+              !(x.status === "ignored" && x.category === "system")
           )
         );
         if (stale.length > 0) {
@@ -987,6 +1012,19 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
     const draftFailures: string[] = [];
     const onError = (message: string) => draftFailures.push(message);
     for (const row of (fresh ?? []) as InboxRow[]) {
+      // מייל של מכונה שנקלט לפני שהכלל היה קיים (או כשנשאר "חדש" כי המודל לא
+      // ענה) נסגר כאן, לפני המודל ובלעדיו.
+      const machine = row.via_form ? null : automatedMailReason({ from_email: row.from_email, subject: row.subject });
+      if (machine) {
+        const { error } = await supabaseAdmin
+          .from("inbox_messages")
+          .update({ status: "ignored", category: "system", draft_note: closedByRule(machine), updated_at: new Date().toISOString() })
+          .eq("id", row.id)
+          .eq("status", "new");
+        if (error) result.errors.push(error.message);
+        else result.autoIgnored++;
+        continue;
+      }
       const ctx = await senderContext(row.from_email);
       let c = await classifyAndDraft(row, ctx, { onError });
       if (!c) continue; // אין מפתח OpenAI או כשל - יישאר 'new' לריצה הבאה

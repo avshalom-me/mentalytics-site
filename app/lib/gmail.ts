@@ -99,6 +99,12 @@ export type InboundMessage = {
    * של הגולש - כך מזהים שהמייל הוא פנייה של אדם ולא התראה (site-inquiry.ts).
    */
   replyTo: string | null;
+  /**
+   * כותרת שבה המייל עצמו מעיד שנשלח אוטומטית: Auto-Submitted (התראת מערכת,
+   * מענה אוטומטי של "אני בחופשה") או Precedence של דיוור המוני. ריק = אין.
+   * מייל כזה נסגר בלי לשאול את המודל (inbox-triage.ts).
+   */
+  autoHeader: string | null;
   subject: string;
   bodyText: string;
   receivedAt: string; // ISO
@@ -208,6 +214,16 @@ export async function getMessage(id: string): Promise<InboundMessage | null> {
   const body = extractBody(raw.payload).slice(0, 20_000);
   // כמה כתובות ב-Reply-To: הראשונה. ריק = אין כותרת כזו.
   const replyTo = parseFrom((headers["reply-to"] ?? "").split(",")[0] ?? "").email;
+  // Auto-Submitted: no הוא מייל רגיל. Precedence: list נשאר בחוץ בכוונה - כך
+  // מסומן גם מייל של אדם שעבר דרך קבוצת דיוור.
+  const autoSubmitted = (headers["auto-submitted"] ?? "").trim().toLowerCase();
+  const precedence = (headers["precedence"] ?? "").trim().toLowerCase();
+  const autoHeader =
+    autoSubmitted && autoSubmitted !== "no"
+      ? `Auto-Submitted: ${autoSubmitted.slice(0, 40)}`
+      : precedence === "bulk" || precedence === "junk"
+        ? `Precedence: ${precedence}`
+        : null;
   return {
     id: raw.id,
     threadId: raw.threadId,
@@ -215,6 +231,7 @@ export async function getMessage(id: string): Promise<InboundMessage | null> {
     fromEmail: from.email,
     fromName: from.name,
     replyTo: replyTo || null,
+    autoHeader,
     subject: (headers["subject"] ?? "").slice(0, 500),
     bodyText: body,
     receivedAt: new Date(Number(raw.internalDate ?? Date.now())).toISOString(),

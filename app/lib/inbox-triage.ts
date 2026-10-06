@@ -31,6 +31,69 @@ export function mayAutoIgnore(category: string, text: string): boolean {
   return category === "spam" || category === "system" || isCourtesyClosing(text);
 }
 
+// ── מייל של מכונה: נסגר בלי לשאול את המודל ────────────────────────────────
+//
+// התראות חיוב של ספק הסליקה, דוחות DMARC, הודעות no-reply וחשבוניות של ספקים
+// נקלטות מהתיבה כמו כל מייל. עד 6/10/2026 מי שסגר אותן היה מודל השפה: הוא סיווג
+// אותן כ"מערכת", והן לא הגיעו לתור. כשהמודל לא עונה (ב-5/10/2026 נגמרה היתרה
+// אצל הספק) אף אחד לא מסווג, וכל התראת חיוב נשארת בתור ככרטיס פתוח "בלי
+// טיוטה", בין הפניות של אנשים.
+//
+// לכן מה שברור שהוא מכונה נסגר כאן, לפי השולח והנושא, בלי מודל. הכללים נגזרו
+// מכל מה שסווג כמערכת או כספאם בתיבה עד היום, והם צרים בכוונה: מייל של אדם
+// שנסגר בטעות הוא לקוח שנעלם, ומייל של מכונה שנשאר בתור הוא רק כרטיס מיותר.
+// מה שלא מתאים לאף כלל ממשיך למודל כמו קודם.
+
+export type MailLike = {
+  from_email: string;
+  subject: string | null;
+  /** כותרת שמעידה על שליחה אוטומטית (Auto-Submitted / Precedence), אם נקראה מהמייל. */
+  auto_header?: string | null;
+};
+
+// "no-reply" כחלק שלם מהכתובת: noreply, no-reply, ads-account-noreply,
+// noreply-dmarc-support. לא "reply" סתם, ולא שם שבמקרה מכיל את הרצף.
+const NO_REPLY_LOCAL = /(^|[._+-])(no-?reply|do-?not-?reply|donotreply)([._+-]|$)/i;
+const MACHINE_LOCAL = /^(mailer-daemon|postmaster|dmarc[a-z0-9._-]*|bounces?([._+-].*)?)$/i;
+const DMARC_SUBJECT = /^\s*(\[preview\]\s*)?report domain:/i;
+// תשובה או העברה של אדם: גם אם השולח נראה כמו מכונה, ההחלטה נשארת למודל.
+const REPLY_PREFIX = /^\s*(re|fw|fwd|השב|תשובה|הועבר)\s*:/i;
+// ספק הסליקה: הודעות על חיוב, זיכוי ומסמך שהופק. הכתובת c+<מספר> היא הערוץ
+// שבו המערכת שלו שולחת מסמכים בשם עסק.
+const SUMIT_DOCUMENT_SENDER = /^c\+\d+$/;
+const SUMIT_NOTICE_SUBJECT =
+  /^\s*(בוצע חיוב עבור|עדכון על (חיוב|זיכוי) שבוצע|קיבלת (חשבונית|קבלה|מסמך)|תזכורת מ|חשבונית מ-SUMIT|לידיעה,)/;
+// הודעת מערכת על חשבונית או קבלה, מכל ספק: נוסח בגוף שני סביל שאדם לא פותח בו נושא.
+const INVOICE_NOTICE_SUBJECT = /^\s*(נשלח(ה)? אליך|קיבלת) (חשבון|חשבונית|קבלה)/;
+
+/**
+ * למה המייל הזה הוא בוודאות של מכונה, או null אם לא ברור (ואז המודל מחליט).
+ * הטקסט שחוזר מוצג לאדמין ליד הפנייה שנסגרה.
+ */
+export function automatedMailReason(mail: MailLike): string | null {
+  const auto = (mail.auto_header ?? "").trim();
+  if (auto) return `מייל אוטומטי (${auto})`;
+
+  // תווי כיוון בלתי נראים בתחילת הנושא (Gmail בממשק עברי) לא מסתירים "Re:".
+  const subject = (mail.subject ?? "").replace(/[\u200e\u200f\u202a-\u202e\u2066-\u2069]/g, "");
+  if (REPLY_PREFIX.test(subject)) return null;
+
+  const email = mail.from_email.trim().toLowerCase();
+  const at = email.lastIndexOf("@");
+  if (at < 1) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+
+  if (DMARC_SUBJECT.test(subject)) return "דוח DMARC";
+  if (NO_REPLY_LOCAL.test(local)) return "כתובת no-reply";
+  if (MACHINE_LOCAL.test(local)) return "כתובת של מערכת דואר";
+  if (domain === "sumit.co.il" && (SUMIT_DOCUMENT_SENDER.test(local) || SUMIT_NOTICE_SUBJECT.test(subject))) {
+    return "הודעה אוטומטית של Sumit";
+  }
+  if (INVOICE_NOTICE_SUBJECT.test(subject)) return "הודעה אוטומטית על חשבונית";
+  return null;
+}
+
 // ── אותה פנייה משתי כתובות ────────────────────────────────────────────────
 //
 // 22/9/26 מטפלת שלחה את אותה בקשת ביטול מכתובת הסטודיו ומהכתובת האישית,

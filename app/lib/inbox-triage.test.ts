@@ -12,7 +12,7 @@ import { describe, it, expect, vi } from "vitest";
 vi.mock("server-only", () => ({}));
 
 import { splitQuoted } from "./email-quote";
-import { isCourtesyClosing, mayAutoIgnore, isSameInquiry, type InquiryLike } from "./inbox-triage";
+import { automatedMailReason, isCourtesyClosing, mayAutoIgnore, isSameInquiry, type InquiryLike } from "./inbox-triage";
 
 const DECLINED_TIME = [
   "היי אבשלום, שמחתי לשמוע.",
@@ -162,5 +162,89 @@ describe("isSameInquiry", () => {
   it("does not link the same address (that is the 'wrote again' case) or messages days apart", () => {
     expect(isSameInquiry(studio, { ...studio, id: "f" })).toBe(false);
     expect(isSameInquiry(studio, { ...personal, received_at: "2026-09-27T10:00:00Z" })).toBe(false);
+  });
+});
+
+// 6/10/26: the language model that used to recognise machine mail stopped
+// answering (the provider's credit ran out), and every charge notice and DMARC
+// report stayed in the queue as an open card, among the inquiries of people.
+// Mail that is plainly a machine's is now closed by rule. The rules were drawn
+// from everything the mailbox had ever classified as system or spam, and they
+// must stay narrow: closing a person's mail by mistake is a customer who
+// vanishes. Senders, names and numbers below are invented.
+describe("mail that is plainly a machine's", () => {
+  const reason = (from_email: string, subject: string, auto_header?: string) =>
+    automatedMailReason({ from_email, subject, auto_header });
+
+  it("is a charge or credit notice of the payment provider", () => {
+    expect(reason("support@sumit.co.il", 'בוצע חיוב עבור דנה לוי ב-העסק שלנו בע"מ')).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("c+1000000001@sumit.co.il", 'עדכון על חיוב שבוצע על ידי העסק שלנו בע"מ')).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("c+1000000001@sumit.co.il", 'עדכון על זיכוי שבוצע על ידי העסק שלנו בע"מ')).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("c+1000000001@sumit.co.il", 'קיבלת חשבונית מס/קבלה זיכוי / 1001 מאת העסק שלנו בע"מ')).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("c+2000000002@sumit.co.il", "תזכורת ממשרד רואה החשבון: הגיע הזמן לשלוח מסמכים")).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("support@sumit.co.il", "חשבונית מ-SUMIT מתאריך 01/09/2026")).toBe("הודעה אוטומטית של Sumit");
+    expect(reason("support@sumit.co.il", "לידיעה, עודכן אמצעי תשלום של דנה לוי")).toBe("הודעה אוטומטית של Sumit");
+  });
+
+  it("is a DMARC report, whoever sends it", () => {
+    expect(reason("noreply-dmarc-support@google.com", "Report domain: example.co.il Submitter: google.com Report-ID: 123")).toBe("דוח DMARC");
+    expect(reason("dmarcreport@microsoft.com", "[Preview] Report Domain: example.co.il Submitter: enterprise.protection.outlook.com")).toBe("דוח DMARC");
+    expect(reason("reports@some-provider.example", "Report Domain: example.co.il Submitter: some-provider.example")).toBe("דוח DMARC");
+  });
+
+  it("comes from a no-reply address or from the mail system itself", () => {
+    for (const from of [
+      "no-reply@accounts.google.com",
+      "noreply@example.com",
+      "ads-account-noreply@google.com",
+      "payments-noreply@google.com",
+      "donotreply@example.com",
+      "do-not-reply@example.com",
+      "NoReply@Example.com",
+    ]) {
+      expect(reason(from, "Security alert")).toBe("כתובת no-reply");
+    }
+    expect(reason("mailer-daemon@googlemail.com", "Delivery Status Notification (Failure)")).toBe("כתובת של מערכת דואר");
+    expect(reason("postmaster@example.com", "Undeliverable")).toBe("כתובת של מערכת דואר");
+    expect(reason("dmarcreport@microsoft.com", "weekly summary")).toBe("כתובת של מערכת דואר");
+  });
+
+  it("is a supplier's invoice notice", () => {
+    expect(reason("invoices@billing.example", "נשלחה אליך חשבונית מס קבלה מספר 30102 מאת ספק כלשהו")).toBe("הודעה אוטומטית על חשבונית");
+    expect(reason("invoices@billing.example", "נשלח אליך חשבון עסקה מספר 10104 מאת ספק כלשהו")).toBe("הודעה אוטומטית על חשבונית");
+  });
+
+  it("says so in its own headers", () => {
+    expect(reason("dana@example.com", "אני בחופשה", "Auto-Submitted: auto-replied")).toBe("מייל אוטומטי (Auto-Submitted: auto-replied)");
+    // a header wins even over a reply prefix: an out-of-office answer is "Re: ..."
+    expect(reason("dana@example.com", "Re: השלמת רישום", "Auto-Submitted: auto-replied")).not.toBeNull();
+  });
+
+  it("is never a person writing from an ordinary address", () => {
+    expect(reason("dana@example.com", "שאלה על החיוב החודשי")).toBeNull();
+    expect(reason("dana@example.com", "קיבלתי חשבונית שגויה")).toBeNull();
+    expect(reason("dana@example.com", "בוצע אצלי חיוב כפול")).toBeNull();
+    expect(reason("office@clinic.example", "תזכורת: מחכים לתשובה")).toBeNull();
+    // an address that merely contains the letters
+    expect(reason("noreplyfan@example.com", "שלום")).toBeNull();
+    expect(reason("replynow@example.com", "שלום")).toBeNull();
+    expect(reason("bouncer.david@example.com", "שלום")).toBeNull();
+  });
+
+  it("is never a reply or a forward, even from a machine-looking address", () => {
+    // a customer's answer that the provider relays, or a person forwarding a notice
+    expect(reason("c+1000000001@sumit.co.il", 'Re: עדכון על חיוב שבוצע על ידי העסק שלנו בע"מ')).toBeNull();
+    expect(reason("support@sumit.co.il", "RE: פנייה לתמיכה 4821")).toBeNull();
+    expect(reason("no-reply@example.com", "Fwd: Security alert")).toBeNull();
+    expect(reason("support@sumit.co.il", "\u200fRe: בוצע חיוב עבור דנה לוי")).toBeNull();
+  });
+
+  it("leaves the provider's human support to the model", () => {
+    expect(reason("support@sumit.co.il", "עדכון לגבי הפנייה שלך לתמיכה")).toBeNull();
+  });
+
+  it("is not decided by a broken sender address", () => {
+    expect(reason("", "Report domain: example.co.il")).toBeNull();
+    expect(reason("not-an-address", "בוצע חיוב עבור דנה לוי")).toBeNull();
   });
 });

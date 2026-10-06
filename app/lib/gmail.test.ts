@@ -230,6 +230,27 @@ describe("site-form inquiries in the mailbox", () => {
     expect((await getMessage("m-1"))?.replyTo).toBeNull();
   });
 
+  // The agent closes machine mail without asking the language model, and one
+  // of its signs is the mail's own headers.
+  it("reports the header by which a mail declares itself automatic", async () => {
+    const from = { name: "From", value: "Dana <dana@example.com>" };
+    stub(message([from, { name: "Auto-Submitted", value: "auto-replied" }]));
+    expect((await getMessage("m-1"))?.autoHeader).toBe("Auto-Submitted: auto-replied");
+    stub(message([from, { name: "Precedence", value: "bulk" }]));
+    expect((await getMessage("m-1"))?.autoHeader).toBe("Precedence: bulk");
+  });
+
+  it("does not take an ordinary or a mailing-list mail for an automatic one", async () => {
+    const from = { name: "From", value: "Dana <dana@example.com>" };
+    stub(message([from]));
+    expect((await getMessage("m-1"))?.autoHeader).toBeNull();
+    stub(message([from, { name: "Auto-Submitted", value: "no" }]));
+    expect((await getMessage("m-1"))?.autoHeader).toBeNull();
+    // a person's mail that passed through a discussion group carries this
+    stub(message([from, { name: "Precedence", value: "list" }]));
+    expect((await getMessage("m-1"))?.autoHeader).toBeNull();
+  });
+
   const sentTo = (to: string, at = "2000") => ({
     messages: [{ labelIds: ["SENT"], internalDate: at, payload: { headers: [{ name: "To", value: to }] } }],
   });
