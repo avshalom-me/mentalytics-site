@@ -2,14 +2,18 @@
 """Meta feed images for the October 2026 ads: one for therapist recruitment, one for patients.
 
 Each is the still half of a pair whose other half is a video (the recruitment video, and the
-adults' promo that the patients' image is built from). The wording is the owner's, approved on
-6/10/2026; the refund line is his sentence, word for word.
+adults' promo). The wording is the owner's: approved on 6/10/2026 and corrected on 7/10/2026,
+when he asked for the audience line big at the top of the therapists' image and gave the
+patients' image its headline and sentence. The refund line is his sentence, word for word.
 Rendered at 1080x1350 (4:5, the feed format) with a 2x device scale.
 
 Rules carried over from the September set (meta-2026-09/gen.py):
 - Big headline, little text: the July carousels were too wordy to stop a scroll.
-- Nothing in the patients' image may assert or imply the viewer's mental-health condition
-  (Meta "Personal Attributes"): it speaks about choosing a therapist, never about the reader.
+- Meta's "Personal Attributes" rule rejects an ad that asserts or implies the viewer's
+  mental-health condition. The owner's headline for the patients' image speaks to the viewer
+  ("need help and don't know where to turn?"): he asked for it on 7/10/2026, and the risk was
+  put to him when the files were handed over. The image of 6/10/2026, which speaks about
+  choosing a therapist and never about the reader, is kept as the fallback (fb-patients-image-alt).
 - No em dash anywhere (house rule), and the logo is the real file, never redrawn.
 """
 import io, os, subprocess
@@ -30,10 +34,12 @@ HEAD = """<!doctype html><html dir="rtl" lang="he"><head><meta charset="utf-8">
 html,body{width:1080px;height:1350px;overflow:hidden;font-family:Heebo,sans-serif;color:var(--text)}
 body{background:radial-gradient(120% 80% at 50% 0%,#ffffff 0%,#F4F9F8 55%,var(--teal-pale) 100%);
  display:flex;flex-direction:column;align-items:center;padding:46px 76px 36px;position:relative}
-.ring{position:absolute;border-radius:50%;border:34px solid;opacity:.55;pointer-events:none}
-.logo{width:200px;height:auto;margin-bottom:22px}
-.chip{display:inline-block;background:var(--gold-pale);color:var(--gold-dark);border:2px solid #F0DDB0;
- font-weight:800;font-size:31px;border-radius:50px;padding:10px 32px;margin-bottom:22px}
+.ring{position:absolute;border-radius:50%;border:34px solid;opacity:.55;pointer-events:none;z-index:0}
+/* the rings are decoration: a headline that reaches a corner must sit over them, not under */
+body > :not(.ring){position:relative;z-index:1}
+.logo{width:170px;height:auto;margin-bottom:16px}
+/* who the ad speaks to: the first line under the logo, and the biggest */
+.who{font-weight:900;font-size:80px;line-height:1.1;color:var(--gold-dark);text-align:center;letter-spacing:-1px;margin-bottom:12px;white-space:nowrap}
 h1{font-weight:900;line-height:1.1;text-align:center;letter-spacing:-1px}
 h1 em{font-style:normal;color:var(--teal)}
 .btn{margin-top:auto;background:var(--teal);color:#fff;font-weight:800;font-size:40px;border-radius:60px;
@@ -85,14 +91,14 @@ def recruit():
                  '<div style="font-size:39px;font-weight:' + ("900" if last else "800") + ';color:' +
                  ("var(--text)" if last else "var(--text-2)") + '">' + t + '</div></div>')
     return head() + """
-<div class="chip">פסיכולוג/ית · עו״ס · מטפל/ת</div>
-<h1 style="font-size:78px">פניות שמתאימות<br><em>לשיטת הטיפול שלך.</em></h1>
-<div class="card" style="width:100%;margin-top:26px;padding:6px 0">""" + rows + """</div>
+<div class="who">פסיכולוגית/עו״ס/מטפלת?</div>
+<h1 style="font-size:74px">פניות שמתאימות<br><em>לשיטת הטיפול שלך.</em></h1>
+<div class="card" style="width:100%;margin-top:28px;padding:8px 0">""" + rows + """</div>
 <div style="width:100%;margin-top:6px">""" + checks([
         "שאלון שפיתחו פסיכולוגים וחוקרים",
         "מסלול חינמי, ומסלול מקודם",
     ]) + """</div>
-<div style="font-size:30px;font-weight:700;color:var(--teal-dark);text-align:center;margin:18px 0 26px">""" + REFUND + """</div>
+<div style="font-size:31px;font-weight:700;color:var(--teal-dark);text-align:center;margin:22px 0 26px">""" + REFUND + """</div>
 """ + foot("לפרטים והצטרפות")
 
 
@@ -104,8 +110,38 @@ def pair(a, b, fill, ink):
             '<div style="' + pill + ';background:#fff;color:' + ink + ';border:5px solid ' + fill + '">' + b + '</div></div>')
 
 
+def quiz_button(label, fill):
+    return ('<div style="flex:1;text-align:center;background:' + fill + ';color:#fff;font-weight:800;font-size:46px;'
+            'border-radius:60px;padding:26px 10px;box-shadow:0 12px 26px rgba(19,31,30,.16);white-space:nowrap">' + label + '</div>')
+
+
 def patients():
-    """Patients: the sentence and the two pairs of the adults' promo video, and what the questionnaire is."""
+    """Patients, the owner's version (7/10/2026): his question, his sentence, and the two questionnaires.
+
+    His words, as he wrote them. Two touches only: "כנס" and "ענה" take the "/י" that his headline's
+    "זקוק/ה" and "יודע/ת" already have, and the stray space before the comma is gone.
+    """
+    return head() + """
+<h1 style="font-size:86px;margin-top:14px">זקוק/ה לעזרה<br><em>ולא יודע/ת לאן לפנות?</em></h1>
+<div class="card" style="width:100%;margin-top:36px;padding:32px 34px">
+ <div style="font-size:42px;line-height:1.5;color:var(--text-2);font-weight:500;text-align:center">
+  כנס/י לטיפול חכם, ענה/י על <b style="color:var(--teal-dark)">שאלון מקצועי</b> שמברר מה הקושי ומה שיטת הטיפול הנכונה לך, ותתאים לך את המטפל הכי מתאים לך.</div>
+</div>
+<div style="display:flex;gap:22px;width:100%;margin-top:34px">""" + \
+        quiz_button("שאלון מבוגרים", "var(--teal)") + quiz_button("שאלון הורים", "var(--gold)") + """</div>
+<div style="width:100%;margin-top:22px">""" + checks([
+        "שאלון חינמי ואנונימי, 2-4 דקות",
+        "פותח על ידי פסיכולוגים קליניים וחוקרים",
+        "מבוסס על מאות מחקרים",
+    ]) + """</div>
+<div class="url" style="margin-top:auto">mentalytics.co.il</div></body></html>"""
+
+
+def patients_alt():
+    """Patients, the fallback (6/10/2026): the sentence and the two pairs of the adults' promo video.
+
+    It never addresses the reader, so it is the one to switch to if Meta rejects the owner's version.
+    """
     return head() + """
 <h1 style="font-size:74px;margin-top:6px">זה לא עניין של מטפל<br>טוב או פחות טוב.<br><em>זה עניין של התאמה.</em></h1>
 <div style="display:flex;flex-direction:column;gap:26px;margin-top:40px">""" + \
@@ -119,7 +155,7 @@ def patients():
 """ + foot("למילוי השאלון")
 
 
-FILES = {"fb-recruit-image": recruit, "fb-patients-image": patients}
+FILES = {"fb-recruit-image": recruit, "fb-patients-image": patients, "fb-patients-image-alt": patients_alt}
 
 if __name__ == "__main__":
     for name, build in FILES.items():
