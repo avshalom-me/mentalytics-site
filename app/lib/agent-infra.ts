@@ -64,13 +64,59 @@ export async function finishAgentRun(
 //
 // managedKeys = כל המפתחות שהריצה הזו באמת בדקה. מפתח שממתין בתור אך לא
 // נבדק בריצה (למשל בדיקה שדולגה) לא ייסגר בטעות.
+//
+// snoozeDays = "ידוע, עזוב". בלי זה ממצא שנדחה ידנית נפתח מחדש בריצה של
+// למחרת, כי המצב שיצר אותו עדיין מתקיים - ואז אין טעם לדחות, והתור מזדקן:
+// ב-7/10/26 היו לסוכן הפרסום 11 ממצאים פתוחים בגיל ממוצע של 27 יום, ואף
+// אחד מהם לא נדחה ידנית מאז 30/8. עם snoozeDays, ממצא שהאדמין דחה לא חוזר
+// במשך התקופה, אלא אם החמיר מאז (חומרה גבוהה יותר מזו שנדחתה). סגירה
+// אוטומטית של הסוכן עצמו אינה דחייה ואינה משתיקה דבר. noSnooze פוטר מפתחות
+// שאסור להשתיק (למשל: הסנכרון עצמו מת, ואז כל שאר המספרים קפואים).
 export async function syncAgentAlerts(
   agent: string,
   active: Omit<NewAgentAction, "agent">[],
-  opts?: { managedKeys?: string[]; recoveryNote?: string }
-): Promise<{ created: number; refreshed: number; recovered: number }> {
+  opts?: { managedKeys?: string[]; recoveryNote?: string; snoozeDays?: number; noSnooze?: (key: string) => boolean }
+): Promise<{ created: number; refreshed: number; recovered: number; snoozed: number }> {
+  let toCreate = active;
+  if (opts?.snoozeDays && opts.snoozeDays > 0) {
+    const keys = active
+      .map((a) => a.dedupeKey)
+      .filter((k): k is string => Boolean(k) && !opts.noSnooze?.(k as string));
+    if (keys.length > 0) {
+      try {
+        const since = new Date(Date.now() - opts.snoozeDays * 86_400_000).toISOString();
+        const { data, error } = await supabaseAdmin
+          .from("agent_actions")
+          .select("dedupe_key, severity")
+          .eq("agent", agent)
+          .eq("status", "dismissed")
+          .eq("resolved_by", "admin")
+          .gte("status_changed_at", since)
+          .in("dedupe_key", keys);
+        if (error) throw new Error(error.message);
+        // החומרה הגבוהה ביותר שנדחתה לכל מפתח (דירוג נמוך = חמור יותר).
+        const dismissedRank = new Map<string, number>();
+        for (const row of data ?? []) {
+          const rank = SEVERITY_RANK[(row.severity as AgentSeverity) ?? "normal"] ?? SEVERITY_RANK.normal;
+          const prev = dismissedRank.get(row.dedupe_key as string);
+          if (prev === undefined || rank < prev) dismissedRank.set(row.dedupe_key as string, rank);
+        }
+        toCreate = active.filter((a) => {
+          const dismissed = a.dedupeKey ? dismissedRank.get(a.dedupeKey) : undefined;
+          if (dismissed === undefined) return true;
+          return SEVERITY_RANK[a.severity ?? "normal"] < dismissed; // החמיר מאז הדחייה
+        });
+      } catch (e) {
+        // לא יודעים מה נדחה - עדיף ממצא שחוזר מממצא שנבלע.
+        console.error(`syncAgentAlerts(${agent}) snooze lookup failed:`, e);
+        toCreate = active;
+      }
+    }
+  }
+  const snoozed = active.length - toCreate.length;
+
   const results = await Promise.all(
-    active.map((a) => createAgentAction({ agent, ...a }))
+    toCreate.map((a) => createAgentAction({ agent, ...a }))
   );
   const created = results.filter((r) => r.created).length;
   const refreshed = results.filter((r) => r.updated).length;
@@ -113,7 +159,7 @@ export async function syncAgentAlerts(
     console.error(`syncAgentAlerts(${agent}) recovery failed:`, e);
   }
 
-  return { created, refreshed, recovered };
+  return { created, refreshed, recovered, snoozed };
 }
 
 export type AgentSeverity = "critical" | "high" | "normal" | "low";

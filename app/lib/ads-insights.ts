@@ -2,6 +2,18 @@ import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
 import { CITY_SEO_LIST, ALL_REGIONS } from "./regions";
+import {
+  cplVerdict,
+  diagnoseCampaign,
+  isGenericGeoTerm,
+  lastSeekerDay,
+  sumFunnel,
+  type Diagnosis,
+  type FunnelDay,
+} from "./ads-diagnosis";
+import { FUNNEL_DAYS, loadCampaignFunnels, loadDiagnosisContext, type DiagnosisContext } from "./ads-diagnosis-data";
+import { PAID_TRAFFIC_CHANGES } from "./paid-traffic-changes";
+import { PAGE_REVISED } from "./page-revised";
 
 // The single ads-analysis engine. Both consumers read from HERE:
 //   /api/admin-ads-console  - serves the full payload to the console page
@@ -16,16 +28,24 @@ import { CITY_SEO_LIST, ALL_REGIONS } from "./regions";
 // agent is fresher than "live" and includes keywords/search terms the live
 // campaign API never returned), and every alert carries a stable key so the
 // queue can auto-recover the moment a fixed problem stops re-appearing.
+//
+// From 7/10/2026 three things changed here, all for the same reason - the
+// queue had 11 open ads findings averaging 27 days old, none ever acted on:
+//   - contacts are counted in people (sessions), not clicks;
+//   - "no contact" and "too expensive" are judged against chance, so a small
+//     campaign's quiet week stays in the console instead of flapping in and
+//     out of the queue;
+//   - a campaign that is spending without seekers gets a diagnosis
+//     (ads-diagnosis.ts) in place of a list of things to go and check.
 
-const LOOKBACK_DAYS = 7;
-// כמה אחורה מחפשים את הפנייה האחרונה של קמפיין. בצורת ארוכה מזה כבר לא
-// צריכה מספר מדויק כדי להיות ברורה, והחלון הקצר שומר את השאילתה זולה.
+// כשאין פונה בכל חלון הנתונים, מאיזה יום סופרים את הכסף שנשרף. בצורת ארוכה
+// מזה כבר לא צריכה מספר מדויק כדי להיות ברורה.
 const DRY_WINDOW_DAYS = 45;
 // תקציב חודשי מתוכנן לפרסום (₪, לפני מע"מ). מקור האמת הוא plan_targets
 // (מדד ads_budget_month, אותה שורה שעמוד /admin/budget קורא). זה רק הגיבוי
 // כשאין שם שורה: 3,500 שנקבע ב-30/8/26, או ADS_MONTHLY_BUDGET בסביבה.
 const FALLBACK_MONTHLY_BUDGET = Number(process.env.ADS_MONTHLY_BUDGET ?? 3500);
-// יעד עלות ללחיצת פנייה כשאין אבן דרך בתוכנית העסקית.
+// יעד עלות לפונה כשאין אבן דרך בתוכנית העסקית.
 const FALLBACK_MAX_CPL = Number(process.env.ADS_MAX_CPL ?? 250);
 
 export type AdsAlert = {
@@ -50,14 +70,21 @@ export type AdsCampaignRow = {
   conv7: number;
   conv30: number;
   sessions7: number; sessions30: number;
+  // סשנים שסיימו שאלון (אנשים), לא אירועי סיום.
   quiz30: number;
   views30: number;
-  contacts7: number; contacts30: number;
-  costPerContact30: number | null;
-  // אורך הבצורת: כמה ימים עברו מאז הפנייה האחרונה, וכמה כסף נשרף מאז.
-  // null = לא נראתה פנייה בכל חלון הבדיקה (DRY_WINDOW_DAYS).
+  // פונים = אנשים (סשנים) שלחצו על כפתור קשר. עד 7/10/26 נספרו כאן לחיצות,
+  // ומי שלחץ שלוש פעמים על וואטסאפ היה שלוש "פניות": באונליין זה הראה ₪16
+  // לפנייה כשהעלות לאדם הייתה ₪42. הלחיצות נשארות לצד, כדי שהפער ייראה.
+  seekers7: number; seekers30: number;
+  contactClicks30: number;
+  costPerSeeker30: number | null;
+  // אורך הבצורת: כמה ימים עברו מאז הפונה האחרון, וכמה כסף נשרף מאז.
+  // null = לא נראה פונה בכל חלון הנתונים (FUNNEL_DAYS).
   daysSinceContact: number | null;
   costSinceContact: number;
+  // למה הקמפיין התייבש. רק לקמפיין שמוציא כסף בלי פונים; ראו ads-diagnosis.ts.
+  diagnosis: Diagnosis | null;
 };
 
 export type AdsInsights = {
@@ -101,7 +128,7 @@ export type RegistryRow = {
   notes: string | null;
 };
 
-type SiteRow = { utm_campaign: string; sessions: number; quiz_completes: number; profile_views: number; contacts: number };
+type SiteRow = { utm_campaign: string; sessions: number; quiz_completes: number; profile_views: number; seekers: number; contact_clicks: number };
 
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -149,28 +176,41 @@ async function monthlyBudgetTarget(): Promise<number> {
 }
 
 export async function buildAdsInsights(): Promise<AdsInsights> {
-  const [registryQ, configQ, dailyQ, kwStatusQ, syncQ, site7Q, site30Q, cplTarget, MONTHLY_BUDGET] = await Promise.all([
+  const sinceFunnelDay = new Date(Date.now() - (FUNNEL_DAYS + 1) * 86_400_000).toISOString().slice(0, 10);
+  const [registryQ, configQ, daily, kwStatusQ, syncQ, funnels, cplTarget, MONTHLY_BUDGET] = await Promise.all([
     supabaseAdmin.from("ads_campaign_registry").select("*").order("google_name"),
     supabaseAdmin.from("ads_campaign_config").select("*"),
-    supabaseAdmin
-      .from("ads_campaign_daily")
-      .select("*")
-      .gte("date", new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10)),
+    // Google's side reaches as far back as the site funnel does, so a dry
+    // spell can be laid against the clicks of the same days. 75 days of a
+    // dozen campaigns is close to the 1000-row cap, hence the paging - and the
+    // second sort key, without which two pages can disagree about a day.
+    fetchAllRows<{ date: string; campaign_name: string; impressions: number; clicks: number; cost: number; conversions: number }>(
+      () => supabaseAdmin
+        .from("ads_campaign_daily")
+        .select("date, campaign_name, impressions, clicks, cost, conversions")
+        .gte("date", sinceFunnelDay)
+        .order("date")
+        .order("campaign_name")
+    ),
     supabaseAdmin.from("ads_keyword_status").select("*"),
     supabaseAdmin.from("ads_sync_log").select("synced_at").order("synced_at", { ascending: false }).limit(1),
-    supabaseAdmin.rpc("ads_console_site_stats", { p_days: 7 }),
-    supabaseAdmin.rpc("ads_console_site_stats", { p_days: 30 }),
+    // The site's side of every paid campaign, by day, in people. One call
+    // where there were two (7 and 30 days) and a third for the last contact.
+    loadCampaignFunnels(),
     maxCplTarget(),
     monthlyBudgetTarget(),
   ]);
-  for (const q of [registryQ, configQ, dailyQ, kwStatusQ, syncQ, site7Q, site30Q]) {
+  for (const q of [registryQ, configQ, kwStatusQ, syncQ]) {
     if (q && typeof q === "object" && "error" in q && q.error) throw new Error(String(q.error.message));
   }
 
   const since7 = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
   const since14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
   const since30 = new Date(Date.now() - 31 * 86_400_000).toISOString().slice(0, 10);
-  const todayIso = new Date().toISOString().slice(0, 10);
+  // Today on the account's clock. The funnel's days are Israel days, and a
+  // contact made after midnight there is still "yesterday" in UTC until 03:00 -
+  // which would read as a campaign whose last contact is in the future.
+  const todayIso = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem" }).format(new Date());
   const sinceDryDay = new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10);
 
   // Keyword/search-term dailies can exceed the 1000-row PostgREST cap, so
@@ -186,22 +226,14 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     ),
   ]);
 
-  // מתי כל קמפיין הביא פנייה בפעם האחרונה. בלי זה בדיקת ה"קר" מכירה רק
+  // מתי כל קמפיין הביא פונה בפעם האחרונה. בלי זה בדיקת ה"קר" מכירה רק
   // "אפס בשבוע", וזה מדד רועש: שבוע יבש בקמפיין קטן הוא לפעמים מקריות,
-  // בעוד עשרה ימים רצופים בקמפיין שממשיך לשלם הם ממצא. נמדד מול
-  // utm_campaign כי זו הזהות שצד האתר מכיר.
-  const contactRows = await fetchAllRows<{ utm_campaign: string | null; clicked_at: string }>(
-    () => supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("utm_campaign, clicked_at")
-      .gte("clicked_at", new Date(Date.now() - DRY_WINDOW_DAYS * 86_400_000).toISOString())
-  );
+  // בעוד עשרה ימים רצופים בקמפיין שממשיך לשלם הם ממצא. נלקח מהמשפך היומי,
+  // לפי utm_campaign, כי זו הזהות שצד האתר מכיר.
   const lastContactByUtm = new Map<string, string>();
-  for (const row of contactRows) {
-    if (!row.utm_campaign) continue;
-    const day = row.clicked_at.slice(0, 10);
-    const prev = lastContactByUtm.get(row.utm_campaign);
-    if (!prev || day > prev) lastContactByUtm.set(row.utm_campaign, day);
+  for (const [utm, days] of funnels) {
+    const last = lastSeekerDay(days);
+    if (last) lastContactByUtm.set(utm, last);
   }
 
   const registry = (registryQ.data ?? []) as RegistryRow[];
@@ -214,11 +246,27 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   };
   const config = (configQ.data ?? []) as ConfigRow[];
   const configByName = new Map(config.map((c) => [c.campaign_name, c]));
-  const daily = (dailyQ.data ?? []) as { date: string; campaign_name: string; impressions: number; clicks: number; cost: number; conversions: number }[];
   const lastSync = (syncQ.data?.[0]?.synced_at as string | undefined) ?? null;
 
-  const site7 = new Map(((site7Q.data ?? []) as SiteRow[]).map((s) => [s.utm_campaign, s]));
-  const site30 = new Map(((site30Q.data ?? []) as SiteRow[]).map((s) => [s.utm_campaign, s]));
+  // The site's side of each campaign over the same days as Google's 7 and 30,
+  // summed from the daily funnel. Everything counts people; the contact
+  // clicks are kept beside the seekers on purpose.
+  const siteSince = (from: string): Map<string, SiteRow> =>
+    new Map(
+      [...funnels].map(([utm, days]: [string, FunnelDay[]]): [string, SiteRow] => {
+        const t = sumFunnel(days, from, todayIso);
+        return [utm, {
+          utm_campaign: utm,
+          sessions: t.sessions,
+          quiz_completes: t.quizDone,
+          profile_views: t.profileViews,
+          seekers: t.seekers,
+          contact_clicks: t.contactClicks,
+        }];
+      })
+    );
+  const site7 = siteSince(since7);
+  const site30 = siteSince(since30);
 
   // --- Google-side aggregates per campaign: 7d, previous-7d, 30d, MTD ---
   type Agg = { impr: number; clicks: number; cost: number; conv: number };
@@ -239,7 +287,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       a.impr += d.impressions; a.clicks += d.clicks; a.cost += d.cost; a.conv += d.conversions;
       m.set(d.campaign_name, a);
     };
-    into(g30);
+    if (d.date >= since30) into(g30);
     if (d.date >= since7) into(g7);
     else if (d.date >= since14) into(gPrev7);
     if (d.date >= monthStart) spendMtd += d.cost;
@@ -256,9 +304,9 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     const a30 = g30.get(name) ?? zero();
     const s7 = reg?.utm_campaign ? site7.get(reg.utm_campaign) : undefined;
     const s30 = reg?.utm_campaign ? site30.get(reg.utm_campaign) : undefined;
-    // הפנייה האחרונה, ומה שנשרף מאז. כשאין פנייה בכל החלון סופרים את כל
-    // ההוצאה שיש עליה נתונים - כלומר 30 הימים של ads_campaign_daily, ולכן
-    // הסכום הזה הוא רצפה ולא הסכום המלא של הבצורת.
+    // הפונה האחרון, ומה שנשרף מאז. כשאין פונה בכל חלון הנתונים סופרים את
+    // ההוצאה של DRY_WINDOW_DAYS האחרונים, ולכן הסכום הזה הוא רצפה ולא
+    // הסכום המלא של הבצורת.
     const lastContactDay = reg?.utm_campaign ? lastContactByUtm.get(reg.utm_campaign) ?? null : null;
     const dryFrom = lastContactDay ?? sinceDryDay;
     return {
@@ -276,21 +324,25 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       sessions7: s7?.sessions ?? 0, sessions30: s30?.sessions ?? 0,
       quiz30: s30?.quiz_completes ?? 0,
       views30: s30?.profile_views ?? 0,
-      contacts7: s7?.contacts ?? 0, contacts30: s30?.contacts ?? 0,
-      costPerContact30: s30 && s30.contacts > 0 && a30.cost > 0 ? r2(a30.cost / s30.contacts) : null,
+      seekers7: s7?.seekers ?? 0, seekers30: s30?.seekers ?? 0,
+      contactClicks30: s30?.contact_clicks ?? 0,
+      costPerSeeker30: s30 && s30.seekers > 0 && a30.cost > 0 ? r2(a30.cost / s30.seekers) : null,
       daysSinceContact: lastContactDay
         ? Math.floor((Date.parse(todayIso) - Date.parse(lastContactDay)) / 86_400_000)
         : null,
       costSinceContact: r2(
         daily.filter((d) => d.campaign_name === name && d.date > dryFrom).reduce((s, d) => s + d.cost, 0)
       ),
+      diagnosis: null,
     };
   }).sort((a, b) => b.cost30 - a.cost30 || a.google_name.localeCompare(b.google_name));
 
   // Paid traffic whose utm_campaign no registry row claims - includes the
   // '(ללא תיוג)' bucket, whose growth means a suffix got swallowed again.
   const siteOnly = [...site30.values()]
-    .filter((s) => !claimedUtm.has(s.utm_campaign))
+    // The funnel reaches back further than 30 days, so a campaign that ended
+    // in the summer is still in the map, with nothing in it.
+    .filter((s) => !claimedUtm.has(s.utm_campaign) && (s.sessions > 0 || s.seekers > 0))
     .sort((a, b) => b.sessions - a.sessions);
 
   // --- Keywords ---
@@ -300,8 +352,14 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   // 30-day keyword impressions per campaign, for the "what is actually
   // serving" check below.
   const kwImprByCampaign = new Map<string, number>();
+  // What each campaign spent on each keyword in 30 days - the diagnosis reads
+  // it to say what the campaign is buying ("psychologist", mostly).
+  const kwCostByCampaign = new Map<string, Map<string, number>>();
   for (const k of kwDaily) {
     kwImprByCampaign.set(k.campaign_name, (kwImprByCampaign.get(k.campaign_name) ?? 0) + k.impressions);
+    const perKw = kwCostByCampaign.get(k.campaign_name) ?? new Map<string, number>();
+    perKw.set(k.keyword, (perKw.get(k.keyword) ?? 0) + k.cost);
+    kwCostByCampaign.set(k.campaign_name, perKw);
     const b = broadByCampaign.get(k.campaign_name) ?? { broad: 0, total: 0 };
     b.total += k.cost;
     if ((k.match_type ?? "").toUpperCase() === "BROAD") b.broad += k.cost;
@@ -337,11 +395,20 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   // --- Search terms ---
   // The "צפון" family is what ate 62% of g-hadera; any generic geo term
   // showing impressions is a leak worth blocking the same day.
-  const GENERIC = /(^|\s)(צפון|בצפון|הצפון|גליל|בגליל|בישראל|בארץ)(\s|$)/;
-  const genericHits = terms
-    .filter((t) => t.date >= since14 && GENERIC.test(t.term) && t.impressions > 0)
-    .map((t) => ({ campaign: t.campaign_name, term: t.term, impressions: t.impressions, clicks: t.clicks, cost: r2(t.cost) }))
-    .sort((a, b) => b.impressions - a.impressions)
+  // One row per campaign and term over the fortnight (the table is daily),
+  // the costly ones first. A place that merely carries the word - "צפון תל
+  // אביב", "צפון השרון" - is not generic; see isGenericGeoTerm.
+  const genericMap = new Map<string, { campaign: string; term: string; impressions: number; clicks: number; cost: number }>();
+  for (const t of terms) {
+    if (t.date < since14 || t.impressions <= 0 || !isGenericGeoTerm(t.term)) continue;
+    const key = `${t.campaign_name} ${t.term}`;
+    const a = genericMap.get(key) ?? { campaign: t.campaign_name, term: t.term, impressions: 0, clicks: 0, cost: 0 };
+    a.impressions += t.impressions; a.clicks += t.clicks; a.cost += t.cost;
+    genericMap.set(key, a);
+  }
+  const genericHits = [...genericMap.values()]
+    .map((g) => ({ ...g, cost: r2(g.cost) }))
+    .sort((a, b) => b.cost - a.cost || b.impressions - a.impressions)
     .slice(0, 30);
   // Google hides sub-threshold queries; the gap between campaign cost and
   // the cost its visible terms account for approximates that hidden share.
@@ -480,9 +547,64 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       `מתחילת החודש: ₪${Math.round(spendMtd)} (הקצב המתוכנן ליום הזה: ₪${Math.round(expected)}). ` +
       `${projectedThisMonth != null ? `סגירה צפויה של החודש: ₪${Math.round(projectedThisMonth)}. ` : ""}` +
       `שבעת הימים האחרונים רצו ב-₪${runRateDaily} ליום - כלומר ₪${Math.round(runRateMonthly)} לחודש מלא, וזה מה שהחודש הבא יורש אם לא משנים תקציבים. ` +
-      `העמודה שמחליטה מאיפה מקצצים היא עלות-לפנייה בקונסולה, לא ההוצאה המוחלטת.`
+      `העמודה שמחליטה מאיפה מקצצים היא העלות לפונה בקונסולה, לא ההוצאה המוחלטת.`
     );
   }
+
+  // ------------------------------------------------------------ Diagnosis
+  // A campaign that is spending and has brought nobody for a week. Each one
+  // gets a diagnosis: is the silence luck, where does the funnel break, what
+  // changed around the day it began, and does what the campaign buys match
+  // what a paid visitor is shown. The context - the visitors' profile, the
+  // listed therapists, recent promotions and demotions, gift offers already in
+  // the queue - is loaded only when there is somebody to diagnose, and a
+  // failure there costs the diagnosis, never the alert.
+  const cold = campaigns.filter(
+    (c) => c.utm_campaign && c.cost7 > 0 && c.seekers7 === 0 && Math.max(c.costSinceContact, c.cost7) >= 50
+  );
+  if (cold.length > 0) {
+    let context: DiagnosisContext | null = null;
+    try {
+      context = await loadDiagnosisContext();
+    } catch (e) {
+      console.error("ads diagnosis context failed:", e instanceof Error ? e.message : e);
+    }
+    if (context) {
+      // The prior a small campaign leans on: seekers per session across every
+      // registered campaign, over the whole funnel window.
+      let allSessions = 0;
+      let allSeekers = 0;
+      for (const utm of claimedUtm) {
+        const t = sumFunnel(funnels.get(utm) ?? [], "0000-00-00", todayIso);
+        allSessions += t.sessions;
+        allSeekers += t.seekers;
+      }
+      const accountRate = allSessions > 0 ? allSeekers / allSessions : 0.05;
+      for (const c of cold) {
+        const utm = c.utm_campaign as string;
+        c.diagnosis = diagnoseCampaign({
+          googleName: c.google_name,
+          utm,
+          today: todayIso,
+          days: funnels.get(utm) ?? [],
+          google: daily
+            .filter((d) => d.campaign_name === c.google_name)
+            .map((d) => ({ date: d.date, clicks: d.clicks, cost: d.cost })),
+          accountRate,
+          profile: context.profiles.get(utm) ?? null,
+          keywords: [...(kwCostByCampaign.get(c.google_name) ?? new Map<string, number>())].map(([keyword, cost]) => ({ keyword, cost })),
+          supply: context.supply,
+          supplyChanges: context.supplyChanges,
+          siteChanges: [...PAID_TRAFFIC_CHANGES],
+          landingRevised: PAGE_REVISED["@landing-families"]?.date ?? null,
+          pendingGiftOffers: context.pendingGiftOffers,
+        });
+      }
+    }
+  }
+  // Campaigns whose silence reached the queue - they are not flagged a second
+  // time as "too expensive".
+  const coldFired = new Set<string>();
 
   let pollutionFired = false;
   for (const c of campaigns) {
@@ -496,42 +618,56 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
       pollutionFired = true;
       push(`ads:pollution:${c.google_name}`, "red", `🗑️ ${c.google_name} - ${Math.round(c.conv7)} המרות מ-${c.clicks7} קליקים בשבוע`, "יחס מעל 1 = פעולת המרה ראשית סופרת צפיות עמוד. Goals > Conversions > להוריד ל-Secondary.");
     }
-    // Spend with zero contacts. The trigger is still a spending week with no
-    // contact, but the alert now leads with HOW LONG the campaign has been
-    // dry, because that is what separates noise from a finding: a single zero
-    // week on a small campaign happens, ten consecutive days on one that keeps
-    // paying does not. g-haifa (03/09/26) fired at ₪173/week and sat in the
-    // queue for three days reading like every other weekly zero, while the
-    // real fact was that its last contact had been on 26/08.
-    if (c.cost7 >= 50 && c.contacts7 === 0 && c.utm_campaign) {
+    // Spend with no seeker. Severity is no longer a sum of money: it is the
+    // chance that the silence is luck, taken from the diagnosis. A small
+    // campaign's quiet week is plausible luck and stays in the console (info
+    // never reaches the queue); 56 sessions without a seeker, on a campaign
+    // that used to bring one in eight, is not - and is red whatever it cost.
+    // Until 7/10/2026 the rule was ₪50 in a week with nothing, red past ₪120,
+    // which gave g-sharon's ordinary dry weeks and g-north-sharon's real
+    // collapse the same colour and the same advice to go and look.
+    if (cold.includes(c)) {
       const dry = c.daysSinceContact;
       const burned = Math.round(Math.max(c.costSinceContact, c.cost7));
-      // אדום כשהבצורת ארוכה משבוע וגם נשרף בה כסף אמיתי, או בכל מקרה
-      // מעל ₪150 בשבוע - הסף הישן, שנשאר כדי שקמפיין יקר לא יירד לכתום
-      // רק בגלל שהפנייה האחרונה שלו הייתה אתמול.
-      const severity = (dry != null && dry >= 7 && burned >= 120) || c.cost7 >= 150 ? "red" : "amber";
-      const howLong = dry == null
-        ? `${DRY_WINDOW_DAYS}+ ימים`
-        : `${dry} ימים`;
+      const d = c.diagnosis;
+      let severity: AdsAlert["severity"] = d
+        ? d.cause === "tracking" || d.chance === "unlikely" ? "red" : d.chance === "borderline" ? "amber" : "info"
+        // No diagnosis (its context failed to load): the old rule of thumb.
+        : (dry != null && dry >= 7 && burned >= 120) || c.cost7 >= 150 ? "red" : "amber";
+      // An expensive week is never silent, however plausible the luck.
+      if (severity === "info" && c.cost7 >= 150) severity = "amber";
+      if (severity !== "info") coldFired.add(c.google_name);
+      const howLong = dry == null ? `${DRY_WINDOW_DAYS}+ ימים` : `${dry} ימים`;
       push(
         `ads:cold:${c.google_name}`,
         severity,
-        `🥶 ${c.google_name} - ${howLong} בלי פנייה, ₪${burned} מאז`,
-        `השבוע האחרון: ₪${Math.round(c.cost7)} על ${c.clicks7} קליקים ואפס פניות. ` +
-        (dry == null
-          ? `לא נרשמה אף פנייה מהקמפיין הזה ב-${DRY_WINDOW_DAYS} הימים האחרונים. `
-          : dry >= 7
-            ? `הפנייה האחרונה הייתה לפני ${dry} ימים - זה כבר לא רעש של שבוע בודד. `
-            : `הפנייה האחרונה הייתה לפני ${dry} ימים, כך שייתכן שזו עדיין תנודתיות. `) +
-        `לבדוק לפי הסדר: דוח מונחי חיפוש (האם הקליקים עברו לשאילתות בלי כוונה), תקרת CPC, ואז ההיצע באזור. ` +
-        `אם שלושתם תקינים - השאלה היא כמה עוד שווה לשלם על הבצורת הזו.`
+        `🥶 ${c.google_name} - ${howLong} בלי פנייה, ₪${burned} מאז${d ? ` · ${d.tag}` : ""}`,
+        d
+          ? d.text
+          : `השבוע האחרון: ₪${Math.round(c.cost7)} על ${c.clicks7} קליקים ואפס פונים. האבחון האוטומטי לא נטען הפעם. ` +
+            `לבדוק לפי הסדר: דוח מונחי חיפוש, תקרת CPC, ואז ההיצע באזור.`
       );
     }
-    // Cost per contact against the business-plan milestone in force.
-    if (c.utm_campaign && c.cost7 >= 75 && c.contacts7 > 0) {
-      const cpl = r2(c.cost7 / c.contacts7);
-      if (cpl > cplTarget.value) {
-        push(`ads:cpl:${c.google_name}`, "amber", `💰 עלות לפנייה ב-${c.google_name}: ₪${Math.round(cpl)} - מעל היעד ₪${cplTarget.value}`, `${LOOKBACK_DAYS} ימים אחרונים: ₪${Math.round(c.cost7)} ל-${c.contacts7} פניות. היעד ${cplTarget.fromPlan ? "מהתוכנית העסקית" : "ברירת מחדל"}. לשקול: חידוד מילות מפתח, תקרת CPC, או צמצום תקציב.`);
+    // Cost per seeker against the business-plan milestone in force: over 30
+    // days, in people, and only when the gap is more than luck allows. The
+    // 7-day version fired on a single contact ("₪96 for 1"), and g-haifa's
+    // opened and closed five times in a month. The test asks how many seekers
+    // the money should have bought at the target, and how likely it is to see
+    // this few if the campaign were in fact on target. A campaign already
+    // flagged as cold is not flagged twice.
+    if (c.utm_campaign && c.cost30 >= 150 && !coldFired.has(c.google_name)) {
+      const v = cplVerdict(c.cost30, c.seekers30, cplTarget.value);
+      if (v.above && v.p < 0.1) {
+        const per = c.seekers30 > 0 ? `₪${Math.round(c.cost30 / c.seekers30)} לפונה` : "אין פונים";
+        const luck = v.p < 0.01 ? "פחות מ-1%" : `${Math.round(v.p * 100)}%`;
+        push(
+          `ads:cpl:${c.google_name}`,
+          v.p < 0.02 ? "red" : "amber",
+          `💰 ${c.google_name} - ${per} ב-30 יום, מעל היעד ₪${cplTarget.value}`,
+          `30 ימים: ₪${Math.round(c.cost30)} ל-${c.seekers30} פונים (${c.contactClicks30} לחיצות). ` +
+          `ביעד ${cplTarget.fromPlan ? "מהתוכנית העסקית" : "ברירת המחדל"} הסכום הזה היה אמור להביא כ-${v.expected.toFixed(1)} פונים, ` +
+          `והסיכוי לקבל ${c.seekers30} או פחות במקרה הוא ${luck}. לשקול: חידוד מילות מפתח, תקרת CPC, או צמצום תקציב.`
+        );
       }
     }
     // Spend that jumped week-over-week. A deliberate budget raise recovers
@@ -653,7 +789,7 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
 
   for (const p of placeless) {
     const c = campaigns.find((x) => x.google_name === p.campaign);
-    const rate = c && c.quiz30 > 0 ? ` יחס פנייה/שאלון שלו: ${Math.round((c.contacts30 / c.quiz30) * 100)}% (ת"א ‏34%).` : "";
+    const rate = c && c.quiz30 > 0 ? ` יחס פנייה/שאלון שלו: ${Math.round((c.seekers30 / c.quiz30) * 100)}% (ת"א ‏34%).` : "";
     push(`ads:placeless:${p.campaign}`, "amber", `🧭 ${p.campaign} - ${p.pct}% מהתקציב על חיפושים בלי שם מקום`, `₪${Math.round(p.cost30)} ב-30 יום הלכו לשאילתות כלליות ("פסיכולוג" בלי עיר). תנועה כזו ממלאת שאלונים ולא פונה.${rate} לשקול מילות מפתח עם שם עיר, או צמצום סוג ההתאמה. הרשימה בסקציית מונחי החיפוש.`);
   }
 
@@ -663,7 +799,22 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   }
 
   if (genericHits.length > 0) {
-    push("ads:generic", "red", `🔍 ${genericHits.length} מונחי חיפוש גנריים ("צפון"/"בישראל") ב-14 יום`, "לחסום מיד כמילים שליליות - מילה כזו בלעה 62% מהתקציב של g-hadera. הרשימה בסקציית מונחי החיפוש למטה.");
+    // Red only when the leak costs real money. Impressions alone are a note
+    // for the console, not something to wake the queue for.
+    const genericCost = genericHits.reduce((sum, g) => sum + g.cost, 0);
+    const worst = genericHits
+      .filter((g) => g.cost > 0)
+      .slice(0, 3)
+      .map((g) => `${g.campaign}: "${g.term}" ₪${Math.round(g.cost)}`)
+      .join(" · ");
+    push(
+      "ads:generic",
+      genericCost >= 25 ? "red" : genericCost > 0 ? "amber" : "info",
+      `🔍 ${genericHits.length} מונחי חיפוש גנריים ("בצפון"/"בישראל") ב-14 יום, ₪${Math.round(genericCost)}`,
+      `${worst ? `היקרים: ${worst}. ` : "עדיין בלי קליקים. "}` +
+      `לחסום כמילים שליליות - מילה כזו בלעה 62% מהתקציב של g-hadera. ` +
+      `שם של מקום שרק מכיל את המילה (צפון תל אביב, צפון השרון) לא נספר. הרשימה המלאה בקונסולה, בסקציית מונחי החיפוש.`
+    );
   }
 
   // Conversion-pipe health: Google's lead count vs the site's own contact
@@ -672,7 +823,12 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
   // while a pollution alert is up - the ratio is meaningless then anyway.
   if (!pollutionFired) {
     const conv7Total = campaigns.reduce((s, c) => s + c.conv7, 0);
-    const contacts7Total = campaigns.reduce((s, c) => s + c.contacts7, 0);
+    // Contact clicks here, not people, on purpose: this lays Google's counter
+    // beside ours for the same event, and the 30%-150% band was set on clicks.
+    const contacts7Total = campaigns.reduce(
+      (s, c) => s + (c.utm_campaign ? site7.get(c.utm_campaign)?.contact_clicks ?? 0 : 0),
+      0
+    );
     if (conv7Total >= 10 || contacts7Total >= 10) {
       const ratio = contacts7Total > 0 ? conv7Total / contacts7Total : null;
       if (ratio != null && (ratio < 0.3 || ratio > 1.5)) {
@@ -700,6 +856,14 @@ export async function buildAdsInsights(): Promise<AdsInsights> {
     ]),
     ...config.flatMap((c) => [`ads:untracked:${c.campaign_id}`, `ads:zero:${c.campaign_id}`, `ads:cpl:${c.campaign_id}`]),
     `ads:pace:${today.slice(0, 7)}`,
+    // A month that has ended cannot still be "over budget so far". The key
+    // carries the month, so last month's alert never matched this month's key
+    // and stayed open for good: on 7/10/2026 August's and September's were
+    // both still pending.
+    ...Array.from({ length: 6 }, (_, i) => {
+      const month = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)) - 2 - i, 1));
+      return `ads:pace:${month.toISOString().slice(0, 7)}`;
+    }),
     "ads:sync-stale", "ads:untagged", "ads:generic", "ads:hmo", "ads:convgap",
   ];
 

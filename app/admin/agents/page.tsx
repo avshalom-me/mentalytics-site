@@ -249,7 +249,13 @@ type GapsRun = {
 type AdsRun = {
   configured: boolean;
   findings: { key: string; severity: string; title: string; detail: string }[];
-  campaigns: { name: string; utm: string | null; cost: number; clicks: number; contacts: number; cpl: number | null }[];
+  // seekers/costPerSeeker סופרים אנשים. contacts/cpl (לחיצות) קיימים רק בריצה
+  // שנשמרה לפני 7/10/26, ונקראים כדי שהריצה האחרונה לא תוצג ריקה ביום המעבר.
+  campaigns: {
+    name: string; utm: string | null; cost: number; clicks: number;
+    seekers?: number; costPerSeeker?: number | null;
+    contacts?: number; cpl?: number | null;
+  }[];
   spend_mtd: number;
   budget_pace: { expected: number; actual: number } | null;
 };
@@ -294,6 +300,9 @@ type AgentMeta = {
   chartGoodWhenZero?: boolean;
   // איפה עוד רואים את הממצאים של הסוכן.
   home?: { href: string; label: string };
+  // כמה ימים ממצא שנדחה ידנית נשאר מושתק (ראו syncAgentAlerts). רק לסוכן
+  // שביקש זאת; אצל השאר ממצא שנדחה נפתח שוב בריצה הבאה אם המצב נמשך.
+  snoozeDays?: number;
 };
 
 const AGENTS: AgentMeta[] = [
@@ -400,15 +409,17 @@ const AGENTS: AgentMeta[] = [
     label: "סוכן הפרסום",
     runAction: "ads_run",
     runLabel: "נטר פרסום עכשיו",
-    desc: "קורא כל בוקר את נתוני Google Ads: כמה הוצאנו, כמה לחיצות ליצירת קשר יצאו מזה ובאיזה מחיר - ומתריע כשקמפיין שורף כסף בלי תוצאות או בלי מדידה תקינה.",
+    desc: "קורא כל בוקר את נתוני Google Ads: כמה הוצאנו, כמה אנשים פנו למטפל בעקבות זה ובאיזה מחיר. מתריע כשקמפיין שורף כסף בלי פונים או בלי מדידה תקינה, ומאבחן למה.",
     howToRead: [
-      "\"עלות ללחיצת פנייה\" = כמה שילמנו בגוגל על כל לחיצה של מטופל על וואטסאפ/טלפון של מטפל. מעל ₪250 - הסוכן מתריע.",
+      "\"פונה\" = אדם שלחץ על וואטסאפ, חיוג או הודעה למטפל. מי שלחץ כמה פעמים נספר פעם אחת. \"עלות לפונה\" נמדדת על 30 יום מול היעד בתוכנית העסקית, והסוכן מתריע רק כשהפער גדול ממה שמקריות מסבירה.",
+      "קמפיין בלי פונים מקבל אבחון: האם זה עדיין בגבול המקריות, באיזה שלב נעצרים המבקרים, מה השתנה באותם ימים, והאם מה שהקמפיין קונה תואם למטפלים המקודמים שמבקר ממומן רואה. האבחון מצביע על הסיבה הסבירה, לא על ודאות.",
       "\"קמפיין בלי utm\" = קמפיין שמוציא כסף ואי אפשר לדעת מה הוא מביא, כי חסר לו תיוג מדידה.",
       "הסוכן קורא בלבד - הוא לא משנה שום דבר בחשבון הפרסום. השהיה או תיקון נעשים ידנית בגוגל.",
     ],
     schedule: "רץ אוטומטית כל בוקר ב-07:00",
     chartLabel: "כמה ממצאי פרסום היו בכל ריצה",
     home: { href: "/admin/ads", label: "עמוד הפרסום" },
+    snoozeDays: 14,
   },
   {
     key: "budget",
@@ -3152,9 +3163,9 @@ export default function AgentsPage() {
                     <tr className="border-b border-stone-200 text-stone-400">
                       <th className="py-1 pe-2 text-right font-semibold">קמפיין</th>
                       <th className="px-2 text-center font-semibold">עלות</th>
-                      <th className="px-2 text-center font-semibold">לחיצות</th>
-                      <th className="px-2 text-center font-semibold">לחיצות פנייה</th>
-                      <th className="px-2 text-center font-semibold">עלות ללחיצת פנייה</th>
+                      <th className="px-2 text-center font-semibold">קליקים</th>
+                      <th className="px-2 text-center font-semibold">פונים</th>
+                      <th className="px-2 text-center font-semibold">עלות לפונה</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -3163,8 +3174,10 @@ export default function AgentsPage() {
                         <td className="py-1 pe-2 font-semibold text-stone-700">{c.name}</td>
                         <td className="px-2 text-center">₪{Math.round(c.cost)}</td>
                         <td className="px-2 text-center">{c.clicks}</td>
-                        <td className="px-2 text-center">{c.contacts}</td>
-                        <td className="px-2 text-center">{c.cpl == null ? "-" : `₪${Math.round(c.cpl)}`}</td>
+                        <td className="px-2 text-center">{c.seekers ?? c.contacts ?? 0}</td>
+                        <td className="px-2 text-center">
+                          {(c.costPerSeeker ?? c.cpl) == null ? "-" : `₪${Math.round((c.costPerSeeker ?? c.cpl) as number)}`}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -3475,7 +3488,7 @@ export default function AgentsPage() {
                       <SeverityTag severity={f.severity} />
                     </span>
                     <span className="font-bold text-stone-700">{f.title}</span>
-                    {f.body && <span className="block text-xs leading-5 text-stone-500">{f.body}</span>}
+                    {f.body && <span className="block whitespace-pre-line text-xs leading-5 text-stone-500">{f.body}</span>}
                   </div>
                   <button
                     onClick={() => resolveAction(f.id, "dismissed")}
@@ -3490,6 +3503,7 @@ export default function AgentsPage() {
             </ul>
             <p className="mt-2 text-[11px] text-stone-500">
               ממצא הוא מידע, לא משימה: הוא נסגר מעצמו כשהמצב שיצר אותו משתנה, ודחייה רק מסתירה אותו.
+              {meta.snoozeDays ? ` ממצא שנדחה כאן לא חוזר במשך ${meta.snoozeDays} יום, אלא אם החמיר.` : ""}
             </p>
           </div>
         )}

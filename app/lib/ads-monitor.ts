@@ -16,6 +16,11 @@ import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
 // קריאה בלבד: הסוכן לא נוגע בקמפיינים ולא משנה תקציבים. הוא מנסח מה כדאי
 // לעשות, ואתה מבצע בממשק של גוגל אחרי אישור.
 
+// ממצא שנדחה ידנית לא חוזר במשך שבועיים, אלא אם החמיר (ראו syncAgentAlerts).
+// שבועיים = שני מחזורי מדידה של קמפיין קטן; פחות מזה והדחייה חוזרת לפני
+// שהיה אפשר ללמוד משהו חדש.
+export const ADS_SNOOZE_DAYS = 14;
+
 export type AdsFinding = {
   key: string;
   severity: "high" | "normal";
@@ -32,8 +37,10 @@ export type AdsMonitorResult = {
     utm: string | null;
     cost: number;
     clicks: number;
-    contacts: number;
-    cpl: number | null;
+    // People who pressed a contact button in the week, and what each cost.
+    // Until 7/10/2026 these two were `contacts` and `cpl` and counted clicks.
+    seekers: number;
+    costPerSeeker: number | null;
   }[];
   spendMtd: number;
   budgetPace: { expected: number; actual: number } | null;
@@ -61,14 +68,14 @@ export async function runAdsMonitor(): Promise<AdsMonitorResult> {
     base.spendMtd = insights.spendMtd;
     base.budgetPace = insights.budgetPace;
     base.campaigns = insights.payload.campaigns
-      .filter((c) => c.cost7 > 0 || c.contacts7 > 0)
+      .filter((c) => c.cost7 > 0 || c.seekers7 > 0)
       .map((c) => ({
         name: c.google_name,
         utm: c.utm_campaign,
         cost: c.cost7,
         clicks: c.clicks7,
-        contacts: c.contacts7,
-        cpl: c.contacts7 > 0 ? Math.round((c.cost7 / c.contacts7) * 10) / 10 : null,
+        seekers: c.seekers7,
+        costPerSeeker: c.seekers7 > 0 ? Math.round((c.cost7 / c.seekers7) * 10) / 10 : null,
       }));
 
     if (!base.configured) {
@@ -86,7 +93,7 @@ export async function runAdsMonitor(): Promise<AdsMonitorResult> {
         detail: a.detail,
       }));
 
-    const { recovered } = await syncAgentAlerts(
+    const { recovered, snoozed } = await syncAgentAlerts(
       "ads",
       base.findings.map((f) => ({
         actionType: "alert",
@@ -99,7 +106,13 @@ export async function runAdsMonitor(): Promise<AdsMonitorResult> {
         dedupeKey: f.key,
         payload: { severity: f.severity },
       })),
-      { managedKeys: insights.managedKeys, recoveryNote: "הממצא כבר לא מתקיים - נסגר אוטומטית" }
+      {
+        managedKeys: insights.managedKeys,
+        recoveryNote: "הממצא כבר לא מתקיים - נסגר אוטומטית",
+        snoozeDays: ADS_SNOOZE_DAYS,
+        // סנכרון מת אינו ממצא שאפשר "לדעת עליו ולהניח": כל שאר המספרים קפואים.
+        noSnooze: (key) => key.startsWith("ads:sync-"),
+      }
     );
 
     await finishAgentRun(runId, {
@@ -114,6 +127,7 @@ export async function runAdsMonitor(): Promise<AdsMonitorResult> {
         spend_mtd: base.spendMtd,
         budget_pace: base.budgetPace,
         recovered_alerts: recovered,
+        snoozed_alerts: snoozed,
         cpl_target: insights.cplTarget,
         last_sync: insights.lastSync,
       },
