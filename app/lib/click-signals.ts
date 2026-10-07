@@ -14,17 +14,19 @@ export type DeviceClass = "mobile" | "tablet" | "desktop";
 /**
  * נייד, טאבלט או מחשב לפי ה-User-Agent. עיגול גס בכוונה, וה-UA עצמו לא נשמר.
  *
- * אנדרואיד בלי "Mobile" הוא טאבלט (כך כרום מסמן): טלפון תמיד נושא את המילה.
+ * הסדר חשוב. קודם מה שמצהיר על עצמו כטאבלט, אחריו סימני טלפון, ורק אז הכלל
+ * "אנדרואיד בלי Mobile הוא טאבלט" (כך כרום מסמן). בגרסה הראשונה הכלל הזה נבדק
+ * לפני סימני הטלפון, ו-Opera Mini בטלפון אנדרואיד, שה-UA שלו לא נושא את המילה
+ * Mobile, נרשם כטאבלט.
  * iPad שמבקש אתר למחשב (iPadOS 13 ומעלה) מציג UA של Mac, ואין בשום כותרת דרך
  * להבדיל - הוא ייספר כמחשב. טעות ידועה וקטנה, לא כזו שמצדיקה לשמור את ה-UA המלא.
  */
 export function deviceClass(userAgent: string | null | undefined): DeviceClass | null {
   const ua = (userAgent ?? "").trim();
   if (!ua) return null;
-  if (/ipad|tablet|kindle|silk\/|playbook/i.test(ua) || (/android/i.test(ua) && !/mobile/i.test(ua))) {
-    return "tablet";
-  }
+  if (/ipad|tablet|kindle|silk\/|playbook/i.test(ua)) return "tablet";
   if (/mobi|iphone|ipod|windows phone|blackberry|opera mini|iemobile/i.test(ua)) return "mobile";
+  if (/android/i.test(ua)) return "tablet";
   return "desktop";
 }
 

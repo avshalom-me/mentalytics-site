@@ -8,10 +8,23 @@ import { readClickSignals } from "@/app/lib/click-signals";
 // tap became a row, so one person read as fourteen inquiries on the therapist's own
 // dashboard and in every admin count. A repeat of the same button by the same visit
 // within this window is skipped. The first tap is always kept, so a therapist with
-// any contact still has one (the refund guarantee only asks "none, or at least one").
+// any contact still has one, and the refund guarantee (which only asks "none, or at
+// least one") reads the same - except at the very edge of a time window: a first tap
+// in the two minutes before a guarantee window opens, repeated inside it, leaves that
+// window empty where it used to hold one. No click in the data had ever fallen in
+// those two minutes when this was written.
 // Two minutes covers the whole burst and still counts a second attempt after a real
 // pause. Rows from before 7/10/2026 are raw and were not changed.
 const CLICK_DEDUPE_SECONDS = 120;
+
+// What PostgREST and Postgres answer when the function itself cannot be used, as
+// opposed to when one particular click is bad:
+//   PGRST202  not in the schema cache - dropped, renamed, or an argument was renamed
+//             so the named arguments sent from here no longer match it
+//   PGRST203  more than one candidate - an overload was added
+//   42883     undefined function
+//   42501     permission denied - the grant to service_role was lost
+const FUNCTION_UNAVAILABLE = new Set(["PGRST202", "PGRST203", "42883", "42501"]);
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 // Surfaces a contact can be initiated from. "profile" was allowed by the DB
@@ -111,23 +124,60 @@ export async function POST(req: NextRequest) {
     // be told apart (a person on a desktop whose tel: link did nothing, or a tool).
     const { device, automated } = readClickSignals(body, req.headers.get("user-agent"));
 
+    // The row, once: the function's arguments and the plain insert below are both
+    // read from it, so the two ways of writing a click cannot drift apart.
+    const click = {
+      therapist_id,
+      click_type,
+      source: safeSource,
+      session_id: safeSessionId,
+      channel: attribution.channel,
+      utm_source: attribution.utm_source,
+      utm_medium: attribution.utm_medium,
+      utm_campaign: attribution.utm_campaign,
+      referrer_host: attribution.referrer_host,
+      device,
+      automated,
+    };
+
     // The skip-and-insert is one database function, not a select followed by an
     // insert here: a burst can put two requests there within microseconds of each
     // other (6/10: two rows 66 microseconds apart), and both would pass a plain check.
     const { data: recorded, error } = await supabaseAdmin.rpc("record_contact_click", {
-      p_therapist_id: therapist_id,
-      p_click_type: click_type,
-      p_source: safeSource,
-      p_session_id: safeSessionId,
-      p_channel: attribution.channel,
-      p_utm_source: attribution.utm_source,
-      p_utm_medium: attribution.utm_medium,
-      p_utm_campaign: attribution.utm_campaign,
-      p_referrer_host: attribution.referrer_host,
-      p_device: device,
-      p_automated: automated,
+      p_therapist_id: click.therapist_id,
+      p_click_type: click.click_type,
+      p_source: click.source,
+      p_session_id: click.session_id,
+      p_channel: click.channel,
+      p_utm_source: click.utm_source,
+      p_utm_medium: click.utm_medium,
+      p_utm_campaign: click.utm_campaign,
+      p_referrer_host: click.referrer_host,
+      p_device: click.device,
+      p_automated: click.automated,
       p_window_seconds: CLICK_DEDUPE_SECONDS,
     });
+
+    // The function is the only writer of a click, and the browser ignores what this
+    // route answers. If it is ever dropped, renamed, overloaded or loses its grant,
+    // every click would vanish without a sound - and a therapist with no recorded
+    // contact reads as owed a refund. So when the function itself cannot be used, the
+    // click is stored the plain way, without the repeat check, and the server log says
+    // so. Only then: a bad click (unknown therapist, malformed id) fails either way,
+    // and after a network error nobody knows whether the row was written, so a second
+    // write could double it.
+    if (error && FUNCTION_UNAVAILABLE.has(error.code ?? "")) {
+      console.error(
+        "record_contact_click cannot be used - the click was stored without the repeat check:",
+        error.code,
+        error.message,
+      );
+      const { error: insertError } = await supabaseAdmin.from("therapist_contact_clicks").insert(click);
+      if (insertError) {
+        return NextResponse.json({ ok: false, error: insertError.message }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true });
+    }
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

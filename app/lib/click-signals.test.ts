@@ -14,6 +14,11 @@ const UA = {
   samsungPhone:
     "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) SamsungBrowser/25.0 Chrome/121.0.0.0 Mobile Safari/537.36",
   firefoxAndroidPhone: "Mozilla/5.0 (Android 14; Mobile; rv:127.0) Gecko/127.0 Firefox/127.0",
+  // an Android phone whose User-Agent does not carry the word "Mobile"
+  operaMiniAndroidPhone: "Opera/9.80 (Android; Opera Mini/36.2.2254/191.280; U; en) Presto/2.12.423 Version/12.16",
+  operaMiniIphone: "Opera/9.80 (iPhone; Opera Mini/16.0.14/191.280; U; en) Presto/2.12.423 Version/12.16",
+  kindleFire:
+    "Mozilla/5.0 (Linux; Android 9; KFMAWI) AppleWebKit/537.36 (KHTML, like Gecko) Silk/96.2.6 like Chrome/96.0.4664.92 Safari/537.36",
   ipadOld:
     "Mozilla/5.0 (iPad; CPU OS 12_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/12.1 Mobile/15E148 Safari/604.1",
   androidTablet:
@@ -34,10 +39,18 @@ describe("deviceClass", () => {
     expect(deviceClass(UA.firefoxAndroidPhone)).toBe("mobile");
   });
 
+  // The first version tested "Android without the word Mobile" before the phone
+  // signs, so this phone was stored as a tablet.
+  it("calls Opera Mini on a phone a mobile, although its User-Agent lacks 'Mobile'", () => {
+    expect(deviceClass(UA.operaMiniAndroidPhone)).toBe("mobile");
+    expect(deviceClass(UA.operaMiniIphone)).toBe("mobile");
+  });
+
   it("calls an iPad or an Android without 'Mobile' a tablet", () => {
     expect(deviceClass(UA.ipadOld)).toBe("tablet");
     expect(deviceClass(UA.androidTablet)).toBe("tablet");
     expect(deviceClass(UA.firefoxAndroidTablet)).toBe("tablet");
+    expect(deviceClass(UA.kindleFire)).toBe("tablet");
   });
 
   it("calls a computer a desktop", () => {
