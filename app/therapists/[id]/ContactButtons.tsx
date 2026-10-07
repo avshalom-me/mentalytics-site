@@ -4,6 +4,7 @@ import { useState } from "react";
 import SiteMessageModal from "../SiteMessageModal";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { clickSignals } from "@/app/lib/click-signals";
 import { gaEvent } from "@/app/lib/gtag";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import { tfaEvent } from "@/app/lib/taboola";
@@ -46,6 +47,7 @@ function track(
       click_type: clickType,
       source,
       session_id: getOrCreateSessionId(),
+      ...clickSignals(),
       ...attribution,
     }),
   }).catch(() => {});

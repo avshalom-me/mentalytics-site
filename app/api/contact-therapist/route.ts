@@ -4,6 +4,7 @@ import { buildInquiryEmail, type InquiryAudience } from "@/app/lib/inquiry-email
 import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
+import { deviceClass } from "@/app/lib/click-signals";
 
 
 const VALID_SOURCES = ["match", "directory", "profile"] as const;
@@ -123,7 +124,15 @@ export async function POST(req: NextRequest) {
         : null;
     const { error: clickErr } = await supabaseAdmin
       .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type: "site_message", source: safeSource, session_id: sessionId, ...sanitizeAttribution(body) });
+      .insert({
+        therapist_id,
+        click_type: "site_message",
+        source: safeSource,
+        session_id: sessionId,
+        // a message is a message, never a repeat to skip - but where it was written from is worth knowing
+        device: deviceClass(req.headers.get("user-agent")),
+        ...sanitizeAttribution(body),
+      });
     if (clickErr) console.error("therapist_contact_clicks (site_message) insert failed:", clickErr.message);
 
     // CRM lead capture - best-effort; a failure here must never surface to the

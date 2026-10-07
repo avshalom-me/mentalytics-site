@@ -14,6 +14,7 @@ import { isPaidVisitor } from "@/app/lib/paid-visitor";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { clickSignals } from "@/app/lib/click-signals";
 import { bioSnippet } from "@/app/lib/bio-snippet";
 import { waLinkFor, telHref } from "@/app/lib/phone";
 import { trackingOptedOut } from "@/app/lib/track-optout";
@@ -36,6 +37,7 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone" | "emai
       click_type: clickType,
       source: "directory",
       session_id: getOrCreateSessionId(),
+      ...clickSignals(),
       ...(getAttribution() ?? {}),
     }),
   }).catch(() => {});

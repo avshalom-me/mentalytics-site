@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
+import { readClickSignals } from "@/app/lib/click-signals";
+
+// 6/10/2026: one visitor tapped "call" on a profile 14 times in 34 seconds and each
+// tap became a row, so one person read as fourteen inquiries on the therapist's own
+// dashboard and in every admin count. A repeat of the same button by the same visit
+// within this window is skipped. The first tap is always kept, so a therapist with
+// any contact still has one (the refund guarantee only asks "none, or at least one").
+// Two minutes covers the whole burst and still counts a second attempt after a real
+// pause. Rows from before 7/10/2026 are raw and were not changed.
+const CLICK_DEDUPE_SECONDS = 120;
 
 const VALID_TYPES = ["whatsapp", "phone", "email", "site_message"] as const;
 // Surfaces a contact can be initiated from. "profile" was allowed by the DB
@@ -96,15 +106,34 @@ export async function POST(req: NextRequest) {
       if (landed?.referrer_host) attribution.referrer_host = landed.referrer_host;
     }
 
-    const { error } = await supabaseAdmin
-      .from("therapist_contact_clicks")
-      .insert({ therapist_id, click_type, source: safeSource, session_id: safeSessionId, ...attribution });
+    // Who clicked: the device from the request's User-Agent, and whether the browser
+    // says it is automation-controlled. Stored with the click so the next burst can
+    // be told apart (a person on a desktop whose tel: link did nothing, or a tool).
+    const { device, automated } = readClickSignals(body, req.headers.get("user-agent"));
+
+    // The skip-and-insert is one database function, not a select followed by an
+    // insert here: a burst can put two requests there within microseconds of each
+    // other (6/10: two rows 66 microseconds apart), and both would pass a plain check.
+    const { data: recorded, error } = await supabaseAdmin.rpc("record_contact_click", {
+      p_therapist_id: therapist_id,
+      p_click_type: click_type,
+      p_source: safeSource,
+      p_session_id: safeSessionId,
+      p_channel: attribution.channel,
+      p_utm_source: attribution.utm_source,
+      p_utm_medium: attribution.utm_medium,
+      p_utm_campaign: attribution.utm_campaign,
+      p_referrer_host: attribution.referrer_host,
+      p_device: device,
+      p_automated: automated,
+      p_window_seconds: CLICK_DEDUPE_SECONDS,
+    });
 
     if (error) {
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, ...(recorded === false ? { deduped: true } : {}) });
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid request" }, { status: 400 });
   }

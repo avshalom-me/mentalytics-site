@@ -8,6 +8,7 @@ import { waLinkFor, waLinkForCenter, telHref } from "@/app/lib/phone";
 import { gaEvent } from "@/app/lib/gtag";
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { clickSignals } from "@/app/lib/click-signals";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import SiteMessageModal from "@/app/therapists/SiteMessageModal";
 import CenterWhatsAppLink from "@/app/centers/[slug]/CenterWhatsAppLink";
@@ -35,6 +36,7 @@ function trackClick(therapistId: string, clickType: "whatsapp" | "phone") {
       click_type: clickType,
       source: "directory",
       session_id: getOrCreateSessionId(),
+      ...clickSignals(),
       ...(getAttribution() ?? {}),
     }),
   }).catch(() => {});

@@ -2,6 +2,7 @@
 
 import { getAttribution } from "@/app/lib/attribution";
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { clickSignals } from "@/app/lib/click-signals";
 import { gaEvent } from "@/app/lib/gtag";
 import { waLinkFor, waLinkForCenter, type CenterLine } from "@/app/lib/phone";
 import { trackingOptedOut } from "@/app/lib/track-optout";
@@ -76,6 +77,7 @@ export default function MatchCardWhatsApp({
         click_type: "whatsapp",
         source: "match",
         session_id: getOrCreateSessionId(),
+        ...clickSignals(),
         ...attribution,
       }),
     }).catch(() => {});

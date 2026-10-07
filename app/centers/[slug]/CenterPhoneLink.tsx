@@ -1,6 +1,7 @@
 "use client";
 
 import { getOrCreateSessionId } from "@/app/lib/session";
+import { clickSignals } from "@/app/lib/click-signals";
 import { getAttribution } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
 import { trackingOptedOut } from "@/app/lib/track-optout";
@@ -36,6 +37,7 @@ export default function CenterPhoneLink({ entityId, centerId, phone, className, 
             click_type: "phone",
             source: "profile",
             session_id: getOrCreateSessionId(),
+            ...clickSignals(),
             ...(getAttribution() ?? {}),
           }),
         }).catch(() => {});
