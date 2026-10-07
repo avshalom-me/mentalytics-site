@@ -64,6 +64,11 @@ ARROW = ('<svg width="34" height="34" viewBox="0 0 24 24"><path d="M19 12H5M11 6
 # on 6/10/2026 to leave the terms as they are.
 REFUND = "אם אין פניות מתאימות בתוך 60 יום מקבלים החזר מלא."
 
+# The owner's sentence about the size of the directory (7/10/2026), broken after its comma.
+# Behind it, measured that day: 243 therapists listed, and 25,735 therapist-card impressions in
+# the 30 days before. The join page says the same (app/lib/plan-evidence.ts).
+SCALE = "במאגר מאות מטפלים,<br>ועשרות אלפי צפיות כרטיס של מטופלים בחודש"
+
 
 def head():
     return HEAD.replace("%(logo)s", LOGO)
@@ -83,22 +88,24 @@ def recruit():
     rows = ""
     for n, t in enumerate(steps, 1):
         last = n == len(steps)
-        rows += ('<div style="display:flex;align-items:center;gap:26px;padding:11px 30px' +
+        rows += ('<div style="display:flex;align-items:center;gap:26px;padding:8px 30px' +
                  (';border-top:2px solid var(--line)' if n > 1 else '') + '">'
-                 '<div style="flex:none;width:64px;height:64px;border-radius:50%;background:' +
+                 '<div style="flex:none;width:58px;height:58px;border-radius:50%;background:' +
                  ("var(--gold)" if last else "var(--teal)") +
-                 ';color:#fff;font-size:38px;font-weight:900;display:flex;align-items:center;justify-content:center">' + str(n) + '</div>'
-                 '<div style="font-size:39px;font-weight:' + ("900" if last else "800") + ';color:' +
+                 ';color:#fff;font-size:35px;font-weight:900;display:flex;align-items:center;justify-content:center">' + str(n) + '</div>'
+                 '<div style="font-size:37px;font-weight:' + ("900" if last else "800") + ';color:' +
                  ("var(--text)" if last else "var(--text-2)") + '">' + t + '</div></div>')
     return head() + """
 <div class="who">פסיכולוגית/עו״ס/מטפלת?</div>
-<h1 style="font-size:74px">פניות שמתאימות<br><em>לשיטת הטיפול שלך.</em></h1>
-<div class="card" style="width:100%;margin-top:28px;padding:8px 0">""" + rows + """</div>
-<div style="width:100%;margin-top:6px">""" + checks([
+<h1 style="font-size:70px">פניות שמתאימות<br><em>לשיטת הטיפול שלך.</em></h1>
+<div class="card" style="width:100%;margin-top:22px;padding:4px 0">""" + rows + """</div>
+<div style="width:100%;margin-top:14px;background:var(--gold-pale);border:2px solid #F0DDB0;border-radius:26px;padding:15px 28px;
+ font-size:34px;line-height:1.35;font-weight:800;color:var(--gold-dark);text-align:center">""" + SCALE + """</div>
+<div style="width:100%">""" + checks([
         "שאלון שפיתחו פסיכולוגים וחוקרים",
         "מסלול חינמי, ומסלול מקודם",
     ]) + """</div>
-<div style="font-size:31px;font-weight:700;color:var(--teal-dark);text-align:center;margin:22px 0 26px">""" + REFUND + """</div>
+<div style="font-size:31px;font-weight:700;color:var(--teal-dark);text-align:center;margin:16px 0 20px">""" + REFUND + """</div>
 """ + foot("לפרטים והצטרפות")
 
 
