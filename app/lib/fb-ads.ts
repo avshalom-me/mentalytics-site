@@ -48,6 +48,10 @@ export type FbFunnelRow = {
   quiz_completed?: number;
   viewed_profile?: number;
   contacting_people?: number;
+  /** Sessions that pressed a register button of a recruitment page (recruit_cta_click). */
+  recruit_cta_clicks?: number;
+  /** Sessions that saw the register screen of the login page (recruit_register_view). */
+  recruit_register_views?: number;
 };
 
 /** A row of the recruitment report (/api/admin-therapist-campaigns). */
@@ -100,6 +104,10 @@ export function buildFbAdsReport(funnel: FbFunnelRow[], recruit: FbRecruitRow[])
         // a visitor who landed on another page with the ad's tag.
         visits: Math.max(Number(r?.visitors ?? 0), sessions),
         steps: [
+          // Between arriving and signing up: pressed the button, saw the form.
+          // Both are zero for the days before 8/10/2026, when nothing measured them.
+          { label: "לחצו על הרשמה", value: Number(f?.recruit_cta_clicks ?? 0) },
+          { label: "הגיעו למסך ההרשמה", value: Number(f?.recruit_register_views ?? 0) },
           { label: "נרשמו", value: Number(r?.signups ?? 0) },
           { label: "אושרו", value: Number(r?.approved ?? 0) },
           { label: "במסלול המקודם", value: Number(r?.paying ?? 0) },

@@ -6,10 +6,16 @@ import { captureAttribution, getAttribution } from "./attribution";
 import { trackingOptedOut } from "./track-optout";
 import { gaEvent } from "./gtag";
 import { tfaEvent } from "./taboola";
+import { isRecruitRegisterHref, scrollPercent } from "./recruit-cta";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "recruit_cta_click" | "recruit_register_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
 
-function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
+/**
+ * keepalive: for an event sent at the moment the visitor leaves the page (a
+ * press on a link that opens another site's tab or a full page load), so the
+ * browser finishes the request after the page is gone. Off for everything else.
+ */
+function sendTrack(event_type: EventType, extra?: Record<string, unknown>, opts?: { keepalive?: boolean }) {
   if (trackingOptedOut()) return; // מכשיר של הצוות - לא מזהמים את הנתונים
   const session_id = getOrCreateSessionId();
   const attribution = getAttribution() ?? {};
@@ -17,6 +23,7 @@ function sendTrack(event_type: EventType, extra?: Record<string, unknown>) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ event_type, session_id, ...attribution, ...extra }),
+    ...(opts?.keepalive ? { keepalive: true } : {}),
   }).catch(() => {});
 }
 
@@ -326,6 +333,65 @@ export function useRecruitPageView(page: string) {
     captureAttribution();
     sendTrack("recruit_page_view", { source: page, metadata: { page } });
   }, [page]);
+}
+
+/**
+ * A press on a "register" button of a recruitment page. The page view above
+ * was the only thing measured there, so of the visitors an ad brought nobody
+ * could say how many pressed the button and left at the next screen.
+ *
+ * One listener on the document instead of a wrapper around each link: the
+ * recruitment pages are server components full of plain links, and a button
+ * added tomorrow is counted with no change here. `position` is which register
+ * button on the page it was (1 = the first, the one above the fold) and
+ * `scroll_pct` how far down the page the visitor was, so "the top button wins"
+ * and "they press only after reading" can both be read later.
+ */
+export function useRecruitCtaClicks(page: string) {
+  useEffect(() => {
+    const isRegister = (el: Element) => isRecruitRegisterHref(el.getAttribute("href"), window.location.origin);
+    const onClick = (event: MouseEvent) => {
+      const link = (event.target as Element | null)?.closest?.("a[href]");
+      if (!link || !isRegister(link)) return;
+      const registerLinks = Array.from(document.querySelectorAll("a[href]")).filter(isRegister);
+      sendTrack(
+        "recruit_cta_click",
+        {
+          source: page,
+          metadata: {
+            page,
+            position: registerLinks.indexOf(link) + 1,
+            scroll_pct: scrollPercent(window.scrollY, document.documentElement.scrollHeight, window.innerHeight),
+            device: deviceBucket(),
+          },
+        },
+        { keepalive: true }
+      );
+    };
+    document.addEventListener("click", onClick);
+    return () => document.removeEventListener("click", onClick);
+  }, [page]);
+}
+
+/**
+ * The register screen of the therapist login page was shown. Fires once per
+ * page load, when the screen is on its register tab: opened by a recruitment
+ * page's button (?mode=register) or switched to with "new here?" on the page
+ * itself. Next to recruit_cta_click it says how many who pressed the button
+ * actually reached the form, and next to the signups how many who reached it
+ * went through.
+ */
+export function useRecruitRegisterView(active: boolean) {
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!active || sent.current) return;
+    sent.current = true;
+    captureAttribution();
+    sendTrack("recruit_register_view", {
+      source: "therapists-login",
+      metadata: { page: "therapists-login", mode: "register", device: deviceBucket() },
+    });
+  }, [active]);
 }
 
 export function useFilterTrack() {

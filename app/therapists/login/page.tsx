@@ -5,6 +5,7 @@ import { supabase } from "@/app/lib/supabaseClient";
 import Link from "next/link";
 import { BarChart2, ShieldCheck, Users, LogIn, UserPlus, MailCheck } from "lucide-react";
 import { NEWSLETTER_CONSENT_TEXT, NEWSLETTER_CONSENT_VERSION } from "@/app/lib/consent";
+import { useRecruitRegisterView } from "@/app/lib/useTrack";
 
 type Mode = "login" | "register" | "reset";
 
@@ -38,6 +39,10 @@ function TherapistLoginContent() {
     // Arriving from a completed password reset (all sessions were revoked there).
     setResetDone(sp.get("reset") === "success");
   }, []);
+
+  // The register tab was shown: the step between pressing the button on a
+  // recruitment page and a signup (see recruit_register_view in useTrack).
+  useRecruitRegisterView(mode === "register");
 
   const resetSuccess = resetDone && mode === "login";
 

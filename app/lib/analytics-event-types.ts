@@ -1,6 +1,6 @@
 // רשימת סוגי האירועים הקנונית של analytics_events - מקור אמת אחד בקוד.
 // חייבת להתאים ל-CHECK constraint בבסיס הנתונים (המיגרציה האחרונה שעדכנה
-// אותו: 20260813_quiz_treatments_event.sql). אירוע חדש = להוסיף כאן + מיגרציה
+// אותו: 20261008_recruit_funnel_events.sql). אירוע חדש = להוסיף כאן + מיגרציה
 // שמרחיבה את ה-constraint; שומר הלילה משווה את הרשימה הזו מול ה-DB כל לילה,
 // כך שהוספה כאן בלי מיגרציה נתפסת תוך יום (הדריפט שכבר "בלע" אירועים פעמיים).
 //
@@ -17,6 +17,11 @@ export const ANALYTICS_EVENT_TYPES = [
   "recommendation_explain_click",
   "match_free_fallback",
   "recruit_page_view",
+  // המשך המשפך של עמוד גיוס (8/10/26): לחיצה על כפתור "פתחו פרופיל" והגעה
+  // למסך ההרשמה. עד אז נמדדה רק כניסה לעמוד, ולא ידענו כמה לחצו ועזבו.
+  // מיגרציה: 20261008_recruit_funnel_events.sql
+  "recruit_cta_click",
+  "recruit_register_view",
   "therapist_explain_click",
   "matching_click",
   // שליחת החיפוש בפועל (matching_click = הטופס נפתח). נושא את האזור שנבחר,

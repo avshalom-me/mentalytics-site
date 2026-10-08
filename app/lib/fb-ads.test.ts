@@ -58,7 +58,31 @@ describe("the per-ad report", () => {
     );
     const ad = report.find((r) => r.campaign === "fb-recruit-image")!;
     expect(ad.visits).toBe(40);
-    expect(ad.steps.map((s) => s.value)).toEqual([3, 2, 1]);
+    expect(ad.steps.map((s) => s.value)).toEqual([0, 0, 3, 2, 1]);
+  });
+
+  it("puts the press on the register button and the register screen between arriving and signing up", () => {
+    const report = buildFbAdsReport(
+      [{ campaign: "fb-recruit-video", sessions: 20, recruit_cta_clicks: 6, recruit_register_views: 5 }],
+      [{ campaign: "fb-recruit-video", visitors: 20, signups: 1, approved: 0, paying: 0 }]
+    );
+    const ad = report.find((r) => r.campaign === "fb-recruit-video")!;
+    expect(ad.steps).toEqual([
+      { label: "לחצו על הרשמה", value: 6 },
+      { label: "הגיעו למסך ההרשמה", value: 5 },
+      { label: "נרשמו", value: 1 },
+      { label: "אושרו", value: 0 },
+      { label: "במסלול המקודם", value: 0 },
+    ]);
+  });
+
+  it("does not give a patients' ad the recruitment steps", () => {
+    const report = buildFbAdsReport(
+      [{ campaign: "fb-patients-image", sessions: 10, recruit_cta_clicks: 3, recruit_register_views: 3 }],
+      []
+    );
+    const ad = report.find((r) => r.campaign === "fb-patients-image")!;
+    expect(ad.steps.map((s) => s.label)).toEqual(["התחילו שאלון", "סיימו שאלון", "צפו בפרופיל מטפל", "פנו למטפל"]);
   });
 
   it("shows an unlisted fb- campaign after the listed ones, on the side its name says", () => {
