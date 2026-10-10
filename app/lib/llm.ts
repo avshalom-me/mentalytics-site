@@ -123,8 +123,9 @@ function primaryProvider(): LlmProvider {
 // ── תקרת הקרדיט ─────────────────────────────────────────────────────────
 
 const BUDGET_USD = Number(process.env.LLM_CREDIT_BUDGET_USD ?? "90");
-// היום בחודש שבו הקרדיט מתחדש (מחזור החיוב של המנוי), לא ה-1 בחודש.
-const RESET_DAY = Math.min(28, Math.max(1, Number(process.env.LLM_CREDIT_RESET_DAY ?? "1")));
+// היום בחודש שבו הקרדיט מתחדש = מחזור החיוב של מנוי ה-Max (הקבלה מגיעה ב-18
+// לחודש), לא ה-1 בחודש. אם המנוי יעבור למועד אחר - LLM_CREDIT_RESET_DAY.
+const RESET_DAY = Math.min(28, Math.max(1, Number(process.env.LLM_CREDIT_RESET_DAY ?? "18")));
 const SPEND_CACHE_MS = 5 * 60_000;
 let spendCache: { at: number; usd: number } | null = null;
 
