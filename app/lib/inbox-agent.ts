@@ -414,14 +414,17 @@ async function loadClickReport(subject: ReportSubject): Promise<ClickReport> {
  * כרונולוגי), ואז חילופים קודמים בשרשורים אחרים. הטבלה כבר מחזיקה את
  * הכול, כולל מה שיובא מההיסטוריה, כך שאין צורך בקריאת Gmail נוספת.
  */
-async function senderHistory(email: string, threadId: string, excludeId: string): Promise<string> {
-  const { data } = await supabaseAdmin
+async function senderHistory(email: string, threadId: string, excludeId: string, before?: string): Promise<string> {
+  let q = supabaseAdmin
     .from("inbox_messages")
     .select("gmail_thread_id, subject, body_text, final_body, status, received_at")
     .eq("from_email", email)
     .neq("id", excludeId)
     .order("received_at", { ascending: false })
     .limit(10);
+  // למבחן איכות על פנייה מהעבר: רק מה שקדם לה, אחרת התשובה שלנו לאותו שרשור דולפת פנימה.
+  if (before) q = q.lt("received_at", before);
+  const { data } = await q;
   const rows = data ?? [];
   if (rows.length === 0) return "";
 
@@ -646,7 +649,7 @@ export async function buildInboxDraftPrompt(
 ): Promise<{ system: string; user: string }> {
   const [shots, history, rules] = await Promise.all([
     exemplars(opts.knowledgeBefore),
-    senderHistory(row.from_email, row.gmail_thread_id, row.id),
+    senderHistory(row.from_email, row.gmail_thread_id, row.id, opts.knowledgeBefore),
     // כלל שנכשל בטעינה לא מפיל טיוטה - היא פשוט נכתבת בלי הכללים.
     approvedLessonRules(opts.knowledgeBefore).catch(() => [] as string[]),
   ]);
