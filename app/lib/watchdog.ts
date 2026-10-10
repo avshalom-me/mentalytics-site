@@ -3,6 +3,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun, syncAgentAlerts, agentEnabled } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
 import { ANALYTICS_EVENT_TYPES } from "./analytics-event-types";
+import { anthropicCycleSpendUsd, llmCreditBudget } from "./llm";
 
 // שומר הלילה (סוכן 2): בדיקות תקינות ליליות של המסלולים הקריטיים, מול
 // האתר החי (HTTP אמיתי - בדיוק מה שמטופל רואה, לא קריאת פונקציות פנימית).
@@ -151,6 +152,59 @@ async function eventConstraintCheck(): Promise<WatchdogCheck> {
     detail = e instanceof Error ? e.message : String(e);
   }
   return { key: "db_event_constraint", label: "התאמת סוגי אירועי אנליטיקה", ok, detail, ms: Date.now() - started };
+}
+
+// --- מודלי שפה: קריאות שנפלו לגיבוי, והתקרבות לתקרת הקרדיט ---
+//
+// הגיבוי ל-OpenAI הוא מה שמונע מסוכן השירות להפסיק לנסח כשהקרדיט נגמר, אבל
+// הוא גם מסתיר את זה: בלי הבדיקה הזו אף אחד לא יודע שהאתר רץ על הגיבוי.
+
+async function llmFallbackCheck(): Promise<WatchdogCheck> {
+  const started = Date.now();
+  let ok = false;
+  let detail = "";
+  try {
+    const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
+    const { data, error } = await supabaseAdmin
+      .from("llm_calls")
+      .select("feature, fallback_from, ok")
+      .gte("created_at", since)
+      .not("fallback_from", "is", null);
+    if (error) {
+      detail = `שגיאת מסד: ${error.message}`;
+    } else if ((data ?? []).length === 0) {
+      ok = true;
+      detail = "תקין";
+    } else {
+      const byReason = new Map<string, number>();
+      for (const r of data ?? []) {
+        const k = String(r.fallback_from);
+        byReason.set(k, (byReason.get(k) ?? 0) + 1);
+      }
+      detail = `${(data ?? []).length} קריאות ב-24 שעות נענו מהגיבוי (OpenAI): ${[...byReason]
+        .map(([k, n]) => `${n} אחרי ${k === "budget" ? "תקרת הקרדיט" : `כשל ב-${k}`}`)
+        .join(", ")}`;
+    }
+  } catch (e) {
+    detail = e instanceof Error ? e.message : String(e);
+  }
+  return { key: "llm_fallback", label: "מודל השפה הראשי עונה (בלי גיבוי)", ok, detail, ms: Date.now() - started };
+}
+
+async function llmBudgetCheck(): Promise<WatchdogCheck> {
+  const started = Date.now();
+  let ok = false;
+  let detail = "";
+  try {
+    const { budgetUsd, cycleStart } = llmCreditBudget();
+    const spent = await anthropicCycleSpendUsd();
+    const share = budgetUsd > 0 ? spent / budgetUsd : 0;
+    ok = share < 0.8;
+    detail = `הוצאה על Claude מאז ${cycleStart.slice(0, 10)}: $${spent.toFixed(2)} מתוך תקרה של $${budgetUsd} (${Math.round(share * 100)}%)`;
+  } catch (e) {
+    detail = e instanceof Error ? e.message : String(e);
+  }
+  return { key: "llm_budget", label: "קרדיט מודלי השפה מתחת ל-80%", ok, detail, ms: Date.now() - started };
 }
 
 async function freshnessCheck(
@@ -355,6 +409,9 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     eventConstraintCheck(),
     // פניות שנשלחו אך לא נרשמו - אותה משפחה של כשל שקט
     leadCaptureCheck(),
+    // מודלי שפה: ריצה על הגיבוי או קרדיט שעומד להיגמר - שניהם שקטים בלי זה
+    llmFallbackCheck(),
+    llmBudgetCheck(),
     // טריות קרונים. בקר הבוקר: אם כובה במתג - הבדיקה מדלגת במקום להתריע
     // על כיבוי מכוון (ממצא ביקורת: שני מנגנוני הבטיחות התנגשו).
     // הסוכנים שומרים זה על זה: כל סוכן יומי נבדק ל-26 שעות, ופערי ההיצע

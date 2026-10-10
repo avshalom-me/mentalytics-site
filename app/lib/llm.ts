@@ -135,6 +135,11 @@ function cycleStart(now = new Date()): string {
   return start.toISOString();
 }
 
+/** התקרה שהשכבה עובדת לפיה - לשומר הלילה ולתצוגה. */
+export function llmCreditBudget(): { budgetUsd: number; resetDay: number; cycleStart: string } {
+  return { budgetUsd: BUDGET_USD, resetDay: RESET_DAY, cycleStart: cycleStart() };
+}
+
 /** הוצאה על Claude במחזור הקרדיט הנוכחי, לפי llm_calls. נשמר 5 דקות בזיכרון. */
 export async function anthropicCycleSpendUsd(): Promise<number> {
   if (spendCache && Date.now() - spendCache.at < SPEND_CACHE_MS) return spendCache.usd;
