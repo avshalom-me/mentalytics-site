@@ -245,7 +245,10 @@ ALTER TABLE my_new_table ENABLE ROW LEVEL SECURITY;
 | משתנה | תפקיד |
 |--------|-------|
 | `RESEND_API_KEY` | שליחת מיילים (טופס יצירת קשר) |
-| `OPENAI_API_KEY` | סוכן AI לסיכום חיבור מטפל-מטופל |
+| `ANTHROPIC_API_KEY` | הספק הראשי של כל מודלי השפה באתר (`app/lib/llm.ts`): טיוטות סוכן השירות, לקחים, דוחות, הסברי ההתאמה, ניתוח נשירה, משוב פרופיל. רץ על הקרדיט החודשי של מנוי Claude Max (מ-10/10/2026) |
+| `OPENAI_API_KEY` | גיבוי לכל קריאה שנכשלת ב-Anthropic (קרדיט שנגמר, תקלה, סירוב) ויצירת תמונות למודעות. בלי המפתח הזה כשל ב-Anthropic נשאר כשל |
+| `LLM_CREDIT_BUDGET_USD` | תקרת הוצאה על Anthropic במחזור קרדיט (ברירת מחדל 90); מעבר לה הקריאות עוברות לגיבוי. `LLM_CREDIT_RESET_DAY` = היום בחודש שבו הקרדיט מתחדש |
+| `LLM_PRIMARY` | `openai` מחזיר את כל האתר ל-OpenAI בלי שינוי קוד. `LLM_MODEL_DEEP/STANDARD/FAST/CLASSIFY` ו-`LLM_FALLBACK_*` דורסים את המודל לכל רמה |
 | `ADMIN_USERNAME` | אדמין UI |
 | `ADMIN_PASSWORD` | אדמין UI. הוחלפה ב-2/10/2026. הערך נשמר רק ב-Vercel וב-`.env.local`, ולא נכתב במסמכים, בקוד או בהודעות קומיט. אותיות אנגליות, ספרות ומקפים בלבד: ה-middleware מפענח עם `atob`, וסיסמה בעברית לא תתאים |
 

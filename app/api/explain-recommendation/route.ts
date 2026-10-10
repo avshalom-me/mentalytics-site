@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
-import OpenAI from "openai";
+import { llmJson } from "@/app/lib/llm";
 import { getTreatmentRationale } from "@/app/lib/treatment-rationale";
 
 // Produces a personalised explanation of why a specific treatment / referral
@@ -11,8 +11,6 @@ import { getTreatmentRationale } from "@/app/lib/treatment-rationale";
 // The client is responsible for sanitising the user's questionnaire data and
 // sending only derived "facts" (scores, flags, derived severity) — never raw
 // free-text fields like trauma descriptions.
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 // ── Input schema ──────────────────────────────────────────────────────────────
 
@@ -58,8 +56,10 @@ type ExplainResponse = {
 };
 
 // Fixed disclaimer — set server-side so the model never has to echo it.
+// גילוי נאות: ההסבר נכתב על ידי מודל שפה (תנאי השימוש של ספק המודל בתחום
+// הבריאות דורשים לומר זאת), ואינו אבחון.
 const EVIDENCE_NOTE =
-  "ההסבר מבוסס על תשובותיך לשאלון בלבד ואינו מהווה אבחון או המלצה רפואית.";
+  "ההסבר נוסח על ידי בינה מלאכותית על בסיס תשובותיך לשאלון בלבד, ואינו מהווה אבחון או המלצה רפואית.";
 
 // The title is a fixed template (the prompt used to ask the model for the
 // same string) — built server-side for both the AI and fallback paths.
@@ -162,76 +162,40 @@ function buildSystemPrompt(body: Body): string {
 }
 
 // The model returns ONLY the explanation text; title + evidence_note are built
-// server-side. strict json_schema constrains decoding, so a response with
-// missing/renamed keys (seen in production with plain json_object mode) cannot
-// be generated.
-const RESPONSE_FORMAT = {
-  type: "json_schema",
-  json_schema: {
-    name: "recommendation_explanation",
-    strict: true,
-    schema: {
-      type: "object",
-      properties: { explanation: { type: "string" } },
-      required: ["explanation"],
-      additionalProperties: false,
-    },
-  },
-} as const;
+// server-side. The schema constrains decoding (structured outputs), so a
+// response with missing/renamed keys (seen in production with plain
+// json_object mode) cannot be generated.
+const ExplanationSchema = z.object({ explanation: z.string() });
 
-// The API call succeeded but the content is unusable (refusal, truncation,
-// bad JSON) — the one case worth a single retry; transport errors are already
-// retried inside the SDK.
+// The call succeeded but the content is unusable (empty explanation) — the
+// one case worth a single retry; transport errors and provider fallback are
+// handled inside the LLM layer.
 class BadAiResponseError extends Error {}
 
-async function callOpenAIOnce(body: Body): Promise<ExplainResponse> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 800,
-    temperature: 0.4,
-    response_format: RESPONSE_FORMAT,
-    messages: [
-      { role: "system", content: buildSystemPrompt(body) },
-      { role: "user", content: buildPrompt(body) },
-    ],
-  });
-
-  const choice = response.choices[0];
-  const content = choice?.message?.content ?? "";
-  const diag = `finish_reason=${choice?.finish_reason ?? "none"}, refusal=${
-    choice?.message?.refusal ? "yes" : "no"
-  }, content_length=${content.length}`;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(content);
-  } catch {
-    throw new BadAiResponseError(`OpenAI response was not valid JSON (${diag})`);
-  }
-
-  const fields = (
-    typeof parsed === "object" && parsed !== null ? parsed : {}
-  ) as Partial<ExplainResponse>;
-  if (typeof fields.explanation !== "string" || fields.explanation.trim() === "") {
-    throw new BadAiResponseError(
-      `OpenAI response missing required fields (keys=[${Object.keys(fields).join(",")}], ${diag})`
-    );
+async function callAiOnce(body: Body): Promise<ExplainResponse> {
+  // Public button, latency matters: the "fast" tier (Sonnet, low effort).
+  const { data, model } = await llmJson(
+    { feature: "explain_recommendation", tier: "fast", system: buildSystemPrompt(body), user: buildPrompt(body), maxTokens: 800 },
+    ExplanationSchema,
+  );
+  if (data.explanation.trim() === "") {
+    throw new BadAiResponseError(`empty explanation from ${model}`);
   }
 
   return {
     title: buildTitle(body),
-    explanation: fields.explanation,
+    explanation: data.explanation,
     evidence_note: EVIDENCE_NOTE,
   };
 }
 
-async function callOpenAI(body: Body): Promise<ExplainResponse> {
+async function callAi(body: Body): Promise<ExplainResponse> {
   try {
-    return await callOpenAIOnce(body);
+    return await callAiOnce(body);
   } catch (err) {
     if (!(err instanceof BadAiResponseError)) throw err;
-    console.warn("[explain-recommendation] unusable OpenAI content, retrying once:", err.message);
-    return callOpenAIOnce(body);
+    console.warn("[explain-recommendation] unusable model content, retrying once:", err.message);
+    return callAiOnce(body);
   }
 }
 
@@ -273,10 +237,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const body = parsed.data;
 
     try {
-      const explanation = await callOpenAI(body);
+      const explanation = await callAi(body);
       return NextResponse.json(explanation, { status: 200 });
     } catch (aiErr) {
-      console.error("[explain-recommendation] OpenAI call failed, using fallback:", aiErr);
+      console.error("[explain-recommendation] model call failed, using fallback:", aiErr);
       const fallback = buildMockExplanation(body);
       return NextResponse.json(fallback, { status: 200 });
     }

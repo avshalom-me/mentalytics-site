@@ -1,5 +1,6 @@
 import "server-only";
-import OpenAI from "openai";
+import { z } from "zod";
+import { llmConfigured, llmJson } from "./llm";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { INBOX_KNOWLEDGE } from "./inbox-knowledge";
 import { cleanLessonRule, parseLessons, sameRule } from "./inbox-lessons-parse";
@@ -16,16 +17,11 @@ import { cleanLessonRule, parseLessons, sameRule } from "./inbox-lessons-parse";
 // ממתינים באדמין → אישור (אפשר לערוך) או דחייה → כלל מאושר נכנס לכל טיוטה
 // מאז, לצמיתות, עד שמסירים אותו. שום כלל לא משפיע על טיוטה בלי אישור.
 
-// מודל חשיבה ולא gpt-4o: החילוץ נדיר (תשובה ערוכה אחת בכמה ימים), אבל כל
-// שיפוט בו גורף - כלל מאושר נכנס לכל טיוטה. בבדיקה על 7 התיקונים הקיימים
-// gpt-4o הפך החזר מותנה לגורף ("לאשר החזר בכל ביטול") והציע כפילויות של
-// בסיס הידע גם כשהתבקש לדלג עליהן.
-const LESSON_MODEL = process.env.AGENT_INBOX_LESSON_MODEL ?? "gpt-5.5";
-const LESSON_EFFORT = (process.env.AGENT_INBOX_LESSON_EFFORT ?? "medium") as
-  | "minimal"
-  | "low"
-  | "medium"
-  | "high";
+// הרמה ה"עמוקה" של שכבת המודלים (llm.ts) ולא מודל רגיל: החילוץ נדיר (תשובה
+// ערוכה אחת בכמה ימים), אבל כל שיפוט בו גורף - כלל מאושר נכנס לכל טיוטה.
+// בבדיקה על 7 התיקונים הקיימים (9/26) gpt-4o הפך החזר מותנה לגורף ("לאשר
+// החזר בכל ביטול") והציע כפילויות של בסיס הידע גם כשהתבקש לדלג עליהן; מודל
+// חשיבה סימן סתירות אמיתיות.
 // תקרה לפרומפט. מעבר לה נכנסים החדשים - תיקון עדכני רלוונטי יותר.
 const MAX_RULES_IN_PROMPT = 60;
 // בריצה המתוזמנת זו רשת ביטחון בלבד (השליחה מחלצת מיד). מודל חשיבה לוקח
@@ -49,14 +45,19 @@ export type InboxLesson = {
   source_from: string | null;
 };
 
-/** הכללים המאושרים, לפרומפט של כל טיוטה - מהישן לחדש. */
-export async function approvedLessonRules(): Promise<string[]> {
-  const { data } = await supabaseAdmin
+/**
+ * הכללים המאושרים, לפרומפט של כל טיוטה - מהישן לחדש.
+ * before: רק כללים שנוצרו לפני רגע נתון (למבחן איכות על פניות עבר).
+ */
+export async function approvedLessonRules(before?: string): Promise<string[]> {
+  let q = supabaseAdmin
     .from("inbox_lessons")
     .select("rule")
     .eq("status", "approved")
     .order("created_at", { ascending: false })
     .limit(MAX_RULES_IN_PROMPT);
+  if (before) q = q.lt("created_at", before);
+  const { data } = await q;
   return (data ?? []).map((r) => String(r.rule)).reverse();
 }
 
@@ -194,6 +195,17 @@ const EXTRACT_PROMPT = [
   '{"lessons": [{"rule": "...", "why": "...", "already_in_facts": true/false, "conflicts_with_facts": "..."}]}',
 ].join("\n");
 
+const LessonsSchema = z.object({
+  lessons: z.array(
+    z.object({
+      rule: z.string(),
+      why: z.string(),
+      already_in_facts: z.boolean(),
+      conflicts_with_facts: z.string(),
+    }),
+  ),
+});
+
 const normalizeText = (s: string) => s.replace(/\s+/g, " ").trim();
 
 export type ExtractResult = { ok: boolean; created: number; skipped?: string; error?: string };
@@ -204,7 +216,7 @@ export type ExtractResult = { ok: boolean; created: number; skipped?: string; er
  * משחרר אותה, והריצה הבאה תנסה שוב.
  */
 export async function extractLessonsFor(messageId: string): Promise<ExtractResult> {
-  if (!process.env.OPENAI_API_KEY) return { ok: false, created: 0, error: "OPENAI_API_KEY חסר" };
+  if (!llmConfigured()) return { ok: false, created: 0, error: "לא מוגדר מפתח למודל שפה" };
 
   const { data: claimed, error: claimErr } = await supabaseAdmin
     .from("inbox_messages")
@@ -230,17 +242,13 @@ export async function extractLessonsFor(messageId: string): Promise<ExtractResul
       .limit(200);
     const existing = (existingRows ?? []).map((r) => String(r.rule));
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    // Responses API: מודלי חשיבה עובדים דרכו ודוחים temperature (כמו בדוח
-    // השבועי). בלי ניסיונות חוזרים - כשל משחרר את התפיסה והריצה הבאה תנסה.
-    const res = await openai.responses.create(
+    // בלי ניסיונות חוזרים - כשל משחרר את התפיסה והריצה הבאה תנסה.
+    const { data } = await llmJson(
       {
-        model: LESSON_MODEL,
-        reasoning: { effort: LESSON_EFFORT },
-        text: { format: { type: "json_object" } },
-        instructions: EXTRACT_PROMPT,
-        // ב-json_object ה-API דורש את המילה json בקלט עצמו, לא רק בהנחיות.
-        input:
+        feature: "inbox_lessons",
+        tier: "deep",
+        system: EXTRACT_PROMPT,
+        user:
           "הנתונים לניתוח. החזר json בלבד, במבנה שבהנחיות.\n" +
           JSON.stringify({
             facts: INBOX_KNOWLEDGE,
@@ -252,10 +260,14 @@ export async function extractLessonsFor(messageId: string): Promise<ExtractResul
             agent_draft: draft.slice(0, 3000),
             admin_final: final.slice(0, 3000),
           }),
+        maxTokens: 2_000,
+        timeoutMs: 120_000,
+        retries: 0,
       },
-      { timeout: 120_000, maxRetries: 0 }
+      LessonsSchema,
     );
-    const lessons = parseLessons(res.output_text ?? "").filter(
+    // אותו מפענח שנבדק (ניקוי, כפילויות, already_in_facts) - על המבנה שאומת.
+    const lessons = parseLessons(JSON.stringify(data)).filter(
       (l) => !existing.some((e) => sameRule(e, l.rule))
     );
     if (lessons.length > 0) {

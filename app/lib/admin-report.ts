@@ -1,6 +1,6 @@
 import "server-only";
 import { Resend } from "resend";
-import OpenAI from "openai";
+import { llmText } from "@/app/lib/llm";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { computeAttribution, type AttributionResult } from "@/app/lib/attribution-report";
 import { CHANNEL_LABELS } from "@/app/lib/attribution";
@@ -8,11 +8,8 @@ import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 // The reports run a few times a month (not per-user), so we can afford the
-// strongest reasoning model here. Isolated via env from the per-user agents.
-const REPORT_LLM_MODEL = process.env.REPORT_LLM_MODEL ?? "gpt-5.5";
-const REPORT_LLM_EFFORT = process.env.REPORT_LLM_EFFORT ?? "high";
+// "deep" tier of the LLM layer (Opus, high effort) - see app/lib/llm.ts.
 const REPORT_TO = alertRecipients();
 
 type Period = { since: string; until: string };
@@ -704,22 +701,23 @@ ${marketingCaveat}
 
 חשוב: דבר ישירות בלי מבוא, בלי "כמובן" / "בוודאי" / "אשמח". התחל מיד בחלק 1.`;
 
-  // Reasoning models work best via the Responses API and reject `temperature`.
   const SYSTEM = "אתה אנליסט מוצר ישראלי ענייני. אתה כותב עברית טבעית, ממוקדת מספרים וללא מליצות.";
   // Cap the call below the 300s function limit (aggregations run before this,
-  // email/DB after) and disable the SDK's default retries — a retry on a
-  // slow-but-eventually-fine call would blow the budget. On overrun this THROWS,
-  // caught by runReport → clean JSON error instead of a platform 504.
-  const response = await openai.responses.create(
-    {
-      model: REPORT_LLM_MODEL,
-      reasoning: { effort: REPORT_LLM_EFFORT as "minimal" | "low" | "medium" | "high" },
-      input: `${SYSTEM}\n\n${prompt}`,
-    },
-    { timeout: 240_000, maxRetries: 0 },
-  );
-
-  const text = response.output_text ?? "";
+  // email/DB after) and disable retries — a retry on a slow-but-eventually-fine
+  // call would blow the budget. Streamed, so a long reasoning pass does not hit
+  // an HTTP idle timeout. On overrun this THROWS, caught by runReport → clean
+  // JSON error instead of a platform 504.
+  const { text } = await llmText({
+    feature: "admin_report",
+    tier: "deep",
+    effort: "high",
+    system: SYSTEM,
+    user: prompt,
+    maxTokens: 6_000,
+    timeoutMs: 240_000,
+    retries: 0,
+    stream: true,
+  });
 
   const part2Split = text.split(/\*\*חלק 2.*?\*\*/);
   const summary = (part2Split[0] ?? text).replace(/\*\*חלק 1.*?\*\*/, "").trim();

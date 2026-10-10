@@ -1,5 +1,6 @@
 import "server-only";
-import OpenAI from "openai";
+import { z } from "zod";
+import { llmConfigured, llmJson } from "./llm";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
 import {
@@ -44,9 +45,9 @@ import { isCenterOnGift } from "./center-gift";
 // מקבלות את הדוגמאות האחרונות בפרומפט. אין fine-tuning - יש התכנסות
 // לניסוחים שאושרו בפועל.
 
-// gpt-4o ולא mini: הבדיקה הראשונה תפסה את mini מעוות עובדה מספרית
-// מבסיס הידע. בעשרות מיילים ביום ההפרש הוא אגורות - והטיוטות יוצאות לאנשים.
-const MODEL = process.env.AGENT_INBOX_LLM_MODEL ?? "gpt-4o";
+// הרמה ה"רגילה" של שכבת המודלים (llm.ts) ולא מודל קטן: הבדיקה הראשונה (8/26)
+// תפסה מודל קטן מעוות עובדה מספרית מבסיס הידע. בעשרות מיילים ביום ההפרש הוא
+// אגורות - והטיוטות יוצאות לאנשים.
 const MAX_DRAFTS_PER_RUN = 10;
 const MAX_EXTERNAL_CHECKS_PER_RUN = 20;
 const INGEST_WINDOW_DAYS = 7;
@@ -118,7 +119,7 @@ type ReportSubject = {
   centerEventsId: string | null;
 };
 
-type SenderContext = {
+export type SenderContext = {
   therapistId: string | null;
   contextText: string; // מוזרק לפרומפט; ריק אם הפונה לא זוהה
   /** הערה לאדמין בלבד, מוצמדת ל-draft_note ולא נכנסת לפרומפט. */
@@ -265,7 +266,7 @@ async function centerSender(email: string): Promise<SenderContext | null> {
   };
 }
 
-async function senderContext(email: string): Promise<SenderContext> {
+export async function senderContext(email: string): Promise<SenderContext> {
   // לא maybeSingle: אותו מייל יכול להופיע בכמה רשומות (רשומת בדיקה,
   // פרופיל כפול), ו-maybeSingle נכשל אז בשקט והפונה יצא "לא מזוהה".
   // מעדיפים את הפרופיל המקודם, ואחריו את הוותיק.
@@ -508,7 +509,20 @@ type Classified = {
   draft_subject: string;
   draft_body: string;
   note: string;
+  /** המודל שניסח בפועל (נשמר ב-draft_model; בגיבוי זה מודל ה-OpenAI). */
+  model: string;
 };
+
+// המבנה שהמודל מחזיר. ב-Claude הוא נאכף בפענוח (structured outputs), בגיבוי
+// הוא מאומת אחרי הפענוח - בשני המקרים תשובה עם שדה חסר לא מגיעה לכאן.
+const DraftSchema = z.object({
+  category: z.string(),
+  needs_reply: z.boolean(),
+  click_report: z.boolean(),
+  draft_subject: z.string(),
+  draft_body: z.string(),
+  note: z.string(),
+});
 
 /**
  * דוח הלחיצות נכנס לטיוטה כאן, אחרי המודל ולא דרכו: המודל רק ביקש אותו (או
@@ -575,14 +589,17 @@ const EXEMPLARS_PER_CATEGORY = 2;
 
 type Exemplar = { category: string; incoming: string; reply: string; draft_before_edit?: string };
 
-async function exemplars(): Promise<Exemplar[]> {
-  const { data } = await supabaseAdmin
+/** before: רק תשובות שנשלחו לפני רגע נתון - למבחן איכות על פניות עבר, בלי שהתשובה שלהן תדלוף לפרומפט. */
+async function exemplars(before?: string): Promise<Exemplar[]> {
+  let q = supabaseAdmin
     .from("inbox_messages")
     .select("category, subject, body_text, draft_body, final_body, replied_at")
     .eq("is_exemplar", true)
     .not("final_body", "is", null)
     .order("replied_at", { ascending: false })
     .limit(60);
+  if (before) q = q.lt("replied_at", before);
+  const { data } = await q;
 
   const flat = (s: string) => s.replace(/\s+/g, " ").trim();
   const perCategory = new Map<string, number>();
@@ -608,67 +625,82 @@ async function exemplars(): Promise<Exemplar[]> {
   return picked;
 }
 
+export type DraftPromptOptions = {
+  forceReply?: boolean;
+  forceClickReport?: boolean;
+  /**
+   * למבחן איכות על פנייה מהעבר: דוגמאות וכללים רק מלפני הרגע הזה, כך שהתשובה
+   * שנשלחה לאותה פנייה לא מופיעה בפרומפט שאמור לנחש אותה.
+   */
+  knowledgeBefore?: string;
+};
+
+/**
+ * הפרומפט של טיוטה אחת, בדיוק כפי שהסוכן שולח אותו. מיוצא כדי שמבחן איכות
+ * בין מודלים יריץ את אותו פרומפט ולא העתק שלו.
+ */
+export async function buildInboxDraftPrompt(
+  row: InboxRow,
+  ctx: SenderContext,
+  opts: DraftPromptOptions = {},
+): Promise<{ system: string; user: string }> {
+  const [shots, history, rules] = await Promise.all([
+    exemplars(opts.knowledgeBefore),
+    senderHistory(row.from_email, row.gmail_thread_id, row.id),
+    // כלל שנכשל בטעינה לא מפיל טיוטה - היא פשוט נכתבת בלי הכללים.
+    approvedLessonRules(opts.knowledgeBefore).catch(() => [] as string[]),
+  ]);
+  return {
+    system: SYSTEM_PROMPT,
+    user: JSON.stringify({
+      facts: INBOX_KNOWLEDGE,
+      ...(rules.length > 0 ? { rules_from_corrections: rules } : {}),
+      sender_context: ctx.contextText || "הפונה לא מזוהה במערכת.",
+      conversation_history: history || "אין התכתבות קודמת עם הפונה.",
+      approved_past_replies: shots,
+      ...(opts.forceReply ? { must_reply: true } : {}),
+      ...(opts.forceClickReport ? { must_attach_click_report: true } : {}),
+      incoming_email: {
+        from: `${row.from_name ?? ""} <${row.from_email}>`,
+        // פנייה מטופס באתר: הפונה מילא טופס, ולא "שלח לנו מייל".
+        ...(row.via_form ? { sent_through: SITE_FORM_LABELS[row.via_form as SiteForm] ?? "טופס באתר" } : {}),
+        subject: row.subject ?? "",
+        // מה שנכתב עכשיו בנפרד מהציטוט: הסיווג נעשה על הפנייה עצמה.
+        body: newText(row).slice(0, 6000),
+        quoted: quotedPart(row).slice(0, 2500),
+      },
+    }),
+  };
+}
+
 // onError: למה לא נוצרה טיוטה. עד 5/10/2026 כשל של המודל נרשם רק ב-console,
-// והפנייה נשארה "חדשה" בלי הסבר: כשיתרת ה-OpenAI נגמרת, הסוכן מפסיק לנסח,
+// והפנייה נשארה "חדשה" בלי הסבר: כשיתרת הספק נגמרת, הסוכן מפסיק לנסח,
 // הריצות נראות תקינות, ואף אחד לא יודע למה פניות מחכות.
 async function classifyAndDraft(
   row: InboxRow,
   ctx: SenderContext,
-  opts: { forceReply?: boolean; forceClickReport?: boolean; onError?: (message: string) => void } = {}
+  opts: DraftPromptOptions & { onError?: (message: string) => void } = {}
 ): Promise<Classified | null> {
-  if (!process.env.OPENAI_API_KEY) {
-    opts.onError?.("OPENAI_API_KEY לא מוגדר");
+  if (!llmConfigured()) {
+    opts.onError?.("לא מוגדר מפתח למודל שפה");
     return null;
   }
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-  const [shots, history, rules] = await Promise.all([
-    exemplars(),
-    senderHistory(row.from_email, row.gmail_thread_id, row.id),
-    // כלל שנכשל בטעינה לא מפיל טיוטה - היא פשוט נכתבת בלי הכללים.
-    approvedLessonRules().catch(() => [] as string[]),
-  ]);
+  const prompt = await buildInboxDraftPrompt(row, ctx, opts);
   try {
-    const res = await openai.chat.completions.create(
+    const { data: p, model } = await llmJson(
       {
-        model: MODEL,
+        feature: "inbox_draft",
+        tier: "standard",
+        system: prompt.system,
+        user: prompt.user,
         // 900 הספיקו לתשובה קצרה. פנייה עם כמה שאלות, ועוד ההסבר שמלווה את דוח
         // הלחיצות, נחתכה באמצע ה-JSON - ואז אין טיוטה בכלל, והפנייה נשארת "חדשה".
-        max_tokens: 1500,
-        temperature: 0.3,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: JSON.stringify({
-              facts: INBOX_KNOWLEDGE,
-              ...(rules.length > 0 ? { rules_from_corrections: rules } : {}),
-              sender_context: ctx.contextText || "הפונה לא מזוהה במערכת.",
-              conversation_history: history || "אין התכתבות קודמת עם הפונה.",
-              approved_past_replies: shots,
-              ...(opts.forceReply ? { must_reply: true } : {}),
-              ...(opts.forceClickReport ? { must_attach_click_report: true } : {}),
-              incoming_email: {
-                from: `${row.from_name ?? ""} <${row.from_email}>`,
-                // פנייה מטופס באתר: הפונה מילא טופס, ולא "שלח לנו מייל".
-                ...(row.via_form ? { sent_through: SITE_FORM_LABELS[row.via_form as SiteForm] ?? "טופס באתר" } : {}),
-                subject: row.subject ?? "",
-                // מה שנכתב עכשיו בנפרד מהציטוט: הסיווג נעשה על הפנייה עצמה.
-                body: newText(row).slice(0, 6000),
-                quoted: quotedPart(row).slice(0, 2500),
-              },
-            }),
-          },
-        ],
+        maxTokens: 2_500,
+        timeoutMs: 90_000,
+        retries: 1,
       },
-      { timeout: 60_000, maxRetries: 1 }
+      DraftSchema,
     );
-    const raw = res.choices[0]?.message?.content?.trim();
-    if (!raw) {
-      opts.onError?.("המודל החזיר תשובה ריקה");
-      return null;
-    }
-    const p = JSON.parse(raw) as Partial<Classified> & { click_report?: boolean };
     const category = VALID_CATEGORIES.has(String(p.category)) ? String(p.category) : "other";
     const draftBody = String(p.draft_body ?? "").slice(0, 8000);
     let note = String(p.note ?? "").slice(0, 400);
@@ -692,6 +724,7 @@ async function classifyAndDraft(
         draft_subject: String(p.draft_subject ?? "").slice(0, 300),
         draft_body: draftBody,
         note,
+        model,
       },
       ctx,
       opts.forceClickReport === true || p.click_report === true,
@@ -1055,7 +1088,7 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
               .join(" · ")
           : c.note || null;
         update.draft_generated_at = new Date().toISOString();
-        update.draft_model = MODEL;
+        update.draft_model = c.model;
         result.drafted++;
       }
       const { error } = await supabaseAdmin.from("inbox_messages").update(update).eq("id", row.id);
@@ -1125,8 +1158,6 @@ export async function runInboxAgent(): Promise<InboxRunResult> {
 // **הדוגמאות מלמדות סגנון, לא עובדות.** תשובה משנה שעברה יכולה לצטט מחיר
 // ישן, ולכן הפרומפט קובע במפורש שעובדות מגיעות מבסיס הידע בלבד.
 
-const BACKFILL_CLASSIFY_MODEL = process.env.AGENT_INBOX_CLASSIFY_MODEL ?? "gpt-4o-mini";
-
 export type BackfillResult = {
   ok: boolean;
   scanned: number;
@@ -1137,33 +1168,28 @@ export type BackfillResult = {
   error?: string;
 };
 
+const CategorySchema = z.object({ category: z.string() });
+
 /** סיווג בלבד לזוג היסטורי - תווית מרשימה סגורה, בלי ניסוח. */
 async function classifyPair(subject: string, body: string): Promise<string> {
-  if (!process.env.OPENAI_API_KEY) return "other";
+  if (!llmConfigured()) return "other";
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const res = await openai.chat.completions.create(
+    const { data } = await llmJson(
       {
-        model: BACKFILL_CLASSIFY_MODEL,
-        max_tokens: 60,
-        temperature: 0,
-        response_format: { type: "json_object" },
-        messages: [
-          {
-            role: "system",
-            content:
-              'סווג מייל נכנס לפלטפורמת "טיפול חכם" לאחת מהקטגוריות: ' +
-              Array.from(VALID_CATEGORIES).join(", ") +
-              '. החזר JSON: {"category": "..."}',
-          },
-          { role: "user", content: `${subject}\n\n${body.slice(0, 1500)}` },
-        ],
+        feature: "inbox_classify",
+        tier: "classify",
+        system:
+          'סווג מייל נכנס לפלטפורמת "טיפול חכם" לאחת מהקטגוריות: ' +
+          Array.from(VALID_CATEGORIES).join(", ") +
+          '. החזר JSON: {"category": "..."}',
+        user: `${subject}\n\n${body.slice(0, 1500)}`,
+        maxTokens: 100,
+        timeoutMs: 30_000,
+        retries: 1,
       },
-      { timeout: 30_000, maxRetries: 1 }
+      CategorySchema,
     );
-    const raw = res.choices[0]?.message?.content?.trim();
-    const cat = raw ? String((JSON.parse(raw) as { category?: string }).category ?? "") : "";
-    return VALID_CATEGORIES.has(cat) ? cat : "other";
+    return VALID_CATEGORIES.has(data.category) ? data.category : "other";
   } catch {
     return "other";
   }
@@ -1414,7 +1440,7 @@ export async function regenerateInboxDraft(
       draft_body: c.draft_body,
       draft_note: c.note || null,
       draft_generated_at: new Date().toISOString(),
-      draft_model: MODEL,
+      draft_model: c.model,
       updated_at: new Date().toISOString(),
     })
     .eq("id", id);
@@ -1466,7 +1492,7 @@ export async function previewInboxDraft(input: {
     senderContext: ctx.contextText,
     adminNote: ctx.adminNote,
     reportProfiles: ctx.report ? ctx.report.profiles.length : null,
-    draft: c ? { ...c, model: MODEL } : null,
+    draft: c,
   };
 }
 
@@ -1633,7 +1659,7 @@ export async function reviveInboxMessage(id: string): Promise<{ ok: boolean; err
         draft_body: c.draft_body,
         draft_note: c.note || null,
         draft_generated_at: now,
-        draft_model: MODEL,
+        draft_model: c.model,
         updated_at: now,
       }
     : { status: "new", updated_at: now };

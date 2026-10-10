@@ -1,5 +1,6 @@
 import "server-only";
-import OpenAI from "openai";
+import { z } from "zod";
+import { llmConfigured, llmJson } from "./llm";
 import type { ProspectRow } from "./center-prospects";
 
 // טיוטה אישית לכל מכון, שנכתבת על ידי מודל שפה אחרי קריאת האתר שלהם.
@@ -17,7 +18,6 @@ import type { ProspectRow } from "./center-prospects";
 // **המשתמש חייב לאמת את הפרטים לפני שליחה.** האזהרה מוצגת בבירור במסך
 // ליד הטיוטה, וגם נשמרת כאן ברשימת ה-facts.
 
-const MODEL = process.env.PROSPECT_LLM_MODEL ?? "gpt-4o-mini";
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 const FETCH_TIMEOUT_MS = 12_000;
 const MAX_SITE_CHARS = 6_000;
@@ -80,47 +80,45 @@ const SYSTEM_PROMPT = [
   "השדה facts הוא רשימת הפרטים שלקחת מהאתר והכנסת לטקסט - כדי שאדם יוכל לאמת אותם. אם לא השתמשת בשום פרט, החזר רשימה ריקה.",
 ].join("\n");
 
+const DraftSchema = z.object({
+  subject: z.string(),
+  body: z.string(),
+  facts: z.array(z.string()),
+});
+
 export async function buildAiProspectDraft(
   p: ProspectRow,
   gapExamples: string[]
 ): Promise<AiDraftResult | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!llmConfigured()) return null;
   if (!p.website) return null;
 
   const siteText = await readSite(p.website);
   if (!siteText) return null;
 
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const res = await openai.chat.completions.create(
+    const { data } = await llmJson(
       {
-        model: MODEL,
-        max_tokens: 700,
-        temperature: 0.4,
-        response_format: { type: "json_object" },
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          {
-            role: "user",
-            content: JSON.stringify({
-              center_name: p.name,
-              city: p.city,
-              site_text: siteText,
-              demand_gaps: gapExamples,
-              our_site: `${SITE_URL}/centers`,
-            }),
-          },
-        ],
+        feature: "prospect_draft",
+        tier: "standard",
+        system: SYSTEM_PROMPT,
+        user: JSON.stringify({
+          center_name: p.name,
+          city: p.city,
+          site_text: siteText,
+          demand_gaps: gapExamples,
+          our_site: `${SITE_URL}/centers`,
+        }),
+        maxTokens: 900,
+        timeoutMs: 60_000,
+        retries: 1,
       },
-      { timeout: 45_000, maxRetries: 1 }
+      DraftSchema,
     );
-    const raw = res.choices[0]?.message?.content?.trim();
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as { subject?: string; body?: string; facts?: unknown };
-    const subject = String(parsed.subject ?? "").trim();
-    const body = String(parsed.body ?? "").trim();
+    const subject = data.subject.trim();
+    const body = data.body.trim();
     if (!subject || body.length < 80) return null;
-    const facts = Array.isArray(parsed.facts) ? parsed.facts.map((f) => String(f)).filter(Boolean) : [];
+    const facts = data.facts.map((f) => f.trim()).filter(Boolean);
     return { subject, body, source: "ai", facts };
   } catch (e) {
     console.error("prospect ai draft failed:", e instanceof Error ? e.message : e);

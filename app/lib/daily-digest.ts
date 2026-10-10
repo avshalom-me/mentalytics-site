@@ -1,5 +1,5 @@
 import "server-only";
-import OpenAI from "openai";
+import { llmConfigured, llmText } from "./llm";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { buildDashboardData } from "./work-queue";
 import { startAgentRun, finishAgentRun } from "./agent-infra";
@@ -18,7 +18,6 @@ import { syncDealReminders } from "./deal-reminders";
 // פרטיות: סיכום ה-AI מקבל תוויות/מונים/דחיפות בלבד - אף שם של פונה או
 // מטפל לא נשלח למודל (ממצא ביקורת 16/8).
 
-const DIGEST_LLM_MODEL = process.env.AGENT_DIGEST_LLM_MODEL ?? "gpt-4o-mini";
 // מעל כמה שורות בסקציה קוטמים (המייל חייב להישאר קריא בדקה).
 const MAX_LINES_PER_SECTION = 6;
 
@@ -376,31 +375,24 @@ async function gatherSections(): Promise<DigestSection[]> {
 // תוויות, מונים ודחיפות בלבד - שום שם, שום תוכן פנייה. נכשל בשקט - הדוח
 // שלם גם בלעדיו.
 async function buildAiSummary(sections: DigestSection[]): Promise<string | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!llmConfigured()) return null;
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
     const payload = sections.map((s) => ({
       label: s.label,
       count: s.count,
       urgent: s.urgent,
     }));
-    const res = await openai.chat.completions.create(
-      {
-        model: DIGEST_LLM_MODEL,
-        max_tokens: 300,
-        temperature: 0.3,
-        messages: [
-          {
-            role: "system",
-            content:
-              "אתה עוזר תפעול של פלטפורמת טיפול חכם. קבל רשימת קטגוריות של עבודה ממתינה (שם קטגוריה, כמות, דחיפות) וכתוב עד 3 שורות קצרות בעברית: במה לטפל קודם ולמה. עובדתי ותמציתי, בלי פתיחות, בלי סופרלטיבים, בלי להמציא פרטים שלא קיבלת. אסור להשתמש בקו מפריד ארוך; השתמש ב' - ' במקום.",
-          },
-          { role: "user", content: JSON.stringify(payload) },
-        ],
-      },
-      { timeout: 30_000, maxRetries: 0 }
-    );
-    const text = res.choices[0]?.message?.content?.trim();
+    const res = await llmText({
+      feature: "daily_digest",
+      tier: "fast",
+      system:
+        "אתה עוזר תפעול של פלטפורמת טיפול חכם. קבל רשימת קטגוריות של עבודה ממתינה (שם קטגוריה, כמות, דחיפות) וכתוב עד 3 שורות קצרות בעברית: במה לטפל קודם ולמה. עובדתי ותמציתי, בלי פתיחות, בלי סופרלטיבים, בלי להמציא פרטים שלא קיבלת. אסור להשתמש בקו מפריד ארוך; השתמש ב' - ' במקום.",
+      user: JSON.stringify(payload),
+      maxTokens: 300,
+      timeoutMs: 30_000,
+      retries: 0,
+    });
+    const text = res.text.trim();
     return text || null;
   } catch (e) {
     console.error("digest AI summary failed:", e);

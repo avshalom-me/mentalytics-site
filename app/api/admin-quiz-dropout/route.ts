@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import OpenAI from "openai";
+import { z } from "zod";
+import { llmConfigured, llmJson } from "@/app/lib/llm";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import {
@@ -17,8 +18,6 @@ import {
 // מוגן ע"י ה-middleware של האדמין (כל /api/admin-*).
 
 export const dynamic = "force-dynamic";
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 type Period = "week" | "month" | "all";
 
@@ -264,34 +263,39 @@ const SYSTEM_PROMPT = `אתה אנליסט מוצר ו-UX עם רקע קליני
   "kids": { אותו מבנה }
 }`;
 
-async function callAi(adults: QuizAnalysis, kids: QuizAnalysis): Promise<AiReport> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 3000,
-    temperature: 0.4,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      {
-        role: "user",
-        content: JSON.stringify({
-          adults: aiPayload("שאלון מבוגרים", adults),
-          kids: aiPayload("שאלון ילדים (ממולא ע\"י הורה)", kids),
-        }, null, 1),
-      },
-    ],
-  });
+const QuizReportSchema = z.object({
+  summary: z.string(),
+  findings: z.array(
+    z.object({
+      step: z.string(),
+      title: z.string(),
+      evidence: z.string(),
+      likely_reasons: z.array(z.string()),
+      suggestions: z.array(z.string()),
+    }),
+  ),
+  quick_wins: z.array(z.string()),
+});
+const AiReportSchema = z.object({ adults: QuizReportSchema, kids: QuizReportSchema });
 
-  const content = response.choices[0]?.message?.content ?? "";
-  const parsed = JSON.parse(content) as Partial<AiReport>;
-  const valid = (q: unknown): q is AiQuizReport => {
-    const x = q as AiQuizReport;
-    return Boolean(x && typeof x.summary === "string" && Array.isArray(x.findings) && Array.isArray(x.quick_wins));
-  };
-  if (!valid(parsed.adults) || !valid(parsed.kids)) {
-    throw new Error("AI response missing required fields");
-  }
-  return parsed as AiReport;
+async function callAi(adults: QuizAnalysis, kids: QuizAnalysis): Promise<AiReport> {
+  // An admin analysis that runs a few times a month: the "deep" tier.
+  const { data } = await llmJson(
+    {
+      feature: "quiz_dropout",
+      tier: "deep",
+      system: SYSTEM_PROMPT,
+      user: JSON.stringify({
+        adults: aiPayload("שאלון מבוגרים", adults),
+        kids: aiPayload("שאלון ילדים (ממולא ע\"י הורה)", kids),
+      }, null, 1),
+      maxTokens: 4_000,
+      timeoutMs: 180_000,
+      retries: 0,
+    },
+    AiReportSchema,
+  );
+  return data;
 }
 
 // ניתוח AI עולה כסף וזהה לאורך שעות — cache קצר בזיכרון מונע ריצות כפולות
@@ -327,8 +331,8 @@ export async function GET(req: NextRequest) {
 
     let ai: AiReport | null = null;
     let aiError: string | null = null;
-    if (!process.env.OPENAI_API_KEY) {
-      aiError = "OPENAI_API_KEY לא מוגדר — מוצג הניתוח הדטרמיניסטי בלבד";
+    if (!llmConfigured()) {
+      aiError = "לא מוגדר מפתח למודל שפה - מוצג הניתוח הדטרמיניסטי בלבד";
     } else if (adults.started === 0 && kids.started === 0) {
       aiError = "אין נתוני שאלונים בתקופה שנבחרה";
     } else {

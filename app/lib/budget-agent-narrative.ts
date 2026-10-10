@@ -1,4 +1,4 @@
-import OpenAI from "openai";
+import { llmConfigured, llmText } from "./llm";
 import { narrativeIsFaithful, type BudgetRecommendation } from "./budget-agent";
 import type { BudgetReport } from "./budget-data";
 
@@ -9,9 +9,8 @@ import type { BudgetReport } from "./budget-data";
 // the recommendation goes out as computed. Only campaign names and figures are
 // sent; nothing about a therapist, a centre or a seeker.
 //
-// gpt-4o and not mini, for the reason the inbox agent gives: mini bent a
-// numeric fact in its first test.
-const MODEL = process.env.AGENT_BUDGET_LLM_MODEL ?? "gpt-4o";
+// The "standard" tier and not a small model, for the reason the inbox agent
+// gives: the small model bent a numeric fact in its first test.
 
 export function budgetFacts(report: BudgetReport) {
   const p = report.projection;
@@ -50,31 +49,24 @@ export async function narrateBudget(
   rec: BudgetRecommendation,
   facts: ReturnType<typeof budgetFacts>
 ): Promise<string | null> {
-  if (!process.env.OPENAI_API_KEY) return null;
+  if (!llmConfigured()) return null;
   try {
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-    const res = await openai.chat.completions.create(
-      {
-        model: MODEL,
-        max_tokens: 300,
-        temperature: 0.2,
-        messages: [
-          {
-            role: "system",
-            content:
-              "אתה עוזר לבעלים של פלטפורמת טיפול חכם לקרוא המלצת תקציב פרסום חודשית. תקבל את ההמלצה כפי שחושבה ואת הנתונים שמאחוריה. " +
-              "כתוב 2-3 משפטים קצרים בעברית: למה זו החלוקה, ומה הסיכון העיקרי בה (למשל אזור שנעצר, או קמפיין שנשפט על מעט נתונים). " +
-              "חוקים: אל תשנה, תעגל, תחשב או תוסיף אף מספר - מותר רק מספר שמופיע בקלט, כפי שהוא. אל תמליץ על שום דבר שאין בהמלצה. " +
-              "בלי פתיחות, בלי סופרלטיבים, בלי כותרות. אסור קו מפריד ארוך; השתמש ב' - '.",
-          },
-          // The title and the changes, not the body: the body quotes the protection
-          // reasons, and those can name a customer.
-          { role: "user", content: JSON.stringify({ recommendation: { title: rec.title, changes: rec.changes }, facts }) },
-        ],
-      },
-      { timeout: 45_000, maxRetries: 0 }
-    );
-    const text = res.choices[0]?.message?.content?.trim().replace(/\s*—\s*/g, " - ");
+    const res = await llmText({
+      feature: "budget_narrative",
+      tier: "standard",
+      system:
+        "אתה עוזר לבעלים של פלטפורמת טיפול חכם לקרוא המלצת תקציב פרסום חודשית. תקבל את ההמלצה כפי שחושבה ואת הנתונים שמאחוריה. " +
+        "כתוב 2-3 משפטים קצרים בעברית: למה זו החלוקה, ומה הסיכון העיקרי בה (למשל אזור שנעצר, או קמפיין שנשפט על מעט נתונים). " +
+        "חוקים: אל תשנה, תעגל, תחשב או תוסיף אף מספר - מותר רק מספר שמופיע בקלט, כפי שהוא. אל תמליץ על שום דבר שאין בהמלצה. " +
+        "בלי פתיחות, בלי סופרלטיבים, בלי כותרות. אסור קו מפריד ארוך; השתמש ב' - '.",
+      // The title and the changes, not the body: the body quotes the protection
+      // reasons, and those can name a customer.
+      user: JSON.stringify({ recommendation: { title: rec.title, changes: rec.changes }, facts }),
+      maxTokens: 400,
+      timeoutMs: 45_000,
+      retries: 0,
+    });
+    const text = res.text.replace(/\s*—\s*/g, " - ").trim();
     if (!text) return null;
     if (!narrativeIsFaithful(text, `${rec.title}\n${rec.body}\n${JSON.stringify(facts)}`)) {
       console.warn("budget narrative dropped: it used a number that was not in its input");

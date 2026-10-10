@@ -1,12 +1,15 @@
-import OpenAI from "openai";
+import { z } from "zod";
+import { llmConfigured, llmJson } from "./llm";
 
 // Hybrid profile-quality feedback for therapists.
 //   1. Rule-based detection finds concrete, certain gaps (no photo, short bio…).
-//   2. gpt-4o-mini rephrases them into warm, personal Hebrew prose.
+//   2. A model rephrases them into warm, personal Hebrew prose.
 //   3. If the AI call is unavailable or fails, we fall back to the rule text.
 // Used by the welcome / onboarding emails (and reusable elsewhere).
-
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+//
+// No module-scope client here on purpose: this file is imported by
+// therapist-emails.ts, which the payment flows import - a client that throws
+// at load when a key is missing would take the checkout down with it.
 
 export type ProfileForFeedback = {
   full_name?: string | null;
@@ -59,36 +62,32 @@ export function detectProfileGaps(t: ProfileForFeedback): string[] {
   return gaps;
 }
 
-async function aiPhrase(gaps: string[]): Promise<string[] | null> {
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.6,
-    max_tokens: 400,
-    response_format: { type: "json_object" },
-    messages: [
-      {
-        role: "system",
-        content:
-          "אתה עוזר אדיב לפלטפורמה ישראלית להתאמת מטפלים נפשיים. כתוב בעברית מקצועית, ברורה ופרקטית. החזר JSON בלבד.",
-      },
-      {
-        role: "user",
-        content:
-          `אלה הפערים שזוהו בפרופיל של מטפל/ת באתר:\n` +
-          gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") +
-          `\n\nנסח/י אותם כהמלצות קצרות ופרקטיות. החזר/החזירי JSON במבנה: ` +
-          `{"bullets": ["המלצה קצרה 1", "המלצה קצרה 2"]}. ` +
-          `כל המלצה עד 22 מילים, ממוקדת ופרקטית. אל תמציא/י פערים שלא מופיעים ברשימה, ואל תוסיף/י משפטי מחמאה או עידוד אישיים.`,
-      },
-    ],
-  });
+const BulletsSchema = z.object({ bullets: z.array(z.string()) });
 
-  const raw = response.choices[0]?.message?.content;
-  if (!raw) return null;
-  const parsed = JSON.parse(raw) as { bullets?: unknown };
-  if (!Array.isArray(parsed.bullets)) return null;
-  const bullets = parsed.bullets
-    .filter((b): b is string => typeof b === "string" && b.trim().length > 0)
+async function aiPhrase(gaps: string[]): Promise<string[] | null> {
+  const { data } = await llmJson(
+    {
+      feature: "profile_feedback",
+      tier: "fast",
+      system:
+        "אתה עוזר אדיב לפלטפורמה ישראלית להתאמת מטפלים נפשיים. כתוב בעברית מקצועית, ברורה ופרקטית. החזר JSON בלבד.",
+      user:
+        `אלה הפערים שזוהו בפרופיל של מטפל/ת באתר:\n` +
+        gaps.map((g, i) => `${i + 1}. ${g}`).join("\n") +
+        `\n\nנסח/י אותם כהמלצות קצרות ופרקטיות. החזר/החזירי JSON במבנה: ` +
+        `{"bullets": ["המלצה קצרה 1", "המלצה קצרה 2"]}. ` +
+        `כל המלצה עד 22 מילים, ממוקדת ופרקטית. אל תמציא/י פערים שלא מופיעים ברשימה, ואל תוסיף/י משפטי מחמאה או עידוד אישיים.`,
+      maxTokens: 500,
+      // Awaited inside the payment-completion request: a slow model must not
+      // hold the checkout response.
+      timeoutMs: 25_000,
+      retries: 0,
+    },
+    BulletsSchema,
+  );
+  const bullets = data.bullets
+    .map((b) => b.trim())
+    .filter((b) => b.length > 0)
     .slice(0, 6);
   return bullets.length > 0 ? bullets : null;
 }
@@ -101,7 +100,7 @@ export async function buildProfileFeedbackHtml(t: ProfileForFeedback): Promise<s
 
   let bullets: string[] = gaps;
 
-  if (process.env.OPENAI_API_KEY) {
+  if (llmConfigured()) {
     try {
       const result = await aiPhrase(gaps);
       if (result) {
