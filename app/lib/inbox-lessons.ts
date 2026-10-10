@@ -163,7 +163,7 @@ export async function addManualLesson(ruleText: string): Promise<{ ok: boolean; 
 
 // ── חילוץ לקחים מתיקון ──────────────────────────────────────────────────
 
-const EXTRACT_PROMPT = [
+export const EXTRACT_PROMPT = [
   "אתה עוזר לסוכן שירות הלקוחות של טיפול חכם ללמוד מתיקונים של האדמין.",
   "תקבל מייל נכנס, את הטיוטה שהסוכן כתב (agent_draft), ואת התשובה שהאדמין שלח בפועל אחרי שתיקן אותה (admin_final).",
   "המשימה: לזהות מה תוקן שצריך לחול גם על תשובות עתידיות, ולנסח את זה ככללים לסוכן.",
@@ -208,6 +208,26 @@ const LessonsSchema = z.object({
 
 const normalizeText = (s: string) => s.replace(/\s+/g, " ").trim();
 
+/** הקלט לחילוץ, כפי שהסוכן שולח אותו. מיוצא כדי שמבחן איכות בין מודלים יריץ את אותו פרומפט. */
+export function lessonExtractionInput(
+  row: { subject: string | null; body_text: string | null; draft_body: string | null; final_body: string | null },
+  existing: string[],
+): string {
+  return (
+    "הנתונים לניתוח. החזר json בלבד, במבנה שבהנחיות.\n" +
+    JSON.stringify({
+      facts: INBOX_KNOWLEDGE,
+      existing_rules: existing,
+      incoming_email: {
+        subject: row.subject ?? "",
+        body: String(row.body_text ?? "").slice(0, 3000),
+      },
+      agent_draft: String(row.draft_body ?? "").trim().slice(0, 3000),
+      admin_final: String(row.final_body ?? "").trim().slice(0, 3000),
+    })
+  );
+}
+
 export type ExtractResult = { ok: boolean; created: number; skipped?: string; error?: string };
 
 /**
@@ -248,18 +268,7 @@ export async function extractLessonsFor(messageId: string): Promise<ExtractResul
         feature: "inbox_lessons",
         tier: "deep",
         system: EXTRACT_PROMPT,
-        user:
-          "הנתונים לניתוח. החזר json בלבד, במבנה שבהנחיות.\n" +
-          JSON.stringify({
-            facts: INBOX_KNOWLEDGE,
-            existing_rules: existing,
-            incoming_email: {
-              subject: row.subject ?? "",
-              body: String(row.body_text ?? "").slice(0, 3000),
-            },
-            agent_draft: draft.slice(0, 3000),
-            admin_final: final.slice(0, 3000),
-          }),
+        user: lessonExtractionInput(row, existing),
         maxTokens: 2_000,
         timeoutMs: 120_000,
         retries: 0,
