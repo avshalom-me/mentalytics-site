@@ -64,6 +64,20 @@ export function readableError(text: string): string {
   }
 }
 
+/**
+ * שגיאות גוגל שיש להן תיקון ברור אצלנו - הסבר בעברית לפני ההודעה הגולמית.
+ * מ-1/4/2026 גוגל מכשילה כל mutate של קמפיינים כשיש בחשבון קמפיין בלי הצהרת
+ * "פרסום פוליטי באיחוד האירופי" (docs/api-policy/eu-par); ההצהרה נעשית פעם
+ * אחת בממשק של גוגל, לכל הקמפיינים הקיימים.
+ */
+function explain(text: string): string {
+  const raw = readableError(text);
+  if (/EU_POLITICAL_ADVERTISING_DECLARATION_REQUIRED/.test(raw)) {
+    return `גוגל חוסמת כל שינוי בקמפיינים כל עוד יש בחשבון קמפיין בלי הצהרת "פרסום פוליטי באיחוד האירופי". לפתוח את גוגל אדס, לאשר את ההצהרה לכל הקמפיינים (פעם אחת), וללחוץ שוב. (${raw})`;
+  }
+  return raw;
+}
+
 function toLive(r: GaqlCampaignRow): LiveCampaign | null {
   const id = r.campaign?.id != null ? String(r.campaign.id) : "";
   if (!id) return null;
@@ -174,7 +188,7 @@ export async function setCampaignDailyBudget(opts: { campaignId: string; amountI
   const { status, text } = await googleAdsPost("/campaignBudgets:mutate", {
     operations: [{ updateMask: "amount_micros", update: { resourceName: c.budgetResource, amountMicros: micros(amount) } }],
   });
-  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${readableError(text)}` };
+  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${explain(text)}` };
 
   await Promise.all([
     supabaseAdmin.from("ads_campaign_config").update({ daily_budget: amount }).eq("campaign_id", Number(c.id)),
@@ -202,7 +216,7 @@ export async function setCampaignStatus(opts: { campaignId: string; status: "ENA
   const { status, text } = await googleAdsPost("/campaigns:mutate", {
     operations: [{ updateMask: "status", update: { resourceName: c.resourceName, status: opts.status } }],
   });
-  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${readableError(text)}` };
+  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${explain(text)}` };
   await Promise.all([
     supabaseAdmin.from("ads_campaign_config").update({ status: opts.status }).eq("campaign_id", Number(c.id)),
     supabaseAdmin.from("ads_campaign_registry").update({ active: opts.status === "ENABLED", updated_at: new Date().toISOString() }).eq("google_name", c.name),
@@ -282,7 +296,7 @@ export async function createPausedCampaign(spec: CampaignSpec, reason: string): 
   ];
 
   const { status, text } = await googleAdsPost("/googleAds:mutate", { mutateOperations, partialFailure: false });
-  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${readableError(text)}` };
+  if (status !== 200) return { ok: false, error: `גוגל סירב (${status}): ${explain(text)}` };
   const responses = (JSON.parse(text)?.mutateOperationResponses ?? []) as { campaignResult?: { resourceName?: string } }[];
   const campaignResource = responses.find((r) => r.campaignResult?.resourceName)?.campaignResult?.resourceName ?? "";
   const campaignId = campaignResource.split("/").pop() ?? "";
