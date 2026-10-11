@@ -41,8 +41,12 @@ jobs:
       - name: Dump database
         env:
           SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        # private_inquiries holds what patients wrote to therapists and centres
+        # (name, contact, message). Its structure is dumped, its rows are not:
+        # that content belongs to the recipient only, and this archive is an
+        # artifact of a public repository. See app/lib/private-inquiry.ts.
         run: |
-          /usr/lib/postgresql/17/bin/pg_dump --no-owner --no-privileges --format=plain --file=backup/database.sql "$SUPABASE_DB_URL"
+          /usr/lib/postgresql/17/bin/pg_dump --no-owner --no-privileges --format=plain --exclude-table-data=public.private_inquiries --file=backup/database.sql "$SUPABASE_DB_URL"
           echo "Database dump size: $(du -h backup/database.sql | cut -f1)"
 
       - name: Backup storage buckets

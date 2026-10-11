@@ -72,6 +72,11 @@ export type PortalData = {
   therapists: TherapistItem[];
   /** הודעות האתר שהגיעו לתיבת המייל של המרכז (לא הודעות לתיבה פרטית של מטפל/ת). */
   messages?: PortalMessage[];
+  /**
+   * מוגדר רק ב"צפייה בתור מרכז" של האדמין: כמה הודעות יש למרכז. התוכן שלהן (מי
+   * כתב ומה) גלוי למרכז בלבד, ולכן האדמין מקבל רשימה ריקה ואת המספר הזה.
+   */
+  messages_private_count?: number;
   stats: Stats | null;
 };
 
@@ -424,7 +429,7 @@ export default function CenterDashboardView({ data, preview = false, justCreated
 
       {/* הודעות מהאתר - התוכן עצמו. עד 15/9/26 הפורטל הציג כאן רק מונה, והתוכן
           נשמר רק במייל: מייל שנפל לספאם או נמחק היה אובד למרכז לגמרי. */}
-      <MessagesSection messages={data.messages ?? []} />
+      <MessagesSection messages={data.messages ?? []} privateCount={data.messages_private_count} />
 
       {/* סטטיסטיקות מרוכזות - פילוח הפונים */}
       {stats && (stats.by_region.length > 0 || stats.by_issue.length > 0 || (stats.clicks_total?.total ?? 0) > 0) && (
@@ -599,7 +604,22 @@ function TrendBars({ trend }: { trend: { label: string; clicks: number }[] }) {
 
 const MESSAGE_PREVIEW_CHARS = 240;
 
-function MessagesSection({ messages }: { messages: PortalMessage[] }) {
+function MessagesSection({ messages, privateCount }: { messages: PortalMessage[]; privateCount?: number }) {
+  // "צפייה בתור מרכז": האדמין רואה שיש הודעות, לא את מה שכתוב בהן.
+  if (privateCount !== undefined) {
+    return (
+      <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
+        <h2 className="mb-1 flex items-center gap-2 text-base font-black text-stone-800">
+          <MessageCircle size={17} style={{ color: "var(--teal)" }} /> הודעות שהגיעו דרך האתר
+        </h2>
+        <p className="rounded-xl bg-stone-50 p-4 text-sm leading-6 text-stone-600">
+          {privateCount === 0
+            ? "עדיין לא התקבלו הודעות דרך האתר."
+            : `${privateCount} הודעות הגיעו לתיבת המרכז. מי כתב ומה נכתב גלוי למרכז בלבד, ולא מוצג בצפייה הזו.`}
+        </p>
+      </section>
+    );
+  }
   return (
     <section className="mb-8 rounded-2xl border border-stone-200 bg-white p-5">
       <h2 className="mb-1 flex items-center gap-2 text-base font-black text-stone-800">

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 import { sendInquiryEmail, INQUIRY_SEND_FAILED_MESSAGE } from "@/app/lib/inquiry-send";
+import { PRIVATE_INQUIRY_SOURCE } from "@/app/lib/private-inquiry";
+import { savePrivateInquiry } from "@/app/lib/private-inquiry-store";
 
 // פנייה דרך האתר אל מרכז טיפולי במסלול 1 (מטפלים בנפרד).
 //
@@ -127,22 +129,30 @@ export async function POST(req: NextRequest) {
     // רישום הליד ב-CRM - best-effort, וכשל כאן לעולם לא ייראה לפונה. הליד נכתב
     // גם כשהמייל נדחה: הפנייה לא הולכת לאיבוד, ודוח הבוקר מצליב אותה מול יומן
     // המיילים. therapist_id נשאר ריק: הפנייה אל המרכז, לא אל אדם מסוים.
+    // השורה נכתבת בלי שם, פרטי קשר והודעה (11/10/2026): מה שהפונה כתב שייך
+    // למרכז בלבד, והאדמין רק סופר. התוכן נשמר בנפרד, במקום ששום מסך אדמין לא
+    // קורא ממנו (private-inquiry-store.ts), ופורטל המרכז מציג אותו משם.
     try {
-      const { error: leadErr } = await supabaseAdmin.from("crm_leads").insert({
-        lead_type: "patient",
-        name,
-        contact,
-        message: msg,
-        center_account_id: center.id,
-        // הודעה לעמוד המרכז נוחתת תמיד בתיבת המרכז - מופיעה בפורטל שלו.
-        received_by_center_id: center.id,
-        source: "site_message",
-        page_source: safeSource,
-        ...sanitizeAttribution(body),
-      });
+      const { data: lead, error: leadErr } = await supabaseAdmin
+        .from("crm_leads")
+        .insert({
+          lead_type: "patient",
+          center_account_id: center.id,
+          // הודעה לעמוד המרכז נוחתת תמיד בתיבת המרכז - מופיעה בפורטל שלו.
+          received_by_center_id: center.id,
+          source: PRIVATE_INQUIRY_SOURCE,
+          page_source: safeSource,
+          ...sanitizeAttribution(body),
+        })
+        .select("id")
+        .single();
       if (leadErr) console.error("crm_leads (center) insert failed:", leadErr.message);
+      else if (lead?.id) {
+        await savePrivateInquiry(lead.id as string, { sender_name: name, sender_contact: contact, message: msg });
+      }
     } catch (e) {
-      console.error("crm_leads (center) insert threw:", e);
+      // ההודעה בלבד: אובייקט השגיאה של בקשה שנכשלה יכול לשאת את המטען שלה
+      console.error("crm_leads (center) insert threw:", e instanceof Error ? e.message : "unknown error");
     }
 
     if (!sent.ok) {

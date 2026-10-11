@@ -6,6 +6,7 @@ import { startAgentRun, finishAgentRun } from "./agent-infra";
 import { sendOpsEmail, escapeHtml } from "./ops-email";
 import { LEAD_TYPES, DEAL_STAGES, CLOSED_DEAL_STAGES, labelOf } from "./crm";
 import { syncDealReminders } from "./deal-reminders";
+import { isPrivateInquiry } from "./private-inquiry";
 
 // בקר התפעול היומי (סוכן 1 בתוכנית): אוסף כל בוקר את מה שדורש תשומת לב.
 // מקור הנתונים הוא אותו תור עבודה של לוח הבקרה (work-queue.ts) + תורי
@@ -332,7 +333,7 @@ async function gatherSections(): Promise<DigestSection[]> {
         .limit(200),
       supabaseAdmin
         .from("crm_leads")
-        .select("name, created_at")
+        .select("name, source, created_at")
         .in("source", ["site_message", "contact_form"])
         .gte("created_at", windowStart)
         .order("created_at", { ascending: false })
@@ -357,8 +358,12 @@ async function gatherSections(): Promise<DigestSection[]> {
             (l) =>
               `❌ המייל ל-${l.recipient} נדחה: ${String(l.error ?? "").slice(0, 80)} · ${ageText(l.created_at as string)}`
           ),
-          ...unlogged.map(
-            (ld) => `❓ פנייה של ${ld.name ?? "?"} בלי רישום שליחה · ${ageText(ld.created_at as string)}`
+          // פנייה של מטופל/ת למטפל/ת או למרכז מופיעה בלי שם הפונה: הדוח נשלח
+          // במייל לצוות, והשם שייך לנמען בלבד.
+          ...unlogged.map((ld) =>
+            isPrivateInquiry(ld)
+              ? `❓ פנייה ממטופל/ת למטפל/ת או למרכז בלי רישום שליחה · ${ageText(ld.created_at as string)}`
+              : `❓ פנייה של ${ld.name ?? "?"} בלי רישום שליחה · ${ageText(ld.created_at as string)}`
           ),
         ].slice(0, MAX_LINES_PER_SECTION),
         link: "/admin/leads",

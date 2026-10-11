@@ -61,7 +61,7 @@ export default function CenterPreviewPage() {
             👁 צפייה בתור מרכז
           </span>
           <span className="text-xs text-amber-900">
-            זה בדיוק מה שהמרכז רואה בפורטל שלו. קריאה בלבד - שום פעולה כאן אינה משנה דבר.
+            זה מה שהמרכז רואה בפורטל שלו, חוץ מתוכן ההודעות שקיבל - הוא גלוי למרכז בלבד. קריאה בלבד - שום פעולה כאן אינה משנה דבר.
           </span>
           <select
             value={current ? id : ""}
