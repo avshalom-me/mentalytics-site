@@ -11,19 +11,11 @@ import { llmConfigured, llmJson } from "./llm";
 // therapist-emails.ts, which the payment flows import - a client that throws
 // at load when a key is missing would take the checkout down with it.
 
-export type ProfileForFeedback = {
-  full_name?: string | null;
-  bio?: string | null;
-  profile_photo_path?: string | null;
-  training_areas?: string[] | null;
-  therapist_types?: string[] | null;
-  regions?: string[] | null;
-  education?: string | null;
-  experience?: string | null;
-  languages?: string[] | null;
-};
-
-const BIO_MIN = 80;
+// The gap rules moved to profile-gaps.ts (pure) on 11/10/26 so the retention
+// review engine can share them without pulling the model client in; the
+// names are re-exported here for the existing callers.
+import { detectProfileGaps, type ProfileForFeedback } from "./profile-gaps";
+export { detectProfileGaps, type ProfileForFeedback };
 
 function escapeHtml(str: string): string {
   return str
@@ -32,34 +24,6 @@ function escapeHtml(str: string): string {
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
-}
-
-// Concrete, rule-based gaps. Each entry is a short Hebrew phrase describing
-// what's missing and why it matters - used both as the AI's input and as the
-// no-AI fallback text. Order is by impact (photo and bio first).
-export function detectProfileGaps(t: ProfileForFeedback): string[] {
-  const gaps: string[] = [];
-
-  if (!t.profile_photo_path) {
-    gaps.push("אין תמונת פרופיל - תמונה מקצועית היא מהגורמים החזקים ביותר לאמון ולפנייה ראשונית.");
-  }
-  if (!t.bio || t.bio.trim().length < BIO_MIN) {
-    gaps.push("הביוגרפיה קצרה או חסרה - תיאור אישי של הגישה הטיפולית שלך מגדיל משמעותית את מספר הפניות.");
-  }
-  if ((t.training_areas?.length ?? 0) <= 2) {
-    gaps.push("מעט תחומי טיפול מסומנים - הוספת תחומים שאת/ה מתמחה בהם תרחיב את החשיפה במערכת ההתאמה ובמאגר.");
-  }
-  if (!t.education || t.education.trim().length < 10) {
-    gaps.push("חסרים פרטי השכלה והכשרה - מטופלים בודקים רקע מקצועי לפני שהם פונים.");
-  }
-  if (!t.experience || t.experience.trim().length < 10) {
-    gaps.push("חסר תיאור ניסיון מקצועי - שנות ניסיון ומסגרות עבודה מחזקות אמון.");
-  }
-  if ((t.regions?.length ?? 0) === 0) {
-    gaps.push("לא סומנו אזורי פעילות - בלי אזור קשה למטופלים למצוא אותך בחיפוש לפי מיקום.");
-  }
-
-  return gaps;
 }
 
 const BulletsSchema = z.object({ bullets: z.array(z.string()) });

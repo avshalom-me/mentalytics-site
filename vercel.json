@@ -65,7 +65,7 @@
       "path": "/api/cron/gift-trial-reminder?send=confirm"
     },
     {
-      "schedule": "45 4 * * *",
+      "schedule": "45 4 * * 0",
       "path": "/api/cron/agent-retention"
     },
     {

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import HelpTip from "./components/HelpTip";
+import RetentionWeeklyModal from "./components/RetentionWeeklyModal";
 import { labelOf, LEAD_TYPES } from "@/app/lib/crm";
 
 type GuaranteeRow = {
@@ -135,6 +136,8 @@ export default function AdminDashboardPage() {
 
   return (
     <div className="min-h-screen bg-stone-50">
+      {/* סקירת השימור השבועית קופצת כאן עד שמאשרים "ראיתי" (RetentionWeeklyModal). */}
+      <RetentionWeeklyModal />
       <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <h1 className="flex items-center gap-2 text-2xl font-black text-stone-900">

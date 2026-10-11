@@ -421,7 +421,8 @@ async function runChecks(): Promise<WatchdogCheck[]> {
     agentFreshnessCheck("ads", "סוכן הפרסום רץ ביממה האחרונה", 26),
     agentFreshnessCheck("conversions", "סוכן ההמרות רץ ביממה האחרונה", 26),
     agentFreshnessCheck("finance", "סוכן הכספים רץ ביממה האחרונה", 26),
-    agentFreshnessCheck("retention", "סוכן השימור רץ ביממה האחרונה", 26),
+    // שבועי מ-11/10/26 (ראשון 04:45 UTC); שמונה ימים = ריצה אחת שהוחמצה.
+    agentFreshnessCheck("retention", "סקירת השימור השבועית רצה בשבוע האחרון", 24 * 8),
     agentFreshnessCheck("center_health", "סוכן בריאות המרכזים רץ ביממה האחרונה", 26),
     // הגיבוי הוא הבדיקה שהכי חשוב שלא תישמט: קבצי ה-Storage אינם מכוסים
     // בשום גיבוי של Supabase, ולכן כל יום שהוא לא רץ הוא יום בלי עותק.

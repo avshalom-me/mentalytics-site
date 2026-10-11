@@ -25,8 +25,7 @@ import { CERT_UPLOAD_FAILED_ACTION, summarizeCertUploadFailures, type CertFailur
 import { syncCenterTherapists } from "@/app/lib/center-promotion";
 import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
-import { guaranteePauseBlock, pauseSourceBlock, type GuaranteeState } from "@/app/lib/match-pause";
-import { guaranteeStateFor } from "@/app/lib/guarantee";
+import { applyMatchPause } from "@/app/lib/match-pause-apply";
 
 type TherapistRow = {
   id: string;
@@ -499,57 +498,14 @@ export async function PATCH(request: Request) {
     // המטפל/ת ממשיך/ה להופיע ולהיות מדורג/ת שם כרגיל. ההקפאה פגה מעצמה.
     // מי מותר ולמה: app/lib/match-pause.ts (משותף לכפתורים באדמין).
     if (body.action === "set_match_pause") {
-      const rawDays = Number(body.days);
-      const days = Number.isFinite(rawDays) ? Math.max(0, Math.min(90, Math.floor(rawDays))) : 0;
-      const until = days > 0 ? new Date(Date.now() + days * 86400000).toISOString() : null;
-      const reason = typeof body.reason === "string" ? body.reason.trim().slice(0, 200) : null;
-
-      const { data: before, error: beforeErr } = await supabaseAdmin
-        .from("therapists")
-        .select("match_paused_until, status, promotion_source")
-        .eq("id", id)
-        .maybeSingle();
-      if (beforeErr) return NextResponse.json({ ok: false, error: beforeErr.message }, { status: 500 });
-      if (!before) return NextResponse.json({ ok: false, error: "מטפל/ת לא נמצא/ה" }, { status: 404 });
-
-      // שחרור מותר תמיד; את ההקפאה בודקים - קודם המסלול, ואז (למשלם/ת
-      // פרטי/ת) חלון ערבות הפניות. כשאי אפשר לבדוק את החלון - לא מקפיאים.
-      if (until) {
-        const sourceBlock = pauseSourceBlock(before);
-        if (sourceBlock) return NextResponse.json({ ok: false, error: sourceBlock }, { status: 409 });
-        if (before.promotion_source === "paid") {
-          let guarantee: GuaranteeState | null;
-          try {
-            guarantee = await guaranteeStateFor(id);
-          } catch (e) {
-            console.error("set_match_pause: guarantee check failed:", e instanceof Error ? e.message : e);
-            return NextResponse.json(
-              { ok: false, error: "לא הצלחנו לבדוק את חלון ערבות הפניות, ולכן לא הקפאנו. נסו שוב בעוד רגע." },
-              { status: 503 },
-            );
-          }
-          const guaranteeBlock = guaranteePauseBlock(guarantee);
-          if (guaranteeBlock) return NextResponse.json({ ok: false, error: guaranteeBlock }, { status: 409 });
-        }
-      }
-
-      const { error } = await supabaseAdmin
-        .from("therapists")
-        .update({ match_paused_until: until, match_paused_reason: until ? reason : null })
-        .eq("id", id);
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
-
-      await writeAudit(supabaseAdmin, {
+      // ההקפאה עצמה ב-match-pause-apply.ts, משותפת עם סקירת השימור.
+      const result = await applyMatchPause({
         therapistId: id,
-        actorType: "admin",
-        action: "set_match_pause",
-        before: { match_paused_until: before.match_paused_until ?? null, promotion_source: before.promotion_source },
-        after: { match_paused_until: until },
-        reason: until
-          ? `admin paused from matching for ${days}d${reason ? `: ${reason}` : ""}`
-          : "admin resumed matching",
+        days: Number(body.days),
+        reason: typeof body.reason === "string" ? body.reason : null,
       });
-      return NextResponse.json({ ok: true, id, match_paused_until: until });
+      if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
+      return NextResponse.json({ ok: true, id, match_paused_until: result.until });
     }
 
     if (body.action === "link_account") {

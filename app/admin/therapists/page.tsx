@@ -417,9 +417,15 @@ export default function AdminTherapistsPage() {
       // ניהול מרכזים נעשה תחת /admin/centers, לא כאן: כברירת מחדל מטפלים
       // משויכי-מרכז (וגם שורת ישות-מרכז) מוסתרים מהעמוד. עם ?center=<id>
       // (כניסה מכרטיס המרכז) העמוד מציג את מטפלי אותו מרכז בלבד.
-      const scope = new URLSearchParams(window.location.search).get("center");
+      const params = new URLSearchParams(window.location.search);
+      const scope = params.get("center");
+      // קישור ישיר למטפל/ת אחד/ת (?therapist=<id>) - מסקירת השימור ומתור
+      // הסוכנים. מציג את הכרטיס המלא שלו/ה בלבד, גם אם הוא/היא של מרכז.
+      const focus = params.get("therapist");
       const all = (json.therapists ?? []) as AdminTherapist[];
-      const rows = scope ? all.filter((t) => t.center_account_id === scope) : all.filter((t) => !t.center_account_id);
+      const rows = focus
+        ? all.filter((t) => t.id === focus)
+        : scope ? all.filter((t) => t.center_account_id === scope) : all.filter((t) => !t.center_account_id);
       setCenterScope(scope);
       setCenterScopeName(scope ? rows.find((t) => t.center_name)?.center_name ?? "" : "");
       setTherapists(rows);

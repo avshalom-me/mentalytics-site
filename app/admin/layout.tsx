@@ -21,6 +21,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     label: "לקוחות",
     items: [
       { href: "/admin/therapists", label: "מטפלים", icon: "👥" },
+      { href: "/admin/retention", label: "שימור מטפלים", icon: "🤝" },
       { href: "/admin/centers", label: "מרכזים טיפוליים", icon: "🏥" },
       { href: "/admin/teachers", label: "מורים (לימוד חכם)", icon: "🎓" },
       { href: "/admin/leads", label: "לידים ופניות", icon: "📥" },

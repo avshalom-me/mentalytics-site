@@ -9,7 +9,7 @@ import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runBudgetAgent } from "@/app/lib/budget-run";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
-import { runRetention } from "@/app/lib/retention";
+import { runRetentionReview } from "@/app/lib/retention-review-data";
 import { runCenterHealth } from "@/app/lib/center-health-agent";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
@@ -487,11 +487,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(result);
     }
     if (body?.action === "retention_run") {
-      const result = await runRetention();
+      // הסקירה השבועית (retention-review-data.ts); הממצאים והפעולות בעמוד /admin/retention.
+      const result = await runRetentionReview({ mode: "manual" });
       return NextResponse.json({
         ok: result.ok,
-        findings: result.findings,
-        checked: result.checked,
+        findings: (result.rows ?? [])
+          .filter((r) => r.risk === "critical" || r.risk === "high" || r.risk === "medium")
+          .map((r) => ({ key: `retention:${r.therapist_id}`, severity: r.risk === "medium" ? "medium" : "high", title: `${r.name}: ${r.risk_reason}` })),
+        checked: result.summary?.checked ?? 0,
         error: result.error,
       });
     }
