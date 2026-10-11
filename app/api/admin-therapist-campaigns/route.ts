@@ -21,20 +21,26 @@ type Row = {
   signup_utm_campaign: string | null;
   status: string | null;
   admin_approved: boolean | null;
+  full_name: string | null;
   created_at: string | null;
 };
 
-// A signup counts as "approved" once it passed manual review and is listable;
+// A signup is an ACCOUNT: a row exists from the moment someone registers, whether
+// or not they ever typed a name. "filled" is the ones that did - the rest are the
+// admin's "נרשמו" tab, with nothing to approve (the same rule as isStub there).
+const isFilled = (r: Row) => Boolean((r.full_name ?? "").trim());
+// "approved" once it passed manual review and is listable;
 // "paying" once the therapist is on a paid / promoted plan.
 const isApproved = (r: Row) =>
   Boolean(r.admin_approved) && (r.status === "approved" || r.status === "paying");
 const isPaying = (r: Row) => r.status === "paying";
 
-type Bucket = { signups: number; approved: number; paying: number };
-const emptyBucket = (): Bucket => ({ signups: 0, approved: 0, paying: 0 });
+type Bucket = { signups: number; filled: number; approved: number; paying: number };
+const emptyBucket = (): Bucket => ({ signups: 0, filled: 0, approved: 0, paying: 0 });
 
 function tally(bucket: Bucket, r: Row): void {
   bucket.signups++;
+  if (isFilled(r)) bucket.filled++;
   if (isApproved(r)) bucket.approved++;
   if (isPaying(r)) bucket.paying++;
 }
@@ -48,7 +54,7 @@ export async function GET(req: NextRequest) {
   try {
     let q = supabaseAdmin
       .from("therapists")
-      .select("signup_channel, signup_utm_campaign, status, admin_approved, created_at");
+      .select("signup_channel, signup_utm_campaign, status, admin_approved, full_name, created_at");
     if (since) q = q.gte("created_at", since);
 
     // Signups (from therapists) + ad visitors per campaign (from analytics_events
@@ -99,6 +105,7 @@ export async function GET(req: NextRequest) {
           campaign,
           visitors: visitorsByCampaign.get(campaign) ?? 0,
           signups: c?.signups ?? 0,
+          filled: c?.filled ?? 0,
           approved: c?.approved ?? 0,
           paying: c?.paying ?? 0,
           channel: c?.channel ?? null,

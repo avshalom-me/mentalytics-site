@@ -52,13 +52,18 @@ export type FbFunnelRow = {
   recruit_cta_clicks?: number;
   /** Sessions that saw the register screen of the login page (recruit_register_view). */
   recruit_register_views?: number;
+  /** Sessions shown the profile form as a brand-new profile (recruit_profile_form_view). */
+  recruit_profile_form_views?: number;
 };
 
 /** A row of the recruitment report (/api/admin-therapist-campaigns). */
 export type FbRecruitRow = {
   campaign: string;
   visitors: number;
+  /** Accounts opened. A row exists from the moment someone registers, with or without a name. */
   signups: number;
+  /** Of those accounts, the ones whose owner typed a name; the rest have no profile at all. */
+  filled?: number;
   approved: number;
   paying: number;
 };
@@ -108,7 +113,14 @@ export function buildFbAdsReport(funnel: FbFunnelRow[], recruit: FbRecruitRow[])
           // Both are zero for the days before 8/10/2026, when nothing measured them.
           { label: "לחצו על הרשמה", value: Number(f?.recruit_cta_clicks ?? 0) },
           { label: "הגיעו למסך ההרשמה", value: Number(f?.recruit_register_views ?? 0) },
-          { label: "נרשמו", value: Number(r?.signups ?? 0) },
+          // An account is not a profile. The row exists from the moment someone
+          // registers, and a good share never type a name: they sit in the admin's
+          // "נרשמו" tab with nothing to approve. Only "filled" is a therapist.
+          { label: "פתחו חשבון", value: Number(r?.signups ?? 0) },
+          // Counted in the browser, so it can sit a little under the accounts; zero
+          // for the days before 11/10/2026, when nothing measured it.
+          { label: "הגיעו לטופס הפרופיל", value: Number(f?.recruit_profile_form_views ?? 0) },
+          { label: "מילאו פרופיל", value: Number(r?.filled ?? 0) },
           { label: "אושרו", value: Number(r?.approved ?? 0) },
           { label: "במסלול המקודם", value: Number(r?.paying ?? 0) },
         ],
