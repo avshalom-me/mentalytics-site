@@ -1,0 +1,32 @@
+name: Delete backup artifacts
+
+# Deletes every archive the Daily Backup workflow left in this repository's
+# artifacts. Those archives hold a full dump of the database, and this
+# repository is public. Run by hand, by the owner, from the Actions tab: the
+# deletion cannot be undone, and nothing else triggers it.
+on:
+  workflow_dispatch:
+
+jobs:
+  delete:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+    steps:
+      - name: Delete all backup artifacts
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const artifacts = await github.paginate(github.rest.actions.listArtifactsForRepo, { owner, repo, per_page: 100 });
+            let deleted = 0;
+            for (const artifact of artifacts) {
+              if (!artifact.name.startsWith('mentalytics-backup-')) continue;
+              await github.rest.actions.deleteArtifact({ owner, repo, artifact_id: artifact.id });
+              deleted++;
+            }
+            const left = await github.paginate(github.rest.actions.listArtifactsForRepo, { owner, repo, per_page: 100 });
+            const still = left.filter((a) => a.name.startsWith('mentalytics-backup-')).length;
+            core.notice(`Deleted ${deleted} backup artifacts; ${still} left.`);
+            if (still > 0) core.setFailed(`${still} backup artifacts could not be deleted`);

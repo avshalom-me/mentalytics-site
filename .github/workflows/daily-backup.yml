@@ -1,10 +1,19 @@
 name: Daily Backup
 
+# Stopped on 11/10/2026 by the owner's decision. This workflow stored a full dump
+# of the database, and a copy of the storage buckets, as an artifact of this
+# repository - and the repository is public: any signed-in GitHub user could
+# download the encrypted archives, so everything rested on the passphrase alone.
+# The schedule is removed, and the archives that were already there are deleted
+# with delete-backup-artifacts.yml.
+#
+# What still backs the data up: Supabase's own daily backups, and the nightly
+# Drive backup of the business tables and the storage files (app/lib/backup-run.ts).
+#
+# The manual trigger is kept for a day this repository is private. Running it
+# while the repository is public publishes such an archive again.
 on:
-  schedule:
-    # 03:00 UTC = 05:00 / 06:00 Israel (depending on DST)
-    - cron: '0 3 * * *'
-  workflow_dispatch: # allows manual run from the Actions tab
+  workflow_dispatch:
 
 jobs:
   backup:

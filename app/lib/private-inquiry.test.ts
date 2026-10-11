@@ -21,6 +21,8 @@ const h = vi.hoisted(() => ({
   /** what a read of each table answers */
   rows: {} as Record<string, Record<string, unknown>[]>,
   sendInquiryEmail: vi.fn(),
+  /** where the therapist's mail lands: their own mailbox, or their centre's */
+  recipient: { to: "therapist@example.com", viaCenter: null as { id: string; name: string } | null },
 }));
 
 vi.mock("server-only", () => ({}));
@@ -52,7 +54,7 @@ vi.mock("@/app/lib/inquiry-send", () => ({
   INQUIRY_SEND_FAILED_MESSAGE: "the message was not sent",
 }));
 vi.mock("@/app/lib/therapist-recipient", () => ({
-  patientInquiryRecipient: async () => ({ to: "therapist@example.com", viaCenter: null }),
+  patientInquiryRecipient: async () => h.recipient,
 }));
 
 import { isPrivateInquiry, withoutPrivateContent, PRIVATE_INQUIRY_NOTICE } from "./private-inquiry";
@@ -112,6 +114,7 @@ beforeEach(() => {
   h.rows = {};
   h.sendInquiryEmail.mockReset();
   h.sendInquiryEmail.mockResolvedValue({ ok: true, id: "mail-1" });
+  h.recipient = { to: "therapist@example.com", viaCenter: null };
 });
 
 describe("withoutPrivateContent", () => {
@@ -168,8 +171,54 @@ describe("the admin never receives what a patient wrote", () => {
   });
 });
 
-describe("a patient's message is stored apart from the row the admin reads", () => {
-  it("to a therapist: the lead row carries no content, the recipient's mail does", async () => {
+describe("what is kept of a patient's message", () => {
+  const therapistRow = {
+    id: THERAPIST, full_name: "מטפלת לדוגמה", email: "therapist@example.com", status: "approved",
+    accepting_new_patients: true, entity_type: null, center_account_id: null,
+  };
+  const toTherapist = () =>
+    contactTherapistPOST(
+      post("http://localhost/api/contact-therapist", {
+        therapist_id: THERAPIST,
+        sender_name: PATIENT.name,
+        sender_contact: PATIENT.contact,
+        message: PATIENT.message,
+        source: "profile",
+        session_id: "visit-1",
+      }),
+    );
+
+  // The owner's decision: what goes straight to a therapist we only need to know
+  // about, not to hold. Nothing of it is written anywhere in the database.
+  it("to a therapist's own mailbox: counted, and nothing of its content is kept at all", async () => {
+    h.rows.therapists = [therapistRow];
+    expect(await (await toTherapist()).json()).toEqual({ ok: true });
+    expect(h.writes.map((w) => w.table).sort()).toEqual(["crm_leads", "therapist_contact_clicks"]);
+    for (const w of h.writes) {
+      for (const secret of SECRETS) expect(JSON.stringify(w.row)).not.toContain(secret);
+    }
+    expect(h.writes.find((w) => w.table === "crm_leads")!.row).toMatchObject({
+      lead_type: "patient", source: "site_message", therapist_id: THERAPIST, received_by_center_id: null,
+    });
+    // the therapist is the only one who gets it
+    const [mail] = h.sendInquiryEmail.mock.calls[0] as [{ to: string; html: string }];
+    expect(mail.to).toBe("therapist@example.com");
+    expect(mail.html).toContain(PATIENT.message);
+  });
+
+  it("to a therapist whose mail lands in the centre's mailbox: kept for that centre's portal only", async () => {
+    h.rows.therapists = [{ ...therapistRow, email: null, center_account_id: CENTER }];
+    h.recipient = { to: "office@example.com", viaCenter: { id: CENTER, name: "מרכז לדוגמה" } };
+    expect(await (await toTherapist()).json()).toEqual({ ok: true });
+    const lead = h.writes.find((w) => w.table === "crm_leads")!.row;
+    expect(lead).toMatchObject({ source: "site_message", therapist_id: THERAPIST, received_by_center_id: CENTER });
+    for (const secret of SECRETS) expect(JSON.stringify(lead)).not.toContain(secret);
+    expect(h.writes.filter((w) => w.table === "private_inquiries").map((w) => w.row)).toEqual([
+      { lead_id: "crm_leads-new-id", sender_name: PATIENT.name, sender_contact: PATIENT.contact, message: PATIENT.message },
+    ]);
+  });
+
+  it("the lead row carries no content, the recipient's mail does", async () => {
     h.rows.therapists = [
       { id: THERAPIST, full_name: "מטפלת לדוגמה", email: "therapist@example.com", status: "approved", accepting_new_patients: true, entity_type: null, center_account_id: null },
     ];
@@ -194,12 +243,8 @@ describe("a patient's message is stored apart from the row the admin reads", () 
     const click = h.writes.find((w) => w.table === "therapist_contact_clicks")!.row;
     for (const secret of SECRETS) expect(JSON.stringify(click)).not.toContain(secret);
 
-    // the content, once, tied to the lead row
-    expect(h.writes.filter((w) => w.table === "private_inquiries").map((w) => w.row)).toEqual([
-      { lead_id: "crm_leads-new-id", sender_name: PATIENT.name, sender_contact: PATIENT.contact, message: PATIENT.message },
-    ]);
-    // nothing sensitive went anywhere else
-    for (const w of h.writes.filter((x) => x.table !== "private_inquiries")) {
+    // nothing sensitive was written anywhere
+    for (const w of h.writes) {
       for (const secret of SECRETS) expect(JSON.stringify(w.row)).not.toContain(secret);
     }
 
@@ -317,5 +362,13 @@ describe("who may touch the content (a scan of the source)", () => {
   it("the GitHub database dump leaves the content rows out", () => {
     const workflow = readFileSync(path.join(ROOT, ".github", "workflows", "daily-backup.yml"), "utf8");
     expect(workflow).toMatch(/pg_dump[^\n]*--exclude-table-data=public\.private_inquiries/);
+  });
+
+  // The archives were artifacts of a public repository: anyone signed in to
+  // GitHub could download the whole database, encrypted. The owner stopped it.
+  it("the GitHub backup no longer runs on a schedule", () => {
+    const workflow = readFileSync(path.join(ROOT, ".github", "workflows", "daily-backup.yml"), "utf8");
+    expect(workflow).not.toMatch(/^\s*schedule:/m);
+    expect(workflow).not.toMatch(/^\s*- cron:/m);
   });
 });

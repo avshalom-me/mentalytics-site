@@ -142,9 +142,15 @@ export async function POST(req: NextRequest) {
     // must not be lost, and the morning digest flags it against the email log.
     //
     // The row carries no name, contact or message (11/10/2026): what the patient
-    // wrote belongs to the recipient, and the admin only counts. The content is
-    // kept apart, where no admin screen reads (private-inquiry-store.ts), and a
-    // constraint on crm_leads refuses it here.
+    // wrote belongs to the recipient, and the admin only counts.
+    //
+    // The content itself is kept only where someone is entitled to read it back.
+    // A message that landed in a centre's mailbox is shown in that centre's portal,
+    // so it is stored apart, where no admin screen reads (private-inquiry-store.ts).
+    // A message that went to the therapist's own mailbox lives in that mailbox
+    // alone: we know that it was sent, to whom and when, and keep nothing of what
+    // it said (the owner's decision). If the mail to the therapist fails, the
+    // sender is told so on the spot and nothing is kept either.
     try {
       const { data: lead, error: leadErr } = await supabaseAdmin
         .from("crm_leads")
@@ -159,7 +165,7 @@ export async function POST(req: NextRequest) {
         .select("id")
         .single();
       if (leadErr) console.error("crm_leads insert failed:", leadErr.message);
-      else if (lead?.id) {
+      else if (lead?.id && receivedByCenterId) {
         await savePrivateInquiry(lead.id as string, { sender_name: name, sender_contact: contact, message: msg });
       }
     } catch (e) {
