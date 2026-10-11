@@ -1358,8 +1358,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, therapists });
     }
 
-    // "צפייה בתור מרכז": אותו מטען בדיוק שהפורטל מקבל, דרך אותה פונקציה
-    // (buildCenterPortalPayload). קריאה בלבד - אין כאן שום כתיבה, ואין
+    // "צפייה בתור מרכז": המטען שהפורטל מקבל, דרך אותה פונקציה
+    // (buildCenterPortalPayload), בלי תוכן ההודעות שהמרכז קיבל: מי כתב ומה
+    // נכתב גלוי למרכז בלבד, והאדמין מקבל את מספרן. קריאה בלבד - אין כאן שום כתיבה, ואין
     // התחזות לחשבון: האדמין מזוהה ב-Basic Auth של /api/admin-, והמרכז נטען
     // לפי id ולא לפי סשן שלו.
     if (action === "center_portal_preview") {

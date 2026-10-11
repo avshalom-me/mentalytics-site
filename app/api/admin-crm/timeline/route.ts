@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { PRIVATE_INQUIRY_NOTICE, withoutPrivateContent } from "@/app/lib/private-inquiry";
 
 // Unified 360° timeline for a therapist: audit log (status changes,
 // promotions, subscription events), outbound emails, internal notes,
@@ -93,7 +94,7 @@ export async function GET(req: NextRequest) {
       .limit(100),
     supabaseAdmin
       .from("crm_leads")
-      .select("name, contact, message, status, created_at")
+      .select("name, contact, source, status, created_at")
       .eq("therapist_id", therapistId)
       .order("created_at", { ascending: false })
       .limit(100),
@@ -141,18 +142,22 @@ export async function GET(req: NextRequest) {
       actor: n.author,
     });
   }
-  for (const l of leads.data ?? []) {
+  for (const raw of leads.data ?? []) {
+    // פנייה של מטופל/ת למטפל/ת: האדמין רואה שהתקבלה ומתי, לא מי כתב ולא מה.
+    const l = withoutPrivateContent(raw);
     events.push({
       kind: "lead",
       ts: l.created_at,
       title: "התקבלה פנייה דרך האתר",
-      detail: l.name ? `${l.name} · ${l.contact ?? ""}` : l.contact ?? null,
+      detail: l.content_private
+        ? PRIVATE_INQUIRY_NOTICE
+        : l.name ? `${l.name} · ${l.contact ?? ""}` : l.contact ?? null,
       actor: null,
     });
   }
   for (const c of clicks.data ?? []) {
-    // site_message clicks are already represented (with content) by the lead
-    // rows above — skip the bare click so the timeline doesn't double-count.
+    // site_message clicks are already represented by the lead rows above —
+    // skip the bare click so the timeline doesn't double-count.
     if (c.click_type === "site_message") continue;
     events.push({
       kind: "click",

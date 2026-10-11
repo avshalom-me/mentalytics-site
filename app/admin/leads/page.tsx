@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import HelpTip from "../components/HelpTip";
 import { LEAD_STATUSES, LEAD_TYPES, labelOf, gmailSearchUrl } from "@/app/lib/crm";
+import { PRIVATE_INQUIRY_NOTICE } from "@/app/lib/private-inquiry";
 
 type Lead = {
   id: string;
@@ -17,6 +18,11 @@ type Lead = {
   utm_campaign: string | null;
   status: string;
   created_at: string;
+  /**
+   * פנייה של מטופל/ת למטפל/ת או למרכז: השרת מחזיר אותה בלי שם, בלי פרטי קשר
+   * ובלי הודעה. היא כאן כדי להיספר, ואין בה מה לטפל.
+   */
+  content_private?: boolean;
 };
 
 const SOURCE_LABELS: Record<string, string> = {
@@ -111,7 +117,7 @@ export default function LeadsPage() {
           <HelpTip id="leads" />
         </div>
         <p className="mb-5 text-sm text-stone-500">
-          פניות שנקלטו מהאתר נשמרות כאן אוטומטית. שימו לב: פרטי פונים לטיפול נפשי — מידע רגיש, פנימי בלבד.
+          פניות שנקלטו מהאתר נשמרות כאן אוטומטית. פנייה של מטופל/ת למטפל/ת או למרכז מופיעה לספירה בלבד: מי כתב ומה נכתב גלוי לנמען בלבד, ולא מוצג כאן.
         </p>
 
         {/* Filters */}
@@ -168,7 +174,9 @@ export default function LeadsPage() {
                   <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-semibold text-stone-500">
                     {labelOf(LEAD_TYPES, l.lead_type)}
                   </span>
-                  <span className="text-sm font-black text-stone-800">{l.name || "ללא שם"}</span>
+                  <span className="text-sm font-black text-stone-800">
+                    {l.content_private ? "פנייה ממטופל/ת" : l.name || "ללא שם"}
+                  </span>
                   {l.contact && (
                     <a
                       href={contactIsEmail ? `mailto:${l.contact}` : `tel:${l.contact}`}
@@ -187,6 +195,9 @@ export default function LeadsPage() {
                   {l.utm_campaign && <span>קמפיין: {l.utm_campaign}</span>}
                 </div>
 
+                {l.content_private && (
+                  <p className="mt-2 rounded-xl bg-stone-50 p-3 text-sm text-stone-500">{PRIVATE_INQUIRY_NOTICE}</p>
+                )}
                 {l.message && (
                   <button
                     type="button"
@@ -198,12 +209,13 @@ export default function LeadsPage() {
                 )}
 
                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                  {l.status === "new" && (
+                  {/* בפנייה פרטית אין מה לטפל ואין במה לעקוב: רק ארכיון ושחזור. */}
+                  {!l.content_private && l.status === "new" && (
                     <ActionBtn onClick={() => setStatus(l.id, "in_progress")} disabled={busy === l.id}>
                       התחל טיפול
                     </ActionBtn>
                   )}
-                  {l.status !== "converted" && l.status !== "closed" && (
+                  {!l.content_private && l.status !== "converted" && l.status !== "closed" && (
                     <ActionBtn onClick={() => setStatus(l.id, "converted")} disabled={busy === l.id}>
                       הומרה ✓
                     </ActionBtn>
@@ -223,9 +235,11 @@ export default function LeadsPage() {
                       החזרה לחדשה
                     </ActionBtn>
                   )}
-                  <ActionBtn onClick={() => createFollowupTask(l)} disabled={busy === l.id}>
-                    + משימת מעקב
-                  </ActionBtn>
+                  {!l.content_private && (
+                    <ActionBtn onClick={() => createFollowupTask(l)} disabled={busy === l.id}>
+                      + משימת מעקב
+                    </ActionBtn>
+                  )}
                   {l.contact && contactIsEmail && (
                     <a
                       href={gmailSearchUrl(l.contact)}

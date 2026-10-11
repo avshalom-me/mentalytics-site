@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { withoutPrivateContent } from "@/app/lib/private-inquiry";
 
 // Inbound inquiries (patients, prospective therapists/teachers, general).
 // Captured automatically from the site's contact pipelines; manageable here.
@@ -58,8 +59,12 @@ export async function GET(req: NextRequest) {
     centerNames = Object.fromEntries((centers ?? []).map((c) => [c.id, c.name ?? ""]));
   }
 
+  // A patient's message to a therapist or a centre is counted here and never
+  // shown: who wrote it and what they wrote belongs to the recipient. The three
+  // columns are already empty in the table for these rows; this is the second
+  // lock, for a row that somehow is not.
   const withNames = (leads ?? []).map((l) => ({
-    ...l,
+    ...withoutPrivateContent(l),
     therapist_name: l.therapist_id
       ? names[l.therapist_id] ?? null
       : l.center_account_id

@@ -42,7 +42,9 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    return NextResponse.json(await buildCenterPortalPayload(center));
+    // הפורטל של המרכז עצמו הוא הקורא היחיד שמקבל את תוכן ההודעות. המרכז כבר
+    // אומת למעלה (resolveCenter), והמטען נבנה רק עבורו.
+    return NextResponse.json(await buildCenterPortalPayload(center, { messageContent: true }));
   } catch (err) {
     return NextResponse.json(
       { ok: false, error: err instanceof Error ? err.message : "Unknown error" },

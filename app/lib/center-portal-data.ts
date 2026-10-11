@@ -4,6 +4,8 @@ import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { therapistPath } from "@/app/lib/therapist-url";
 import type { PortalCenter } from "@/app/lib/center-auth";
 import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type CenterDirector, type CenterFaqItem } from "@/app/lib/center-public";
+import { PRIVATE_INQUIRY_SOURCE } from "@/app/lib/private-inquiry";
+import { loadPrivateInquiries } from "@/app/lib/private-inquiry-store";
 
 // בניית המטען של פורטל המרכז. הופרד מ-/api/center-portal ב-7/9/2026 כדי
 // שהאדמין יוכל להציג "צפייה בתור מרכז" מאותו קוד בדיוק: תצוגה מקדימה
@@ -12,6 +14,11 @@ import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type 
 //
 // הפונקציה מקבלת מרכז שכבר אומת (או נטען ע"י אדמין) ואינה בודקת הרשאות -
 // האימות נשאר בקוראים: resolveCenter בפורטל, ה-Basic Auth של האדמין בשני.
+//
+// חריג אחד ל"אותו מטען בדיוק" (11/10/2026): תוכן ההודעות שהמרכז קיבל - שם
+// הפונה, פרטי הקשר שלו ומה שכתב - יוצא רק כשהקורא ביקש אותו במפורש, ורק הפורטל
+// האמיתי מבקש. "צפייה בתור מרכז" של האדמין מקבלת את מספר ההודעות בלבד. ברירת
+// המחדל היא בלי תוכן, כדי שקורא חדש שישכח לבחור לא יחשוף.
 
 function tallyBy<T>(rows: T[], key: (r: T) => string | null | undefined) {
   const counts: Record<string, number> = {};
@@ -41,7 +48,11 @@ type TherapistRow = {
 const monthAgo = () => new Date(Date.now() - 30 * 86_400_000);
 const weekAgo = () => new Date(Date.now() - 7 * 86_400_000);
 
-export async function buildCenterPortalPayload(center: PortalCenter) {
+export async function buildCenterPortalPayload(
+  center: PortalCenter,
+  opts: { messageContent?: boolean } = {},
+) {
+  const withMessageContent = opts.messageContent === true;
   // מסלול 2 (מרכז כישות): שורת ישות-המרכז אינה מוצגת ברשימת המטפלים - היא
   // הפרופיל שהמרכז עורך. שולפים את מזההּ וסטטוסהּ כדי שהדשבורד יקשר לעריכה.
   const isEntity = (center.billing_track as string) === "center_entity";
@@ -159,13 +170,17 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
   // ברגע השליחה - ולא לפי "למטפל אין כרגע מייל": אחרת מרכז שמוחק את השדה
   // בפרופיל היה חושף בדיעבד הודעות שנשלחו לתיבה הפרטית של המטפל/ת.
   // נשלף לפני היציאה המוקדמת: גם מרכז בלי מטפלים מקבל הודעות לעמוד שלו.
+  // השורה ב-crm_leads אומרת רק מתי ולמי. התוכן יושב בנפרד ונטען רק לפורטל עצמו.
   const { data: messageRows } = await supabaseAdmin
     .from("crm_leads")
-    .select("id, name, contact, message, therapist_id, created_at")
+    .select("id, therapist_id, created_at")
     .eq("received_by_center_id", center.id)
-    .eq("source", "site_message")
+    .eq("source", PRIVATE_INQUIRY_SOURCE)
     .order("created_at", { ascending: false })
     .limit(50);
+  const messageContent = withMessageContent
+    ? await loadPrivateInquiries((messageRows ?? []).map((m) => m.id as string))
+    : new Map();
   const nameById = new Map<string, string>(therapists.map((t) => [t.id, t.full_name ?? ""]));
   const unknownIds = [...new Set(
     (messageRows ?? [])
@@ -177,18 +192,22 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     const { data: extra } = await supabaseAdmin.from("therapists").select("id, full_name").in("id", unknownIds);
     for (const t of extra ?? []) nameById.set(t.id as string, (t.full_name as string | null) ?? "");
   }
-  const messages = (messageRows ?? []).map((m) => {
+  const messages = !withMessageContent ? [] : (messageRows ?? []).map((m) => {
     const tid = m.therapist_id as string | null;
+    const content = messageContent.get(m.id as string);
     return {
       id: m.id as string,
       created_at: m.created_at as string,
-      sender_name: (m.name as string | null) ?? "",
-      sender_contact: (m.contact as string | null) ?? "",
-      message: (m.message as string | null) ?? "",
+      sender_name: content?.sender_name ?? "",
+      sender_contact: content?.sender_contact ?? "",
+      message: content?.message ?? "",
       // null = למרכז עצמו (עמוד המרכז, או ישות-המרכז במסלול 2)
       to_therapist: tid && tid !== entity?.id ? (nameById.get(tid) || "מטפל/ת מהצוות") : null,
     };
   });
+  // מי שלא קיבל את התוכן (האדמין) מקבל במקומו כמה הודעות יש. undefined = הקורא
+  // הוא המרכז עצמו, והרשימה למעלה היא כל מה שיש להציג.
+  const messagesPrivateCount = withMessageContent ? undefined : (messageRows ?? []).length;
 
   // אין נתונים להצגה - מחזירים שלד ריק (מרכז חדש / טרם שויכו מטפלים / ישות
   // שטרם נכנסה להתאמות).
@@ -208,6 +227,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
       },
       therapists: [],
       messages,
+      messages_private_count: messagesPrivateCount,
       stats: null,
       generated_at: new Date().toISOString(),
     });
@@ -539,6 +559,7 @@ export async function buildCenterPortalPayload(center: PortalCenter) {
     },
     therapists: therapistList,
     messages,
+    messages_private_count: messagesPrivateCount,
     stats: {
       // "בהתאמות" = מקודם בפועל (מנוי המרכז) ואושר על-ידי אדמין.
       listed_count: therapists.filter((t) => t.status === "paying" && t.admin_approved).length,
