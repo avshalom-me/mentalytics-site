@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         ok: true,
         review: latest.review,
-        top: top.map((r) => ({ therapist_id: r.therapist_id, name: r.name, tier: r.tier, risk: r.risk, risk_reason: r.risk_reason, primary_action: r.primary_action })),
+        top: top.map((r) => ({ therapist_id: r.therapist_id, name: r.name, tier: r.tier, risk: r.risk, risk_reason: r.risk_reason, todo: r.todo, primary_action: r.primary_action })),
         pending_count: (pending ?? []).filter((p) => p.action_type !== "alert").length,
       });
     }

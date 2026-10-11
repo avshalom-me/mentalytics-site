@@ -1,19 +1,8 @@
 import "server-only";
 import { z } from "zod";
-import { llmConfigured, llmJson, llmText } from "./llm";
-import { narrativeIsFaithful } from "./budget-agent";
+import { llmConfigured, llmJson } from "./llm";
 import { therapistPhotoUrl } from "./therapist-photo-url";
-import {
-  emailBodyProblem,
-  RISK_LABELS,
-  SOURCE_LABELS,
-  TIER_LABELS,
-  type ReviewContext,
-  type ReviewFlag,
-  type ReviewRow,
-  type ReviewSummary,
-  type TherapistInput,
-} from "./retention-review";
+import { emailBodyProblem, todoSentence, type ReviewFlag, type ReviewRow, type TherapistInput } from "./retention-review";
 
 // שלב 2 של סקירת השימור: מה שהמודל מוסיף מעל המנוע הטהור, ורק אחריו.
 //   1. סקירת כרטיס (Sonnet, עם התמונה) למי שהכרטיס שלו לא נפתח או הפרופיל
@@ -21,8 +10,7 @@ import {
 //   2. טיוטת המייל (Opus) במקום התבנית: אותן עובדות (הדגלים שבאחריות
 //      המטפל/ת), ניסוח אישי, בלי אף מספר ביצועים - ואם המודל בכל זאת כתב
 //      מספר, התבנית חוזרת.
-//   3. הנרטיב השבועי (Opus, חשיבה עמוקה): מה הכי חשוב השבוע, דפוסים על פני
-//      מטפלים ואזורים, סדר פעולות. כל מספר בו חייב להופיע בקלט.
+// (הנרטיב השבועי הוסר 11/10/26 - הבעלים רוצה רובריקות, לא מלל.)
 // כל קריאה נכשלת לבדה: בלי מודל הסקירה היא בדיוק מה שהייתה בשלב 1.
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
@@ -89,6 +77,7 @@ const DRAFT_SYSTEM = `אתה כותב בשם צוות "טיפול חכם" (את�
 כללים שאינם ניתנים לשינוי:
 - אל תכתוב שום מספר על הביצועים של המטפל/ת (פניות, צפיות, הופעות, דירוג). אל תכתוב מספרים בכלל, חוץ מאחוז ביקוש כללי שמופיע בעובדות.
 - כתוב רק על העובדות שניתנו. אל תמציא פער שלא ברשימה ואל תסיק דברים על המטפל/ת.
+- לעולם אל תציע למטפל/ת לסמן שיטת טיפול או תחום ספציפי (למשל "כדאי לסמן CBT"). מותר רק לבקש לוודא שכל התחומים שהוא/היא עוסק/ת בהם מסומנים.
 - טון: ענייני, חם, בלי שיווקיות ("לבחור דווקא בך", "להוביל", "להזניק"), בלי מחמאות ריקות, בלי לשון שכנוע ובלי סימני קריאה.
 - עברית פשוטה, פנייה בגוף שני לפי המין שניתן. 2-3 הצעות קונקרטיות, כל אחת בפסקה קצרה או בנקודה. פתיחה של משפט אחד, סיום של משפט אחד שמזמין להשיב למייל אם יש שאלה.
 - לא להשתמש במקף ארוך (—); להשתמש ב-" - ". לא להוסיף חתימה (היא מתווספת אוטומטית) ולא קישור (כפתור העריכה מתווסף אוטומטית).
@@ -125,71 +114,19 @@ async function draftEmail(t: TherapistInput, gender: string | null, flags: Revie
   }
 }
 
-// ── 3. הנרטיב השבועי ────────────────────────────────────────────────────────
-
-const NARRATIVE_SYSTEM = `אתה כותב למנהל של "טיפול חכם" (אתר ישראלי להתאמת טיפול נפשי; מטפלים משלמים על קידום) את הפתיח של סקירת השימור השבועית. הקלט: סיכום מספרי ורשימת המקודמים בסיכון עם המשפך, הדגלים והפעולה המוצעת לכל אחד.
-כתוב 4-7 משפטים בעברית, בלי כותרות ובלי רשימות: (1) מה הכי חשוב השבוע ולמה; (2) דפוסים חוצי-מטפלים אם יש - אזור שבו כמה נפגעים יחד, קבוצת ניסיון שמסתיימת באותו תאריך, סיבה משותפת (אונליין, שיטה חסרה, קמפיין); (3) סדר פעולות מומלץ, בזהירות: מה עדיף לפני מה.
-כל מספר שתכתוב חייב להופיע בקלט כפי שהוא. אל תמציא שמות, מספרים או סיבות. בלי שיווקיות, בלי מקף ארוך (—). שמות מטפלים מותרים.`;
-
-function narrativeInput(rows: ReviewRow[], summary: ReviewSummary, ctx: ReviewContext): string {
-  const attention = rows.filter((r) => r.risk === "critical" || r.risk === "high" || r.risk === "medium");
-  const lines = attention.map((r) => {
-    const m = r.metrics;
-    return [
-      `${r.name} (${TIER_LABELS[r.tier]}, ${SOURCE_LABELS[r.promotion_source ?? ""] ?? r.promotion_source}, ${m.regions.join("/") || "ללא אזור"}): ${RISK_LABELS[r.risk]}.`,
-      r.risk_reason,
-      `כרטיסים ${m.cards_cur}${m.cardsBenchmark != null ? ` מול בנצ'מרק ${m.cardsBenchmark}` : ""}, כניסות ${m.opens_cur}, פונים ${m.people_cur} (קודם ${m.people_prev}).`,
-      `דגלים: ${r.flags.map((f) => f.label).join(", ") || "אין"}. פעולה: ${r.actions[0]?.title ?? "אין"}.`,
-    ].join(" ");
-  });
-  return [
-    `שבוע: ${ctx.holidayWeek ? `שבוע ${ctx.holidayWeek}. ` : ""}נבדקו ${summary.checked} מקודמים: ${summary.byRisk.critical} קריטי, ${summary.byRisk.high} סיכון גבוה, ${summary.byRisk.medium} בינוני, ${summary.byRisk.ok} תקינים, ${summary.byRisk.new} חדשים, ${summary.byRisk.paused} מוקפאים. ${summary.actions} פעולות מוכנות.`,
-    ctx.benchmark ? `בנצ'מרק משלם פרטי ל-30 יום: ${ctx.benchmark.cards} כרטיסים, ${ctx.benchmark.opens} כניסות, ${ctx.benchmark.people} פונים (${ctx.benchmark.peers} עמיתים). ${Math.round(ctx.onlineShare * 100)}% מהחיפושים ביקשו אונליין.` : "",
-    "",
-    ...lines,
-  ].join("\n");
-}
-
-async function weeklyNarrative(rows: ReviewRow[], summary: ReviewSummary, ctx: ReviewContext): Promise<string | null> {
-  const input = narrativeInput(rows, summary, ctx);
-  try {
-    const out = await llmText({
-      feature: "retention_weekly",
-      tier: "deep",
-      system: NARRATIVE_SYSTEM,
-      user: input,
-      maxTokens: 900,
-      timeoutMs: 120_000,
-      retries: 0,
-    });
-    const text = out.text.trim().replace(/—/g, " - ");
-    if (!text) return null;
-    if (!narrativeIsFaithful(text, input)) {
-      console.warn("retention_weekly: narrative carried a number that is not in the input - dropped");
-      return null;
-    }
-    return text;
-  } catch (e) {
-    console.warn("retention_weekly failed:", e instanceof Error ? e.message : e);
-    return null;
-  }
-}
-
 // ── ההעשרה ──────────────────────────────────────────────────────────────────
 
-export type ModelEnrichment = { narrative: string | null; cardReviews: number; drafts: number };
+export type ModelEnrichment = { cardReviews: number; drafts: number };
 
 /**
- * מוסיף לשורות (במקום) את סקירת הכרטיס כדגל ואת טיוטת המודל במקום התבנית,
- * ומחזיר את הנרטיב. בלי מפתח למודל - לא נוגע בכלום.
+ * מוסיף לשורות (במקום) את סקירת הכרטיס כדגל ואת טיוטת המודל במקום התבנית.
+ * בלי מפתח למודל - לא נוגע בכלום.
  */
 export async function enrichReviewWithModel(
   rows: ReviewRow[],
   inputs: Map<string, TherapistInput & { gender: string | null; therapist_types: string[] }>,
-  summary: ReviewSummary,
-  ctx: ReviewContext,
 ): Promise<ModelEnrichment> {
-  if (!llmConfigured()) return { narrative: null, cardReviews: 0, drafts: 0 };
+  if (!llmConfigured()) return { cardReviews: 0, drafts: 0 };
 
   const needsCard = rows
     .filter((r) => (r.risk === "critical" || r.risk === "high" || r.risk === "medium") && r.flags.some((f) => f.key === "card_not_opened" || f.key === "profile_not_converting"))
@@ -229,8 +166,9 @@ export async function enrichReviewWithModel(
     action.body = draft.body;
     action.detail = "טיוטה של המודל מתוך הדגלים, בלי מספרים. נשלחת רק אחרי עריכה ולחיצה.";
     drafts++;
+    // המייל מבקש עכשיו גם את מה שסקירת הכרטיס העלתה - שורת "מה לעשות" מתעדכנת.
+    r.todo = todoSentence(r.actions, r.flags, r.risk);
   });
 
-  const narrative = await weeklyNarrative(rows, summary, ctx);
-  return { narrative, cardReviews: cards.size, drafts };
+  return { cardReviews: cards.size, drafts };
 }

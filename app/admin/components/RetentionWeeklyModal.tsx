@@ -7,9 +7,9 @@ import { useEffect, useState } from "react";
 // לא אושרה ("ראיתי" נשמר במסד, כך ששני האדמינים רואים אותו מצב). "אחר כך"
 // משתיק אותו רק בדפדפן הזה עד לכניסה הבאה.
 
-type Top = { therapist_id: string; name: string | null; tier: string; risk: string; risk_reason: string | null; primary_action: string | null };
+type Top = { therapist_id: string; name: string | null; tier: string; risk: string; risk_reason: string | null; todo: string | null; primary_action: string | null };
 type Brief = {
-  review: { id: string; week_start: string; created_at: string; summary: Record<string, unknown>; narrative: string | null; acknowledged_at: string | null } | null;
+  review: { id: string; week_start: string; created_at: string; summary: Record<string, unknown>; acknowledged_at: string | null } | null;
   top: Top[];
   pending_count: number;
 };
@@ -20,7 +20,6 @@ const RISK_TONE: Record<string, string> = {
   high: "bg-amber-100 text-amber-800",
   medium: "bg-yellow-50 text-yellow-800",
 };
-const ACTION_LABEL: Record<string, string> = { fix: "לתקן באדמין", freeze: "הקפאה שקטה", email: "מייל שיפור", task: "שיחה", campaign: "קמפיין" };
 
 function weekLabel(iso: string): string {
   const d = new Date(iso);
@@ -95,9 +94,6 @@ export default function RetentionWeeklyModal() {
           <span className="rounded-full bg-stone-100 px-3 py-1 font-bold text-stone-600">{brief.pending_count} פעולות ממתינות</span>
           {s.holidayWeek && <span className="rounded-full bg-sky-50 px-3 py-1 font-bold text-sky-800">שבוע {s.holidayWeek}</span>}
         </div>
-        {brief.review.narrative && (
-          <p className="mb-4 rounded-xl bg-[var(--teal-pale)] p-3 text-sm leading-relaxed text-stone-800">{brief.review.narrative}</p>
-        )}
         {brief.top.length === 0 ? (
           <p className="mb-4 text-sm text-stone-500">כל {s.checked ?? ""} המקודמים תקינים השבוע.</p>
         ) : (
@@ -107,8 +103,7 @@ export default function RetentionWeeklyModal() {
                 <span className={`mt-0.5 shrink-0 rounded-full px-2 py-0.5 text-xs font-bold ${RISK_TONE[t.risk] ?? "bg-stone-100 text-stone-600"}`}>{RISK_LABEL[t.risk] ?? t.risk}</span>
                 <span className="min-w-0 flex-1">
                   <span className="font-bold text-stone-900">{t.name}</span>
-                  {t.primary_action && <span className="ms-2 text-xs text-stone-500">← {ACTION_LABEL[t.primary_action] ?? t.primary_action}</span>}
-                  <span className="block text-xs text-stone-500">{t.risk_reason}</span>
+                  <span className="block text-xs text-stone-600">{t.todo ?? t.risk_reason}</span>
                 </span>
               </li>
             ))}

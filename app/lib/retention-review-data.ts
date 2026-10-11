@@ -284,9 +284,9 @@ export async function runRetentionReview(opts?: { mode?: string; now?: Date; noM
     const { rows, summary } = buildRetentionReview(inputs, ctx);
     const weekStart = reviewWeekStart(now);
 
-    // שלב 2: המודל מוסיף סקירת כרטיס, טיוטות ונרטיב - מעל המנוע, ורק אחריו.
+    // שלב 2: המודל מוסיף סקירת כרטיס וטיוטות - מעל המנוע, ורק אחריו.
     // כישלון שם משאיר את הסקירה של שלב 1 שלמה.
-    const enrichment = opts?.noModel ? null : await enrichReviewWithModel(rows, modelInputs, summary, ctx);
+    const enrichment = opts?.noModel ? null : await enrichReviewWithModel(rows, modelInputs);
 
     // הצילום: שורת סקירה לשבוע, ושורה לכל מקודם. ריצה חוזרת מחליפה את השורות.
     const { data: review, error: reviewErr } = await supabaseAdmin
@@ -296,13 +296,13 @@ export async function runRetentionReview(opts?: { mode?: string; now?: Date; noM
           week_start: weekStart,
           created_at: now.toISOString(),
           run_id: runId,
-          narrative: enrichment?.narrative ?? null,
+          narrative: null,
           summary: {
             ...summary,
             benchmark: ctx.benchmark,
             onlineShare: ctx.onlineShare,
             demandTotal: ctx.demandTotal,
-            model: enrichment ? { cardReviews: enrichment.cardReviews, drafts: enrichment.drafts, narrative: !!enrichment.narrative } : null,
+            model: enrichment ? { cardReviews: enrichment.cardReviews, drafts: enrichment.drafts } : null,
           },
         },
         { onConflict: "week_start" },
@@ -326,6 +326,7 @@ export async function runRetentionReview(opts?: { mode?: string; now?: Date; noM
       actions: r.actions,
       primary_action: r.primary_action,
       risk_reason: r.risk_reason,
+      todo: r.todo,
     }));
     for (let i = 0; i < toInsert.length; i += 100) {
       const { error } = await supabaseAdmin.from("retention_review_rows").insert(toInsert.slice(i, i + 100));
@@ -441,6 +442,7 @@ export type StoredReviewRow = {
   actions: ReviewRow["actions"];
   primary_action: string | null;
   risk_reason: string | null;
+  todo: string | null;
 };
 
 /** תוצאות הפעולות שבוצעו ב-90 הימים האחרונים: פניות לפני ואחרי, עריכת פרופיל, עזיבה. */
@@ -505,7 +507,7 @@ export async function latestRetentionReview(): Promise<{ review: StoredReview; r
   const rows = await fetchAllRows<StoredReviewRow>(() =>
     supabaseAdmin
       .from("retention_review_rows")
-      .select("id, therapist_id, name, tier, risk, promotion_source, metrics, flags, actions, primary_action, risk_reason")
+      .select("id, therapist_id, name, tier, risk, promotion_source, metrics, flags, actions, primary_action, risk_reason, todo")
       .eq("review_id", review.id)
       .order("created_at"),
   );

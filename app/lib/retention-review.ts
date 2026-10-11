@@ -21,7 +21,7 @@ export type ReviewTier = "high" | "medium" | "center";
 export type ReviewRisk = "critical" | "high" | "medium" | "ok" | "new" | "paused";
 export type FlagOwner = "therapist" | "us" | "market";
 export type FlagSeverity = "critical" | "high" | "normal";
-export type ReviewActionType = "fix" | "freeze" | "email" | "task" | "campaign";
+export type ReviewActionType = "fix" | "freeze" | "email" | "task" | "campaign" | "extend";
 
 export type ReviewFlag = {
   key: string;
@@ -163,6 +163,8 @@ export type ReviewRow = {
   primary_action: ReviewActionType | null;
   /** למה הסיכון הוא מה שהוא - משפט אחד לטבלה. */
   risk_reason: string;
+  /** מה לעשות - משפט אחד, הדבר הכי חשוב (או 2-3), לשורה הסגורה. */
+  todo: string;
 };
 
 export type ReviewSummary = {
@@ -171,6 +173,8 @@ export type ReviewSummary = {
   byRisk: Record<ReviewRisk, number>;
   actions: number;
   holidayWeek: string | null;
+  /** מי לא נבדק/ת בכוונה: מושהים (לא מקבלים מטופלים) ולא מאושרים. */
+  excluded: { suspended: number; unapproved: number };
 };
 
 // ── ספים. כל אחד מתועד כדי שלא יזוז בלי סיבה ───────────────────────────────
@@ -221,9 +225,9 @@ export const EMAIL_MAX_PARAGRAPHS = 3;
 const RISK_RANK: Record<ReviewRisk, number> = { critical: 0, high: 1, medium: 2, new: 3, paused: 4, ok: 5 };
 const TIER_RANK: Record<ReviewTier, number> = { high: 0, center: 1, medium: 2 };
 const SEVERITY_RANK: Record<FlagSeverity, number> = { critical: 0, high: 1, normal: 2 };
-const ACTION_RANK: Record<ReviewActionType, number> = { fix: 0, freeze: 1, email: 2, task: 3, campaign: 4 };
+const ACTION_RANK: Record<ReviewActionType, number> = { fix: 0, freeze: 1, email: 2, extend: 3, task: 4, campaign: 5 };
 
-export const TIER_LABELS: Record<ReviewTier, string> = { high: "חשיבות גבוהה", center: "מכונים", medium: "חשיבות בינונית" };
+export const TIER_LABELS: Record<ReviewTier, string> = { high: "משלמים ובמסלול לתשלום", center: "מכונים", medium: "מקודמים במתנה" };
 export const RISK_LABELS: Record<ReviewRisk, string> = {
   critical: "קריטי", high: "סיכון גבוה", medium: "סיכון בינוני", ok: "תקין", new: "חדש/ה", paused: "מוקפא/ת",
 };
@@ -259,17 +263,28 @@ export function regionsOf(cities: string[]): string[] {
   return [...out];
 }
 
-/** חשיבות: למי זה חשוב לנו. null = לא בסקירה (חינמי, לא מקודם). */
-export function tierOf(t: Pick<TherapistInput, "status" | "promotion_source" | "entity_type" | "promoted_until">, now: Date): ReviewTier | null {
+/**
+ * חשיבות: למי זה חשוב לנו. null = לא בסקירה (חינמי, לא מקודם).
+ * שתי קבוצות ברורות (הבעלים, 11/10/26 אחרי הריצה הראשונה): מי שמשלם או במסלול
+ * שמגיע לתשלום (paid, gift_trial), ומקודמי מתנה (trial, manual) - פחות דחופים
+ * משמעותית, גם כשהניסיון שלהם מסתיים. מכונים בקבוצה משלהם.
+ */
+export function tierOf(t: Pick<TherapistInput, "status" | "promotion_source" | "entity_type">): ReviewTier | null {
   if (t.entity_type === "center" || t.promotion_source === "center") return t.status === "paying" ? "center" : null;
   if (t.status !== "paying") return null;
   if (t.promotion_source === "paid" || t.promotion_source === "gift_trial") return "high";
-  if (t.promotion_source === "trial") {
-    // רגע ההמרה: בשבועיים האחרונים של הניסיון יוצאת הצעת השדרוג.
-    if (t.promoted_until && daysUntil(t.promoted_until, now) <= TRIAL_END_SOON_DAYS) return "high";
-    return "medium";
-  }
   return "medium";
+}
+
+/**
+ * מי לא נבדק/ת בכלל: מושהה/ית (accepting_new_patients=false) או לא מאושר/ת
+ * לרישום. ההשהיה היא החלטה (של המטפל/ת או שלנו), לא סיכון; המאושרים-בהמתנה
+ * כבר בתור העבודה בלוח הבקרה.
+ */
+export function excludedFromReview(t: Pick<TherapistInput, "accepting_new_patients" | "admin_approved">): "suspended" | "unapproved" | null {
+  if (t.accepting_new_patients === false) return "suspended";
+  if (t.admin_approved === false) return "unapproved";
+  return null;
 }
 
 function benchmarkFor(regions: string[], ctx: ReviewContext): { bench: Benchmark | null; scope: "region" | "all" | null } {
@@ -298,7 +313,7 @@ type ProfileGapTexts = Partial<Record<ProfileGapKey, string>>;
 const GAP_EMAIL: ProfileGapTexts = {
   photo: "בפרופיל אין תמונה. תמונה מקצועית, שרואים בה פנים, היא הדבר הראשון שמטופלים מסתכלים עליו בכרטיס ובפרופיל.",
   bio: "הביוגרפיה בפרופיל קצרה. שתי השורות הראשונות שלה מופיעות בכרטיס בתוצאות השאלון, ולכן כדאי שיאמרו במשפט אחד למי ובמה את/ה עוזר/ת, ואחריהן קצת על הגישה.",
-  areas: "מסומנים מעט תחומי טיפול. אם יש תחומים נוספים שאת/ה עוסק/ת בהם, הוספתם מרחיבה את החיפושים שבהם הפרופיל מופיע.",
+  areas: "כדאי לוודא שכל התחומים שאת/ה עוסק/ת בהם מסומנים בפרופיל: החיפוש בתוצאות השאלון הוא לפי תחום, ותחום שלא מסומן לא נכנס אליו.",
   education: "בפרופיל חסרים פרטי השכלה והכשרה. מטופלים בודקים רקע מקצועי לפני שהם פונים.",
   experience: "בפרופיל חסר תיאור של הניסיון המקצועי: שנות ניסיון ומסגרות עבודה.",
   regions: "בפרופיל לא מסומנת אף עיר. החיפוש באתר הוא לפי מקום, ובלי עיר הפרופיל לא מופיע בחיפושים לפי אזור.",
@@ -311,17 +326,7 @@ function flagsFor(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, ctx: Review
   const isNew = m.tenureDays < MIN_TENURE_DAYS;
   const bench = m.cardsBenchmark;
 
-  // ── אצלנו: משלם/ת שלא יכול/ה לקבל פניות בכלל ──
-  if (t.admin_approved === false || t.accepting_new_patients === false) {
-    const why = t.admin_approved === false ? "הפרופיל לא מאושר לרישום" : "מסומן/ת כלא מקבל/ת מטופלים חדשים";
-    flags.push({
-      key: "hidden",
-      severity: "critical",
-      owner: "us",
-      label: "מקודם/ת ומוסתר/ת",
-      detail: `${why}, ולכן לא מופיע/ה בתוצאות השאלון בכלל - אפס פניות הוא תוצאה של ההגדרה, לא של הפרופיל.`,
-    });
-  }
+  // ── אצלנו: מקודם/ת שאף חיפוש לא יכול להגיע אליו/ה ──
   if (m.regions.length === 0 && t.online !== true) {
     flags.push({
       key: "no_reach",
@@ -413,16 +418,17 @@ function flagsFor(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, ctx: Review
       emailParagraph: `אם את/ה מקבל/ת מטופלים גם בשיחת וידאו, כדאי לסמן זאת בפרופיל: כ-${pct(ctx.onlineShare)} מהפונים באתר מחפשים טיפול אונליין, ומי שלא סימן זאת לא מופיע אצלם.`,
     });
   }
-  // שיטה שהשאלון ממליץ עליה הרבה באזור ואינה בפרופיל.
+  // שיטה שהשאלון ממליץ עליה הרבה באזור ואינה בפרופיל. לידיעתנו בלבד: לא מציעים
+  // למטפל/ת לסמן שיטה ספציפית (הבעלים, 11/10/26) - רק לוודא שכל התחומים
+  // שהוא/היא עוסק/ת בהם מסומנים (narrow_profile / gap_areas).
   const missing = missingTreatment(t, m.regions, ctx);
   if (missing) {
     flags.push({
       key: "treatment_mismatch",
       severity: "normal",
-      owner: "therapist",
-      label: `בלי ${missing.t}`,
-      detail: `${missing.t} הומלץ ל-${pct(missing.share)} מהשאלונים ב${missing.region} (${missing.n} מתוך ${missing.sessions}), ואינו בתחומי הטיפול בפרופיל.`,
-      emailParagraph: `רבים מהפונים באזור שלך מקבלים בשאלון המלצה ל${missing.t}. אם זה תחום שאת/ה עוסק/ת בו, כדאי לסמן אותו בפרופיל - החיפוש בתוצאות השאלון הוא לפי שיטת הטיפול שהומלצה.`,
+      owner: "us",
+      label: `ביקוש ל${/^[A-Za-z]/.test(missing.t) ? "-" : ""}${missing.t} באזור`,
+      detail: `${missing.t} הומלץ ל-${pct(missing.share)} מהשאלונים ב${missing.region} (${missing.n} מתוך ${missing.sessions}), ואינו בתחומי הטיפול בפרופיל. לא מציעים לסמן שיטה ספציפית.`,
     });
   }
 
@@ -440,7 +446,8 @@ function flagsFor(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, ctx: Review
       detail: `${narrow.join(", ")} - כל אחד מהם מצמצם את החיפושים שבהם הפרופיל מופיע.`,
       emailParagraph:
         (m.regions.length === 1 && t.online !== true ? "בפרופיל מסומן אזור אחד. אם את/ה מקבל/ת מטופלים גם מערים סמוכות, כדאי להוסיף אותן - החיפוש באתר הוא לפי מקום. " : "") +
-        (t.age_groups.length === 1 ? "מסומנת קבוצת גיל אחת; אם את/ה מטפל/ת גם בגילאים נוספים, כדאי לסמן אותם." : ""),
+        (t.age_groups.length === 1 ? "מסומנת קבוצת גיל אחת; אם את/ה מטפל/ת גם בגילאים נוספים, כדאי לסמן אותם. " : "") +
+        (t.training_areas.length > 2 && t.training_areas.length < 4 ? "כדאי לוודא שכל התחומים שאת/ה עוסק/ת בהם מסומנים." : ""),
     });
   }
   if (bench != null && bench > 0 && m.cards30 < bench * LOW_EXPOSURE_RATIO) {
@@ -522,28 +529,50 @@ function flagsFor(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, ctx: Review
     });
   }
 
-  // ── רגע כסף ──
-  const money: string[] = [];
+  // ── מועדים שמשנים את הסיכון: כל אחד דגל משלו, עם התאריך בכותרת ──
   if (m.guaranteeDaysLeft != null && m.guaranteeContacts === 0 && m.guaranteeDaysLeft <= BILLING_SOON_DAYS) {
-    money.push(m.guaranteeDaysLeft >= 0
-      ? `חלון ערבות הפניות נסגר בעוד ${m.guaranteeDaysLeft} ימים ובינתיים אין פנייה - החזר מלא אם זה יישאר כך`
-      : "חלון ערבות הפניות נסגר בלי פנייה - זכאות להחזר מלא");
+    flags.push({
+      key: "guarantee_closing",
+      severity: "high",
+      owner: "us",
+      label: m.guaranteeDaysLeft >= 0 ? `ערבות הפניות נסגרת בעוד ${m.guaranteeDaysLeft} ימים` : "ערבות הפניות נסגרה בלי פנייה",
+      detail: m.guaranteeDaysLeft >= 0
+        ? `חלון ערבות הפניות (החזר מלא אם אין פנייה) נסגר בעוד ${m.guaranteeDaysLeft} ימים, ובינתיים אין אף פנייה.`
+        : "חלון ערבות הפניות נסגר בלי אף פנייה - זכאות להחזר מלא.",
+    });
   }
   if (m.daysToFirstCharge != null && m.daysToFirstCharge <= BILLING_SOON_DAYS && t.subscription?.first_charge_on) {
-    money.push(`החיוב הראשון ב-${ilDate(t.subscription.first_charge_on)}${m.daysToFirstCharge >= 0 ? ` (בעוד ${m.daysToFirstCharge} ימים)` : ""}`);
+    flags.push({
+      key: "first_charge_soon",
+      severity: "high",
+      owner: "us",
+      label: `חיוב ראשון ב-${ilDate(t.subscription.first_charge_on)}`,
+      detail: `הכרטיס שנמסר במתנה מתחיל להיגבות ב-${ilDate(t.subscription.first_charge_on)}${m.daysToFirstCharge >= 0 ? ` (בעוד ${m.daysToFirstCharge} ימים)` : ""}. מי שמגיע לחיוב בלי פניות - מבטל.`,
+    });
   }
   if (t.promotion_source === "trial" && m.daysToPromotionEnd != null && m.daysToPromotionEnd <= TRIAL_END_SOON_DAYS && t.promoted_until) {
-    money.push(`תקופת הניסיון מסתיימת ב-${ilDate(t.promoted_until)}${m.daysToPromotionEnd >= 0 ? ` (בעוד ${m.daysToPromotionEnd} ימים)` : ""}`);
+    flags.push({
+      key: "trial_ending",
+      severity: "high",
+      owner: "us",
+      label: `הניסיון מסתיים ב-${ilDate(t.promoted_until)}`,
+      detail: `תקופת הניסיון מסתיימת ב-${ilDate(t.promoted_until)}${m.daysToPromotionEnd >= 0 ? ` (בעוד ${m.daysToPromotionEnd} ימים)` : ""}. ההצעה להמשיך בתשלום יוצאת רק למי שקיבל/ה פניות.`,
+    });
   }
   if (m.daysToPriceRevert != null && m.daysToPriceRevert >= 0 && m.daysToPriceRevert <= BILLING_SOON_DAYS && t.subscription?.promo_reverts_at) {
-    money.push(`המחיר עולה למחיר המלא ב-${ilDate(t.subscription.promo_reverts_at)}`);
-  }
-  if (money.length > 0) {
-    flags.push({ key: "billing_moment", severity: "high", owner: "us", label: "רגע כסף", detail: money.join("; ") + "." });
+    flags.push({
+      key: "price_rising",
+      severity: "high",
+      owner: "us",
+      label: `המחיר עולה ב-${ilDate(t.subscription.promo_reverts_at)}`,
+      detail: `המחיר המוזל מסתיים ב-${ilDate(t.subscription.promo_reverts_at)} והחיוב עובר למחיר המלא.`,
+    });
   }
 
   return flags.sort((a, b) => SEVERITY_RANK[a.severity] - SEVERITY_RANK[b.severity]);
 }
+
+export const MONEY_FLAG_KEYS = ["guarantee_closing", "first_charge_soon", "trial_ending", "price_rising"] as const;
 
 function missingTreatment(t: TherapistInput, regions: string[], ctx: ReviewContext): { t: string; region: string; share: number; n: number; sessions: number } | null {
   const mine = new Set(t.training_areas);
@@ -578,8 +607,10 @@ function riskOf(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, flags: Review
     : `חשיפה נמוכה (${m.cards30} הופעות ל-30 יום מול ${m.cardsBenchmark}) ורק ${f.people_21} פונים`;
 
   const escalations: string[] = [];
-  const billing = flags.find((x) => x.key === "billing_moment");
-  if (billing) escalations.push(billing.detail.replace(/\.$/, ""));
+  for (const key of MONEY_FLAG_KEYS) {
+    const money = flags.find((x) => x.key === key);
+    if (money) escalations.push(money.label);
+  }
   if (flags.some((x) => x.key === "drop")) escalations.push("ירידה חדה מול התקופה הקודמת");
   if (noContact && (m.daysSinceContact == null ? m.tenureDays : m.daysSinceContact) >= LONG_SILENCE_DAYS) escalations.push(`${LONG_SILENCE_DAYS}+ ימים בלי פנייה`);
   if (escalations.length > 0) return { risk: "high", reason: `${base}; ${escalations.join("; ")}.` };
@@ -673,6 +704,17 @@ function actionsFor(t: TherapistWithTier, f: FunnelRow, m: ReviewMetrics, risk: 
     });
   }
 
+  // הארכת ניסיון: כשהניסיון מסתיים ועוד אין פניות - לתת לפרופיל עוד זמן אחרי התיקונים.
+  const trialEnding = flags.find((x) => x.key === "trial_ending");
+  if (trialEnding && t.promotion_source === "trial" && f.people_21 === 0 && t.promoted_until) {
+    actions.push({
+      type: "extend",
+      title: "הארכת הניסיון",
+      detail: `${trialEnding.label}, ועדיין אין פניות. הארכה מזיזה רק את התאריך: בלי מייל, בלי איפוס ותק.`,
+      days: 30,
+    });
+  }
+
   // שיחה: סיכון גבוה או קריטי אצל מי שמשלם או עומד לשלם.
   if ((risk === "high" || risk === "critical") && t.tier === "high") {
     actions.push({
@@ -726,12 +768,59 @@ function crowdByRegion(rows: { t: TherapistInput; regions: string[]; f: FunnelRo
 
 type TherapistWithTier = TherapistInput & { tier: ReviewTier };
 
+// הקיצורים לשורת "מה לעשות": דגל שבאחריות המטפל/ת → מה המייל מבקש, בשתי מילים.
+const TODO_SHORT: Record<string, string> = {
+  contact_buttons: "טלפון נייד",
+  landline: "מספר נייד לוואטסאפ",
+  gap_photo: "תמונה",
+  gap_bio: "ביו",
+  gap_areas: "לוודא תחומים",
+  gap_education: "השכלה",
+  gap_experience: "ניסיון",
+  not_online: "אונליין",
+  narrow_profile: "ערים/גילאים נוספים",
+  card_not_opened: "פתיחת הכרטיס",
+  card_review: "תמונה ופתיחה",
+  profile_not_converting: "מחיר וקשר",
+};
+
+/** המשפט הסגור: הדבר הכי חשוב לעשות, ואחריו עוד אחד-שניים אם יש. */
+export function todoSentence(actions: ReviewAction[], flags: ReviewFlag[], risk: ReviewRisk): string {
+  if (risk === "paused") return "מוקפא/ת בהחלטה שלנו - אין מה לעשות השבוע.";
+  const parts: string[] = [];
+  for (const a of actions) {
+    if (a.type === "fix") parts.push(`לתקן באדמין: ${a.detail}`);
+    else if (a.type === "freeze") parts.push(`להקפיא ל-${a.days ?? FREEZE_DAYS} ימים (חזק/ה מדי באזור)`);
+    else if (a.type === "email") {
+      const asks = flags.filter((x) => x.owner === "therapist" && TODO_SHORT[x.key]).map((x) => TODO_SHORT[x.key]);
+      const unique = [...new Set(asks)].slice(0, 3);
+      parts.push(unique.length > 0 ? `לשלוח מייל (${unique.join(", ")})` : "לשלוח מייל");
+    } else if (a.type === "extend") parts.push("להאריך את הניסיון");
+    else if (a.type === "task") {
+      const money = flags.find((x) => (MONEY_FLAG_KEYS as readonly string[]).includes(x.key));
+      parts.push(money ? `להתקשר לפני המועד (${money.label})` : "להתקשר");
+    } else if (a.type === "campaign") parts.push(a.region ? `לבדוק קמפיין ב${a.region}` : "לבדוק קמפיין");
+  }
+  if (parts.length === 0) {
+    if (risk === "new") return "עוד מוקדם למדוד - לעקוב בשבוע הבא.";
+    return "אין מה לעשות השבוע.";
+  }
+  const [first, ...rest] = parts.slice(0, 3);
+  return rest.length > 0 ? `${first}, ו${rest.join(", ו")}.` : `${first}.`;
+}
+
 export function buildRetentionReview(inputs: TherapistInput[], ctx: ReviewContext): { rows: ReviewRow[]; summary: ReviewSummary } {
   const now = ctx.now;
   const members: { t: TherapistWithTier; regions: string[]; f: FunnelRow }[] = [];
+  const excluded = { suspended: 0, unapproved: 0 };
   for (const t of inputs) {
-    const tier = tierOf(t, now);
+    const tier = tierOf(t);
     if (!tier) continue;
+    const why = excludedFromReview(t);
+    if (why) {
+      excluded[why]++;
+      continue;
+    }
     members.push({ t: { ...t, tier }, regions: regionsOf(t.cities), f: t.funnel ?? EMPTY_FUNNEL });
   }
   // הדחיקה נמדדת בין המקודמים שבאמת מופיעים בשאלון (לא מוקפאים).
@@ -782,6 +871,7 @@ export function buildRetentionReview(inputs: TherapistInput[], ctx: ReviewContex
       actions,
       primary_action: actions[0]?.type ?? null,
       risk_reason: reason,
+      todo: todoSentence(actions, flags, risk),
     };
   });
 
@@ -793,11 +883,12 @@ export function buildRetentionReview(inputs: TherapistInput[], ctx: ReviewContex
     byRisk: { critical: 0, high: 0, medium: 0, ok: 0, new: 0, paused: 0 },
     actions: 0,
     holidayWeek: ctx.holidayWeek,
+    excluded,
   };
   for (const r of rows) {
     summary.byTier[r.tier]++;
     summary.byRisk[r.risk]++;
-    summary.actions += r.actions.filter((a) => a.type !== "campaign").length;
+    summary.actions += r.actions.filter((a) => a.type !== "campaign" && a.type !== "extend").length;
   }
   return { rows, summary };
 }
