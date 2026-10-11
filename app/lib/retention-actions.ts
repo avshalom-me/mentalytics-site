@@ -5,6 +5,10 @@ import { operationalMailTarget } from "./therapist-recipient";
 import { sendTherapistAdminMessageEmail } from "./therapist-emails";
 import { applyMatchPause } from "./match-pause-apply";
 import { OUTREACH_COOLDOWN_DAYS } from "./retention-review-data";
+import { emailBodyProblem, reviewWeekStart } from "./retention-review";
+
+/** עד כמה מיילי שימור יוצאים בשבוע (הבעלים, 11/10/26). */
+export const WEEKLY_EMAIL_CAP = Number(process.env.RETENTION_WEEKLY_EMAIL_CAP ?? 5);
 
 // הכפתורים של סקירת השימור. כל פעולה כאן נקראת אך ורק מלחיצה מפורשת של
 // אדמין בעמוד השימור (/api/admin-retention), ולא מקרון: המייל יוצא רק
@@ -74,13 +78,23 @@ export async function sendRetentionEmail(opts: { actionId: string; subject: stri
   const subject = opts.subject.trim().slice(0, 200) || "כמה הצעות לפרופיל שלך בטיפול חכם";
   const body = opts.body.trim().slice(0, 6000);
   if (!body) return { ok: false, error: "גוף המייל ריק" };
-  if (/\d{2,}/.test(body.replace(/\d+%/g, ""))) {
-    // מספר דו-ספרתי שאינו אחוז ביקוש כללי = כנראה מספר ביצועים של המטפל/ת.
-    return { ok: false, error: "בגוף המייל יש מספר. לפי ההחלטה מ-15/8/26 לא שולחים למטפלים מספרי ביצועים - נא להסיר אותו." };
-  }
+  const problem = emailBodyProblem(body);
+  if (problem) return { ok: false, error: `${problem} - נא לתקן לפני השליחה.` };
   const loaded = await loadPending(opts.actionId, "retention_email");
   if (!loaded.ok) return { ok: false, error: loaded.error };
   const therapistId = loaded.action.entity_id as string;
+
+  // תקרה שבועית (החלטת הבעלים 11/10/26): עד WEEKLY_EMAIL_CAP מיילי שימור בשבוע,
+  // נספרים מיומן הביקורת מיום ראשון. בלי force - תקרה היא תקרה.
+  const weekStartIso = new Date(`${reviewWeekStart(new Date())}T00:00:00+03:00`).toISOString();
+  const { count: sentThisWeek } = await supabaseAdmin
+    .from("therapist_audit_log")
+    .select("id", { count: "exact", head: true })
+    .eq("action", "retention_email_sent")
+    .gte("created_at", weekStartIso);
+  if ((sentThisWeek ?? 0) >= WEEKLY_EMAIL_CAP) {
+    return { ok: false, error: `כבר נשלחו ${sentThisWeek} מיילי שימור השבוע - זו התקרה השבועית (${WEEKLY_EMAIL_CAP}). השאר ממתינים לשבוע הבא.` };
+  }
 
   const { data: t, error: tErr } = await supabaseAdmin
     .from("therapists")
@@ -135,6 +149,40 @@ export async function freezeFromReview(opts: { actionId: string; days: number })
   if (!result.ok) return { ok: false, error: result.error };
   await markExecuted(opts.actionId, `הוקפא/ה מההתאמות ל-${days} ימים (עד ${result.until ? new Date(result.until).toLocaleDateString("he-IL") : ""})`);
   return { ok: true, until: result.until };
+}
+
+/**
+ * הארכת תקופת ניסיון בלי תופעות לוואי: רק promoted_until זז, ותזכורות סוף
+ * הניסיון מתאפסות כדי שיישלחו שוב לפני המועד החדש. (PATCH הקידום בעמוד
+ * המטפלים מאפס promoted_since, שולח מייל קידום ומבטל הוראת קבע - לא כאן.)
+ */
+export async function extendTrial(opts: { therapistId: string; days: number; note?: string }): Promise<{ ok: boolean; error?: string; promoted_until?: string }> {
+  const days = Math.max(7, Math.min(60, Math.floor(opts.days) || 30));
+  const { data: t, error } = await supabaseAdmin
+    .from("therapists")
+    .select("id, full_name, status, promotion_source, promoted_until")
+    .eq("id", opts.therapistId)
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  if (!t) return { ok: false, error: "המטפל/ת לא נמצא/ה" };
+  if (t.status !== "paying" || t.promotion_source !== "trial") return { ok: false, error: "הארכה אפשרית רק לתקופת ניסיון פעילה" };
+  if (!t.promoted_until) return { ok: false, error: "לניסיון הזה אין תאריך סיום" };
+  const base = Math.max(new Date(t.promoted_until as string).getTime(), Date.now());
+  const until = new Date(base + days * 86_400_000).toISOString();
+  const { error: updErr } = await supabaseAdmin
+    .from("therapists")
+    .update({ promoted_until: until, trial_ending_notified_at: null, trial_ending_reminded_at: null })
+    .eq("id", opts.therapistId);
+  if (updErr) return { ok: false, error: updErr.message };
+  await writeAudit(supabaseAdmin, {
+    therapistId: opts.therapistId,
+    actorType: "admin",
+    action: "trial_extended",
+    before: { promoted_until: t.promoted_until },
+    after: { promoted_until: until, days },
+    reason: opts.note ?? "admin extended the trial from the retention review",
+  });
+  return { ok: true, promoted_until: until };
 }
 
 export async function createRetentionTask(opts: { actionId: string }): Promise<{ ok: boolean; error?: string; taskId?: string }> {

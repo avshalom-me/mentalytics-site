@@ -9,7 +9,7 @@ import { useEffect, useState } from "react";
 
 type Top = { therapist_id: string; name: string | null; tier: string; risk: string; risk_reason: string | null; primary_action: string | null };
 type Brief = {
-  review: { id: string; week_start: string; created_at: string; summary: Record<string, unknown>; acknowledged_at: string | null } | null;
+  review: { id: string; week_start: string; created_at: string; summary: Record<string, unknown>; narrative: string | null; acknowledged_at: string | null } | null;
   top: Top[];
   pending_count: number;
 };
@@ -95,6 +95,9 @@ export default function RetentionWeeklyModal() {
           <span className="rounded-full bg-stone-100 px-3 py-1 font-bold text-stone-600">{brief.pending_count} פעולות ממתינות</span>
           {s.holidayWeek && <span className="rounded-full bg-sky-50 px-3 py-1 font-bold text-sky-800">שבוע {s.holidayWeek}</span>}
         </div>
+        {brief.review.narrative && (
+          <p className="mb-4 rounded-xl bg-[var(--teal-pale)] p-3 text-sm leading-relaxed text-stone-800">{brief.review.narrative}</p>
+        )}
         {brief.top.length === 0 ? (
           <p className="mb-4 text-sm text-stone-500">כל {s.checked ?? ""} המקודמים תקינים השבוע.</p>
         ) : (

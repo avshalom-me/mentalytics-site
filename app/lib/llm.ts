@@ -44,6 +44,8 @@ export type LlmRequest = {
   fallback?: boolean;
   /** פלט ארוך (דוחות): קריאה ב-streaming, כדי לא ליפול על timeout של HTTP. */
   stream?: boolean;
+  /** תמונות לצד הטקסט (כתובות ציבוריות), למשל תמונת פרופיל לסקירת כרטיס. */
+  images?: { url: string }[];
 };
 
 export type LlmResult = {
@@ -243,13 +245,25 @@ async function callAnthropic<T>(
   if (!apiKey) throw new LlmError("ANTHROPIC_API_KEY חסר", "config", "anthropic");
   const client = new Anthropic({ apiKey, timeout: req.timeoutMs ?? 60_000, maxRetries: req.retries ?? 1 });
   const cache = req.cacheSystem ?? req.system.length >= 1_500;
+  const images = req.images ?? [];
   const base = {
     model: cfg.anthropic,
     max_tokens: anthropicMaxTokens(req.maxTokens),
     system: cache
       ? [{ type: "text" as const, text: req.system, cache_control: { type: "ephemeral" as const } }]
       : req.system,
-    messages: [{ role: "user" as const, content: req.user }],
+    messages: [
+      {
+        role: "user" as const,
+        content:
+          images.length > 0
+            ? [
+                ...images.map((img) => ({ type: "image" as const, source: { type: "url" as const, url: img.url } })),
+                { type: "text" as const, text: req.user },
+              ]
+            : req.user,
+      },
+    ],
   };
   const effort = req.effort ?? cfg.effort;
 
@@ -309,7 +323,15 @@ async function callOpenAI<T>(
     messages: [
       { role: "system", content: req.system },
       // json_object דורש שהמילה json תופיע בהודעות עצמן.
-      { role: "user", content: schema ? `${req.user}\n\n(json)` : req.user },
+      {
+        role: "user",
+        content: (req.images ?? []).length > 0
+          ? [
+              { type: "text" as const, text: schema ? `${req.user}\n\n(json)` : req.user },
+              ...(req.images ?? []).map((img) => ({ type: "image_url" as const, image_url: { url: img.url } })),
+            ]
+          : schema ? `${req.user}\n\n(json)` : req.user,
+      },
     ],
   });
   const choice = res.choices[0];

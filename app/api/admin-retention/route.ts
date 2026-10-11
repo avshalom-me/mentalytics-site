@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { latestRetentionReview, runRetentionReview } from "@/app/lib/retention-review-data";
+import { latestRetentionReview, retentionOutcomes, runRetentionReview } from "@/app/lib/retention-review-data";
 import {
   acknowledgeReview,
   createRetentionTask,
   dismissRetentionAction,
+  extendTrial,
   freezeFromReview,
   sendRetentionEmail,
 } from "@/app/lib/retention-actions";
@@ -13,13 +14,18 @@ import {
 // של האדמין (middleware.ts מכסה כל /api/admin-*).
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// ריצה ידנית עם המודל (סקירות כרטיס, טיוטות, נרטיב) לוקחת עד כשתי דקות.
+export const maxDuration = 300;
 
 const RISK_FOR_MODAL = new Set(["critical", "high", "medium"]);
 
 export async function GET(req: NextRequest) {
   try {
     const brief = req.nextUrl.searchParams.get("brief") === "1";
+    if (req.nextUrl.searchParams.get("outcomes") === "1") {
+      const out = await retentionOutcomes();
+      return NextResponse.json({ ok: true, ...out });
+    }
     const latest = await latestRetentionReview();
     if (!latest) return NextResponse.json({ ok: true, review: null, rows: [], pending: [] });
 
@@ -67,6 +73,12 @@ export async function POST(req: NextRequest) {
       if (!reviewId) return NextResponse.json({ ok: false, error: "חסר review_id" }, { status: 400 });
       const r = await acknowledgeReview(reviewId, String(body.by ?? "admin"));
       return NextResponse.json(r, { status: r.ok ? 200 : 500 });
+    }
+    if (action === "extend_trial") {
+      const therapistId = String(body.therapist_id ?? "");
+      if (!therapistId) return NextResponse.json({ ok: false, error: "חסר therapist_id" }, { status: 400 });
+      const r = await extendTrial({ therapistId, days: Number(body.days ?? 30) });
+      return NextResponse.json(r, { status: r.ok ? 200 : 409 });
     }
     if (!actionId) return NextResponse.json({ ok: false, error: "חסר id של ההצעה" }, { status: 400 });
     if (action === "email_send") {

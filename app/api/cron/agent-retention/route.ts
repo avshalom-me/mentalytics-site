@@ -8,7 +8,8 @@ import { runRetentionReview } from "@/app/lib/retention-review-data";
 // נשלח, שום קידום לא משתנה. הכפתורים בעמוד /admin/retention.
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 120;
+// עם המודל (סקירות כרטיס, טיוטות, נרטיב) הריצה לוקחת עד כשתי דקות.
+export const maxDuration = 300;
 
 export async function GET(req: NextRequest) {
   if (!cronAuthorized(req)) {

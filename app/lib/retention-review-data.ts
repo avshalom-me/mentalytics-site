@@ -4,6 +4,8 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { agentEnabled, finishAgentRun, startAgentRun, syncAgentAlerts, type AgentSeverity, type NewAgentAction } from "./agent-infra";
 import { computeGuarantee } from "./guarantee";
 import { holidaysBetween } from "./israel-holidays";
+import { enrichReviewWithModel } from "./retention-model";
+import { computeOutcomes, summarizeOutcomes, type ActionOutcome, type ContactEvent, type ExecutedAction, type TherapistState } from "./retention-outcomes";
 import {
   benchmarkFrom,
   buildRetentionReview,
@@ -61,7 +63,12 @@ type TRow = {
   phone: string | null;
   email: string | null;
   match_paused_until: string | null;
+  gender: string | null;
+  therapist_types: string[] | null;
 };
+
+/** הקלט למודל: הקלט של המנוע ועוד מה שרק הניסוח צריך (מין לדקדוק, סוג המטפל/ת לכרטיס). */
+export type ModelInput = TherapistInput & { gender: string | null; therapist_types: string[] };
 
 type FunnelRpcRow = { therapist_id: string } & FunnelRow;
 type DemandRpcRow = { region: string | null; searches: number; online_searches: number; treatment_sessions: number; treatments: { t: string; n: number }[] | null };
@@ -103,13 +110,13 @@ async function lastOutreachByEmail(emails: string[], sinceIso: string): Promise<
   return out;
 }
 
-export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: TherapistInput[]; ctx: ReviewContext }> {
+export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: TherapistInput[]; modelInputs: Map<string, ModelInput>; ctx: ReviewContext }> {
   const [therapistsRes, funnelRes, demandRes, guaranteeRows] = await Promise.all([
     fetchAllRows<TRow>(() =>
       supabaseAdmin
         .from("therapists")
         .select(
-          "id, full_name, status, promotion_source, entity_type, center_account_id, promoted_since, promoted_until, created_at, admin_approved, accepting_new_patients, online, regions, training_areas, age_groups, bio, profile_photo_path, education, experience, phone, email, match_paused_until",
+          "id, full_name, status, promotion_source, entity_type, center_account_id, promoted_since, promoted_until, created_at, admin_approved, accepting_new_patients, online, regions, training_areas, age_groups, bio, profile_photo_path, education, experience, phone, email, match_paused_until, gender, therapist_types",
         )
         .or("status.eq.paying,entity_type.eq.center")
         .order("id"),
@@ -204,6 +211,11 @@ export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: T
     funnel: funnelBy.get(t.id) ?? null,
     lastOutreachAt: outreach.get((t.email ?? "").trim().toLowerCase()) ?? null,
   }));
+  const modelInputs = new Map<string, ModelInput>();
+  for (let i = 0; i < inputs.length; i++) {
+    const t = therapists[i];
+    modelInputs.set(t.id, { ...inputs[i], gender: t.gender, therapist_types: Array.isArray(t.therapist_types) ? t.therapist_types : [] });
+  }
 
   // בנצ'מרק: משלם פרטי, ותק 30 יום, מאושר, לא מוקפא - כמו ב-center-health.
   const peerCutoff = now.getTime() - PEER_TENURE_DAYS * 86_400_000;
@@ -234,6 +246,7 @@ export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: T
 
   return {
     inputs,
+    modelInputs,
     ctx: {
       now,
       windowDays: WINDOW_DAYS,
@@ -262,20 +275,36 @@ const ACTION_TITLES: Record<string, (r: ReviewRow) => string> = {
   task: (r) => `${r.name}: שיחת שימור`,
 };
 
-export async function runRetentionReview(opts?: { mode?: string; now?: Date }): Promise<RetentionReviewResult> {
+export async function runRetentionReview(opts?: { mode?: string; now?: Date; noModel?: boolean }): Promise<RetentionReviewResult> {
   if (!agentEnabled("retention")) return { ok: true, disabled: true };
   const now = opts?.now ?? new Date();
   const runId = await startAgentRun("retention", opts?.mode ?? "weekly");
   try {
-    const { inputs, ctx } = await loadRetentionInputs(now);
+    const { inputs, modelInputs, ctx } = await loadRetentionInputs(now);
     const { rows, summary } = buildRetentionReview(inputs, ctx);
     const weekStart = reviewWeekStart(now);
+
+    // שלב 2: המודל מוסיף סקירת כרטיס, טיוטות ונרטיב - מעל המנוע, ורק אחריו.
+    // כישלון שם משאיר את הסקירה של שלב 1 שלמה.
+    const enrichment = opts?.noModel ? null : await enrichReviewWithModel(rows, modelInputs, summary, ctx);
 
     // הצילום: שורת סקירה לשבוע, ושורה לכל מקודם. ריצה חוזרת מחליפה את השורות.
     const { data: review, error: reviewErr } = await supabaseAdmin
       .from("retention_reviews")
       .upsert(
-        { week_start: weekStart, created_at: now.toISOString(), run_id: runId, summary: { ...summary, benchmark: ctx.benchmark, onlineShare: ctx.onlineShare, demandTotal: ctx.demandTotal } },
+        {
+          week_start: weekStart,
+          created_at: now.toISOString(),
+          run_id: runId,
+          narrative: enrichment?.narrative ?? null,
+          summary: {
+            ...summary,
+            benchmark: ctx.benchmark,
+            onlineShare: ctx.onlineShare,
+            demandTotal: ctx.demandTotal,
+            model: enrichment ? { cardReviews: enrichment.cardReviews, drafts: enrichment.drafts, narrative: !!enrichment.narrative } : null,
+          },
+        },
         { onConflict: "week_start" },
       )
       .select("id")
@@ -413,6 +442,55 @@ export type StoredReviewRow = {
   primary_action: string | null;
   risk_reason: string | null;
 };
+
+/** תוצאות הפעולות שבוצעו ב-90 הימים האחרונים: פניות לפני ואחרי, עריכת פרופיל, עזיבה. */
+export async function retentionOutcomes(now = new Date()): Promise<{ rows: ActionOutcome[]; summary: ReturnType<typeof summarizeOutcomes> }> {
+  const since = new Date(now.getTime() - 90 * 86_400_000).toISOString();
+  const { data: actions, error } = await supabaseAdmin
+    .from("agent_actions")
+    .select("id, action_type, entity_id, entity_label, status_changed_at, resolution_note")
+    .eq("agent", "retention")
+    .eq("status", "executed")
+    .in("action_type", ["retention_email", "retention_freeze", "retention_task"])
+    .gte("status_changed_at", since)
+    .order("status_changed_at", { ascending: false });
+  if (error) throw new Error(error.message);
+  const executed: ExecutedAction[] = (actions ?? [])
+    .filter((a) => a.entity_id && a.status_changed_at)
+    .map((a) => ({
+      id: a.id as string,
+      action_type: a.action_type as string,
+      therapist_id: a.entity_id as string,
+      entity_label: (a.entity_label as string | null) ?? null,
+      executed_at: a.status_changed_at as string,
+      resolution_note: (a.resolution_note as string | null) ?? null,
+    }));
+  if (executed.length === 0) return { rows: [], summary: [] };
+
+  const ids = [...new Set(executed.map((a) => a.therapist_id))];
+  const earliest = executed.reduce((m, a) => (a.executed_at < m ? a.executed_at : m), executed[0].executed_at);
+  const fromIso = new Date(new Date(earliest).getTime() - 14 * 86_400_000).toISOString();
+  const [clicks, statesRes] = await Promise.all([
+    fetchAllRows<{ therapist_id: string; session_id: string | null; id: string; clicked_at: string }>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id, session_id, id, clicked_at")
+        .in("therapist_id", ids)
+        .gte("clicked_at", fromIso)
+        .or("automated.is.null,automated.eq.false")
+        .order("clicked_at"),
+    ),
+    supabaseAdmin.from("therapists").select("id, status, promotion_source, profile_updated_at").in("id", ids),
+  ]);
+  if (statesRes.error) throw new Error(statesRes.error.message);
+  const contacts: ContactEvent[] = clicks.map((c) => ({ therapist_id: c.therapist_id, sid: c.session_id ?? c.id, at: c.clicked_at }));
+  const states = new Map<string, TherapistState>();
+  for (const t of statesRes.data ?? []) {
+    states.set(t.id as string, { status: (t.status as string | null) ?? null, promotion_source: (t.promotion_source as string | null) ?? null, profile_updated_at: (t.profile_updated_at as string | null) ?? null });
+  }
+  const rows = computeOutcomes(executed, contacts, states, now);
+  return { rows, summary: summarizeOutcomes(rows) };
+}
 
 /** הסקירה האחרונה עם השורות שלה, או null כשעוד לא רצה אף פעם. */
 export async function latestRetentionReview(): Promise<{ review: StoredReview; rows: StoredReviewRow[] } | null> {

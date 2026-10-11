@@ -591,6 +591,21 @@ function riskOf(t: TherapistInput, f: FunnelRow, m: ReviewMetrics, flags: Review
 export type EmailDraft = { subject: string; body: string };
 
 /**
+ * מה אסור בגוף מייל למטפל/ת: מספר דו-ספרתי שאינו אחוז (כנראה מספר ביצועים),
+ * מקף ארוך, ואורך לא סביר. אותו כלל לטיוטת המודל ולשליחה הידנית.
+ */
+export function emailBodyProblem(body: string): string | null {
+  const text = body.trim();
+  if (text.length < 120) return "הטיוטה קצרה מדי";
+  if (text.length > 2200) return "הטיוטה ארוכה מדי";
+  if (text.includes("—")) return "יש מקף ארוך בטקסט";
+  if (/\d{2,}/.test(text.replace(/\d+%/g, "").replace(/\b\d{1,2}\.\d{1,2}(\.\d{2,4})?\b/g, ""))) {
+    return "בגוף המייל יש מספר. לפי ההחלטה מ-15/8/26 לא שולחים למטפלים מספרי ביצועים";
+  }
+  return null;
+}
+
+/**
  * טיוטת המייל למטפל/ת: רק פסקאות של דגלים שבאחריותו/ה, עד שלוש, בלי אף מספר
  * על הביצועים שלו/ה. מוחזר null כשאין מה להציע.
  */

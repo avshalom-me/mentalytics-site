@@ -21,10 +21,32 @@ type Review = {
     benchmark?: { peers: number; cards: number; opens: number; people: number } | null;
     onlineShare?: number;
     demandTotal?: number;
+    model?: { cardReviews: number; drafts: number; narrative: boolean } | null;
   };
+  narrative: string | null;
   acknowledged_at: string | null;
   acknowledged_by: string | null;
 };
+
+type Outcome = {
+  action_id: string;
+  action_type: string;
+  therapist_id: string;
+  name: string;
+  executed_at: string;
+  days_since: number;
+  before14: number;
+  after14: number | null;
+  after28: number | null;
+  profile_edited: boolean;
+  still_promoted: boolean;
+  verdict: "recovered" | "edited" | "no_change" | "left" | "too_early";
+};
+type OutcomeSummary = { action_type: string; total: number; measured: number; recovered: number; edited: number; left: number };
+
+const OUTCOME_LABEL: Record<Outcome["verdict"], string> = { recovered: "חזרו פניות", edited: "ערך/ה פרופיל", no_change: "בלי שינוי", left: "עזב/ה", too_early: "מוקדם מדי" };
+const OUTCOME_TONE: Record<Outcome["verdict"], string> = { recovered: "text-emerald-700", edited: "text-sky-700", no_change: "text-stone-500", left: "text-red-700", too_early: "text-stone-400" };
+const ACTION_TYPE_LABEL: Record<string, string> = { retention_email: "מייל שיפור", retention_freeze: "הקפאה שקטה", retention_task: "שיחת שימור" };
 
 type Row = {
   id: string;
@@ -175,6 +197,13 @@ export default function RetentionPage() {
 
         {review && (
           <>
+            {review.narrative && (
+              <div className="mb-6 rounded-2xl border border-[var(--teal-mid)] bg-[var(--teal-pale)] p-4 text-sm leading-relaxed text-stone-800">
+                <div className="mb-1 text-xs font-bold text-[var(--teal-dark)]">מה חשוב השבוע</div>
+                <p className="whitespace-pre-line">{review.narrative}</p>
+                <div className="mt-2 text-[11px] text-stone-500">נוסח על ידי המודל מתוך המפה למטה; כל מספר בו נבדק מול הקלט.{s.model ? ` השבוע: ${s.model.cardReviews} סקירות כרטיס, ${s.model.drafts} טיוטות של המודל.` : ""}</div>
+              </div>
+            )}
             <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
               <Stat label="קריטי" value={byRisk.critical ?? 0} tone="red" />
               <Stat label="סיכון גבוה" value={byRisk.high ?? 0} tone="amber" />
@@ -190,6 +219,8 @@ export default function RetentionPage() {
                 {" "}פניות = אנשים שונים, בלי לחיצות חוזרות ובלי אוטומטיות.
               </p>
             )}
+
+            <Outcomes />
 
             {(["high", "center", "medium"] as ReviewTier[]).map((tier) => {
               const group = byTier[tier];
@@ -241,6 +272,79 @@ export default function RetentionPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// "מה קרה למה שעשינו": נטען רק כשפותחים, כי זו שאילתה על 90 יום של לחיצות.
+function Outcomes() {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<Outcome[] | null>(null);
+  const [summary, setSummary] = useState<OutcomeSummary[]>([]);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (!open || rows) return;
+    fetch("/api/admin-retention?outcomes=1", { cache: "no-store" })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.ok) throw new Error(j.error || "שגיאה");
+        setRows(j.rows ?? []);
+        setSummary(j.summary ?? []);
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : "שגיאה"));
+  }, [open, rows]);
+
+  return (
+    <section className="mb-8 overflow-hidden rounded-2xl border border-stone-200 bg-white">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between px-4 py-3 text-start text-sm font-black text-stone-600 hover:bg-stone-50">
+        <span>{open ? "▾" : "◂"} מה קרה למה שעשינו (90 יום)</span>
+        <span className="text-xs font-normal text-stone-400">פניות = אנשים, 14 יום לפני הפעולה מול 14 ו-28 אחריה</span>
+      </button>
+      {open && (
+        <div className="border-t border-stone-100 px-4 py-3">
+          {error && <p className="text-sm text-red-700">{error}</p>}
+          {!rows && !error && <p className="text-sm text-stone-400">טוען…</p>}
+          {rows && rows.length === 0 && <p className="text-sm text-stone-400">עוד לא בוצעה אף פעולה מהסקירה.</p>}
+          {rows && rows.length > 0 && (
+            <>
+              <div className="mb-3 flex flex-wrap gap-2 text-xs">
+                {summary.map((sm) => (
+                  <span key={sm.action_type} className="rounded-full bg-stone-100 px-3 py-1 text-stone-700">
+                    <b>{ACTION_TYPE_LABEL[sm.action_type] ?? sm.action_type}</b>: {sm.total} בוצעו · {sm.measured} נמדדו · {sm.recovered} חזרו פניות · {sm.edited} ערכו פרופיל · {sm.left} עזבו
+                  </span>
+                ))}
+              </div>
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-start text-stone-400">
+                    <th className="py-1 text-start font-semibold">מטפל/ת</th>
+                    <th className="py-1 text-start font-semibold">פעולה</th>
+                    <th className="py-1 text-start font-semibold">מתי</th>
+                    <th className="py-1 text-start font-semibold">לפני (14 יום)</th>
+                    <th className="py-1 text-start font-semibold">אחרי 14</th>
+                    <th className="py-1 text-start font-semibold">אחרי 28</th>
+                    <th className="py-1 text-start font-semibold">תוצאה</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((o) => (
+                    <tr key={o.action_id} className="border-t border-stone-100">
+                      <td className="py-1.5"><Link href={`/admin/therapists?therapist=${o.therapist_id}`} className="font-semibold text-stone-800 hover:underline">{o.name}</Link></td>
+                      <td className="py-1.5 text-stone-600">{ACTION_TYPE_LABEL[o.action_type] ?? o.action_type}</td>
+                      <td className="py-1.5 text-stone-500">{fmtDate(o.executed_at)} ({o.days_since} ימים)</td>
+                      <td className="py-1.5">{o.before14}</td>
+                      <td className="py-1.5">{o.after14 ?? "-"}</td>
+                      <td className="py-1.5">{o.after28 ?? "-"}</td>
+                      <td className={`py-1.5 font-bold ${OUTCOME_TONE[o.verdict]}`}>{OUTCOME_LABEL[o.verdict]}{o.profile_edited && o.verdict !== "edited" ? " · ערך/ה פרופיל" : ""}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -326,10 +430,46 @@ function RowCard({
               <ActionCard key={`${a.type}-${i}`} row={row} action={a} pending={pendingFor(row.therapist_id, a.type)} post={post} onChanged={onChanged} />
             ))}
             {row.actions.length === 0 && <p className="text-xs text-stone-400">אין פעולה מוצעת.</p>}
+            {row.promotion_source === "trial" && m.daysToPromotionEnd != null && <ExtendTrialCard row={row} post={post} onChanged={onChanged} />}
           </div>
           <Link href={`/admin/therapists?therapist=${row.therapist_id}`} className="inline-block text-xs font-bold text-stone-500 underline">לכרטיס המטפל/ת באדמין ←</Link>
         </div>
       )}
+    </div>
+  );
+}
+
+// הארכת ניסיון בלחיצה: רק התאריך זז (בלי מייל קידום, בלי איפוס ותק), ותזכורות
+// סוף הניסיון יישלחו שוב לפני המועד החדש.
+function ExtendTrialCard({ row, post, onChanged }: {
+  row: Row;
+  post: (body: Record<string, unknown>) => Promise<{ ok: boolean; error?: string; status: number; [k: string]: unknown }>;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState("");
+  const ends = row.metrics.daysToPromotionEnd ?? 0;
+  async function extend(days: number) {
+    if (!confirm(`להאריך את תקופת הניסיון של ${row.name} ב-${days} ימים? לא נשלח שום מייל.`)) return;
+    setBusy(true);
+    setMsg("");
+    try {
+      const j = await post({ action: "extend_trial", therapist_id: row.therapist_id, days });
+      setMsg(j.ok ? `הוארך עד ${fmtDate(String(j.promoted_until ?? ""))}.` : String(j.error ?? "נכשל"));
+      if (j.ok) await onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="rounded-xl border border-stone-200 bg-white p-3">
+      <div className="mb-1 text-sm font-bold text-stone-800">⏳ הארכת תקופת הניסיון</div>
+      <p className="mb-2 text-xs text-stone-500">{ends >= 0 ? `הניסיון מסתיים בעוד ${ends} ימים.` : "הניסיון כבר הסתיים."} הארכה מזיזה רק את התאריך: בלי מייל, בלי איפוס ותק, בלי נגיעה בחיוב.</p>
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={() => extend(30)} className="rounded-full border border-stone-300 px-4 py-1.5 text-xs font-bold text-stone-700 disabled:opacity-50">+30 ימים</button>
+        <button type="button" disabled={busy} onClick={() => extend(14)} className="rounded-full border border-stone-200 px-3 py-1.5 text-xs font-bold text-stone-500 disabled:opacity-50">+14</button>
+      </div>
+      {msg && <p className="mt-2 text-xs text-stone-600">{msg}</p>}
     </div>
   );
 }
