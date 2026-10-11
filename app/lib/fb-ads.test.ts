@@ -51,29 +51,51 @@ describe("the per-ad report", () => {
     ]);
   });
 
-  it("gives a recruitment ad its signups, counted against the join page's visitors", () => {
+  it("gives a recruitment ad its accounts, counted against the join page's visitors", () => {
     const report = buildFbAdsReport(
       [{ campaign: "fb-recruit-image", sessions: 38 }],
-      [{ campaign: "fb-recruit-image", visitors: 40, signups: 3, approved: 2, paying: 1 }]
+      [{ campaign: "fb-recruit-image", visitors: 40, signups: 3, filled: 2, approved: 2, paying: 1 }]
     );
     const ad = report.find((r) => r.campaign === "fb-recruit-image")!;
     expect(ad.visits).toBe(40);
-    expect(ad.steps.map((s) => s.value)).toEqual([0, 0, 3, 2, 1]);
+    expect(ad.steps.map((s) => s.value)).toEqual([0, 0, 3, 0, 2, 2, 1]);
   });
 
-  it("puts the press on the register button and the register screen between arriving and signing up", () => {
+  it("puts the press on the register button, the register screen, the account, the profile form and the profile in that order", () => {
     const report = buildFbAdsReport(
-      [{ campaign: "fb-recruit-video", sessions: 20, recruit_cta_clicks: 6, recruit_register_views: 5 }],
-      [{ campaign: "fb-recruit-video", visitors: 20, signups: 1, approved: 0, paying: 0 }]
+      [{ campaign: "fb-recruit-video", sessions: 20, recruit_cta_clicks: 6, recruit_register_views: 5, recruit_profile_form_views: 3 }],
+      [{ campaign: "fb-recruit-video", visitors: 20, signups: 4, filled: 1, approved: 1, paying: 0 }]
     );
     const ad = report.find((r) => r.campaign === "fb-recruit-video")!;
     expect(ad.steps).toEqual([
       { label: "לחצו על הרשמה", value: 6 },
       { label: "הגיעו למסך ההרשמה", value: 5 },
-      { label: "נרשמו", value: 1 },
-      { label: "אושרו", value: 0 },
+      { label: "פתחו חשבון", value: 4 },
+      { label: "הגיעו לטופס הפרופיל", value: 3 },
+      { label: "מילאו פרופיל", value: 1 },
+      { label: "אושרו", value: 1 },
       { label: "במסלול המקודם", value: 0 },
     ]);
+  });
+
+  // The 10/10/2026 registrant: an account from the video ad, no name, nothing to
+  // approve. The card used to read "נרשמו 1, אושרו 0", as if one was waiting.
+  it("does not take an account with no name for a profile, and reads a missing count as zero", () => {
+    const report = buildFbAdsReport(
+      [{ campaign: "fb-recruit-video", sessions: 143 }],
+      [{ campaign: "fb-recruit-video", visitors: 143, signups: 1, approved: 0, paying: 0 }]
+    );
+    const steps = Object.fromEntries(report.find((r) => r.campaign === "fb-recruit-video")!.steps.map((s) => [s.label, s.value]));
+    expect(steps["פתחו חשבון"]).toBe(1);
+    expect(steps["מילאו פרופיל"]).toBe(0);
+    expect(steps["אושרו"]).toBe(0);
+  });
+
+  it("gives every step of a card its own label, since the card keys its rows by it", () => {
+    for (const ad of buildFbAdsReport([], [])) {
+      const labels = ad.steps.map((s) => s.label);
+      expect(new Set(labels).size).toBe(labels.length);
+    }
   });
 
   it("does not give a patients' ad the recruitment steps", () => {

@@ -1,6 +1,6 @@
 // רשימת סוגי האירועים הקנונית של analytics_events - מקור אמת אחד בקוד.
 // חייבת להתאים ל-CHECK constraint בבסיס הנתונים (המיגרציה האחרונה שעדכנה
-// אותו: 20261008_recruit_funnel_events.sql). אירוע חדש = להוסיף כאן + מיגרציה
+// אותו: 20261011c_recruit_profile_form_view.sql). אירוע חדש = להוסיף כאן + מיגרציה
 // שמרחיבה את ה-constraint; שומר הלילה משווה את הרשימה הזו מול ה-DB כל לילה,
 // כך שהוספה כאן בלי מיגרציה נתפסת תוך יום (הדריפט שכבר "בלע" אירועים פעמיים).
 //
@@ -22,6 +22,10 @@ export const ANALYTICS_EVENT_TYPES = [
   // מיגרציה: 20261008_recruit_funnel_events.sql
   "recruit_cta_click",
   "recruit_register_view",
+  // הטופס שאחרי ההרשמה (11/10/26): טופס הפרופיל הוצג למי שפתח חשבון ועוד לא
+  // הקליד שם. בלי זה אי אפשר היה לדעת אם הרשומים הריקים ראו את הטופס ועזבו או
+  // שלא הגיעו אליו. מיגרציה: 20261011c_recruit_profile_form_view.sql
+  "recruit_profile_form_view",
   "therapist_explain_click",
   "matching_click",
   // שליחת החיפוש בפועל (matching_click = הטופס נפתח). נושא את האזור שנבחר,

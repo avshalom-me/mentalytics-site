@@ -8,7 +8,7 @@ import { gaEvent } from "./gtag";
 import { tfaEvent } from "./taboola";
 import { isRecruitRegisterHref, scrollPercent } from "./recruit-cta";
 
-type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "recruit_cta_click" | "recruit_register_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
+type EventType = "page_view" | "profile_impression" | "filter_used" | "quiz_step" | "quiz_complete" | "quiz_treatments" | "recruit_page_view" | "recruit_cta_click" | "recruit_register_view" | "recruit_profile_form_view" | "therapist_explain_click" | "matching_click" | "match_search" | "match_results" | "match_saved";
 
 /**
  * keepalive: for an event sent at the moment the visitor leaves the page (a
@@ -390,6 +390,26 @@ export function useRecruitRegisterView(active: boolean) {
     sendTrack("recruit_register_view", {
       source: "therapists-login",
       metadata: { page: "therapists-login", mode: "register", device: deviceBucket() },
+    });
+  }, [active]);
+}
+
+/**
+ * The profile form was shown to a registrant who has not saved a name yet. A
+ * registration is an account first and a profile second, and a share of the
+ * accounts never get to the second: the signups say how many stopped, this says
+ * whether they saw the form before they did. Fires once per page load, and only
+ * for a brand-new profile; a therapist editing a saved one is not in this funnel.
+ */
+export function useRecruitProfileFormView(active: boolean) {
+  const sent = useRef(false);
+  useEffect(() => {
+    if (!active || sent.current) return;
+    sent.current = true;
+    captureAttribution();
+    sendTrack("recruit_profile_form_view", {
+      source: "therapists-profile-edit",
+      metadata: { page: "therapists-profile-edit", device: deviceBucket() },
     });
   }, [active]);
 }

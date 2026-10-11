@@ -16,6 +16,7 @@ import { uploadCertificate, readFileBytes, PHOTO_UNREADABLE_MESSAGE, type JsonRe
 import { PLAN_EVIDENCE } from "@/app/lib/plan-evidence";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
+import { useRecruitProfileFormView } from "@/app/lib/useTrack";
 import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
 import CenterOwnerNotice from "@/app/therapists/CenterOwnerNotice";
 
@@ -110,6 +111,10 @@ export default function TherapistProfileEditPage() {
     publication_links: [] as string[],
     price: "" as string,
   });
+
+  // A registrant who has not saved a name yet is looking at the form that turns an
+  // account into a profile: counted once, so the signups can be read against it.
+  useRecruitProfileFormView(!loading && isNew);
 
   useEffect(() => {
     async function loadProfile(session: { access_token: string }) {
