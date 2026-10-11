@@ -6,6 +6,7 @@ import { computeGuarantee } from "./guarantee";
 import { holidaysBetween } from "./israel-holidays";
 import { enrichReviewWithModel } from "./retention-model";
 import { computeOutcomes, summarizeOutcomes, type ActionOutcome, type ContactEvent, type ExecutedAction, type TherapistState } from "./retention-outcomes";
+import { REGION_CAMPAIGNS } from "./ads-campaign-spec";
 import {
   benchmarkFrom,
   buildRetentionReview,
@@ -16,6 +17,7 @@ import {
   REGION_BENCHMARK_MIN_PEERS,
   type Benchmark,
   type FunnelRow,
+  type RegionCampaign,
   type RegionDemand,
   type ReviewContext,
   type ReviewRow,
@@ -110,8 +112,47 @@ async function lastOutreachByEmail(emails: string[], sinceIso: string): Promise<
   return out;
 }
 
+/**
+ * הקמפיין של כל אזור: הרישום (google_name → utm) מצליב את הסנכרון הלילי
+ * (ads_campaign_config: סטטוס ותקציב יומי) עם מפת האזורים של ads-campaign-spec.
+ * כשיש כמה קמפיינים לאותו utm (ישן וחדש) - הפעיל קודם. כשל כאן לא מפיל את
+ * הסקירה: בלי המפה, פעולת הקמפיין היא "להקים" במקום "להעלות".
+ */
+async function loadRegionCampaigns(): Promise<Record<string, RegionCampaign>> {
+  const [cfg, reg] = await Promise.all([
+    supabaseAdmin.from("ads_campaign_config").select("campaign_id, campaign_name, status, daily_budget"),
+    supabaseAdmin.from("ads_campaign_registry").select("google_name, utm_campaign"),
+  ]);
+  if (cfg.error || reg.error) {
+    console.error("retention: campaigns read failed:", cfg.error?.message ?? reg.error?.message);
+    return {};
+  }
+  const utmByName = new Map<string, string>();
+  for (const r of reg.data ?? []) if (r.utm_campaign) utmByName.set(String(r.google_name), String(r.utm_campaign));
+  const byUtm = new Map<string, RegionCampaign[]>();
+  for (const c of cfg.data ?? []) {
+    const utm = utmByName.get(String(c.campaign_name));
+    if (!utm) continue;
+    const item: RegionCampaign = {
+      utm,
+      name: String(c.campaign_name),
+      campaignId: c.campaign_id != null ? String(c.campaign_id) : null,
+      status: c.status === "ENABLED" ? "ENABLED" : "PAUSED",
+      dailyBudget: c.daily_budget != null && Number(c.daily_budget) > 0 ? Number(c.daily_budget) : null,
+    };
+    byUtm.set(utm, [...(byUtm.get(utm) ?? []), item]);
+  }
+  const out: Record<string, RegionCampaign> = {};
+  for (const [region, m] of Object.entries(REGION_CAMPAIGNS)) {
+    const list = byUtm.get(m.utm) ?? [];
+    const pick = list.find((c) => c.status === "ENABLED") ?? list[0];
+    if (pick) out[region] = pick;
+  }
+  return out;
+}
+
 export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: TherapistInput[]; modelInputs: Map<string, ModelInput>; ctx: ReviewContext }> {
-  const [therapistsRes, funnelRes, demandRes, guaranteeRows] = await Promise.all([
+  const [therapistsRes, funnelRes, demandRes, guaranteeRows, campaigns] = await Promise.all([
     fetchAllRows<TRow>(() =>
       supabaseAdmin
         .from("therapists")
@@ -124,6 +165,7 @@ export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: T
     supabaseAdmin.rpc("retention_therapist_funnel", { p_days: WINDOW_DAYS }),
     supabaseAdmin.rpc("retention_region_demand", { p_days: WINDOW_DAYS }),
     computeGuarantee(),
+    loadRegionCampaigns(),
   ]);
   if (funnelRes.error) throw new Error(`retention_therapist_funnel: ${funnelRes.error.message}`);
   if (demandRes.error) throw new Error(`retention_region_demand: ${demandRes.error.message}`);
@@ -257,6 +299,7 @@ export async function loadRetentionInputs(now = new Date()): Promise<{ inputs: T
       onlineShare: demandTotal > 0 ? demandOnline / demandTotal : 0,
       holidayWeek: holidays[0]?.name ?? null,
       emailCooldownDays: OUTREACH_COOLDOWN_DAYS,
+      campaigns,
     },
   };
 }

@@ -1,6 +1,7 @@
 import { CITY_TO_REGION } from "./regions";
 import { isMobileNumber, phoneNationalDigits } from "./phone";
 import { detectProfileGapsDetailed, type ProfileGapKey } from "./profile-gaps";
+import { REGION_CAMPAIGNS, suggestedBudgetRaise } from "./ads-campaign-spec";
 
 // סקירת השימור השבועית - המנוע הטהור (docs/agents/retention-agent-plan.md).
 //
@@ -47,6 +48,29 @@ export type ReviewAction = {
   /** קמפיין / תיקון: לאן הכפתור מוביל. */
   link?: string;
   region?: string;
+  /** קמפיין: מה בדיוק הלחיצה עושה בגוגל (תקציב / הפעלה מחדש / הקמה). */
+  campaign?: CampaignAction;
+};
+
+export type CampaignActionKind = "budget" | "enable" | "create";
+export type CampaignAction = {
+  kind: CampaignActionKind;
+  region: string;
+  utm: string;
+  name?: string | null;
+  campaignId?: string | null;
+  /** תקציב: מ-₪ ל-₪ ליום. */
+  from?: number | null;
+  to?: number | null;
+};
+
+/** הקמפיין שמשרת אזור, מהסנכרון הלילי של גוגל אדס (ads_campaign_config + registry). */
+export type RegionCampaign = {
+  utm: string;
+  name: string;
+  campaignId: string | null;
+  status: "ENABLED" | "PAUSED";
+  dailyBudget: number | null;
 };
 
 export type FunnelRow = {
@@ -129,6 +153,8 @@ export type ReviewContext = {
   /** שם החג כשהשבוע הנסקר כולל חג - הירידה אז אינה אישית. */
   holidayWeek: string | null;
   emailCooldownDays: number;
+  /** הקמפיין של כל אזור, לפעולת הקמפיין (תקציב / הפעלה / הקמה). */
+  campaigns: Record<string, RegionCampaign>;
 };
 
 export type ReviewMetrics = FunnelRow & {
@@ -173,14 +199,18 @@ export type ReviewSummary = {
   byRisk: Record<ReviewRisk, number>;
   actions: number;
   holidayWeek: string | null;
-  /** מי לא נבדק/ת בכוונה: מושהים (לא מקבלים מטופלים) ולא מאושרים. */
-  excluded: { suspended: number; unapproved: number };
+  /** מי לא נבדק/ת בכוונה: מושהים (לא מקבלים מטופלים), לא מאושרים, וחדשים (פחות מארבעה שבועות). */
+  excluded: { suspended: number; unapproved: number; new: number };
 };
 
 // ── ספים. כל אחד מתועד כדי שלא יזוז בלי סיבה ───────────────────────────────
 
-/** מתחת לזה ימי ותק אין ציון סיכון, יש צ'קליסט קליטה. */
-export const MIN_TENURE_DAYS = 14;
+/**
+ * מתחת לזה ימי ותק המטפל/ת לא ברשימה בכלל (הבעלים, 11/10/26: "את כל החדשים
+ * אין מה לשים ברשימה - עד שהם צוברים לפחות 3-4 שבועות"). ארבעה שבועות: שבוע
+ * התייצבות ואז חלון מלא של שלושה שבועות בלי פניות.
+ */
+export const MIN_TENURE_DAYS = 28;
 /** "בלי פניות בכלל": החלון של הבעלים - שלושה שבועות. */
 export const NO_CONTACT_DAYS = 21;
 /** חשיפה נמוכה: הופעות כרטיס מתחת ל-40% מהבנצ'מרק... */
@@ -724,18 +754,45 @@ function actionsFor(t: TherapistWithTier, f: FunnelRow, m: ReviewMetrics, risk: 
     });
   }
 
-  // קמפיין: ביקוש נמוך באזור, או תלות בממומן. בשלב הזה קישור ומפרט, לא לחיצה בגוגל.
-  const demandFlag = flags.find((x) => x.key === "no_demand" || x.key === "paid_dependent");
+  // קמפיין: ביקוש נמוך באזור, תלות בממומן, או חשיפה נמוכה - ואז הלחיצה היא
+  // בגוגל עצמו (google-ads-write.ts): להעלות את תקציב הקמפיין של האזור, להפעיל
+  // אותו מחדש אם הושהה, או להקים חדש (מושהה) כשאין.
+  const demandFlag = flags.find((x) => x.key === "no_demand" || x.key === "paid_dependent" || x.key === "low_exposure");
   if (demandFlag && m.regions.length > 0 && (risk === "high" || risk === "medium")) {
-    actions.push({
-      type: "campaign",
-      title: demandFlag.key === "no_demand" ? `קמפיין ב${m.regions[0]}` : `לבדוק את הקמפיין ב${m.regions[0]}`,
-      detail: demandFlag.key === "no_demand"
-        ? "אין מספיק חיפושים באזור כדי שפרופיל כלשהו יביא פניות; הערכה והמילים לאזור בעמוד הפרסום."
-        : "רוב החשיפה ממומנת - לוודא שהקמפיין באזור פעיל ובתקציב.",
-      link: "/admin/ads",
-      region: m.regions[0],
-    });
+    const region = m.regions[0];
+    const why = demandFlag.key === "no_demand"
+      ? "אין מספיק חיפושים באזור כדי שפרופיל כלשהו יביא פניות."
+      : demandFlag.key === "paid_dependent"
+        ? "רוב החשיפה ממומנת - הקמפיין באזור הוא מה שמביא אותה."
+        : "חשיפה נמוכה מהעמיתים - יותר ביקוש באזור מגדיל את החשיפה של כולם שם.";
+    const live = ctx.campaigns[region] ?? null;
+    const mapped = REGION_CAMPAIGNS[region] ?? null;
+    if (live && live.status === "ENABLED" && live.dailyBudget != null) {
+      const to = suggestedBudgetRaise(live.dailyBudget);
+      actions.push({
+        type: "campaign",
+        title: `להעלות את ${live.name} מ-₪${live.dailyBudget} ל-₪${to} ליום`,
+        detail: `${why} השינוי נעשה בגוגל בלחיצה, אחרי בדיקה מול התקרה החודשית.`,
+        region,
+        campaign: { kind: "budget", region, utm: live.utm, name: live.name, campaignId: live.campaignId, from: live.dailyBudget, to },
+      });
+    } else if (live) {
+      actions.push({
+        type: "campaign",
+        title: `להפעיל מחדש את ${live.name}${live.dailyBudget != null ? ` (₪${live.dailyBudget} ליום)` : ""}`,
+        detail: `${why} הקמפיין באזור מושהה; ההפעלה נעשית בגוגל בלחיצה, אחרי בדיקה מול התקרה החודשית.`,
+        region,
+        campaign: { kind: "enable", region, utm: live.utm, name: live.name, campaignId: live.campaignId, from: live.dailyBudget, to: live.dailyBudget },
+      });
+    } else if (mapped) {
+      actions.push({
+        type: "campaign",
+        title: `להקים קמפיין ב${region}`,
+        detail: `${why} אין קמפיין לאזור; הלחיצה יוצרת אותו בגוגל מושהה, מהמפרט הקבוע, וההפעלה היא לחיצה שנייה.`,
+        region,
+        campaign: { kind: "create", region, utm: mapped.utm },
+      });
+    }
   }
 
   return actions.sort((a, b) => ACTION_RANK[a.type] - ACTION_RANK[b.type]);
@@ -799,7 +856,13 @@ export function todoSentence(actions: ReviewAction[], flags: ReviewFlag[], risk:
     else if (a.type === "task") {
       const money = flags.find((x) => (MONEY_FLAG_KEYS as readonly string[]).includes(x.key));
       parts.push(money ? `להתקשר לפני המועד (${money.label})` : "להתקשר");
-    } else if (a.type === "campaign") parts.push(a.region ? `לבדוק קמפיין ב${a.region}` : "לבדוק קמפיין");
+    } else if (a.type === "campaign") {
+      const c = a.campaign;
+      if (c?.kind === "budget") parts.push(`להעלות תקציב ב${c.region}`);
+      else if (c?.kind === "enable") parts.push(`להפעיל מחדש קמפיין ב${c.region}`);
+      else if (c?.kind === "create") parts.push(`להקים קמפיין ב${c.region}`);
+      else parts.push(a.region ? `לבדוק קמפיין ב${a.region}` : "לבדוק קמפיין");
+    }
   }
   if (parts.length === 0) {
     if (risk === "new") return "עוד מוקדם למדוד - לעקוב בשבוע הבא.";
@@ -812,13 +875,18 @@ export function todoSentence(actions: ReviewAction[], flags: ReviewFlag[], risk:
 export function buildRetentionReview(inputs: TherapistInput[], ctx: ReviewContext): { rows: ReviewRow[]; summary: ReviewSummary } {
   const now = ctx.now;
   const members: { t: TherapistWithTier; regions: string[]; f: FunnelRow }[] = [];
-  const excluded = { suspended: 0, unapproved: 0 };
+  const excluded = { suspended: 0, unapproved: 0, new: 0 };
   for (const t of inputs) {
     const tier = tierOf(t);
     if (!tier) continue;
     const why = excludedFromReview(t);
     if (why) {
       excluded[why]++;
+      continue;
+    }
+    // חדש/ה: נספר/ת ולא נבדק/ת, עד שיש ותק למדוד.
+    if (daysBetween(t.promoted_since ?? t.created_at, now) < MIN_TENURE_DAYS) {
+      excluded.new++;
       continue;
     }
     members.push({ t: { ...t, tier }, regions: regionsOf(t.cities), f: t.funnel ?? EMPTY_FUNNEL });

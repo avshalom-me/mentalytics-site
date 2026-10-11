@@ -62,6 +62,7 @@ function ctx(over: Partial<ReviewContext> = {}): ReviewContext {
     onlineShare: 0.3,
     holidayWeek: null,
     emailCooldownDays: 21,
+    campaigns: {},
     ...over,
   };
 }
@@ -85,7 +86,7 @@ describe("tierOf", () => {
     expect(excludedFromReview({ accepting_new_patients: true, admin_approved: true })).toBeNull();
     const { rows, summary } = buildRetentionReview([therapist({ accepting_new_patients: false }), therapist({ id: "u", admin_approved: false })], ctx());
     expect(rows).toEqual([]);
-    expect(summary.excluded).toEqual({ suspended: 1, unapproved: 1 });
+    expect(summary.excluded).toEqual({ suspended: 1, unapproved: 1, new: 0 });
     expect(summary.checked).toBe(0);
   });
 });
@@ -158,19 +159,20 @@ describe("risk", () => {
     expect(landline.risk).toBe("ok");
   });
 
-  it("a new therapist gets an onboarding checklist, not a risk score", () => {
+  it("a therapist promoted less than four weeks ago is not in the list at all, only counted", () => {
     const fresh = therapist({ promoted_since: daysAgo(5), funnel: funnel({}), profile_photo_path: null });
-    const row = buildRetentionReview([fresh], ctx()).rows[0];
-    expect(row.risk).toBe("new");
-    expect(row.flags.map((f) => f.key)).toContain("gap_photo");
-    expect(row.actions.map((a) => a.type)).toEqual(["email"]);
+    const almost = therapist({ id: "a", promoted_since: daysAgo(27), funnel: funnel({}) });
+    const { rows, summary } = buildRetentionReview([fresh, almost], ctx());
+    expect(rows).toEqual([]);
+    expect(summary.excluded.new).toBe(2);
+    expect(summary.checked).toBe(0);
   });
 
-  it("a new therapist with no card appearance after a week is critical - that is on us", () => {
-    const fresh = therapist({ promoted_since: daysAgo(9), funnel: funnel({}) });
-    const row = buildRetentionReview([fresh], ctx()).rows[0];
-    expect(row.risk).toBe("critical");
-    expect(row.flags[0].key).toBe("no_first_card");
+  it("from four weeks on, the therapist is measured like everyone else", () => {
+    const settled = therapist({ promoted_since: daysAgo(28), funnel: funnel({ cards_cur: 40, opens_cur: 8, people_21: 0, first_card_at: daysAgo(27) }) });
+    const { rows } = buildRetentionReview([settled], ctx());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].risk).toBe("medium");
   });
 
   it("a frozen therapist is reported as paused, not at risk", () => {
@@ -210,7 +212,23 @@ describe("diagnosis flags", () => {
     expect(keys).toContain("no_demand");
     expect(keys).toContain("paid_dependent");
     expect(keys).toContain("not_online");
-    expect(row.actions.map((a) => a.type)).toContain("campaign");
+    // בלי קמפיין לאזור: הלחיצה מקימה אחד (מושהה).
+    const campaign = row.actions.find((a) => a.type === "campaign");
+    expect(campaign?.campaign).toEqual({ kind: "create", region: "עמק יזרעאל ונצרת", utm: "g-emek" });
+    expect(row.todo).toContain("להקים קמפיין בעמק יזרעאל ונצרת");
+  });
+
+  it("offers a budget raise when the region's campaign runs, and a restart when it is paused", () => {
+    const quiet = therapist({ online: false, cities: ["מגדל העמק"], funnel: funnel({ cards_cur: 25, paid_cards_cur: 22, opens_cur: 5, people_21: 0, first_card_at: daysAgo(59) }) });
+    const demand = { "עמק יזרעאל ונצרת": { searches: 12, online: 2, treatmentSessions: 5, treatments: [] } };
+    const running = buildRetentionReview([quiet], ctx({ demand, campaigns: { "עמק יזרעאל ונצרת": { utm: "g-emek", name: "g-emek1", campaignId: "123", status: "ENABLED", dailyBudget: 10 } } })).rows[0];
+    const raise = running.actions.find((a) => a.type === "campaign")!;
+    expect(raise.campaign).toMatchObject({ kind: "budget", name: "g-emek1", campaignId: "123", from: 10, to: 15 });
+    expect(raise.title).toBe("להעלות את g-emek1 מ-₪10 ל-₪15 ליום");
+    expect(running.todo).toContain("להעלות תקציב בעמק יזרעאל ונצרת");
+    const paused = buildRetentionReview([quiet], ctx({ demand, campaigns: { "עמק יזרעאל ונצרת": { utm: "g-emek", name: "g-emek1", campaignId: "123", status: "PAUSED", dailyBudget: 10 } } })).rows[0];
+    expect(paused.actions.find((a) => a.type === "campaign")?.campaign?.kind).toBe("enable");
+    expect(paused.todo).toContain("להפעיל מחדש קמפיין בעמק יזרעאל ונצרת");
   });
 
   it("finds the therapist who crowds a region and offers a silent freeze; the others are marked crowded out", () => {
