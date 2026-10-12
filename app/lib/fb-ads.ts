@@ -26,11 +26,10 @@ const SITE = "https://www.mentalytics.co.il";
 
 /** The ads of October 2026 (docs/ads-copy/meta-2026-10.md). A new ad is a new row here. */
 export const FB_ADS: FbAd[] = [
-  { campaign: "fb-patients-image", audience: "patients", label: "מטופלים · תמונה", path: "/lp/story-c" },
+  // Published on 12/10/2026 as the poster followed by three screens of the site, under this
+  // link: the owner pasted the image ad's link into the carousel. The label says what runs.
+  { campaign: "fb-patients-image", audience: "patients", label: "מטופלים · קרוסלה (כרזה + 3 מסכים)", path: "/lp/story-c" },
   { campaign: "fb-patients-video", audience: "patients", label: "מטופלים · סרטון", path: "/lp/story-c" },
-  // The poster followed by three screens of the site (12/10/2026): its own link, so the
-  // carousel is read apart from the poster on its own.
-  { campaign: "fb-patients-carousel", audience: "patients", label: "מטופלים · קרוסלה", path: "/lp/story-c" },
   { campaign: "fb-recruit-image", audience: "recruit", label: "גיוס מטפלים · תמונה", path: "/therapists/join" },
   { campaign: "fb-recruit-video", audience: "recruit", label: "גיוס מטפלים · סרטון", path: "/therapists/join" },
 ];
