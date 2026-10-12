@@ -15,6 +15,7 @@ import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
 import AdminCertUpload from "./components/AdminCertUpload";
 import { therapistPath } from "@/app/lib/therapist-url";
+import { setTrackingOptOut } from "@/app/lib/track-optout";
 
 const ALL_CITIES = Object.values(REGION_CITIES).flat();
 const EXPRESSIVE_AREA = "טיפול בהבעה ויצירה";
@@ -1786,15 +1787,30 @@ export default function AdminTherapistsPage() {
           </button>
         </div>
         <button
-          onClick={() => {
+          onClick={async () => {
             // Stores the STAFF_BYPASS_TOKEN locally; it's sent to the score
             // routes, which validate it server-side and skip the free limit.
-            if (isBypassed) { localStorage.removeItem("staff_token"); window.location.reload(); }
-            else {
-              const token = window.prompt("הזן את טוקן ה-staff (STAFF_BYPASS_TOKEN):");
-              if (token) { localStorage.setItem("staff_token", token); window.location.reload(); }
+            if (isBypassed) { localStorage.removeItem("staff_token"); window.location.reload(); return; }
+            // One click (12/10/2026): the server hands the code to a logged-in
+            // admin, so there is nothing to look up or type in each new browser.
+            try {
+              const res = await fetch("/api/admin-staff-mode", { method: "POST" });
+              const j = await res.json();
+              if (!res.ok || !j.ok || typeof j.token !== "string") {
+                window.alert(j.error || "לא ניתן להפעיל מצב אדמין");
+                return;
+              }
+              localStorage.setItem("staff_token", j.token);
+              // כמו קישור הצוות (?staff=) בעמודי השאלונים: בדיקות של הצוות לא נספרות
+              // כמבקרים. נדלק פעם אחת בהפעלה, וכפתור המדידה ב-/admin/seo נשאר
+              // הסמכות היחידה להחזיר אותה.
+              setTrackingOptOut(true);
+              window.location.reload();
+            } catch {
+              window.alert("לא ניתן להפעיל מצב אדמין");
             }
           }}
+          title={isBypassed ? "כיבוי: השאלונים בדפדפן הזה חוזרים להגבלת הניסיונות" : "השאלונים בדפדפן הזה לא יוגבלו ולא ייספרו, וגם המדידה תכובה בו"}
           className={`text-xs px-3 py-1.5 rounded-lg border font-medium ${isBypassed ? "bg-green-100 text-green-700 border-green-300" : "bg-stone-100 text-stone-600 border-stone-300"}`}
         >
           {isBypassed ? "✓ מצב אדמין פעיל (ללא הגבלת שאלון)" : "הפעל מצב אדמין"}
