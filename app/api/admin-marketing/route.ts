@@ -308,6 +308,11 @@ export async function GET() {
       // that; the date tells history from a leak at a glance (30 of them sat in
       // the 30-day window on 24/9, all from 25/8-15/9).
       freeAdsLast: string | null;
+      // The same clicks per tier, by the channel the visitor arrived through. The
+      // chip said "21 inquiries, 11 of them from Google Ads" and the owner asked
+      // where the other ten came from (12/10/2026). Raw channel keys; the page
+      // groups and names them like the traffic-sources table below it.
+      sources: Record<RecipientTier, Record<string, number>>;
     };
     const payingById = new Map(payingList.map((t) => [t.id, t]));
     const freeRows = (freeListRes.data ?? []) as { id: string; full_name: string | null }[];
@@ -328,6 +333,7 @@ export async function GET() {
         total: 0, paid: 0, center: 0, trial: 0, free: 0, other: 0,
         paidAds: 0, centerAds: 0, trialAds: 0, freeAds: 0, otherAds: 0,
         freeAdsLast: null,
+        sources: { paid: {}, center: {}, trial: {}, free: {}, other: {} },
       };
       const byTherapist = new Map<string, Recipient>();
       for (const c of clicksAll) {
@@ -337,6 +343,8 @@ export async function GET() {
           payer ? tierOf(payer) : freeIdSet.has(c.therapist_id) ? "free" : "other";
         s.total++;
         s[key]++;
+        const channel = c.channel ?? "unknown";
+        s.sources[key][channel] = (s.sources[key][channel] ?? 0) + 1;
         const isAds = c.channel === "google_paid";
         if (isAds) {
           s[`${key}Ads`]++;

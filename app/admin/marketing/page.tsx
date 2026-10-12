@@ -14,6 +14,7 @@ import { REGION_LABELS, ISSUE_LABELS, AGE_LABELS, GENDER_LABELS } from "@/app/li
 const isPaidCampaign = (campaign: string) => /^(g-|tab-|fb-)/.test(campaign);
 import ContactDestinations from "@/app/admin/ContactDestinations";
 import TrafficSourcesPanel, { type TrafficPeriod } from "./TrafficSourcesPanel";
+import { countBySource, type SourceCount } from "@/app/lib/traffic-source-groups";
 
 // PHASE 1 marketing/leads dashboard. Data-first: KPIs (2/7/30 days) + plan
 // targets vs. actuals; the weekly AI insight is opt-in (a button) and split into
@@ -119,6 +120,8 @@ type ClickSplit = {
   paidAds: number; centerAds: number; trialAds: number; freeAds: number; otherAds: number;
   /** הפנייה האחרונה מגוגל אדס למטפל חינמי (מ-16/9/26 אמור להיות רק היסטוריה). */
   freeAdsLast?: string | null;
+  /** אותן פניות לכל מסלול, לפי הערוץ שבו הגיע המבקר (מפתחות channel גולמיים). */
+  sources?: Record<string, Record<string, number>>;
 };
 
 type Data = {
@@ -260,8 +263,11 @@ function Delta({ cur, prev, unit }: { cur: number; prev: number; unit: string })
 // inquiries next to the "70 inquiries" tile, and "where did the rest go?" was
 // asked twice (19/8, 24/9/2026). So the label says "מטפלים" outright, and the
 // inquiries those therapists received sit on their own line underneath.
-function CoverageChip({ label, covered, total, fromAds, clicks, clicksAds }: {
-  label: string; covered: number; total: number; fromAds: number; clicks?: number; clicksAds?: number;
+// "21 פניות, 11 מהן מגוגל אדס" raised the next question, "מאיפה השאר?"
+// (12/10/2026), so the inquiries that are not from Google Ads are listed by
+// source on a third line, under the names the traffic-sources table uses.
+function CoverageChip({ label, covered, total, fromAds, clicks, clicksAds, rest }: {
+  label: string; covered: number; total: number; fromAds: number; clicks?: number; clicksAds?: number; rest?: SourceCount[];
 }) {
   const ratio = total > 0 ? covered / total : 1;
   const cls =
@@ -269,7 +275,7 @@ function CoverageChip({ label, covered, total, fromAds, clicks, clicksAds }: {
     : ratio >= 0.5 ? "bg-amber-100 text-amber-800 border-amber-200"
     : "bg-red-100 text-red-700 border-red-200";
   return (
-    <div className={`rounded-xl border px-4 py-2.5 text-center ${cls}`}>
+    <div className={`max-w-[19rem] rounded-xl border px-4 py-2.5 text-center ${cls}`}>
       <div className="text-2xl font-black leading-tight">
         {num(covered)}<span className="text-sm font-bold opacity-60"> מתוך {num(total)}</span>
       </div>
@@ -280,6 +286,11 @@ function CoverageChip({ label, covered, total, fromAds, clicks, clicksAds }: {
       {clicks !== undefined && (
         <div className="text-[11px] font-semibold opacity-75">
           יחד: {num(clicks)} פניות, {num(clicksAds ?? 0)} מהן מגוגל אדס
+        </div>
+      )}
+      {rest && rest.length > 0 && (
+        <div className="text-[11px] font-semibold opacity-75">
+          השאר: {rest.map((r) => `${num(r.n)} ${r.label}`).join(" · ")}
         </div>
       )}
     </div>
@@ -460,6 +471,9 @@ function RecipientsList({ list, periodLabel }: { list: Recipient[]; periodLabel:
 function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: string; periodLabel: string }) {
   const p = c.periods[periodKey] ?? { paid: 0, center: 0, trial: 0, paidAds: 0, centerAds: 0, trialAds: 0 };
   const s = c.clicks?.[periodKey];
+  // הפניות שאינן מגוגל אדס, לפי מקור. גוגל אדס כבר מופיע בשורה שמעל.
+  const rest = (tier: "paid" | "center" | "trial") =>
+    s?.sources ? countBySource(s.sources[tier] ?? {}, ["google_paid"]) : undefined;
   const [showAll, setShowAll] = useState(false);
   const rows = showAll ? c.starving : c.starving.slice(0, 6);
   return (
@@ -474,14 +488,14 @@ function CoveragePanel({ c, periodKey, periodLabel }: { c: Coverage; periodKey: 
       </p>
       <div className="mb-3 flex flex-wrap gap-2">
         <CoverageChip label={`מטפלים בתשלום קיבלו פנייה`} covered={p.paid} total={c.paidTotal} fromAds={p.paidAds}
-          clicks={s?.paid} clicksAds={s?.paidAds} />
+          clicks={s?.paid} clicksAds={s?.paidAds} rest={rest("paid")} />
         {/* מרכזים בשבב נפרד: עד 21/8/2026 הם נספרו בתוך "מתנה", ולכן מרכז
             משלם הוצג כמי שקיבל חשיפה חינם - וכיסוי הפניות של הלקוחות
             המשלמים נראה גרוע ממה שהוא. */}
         <CoverageChip label={`מטפלי מרכזים קיבלו פנייה`} covered={p.center} total={c.centerTotal} fromAds={p.centerAds}
-          clicks={s?.center} clicksAds={s?.centerAds} />
+          clicks={s?.center} clicksAds={s?.centerAds} rest={rest("center")} />
         <CoverageChip label={`מקודמים (מתנה) קיבלו פנייה`} covered={p.trial} total={c.trialTotal} fromAds={p.trialAds}
-          clicks={s?.trial} clicksAds={s?.trialAds} />
+          clicks={s?.trial} clicksAds={s?.trialAds} rest={rest("trial")} />
       </div>
       {s && (
         <p className="mb-4 text-xs leading-5 text-stone-600">

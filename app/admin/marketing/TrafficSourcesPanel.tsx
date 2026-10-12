@@ -9,6 +9,8 @@
 // admin_traffic_sources, שמזהה AI גם בשורות שנרשמו לפני שהערוץ נוסף (4/9/2026),
 // ולכן עד תחילת אוקטובר המספר כאן גבוה במעט מזה שבטבלה המפורטת.
 
+import { sourceGroup, type SourceGroup } from "@/app/lib/traffic-source-groups";
+
 export type TrafficSourceRow = {
   key: string;
   sessions: number;
@@ -25,26 +27,29 @@ export type TrafficPeriod = {
   referrers: { host: string; sessions: number }[];
 };
 
-type Group = { id: string; label: string; keys: string[]; color: string; hint?: string };
+type Group = SourceGroup & { color: string; hint?: string };
+// שם המקור והערוצים שלו באים מ-traffic-source-groups, שמשמש גם את שורת "השאר"
+// בכרטיסי כיסוי הפניות; כאן נוספים רק הצבע וההסבר.
+const group = (id: string, color: string, hint?: string): Group => ({ ...sourceGroup(id), color, hint });
 
 // הסדר הוא סדר התצוגה. צבע = זהות המקור, והוא זהה בנקודה ובפס; ה-AI בסגול של
 // הקו ב-/admin/seo, כדי ששני המסכים ידברו באותה שפה.
 const MAIN: Group[] = [
-  { id: "google_paid", label: "גוגל ממומן", keys: ["google_paid"], color: "#2563EB" },
-  { id: "google_organic", label: "גוגל אורגני", keys: ["google_organic"], color: "#0284C7" },
-  { id: "ai", label: "עוזרי AI", keys: ["ai"], color: "#7C3AED" },
-  { id: "referral", label: "אתרים מפנים", keys: ["referral"], color: "#D49018" },
-  { id: "direct", label: "כניסות ישירות", keys: ["direct"], color: "#78716C", hint: "הקלדת כתובת, סימנייה, או אפליקציה שלא מעבירה מפנה" },
-  { id: "taboola", label: "טאבולה", keys: ["taboola_paid"], color: "#EA580C" },
-  { id: "meta", label: "פייסבוק ואינסטגרם", keys: ["meta_paid", "meta_organic"], color: "#4F46E5" },
+  group("google_paid", "#2563EB"),
+  group("google_organic", "#0284C7"),
+  group("ai", "#7C3AED"),
+  group("referral", "#D49018"),
+  group("direct", "#78716C", "הקלדת כתובת, סימנייה, או אפליקציה שלא מעבירה מפנה"),
+  group("taboola", "#EA580C"),
+  group("meta", "#4F46E5"),
 ];
 // מוצגים רק כשיש בהם תנועה בתקופה - אחרת הם רעש.
 const EXTRA: Group[] = [
-  { id: "whatsapp", label: "וואטסאפ", keys: ["whatsapp"], color: "#16A34A" },
-  { id: "email", label: "קישור ממייל", keys: ["email"], color: "#0D9488" },
-  { id: "search_other", label: "מנועי חיפוש אחרים", keys: ["search_other"], color: "#0891B2", hint: "Bing, DuckDuckGo ודומיהם" },
-  { id: "tiktok", label: "טיקטוק", keys: ["tiktok_paid", "tiktok_organic"], color: "#BE185D" },
-  { id: "unknown", label: "לא מזוהה", keys: ["unknown", "other"], color: "#A8A29E", hint: "אירועים בלי ערוץ, או תיוג קמפיין שאינו מוכר" },
+  group("whatsapp", "#16A34A"),
+  group("email", "#0D9488"),
+  group("search_other", "#0891B2", "Bing, DuckDuckGo ודומיהם"),
+  group("tiktok", "#BE185D"),
+  group("unknown", "#A8A29E", "אירועים בלי ערוץ, או תיוג קמפיין שאינו מוכר"),
 ];
 
 const ASSISTANTS: { key: string; label: string; always: boolean }[] = [
