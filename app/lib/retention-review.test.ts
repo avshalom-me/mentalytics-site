@@ -4,9 +4,12 @@ import {
   benchmarkFrom,
   buildRetentionEmail,
   buildRetentionReview,
+  emailBodyProblem,
+  excludedFromReview,
   regionsOf,
   reviewWeekStart,
   tierOf,
+  todoSentence,
   type FunnelRow,
   type ReviewContext,
   type TherapistInput,
@@ -59,6 +62,7 @@ function ctx(over: Partial<ReviewContext> = {}): ReviewContext {
     onlineShare: 0.3,
     holidayWeek: null,
     emailCooldownDays: 21,
+    campaigns: {},
     ...over,
   };
 }
@@ -66,16 +70,24 @@ function ctx(over: Partial<ReviewContext> = {}): ReviewContext {
 const funnel = (over: Partial<FunnelRow>): FunnelRow => ({ ...EMPTY_FUNNEL, ...over });
 
 describe("tierOf", () => {
-  it("paid and gift_trial are high; manual is medium; a trial is medium until its last two weeks", () => {
-    expect(tierOf({ status: "paying", promotion_source: "paid", entity_type: null, promoted_until: null }, NOW)).toBe("high");
-    expect(tierOf({ status: "paying", promotion_source: "gift_trial", entity_type: null, promoted_until: null }, NOW)).toBe("high");
-    expect(tierOf({ status: "paying", promotion_source: "manual", entity_type: null, promoted_until: null }, NOW)).toBe("medium");
-    expect(tierOf({ status: "paying", promotion_source: "trial", entity_type: null, promoted_until: daysAhead(40) }, NOW)).toBe("medium");
-    expect(tierOf({ status: "paying", promotion_source: "trial", entity_type: null, promoted_until: daysAhead(10) }, NOW)).toBe("high");
+  it("paid and gift_trial are the money group; trial and manual are the gift group, even when the trial is ending", () => {
+    expect(tierOf({ status: "paying", promotion_source: "paid", entity_type: null })).toBe("high");
+    expect(tierOf({ status: "paying", promotion_source: "gift_trial", entity_type: null })).toBe("high");
+    expect(tierOf({ status: "paying", promotion_source: "manual", entity_type: null })).toBe("medium");
+    expect(tierOf({ status: "paying", promotion_source: "trial", entity_type: null })).toBe("medium");
   });
   it("centers are their own group, and a free therapist is not in the review", () => {
-    expect(tierOf({ status: "paying", promotion_source: "center", entity_type: null, promoted_until: null }, NOW)).toBe("center");
-    expect(tierOf({ status: "approved", promotion_source: null, entity_type: null, promoted_until: null }, NOW)).toBeNull();
+    expect(tierOf({ status: "paying", promotion_source: "center", entity_type: null })).toBe("center");
+    expect(tierOf({ status: "approved", promotion_source: null, entity_type: null })).toBeNull();
+  });
+  it("a suspended or unapproved therapist is left out of the review and counted, not flagged", () => {
+    expect(excludedFromReview({ accepting_new_patients: false, admin_approved: true })).toBe("suspended");
+    expect(excludedFromReview({ accepting_new_patients: true, admin_approved: false })).toBe("unapproved");
+    expect(excludedFromReview({ accepting_new_patients: true, admin_approved: true })).toBeNull();
+    const { rows, summary } = buildRetentionReview([therapist({ accepting_new_patients: false }), therapist({ id: "u", admin_approved: false })], ctx());
+    expect(rows).toEqual([]);
+    expect(summary.excluded).toEqual({ suspended: 1, unapproved: 1, new: 0 });
+    expect(summary.checked).toBe(0);
   });
 });
 
@@ -93,8 +105,21 @@ describe("risk", () => {
     const guaranteed = therapist({ ...quiet, guarantee: { daysLeft: 10, contacts: 0 } });
     const row = buildRetentionReview([guaranteed], ctx()).rows[0];
     expect(row.risk).toBe("high");
-    expect(row.flags.map((f) => f.key)).toContain("billing_moment");
+    const flag = row.flags.find((f) => f.key === "guarantee_closing");
+    expect(flag?.label).toBe("ערבות הפניות נסגרת בעוד 10 ימים");
     expect(row.actions.map((a) => a.type)).toContain("task");
+    expect(row.todo).toContain("להתקשר לפני המועד (ערבות הפניות נסגרת בעוד 10 ימים)");
+  });
+
+  it("a trial ending without contacts stays in the gift group, is high, and offers an extension", () => {
+    const t = therapist({ promotion_source: "trial", promoted_until: daysAhead(9), funnel: funnel({ cards_cur: 40, opens_cur: 8, people_21: 0, last_contact_at: daysAgo(25), first_card_at: daysAgo(59) }) });
+    const row = buildRetentionReview([t], ctx()).rows[0];
+    expect(row.tier).toBe("medium");
+    expect(row.risk).toBe("high");
+    expect(row.flags.find((f) => f.key === "trial_ending")?.label).toMatch(/^הניסיון מסתיים ב-/);
+    expect(row.actions.map((a) => a.type)).toContain("extend");
+    expect(row.actions.map((a) => a.type)).not.toContain("task"); // שיחה רק למי שמשלם או עומד לשלם
+    expect(row.todo).toContain("להאריך את הניסיון");
   });
 
   it("low exposure with enough contacts is fine; low exposure with one contact is medium", () => {
@@ -116,12 +141,13 @@ describe("risk", () => {
     expect(row.flags.map((f) => f.key)).not.toContain("low_exposure");
   });
 
-  it("a paying therapist who is hidden is critical, with a fix action, whatever the numbers say", () => {
-    const row = buildRetentionReview([therapist({ accepting_new_patients: false })], ctx()).rows[0];
+  it("a paying therapist nobody can reach (no city, not online) is critical, with a fix action", () => {
+    const row = buildRetentionReview([therapist({ cities: [], online: false })], ctx()).rows[0];
     expect(row.risk).toBe("critical");
-    expect(row.flags[0].key).toBe("hidden");
+    expect(row.flags[0].key).toBe("no_reach");
     expect(row.actions[0].type).toBe("fix");
     expect(row.actions[0].link).toContain(row.therapist_id);
+    expect(row.todo).toMatch(/^לתקן באדמין/);
   });
 
   it("an invalid phone with no email is critical; a landline only loses WhatsApp", () => {
@@ -133,19 +159,20 @@ describe("risk", () => {
     expect(landline.risk).toBe("ok");
   });
 
-  it("a new therapist gets an onboarding checklist, not a risk score", () => {
+  it("a therapist promoted less than four weeks ago is not in the list at all, only counted", () => {
     const fresh = therapist({ promoted_since: daysAgo(5), funnel: funnel({}), profile_photo_path: null });
-    const row = buildRetentionReview([fresh], ctx()).rows[0];
-    expect(row.risk).toBe("new");
-    expect(row.flags.map((f) => f.key)).toContain("gap_photo");
-    expect(row.actions.map((a) => a.type)).toEqual(["email"]);
+    const almost = therapist({ id: "a", promoted_since: daysAgo(27), funnel: funnel({}) });
+    const { rows, summary } = buildRetentionReview([fresh, almost], ctx());
+    expect(rows).toEqual([]);
+    expect(summary.excluded.new).toBe(2);
+    expect(summary.checked).toBe(0);
   });
 
-  it("a new therapist with no card appearance after a week is critical - that is on us", () => {
-    const fresh = therapist({ promoted_since: daysAgo(9), funnel: funnel({}) });
-    const row = buildRetentionReview([fresh], ctx()).rows[0];
-    expect(row.risk).toBe("critical");
-    expect(row.flags[0].key).toBe("no_first_card");
+  it("from four weeks on, the therapist is measured like everyone else", () => {
+    const settled = therapist({ promoted_since: daysAgo(28), funnel: funnel({ cards_cur: 40, opens_cur: 8, people_21: 0, first_card_at: daysAgo(27) }) });
+    const { rows } = buildRetentionReview([settled], ctx());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].risk).toBe("medium");
   });
 
   it("a frozen therapist is reported as paused, not at risk", () => {
@@ -161,11 +188,14 @@ describe("risk", () => {
 });
 
 describe("diagnosis flags", () => {
-  it("names the treatment the region's quizzes recommend that the profile lacks", () => {
+  it("notes the treatment the region's quizzes recommend that the profile lacks - for us, never as a suggestion to the therapist", () => {
     const row = buildRetentionReview([therapist({ training_areas: ["טיפול דינאמי", "חרדה", "דיכאון", "זוגיות"], funnel: funnel({ cards_cur: 30, opens_cur: 6, people_21: 0, first_card_at: daysAgo(59) }) })], ctx()).rows[0];
     const flag = row.flags.find((f) => f.key === "treatment_mismatch");
-    expect(flag?.label).toBe("בלי CBT");
-    expect(flag?.emailParagraph).toContain("CBT");
+    expect(flag?.label).toBe("ביקוש ל-CBT באזור");
+    expect(flag?.owner).toBe("us");
+    expect(flag?.emailParagraph).toBeUndefined();
+    const email = row.actions.find((a) => a.type === "email");
+    expect(email?.body ?? "").not.toContain("CBT");
   });
 
   it("flags a card that is rarely opened and a profile that is opened but never contacted", () => {
@@ -182,7 +212,23 @@ describe("diagnosis flags", () => {
     expect(keys).toContain("no_demand");
     expect(keys).toContain("paid_dependent");
     expect(keys).toContain("not_online");
-    expect(row.actions.map((a) => a.type)).toContain("campaign");
+    // בלי קמפיין לאזור: הלחיצה מקימה אחד (מושהה).
+    const campaign = row.actions.find((a) => a.type === "campaign");
+    expect(campaign?.campaign).toEqual({ kind: "create", region: "עמק יזרעאל ונצרת", utm: "g-emek" });
+    expect(row.todo).toContain("להקים קמפיין בעמק יזרעאל ונצרת");
+  });
+
+  it("offers a budget raise when the region's campaign runs, and a restart when it is paused", () => {
+    const quiet = therapist({ online: false, cities: ["מגדל העמק"], funnel: funnel({ cards_cur: 25, paid_cards_cur: 22, opens_cur: 5, people_21: 0, first_card_at: daysAgo(59) }) });
+    const demand = { "עמק יזרעאל ונצרת": { searches: 12, online: 2, treatmentSessions: 5, treatments: [] } };
+    const running = buildRetentionReview([quiet], ctx({ demand, campaigns: { "עמק יזרעאל ונצרת": { utm: "g-emek", name: "g-emek1", campaignId: "123", status: "ENABLED", dailyBudget: 10 } } })).rows[0];
+    const raise = running.actions.find((a) => a.type === "campaign")!;
+    expect(raise.campaign).toMatchObject({ kind: "budget", name: "g-emek1", campaignId: "123", from: 10, to: 15 });
+    expect(raise.title).toBe("להעלות את g-emek1 מ-₪10 ל-₪15 ליום");
+    expect(running.todo).toContain("להעלות תקציב בעמק יזרעאל ונצרת");
+    const paused = buildRetentionReview([quiet], ctx({ demand, campaigns: { "עמק יזרעאל ונצרת": { utm: "g-emek", name: "g-emek1", campaignId: "123", status: "PAUSED", dailyBudget: 10 } } })).rows[0];
+    expect(paused.actions.find((a) => a.type === "campaign")?.campaign?.kind).toBe("enable");
+    expect(paused.todo).toContain("להפעיל מחדש קמפיין בעמק יזרעאל ונצרת");
   });
 
   it("finds the therapist who crowds a region and offers a silent freeze; the others are marked crowded out", () => {
@@ -251,6 +297,36 @@ describe("summary and ordering", () => {
     expect(summary.byRisk.high).toBe(2);
     expect(summary.byRisk.ok).toBe(1);
     expect(summary.checked).toBe(3);
+  });
+});
+
+describe("the one-sentence todo", () => {
+  it("leads with the most important action and names what the email asks for, at most three things", () => {
+    const row = buildRetentionReview([therapist({ online: false, profile_photo_path: null, bio: "קצר", phone: "03-5551234", funnel: funnel({ cards_cur: 60, opens_cur: 2, people_21: 0, last_contact_at: daysAgo(25), first_card_at: daysAgo(59) }) })], ctx()).rows[0];
+    // לפי חומרת הדגל: תמונה וביו (גבוהה) לפני הקו הנייח (רגילה).
+    expect(row.todo).toBe("לשלוח מייל (תמונה, ביו, מספר נייד לוואטסאפ).");
+  });
+  it("combines two actions into one sentence", () => {
+    expect(todoSentence(
+      [{ type: "freeze", title: "x", detail: "y", days: 7 }, { type: "task", title: "x", detail: "y" }],
+      [{ key: "guarantee_closing", severity: "high", owner: "us", label: "ערבות הפניות נסגרת בעוד 5 ימים", detail: "" }],
+      "high",
+    )).toBe("להקפיא ל-7 ימים (חזק/ה מדי באזור), ולהתקשר לפני המועד (ערבות הפניות נסגרת בעוד 5 ימים).");
+  });
+  it("says so when there is nothing to do, and that a frozen therapist is a decision", () => {
+    expect(todoSentence([], [], "ok")).toBe("אין מה לעשות השבוע.");
+    expect(todoSentence([], [], "new")).toBe("עוד מוקדם למדוד - לעקוב בשבוע הבא.");
+    expect(todoSentence([], [], "paused")).toMatch(/^מוקפא/);
+  });
+});
+
+describe("emailBodyProblem", () => {
+  it("rejects performance numbers, an em dash and bad lengths, and accepts demand percentages and dates", () => {
+    const ok = "שלום דנה,\n\nעברנו על הפרופיל שלך ויש כמה דברים שיכולים לעזור: כ-19% מהפונים מחפשים אונליין, וכדאי לוודא שכל התחומים מסומנים. ההצעה תקפה עד 22.10.2026.\n\nבברכה";
+    expect(emailBodyProblem(ok)).toBeNull();
+    expect(emailBodyProblem(ok.replace("כ-19%", "היו לך 47 הופעות"))).toMatch(/מספר/);
+    expect(emailBodyProblem(ok + " — סוף")).toMatch(/מקף/);
+    expect(emailBodyProblem("קצר")).toMatch(/קצרה/);
   });
 });
 

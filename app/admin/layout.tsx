@@ -73,6 +73,20 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   // "/admin" would startsWith-match every admin page — exact-match it.
   const isActive = (href: string) =>
     href === "/admin" ? pathname === "/admin" : pathname === href || pathname?.startsWith(href + "/");
+  // התג על "שימור מטפלים": כמה פעולות מהסקירה השבועית עוד ממתינות ללחיצה.
+  const [retentionPending, setRetentionPending] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/admin-retention?brief=1")
+      .then((r) => r.json())
+      .then((j) => {
+        if (!cancelled && j?.ok && typeof j.pending_count === "number") setRetentionPending(j.pending_count);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [pathname]);
 
   return (
     <nav className="flex flex-col gap-5">
@@ -97,6 +111,9 @@ function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
                 >
                   <span className="text-xs">{item.icon}</span>
                   {item.label}
+                  {item.href === "/admin/retention" && retentionPending > 0 && (
+                    <span className="ms-auto rounded-full bg-amber-100 px-1.5 text-[10px] font-bold text-amber-800">{retentionPending}</span>
+                  )}
                 </Link>
               );
             })}

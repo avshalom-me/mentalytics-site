@@ -1,7 +1,10 @@
 import "server-only"; // compile-time tripwire: this module holds API secrets and must never be pulled into a client bundle.
 
-// Read-only Google Ads API client - pulls per-campaign spend + performance so the
-// marketing dashboard can show real cost / CPC / CTR / CPL without manual entry.
+// Google Ads API client - pulls per-campaign spend + performance so the
+// marketing dashboard can show real cost / CPC / CTR / CPL without manual entry,
+// and carries the authenticated POST that the two writing modules use
+// (google-ads-conversions.ts; google-ads-write.ts for budgets and campaigns,
+// always from an explicit admin click).
 // Uses the REST API (searchStream) + a refresh-token OAuth flow - no new npm
 // dependency. All secrets come from env (set in Vercel); when they're absent the
 // dashboard degrades gracefully to a "not configured" state.
@@ -19,6 +22,11 @@ const API_VERSION = process.env.GOOGLE_ADS_API_VERSION || "v24";
 
 export function googleAdsConfigured(): boolean {
   return Boolean(DEV_TOKEN && CLIENT_ID && CLIENT_SECRET && REFRESH_TOKEN && CUSTOMER_ID);
+}
+
+/** מזהה חשבון הפרסום (ספרות בלבד) - לבניית resource names בקריאות mutate. */
+export function googleAdsCustomerId(): string {
+  return CUSTOMER_ID;
 }
 
 export type AdsCampaign = {

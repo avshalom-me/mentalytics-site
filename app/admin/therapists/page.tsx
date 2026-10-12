@@ -429,6 +429,15 @@ export default function AdminTherapistsPage() {
       setCenterScope(scope);
       setCenterScopeName(scope ? rows.find((t) => t.center_name)?.center_name ?? "" : "");
       setTherapists(rows);
+      // קישור ממוקד: לפתוח את הטאב שבו הכרטיס באמת נמצא (מקודם/ת מאושר/ת
+      // יושב/ת ב"מאושרים", לא ב"דורש טיפול" שנפתח כברירת מחדל ונראה ריק),
+      // ולפרוש את הכרטיס.
+      if (focus && rows[0]) {
+        const t = rows[0];
+        const listed = Boolean(t.admin_approved) && (t.status === "approved" || t.status === "paying");
+        setActiveTab(listed || t.status === THERAPIST_ARCHIVED_STATUS ? "approved" : t.status === "rejected" ? "rejected" : "action");
+        setExpandedIds(new Set([t.id]));
+      }
       // Fresh signed URLs — clear images previously marked broken (expired URL).
       setBrokenImages({});
     } catch (err) {
