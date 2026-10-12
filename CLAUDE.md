@@ -54,12 +54,11 @@
 ## גופנים (חובה)
 
 ```css
-@import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;700;800;900&display=swap');
-
 --font-body:    'Heebo', sans-serif;   /* לכל הטקסטים */
 ```
 
 - **Heebo בלבד.** עוצב במיוחד לעברית.
+- **הגופן מתארח אצלנו** (מ-12/10/2026): הכללים ב-`app/fonts/heebo.css`, הקבצים ב-`public/fonts/heebo-v28`. לא להחזיר `next/font/google` ולא `@import` מגוגל: כשה-build משך את הגופן מגוגל, הפריסה נכשלה שלוש פעמים בשלושה שבועות בלי קשר לקוד. יש על זה בדיקה (`app/lib/font-self-hosted.test.ts`).
 - **אסור:** Arial, Inter, system-ui, Rubik כגופן ראשי.
 
 ---

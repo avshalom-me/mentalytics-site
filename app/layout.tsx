@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { preload } from "react-dom";
 import "./globals.css";
-import { Heebo } from "next/font/google";
+import "./fonts/heebo.css";
 import NavBar from "./components/NavBar";
 import SiteFooter from "./components/SiteFooter";
 import AccessibilityWidget from "./components/AccessibilityWidget";
@@ -11,11 +12,10 @@ import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
 import { OG_FALLBACK_IMAGE } from "@/app/lib/share-metadata";
 import { learningFooterLinkLive } from "@/app/lib/learning-door";
 
-const heebo = Heebo({
-  subsets: ["hebrew"],
-  weight: ["300", "400", "500", "700", "800", "900"],
-  display: "swap",
-});
+// Heebo מתארח אצלנו ולא נמשך מגוגל בזמן ה-build; הכללים וההסבר ב-fonts/heebo.css.
+// הקובץ העברי נטען מראש, כמו ש-next/font עשה: בלי זה הדפדפן מגלה את הגופן רק
+// אחרי שקרא את ה-CSS, והטקסט מוצג זמן רב יותר בגופן החלופי.
+const HEEBO_HEBREW_FONT = "/fonts/heebo-v28/heebo-hebrew.woff2";
 
 export const metadata: Metadata = {
   title: { default: "טיפול חכם", template: "%s | טיפול חכם" },
@@ -39,9 +39,13 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // preload() ולא תג <link> ב-<head>: React מרים רמז כזה לראש ה-head בעצמו, ותג
+  // כתוב ביד יצא ב-HTML פעמיים. crossOrigin נדרש גם לקובץ מהדומיין שלנו: גופנים
+  // נטענים תמיד במצב CORS, ובלעדיו הדפדפן מוריד את הקובץ פעמיים.
+  preload(HEEBO_HEBREW_FONT, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
   return (
     <html lang="he" dir="rtl">
-      <body className={`${heebo.className} min-h-screen`}>
+      <body className="min-h-screen">
         {/* ראשון ב-body, לפני הציור הראשון: מסמן מבקר ממומן (html.mnt-paid)
             כדי שמטפלים חינמיים לא יוצגו לו - ראו app/lib/paid-visitor.ts. */}
         <script id="paid-visitor" dangerouslySetInnerHTML={{ __html: paidVisitorBootScript() }} />

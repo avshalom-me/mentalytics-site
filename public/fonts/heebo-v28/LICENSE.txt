@@ -1,0 +1,9 @@
+Heebo (variable font, version 28 as distributed by Google Fonts)
+Copyright 2014 The Heebo Project Authors (https://github.com/OdedEzer/heebo)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+The license text is available with a FAQ at: https://openfontlicense.org
+
+The files in this folder are the unmodified subset files served by Google
+Fonts for the family "Heebo" (hebrew, latin, latin-ext, math, symbols),
+renamed for readability.

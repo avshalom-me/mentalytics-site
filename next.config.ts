@@ -96,6 +96,15 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Heebo is served from /public (app/fonts/heebo.css), and a file in /public
+      // is sent with "max-age=0, must-revalidate": the browser would ask about
+      // the font again on every page. The folder name carries the font version,
+      // so the files never change at this address and can be cached for good -
+      // the same header /_next/static/media gave them under next/font.
+      {
+        source: "/fonts/heebo-v28/:file*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
       // The one root layout renders <html lang="he"> on every route, so the
       // English page declares its language here, where a crawler reads it
       // without running any script (app/en/DocumentLanguage.tsx fixes the

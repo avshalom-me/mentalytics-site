@@ -25,7 +25,9 @@ html { scroll-behavior: smooth; }
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Heebo', sans-serif;
+  /* 'Heebo Fallback' = Arial מכויל למידות של Heebo (app/fonts/heebo.css), מוצג
+     עד שהגופן נטען ומונע קפיצה של הטקסט. */
+  font-family: 'Heebo', 'Heebo Fallback', sans-serif;
   overflow-x: hidden;
   line-height: 1.6;
 }
