@@ -16,11 +16,16 @@ whose therapist has no photo shows this same silhouette, so no face had to be ma
 Rules:
 - A crop only. Nothing is moved, joined or redrawn, and the page's own background fills the
   margins. Each cut falls in a gap of the page, never through a line of text.
-- The list card says "דמו להמחשה", as the videos do next to the same list.
-- The report card shows the treatment and the summary, not the paragraph that names the
-  difficulty: Meta's "Personal Attributes" rule is about an ad that tells the viewer what
-  they suffer from, and a sample report is the nearest these cards come to it.
+- A therapist card says "דמו להמחשה", as the videos do next to the same list.
 - Same size as the poster: 1080x1350 at a 2x device scale.
+
+The first versions of cards 3 and 4 showed the report's summary and two therapists side by
+side with their percentages. The owner then asked (12/10/2026) for the two explanations the
+site writes, as the video shows them: "why was this suggested to me" under the treatment, and
+"why was this therapist matched to me" on the therapist's card. Both speak to the reader about
+anxiety, and Meta's "Personal Attributes" rule is about exactly that, an ad telling the viewer
+what they suffer from; the risk was put to him. Each explanation is shown down to its own
+caveat ("not a diagnosis"). The first versions are kept under their own names as the fallback.
 """
 import io, os, subprocess
 from PIL import Image
@@ -49,11 +54,18 @@ img{position:absolute;display:block}
 CARDS = {
     # The opening screen, down to the third promise ("only what is relevant").
     "fb-patients-carousel-2-quiz": ("a_open0.png", 30, 1650, 0, ""),
-    # The result: the treatment, the button that searches for it, and the summary. The page's
-    # top margin is 48px taller here so that the cut falls in the gap after the summary.
-    "fb-patients-carousel-3-report": ("a_report1.png", 0, 1562, 48, ""),
+    # The finding with its treatment, and "why was this suggested to me" opened: both
+    # paragraphs and the caveat under them.
+    "fb-patients-carousel-3-report": ("a_report1.png", 2470, 4475, 0, ""),
+    # One therapist: the match percentages, and "why was this therapist matched to me"
+    # opened, down to its caveat.
+    "fb-patients-carousel-4-therapists": ("a_list1.png", 1412, 3690, 56, "דמו להמחשה"),
+    # The fallback, with neither explanation. The top of the report: the treatment, the
+    # button that searches for it, and the summary (the page's top margin is 48px taller so
+    # that the cut falls in the gap after the summary).
+    "fb-patients-carousel-3-report-summary": ("a_report1.png", 0, 1562, 48, ""),
     # The first therapist in full and the second down to the match percentages.
-    "fb-patients-carousel-4-therapists": ("a_list0.png", 1412, 3048, 60, "דמו להמחשה"),
+    "fb-patients-carousel-4-therapists-list": ("a_list0.png", 1412, 3048, 60, "דמו להמחשה"),
 }
 
 
