@@ -1,0 +1,4 @@
+public/
+answers_sent.json
+*.txt
+__pycache__/
