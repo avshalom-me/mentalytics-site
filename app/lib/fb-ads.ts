@@ -28,6 +28,9 @@ const SITE = "https://www.mentalytics.co.il";
 export const FB_ADS: FbAd[] = [
   { campaign: "fb-patients-image", audience: "patients", label: "מטופלים · תמונה", path: "/lp/story-c" },
   { campaign: "fb-patients-video", audience: "patients", label: "מטופלים · סרטון", path: "/lp/story-c" },
+  // The poster followed by three screens of the site (12/10/2026): its own link, so the
+  // carousel is read apart from the poster on its own.
+  { campaign: "fb-patients-carousel", audience: "patients", label: "מטופלים · קרוסלה", path: "/lp/story-c" },
   { campaign: "fb-recruit-image", audience: "recruit", label: "גיוס מטפלים · תמונה", path: "/therapists/join" },
   { campaign: "fb-recruit-video", audience: "recruit", label: "גיוס מטפלים · סרטון", path: "/therapists/join" },
 ];
