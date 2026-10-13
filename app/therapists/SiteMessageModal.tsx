@@ -135,7 +135,7 @@ export default function SiteMessageModal({
       } else {
         setDone(true);
         // GA4 conversion: patient sent a site message to a therapist (a lead).
-        gaEvent("generate_lead", { method: "site_message", source });
+        gaEvent("generate_lead", { method: "site_message", source, therapist_id: therapistId });
         // אותה פנייה גם ל-Taboola: זה הכפתור היחיד בפס הצף במובייל כשאין
         // טלפון, ובלעדיו הקמפיין רואה פחות פניות ממה שהאדמין סופר.
         tfaEvent("contact");

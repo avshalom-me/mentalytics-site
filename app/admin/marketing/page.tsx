@@ -1537,7 +1537,8 @@ function DemandSupply() {
                       <tr className="border-b border-stone-200 text-xs text-stone-500">
                         <th className="px-2 py-2 text-right font-semibold">קמפיין</th>
                         <th className="px-2 py-2 text-center font-semibold">מבקרים</th>
-                        <th className="px-2 py-2 text-center font-semibold">נרשמו</th>
+                        {/* כל החשבונות שנפתחו, גם בלי פרופיל; "נרשמו" בעמוד המטפלים הוא רק מי שלא מילא. */}
+                        <th className="px-2 py-2 text-center font-semibold">פתחו חשבון</th>
                         <th className="px-2 py-2 text-center font-semibold">אושרו</th>
                         <th className="px-2 py-2 text-center font-semibold">משלמים</th>
                       </tr>

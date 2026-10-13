@@ -81,7 +81,8 @@ export default function MatchCardWhatsApp({
         ...attribution,
       }),
     }).catch(() => {});
-    gaEvent("generate_lead", { method: "whatsapp", source: "match" });
+    // המזהה הוא מה שמאפשר ל-GA4 לספור לחיצה חוזרת על אותו כפתור כפנייה אחת.
+    gaEvent("generate_lead", { method: "whatsapp", source: "match", therapist_id: therapistId });
   }
 
   return (

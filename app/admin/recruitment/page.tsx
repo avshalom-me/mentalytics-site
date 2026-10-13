@@ -106,7 +106,7 @@ export default function RecruitmentPage() {
           </div>
         </div>
         <p className="text-sm text-stone-500 mb-6">
-          כמה <strong>מבקרים</strong> כל מודעה הביאה, כמה מהם <strong>נרשמו</strong>, ומי עברו אישור/הפכו למקודמים — הכל מהצד שלנו, בלי הממשק המבלבל של פייסבוק. כך רואים איזו מודעה מביאה את הלידים הטובים יותר.
+          כמה <strong>מבקרים</strong> כל מודעה הביאה, כמה מהם <strong>פתחו חשבון</strong> (גם בלי למלא פרופיל), ומי עברו אישור/הפכו למקודמים — הכל מהצד שלנו, בלי הממשק המבלבל של פייסבוק. כך רואים איזו מודעה מביאה את הלידים הטובים יותר.
         </p>
 
         {loading && <p className="text-sm text-stone-400">טוען…</p>}
@@ -122,8 +122,10 @@ export default function RecruitmentPage() {
               <div className="text-xs font-semibold mt-1 text-teal-700">סך הרשמות מטפלים (בטווח)</div>
             </div>
 
-            {/* A/B head-to-head — always shown as the scoreboard, even at 0:0 */}
-            <ABCompare direct={direct} evocative={evocative} />
+            {/* A/B head-to-head of the two Meta ads. Shown while either of them
+                has activity in the chosen range; the ads have been paused since
+                the autumn, and a scoreboard fixed at 0:0 read as a live test. */}
+            {(direct || evocative) && <ABCompare direct={direct} evocative={evocative} />}
 
             {/* All campaigns */}
             <div className="rounded-2xl border border-stone-200 bg-white p-5 mb-6 overflow-x-auto">
@@ -270,7 +272,9 @@ function ABCard({
         </div>
         <div>
           <div className="text-4xl font-black text-stone-800">{num(signups)}</div>
-          <div className="text-xs font-semibold text-stone-500 mt-1">נרשמו</div>
+          {/* "פתחו חשבון" ולא "נרשמו": בעמוד המטפלים "נרשמו" הוא מי שפתח חשבון
+              ולא מילא פרופיל, וכאן נספרים כל החשבונות. */}
+          <div className="text-xs font-semibold text-stone-500 mt-1">פתחו חשבון</div>
         </div>
       </div>
       <div className="mt-4 text-sm text-stone-600">

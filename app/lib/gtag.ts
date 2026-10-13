@@ -13,12 +13,39 @@
  * had been optimising against.
  */
 import { getAttribution } from "./attribution";
+import { trackingOptedOut } from "./track-optout";
 
 declare global {
   interface Window {
     gtag?: (...args: unknown[]) => void;
     dataLayer?: unknown[];
   }
+}
+
+/**
+ * A repeated press on the same contact button is one lead, as the database
+ * has counted it since 7/10/2026 (record_contact_click, 120 seconds). GA4 and
+ * Google Ads got every press: the burst of 13 on one profile that day was 13
+ * conversions, and Ads bids on that number. Same window, keyed by the button
+ * (method, source) and the therapist - two therapists in a row are two leads.
+ */
+export const LEAD_DEDUPE_MS = 120_000;
+
+function leadRepeated(params: Record<string, unknown>): boolean {
+  // The directory's buttons do not say which therapist was pressed (their
+  // files are lastmod sources of /therapists and /en); without an id nothing
+  // is held back, because contacting two therapists in a row is common there.
+  if (!params.therapist_id) return false;
+  const key = `ga_lead:${String(params.method ?? "")}:${String(params.source ?? "")}:${String(params.therapist_id)}`;
+  try {
+    const now = Date.now();
+    const last = Number(sessionStorage.getItem(key) ?? 0);
+    if (last && now - last < LEAD_DEDUPE_MS) return true;
+    sessionStorage.setItem(key, String(now));
+  } catch {
+    /* storage blocked - count the press rather than lose a conversion */
+  }
+  return false;
 }
 
 /**
@@ -35,6 +62,10 @@ const ADS_LEAD_SEND_TO = "AW-18223934468/35zMCMTf8docEITY7PFD";
 /** Fire a GA4 event now. Safe no-op if gtag hasn't loaded yet. */
 export function gaEvent(name: string, params: Record<string, unknown> = {}): void {
   if (typeof window === "undefined" || typeof window.gtag !== "function") return;
+  // A browser that opted out of measurement (the team's) sends nothing to GA4
+  // or Ads either - until 13/10/2026 only our own events honoured the flag.
+  if (trackingOptedOut()) return;
+  if (name === "generate_lead" && leadRepeated(params)) return;
   // Attach our normalized marketing channel so conversions can be segmented by
   // source inside GA4. (GA4 also auto-captures the gclid-based source that
   // Google Ads needs for conversion import - this is an extra, friendly label.)

@@ -4,6 +4,7 @@ import { getOrCreateSessionId } from "@/app/lib/session";
 import { clickSignals } from "@/app/lib/click-signals";
 import { getAttribution } from "@/app/lib/attribution";
 import { gaEvent } from "@/app/lib/gtag";
+import { tfaEvent } from "@/app/lib/taboola";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import { trackCenterEvent } from "@/app/components/CenterTracking";
 
@@ -44,7 +45,10 @@ export default function CenterPhoneLink({ entityId, centerId, phone, className, 
       } else if (centerId) {
         trackCenterEvent("center_contact_click", centerId, { type: "phone" });
       }
-      gaEvent("generate_lead", { method: "phone", source: "center_page" });
+      // המזהה הוא מה שמאפשר ל-GA4 לספור לחיצה חוזרת על אותו כפתור כפנייה אחת.
+      gaEvent("generate_lead", { method: "phone", source: "center_page", therapist_id: entityId ?? centerId });
+      // עד 13/10/2026 טאבולה לא קיבלה את הפנייה מעמוד מרכז - רק מפרופיל ומכרטיס התאמה.
+      tfaEvent("contact");
     } catch { /* מעקב לא חוסם חיוג */ }
   }
   return (

@@ -11,6 +11,13 @@ import Script from "next/script";
 import { paidVisitorBootScript } from "@/app/lib/paid-visitor";
 import { OG_FALLBACK_IMAGE } from "@/app/lib/share-metadata";
 import { learningFooterLinkLive } from "@/app/lib/learning-door";
+import { TRACKING_OPTOUT_KEY } from "@/app/lib/track-optout";
+
+// The team's browsers opt out of measurement (app/lib/track-optout.ts). Our
+// own events honoured that from the start; the two third-party tags below did
+// not, so every visit of the owner's reached GA4, Google Ads and Taboola.
+// Each tag now checks the same flag before it configures itself.
+const NOT_OPTED_OUT = `!(function(){try{return localStorage.getItem(${JSON.stringify(TRACKING_OPTOUT_KEY)})==="1"}catch(e){return false}})()`;
 
 // Heebo מתארח אצלנו ולא נמשך מגוגל בזמן ה-build; הכללים וההסבר ב-fonts/heebo.css.
 // הקובץ העברי נטען מראש, כמו ש-next/font עשה: בלי זה הדפדפן מגלה את הגופן רק
@@ -69,9 +76,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Script id="google-analytics" strategy="afterInteractive">{`
           window.dataLayer = window.dataLayer || [];
           function gtag(){dataLayer.push(arguments);}
-          gtag('js', new Date());
-          gtag('config', 'G-V3QQRXSQ0T');
-          gtag('config', 'AW-18223934468');
+          if (${NOT_OPTED_OUT}) {
+            gtag('js', new Date());
+            gtag('config', 'G-V3QQRXSQ0T');
+            gtag('config', 'AW-18223934468');
+          }
         `}</Script>
         {/*
           פיקסל Taboola (חשבון 2102216) עבור קמפייני הנייטיב. הותקן ידנית
@@ -81,16 +90,18 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           כאן נטען הבסיס ונורה page_view; אירועי ההמרה נשלחים מ-app/lib/taboola.ts.
         */}
         <Script id="taboola-pixel" strategy="afterInteractive">{`
-          window._tfa = window._tfa || [];
-          window._tfa.push({notify: 'event', name: 'page_view', id: 2102216});
-          !function (t, f, a, x) {
-            if (!document.getElementById(x)) {
-              t.async = 1;t.src = a;t.id=x;f.parentNode.insertBefore(t, f);
-            }
-          }(document.createElement('script'),
-          document.getElementsByTagName('script')[0],
-          '//cdn.taboola.com/libtrc/unip/2102216/tfa.js',
-          'tb_tfa_script');
+          if (${NOT_OPTED_OUT}) {
+            window._tfa = window._tfa || [];
+            window._tfa.push({notify: 'event', name: 'page_view', id: 2102216});
+            !function (t, f, a, x) {
+              if (!document.getElementById(x)) {
+                t.async = 1;t.src = a;t.id=x;f.parentNode.insertBefore(t, f);
+              }
+            }(document.createElement('script'),
+            document.getElementsByTagName('script')[0],
+            '//cdn.taboola.com/libtrc/unip/2102216/tfa.js',
+            'tb_tfa_script');
+          }
         `}</Script>
 
         {/* The footer's link to "לימוד חכם" is decided here, on the server, so the

@@ -195,8 +195,26 @@ const OTHER_SEARCH_HOSTS = [
   "baidu.com",
 ] as const;
 
-/** Derive a single normalized channel from URL params + referrer. */
-function deriveChannel(params: URLSearchParams, referrer: string): Channel {
+/**
+ * Our own hostnames. A landing whose referrer is one of them is not a visit
+ * from elsewhere - it is a session whose stored touch expired on the way, or a
+ * hard navigation from the dashboard or the teachers' door. Until 13/10/2026
+ * those were counted as `referral`, next to the backlinks.
+ */
+const OWN_HOSTS = ["mentalytics.co.il"] as const;
+
+function isOwnReferrer(ref: string): boolean {
+  let host = "";
+  try {
+    host = new URL(ref).hostname;
+  } catch {
+    return false;
+  }
+  return OWN_HOSTS.some((own) => host === own || host.endsWith(`.${own}`));
+}
+
+/** Derive a single normalized channel from URL params + referrer. Exported for its tests. */
+export function deriveChannel(params: URLSearchParams, referrer: string): Channel {
   const src = (params.get("utm_source") || "").trim().toLowerCase();
   const med = (params.get("utm_medium") || "").trim().toLowerCase();
   const ref = (referrer || "").trim().toLowerCase();
@@ -235,6 +253,7 @@ function deriveChannel(params: URLSearchParams, referrer: string): Channel {
 
   // No UTM - infer from the referrer.
   if (!ref) return "direct";
+  if (isOwnReferrer(ref)) return "direct";
   if (ref.includes("whatsapp") || ref.includes("wa.me")) return "whatsapp";
   // BEFORE the google. test, and that order is the whole point: gemini.google.com
   // contains "google." and was being counted as organic search. Measured 3/9/2026,

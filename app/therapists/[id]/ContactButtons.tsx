@@ -53,7 +53,8 @@ function track(
   }).catch(() => {});
   // GA4 conversion: the patient reached out to a therapist - the key patient-side
   // lead. Mark it a Key Event + import to Google Ads so paid search optimizes to it.
-  gaEvent("generate_lead", { method: clickType, source });
+  // The id is what lets GA4 count a repeated press on the same button as one lead.
+  gaEvent("generate_lead", { method: clickType, source, therapist_id: therapistId });
 }
 
 // Shared pill styling for the large, prominent profile contact buttons.

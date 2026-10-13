@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { Metadata } from "next";
-import { countListed } from "@/app/lib/therapist-directory";
+import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import PageViewTracker from "@/app/components/PageViewTracker";
 import QuizCta from "@/app/therapists/QuizCta";
 import TooltipAsterisk from "@/app/components/TooltipAsterisk";
@@ -50,8 +50,24 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
+// מי שמגיע מקמפיין רואה רק מטפלים מקודמים (החלטת הבעלים 16/9/26, ראו
+// app/lib/paid-visitor.ts), ולכן "מתוך X מטפלים" סופר רק אותם. עד 13/10/2026
+// נספר כל המאגר, כולל חינמיים שהמבקר הזה לא יראה לעולם.
+async function promotedCount(online?: boolean): Promise<number> {
+  let q = supabaseAdmin
+    .from("therapists")
+    .select("id", { count: "exact", head: true })
+    .eq("status", "paying")
+    .eq("admin_approved", true)
+    .neq("entity_type", "center");
+  if (online) q = q.eq("online", true);
+  const { count, error } = await q;
+  if (error) throw new Error(`promoted count failed: ${error.message}`);
+  return count ?? 0;
+}
+
 export default async function QuizLandingPage() {
-  const [total, online] = await Promise.all([countListed(), countListed({ online: true })]);
+  const [total, online] = await Promise.all([promotedCount(), promotedCount(true)]);
 
   return (
     <main dir="rtl" style={{ background: "var(--bg)" }}>

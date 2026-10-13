@@ -1,5 +1,6 @@
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rowInRegion } from "@/app/lib/therapist-directory";
+import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 // דוח חשיפה/לחיצות לאזור, לצורך שיתוף עם מרכזים טיפוליים שמתלבטים אם
 // להצטרף (17/8/2026). מטפלים מקודמים בלבד (תשלום או מתנה) - לא ישויות-מרכז,
@@ -78,22 +79,31 @@ export async function loadRegionReport(region: string): Promise<RegionReport | n
   if (eligible.length === 0) return null;
 
   const ids = eligible.map((t) => t.id);
-  const [{ data: viewRows }, { data: clickRows }] = await Promise.all([
-    supabaseAdmin
-      .from("therapist_profile_views")
-      .select("therapist_id, viewed_at, session_id")
-      .in("therapist_id", ids)
-      .in("source", ["match", "directory"])
-      .gte("viewed_at", windowStart.toISOString()),
-    supabaseAdmin
-      .from("therapist_contact_clicks")
-      .select("therapist_id, clicked_at, session_id")
-      .in("therapist_id", ids)
-      .gte("clicked_at", windowStart.toISOString()),
+  // Paged: a plain select stops at 1,000 rows, and a region's promoted
+  // therapists collect more views than that in a month - the page would have
+  // shown exactly 1,000 and called it the total.
+  type ViewRow = { therapist_id: string; viewed_at: string; session_id: string | null };
+  type ClickRow = { therapist_id: string; clicked_at: string; session_id: string | null };
+  const [viewRows, clickRows] = await Promise.all([
+    fetchAllRows<ViewRow>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id, viewed_at, session_id")
+        .in("therapist_id", ids)
+        .in("source", ["match", "directory"])
+        .gte("viewed_at", windowStart.toISOString()),
+    ),
+    fetchAllRows<ClickRow>(() =>
+      supabaseAdmin
+        .from("therapist_contact_clicks")
+        .select("therapist_id, clicked_at, session_id")
+        .in("therapist_id", ids)
+        .gte("clicked_at", windowStart.toISOString()),
+    ),
   ]);
 
-  const views = (viewRows ?? []).filter((v) => !isBotDay(v.viewed_at as string));
-  const clicks = (clickRows ?? []).filter((c) => !isBotDay(c.clicked_at as string));
+  const views = viewRows.filter((v) => !isBotDay(v.viewed_at));
+  const clicks = clickRows.filter((c) => !isBotDay(c.clicked_at));
 
   const viewsByTherapist = new Map<string, number>();
   const viewerSessions = new Set<string>();
