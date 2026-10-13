@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { llmJson } from "@/app/lib/llm";
 import { getTreatmentRationale } from "@/app/lib/treatment-rationale";
+import { capped, cappedList, explainBodyTooLarge, explainModelAllowed, explainRateLimited } from "@/app/lib/explain-guard";
 
 // Produces a personalised explanation of why a specific treatment / referral
 // was recommended to a given user based on their questionnaire answers.
@@ -14,33 +15,39 @@ import { getTreatmentRationale } from "@/app/lib/treatment-rationale";
 
 // ── Input schema ──────────────────────────────────────────────────────────────
 
+// Every field is capped at a length a real questionnaire could produce (see
+// app/lib/explain-guard.ts): the prompt is built from this body and the model
+// bills by the token.
 const BodySchema = z.object({
   questionnaire_type: z.enum(["adult", "child", "school"]),
 
   recommendation: z.object({
-    treatment: z.string(),               // e.g. "CBT"
-    treatment_label: z.string(),         // human readable, e.g. "CBT לחרדה"
-    domain: z.string(),                  // e.g. "מורכבויות בתחום הרגשי/האישי"
+    treatment: capped(80),               // e.g. "CBT"
+    treatment_label: capped(160),        // human readable, e.g. "CBT לחרדה"
+    domain: capped(160),                 // e.g. "מורכבויות בתחום הרגשי/האישי"
     urgent: z.boolean().optional(),
-    symptom_text: z.string().optional(), // short text describing the finding
+    symptom_text: capped(1_500).optional(), // short text describing the finding
   }),
 
   user_facts: z.object({
     // Derived facts — sanitised on the client. Free-form so different
     // questionnaires can supply different summaries (mood scores for adults,
     // grade-level + behaviour categories for kids, etc.).
-    summary: z.array(z.string()).optional(),   // bullet-style summary lines
-    scores: z.record(z.string(), z.union([z.number(), z.string()])).optional(),
-    age_band: z.string().optional(),
-    gender: z.string().optional(),
-    flags: z.array(z.string()).optional(),
+    summary: cappedList(400, 40).optional(),   // bullet-style summary lines
+    scores: z
+      .record(z.string().max(60), z.union([z.number(), z.string().max(80)]))
+      .refine((r) => Object.keys(r).length <= 60, "too many scores")
+      .optional(),
+    age_band: capped(40).optional(),
+    gender: capped(20).optional(),
+    flags: cappedList(120, 40).optional(),
   }).optional(),
 
   treatment_rationale: z.object({
     // Optional structured rationale supplied by the client — gives the model
     // ground truth so it doesn't invent evidence claims.
-    why: z.string().optional(),
-    typical_duration: z.string().optional(),
+    why: capped(2_000).optional(),
+    typical_duration: capped(200).optional(),
     evidence_strength: z.enum(["high", "moderate", "low"]).optional(),
   }).optional(),
 });
@@ -199,32 +206,30 @@ async function callAi(body: Body): Promise<ExplainResponse> {
   }
 }
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
-// Each IP gets 30 explanation requests per minute — generous enough for normal
-// use, low enough to deter abuse. In-memory only; resets on cold start.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (entry.count >= 30) return false;
-  entry.count++;
-  return true;
-}
-
 // ── Route handler ─────────────────────────────────────────────────────────────
+// Public, unauthenticated endpoint that calls a paid model. The guards (per
+// address a minute, body size, field caps, and a site-wide daily cap past which
+// the template is served) are described in app/lib/explain-guard.ts.
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip)) {
+  if (explainRateLimited(req, "explain-recommendation")) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+  if (explainBodyTooLarge(req)) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
   }
 
   try {
-    const raw = await req.json();
+    const text = await req.text();
+    if (explainBodyTooLarge(req, text)) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
     const parsed = BodySchema.safeParse(raw);
 
     if (!parsed.success) {
@@ -235,6 +240,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const body = parsed.data;
+
+    if (!(await explainModelAllowed("explain_recommendation"))) {
+      console.warn("[explain-recommendation] daily cap reached, serving the template");
+      return NextResponse.json(buildMockExplanation(body), { status: 200 });
+    }
 
     try {
       const explanation = await callAi(body);

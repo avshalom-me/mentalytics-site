@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { llmJson } from "@/app/lib/llm";
+import { capped, cappedList, explainBodyTooLarge, explainModelAllowed, explainRateLimited } from "@/app/lib/explain-guard";
 
 // ── Input schema ──────────────────────────────────────────────────────────────
+// Every field is capped at a length a real profile or questionnaire could
+// produce (see app/lib/explain-guard.ts): the prompt is built from this body
+// and the model bills by the token.
 
 const BodySchema = z.object({
   questionnaire_type: z.enum(["adult", "child", "school"]),
@@ -10,45 +14,48 @@ const BodySchema = z.object({
 
   user_summary: z
     .object({
-      age_group: z.string().optional(),
+      age_group: capped(40).optional(),
       // adult flow: the user's gender; child flow: the child's gender.
-      gender: z.string().nullable().optional(),
-      region_preference: z.string().optional(),
+      gender: capped(20).nullable().optional(),
+      region_preference: capped(60).optional(),
       online_preference: z.boolean().optional(),
-      therapist_gender_preference: z.string().nullable().optional(),
-      main_needs: z.array(z.string()).optional(),
-      recommended_treatment_types: z.array(z.string()).optional(),
-      couples_modality: z.string().nullable().optional(),
-      recommended_assessment_types: z.array(z.string()).optional(),
-      recommended_therapist_types: z.array(z.string()).optional(),
-      cultural_preferences: z.array(z.string()).optional(),
+      therapist_gender_preference: capped(20).nullable().optional(),
+      main_needs: cappedList(120, 20).optional(),
+      recommended_treatment_types: cappedList(80, 20).optional(),
+      couples_modality: capped(40).nullable().optional(),
+      recommended_assessment_types: cappedList(80, 20).optional(),
+      recommended_therapist_types: cappedList(80, 20).optional(),
+      cultural_preferences: cappedList(80, 20).optional(),
     })
     .optional(),
 
   therapist: z.object({
-    id: z.string(),
-    full_name: z.string(),
-    therapist_types: z.array(z.string()).optional(),
-    training_areas: z.array(z.string()).optional(),
-    couples_modalities: z.array(z.string()).optional(),
-    regions: z.array(z.string()).optional(),
+    id: capped(80),
+    full_name: capped(120),
+    therapist_types: cappedList(80, 20).optional(),
+    training_areas: cappedList(80, 40).optional(),
+    couples_modalities: cappedList(40, 10).optional(),
+    regions: cappedList(60, 40).optional(),
     online: z.boolean().optional(),
-    gender: z.string().nullable().optional(),
-    cultural_prefs: z.array(z.string()).optional(),
-    bio: z.string().nullable().optional(),
+    gender: capped(20).nullable().optional(),
+    cultural_prefs: cappedList(80, 20).optional(),
+    bio: capped(4_000).nullable().optional(),
     // 'center' = מרכז טיפולי (מסלול 2) ולא אדם - משנה כותרת, גוף ולשון.
-    entity_type: z.string().nullable().optional(),
+    entity_type: capped(20).nullable().optional(),
     /** התואר הציבורי כפי שמוצג בכותרת הפרופיל (ראו publicTherapistTitle). */
-    public_title: z.string().nullable().optional(),
+    public_title: capped(120).nullable().optional(),
     /** משמש לגזירת public_title בצד השרת כשהלקוח לא שלח אותו. */
-    age_groups: z.array(z.string()).nullable().optional(),
+    age_groups: cappedList(40, 10).nullable().optional(),
   }),
 
   match_result: z.object({
     match_score: z.number(),
     personality_score: z.number().nullable().optional(),
-    match_reasons: z.array(z.string()),
-    matched_fields: z.record(z.string(), z.unknown()).optional(),
+    match_reasons: cappedList(300, 20),
+    matched_fields: z
+      .record(z.string().max(60), z.unknown())
+      .refine((r) => JSON.stringify(r).length <= 4_000, "matched_fields too large")
+      .optional(),
   }),
 
   addiction_cbt_fallback: z.boolean().optional(),
@@ -315,33 +322,30 @@ async function callAi(body: Body): Promise<ExplainResponse> {
   }
 }
 
-// ── Rate limiting ─────────────────────────────────────────────────────────────
-// Public, unauthenticated endpoint that calls a paid model — cap each IP at 30
-// requests/minute so it can't be abused to run up cost. In-memory only; resets
-// on cold start. Mirrors /api/explain-recommendation.
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (entry.count >= 30) return false;
-  entry.count++;
-  return true;
-}
-
 // ── Route handler ─────────────────────────────────────────────────────────────
+// Public, unauthenticated endpoint that calls a paid model. The guards (per
+// address a minute, body size, field caps, and a site-wide daily cap past which
+// the template is served) are described in app/lib/explain-guard.ts.
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip)) {
+  if (explainRateLimited(req, "explain-match")) {
     return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+  }
+  if (explainBodyTooLarge(req)) {
+    return NextResponse.json({ error: "Request body too large" }, { status: 413 });
   }
 
   try {
-    const raw = await req.json();
+    const text = await req.text();
+    if (explainBodyTooLarge(req, text)) {
+      return NextResponse.json({ error: "Request body too large" }, { status: 413 });
+    }
+    let raw: unknown;
+    try {
+      raw = JSON.parse(text);
+    } catch {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
     const parsed = BodySchema.safeParse(raw);
 
     if (!parsed.success) {
@@ -352,6 +356,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
 
     const body = parsed.data;
+
+    if (!(await explainModelAllowed("explain_match"))) {
+      console.warn("[explain-match] daily cap reached, serving the template");
+      return NextResponse.json(buildMockExplanation(body), { status: 200 });
+    }
 
     try {
       const explanation = await callAi(body);

@@ -66,4 +66,10 @@ describe("/api/developers", () => {
     expect((await post({ email: "someone@example.com" })).status).toBe(400);
     expect(sendMock).not.toHaveBeenCalled();
   });
+
+  it("accepts a submission without the idea's description, which the form marks optional", async () => {
+    const res = await post({ name: valid.name, email: valid.email, description: "" });
+    expect(res.status).toBe(200);
+    expect(sendMock).toHaveBeenCalledTimes(1);
+  });
 });

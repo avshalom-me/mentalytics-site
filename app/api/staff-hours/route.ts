@@ -1,24 +1,26 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
+import { lockedOut, recordFailure } from "@/app/lib/failed-attempts";
 
 // דיווח שעות לעובדים — API ציבורי המשרת את עמוד הנוכחות /staff.
 // זיהוי בקוד אישי (PIN) בלבד: העובד לא חשוף לנתוני אף אחד אחר, וכל פעולה
-// מאומתת מחדש מול ה-PIN (אין session). הגבלת קצב לפי IP מקשה על ניחוש קודים.
+// מאומתת מחדש מול ה-PIN (אין session).
+//
+// הגנה מניחוש (13/10/2026): עד אז הבלם היחיד היה 20 בקשות בדקה לכתובת, וקוד
+// של 4 ספרות (10,000 אפשרויות) נופל כך בתוך שעות. עכשיו נספרים רק קודים
+// שגויים: חמישה מאותה כתובת נועלים אותה לרבע שעה, ו-30 מכל הכתובות יחד
+// נועלים את הנתיב לשעה. מי שמקליד את הקוד הנכון לא מרגיש בזה.
 
 export const dynamic = "force-dynamic";
 
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000 });
-    return true;
-  }
-  if (entry.count >= 20) return false;
-  entry.count++;
-  return true;
-}
+const REQUESTS_PER_MINUTE = 20;
+const WRONG_PINS_PER_ADDRESS = 5;
+const ADDRESS_LOCK_MS = 15 * 60_000;
+const WRONG_PINS_SITE_WIDE = 30;
+const SITE_LOCK_MS = 60 * 60_000;
+
+const LOCKED_MESSAGE = "יותר מדי ניסיונות שגויים - נסו שוב מאוחר יותר";
 
 const MAX_SESSION_HOURS = 16; // משמרת ארוכה מזה היא כמעט ודאי טעות הקלדה
 
@@ -94,9 +96,13 @@ async function buildStatus(staff: StaffRow) {
 }
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
-  if (!checkRateLimit(ip)) {
-    return NextResponse.json({ ok: false, error: "יותר מדי ניסיונות — נסו שוב בעוד דקה" }, { status: 429 });
+  const ip = clientIp(req);
+  const pace = rateLimit("staff-hours", ip, REQUESTS_PER_MINUTE, 60_000);
+  if (!pace.ok) {
+    return tooManyRequests(pace.retryAfterSeconds, "יותר מדי ניסיונות - נסו שוב בעוד דקה");
+  }
+  if (lockedOut("staff-pin", ip, WRONG_PINS_PER_ADDRESS) || lockedOut("staff-pin-all", "all", WRONG_PINS_SITE_WIDE)) {
+    return NextResponse.json({ ok: false, error: LOCKED_MESSAGE }, { status: 429 });
   }
 
   let body: Record<string, unknown>;
@@ -110,6 +116,8 @@ export async function POST(req: NextRequest) {
   const pin = typeof body.pin === "string" ? body.pin.trim() : "";
   const staff = await findByPin(pin);
   if (!staff) {
+    recordFailure("staff-pin", ip, ADDRESS_LOCK_MS);
+    recordFailure("staff-pin-all", "all", SITE_LOCK_MS);
     return NextResponse.json({ ok: false, error: "קוד אישי שגוי" }, { status: 401 });
   }
 

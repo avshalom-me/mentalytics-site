@@ -31,7 +31,10 @@ export async function POST(req: NextRequest) {
 
     const { name, email, phone, role, stage, description, link } = await req.json();
 
-    if (!name || !email || !description) {
+    // Name and email only: the form marks the idea's description optional and
+    // sends without it, and until 13/10/2026 this line then refused the
+    // submission as "missing required fields".
+    if (!name || !email) {
       return NextResponse.json({ ok: false, error: "שדות חובה חסרים" }, { status: 400 });
     }
     // A malformed address makes Resend reject the send anyway; catching it here
@@ -46,7 +49,7 @@ export async function POST(req: NextRequest) {
       phone: escapeHtml(String(phone || "")),
       role: escapeHtml(String(role || "")),
       stage: escapeHtml(String(stage || "")),
-      description: escapeHtml(String(description)),
+      description: escapeHtml(String(description || "")),
       link: escapeHtml(String(link || "")),
     };
 
@@ -74,7 +77,7 @@ export async function POST(req: NextRequest) {
           </table>
           <div style="margin-top: 16px; padding: 16px; background: #f5f5f5; border-radius: 8px;">
             <strong>תיאור הרעיון:</strong>
-            <p style="margin-top: 8px; white-space: pre-wrap;">${safe.description}</p>
+            <p style="margin-top: 8px; white-space: pre-wrap;">${safe.description || "—"}</p>
           </div>
           <p style="margin-top: 16px; font-size: 12px; color: #999;">נשלח מ-mentalytics.co.il/developers</p>
         </div>
