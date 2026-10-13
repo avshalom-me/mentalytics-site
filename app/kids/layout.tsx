@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { staffLinkBootScript } from "@/app/lib/staff-link";
 
 export const metadata: Metadata = {
   title: "שאלון הכוונה טיפולית לילדים ונוער",
@@ -12,5 +13,12 @@ export const metadata: Metadata = {
 };
 
 export default function KidsLayout({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+  return (
+    <>
+      {/* קישור צוות (?staff=): הקוד עובר לאחסון והכתובת נמחקת עוד בזמן פענוח
+          ה-HTML, לפני שתגי המדידה נטענים - ראו app/lib/staff-link.ts. */}
+      <script id="staff-link" dangerouslySetInnerHTML={{ __html: staffLinkBootScript() }} />
+      {children}
+    </>
+  );
 }

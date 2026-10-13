@@ -5,7 +5,9 @@
 // האירועים מהדפדפן הזה. נשמר ב-localStorage באותו origin, ולכן הפעלה מהאדמין
 // חלה גם על האתר הציבורי.
 
-const KEY = "mnt_no_track";
+/** מיוצא לסקריפט של קישור הצוות (app/lib/staff-link.ts), שכותב את אותו מפתח לפני שהמודול הזה נטען. */
+export const TRACKING_OPTOUT_KEY = "mnt_no_track";
+const KEY = TRACKING_OPTOUT_KEY;
 
 export function trackingOptedOut(): boolean {
   if (typeof window === "undefined") return false;

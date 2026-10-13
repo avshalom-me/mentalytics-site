@@ -1,8 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Resend } from "resend";
 import { SITE_FORM_SUBJECT_PREFIX } from "@/app/lib/site-inquiry";
+import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 
 const resend = new Resend(process.env.RESEND_API_KEY);
+
+// Every submission sends a real email, and Resend's free tier gives the whole
+// site 100 a day. This was the one public mail-sending route with no ceiling
+// (found 12/10/26): a loop of a hundred requests would have used up the day's
+// allowance, and patient messages and sign-up mails with it. Same numbers as
+// /api/contact - far above what a person needs, far below what drains the day.
+const DEVELOPERS_LIMIT = 5;
+const DEVELOPERS_WINDOW_MS = 60 * 60_000;
 
 function escapeHtml(str: string): string {
   return str
@@ -15,10 +24,20 @@ function escapeHtml(str: string): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const gate = rateLimit("developers", clientIp(req), DEVELOPERS_LIMIT, DEVELOPERS_WINDOW_MS);
+    if (!gate.ok) {
+      return tooManyRequests(gate.retryAfterSeconds, "נשלחו יותר מדי פניות. נסו שוב בעוד שעה.");
+    }
+
     const { name, email, phone, role, stage, description, link } = await req.json();
 
     if (!name || !email || !description) {
       return NextResponse.json({ ok: false, error: "שדות חובה חסרים" }, { status: 400 });
+    }
+    // A malformed address makes Resend reject the send anyway; catching it here
+    // also keeps it out of the replyTo header.
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(String(email).trim())) {
+      return NextResponse.json({ ok: false, error: "כתובת מייל לא תקינה" }, { status: 400 });
     }
 
     const safe = {
@@ -34,7 +53,7 @@ export async function POST(req: NextRequest) {
     await resend.emails.send({
       from: "טיפול חכם — בית למפתחים <noreply@mentalytics.co.il>",
       to: "admin@getmentalytics.com",
-      replyTo: email,
+      replyTo: String(email).trim(),
       // התחילית היא חלק מהכלל שלפיו סוכן השירות מזהה את המייל כפנייה של
       // גולש (site-inquiry.ts), ולכן היא מוגדרת שם ולא כאן. נושא מייל הוא טקסט:
       // השם נכנס בלי escape של HTML, ובלי שורות חדשות.

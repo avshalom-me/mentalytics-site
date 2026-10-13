@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoreKidsQuestionnaire } from "@/app/lib/kids-score.server";
-import { bumpAndCheckIpDaily, getIp } from "@/app/lib/usage";
+import { bumpAndCheckIpDaily, cleanFp, getIp, getUsage } from "@/app/lib/usage";
 import { isActiveReviewToken } from "@/app/lib/school-review.server";
 
 // The counsellor rubric scores with the kids engine, free of the parent
 // paywall: a counsellor works through a caseload, and a referral channel is
 // worth more than a credit (docs/school-questionnaire-plan.md, section 9). The
-// per-IP daily cap stays as the abuse backstop. It answers 429, never 402 -
-// there is no payment screen to send a counsellor to.
+// per-IP daily cap stays as the abuse backstop (429).
+//
+// Free of the paywall is not the same as a way around it. Until 13/10/2026 the
+// route asked nothing about the device, so a parent whose free runs of the kids
+// questionnaire were used up could post the same answers here and be scored
+// for nothing. Now a device the kids route would refuse (its free runs spent,
+// no paid credit) is refused here too, with the kids route's 402 so the quiz
+// shows its payment screen. No credit is ever taken here, so a counsellor is
+// still never charged; only a device that had already hit the parents' limit
+// sees a difference.
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -20,8 +28,15 @@ export async function POST(request: NextRequest) {
     // them and for nobody else; a request without one never reaches the
     // database to ask.
     const reviewing = await isActiveReviewToken((body as Record<string, unknown>)._reviewToken);
-    if (!reviewing && !(await bumpAndCheckIpDaily(getIp(request)))) {
-      return NextResponse.json({ ok: false, error: "Daily limit reached" }, { status: 429 });
+    if (!reviewing) {
+      const ip = getIp(request);
+      const usage = await getUsage(ip, cleanFp((body as Record<string, unknown>)._fp), "kids");
+      if (usage.paymentRequired) {
+        return NextResponse.json({ ok: false, paymentRequired: true }, { status: 402 });
+      }
+      if (!(await bumpAndCheckIpDaily(ip))) {
+        return NextResponse.json({ ok: false, error: "Daily limit reached" }, { status: 429 });
+      }
     }
     const result = scoreKidsQuestionnaire(body);
     // No research counters here on purpose: the counsellor flow is a professional

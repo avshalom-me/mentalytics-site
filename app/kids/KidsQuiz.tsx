@@ -4015,6 +4015,12 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
       // בדשבורד השיווק. נדלק פעם אחת בפתיחת הקישור ולא בכל טעינה, כדי
       // שכפתור המדידה ב-/admin/seo יישאר הסמכות היחידה להחזיר אותה.
       setTrackingOptOut(true);
+      // בדרך כלל הסקריפט ב-layout כבר הסיר את הקוד מהכתובת לפני שתגי המדידה
+      // נטענו (app/lib/staff-link.ts); כאן רק אם הוא לא רץ, כדי שהקוד לא
+      // יישאר בשורת הכתובת ובהיסטוריה.
+      params.delete("staff");
+      const rest = params.toString();
+      window.history.replaceState(window.history.state, "", `${window.location.pathname}${rest ? `?${rest}` : ""}${window.location.hash}`);
     }
     if (localStorage.getItem("staff_token")) { setUsageAllowed(true); return; }
     getFingerprint()
