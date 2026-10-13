@@ -262,7 +262,7 @@ export default function AdminDashboardPage() {
                 <QueueRow
                   tone="amber"
                   icon="🎓"
-                  title={`${q!.pending_teachers_count} מורים ממתינים לאימות ההכשרה (מענה לימודי)`}
+                  title={`${q!.pending_teachers_count} מורים ממתינים לאישור (לימוד חכם)`}
                   action={{ label: "לאישור", href: "/admin/teachers" }}
                 />
               )}

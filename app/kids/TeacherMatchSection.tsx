@@ -113,7 +113,7 @@ export default function TeacherMatchSection({
         <div className="rounded-2xl border border-sky-200 bg-sky-50 p-5">
           <h3 className="font-bold text-[var(--teal-dark)] text-lg mb-1">מציאת {search.label}</h3>
           <p className="text-xs text-gray-500 mb-4">
-            מורים שההכשרה שלהם אומתה, לפי התחום ושכבת הגיל. הפנייה היא ישירות למורה.
+            מורים מהמאגר של לימוד חכם, לפי התחום ושכבת הגיל. אצל מורים להוראה מתקנת ולחינוך מיוחד התעודה נבדקה. הפנייה היא ישירות למורה.
             {needs.length > 0 && ` בתוך האזור שתבחרו יוצגו ראשונים מורים שהצהירו על ניסיון עם מה שעלה בשאלון: ${needs.map((n) => needLabel(n, true)).join(", ")}.`}
           </p>
 

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { loadListedTeacherBySlug, teacherPhotoUrl } from "@/app/lib/teachers.server";
-import { subjectLabel, gradeGroupLabel, qualificationLabel, expertiseLabel, focusesBySubject, lessonSettingsText } from "@/app/lib/teacher-options";
+import { subjectLabel, gradeGroupLabel, qualificationLabel, qualificationNeedsCertificate, expertiseLabel, focusesBySubject, lessonSettingsText } from "@/app/lib/teacher-options";
 import TeacherContactButtons from "../../TeacherContactButtons";
 import TeacherProfileView from "./TeacherProfileView";
 
@@ -28,6 +28,9 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
   const photo = teacherPhotoUrl(t);
   const focusGroups = focusesBySubject(t.subjects, t.focuses ?? []);
   const expertise = t.expertise ?? [];
+  // תעודה נבדקת רק למי שהכשרתו מחייבת אותה (הוראה מתקנת, חינוך מיוחד); אצל
+  // מורה פרטי/ת ההכשרה היא לפי הצהרה, וכך היא מסומנת.
+  const certificateChecked = qualificationNeedsCertificate(t.qualification);
   // ערים, ואחריהן איפה מתקיים השיעור: "חיפה, נשר · בבית התלמיד, אונליין".
   const where = [t.regions.join(", "), lessonSettingsText(t)].filter(Boolean).join(" · ");
 
@@ -51,7 +54,7 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <h1 className="text-2xl font-black text-[var(--text)]">{t.full_name}</h1>
-              <span className="rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ ההכשרה אומתה</span>
+              {certificateChecked && <span className="rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ תעודה נבדקה</span>}
               {t.remedial && <span className="rounded-full bg-[var(--gold-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--gold-dark)]">הוראה מתקנת</span>}
             </div>
             <p className="mt-1 text-sm text-[var(--muted)]">
@@ -96,7 +99,9 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
             </div>
           )}
           <div className="rounded-xl bg-[var(--surface)] p-3">
-            <dt className="text-xs font-bold text-[var(--muted)]">הכשרה</dt>
+            <dt className="text-xs font-bold text-[var(--muted)]">
+              הכשרה {!certificateChecked && <span className="font-normal">(לפי הצהרת המורה)</span>}
+            </dt>
             <dd className="font-semibold text-[var(--text)]">{qualificationLabel(t.qualification)}</dd>
           </div>
           {t.experience_years != null && (
@@ -121,9 +126,12 @@ export default async function TeacherProfilePage({ params, searchParams }: { par
       </div>
 
       <p className="mt-6 text-xs leading-6 text-[var(--muted)]">
-        מורה עצמאי/ת. טיפול חכם אימתה את ההכשרה המוצהרת מול תעודה, ואינה צד לשיעורים, לתשלום או לתוכנם.
-        מוקדי ההוראה והניסיון עם קשיים מסוימים הם לפי הצהרת המורה, ולא אומתו.
-        המורה אינו/ה מטפל/ת ואינו/ה מאבחן/ת; לקושי רגשי או לבירור אבחוני,{" "}
+        מורה עצמאי/ת. לימוד חכם אינו צד לשיעורים, לתשלום או לתוכנם.{" "}
+        {certificateChecked
+          ? "ראינו את התעודה ובדקנו שהיא מתאימה להכשרה המוצהרת. מוקדי ההוראה והניסיון עם קשיים מסוימים הם לפי הצהרת המורה, ולא אומתו."
+          : "ההכשרה, מוקדי ההוראה והניסיון הם לפי הצהרת המורה, ולא אומתו."}{" "}
+        רקע פלילי אינו נבדק: המורה הצהיר/ה בהרשמה שאין מניעה על פי דין לעבודתו/ה עם קטינים.
+        שיעורים אינם טיפול ואינם תחליף לאבחון; לקושי רגשי או לבירור אבחוני,{" "}
         {fromMatch ? "ראו את שאר ההמלצות בדוח השאלון." : "פונים לאנשי המקצוע המתאימים."}
       </p>
     </main>

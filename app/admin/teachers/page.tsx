@@ -5,6 +5,7 @@ import HelpTip from "../components/HelpTip";
 import { gmailSearchUrl } from "@/app/lib/crm";
 import {
   TEACHER_LISTING_STATES,
+  TEACHER_FREE_LISTING,
   TEACHER_PRICE_GROSS,
   TEACHER_TRIAL_DAYS,
   TEACHER_PAY_EMAIL_DAY,
@@ -13,6 +14,7 @@ import {
   gradeGroupLabel,
   qualificationLabel,
   qualificationAllowsRemedial,
+  qualificationNeedsCertificate,
   expertiseLabel,
   focusesBySubject,
   lessonSettingsText,
@@ -91,7 +93,7 @@ const SUPPLY_KEYS = [
 
 const TABS: { key: string; label: string; states: string[] }[] = [
   { key: "pending", label: "ממתינים לאישור", states: ["pending"] },
-  { key: "listed", label: "מוצגים (ניסיון + משלמים)", states: ["trial", "paying"] },
+  { key: "listed", label: TEACHER_FREE_LISTING ? "מוצגים" : "מוצגים (ניסיון + משלמים)", states: ["trial", "paying"] },
   { key: "archived", label: "ארכיון", states: ["archived"] },
   { key: "rejected", label: "נדחו", states: ["rejected"] },
   { key: "all", label: "הכול", states: TEACHER_LISTING_STATES.map((s) => s.key) },
@@ -195,12 +197,15 @@ export default function AdminTeachersPage() {
   }
 
   async function approve(t: Teacher, sendEmail: boolean) {
+    // כשהמאגר חינם אין תקופת ניסיון: אישור = הצגה להורים, בלי תאריך סיום.
+    const starts = TEACHER_FREE_LISTING ? "ולהציג אותו/ה להורים, ללא תשלום" : `ולהתחיל ${TEACHER_TRIAL_DAYS} ימי ניסיון`;
     const text = sendEmail
-      ? `לאשר את ${t.full_name} ולהתחיל ${TEACHER_TRIAL_DAYS} ימי ניסיון? יישלח מייל אישור עם הקישור האישי.`
-      : `לאשר את ${t.full_name} ולהתחיל ${TEACHER_TRIAL_DAYS} ימי ניסיון, בלי לשלוח מייל?`;
+      ? `לאשר את ${t.full_name} ${starts}? יישלח מייל אישור עם הקישור האישי.`
+      : `לאשר את ${t.full_name} ${starts}, בלי לשלוח מייל?`;
     if (!confirm(text)) return;
     let r = await act(t.id, "approve", { send_email: sendEmail });
-    if (!r.ok && !t.has_certificate && confirm(`${r.error}\n\nלאשר בכל זאת, בלי תעודה?`)) {
+    // תעודה נדרשת רק להכשרה בהוראה מתקנת או בחינוך מיוחד; שם אישור בלעדיה דורש אישור מפורש.
+    if (!r.ok && !t.has_certificate && qualificationNeedsCertificate(t.qualification) && confirm(`${r.error}\n\nלאשר בכל זאת, בלי תעודה?`)) {
       r = await act(t.id, "approve", { send_email: sendEmail, without_certificate: true });
     }
     if (!r.ok) alert(r.error);
@@ -253,8 +258,18 @@ export default function AdminTeachersPage() {
           <HelpTip id="teachers" />
         </div>
         <p className="mb-4 text-sm text-stone-500">
-          {TEACHER_TRIAL_DAYS} ימי ניסיון מהאישור, בלי תשלום. ביום ה-{TEACHER_PAY_EMAIL_DAY} יוצא מייל להרשמה ({TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ), ביום האחרון מייל נוסף,
-          ולמחרת מי שלא נרשם/ה עובר/ת לארכיון. המורים מוצגים רק בתוצאות שאלון הילדים.
+          {TEACHER_FREE_LISTING ? (
+            <>
+              המאגר חינם למורים, ובלי מחיר עתידי (החלטה מ-13/10/2026): אישור מציג את המורה להורים בלי תאריך סיום, ולא נשלחים מיילים
+              של תשלום. תעודה נדרשת רק להכשרה בהוראה מתקנת או בחינוך מיוחד; מורה פרטי/ת מאושר/ת בלי תעודה, וההכשרה מוצגת להורים
+              &quot;לפי הצהרת המורה&quot;. המורים מוצגים בתוצאות שאלון הילדים ובמאגר המורים (/learning/teachers).
+            </>
+          ) : (
+            <>
+              {TEACHER_TRIAL_DAYS} ימי ניסיון מהאישור, בלי תשלום. ביום ה-{TEACHER_PAY_EMAIL_DAY} יוצא מייל להרשמה ({TEACHER_PRICE_GROSS} ש״ח לחודש כולל מע״מ), ביום האחרון מייל נוסף,
+              ולמחרת מי שלא נרשם/ה עובר/ת לארכיון. המורים מוצגים בתוצאות שאלון הילדים ובמאגר המורים (/learning/teachers).
+            </>
+          )}
         </p>
 
         <div className="mb-4 rounded-2xl border border-stone-200 bg-white p-3 text-xs leading-5 text-stone-600">
@@ -398,7 +413,9 @@ export default function AdminTeachersPage() {
                       {t.remedial && <span className="rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">הוראה מתקנת</span>}
                       {activeSumit && <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700">הוראת קבע {t.sumit_recurring_id}</span>}
                       {paused && <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">❄️ מוקפא/ת עד {fmtDate(t.paused_until)}</span>}
-                      {!t.has_certificate && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">בלי תעודה</span>}
+                      {qualificationNeedsCertificate(t.qualification)
+                        ? !t.has_certificate && <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700">חסרה תעודה</span>
+                        : <span className="rounded-full bg-stone-100 px-2 py-0.5 text-[11px] font-bold text-stone-600">לא נדרשת תעודה</span>}
                     </div>
                     <div className="mt-1 text-xs text-stone-600">
                       {t.subjects.map(subjectLabel).join(", ")} · {t.grade_groups.map(gradeGroupLabel).join(", ")} · {t.regions.join(", ") || "-"}
@@ -441,12 +458,12 @@ export default function AdminTeachersPage() {
                     </>
                   )}
                   {t.listing_state === "archived" && (
-                    <button disabled={isBusy} onClick={() => run(t.id, "approve", { send_email: false }, `להחזיר את ${t.full_name} למאגר עם ${TEACHER_TRIAL_DAYS} ימי ניסיון חדשים?`)} className="rounded-full bg-emerald-700 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-50">החזרה למאגר (ניסיון חדש)</button>
+                    <button disabled={isBusy} onClick={() => run(t.id, "approve", { send_email: false }, TEACHER_FREE_LISTING ? `להחזיר את ${t.full_name} למאגר?` : `להחזיר את ${t.full_name} למאגר עם ${TEACHER_TRIAL_DAYS} ימי ניסיון חדשים?`)} className="rounded-full bg-emerald-700 px-3 py-1 text-xs font-bold text-white hover:bg-emerald-600 disabled:opacity-50">{TEACHER_FREE_LISTING ? "החזרה למאגר" : "החזרה למאגר (ניסיון חדש)"}</button>
                   )}
                   {(t.listing_state === "pending" || t.listing_state === "trial") && !activeSumit && (
                     <button disabled={isBusy} onClick={() => reject(t)} className="rounded-full border border-red-200 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">דחייה</button>
                   )}
-                  {(t.listing_state === "trial" || t.listing_state === "archived") && !activeSumit && (
+                  {!TEACHER_FREE_LISTING && (t.listing_state === "trial" || t.listing_state === "archived") && !activeSumit && (
                     <button disabled={isBusy} onClick={() => { const d = Number(prompt("להאריך את הניסיון בכמה ימים? שני המיילים של סוף הניסיון יישלחו שוב לקראת התאריך החדש.", "30")); if (d > 0) void run(t.id, "extend_trial", { days: d }); }} className={btn}>+ הארכת ניסיון</button>
                   )}
                   {(t.listing_state === "trial" || t.listing_state === "paying") &&
@@ -465,7 +482,7 @@ export default function AdminTeachersPage() {
                     <button disabled={isBusy} onClick={() => run(t.id, "revoke_paying", {}, "להסיר את הסימון כמשלם/ת?")} className={btn}>הסרת סימון משלם/ת</button>
                   )}
                   {activeSumit && (
-                    <button disabled={isBusy} onClick={() => run(t.id, "cancel_subscription", {}, `לבטל את הוראת הקבע ${t.sumit_recurring_id} ב-Sumit? ${left != null && left > 0 ? "המורה יחזור/תחזור לניסיון עד סופו." : "המורה יעבור/תעבור לארכיון."}`)} className="rounded-full border border-red-200 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">ביטול הוראת קבע</button>
+                    <button disabled={isBusy} onClick={() => run(t.id, "cancel_subscription", {}, `לבטל את הוראת הקבע ${t.sumit_recurring_id} ב-Sumit? ${TEACHER_FREE_LISTING ? "המורה יישאר/תישאר מוצג/ת, ללא תשלום." : left != null && left > 0 ? "המורה יחזור/תחזור לניסיון עד סופו." : "המורה יעבור/תעבור לארכיון."}`)} className="rounded-full border border-red-200 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50">ביטול הוראת קבע</button>
                   )}
                   {(t.remedial || remedialOk) && (
                     <button disabled={isBusy} onClick={() => run(t.id, "set_remedial", { remedial: !t.remedial })} className={btn} title="מסומן = מוצע גם להמלצות של הוראה מתקנת">

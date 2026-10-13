@@ -11,6 +11,15 @@
 /** השם שהורים ומורים רואים. שם האתר בגוגל נשאר "טיפול חכם" (אותו דומיין). */
 export const LEARNING_BRAND = "לימוד חכם";
 
+/** החתימה על עמודי הדלת ועל חומרי הגיוס (הבעלים, 13/10/2026). */
+export const LEARNING_SIGNATURE = "צוות לימוד חכם";
+
+/**
+ * התמונה שמופיעה כשמשתפים עמוד של הדלת (1200x630, עם הלוגו של לימוד חכם).
+ * הגיוס מתחיל בפוסטים בקבוצות פייסבוק, ושם תצוגת הקישור היא רוב מה שרואים.
+ */
+export const LEARNING_OG_IMAGE = "/og-limud-chacham.png";
+
 /**
  * המתג שפותח את הדלת לגוגל.
  *
@@ -39,18 +48,37 @@ export function learningRobots(): { index: boolean; follow: boolean } {
   return LEARNING_DOOR_PUBLIC ? { index: true, follow: true } : { index: false, follow: false };
 }
 
+/**
+ * מאגר המורים (/learning/teachers, מ-13/10/2026) נכנס לאינדקס ול-sitemap רק
+ * כשיש בו מה לראות. מאגר עם מורה אחד או שניים הוא עמוד דל, ועמוד דל שמתאנדקס
+ * מושך למטה גם את הדלת שמקשרת אליו. מתחת לסף העמוד חי ומקושר, עם noindex.
+ */
+export const LEARNING_DIRECTORY_MIN_TO_INDEX = 5;
+
+export function learningDirectoryIndexed(listedTeachers: number): boolean {
+  return LEARNING_DOOR_PUBLIC && listedTeachers >= LEARNING_DIRECTORY_MIN_TO_INDEX;
+}
+
+/** המטא robots של מאגר המורים. follow נשאר דלוק: הקישורים ממנו הם לדלת ולטופס. */
+export function learningDirectoryRobots(listedTeachers: number): { index: boolean; follow: boolean } {
+  return { index: learningDirectoryIndexed(listedTeachers), follow: LEARNING_DOOR_PUBLIC };
+}
+
 /** האם הנתיב שייך לאזור "לימוד חכם" - שם הכותרת העליונה של האתר מתחלפת. */
 export function isLearningPath(pathname: string | null | undefined): boolean {
   return pathname === "/learning" || (pathname ?? "").startsWith("/learning/");
 }
 
 /**
- * שם העמוד באירוע page_view של הדלת - ורק של הדלת. עמוד ההצטרפות של המורים
- * הוא עמוד גיוס (נשאר מחוץ ל-page_view כמו /therapists/join), והאזורים
- * הפרטיים אינם נספרים כלל; לכולם null. ראו app/learning/LearningDoorTracker.tsx.
+ * שם העמוד באירוע page_view: הדלת ומאגר המורים, שני העמודים שהורה נוחת
+ * עליהם. עמוד ההצטרפות של המורים הוא עמוד גיוס (נשאר מחוץ ל-page_view כמו
+ * /therapists/join), והאזורים הפרטיים אינם נספרים כלל; לכולם null.
+ * ראו app/learning/LearningDoorTracker.tsx.
  */
 export function learningDoorPageName(pathname: string | null | undefined): string | null {
-  return pathname === "/learning" ? "learning" : null;
+  if (pathname === "/learning") return "learning";
+  if (pathname === "/learning/teachers") return "learning-teachers";
+  return null;
 }
 
 /**

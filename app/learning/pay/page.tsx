@@ -17,6 +17,8 @@ type Offer = {
   amount_gross: number;
   already_subscribed: boolean;
   can_pay: boolean;
+  /** המאגר חינם כרגע (TEACHER_FREE_LISTING): אין הרשמה לתשלום. */
+  free_listing?: boolean;
 };
 type SumitConfig = { companyId: string; publicKey: string };
 type SumitTokenizeResponse = { Status: number; UserErrorMessage?: string; Data: { SingleUseToken?: string } | null };
@@ -153,6 +155,17 @@ export default function TeacherPayPage() {
       </div>
     );
   }
+  if (offer.free_listing && !offer.already_subscribed) {
+    return (
+      <div className={wrap} dir="rtl">
+        <div className={inner}>
+          <h1 className="mb-3 text-2xl font-black text-[#131F1E]">אין מה להסדיר</h1>
+          <p className="leading-7 text-[#3E5250]">ההופעה במאגר כרגע ללא תשלום, ואין צורך בכרטיס אשראי או בהרשמה נוספת.</p>
+          <a href="/learning/me" className="mt-6 inline-block text-sm font-bold text-[#2A6462] underline">לפרופיל שלי</a>
+        </div>
+      </div>
+    );
+  }
   if (!offer.can_pay) {
     return (
       <div className={wrap} dir="rtl">
@@ -161,7 +174,7 @@ export default function TeacherPayPage() {
           <p className="leading-7 text-[#3E5250]">
             {offer.already_subscribed
               ? "קיימת כבר הוראת קבע פעילה. לשינוי או לביטול - בהודעת מייל ל-admin@getmentalytics.com."
-              : "הפרופיל עדיין ממתין לאימות ההכשרה. נעדכן במייל כשיאושר."}
+              : "הפרופיל עדיין ממתין לאישור. נעדכן במייל כשיאושר."}
           </p>
           <a href="/learning/me" className="mt-6 inline-block text-sm font-bold text-[#2A6462] underline">לפרופיל שלי</a>
         </div>

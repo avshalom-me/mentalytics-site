@@ -75,7 +75,7 @@ async function sendTeacherEmail(opts: {
 
 type Addressee = { id: string; email: string; full_name: string; edit_token: string };
 
-export function sendTeacherSignupReceivedEmail(t: Addressee) {
+export function sendTeacherSignupReceivedEmail(t: Addressee & { needs_certificate?: boolean }) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_signup_received", subject: SIGNUP_RECEIVED_SUBJECT, html: signupReceivedHtml(t) });
 }
 
@@ -83,7 +83,7 @@ export function sendTeacherPersonalLinkEmail(t: Addressee) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_personal_link", subject: PERSONAL_LINK_SUBJECT, html: personalLinkHtml(t) });
 }
 
-export function sendTeacherApprovedEmail(t: Addressee & { trial_ends_at: string }) {
+export function sendTeacherApprovedEmail(t: Addressee & { trial_ends_at: string | null; certificate_checked?: boolean }) {
   return sendTeacherEmail({ to: t.email, teacherId: t.id, template: "teacher_approved", subject: APPROVED_SUBJECT, html: approvedHtml(t), manual: true });
 }
 

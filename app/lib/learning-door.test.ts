@@ -22,9 +22,11 @@ describe("the learning door", () => {
     expect(isLearningPath(undefined)).toBe(false);
   });
 
-  it("counts a page view for the door itself, and for nothing else under it", () => {
+  it("counts a page view for the door and the teachers directory, and for nothing else under them", () => {
     expect(learningDoorPageName("/learning")).toBe("learning");
-    for (const other of ["/learning/join", "/learning/me", "/learning/pay", "/learning/t/some-teacher", "/learning/", "/", null, undefined]) {
+    // The directory (13/10/2026) is the other page a parent lands on.
+    expect(learningDoorPageName("/learning/teachers")).toBe("learning-teachers");
+    for (const other of ["/learning/join", "/learning/me", "/learning/pay", "/learning/t/some-teacher", "/learning/", "/learning/teachers/x", "/", null, undefined]) {
       expect(learningDoorPageName(other), String(other)).toBeNull();
     }
     // The layout mounts the tracker, so page.tsx (a lastmod source) stays untouched.

@@ -11,15 +11,11 @@ import {
   TEACHER_LANGUAGES,
   TEACHER_REFERRAL_KEYS,
   teacherSearchFromKey,
-  subjectLabel,
-  gradeGroupLabel,
-  qualificationLabel,
-  expertiseLabel,
-  lessonSettingsText,
   teacherSearchLabel,
   type TeacherGradeGroup,
   type TeacherSubject,
 } from "@/app/lib/teacher-options";
+import { teacherCard } from "@/app/lib/teacher-card";
 import { sanitizeNeeds } from "@/app/lib/teacher-needs";
 import { TEACHER_PUBLIC_COLUMNS, teacherPhotoUrl } from "@/app/lib/teachers.server";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
@@ -143,30 +139,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     search: { subject, remedial, gradeGroup, city, region, onlineRequired, needs, label: direct ? teacherSearchLabel(subject, remedial) : fromKey.label },
-    matches: matches.map((m) => ({
-      id: m.teacher.id,
-      full_name: m.teacher.full_name,
-      gender: m.teacher.gender,
-      slug: m.teacher.slug,
-      photo_url: teacherPhotoUrl(m.teacher),
-      bio: m.teacher.bio,
-      phone: m.teacher.phone,
-      regions: m.teacher.regions,
-      online: m.teacher.online,
-      remedial: m.teacher.remedial,
-      subject_labels: m.teacher.subjects.map(subjectLabel),
-      grade_labels: m.teacher.grade_groups.map(gradeGroupLabel),
-      qualification_label: qualificationLabel(m.teacher.qualification),
-      // ניסיון מוצהר (לא מאומת) ומקום השיעור - מוצגים בכרטיס. need_labels הם
-      // מתוכו: מה שמתאים לקשיים שצוינו בחיפוש, ולכן קידם את המורה בסדר.
-      expertise_labels: (m.teacher.expertise ?? []).map((k) => expertiseLabel(k, true)),
-      need_labels: m.needsMatched.map((k) => expertiseLabel(k, true)),
-      lesson_text: lessonSettingsText(m.teacher),
-      experience_years: m.teacher.experience_years,
-      price_text: m.teacher.price_text,
-      match_score: m.score,
-      in_requested_area: m.inRequestedArea,
-      match_reasons: m.reasons,
-    })),
+    matches: matches.map((m) => teacherCard(m, teacherPhotoUrl(m.teacher))),
   });
 }

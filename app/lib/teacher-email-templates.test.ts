@@ -85,12 +85,15 @@ describe("every teacher email", () => {
     expect(html).not.toContain("<b>x</b>");
     expect(html).not.toContain("<script>");
   });
-  it("mentions no payment request before day 85: sign-up and approval only say an email will come", () => {
-    for (const html of [signupReceivedHtml(T), approvedHtml(T)]) {
-      const t = text(html);
-      expect(t).toContain("לקראת סוף התקופה נשלח מייל");
+  it("asks for no payment at sign-up or approval", () => {
+    // The listing is free since 13/10/2026 (TEACHER_FREE_LISTING); what these two
+    // emails say about it is pinned in teacher-free-listing.test.ts. With a trial
+    // end date (billing mode, switched off) the approval still only announces a
+    // later email, never a payment link.
+    for (const html of [signupReceivedHtml(T), approvedHtml(T), approvedHtml({ ...T, trial_ends_at: null })]) {
       expect(html).not.toContain("?to=pay");
     }
+    expect(text(approvedHtml(T))).toContain("לקראת סוף התקופה נשלח מייל");
   });
 });
 

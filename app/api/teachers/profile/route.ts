@@ -12,7 +12,9 @@ import {
   TEACHER_QUALIFICATION_KEYS,
   TEACHER_PRICE_GROSS,
   TEACHER_EXPERTISE_MAX,
+  TEACHER_FREE_LISTING,
   qualificationAllowsRemedial,
+  qualificationNeedsCertificate,
   hasActiveStandingOrder,
   sanitizeTeacherExtras,
   teachesInPerson,
@@ -65,7 +67,8 @@ function view(t: Record<string, unknown>) {
   const state = String(t.listing_state);
   const trialEndsAt = (t.trial_ends_at as string | null) ?? null;
   const subscribed = hasActiveStandingOrder(t);
-  const phase = state === "trial" ? trialPhase(trialEndsAt) : null;
+  // כשהמאגר חינם אין שלב ניסיון, אין תאריך סיום ואין הרשמה לתשלום.
+  const phase = state === "trial" && !TEACHER_FREE_LISTING ? trialPhase(trialEndsAt) : null;
   return {
     id: t.id,
     full_name: t.full_name,
@@ -90,18 +93,21 @@ function view(t: Record<string, unknown>) {
     teaching_certificate: t.teaching_certificate,
     experience_years: t.experience_years,
     has_certificate: !!t.certificate_path,
+    /** תעודה נדרשת רק להכשרה בהוראה מתקנת או בחינוך מיוחד. */
+    needs_certificate: qualificationNeedsCertificate(t.qualification as string | null),
     // תמונה של מורה שנדחה/תה אינה מוגשת (ראו /teacher-photo), ולכן גם לא מקושרת.
     photo_url: state === "rejected" ? null : teacherPhotoUrl({ id: String(t.id), photo_path: (t.photo_path as string | null) ?? null }),
     listing_state: state,
     /** אחרי האישור ההכשרה נעולה לעריכה - שינוי שלה עובר דרכנו. */
     qualification_locked: !!t.approved_at,
-    trial_ends_at: trialEndsAt,
+    trial_ends_at: TEACHER_FREE_LISTING ? null : trialEndsAt,
     trial_phase: phase,
+    free_listing: TEACHER_FREE_LISTING,
     paused_until: t.paused_until,
     subscribed,
     first_charge_on: t.sumit_first_charge_on,
     // ההרשמה לתשלום נפתחת מיום 85 (או בארכיון). לפני כן לא מבקשים כלום.
-    can_subscribe: !subscribed && (state === "archived" || (state === "trial" && phase !== "free" && phase !== null)),
+    can_subscribe: !TEACHER_FREE_LISTING && !subscribed && (state === "archived" || (state === "trial" && phase !== "free" && phase !== null)),
     price_gross: TEACHER_PRICE_GROSS,
   };
 }

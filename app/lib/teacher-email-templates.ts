@@ -17,7 +17,13 @@
 // הטון: עובדתי. בלי סופרלטיבים ובלי לשון שכנוע; המספרים של המורה עצמו/ה
 // (כשיש כאלה) הם הטיעון. בלי מקף ארוך.
 
-import { TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS, teacherLinkUrl } from "./teacher-options";
+// מ-13/10/2026 המאגר חינם (TEACHER_FREE_LISTING, החלטת הבעלים): שני מיילי
+// הניסיון ומייל אישור התשלום אינם נשלחים, ומיילי הקליטה והאישור אינם מזכירים
+// תקופת ניסיון או מחיר. הנוסח של מצב הגבייה נשאר כאן, כבוי, יחד עם המנגנון.
+// באותו יום הוחלט שתעודה נדרשת ונבדקת רק אצל מורים להוראה מתקנת ולחינוך
+// מיוחד, ולכן "נבדוק את התעודה" ו"בדקנו את התעודה" נאמרים רק להם.
+
+import { TEACHER_FREE_LISTING, TEACHER_PRICE_GROSS, TEACHER_TRIAL_DAYS, teacherLinkUrl } from "./teacher-options";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
@@ -126,13 +132,18 @@ export function trialLastDayHtml(t: EmailTeacher): string {
 // ── מיילים שהם תגובה לפעולה של המורה ─────────────────────────────────────────
 
 export const SIGNUP_RECEIVED_SUBJECT = "ההרשמה למענה הלימודי נקלטה | טיפול חכם";
-export function signupReceivedHtml(t: EmailTeacher): string {
+/** needs_certificate: ההכשרה המוצהרת מחייבת תעודה (qualificationNeedsCertificate). */
+export function signupReceivedHtml(t: EmailTeacher & { needs_certificate?: boolean }): string {
+  const review = t.needs_certificate ? "נבדוק את התעודה שצירפת" : "נעבור על הפרטים";
+  const terms = TEACHER_FREE_LISTING
+    ? "ההצטרפות וההופעה במאגר ללא תשלום, ואין צורך בכרטיס אשראי."
+    : `מרגע האישור: ${TEACHER_TRIAL_DAYS} יום ללא תשלום וללא כרטיס אשראי. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-${TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ, ללא התחייבות.`;
   return shell(
     hello(t.full_name),
-    `${p("קיבלנו את הפרטים שלך למענה הלימודי של טיפול חכם. בימים הקרובים נאמת את ההכשרה מול התעודה שצירפת, ונעדכן במייל כשהפרופיל יאושר ויתחיל להופיע להורים.")}
+    `${p(`קיבלנו את הפרטים שלך למענה הלימודי של טיפול חכם. בימים הקרובים ${review}, ונעדכן במייל כשהפרופיל יאושר ויתחיל להופיע להורים.`)}
       ${p("זה הקישור האישי שלך לעדכון הפרופיל ולצפייה בנתונים. הוא מחליף סיסמה, ולכן כדאי לשמור את המייל הזה:")}
       ${cta(teacherLinkUrl(t.edit_token), "לפרופיל שלי ←")}
-      ${p(`מרגע האישור: ${TEACHER_TRIAL_DAYS} יום ללא תשלום וללא כרטיס אשראי. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-${TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ, ללא התחייבות.`)}`,
+      ${p(terms)}`,
   );
 }
 
@@ -147,13 +158,22 @@ export function personalLinkHtml(t: EmailTeacher): string {
 }
 
 export const APPROVED_SUBJECT = "הפרופיל שלך במענה הלימודי אושר | טיפול חכם";
-export function approvedHtml(t: EmailTeacher & { trial_ends_at: string }): string {
+/**
+ * trial_ends_at ריק = המאגר חינם, ואין תקופת ניסיון לציין.
+ * certificate_checked = ההכשרה מחייבת תעודה והיא נבדקה; רק אז נאמר "בדקנו".
+ */
+export function approvedHtml(t: EmailTeacher & { trial_ends_at: string | null; certificate_checked?: boolean }): string {
+  const opening = t.certificate_checked ? "בדקנו את התעודה, והפרופיל שלך מוצג" : "הפרופיל שלך אושר, והוא מוצג";
+  const box = t.trial_ends_at
+    ? `<p style="margin:0 0 6px;font-weight:bold;color:#0F5468;">תקופת הניסיון</p>
+        <p style="margin:0;font-size:15px;">עד <strong>${hebDate(t.trial_ends_at)}</strong>, ללא תשלום וללא כרטיס אשראי. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-${TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ, ללא התחייבות.</p>`
+    : `<p style="margin:0 0 6px;font-weight:bold;color:#0F5468;">ללא תשלום</p>
+        <p style="margin:0;font-size:15px;">ההופעה במאגר אינה כרוכה כרגע בתשלום, ואין צורך בכרטיס אשראי.</p>`;
   return shell(
     hello(t.full_name),
-    `${p("אימתנו את ההכשרה, והפרופיל שלך מוצג מעכשיו להורים שהשאלון של טיפול חכם זיהה אצל ילדם קושי לימודי בתחומים שבחרת.")}
+    `${p(`${opening} מעכשיו להורים שמחפשים מורה בתחומים שבחרת: בתוצאות השאלון לילדים ולנוער של טיפול חכם, ובמאגר המורים.`)}
       <div style="background:#F0F7FA;border:1px solid #D8E4E8;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
-        <p style="margin:0 0 6px;font-weight:bold;color:#0F5468;">תקופת הניסיון</p>
-        <p style="margin:0;font-size:15px;">עד <strong>${hebDate(t.trial_ends_at)}</strong>, ללא תשלום וללא כרטיס אשראי. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-${TEACHER_PRICE_GROSS} ש"ח לחודש כולל מע"מ, ללא התחייבות.</p>
+        ${box}
       </div>
       ${cta(teacherLinkUrl(t.edit_token), "לפרופיל ולנתונים שלי ←")}
       ${p("ההורים פונים ישירות אליך, בוואטסאפ או בטלפון. כדאי להשיב בתוך שעות ספורות: הורה שפנה ולא נענה ממשיך בדרך כלל למורה הבא.")}`,
@@ -182,19 +202,27 @@ export function paymentConfirmedHtml(t: EmailTeacher, firstChargeOn: string): st
 
 // ── תצוגה מקדימה באדמין ──────────────────────────────────────────────────────
 
-export const TEACHER_EMAIL_PREVIEWS = [
-  { key: "trial_ending", label: "יום 85 - המייל להרשמה" },
-  { key: "trial_ending_no_contacts", label: "יום 85 - למורה בלי פניות" },
-  { key: "trial_last_day", label: "היום האחרון" },
-  { key: "signup_received", label: "קליטת ההרשמה" },
-  { key: "approved", label: "אישור הפרופיל (נשלח מהאדמין)" },
-  { key: "payment_confirmed", label: "אישור ההרשמה לתשלום" },
-  { key: "personal_link", label: "שליחת הקישור האישי" },
+/** billing = מייל של מצב הגבייה; כשהמאגר חינם הוא לא נשלח ולכן גם לא מוצג. */
+const ALL_EMAIL_PREVIEWS = [
+  { key: "trial_ending", label: "יום 85 - המייל להרשמה", billing: true },
+  { key: "trial_ending_no_contacts", label: "יום 85 - למורה בלי פניות", billing: true },
+  { key: "trial_last_day", label: "היום האחרון", billing: true },
+  { key: "signup_received", label: "קליטת ההרשמה (מורה פרטי/ת, בלי תעודה)", billing: false },
+  { key: "signup_received_certificate", label: "קליטת ההרשמה (הוראה מתקנת, עם תעודה)", billing: false },
+  { key: "approved", label: "אישור הפרופיל (נשלח מהאדמין; מורה פרטי/ת)", billing: false },
+  { key: "approved_certificate", label: "אישור הפרופיל (נשלח מהאדמין; התעודה נבדקה)", billing: false },
+  { key: "payment_confirmed", label: "אישור ההרשמה לתשלום", billing: true },
+  { key: "personal_link", label: "שליחת הקישור האישי", billing: false },
 ] as const;
+
+/** המיילים שמורים מקבלים כרגע - מה שהאדמין מציג תחת "המיילים שהמורים מקבלים". */
+export const TEACHER_EMAIL_PREVIEWS = ALL_EMAIL_PREVIEWS.filter((e) => !TEACHER_FREE_LISTING || !e.billing);
 
 /** המייל כפי שהוא נשלח, עם מורה לדוגמה. null = מפתח לא מוכר. */
 export function teacherEmailPreview(key: string, trialEndsAt: string): { subject: string; html: string } | null {
   const t = { full_name: "דנה לוי", edit_token: "PREVIEW-TOKEN", trial_ends_at: trialEndsAt };
+  // מה שמייל האישור אומר על התשלום הוא מה שהמורה יקבל היום: בלי תאריך כשהמאגר חינם.
+  const approvedEnd = TEACHER_FREE_LISTING ? null : trialEndsAt;
   switch (key) {
     case "trial_ending":
       return { subject: trialEndingSubject(trialEndsAt), html: trialEndingHtml(t, { impressions: 46, contacts: 7 }) };
@@ -204,8 +232,12 @@ export function teacherEmailPreview(key: string, trialEndsAt: string): { subject
       return { subject: TRIAL_LAST_DAY_SUBJECT, html: trialLastDayHtml(t) };
     case "signup_received":
       return { subject: SIGNUP_RECEIVED_SUBJECT, html: signupReceivedHtml(t) };
+    case "signup_received_certificate":
+      return { subject: SIGNUP_RECEIVED_SUBJECT, html: signupReceivedHtml({ ...t, needs_certificate: true }) };
     case "approved":
-      return { subject: APPROVED_SUBJECT, html: approvedHtml(t) };
+      return { subject: APPROVED_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd }) };
+    case "approved_certificate":
+      return { subject: APPROVED_SUBJECT, html: approvedHtml({ ...t, trial_ends_at: approvedEnd, certificate_checked: true }) };
     case "payment_confirmed":
       return { subject: PAYMENT_CONFIRMED_SUBJECT, html: paymentConfirmedHtml(t, trialEndsAt.slice(0, 10)) };
     case "personal_link":

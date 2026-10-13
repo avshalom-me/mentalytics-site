@@ -11,7 +11,8 @@ import { ASSESSMENTS } from "@/app/lib/assessments";
 import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
 import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 import { revisedAt } from "@/app/lib/page-revised";
-import { LEARNING_DOOR_PUBLIC } from "@/app/lib/learning-door";
+import { LEARNING_DOOR_PUBLIC, learningDirectoryIndexed } from "@/app/lib/learning-door";
+import { loadDoorSupply } from "@/app/lib/teachers.server";
 import { sitemapLoc } from "@/app/lib/sitemap-loc";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -30,6 +31,10 @@ export const revalidate = 3600;
 // changing a date, and never wire one to `new Date()`.
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
+  // The teachers directory is listed only once it has enough teachers to be worth
+  // indexing - the same rule its own robots meta follows (learningDirectoryIndexed).
+  const listedTeachers = (await loadDoorSupply()).total;
+
   const staticPagesRaw: MetadataRoute.Sitemap = [
     { url: BASE, priority: 1.0, changeFrequency: "weekly" },
     // /adults and /kids are deliberately absent: both are noindex (they are the
@@ -80,14 +85,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // The counsellor rubric's doorway. /school itself stays out of the index and
     // out of this list - it is the instrument, this is the page search should find.
     { url: `${BASE}/counselors`, priority: 0.6, changeFrequency: "monthly" },
-    // "לימוד חכם", the teachers' door: the parents' page and the teachers' join
-    // page. Listed only once the door is open - while it is closed both are
+    // "לימוד חכם", the teachers' door: the parents' page, the teachers' join
+    // page, and the teachers directory once it is not thin. Listed only once the door is open - while it is closed both are
     // noindex, and a noindex URL here is "submitted URL marked noindex". The
     // teacher profiles under /learning/t stay out either way.
     ...(LEARNING_DOOR_PUBLIC
       ? [
           { url: `${BASE}/learning`, priority: 0.6, changeFrequency: "weekly" as const },
           { url: `${BASE}/learning/join`, priority: 0.4, changeFrequency: "monthly" as const },
+          ...(learningDirectoryIndexed(listedTeachers) ? [{ url: `${BASE}/learning/teachers`, priority: 0.6, changeFrequency: "weekly" as const }] : []),
         ]
       : []),
     { url: `${BASE}/terms`, priority: 0.3, changeFrequency: "yearly" },

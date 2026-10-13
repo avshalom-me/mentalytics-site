@@ -20,6 +20,8 @@ export type RecruitmentChannel = {
 };
 
 export const TEACHER_RECRUITMENT_CHANNELS: RecruitmentChannel[] = [
+  // הבעלים (13/10/2026): הגיוס מתחיל בפוסטים שלו בקבוצות פייסבוק של מורים, לפני הפנייה למכללות ולרשתות.
+  { key: "facebook-groups", kind: "community", name: "קבוצות פייסבוק של מורים", note: "פוסט אישי של הבעלים בקבוצות של מורים להוראה מתקנת ומורים פרטיים; זה הקישור שמצרפים לפוסט", url: null },
   { key: "levinsky", kind: "college", name: "לוינסקי-וינגייט (קמפוס לוינסקי)", note: "לימודי תעודה בהוראה מתקנת", url: "https://www.levinsky.ac.il/program/%D7%9C%D7%99%D7%9E%D7%95%D7%93%D7%99-%D7%AA%D7%A2%D7%95%D7%93%D7%94-%D7%95%D7%A4%D7%99%D7%AA%D7%95%D7%97-%D7%9E%D7%A7%D7%A6%D7%95%D7%A2%D7%99/%D7%94%D7%95%D7%A8%D7%90%D7%94-%D7%9E%D7%AA%D7%A7%D7%A0%D7%AA/" },
   { key: "wingate", kind: "college", name: "המכללה האקדמית בוינגייט", note: "לימודי הוראה מתקנת", url: "https://www.wincol.ac.il/center/diploma/counseling-guidance-treatment/remedial-teaching/" },
   { key: "dyellin", kind: "college", name: "דוד ילין", note: "הוראה מותאמת (מתקנת) - קריאה, כתיבה, חשבון ואסטרטגיות למידה", url: "https://www.dyellin.ac.il/continuing_studies/corrective_teaching" },

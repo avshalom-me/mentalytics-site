@@ -14,7 +14,8 @@ import { LEARNING_BRAND } from "@/app/lib/learning-door";
 // הדרך חזרה לאתר הראשי היא הקישור "מבית טיפול חכם" שליד הלוגו.
 
 const links = [
-  { href: "/learning#search", label: "חיפוש מורה" },
+  { href: "/learning/teachers", label: "מאגר המורים" },
+  { href: "/learning#which", label: "הוראה מתקנת או מורה פרטי" },
   { href: "/learning#how", label: "איך זה עובד" },
   { href: "/learning#faq", label: "שאלות נפוצות" },
   { href: "/kids", label: "שאלון לילדים ולנוער" },
@@ -59,7 +60,7 @@ export default function LearningNavBar() {
         </nav>
 
         <div className="hidden items-center gap-2 md:flex">
-          <a href="/learning#search"
+          <a href="/learning/teachers"
             style={{ background: "var(--teal)", color: "white", borderRadius: "50px", fontWeight: 700, fontSize: "13px", padding: "7px 14px", transition: "all .2s", display: "inline-flex", alignItems: "center", gap: "5px" }}
             className="hover:bg-[var(--teal-dark)]">
             <Search size={14} />
@@ -68,7 +69,7 @@ export default function LearningNavBar() {
         </div>
 
         <div className="flex items-center gap-2 md:hidden">
-          <a href="/learning#search" style={{ background: "var(--teal)", color: "white", borderRadius: "50px", padding: "8px 14px", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
+          <a href="/learning/teachers" style={{ background: "var(--teal)", color: "white", borderRadius: "50px", padding: "8px 14px", fontSize: "13px", fontWeight: 700, display: "inline-flex", alignItems: "center", gap: "4px", whiteSpace: "nowrap" }}>
             <Search size={13} />חיפוש מורה
           </a>
           <button onClick={() => setOpen(!open)} aria-label={open ? "סגור תפריט" : "פתח תפריט"} aria-expanded={open}

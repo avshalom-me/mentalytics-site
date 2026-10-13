@@ -6,7 +6,7 @@ import { listRecurringForCustomer, SUMIT_RECURRING_ACTIVE_STATUSES } from "@/app
 import { sendTeacherTrialEndingEmail, sendTeacherTrialLastDayEmail } from "@/app/lib/teacher-emails";
 import { teacherStats, teacherNote, emptyTeacherStats } from "@/app/lib/teachers.server";
 import { planTrialActions, israelDate, israelEndOfDay, sumitCheckDue, type TrialRow } from "@/app/lib/teacher-trial";
-import { hasActiveStandingOrder, TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
+import { hasActiveStandingOrder, TEACHER_FREE_LISTING, TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 
 // הקרון היומי של ענף המורים (09:20 בשעון ישראל בקיץ, 08:20 בחורף).
@@ -85,7 +85,9 @@ export async function GET(req: NextRequest) {
   const byId = new Map(rows.map((r) => [r.id, r]));
 
   // ── 1. תקופות הניסיון ─────────────────────────────────────────────────────
-  const plan = planTrialActions(
+  // כשהמאגר חינם (TEACHER_FREE_LISTING, החלטת הבעלים 13/10/2026) אין תקופת
+  // ניסיון: שום מייל להרשמה ושום ארכיון, גם לשורה שנשאר לה תאריך סיום ישן.
+  const trialPlan = TEACHER_FREE_LISTING ? [] : planTrialActions(
     rows.map((r): TrialRow => ({
       id: r.id,
       listing_state: r.listing_state,
@@ -95,7 +97,8 @@ export async function GET(req: NextRequest) {
       hasActiveSubscription: subscribed(r),
     })),
     now,
-  ).sort((a, b) => ACTION_ORDER[a.kind] - ACTION_ORDER[b.kind]);
+  );
+  const plan = trialPlan.sort((a, b) => ACTION_ORDER[a.kind] - ACTION_ORDER[b.kind]);
   const stats = await teacherStats(plan.map((a) => a.id));
   let payEmails = 0;
   let lastDayEmails = 0;
@@ -218,7 +221,7 @@ export async function GET(req: NextRequest) {
         await supabaseAdmin.from("teachers").update({ sumit_verified_at: nowIso }).eq("id", r.id);
         continue;
       }
-      const trialLive = !!r.trial_ends_at && new Date(r.trial_ends_at) > now;
+      const trialLive = TEACHER_FREE_LISTING || (!!r.trial_ends_at && new Date(r.trial_ends_at) > now);
       await supabaseAdmin
         .from("teachers")
         .update({

@@ -4,42 +4,17 @@ import type { ReactNode } from "react";
 import MatchResultCard from "@/app/components/MatchResultCard";
 import TeacherContactButtons, { type TeacherEventContext } from "@/app/learning/TeacherContactButtons";
 import { teacherPath } from "@/app/lib/teacher-options";
+import type { TeacherCard } from "@/app/lib/teacher-card";
 
 // רשימת תוצאות של חיפוש מורים: "באזור שבחרתם", ואחריה הסביבה. רכיב אחד
-// לשני המקומות שמחפשים בהם מורה - מסך החיפוש בשאלון הילדים והחיפוש הישיר
-// בדלת "לימוד חכם" - כדי שכרטיס מורה ייראה ויתנהג אותו דבר בשניהם.
+// לשני המקומות שמוצגים בהם מורים - מסך החיפוש בשאלון הילדים ומאגר המורים
+// של "לימוד חכם" (/learning/teachers) - כדי שכרטיס מורה ייראה ויתנהג אותו
+// דבר בשניהם.
 //
 // אין כאן ציון אישיותי ואין "למה הותאם לי": ההתאמה היא תחום, סוג מורה, שכבת
 // גיל, מרחק, והקשיים שצוינו - וכל אלה נאמרים בכרטיס במילים.
 
-/** כרטיס מורה כפי ש-/api/match-teachers מחזיר אותו. */
-export type TeacherCard = {
-  id: string;
-  full_name: string;
-  gender: string | null;
-  slug: string | null;
-  photo_url: string | null;
-  bio: string | null;
-  phone: string | null;
-  regions: string[];
-  online: boolean;
-  remedial: boolean;
-  subject_labels: string[];
-  grade_labels: string[];
-  qualification_label: string;
-  /** ניסיון מוצהר עם מאפייני למידה, בתוויות קצרות. לפי המורה, לא מאומת. */
-  expertise_labels: string[];
-  /** מתוך הניסיון המוצהר: מה שמתאים לקשיים שצוינו בחיפוש. */
-  need_labels?: string[];
-  /** איפה מתקיים השיעור, במילים: "בבית התלמיד, אונליין". */
-  lesson_text: string;
-  experience_years: number | null;
-  price_text: string | null;
-  match_score: number;
-  in_requested_area: boolean;
-  /** הסיבות שהשרת חישב: "באזור שלכם", "אזור סמוך", "אונליין" ועוד. */
-  match_reasons: string[];
-};
+export type { TeacherCard } from "@/app/lib/teacher-card";
 
 /**
  * למה מורה שמחוץ לאזור מופיע/ה בכל זאת. נקבע לפי מה שהשרת חישב ולא לפי
@@ -58,6 +33,8 @@ export default function TeacherResults({
   ctx,
   profileQuery,
   empty,
+  showScore = true,
+  total,
 }: {
   results: TeacherCard[];
   /** החיפוש רץ עם אזור או עיר - רק אז יש "באזור שבחרתם" ו"מחוץ לאזור". */
@@ -67,9 +44,17 @@ export default function TeacherResults({
   profileQuery: string;
   /** מה שמוצג כשלא נמצא אף מורה. */
   empty: ReactNode;
+  /**
+   * false במאגר המורים: שם ההורה מעיין ברשימה ולא שאל שאלה שיש לה "אחוז
+   * התאמה". ההתאמה לקשיים שצוינו עדיין נאמרת במילים בשורת הניסיון.
+   */
+  showScore?: boolean;
+  /** כמה מורים נמצאו בסך הכול, כשהרשימה שהועברה היא רק העמוד הראשון שלה. */
+  total?: number;
 }) {
   if (results.length === 0) return <>{empty}</>;
 
+  const count = total ?? results.length;
   const local = results.filter((m) => m.in_requested_area);
   const away = results.filter((m) => !m.in_requested_area);
   const ordered = located ? [...local, ...away] : results;
@@ -85,7 +70,7 @@ export default function TeacherResults({
 
   return (
     <>
-      <div className="mb-3 text-sm font-bold text-[var(--teal-dark)]">{results.length === 1 ? "נמצא/ה מורה אחד/ת:" : `נמצאו ${results.length} מורים:`}</div>
+      <div className="mb-3 text-sm font-bold text-[var(--teal-dark)]">{count === 1 ? "נמצא/ה מורה אחד/ת:" : `נמצאו ${count} מורים:`}</div>
       <div className="space-y-4">
         {ordered.map((t, idx) => {
           const isAway = located && !t.in_requested_area;
@@ -113,6 +98,7 @@ export default function TeacherResults({
               <MatchResultCard
                 name={t.full_name}
                 isCenter={false}
+                verifiedLabel={t.certificate_checked ? "✓ תעודה נבדקה" : null}
                 photoUrl={t.photo_url}
                 gender={t.gender}
                 subtitle={`${t.remedial ? "הוראה מתקנת" : "מורה פרטי/ת"} • ${t.subject_labels.join(", ")} • ${t.lesson_text || (t.online ? "גם אונליין" : "פנים אל פנים")}`}
@@ -123,6 +109,8 @@ export default function TeacherResults({
                   <>
                     <p className="mt-1.5 text-xs text-[var(--muted)]">
                       🎓 {t.qualification_label}
+                      {/* אצל מורה פרטי/ת ההכשרה אינה נבדקת, וכך היא מסומנת. */}
+                      {!t.certificate_checked && " (לפי הצהרת המורה)"}
                       {t.experience_years != null ? ` · ${t.experience_years} שנות ניסיון` : ""} · {t.grade_labels.join(", ")}
                       {t.price_text ? ` · ${t.price_text}` : ""}
                     </p>
@@ -141,9 +129,11 @@ export default function TeacherResults({
                   </>
                 }
                 score={
-                  isAway
-                    ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: awayReason(t).label }
-                    : { kind: "percent", overall: t.match_score, professional: null, personality: null }
+                  !showScore
+                    ? null
+                    : isAway
+                      ? { kind: "words", label: t.match_score >= 90 ? "התאמה מלאה" : "התאמה טובה", reason: awayReason(t).label }
+                      : { kind: "percent", overall: t.match_score, professional: null, personality: null }
                 }
                 actions={
                   <>
@@ -162,7 +152,8 @@ export default function TeacherResults({
         })}
       </div>
       <p className="mt-4 text-xs leading-5 text-[var(--muted)]">
-        המורים עצמאיים. טיפול חכם אימתה את ההכשרה המוצהרת מול תעודה, ואינה צד לשיעורים או לתשלום.
+        המורים עצמאיים, ולימוד חכם אינו צד לשיעורים או לתשלום. תעודה נבדקה רק אצל מורים להוראה מתקנת ולחינוך מיוחד; שאר
+        הפרטים הם לפי הצהרת המורה. איננו בודקים רישום פלילי.
       </p>
     </>
   );

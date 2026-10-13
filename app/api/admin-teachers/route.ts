@@ -6,7 +6,15 @@ import { sendTeacherApprovedEmail, sendTeacherRejectedEmail, type TeacherEmailRe
 import { trialEndFor, extendedTrialEnd, israelDate } from "@/app/lib/teacher-trial";
 import { teacherEmailPreview } from "@/app/lib/teacher-email-templates";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { qualificationAllowsRemedial, qualificationLabel, hasActiveStandingOrder, TEACHER_QUALIFICATION_KEYS, TEACHER_LISTED_STATES } from "@/app/lib/teacher-options";
+import {
+  qualificationAllowsRemedial,
+  qualificationNeedsCertificate,
+  qualificationLabel,
+  hasActiveStandingOrder,
+  TEACHER_FREE_LISTING,
+  TEACHER_QUALIFICATION_KEYS,
+  TEACHER_LISTED_STATES,
+} from "@/app/lib/teacher-options";
 
 // ניהול המורים באדמין. Basic Auth + שומר CSRF של ה-middleware מכסים את כל
 // /api/admin-*. כל פעולה שמשנה מצב נרשמת בהיסטוריה של המורה (crm_notes עם
@@ -132,18 +140,22 @@ export async function PATCH(req: NextRequest) {
 
   switch (action) {
     case "approve": {
-      // אישור ראשון דורש תעודה (אין רישוי ממלכתי - התעודה היא האימות). מי
-      // שכבר אושר/ה בעבר חוזר/ת מהארכיון בלי בדיקה חוזרת.
-      if (!t.certificate_path && !t.approved_at && body.without_certificate !== true) {
-        return NextResponse.json({ ok: false, error: "אין תעודה בפרופיל, ולכן אי אפשר לאמת את ההכשרה." }, { status: 409 });
+      // תעודה נדרשת רק ממי שמצהיר/ה על הכשרה בהוראה מתקנת או בחינוך מיוחד
+      // (החלטת הבעלים, 13/10/2026). אין רישוי ממלכתי, ולכן שם התעודה היא
+      // האימות, ואישור ראשון בלעדיה דורש אישור מפורש. מורה פרטי/ת מאושר/ת
+      // בלי תעודה. מי שכבר אושר/ה בעבר חוזר/ת מהארכיון בלי בדיקה חוזרת.
+      const needsCert = qualificationNeedsCertificate(t.qualification as string | null);
+      if (needsCert && !t.certificate_path && !t.approved_at && body.without_certificate !== true) {
+        return NextResponse.json({ ok: false, error: "ההכשרה המוצהרת מחייבת תעודה, ואין תעודה בפרופיל." }, { status: 409 });
       }
-      // אישור = תחילת 90 ימי הניסיון. מורה שתקופת הניסיון שלו/ה עוד רצה (אישור
-      // מחדש אחרי דחייה) שומר/ת את תאריך הסיום; אחרת מתחילה תקופה חדשה, ושני
-      // המיילים של סופה יישלחו שוב בבוא הזמן. חזרה מהארכיון היא תמיד תקופה
-      // חדשה - זה מה שהכפתור "החזרה למאגר (ניסיון חדש)" אומר, גם כשהארכיון
-      // היה ידני והתאריך הישן עוד לא עבר.
-      const keep = t.listing_state !== "archived" && !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
-      const trialEndsAt = keep ? String(t.trial_ends_at) : trialEndFor(now).toISOString();
+      // כשהמאגר חינם (TEACHER_FREE_LISTING) אין תקופת ניסיון: המורה מוצג/ת בלי
+      // תאריך סיום, והקרון לא ישלח לו/ה דבר. אחרת אישור = תחילת 90 ימי הניסיון.
+      // מורה שתקופת הניסיון שלו/ה עוד רצה (אישור מחדש אחרי דחייה) שומר/ת את
+      // תאריך הסיום; אחרת מתחילה תקופה חדשה, ושני המיילים של סופה יישלחו שוב
+      // בבוא הזמן. חזרה מהארכיון היא תמיד תקופה חדשה - זה מה שהכפתור "החזרה
+      // למאגר (ניסיון חדש)" אומר, גם כשהארכיון היה ידני והתאריך הישן עוד לא עבר.
+      const keep = !TEACHER_FREE_LISTING && t.listing_state !== "archived" && !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
+      const trialEndsAt = TEACHER_FREE_LISTING ? null : keep ? String(t.trial_ends_at) : trialEndFor(now).toISOString();
       Object.assign(update, {
         listing_state: activeSubscription(t) ? "paying" : "trial",
         approved_at: (t.approved_at as string | null) ?? nowIso,
@@ -154,8 +166,10 @@ export async function PATCH(req: NextRequest) {
         remedial: !!t.remedial && qualificationAllowsRemedial(t.qualification as string | null),
         ...(keep ? {} : { trial_ending_notified_at: null, trial_last_day_notified_at: null }),
       });
-      note = `אושר/ה להצגה. ניסיון עד ${israelDate(new Date(trialEndsAt))}.`;
-      if (body.send_email === true) sendMail = () => sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt });
+      note = trialEndsAt ? `אושר/ה להצגה. ניסיון עד ${israelDate(new Date(trialEndsAt))}.` : "אושר/ה להצגה, ללא תשלום.";
+      if (body.send_email === true) {
+        sendMail = () => sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: trialEndsAt, certificate_checked: needsCert && !!t.certificate_path });
+      }
       break;
     }
     case "reject": {
@@ -185,6 +199,7 @@ export async function PATCH(req: NextRequest) {
       break;
     }
     case "extend_trial": {
+      if (TEACHER_FREE_LISTING) return NextResponse.json({ ok: false, error: "המאגר חינם כרגע, ואין תקופת ניסיון להאריך" }, { status: 400 });
       if (!t.approved_at) return NextResponse.json({ ok: false, error: "המורה עוד לא אושר/ה" }, { status: 400 });
       const days = Math.max(1, Math.min(Number(body.days) || 30, 365));
       const until = extendedTrialEnd((t.trial_ends_at as string | null) ?? null, days, now).toISOString();
@@ -220,9 +235,9 @@ export async function PATCH(req: NextRequest) {
     }
     case "revoke_paying": {
       if (activeSubscription(t)) return NextResponse.json({ ok: false, error: "יש הוראת קבע פעילה ב-Sumit - קודם לבטל אותה" }, { status: 409 });
-      const trialLive = !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
+      const trialLive = TEACHER_FREE_LISTING || (!!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now);
       Object.assign(update, { listing_state: trialLive ? "trial" : "archived", paying_since: null, archived_at: trialLive ? null : nowIso });
-      note = `הסימון כמשלם/ת הוסר. מצב: ${trialLive ? "ניסיון" : "ארכיון"}.`;
+      note = `הסימון כמשלם/ת הוסר. מצב: ${trialLive ? (TEACHER_FREE_LISTING ? "מוצג/ת, ללא תשלום" : "ניסיון") : "ארכיון"}.`;
       break;
     }
     case "cancel_subscription": {
@@ -233,14 +248,14 @@ export async function PATCH(req: NextRequest) {
       } catch (e) {
         return NextResponse.json({ ok: false, error: `הביטול ב-Sumit נכשל: ${e instanceof Error ? e.message : e}` }, { status: 500 });
       }
-      const trialLive = !!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now;
+      const trialLive = TEACHER_FREE_LISTING || (!!t.trial_ends_at && new Date(String(t.trial_ends_at)) > now);
       Object.assign(update, {
         sumit_cancelled_at: nowIso,
         listing_state: trialLive ? "trial" : "archived",
         paying_since: null,
         archived_at: trialLive ? null : nowIso,
       });
-      note = `הוראת הקבע (${recurring}) בוטלה ב-Sumit. מצב: ${trialLive ? "ניסיון" : "ארכיון"}.`;
+      note = `הוראת הקבע (${recurring}) בוטלה ב-Sumit. מצב: ${trialLive ? (TEACHER_FREE_LISTING ? "מוצג/ת, ללא תשלום" : "ניסיון") : "ארכיון"}.`;
       break;
     }
     case "add_note": {
@@ -250,10 +265,14 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ ok: true });
     }
     case "resend_approval": {
-      if (!t.trial_ends_at || !(TEACHER_LISTED_STATES as readonly string[]).includes(String(t.listing_state))) {
+      if ((!TEACHER_FREE_LISTING && !t.trial_ends_at) || !(TEACHER_LISTED_STATES as readonly string[]).includes(String(t.listing_state))) {
         return NextResponse.json({ ok: false, error: "המורה אינו/ה מוצג/ת כרגע" }, { status: 400 });
       }
-      mail = await sendTeacherApprovedEmail({ ...emailTo, trial_ends_at: String(t.trial_ends_at) });
+      mail = await sendTeacherApprovedEmail({
+        ...emailTo,
+        trial_ends_at: TEACHER_FREE_LISTING ? null : String(t.trial_ends_at),
+        certificate_checked: qualificationNeedsCertificate(t.qualification as string | null) && !!t.certificate_path,
+      });
       await teacherNote(id, `מייל האישור נשלח שוב: ${mail.status}${mail.error ? ` (${mail.error})` : ""}`);
       return NextResponse.json({ ok: true, mail });
     }

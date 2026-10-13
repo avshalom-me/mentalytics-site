@@ -3,8 +3,9 @@ import { randomBytes } from "node:crypto";
 import { NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { slugify } from "@/app/lib/articles";
-import { teacherDoorSupply, type TeacherRow } from "@/app/lib/teacher-match";
+import { isTeacherListed, teacherDoorSupply, type TeacherRow } from "@/app/lib/teacher-match";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
+import type { DirectoryTeacher } from "@/app/lib/teacher-card";
 
 import { TEACHER_LISTED_STATES, type TeacherSubject } from "@/app/lib/teacher-options";
 
@@ -147,6 +148,30 @@ export async function loadDoorSupply(): Promise<{ total: number; subjects: Teach
   } catch (e) {
     console.error("loadDoorSupply failed:", e instanceof Error ? e.message : e);
     return { total: 0, subjects: [] };
+  }
+}
+
+// ── מאגר המורים ──────────────────────────────────────────────────────────────
+
+/**
+ * כל המורים שמוצגים כרגע - למאגר המורים (/learning/teachers), שמציג את כולם
+ * ומסנן בדפדפן. רק העמודות הציבוריות (בלי מייל, טוקן ונתיב התעודה). שגיאת
+ * קריאה נחשבת כמאגר ריק: העמוד עולה עם הודעת "המאגר נפתח" במקום ליפול.
+ */
+export async function loadDirectoryTeachers(now: Date = new Date()): Promise<DirectoryTeacher[]> {
+  try {
+    const rows = await fetchAllRows<TeacherRow>(
+      () =>
+        supabaseAdmin
+          .from("teachers")
+          .select(TEACHER_PUBLIC_COLUMNS)
+          .in("listing_state", [...TEACHER_LISTED_STATES])
+          .order("id") as unknown as { range: (from: number, to: number) => PromiseLike<{ data: TeacherRow[] | null; error: { message: string } | null }> },
+    );
+    return rows.filter((t) => isTeacherListed(t, now)).map((t) => ({ ...t, photo_url: teacherPhotoUrl(t) }));
+  } catch (e) {
+    console.error("loadDirectoryTeachers failed:", e instanceof Error ? e.message : e);
+    return [];
   }
 }
 

@@ -47,6 +47,7 @@ export default function MatchResultCard({
   name,
   nameAs: Name = "h3",
   isCenter,
+  verifiedLabel = "✓ מאומת",
   photoUrl,
   gender,
   subtitle,
@@ -65,6 +66,12 @@ export default function MatchResultCard({
   /** h3 בתוך מסך התוצאות (יש מעליו h2), h2 ברשימה השמורה. */
   nameAs?: "h2" | "h3";
   isCenter: boolean;
+  /**
+   * התג שליד השם. אצל מטפלים ומרכזים: "✓ מאומת" (ברירת המחדל). אצל מורים הוא
+   * מוצג רק למי שתעודתו נבדקה ("✓ תעודה נבדקה"), ו-null למורה שההכשרה שלו
+   * היא לפי הצהרה - שם תג "מאומת" היה פשוט לא נכון.
+   */
+  verifiedLabel?: string | null;
   photoUrl: string | null | undefined;
   gender: string | null | undefined;
   subtitle: string;
@@ -124,7 +131,9 @@ export default function MatchResultCard({
             {isCenter && (
               <span className="inline-flex items-center gap-1 rounded-full bg-[var(--gold-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--gold-dark)]">🏢 מרכז טיפולי</span>
             )}
-            <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">✓ מאומת</span>
+            {verifiedLabel && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-[var(--teal-pale)] px-2.5 py-0.5 text-[12px] font-bold text-[var(--teal-dark)]">{verifiedLabel}</span>
+            )}
           </div>
           <p className="mt-0.5 text-xs text-[var(--muted)]">{subtitle}</p>
           {affiliation && (

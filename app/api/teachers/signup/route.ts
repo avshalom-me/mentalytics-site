@@ -15,6 +15,7 @@ import {
   TEACHER_QUALIFICATION_KEYS,
   TEACHER_EXPERTISE_MAX,
   qualificationAllowsRemedial,
+  qualificationNeedsCertificate,
   sanitizeTeacherExtras,
   teachesInPerson,
   subjectLabel,
@@ -28,8 +29,8 @@ import { newEditToken, uniqueTeacherSlug, setTeacherCookie, teacherLinkUrl, cros
 
 // הרשמת מורה למענה הלימודי. בלי חשבון: הטופס יוצר שורה במצב pending, והדפדפן
 // מקבל עוגייה שמזהה את המורה (ראו teachers.server.ts). הקישור האישי נשלח
-// במייל ומוצג פעם אחת על המסך. האישור הוא ידני באדמין, מול התעודה שמועלית
-// מיד אחרי השמירה.
+// במייל ומוצג פעם אחת על המסך. האישור הוא ידני באדמין. תעודה מועלית מיד
+// אחרי השמירה רק כשההכשרה המוצהרת מחייבת אותה (הוראה מתקנת, חינוך מיוחד).
 
 export const dynamic = "force-dynamic";
 
@@ -216,13 +217,13 @@ export async function POST(req: NextRequest) {
         <p>תחומים: ${b.subjects.map(subjectLabel).join(", ")}${remedial ? " · הוראה מתקנת" : ""}<br/>
         שכבות: ${b.grade_groups.map(gradeGroupLabel).join(", ")}<br/>
         ערים: ${escapeHtml(regions.join(", ") || "-")} · שיעור: ${escapeHtml(lessonSettingsText({ lesson_settings: extras.lesson_settings, online, regions }) || "-")}<br/>
-        הכשרה: ${escapeHtml(qualificationLabel(b.qualification))}${b.institution ? ` (${escapeHtml(b.institution)})` : ""}<br/>
+        הכשרה: ${escapeHtml(qualificationLabel(b.qualification))}${b.institution ? ` (${escapeHtml(b.institution)})` : ""} · ${qualificationNeedsCertificate(b.qualification) ? "נדרשת תעודה" : "בלי תעודה, לפי הצהרה"}<br/>
         ניסיון מוצהר: ${escapeHtml(extras.expertise.map((k) => expertiseLabel(k, true)).join(", ") || "-")}<br/>
         מוקדים: ${escapeHtml(focusesBySubject(b.subjects, extras.focuses).map((g) => `${g.label}: ${g.focuses.join(", ")}`).join("; ") || "-")}</p>
         <p><a href="${site}/admin/teachers">לאישור באדמין ←</a></p>
       </div>`,
     }));
-    mails.push(sendTeacherSignupReceivedEmail({ id: created.id, email: b.email, full_name: b.full_name, edit_token: token }));
+    mails.push(sendTeacherSignupReceivedEmail({ id: created.id, email: b.email, full_name: b.full_name, edit_token: token, needs_certificate: qualificationNeedsCertificate(b.qualification) }));
   } else if ((recent ?? 0) === DAILY_SIGNUP_EMAIL_CAP + 1) {
     mails.push(sendOpsEmail({
       template: "teacher_signup_flood",

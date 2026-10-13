@@ -288,7 +288,7 @@ async function gatherSections(): Promise<DigestSection[]> {
   }
   if (q.pending_teachers_count > 0) {
     approvalItems += q.pending_teachers_count;
-    approvalLines.push(`${q.pending_teachers_count} מורים ממתינים לאימות ההכשרה`);
+    approvalLines.push(`${q.pending_teachers_count} מורים ממתינים לאישור`);
   }
   if (q.pending_articles_count > 0) {
     approvalItems += q.pending_articles_count;

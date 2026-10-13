@@ -29,11 +29,15 @@ type Profile = {
   teaching_certificate: boolean;
   experience_years: number | null;
   has_certificate: boolean;
+  /** תעודה נדרשת רק להכשרה בהוראה מתקנת או בחינוך מיוחד. */
+  needs_certificate: boolean;
   photo_url: string | null;
   listing_state: string;
   qualification_locked: boolean;
   trial_ends_at: string | null;
   trial_phase: "free" | "closing" | "last_day" | "ended" | null;
+  /** המאגר חינם כרגע: אין תקופת ניסיון ואין הרשמה לתשלום. */
+  free_listing: boolean;
   paused_until: string | null;
   subscribed: boolean;
   first_charge_on: string | null;
@@ -209,17 +213,20 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
         <div className="mt-3 space-y-1.5 text-sm leading-6 text-[var(--text-2)]">
           {state === "pending" && (
             <p>
-              הפרופיל ממתין לאימות ההכשרה. נעדכן במייל כשיאושר.{" "}
-              {!profile.has_certificate && <strong className="text-amber-700">עדיין לא הועלתה תעודה - בלי תעודה לא נוכל לאשר.</strong>}
+              הפרופיל ממתין לאישור שלנו. נעדכן במייל כשיאושר.{" "}
+              {profile.needs_certificate && !profile.has_certificate && (
+                <strong className="text-amber-700">להכשרה שבחרת נדרשת תעודה, והיא עדיין לא הועלתה. בלי התעודה לא נוכל לאשר.</strong>
+              )}
             </p>
           )}
-          {state === "trial" && !profile.subscribed && profile.trial_phase === "free" && (
+          {state === "trial" && profile.free_listing && <p>הפרופיל מוצג להורים. כרגע ללא תשלום, ואין צורך לעשות דבר.</p>}
+          {state === "trial" && !profile.free_listing && !profile.subscribed && profile.trial_phase === "free" && (
             <p>
               תקופת הניסיון עד <strong>{hebDate(profile.trial_ends_at)}</strong>, ללא תשלום. לקראת סוף התקופה נשלח מייל עם אפשרות להמשיך ב-{price} ש״ח לחודש
               כולל מע״מ, ללא התחייבות. עד אז אין צורך לעשות דבר.
             </p>
           )}
-          {state === "trial" && !profile.subscribed && profile.trial_phase !== "free" && (
+          {state === "trial" && !profile.free_listing && !profile.subscribed && profile.trial_phase !== "free" && (
             <p>
               תקופת הניסיון מסתיימת {profile.trial_phase === "last_day" ? <strong>היום</strong> : <>ב-<strong>{hebDate(profile.trial_ends_at)}</strong></>}. כדי להמשיך
               להופיע להורים: {price} ש״ח לחודש כולל מע״מ, ללא התחייבות. בלי הרשמה, הפרופיל יעבור לארכיון.
@@ -230,8 +237,9 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
               המנוי פעיל{profile.first_charge_on ? `; החיוב הראשון ${hebDate(`${profile.first_charge_on}T12:00:00Z`)}` : ""}. לביטול - בהודעת מייל ל-admin@getmentalytics.com.
             </p>
           )}
-          {state === "archived" && <p>תקופת הניסיון הסתיימה, והפרופיל נמצא בארכיון ואינו מוצג להורים. אפשר להפעיל אותו מחדש בכל רגע: {price} ש״ח לחודש כולל מע״מ, ללא התחייבות.</p>}
-          {state === "rejected" && <p>הפרופיל לא אושר. אם יש בידך תעודה שלא צורפה, אפשר להעלות אותה כאן ולכתוב לנו.</p>}
+          {state === "archived" && profile.free_listing && <p>הפרופיל נמצא בארכיון ואינו מוצג להורים. להחזרה למאגר כתבו לנו: admin@getmentalytics.com.</p>}
+          {state === "archived" && !profile.free_listing && <p>תקופת הניסיון הסתיימה, והפרופיל נמצא בארכיון ואינו מוצג להורים. אפשר להפעיל אותו מחדש בכל רגע: {price} ש״ח לחודש כולל מע״מ, ללא התחייבות.</p>}
+          {state === "rejected" && <p>הפרופיל לא אושר. אם חסר בו פרט, או אם יש בידך תעודה שלא צורפה, אפשר להשלים כאן ולכתוב לנו.</p>}
           {profile.paused_until && new Date(profile.paused_until) > new Date() && <p className="text-amber-700">הפרופיל אינו מוצג זמנית, עד {hebDate(profile.paused_until)}.</p>}
         </div>
         <div className="mt-4 flex flex-wrap items-center gap-4">
@@ -264,7 +272,7 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
             </div>
           ))}
           <p className="col-span-2 text-xs leading-5 text-[var(--muted)] sm:col-span-4">
-            &quot;הופעה&quot; = הפרופיל הוצג להורה בתוצאות השאלון. &quot;פנייה&quot; = לחיצה על וואטסאפ או חיוג, מהכרטיס או מהפרופיל. ההורים פונים ישירות אליך, ולכן השיחה עצמה לא נמדדת.
+            &quot;הופעה&quot; = הפרופיל הוצג להורה, בתוצאות השאלון או במאגר המורים. &quot;פנייה&quot; = לחיצה על וואטסאפ או חיוג, מהכרטיס או מהפרופיל. ההורים פונים ישירות אליך, ולכן השיחה עצמה לא נמדדת.
           </p>
         </section>
       )}
@@ -279,12 +287,15 @@ export default function MeClient({ invalidLink }: { invalidLink: boolean }) {
             </label>
             <input id="tme-photo" type="file" accept="image/*" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("photo", f); }} className="text-sm" />
           </div>
-          <div>
-            <label htmlFor="tme-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
-              תעודה {profile.has_certificate ? <span className="font-normal text-emerald-700">(קיימת)</span> : <span className="font-normal text-amber-700">(חסרה)</span>}
-            </label>
-            <input id="tme-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("certificate", f); }} className="text-sm" />
-          </div>
+          {/* תעודה: רק כשההכשרה מחייבת אותה, או כשכבר הועלתה אחת. */}
+          {(profile.needs_certificate || profile.has_certificate) && (
+            <div>
+              <label htmlFor="tme-cert" className="mb-1 block text-sm font-bold text-[var(--text-2)]">
+                תעודה {profile.has_certificate ? <span className="font-normal text-emerald-700">(קיימת)</span> : <span className="font-normal text-amber-700">(חסרה)</span>}
+              </label>
+              <input id="tme-cert" type="file" accept=".pdf,.jpg,.jpeg,.png" disabled={busy} onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) void upload("certificate", f); }} className="text-sm" />
+            </div>
+          )}
         </div>
         {error && <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
         {msg && <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-700">{msg}</div>}

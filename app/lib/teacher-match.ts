@@ -108,7 +108,7 @@ export function isTeacherListed(t: Pick<TeacherRow, "listing_state" | "paused_un
   return true;
 }
 
-function scoreOne(t: TeacherRow, input: TeacherMatchInput): TeacherMatch | null {
+function scoreOne(t: TeacherRow, input: Omit<TeacherMatchInput, "limit">): TeacherMatch | null {
   const reasons: string[] = [];
   let earned = 0;
   let possible = 0;
@@ -202,7 +202,13 @@ function commercialRank(state: string): number {
   return state === "paying" ? 0 : state === "trial" ? 1 : 2;
 }
 
-export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now: Date = new Date()): TeacherMatch[] {
+/**
+ * כל המורים שמתאימים לבקשה, בסדר ההצגה, בלי תקרה. מאגר המורים
+ * (/learning/teachers) מציג את כולם ומסנן בדפדפן; חיפוש מתוך השאלון עובר דרך
+ * matchTeachers, שחותך לעשרה-עשרים. הסדר זהה בשניהם, כדי שמורה לא יופיע
+ * במקום אחד לפני עמית ובמקום אחר אחריו.
+ */
+export function rankTeachers(rows: TeacherRow[], input: Omit<TeacherMatchInput, "limit">, now: Date = new Date()): TeacherMatch[] {
   const day = now.toISOString().slice(0, 10);
   const scored: TeacherMatch[] = [];
   for (const t of rows) {
@@ -220,7 +226,11 @@ export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now:
     if (c !== 0) return c;
     return dailyRotation(a.teacher.id, day) - dailyRotation(b.teacher.id, day);
   });
-  return scored.slice(0, Math.max(1, Math.min(input.limit || 10, 20)));
+  return scored;
+}
+
+export function matchTeachers(rows: TeacherRow[], input: TeacherMatchInput, now: Date = new Date()): TeacherMatch[] {
+  return rankTeachers(rows, input, now).slice(0, Math.max(1, Math.min(input.limit || 10, 20)));
 }
 
 /**

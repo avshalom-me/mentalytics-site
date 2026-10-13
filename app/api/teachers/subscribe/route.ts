@@ -6,7 +6,7 @@ import { createAgentAction } from "@/app/lib/agent-infra";
 import { loadTeacherFromRequest, crossSiteWrite, teacherNote } from "@/app/lib/teachers.server";
 import { sendTeacherPaymentConfirmedEmail } from "@/app/lib/teacher-emails";
 import { israelDate } from "@/app/lib/teacher-trial";
-import { TEACHER_PRICE_GROSS, hasActiveStandingOrder } from "@/app/lib/teacher-options";
+import { TEACHER_FREE_LISTING, TEACHER_PRICE_GROSS, hasActiveStandingOrder } from "@/app/lib/teacher-options";
 
 // ההרשמה לתשלום של מורה: 60 ש"ח לחודש כולל מע"מ, ללא התחייבות. הכרטיס עובר
 // ישירות ל-Sumit מהדפדפן (טוקן חד-פעמי), וכאן נפתחת הוראת הקבע. אם תקופת
@@ -29,7 +29,10 @@ function firstCharge(trialEndsAt: string | null): { date: string; deferred: bool
 }
 
 const subscribed = hasActiveStandingOrder;
-const payable = (t: Record<string, unknown>) => ["trial", "paying", "archived"].includes(String(t.listing_state)) && !subscribed(t);
+// כשהמאגר חינם (TEACHER_FREE_LISTING, החלטת הבעלים 13/10/2026) אין הרשמה לתשלום
+// בכלל: העמוד אומר זאת, וה-POST נדחה גם למי שהגיע אליו ישירות.
+const payable = (t: Record<string, unknown>) =>
+  !TEACHER_FREE_LISTING && ["trial", "paying", "archived"].includes(String(t.listing_state)) && !subscribed(t);
 
 export async function GET(req: NextRequest) {
   const t = await loadTeacherFromRequest(req);
@@ -52,6 +55,7 @@ export async function GET(req: NextRequest) {
       amount_gross: TEACHER_PRICE_GROSS,
       already_subscribed: subscribed(t),
       can_pay: payable(t),
+      free_listing: TEACHER_FREE_LISTING,
     },
     { headers: { "Cache-Control": "no-store" } },
   );
@@ -70,6 +74,9 @@ export async function POST(req: NextRequest) {
     if (!singleUseToken) return NextResponse.json({ ok: false, error: "חסרים פרטי תשלום" }, { status: 400 });
 
     if (subscribed(t)) return NextResponse.json({ ok: false, error: "כבר קיימת הוראת קבע פעילה" }, { status: 409 });
+    if (TEACHER_FREE_LISTING) {
+      return NextResponse.json({ ok: false, error: "ההופעה במאגר ללא תשלום כרגע, ואין הרשמה לתשלום" }, { status: 409 });
+    }
     if (!payable(t)) {
       return NextResponse.json({ ok: false, error: "הפרופיל עדיין לא אושר, ולכן אין עדיין מה להסדיר" }, { status: 409 });
     }
