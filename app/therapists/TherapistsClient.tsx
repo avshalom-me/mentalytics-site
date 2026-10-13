@@ -168,8 +168,15 @@ function TherapistCard({
   };
 
   return (
+    // data-nosnippet: the card stays indexed, but Google may not quote it under
+    // the search result. Every other listing page has worked this way since
+    // 5/10/2026 (see TherapistResultCard); this directory was the one place a
+    // therapist's bio and towns could still stand in for the questionnaire line
+    // the page opens with. It is on the <div> because Google honours the
+    // attribute only on span, div and section.
     <div
       ref={impressionRef}
+      data-nosnippet
       data-tier={t.free ? "free" : "promoted"}
       className="rounded-2xl bg-white overflow-hidden transition hover:shadow-lg hover:-translate-y-0.5"
       style={{ border: "1px solid var(--line)", boxShadow: "0 2px 10px rgba(61,140,138,.06)" }}
@@ -497,8 +504,10 @@ export default function TherapistsClient({ therapists, variant = "main" }: { the
           directory is the one page that genuinely lands both audiences. */}
       <QuizCta body="ענו על שאלון קצר מבוסס מחקר שנבנה על ידי פסיכולוגים - נזהה את הצורך, נמליץ על סוג הטיפול, ונתאים לכם מטפל/ת. בחינם וללא התחייבות." />
 
-      {/* Filters */}
-      <div className="mb-7 flex flex-wrap items-center gap-3 p-4 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
+      {/* Filters. Out of snippets like the cards below: the two dropdowns are
+          some eighty place names in a row, and a search that names a region or
+          a city matches them better than it matches the opening paragraph. */}
+      <div data-nosnippet className="mb-7 flex flex-wrap items-center gap-3 p-4 rounded-2xl" style={{ background: "var(--surface)", border: "1px solid var(--line)" }}>
         <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--muted)" }}>סינון לפי:</span>
         <select
           value={regionFilter}
