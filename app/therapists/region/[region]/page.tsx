@@ -13,7 +13,7 @@ import PageViewTracker from "@/app/components/PageViewTracker";
 import CitySeoSection from "@/app/therapists/CitySeoSection";
 import QuizCta from "@/app/therapists/QuizCta";
 import { loadLocalArticles } from "@/app/lib/local-articles";
-import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { placeDescription } from "@/app/lib/meta-description";
 import { ONLINE_COPY, ONLINE_HUB_DESCRIPTION, ONLINE_HUB_INTRO } from "@/app/lib/online-copy";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -66,10 +66,11 @@ export async function generateMetadata({ params }: { params: Promise<{ region: s
   const regionCount = isOnline ? 0 : await countListed({ region: r.region });
   const robots =
     !isOnline && regionCount < MIN_LISTED_FOR_INDEX ? { index: false as const, follow: true } : undefined;
-  // Count-free, like the city pages (owner's call, 14/8/26).
+  // Count-free and questionnaire-first, like the city pages (owner's calls of
+  // 14/8/26 and 24/9/26 - see placeDescription).
   const description = isOnline
     ? ONLINE_HUB_DESCRIPTION
-    : `טיפול פסיכולוגי, נפשי ורגשי ב${label}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
+    : placeDescription(`טיפול פסיכולוגי, נפשי ורגשי ב${label}`);
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
 
@@ -218,16 +219,26 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </div>
       )}
 
-      {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
+      {/* SEO content - below the listings (patients rarely scroll here; crawlers do).
+          From here down the page is out of snippets (data-nosnippet: indexed,
+          never quoted), block by block - this paragraph, the Q&A section and
+          the link rows. What is left to quote is the opening paragraph, the
+          questionnaire box and the meta description, and all three make the
+          offer. Until 13/10/2026 only the online hub worked this way; a survey
+          of Google's results that day found it quoting whichever passage
+          matched the query, a price answer included. Only span, div and
+          section carry the attribute as far as Google is concerned. */}
       {!isOnline && REGION_INTRO[r.region] && (
-        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <section data-nosnippet className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>על אזור {r.region}</h2>
-          {/* The questionnaire lives in this paragraph too, not only at the top.
-              Google picks the snippet per query: for "מטפל רגשי בחיפה" (21/9/2026)
+          {/* Google picks the snippet per query: for "מטפל רגשי בחיפה" (21/9/2026)
               it skipped both the meta description and the opening paragraph and
               quoted this one, because "קהילת מטפלים... חיפה והקריות" matched the
-              query better - so the result ran without the offer. Whichever
-              passage it picks now, the offer is in it. */}
+              query better - so the result ran without the offer. The offer was
+              appended here that day, but a snippet shows about 160 characters
+              from where the query matched and the offer sits at the end, so the
+              section is out of snippets instead. The sentence stays for the
+              reader who gets this far. */}
           <p className="text-[15px] leading-8 text-stone-600">
             {REGION_INTRO[r.region]}{" "}
             לא בטוחים איזה טיפול מתאים לכם? מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם.
@@ -235,24 +246,22 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
         </section>
       )}
 
-      {/* On the online hub the whole section is data-nosnippet: its price and
-          "does it work" answers are exactly what Google would lift for a query
-          like "פסיכולוג אונליין", and the snippet that converts is the
-          questionnaire line at the top (owner, 24-25/9/2026). Region pages
-          keep their current behaviour until the 20/10 measurement. */}
-      <div data-nosnippet={isOnline ? true : undefined}>
-        <CitySeoSection
-          placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
-          kind={isOnline ? "online" : "region"}
-          therapists={list}
-          regionName={isOnline ? null : r.region}
-          articles={localArticles}
-        />
-      </div>
+      {/* The section marks itself data-nosnippet: its price and "does it work"
+          answers are exactly what Google lifts for a query like "פסיכולוג
+          אונליין", and the snippet that converts is the questionnaire line at
+          the top (owner, 24-25/9/2026). First on the online hub only; on every
+          city and region page since 13/10/2026. */}
+      <CitySeoSection
+        placeName={isOnline ? "אונליין" : `אזור ${r.kind === "region" ? r.region : ""}`}
+        kind={isOnline ? "online" : "region"}
+        therapists={list}
+        regionName={isOnline ? null : r.region}
+        articles={localArticles}
+      />
 
       {/* Cities within this region (internal linking → city pages) */}
       {regionCities.length > 0 && (
-        <div className="mt-12 pt-8 border-t border-[var(--line)]">
+        <div data-nosnippet className="mt-12 pt-8 border-t border-[var(--line)]">
           <h2 className="text-base font-extrabold text-stone-800 mb-3">ערים ב{label}</h2>
           <div className="flex flex-wrap gap-2">
             {regionCities.map((city) => (
@@ -264,7 +273,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       )}
 
       {/* Internal linking to other regions + online */}
-      <div className="mt-12 pt-8 border-t border-[var(--line)]">
+      <div data-nosnippet className="mt-12 pt-8 border-t border-[var(--line)]">
         <h2 className="text-base font-extrabold text-stone-800 mb-3">אזורים נוספים</h2>
         <div className="flex flex-wrap gap-2">
           {!isOnline && (
@@ -279,7 +288,7 @@ export default async function RegionPage({ params }: { params: Promise<{ region:
       </div>
 
       {/* Specialty landing pages (internal linking / crawl discovery) */}
-      <div className="mt-8 pt-6 border-t border-[var(--line)]">
+      <div data-nosnippet className="mt-8 pt-6 border-t border-[var(--line)]">
         <h2 className="text-base font-extrabold text-stone-800 mb-3">לפי התמחות</h2>
         <div className="flex flex-wrap gap-2">
           {SPECIALTY_LIST.slice(0, 12).map((s) => (

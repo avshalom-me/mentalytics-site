@@ -95,3 +95,38 @@ export const QUIZ = "שאלון מבוסס-מחקר שנבנה על ידי פס�
 export function therapistOffers(): string[] {
   return [`${CREDENTIALS}, ו${QUIZ}.`, "מטפלים שתעודותיהם אומתו, ושאלון התאמה מבוסס-מחקר."];
 }
+
+/**
+ * The questionnaire as an invitation - the same sentence each place page opens
+ * with, so the search result reads alike whichever of the two Google shows.
+ */
+export const QUIZ_INVITE = "מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם";
+
+/**
+ * The description of a place page (city, city + topic, region): the
+ * questionnaire first, direct contact with verified therapists second.
+ *
+ * Until 13/10/2026 these pages said it the other way round - "מטפלים
+ * ופסיכולוגים שתעודותיהם אומתו, ושאלון מבוסס-מחקר..." - and a survey of
+ * Google's results that day found the description shown for 4 city queries
+ * out of 25. There the questionnaire read as a footnote to a directory,
+ * while the owner's rule (24/9/2026) is that the result leads with it, as the
+ * opening paragraph of each page already does.
+ *
+ * Tails are tried richest first and the first that fits the budget wins, so a
+ * long place name loses the closing words rather than being cut mid-sentence.
+ */
+export function placeDescription(lead: string, opts: { fem?: boolean } = {}): string {
+  const verified = opts.fem ? "למטפלות שתעודותיהן אומתו" : "למטפלים שתעודותיהם אומתו";
+  const tails = [
+    `, או פנו ישירות ${verified}. בחינם וללא התחייבות.`,
+    `, או פנו ישירות ${verified}.`,
+    `, או פנו ישירות ${opts.fem ? "למטפלות מאומתות" : "למטפלים מאומתים"}.`,
+    ".",
+  ];
+  for (const tail of tails) {
+    const candidate = `${lead}: ${QUIZ_INVITE}${tail}`;
+    if ([...candidate].length <= META_MAX) return candidate;
+  }
+  return clampWords(`${lead}: ${QUIZ_INVITE}.`, META_MAX);
+}

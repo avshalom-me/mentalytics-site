@@ -259,19 +259,26 @@ export default function CitySeoSection({
   };
 
   return (
-    <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+    // The whole section is out of snippets (data-nosnippet: still indexed for
+    // ranking, never quoted). Google picks the snippet per query, and every
+    // passage here has at some point been lifted in place of the questionnaire
+    // line the page opens with: the profession list (14/8), the authors in the
+    // articles block (5/10), and on 13/10/2026 a price answer - "פסיכולוג בבית
+    // שמש" showed "בית שמש שייכת לאזור ירושלים והסביבה, ותעריפי הטיפול..."
+    // from a copy crawled four days earlier. Marking passages one at a time
+    // left the next one to win, so the section is marked once. The online hub
+    // has worked this way since 25/9.
+    //
+    // It sits on the <section> because Google honours the attribute only on
+    // span, div and section. On a <p> it does nothing: this section's first
+    // paragraph carried it that way for six weeks, and on 5/10 it was still
+    // being quoted on five city and region pages.
+    <section data-nosnippet className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqLd).replace(/</g, "\\u003c") }} />
       <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
         {headings[h % headings.length]}
       </h2>
-      {/* data-nosnippet: still indexed for ranking, but Google may not quote it.
-          This paragraph kept winning the snippet over the intro line, which is
-          the one written to earn the click. On a <div>, not on the <p>: Google
-          honours the attribute only on span, div and section, and while it sat
-          on the <p> this paragraph was quoted on five city and region pages. */}
-      <div data-nosnippet>
-        <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
-      </div>
+      <p className="text-[15px] leading-8 text-stone-600 mb-6">{statsParagraph}</p>
 
       {/* One link, three phrasings, picked by the same place hash as the
           headings. Every landing page claims the questionnaire was built by
@@ -306,12 +313,8 @@ export default function CitySeoSection({
         )}
       </p>
 
-      {/* Out of snippets for the same reason as the paragraph above. With the
-          listing hidden, this block is the next passage on the page that answers
-          "מטפלים ב[עיר]" - a heading, then names - and it carries no
-          questionnaire line. Still indexed, and its links still count. */}
       {articles.length > 0 && (
-        <div className="mb-8" data-nosnippet>
+        <div className="mb-8">
           <h3 className="text-base font-extrabold mb-3" style={{ color: "var(--text)" }}>
             {kind === "online"
               ? "מאמרים ממטפלים שמטפלים אונליין"

@@ -11,7 +11,7 @@ import QuizCta from "@/app/therapists/QuizCta";
 import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import { paidHideAttr } from "@/app/lib/paid-visitor";
 import { loadCityArticles } from "@/app/lib/local-articles";
-import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { placeDescription } from "@/app/lib/meta-description";
 import { cityTopicList, cityTopicCitiesFor, MIN_CITY_TOPIC } from "@/app/lib/topics";
 
 const BASE = "https://www.mentalytics.co.il";
@@ -43,11 +43,11 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
     neighbors.length ? countListed({ citiesAny: [city, ...neighbors] }) : Promise.resolve(0),
   ]);
   // No supply count here (owner's call, 14/8/26 - see app/lib/meta-description.ts):
-  // the snippet sells credentials and the clinician-built quiz, not inventory.
-  const description =
-    count >= 3
-      ? `טיפול פסיכולוגי, נפשי ורגשי ב${city}: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`
-      : `טיפול פסיכולוגי, נפשי ורגשי ב${city} והסביבה: ${CREDENTIALS}, ו${QUIZ}. בחינם וללא התחייבות.`;
+  // the snippet sells the clinician-built quiz and checked credentials, not
+  // inventory - and in that order, like the opening paragraph below.
+  const description = placeDescription(
+    `טיפול פסיכולוגי, נפשי ורגשי ב${city}${count >= 3 ? "" : " והסביבה"}`
+  );
   const robots = cityIsIndexable(city, count, pool) ? undefined : { index: false, follow: true };
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
 }
@@ -159,8 +159,18 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
         </div>
       )}
 
+      {/* From here down the page is out of snippets (data-nosnippet: indexed,
+          never quoted), block by block: the two "nearby" listings with their
+          headings, the topic chips, the paragraph about the city, the Q&A
+          section and the link rows. Google chooses the snippet per query, and
+          on 13/10/2026 a survey of its results found it quoting whichever of
+          these matched - a price answer for "פסיכולוג בבית שמש" - in place of
+          the questionnaire line. What is left to quote is the opening
+          paragraph, the questionnaire box and the meta description, and all
+          three make the offer. Only span, div and section carry the attribute
+          as far as Google is concerned, so it is never put on a <p>. */}
       {nearbyCities.length > 0 && (
-        <div className="mb-10" {...paidHideAttr(nearbyCities)}>
+        <div data-nosnippet className="mb-10" {...paidHideAttr(nearbyCities)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים בערים צמודות ל{city}</h2>
           <p className="text-sm text-stone-500 mb-4">
             {nearbyCityNames.length > 0
@@ -174,7 +184,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       )}
 
       {nearbyRegion.length > 0 && (
-        <div className="mb-6" {...paidHideAttr(nearbyRegion)}>
+        <div data-nosnippet className="mb-6" {...paidHideAttr(nearbyRegion)}>
           <h2 className="text-lg font-extrabold text-stone-800 mb-1">מטפלים נוספים באזור {region}</h2>
           <p className="text-sm text-stone-500 mb-4">פעילים באזור (לא ציינו את {city} ספציפית) - לרבים מהם נוחות גם לתושבי {city}.</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -198,7 +208,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
           landing on region pages held. The links pass the same equity from
           here; a visitor who came for a list meets the list first. */}
       {topicLinks.length > 0 && (
-        <div className="mb-6 flex flex-wrap items-center gap-2">
+        <div data-nosnippet className="mb-6 flex flex-wrap items-center gap-2">
           <span className="text-sm font-semibold text-stone-500">ב{city} לפי תחום:</span>
           {topicLinks.map((t) => (
             <Link key={t.slug} href={`/therapists/city/${regionToSlug(city)}/${t.slug}`}
@@ -210,11 +220,15 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
 
       {/* SEO content - below the listings (patients rarely scroll here; crawlers do) */}
       {CITY_INTRO[city] && (
-        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <section data-nosnippet className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>טיפול פסיכולוגי, נפשי ורגשי ב{city}</h2>
-          {/* The questionnaire is carried here as well as at the top - see the
-              same section in region/[region]/page.tsx for why: Google chooses
-              the snippet per query, and for some queries this is the passage. */}
+          {/* The questionnaire sentence was appended here on 21/9 so that this
+              passage would carry the offer when Google chose it. That is not
+              something to rely on: a snippet shows about 160 characters from
+              where the query matched, and the offer sits at the end of a long
+              paragraph. The section is out of snippets instead (see the note
+              above the nearby listings); the sentence stays for the reader
+              who gets this far. */}
           <p className="text-[15px] leading-8 text-stone-600">
             {CITY_INTRO[city]}{" "}
             לא בטוחים איזה טיפול מתאים לכם? מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם.
@@ -235,7 +249,7 @@ export default async function CityPage({ params }: { params: Promise<{ city: str
       />
 
       {/* Internal linking */}
-      <div className="mt-12 pt-8 border-t border-[var(--line)]">
+      <div data-nosnippet className="mt-12 pt-8 border-t border-[var(--line)]">
         <div className="flex flex-wrap gap-2">
           {region && (
             <Link href={`/therapists/region/${regionToSlug(region)}`} className="rounded-full px-3.5 py-1.5 text-sm font-semibold hover:bg-[var(--teal-pale)]"

@@ -11,7 +11,7 @@ import QuizCta from "@/app/therapists/QuizCta";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
 import PaidVisitorNotice from "@/app/components/PaidVisitorNotice";
 import PageViewTracker from "@/app/components/PageViewTracker";
-import { CREDENTIALS, QUIZ } from "@/app/lib/meta-description";
+import { placeDescription } from "@/app/lib/meta-description";
 import { cityFact } from "@/app/lib/city-facts";
 import { genderTitle } from "@/app/lib/gender-text";
 
@@ -46,8 +46,8 @@ export async function generateMetadata({ params }: { params: Promise<{ city: str
   const title = `${topic.name} ${inPhrase(city)} - ${topic.cityTitleTail ?? "מטפלים מאומתים"} | טיפול חכם`;
   const url = `${BASE}/therapists/city/${regionToSlug(city)}/${topic.slug}`;
   const count = await countListed({ ...topic.filter, city });
-  // Same shape as the city pages, and count-free for the same reason.
-  const description = `${topic.name} ${inPhrase(city)}: ${CREDENTIALS} ובעלי הכשרה בתחום, ו${QUIZ}.`;
+  // Same shape as the city pages: count-free, and the questionnaire first.
+  const description = placeDescription(`${topic.name} ${inPhrase(city)}`, { fem: topic.kind === "gender" });
   const robots =
     topic.adsOnly || count < MIN_CITY_TOPIC ? { index: false as const, follow: true } : undefined;
   return { title, description, alternates: { canonical: url }, robots, openGraph: { title, description, url } };
@@ -159,7 +159,12 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
             ? `${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלות ${inPhrase(city)} שתעודות ההכשרה שלהן אומתו ובעלות הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקן זמינות גם אונליין)" : ""}. בחינם וללא התחייבות.`
             : `${topic.name} ${inPhrase(city)}: מלאו שאלון מקצועי שפותח על ידי פסיכולוגים קליניים ומצאו את ההתאמה הנכונה עבורכם, או עברו על רשימת המטפלים ${inPhrase(city)} שתעודות ההכשרה שלהם אומתו ובעלי הכשרה בתחום ופנו ישירות${onlineHere > 0 ? " (חלקם זמינים גם אונליין)" : ""}. בחינם וללא התחייבות.`}
         </p>
-        <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
+        {/* Out of snippets: a supply line with no questionnaire in it, sitting
+            right under the paragraph that should be quoted. On a div, because
+            Google ignores data-nosnippet on a <p>. */}
+        <div data-nosnippet>
+          <p className="mt-2 text-sm text-stone-500">{topic.supplyNote}.</p>
+        </div>
       </div>
 
       {/* Quiz CTA. A children/teens topic sends parents to the kids
@@ -188,29 +193,38 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
       {/* The city note, its verified fact and the questions come AFTER the
           cards. From 9/9/26 they sat above them, and this page is the landing
           page of the kids campaign: the share of its visitors who ever reached
-          a therapist card fell from 83% to 38% the following week. */}
-      {(cityNote || fact) && (
-        <p className="mt-10 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
-          {cityNote}
-          {cityNote && fact ? " " : null}
-          {fact && (
-            <>
-              {fact.text}
-              {" (מקור: "}
-              <a href={fact.url} target="_blank" rel="noopener" className="font-semibold text-[#2e7d8c] hover:underline">{fact.source}</a>
-              {")."}
-            </>
-          )}
-        </p>
-      )}
-      <TopicFaq
-        topic={topic}
-        title={`${topic.name} ${inPhrase(city)} - ${topic.kind === "audience" ? "שאלות של הורים" : "שאלות נפוצות"}`}
-      />
+          a therapist card fell from 83% to 38% the following week.
+
+          Everything from here down is out of snippets (data-nosnippet: indexed,
+          never quoted). On 13/10/2026 Google was showing this note - "בתל אביב
+          מוצגות פסיכולוגית קלינית, פסיכולוגית תעסוקתית..." - under ten women's,
+          children's and youth pages in five cities, in place of the
+          questionnaire line the page opens with. What is left to quote is that
+          opening paragraph, the questionnaire box and the meta description. */}
+      <div data-nosnippet>
+        {(cityNote || fact) && (
+          <p className="mt-10 text-[15px] leading-8 text-stone-600" style={{ maxWidth: "72ch" }}>
+            {cityNote}
+            {cityNote && fact ? " " : null}
+            {fact && (
+              <>
+                {fact.text}
+                {" (מקור: "}
+                <a href={fact.url} target="_blank" rel="noopener" className="font-semibold text-[#2e7d8c] hover:underline">{fact.source}</a>
+                {")."}
+              </>
+            )}
+          </p>
+        )}
+        <TopicFaq
+          topic={topic}
+          title={`${topic.name} ${inPhrase(city)} - ${topic.kind === "audience" ? "שאלות של הורים" : "שאלות נפוצות"}`}
+        />
+      </div>
 
       {/* Prose below the listings (see the topic page for the rationale). */}
       {topic.intro && (
-        <section className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
+        <section data-nosnippet className="mt-14 pt-10 border-t border-[var(--line)]" style={{ maxWidth: "72ch" }}>
           <h2 className="text-xl font-extrabold mb-4" style={{ color: "var(--text)" }}>
             על {topic.name} - מה חשוב לדעת
           </h2>
@@ -218,7 +232,7 @@ export default async function CityTopicPage({ params }: { params: Promise<{ city
         </section>
       )}
 
-      <div className="mt-8 pt-6 border-t border-[var(--line)]">
+      <div data-nosnippet className="mt-8 pt-6 border-t border-[var(--line)]">
         <h2 className="text-base font-extrabold text-stone-800 mb-3">המשך עיון</h2>
         <div className="flex flex-wrap gap-2">
           {isNamedTopic && (
