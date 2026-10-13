@@ -5,6 +5,7 @@ import {
   LEARNING_FOOTER_LINK_FROM,
   LEARNING_PRIVATE_SEGMENTS,
   isLearningPath,
+  learningDoorPageName,
   learningFooterLinkLive,
   learningRobots,
 } from "./learning-door";
@@ -19,6 +20,16 @@ describe("the learning door", () => {
     expect(isLearningPath("/")).toBe(false);
     expect(isLearningPath(null)).toBe(false);
     expect(isLearningPath(undefined)).toBe(false);
+  });
+
+  it("counts a page view for the door itself, and for nothing else under it", () => {
+    expect(learningDoorPageName("/learning")).toBe("learning");
+    for (const other of ["/learning/join", "/learning/me", "/learning/pay", "/learning/t/some-teacher", "/learning/", "/", null, undefined]) {
+      expect(learningDoorPageName(other), String(other)).toBeNull();
+    }
+    // The layout mounts the tracker, so page.tsx (a lastmod source) stays untouched.
+    expect(readFileSync("app/learning/layout.tsx", "utf8")).toContain("<LearningDoorTracker />");
+    expect(readFileSync("app/learning/page.tsx", "utf8")).not.toContain("PageViewTracker");
   });
 
   it("the door pages follow the one switch", () => {

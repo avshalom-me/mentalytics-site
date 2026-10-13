@@ -45,6 +45,15 @@ export function isLearningPath(pathname: string | null | undefined): boolean {
 }
 
 /**
+ * שם העמוד באירוע page_view של הדלת - ורק של הדלת. עמוד ההצטרפות של המורים
+ * הוא עמוד גיוס (נשאר מחוץ ל-page_view כמו /therapists/join), והאזורים
+ * הפרטיים אינם נספרים כלל; לכולם null. ראו app/learning/LearningDoorTracker.tsx.
+ */
+export function learningDoorPageName(pathname: string | null | undefined): string | null {
+  return pathname === "/learning" ? "learning" : null;
+}
+
+/**
  * היום שממנו ה-footer של האתר מקשר לדלת (שעון ישראל).
  *
  * הקישור הוא שינוי בקישורים הפנימיים של כל עמוד באתר, ועד 20/10/2026 בערך

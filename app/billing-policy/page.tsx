@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
 
 export const metadata: Metadata = {
   title: "תקנון רכישה - חיוב, ביטול והחזרים",
@@ -19,7 +20,7 @@ export default function BillingPolicyPage() {
       </Link>
 
       <h1 className="mt-6 text-3xl font-black text-stone-900 mb-2">תקנון רכישה - חיוב, ביטול והחזרים</h1>
-      <p className="text-sm text-stone-500 mb-10">טיפול חכם - מנטליטיקס | עודכן לאחרונה: מאי 2026</p>
+      <p className="text-sm text-stone-500 mb-10">טיפול חכם - מנטליטיקס | עודכן לאחרונה: אוקטובר 2026</p>
 
       <div className="space-y-8 text-sm leading-7 text-stone-700">
 
@@ -46,7 +47,8 @@ export default function BillingPolicyPage() {
           <p>האתר מציע שני סוגי שירותים בתשלום:</p>
           <ul className="list-disc pr-6 mt-2 space-y-1">
             <li><strong>מנוי חודשי למטפלים (מסלול מקודם):</strong> מנוי מתחדש בעלות של 140 ש&quot;ח לחודש (לא כולל מע&quot;מ). כולל הופעה במערכת ההתאמה החכמה, סטטיסטיקות מתקדמות, ודו&quot;חות פילוח פניות.</li>
-            <li><strong>שימוש בשאלון התאמה (מטופלים):</strong> ששת השימושים הראשונים חינמיים. כל שימוש נוסף בעלות של 30 ש&quot;ח (לא כולל מע&quot;מ).</li>
+            {/* המספר מ-promo.ts, שם חיה המכסה (8 מ-2/9/2026); התקנון אמר "ששת" עד 13/10/2026. */}
+            <li><strong>שימוש בשאלון התאמה (מטופלים):</strong> {MAX_FREE_QUIZZES} השימושים הראשונים חינמיים. כל שימוש נוסף בעלות של 30 ש&quot;ח (לא כולל מע&quot;מ).</li>
           </ul>
         </section>
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import LearningDoorTracker from "./LearningDoorTracker";
 
 // "לימוד חכם" - אזור המורים, תחת /learning.
 //
@@ -15,5 +16,12 @@ export const metadata: Metadata = {
 };
 
 export default function LearningLayout({ children }: { children: React.ReactNode }) {
-  return children;
+  // page_view לדלת עצמה (/learning בלבד) נשלח מכאן ולא מ-page.tsx, כדי ששינוי
+  // במדידה לא יזיז את תאריך העדכון המוצהר של העמוד - ראו LearningDoorTracker.
+  return (
+    <>
+      <LearningDoorTracker />
+      {children}
+    </>
+  );
 }

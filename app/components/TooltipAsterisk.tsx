@@ -1,5 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
+import { MAX_FREE_QUIZZES } from "@/app/lib/promo";
 
 export default function TooltipAsterisk() {
   const [open, setOpen] = useState(false);
@@ -47,7 +48,8 @@ export default function TooltipAsterisk() {
           boxShadow: "0 4px 12px rgba(0,0,0,0.18)",
           pointerEvents: "none",
         }}>
-          בשימוש הוגן. עד 5 שימושים לכל שאלון
+          {/* המספר מ-promo.ts: כשהמכסה עלתה מ-5 ל-8 (2/9/2026) הטולטיפ נשאר על 5. */}
+          בשימוש הוגן. עד {MAX_FREE_QUIZZES} שימושים לכל שאלון
         </span>
       )}
     </span>
