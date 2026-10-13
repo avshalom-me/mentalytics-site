@@ -95,6 +95,10 @@
     {
       "schedule": "15 8 * * *",
       "path": "/api/cron/retention-gift-reminder?send=confirm"
+    },
+    {
+      "schedule": "50 23 * * *",
+      "path": "/api/cron/indexnow"
     }
   ]
 }
