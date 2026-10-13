@@ -12,6 +12,7 @@ import { ARRANGEMENT_PAGES } from "@/app/lib/arrangements";
 import { BTL_TRACKS } from "@/app/lib/btl-tracks";
 import { revisedAt } from "@/app/lib/page-revised";
 import { LEARNING_DOOR_PUBLIC } from "@/app/lib/learning-door";
+import { sitemapLoc } from "@/app/lib/sitemap-loc";
 
 const BASE = "https://www.mentalytics.co.il";
 
@@ -269,5 +270,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: revisedAt("@landing-families"),
   }));
 
-  return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...landingPages, ...centerPages];
+  // Every <loc> in the escaped form the page's canonical uses - the Hebrew
+  // paths went out raw until 13/10/2026, and Search Console could not match
+  // them to the indexed pages. See app/lib/sitemap-loc.ts.
+  return [...staticPages, ...therapistPages, ...articlePages, ...sectionPages, ...landingPages, ...centerPages].map((p) => ({
+    ...p,
+    url: sitemapLoc(String(p.url)),
+  }));
 }

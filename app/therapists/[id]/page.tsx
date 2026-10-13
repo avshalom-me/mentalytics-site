@@ -19,6 +19,7 @@ import ProfileBackLink from "./ProfileBackLink";
 import { waLinkFor, waLinkForCenter, centerWhatsAppNumber, centerLineFor, telHref } from "@/app/lib/phone";
 import { siteAuthorProfileFields } from "@/app/lib/author";
 import { therapistPhotoUrl } from "@/app/lib/therapist-photo-url";
+import { profileMetaDescription } from "@/app/lib/profile-meta";
 
 const BASE_URL = "https://www.mentalytics.co.il";
 
@@ -218,7 +219,17 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     therapist.gender,
     therapist.age_groups
   );
-  const bioSnippet = therapist.bio ? therapist.bio.slice(0, 140) : "";
+  // Who, where, what they treat, then the bio in whole sentences - never a
+  // mid-word cut of the bio alone, which is what the SERP showed until
+  // 13/10/2026. See app/lib/profile-meta.ts.
+  const description = profileMetaDescription({
+    name,
+    title: type,
+    regions: therapist.regions,
+    online: therapist.online,
+    trainingAreas: therapist.training_areas,
+    bio: therapist.bio,
+  });
   const canonical = `${BASE_URL}${therapistPath(id, therapist.full_name)}`;
   // Stable, crawlable photo URL (see app/therapist-photo/[id]/route.ts). Gives
   // the profile an indexable og:image instead of an expiring signed URL. The
@@ -228,18 +239,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
   return {
     title: `${name} - ${type} | טיפול חכם`,
-    description: bioSnippet || `פרופיל של ${name}, ${type}. מצאו מטפל מתאים בטיפול חכם.`,
+    description,
     alternates: { canonical },
     openGraph: {
       title: `${name} - ${type}`,
-      description: bioSnippet,
+      description,
       url: canonical,
       images: [{ url: ogImage, alt: name }],
     },
     twitter: {
       card: therapist.profile_photo_path ? "summary_large_image" : "summary",
       title: `${name} - ${type}`,
-      description: bioSnippet,
+      description,
       images: [ogImage],
     },
   };
