@@ -26,6 +26,8 @@ import { syncCenterTherapists } from "@/app/lib/center-promotion";
 import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 import { REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import { applyMatchPause } from "@/app/lib/match-pause-apply";
+import { grantRetentionGift, planRetentionGift } from "@/app/lib/retention-gift";
+import { RETENTION_GIFT_DEFAULT_MONTHS } from "@/app/lib/retention-gift-rules";
 
 type TherapistRow = {
   id: string;
@@ -167,7 +169,7 @@ async function buildTherapistsResponse(onlyId?: string) {
 
   let subsQuery = supabaseAdmin
     .from("subscriptions")
-    .select("therapist_id, status, current_period_end, promo_reverts_at");
+    .select("therapist_id, status, current_period_end, promo_reverts_at, retention_gift_until");
   if (onlyId) subsQuery = subsQuery.eq("therapist_id", onlyId);
 
   // Certificate uploads that failed in the therapist's browser (reported via
@@ -275,7 +277,7 @@ async function buildTherapistsResponse(onlyId?: string) {
     (engByTherapist[id] ??= { v30: 0, v60: 0, vt: 0, c30: 0, c60: 0, ct: 0, ch30: { paid: 0, organic: 0, direct: 0, other: 0 } });
   const subByTherapist: Record<
     string,
-    { status: string; current_period_end: string | null; promo_reverts_at: string | null }
+    { status: string; current_period_end: string | null; promo_reverts_at: string | null; retention_gift_until: string | null }
   > = {};
 
   if (therapistIds.length > 0) {
@@ -350,6 +352,7 @@ async function buildTherapistsResponse(onlyId?: string) {
       status: string;
       current_period_end: string | null;
       promo_reverts_at: string | null;
+      retention_gift_until: string | null;
     }>) {
       // Prefer the active subscription when a therapist has more than one row.
       const prev = subByTherapist[s.therapist_id];
@@ -358,6 +361,7 @@ async function buildTherapistsResponse(onlyId?: string) {
           status: s.status,
           current_period_end: s.current_period_end,
           promo_reverts_at: s.promo_reverts_at,
+          retention_gift_until: s.retention_gift_until ?? null,
         };
       }
     }
@@ -506,6 +510,49 @@ export async function PATCH(request: Request) {
       });
       if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
       return NextResponse.json({ ok: true, id, match_paused_until: result.until });
+    }
+
+    // "הארכה במתנה - שימור": דחיית החיוב הבא של מטפל/ת משלם/ת בכמה חודשים.
+    // הקידום לא משתנה, הוראת הקבע נשארת, ובסוף התקופה Sumit ממשיכה לחייב
+    // מעצמה. כל הכללים וההסברים ב-app/lib/retention-gift.ts.
+    //   retention_gift_preview  קריאה בלבד: האם אפשר, ומה התאריכים (לחלון)
+    //   grant_retention_gift    הביצוע. send_email=true שולח למטפל/ת את מייל המתנה
+    if (body.action === "retention_gift_preview" || body.action === "grant_retention_gift") {
+      const months = Number(body.months ?? RETENTION_GIFT_DEFAULT_MONTHS);
+      try {
+        if (body.action === "retention_gift_preview") {
+          const plan = await planRetentionGift(id, months);
+          if (!plan.ok) return NextResponse.json({ ok: false, error: plan.reason }, { status: 409 });
+          return NextResponse.json({
+            ok: true,
+            id,
+            plan: {
+              name: plan.name,
+              email: plan.email,
+              months: plan.months,
+              amount: plan.amount,
+              current_next_billing: plan.currentNextBilling,
+              new_next_billing: plan.newNextBilling,
+              warnings: plan.warnings,
+            },
+          });
+        }
+        const result = await grantRetentionGift({ therapistId: id, months, sendEmail: body.send_email === true });
+        if (!result.ok) return NextResponse.json({ ok: false, error: result.reason }, { status: 409 });
+        return NextResponse.json({
+          ok: true,
+          id,
+          retention_gift_until: result.nextBilling,
+          previous_next_billing: result.previousNextBilling,
+          months: result.months,
+          email: result.email,
+          warnings: result.warnings,
+        });
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "unknown";
+        console.error(`${body.action} failed for ${id}:`, msg);
+        return NextResponse.json({ ok: false, error: `הפעולה נכשלה: ${msg}` }, { status: 502 });
+      }
     }
 
     if (body.action === "link_account") {

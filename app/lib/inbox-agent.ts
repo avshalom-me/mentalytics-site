@@ -301,11 +301,19 @@ export async function senderContext(email: string): Promise<SenderContext> {
     lines.push(`מסלול נוכחי: ${src}${t.promoted_since ? `, מאז ${String(t.promoted_since).slice(0, 10)}` : ""}.`);
     const { data: sub } = await supabaseAdmin
       .from("subscriptions")
-      .select("first_charge_on, status")
+      .select("first_charge_on, status, retention_gift_until, retention_gift_months")
       .eq("therapist_id", t.id)
       .maybeSingle();
     if (sub?.first_charge_on) {
       lines.push(`תאריך החיוב הראשון שלו/ה: ${String(sub.first_charge_on).slice(0, 10)}.`);
+    }
+    // "הארכה במתנה - שימור": בלי השורה הזו הסוכן היה עונה למטפל ששואל על
+    // המייל שקיבל ("מתי אני מחויב שוב?") כאילו הוא מחויב כל חודש כרגיל.
+    const giftUntil = sub?.retention_gift_until ? String(sub.retention_gift_until).slice(0, 10) : null;
+    if (giftUntil && giftUntil > new Date().toISOString().slice(0, 10)) {
+      lines.push(
+        `קיבל/ה מאיתנו מתנת שימור של ${Number(sub?.retention_gift_months) || 2} חודשים: הקידום ממשיך כרגיל, הכרטיס לא מחויב בתקופה, והחיוב חוזר ב-${giftUntil}. שבוע לפני כן נשלח אליו/ה מייל תזכורת. ביטול בכל שלב - במענה למייל.`
+      );
     }
   } else {
     lines.push(`מסלול נוכחי: חינמי (מופיע במאגר, לא במערכת ההתאמות).`);

@@ -689,6 +689,107 @@ export async function updateRecurringPrice(opts: {
   );
 }
 
+// ---------- Defer the next charge of an existing standing order ----------
+//
+// "הארכה במתנה - שימור": הלקוח לא מחויב לתקופה, ואז החיובים ממשיכים. במקום
+// לבטל את ההוראה ולפתוח חדשה מהכרטיס השמור (שתי פעולות, ושלב ביניים שבו
+// ללקוח אין הוראת קבע בכלל אם השנייה נכשלת), דוחים את תאריך החיוב הבא של
+// ההוראה הקיימת - `NextPaymentDate` בסכמה הרשמית של /billing/recurring/update/.
+// ההוראה, הכרטיס, המחיר ומספר ההוראה נשארים, ובסוף התקופה Sumit מחייבת
+// מעצמה: שום דבר אצלנו לא צריך לקרות כדי שהתשלומים יחזרו.
+//
+// אותו חוזה כמו updateRecurringPrice: קוראים, מעדכנים, קוראים שוב, ומצליחים
+// רק אם ההוראה באמת במצב שביקשנו. הבדיקה שאחרי כוללת גם את מה ש*לא* ביקשנו
+// לשנות (מחיר, סטטוס): הפרמטר הזה לא נמדד מול הוראה חיה לפני 13/10/2026,
+// ולכן עדכון שנגע במשהו נוסף חייב להיתפס כאן ולא בחשבונית של הלקוח.
+export function sumitDay(value: unknown): string | null {
+  // Sumit מחזיר תאריכים כ-"2026-09-16T00:00:00+03:00": עשרת התווים הראשונים
+  // הם התאריך בשעון ישראל, וזה מה שמשווים - לא רגע בזמן.
+  const s = typeof value === "string" ? value.slice(0, 10) : "";
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null;
+}
+
+export async function deferRecurringNextBilling(opts: {
+  recurringItemId: number;
+  customerExternalId: string;
+  /** YYYY-MM-DD, בשעון ישראל. */
+  nextPaymentDate: string;
+  /** רק לתיקון: החזרת תאריך שנדחה ולא נרשם אצלנו. בלעדיו מותר רק לדחות קדימה. */
+  allowEarlier?: boolean;
+}): Promise<{ previousNextBilling: string; nextBilling: string }> {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.nextPaymentDate)) {
+    throw new Error(`deferRecurringNextBilling: bad date ${opts.nextPaymentDate}`);
+  }
+
+  const read = async (phase: string): Promise<RecurringItem> => {
+    const items = await listRecurringForCustomer({
+      externalIdentifier: opts.customerExternalId,
+      includeInactive: true,
+    });
+    const item = items.find((i) => Number(i.ID) === opts.recurringItemId);
+    if (!item || !SUMIT_RECURRING_ACTIVE_STATUSES.includes(Number(item.Status))) {
+      throw new Error(
+        `Sumit defer: recurring item ${opts.recurringItemId} not active (${phase}, status=${item?.Status ?? "missing"})`
+      );
+    }
+    return item;
+  };
+  const send = (date: string) =>
+    api("/billing/recurring/update/", {
+      Customer: { ExternalIdentifier: opts.customerExternalId, SearchMode: 0 },
+      RecurringCustomerItemID: opts.recurringItemId,
+      NextPaymentDate: date,
+    });
+
+  const before = await read("before");
+  const previousNextBilling = sumitDay(before.Date_NextBilling);
+  if (!previousNextBilling) {
+    throw new Error(`Sumit defer: item ${opts.recurringItemId} has no next billing date to move`);
+  }
+  if (!opts.allowEarlier && opts.nextPaymentDate <= previousNextBilling) {
+    throw new Error(
+      `Sumit defer: ${opts.nextPaymentDate} is not after the current next billing ${previousNextBilling}`
+    );
+  }
+
+  await send(opts.nextPaymentDate);
+  const after = await read("after update");
+
+  const samePrice =
+    typeof before.UnitPrice !== "number" ||
+    typeof after.UnitPrice !== "number" ||
+    Math.abs(before.UnitPrice - after.UnitPrice) <= 0.01;
+  const moved = sumitDay(after.Date_NextBilling) === opts.nextPaymentDate;
+  if (moved && samePrice) {
+    return { previousNextBilling, nextBilling: opts.nextPaymentDate };
+  }
+
+  // לא מה שביקשנו. מחזירים את התאריך למקומו ונכשלים, כדי שהקורא לא ירשום
+  // מתנה שההוראה לא משקפת - לקוח שנאמר לו "חודשיים בלי חיוב" ויחויב בכל זאת.
+  let restored = false;
+  if (sumitDay(after.Date_NextBilling) !== previousNextBilling) {
+    try {
+      await send(previousNextBilling);
+      restored = sumitDay((await read("after restore")).Date_NextBilling) === previousNextBilling;
+    } catch (restoreErr) {
+      console.error(
+        `Sumit defer restore failed for item ${opts.recurringItemId}:`,
+        restoreErr instanceof Error ? restoreErr.message : restoreErr
+      );
+    }
+  } else {
+    restored = true;
+  }
+  throw new Error(
+    `Sumit defer did not take effect: item ${opts.recurringItemId} next billing is ` +
+      `${sumitDay(after.Date_NextBilling) ?? "unknown"} (wanted ${opts.nextPaymentDate}, was ${previousNextBilling}), ` +
+      `price ${before.UnitPrice} -> ${after.UnitPrice}; ` +
+      (restored ? "the original date is back in place" : "COULD NOT RESTORE the original date - check the order in Sumit") +
+      // החזרת התאריך אינה מחזירה מחיר: אם העדכון נגע גם בו, מישהו חייב לדעת.
+      (samePrice ? "" : "; THE PRICE CHANGED and was not restored - check the order in Sumit")
+  );
+}
+
 // ---------- Status sync (daily cron polls this) ----------
 
 // Status enum from live API responses: 0 = active, non-zero = cancelled/

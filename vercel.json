@@ -91,6 +91,10 @@
     {
       "schedule": "0 6 * * *",
       "path": "/api/cron/final-signup-reminder?send=confirm"
+    },
+    {
+      "schedule": "15 8 * * *",
+      "path": "/api/cron/retention-gift-reminder?send=confirm"
     }
   ]
 }

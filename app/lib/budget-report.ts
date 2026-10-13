@@ -127,7 +127,7 @@ async function loadShared(month?: string): Promise<Shared> {
       .from("therapists")
       .select("id, full_name, regions, online, promotion_source, center_account_id, promoted_since, created_at")
       .eq("status", "paying"),
-    supabaseAdmin.from("subscriptions").select("therapist_id, status, amount, first_charge_on, cancelled_at, created_at"),
+    supabaseAdmin.from("subscriptions").select("therapist_id, status, amount, first_charge_on, retention_gift_until, cancelled_at, created_at"),
     supabaseAdmin.from("therapy_center_accounts").select("id, name, status, agreed_monthly_price, billing_starts_at"),
     fetchAllRows<DailyRow>(() =>
       supabaseAdmin
@@ -166,7 +166,16 @@ async function loadShared(month?: string): Promise<Shared> {
     clicks90,
     matches30,
     therapists: (therapistsQ.data ?? []) as TherapistRow[],
-    subs: (subsQ.data ?? []) as SubRow[],
+    // "הארכה במתנה - שימור" דוחה את החיוב הבא של מנוי משלם. מבחינת הדוח זה
+    // אותו מצב כמו חיוב ראשון שטרם יצא: המנוי פעיל אבל אין ממנו הכנסה עד
+    // התאריך. לכן התאריך המאוחר מבין השניים הוא "מתי מתחילים לחייב", וכל
+    // החישובים למטה (MRR עכשיו, MRR קרוב, חיובים צפויים) ממשיכים לקרוא שדה
+    // אחד. בלי זה מטפל בתקופת מתנה היה נספר כהכנסה חודשית שלא מגיעה.
+    subs: ((subsQ.data ?? []) as Array<SubRow & { retention_gift_until?: string | null }>).map((x) => {
+      const gift = x.retention_gift_until ? String(x.retention_gift_until).slice(0, 10) : null;
+      const first = x.first_charge_on ? String(x.first_charge_on).slice(0, 10) : null;
+      return { ...x, first_charge_on: gift && (!first || gift > first) ? gift : x.first_charge_on };
+    }),
     centers: (centersQ.data ?? []) as CenterRow[],
     daily90,
     window90: new Map(

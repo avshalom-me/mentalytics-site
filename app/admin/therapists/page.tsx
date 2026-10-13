@@ -12,6 +12,11 @@ import { missingProfileFields } from "@/app/lib/profile-completeness";
 import { EXPENSE_CATEGORIES, REFUND_CATEGORIES, VAT_RATE } from "@/app/lib/crm";
 import { canPauseFromMatching } from "@/app/lib/match-pause";
 import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
+import {
+  RETENTION_GIFT_DEFAULT_MONTHS, RETENTION_GIFT_MONTH_OPTIONS, RETENTION_GIFT_REMINDER_DAYS,
+  israelDayToIso, monthsLabel, retentionGiftActive,
+} from "@/app/lib/retention-gift-rules";
+import { buildRetentionGiftGrantedEmail, hebDay } from "@/app/lib/retention-gift-emails";
 import TherapistCrmPanel from "./components/TherapistCrmPanel";
 import AdminCertUpload from "./components/AdminCertUpload";
 import { therapistPath } from "@/app/lib/therapist-url";
@@ -71,7 +76,13 @@ type AdminTherapist = {
   contacts_total: number;
   /** פילוח ערוץ של הצפיות ב-30 יום - האבחון של "מאיפה מגיעה החשיפה שלו". */
   views_30d_by_channel?: { paid: number; organic: number; direct: number; other: number };
-  subscription: { status: string; current_period_end: string | null; promo_reverts_at: string | null } | null;
+  subscription: {
+    status: string;
+    current_period_end: string | null;
+    promo_reverts_at: string | null;
+    /** "הארכה במתנה - שימור": היום שבו החיוב חוזר. ריק = אין מתנה. */
+    retention_gift_until?: string | null;
+  } | null;
   center_account_id: string | null;
   center_name: string | null;
   missing: string[];
@@ -373,6 +384,22 @@ export default function AdminTherapistsPage() {
   // נרשמת שורת ההוצאה בספר, אחרת ההחזר לא מתועד בשום מקום.
   const [cancelPayingFor, setCancelPayingFor] = useState<AdminTherapist | null>(null);
   const [cancelSaving, setCancelSaving] = useState(false);
+
+  // "הארכה במתנה - שימור": דחיית החיוב הבא של מטפל/ת משלם/ת. החלון טוען
+  // תצוגה מקדימה מהשרת (קריאה בלבד מול Sumit) לפני שמאפשר לאשר, כדי שהאדמין
+  // יראה את התאריכים האמיתיים ולא ניחוש. הכללים ב-app/lib/retention-gift.ts.
+  const [retentionGiftFor, setRetentionGiftFor] = useState<AdminTherapist | null>(null);
+  const [retentionGiftMonths, setRetentionGiftMonths] = useState<number>(RETENTION_GIFT_DEFAULT_MONTHS);
+  const [retentionGiftPlan, setRetentionGiftPlan] = useState<{
+    name: string; email: string | null; months: number; amount: number;
+    current_next_billing: string; new_next_billing: string; warnings: string[];
+  } | null>(null);
+  const [retentionGiftError, setRetentionGiftError] = useState("");
+  const [retentionGiftLoading, setRetentionGiftLoading] = useState(false);
+  const [retentionGiftSaving, setRetentionGiftSaving] = useState(false);
+  const [retentionGiftSendEmail, setRetentionGiftSendEmail] = useState(true);
+  const [retentionGiftShowMail, setRetentionGiftShowMail] = useState(false);
+  const [retentionGiftResults, setRetentionGiftResults] = useState<Record<string, string>>({});
   const [refundChecked, setRefundChecked] = useState(false);
   const [refundAmount, setRefundAmount] = useState("");
   const [refundDate, setRefundDate] = useState("");
@@ -656,6 +683,87 @@ export default function AdminTherapistsPage() {
   // רישום החזר כספי שכבר בוצע (או עומד להתבצע) ידנית בדשבורד של Sumit.
   // לא נוגע בכסף - רק כותב שורת הוצאה בספר + שורת audit, כדי שהמאזן החודשי
   // ידע על הכסף שיצא. מוחזר טקסט לתצוגה, או null אם לא נרשם כלום.
+  // תצוגה מקדימה של מתנת השימור: השרת בודק זכאות וקורא מ-Sumit את תאריך
+  // החיוב הבא. קריאה בלבד - שום דבר לא משתנה עד האישור.
+  async function loadRetentionGiftPlan(t: AdminTherapist, months: number) {
+    setRetentionGiftPlan(null);
+    setRetentionGiftError("");
+    setRetentionGiftLoading(true);
+    try {
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: t.id, action: "retention_gift_preview", months }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "הבדיקה נכשלה");
+      setRetentionGiftPlan(json.plan);
+    } catch (err) {
+      setRetentionGiftError(err instanceof Error ? err.message : "שגיאה");
+    } finally {
+      setRetentionGiftLoading(false);
+    }
+  }
+
+  function openRetentionGift(t: AdminTherapist) {
+    setRetentionGiftFor(t);
+    setRetentionGiftMonths(RETENTION_GIFT_DEFAULT_MONTHS);
+    setRetentionGiftSendEmail(true);
+    setRetentionGiftShowMail(false);
+    void loadRetentionGiftPlan(t, RETENTION_GIFT_DEFAULT_MONTHS);
+  }
+
+  async function confirmRetentionGift() {
+    const t = retentionGiftFor;
+    if (!t || !retentionGiftPlan) return;
+    setRetentionGiftSaving(true);
+    setRetentionGiftError("");
+    try {
+      const res = await fetch("/api/admin-therapists", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: t.id,
+          action: "grant_retention_gift",
+          months: retentionGiftMonths,
+          send_email: retentionGiftSendEmail,
+        }),
+      });
+      const json = await res.json();
+      if (!res.ok || !json.ok) throw new Error(json.error || "הפעולה נכשלה");
+      const until: string = json.retention_gift_until;
+      setTherapists((prev) =>
+        prev.map((x) =>
+          x.id === t.id && x.subscription
+            ? {
+                ...x,
+                subscription: {
+                  ...x.subscription,
+                  current_period_end: israelDayToIso(until),
+                  retention_gift_until: until,
+                },
+              }
+            : x
+        )
+      );
+      const mail = json.email as { requested: boolean; sent: boolean; to?: string; error?: string };
+      const mailNote = !mail.requested
+        ? "לא נשלח מייל (לפי בחירתך)."
+        : mail.sent
+          ? `מייל המתנה נשלח ל-${mail.to}.`
+          : `⚠ המתנה ניתנה, אבל המייל לא נשלח (${mail.error || "שגיאה"}). יש לעדכן את המטפל/ת ידנית.`;
+      setRetentionGiftResults((prev) => ({
+        ...prev,
+        [t.id]: `🎁 ניתנה מתנת שימור של ${monthsLabel(json.months)}: החיוב נדחה מ-${hebDay(json.previous_next_billing)} ל-${hebDay(until)}. ${mailNote}`,
+      }));
+      setRetentionGiftFor(null);
+    } catch (err) {
+      setRetentionGiftError(err instanceof Error ? err.message : "שגיאה");
+    } finally {
+      setRetentionGiftSaving(false);
+    }
+  }
+
   async function recordRefund(id: string): Promise<string | null> {
     const gross = Number(refundAmount);
     if (!Number.isFinite(gross) || gross <= 0) {
@@ -1462,6 +1570,11 @@ export default function AdminTherapistsPage() {
                   )}
                 </span>
               )}
+              {therapist.status === "paying" && retentionGiftActive(therapist.subscription?.retention_gift_until) && (
+                <span className="font-semibold text-[#2A6462]">
+                  · 🎁 מתנת שימור: בלי חיוב עד {hebDay(therapist.subscription!.retention_gift_until!)}
+                </span>
+              )}
               {therapist.subscription?.promo_reverts_at && (
                 <span className="text-amber-700 font-semibold">
                   · מבצע — חוזר ל-₪140 ב-{new Date(therapist.subscription.promo_reverts_at).toLocaleDateString("he-IL")}
@@ -1678,6 +1791,21 @@ export default function AdminTherapistsPage() {
                 </button>
               )}
               {therapist.status === "paying" && therapist.promotion_source === "paid" && (
+                retentionGiftActive(therapist.subscription?.retention_gift_until) ? (
+                  <span className="rounded-xl border border-[#C2DFDE] bg-[#EAF4F3] px-4 py-2 text-sm font-medium text-[#2A6462]"
+                    title="מתנת שימור בתוקף. אפשר לתת מתנה נוספת אחרי שהחיוב יחזור.">
+                    🎁 במתנת שימור עד {hebDay(therapist.subscription!.retention_gift_until!)}
+                  </span>
+                ) : (
+                  <button type="button" disabled={isBusy}
+                    className="rounded-xl border border-[#3D8C8A] bg-white px-4 py-2 text-sm font-medium text-[#2A6462] hover:bg-[#EAF4F3] disabled:opacity-50"
+                    title="החיובים נעצרים לחודשיים ואז ממשיכים מעצמם. הקידום לא משתנה."
+                    onClick={() => openRetentionGift(therapist)}>
+                    🎁 הארכה במתנה - שימור
+                  </button>
+                )
+              )}
+              {therapist.status === "paying" && therapist.promotion_source === "paid" && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => {
@@ -1742,6 +1870,11 @@ export default function AdminTherapistsPage() {
             {refundResults[therapist.id] && (
               <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
                 {refundResults[therapist.id]}
+              </div>
+            )}
+            {retentionGiftResults[therapist.id] && (
+              <div className="mt-2 rounded-lg border border-[#C2DFDE] bg-[#EAF4F3] px-3 py-2 text-xs text-[#2A6462]">
+                {retentionGiftResults[therapist.id]}
               </div>
             )}
           </div>
@@ -2679,6 +2812,116 @@ export default function AdminTherapistsPage() {
           </div>
         </div>
       )}
+
+      {/* ── הארכה במתנה - שימור ── */}
+      {retentionGiftFor && (() => {
+        const plan = retentionGiftPlan;
+        const mail = plan
+          ? buildRetentionGiftGrantedEmail({
+              name: plan.name,
+              months: plan.months,
+              chargeDate: plan.new_next_billing,
+              amount: plan.amount,
+            })
+          : null;
+        const reminderDay = plan
+          ? new Date(new Date(`${plan.new_next_billing}T12:00:00Z`).getTime() - RETENTION_GIFT_REMINDER_DAYS * 86400000)
+              .toISOString().slice(0, 10)
+          : null;
+        return (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 p-4" dir="rtl"
+            onClick={() => { if (!retentionGiftSaving) setRetentionGiftFor(null); }}>
+            <div className="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+              <h3 className="mb-1 text-lg font-bold text-stone-900">
+                🎁 הארכה במתנה - שימור · {retentionGiftFor.full_name?.trim() || retentionGiftFor.email || "מטפל/ת"}
+              </h3>
+              <p className="mb-4 text-sm text-stone-600">
+                החיובים נעצרים לתקופה ואז ממשיכים מעצמם. הקידום באתר לא משתנה, והוראת הקבע ב-Sumit
+                נשארת כמו שהיא: רק תאריך החיוב הבא נדחה.
+              </p>
+
+              <div className="mb-4 flex items-center gap-2">
+                <span className="text-sm font-semibold text-stone-800">משך המתנה:</span>
+                {RETENTION_GIFT_MONTH_OPTIONS.map((m) => (
+                  <button key={m} type="button" disabled={retentionGiftSaving || retentionGiftLoading}
+                    onClick={() => { setRetentionGiftMonths(m); void loadRetentionGiftPlan(retentionGiftFor, m); }}
+                    className={`rounded-full border px-4 py-1.5 text-sm font-bold transition disabled:opacity-50 ${
+                      retentionGiftMonths === m
+                        ? "border-[#3D8C8A] bg-[#3D8C8A] text-white"
+                        : "border-[#C2DFDE] bg-white text-[#2A6462] hover:bg-[#EAF4F3]"
+                    }`}>
+                    {monthsLabel(m)}
+                  </button>
+                ))}
+              </div>
+
+              {retentionGiftLoading && (
+                <p className="rounded-xl bg-stone-50 px-4 py-3 text-sm text-stone-500">בודק מול Sumit...</p>
+              )}
+
+              {retentionGiftError && (
+                <p className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{retentionGiftError}</p>
+              )}
+
+              {plan && !retentionGiftLoading && (
+                <>
+                  <div className="rounded-xl border border-[#C2DFDE] bg-[#EAF4F3] px-4 py-3 text-sm text-[#131F1E]">
+                    <div>החיוב הבא היום: <strong>{hebDay(plan.current_next_billing)}</strong></div>
+                    <div>אחרי המתנה החיוב חוזר ב: <strong>{hebDay(plan.new_next_billing)}</strong> (₪{plan.amount} + מע&quot;מ לחודש, כמו קודם)</div>
+                    <div className="mt-1 text-xs text-[#3E5250]">
+                      מייל תזכורת ייצא אליו/ה אוטומטית בסביבות {reminderDay ? hebDay(reminderDay) : ""}, שבוע לפני חזרת החיוב.
+                    </div>
+                  </div>
+
+                  {plan.warnings.map((w) => (
+                    <p key={w} className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-xs text-amber-900">⚠ {w}</p>
+                  ))}
+
+                  <label className="mt-4 flex cursor-pointer items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800">
+                    <input type="checkbox" checked={retentionGiftSendEmail} disabled={retentionGiftSaving || !plan.email}
+                      onChange={(e) => setRetentionGiftSendEmail(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-[#3D8C8A]" />
+                    <span>
+                      <b>לשלוח למטפל/ת מייל על המתנה</b>
+                      <span className="mt-0.5 block text-xs text-stone-500">
+                        {plan.email ? `יישלח ל-${plan.email}.` : "לא רשומה כתובת מייל, ולכן לא יישלח מייל."}{" "}
+                        <button type="button" className="font-semibold text-[#2A6462] underline"
+                          onClick={(e) => { e.preventDefault(); setRetentionGiftShowMail((v) => !v); }}>
+                          {retentionGiftShowMail ? "הסתרת המייל" : "הצגת המייל"}
+                        </button>
+                      </span>
+                      {!retentionGiftSendEmail && (
+                        <span className="mt-1 block text-xs font-semibold text-amber-700">
+                          בלי מייל המטפל/ת לא יידע/תדע על המתנה, אבל מייל התזכורת שבוע לפני חזרת החיוב עדיין ייצא.
+                        </span>
+                      )}
+                    </span>
+                  </label>
+
+                  {retentionGiftShowMail && mail && (
+                    <div className="mt-2 rounded-xl border border-stone-200 bg-white px-4 py-3">
+                      <div className="mb-2 text-xs font-bold text-stone-500">נושא: {mail.subject}</div>
+                      <div className="whitespace-pre-line text-sm leading-6 text-stone-800">{mail.text}</div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              <div className="mt-5 flex justify-end gap-2">
+                <button type="button" onClick={() => setRetentionGiftFor(null)} disabled={retentionGiftSaving}
+                  className="rounded-full border border-stone-300 bg-white px-5 py-2 text-sm font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                  ביטול
+                </button>
+                <button type="button" disabled={retentionGiftSaving || retentionGiftLoading || !plan}
+                  onClick={() => void confirmRetentionGift()}
+                  className="rounded-full bg-[#3D8C8A] px-5 py-2 text-sm font-semibold text-white hover:bg-[#2A6462] disabled:opacity-50">
+                  {retentionGiftSaving ? "מעדכן ב-Sumit..." : `לתת ${monthsLabel(retentionGiftMonths)} במתנה`}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── ביטול מנוי של מטפל משלם (+ רישום החזר אופציונלי) ── */}
       {cancelPayingFor && (
