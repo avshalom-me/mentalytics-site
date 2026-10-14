@@ -5,6 +5,7 @@ import { getOrCreateSessionId } from "@/app/lib/session";
 import { getAttribution } from "@/app/lib/attribution";
 import { trackingOptedOut } from "@/app/lib/track-optout";
 import { takeMatchContext, type SensitiveMatchContext } from "@/app/lib/match-view-context";
+import { clickSignals } from "@/app/lib/click-signals";
 
 /**
  * What the URL may carry about a match visit: nothing about health. The
@@ -54,6 +55,8 @@ export default function TrackView({
         viewer_symptom: s?.symptom ?? null,
         match_score: context?.match_score ?? null,
         session_id,
+        // דפדפן שמצהיר שהוא נשלט בידי כלי אוטומציה לא נרשם כצפייה (ראו track-view).
+        ...clickSignals(),
         ...attribution,
       }),
     }).catch(() => {});

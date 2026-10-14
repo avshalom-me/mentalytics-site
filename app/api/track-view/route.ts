@@ -9,6 +9,14 @@ import {
 import { sanitizeAttribution, isValidChannel } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
 import { generalizeFinding } from "@/app/lib/sensitive-findings";
+import { readClickSignals } from "@/app/lib/click-signals";
+
+// מ-7/10/2026 בשעה 19:00 סורק עם User-Agent רגיל נכנס לדפי מטפלים כ-45 פעמים
+// בשעה, מסביב לשעון, ונרשם כאן כ-4,400 צפיות בשבוע (פי 8 מהאמיתיות). הן הועברו
+// ל-therapist_profile_views_quarantine (מיגרציה 20261014). עד התאריך הזה נרשם
+// ביומן השרת ה-User-Agent של כל צפייה שהגיעה בלי מפנה ובלי קמפיין, כדי לזהות
+// את הסורק ולהוסיף אותו ל-bot-detect.ts. ה-UA לא נשמר במסד.
+const UA_LOG_UNTIL = Date.parse("2026-10-21T00:00:00+03:00");
 
 // "match_card"   = impression in the match-results list
 // "match"        = entry into the full profile page coming from match results
@@ -70,6 +78,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
+    // דפדפן שמצהיר על עצמו שהוא נשלט בידי כלי אוטומציה (navigator.webdriver).
+    // אותו אות שנשמר עם לחיצות קשר; כאן הוא פשוט לא נרשם.
+    if (readClickSignals(body, null).automated === true) {
+      return NextResponse.json({ ok: true, bot: true });
+    }
     const { therapist_id, source, viewer_region, viewer_issue, viewer_age_band, viewer_gender, match_score, session_id } = body ?? {};
 
     if (!therapist_id || typeof therapist_id !== "string") {
@@ -151,6 +164,10 @@ export async function POST(req: NextRequest) {
         .limit(1)
         .maybeSingle();
       if (landed?.referrer_host) attribution.referrer_host = landed.referrer_host;
+    }
+
+    if (Date.now() < UA_LOG_UNTIL && safeSource === "directory" && attribution.channel === "direct" && !attribution.referrer_host) {
+      console.log("[track-view:direct-noref]", (req.headers.get("user-agent") ?? "(none)").slice(0, 300));
     }
 
     await supabaseAdmin
