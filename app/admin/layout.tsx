@@ -45,6 +45,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
       { href: "/admin/recruitment", label: "גיוס מטפלים", icon: "🧲" },
       { href: "/admin/ads", label: "פרסום ממומן", icon: "📣" },
       { href: "/admin/fb-ads", label: "מודעות פייסבוק", icon: "📘" },
+      { href: "/admin/fb-page-posts", label: "פוסטים לעמוד הפייסבוק", icon: "🗓️" },
       { href: "/admin/ads-console", label: "גוגל אדס - ניתוח", icon: "📡" },
       { href: "/admin/budget", label: "תקציב פרסום", icon: "🧮" },
       { href: "/admin/recommendations", label: "המלצות", icon: "💡" },
