@@ -167,7 +167,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (Date.now() < UA_LOG_UNTIL && safeSource === "directory" && attribution.channel === "direct" && !attribution.referrer_host) {
-      console.log("[track-view:direct-noref]", (req.headers.get("user-agent") ?? "(none)").slice(0, 300));
+      // המדינה (כותרת של Vercel, בלי IP): שלוש הדגימות הראשונות, 14/10, נכנסו דרך
+      // סינגפור ומומבאי עם UA של כרום רגיל במחשב, ולכן המדינה היא הסימן שאפשר לסנן לפיו.
+      console.log(
+        "[track-view:direct-noref]",
+        req.headers.get("x-vercel-ip-country") ?? "??",
+        (req.headers.get("user-agent") ?? "(none)").slice(0, 300),
+      );
     }
 
     await supabaseAdmin
