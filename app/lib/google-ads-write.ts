@@ -119,19 +119,27 @@ export async function freeCampaignName(base: string): Promise<string> {
   throw new Error(`לא נמצא שם פנוי לקמפיין ${base}`);
 }
 
-export type CeilingCheck = { ok: boolean; ceiling: number | null; projectedMonthly: number; dailyTotal: number; month: string };
+export type CeilingCheck = { ok: boolean; ceiling: number | null; projectedMonthly: number; dailyTotal: number; spentMtd: number; daysLeft: number; month: string };
 
 /**
- * התקרה: סכום התקציבים היומיים של הקמפיינים הפעילים (מהסנכרון, עם השינוי
- * המבוקש) כפול ימי החודש, מול מה שהתקרה משאירה לגוגל אחרי הפלטפורמות האחרות.
+ * התקרה: מה שכבר הוצא בגוגל מתחילת החודש (ads_campaign_daily), ועוד סכום
+ * התקציבים היומיים של הקמפיינים הפעילים (מהסנכרון, עם השינוי המבוקש) כפול
+ * הימים שנותרו בחודש כולל היום - מול מה שהתקרה משאירה לגוגל אחרי הפלטפורמות
+ * האחרות. (הגרסה הראשונה הכפילה תקציב יומי בחודש מלא, ולכן חסמה העלאה קטנה
+ * בסוף החודש ופספסה חודש שהתחיל יקר - ממצא של סקירת ג'מיני, 14/10/26.)
  */
 export async function checkCeiling(change: { campaignId: string; dailyIls: number; enabled: boolean }): Promise<CeilingCheck> {
-  const month = israelToday().slice(0, 7);
-  const [report, cfg] = await Promise.all([
+  const today = israelToday();
+  const month = today.slice(0, 7);
+  const [report, cfg, spent] = await Promise.all([
     loadBudgetReport({ month }),
     supabaseAdmin.from("ads_campaign_config").select("campaign_id, status, daily_budget"),
+    supabaseAdmin.from("ads_campaign_daily").select("cost").gte("date", `${month}-01`).lte("date", today),
   ]);
   if (cfg.error) throw new Error(`ads_campaign_config: ${cfg.error.message}`);
+  if (spent.error) throw new Error(`ads_campaign_daily: ${spent.error.message}`);
+  const spentMtd = Math.round((spent.data ?? []).reduce((sum, r) => sum + (Number(r.cost) || 0), 0) * 100) / 100;
+  const daysLeft = daysInMonth(month) - Number(today.slice(8, 10)) + 1;
   let dailyTotal = 0;
   for (const c of cfg.data ?? []) {
     if (String(c.campaign_id) === change.campaignId) continue;
@@ -140,8 +148,8 @@ export async function checkCeiling(change: { campaignId: string; dailyIls: numbe
   if (change.enabled) dailyTotal += change.dailyIls;
   dailyTotal = Math.round(dailyTotal * 100) / 100;
   const ceiling = report.projection.googleCeiling ?? report.ceiling?.value ?? null;
-  const projectedMonthly = Math.round(dailyTotal * daysInMonth(month));
-  return { ok: ceiling == null || projectedMonthly <= ceiling, ceiling, projectedMonthly, dailyTotal, month };
+  const projectedMonthly = Math.round(spentMtd + dailyTotal * daysLeft);
+  return { ok: ceiling == null || projectedMonthly <= ceiling, ceiling, projectedMonthly, dailyTotal, spentMtd, daysLeft, month };
 }
 
 async function logAdsWrite(kind: string, title: string, payload: Record<string, unknown>): Promise<void> {
