@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { scoreKidsQuestionnaire } from "@/app/lib/kids-score.server";
-import { bumpAndCheckIpDaily, cleanFp, getIp, getUsage } from "@/app/lib/usage";
+import { bumpAndCheckIpDaily, cleanFp, getIp, getUsage, isStaffRequest } from "@/app/lib/usage";
 import { isActiveReviewToken } from "@/app/lib/school-review.server";
 
 // The counsellor rubric scores with the kids engine, free of the parent
@@ -28,7 +28,10 @@ export async function POST(request: NextRequest) {
     // them and for nobody else; a request without one never reaches the
     // database to ask.
     const reviewing = await isActiveReviewToken((body as Record<string, unknown>)._reviewToken);
-    if (!reviewing) {
+    // The team tries the rubric from its own browsers: a staff browser is not
+    // asked about the parents' free runs, and is not held to the daily cap.
+    const staff = await isStaffRequest(request, (body as Record<string, unknown>)._staffToken);
+    if (!reviewing && !staff) {
       const ip = getIp(request);
       const usage = await getUsage(ip, cleanFp((body as Record<string, unknown>)._fp), "kids");
       if (usage.paymentRequired) {

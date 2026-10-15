@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { STAFF_COOKIE, STAFF_COOKIE_MAX_AGE_SECONDS, staffCookieValue } from "@/app/lib/staff-cookie";
 
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME ?? "admin";
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD ?? "";
@@ -80,7 +81,7 @@ function crossSiteWrite(request: NextRequest): boolean {
   }
 }
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   if (!needsAuth(request.nextUrl.pathname)) {
     return NextResponse.next();
   }
@@ -98,7 +99,29 @@ export function middleware(request: NextRequest) {
     });
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+
+  // A browser that has passed the admin gate is a staff browser: the
+  // questionnaires do not limit it and do not count it (app/lib/staff-cookie.ts).
+  // Pages only - the /api/admin-* calls a page makes ride on the same browser,
+  // and one cookie per page visit is enough to keep the year renewed. Nothing
+  // is set when the server has no staff token.
+  if (request.nextUrl.pathname.startsWith("/admin")) {
+    const value = await staffCookieValue();
+    if (value) {
+      response.cookies.set({
+        name: STAFF_COOKIE,
+        value,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: STAFF_COOKIE_MAX_AGE_SECONDS,
+      });
+    }
+  }
+
+  return response;
 }
 
 export const config = {

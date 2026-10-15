@@ -12,6 +12,7 @@ const m = vi.hoisted(() => ({
   bump: vi.fn(),
   review: vi.fn(),
   score: vi.fn(),
+  staff: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -19,6 +20,7 @@ vi.mock("@/app/lib/usage", () => ({
   getUsage: m.getUsage,
   bumpAndCheckIpDaily: m.bump,
   getIp: () => "10.0.0.1",
+  isStaffRequest: m.staff,
   cleanFp: (fp: unknown) => (typeof fp === "string" && /^[a-f0-9]{64}$/.test(fp) ? fp : null),
 }));
 vi.mock("@/app/lib/school-review.server", () => ({ isActiveReviewToken: m.review }));
@@ -38,6 +40,7 @@ beforeEach(() => {
   m.getUsage.mockReset();
   m.bump.mockReset().mockResolvedValue(true);
   m.review.mockReset().mockResolvedValue(false);
+  m.staff.mockReset().mockResolvedValue(false);
   m.score.mockReset().mockReturnValue({ emotional: [], academic: [] });
 });
 
@@ -64,6 +67,16 @@ describe("/api/questionnaire/school/score", () => {
     m.review.mockResolvedValue(true);
     m.getUsage.mockResolvedValue(exhausted);
     const res = await post({ _fp: FP, _reviewToken: "x".repeat(32), q1: 1 });
+    expect(res.status).toBe(200);
+    expect(m.getUsage).not.toHaveBeenCalled();
+    expect(m.bump).not.toHaveBeenCalled();
+  });
+
+  it("a staff browser is not asked about the free runs and is not held to the daily cap", async () => {
+    m.staff.mockResolvedValue(true);
+    m.getUsage.mockResolvedValue(exhausted);
+    m.bump.mockResolvedValue(false);
+    const res = await post({ _fp: FP, q1: 1 });
     expect(res.status).toBe(200);
     expect(m.getUsage).not.toHaveBeenCalled();
     expect(m.bump).not.toHaveBeenCalled();

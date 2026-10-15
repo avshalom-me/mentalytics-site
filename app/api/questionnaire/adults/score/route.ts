@@ -7,7 +7,7 @@ import {
   consumeUsage,
   getIp,
   getUsage,
-  isStaffBypass,
+  isStaffRequest,
   MAX_FREE,
 } from "@/app/lib/usage";
 import { recordQuizScoring } from "@/app/lib/research-counts";
@@ -27,7 +27,9 @@ export async function POST(request: NextRequest) {
     // Server-side free-tier enforcement. The result (the personalized
     // recommendations) is the paid product, so the limit is checked HERE —
     // not just in the client UI, which is trivially bypassable.
-    const staff = isStaffBypass(body._staffToken);
+    // Staff = the code in the body (?staff= link, localStorage, the watchdog) or
+    // the staff cookie of a browser that has logged in to the admin.
+    const staff = await isStaffRequest(request, body._staffToken);
     const fp = cleanFp(body._fp);
     const ip = getIp(request);
 

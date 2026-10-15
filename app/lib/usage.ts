@@ -1,5 +1,6 @@
 import "server-only";
 import { createClient } from "@supabase/supabase-js";
+import { hasStaffCookie } from "./staff-cookie";
 
 // Server-side quiz usage tracking + free-tier enforcement.
 // Single source of truth shared by /api/usage/check, the questionnaire
@@ -48,6 +49,20 @@ export function getIp(req: { headers: { get(name: string): string | null } }): s
 export function isStaffBypass(token: unknown): boolean {
   const secret = process.env.STAFF_BYPASS_TOKEN;
   return typeof secret === "string" && secret.length > 0 && token === secret;
+}
+
+/**
+ * Staff by either route: the code in the request body (a ?staff= link, or the
+ * browser's localStorage, or the night watchdog) or the staff cookie the admin
+ * gate gives every browser that logs in (app/lib/staff-cookie.ts). The cookie
+ * is what lets a staff browser open the questionnaires with nothing stored in
+ * the page and nothing to press.
+ */
+export async function isStaffRequest(
+  req: { cookies: { get(name: string): { value: string } | undefined } },
+  token: unknown,
+): Promise<boolean> {
+  return isStaffBypass(token) || (await hasStaffCookie(req));
 }
 
 function identifiersFor(ip: string, fp: string | null): string[] {
