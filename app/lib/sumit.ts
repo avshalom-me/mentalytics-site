@@ -187,6 +187,46 @@ export interface SubscriptionChargeResult {
   [k: string]: unknown;
 }
 
+// ---------- Which Sumit customer a new standing order is filed under ----------
+//
+// Sumit's customer SearchMode: 0 Automatic, 1 None (always a new customer),
+// 2 ExternalIdentifier, 3 Name, 4 CompanyNumber, 5 Phone, 6 EmailAddress.
+// Automatic does not stop at our identifier: when no customer carries it, it
+// goes on to match the company number, email or phone we send. On 14/10/2026
+// that filed a centre's new order under an older Sumit customer that was
+// opened by hand and carries none of our identifiers. Every lookup by
+// `center:<id>` then came back empty, and two days later the daily sync read
+// the paying centre as cancelled and archived it.
+//
+// A new standing order is therefore filed under our identifier only. If Sumit
+// refuses that request, nothing was created (SumitBusinessError), and when the
+// card arrived with the request we try once more the old way, so a signup
+// never fails on the lookup alone. The daily sync finds an order that still
+// lands under someone else's customer (findRecurringUnderPayerDetails).
+const SEARCH_AUTOMATIC = 0;
+const SEARCH_BY_EXTERNAL_ID = 2;
+
+async function chargeUnderOurCustomer(
+  customer: Record<string, unknown>,
+  body: Record<string, unknown>,
+): Promise<SubscriptionChargeResult> {
+  const send = (mode: number) =>
+    api<SubscriptionChargeResult>("/billing/recurring/charge/", { ...body, Customer: { ...customer, SearchMode: mode } });
+  try {
+    return await send(SEARCH_BY_EXTERNAL_ID);
+  } catch (e) {
+    // Without a token the order is charged to the card saved on the customer
+    // found by our identifier; searching wider would find someone else's.
+    if (!(e instanceof SumitBusinessError) || !body.SingleUseToken) throw e;
+    console.error(
+      `Sumit refused a standing order filed under ${String(customer.ExternalIdentifier)} alone; ` +
+        `retrying with the automatic customer search:`,
+      e.message,
+    );
+    return await send(SEARCH_AUTOMATIC);
+  }
+}
+
 export async function createSubscription(opts: {
   therapistId: string;
   therapistName: string;
@@ -202,14 +242,12 @@ export async function createSubscription(opts: {
   // מנגנון בדיוק שכבר עובד אצל המרכזים.
   firstChargeDate?: string;
 }): Promise<SubscriptionChargeResult> {
-  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
-    Customer: {
-      ExternalIdentifier: opts.therapistId,
-      SearchMode: 0,
-      Name: opts.therapistName,
-      EmailAddress: opts.therapistEmail,
-      Phone: opts.therapistPhone || null,
-    },
+  const charge = await chargeUnderOurCustomer({
+    ExternalIdentifier: opts.therapistId,
+    Name: opts.therapistName,
+    EmailAddress: opts.therapistEmail,
+    Phone: opts.therapistPhone || null,
+  }, {
     SingleUseToken: opts.singleUseToken,
     Items: [
       {
@@ -300,14 +338,12 @@ export async function createTeacherSubscription(opts: {
   firstChargeDate?: string;
 }): Promise<SubscriptionChargeResult> {
   const externalId = `teacher:${opts.teacherId}`;
-  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
-    Customer: {
-      ExternalIdentifier: externalId,
-      SearchMode: 0,
-      Name: opts.teacherName,
-      EmailAddress: opts.teacherEmail,
-      Phone: opts.teacherPhone || null,
-    },
+  const charge = await chargeUnderOurCustomer({
+    ExternalIdentifier: externalId,
+    Name: opts.teacherName,
+    EmailAddress: opts.teacherEmail,
+    Phone: opts.teacherPhone || null,
+  }, {
     SingleUseToken: opts.singleUseToken,
     Items: [
       {
@@ -380,15 +416,13 @@ export async function createCenterSubscription(opts: {
   const externalId = `center:${opts.centerId}`;
   // Quantity=1, UnitPrice=הסכום הכולל - כדי שעדכון מחיר/מספר-מטפלים בעתיד יעבור
   // דרך updateRecurringPrice (שמעדכן UnitPrice) בלי לגעת בכמות ב-Sumit.
-  const charge = await api<SubscriptionChargeResult>("/billing/recurring/charge/", {
-    Customer: {
-      ExternalIdentifier: externalId,
-      SearchMode: 0,
-      Name: opts.payerName || opts.centerName,
-      EmailAddress: opts.payerEmail,
-      Phone: opts.payerPhone || null,
-      CompanyNumber: opts.companyNumber || null,
-    },
+  const charge = await chargeUnderOurCustomer({
+    ExternalIdentifier: externalId,
+    Name: opts.payerName || opts.centerName,
+    EmailAddress: opts.payerEmail,
+    Phone: opts.payerPhone || null,
+    CompanyNumber: opts.companyNumber || null,
+  }, {
     // בלי טוקן השדה לא נשלח בכלל, ו-Sumit מחייב את אמצעי התשלום השמור של
     // הלקוח ("Leave this empty to use the customer payment method"). אומת חי
     // ב-5/10/2026: הוראה מתוזמנת נוצרה כך מכרטיס שמור, ובוטלה.
@@ -507,13 +541,29 @@ export async function cancelSubscription(opts: {
 // On a failure the caller must not record the customer as stopped; orders
 // cancelled before the failure stay cancelled, and a second call finishes the
 // rest.
-export async function cancelLiveOrdersForCustomer(customerExternalId: string): Promise<number[]> {
+//
+// `recorded` is the order we have on file and the payer's details. When our
+// identifier does not see that order, it may be filed under someone else's
+// Sumit customer (findRecurringUnderPayerDetails), and it is cancelled there
+// too - otherwise stopping such a centre would answer "nothing was live" while
+// its card kept being charged.
+export async function cancelLiveOrdersForCustomer(
+  customerExternalId: string,
+  recorded?: { recurringItemId?: number | string | null; payer?: SumitPayerDetails },
+): Promise<number[]> {
   const read = () =>
     listRecurringForCustomer({ externalIdentifier: customerExternalId, includeInactive: true });
   const mayCharge = (i: RecurringItem) => !SUMIT_RECURRING_ENDED_STATUSES.includes(Number(i.Status));
 
-  const live = (await read()).filter(mayCharge);
-  if (live.length === 0) return [];
+  const ours = await read();
+  const live = ours.filter(mayCharge);
+  let foreign: ForeignCustomerOrder | null = null;
+  const recordedId = Number(recorded?.recurringItemId) || 0;
+  if (recordedId && recorded?.payer && !ours.some((i) => Number(i.ID) === recordedId)) {
+    const hit = await findRecurringUnderPayerDetails(recordedId, recorded.payer);
+    if (hit && mayCharge(hit.item)) foreign = hit;
+  }
+  if (live.length === 0 && !foreign) return [];
 
   for (const item of live) {
     // Same request as cancelSubscription; the check comes once, after all of them.
@@ -522,9 +572,24 @@ export async function cancelLiveOrdersForCustomer(customerExternalId: string): P
       RecurringCustomerItemID: Number(item.ID),
     });
   }
+  if (foreign) {
+    await api("/billing/recurring/cancel/", {
+      Customer: foreign.customer,
+      RecurringCustomerItemID: Number(foreign.item.ID),
+    });
+  }
 
   const cancelled = live.map((i) => Number(i.ID));
-  const survivors = (await read()).filter((i) => cancelled.includes(Number(i.ID)) && mayCharge(i));
+  const survivors = live.length > 0
+    ? (await read()).filter((i) => cancelled.includes(Number(i.ID)) && mayCharge(i))
+    : [];
+  if (foreign) {
+    const foreignId = Number(foreign.item.ID);
+    cancelled.push(foreignId);
+    const after = (await listRecurringFor(foreign.customer, true)).find((i) => Number(i.ID) === foreignId);
+    // Gone from the list is not proof it ended.
+    if (!after || mayCharge(after)) survivors.push(after ?? foreign.item);
+  }
   if (survivors.length > 0) {
     throw new Error(
       `Sumit cancel did not take effect: ${survivors
@@ -837,18 +902,65 @@ export async function listRecurringForCustomer(opts: {
   externalIdentifier: string;
   includeInactive?: boolean;
 }): Promise<RecurringItem[]> {
+  return listRecurringFor(
+    { ExternalIdentifier: opts.externalIdentifier, SearchMode: 0 },
+    opts.includeInactive ?? false,
+  );
+}
+
+async function listRecurringFor(customer: Record<string, unknown>, includeInactive: boolean): Promise<RecurringItem[]> {
   // Sumit wraps the list as { RecurringItems: [...] } inside the envelope's Data.
   const data = await api<{ RecurringItems?: RecurringItem[] }>(
     "/billing/recurring/listforcustomer/",
-    {
-      Customer: {
-        ExternalIdentifier: opts.externalIdentifier,
-        SearchMode: 0,
-      },
-      IncludeInactive: opts.includeInactive ?? false,
-    }
+    { Customer: customer, IncludeInactive: includeInactive },
   );
   return data.RecurringItems ?? [];
+}
+
+// ---------- An order filed under someone else's Sumit customer ----------
+//
+// See chargeUnderOurCustomer: until 16/10/2026 a new order could be filed under
+// an older Sumit customer that matched on the payer's details. Such an order
+// is invisible to every lookup by our identifier. Asked when our identifier
+// misses the order we have on file, before anything reads that miss as
+// "cancelled". Measured on the live account on 16/10/2026: the centre's order
+// came back under its payer's company number, email, phone and name, and
+// under none of our identifiers.
+//
+// Read-only. A lookup that finds no customer returns an empty list (measured
+// the same day); a lookup that fails throws, so the caller treats it like any
+// other failed read and changes nothing.
+export interface SumitPayerDetails {
+  email?: string | null;
+  phone?: string | null;
+  companyNumber?: string | null;
+}
+
+export interface ForeignCustomerOrder {
+  item: RecurringItem;
+  /** Which payer detail found the customer the order is filed under. */
+  matchedBy: "company_number" | "email" | "phone";
+  /** The customer to send Sumit when acting on this order. */
+  customer: Record<string, unknown>;
+}
+
+export async function findRecurringUnderPayerDetails(
+  recurringItemId: number | string,
+  payer: SumitPayerDetails,
+): Promise<ForeignCustomerOrder | null> {
+  const id = Number(recurringItemId);
+  if (!id) return null;
+  const lookups: [ForeignCustomerOrder["matchedBy"], string | null | undefined, Record<string, unknown>][] = [
+    ["company_number", payer.companyNumber, { CompanyNumber: payer.companyNumber?.trim(), SearchMode: 4 }],
+    ["email", payer.email, { EmailAddress: payer.email?.trim(), SearchMode: 6 }],
+    ["phone", payer.phone, { Phone: payer.phone?.trim(), SearchMode: 5 }],
+  ];
+  for (const [matchedBy, value, customer] of lookups) {
+    if (!value?.trim()) continue;
+    const item = (await listRecurringFor(customer, true)).find((i) => Number(i.ID) === id);
+    if (item) return { item, matchedBy, customer };
+  }
+  return null;
 }
 
 // ---------- Accounting documents (read-only) ----------

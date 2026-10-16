@@ -5,7 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { buildCenterPortalPayload } from "@/app/lib/center-portal-data";
 import { PORTAL_CENTER_COLS, type PortalCenter } from "@/app/lib/center-auth";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
-import { cancelLiveOrdersForCustomer, createCenterSubscription, getSavedPaymentMethod, listRecurringForCustomer, updateRecurringPrice, SumitPaymentDeclinedError, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES, type SavedPaymentMethod } from "@/app/lib/sumit";
+import { cancelLiveOrdersForCustomer, createCenterSubscription, findRecurringUnderPayerDetails, getSavedPaymentMethod, listRecurringForCustomer, updateRecurringPrice, SumitPaymentDeclinedError, SUMIT_RECURRING_ACTIVE_STATUSES, SUMIT_RECURRING_CANCELLED_STATUS, SUMIT_RECURRING_ENDED_STATUSES, type SavedPaymentMethod } from "@/app/lib/sumit";
 import { sendCenterProposalEmail, sendCenterGiftEmail, sendCenterStopEmail } from "@/app/lib/center-emails";
 import { pickCenterNoticeAddresses } from "@/app/lib/center-notice-emails";
 import { centerMonthlyPricing } from "@/app/lib/center-pricing";
@@ -64,12 +64,27 @@ function parseLocations(v: unknown): number { const n = Math.floor(Number(v)); r
 // בזמן שההוראה שלו חיה ממשיך להיות מחויב בלי שאף מנגנון יראה את זה.
 async function endCenterBilling(
   action: string,
-  center: { id: string; status: string; sumit_recurring_id: string | null; gift_granted_at?: string | null },
+  center: {
+    id: string;
+    status: string;
+    sumit_recurring_id: string | null;
+    gift_granted_at?: string | null;
+    payer_email?: string | null;
+    payer_phone?: string | null;
+    payer_company_number?: string | null;
+  },
 ): Promise<{ ok: true; cancelled: number[] } | { ok: false; response: NextResponse }> {
   const mayHaveOrder = !!center.sumit_recurring_id || (center.status === "active" && !isCenterOnGift(center));
   if (!mayHaveOrder) return { ok: true, cancelled: [] };
   try {
-    return { ok: true, cancelled: await cancelLiveOrdersForCustomer(`center:${center.id}`) };
+    // פרטי המשלם: הוראה שנרשמה ב-Sumit תחת לקוח ותיק אחר (ראו
+    // findRecurringUnderPayerDetails) לא נמצאת לפי המזהה שלנו, והעצירה הייתה
+    // עונה "אין הוראה חיה" בזמן שהכרטיס ממשיך להיות מחויב.
+    const cancelled = await cancelLiveOrdersForCustomer(`center:${center.id}`, {
+      recurringItemId: center.sumit_recurring_id,
+      payer: { email: center.payer_email, phone: center.payer_phone, companyNumber: center.payer_company_number },
+    });
+    return { ok: true, cancelled };
   } catch (e) {
     console.error(`admin-centers ${action}: ending billing at Sumit failed for center=${center.id}:`, e instanceof Error ? e.message : e);
     return {
@@ -1210,9 +1225,17 @@ export async function POST(req: NextRequest) {
         externalIdentifier: `center:${center.id}`,
         includeInactive: true,
       });
-      const ours = center.sumit_recurring_id
+      let ours = center.sumit_recurring_id
         ? items.find((i) => Number(i.ID) === Number(center.sumit_recurring_id))
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+      // הוראה שנרשמה תחת לקוח Sumit אחר - כמו בסנכרון היומי.
+      if (!ours && center.sumit_recurring_id) {
+        ours = (await findRecurringUnderPayerDetails(center.sumit_recurring_id, {
+          email: center.payer_email,
+          phone: center.payer_phone,
+          companyNumber: center.payer_company_number,
+        }))?.item;
+      }
       // מבטלים אצלנו רק כשההוראה באמת בוטלה ב-Sumit (Status=1). 0=פעילה
       // ו-12=מתוזמנת (חודשי מתנה) הן חיות. הבדיקה הישנה (Status !== 0) ביטלה
       // מרכז בתקופת מתנה בכל לחיצה על "סטטוס מ-Sumit" - אותו באג שהיה ב-cron.

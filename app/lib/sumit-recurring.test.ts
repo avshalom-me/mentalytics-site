@@ -3,7 +3,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 process.env.SUMIT_COMPANY_ID = process.env.SUMIT_COMPANY_ID || "1";
 process.env.SUMIT_API_KEY = process.env.SUMIT_API_KEY || "test-key";
 
-import { cancelLiveOrdersForCustomer, cardExpired, createCenterSubscription, getSavedPaymentMethod, updateRecurringPrice } from "./sumit";
+import { cancelLiveOrdersForCustomer, cardExpired, createCenterSubscription, findRecurringUnderPayerDetails, getSavedPaymentMethod, updateRecurringPrice } from "./sumit";
 
 const ITEM_ID = 2059972492;
 const CUSTOMER = "therapist-under-test";
@@ -344,5 +344,122 @@ describe("a centre's standing order", () => {
     fakeCharge({ Payment: { ValidPayment: false, Status: "004", StatusDescription: "סירוב" }, DocumentID: null, RecurringCustomerItemIDs: [] });
 
     await expect(createCenterSubscription({ ...BASE })).rejects.toThrow(/payment declined/);
+  });
+});
+
+// 14/10/2026: Sumit's automatic customer search filed a centre's new order
+// under an older customer that matched on the payer's company number, and
+// carried none of our identifiers. Two days later the sync archived the
+// paying centre, because no lookup by `center:<id>` could see the order.
+describe("an order filed under someone else's Sumit customer", () => {
+  const BASE = { centerId: "under-test", centerName: "מרכז לדוגמה", payerName: "מרכז לדוגמה", payerEmail: "office@example.org", companyNumber: "512345678", unitPrice: 240 };
+  type Customer = Record<string, unknown>;
+
+  /** Sumit refuses `refuseModes` on the charge; answers the order list per customer. */
+  function fakeSumit(opts: {
+    refuseModes?: number[];
+    ordersUnder?: (c: Customer) => { ID: number; Status: number }[];
+    stuck?: boolean;
+  }) {
+    const charges: Customer[] = [];
+    const lists: Customer[] = [];
+    const cancels: { customer: Customer; id: number }[] = [];
+    const cancelled = new Set<number>();
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init: { body: string }) => {
+      const path = new URL(url).pathname;
+      const body = JSON.parse(init.body);
+      const ok = (data: unknown) => ({ ok: true, json: async () => ({ Status: 0, UserErrorMessage: null, TechnicalErrorDetails: null, Data: data }) });
+      if (path === "/billing/recurring/charge/") {
+        charges.push(body.Customer);
+        if (opts.refuseModes?.includes(body.Customer.SearchMode)) {
+          return { ok: true, json: async () => ({ Status: 1, UserErrorMessage: "refused", TechnicalErrorDetails: null, Data: null }) };
+        }
+        return ok({ Payment: { ValidPayment: true }, DocumentID: 7, RecurringCustomerItemIDs: [555] });
+      }
+      if (path === "/billing/recurring/listforcustomer/") {
+        lists.push(body.Customer);
+        const orders = (opts.ordersUnder?.(body.Customer) ?? []).map((o) => ({ ...o, Status: cancelled.has(o.ID) ? 1 : o.Status }));
+        return ok({ RecurringItems: orders });
+      }
+      if (path === "/billing/recurring/cancel/") {
+        cancels.push({ customer: body.Customer, id: body.RecurringCustomerItemID });
+        if (!opts.stuck) cancelled.add(body.RecurringCustomerItemID);
+        return ok({});
+      }
+      throw new Error(`unexpected path ${path}`);
+    }));
+    return { charges, lists, cancels };
+  }
+  const underCompanyNumber = (c: Customer) => (c.CompanyNumber === "512345678" && c.SearchMode === 4 ? [{ ID: 2451709342, Status: 12 }] : []);
+
+  it("files a new order under our identifier only", async () => {
+    const sumit = fakeSumit({});
+    await createCenterSubscription({ ...BASE, singleUseToken: "tok_1" });
+
+    expect(sumit.charges).toHaveLength(1);
+    expect(sumit.charges[0].SearchMode).toBe(2);
+    expect(sumit.charges[0].ExternalIdentifier).toBe("center:under-test");
+    // The payer's details still go along: they are printed on the invoice.
+    expect(sumit.charges[0].CompanyNumber).toBe("512345678");
+  });
+
+  it("falls back to the automatic search once when Sumit refuses, so a signup never fails on the lookup", async () => {
+    const sumit = fakeSumit({ refuseModes: [2] });
+    const result = await createCenterSubscription({ ...BASE, singleUseToken: "tok_1" });
+
+    expect(sumit.charges.map((c) => c.SearchMode)).toEqual([2, 0]);
+    expect(result.RecurringItemID).toBe(555);
+  });
+
+  it("does not search wider for a saved card: that would charge someone else's", async () => {
+    const sumit = fakeSumit({ refuseModes: [2] });
+    await expect(createCenterSubscription({ ...BASE, firstChargeDate: "2026-11-04" })).rejects.toThrow(/refused/);
+    expect(sumit.charges).toHaveLength(1);
+  });
+
+  it("finds the order under the payer's details, company number first", async () => {
+    const sumit = fakeSumit({ ordersUnder: underCompanyNumber });
+    const hit = await findRecurringUnderPayerDetails("2451709342", { email: "office@example.org", companyNumber: "512345678" });
+
+    expect(hit?.item.ID).toBe(2451709342);
+    expect(hit?.matchedBy).toBe("company_number");
+    expect(sumit.lists).toHaveLength(1);
+  });
+
+  it("tries email and phone in turn, and skips details it does not have", async () => {
+    const sumit = fakeSumit({ ordersUnder: (c) => (c.SearchMode === 5 ? [{ ID: 9, Status: 0 }] : []) });
+    const hit = await findRecurringUnderPayerDetails(9, { email: "office@example.org", phone: "0501234567", companyNumber: "" });
+
+    expect(hit?.matchedBy).toBe("phone");
+    expect(sumit.lists.map((c) => c.SearchMode)).toEqual([6, 5]);
+  });
+
+  it("answers null when no customer holds the order", async () => {
+    fakeSumit({ ordersUnder: () => [{ ID: 1, Status: 0 }] });
+    expect(await findRecurringUnderPayerDetails(2451709342, { email: "office@example.org", companyNumber: "512345678" })).toBeNull();
+  });
+
+  it("stopping the centre cancels the order where it is, and verifies it there", async () => {
+    const sumit = fakeSumit({ ordersUnder: underCompanyNumber });
+    const cancelled = await cancelLiveOrdersForCustomer("center:under-test", {
+      recurringItemId: "2451709342",
+      payer: { email: "office@example.org", companyNumber: "512345678" },
+    });
+
+    expect(cancelled).toEqual([2451709342]);
+    expect(sumit.cancels).toEqual([{ customer: { CompanyNumber: "512345678", SearchMode: 4 }, id: 2451709342 }]);
+  });
+
+  it("fails when the cancel under the other customer does not take effect", async () => {
+    fakeSumit({ ordersUnder: underCompanyNumber, stuck: true });
+    await expect(
+      cancelLiveOrdersForCustomer("center:under-test", { recurringItemId: 2451709342, payer: { companyNumber: "512345678" } }),
+    ).rejects.toThrow(/did not take effect.*2451709342/);
+  });
+
+  it("does not look further when our identifier already sees the recorded order", async () => {
+    const sumit = fakeSumit({ ordersUnder: (c) => (c.ExternalIdentifier === "center:under-test" ? [{ ID: 5, Status: 1 }] : [{ ID: 5, Status: 0 }]) });
+    expect(await cancelLiveOrdersForCustomer("center:under-test", { recurringItemId: 5, payer: { companyNumber: "512345678" } })).toEqual([]);
+    expect(sumit.lists).toHaveLength(1);
   });
 });

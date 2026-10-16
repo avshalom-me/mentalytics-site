@@ -4,6 +4,7 @@ import { timingSafeEqual } from "crypto";
 import { Resend } from "resend";
 import {
   listRecurringForCustomer,
+  findRecurringUnderPayerDetails,
   cancelSubscription,
   updateRecurringPrice,
   SUBSCRIPTION_BASE_PRICE,
@@ -103,6 +104,62 @@ async function alertAdminUnknownStatus(
   } catch (e) {
     console.error("alertAdminUnknownStatus: failed to send admin email:", e);
     return false;
+  }
+}
+
+// ההוראה הרשומה אצלנו לא נמצאה לפי המזהה שלנו ב-Sumit, ונמצאה תחת לקוח אחר
+// לפי פרטי המשלם (findRecurringUnderPayerDetails). לא משנים דבר: ההוראה חיה
+// או מתה לפי הסטטוס שלה, כמו כל הוראה. ההתראה היא כי עד שהלקוח ב-Sumit מקבל
+// את המזהה שלנו, פעולות אדמין שמחפשות לפיו (שינוי מחיר, חידוש מהכרטיס השמור,
+// מתנת שימור, ביטול מטפל) לא ימצאו אותה וייכשלו.
+// מרכז: פעם אחת (sumit_foreign_customer_at, הקורא בודק). מטפל: אחת לשבוע.
+const FOREIGN_MATCH_LABEL = { company_number: "ח.פ / ע.מ", email: "כתובת המייל", phone: "הטלפון" } as const;
+
+async function alertAdminForeignCustomer(o: {
+  kind: "center" | "therapist";
+  id: string;
+  name: string;
+  recurringItemId: string;
+  matchedBy: keyof typeof FOREIGN_MATCH_LABEL;
+  status: number;
+}): Promise<void> {
+  if (o.kind === "therapist") {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: recent } = await supabase
+      .from("therapist_audit_log")
+      .select("id")
+      .eq("therapist_id", o.id)
+      .eq("action", "sumit_foreign_customer")
+      .gte("created_at", weekAgo)
+      .limit(1)
+      .maybeSingle();
+    await writeAudit(supabase, {
+      therapistId: o.id,
+      actorType: "sumit",
+      action: "sumit_foreign_customer",
+      before: null,
+      after: { sumit_recurring: o.recurringItemId, sumit_status: o.status, matched_by: o.matchedBy },
+      reason: "standing order filed under another Sumit customer",
+    });
+    if (recent) return;
+  }
+  const who = o.kind === "center" ? "המרכז" : "המטפל/ת";
+  const idLabel = o.kind === "center" ? "center_id" : "therapist_id";
+  const ourId = o.kind === "center" ? `center:${o.id}` : o.id;
+  try {
+    await resend.emails.send({
+      from: "טיפול חכם <noreply@mentalytics.co.il>",
+      to: ALERT_TO,
+      subject: `🔎 הוראת הקבע של "${o.name}" רשומה ב-Sumit תחת לקוח אחר`,
+      html: `<div dir="rtl" style="font-family:Arial,sans-serif;line-height:1.7;">
+        <p>הסנכרון היומי לא מצא את הוראת הקבע של ${who} <strong>${o.name.replace(/</g, "&lt;")}</strong> לפי המזהה שלנו ב-Sumit, ומצא אותה תחת לקוח אחר ב-Sumit, לפי ${FOREIGN_MATCH_LABEL[o.matchedBy]} של המשלם.</p>
+        <p><strong>לא בוצע שום שינוי.</strong> ההוראה נבדקת כרגיל (סטטוס עכשיו: ${o.status}; 0 = פעילה, 12 = מתוזמנת), ו${who} לא יועבר לארכיון בגלל זה.</p>
+        <p>מה לעשות: ב-Sumit, בכרטיס הלקוח שתחתיו רשומה ההוראה, למלא בשדה "מזהה חיצוני" את הערך <strong dir="ltr">${ourId}</strong>. עד אז שינוי מחיר, חידוש מהכרטיס השמור ומתנת שימור מהאדמין לא יגיעו להוראה הזו.</p>
+        <p><strong>${idLabel}:</strong> ${o.id}<br/><strong>מזהה הוראת קבע:</strong> ${o.recurringItemId}</p>
+      </div>`,
+    });
+  } catch (e) {
+    console.error("alertAdminForeignCustomer: failed to send admin email:", e);
   }
 }
 
@@ -338,6 +395,7 @@ export async function GET(req: NextRequest) {
   let unknownStatusAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
   let duplicateOrdersFound = 0; // מטפלים עם יותר מהוראת קבע חיה אחת
   let duplicateOrderAlerts = 0; // מתוכם, כמה הפכו למייל לאדמין
+  let underForeignCustomer = 0; // מטפלים שההוראה שלהם רשומה תחת לקוח Sumit אחר
 
   // -------- (1) Sumit subscription state for paid therapists --------
   // 'gift_trial' נכלל לצד 'paid': מטפל שהצטרף במסלול ההזמנה הוא לקוח משלם
@@ -345,7 +403,7 @@ export async function GET(req: NextRequest) {
   // אחרי שיבטל ב-Sumit. הדילוג בזמן חלון המתנה נעשה בתוך הלולאה.
   const { data: paidTherapists } = await supabase
     .from("therapists")
-    .select("id, full_name, email, admin_approved, promotion_source")
+    .select("id, full_name, email, phone, admin_approved, promotion_source")
     .eq("status", "paying")
     .in("promotion_source", ["paid", "gift_trial"]);
 
@@ -378,9 +436,31 @@ export async function GET(req: NextRequest) {
         .eq("status", "active")
         .maybeSingle();
 
-      const target = sub?.morning_token_id
+      let target = sub?.morning_token_id
         ? items.find((i) => String(i.ID) === sub.morning_token_id)
         : items.sort((a, b) => Number(b.ID) - Number(a.ID))[0];
+
+      // כמו בסעיף (5): הוראה שנרשמה ב-Sumit תחת לקוח ותיק אחר נמצאת לפי
+      // פרטי המטפל, ואז הסטטוס שלה קובע. בלי זה שתי ריצות היו מורידות מטפל
+      // שמשלם. ההתראה אחת לשבוע, דרך יומן המטפל.
+      if (!target && sub?.morning_token_id) {
+        const foreign = await findRecurringUnderPayerDetails(sub.morning_token_id, {
+          email: t.email,
+          phone: t.phone,
+        });
+        if (foreign) {
+          target = foreign.item;
+          underForeignCustomer++;
+          await alertAdminForeignCustomer({
+            kind: "therapist",
+            id: t.id,
+            name: t.full_name ?? "",
+            recurringItemId: sub.morning_token_id,
+            matchedBy: foreign.matchedBy,
+            status: Number(foreign.item.Status),
+          });
+        }
+      }
 
       // גלאי חיוב כפול. רץ לפני כל שאר ההחלטות ואינו משנה אף אחת מהן - מטפל
       // עם שתי הוראות חיות הוא עדיין מטפל תקין מבחינת הסטטוס, ולכן בלי
@@ -826,9 +906,10 @@ export async function GET(req: NextRequest) {
   let centerTherapistsDemoted = 0;
   let centerChargesRecorded = 0;
   let centerOrphansFound = 0;
+  let centersUnderForeignCustomer = 0;
   const { data: activeCenters } = await supabase
     .from("therapy_center_accounts")
-    .select("id, name, sumit_recurring_id, sumit_miss_count, last_billed_on, agreed_monthly_price, billing_track, payer_email")
+    .select("id, name, sumit_recurring_id, sumit_miss_count, last_billed_on, agreed_monthly_price, billing_track, payer_email, payer_phone, payer_company_number, sumit_foreign_customer_at")
     .eq("status", "active")
     .not("sumit_recurring_id", "is", null);
 
@@ -839,7 +920,41 @@ export async function GET(req: NextRequest) {
         externalIdentifier: `center:${c.id}`,
         includeInactive: true,
       });
-      const ours = items.find((i) => Number(i.ID) === Number(c.sumit_recurring_id));
+      let ours = items.find((i) => Number(i.ID) === Number(c.sumit_recurring_id));
+
+      // הוראה שלא נמצאה לפי המזהה שלנו אולי רשומה ב-Sumit תחת לקוח ותיק אחר,
+      // שנמצא לפי פרטי המשלם (findRecurringUnderPayerDetails). כך נגנז ב-15/10
+      // מרכז משלם. נמצאה כך = ההוראה קיימת, והסטטוס שלה קובע כרגיל. מתריעים
+      // פעם אחת: עד שמתקנים את הלקוח ב-Sumit, כל פעולה מהאדמין שמחפשת לפי
+      // המזהה שלנו (שינוי מחיר, חידוש מהכרטיס השמור) לא תגיע אליה.
+      if (!ours) {
+        const foreign = await findRecurringUnderPayerDetails(c.sumit_recurring_id, {
+          email: c.payer_email,
+          phone: c.payer_phone,
+          companyNumber: c.payer_company_number,
+        });
+        if (foreign) {
+          ours = foreign.item;
+          centersUnderForeignCustomer++;
+          if (!c.sumit_foreign_customer_at) {
+            await alertAdminForeignCustomer({
+              kind: "center",
+              id: c.id as string,
+              name: c.name ?? "",
+              recurringItemId: String(c.sumit_recurring_id),
+              matchedBy: foreign.matchedBy,
+              status: Number(foreign.item.Status),
+            });
+            await supabase
+              .from("therapy_center_accounts")
+              .update({ sumit_foreign_customer_at: new Date().toISOString() })
+              .eq("id", c.id);
+          }
+        }
+      } else if (c.sumit_foreign_customer_at) {
+        // הלקוח תוקן ב-Sumit: ההוראה נמצאת שוב לפי המזהה שלנו.
+        await supabase.from("therapy_center_accounts").update({ sumit_foreign_customer_at: null }).eq("id", c.id);
+      }
 
       // (א) מראה מקומית לחיובים החוזרים. ל-Sumit אין webhooks, ולכן בלי זה
       // מרכז שמשלם כל חודש מופיע אצלנו כשורת תשלום אחת לכל היותר - וההכנסה
@@ -1098,11 +1213,13 @@ export async function GET(req: NextRequest) {
     unknownStatusAlerts,
     duplicateOrdersFound,
     duplicateOrderAlerts,
+    underForeignCustomer,
     centersChecked,
     centersCancelled,
     centerTherapistsDemoted,
     centerChargesRecorded,
     centerOrphansFound,
+    centersUnderForeignCustomer,
     centerGiftsEnded,
     documentsSynced,
     errors,
