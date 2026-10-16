@@ -40,6 +40,13 @@ describe("the gift offer email", () => {
     expect(html).toContain("<strong>חשוב</strong>");
   });
 
+  it("states the reduced months after the gift and that leaving at its end costs nothing", () => {
+    const html = buildGiftOfferEmailHtml({ message: BODY, joinUrl: JOIN })!;
+    expect(html).toContain('אחריהם 2 חודשים ב-70 ש"ח + מע"מ לחודש');
+    expect(html).toContain('המחיר המלא - 140 ש"ח + מע"מ לחודש');
+    expect(html).toContain("כולל מיד בסוף תקופת המתנה, ואז אין חיוב כלל");
+  });
+
   it("refuses an empty body", () => {
     expect(buildGiftOfferEmailHtml({ message: "  " })).toBeNull();
   });

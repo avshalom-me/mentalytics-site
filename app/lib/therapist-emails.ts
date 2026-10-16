@@ -7,6 +7,7 @@ import { alertRecipients } from "./alert-recipients";
 import { promotedPlanTable } from "./promoted-plan-table";
 import { linkifyEscapedText } from "./linkify";
 import { SUBSCRIPTION_BASE_PRICE } from "./sumit";
+import { GIFT_FOLLOWON_MONTHS, GIFT_FOLLOWON_PRICE } from "./promo";
 import {
   isPromoActive,
   SUBSCRIPTION_PROMO_PRICE,
@@ -1046,7 +1047,9 @@ export function buildGiftOfferEmailHtml(opts: {
       ${joinButton}
       <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל המסלול המקודם - לעומת המסלול החינמי שיש לך היום</p>
       ${promotedPlanTable(
-        'המסלול המקודם עולה 140 ש"ח + מע"מ לחודש, והחודשיים הראשונים ללא תשלום. ביטול בכל שלב בהודעת מייל אלינו.' +
+        // עד 16/10/2026 המשפט הזה דילג על מדרגת ההמשך ואמר רק "140, והחודשיים
+        // הראשונים ללא תשלום", בעוד שגוף ההצעה פירט את החודשיים המוזלים.
+        `במסלול המתנה החודשיים הראשונים ללא תשלום, אחריהם ${GIFT_FOLLOWON_MONTHS} חודשים ב-${GIFT_FOLLOWON_PRICE} ש"ח + מע"מ לחודש, ורק לאחר מכן המחיר המלא - ${SUBSCRIPTION_BASE_PRICE} ש"ח + מע"מ לחודש. אפשר לצאת בכל שלב בהודעת מייל אלינו, כולל מיד בסוף תקופת המתנה, ואז אין חיוב כלל.` +
           (deadline ? ` ההצעה תקפה עד ${deadline}, ואחריו הקישור נסגר.` : "")
       )}
       <hr style="border:0;border-top:1px solid #E8E0D8;margin:24px 0;" />
