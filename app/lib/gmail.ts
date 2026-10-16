@@ -2,6 +2,7 @@ import "server-only";
 import { randomBytes } from "crypto";
 import { dropRepeatedClosing } from "./email-signature";
 import { splitQuoted, stripQuoted } from "./email-quote";
+import { linkifyEscapedText } from "./linkify";
 
 // לקוח Gmail לתיבת admin@getmentalytics.com, במסלול OAuth פנימי של
 // Workspace - אותו דפוס בדיוק כמו GOOGLE_ADS_REFRESH_TOKEN: אפליקציה
@@ -437,7 +438,9 @@ function escapeHtmlText(str: string): string {
 function rtlHtmlBody(text: string): string {
   // בלי תו שורה אחרי ה-<br>: תחת pre-wrap גם הוא נספר כשבירה, וכל שורה
   // בתשובה הייתה יוצאת מוכפלת.
-  const safe = escapeHtmlText(text).replace(/\r?\n/g, "<br>");
+  // כתובות אתר הופכות לקישורים אמיתיים: באאוטלוק טקסט של כתובת לא נלחץ
+  // (16/10/2026, קישור הצטרפות שלא נפתח - ראו app/lib/linkify.ts).
+  const safe = linkifyEscapedText(escapeHtmlText(text)).replace(/\r?\n/g, "<br>");
   return [
     '<div dir="rtl" style="direction:rtl;text-align:right;unicode-bidi:plaintext;',
     "white-space:pre-wrap;font-family:'Heebo',Arial,sans-serif;font-size:15px;",

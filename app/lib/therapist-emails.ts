@@ -5,6 +5,7 @@ import { buildProfileFeedbackHtml, type ProfileForFeedback } from "./profile-fee
 import { buildArticleInviteEmail } from "./article-invite-email";
 import { alertRecipients } from "./alert-recipients";
 import { promotedPlanTable } from "./promoted-plan-table";
+import { linkifyEscapedText } from "./linkify";
 import { SUBSCRIPTION_BASE_PRICE } from "./sumit";
 import {
   isPromoActive,
@@ -978,26 +979,55 @@ export async function sendGiftOfferEmail(opts: {
   message: string;
   /** מתי הקישור נסגר. מוצג ליד טבלת התנאים, לא רק בגוף המכתב. */
   expiresAt?: string;
+  /**
+   * הקישור האישי להצטרפות. מוצג ככפתור מתחת לגוף המכתב. עד 16/10/2026 הוא
+   * הופיע רק כטקסט בתוך הגוף, ובאאוטלוק לא היה לחיץ - הקישור הלחיץ היחיד
+   * במייל היה לאזור האישי, ושם אין הצעת מתנה.
+   */
+  joinUrl?: string;
 }): Promise<{ ok: boolean; error?: string }> {
+  const html = buildGiftOfferEmailHtml(opts);
   if (!process.env.RESEND_API_KEY) {
     console.warn("sendGiftOfferEmail: RESEND_API_KEY not configured, skipping");
     return { ok: false, error: "resend not configured" };
   }
-  if (!opts.message?.trim()) {
+  if (!html) {
     return { ok: false, error: "empty message" };
   }
 
   const subject = opts.subject?.trim() || "הצעת קידום במתנה - טיפול חכם";
-  // הטיוטה כוללת את פנייתה ("שלום X,") ואת החתימה, ולכן היא נכנסת כגוש אחד
-  // ולא נעטפת שוב בשלום/חתימה של המעטפת.
-  // הטיוטה נכנסת כטקסט ולכן עוברת escape. אחריו - ורק אחריו - מותר סימון
-  // הדגשה אחד: **טקסט** הופך ל-<strong>. הסדר הזה הוא מה שהופך את זה לבטוח
-  // (התוכן כבר נוטרל, ו-** אינו תו HTML), והוא מאפשר לאדמין להדגיש שורה
-  // בטיוטה בלי לכתוב HTML. שורת התזכורת לפני החיוב הראשון מסומנת כך.
-  const safeMessage = escapeHtml(opts.message.trim()).replace(
+  const r = await sendBulkEmail({
+    from: FROM,
+    to: opts.to,
+    subject,
+    html,
+    replyTo: "admin@getmentalytics.com",
+  });
+  if (!r.ok && !r.skipped) console.error("sendGiftOfferEmail: send error:", r.error);
+  return { ok: r.ok, error: r.error };
+}
+
+/** ה-HTML של הצעת המתנה, בלי שליחה - כדי שאפשר יהיה לבדוק אותו. null כשהגוף ריק. */
+export function buildGiftOfferEmailHtml(opts: {
+  message: string;
+  expiresAt?: string;
+  joinUrl?: string;
+}): string | null {
+  if (!opts.message?.trim()) return null;
+  // הגוף עובר escape, ואחריו כתובות האתר שבו הופכות לקישורים אמיתיים (גם
+  // הקישור האישי, כשהוא כתוב בגוף), וסימון ההדגשה **טקסט** הופך ל-<strong>.
+  const safeMessage = linkifyEscapedText(escapeHtml(opts.message.trim())).replace(
     /\*\*([^*\n]+)\*\*/g,
     "<strong>$1</strong>"
   );
+  // הכפתור הוא הדרך הראשית להצטרף. הוא מופיע מיד אחרי הגוף, לפני טבלת
+  // ההשוואה והרבה לפני הקישור המשני לאזור האישי, כדי ששום קישור אחר לא
+  // ייראה כמו "הקישור".
+  const joinButton = opts.joinUrl
+    ? `<div style="text-align:center;margin:0 0 22px;">
+        <a href="${escapeHtml(opts.joinUrl)}" style="display:inline-block;background-color:#0F5468;background-image:linear-gradient(135deg,#0F5468,#1A7A96);color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 34px;border-radius:50px;">להצטרפות במסלול המתנה ←</a>
+      </div>`
+    : "";
   const profileUrl = `${SITE_URL}/therapists/dashboard`;
   const deadline = opts.expiresAt
     ? new Date(opts.expiresAt).toLocaleDateString("he-IL", {
@@ -1007,12 +1037,13 @@ export async function sendGiftOfferEmail(opts: {
       })
     : "";
 
-  const html = `<!doctype html>
+  return `<!doctype html>
 <html dir="rtl" lang="he">
   <body dir="rtl" style="font-family:'Heebo',Arial,sans-serif;background:#F7F4EF;margin:0;padding:24px;direction:rtl;">
     <div dir="rtl" style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #E8E0D8;border-radius:14px;padding:28px;line-height:1.7;color:#1a4a5c;direction:rtl;text-align:right;">
       ${EMAIL_LOGO_HEADER}
       <div style="white-space:pre-line;margin:0 0 22px;font-size:15px;color:#1a4a5c;">${safeMessage}</div>
+      ${joinButton}
       <p style="margin:0 0 10px;font-size:15px;font-weight:bold;color:#0F5468;">מה כולל המסלול המקודם - לעומת המסלול החינמי שיש לך היום</p>
       ${promotedPlanTable(
         'המסלול המקודם עולה 140 ש"ח + מע"מ לחודש, והחודשיים הראשונים ללא תשלום. ביטול בכל שלב בהודעת מייל אלינו.' +
@@ -1029,14 +1060,4 @@ export async function sendGiftOfferEmail(opts: {
     </div>
   </body>
 </html>`;
-
-  const r = await sendBulkEmail({
-    from: FROM,
-    to: opts.to,
-    subject,
-    html,
-    replyTo: "admin@getmentalytics.com",
-  });
-  if (!r.ok && !r.skipped) console.error("sendGiftOfferEmail: send error:", r.error);
-  return { ok: r.ok, error: r.error };
 }

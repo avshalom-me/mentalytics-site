@@ -190,6 +190,8 @@ export async function sendGiftOffer(opts: {
     subject,
     message: bodyFinal,
     expiresAt: offerExpiresAt,
+    // כפתור הצטרפות אמיתי - ראו sendGiftOfferEmail.
+    joinUrl,
   });
   if (!sent.ok) {
     // המייל לא יצא - ההצעה נשארת ממתינה בתור כדי שאפשר יהיה לנסות שוב.

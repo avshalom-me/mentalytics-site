@@ -160,6 +160,18 @@ describe("sendGmailReply signature", () => {
     expect(html).toContain(logoOnly);
   });
 
+  // A link in a reply was plain text in the HTML part, and Outlook does not make
+  // that clickable (16/10/2026). The plain-text part keeps the bare address.
+  it("makes a web address in the reply a real link in the HTML part", async () => {
+    sendAs = [{ sendAsEmail: "admin@getmentalytics.com", signature: "", isDefault: true }];
+    const link = "https://www.mentalytics.co.il/therapists/gift-checkout?token=AbC-12_xYz";
+    await sendGmailReply({ ...reply, body: `שלום,\nהקישור:\n${link}\n\nבברכה,\nצוות טיפול חכם` });
+    const { text, html } = parts(sentRaw!);
+    expect(html).toContain(`<a href="${link}"`);
+    expect(text).toContain(link);
+    expect(text).not.toContain("<a ");
+  });
+
   it("still sends the reply when the signature cannot be read", async () => {
     sendAs = "fail";
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
