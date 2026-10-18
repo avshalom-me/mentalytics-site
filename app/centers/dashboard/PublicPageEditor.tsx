@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
 import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
+import { downscaleImageForUpload, centerUploadErrorMessage, CENTER_UPLOAD_NETWORK_MESSAGE } from "@/app/lib/center-image-upload";
 
 // עורך העמוד הציבורי של המרכז - קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
 // תרנדר את הדף המארח). מוצגת בעמוד העריכה /centers/dashboard/profile.
@@ -108,15 +109,23 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
   async function uploadCenterImage(file: File, kind: "center_image" | "center_gallery"): Promise<string | null> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { window.location.href = "/centers/login"; return null; }
+    // תמונה מהטלפון עוברת את מגבלת 4.5MB של Vercel - ראו center-image-upload.ts.
+    const toSend = await downscaleImageForUpload(file, kind === "center_gallery" ? 1600 : 1200);
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", toSend);
     fd.append("type", kind);
-    const res = await fetch("/api/center-portal/upload", {
-      method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body: fd,
-    });
-    const json = await res.json();
-    if (!json.ok) { setErr(json.error ?? "העלאת התמונה נכשלה"); return null; }
-    return json.path as string;
+    try {
+      const res = await fetch("/api/center-portal/upload", {
+        method: "POST", headers: { Authorization: `Bearer ${session.access_token}` }, body: fd,
+      });
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok) return json.path as string;
+      setErr(centerUploadErrorMessage(res.status, json?.error));
+      return null;
+    } catch {
+      setErr(CENTER_UPLOAD_NETWORK_MESSAGE);
+      return null;
+    }
   }
 
   async function onLogoFile(file: File | null) {

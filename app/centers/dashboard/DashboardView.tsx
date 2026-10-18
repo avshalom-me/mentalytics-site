@@ -114,6 +114,26 @@ function blockers(t: TherapistItem) {
   );
 }
 
+// "צפייה בתור מרכז" באדמין: עמודי העריכה של הפורטל נפתחים לפי חשבון המרכז
+// שמחובר לדפדפן. אצל הבעלים זה מרכז הניסיון שלו, ולכן קישור עריכה מהתצוגה
+// פתח מרכז אחר בלי שום סימן (18/10/2026). בתצוגה מוצגת במקומו הדרך באדמין.
+function PreviewEditNote({ entityId }: { entityId?: string | null }) {
+  return (
+    <>
+      {entityId && (
+        <Link href={`/admin/therapists?therapist=${entityId}`}
+          className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
+          style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+          ✏️ פרופיל ההתאמה - עריכה באדמין
+        </Link>
+      )}
+      <span className="text-xs leading-5 text-stone-500">
+        את טקסט העמוד הציבורי עורכים באדמין, ב&quot;עריכת פרטים&quot; בכרטיס המרכז. תמונות, צוות ושאלות נפוצות נערכים רק מהחשבון של המרכז.
+      </span>
+    </>
+  );
+}
+
 // התצוגה של פורטל המרכז, מופרדת מטעינת הנתונים (7/9/2026). שני קוראים:
 // הפורטל עצמו, ו-"צפייה בתור מרכז" באדמין. preview=true מסתיר את הפעולות
 // (התנתקות, עריכה, הוספת מטפל) - הן שייכות לבעל החשבון, לא לצופה.
@@ -222,7 +242,7 @@ export default function CenterDashboardView({ data, preview = false, justCreated
             המרכז עדיין <strong>לא יופיע בהתאמות</strong> - מערכת ההתאמות משדכת מטופלים לפי
             תחומי הטיפול, קבוצות הגיל, השפות והאזורים שתסמנו. זה לוקח כ-3 דקות.
           </p>
-          <Link href={`/centers/dashboard/therapists/${center.entity.id}`}
+          <Link href={preview ? `/admin/therapists?therapist=${center.entity.id}` : `/centers/dashboard/therapists/${center.entity.id}`}
             className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
             style={{ background: "linear-gradient(135deg,#b45309,#d97706)" }}>
             ✏️ לסימון סוגי הטיפול עכשיו
@@ -238,11 +258,13 @@ export default function CenterDashboardView({ data, preview = false, justCreated
             המרכז מוצג כרובריקה אחת (&quot;מרכז טיפולי&quot;) במערכת ההתאמות, ולצדה עמוד ציבורי עם הלוגו, הצוות והתמונות. כל השינויים והעריכות - בלחיצה אחת:
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/centers/dashboard/profile"
-              className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
-              style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
-              ✏️ עריכת הפרופיל והעמוד הציבורי
-            </Link>
+            {preview ? <PreviewEditNote entityId={center.entity?.id} /> : (
+              <Link href="/centers/dashboard/profile"
+                className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
+                style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+                ✏️ עריכת הפרופיל והעמוד הציבורי
+              </Link>
+            )}
             {center.public_page.slug && (
               <a href={`/centers/${center.public_page.slug}`} target="_blank"
                 className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">
@@ -286,7 +308,7 @@ export default function CenterDashboardView({ data, preview = false, justCreated
               </span>
             )}
           </h2>
-          {center.status === "active" && (
+          {!preview && center.status === "active" && (
             center.therapist_quota > 0 && center.linked_count >= center.therapist_quota ? (
               <span className="rounded-full border border-stone-200 bg-stone-50 px-4 py-1.5 text-xs text-stone-500"
                 title="כל מקומות המנוי בשימוש - להרחבה פנו אלינו">
@@ -353,7 +375,7 @@ export default function CenterDashboardView({ data, preview = false, justCreated
                     <td className="py-2.5 text-center font-bold text-[#2A5C3A]">{t.month_clicks}</td>
                     <td className="py-2.5 text-center">{blockers(t)}</td>
                     <td className="py-2.5 text-left whitespace-nowrap">
-                      <Link href={`/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline me-3">
+                      <Link href={preview ? `/admin/therapists?therapist=${t.id}` : `/centers/dashboard/therapists/${t.id}`} className="inline-flex items-center gap-1 text-xs font-semibold text-stone-600 hover:underline me-3">
                         ✏️ עריכה
                       </Link>
                       <Link href={t.profile_path} target="_blank" className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--teal)] hover:underline">
@@ -384,11 +406,13 @@ export default function CenterDashboardView({ data, preview = false, justCreated
             עמוד ציבורי מקודם בגוגל עם הלוגו, המידע על המרכז, הצוות המוביל ותמונות המרכז.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <Link href="/centers/dashboard/profile"
-              className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
-              style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
-              ✏️ עריכת העמוד והפרטים
-            </Link>
+            {preview ? <PreviewEditNote /> : (
+              <Link href="/centers/dashboard/profile"
+                className="inline-block rounded-full px-5 py-2 text-sm font-bold text-white transition hover:opacity-95"
+                style={{ background: "linear-gradient(135deg,var(--teal-dark),var(--teal))" }}>
+                ✏️ עריכת העמוד והפרטים
+              </Link>
+            )}
             {center.public_page.slug && (
               <a href={`/centers/${center.public_page.slug}`} target="_blank"
                 className="inline-flex items-center gap-1 rounded-full border border-stone-300 bg-white px-4 py-2 text-sm font-semibold text-stone-600 hover:bg-stone-50">

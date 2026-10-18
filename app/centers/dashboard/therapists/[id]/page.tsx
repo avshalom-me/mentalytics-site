@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { parsePriceInput } from "@/app/lib/price-input";
+import { downscaleImageForUpload, centerUploadErrorMessage, CENTER_UPLOAD_NETWORK_MESSAGE } from "@/app/lib/center-image-upload";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 // טופס פרופיל מטפל בפורטל המרכז - יצירה ('new') או עריכה (UUID). הפרופיל
@@ -167,8 +168,10 @@ export default function CenterTherapistFormPage() {
   }, [therapistId]);
 
   async function uploadFile(file: File, type: "photo" | "certificate", id: string, accessToken: string): Promise<string | null> {
+    // תמונה מהטלפון עוברת את מגבלת 4.5MB של Vercel - ראו center-image-upload.ts.
+    const toSend = type === "photo" ? await downscaleImageForUpload(file, 1200) : file;
     const fd = new FormData();
-    fd.append("file", file);
+    fd.append("file", toSend);
     fd.append("type", type);
     fd.append("therapist_id", id);
     try {
@@ -177,10 +180,16 @@ export default function CenterTherapistFormPage() {
         headers: { Authorization: `Bearer ${accessToken}` },
         body: fd,
       });
-      const json = await res.json();
-      return json.ok ? null : (json.error ?? "העלאה נכשלה");
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok) return null;
+      if (type === "certificate") {
+        return res.status === 413
+          ? "הקובץ גדול מדי להעלאה - אפשר לסרוק בגודל קטן יותר (עד 4MB)"
+          : (typeof json?.error === "string" ? json.error : `העלאה נכשלה (שגיאה ${res.status})`);
+      }
+      return centerUploadErrorMessage(res.status, json?.error);
     } catch {
-      return "העלאה נכשלה";
+      return CENTER_UPLOAD_NETWORK_MESSAGE;
     }
   }
 
