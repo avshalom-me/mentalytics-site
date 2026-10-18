@@ -13,6 +13,10 @@ import {
 import RegionCityPicker from "@/app/components/RegionCityPicker";
 import { parsePriceInput } from "@/app/lib/price-input";
 import { downscaleImageForUpload, centerUploadErrorMessage, CENTER_UPLOAD_NETWORK_MESSAGE } from "@/app/lib/center-image-upload";
+import {
+  centerFormDraftKey, readFormDraft, writeFormDraft, clearFormDraft,
+  centerFormSaveErrorMessage, CENTER_FORM_SAVE_NETWORK_MESSAGE,
+} from "@/app/lib/center-form-draft";
 import { ArrowRight, Loader2 } from "lucide-react";
 
 // טופס פרופיל מטפל בפורטל המרכז - יצירה ('new') או עריכה (UUID). הפרופיל
@@ -84,6 +88,11 @@ export default function CenterTherapistFormPage() {
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [existingCerts, setExistingCerts] = useState<Array<{ id: string; original_name: string; signed_url: string | null }>>([]);
+  // מה ששמור בשרת (JSON של הטופס), כדי לדעת מתי יש שינוי שעוד לא נשמר -
+  // ראו center-form-draft.ts. null עד שהטעינה מסתיימת.
+  const [savedSnapshot, setSavedSnapshot] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
+  const draftKey = centerFormDraftKey(params.id);
 
   const [form, setForm] = useState({
     full_name: "", email: "", phone: "", bio: "", gender: "", online: false,
@@ -104,6 +113,27 @@ export default function CenterTherapistFormPage() {
     accepting_new_patients: true,
   });
 
+  // מה שנטען מהשרת נכנס לטופס, ואם בדפדפן הזה יש טיוטה שלא נשמרה - היא גוברת.
+  function applyLoaded(loaded: typeof form) {
+    setSavedSnapshot(JSON.stringify(loaded));
+    const draft = readFormDraft<Partial<typeof form>>(draftKey);
+    const merged = draft ? { ...loaded, ...draft } : loaded;
+    if (draft && JSON.stringify(merged) !== JSON.stringify(loaded)) {
+      setForm(merged);
+      setDraftRestored(true);
+    } else {
+      setForm(loaded);
+      if (draft) clearFormDraft(draftKey);
+    }
+  }
+
+  // כל שינוי שעוד לא נשמר בשרת נשמר גם בדפדפן (ראו center-form-draft.ts).
+  useEffect(() => {
+    if (savedSnapshot === null) return;
+    if (JSON.stringify(form) === savedSnapshot) clearFormDraft(draftKey);
+    else writeFormDraft(draftKey, form);
+  }, [form, savedSnapshot, draftKey]);
+
   useEffect(() => {
     (async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -113,6 +143,7 @@ export default function CenterTherapistFormPage() {
       }
       setToken(session.access_token);
       if (!therapistId) {
+        applyLoaded(form);
         setLoading(false);
         return;
       }
@@ -130,7 +161,7 @@ export default function CenterTherapistFormPage() {
           setNumLocations(Math.max(1, Math.floor(Number(json.numLocations) || 1)));
           setProfilePhotoUrl(json.photoUrl ?? null);
           setExistingCerts(json.certificates ?? []);
-          setForm({
+          applyLoaded({
             full_name: t.full_name ?? "",
             email: t.email ?? "",
             phone: t.phone ?? "",
@@ -226,18 +257,31 @@ export default function CenterTherapistFormPage() {
       price: priceCheck.value,
     };
 
-    const res = await fetch("/api/center-portal/therapists", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify(isNew ? { action: "create", ...fields } : { action: "update", id: therapistId, ...fields }),
-    });
-    const json = await res.json();
-    if (!json.ok) {
-      setSaveErr(json.error ?? "שגיאה בשמירה");
+    // תשובה שאינה JSON (413, 504) או בקשה שלא יצאה השאירו עד 18/10/2026 את
+    // הכפתור מסתובב בלי הודעה. עכשיו כל כישלון מוסבר, והטיוטה נשארת בדפדפן.
+    let res: Response;
+    try {
+      res = await fetch("/api/center-portal/therapists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify(isNew ? { action: "create", ...fields } : { action: "update", id: therapistId, ...fields }),
+      });
+    } catch {
+      setSaveErr(CENTER_FORM_SAVE_NETWORK_MESSAGE);
+      setSaving(false);
+      return;
+    }
+    const json = await res.json().catch(() => null);
+    if (!res.ok || !json?.ok) {
+      setSaveErr(centerFormSaveErrorMessage(res.status, json?.error));
       setSaving(false);
       return;
     }
     const savedId: string = json.id;
+    // נשמר בשרת - הטיוטה המקומית כבר לא נחוצה.
+    setSavedSnapshot(JSON.stringify(form));
+    clearFormDraft(draftKey);
+    setDraftRestored(false);
 
     // העלאות - best-effort: כשל לא מסתיר את השמירה שהצליחה.
     const uploadIssues: string[] = [];
@@ -307,6 +351,21 @@ export default function CenterTherapistFormPage() {
         </Link>
       </div>
 
+      {draftRestored && (
+        <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-3 text-sm leading-6 text-amber-900">
+          <strong>החזרנו את מה שמילאת כאן ועוד לא נשמר.</strong> כדאי לעבור על הפרטים וללחוץ על &quot;שמירת שינויים&quot; בתחתית.
+          {" "}
+          <button type="button" className="font-bold underline"
+            onClick={() => {
+              if (savedSnapshot) setForm(JSON.parse(savedSnapshot));
+              clearFormDraft(draftKey);
+              setDraftRestored(false);
+            }}>
+            לחזור לפרטים השמורים
+          </button>
+        </div>
+      )}
+
       <form onSubmit={handleSave} className="space-y-5">
         <div className="rounded-2xl border border-[#E8E0D8] bg-white p-6">
           <h2 className="text-lg font-extrabold text-stone-900 mb-5">{isEntity ? "פרטי המרכז" : "פרטים אישיים"}</h2>
@@ -326,7 +385,8 @@ export default function CenterTherapistFormPage() {
                 <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון</label>
                 <p className="rounded-xl border border-dashed border-stone-300 bg-stone-50 px-3 py-2 text-xs leading-5 text-stone-600">
                   המספרים שמטופלים רואים - טלפון לחיוג ווואטסאפ עסקי - נקבעים ב
-                  <Link href="/centers/dashboard/profile" className="font-bold text-[var(--teal-dark)] underline">עורך העמוד הציבורי</Link>.
+                  {/* בחלון חדש: יציאה מהטופס באמצע המילוי איבדה את כל מה שסומן (18/10/2026). */}
+                  <Link href="/centers/dashboard/profile" target="_blank" rel="noopener noreferrer" className="font-bold text-[var(--teal-dark)] underline">עורך העמוד הציבורי</Link>.
                   השדה הזה פנימי ואינו מוצג.
                 </p>
               </div>
@@ -389,8 +449,8 @@ export default function CenterTherapistFormPage() {
               לוגו המרכז וחברי הצוות (שם, תפקיד ותמונה) מנוהלים בעמוד הפרופיל הציבורי של המרכז.
               במרכז טיפולי אין צורך להעלות תעודות רישיון לכל מטפל - הסמכות הצוות מנוהלות אצלכם.
             </p>
-            <Link href="/centers/dashboard" className="mt-3 inline-flex items-center gap-1 text-sm font-bold underline" style={{ color: "var(--teal)" }}>
-              <ArrowRight size={15} /> לניהול הפרופיל הציבורי בפורטל
+            <Link href="/centers/dashboard/profile" target="_blank" rel="noopener noreferrer" className="mt-3 inline-flex items-center gap-1 text-sm font-bold underline" style={{ color: "var(--teal)" }}>
+              <ArrowRight size={15} /> לעורך העמוד הציבורי (בחלון חדש)
             </Link>
           </div>
         ) : (
