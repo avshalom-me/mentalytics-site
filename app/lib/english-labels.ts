@@ -146,6 +146,8 @@ export const EN_THERAPIST_TYPES: Record<string, string> = {
   "פסיכולוג שיקומי/רפואי": "Rehabilitation psychologist",
   "פסיכולוג התפתחותי": "Developmental psychologist",
   "פסיכולוג תעסוקתי": "Occupational psychologist",
+  "פסיכיאטר/ית": "Psychiatrist",
+  "אח/ות מוסמך/ת": "Registered nurse",
   "יועצ/ת חינוכי": "Educational counselor",
   'עו"ס קליני': "Clinical social worker",
   "מטפל/ת בהבעה ויצירה": "Creative arts therapist",
@@ -183,6 +185,8 @@ export const EN_TRAINING_AREAS: Record<string, string> = {
   "טיפול בקשיי תקשורת ASD": "Autism (ASD) communication therapy",
   "טיפול בהפרעות אכילה": "Eating disorders",
   "טיפול באנקופרזיס": "Encopresis",
+  "חוות דעת פסיכיאטרית לילדים ונוער": "Psychiatric evaluation (children and teens)",
+  "חוות דעת פסיכיאטרית למבוגרים": "Psychiatric evaluation (adults)",
   // Legacy values (PLAY_THERAPY_MODALITIES), still on live profiles.
   "טיפול באומנות": "Art therapy",
   "טיפול בתנועה": "Movement therapy",
