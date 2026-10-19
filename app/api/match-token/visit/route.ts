@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
+import { rateLimit, clientIp } from "@/app/lib/rate-limit";
 
 // רישום ביקור אמיתי ברשימת התאמות שמורה, עם מזהה הסשן - ראו המיגרציה
 // 20260918_match_token_visits.sql. נקרא מ-MatchReturnTracker בדפדפן, רק
@@ -8,6 +9,11 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 const TOKEN_RE = /^[A-Za-z0-9_-]{6,32}$/;
 
 export async function POST(req: NextRequest) {
+  // ביקור אמיתי הוא אחד לכל טעינת דף; בלי תקרה, לולאה עם טוקן חי ומזהי סשן
+  // מומצאים ממלאת את הטבלה ומעוותת את מדד החזרות (19/10/2026).
+  if (!rateLimit("match-token-visit", clientIp(req), 30, 60_000).ok) {
+    return NextResponse.json({ ok: false }, { status: 429 });
+  }
   try {
     const body = await req.json().catch(() => null);
     const token = typeof body?.token === "string" ? body.token : "";

@@ -7,7 +7,12 @@ import { NextRequest } from "next/server";
 // them lock the address out for a quarter of an hour, and a site-wide budget
 // of failures locks everyone out for an hour - while the people who type the
 // right code keep clocking in as before.
-const h = vi.hoisted(() => ({ pins: new Map<string, { id: string; full_name: string; active: boolean }>() }));
+const h = vi.hoisted(() => ({
+  pins: new Map<string, { id: string; full_name: string; active: boolean }>(),
+  // The database-side daily counter of wrong codes (daily_counters), which
+  // survives a new instance - unlike the in-memory counters.
+  dailyWrong: 0,
+}));
 
 vi.mock("server-only", () => ({}));
 vi.mock("@/app/lib/supabaseAdmin", () => {
@@ -25,7 +30,12 @@ vi.mock("@/app/lib/supabaseAdmin", () => {
     c.then = (resolve: (v: unknown) => unknown) => Promise.resolve({ data: [], error: null }).then(resolve);
     return c;
   };
-  return { supabaseAdmin: { from: chain } };
+  return {
+    supabaseAdmin: {
+      from: chain,
+      rpc: async (fn: string) => (fn === "bump_daily_counter" ? { data: ++h.dailyWrong, error: null } : { data: null, error: { message: `unexpected rpc ${fn}` } }),
+    },
+  };
 });
 
 import { POST } from "@/app/api/staff-hours/route";
@@ -38,6 +48,7 @@ function post(body: unknown, ip: string) {
 beforeEach(() => {
   resetFailures();
   h.pins.clear();
+  h.dailyWrong = 0;
   // An invented employee; the code is a test value.
   h.pins.set("246810", { id: "s-1", full_name: "פלוני", active: true });
 });
@@ -63,5 +74,16 @@ describe("/api/staff-hours", () => {
     // 30 failures from 30 different addresses (each below its own limit).
     for (let i = 0; i < 30; i++) expect((await post({ action: "status", pin: "0000" }, `10.4.1.${i + 1}`)).status).toBe(401);
     expect((await post({ action: "status", pin: "246810" }, "10.4.9.9")).status).toBe(429);
+  });
+
+  // A guesser spread over cold starts resets every in-memory counter. The
+  // day's budget of wrong codes lives in the database, so a fresh instance
+  // still answers a wrong code with a lock once the budget is spent - while a
+  // correct code keeps working (19/10/2026).
+  it("a day's budget of wrong codes holds across instances", async () => {
+    h.dailyWrong = 60; // spent earlier today, on other instances
+    resetFailures(); // this instance has seen nothing
+    expect((await post({ action: "status", pin: "0000" }, "10.6.0.1")).status).toBe(429);
+    expect((await post({ action: "status", pin: "246810" }, "10.6.0.2")).status).toBe(200);
   });
 });

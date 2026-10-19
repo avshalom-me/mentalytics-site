@@ -1,4 +1,5 @@
 import "server-only";
+import { timingSafeEqual } from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { hasStaffCookie } from "./staff-cookie";
 
@@ -48,7 +49,11 @@ export function getIp(req: { headers: { get(name: string): string | null } }): s
 // AND matches, so a leaked/blank env can never open the gate.
 export function isStaffBypass(token: unknown): boolean {
   const secret = process.env.STAFF_BYPASS_TOKEN;
-  return typeof secret === "string" && secret.length > 0 && token === secret;
+  if (typeof secret !== "string" || secret.length === 0 || typeof token !== "string") return false;
+  // השוואה בזמן קבוע: `===` עוצר בתו הראשון שלא תואם, ומודד את אורך ההתאמה.
+  const a = Buffer.from(token);
+  const b = Buffer.from(secret);
+  return a.length === b.length && timingSafeEqual(a, b);
 }
 
 /**

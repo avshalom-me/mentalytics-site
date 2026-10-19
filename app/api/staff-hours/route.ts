@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { rateLimit, clientIp, tooManyRequests } from "@/app/lib/rate-limit";
 import { lockedOut, recordFailure } from "@/app/lib/failed-attempts";
+import { underDailyCap } from "@/app/lib/daily-cap";
 
 // דיווח שעות לעובדים — API ציבורי המשרת את עמוד הנוכחות /staff.
 // זיהוי בקוד אישי (PIN) בלבד: העובד לא חשוף לנתוני אף אחד אחר, וכל פעולה
@@ -19,6 +20,12 @@ const WRONG_PINS_PER_ADDRESS = 5;
 const ADDRESS_LOCK_MS = 15 * 60_000;
 const WRONG_PINS_SITE_WIDE = 30;
 const SITE_LOCK_MS = 60 * 60_000;
+// המונים למעלה חיים בזיכרון של instance אחד, ומנחש שמפוזר על כמה instances
+// מאפס אותם. התקציב היומי הזה נספר במסד (daily_counters) ולכן מחזיק בכולם:
+// 60 קודים שגויים ביום לכל האתר, ואחריהם כל קוד שגוי נוסף נענה בנעילה. קוד נכון
+// עובר תמיד, כך שעובד/ת שמקליד/ה נכון לא נפגע/ת; 60 ניחושים ביום מול 10,000
+// אפשרויות הם חודשים של עבודה (19/10/2026).
+const WRONG_PINS_PER_DAY = 60;
 
 const LOCKED_MESSAGE = "יותר מדי ניסיונות שגויים - נסו שוב מאוחר יותר";
 
@@ -118,6 +125,9 @@ export async function POST(req: NextRequest) {
   if (!staff) {
     recordFailure("staff-pin", ip, ADDRESS_LOCK_MS);
     recordFailure("staff-pin-all", "all", SITE_LOCK_MS);
+    if (!(await underDailyCap("staff-pin-wrong", WRONG_PINS_PER_DAY))) {
+      return NextResponse.json({ ok: false, error: LOCKED_MESSAGE }, { status: 429 });
+    }
     return NextResponse.json({ ok: false, error: "קוד אישי שגוי" }, { status: 401 });
   }
 

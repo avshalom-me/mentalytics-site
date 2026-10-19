@@ -47,26 +47,26 @@ describe("a centre's business WhatsApp", () => {
 // switchboard types its own line there. That is not a line of the therapist's.
 describe("is the same line", () => {
   it("recognises one number written three ways", () => {
-    expect(isSamePhoneLine("077-805-2051", "0778052051")).toBe(true);
-    expect(isSamePhoneLine("+972 77 805 2051", "077-8052051")).toBe(true);
-    expect(isSamePhoneLine("972778052051", "(077) 8052051")).toBe(true);
+    expect(isSamePhoneLine("077-123-4567", "0771234567")).toBe(true);
+    expect(isSamePhoneLine("+972 77 123 4567", "077-1234567")).toBe(true);
+    expect(isSamePhoneLine("972771234567", "(077) 1234567")).toBe(true);
   });
 
   it("tells two different lines apart", () => {
-    expect(isSamePhoneLine("077-8052051", "077-8052052")).toBe(false);
+    expect(isSamePhoneLine("077-1234567", "077-1234568")).toBe(false);
     expect(isSamePhoneLine("052-1234567", "072-1234567")).toBe(false);
   });
 
   it("never calls empty, a note or an email the same line", () => {
     expect(isSamePhoneLine("", "")).toBe(false);
     expect(isSamePhoneLine(null, null)).toBe(false);
-    expect(isSamePhoneLine("077-8052051", null)).toBe(false);
+    expect(isSamePhoneLine("077-1234567", null)).toBe(false);
     expect(isSamePhoneLine("office@example.com", "office@example.com")).toBe(false);
   });
 });
 
 describe("the line a center member is reached on", () => {
-  const center = { phone: "077-8052051", whatsapp: "077-8052051" };
+  const center = { phone: "077-1234567", whatsapp: "077-1234567" };
 
   it("is the center's line when the therapist has no phone of their own", () => {
     expect(centerLineFor("", center)).toEqual(center);
@@ -75,17 +75,17 @@ describe("the line a center member is reached on", () => {
   });
 
   it("is the center's line when their phone field holds the center's own non-mobile line", () => {
-    expect(centerLineFor("077-8052051", center)).toEqual(center);
-    expect(centerLineFor("0778052051", { phone: null, whatsapp: "077-805-2051" })).toEqual({
+    expect(centerLineFor("077-1234567", center)).toEqual(center);
+    expect(centerLineFor("0771234567", { phone: null, whatsapp: "077-123-4567" })).toEqual({
       phone: null,
-      whatsapp: "077-805-2051",
+      whatsapp: "077-123-4567",
     });
   });
 
   it("stays the therapist's own when it is a mobile, even the center's mobile", () => {
     expect(centerLineFor("054-1234567", center)).toBeNull();
     // A centre whose public line is a mobile and whose members used it: it already worked.
-    expect(centerLineFor("055-4337580", { phone: "055-4337580", whatsapp: "055-4337580" })).toBeNull();
+    expect(centerLineFor("055-9876543", { phone: "055-9876543", whatsapp: "055-9876543" })).toBeNull();
     expect(centerLineFor("+39 333 123 4567", center)).toBeNull();
   });
 
@@ -97,7 +97,7 @@ describe("the line a center member is reached on", () => {
   it("is nothing when the center has no public line to offer", () => {
     expect(centerLineFor("", null)).toBeNull();
     expect(centerLineFor("", { phone: "", whatsapp: null })).toBeNull();
-    expect(centerLineFor("077-8052051", { phone: null, whatsapp: null })).toBeNull();
+    expect(centerLineFor("077-1234567", { phone: null, whatsapp: null })).toBeNull();
   });
 });
 

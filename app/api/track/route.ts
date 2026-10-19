@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { sanitizeAttribution } from "@/app/lib/attribution";
 import { isBotRequest } from "@/app/lib/bot-detect";
 import { CLIENT_ANALYTICS_EVENT_TYPES } from "@/app/lib/analytics-event-types";
+import { normalizeTrackFields } from "@/app/lib/track-input";
 
 // הרשימה הקנונית חיה ב-app/lib/analytics-event-types.ts (מקור אמת אחד,
 // ששומר הלילה משווה כל לילה מול ה-CHECK בבסיס הנתונים); כאן רק תת-הקבוצה
@@ -38,16 +39,18 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { event_type, source, therapist_id, session_id, metadata } = body ?? {};
+    const { event_type } = body ?? {};
 
     if (!VALID_EVENTS.includes(event_type as EventType)) {
       return NextResponse.json({ ok: false, error: "Invalid event_type" }, { status: 400 });
     }
 
-    const safeTherapistId = typeof therapist_id === "string" && therapist_id.length > 0 ? therapist_id : null;
-    const safeSessionId = typeof session_id === "string" && session_id.length > 0 && session_id.length <= 128 ? session_id : null;
-    const safeSource = typeof source === "string" ? source : null;
-    const safeMetadata = typeof metadata === "object" && metadata !== null ? metadata : {};
+    // תקרות על גודל השדות - ראו track-input.ts (19/10/2026).
+    const fields = normalizeTrackFields(body ?? {});
+    if (!fields) {
+      return NextResponse.json({ ok: false, error: "metadata too large" }, { status: 400 });
+    }
+    const { source: safeSource, therapist_id: safeTherapistId, session_id: safeSessionId, metadata: safeMetadata } = fields;
 
     // Dedup impressions: skip if same (therapist_id, session_id) in last 5 min
     if (event_type === "profile_impression" && safeTherapistId && safeSessionId) {
