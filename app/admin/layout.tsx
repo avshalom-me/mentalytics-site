@@ -31,7 +31,12 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   },
   {
     label: "בתי ספר",
-    items: [{ href: "/admin/schools/payments", label: "רישיונות ותשלומים", icon: "🏫" }],
+    items: [
+      { href: "/admin/schools", label: "בתי ספר", icon: "🏫" },
+      { href: "/admin/schools/pipeline", label: "צינור", icon: "📋" },
+      { href: "/admin/schools/owners", label: "בעלויות", icon: "🏛️" },
+      { href: "/admin/schools/payments", label: "רישיונות ותשלומים", icon: "💳" },
+    ],
   },
   {
     label: "כספים",
@@ -73,11 +78,18 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
   },
 ];
 
+const ALL_HREFS = NAV_GROUPS.flatMap((g) => g.items.map((i) => i.href));
+
 function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
   const pathname = usePathname();
   // "/admin" would startsWith-match every admin page — exact-match it.
+  // An item that has a more specific sibling (/admin/schools vs
+  // /admin/schools/pipeline) is not active on the sibling's pages.
+  const matches = (href: string) => pathname === href || Boolean(pathname?.startsWith(href + "/"));
   const isActive = (href: string) =>
-    href === "/admin" ? pathname === "/admin" : pathname === href || pathname?.startsWith(href + "/");
+    href === "/admin"
+      ? pathname === "/admin"
+      : matches(href) && !ALL_HREFS.some((other) => other.startsWith(href + "/") && matches(other));
   // התג על "שימור מטפלים": כמה פעולות מהסקירה השבועית עוד ממתינות ללחיצה.
   const [retentionPending, setRetentionPending] = useState(0);
   useEffect(() => {

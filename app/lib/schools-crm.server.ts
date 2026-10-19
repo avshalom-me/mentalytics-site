@@ -3,9 +3,13 @@
 // עם אובייקט "צופה", והספרייה אוכפת מה מותר למי. אין כאן ייבוא של Next.
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
+  CLOSED_DEAL_STAGES,
+  DEAL_STAGES,
   DEFAULT_BRANCH_SETTINGS,
+  SCHOOL_STATUSES,
   generateAccessCode,
   grossToNet,
+  labelOf,
   licenseUsable,
   nextExpectedPayment,
   normalizeAccessCode,
@@ -99,35 +103,158 @@ export async function logActivity(
 // ── בעלויות, בתי ספר, אנשי קשר ──────────────────────────────────────────────────
 type Row = Record<string, unknown>;
 
+// לא לכל טבלה יש created_by ו-updated_at (school_contacts בלי הראשון,
+// school_trainings בלי השני): עמודה שאין בטבלה היא שגיאת כתיבה, אז מוסיפים
+// כל אחת רק איפה שהיא קיימת במיגרציה.
+const HAS_CREATED_BY = new Set(["school_owners", "schools", "school_deals", "school_trainings", "school_licenses"]);
+const HAS_UPDATED_AT = new Set(["school_owners", "schools", "school_contacts", "school_deals", "school_licenses"]);
+
 async function upsert(table: string, v: Viewer, patch: Row, id?: string): Promise<Row> {
-  const now = new Date().toISOString();
   if (id) {
-    const { data, error } = await supabaseAdmin.from(table).update({ ...patch, updated_at: now }).eq("id", id).select().single();
+    const row = HAS_UPDATED_AT.has(table) ? { ...patch, updated_at: new Date().toISOString() } : patch;
+    const { data, error } = await supabaseAdmin.from(table).update(row).eq("id", id).select().single();
     if (error) throw new SchoolsCrmError(error.message, 500);
     return data as Row;
   }
-  const { data, error } = await supabaseAdmin.from(table).insert({ ...patch, created_by: v.name }).select().single();
+  const row = HAS_CREATED_BY.has(table) ? { ...patch, created_by: v.name } : patch;
+  const { data, error } = await supabaseAdmin.from(table).insert(row).select().single();
   if (error) throw new SchoolsCrmError(error.message, 500);
   return data as Row;
 }
 
 export const saveOwner = (v: Viewer, patch: Row, id?: string) => upsert("school_owners", v, patch, id);
-export const saveSchool = (v: Viewer, patch: Row, id?: string) => upsert("schools", v, patch, id);
+/** בית ספר חדש או עדכון. הוספה ושינוי סטטוס נרשמים בציר הזמן של בית הספר. */
+export async function saveSchool(v: Viewer, patch: Row, id?: string): Promise<Row> {
+  if (!id) {
+    const school = await upsert("schools", v, patch);
+    await logActivity(v, "school", school.id as string, "system", "בית הספר נוסף לרשימה");
+    return school;
+  }
+  const { data: before } = await supabaseAdmin.from("schools").select("status").eq("id", id).maybeSingle();
+  const school = await upsert("schools", v, patch, id);
+  if (typeof patch.status === "string" && before && patch.status !== before.status) {
+    await logActivity(v, "school", id, "status", `סטטוס בית הספר השתנה מ"${labelOf(SCHOOL_STATUSES, before.status as string)}" ל"${labelOf(SCHOOL_STATUSES, patch.status)}"`);
+  }
+  return school;
+}
 export const saveContact = (v: Viewer, patch: Row, id?: string) => upsert("school_contacts", v, patch, id);
 export const saveTraining = (v: Viewer, patch: Row, id?: string) => upsert("school_trainings", v, patch, id);
 
-export type SchoolListFilter = { status?: string; region?: string; ownerId?: string; q?: string; includeDemo?: boolean };
+export type SchoolListFilter = { status?: string; region?: string; ownerId?: string; q?: string; includeDemo?: boolean; limit?: number };
+
+/** טקסט חופשי בלי התווים ששוברים את מחרוזת הסינון של PostgREST (פסיק, סוגריים, אחוז, כוכבית). */
+function searchTerm(q: string | undefined): string {
+  return (q ?? "").replace(/[,()%*\\"]/g, " ").replace(/\s+/g, " ").trim().slice(0, 80);
+}
 
 export async function listSchools(f: SchoolListFilter = {}) {
-  let q = supabaseAdmin.from("schools").select("*, school_owners(name, kind)").order("updated_at", { ascending: false }).limit(500);
+  let q = supabaseAdmin
+    .from("schools")
+    .select("*, school_owners(name, kind)")
+    .order("updated_at", { ascending: false })
+    .limit(Math.min(Math.max(f.limit ?? 500, 1), 500));
   if (f.status) q = q.eq("status", f.status);
   if (f.region) q = q.eq("region_key", f.region);
   if (f.ownerId) q = q.eq("owner_id", f.ownerId);
   if (!f.includeDemo) q = q.eq("is_demo", false);
-  if (f.q) q = q.or(`name.ilike.%${f.q}%,city.ilike.%${f.q}%,symbol.ilike.%${f.q}%`);
+  const term = searchTerm(f.q);
+  if (term) q = q.or(`name.ilike.%${term}%,city.ilike.%${term}%,symbol.ilike.%${term}%`);
   const { data, error } = await q;
   if (error) throw new SchoolsCrmError(error.message, 500);
   return data ?? [];
+}
+
+/** כמה בתי ספר בכל סטטוס, באותם סינונים (חוץ מהסטטוס עצמו), לשורת הסיכום. */
+export async function countSchoolsByStatus(f: SchoolListFilter = {}): Promise<Record<string, number>> {
+  const term = searchTerm(f.q);
+  const entries = await Promise.all(
+    SCHOOL_STATUSES.map(async (st) => {
+      let q = supabaseAdmin.from("schools").select("id", { count: "exact", head: true }).eq("status", st.value);
+      if (f.region) q = q.eq("region_key", f.region);
+      if (f.ownerId) q = q.eq("owner_id", f.ownerId);
+      if (!f.includeDemo) q = q.eq("is_demo", false);
+      if (term) q = q.or(`name.ilike.%${term}%,city.ilike.%${term}%,symbol.ilike.%${term}%`);
+      const { count, error } = await q;
+      if (error) throw new SchoolsCrmError(error.message, 500);
+      return [st.value, count ?? 0] as const;
+    }),
+  );
+  return Object.fromEntries(entries);
+}
+
+export type SchoolOverview = { open_deal_stage: string | null; has_active_license: boolean; last_activity_at: string | null };
+
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+/**
+ * לשורת הרשימה: שלב העסקה הפתוחה, האם יש רישיון שפותח את השאלון היום, ומועד
+ * הפעילות האחרונה (של בית הספר, של עסקאותיו ושל רישיונותיו). בחבילות של 60
+ * מזהים, כדי שכתובת הבקשה לא תתנפח כשהרשימה ארוכה.
+ */
+export async function schoolsOverview(schoolIds: string[]): Promise<Map<string, SchoolOverview>> {
+  const out = new Map<string, SchoolOverview>();
+  for (const id of schoolIds) out.set(id, { open_deal_stage: null, has_active_license: false, last_activity_at: null });
+  if (schoolIds.length === 0) return out;
+  const today = todayIL();
+  const parts = chunk(schoolIds, 60);
+
+  const [dealResults, licenseResults] = await Promise.all([
+    Promise.all(parts.map((ids) => supabaseAdmin.from("school_deals").select("id, school_id, stage, stage_changed_at").in("school_id", ids))),
+    Promise.all(
+      parts.map((ids) =>
+        supabaseAdmin
+          .from("school_licenses")
+          .select("id, school_id, kind, status, start_date, end_date, price_net, months, paid_at, refunded_at, code_disabled")
+          .in("school_id", ids),
+      ),
+    ),
+  ]);
+  for (const r of [...dealResults, ...licenseResults]) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
+
+  // מזהה ישות (בית ספר, עסקה, רישיון) ← בית הספר שלו.
+  const ownerOf = new Map<string, string>(schoolIds.map((id) => [id, id]));
+  const openSince = new Map<string, string>();
+  for (const d of dealResults.flatMap((r) => r.data ?? [])) {
+    ownerOf.set(d.id, d.school_id);
+    if ((CLOSED_DEAL_STAGES as readonly string[]).includes(d.stage)) continue;
+    const row = out.get(d.school_id);
+    if (!row) continue;
+    if (!openSince.has(d.school_id) || String(d.stage_changed_at) > (openSince.get(d.school_id) as string)) {
+      openSince.set(d.school_id, String(d.stage_changed_at));
+      row.open_deal_stage = d.stage;
+    }
+  }
+  for (const l of licenseResults.flatMap((r) => r.data ?? [])) {
+    ownerOf.set(l.id, l.school_id);
+    const row = out.get(l.school_id);
+    if (row && licenseUsable(l, today)) row.has_active_license = true;
+  }
+
+  const activityResults = await Promise.all(
+    chunk([...ownerOf.keys()], 60).map((ids) =>
+      supabaseAdmin.from("school_activities").select("entity_id, happened_at").in("entity_id", ids).order("happened_at", { ascending: false }).limit(1000),
+    ),
+  );
+  for (const r of activityResults) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
+  for (const a of activityResults.flatMap((r) => r.data ?? [])) {
+    const row = out.get(ownerOf.get(a.entity_id) ?? "");
+    if (row && (!row.last_activity_at || a.happened_at > row.last_activity_at)) row.last_activity_at = a.happened_at;
+  }
+  return out;
+}
+
+/** בעלויות עם מספר בתי הספר של כל אחת. */
+export async function listOwners(): Promise<(Row & { id: string; name: string; schools_count: number })[]> {
+  const { data, error } = await supabaseAdmin.from("school_owners").select("*, schools(count)").order("name", { ascending: true }).limit(1000);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return (data ?? []).map((o: Row & { id: string; name: string; schools?: { count: number }[] }) => {
+    const { schools, ...rest } = o;
+    return { ...rest, schools_count: Number(schools?.[0]?.count ?? 0) };
+  });
 }
 
 export async function getSchoolDetail(id: string) {
@@ -145,12 +272,36 @@ export async function getSchoolDetail(id: string) {
   return { school: school.data, contacts: contacts.data ?? [], deals: deals.data ?? [], licenses: licenses.data ?? [], trainings: trainings.data ?? [], activities: activities.data ?? [] };
 }
 
+/** ציר הזמן של בית ספר: הפעילות שלו, של עסקאותיו ושל רישיונותיו, מהחדש לישן. */
+export async function schoolTimeline(schoolId: string, dealIds: string[], licenseIds: string[]) {
+  const { data, error } = await supabaseAdmin
+    .from("school_activities")
+    .select("*")
+    .in("entity_id", [schoolId, ...dealIds, ...licenseIds])
+    .order("happened_at", { ascending: false })
+    .limit(300);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return data ?? [];
+}
+
+/** איש קשר שסומן ראשי הופך לראשי היחיד בבית הספר. */
+export async function clearOtherPrimaryContacts(schoolId: string, keepId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from("school_contacts")
+    .update({ is_primary: false, updated_at: new Date().toISOString() })
+    .eq("school_id", schoolId)
+    .eq("is_primary", true)
+    .neq("id", keepId);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+}
+
 // ── עסקאות ──────────────────────────────────────────────────────────────────────
 export async function saveDeal(v: Viewer, patch: Row, id?: string): Promise<Row> {
   const now = new Date().toISOString();
   if (!id) {
-    const deal = await upsert("school_deals", v, { ...patch, stage_changed_at: now });
-    await logActivity(v, "school_deal", deal.id as string, "status", `עסקה נפתחה: ${String(deal.stage)}`);
+    const closed = patch.stage === "active" || patch.stage === "lost";
+    const deal = await upsert("school_deals", v, { ...patch, stage_changed_at: now, ...(closed ? { closed_at: now } : {}) });
+    await logActivity(v, "school_deal", deal.id as string, "status", `עסקה נפתחה בשלב "${labelOf(DEAL_STAGES, String(deal.stage))}"`);
     return deal;
   }
   const { data: before } = await supabaseAdmin.from("school_deals").select("stage").eq("id", id).single();
@@ -161,8 +312,19 @@ export async function saveDeal(v: Viewer, patch: Row, id?: string): Promise<Row>
     extra.closed_at = patch.stage === "active" || patch.stage === "lost" ? now : null;
   }
   const deal = await upsert("school_deals", v, { ...patch, ...extra }, id);
-  if (stageChanged) await logActivity(v, "school_deal", id, "status", `סטטוס: ${String(before?.stage)} → ${String(patch.stage)}`);
+  if (stageChanged) await logActivity(v, "school_deal", id, "status", `שלב העסקה השתנה מ"${labelOf(DEAL_STAGES, String(before?.stage))}" ל"${labelOf(DEAL_STAGES, String(patch.stage))}"`);
   return deal;
+}
+
+/** כל העסקאות עם בית הספר (או הבעלות) שלהן, ללוח הצינור. */
+export async function listDeals() {
+  const { data, error } = await supabaseAdmin
+    .from("school_deals")
+    .select("*, schools(name, city, symbol, is_demo), school_owners(name)")
+    .order("stage_changed_at", { ascending: false })
+    .limit(1000);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return data ?? [];
 }
 
 // ── רישיונות ותשלומים ───────────────────────────────────────────────────────────
