@@ -32,6 +32,9 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 vi.mock("@/app/lib/research-counts", () => ({ recordQuizScoring: research.recordQuizScoring }));
 vi.mock("@/app/lib/school-review.server", () => ({ isActiveReviewToken: async () => false }));
+// The school licence gate is a separate concern (school-score-route.test.ts);
+// here no browser carries a licence, and the module must not open a client.
+vi.mock("@/app/lib/schools-crm.server", () => ({ licenseStillUsable: async () => false, bumpSchoolUsage: async () => {} }));
 
 import { GET as usageCheck } from "@/app/api/usage/check/route";
 import { POST as adultsScore } from "@/app/api/questionnaire/adults/score/route";

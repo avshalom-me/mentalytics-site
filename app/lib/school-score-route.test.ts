@@ -13,6 +13,8 @@ const m = vi.hoisted(() => ({
   review: vi.fn(),
   score: vi.fn(),
   staff: vi.fn(),
+  license: vi.fn(),
+  usageBump: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
@@ -25,16 +27,25 @@ vi.mock("@/app/lib/usage", () => ({
 }));
 vi.mock("@/app/lib/school-review.server", () => ({ isActiveReviewToken: m.review }));
 vi.mock("@/app/lib/kids-score.server", () => ({ scoreKidsQuestionnaire: m.score }));
+vi.mock("@/app/lib/schools-crm.server", () => ({ licenseStillUsable: m.license, bumpSchoolUsage: m.usageBump }));
 
 import { POST } from "@/app/api/questionnaire/school/score/route";
+import { SCHOOL_COOKIE, encodeGrant } from "@/app/lib/school-gate.server";
+
+process.env.CRON_SECRET = "test-gate-secret";
 
 const FP = "a".repeat(64);
 const free = { count: 2, limit: 8, allowed: true, paymentRequired: false };
 const exhausted = { count: 8, limit: 8, allowed: false, paymentRequired: true };
 
-function post(body: unknown) {
-  return POST(new NextRequest("http://localhost/api/questionnaire/school/score", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) }));
+function post(body: unknown, cookie?: string) {
+  const headers: Record<string, string> = { "content-type": "application/json" };
+  if (cookie) headers.cookie = `${SCHOOL_COOKIE}=${cookie}`;
+  return POST(new NextRequest("http://localhost/api/questionnaire/school/score", { method: "POST", headers, body: JSON.stringify(body) }));
 }
+
+// A signed grant for a licensed school, as /api/school-access would set it.
+const grant = () => encodeGrant({ license_id: "lic-1", school_id: "school-1", exp: Math.floor(Date.now() / 1000) + 3600 });
 
 beforeEach(() => {
   m.getUsage.mockReset();
@@ -42,6 +53,9 @@ beforeEach(() => {
   m.review.mockReset().mockResolvedValue(false);
   m.staff.mockReset().mockResolvedValue(false);
   m.score.mockReset().mockReturnValue({ emotional: [], academic: [] });
+  m.license.mockReset().mockResolvedValue(false);
+  m.usageBump.mockReset().mockResolvedValue(undefined);
+  delete process.env.SCHOOL_GATE_ON;
 });
 
 describe("/api/questionnaire/school/score", () => {
@@ -96,5 +110,68 @@ describe("/api/questionnaire/school/score", () => {
     m.getUsage.mockResolvedValue(free);
     await post({ q1: 1 });
     expect(m.getUsage).toHaveBeenCalledWith("10.0.0.1", null, "kids");
+  });
+
+  // From 19/10/2026 the questionnaire is licensed to schools (app/lib/school-gate.server.ts).
+  describe("the school licence gate", () => {
+    it("with the gate on, a request without a licence is refused before the parents' checks", async () => {
+      process.env.SCHOOL_GATE_ON = "1";
+      m.getUsage.mockResolvedValue(free);
+      const res = await post({ _fp: FP, q1: 1 });
+      expect(res.status).toBe(403);
+      expect(await res.json()).toEqual({ ok: false, licenseRequired: true });
+      expect(m.getUsage).not.toHaveBeenCalled();
+      expect(m.score).not.toHaveBeenCalled();
+    });
+
+    it("a licensed school's cookie opens the questionnaire, skips the parents' checks, and counts the run for the school", async () => {
+      process.env.SCHOOL_GATE_ON = "1";
+      m.license.mockResolvedValue(true);
+      m.getUsage.mockResolvedValue(exhausted);
+      m.bump.mockResolvedValue(false);
+      const res = await post({ _fp: FP, q1: 1 }, grant());
+      expect(res.status).toBe(200);
+      expect(m.license).toHaveBeenCalledWith("lic-1");
+      expect(m.usageBump).toHaveBeenCalledWith("school-1");
+      expect(m.getUsage).not.toHaveBeenCalled();
+      expect(m.bump).not.toHaveBeenCalled();
+    });
+
+    it("a cookie whose licence was cancelled or disabled is no licence", async () => {
+      process.env.SCHOOL_GATE_ON = "1";
+      m.license.mockResolvedValue(false);
+      const res = await post({ _fp: FP, q1: 1 }, grant());
+      expect(res.status).toBe(403);
+      expect(m.usageBump).not.toHaveBeenCalled();
+    });
+
+    it("a cookie with a forged signature is no licence", async () => {
+      process.env.SCHOOL_GATE_ON = "1";
+      m.license.mockResolvedValue(true);
+      const forged = grant().replace(/\.[^.]+$/, ".AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
+      const res = await post({ _fp: FP, q1: 1 }, forged);
+      expect(res.status).toBe(403);
+      expect(m.license).not.toHaveBeenCalled();
+    });
+
+    it("with the gate off, the cookie only lifts the parents' checks and counts the run", async () => {
+      m.license.mockResolvedValue(true);
+      m.getUsage.mockResolvedValue(exhausted);
+      const res = await post({ _fp: FP, q1: 1 }, grant());
+      expect(res.status).toBe(200);
+      expect(m.getUsage).not.toHaveBeenCalled();
+      expect(m.usageBump).toHaveBeenCalledWith("school-1");
+    });
+
+    it("a reviewer's token and a staff browser pass the gate without a licence", async () => {
+      process.env.SCHOOL_GATE_ON = "1";
+      m.review.mockResolvedValue(true);
+      expect((await post({ _fp: FP, _reviewToken: "x".repeat(32), q1: 1 })).status).toBe(200);
+      m.review.mockResolvedValue(false);
+      m.staff.mockResolvedValue(true);
+      expect((await post({ _fp: FP, q1: 1 })).status).toBe(200);
+      expect(m.license).not.toHaveBeenCalled();
+      expect(m.usageBump).not.toHaveBeenCalled();
+    });
   });
 });
