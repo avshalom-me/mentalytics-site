@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { resolveCenter } from "@/app/lib/center-auth";
+import { prepareCenterLogo } from "@/app/lib/center-logo-image";
 
 // העלאת קבצים מפורטל המרכז - תמונת פרופיל / תעודה עבור מטפל של המרכז.
 // שיקוף של /api/therapist-upload (כיווץ תמונות, ולידציית תעודות), עם אימות
@@ -19,15 +20,32 @@ export async function POST(req: NextRequest) {
 
   const formData = await req.formData();
   const file = formData.get("file") as File | null;
-  const type = formData.get("type") as string | null; // "photo" | "certificate" | "center_image" | "center_gallery"
+  const type = formData.get("type") as string | null; // "photo" | "certificate" | "center_logo" | "center_image" | "center_gallery"
 
   if (!file || !type) {
     return NextResponse.json({ ok: false, error: "Missing file or type" }, { status: 400 });
   }
 
+  // לוגו המרכז - נחתכים ממנו השוליים (center-logo-image.ts), ואז אותו נתיב כמו
+  // שאר תמונות המרכז, שהפורטל שומר דרך update_public_page.
+  if (type === "center_logo") {
+    let out: Buffer;
+    try {
+      out = await prepareCenterLogo(Buffer.from(await file.arrayBuffer()));
+    } catch {
+      return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
+    }
+    const p = `center-assets/${center.id}-${Date.now()}.webp`;
+    const { error: upErr } = await supabaseAdmin.storage
+      .from("therapist-certificates")
+      .upload(p, out, { contentType: "image/webp", upsert: true });
+    if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 });
+    return NextResponse.json({ ok: true, path: p });
+  }
+
   // תמונת מרכז - מכווצת ומוחזרת; הנתיב נשמר ע"י הפורטל דרך update_public_page.
   // אין צורך ב-therapist_id - התמונה משויכת למרכז.
-  //   center_image   - לוגו / תמונת חבר צוות (קטן, 512).
+  //   center_image   - תמונת חבר צוות / מנהל (קטן, 512). הלוגו - center_logo למעלה.
   //   center_gallery - תמונת גלריה של המרכז (הכניסה/חדרים) - רזולוציה גבוהה יותר.
   if (type === "center_image" || type === "center_gallery") {
     const isGallery = type === "center_gallery";

@@ -106,7 +106,7 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
   const donePct = Math.round((completeness.filter((c) => c.done).length / completeness.length) * 100);
 
   // העלאת תמונת מרכז (לוגו / חבר צוות / גלריה) - מחזירה נתיב אחסון שנשמר בשמירה.
-  async function uploadCenterImage(file: File, kind: "center_image" | "center_gallery"): Promise<string | null> {
+  async function uploadCenterImage(file: File, kind: "center_logo" | "center_image" | "center_gallery"): Promise<string | null> {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) { window.location.href = "/centers/login"; return null; }
     // תמונה מהטלפון עוברת את מגבלת 4.5MB של Vercel - ראו center-image-upload.ts.
@@ -131,7 +131,8 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
   async function onLogoFile(file: File | null) {
     if (!file) return;
     setLogoBusy(true); setErr("");
-    const path = await uploadCenterImage(file, "center_image");
+    // center_logo: השרת חותך את השוליים מסביב ללוגו (center-logo-image.ts).
+    const path = await uploadCenterImage(file, "center_logo");
     if (path) { setLogoPath(path); setLogoPreview(URL.createObjectURL(file)); }
     setLogoBusy(false);
   }
