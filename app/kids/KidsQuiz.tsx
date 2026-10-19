@@ -4187,6 +4187,12 @@ export default function KidsQuiz({ audience = "parent" }: { audience?: Audience 
         body: JSON.stringify({ ...answers, _fp: fp, _staffToken: staffToken, _reviewToken: inReview() ? reviewToken() ?? undefined : undefined }),
       });
       if (r.status === 402) { setPaymentRequired(true); return; }
+      // שאלון היועצות ברישיון: השרת סירב כי אין קוד גישה תקף (השער דולק, או
+      // שהרישיון פג באמצע). app/school/SchoolGate.tsx מאזין ומציג את מסך הקוד.
+      if (r.status === 403 && audience === "counselor") {
+        const d = await r.json().catch(() => null);
+        if (d && d.licenseRequired) { window.dispatchEvent(new Event("school-license-required")); return; }
+      }
       if (!r.ok) throw new Error();
       const d = await r.json();
       if (!d.ok) throw new Error();

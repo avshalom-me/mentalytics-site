@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { scoreKidsQuestionnaire } from "@/app/lib/kids-score.server";
 import { bumpAndCheckIpDaily, cleanFp, getIp, getUsage, isStaffRequest } from "@/app/lib/usage";
 import { isActiveReviewToken } from "@/app/lib/school-review.server";
+import { grantFromRequest, schoolGateOn } from "@/app/lib/school-gate.server";
+import { bumpSchoolUsage, licenseStillUsable } from "@/app/lib/schools-crm.server";
 
 // The counsellor rubric scores with the kids engine, free of the parent
 // paywall: a counsellor works through a caseload, and a referral channel is
@@ -31,7 +33,17 @@ export async function POST(request: NextRequest) {
     // The team tries the rubric from its own browsers: a staff browser is not
     // asked about the parents' free runs, and is not held to the daily cap.
     const staff = await isStaffRequest(request, (body as Record<string, unknown>)._staffToken);
-    if (!reviewing && !staff) {
+    // בית ספר ברישיון: העוגייה החתומה מהקוד שהיועצת הקלידה
+    // (app/lib/school-gate.server.ts). הרישיון נבדק מול המסד בכל חישוב, כך
+    // שביטול או השבתת קוד תופסים מיד. בית ספר כזה אינו נספר מול תקרת ה-IP
+    // (משרד שלם יוצא מכתובת אחת), והשאלון שלו נמנה למוסד, בלי תוכן.
+    const grant = reviewing || staff ? null : grantFromRequest(request);
+    const licensed = !!grant && (await licenseStillUsable(grant.license_id));
+    if (!reviewing && !staff && !licensed && schoolGateOn()) {
+      // השער דולק: בלי רישיון אין ניקוד. הלקוח מציג את מסך הקוד.
+      return NextResponse.json({ ok: false, licenseRequired: true }, { status: 403 });
+    }
+    if (!reviewing && !staff && !licensed) {
       const ip = getIp(request);
       const usage = await getUsage(ip, cleanFp((body as Record<string, unknown>)._fp), "kids");
       if (usage.paymentRequired) {
@@ -42,6 +54,7 @@ export async function POST(request: NextRequest) {
       }
     }
     const result = scoreKidsQuestionnaire(body);
+    if (licensed && grant) await bumpSchoolUsage(grant.school_id);
     // No research counters here on purpose: the counsellor flow is a professional
     // tool about a third party and has a handful of users, so even a weekly
     // count could point at one questionnaire. The version stamp is harmless.
