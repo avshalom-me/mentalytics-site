@@ -7,15 +7,26 @@ import {
   generateAccessCode,
   grossToNet,
   licenseUsable,
+  nextExpectedPayment,
   normalizeAccessCode,
+  payPageOpen,
   paymentSchedule,
   planLicense,
   schoolYearOf,
+  vatOf,
   type BranchSettings,
   type SchoolEntityType,
 } from "./schools-crm";
 
 export type Viewer = { role: "owner" | "partner"; name: string };
+
+/** הבעלים מהאדמין (Basic Auth, בלי משתמשים): שם קבוע ביומן הפעילות. */
+export const OWNER_VIEWER: Viewer = { role: "owner", name: "בעלים" };
+/** דף התשלום הציבורי: פעולות מערכת שבית הספר גרם להן. */
+export const PAY_PAGE_VIEWER: Viewer = { role: "owner", name: "דף התשלום" };
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export const isUuid = (s: unknown): s is string => typeof s === "string" && UUID_RE.test(s);
 
 export class SchoolsCrmError extends Error {
   constructor(message: string, public status = 400) {
@@ -41,7 +52,13 @@ export async function getBranchSettings(): Promise<BranchSettings & { version: n
     .maybeSingle();
   if (error) throw new SchoolsCrmError(error.message, 500);
   if (!data) return { ...DEFAULT_BRANCH_SETTINGS, version: 0 };
-  return { ...DEFAULT_BRANCH_SETTINGS, ...(data.data as Partial<BranchSettings>), version: data.version as number };
+  const stored = data.data as Partial<BranchSettings>;
+  return {
+    ...DEFAULT_BRANCH_SETTINGS,
+    ...stored,
+    payment_details: { ...DEFAULT_BRANCH_SETTINGS.payment_details, ...(stored.payment_details ?? {}) },
+    version: data.version as number,
+  };
 }
 
 export async function saveBranchSettings(v: Viewer, next: BranchSettings, note?: string): Promise<number> {
@@ -209,7 +226,15 @@ export async function createLicense(v: Viewer, input: NewLicense) {
 export async function markPaymentReceived(
   v: Viewer,
   paymentId: string,
-  details: { method: string; received_at?: string; sumit_document_number?: string; proforma_number?: string; statement_line_id?: string; note?: string },
+  details: {
+    method: string;
+    received_at?: string;
+    sumit_document_id?: string;
+    sumit_document_number?: string;
+    proforma_number?: string;
+    statement_line_id?: string;
+    note?: string;
+  },
 ) {
   const receivedAt = details.received_at ?? new Date().toISOString();
   const { data: payment, error } = await supabaseAdmin
@@ -218,6 +243,7 @@ export async function markPaymentReceived(
       status: "received",
       method: details.method,
       received_at: receivedAt,
+      sumit_document_id: details.sumit_document_id ?? null,
       sumit_document_number: details.sumit_document_number ?? null,
       proforma_number: details.proforma_number ?? null,
       statement_line_id: details.statement_line_id ?? null,
@@ -263,6 +289,97 @@ export async function cancelLicense(v: Viewer, licenseId: string, reason: string
     .eq("id", licenseId);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await logActivity(v, "school_license", licenseId, "system", `הרישיון בוטל: ${reason}`);
+}
+
+/** כל הרישיונות עם בית הספר והתשלומים שלהם, לאדמין. */
+export async function listLicenses() {
+  const { data, error } = await supabaseAdmin
+    .from("school_licenses")
+    .select("*, schools(name, symbol, city, is_demo), school_payments(*)")
+    .order("created_at", { ascending: false })
+    .limit(500);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return (data ?? []).map((l) => ({ ...l, school_payments: [...(l.school_payments ?? [])].sort((a, b) => a.seq - b.seq) }));
+}
+
+// ── דף התשלום ───────────────────────────────────────────────────────────────────
+export type PayPagePayment = {
+  id: string;
+  seq: number;
+  amount_gross: number;
+  amount_net: number;
+  due_date: string | null;
+  status: string;
+  received_at: string | null;
+  method: string | null;
+};
+
+/**
+ * מה שדף התשלום הציבורי מציג. בלי קוד הגישה: הוא נמסר רק אחרי שהתשלום
+ * הראשון התקבל (בדף, אחרי חיוב בכרטיס; באדמין, אחרי העברה).
+ */
+export async function getPayPage(licenseId: string) {
+  if (!isUuid(licenseId)) return null;
+  const { data: l, error } = await supabaseAdmin
+    .from("school_licenses")
+    .select("id, school_id, kind, status, school_year, start_date, end_date, price_gross, price_net, schedule_kind, schools!inner(name, symbol), school_payments(id, seq, amount_gross, amount_net, due_date, status, received_at, method)")
+    .eq("id", licenseId)
+    .maybeSingle();
+  if (error || !l) return null;
+  const school = (Array.isArray(l.schools) ? l.schools[0] : l.schools) as { name: string; symbol: string | null };
+  const payments = ([...(l.school_payments ?? [])] as PayPagePayment[]).sort((a, b) => a.seq - b.seq);
+  const settings = await getBranchSettings();
+  return {
+    license: {
+      id: l.id,
+      school_id: l.school_id,
+      kind: l.kind,
+      status: l.status,
+      school_year: l.school_year,
+      start_date: l.start_date,
+      end_date: l.end_date,
+      price_gross: Number(l.price_gross),
+      price_net: Number(l.price_net),
+      vat: vatOf(Number(l.price_gross)),
+      schedule_kind: l.schedule_kind,
+    },
+    school: { name: school.name, symbol: school.symbol },
+    payments: payments.map((p) => ({ ...p, amount_gross: Number(p.amount_gross), amount_net: Number(p.amount_net) })),
+    next: nextExpectedPayment(payments),
+    open: payPageOpen(l, todayIL()),
+    details: settings.payment_details,
+  };
+}
+
+/**
+ * תופס תשלום לחיוב בכרטיס, כדי ששתי לחיצות לא יחייבו פעמיים: method עובר
+ * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע)
+ * משתחררת אחרי שתי דקות.
+ */
+export async function claimPaymentForCard(paymentId: string): Promise<boolean> {
+  const stale = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("school_payments")
+    .update({ method: "card", note: "חיוב בכרטיס בתהליך", updated_at: new Date().toISOString() })
+    .eq("id", paymentId)
+    .eq("status", "expected")
+    .or(`method.is.null,and(method.eq.card,updated_at.lt.${stale})`)
+    .select("id");
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return (data?.length ?? 0) > 0;
+}
+
+export async function releasePaymentClaim(paymentId: string): Promise<void> {
+  await supabaseAdmin
+    .from("school_payments")
+    .update({ method: null, note: null, updated_at: new Date().toISOString() })
+    .eq("id", paymentId)
+    .eq("status", "expected");
+}
+
+export async function licenseAccessCode(licenseId: string): Promise<{ status: string; access_code: string } | null> {
+  const { data } = await supabaseAdmin.from("school_licenses").select("status, access_code").eq("id", licenseId).maybeSingle();
+  return data ?? null;
 }
 
 // ── קוד גישה בשאלון ───────────────────────────────────────────────────────────────

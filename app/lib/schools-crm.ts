@@ -204,6 +204,24 @@ export type BranchSettings = {
   trial_enabled: boolean; // האם טופס הפנייה מציע קוד ניסיון
   trial_days: number;
   pilot_default_days: number;
+  payment_details: PaymentDetails;
+};
+
+// פרטי התשלום שדף התשלום מציג לבית הספר (העברה בנקאית והמחאה). יושבים במסד
+// עם שאר הגדרות הענף ולא בקוד: הריפו ציבורי. שדה ריק = הפסקה לא מוצגת.
+export type PaymentDetails = {
+  payee: string; // שם המוטב כפי שמופיע בחשבון הבנק
+  company_number: string; // ח.פ.
+  bank_name: string;
+  bank_branch: string;
+  bank_account: string;
+  iban: string;
+  check_address: string; // כתובת למשלוח המחאה
+  contact_email: string; // לאישורי העברה ולשאלות
+};
+
+export const EMPTY_PAYMENT_DETAILS: PaymentDetails = {
+  payee: "", company_number: "", bank_name: "", bank_branch: "", bank_account: "", iban: "", check_address: "", contact_email: "",
 };
 
 export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
@@ -221,6 +239,7 @@ export const DEFAULT_BRANCH_SETTINGS: BranchSettings = {
   trial_enabled: false,
   trial_days: 14,
   pilot_default_days: 60,
+  payment_details: EMPTY_PAYMENT_DETAILS,
 };
 
 // ── תאריכים ───────────────────────────────────────────────────────────────────
@@ -311,6 +330,30 @@ export function paymentSchedule(priceGross: number, scheduleKind: string, activa
     { seq: 1, amount_gross: first, amount_net: grossToNet(first), due_date: activationIso },
     { seq: 2, amount_gross: second, amount_net: grossToNet(second), due_date: `${schoolYear.startYear + 1}-02-28` },
   ];
+}
+
+/** המע"מ שבתוך מחיר כולל. */
+export function vatOf(gross: number): number {
+  return Math.round((gross - grossToNet(gross)) * 100) / 100;
+}
+
+/** התשלום הפתוח הבא של רישיון: הראשון לפי הסדר שעדיין צפוי. */
+export function nextExpectedPayment<T extends { seq: number; status: string }>(payments: T[]): T | null {
+  return [...payments].sort((a, b) => a.seq - b.seq).find((p) => p.status === "expected") ?? null;
+}
+
+/**
+ * דף התשלום פתוח לרישיון שממתין לתשלום או פעיל (התשלום השני בלוח 40/60),
+ * עד סוף הרישיון. רישיון שבוטל או פג אינו מקבל תשלומים.
+ */
+export function payPageOpen(l: { status: string; end_date: string }, todayIso: string): boolean {
+  return (l.status === "pending_payment" || l.status === "active") && todayIso <= l.end_date;
+}
+
+/** שם הפריט בחשבונית של Sumit: סוג הרישיון, שנת הלימודים, ומספר התשלום כשיש יותר מאחד. */
+export function licenseInvoiceItem(kind: string, schoolYear: string, seq: number, total: number): string {
+  const base = `רישיון ${labelOf(LICENSE_KINDS, kind)} לשאלון היועצות, ${schoolYear}`;
+  return `${total > 1 ? `${base}, תשלום ${seq} מתוך ${total}` : base} | טיפול חכם`;
 }
 
 // ── קוד גישה ──────────────────────────────────────────────────────────────────

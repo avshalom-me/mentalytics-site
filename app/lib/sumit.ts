@@ -172,6 +172,46 @@ export async function chargeQuizPayment(opts: {
   return result;
 }
 
+// ---------- One-off charge (school licence) ----------
+//
+// A school paying for a licence to the counsellor questionnaire from its
+// payment page (app/school/pay/[license]). The Sumit customer is the school
+// itself (school:<id>), so its payments and documents gather under one card;
+// the payer's address receives the invoice-receipt. The price agreed with a
+// school includes VAT, so UnitPrice is the full amount with VATIncluded=true:
+// Sumit splits the VAT out itself and the sum charged is exactly the sum
+// agreed, with no rounding on our side.
+
+export async function chargeSchoolPayment(opts: {
+  schoolId: string;
+  schoolName: string;
+  payerName: string;
+  payerEmail: string;
+  payerPhone: string;
+  singleUseToken: string;
+  amountGross: number;
+  itemName: string;
+}): Promise<OneOffChargeResult> {
+  const result = await chargeUnderOurCustomer<OneOffChargeResult>(
+    {
+      ExternalIdentifier: `school:${opts.schoolId}`,
+      Name: opts.schoolName,
+      EmailAddress: opts.payerEmail,
+      Phone: opts.payerPhone,
+    },
+    {
+      SingleUseToken: opts.singleUseToken,
+      Items: [{ Item: { Name: opts.itemName, SKU: "SCHOOL-LICENSE" }, Quantity: 1, UnitPrice: opts.amountGross }],
+      VATIncluded: true,
+      SendDocumentByEmail: true,
+      PreventStandingOrder: true,
+    },
+    "/billing/payments/charge/",
+  );
+  assertChargeSucceeded(result, "school licence charge");
+  return result;
+}
+
 // ---------- Subscription (charge + create standing order) ----------
 
 export interface SubscriptionChargeResult {
@@ -206,12 +246,12 @@ export interface SubscriptionChargeResult {
 const SEARCH_AUTOMATIC = 0;
 const SEARCH_BY_EXTERNAL_ID = 2;
 
-async function chargeUnderOurCustomer(
+async function chargeUnderOurCustomer<T extends { [k: string]: unknown } = SubscriptionChargeResult>(
   customer: Record<string, unknown>,
   body: Record<string, unknown>,
-): Promise<SubscriptionChargeResult> {
-  const send = (mode: number) =>
-    api<SubscriptionChargeResult>("/billing/recurring/charge/", { ...body, Customer: { ...customer, SearchMode: mode } });
+  path = "/billing/recurring/charge/",
+): Promise<T> {
+  const send = (mode: number) => api<T>(path, { ...body, Customer: { ...customer, SearchMode: mode } });
   try {
     return await send(SEARCH_BY_EXTERNAL_ID);
   } catch (e) {

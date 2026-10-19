@@ -8,10 +8,13 @@ import {
   gateReceiptValue,
   generateAccessCode,
   grossToNet,
+  licenseInvoiceItem,
   licenseUsable,
   monthsToYearEnd,
+  nextExpectedPayment,
   normalizeAccessCode,
   partialPrice,
+  payPageOpen,
   paymentSchedule,
   planLicense,
   platformFeeForMonth,
@@ -136,5 +139,29 @@ describe("the migration and the lists stay in step", () => {
     expect(DEFAULT_BRANCH_SETTINGS.ladder.map((s) => [s.rate, s.gate_schools, s.gate_receipts])).toEqual([
       [0.1, null, null], [0.2, 40, 25_000], [0.3, 120, 76_000], [0.4, 300, 190_000], [0.5, 500, 320_000],
     ]);
+  });
+});
+
+describe("the payment page", () => {
+  it("offers the lowest-numbered payment that is still expected, whatever the row order", () => {
+    const rows = [
+      { seq: 2, status: "expected" },
+      { seq: 1, status: "received" },
+    ];
+    expect(nextExpectedPayment(rows)?.seq).toBe(2);
+    expect(nextExpectedPayment([{ seq: 2, status: "expected" }, { seq: 1, status: "expected" }])?.seq).toBe(1);
+    expect(nextExpectedPayment([{ seq: 1, status: "received" }])).toBeNull();
+    expect(nextExpectedPayment([])).toBeNull();
+  });
+  it("is open while the licence waits for payment or runs, and closed once it is cancelled or over", () => {
+    expect(payPageOpen({ status: "pending_payment", end_date: "2027-08-31" }, "2026-11-01")).toBe(true);
+    expect(payPageOpen({ status: "active", end_date: "2027-08-31" }, "2027-02-01")).toBe(true);
+    expect(payPageOpen({ status: "active", end_date: "2027-08-31" }, "2027-09-01")).toBe(false);
+    expect(payPageOpen({ status: "cancelled", end_date: "2027-08-31" }, "2026-11-01")).toBe(false);
+    expect(payPageOpen({ status: "expired", end_date: "2026-08-31" }, "2026-11-01")).toBe(false);
+  });
+  it("names the invoice item after the licence, and numbers a split payment", () => {
+    expect(licenseInvoiceItem("annual", "2026/27", 1, 1)).toBe("רישיון שנתי לשאלון היועצות, 2026/27 | טיפול חכם");
+    expect(licenseInvoiceItem("partial", "2026/27", 2, 2)).toBe("רישיון חלקי עד סוף שנת הלימודים לשאלון היועצות, 2026/27, תשלום 2 מתוך 2 | טיפול חכם");
   });
 });

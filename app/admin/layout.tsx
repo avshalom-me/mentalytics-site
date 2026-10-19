@@ -30,6 +30,10 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     ],
   },
   {
+    label: "בתי ספר",
+    items: [{ href: "/admin/schools/payments", label: "רישיונות ותשלומים", icon: "🏫" }],
+  },
+  {
     label: "כספים",
     items: [{ href: "/admin/finance", label: "הכנסות והוצאות", icon: "💰" }],
   },
