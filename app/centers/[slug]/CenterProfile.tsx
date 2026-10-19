@@ -247,9 +247,16 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
             {/* במובייל הלוגו כאן; בדסקטופ הוא גדול ודביק בעמודת הצד */}
             <div className="mb-6 flex justify-center lg:hidden">
               {assets.logoUrl ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={assets.logoUrl} alt={`הלוגו של ${center.name}`}
-                  className="h-[112px] w-[112px] rounded-[26px] border border-[var(--line)] bg-white object-contain p-2.5 shadow-[0_10px_30px_rgba(42,100,98,.10)]" />
+                // המסגרת נבנית לפי צורת הלוגו ולא כריבוע קבוע (19/10/2026). רוב לוגואי
+                // המרכזים רחבים (פי 2.6-3.9 מגובהם), ובריבוע של 112 עם ריפוד הם יצאו
+                // פס בגובה 24-35 פיקסלים. עכשיו: עד 120 גובה ועד כ-300 רוחב, והיחס נשמר
+                // (max-width/max-height על תמונה עם width/height אוטומטיים). הרוחב נגזר
+                // מרוחב המסך, כך שהמסגרת עם הריפוד לא חורגת גם בטלפון של 320.
+                <div className="inline-flex max-w-full items-center justify-center rounded-[26px] border border-[var(--line)] bg-white px-5 py-4 shadow-[0_10px_30px_rgba(42,100,98,.10)]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={assets.logoUrl} alt={`הלוגו של ${center.name}`}
+                    className="block h-auto max-h-[120px] w-auto max-w-[min(300px,calc(100vw-96px))] object-contain" />
+                </div>
               ) : (
                 <div className="flex h-[112px] w-[112px] items-center justify-center rounded-[26px] text-3xl font-black text-white shadow-[0_10px_30px_rgba(42,100,98,.14)]"
                   style={{ background: "linear-gradient(140deg,var(--teal),var(--teal-dark))" }}>
