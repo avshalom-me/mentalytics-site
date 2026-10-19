@@ -4,6 +4,7 @@ import Link from "next/link";
 import { shareMetadata } from "@/app/lib/share-metadata";
 import { team } from "@/app/lib/team";
 import PageViewTracker from "@/app/components/PageViewTracker";
+import AccessRequestForm from "./AccessRequestForm";
 
 /**
  * The doorway to the counsellor rubric.
@@ -79,6 +80,10 @@ const FAQ = [
     a: "מפרסומים רשמיים של משרד החינוך בלבד, ולצד כל מסלול כתוב מול מה הוא אומת ומתי. הם משתנים משנה לשנה, ולרשות המקומית עשויים להיות מועדים פנימיים מוקדמים יותר - לכן המפה אומרת מה המועד הסטטוטורי ומבקשת לאמת מול הרשות לפני הגשה.",
   },
   {
+    q: "מי יכול להשתמש בשאלון?",
+    a: "בתי ספר ורשויות מקומיות שיש להם רישיון לשנת הלימודים. בית הספר מקבל קוד גישה, והיועצות והצוות מקלידים אותו פעם אחת בכל מכשיר. לבית ספר שעוד אין לו קוד אפשר לבקש גישה בטופס שבעמוד הזה.",
+  },
+  {
     q: "כמה זה עולה?",
     a: "כלום. השאלון פתוח ליועצות ולצוותי חינוך בלי תשלום ובלי הרשמה.",
   },
@@ -105,7 +110,14 @@ export default function CounselorsPage() {
             className="inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-bold text-white transition-opacity hover:opacity-90"
             style={{ background: "var(--teal-dark)" }}
           >
-            למילוי השאלון ←
+            כניסה עם קוד בית ספר
+          </Link>
+          <Link
+            href="#access"
+            className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-base font-bold transition-opacity hover:opacity-80"
+            style={{ border: "1.5px solid var(--teal-dark)", color: "var(--teal-dark)" }}
+          >
+            לקבלת גישה לבית הספר
           </Link>
           <span className="text-sm" style={{ color: "var(--muted)" }}>בחינם · בלי הרשמה · בלי פרטים מזהים</span>
         </div>
@@ -171,6 +183,27 @@ export default function CounselorsPage() {
         </div>
       </section>
 
+      {/* Access: how a school gets the code. No price on the page, by the owner's decision:
+          it depends on the school and the agreement, and is given in the reply. */}
+      <section id="access" className="mx-auto max-w-3xl scroll-mt-24 px-5 py-16">
+        <h2 className="text-2xl font-black sm:text-3xl" style={{ color: "var(--text)" }}>גישה לבתי ספר ולרשויות</h2>
+        <div className="mt-6 space-y-4 leading-relaxed" style={{ color: "var(--text-2)" }}>
+          <p>
+            השאלון ניתן לבתי ספר ולרשויות מקומיות ברישיון לשנת לימודים. בית הספר מקבל קוד גישה: מקלידים אותו פעם אחת בכל
+            מכשיר שהיועצת עובדת בו, והוא פותח את השאלון.
+          </p>
+          <p>
+            המחיר תלוי בגודל בית הספר ובהסכם, והוא נמסר במענה לפנייה. העבודה מול בית הספר היא לפי נוהלי הרכש שלו: מסמכי
+            ספק לפי בקשה, הצעת מחיר וחשבונית עסקה, ותשלום בהעברה בנקאית, בכרטיס אשראי או בהמחאה. הרישיון נפתח עם התשלום הראשון.
+          </p>
+          <p>
+            מי שמטפל ברכש או בהנהלת החשבונות של בית הספר ימצא את הפרטים בעמוד{" "}
+            <Link href="/counselors/supplier" className="font-bold underline" style={{ color: "var(--teal-dark)" }}>מסמכי ספק ותנאי תשלום</Link>.
+          </p>
+        </div>
+        <AccessRequestForm />
+      </section>
+
       {/* FAQ */}
       <section className="py-16" style={{ background: "var(--surface)" }}>
         <div className="mx-auto max-w-3xl px-5">
@@ -192,13 +225,20 @@ export default function CounselorsPage() {
         <p className="mx-auto mt-4 max-w-xl leading-relaxed" style={{ color: "var(--text-2)" }}>
           הדרך לראות אם זה עוזר היא למלא פעם אחת על מקרה שכבר מוכר לך, ולהשוות למה שהיית כותבת בעצמך.
         </p>
-        <div className="mt-8">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
           <Link
             href="/school"
             className="inline-flex items-center justify-center rounded-full px-8 py-4 text-base font-bold text-white transition-opacity hover:opacity-90"
             style={{ background: "var(--teal-dark)" }}
           >
-            למילוי השאלון ←
+            כניסה עם קוד בית ספר
+          </Link>
+          <Link
+            href="#access"
+            className="inline-flex items-center justify-center rounded-full bg-white px-8 py-4 text-base font-bold transition-opacity hover:opacity-80"
+            style={{ border: "1.5px solid var(--teal-dark)", color: "var(--teal-dark)" }}
+          >
+            לקבלת גישה לבית הספר
           </Link>
         </div>
         <p className="mt-10 text-sm leading-relaxed" style={{ color: "var(--muted)" }}>

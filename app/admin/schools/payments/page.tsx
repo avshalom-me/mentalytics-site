@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import HelpTip from "../../components/HelpTip";
 import {
   LICENSE_KINDS,
   LICENSE_STATUSES,
@@ -118,7 +119,10 @@ export default function SchoolPaymentsPage() {
     <div className="p-6" dir="rtl">
       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-stone-900">רישיונות ותשלומים</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-black text-stone-900">רישיונות ותשלומים</h1>
+            <HelpTip id="school-payments" />
+          </div>
           <p className="mt-1 text-sm text-stone-500">שנת הלימודים {summary.year}: התקבלו {shekel(summary.received)}. פתוח לגבייה: {shekel(summary.expected)}{summary.overdue ? `, ${summary.overdue} באיחור` : ""}.</p>
         </div>
         <button type="button" onClick={() => setShowNew((v) => !v)} className="rounded-full bg-[#3D8C8A] px-5 py-2 text-sm font-bold text-white hover:bg-[#2A6462]">
@@ -268,6 +272,7 @@ function LicenseCard({ license: l, onChanged, say }: { license: License; onChang
 
       <div className="mt-3 flex flex-wrap items-center gap-2 text-sm">
         <span className="text-stone-500">קוד גישה:</span>
+        <HelpTip id="school-access-code" />
         <code dir="ltr" className="rounded bg-stone-100 px-2 py-0.5 font-mono tracking-widest">{showCode ? l.access_code : "••••-••••"}</code>
         <button type="button" onClick={() => setShowCode((v) => !v)} className="text-xs text-[#2A6462] underline">{showCode ? "הסתרה" : "הצגה"}</button>
         <button type="button" onClick={() => copy(l.access_code, "הקוד")} className="text-xs text-[#2A6462] underline">העתקה</button>
