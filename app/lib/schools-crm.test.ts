@@ -4,6 +4,10 @@ import {
   DEFAULT_BRANCH_SETTINGS,
   DEAL_STAGES,
   SCHOOL_ENTITY_TYPES,
+  autoMatchable,
+  matchTransferCandidates,
+  normalizeForMatch,
+  type ExpectedPayment,
   countsForGate,
   gateReceiptValue,
   generateAccessCode,
@@ -163,5 +167,49 @@ describe("the payment page", () => {
   it("names the invoice item after the licence, and numbers a split payment", () => {
     expect(licenseInvoiceItem("annual", "2026/27", 1, 1)).toBe("רישיון שנתי לשאלון היועצות, 2026/27 | טיפול חכם");
     expect(licenseInvoiceItem("partial", "2026/27", 2, 2)).toBe("רישיון חלקי עד סוף שנת הלימודים לשאלון היועצות, 2026/27, תשלום 2 מתוך 2 | טיפול חכם");
+  });
+});
+
+describe("matching a bank credit to an expected payment", () => {
+  const expected: ExpectedPayment[] = [
+    { id: "p1", seq: 1, amount_gross: 1180, due_date: "2026-11-01", proforma_number: null, license_id: "l1", school_id: "s1", school_name: "אורנים", school_symbol: "412345" },
+    { id: "p2", seq: 1, amount_gross: 1180, due_date: "2026-11-01", proforma_number: "DT-77", license_id: "l2", school_id: "s2", school_name: "בי\"ס הגפן", school_symbol: null },
+    { id: "p3", seq: 2, amount_gross: 708, due_date: "2027-02-28", proforma_number: null, license_id: "l1", school_id: "s1", school_name: "אורנים", school_symbol: "412345" },
+  ];
+  const credit = (amount: number, description: string, reference: string | null = null) => ({ id: "c", line_date: "2026-11-03", amount, description, reference });
+
+  it("normalises punctuation and quotes so a bank description matches a school name", () => {
+    expect(normalizeForMatch('העברה מ-בי"ס  הגפן (ת"א)')).toBe("העברה מ בי ס הגפן ת א");
+  });
+  it("amount plus the school symbol is a strong match, and is applied without a click", () => {
+    const [best] = matchTransferCandidates(credit(1180, "העברה עיריית X", "412345"), expected);
+    expect(best.payment.id).toBe("p1");
+    expect(best.confidence).toBe("strong");
+    expect(autoMatchable(best)).toBe(true);
+  });
+  it("amount plus the proforma number is strong too", () => {
+    const [best] = matchTransferCandidates(credit(1180, "DT-77 תשלום"), expected);
+    expect(best.payment.id).toBe("p2");
+    expect(autoMatchable(best)).toBe(true);
+  });
+  it("the same amount alone proposes every payment of that amount, never automatically", () => {
+    const c = matchTransferCandidates(credit(1180.5, "העברה"), expected);
+    expect(c.map((x) => x.payment.id)).toEqual(["p1", "p2"]);
+    expect(c.every((x) => x.confidence === "amount" && !autoMatchable(x))).toBe(true);
+  });
+  it("a name in the description strengthens a proposal but does not apply it by itself", () => {
+    const [best] = matchTransferCandidates(credit(1180, "העברה מבית ספר אורנים"), expected);
+    expect(best.payment.id).toBe("p1");
+    expect(best.confidence).toBe("strong");
+    expect(autoMatchable(best)).toBe(false);
+  });
+  it("a symbol with a different amount is only a weak hint, and an unrelated credit is nothing", () => {
+    const weak = matchTransferCandidates(credit(500, "412345"), expected);
+    expect(weak.map((x) => [x.payment.id, x.confidence])).toEqual([["p1", "key"], ["p3", "key"]]);
+    expect(matchTransferCandidates(credit(999, "משכורת"), expected)).toEqual([]);
+  });
+  it("a short symbol inside a longer number does not match", () => {
+    const short = [{ ...expected[0], school_symbol: "123" }];
+    expect(matchTransferCandidates(credit(1180, "ref 4123456"), short)[0].reasons).toEqual(["amount"]);
   });
 });

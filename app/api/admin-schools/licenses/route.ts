@@ -2,12 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   OWNER_VIEWER,
   SchoolsCrmError,
+  autoMatchTransfers,
   cancelLicense,
   createLicense,
   isUuid,
   listLicenses,
   listSchools,
   markPaymentReceived,
+  matchTransfer,
+  proposeTransferMatches,
   setLicenseCode,
 } from "@/app/lib/schools-crm.server";
 import { LICENSE_KINDS, PAYMENT_METHODS, SCHEDULE_KINDS } from "@/app/lib/schools-crm";
@@ -18,15 +21,21 @@ import { LICENSE_KINDS, PAYMENT_METHODS, SCHEDULE_KINDS } from "@/app/lib/school
 // GET   כל הרישיונות עם בית הספר והתשלומים, ורשימת בתי הספר לרישיון חדש.
 // POST  {action}: create (רישיון חדש עם קוד ולוח תשלומים), mark_received
 //       (העברה, המחאה או הזמנת רכש שהגיעו; התשלום הראשון מפעיל את הרישיון),
-//       code (השבתה/הפעלה של קוד הגישה), cancel (ביטול רישיון).
+//       code (השבתה/הפעלה של קוד הגישה), cancel (ביטול רישיון),
+//       match_transfer (שיוך זיכוי מדף הבנק לתשלום צפוי), auto_match (רק
+//       ההתאמות הוודאיות, כמו בקרון היומי).
+// GET ?transfers=1  זיכויים מדף הבנק עם ההצעות שלהם.
 
 export const dynamic = "force-dynamic";
 
 const has = (list: { value: string }[], v: unknown) => typeof v === "string" && list.some((o) => o.value === v);
 const str = (v: unknown, max = 500) => (typeof v === "string" ? v.trim().slice(0, max) : "");
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
+    if (req.nextUrl.searchParams.get("transfers")) {
+      return NextResponse.json({ ok: true, ...(await proposeTransferMatches()) });
+    }
     const [licenses, schools] = await Promise.all([listLicenses(), listSchools({ includeDemo: true })]);
     return NextResponse.json({
       ok: true,
@@ -90,6 +99,14 @@ export async function POST(req: NextRequest) {
         if (!reason) return NextResponse.json({ ok: false, error: "כותבים סיבה לביטול" }, { status: 400 });
         await cancelLicense(OWNER_VIEWER, body.license_id, reason);
         return NextResponse.json({ ok: true });
+      }
+      case "match_transfer": {
+        if (!isUuid(body.payment_id) || !isUuid(body.statement_line_id)) return NextResponse.json({ ok: false, error: "חסר מזהה" }, { status: 400 });
+        const payment = await matchTransfer(OWNER_VIEWER, body.payment_id, body.statement_line_id);
+        return NextResponse.json({ ok: true, payment });
+      }
+      case "auto_match": {
+        return NextResponse.json({ ok: true, ...(await autoMatchTransfers(OWNER_VIEWER)) });
       }
       default:
         return NextResponse.json({ ok: false, error: "פעולה לא מוכרת" }, { status: 400 });

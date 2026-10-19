@@ -6,6 +6,8 @@ import {
   CLOSED_DEAL_STAGES,
   DEAL_STAGES,
   DEFAULT_BRANCH_SETTINGS,
+  LICENSE_KINDS,
+  PAYMENT_METHODS,
   SCHOOL_STATUSES,
   generateAccessCode,
   grossToNet,
@@ -18,8 +20,13 @@ import {
   planLicense,
   schoolYearOf,
   vatOf,
+  autoMatchable,
+  matchTransferCandidates,
+  type BankCredit,
   type BranchSettings,
+  type ExpectedPayment,
   type SchoolEntityType,
+  type TransferCandidate,
 } from "./schools-crm";
 
 export type Viewer = { role: "owner" | "partner"; name: string };
@@ -380,8 +387,9 @@ export async function createLicense(v: Viewer, input: NewLicense) {
     const { error: pErr } = await supabaseAdmin.from("school_payments").insert(payments);
     if (pErr) throw new SchoolsCrmError(pErr.message, 500);
   }
-  await logActivity(v, "school_license", license.id, "system", free ? `רישיון ${plan.kind} הופעל` : `רישיון ${plan.kind} נוצר, ממתין לתשלום`);
-  await logActivity(v, "school", input.school_id, "system", `רישיון ${plan.kind} לשנת ${plan.school_year}`);
+  const kindLabel = labelOf(LICENSE_KINDS, plan.kind);
+  await logActivity(v, "school_license", license.id, "system", free ? `רישיון ${kindLabel} הופעל` : `רישיון ${kindLabel} נוצר, ממתין לתשלום`);
+  await logActivity(v, "school", input.school_id, "system", `רישיון ${kindLabel} לשנת ${plan.school_year}`);
   return license;
 }
 
@@ -429,10 +437,10 @@ export async function markPaymentReceived(
     if (lErr) throw new SchoolsCrmError(lErr.message, 500);
     if (lic) {
       await supabaseAdmin.from("schools").update({ status: "customer", updated_at: new Date().toISOString() }).eq("id", lic.school_id).in("status", ["prospect", "pilot", "past"]);
-      await logActivity(v, "school_license", lic.id, "system", `התקבל תשלום ${payment.amount_gross} ש"ח (${details.method}); הרישיון הופעל`);
+      await logActivity(v, "school_license", lic.id, "system", `התקבל תשלום ${payment.amount_gross} ש"ח (${labelOf(PAYMENT_METHODS, details.method)}); הרישיון הופעל`);
     }
   } else {
-    await logActivity(v, "school_license", payment.license_id, "system", `התקבל תשלום ${payment.seq}: ${payment.amount_gross} ש"ח (${details.method})`);
+    await logActivity(v, "school_license", payment.license_id, "system", `התקבל תשלום ${payment.seq}: ${payment.amount_gross} ש"ח (${labelOf(PAYMENT_METHODS, details.method)})`);
   }
   return payment;
 }
@@ -576,4 +584,129 @@ export async function licenseStillUsable(licenseId: string): Promise<boolean> {
 export async function bumpSchoolUsage(schoolId: string): Promise<void> {
   const { error } = await supabaseAdmin.rpc("bump_school_usage", { p_school_id: schoolId });
   if (error) console.error("bump_school_usage failed:", error.message);
+}
+
+// ── התאמת העברות בנקאיות ───────────────────────────────────────────────────────
+// זיכויים מדף הבנק (statement_lines, נטען מהקובץ החודשי) מול תשלומים צפויים של
+// רישיונות. ההצעה מוצגת במסך הרישיונות; "ודאי" (סכום + סמל/דרישה) מיושם גם
+// בקרון היומי. שורת הבנק עצמה אינה משתנה: הסיווג שלה שייך לסוכן התקציב.
+
+const CREDIT_FLOWS = ["income", "unknown"];
+
+/** זיכויים בבנק שעדיין לא שויכו לתשלום של רישיון, מהתקופה האחרונה. */
+export async function listUnmatchedBankCredits(days = 180): Promise<BankCredit[]> {
+  const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const [lines, linked] = await Promise.all([
+    supabaseAdmin
+      .from("statement_lines")
+      .select("id, line_date, amount, description, reference")
+      .eq("source", "bank")
+      .gt("amount", 0)
+      .in("flow", CREDIT_FLOWS)
+      .neq("status", "ignored")
+      .gte("line_date", since)
+      .order("line_date", { ascending: false })
+      .limit(500),
+    supabaseAdmin.from("school_payments").select("statement_line_id").not("statement_line_id", "is", null),
+  ]);
+  if (lines.error) throw new SchoolsCrmError(lines.error.message, 500);
+  if (linked.error) throw new SchoolsCrmError(linked.error.message, 500);
+  const taken = new Set((linked.data ?? []).map((r) => r.statement_line_id as string));
+  return (lines.data ?? [])
+    .filter((l) => !taken.has(l.id))
+    .map((l) => ({ id: l.id, line_date: l.line_date, amount: Number(l.amount), description: l.description ?? "", reference: l.reference ?? null }));
+}
+
+/** התשלומים הצפויים של רישיונות שממתינים לתשלום או פעילים, עם בית הספר. */
+export async function listExpectedPayments(): Promise<ExpectedPayment[]> {
+  const { data, error } = await supabaseAdmin
+    .from("school_payments")
+    .select("id, seq, amount_gross, due_date, proforma_number, license_id, school_licenses!inner(status, school_id, schools!inner(name, symbol))")
+    .eq("status", "expected")
+    .in("school_licenses.status", ["pending_payment", "active"]);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  type Lic = { school_id: string; schools: { name: string; symbol: string | null } | { name: string; symbol: string | null }[] };
+  return (data ?? []).map((p) => {
+    const lic = (Array.isArray(p.school_licenses) ? p.school_licenses[0] : p.school_licenses) as Lic;
+    const school = Array.isArray(lic.schools) ? lic.schools[0] : lic.schools;
+    return {
+      id: p.id,
+      seq: p.seq,
+      amount_gross: Number(p.amount_gross),
+      due_date: p.due_date,
+      proforma_number: p.proforma_number,
+      license_id: p.license_id,
+      school_id: lic.school_id,
+      school_name: school?.name ?? "",
+      school_symbol: school?.symbol ?? null,
+    };
+  });
+}
+
+export type TransferProposal = BankCredit & { candidates: TransferCandidate[] };
+
+/** זיכויים עם לפחות הצעה אחת, וכמה זיכויים נשארו בלי שום הצעה. */
+export async function proposeTransferMatches(): Promise<{ proposals: TransferProposal[]; other_credits: number; expected: number }> {
+  const [credits, expected] = await Promise.all([listUnmatchedBankCredits(), listExpectedPayments()]);
+  const proposals: TransferProposal[] = [];
+  let other = 0;
+  for (const c of credits) {
+    const candidates = matchTransferCandidates(c, expected);
+    if (candidates.length) proposals.push({ ...c, candidates });
+    else other++;
+  }
+  return { proposals, other_credits: other, expected: expected.length };
+}
+
+/** שיוך זיכוי מהבנק לתשלום צפוי: התשלום נרשם כהתקבל בהעברה, בתאריך של שורת הבנק. */
+export async function matchTransfer(v: Viewer, paymentId: string, lineId: string, note?: string) {
+  const [{ data: line, error: lErr }, { data: taken }, { data: payment }] = await Promise.all([
+    supabaseAdmin.from("statement_lines").select("id, source, amount, line_date, description").eq("id", lineId).maybeSingle(),
+    supabaseAdmin.from("school_payments").select("id").eq("statement_line_id", lineId).limit(1),
+    supabaseAdmin.from("school_payments").select("id, status, amount_gross").eq("id", paymentId).maybeSingle(),
+  ]);
+  if (lErr) throw new SchoolsCrmError(lErr.message, 500);
+  if (!line || line.source !== "bank" || Number(line.amount) <= 0) throw new SchoolsCrmError("שורת הבנק לא נמצאה, או שאינה זיכוי", 404);
+  if ((taken?.length ?? 0) > 0) throw new SchoolsCrmError("שורת הבנק הזו כבר שויכה לתשלום", 409);
+  if (!payment) throw new SchoolsCrmError("התשלום לא נמצא", 404);
+  if (payment.status !== "expected") throw new SchoolsCrmError("התשלום הזה כבר נרשם", 409);
+  const diff = Math.abs(Number(line.amount) - Number(payment.amount_gross));
+  const base = note ?? `שויך לזיכוי בבנק מ-${line.line_date}: ${String(line.description).slice(0, 80)}`;
+  return markPaymentReceived(v, paymentId, {
+    method: "transfer",
+    received_at: `${line.line_date}T12:00:00+03:00`,
+    statement_line_id: lineId,
+    note: diff > 1 ? `${base} (הועבר ${Number(line.amount)} ש"ח מול ${Number(payment.amount_gross)} צפוי)` : base,
+  });
+}
+
+/**
+ * מיישם את ההתאמות הוודאיות בלבד: זיכוי עם מועמד ודאי יחיד, שגם התשלום שלו
+ * אינו מועמד ודאי של זיכוי אחר. רץ מהקרון היומי ומכפתור במסך.
+ */
+export async function autoMatchTransfers(v: Viewer): Promise<{ matched: number; skipped: number }> {
+  const { proposals } = await proposeTransferMatches();
+  const pairs: { lineId: string; paymentId: string }[] = [];
+  for (const p of proposals) {
+    const sure = p.candidates.filter(autoMatchable);
+    if (sure.length === 1) pairs.push({ lineId: p.id, paymentId: sure[0].payment.id });
+  }
+  const perPayment = new Map<string, number>();
+  for (const pr of pairs) perPayment.set(pr.paymentId, (perPayment.get(pr.paymentId) ?? 0) + 1);
+  let matched = 0;
+  let skipped = 0;
+  for (const pr of pairs) {
+    if ((perPayment.get(pr.paymentId) ?? 0) !== 1) {
+      skipped++;
+      continue;
+    }
+    try {
+      await matchTransfer(v, pr.paymentId, pr.lineId);
+      matched++;
+    } catch (e) {
+      skipped++;
+      console.error("autoMatchTransfers:", e instanceof Error ? e.message : e);
+    }
+  }
+  return { matched, skipped };
 }

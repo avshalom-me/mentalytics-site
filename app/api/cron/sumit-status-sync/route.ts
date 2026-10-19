@@ -21,6 +21,7 @@ import { startAgentRun, finishAgentRun } from "@/app/lib/agent-infra";
 import { stopActiveCenter } from "@/app/lib/center-promotion";
 import { alertRecipients } from "@/app/lib/alert-recipients";
 import { syncSumitDocuments } from "@/app/lib/sumit-documents";
+import { autoMatchTransfers } from "@/app/lib/schools-crm.server";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -1184,13 +1185,26 @@ export async function GET(req: NextRequest) {
     console.error("sumit documents sync failed:", err instanceof Error ? err.message : err);
   }
 
+  // -------- (7) העברות של בתי ספר מדף הבנק → תשלומי רישיונות --------
+  // רק התאמה ודאית (סכום + סמל מוסד או מספר דרישה) מיושמת לבד; השאר מוצע
+  // במסך הרישיונות (app/lib/schools-crm.server.ts, autoMatchTransfers).
+  let transfersMatched = 0;
+  try {
+    const m = await autoMatchTransfers({ role: "owner", name: "קרון יומי" });
+    transfersMatched = m.matched;
+  } catch (err) {
+    errors++;
+    console.error("school transfers auto-match failed:", err instanceof Error ? err.message : err);
+  }
+
   await finishAgentRun(runId, {
     status: errors > 0 ? "error" : "ok",
     summary:
       `נבדקו ${checked} מנויים; ${demoted} הורדו, ${trialsExpired} מתנות פגו, ` +
       `${rolledToPaid} התגלגלו לתשלום, ${orphansCancelled} הוראות יתומות בוטלו; ` +
       (centerGiftsEnded > 0 ? `${centerGiftsEnded} מתנות מרכז הסתיימו; ` : "") +
-      `${documentsSynced} מסמכי Sumit סונכרנו`,
+      `${documentsSynced} מסמכי Sumit סונכרנו` +
+      (transfersMatched > 0 ? `; ${transfersMatched} העברות של בתי ספר שויכו` : ""),
     error: errors > 0 ? `${errors} שגיאות בריצה` : undefined,
   });
 

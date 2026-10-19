@@ -430,3 +430,67 @@ export function platformFeeForMonth(trailing12Receipts: number, settings: Branch
   if (trailing12Receipts <= p.tier2_max) return p.tier2_monthly;
   return Math.round((trailing12Receipts * p.pct_above) / 12);
 }
+
+// ── התאמת העברות בנקאיות לתשלומים צפויים ─────────────────────────────────────
+// זיכוי בדף הבנק (statement_lines) מול תשלום צפוי של רישיון. ההחלטה כאן טהורה;
+// הקריאה מהמסד והרישום ב-schools-crm.server.ts. "ודאי" = גם הסכום וגם מפתח
+// חד-ערכי (סמל מוסד או מספר דרישת התשלום) תואמים; רק התאמה כזו מיושמת בלי
+// לחיצה. שם בית ספר בתיאור מחזק הצעה אבל אינו מספיק לבד: בבנק מופיע שם
+// המעביר, ולא תמיד זה שם בית הספר.
+export type BankCredit = { id: string; line_date: string; amount: number; description: string; reference: string | null };
+export type ExpectedPayment = {
+  id: string;
+  seq: number;
+  amount_gross: number;
+  due_date: string | null;
+  proforma_number: string | null;
+  license_id: string;
+  school_id: string;
+  school_name: string;
+  school_symbol: string | null;
+};
+export type MatchReason = "amount" | "symbol" | "proforma" | "name";
+export type MatchConfidence = "strong" | "amount" | "key";
+export type TransferCandidate = { payment: ExpectedPayment; confidence: MatchConfidence; reasons: MatchReason[] };
+
+/** אותיות וספרות בלבד, ברווח אחד: "בי\"ס  אורנים (ת\"א)" ו-ביס אורנים תא שווים. */
+export function normalizeForMatch(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[֑-ׇ]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
+}
+
+const AMOUNT_TOLERANCE = 1;
+
+export function matchTransferCandidates(credit: BankCredit, expected: ExpectedPayment[]): TransferCandidate[] {
+  const text = ` ${normalizeForMatch(`${credit.description} ${credit.reference ?? ""}`)} `;
+  const out: TransferCandidate[] = [];
+  for (const p of expected) {
+    const reasons: MatchReason[] = [];
+    if (Math.abs(credit.amount - p.amount_gross) <= AMOUNT_TOLERANCE) reasons.push("amount");
+    if (p.school_symbol && p.school_symbol.length >= 4 && text.includes(` ${p.school_symbol} `)) reasons.push("symbol");
+    if (p.proforma_number && text.includes(` ${normalizeForMatch(p.proforma_number)} `)) reasons.push("proforma");
+    const name = normalizeForMatch(p.school_name);
+    if (name.length >= 4 && text.includes(` ${name} `)) reasons.push("name");
+    const key = reasons.some((r) => r !== "amount");
+    const amount = reasons.includes("amount");
+    if (!key && !amount) continue;
+    out.push({ payment: p, reasons, confidence: amount && key ? "strong" : amount ? "amount" : "key" });
+  }
+  const rank: Record<MatchConfidence, number> = { strong: 0, amount: 1, key: 2 };
+  return out.sort((a, b) => rank[a.confidence] - rank[b.confidence] || a.payment.seq - b.payment.seq);
+}
+
+/** מיושם בלי לחיצה: סכום ועוד סמל מוסד או מספר דרישה. שם לבד אינו מספיק. */
+export function autoMatchable(c: TransferCandidate): boolean {
+  return c.reasons.includes("amount") && (c.reasons.includes("symbol") || c.reasons.includes("proforma"));
+}
+
+export const MATCH_REASON_LABELS: Record<MatchReason, string> = {
+  amount: "אותו סכום",
+  symbol: "סמל המוסד בתיאור",
+  proforma: "מספר דרישת התשלום בתיאור",
+  name: "שם בית הספר בתיאור",
+};

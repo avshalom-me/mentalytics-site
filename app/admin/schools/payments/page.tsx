@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HelpTip from "../../components/HelpTip";
+import TransfersPanel from "../TransfersPanel";
 import {
   LICENSE_KINDS,
   LICENSE_STATUSES,
@@ -131,6 +132,8 @@ export default function SchoolPaymentsPage() {
       </div>
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {flash && <div className="mb-4 rounded-xl border border-[#C2DFDE] bg-[#EAF4F3] p-3 text-sm text-[#2A6462]">{flash}</div>}
+
+      <TransfersPanel onMatched={load} say={say} />
 
       {showNew && (
         <NewLicenseForm
