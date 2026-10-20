@@ -24,6 +24,7 @@ export async function GET(req: NextRequest) {
       ok: result.ok,
       gift_gaps: result.giftGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
       recruit_gaps: result.recruitGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
+      concentration_offers: result.concentrationOffers,
       error: result.error,
     },
     { status: result.ok ? 200 : 500 }

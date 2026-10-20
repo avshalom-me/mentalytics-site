@@ -3,6 +3,8 @@ import { PROSPECT_REGION_LABELS } from "@/app/lib/prospect-regions";
 import { repeatedClosingLine } from "@/app/lib/email-signature";
 import { splitQuoted } from "@/app/lib/email-quote";
 import GiftOfferHistory from "@/app/admin/components/GiftOfferHistory";
+import ConcentrationPanel from "@/app/admin/components/ConcentrationPanel";
+import type { ConcentrationSummary, FreezeCandidate } from "@/app/lib/contact-concentration";
 
 import { Fragment, useEffect, useRef, useState } from "react";
 
@@ -244,6 +246,9 @@ type GapsRun = {
   gift_gaps: SupplyGap[];
   recruit_gaps: SupplyGap[];
   waiting_gaps: WaitingGap[];
+  // ריכוז פניות והקפאה - נוספו 20/10/26, חסרים בריצות שנשמרו לפני כן.
+  concentration?: ConcentrationSummary[];
+  freeze?: FreezeCandidate[];
 };
 
 type AdsRun = {
@@ -3032,8 +3037,9 @@ export default function AgentsPage() {
           <div className="space-y-2 text-sm">
             <p className="text-stone-600">
               🎁 {gaps.gift_gaps.length} הצעות מתנה · 🧲 {gaps.recruit_gaps.length} פערי גיוס · ⏳{" "}
-              {gaps.waiting_gaps.length} ממתינים לתשובה
+              {gaps.waiting_gaps.length} ממתינים לתשובה · 🔥 {gaps.concentration?.length ?? 0} ריכוזי פניות
             </p>
+            <ConcentrationPanel concentration={gaps.concentration ?? []} freeze={gaps.freeze ?? []} />
             {gaps.recruit_gaps.length > 0 && (
               <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={gaps.recruit_gaps.length}>
                 <ul className="space-y-1 text-xs text-stone-600">
@@ -3053,13 +3059,17 @@ export default function AgentsPage() {
         ? (d?.recruit as { region: string; treatment: string; events: number }[])
         : [];
       const waiting = Array.isArray(d?.waiting) ? (d?.waiting as WaitingGap[]) : [];
+      const concentration = Array.isArray(d?.concentration) ? (d?.concentration as ConcentrationSummary[]) : [];
+      const freeze = Array.isArray(d?.freeze) ? (d?.freeze as FreezeCandidate[]) : [];
       if (!stored) return <p className="text-sm text-stone-400">עדיין אין ריצה - אפשר להריץ עכשיו.</p>;
       return (
         <div className="space-y-2 text-sm">
           <p className="text-stone-600">
-            🎁 {gift.length} הצעות מתנה · 🧲 {recruit.length} פערי גיוס · ⏳ {waiting.length} ממתינים לתשובה
+            🎁 {gift.length} הצעות מתנה · 🧲 {recruit.length} פערי גיוס · ⏳ {waiting.length} ממתינים לתשובה · 🔥{" "}
+            {concentration.length} ריכוזי פניות
             <span className="text-xs text-stone-400"> · {when}</span>
           </p>
+          <ConcentrationPanel concentration={concentration} freeze={freeze} />
           {recruit.length > 0 && (
             <Collapse title="איפה כדאי לגייס (אין לנו אף מטפל מתאים)" count={recruit.length}>
               <ul className="space-y-1 text-xs text-stone-600">

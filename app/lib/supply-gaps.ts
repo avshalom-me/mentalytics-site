@@ -13,6 +13,28 @@ import {
   GIFT_OFFER_COOLDOWN_DAYS,
 } from "./gift-offer";
 import { GIFT_FOLLOWON_PRICE, GIFT_FOLLOWON_MONTHS } from "./promo";
+import {
+  canonicalPart,
+  matchPart,
+  treatmentKey,
+  treatmentLabel,
+  treatmentParts,
+  treatmentPhrase,
+} from "./treatment-parts";
+import {
+  analyzeConcentration,
+  isConcentrated,
+  NEW_PER_SLICE,
+  ONLINE_REGION,
+  CONCENTRATION_WINDOW_DAYS,
+  type ConcentrationSlice,
+  type ConcentrationSummary,
+  type FreezeCandidate,
+} from "./contact-concentration";
+import { loadConcentrationInput } from "./contact-concentration-data";
+
+// היה מוגדר כאן עד 20/10/26; נשאר מיוצא מכאן בשביל מי שכבר מייבא אותו.
+export { treatmentParts };
 
 // סוכן פערי ההיצע (סוכן 11): מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים
 // ביקשו טיפול ולא היה לנו מטפל משלם להראות להם, ומציע מה לעשות עם כל פער:
@@ -78,6 +100,10 @@ type TherapistRow = {
   online: boolean | null;
   training_areas: string[] | null;
   age_groups: string[] | null;
+  // לניתוח ריכוז הפניות ולבדיקת ההקפאה (contact-concentration.ts).
+  entity_type: string | null;
+  match_paused_until: string | null;
+  promoted_since: string | null;
 };
 
 // "אזורים נוספים" מאגד אזורים שאין ביניהם קשר גיאוגרפי (נגב ואילת, יהודה
@@ -137,6 +163,12 @@ export type SupplyGapsResult = {
   giftGaps: SupplyGap[];
   recruitGaps: SupplyGap[];
   waitingGaps: WaitingGap[];
+  /** חיתוכים שבהם מעט מטפלים מקבלים את רוב הפניות (20/10/26). */
+  concentration: ConcentrationSummary[];
+  /** כמה מהם הפכו להצעת מתנה בתור. */
+  concentrationOffers: number;
+  /** מי היה מוקפא לשבוע, ולמה כן או לא - בדיקה בלבד, שום דבר לא מוקפא מכאן. */
+  freeze: FreezeCandidate[];
   error?: string;
 };
 
@@ -153,91 +185,9 @@ function asStringArray(v: unknown): string[] {
   return [];
 }
 
-// ראשי תיבות לועזיים (cbt/dbt/emdr) נשמרים במאגר באותיות קטנות ונראים
-// שבורים בתוך משפט בעברית - מוצגים באותיות גדולות.
-function treatmentLabel(t: string): string {
-  return /^[a-z0-9\s-]+$/i.test(t) ? t.toUpperCase() : t;
-}
-
-// ── חיתוך משולב ────────────────────────────────────────────────────────
-// מטופל שמבקש "CBT + טיפול דינאמי" מייצר מחרוזת אחת, ועד 20/8/26 היא
-// הושוותה כמכלול מול תחומי ההתמחות של המטפל. אין מטפל שרשום אצלו תחום
-// בשם "CBT + טיפול דינאמי", ולכן אף מועמד לא נמצא לעולם וכל חיתוך משולב
-// סווג כ"אין לנו אף מטפל" ונשלח לרשימת הגיוס. בפועל 15 מתוך 26 פערי
-// הגיוס היו כאלה, והביקוש הגדול ביותר בנתונים הוא בדיוק שילוב כזה.
-//
-// נוסף לזה פיצול וריאנטים: "טיפול CBT + טיפול דינאמי" ו-"CBT + טיפול
-// דינאמי" נספרו כשני חיתוכים נפרדים, כל אחד מתחת לסף - וכך ריכוז ביקוש
-// אמיתי נראה כפירורים.
-
-function normTreat(v: string): string {
-  return v.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
-// וריאנטים שהם אותו תחום. הרשימה מכוונת ומינימלית: רק תחילית "טיפול"
-// לפני ראשי תיבות לועזיים, שם ההבדל הוא ניסוח ולא תוכן.
-const TREATMENT_ALIASES: Record<string, string> = {
-  "טיפול cbt": "cbt",
-  "טיפול dbt": "dbt",
-  "טיפול emdr": "emdr",
-  "טיפול cpt": "cpt",
-  "טיפול act": "act",
-};
-
-function canonicalPart(raw: string): string {
-  const n = normTreat(raw);
-  return TREATMENT_ALIASES[n] ?? n;
-}
-
-/** הרכיב כפי שהוא נבדק מול training_areas של המטפל.
- *
- *  תוויות ההמלצה מהשאלון נושאות לעיתים סיוג בסוגריים - "טיפול זוגי (בהעדפה
- *  לגישה דינמית)". הסיוג הוא העדפה ולא דרישה, אבל ההשוואה מול training_areas
- *  היא שוויון מחרוזות מנורמל, ולכן התווית המלאה לא תאמה אף מטפל: כל פער של
- *  טיפול זוגי סווג כ"אין במאגר אף מטפל חינמי מאושר שמתאים" ונשלח לגיוס במקום
- *  להצעת מתנה (14 ממצאים ב-60 יום, מול הצעת מתנה אחת). מסירים את הסיוג לצורך
- *  ההתאמה בלבד - התווית המלאה נשארת בכותרת הממצא ובמפתח הצבירה. */
-function matchPart(raw: string): string {
-  return raw.replace(/\s*\([^)]*\)\s*/g, " ").trim() || raw.trim();
-}
-
-/** פירוק "CBT + טיפול דינאמי" לרכיביו, בלי כפילויות ובסדר קבוע. */
-export function treatmentParts(raw: string): string[] {
-  const parts = raw
-    .split("+")
-    .map((x) => x.trim())
-    .filter(Boolean);
-  return parts.length > 0 ? parts : [raw.trim()].filter(Boolean);
-}
-
-function canonicalParts(raw: string): string[] {
-  return Array.from(new Set(treatmentParts(raw).map(canonicalPart))).sort();
-}
-
-/** מפתח הצבירה: שני ניסוחים של אותו שילוב מתמזגים לחיתוך אחד. */
-function treatmentKey(raw: string): string {
-  return canonicalParts(raw).join(" + ");
-}
-
-/** ניסוח קריא לשילוב: "שילוב של CBT וטיפול דינאמי", "X, Y ו-Z".
- *  ו' לפני מילה לועזית מקבלת מקף ("ו-CPT"), אחרת היא נדבקת אליה. */
-function joinWithVav(word: string): string {
-  return /^[a-z0-9]/i.test(word) ? `ו-${word}` : `ו${word}`;
-}
-
-function treatmentPhrase(raw: string): string {
-  const parts = treatmentParts(raw).map(treatmentLabel);
-  if (parts.length === 1) return parts[0];
-  const last = joinWithVav(parts[parts.length - 1]);
-  const head = parts.slice(0, -1).join(", ");
-  // "שילוב של" - כדי שהמטפל יבין שהמטופל ביקש את הצירוף, ולא שהיו כמה
-  // מטופלים שכל אחד ביקש משהו אחר.
-  return `שילוב של ${head} ${last}`;
-}
-
 // טיוטת הצעת הקידום. תבנית קבועה בטון עובדתי-מסייע: מובילה בצורך שלנו,
 // לא במספרי הביצועים של המטפל, ובלי ניסוחים שיווקיים.
-function buildGiftDraft(
+export function buildGiftDraft(
   name: string,
   regionKey: string,
   rawTreatment: string,
@@ -265,6 +215,13 @@ function buildGiftDraft(
     ? `הפרופיל שלך מתאים ל${treatmentLabel(coveredPart)}, שהוא חלק מהשילוב הזה`
     : "הפרופיל שלך מתאים לחיתוך הזה";
 
+  return giftOfferDraft(name, demandLine, fitLine, treatment, where);
+}
+
+// מה שמשותף לשתי הטיוטות (פער היצע וריכוז פניות): תנאי המסלול, מה זה אומר
+// בפועל, הקישור והחתימה. במקום אחד, כדי שתנאים שהבעלים אישר לא ייפרדו בין
+// שתי גרסאות של אותה הצעה.
+function giftOfferDraft(name: string, demandLine: string, fitLine: string, treatment: string, where: string): string {
   return [
     `שלום ${name},`,
     ``,
@@ -285,6 +242,25 @@ function buildGiftDraft(
     `בברכה,`,
     `צוות טיפול חכם`,
   ].join("\n");
+}
+
+// טיוטת הצעת המתנה לחיתוך של ריכוז פניות (נוסף 20/10/26): אין כאן חוסר -
+// היו מטפלים להציע - אלא מעט מטפלים שמקבלים את רוב הפניות. הטיוטה אומרת
+// בדיוק את זה, בלי שמות, בלי מספרים של מטפלים אחרים, ובלי לטעון שלא היה
+// למטופלים מה לקבל.
+export function buildConcentrationDraft(
+  name: string,
+  regionKey: string,
+  rawTreatment: string,
+  people: number
+): string {
+  const treatment = treatmentPhrase(rawTreatment);
+  const where = regionPhrase(regionKey);
+  const who = people >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים";
+  const demandLine =
+    `בשבועיים האחרונים ${who} שחיפשו ${treatment} ${where} דרך מערכת ההתאמות, שבה מוצגים רק מטפלים מקודמים, ` +
+    `פנו למטפלים שהוצגו להם. הפניות מתרכזות כרגע אצל מספר קטן של מטפלים בתחום ובאזור הזה, ואנחנו רוצים שלמטופלים יהיו יותר אפשרויות.`;
+  return giftOfferDraft(name, demandLine, "הפרופיל שלך מתאים לתחום ולאזור האלה", treatment, where);
 }
 
 /** איפה בתוך הקבוצה הפער נראה, כשזה צר מהקבוצה כולה. שורה ריקה אחרת. */
@@ -318,7 +294,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // ההתאמה נושאת את האזור והטיפול שהמטופל ביקש - גם כשכן היו מטפלים
     // להציע. אירוע הפער (למטה) נרשם רק כשלא היה אף משלם, ולכן הוא לבדו
     // לא יכול לגלות חיתוך שיש בו מטפל אחד או שניים.
-    const [viewsRes, eventsRes, therapists, sentOffers] = await Promise.all([
+    const [viewsRes, eventsRes, therapists, sentOffers, concInput] = await Promise.all([
       fetchAllRows<{ viewer_region: string | null; viewer_treatment: string | null; session_id: string | null }>(
         () =>
           supabaseAdmin
@@ -339,13 +315,15 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         supabaseAdmin
           .from("therapists")
           .select(
-            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, online, training_areas, age_groups"
+            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, online, training_areas, age_groups, entity_type, match_paused_until, promoted_since"
           )
           .in("status", ["paying", "approved"])
       ),
       // הצעות מתנה שכבר יצאו: מוציאות את מי שקיבל אותן מבריכת המועמדים,
       // ומשתיקות את הפער שממנו יצאו כל עוד ההמתנה לתשובה נמשכת.
       recentGiftOffers(),
+      // ריכוז פניות: מי פנה למי בשבועיים האחרונים (contact-concentration-data.ts).
+      loadConcentrationInput(),
     ]);
 
     // צבירה לפי קבוצת אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
@@ -584,9 +562,65 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const giftGaps = gaps.filter((g) => g.kind === "gift");
     const recruitGaps = gaps.filter((g) => g.kind === "recruit");
 
+    // ── ריכוז פניות (20/10/26) ─────────────────────────────────────────────
+    // חיתוך שאין בו חוסר, אבל מעט מטפלים מקבלים בו את רוב הפניות: הצעת מתנה
+    // לעוד מטפלים מאותו אזור ותחום, באותו מסלול שליחה ובאותם צינונים כמו
+    // פער היצע. חיתוך שכבר עלה כפער לא מוצע פעמיים.
+    const conc = analyzeConcentration({
+      contacts: concInput.contacts,
+      therapists,
+      lastPausedAt: concInput.lastPausedAt,
+    });
+    const gapKeys = new Set(gaps.map((g) => `${g.region}|${treatmentKey(g.treatment)}`));
+    type ConcOffer = { slice: ConcentrationSlice; regionLabel: string; candidates: GapCandidate[]; key: string };
+    const concOffers: ConcOffer[] = [];
+    const concentrated = conc.slices.filter(isConcentrated);
+    // מטפל שעובד בשני אזורים (חיפה ועמק יזרעאל) עלה כמועמד בשני כרטיסים, והשליחה
+    // מהכרטיס השני הייתה נחסמת בצינון. כל מועמד מופיע בכרטיס אחד בלבד.
+    const assigned = new Set<string>();
+    for (const s of concentrated) {
+      const groupKey = s.region === ONLINE_REGION ? "online" : regionGroupOf(s.region);
+      if (UNACTIONABLE_GROUPS.has(groupKey)) continue;
+      // אותו חיתוך ברזולוציה של פערי ההיצע (קבוצת אזורים) - אם הוא כבר פער,
+      // ההצעה שם מכסה אותו.
+      if (gapKeys.has(`${regionGroupLabel(groupKey)}|${treatmentKey(s.treatment)}`)) continue;
+      // ההצעה נרשמת באזור המלא ("גוש דן"), ולכן גם ההמתנה לתשובה נבדקת שם.
+      // וגם ברמת הקבוצה: הצעת פער שיצאה לאחרונה ל"המרכז והשפלה" כבר מוסיפה
+      // מטפלים לגוש דן, ואין טעם לשלוח עוד לפני שידוע מה קרה איתה.
+      const regionLabel = s.region === ONLINE_REGION ? regionGroupLabel("online") : s.region;
+      if (
+        waitingByGap.has(`${regionLabel}|${treatmentKey(s.treatment)}`) ||
+        waitingByGap.has(`${regionGroupLabel(groupKey)}|${treatmentKey(s.treatment)}`)
+      ) {
+        continue;
+      }
+      const fresh = freePool.filter(
+        (t) =>
+          !offeredRecently.has(t.id) &&
+          !assigned.has(t.id) &&
+          (s.region === ONLINE_REGION ? t.online === true : coversRegion(t.regions ?? [], s.region)) &&
+          overlaps(t.training_areas ?? [], [matchPart(s.treatment)])
+      );
+      if (fresh.length === 0) continue;
+      const label = treatmentLabel(s.treatment);
+      const picked = fresh.slice(0, MAX_CANDIDATES_PER_GAP);
+      for (const t of picked) assigned.add(t.id);
+      concOffers.push({
+        slice: s,
+        regionLabel,
+        key: `conc:gift:${s.region}|${s.treatment}`,
+        candidates: picked.map((t) => ({
+          therapist_id: t.id,
+          full_name: t.full_name ?? "",
+          email: t.email ?? "",
+          draft: buildConcentrationDraft(t.full_name ?? "", s.region, label, s.slicePeople),
+        })),
+      });
+    }
+
     // הצעות לתור, עם החלמה אוטומטית: פער שנסגר (נוסף מטפל משלם, או שכבר
     // יצאה בו הצעה) סוגר את ההצעה שלו בריצה הבאה.
-    const actions = gaps.map((g) =>
+    const gapActions = gaps.map((g) =>
         g.kind === "gift"
           ? {
               actionType: "gift_offer",
@@ -632,6 +666,57 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
             }
     );
 
+    // הצעות הריכוז נכנסות לאותו תור ובאותו סוג פעולה (gift_offer), ולכן
+    // השליחה, הצינון והתיעוד הם אלה של gift-offer.ts - אין מסלול שליחה שני.
+    // supply_target = כמה מטפלים חדשים מציעים לחיתוך; paying_covering = 0,
+    // כי כאן היעד הוא "עוד אפשרויות" ולא השלמה למספר מינימלי.
+    const concActions = concOffers.map((o) => {
+      const s = o.slice;
+      const label = treatmentLabel(s.treatment);
+      const where = s.region === ONLINE_REGION ? "אונליין" : s.region;
+      return {
+        actionType: "gift_offer",
+        kind: "action" as const,
+        title: `הצעת קידום מתנה (ריכוז פניות): ${label} · ${where}`,
+        body:
+          `${s.slicePeople} מטופלים שחיפשו ${label} פנו ב-${CONCENTRATION_WINDOW_DAYS} הימים האחרונים למקודמים ב${where}; ` +
+          `${s.hotPeople} מהם ל-${s.hot.length === 1 ? "מטפל/ת אחד/ת" : `${s.hot.length} מטפלים`} בלבד: ` +
+          `${s.hot.map((h) => `${h.name} (${h.people} פונים בסך הכל)`).join(", ")}.\n` +
+          `מקודמים בחיתוך: ${s.covering} (${s.paidCovering} משלמים)` +
+          (s.idle > 0
+            ? `, ${s.idle} מהם בלי אף פנייה בשבועיים - מטפל/ת נוסף/ת עלול/ה להתחלק איתם ולא עם העמוסים.\n`
+            : `.\n`) +
+          `מועמדים מתאימים במאגר: ${o.candidates.map((c) => `${c.full_name} (${c.email})`).join(", ")}\n` +
+          `הטיוטה ניתנת לעריכה למטה, והמייל יוצא רק בלחיצה שלך.`,
+        entityType: "therapist",
+        entityId: o.candidates[0].therapist_id,
+        entityLabel: o.candidates[0].full_name,
+        dedupeKey: o.key,
+        payload: {
+          region: o.regionLabel,
+          treatment: label,
+          gift_months: GIFT_MONTHS,
+          gap_key: o.key,
+          subject: GIFT_SUBJECT,
+          candidates: o.candidates,
+          paying_covering: 0,
+          supply_target: NEW_PER_SLICE,
+          reason: "concentration",
+        },
+      };
+    });
+    const actions = [...gapActions, ...concActions];
+    const concSummary: ConcentrationSummary[] = concentrated.map((c) => ({
+      region: c.region,
+      treatment: treatmentLabel(c.treatment),
+      hot: c.hot.map((h) => ({ id: h.id, name: h.name, people: h.people })),
+      slicePeople: c.slicePeople,
+      hotPeople: c.hotPeople,
+      covering: c.covering,
+      idle: c.idle,
+      offered: concOffers.some((o) => o.slice === c),
+    }));
+
     // בלי managedKeys: הריצה מחשבת מחדש את כל תמונת הפערים, ולכן כל הצעה
     // ממתינה שהריצה הזו לא הפיקה מחדש כבר לא רלוונטית ונסגרת. (עם רשימת
     // המפתחות של הריצה הנוכחית, כפי שהיה קודם, שום הצעה לא הייתה נסגרת
@@ -655,14 +740,17 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     }
 
     await finishAgentRun(runId, {
-      status: gaps.length > 0 ? "ok" : "empty",
+      status: gaps.length > 0 || concOffers.length > 0 ? "ok" : "empty",
       summary:
-        gaps.length > 0
+        (gaps.length > 0
           ? `${gaps.length} פערי היצע: ${giftGaps.length} להצעת מתנה, ${recruitGaps.length} לגיוס` +
             (waitingGaps.length > 0 ? `, ${waitingGaps.length} ממתינים לתשובה` : "")
           : waitingGaps.length > 0
             ? `אין פערים חדשים; ${waitingGaps.length} ממתינים לתשובה על הצעה שנשלחה`
-            : "אין פערי היצע פתוחים",
+            : "אין פערי היצע פתוחים") +
+        (concentrated.length > 0
+          ? ` · ${concentrated.length} ריכוזי פניות (${concOffers.length} להצעת מתנה)`
+          : ""),
       details: {
         gift: giftGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
         recruit: recruitGaps.map((g) => ({ region: g.region, treatment: g.treatment, events: g.events })),
@@ -670,13 +758,35 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         cooldown_days: GIFT_OFFER_COOLDOWN_DAYS,
         min_supply_per_slice: MIN_SUPPLY_PER_SLICE,
         skipped_unactionable: skippedUnactionable,
+        // ריכוז פניות והקפאה - לתצוגה בעמוד הסוכנים גם בלי ריצה ידנית.
+        concentration: concSummary,
+        freeze: conc.freeze,
       },
     });
 
-    return { ok: true, gaps, giftGaps, recruitGaps, waitingGaps };
+    return {
+      ok: true,
+      gaps,
+      giftGaps,
+      recruitGaps,
+      waitingGaps,
+      concentration: concSummary,
+      concentrationOffers: concOffers.length,
+      freeze: conc.freeze,
+    };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     await finishAgentRun(runId, { status: "error", error: msg });
-    return { ok: false, gaps: [], giftGaps: [], recruitGaps: [], waitingGaps: [], error: msg };
+    return {
+      ok: false,
+      gaps: [],
+      giftGaps: [],
+      recruitGaps: [],
+      waitingGaps: [],
+      concentration: [],
+      concentrationOffers: 0,
+      freeze: [],
+      error: msg,
+    };
   }
 }

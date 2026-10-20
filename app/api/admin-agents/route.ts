@@ -246,6 +246,10 @@ export async function POST(req: NextRequest) {
         gift_gaps: result.giftGaps,
         recruit_gaps: result.recruitGaps,
         waiting_gaps: result.waitingGaps,
+        // ריכוז פניות ובדיקת ההקפאה (contact-concentration.ts).
+        concentration: result.concentration,
+        concentration_offers: result.concentrationOffers,
+        freeze: result.freeze,
         error: result.error,
       });
     }
