@@ -26,6 +26,8 @@ function therapist(id: string, over: Partial<ConcTherapist> = {}): ConcTherapist
     regions: ["תל אביב"],
     online: false,
     training_areas: ["CBT", "טיפול דינאמי"],
+    assessment_types: [],
+    couples_modalities: [],
     age_groups: ["מבוגרים"],
     admin_approved: true,
     accepting_new_patients: true,
@@ -203,7 +205,7 @@ describe("whether a one-week freeze is safe", () => {
       therapists: [therapist("hot", { age_groups: ["ילדים", "מבוגרים"] }), ...quiet(5)],
     });
     expect(r.freeze[0].safe).toBe(false);
-    expect(r.freeze[0].blockedReason).toContain("ילדים ונוער");
+    expect(r.freeze[0].blockedReason).toContain("(ילדים)");
   });
 
   it("follows the manual freeze rules: no centers and no invitation route before the first charge", () => {
@@ -236,6 +238,83 @@ describe("whether a one-week freeze is safe", () => {
   it("does not freeze a paying therapist whose subscription cannot be found", () => {
     const r = analyzeConcentration({ ...base, paidSince: new Map(), therapists: [therapist("hot"), ...quiet(5)] });
     expect(r.freeze[0].safe).toBe(false);
+  });
+
+  it("does not count as an alternative someone whose 'accepting new patients' is not set - the quiz shows only true", () => {
+    const r = analyzeConcentration({
+      ...base,
+      therapists: [therapist("hot"), ...quiet(3), therapist("unset", { accepting_new_patients: null })],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].weakest?.alternatives).toBe(3);
+  });
+
+  it("checks the online patients of a therapist who also has a clinic", () => {
+    const mixed = [...contacts("hot", 2), ...contacts("hot", 3, "CBT", "match", { regionGroup: "online" }).map((c, i) => ({ ...c, sessionId: `o${i}` }))];
+    const r = analyzeConcentration({
+      ...base,
+      contacts: mixed,
+      // חמש חלופות בקליניקה בגוש דן, אף אחת לא אונליין.
+      therapists: [therapist("hot", { online: true }), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("אונליין");
+  });
+
+  it("does not freeze when a quiz contact cannot be tied to what the patient searched or where", () => {
+    const r = analyzeConcentration({
+      ...base,
+      contacts: [...contacts("hot", 4), { therapistId: "hot", sessionId: "x", source: "match", treatment: null, regionGroup: null, ageBand: null }],
+      therapists: [therapist("hot"), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("בלי נתון מלא");
+  });
+
+  it("checks each child age group separately: therapists for teens are not alternatives for toddlers", () => {
+    const r = analyzeConcentration({
+      ...base,
+      contacts: contacts("hot", 5, "CBT", "match", { ageBand: "child" }),
+      therapists: [therapist("hot", { age_groups: ["גיל הרך", "נוער"] }), ...quiet(5, { age_groups: ["נוער"] })],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("גיל הרך");
+  });
+
+  it("a contact with no age band makes every age group of the therapist count", () => {
+    const r = analyzeConcentration({
+      ...base,
+      contacts: contacts("hot", 5, "CBT", "match", { ageBand: null }),
+      therapists: [therapist("hot", { age_groups: ["ילדים", "מבוגרים"] }), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("ילדים");
+  });
+
+  it("never freezes a center's own listing", () => {
+    const r = analyzeConcentration({ ...base, therapists: [therapist("hot", { entity_type: "center" }), ...quiet(5)] });
+    expect(r.freeze[0].safe).toBe(false);
+  });
+
+  it("keeps the 28-day cooldown even when the freeze is missing from the audit log", () => {
+    const r = analyzeConcentration({
+      ...base,
+      therapists: [therapist("hot", { match_paused_until: "2026-10-10T00:00:00Z" }), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("הקפאה קודמת");
+  });
+
+  it("counts expertise the way the match engine does, including assessment types", () => {
+    const r = analyzeConcentration({
+      ...base,
+      contacts: contacts("hot", 5, "פסיכו-דידקטי"),
+      therapists: [
+        therapist("hot", { training_areas: [], assessment_types: ["פסיכו-דידקטי"] }),
+        ...quiet(5, { training_areas: [], assessment_types: ["פסיכו-דידקטי"] }),
+      ],
+    });
+    expect(r.freeze[0].safe).toBe(true);
   });
 
   it("a gift promotion of more than 60 days needs no subscription", () => {

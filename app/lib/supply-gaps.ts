@@ -27,6 +27,7 @@ import {
   NEW_PER_SLICE,
   ONLINE_REGION,
   PAID_SOURCES,
+  regionDisplay,
   CONCENTRATION_WINDOW_DAYS,
   FREEZE_CHECK_EVERY_DAYS,
   FREEZE_DAYS,
@@ -37,8 +38,6 @@ import {
 import { loadConcentrationInput } from "./contact-concentration-data";
 import { serverFreezeChecks, FREEZE_ACTION_TYPE } from "./contact-concentration-freeze";
 
-// היה מוגדר כאן עד 20/10/26; נשאר מיוצא מכאן בשביל מי שכבר מייבא אותו.
-export { treatmentParts };
 
 // סוכן פערי ההיצע (סוכן 11): מוצא חיתוכים של אזור × סוג טיפול שבהם מטופלים
 // ביקשו טיפול ולא היה לנו מטפל משלם להראות להם, ומציע מה לעשות עם כל פער:
@@ -103,6 +102,8 @@ type TherapistRow = {
   regions: string[] | null;
   online: boolean | null;
   training_areas: string[] | null;
+  assessment_types: string[] | null;
+  couples_modalities: string[] | null;
   age_groups: string[] | null;
   // לניתוח ריכוז הפניות ולבדיקת ההקפאה (contact-concentration.ts).
   entity_type: string | null;
@@ -311,7 +312,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         supabaseAdmin
           .from("therapists")
           .select(
-            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, online, training_areas, age_groups, entity_type, match_paused_until, promoted_since"
+            "id, full_name, email, status, promotion_source, promoted_until, admin_approved, accepting_new_patients, regions, online, training_areas, assessment_types, couples_modalities, age_groups, entity_type, match_paused_until, promoted_since"
           )
           .in("status", ["paying", "approved"])
       ),
@@ -690,7 +691,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const concActions = concOffers.map((o) => {
       const s = o.slice;
       const label = treatmentLabel(s.treatment);
-      const where = s.region === ONLINE_REGION ? "אונליין" : s.region;
+      const where = regionDisplay(s.region);
       return {
         actionType: "gift_offer",
         kind: "action" as const,
@@ -727,12 +728,17 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // בכל הכללים (contact-concentration.ts + חלון הערבות); ההקפאה רק בלחיצה,
     // ושם הכול נבדק שוב. בריצה שבין שתי בדיקות לא עולות הצעות חדשות, אבל
     // הצעה שעוד ממתינה ועדיין בטוחה נשמרת - אחרת הסנכרון היה סוגר אותה.
-    const freeze = concInput ? await serverFreezeChecks(conc.freeze) : [];
-    const lastBatchAt = await lastFreezeBatchAt();
+    const [freeze, lastBatch, pendingFreezeKeys] = await Promise.all([
+      concInput ? serverFreezeChecks(conc.freeze) : Promise.resolve([]),
+      lastFreezeBatchAt(),
+      pendingFreezeProposalKeys(),
+    ]);
+    // כשלא הצלחנו לקרוא מתי הייתה הבדיקה הקודמת - לא מעלים מנה חדשה, וגם לא
+    // רושמים זמן מנה (אחרת כישלון רגעי היה מזיז את השעון בשבועיים).
     const freezeDue =
       concInput !== null &&
-      (!lastBatchAt || Date.now() - Date.parse(lastBatchAt) >= (FREEZE_CHECK_EVERY_DAYS - 1) * 86_400_000);
-    const pendingFreezeKeys = await pendingFreezeProposalKeys();
+      lastBatch.ok &&
+      (!lastBatch.at || Date.now() - Date.parse(lastBatch.at) >= (FREEZE_CHECK_EVERY_DAYS - 1) * 86_400_000);
     const freezeKey = (id: string) => `conc:freeze:${id}`;
     const freezeActions = freeze
       .filter((f) => f.safe && (freezeDue || pendingFreezeKeys.has(freezeKey(f.id))))
@@ -745,7 +751,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
           body:
             `${f.people} פונים ב-${CONCENTRATION_WINDOW_DAYS} הימים האחרונים, ${f.matchPeople} מהם מהשאלון.\n` +
             (w
-              ? `גם בלי ${f.name} נשארות לפחות ${w.alternatives} חלופות פעילות (${treatmentLabel(w.treatment)} · ${w.region === ONLINE_REGION ? "אונליין" : w.region}).\n`
+              ? `גם בלי ${f.name} נשארות לפחות ${w.alternatives} חלופות פעילות (${treatmentLabel(w.treatment)} · ${regionDisplay(w.region)}).\n`
               : "") +
             `ההקפאה: ${FREEZE_DAYS} ימים מתוצאות השאלון בלבד. המאגר, עמודי הערים והחיוב לא משתנים, ולא נשלח שום מייל.\n` +
             `בלחיצה כל הבדיקות רצות שוב על הנתונים של עכשיו.`,
@@ -820,7 +826,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         concentration: concSummary,
         freeze,
         // מתי עלתה לאחרונה מנת הצעות הקפאה - קובע מתי הבאה (פעם בשבועיים).
-        freeze_batch_at: freezeDue ? new Date().toISOString() : lastBatchAt,
+        freeze_batch_at: freezeDue ? new Date().toISOString() : lastBatch.ok ? lastBatch.at : null,
         freeze_proposals: freezeActions.length,
       },
     });
@@ -853,7 +859,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
 }
 
 /** מתי עלתה לאחרונה מנה של הצעות הקפאה (נשמר בפרטי הריצה). */
-async function lastFreezeBatchAt(): Promise<string | null> {
+async function lastFreezeBatchAt(): Promise<{ ok: true; at: string | null } | { ok: false }> {
   const { data, error } = await supabaseAdmin
     .from("agent_runs")
     .select("details")
@@ -863,13 +869,11 @@ async function lastFreezeBatchAt(): Promise<string | null> {
     .limit(1)
     .maybeSingle();
   if (error) {
-    // לא יודעים מתי הייתה הבדיקה הקודמת: לא מעלים מנה חדשה (עדיף לאחר
-    // בשבוע מלהעלות הצעות כל שבוע).
     console.error("supply_gaps: last freeze batch lookup failed:", error.message);
-    return new Date().toISOString();
+    return { ok: false };
   }
   const at = (data?.details as Record<string, unknown> | null)?.freeze_batch_at;
-  return typeof at === "string" ? at : null;
+  return { ok: true, at: typeof at === "string" ? at : null };
 }
 
 /** הצעות הקפאה שממתינות בתור - נשמרות גם בריצה שבין שתי בדיקות. */

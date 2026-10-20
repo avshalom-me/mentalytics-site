@@ -7,7 +7,7 @@ import {
   FREEZE_CHECK_EVERY_DAYS,
   HOT_MIN_PEOPLE,
   CONCENTRATION_WINDOW_DAYS,
-  ONLINE_REGION,
+  regionDisplay,
   type ConcentrationSummary,
   type FreezeCandidate,
 } from "@/app/lib/contact-concentration";
@@ -27,10 +27,6 @@ const SOURCE_LABEL: Record<string, string> = {
   gift_trial: "בחודשי המתנה",
   center: "דרך מרכז",
 };
-
-function whereLabel(region: string): string {
-  return region === ONLINE_REGION ? "אונליין" : region;
-}
 
 function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
   return (
@@ -63,7 +59,7 @@ export default function ConcentrationPanel({
             {concentration.map((c) => (
               <li key={`${c.region}|${c.treatment}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
                 <span className="font-bold text-stone-800">
-                  🔥 {c.treatment} · {whereLabel(c.region)}
+                  🔥 {c.treatment} · {regionDisplay(c.region)}
                 </span>
                 <span>
                   {c.slicePeople} פונים, {c.hotPeople} מהם אצל: {c.hot.map((h) => `${h.name} (${h.people})`).join(", ")}
@@ -100,7 +96,7 @@ export default function ConcentrationPanel({
                 <span className={f.safe ? "text-stone-600" : "text-red-700"}>
                   {f.safe
                     ? f.weakest
-                      ? `· נשארות ${f.weakest.alternatives} חלופות לפחות (${treatmentLabel(f.weakest.treatment)} · ${whereLabel(f.weakest.region)})`
+                      ? `· נשארות ${f.weakest.alternatives} חלופות לפחות (${treatmentLabel(f.weakest.treatment)} · ${regionDisplay(f.weakest.region)})`
                       : ""
                     : `· ${f.blockedReason}`}
                 </span>

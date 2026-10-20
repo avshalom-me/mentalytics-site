@@ -16,7 +16,7 @@
 // בשרון ובירושלים "יצר" ריכוז בשלושתם, גם כשכל הפונים אליו היו מגוש דן.
 // מטפל שעובד רק אונליין נספר תחת "online".
 
-import { coversRegion, overlaps, regionsCovered } from "./match-fallback";
+import { coversRegion, expertiseOf, overlaps, regionsCovered } from "./match-fallback";
 import { pauseSourceBlock } from "./match-pause";
 import { regionGroupOf } from "./regions";
 import { canonicalPart, matchPart, treatmentLabel, treatmentParts } from "./treatment-parts";
@@ -56,6 +56,9 @@ export const FREEZE_CHECK_EVERY_DAYS = 14;
 
 export const ONLINE_REGION = "online";
 
+/** סוג הפעולה בתור של הצעה להקפאה שקטה. */
+export const FREEZE_ACTION_TYPE = "concentration_freeze";
+
 /** מקור קידום של לקוח שמשלם בפועל (ישירות, דרך מרכז, או בחודשי המתנה לפני
  *  החיוב הראשון) - מול קידום מתנה שיפוג. משותף לסוכן פערי ההיצע. */
 export const PAID_SOURCES = new Set(["paid", "center", "gift_trial"]);
@@ -82,6 +85,9 @@ export type ConcTherapist = {
   regions: string[] | null;
   online: boolean | null;
   training_areas: string[] | null;
+  // מנוע ההתאמה מחשב מומחיות מהשלושה יחד (expertiseOf), ולכן גם כאן.
+  assessment_types: string[] | null;
+  couples_modalities: string[] | null;
   age_groups: string[] | null;
   admin_approved: boolean | null;
   accepting_new_patients: boolean | null;
@@ -143,22 +149,26 @@ export type ConcentrationResult = {
 
 // ── קבוצות גיל ────────────────────────────────────────────────────────────
 // הצפייה שומרת שכבת גיל של המטופל ("child", "18-30"), והמטפל מסמן קבוצות
-// ("ילדים", "מבוגרים"). ההקפאה צריכה לדעת אם יש חלופה לאותם מטופלים, ולכן
-// שתיהן מתורגמות לשני סוגים: ילדים ונוער, או מבוגרים.
-type AgeKind = "kids" | "adults";
+// ("גיל הרך", "ילדים", "נוער", "מבוגרים"). חלופה להקפאה צריכה לשרת בדיוק את
+// אותה קבוצה: מטפלת לנוער אינה חלופה לפעוט. מטופל מבוגר דורש "מבוגרים" (גם
+// בגיל השלישי השאלון שולח "מבוגרים"); ילד דורש כל אחת מקבוצות הילדים שהמטפל
+// העמוס משרת, כל אחת בנפרד, כי שכבת הגיל "child" לא מבחינה ביניהן.
 const KID_GROUPS = ["גיל הרך", "ילדים", "נוער"];
-const ADULT_GROUPS = ["מבוגרים", "הגיל השלישי"];
+const ADULTS = "מבוגרים";
 
-function ageKindOfBand(band: string | null): AgeKind | null {
-  if (!band) return null;
-  return band === "child" ? "kids" : "adults";
+/** קבוצות הגיל שהחלופות חייבות לשרת, לפי מי שבאמת פנה. פנייה בלי שכבת גיל
+ *  ידועה מוסיפה את כל הקבוצות שהמטפל משרת - לא יודעים מי היא, אז בודקים את כולן. */
+function requiredAgeGroups(t: ConcTherapist, bands: (string | null)[]): string[] {
+  const own = t.age_groups ?? [];
+  const kids = own.filter((g) => KID_GROUPS.includes(g));
+  const need = new Set<string>();
+  for (const band of bands) {
+    if (band === null) for (const g of own) need.add(g);
+    else if (band === "child") for (const g of kids.length > 0 ? kids : ["ילדים"]) need.add(g);
+    else need.add(ADULTS);
+  }
+  return [...need];
 }
-
-function servesKind(ageGroups: string[] | null, kind: AgeKind): boolean {
-  return overlaps(ageGroups ?? [], kind === "kids" ? KID_GROUPS : ADULT_GROUPS);
-}
-
-const AGE_KIND_LABEL: Record<AgeKind, string> = { kids: "ילדים ונוער", adults: "מבוגרים" };
 
 function isPromoted(t: ConcTherapist): boolean {
   return t.status === "paying";
@@ -168,11 +178,11 @@ function isPaused(t: ConcTherapist, nowMs: number): boolean {
   return !!t.match_paused_until && Date.parse(t.match_paused_until) > nowMs;
 }
 
-/** האזורים שבהם המטפל עובד: אזורים מלאים, או "online" למי שעובד רק אונליין. */
+/** האזורים שבהם המטפל עובד: אזורים מלאים, ו-"online" לכל מי שעובד אונליין -
+ *  גם כשיש לו קליניקה, כי מטופלים שביקשו אונליין פונים גם אליו. */
 export function workRegions(t: Pick<ConcTherapist, "regions" | "online">): string[] {
   const covered = [...regionsCovered(t.regions ?? [])];
-  if (covered.length > 0) return covered;
-  return t.online ? [ONLINE_REGION] : [];
+  return t.online ? [...covered, ONLINE_REGION] : covered;
 }
 
 /** קבוצת האזורים של אזור מלא, כמו שהיא נשמרת בצפייה ("גוש דן" → "center"). */
@@ -193,7 +203,9 @@ function coversSliceRegion(t: ConcTherapist, region: string): boolean {
 }
 
 function coversTreatment(t: ConcTherapist, part: string): boolean {
-  return overlaps(t.training_areas ?? [], [matchPart(part)]);
+  return overlaps(expertiseOf(t.training_areas ?? [], t.assessment_types ?? [], t.couples_modalities ?? []), [
+    matchPart(part),
+  ]);
 }
 
 /** הרכיבים של טיפול מבוקש, מנורמלים ("טיפול CBT" ו-"CBT" הם אותו רכיב). */
@@ -208,7 +220,8 @@ function withLamed(treatment: string): string {
   return /^[a-z0-9]/i.test(label) ? `-${label}` : label;
 }
 
-function whereOf(region: string): string {
+/** איך אזור של חיתוך מוצג: "גוש דן", או "אונליין" (אונליין אינו מקום). */
+export function regionDisplay(region: string): string {
   return region === ONLINE_REGION ? "אונליין" : region;
 }
 
@@ -324,6 +337,9 @@ export function analyzeConcentration(input: {
 
     const sourceBlock = pauseSourceBlock(t);
     if (sourceBlock) return blocked(sourceBlock);
+    // רשומת מרכז (ישות) מקודמת לפעמים כ-paid או ידנית, ואז pauseSourceBlock לא
+    // תופס אותה - אבל חשיפה של מרכז לא מוקפאת (match-pause.ts).
+    if (t.entity_type === "center") return blocked("רשומת מרכז: חשיפה של מרכז לא מוקפאת.");
     if (isPaused(t, nowMs)) return blocked("כבר מוקפא/ת מההתאמות.");
     const isPaid = t.promotion_source === "paid";
     const paidStart = input.paidSince?.get(t.id) ?? null;
@@ -340,11 +356,15 @@ export function analyzeConcentration(input: {
           : `בקידום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`
       );
     }
+    // צינון משני מקורות: יומן הביקורת והצעות שבוצעו (מתי הוקפא/ה), ותאריך הסיום
+    // שנשאר על המטפל/ת אחרי שההקפאה פגה (שחרור ידני מאפס אותו, הקפאה שפגה - לא).
+    const ilDate = (iso: string) => new Date(iso).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" });
     const lastPaused = input.lastPausedAt?.get(t.id);
     if (lastPaused && nowMs - Date.parse(lastPaused) < FREEZE_COOLDOWN_DAYS * 86_400_000) {
-      return blocked(
-        `הוקפא/ה כבר ב-${new Date(lastPaused).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })}; הקפאה אחת בכל ${FREEZE_COOLDOWN_DAYS} ימים.`
-      );
+      return blocked(`הוקפא/ה כבר ב-${ilDate(lastPaused)}; הקפאה אחת בכל ${FREEZE_COOLDOWN_DAYS} ימים.`);
+    }
+    if (t.match_paused_until && nowMs - Date.parse(t.match_paused_until) < FREEZE_COOLDOWN_DAYS * 86_400_000) {
+      return blocked(`הקפאה קודמת הסתיימה ב-${ilDate(t.match_paused_until)}; הקפאה אחת בכל ${FREEZE_COOLDOWN_DAYS} ימים.`);
     }
     if (base.matchPeople < FREEZE_MIN_MATCH_PEOPLE) {
       return blocked(
@@ -352,44 +372,50 @@ export function analyzeConcentration(input: {
       );
     }
 
+    // כל מי שפנה מהשאלון חייב להיות ממופה לחיתוך: ידוע מה חיפש, באיזה אזור,
+    // והמטפל/ת עוסק/ת בזה. פונה שלא ממופה הוא מטופל שלא נבדק אם יש לו חלופה -
+    // ולכן במקום לדלג עליו, לא מקפיאים.
+    const regions = workRegions(t);
+    const quiz = (pairsOf.get(t.id) ?? []).filter((c) => c.source === "match");
+    const unmapped = quiz.filter(
+      (c) => !c.parts.some((p) => coversTreatment(t, p)) || !regions.some((r) => contactInRegion(c.regionGroup, r))
+    ).length;
+    if (unmapped > 0) {
+      return blocked(
+        `${unmapped} מהפונים מהשאלון בלי נתון מלא על מה חיפשו או איפה, ולכן אי אפשר לוודא שיש להם חלופה.`
+      );
+    }
+
     const served = [...(servedSlices.get(t.id)?.values() ?? [])];
-    if (served.length === 0) {
-      return blocked("אין נתון על הטיפול והאזור שהפונים חיפשו, ולכן אי אפשר לבדוק חלופות.");
+    const ages = requiredAgeGroups(t, quiz.map((c) => c.ageBand));
+    if (served.length === 0 || ages.length === 0) {
+      return blocked("אין נתון על הטיפול, האזור או הגיל של הפונים, ולכן אי אפשר לבדוק חלופות.");
     }
 
-    // קבוצות הגיל שבאמת פנו אליו; בלי נתון - כל מה שהמטפל מסמן.
-    const kinds = new Set<AgeKind>();
-    for (const c of pairsOf.get(t.id) ?? []) {
-      const k = ageKindOfBand(c.ageBand);
-      if (k) kinds.add(k);
-    }
-    if (kinds.size === 0) {
-      if (servesKind(t.age_groups, "kids")) kinds.add("kids");
-      if (servesKind(t.age_groups, "adults")) kinds.add("adults");
-    }
-
-    let weakest: (NonNullable<FreezeCandidate["weakest"]> & { kind: AgeKind }) | null = null;
+    // חלופה = מי שמנוע ההתאמה באמת היה מציג במקום: מקודם/ת, מאושר/ת, מקבל/ת
+    // מטופלים חדשים (true בדיוק, כמו ב-/api/match), לא מוקפא/ת ולא עמוס/ה.
+    let weakest: (NonNullable<FreezeCandidate["weakest"]> & { age: string }) | null = null;
     for (const s of served) {
-      for (const kind of kinds) {
+      for (const age of ages) {
         const alternatives = promoted.filter(
           (o) =>
             o.id !== t.id &&
             !hotIds.has(o.id) &&
             !isPaused(o, nowMs) &&
             o.admin_approved === true &&
-            o.accepting_new_patients !== false &&
+            o.accepting_new_patients === true &&
             coversSliceRegion(o, s.region) &&
             coversTreatment(o, s.treatment) &&
-            servesKind(o.age_groups, kind)
+            overlaps(o.age_groups ?? [], [age])
         ).length;
-        if (!weakest || alternatives < weakest.alternatives) weakest = { ...s, alternatives, kind };
+        if (!weakest || alternatives < weakest.alternatives) weakest = { ...s, alternatives, age };
       }
     }
-    if (!weakest) return blocked("אין נתון על קבוצת הגיל של הפונים, ולכן אי אפשר לבדוק חלופות.");
-    const { kind, ...weakestSlice } = weakest;
+    if (!weakest) return blocked("אין נתון על הטיפול, האזור או הגיל של הפונים, ולכן אי אפשר לבדוק חלופות.");
+    const { age, ...weakestSlice } = weakest;
     if (weakest.alternatives < FREEZE_MIN_ALTERNATIVES) {
       return blocked(
-        `ב${whereOf(weakest.region)} נשארים רק ${weakest.alternatives} מקודמים ל${withLamed(weakest.treatment)} ל${AGE_KIND_LABEL[kind]}; צריך ${FREEZE_MIN_ALTERNATIVES}.`,
+        `ב${regionDisplay(weakest.region)} נשארים רק ${weakest.alternatives} מקודמים ל${withLamed(weakest.treatment)} (${age}); צריך ${FREEZE_MIN_ALTERNATIVES}.`,
         weakestSlice
       );
     }

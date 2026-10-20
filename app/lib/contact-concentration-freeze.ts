@@ -9,6 +9,7 @@ import {
   FREEZE_DAYS,
   HOT_MIN_PEOPLE,
   CONCENTRATION_WINDOW_DAYS,
+  FREEZE_ACTION_TYPE,
   type ConcTherapist,
   type FreezeCandidate,
 } from "./contact-concentration";
@@ -21,7 +22,7 @@ import {
 //      ואז applyMatchPause עם ההגנות שלו (מסלול, חלון ערבות).
 // ההקפאה לא שולחת שום מייל ולא משנה שום דגל ציבורי (ראו match-pause.ts).
 
-export const FREEZE_ACTION_TYPE = "concentration_freeze";
+export { FREEZE_ACTION_TYPE };
 
 /** בדיקות שדורשות מסד ולכן לא יושבות במודול הטהור: למשלם/ת - חלון ערבות
  *  הפניות סגור. כשאי אפשר לבדוק, לא מקפיאים. */
@@ -51,7 +52,7 @@ async function currentFreezeCandidates(): Promise<FreezeCandidate[]> {
       supabaseAdmin
         .from("therapists")
         .select(
-          "id, full_name, status, promotion_source, entity_type, regions, online, training_areas, age_groups, admin_approved, accepting_new_patients, match_paused_until, promoted_since"
+          "id, full_name, status, promotion_source, entity_type, regions, online, training_areas, assessment_types, couples_modalities, age_groups, admin_approved, accepting_new_patients, match_paused_until, promoted_since"
         )
         .eq("status", "paying")
     ),
@@ -83,15 +84,54 @@ export async function freezeForConcentration(opts: {
   if (action.status !== "pending") return { ok: false, status: 409, error: "ההצעה כבר טופלה - רענן/י את העמוד" };
   if (action.entity_id !== opts.therapistId) return { ok: false, status: 409, error: "ההצעה שייכת למטפל/ת אחר/ת" };
 
-  const candidate = (await currentFreezeCandidates()).find((f) => f.id === opts.therapistId);
-  if (!candidate) {
-    return {
-      ok: false,
-      status: 409,
-      error: `לא הוקפא/ה: כבר לא ${HOT_MIN_PEOPLE} פונים ומעלה ב-${CONCENTRATION_WINDOW_DAYS} הימים האחרונים, ואין סיבה להקפיא.`,
-    };
+  // תפיסה אטומית של ההצעה לפני כל דבר אחר: pending → approved רק אם היא עוד
+  // pending. שתי לחיצות בו-זמנית (שתי לשוניות, ניסיון חוזר אחרי timeout) -
+  // רק אחת תופסת, והשנייה נעצרת כאן ולא מקפיאה פעם שנייה.
+  const nowIso = () => new Date().toISOString();
+  const { data: claimed, error: claimErr } = await supabaseAdmin
+    .from("agent_actions")
+    .update({ status: "approved", status_changed_at: nowIso(), resolved_by: "admin", resolution_note: "בבדיקה לפני הקפאה" })
+    .eq("id", opts.actionId)
+    .eq("status", "pending")
+    .select("id");
+  if (claimErr) return { ok: false, status: 500, error: claimErr.message };
+  if (!claimed || claimed.length === 0) return { ok: false, status: 409, error: "ההצעה כבר בטיפול - רענן/י את העמוד" };
+
+  // מכאן כל יציאה בלי הקפאה מחזירה או סוגרת את ההצעה. כשל טכני - חזרה
+  // לתור, כדי שאפשר יהיה לנסות שוב. כלל שכבר לא מתקיים - סגירה עם הסיבה,
+  // כי לחיצה נוספת תיעצר באותו מקום.
+  const release = async (outcome: "retry" | "close", note: string) => {
+    const { error } = await supabaseAdmin
+      .from("agent_actions")
+      .update(
+        outcome === "retry"
+          ? { status: "pending", status_changed_at: nowIso(), resolved_by: null, resolution_note: null }
+          : { status: "dismissed", status_changed_at: nowIso(), resolved_by: "system", resolution_note: note }
+      )
+      .eq("id", opts.actionId)
+      .eq("status", "approved");
+    if (error) console.error("freezeForConcentration: release failed:", error.message);
+  };
+
+  let candidates: FreezeCandidate[];
+  try {
+    candidates = await currentFreezeCandidates();
+  } catch (e) {
+    await release("retry", "");
+    const msg = e instanceof Error ? e.message : String(e);
+    return { ok: false, status: 503, error: `הבדיקה לפני ההקפאה נכשלה, ולכן לא הוקפא/ה. נסו שוב בעוד רגע. (${msg})` };
   }
-  if (!candidate.safe) return { ok: false, status: 409, error: `לא הוקפא/ה: ${candidate.blockedReason}` };
+  const candidate = candidates.find((f) => f.id === opts.therapistId);
+  if (!candidate) {
+    const error = `לא הוקפא/ה: כבר לא ${HOT_MIN_PEOPLE} פונים ומעלה ב-${CONCENTRATION_WINDOW_DAYS} הימים האחרונים, ואין סיבה להקפיא.`;
+    await release("close", error);
+    return { ok: false, status: 409, error };
+  }
+  if (!candidate.safe) {
+    const error = `לא הוקפא/ה: ${candidate.blockedReason}`;
+    await release("close", error);
+    return { ok: false, status: 409, error };
+  }
 
   const paused = await applyMatchPause({
     therapistId: opts.therapistId,
@@ -102,7 +142,12 @@ export async function freezeForConcentration(opts: {
       `(${candidate.people} people in ${CONCENTRATION_WINDOW_DAYS}d, ${candidate.matchPeople} from the quiz, ` +
       `${candidate.weakest?.alternatives ?? "?"} alternatives), re-checked at click`,
   });
-  if (!paused.ok) return paused;
+  if (!paused.ok) {
+    // applyMatchPause מסרב גם מסיבה של כלל (מסלול, ערבות) וגם מתקלה; בכל מקרה
+    // לא הוקפא/ה, וההצעה חוזרת לתור עם ההודעה למטה.
+    await release(paused.status >= 500 ? "retry" : "close", `לא הוקפא/ה: ${paused.error}`);
+    return paused;
+  }
 
   const until = paused.until
     ? new Date(paused.until).toLocaleDateString("he-IL", { timeZone: "Asia/Jerusalem" })
@@ -111,14 +156,14 @@ export async function freezeForConcentration(opts: {
     .from("agent_actions")
     .update({
       status: "executed",
-      status_changed_at: new Date().toISOString(),
+      status_changed_at: nowIso(),
       resolved_by: "admin",
       resolution_note: `❄️ ${candidate.name} הוקפא/ה מתוצאות השאלון עד ${until}, בלי מייל`,
     })
     .eq("id", opts.actionId)
-    .eq("status", "pending");
-  // ההקפאה כבר בוצעה; כישלון כאן רק משאיר את ההצעה פתוחה, ולחיצה שנייה
-  // תיעצר בבדיקה ("כבר מוקפא/ת").
+    .eq("status", "approved");
+  // ההקפאה כבר בוצעה; כישלון כאן משאיר את ההצעה ב-approved (לא חוזרת לתור),
+  // והצינון של 28 יום נשען גם על יומן הביקורת וגם על תאריך ההקפאה עצמו.
   if (updErr) console.error("freezeForConcentration: action update failed:", updErr.message);
   return { ok: true, until: paused.until };
 }

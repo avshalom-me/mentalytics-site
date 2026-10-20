@@ -1,7 +1,12 @@
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
-import { CONCENTRATION_WINDOW_DAYS, FREEZE_COOLDOWN_DAYS, type ConcContact } from "./contact-concentration";
+import {
+  CONCENTRATION_WINDOW_DAYS,
+  FREEZE_ACTION_TYPE,
+  FREEZE_COOLDOWN_DAYS,
+  type ConcContact,
+} from "./contact-concentration";
 
 // הנתונים לניתוח ריכוז הפניות (contact-concentration.ts): מי פנה למי בחלון,
 // מה חיפש ואיפה, מי הוקפא לאחרונה, ומתי התחיל כל מנוי פעיל. קריאה בלבד.
@@ -16,7 +21,7 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
   const sinceIso = new Date(now.getTime() - CONCENTRATION_WINDOW_DAYS * 86_400_000).toISOString();
   const pauseSinceIso = new Date(now.getTime() - FREEZE_COOLDOWN_DAYS * 86_400_000).toISOString();
 
-  const [clicks, views, pauses, subs] = await Promise.all([
+  const [clicks, views, pauses, executed, subs] = await Promise.all([
     fetchAllRows<{ therapist_id: string; session_id: string | null; source: string | null; automated: boolean | null }>(
       () =>
         supabaseAdmin
@@ -41,16 +46,27 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
         .not("session_id", "is", null)
         .gte("viewed_at", new Date(Date.parse(sinceIso) - 86_400_000).toISOString())
     ),
-    supabaseAdmin
-      .from("therapist_audit_log")
-      .select("therapist_id, created_at, after_state")
-      .eq("action", "set_match_pause")
-      .gte("created_at", pauseSinceIso),
+    // צינון ההקפאה משני מקורות, כדי שהקפאה שלא נרשמה ביומן (writeAudit לא
+    // זורק על כישלון) לא תאפשר הקפאה חוזרת: יומן הביקורת, והצעות שבוצעו.
+    fetchAllRows<{ therapist_id: string; created_at: string; after_state: Record<string, unknown> | null }>(() =>
+      supabaseAdmin
+        .from("therapist_audit_log")
+        .select("therapist_id, created_at, after_state")
+        .eq("action", "set_match_pause")
+        .gte("created_at", pauseSinceIso)
+    ),
+    fetchAllRows<{ entity_id: string | null; status_changed_at: string | null }>(() =>
+      supabaseAdmin
+        .from("agent_actions")
+        .select("entity_id, status_changed_at")
+        .eq("action_type", FREEZE_ACTION_TYPE)
+        .eq("status", "executed")
+        .gte("status_changed_at", pauseSinceIso)
+    ),
     // תחילת המנוי הפעיל - "60 יום מקידום ממומן" נמדד ממנה למשלמים.
     supabaseAdmin.from("subscriptions").select("therapist_id, created_at").eq("status", "active"),
   ]);
-  // בלי אחד מאלה אי אפשר לבדוק את כללי ההקפאה, ולכן לא ממשיכים בחצי מידע.
-  if (pauses.error) throw new Error(`קריאת ההקפאות האחרונות נכשלה: ${pauses.error.message}`);
+  // בלי זה אי אפשר לבדוק את כללי ההקפאה, ולכן לא ממשיכים בחצי מידע.
   if (subs.error) throw new Error(`קריאת המנויים נכשלה: ${subs.error.message}`);
 
   const byPair = new Map<string, ViewContext>();
@@ -93,11 +109,13 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
 
   // רק הקפאה (לא שחרור): after_state.match_paused_until מלא.
   const lastPausedAt = new Map<string, string>();
-  for (const p of (pauses.data ?? []) as { therapist_id: string; created_at: string; after_state: Record<string, unknown> | null }[]) {
-    if (!p.after_state?.match_paused_until) continue;
-    const prev = lastPausedAt.get(p.therapist_id);
-    if (!prev || p.created_at > prev) lastPausedAt.set(p.therapist_id, p.created_at);
-  }
+  const notePause = (id: string | null, at: string | null) => {
+    if (!id || !at) return;
+    const prev = lastPausedAt.get(id);
+    if (!prev || at > prev) lastPausedAt.set(id, at);
+  };
+  for (const p of pauses) if (p.after_state?.match_paused_until) notePause(p.therapist_id, p.created_at);
+  for (const a of executed) notePause(a.entity_id, a.status_changed_at);
 
   // מנוי פעיל אחד לכל משלם/ת בפועל; אם יש יותר, המוקדם הוא תחילת התשלום.
   const paidSince = new Map<string, string>();
