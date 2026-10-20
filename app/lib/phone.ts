@@ -59,6 +59,36 @@ export const WHATSAPP_MESSAGE =
   'שלום, הגעתי אלייך דרך אתר "טיפול חכם", אשמח לשמוע פרטים לגבי הטיפול';
 
 /**
+ * The first usable phone number in a free-text field, as typed (trimmed), or null.
+ *
+ * A centre typed a landline and a mobile into its one "phone" field, separated
+ * by a slash. The whole value failed validation, so its page showed no phone at
+ * all - not in the header, not in the contact box, no call button (20/10/2026).
+ * This splits on the separators people put between numbers and returns the
+ * first piece that is a real number.
+ */
+export function firstPhoneIn(raw: string | null | undefined): string | null {
+  if (!raw) return null;
+  const whole = String(raw).trim();
+  if (!whole) return null;
+  if (phoneNationalDigits(whole)) return whole;
+  for (const part of whole.split(/\s*[\/,;|\\]\s*|\s+או\s+/)) {
+    const p = part.trim();
+    if (p && phoneNationalDigits(p)) return p;
+  }
+  return null;
+}
+
+/** How many usable phone numbers the field holds (for the editor's warning). */
+export function phonesInField(raw: string | null | undefined): number {
+  if (!raw) return 0;
+  const whole = String(raw).trim();
+  if (!whole) return 0;
+  if (phoneNationalDigits(whole)) return 1;
+  return whole.split(/\s*[\/,;|\\]\s*|\s+או\s+/).filter((p) => p.trim() && phoneNationalDigits(p.trim())).length;
+}
+
+/**
  * האם המספר הוא נייד ישראלי. בצורה הלאומית (בלי האפס המוביל) נייד מתחיל
  * תמיד ב-5; כל השאר קווי - 02/03/04/08/09 אזוריים, ו-072/073/077 VoIP.
  */

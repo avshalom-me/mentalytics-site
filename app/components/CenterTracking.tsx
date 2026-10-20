@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { getOrCreateSessionId } from "@/app/lib/session";
 import { getAttribution } from "@/app/lib/attribution";
 import { trackingOptedOut } from "@/app/lib/track-optout";
+import { centerWebsiteHref } from "@/app/lib/center-page-details";
 
 // אירועי עמוד-מרכז (מיגרציה 20260820): צפיית עמוד, לחיצה לאתר המרכז,
 // ולחיצת קשר במסלול 1 - שם אין שורת ישות ב-therapists ולכן אין לאן לרשום
@@ -46,7 +47,16 @@ export function CenterPageView({ centerId, track }: { centerId: string; track: s
   return null;
 }
 
-/** עוגן "אתר המרכז" - נספר לפני היציאה החוצה. */
+/**
+ * עוגן "אתר המרכז" - נספר לפני היציאה החוצה, והלחיצות מוצגות למרכז בפורטל.
+ *
+ * מ-20/10/2026 שלושה דברים, כדי שהמרכז יוכל לאמת את המספר גם אצלו:
+ * - הכתובת נושאת utm_source=mentalytics (center-page-details.ts), כך שהביקורים
+ *   מסומנים בגוגל אנליטיקס של המרכז.
+ * - בלי noreferrer: עד אז הדפדפן מחק את כתובת המקור, והביקור נרשם אצל המרכז
+ *   כ"ישיר". noopener נשאר (אבטחה); nofollow נשאר, כי זה קישור לעסק שמשלם לנו.
+ * - גם לחיצה בכפתור האמצעי (פתיחה בלשונית חדשה) נספרת.
+ */
 export function CenterWebsiteLink({ centerId, href, className, style, children }: {
   centerId: string;
   href: string;
@@ -56,10 +66,11 @@ export function CenterWebsiteLink({ centerId, href, className, style, children }
 }) {
   return (
     <a
-      href={href}
+      href={centerWebsiteHref(href) ?? href}
       target="_blank"
-      rel="noopener noreferrer nofollow"
+      rel="noopener nofollow"
       onClick={() => trackCenterEvent("center_website_click", centerId)}
+      onAuxClick={(e) => { if (e.button === 1) trackCenterEvent("center_website_click", centerId); }}
       className={className}
       style={style}
     >

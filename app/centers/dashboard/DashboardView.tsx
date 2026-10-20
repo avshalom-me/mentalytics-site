@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search } from "lucide-react";
+import { Building2, Users, Eye, MessageCircle, MapPin, Activity, ExternalLink, LogOut, Loader2, Sparkles, Search, Globe } from "lucide-react";
 import { type PublicPage } from "./PublicPageEditor";
 import InvitePanel from "./InvitePanel";
 import MembersPanel from "./MembersPanel";
@@ -39,6 +39,8 @@ type Stats = {
   impressions_month?: number;  // מצטבר
   directory_impressions?: number;
   clicks_total?: Clicks;
+  /** לחיצות על "אתר המרכז" בעמוד המרכז (מצטבר / 30 יום), בלי חזרות בתוך שתי דקות. */
+  website_clicks?: { total: number; month: number };
   by_source?: { match: SourceFunnel; directory: SourceFunnel; direct_contacts: number };
   benchmark?: {
     days: number; peers: number;
@@ -145,6 +147,11 @@ export default function CenterDashboardView({ data, preview = false, justCreated
 }) {
   const { center, therapists, stats } = data;
   const isEntity = center.billing_track === "center_entity"; // מסלול 2 - מרכז כישות אחת
+  const hasWebsite = !!center.public_page.website?.trim();
+  // מחלקות Tailwind חייבות להופיע כמחרוזת שלמה בקוד, ולכן מיפוי ולא תבנית.
+  const statCardCount = (isEntity ? 4 : 5) + (hasWebsite ? 1 : 0);
+  const statGridCols =
+    statCardCount === 4 ? "md:grid-cols-4" : statCardCount === 5 ? "md:grid-cols-5" : "md:grid-cols-3 lg:grid-cols-6";
 
   return (
     <main className="mx-auto max-w-5xl px-5 py-8 pb-20" dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
@@ -204,7 +211,7 @@ export default function CenterDashboardView({ data, preview = false, justCreated
       )}
 
       {/* מדדים מרכזיים */}
-      <div className={`mb-8 grid grid-cols-2 gap-3 ${isEntity ? "md:grid-cols-4" : "md:grid-cols-5"}`}>
+      <div className={`mb-8 grid grid-cols-2 gap-3 ${statGridCols}`}>
         {!isEntity && (
           <StatCard icon={Users} label="מטפלים במרכז" value={therapists.length} sub={`${stats?.listed_count ?? 0} מוצגים בהתאמות`} color="#0F5468" />
         )}
@@ -212,6 +219,10 @@ export default function CenterDashboardView({ data, preview = false, justCreated
         <StatCard icon={Search} label="הופעות במאגר" value={stats?.directory_impressions ?? 0} sub="מצטבר · בגלישה במאגר" color="#0F766E" />
         <StatCard icon={Eye} label={isEntity ? "צפיות בפרופיל" : "צפיות בפרופילים"} value={stats?.views_month ?? 0} sub="מצטבר" color="#1A7A96" />
         <StatCard icon={MessageCircle} label="לחיצות ליצירת קשר" value={stats?.clicks_total?.total ?? 0} sub="מצטבר" color="#2A5C3A" />
+        {/* מוצג רק למרכז שיש לו קישור לאתר בעמוד - בלעדיו אין על מה ללחוץ. */}
+        {hasWebsite && (
+          <StatCard icon={Globe} label="לחיצות לאתר שלכם" value={stats?.website_clicks?.total ?? 0} sub="מצטבר · יציאה לאתר המרכז" color="#A87010" />
+        )}
       </div>
 
       {/* ההסבר יושב מיד מתחת למדדים ולא בתחתית העמוד: הוא מגדיר מה המספרים
@@ -225,6 +236,14 @@ export default function CenterDashboardView({ data, preview = false, justCreated
           אתכם בגוגל ופונים ישירות - דרך האתר שלכם או בטלפון - ופניות כאלה לא נספרות כאן כלל.
           {" "}<strong>המספר הוא רצפה, לא התמונה המלאה.</strong>
         </p>
+        {hasWebsite && (
+          <p className="mt-2 text-[13px] leading-6 text-stone-700">
+            <strong>לחיצות לאתר שלכם</strong> = מבקרים שלחצו על &quot;אתר המרכז&quot; בעמוד שלכם אצלנו ויצאו לאתר
+            שלכם. לחיצה חוזרת של אותו מבקר בתוך שתי דקות נספרת פעם אחת. מ-20/10/2026 הביקורים האלה
+            מגיעים אליכם מסומנים <span dir="ltr">utm_source=mentalytics</span>, כך שאפשר לראות אותם, ומה המבקרים
+            עשו אחר כך, גם בגוגל אנליטיקס של האתר שלכם.
+          </p>
+        )}
       </div>
 
       {stats?.by_source && stats.by_source.direct_contacts > 0 && (

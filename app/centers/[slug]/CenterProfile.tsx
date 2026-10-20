@@ -3,7 +3,8 @@ import { MapPin, Globe, Phone, BadgeCheck, Clock, Accessibility, Languages, Hand
 import { treatmentExplainer } from "@/app/lib/treatment-explainers";
 import type { PublicCenter } from "@/app/lib/center-public";
 import { centerKind } from "@/app/lib/center-title";
-import { telHref as telHrefFor, centerWhatsAppNumber, waLinkForCenter } from "@/app/lib/phone";
+import { telHref as telHrefFor, centerWhatsAppNumber, waLinkForCenter, firstPhoneIn } from "@/app/lib/phone";
+import { centerHeaderPlace, centerPlaces } from "@/app/lib/center-page-details";
 import { therapistPath } from "@/app/lib/therapist-url";
 import type { PublicTherapist } from "@/app/therapists/TherapistsClient";
 import TherapistResultCard from "@/app/components/TherapistResultCard";
@@ -110,6 +111,13 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
   );
   const regionChips = (entity?.regions ?? []).map((r) => String(r)).filter(Boolean);
   const showOffer = offerChips.length > 0 || regionChips.length > 0 || !!entity?.online;
+  // המקום בכותרת: השדה "עיר", ואם לא מולא - הערים שהמרכז כבר סימן (מסלול 2:
+  // אזורי ההתאמה; מסלול 1: הערים של המטפלים). עד 20/10/2026 מרכז בלי השדה
+  // קיבל כותרת בלי מיקום, והעיר הופיעה רק למטה - ראו center-page-details.ts.
+  const headerCities = isEntity ? regionChips.map(regionLabel) : therapists.flatMap((t) => t.regions ?? []);
+  const place = centerHeaderPlace(center.public_city, headerCities);
+  // בתגית שמעל השם - המקום הראשון בלבד; הרשימה המלאה בשורה שמתחת לשם.
+  const pillPlace = centerPlaces(center.public_city, headerCities)[0] ?? null;
 
   const website = center.public_website?.trim();
   const websiteHref = website ? (/^https?:\/\//i.test(website) ? website : `https://${website}`) : null;
@@ -192,13 +200,15 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
       ? { address: { "@type": "PostalAddress", ...(center.public_address ? { streetAddress: center.public_address } : {}), ...(center.public_city ? { addressLocality: center.public_city } : {}), addressCountry: "IL" } }
       : {}),
     ...(websiteHref ? { sameAs: [websiteHref] } : {}),
-    ...(center.public_phone ? { telephone: center.public_phone } : {}),
+    ...(firstPhoneIn(center.public_phone) ? { telephone: firstPhoneIn(center.public_phone) } : {}),
     ...(therapists.length > 0
       ? { employee: therapists.map((t) => ({ "@type": "Person", name: t.full_name, url: `${BASE}${therapistPath(t.id, t.full_name)}` })) }
       : {}),
   };
 
-  const phone = center.public_phone?.trim() || null;
+  // המספר הראשון בשדה: מרכז שכתב שני מספרים באותו שדה ("02... / 05...") קיבל
+  // עמוד בלי טלפון בכלל, כי הערך השלם נפסל בבדיקה (20/10/2026).
+  const phone = firstPhoneIn(center.public_phone);
   // ולידציה כמו אצל מטפלים (phone.ts): שדה חופשי עם מייל/טקסט לא מייצר כפתור מת.
   const telHref = telHrefFor(phone);
   // הוואטסאפ העסקי (15/9/2026) קודם; בלעדיו - הטלפון לחיוג אם הוא נייד, כמו
@@ -269,12 +279,12 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                 יחד, ובלי איזון נשארת מילה יתומה בשורה השנייה. */}
             <p className="mb-4 inline-flex items-center gap-2 rounded-full bg-[var(--teal-pale)] py-1.5 text-[13px] font-extrabold uppercase tracking-[.16em] text-[var(--teal)] text-balance" style={{ paddingInline: "18px" }}>
               <span aria-hidden className="h-1.5 w-1.5 rounded-full bg-[var(--teal)]" />
-              {centerKind(center.public_focus)}{center.public_city ? ` · ${center.public_city}` : ""}
+              {centerKind(center.public_focus)}{pillPlace ? ` · ${pillPlace}` : ""}
             </p>
             <h1 className="text-[clamp(2.4rem,4.5vw,3.6rem)] font-black leading-[1.07] tracking-tight text-[var(--text)]">{center.name}</h1>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-x-7 gap-y-3 text-[16px] text-[var(--text-2)]">
-              {center.public_city && (
-                <span className="inline-flex items-center gap-1.5"><MapPin size={17} style={{ color: "var(--teal)" }} /> {center.public_city}</span>
+              {place && (
+                <span className="inline-flex items-center gap-1.5"><MapPin size={17} style={{ color: "var(--teal)" }} /> {place}</span>
               )}
               {phone && telHref && (
                 <CenterPhoneLink entityId={entity?.id} centerId={center.id} phone={phone}
@@ -316,8 +326,11 @@ export default function CenterProfile({ center, entity, assets, viewSource, ther
                           boxShadow: p.isDirector ? "0 24px 56px rgba(42,100,98,.22)" : "0 18px 44px rgba(42,100,98,.16)",
                         }}>
                         {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {/* חיתוך מקרוב לחלק העליון ולא מהאמצע: תמונת פורטרט (גבוהה מרוחבה)
+                            איבדה במסגרת הריבועית את קודקוד הראש (20/10/2026). על תמונה
+                            ריבועית או רחבה אין לזה השפעה. */}
                         <img src={p.photoUrl ?? avatarFor(p.name, p.role)} alt={p.name}
-                          className="h-full w-full object-cover" />
+                          className="h-full w-full object-cover" style={{ objectPosition: "50% 12%" }} />
                       </div>
                       <p className="mt-5 text-[1.3rem] font-black tracking-tight text-[var(--text)]">{p.name}</p>
                       {p.role && <p className="mt-1 text-[15px] leading-6 text-[var(--text-2)]">{p.role}</p>}

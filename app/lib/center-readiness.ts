@@ -1,5 +1,6 @@
 import "server-only";
 import type { CenterDirector, CenterFaqItem, CenterGalleryPhoto, CenterTeamMember } from "./center-public";
+import { phonesInField } from "./phone";
 
 // מוכנות מרכז - לפי המסלול שנרכש, ולא לפי מדד אחד לכולם.
 //
@@ -59,6 +60,8 @@ export type CenterRowForReadiness = {
   public_address: string | null;
   public_hours: string | null;
   public_faq: unknown;
+  public_city?: string | null;
+  public_phone?: string | null;
 };
 
 /** מצב מטפלי המרכז, כפי שנשלף פעם אחת בקורא. */
@@ -111,6 +114,10 @@ function publicPageItems(c: CenterRowForReadiness, criticalAll: boolean): Readin
       !!((director.name ?? "").trim() && (director.note ?? "").trim()),
       false
     ),
+    // העיר והטלפון מוצגים בראש העמוד. ב-20/10/2026 מרכז בלי עיר ועם שני מספרים
+    // בשדה הטלפון קיבל כותרת בלי שניהם - ושום מסך לא סימן את זה.
+    item("עיר", (c.public_city ?? "").trim().length > 0, true),
+    item("טלפון לחיוג (מספר אחד)", phonesInField(c.public_phone) === 1, false),
     item("כתובת", (c.public_address ?? "").trim().length > 0, true),
     item("שעות פעילות", (c.public_hours ?? "").trim().length > 0, false),
     item("שנת ייסוד", c.public_founded_year != null, false),

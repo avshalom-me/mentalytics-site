@@ -6,6 +6,7 @@ import type { PortalCenter } from "@/app/lib/center-auth";
 import { signCenterAssets, type CenterTeamMember, type CenterGalleryPhoto, type CenterDirector, type CenterFaqItem } from "@/app/lib/center-public";
 import { PRIVATE_INQUIRY_SOURCE } from "@/app/lib/private-inquiry";
 import { loadPrivateInquiries } from "@/app/lib/private-inquiry-store";
+import { countWebsiteClicks } from "@/app/lib/center-page-details";
 
 // בניית המטען של פורטל המרכז. הופרד מ-/api/center-portal ב-7/9/2026 כדי
 // שהאדמין יוכל להציג "צפייה בתור מרכז" מאותו קוד בדיוק: תצוגה מקדימה
@@ -246,7 +247,7 @@ export async function buildCenterPortalPayload(
   // ישות לרשום עליה. עד 15/9/26 הן לא הגיעו לפורטל בכלל: המרכז ראה רק את
   // הלחיצות על המטפלים שלו. מסלול 2 לא צריך את זה - שם הכול על הישות.
   const CENTER_LEVEL = "center";
-  const [rawClicks, views, dirImpressions, centerEvents] = await Promise.all([
+  const [rawClicks, views, dirImpressions, centerEvents, websiteEvents] = await Promise.all([
     fetchAllRows<{ therapist_id: string; click_type: string; clicked_at: string; source: string | null }>(() =>
       supabaseAdmin
         .from("therapist_contact_clicks")
@@ -280,7 +281,21 @@ export async function buildCenterPortalPayload(
             .eq("event_type", "center_contact_click")
             .eq("metadata->>center_id", center.id),
         ),
+    // לחיצות על "אתר המרכז" בעמוד המרכז (נאספות מ-20/8/2026, מוצגות למרכז
+    // מ-20/10/2026). שני המסלולים - הקישור יושב בעמוד המרכז, לא בכרטיס מטפל.
+    fetchAllRows<{ created_at: string; session_id: string | null }>(() =>
+      supabaseAdmin
+        .from("analytics_events")
+        .select("created_at, session_id")
+        .eq("event_type", "center_website_click")
+        .eq("metadata->>center_id", center.id),
+    ),
   ]);
+  // חזרה של אותו מבקר בתוך שתי דקות נספרת פעם אחת, כמו בלחיצות הקשר.
+  const websiteClicks = {
+    total: countWebsiteClicks(websiteEvents),
+    month: countWebsiteClicks(websiteEvents.filter((e) => e.created_at >= mAgo)),
+  };
   const clicks = [
     ...rawClicks,
     ...centerEvents.map((e) => ({
@@ -569,6 +584,8 @@ export async function buildCenterPortalPayload(
       impressions_month: matchImpressions,
       directory_impressions: dirImpressions.length,
       clicks_total: clicksByType(clicks),
+      // לא חלק מ"לחיצות ליצירת קשר": יציאה לאתר המרכז אינה פנייה.
+      website_clicks: websiteClicks,
       by_source: bySource,
       benchmark,
       // נשמרים לתאימות לאחור בלבד - הממשק אינו מציג עוד חלונות של 30/7 יום.

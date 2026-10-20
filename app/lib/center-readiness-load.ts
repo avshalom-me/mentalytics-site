@@ -44,7 +44,7 @@ const CENTER_COLUMNS =
   "id, name, status, email, payer_email, user_id, token, paid_at, gift_granted_at, billing_track, therapist_count, " +
   "price_per_therapist, fixed_monthly_price, public_page_enabled, logo_path, public_description, " +
   "team_members, gallery, public_director, public_founded_year, public_team_size, public_address, " +
-  "public_hours, public_faq";
+  "public_hours, public_faq, public_city, public_phone";
 
 export async function loadCentersWithReadiness(): Promise<CenterWithReadiness[]> {
   const { data: centers, error } = await supabaseAdmin

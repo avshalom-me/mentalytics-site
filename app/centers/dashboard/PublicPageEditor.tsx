@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { supabase } from "@/app/lib/supabaseClient";
-import { isMobileNumber, phoneNationalDigits } from "@/app/lib/phone";
+import { isMobileNumber, phoneNationalDigits, phonesInField } from "@/app/lib/phone";
 import { downscaleImageForUpload, centerUploadErrorMessage, CENTER_UPLOAD_NETWORK_MESSAGE } from "@/app/lib/center-image-upload";
 
 // עורך העמוד הציבורי של המרכז - קומפוננטה עצמאית (state מקומי כדי שהקלדה לא
@@ -99,6 +99,9 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
     { label: "דבר המנהל/ת", done: !!(dirName.trim() && dirNote.trim()) },
     { label: "שנת ייסוד", done: !!foundedYear.trim() },
     { label: "גודל הצוות", done: !!teamSize.trim() },
+    // העיר מוצגת בראש העמוד, מתחת לשם (20/10/2026: מרכז בלי עיר קיבל כותרת בלי מיקום).
+    { label: "עיר", done: !!city.trim() },
+    { label: "טלפון לחיוג", done: phonesInField(phone) >= 1 },
     { label: "כתובת", done: !!address.trim() },
     { label: "שעות פעילות", done: !!hours.trim() },
     { label: "שאלה נפוצה אחת לפחות", done: faq.some((f) => f.q.trim() && f.a.trim()) },
@@ -384,15 +387,24 @@ export default function PublicPageEditor({ initial, isEntity = false }: { initia
 
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="mb-1 block text-sm font-semibold text-stone-700">עיר / כתובת</label>
-          <input value={city} onChange={(e) => setCity(e.target.value)}
+          <label className="mb-1 block text-sm font-semibold text-stone-700">עיר (מוצגת בראש העמוד)</label>
+          <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="למשל ירושלים"
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
+          <p className="mt-1 text-[11.5px] leading-4 text-stone-500">שם העיר בלבד. את הרחוב כותבים למטה, ב&quot;כתובת מלאה&quot;.</p>
         </div>
         <div>
           <label className="mb-1 block text-sm font-semibold text-stone-700">טלפון לחיוג (מוצג באתר)</label>
           <input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" placeholder="למשל 072-1234567 או 03-1234567"
             className="w-full rounded-lg border border-stone-300 px-3 py-2 text-sm outline-none focus:border-[var(--teal)]" />
-          <p className="mt-1 text-[11.5px] leading-4 text-stone-500">כפתור החיוג בעמוד המרכז. יכול להיות מרכזייה או קו וירטואלי.</p>
+          {(() => {
+            // מספר אחד בשדה. שני מספרים באותו שדה הפילו בעבר את הטלפון מהעמוד כולו
+            // (20/10/2026); היום מוצג הראשון, ואומרים זאת למרכז במקום לנחש בשקט.
+            const typed = phone.trim();
+            const n = phonesInField(typed);
+            if (typed && n === 0) return <p className="mt-1 text-[11.5px] font-bold text-red-600">זה לא נראה כמו מספר טלפון, ולכן לא יופיע כפתור חיוג.</p>;
+            if (n > 1) return <p className="mt-1 text-[11.5px] font-bold text-amber-700">יש כאן יותר ממספר אחד. בעמוד יוצג רק הראשון. מספר נייד לוואטסאפ נכנס בשדה הוואטסאפ למטה.</p>;
+            return <p className="mt-1 text-[11.5px] leading-4 text-stone-500">מספר אחד, לכפתור החיוג בעמוד המרכז. יכול להיות מרכזייה או קו וירטואלי.</p>;
+          })()}
         </div>
       </div>
 
