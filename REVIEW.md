@@ -44,6 +44,8 @@
 
 - `event_type` או ערך enum חדש בקוד = הרחבת ה-CHECK constraint במיגרציה באותו קומיט, אחרת השורות נדחות בשקט.
 - טבלה חדשה: `GRANT ... TO service_role` + `ENABLE ROW LEVEL SECURITY` + policies. בלי GRANT ל-`anon` אלא אם הטבלה ציבורית באמת.
+- מ-20/10/2026 אף טבלה ב-public לא פתוחה ל-`anon` או ל-`authenticated` (מיגרציה `20261020_revoke_client_grants_legacy_tables.sql`). הדפדפן לא קורא טבלאות; הוא משתמש ב-Supabase רק להתחברות ולהעלאה בכתובת חתומה. קוד חדש שקורא טבלה מהדפדפן ייכשל ב-42501 - הנתונים עוברים דרך נתיב API.
+- `.claude/settings.local.json` מקומי בלבד ולא נכנס לריפו.
 - ספירה על טבלה שעלולה לעבור 1,000 שורות נעשית ב-DB (RPC / `count: 'exact'`), לא ב-JS על שורות שנמשכו.
 - `supabaseAdmin` עוקף RLS: כל שימוש בו בנתיב חייב לבוא אחרי בדיקת הרשאה, ועדכון לפי `id` מהלקוח חייב בדיקת בעלות (`center_account_id`, `user_id`).
 - מצב חי בודקים במסד ברגע התשובה, לא מהזיכרון. סטטוס היסטורי מ-`therapist_audit_log`, לא מהשדה של היום.

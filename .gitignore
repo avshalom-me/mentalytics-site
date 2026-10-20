@@ -45,6 +45,10 @@ next-env.d.ts
 # claude agent local files
 .claude/worktrees/
 .claude/launch.json
+# The permission allowlist of Claude Code on this machine. It was swept into a bulk
+# commit on 30/3/2026 and tracked until 20/10/2026, so every approved command (with
+# paths, ids and URLs in it) went to the public repo. Local only from now on.
+.claude/settings.local.json
 
 # Internal centers sales sheet — confidential (price floors, margins, negotiation
 # strategy). NOT committed: the repo is public. The PDF lives in a private Supabase
