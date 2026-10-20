@@ -3,7 +3,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { fetchAllRows } from "./fetch-all-rows";
 import { JOIN_LINK_PLACEHOLDER, GIFT_OFFER_TTL_DAYS } from "./gift-checkout";
 import { coversRegion, overlaps } from "./match-fallback";
-import { REGION_GROUPS, REGION_GROUP_LABELS, regionGroupOf } from "./regions";
+import { ALL_REGIONS, REGION_GROUPS, REGION_GROUP_LABELS, regionGroupOf } from "./regions";
 import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
 import {
   giftEligibilityError,
@@ -26,6 +26,7 @@ import {
   isConcentrated,
   NEW_PER_SLICE,
   ONLINE_REGION,
+  PAID_SOURCES,
   CONCENTRATION_WINDOW_DAYS,
   type ConcentrationSlice,
   type ConcentrationSummary,
@@ -82,8 +83,8 @@ function supplyTargetFor(demand: number): number {
 
 // מקור קידום שמשקף לקוח שמשלם בפועל (ישירות או דרך מרכז), מול קידום
 // מתנה שיפוג. שניהם נספרים ככיסוי - למטופל אין הבדל - אבל ההפרדה מוצגת,
-// כי חיתוך שנשען כולו על מתנות יתרוקן ברגע שהן יסתיימו.
-const PAID_SOURCES = new Set(["paid", "center", "gift_trial"]);
+// כי חיתוך שנשען כולו על מתנות יתרוקן ברגע שהן יסתיימו. PAID_SOURCES משותף
+// עם ניתוח ריכוז הפניות (contact-concentration.ts).
 
 type FallbackEvent = { metadata: Record<string, unknown> | null };
 
@@ -323,7 +324,11 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // ומשתיקות את הפער שממנו יצאו כל עוד ההמתנה לתשובה נמשכת.
       recentGiftOffers(),
       // ריכוז פניות: מי פנה למי בשבועיים האחרונים (contact-concentration-data.ts).
-      loadConcentrationInput(),
+      // כישלון כאן לא מפיל את פערי ההיצע - הם לא תלויים בנתונים האלה.
+      loadConcentrationInput().catch((e) => {
+        console.error("supply_gaps: concentration input failed:", e instanceof Error ? e.message : e);
+        return null;
+      }),
     ]);
 
     // צבירה לפי קבוצת אזור × טיפול. events = כמה מטופלים נתקלו בחיתוך הזה,
@@ -414,14 +419,27 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const offerNames = new Map<string, string>(
       therapists.map((t) => [t.id, t.full_name ?? ""])
     );
+    // הצעות ריכוז פניות (מ-20/10/26) נרשמות באזור מלא ("גוש דן") ולא בתווית
+    // הקבוצה ("המרכז והשפלה"). לצורך הפערים הן נספרות גם בקבוצה שלהן - אחרת
+    // פער ברמת הקבוצה לא היה רואה שכבר יצאה הצעה לאותו מקום ולאותו תחום.
+    // waitingGroupLabelled שומר רק את מה שנרשם בתווית קבוצה, לבדיקה של הריכוז
+    // עצמו: הצעה בגוש דן לא משתיקה ריכוז בשפלה.
+    const waitingGroupLabelled = new Set<string>();
+    const bump = (key: string, sentAt: string): void => {
+      const prev = waitingByGap.get(key);
+      waitingByGap.set(key, {
+        count: (prev?.count ?? 0) + 1,
+        latest: prev && prev.latest > sentAt ? prev.latest : sentAt,
+      });
+    };
     for (const o of sentOffers) {
       const key = `${o.region}|${treatmentKey(o.treatment)}`;
       if (o.sent_at >= waitCutoff) {
-        const prev = waitingByGap.get(key);
-        waitingByGap.set(key, {
-          count: (prev?.count ?? 0) + 1,
-          latest: prev && prev.latest > o.sent_at ? prev.latest : o.sent_at,
-        });
+        bump(key, o.sent_at);
+        const isFullRegion = (ALL_REGIONS as readonly string[]).includes(o.region);
+        const groupLabel = isFullRegion ? regionGroupLabel(regionGroupOf(o.region)) : null;
+        if (groupLabel && groupLabel !== o.region) bump(`${groupLabel}|${treatmentKey(o.treatment)}`, o.sent_at);
+        if (!isFullRegion) waitingGroupLabelled.add(key);
         continue;
       }
       const prevLapsed = lapsedByGap.get(key);
@@ -566,18 +584,17 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // חיתוך שאין בו חוסר, אבל מעט מטפלים מקבלים בו את רוב הפניות: הצעת מתנה
     // לעוד מטפלים מאותו אזור ותחום, באותו מסלול שליחה ובאותם צינונים כמו
     // פער היצע. חיתוך שכבר עלה כפער לא מוצע פעמיים.
-    const conc = analyzeConcentration({
-      contacts: concInput.contacts,
-      therapists,
-      lastPausedAt: concInput.lastPausedAt,
-    });
+    const conc = concInput
+      ? analyzeConcentration({ contacts: concInput.contacts, therapists, lastPausedAt: concInput.lastPausedAt })
+      : { hot: [], slices: [], freeze: [] };
     const gapKeys = new Set(gaps.map((g) => `${g.region}|${treatmentKey(g.treatment)}`));
     type ConcOffer = { slice: ConcentrationSlice; regionLabel: string; candidates: GapCandidate[]; key: string };
     const concOffers: ConcOffer[] = [];
     const concentrated = conc.slices.filter(isConcentrated);
     // מטפל שעובד בשני אזורים (חיפה ועמק יזרעאל) עלה כמועמד בשני כרטיסים, והשליחה
     // מהכרטיס השני הייתה נחסמת בצינון. כל מועמד מופיע בכרטיס אחד בלבד.
-    const assigned = new Set<string>();
+    // גם מי שכבר מועמד/ת בכרטיס של פער היצע באותה ריצה.
+    const assigned = new Set<string>(gaps.flatMap((g) => g.candidates.map((c) => c.therapist_id)));
     for (const s of concentrated) {
       const groupKey = s.region === ONLINE_REGION ? "online" : regionGroupOf(s.region);
       if (UNACTIONABLE_GROUPS.has(groupKey)) continue;
@@ -590,7 +607,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       const regionLabel = s.region === ONLINE_REGION ? regionGroupLabel("online") : s.region;
       if (
         waitingByGap.has(`${regionLabel}|${treatmentKey(s.treatment)}`) ||
-        waitingByGap.has(`${regionGroupLabel(groupKey)}|${treatmentKey(s.treatment)}`)
+        waitingGroupLabelled.has(`${regionGroupLabel(groupKey)}|${treatmentKey(s.treatment)}`)
       ) {
         continue;
       }

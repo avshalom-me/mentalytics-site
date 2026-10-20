@@ -15,8 +15,8 @@ import {
 //
 // שתי רשימות: איפה מעט מטפלים מקבלים את רוב הפניות (ואם יצאה משם הצעת מתנה
 // לתור), ומי היה מוקפא לשבוע ולמה כן או לא. ההקפאה כאן אינה אוטומטית: כפתור
-// לכל מי שעבר את כל הבדיקות, והוא קורא לאותה פעולה כמו הכפתור בעמוד המטפלים
-// (applyMatchPause, עם כל ההגנות שלה).
+// לכל מי שעבר את כל הבדיקות. בלחיצה השרת בודק הכול מחדש על הנתונים של עכשיו,
+// ורק אז מקפיא דרך אותה פעולה כמו הכפתור בעמוד המטפלים (applyMatchPause).
 
 const SOURCE_LABEL: Record<string, string> = {
   paid: "משלם/ת",
@@ -65,10 +65,12 @@ export default function ConcentrationPanel({
     setBusy(c.id);
     setError("");
     try {
-      const res = await fetch("/api/admin-therapists", {
+      // השרת מריץ את הבדיקה מחדש על הנתונים של עכשיו לפני שהוא מקפיא: הרשימה
+      // כאן היא מהריצה האחרונה, ומאז אפשר שהמצב השתנה.
+      const res = await fetch("/api/admin-agents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: c.id, action: "set_match_pause", days: FREEZE_DAYS, reason: "ריכוז פניות" }),
+        body: JSON.stringify({ action: "concentration_freeze", therapist_id: c.id }),
       });
       const j = (await res.json().catch(() => null)) as { ok?: boolean; error?: string; match_paused_until?: string } | null;
       if (!res.ok || !j?.ok) {

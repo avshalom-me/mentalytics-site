@@ -4,7 +4,9 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { CONCENTRATION_WINDOW_DAYS, FREEZE_COOLDOWN_DAYS, type ConcContact } from "./contact-concentration";
 
 // הנתונים לניתוח ריכוז הפניות (contact-concentration.ts): מי פנה למי בחלון,
-// מה הוא חיפש, ומי הוקפא לאחרונה. קריאה בלבד.
+// מה חיפש ואיפה, ומי הוקפא לאחרונה. קריאה בלבד.
+
+type ViewContext = { treatment: string; regionGroup: string | null; ageBand: string | null; at: string };
 
 export async function loadConcentrationInput(now = new Date()): Promise<{
   contacts: ConcContact[];
@@ -21,16 +23,22 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
           .select("therapist_id, session_id, source, automated")
           .gte("clicked_at", sinceIso)
     ),
-    // הטיפול שהמטופל חיפש נשמר על הצפיות שמגיעות מהשאלון (כרטיס או כניסה
-    // לפרופיל). יום מרווח לפני החלון: מי שמילא שאלון אתמול בלילה ופנה הבוקר.
-    fetchAllRows<{ therapist_id: string; session_id: string | null; viewer_treatment: string | null; viewed_at: string }>(
-      () =>
-        supabaseAdmin
-          .from("therapist_profile_views")
-          .select("therapist_id, session_id, viewer_treatment, viewed_at")
-          .not("viewer_treatment", "is", null)
-          .not("session_id", "is", null)
-          .gte("viewed_at", new Date(Date.parse(sinceIso) - 86_400_000).toISOString())
+    // מה המטופל חיפש, איפה ובאיזה גיל נשמר על הכניסה לפרופיל מתוך תוצאות
+    // השאלון. יום מרווח לפני החלון: מי שמילא שאלון אתמול בלילה ופנה הבוקר.
+    fetchAllRows<{
+      therapist_id: string;
+      session_id: string | null;
+      viewer_treatment: string | null;
+      viewer_region: string | null;
+      viewer_age_band: string | null;
+      viewed_at: string;
+    }>(() =>
+      supabaseAdmin
+        .from("therapist_profile_views")
+        .select("therapist_id, session_id, viewer_treatment, viewer_region, viewer_age_band, viewed_at")
+        .not("viewer_treatment", "is", null)
+        .not("session_id", "is", null)
+        .gte("viewed_at", new Date(Date.parse(sinceIso) - 86_400_000).toISOString())
     ),
     supabaseAdmin
       .from("therapist_audit_log")
@@ -40,26 +48,41 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
   ]);
   if (pauses.error) throw new Error(`קריאת ההקפאות האחרונות נכשלה: ${pauses.error.message}`);
 
-  // הטיפול של מטפל × סשן, ובנפילה - הטיפול האחרון שהסשן חיפש בכלל (מי שמילא
-  // שאלון ואחר כך פנה מהמאגר חיפש את אותו דבר).
-  const byPair = new Map<string, string>();
-  const bySession = new Map<string, { treatment: string; at: string }>();
+  const byPair = new Map<string, ViewContext>();
+  const bySession = new Map<string, ViewContext>();
   for (const v of views) {
     if (!v.session_id || !v.viewer_treatment) continue;
-    byPair.set(`${v.therapist_id}|${v.session_id}`, v.viewer_treatment);
+    const ctx: ViewContext = {
+      treatment: v.viewer_treatment,
+      regionGroup: v.viewer_region,
+      ageBand: v.viewer_age_band,
+      at: v.viewed_at,
+    };
+    const pairKey = `${v.therapist_id}|${v.session_id}`;
+    const prevPair = byPair.get(pairKey);
+    if (!prevPair || ctx.at > prevPair.at) byPair.set(pairKey, ctx);
     const prev = bySession.get(v.session_id);
-    if (!prev || v.viewed_at > prev.at) bySession.set(v.session_id, { treatment: v.viewer_treatment, at: v.viewed_at });
+    if (!prev || ctx.at > prev.at) bySession.set(v.session_id, ctx);
   }
 
   const contacts: ConcContact[] = [];
   for (const c of clicks) {
     // לחיצה שהדפדפן הצהיר עליה כאוטומטית אינה אדם.
     if (!c.session_id || c.automated === true) continue;
+    const source = c.source ?? "";
+    // ההקשר של המטפל הזה בסשן הזה - קיים כשהמטופל נכנס אליו מתוך תוצאות
+    // השאלון. לחיצה ישר מכרטיס התוצאות (בלי כניסה לפרופיל) לוקחת את ההקשר
+    // מהשאלון של אותו סשן; לחיצה מהמאגר או מפרופיל שהגיעו אליו בדרך אחרת
+    // נשארת בלי הקשר, כי אין דרך לדעת מה המטופל חיפש שם.
+    const ctx =
+      byPair.get(`${c.therapist_id}|${c.session_id}`) ?? (source === "match" ? bySession.get(c.session_id) : undefined);
     contacts.push({
       therapistId: c.therapist_id,
       sessionId: c.session_id,
-      source: c.source ?? "",
-      treatment: byPair.get(`${c.therapist_id}|${c.session_id}`) ?? bySession.get(c.session_id)?.treatment ?? null,
+      source,
+      treatment: ctx?.treatment ?? null,
+      regionGroup: ctx?.regionGroup ?? null,
+      ageBand: ctx?.ageBand ?? null,
     });
   }
 

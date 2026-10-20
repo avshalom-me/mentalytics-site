@@ -33,9 +33,23 @@ function therapist(id: string, over: Partial<ConcTherapist> = {}): ConcTherapist
   };
 }
 
-/** n פונים שונים למטפל, כולם מהשאלון ועל אותו טיפול. */
-function contacts(therapistId: string, n: number, treatment: string | null = "CBT", source = "match"): ConcContact[] {
-  return Array.from({ length: n }, (_, i) => ({ therapistId, sessionId: `${therapistId}-s${i}`, source, treatment }));
+/** n פונים שונים למטפל, כולם מהשאלון, מבוגרים מאזור המרכז, על אותו טיפול. */
+function contacts(
+  therapistId: string,
+  n: number,
+  treatment: string | null = "CBT",
+  source = "match",
+  over: Partial<ConcContact> = {}
+): ConcContact[] {
+  return Array.from({ length: n }, (_, i) => ({
+    therapistId,
+    sessionId: `${therapistId}-s${i}`,
+    source,
+    treatment,
+    regionGroup: treatment ? "center" : null,
+    ageBand: treatment ? "18-30" : null,
+    ...over,
+  }));
 }
 
 /** מטפלים פעילים נוספים באותו אזור ותחום, בלי פניות. */
@@ -47,7 +61,7 @@ describe("who counts as receiving many contacts", () => {
   it("is a person, not a click: the same visitor clicking twice is one", () => {
     const twice: ConcContact[] = [
       ...contacts("hot", HOT_MIN_PEOPLE - 1),
-      { therapistId: "hot", sessionId: "hot-s0", source: "profile", treatment: null },
+      { therapistId: "hot", sessionId: "hot-s0", source: "profile", treatment: null, regionGroup: null, ageBand: null },
     ];
     const r = analyzeConcentration({ contacts: twice, therapists: [therapist("hot")], now: NOW });
     expect(r.hot).toHaveLength(0);
@@ -116,12 +130,33 @@ describe("a slice where a few therapists take most of the contacts", () => {
   it("an online-only therapist is measured against other therapists who work online", () => {
     expect(workRegions({ regions: [], online: true })).toEqual([ONLINE_REGION]);
     const r = analyzeConcentration({
-      contacts: contacts("hot", 4),
+      contacts: contacts("hot", 4, "CBT", "match", { regionGroup: "online" }),
       therapists: [therapist("hot", { regions: [], online: true }), therapist("o1", { regions: ["חיפה"], online: true })],
       now: NOW,
     });
     const slice = r.slices.find((s) => s.region === ONLINE_REGION)!;
     expect(slice.covering).toBe(2);
+  });
+});
+
+describe("where the contacts actually came from", () => {
+  it("counts a contact only in the region the patient searched, not in every region the therapist lists", () => {
+    const r = analyzeConcentration({
+      contacts: contacts("hot", 5),
+      therapists: [therapist("hot", { regions: ["תל אביב", "ירושלים"] })],
+      now: NOW,
+    });
+    expect(r.slices.map((s) => s.region)).toEqual(["גוש דן"]);
+  });
+
+  it("a contact without a known region makes no regional slice", () => {
+    const r = analyzeConcentration({
+      contacts: contacts("hot", 5, "CBT", "match", { regionGroup: null }),
+      therapists: [therapist("hot")],
+      now: NOW,
+    });
+    expect(r.hot).toHaveLength(1);
+    expect(r.slices).toHaveLength(0);
   });
 });
 
@@ -151,6 +186,17 @@ describe("whether a one-week freeze is safe", () => {
     const hot = r.freeze.find((f) => f.id === "hot")!;
     expect(hot.safe).toBe(false);
     expect(hot.weakest?.alternatives).toBe(FREEZE_MIN_ALTERNATIVES - 1);
+  });
+
+  it("checks alternatives for the ages that actually contacted: children are not covered by adults-only therapists", () => {
+    const kids = contacts("hot", 5, "CBT", "match", { ageBand: "child" });
+    const r = analyzeConcentration({
+      contacts: kids,
+      therapists: [therapist("hot", { age_groups: ["ילדים", "מבוגרים"] }), ...quiet(5)],
+      now: NOW,
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("ילדים ונוער");
   });
 
   it("follows the manual freeze rules: no centers and no invitation route before the first charge", () => {

@@ -8,6 +8,7 @@ import { googleAdsConfigured } from "@/app/lib/google-ads";
 import { runAdsMonitor } from "@/app/lib/ads-monitor";
 import { runBudgetAgent } from "@/app/lib/budget-run";
 import { runSupplyGaps } from "@/app/lib/supply-gaps";
+import { freezeForConcentration } from "@/app/lib/contact-concentration-freeze";
 import { runFinanceRecon } from "@/app/lib/finance-recon";
 import { runRetentionReview } from "@/app/lib/retention-review-data";
 import { runCenterHealth } from "@/app/lib/center-health-agent";
@@ -252,6 +253,15 @@ export async function POST(req: NextRequest) {
         freeze: result.freeze,
         error: result.error,
       });
+    }
+    // הקפאה לשבוע מרשימת ריכוז הפניות. הבדיקה כולה רצה מחדש לפני ההקפאה,
+    // כי הרשימה בעמוד היא מהריצה האחרונה (contact-concentration-freeze.ts).
+    if (body?.action === "concentration_freeze") {
+      const therapistId = String(body?.therapist_id ?? "");
+      if (!therapistId) return NextResponse.json({ ok: false, error: "חסר מזהה מטפל/ת" }, { status: 400 });
+      const result = await freezeForConcentration(therapistId);
+      if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
+      return NextResponse.json({ ok: true, match_paused_until: result.until });
     }
     // שליחת הצעת מתנה: מסלול השליחה היחיד, ורק מקליק מפורש באדמין. המייל
     // יוצא כאן ורק כאן - אין קרון ואין מסלול אוטומטי שמריץ את זה.
