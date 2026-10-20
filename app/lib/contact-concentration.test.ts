@@ -317,13 +317,16 @@ describe("whether a one-week freeze is safe", () => {
     expect(r.freeze[0].safe).toBe(true);
   });
 
-  it("a gift promotion of more than 60 days needs no subscription", () => {
-    const r = analyzeConcentration({
-      ...base,
-      paidSince: new Map(),
-      therapists: [therapist("hot", { promotion_source: "trial" }), ...quiet(5)],
-    });
-    expect(r.freeze[0].safe).toBe(true);
+  // "בקידום מתנה לא לעשות את ההקפאה הזו. רק מטפל בתשלום" (הבעלים, 20/10/26).
+  it("never proposes freezing a gift promotion, however long and however busy", () => {
+    for (const source of ["trial", "manual"]) {
+      const r = analyzeConcentration({
+        ...base,
+        therapists: [therapist("hot", { promotion_source: source }), ...quiet(5)],
+      });
+      expect(r.freeze[0].safe).toBe(false);
+      expect(r.freeze[0].blockedReason).toContain("בתשלום");
+    }
   });
 
   it("does not freeze again within four weeks of the last freeze", () => {

@@ -43,9 +43,9 @@ export const FREEZE_MIN_ALTERNATIVES = 4;
 export const FREEZE_DAYS = 7;
 /** לא מקפיאים שוב מי שהוקפא בחודש האחרון - אחרת שבוע בפנים ושבוע בחוץ. */
 export const FREEZE_COOLDOWN_DAYS = 28;
-/** "עברו לפחות 60 יום מקידום ממומן" (הבעלים, 20/10/26). נמדד מתחילת הקידום,
- *  ולמשלם/ת - מהמאוחר בין תחילת הקידום לתחילת המנוי, כלומר 60 יום של קידום
- *  בתשלום. אלה גם 60 ימי ערבות הפניות: בתוכם לא מקפיאים משלם/ת בכלל. */
+/** "עברו לפחות 60 יום מקידום ממומן" (הבעלים, 20/10/26): מהמאוחר בין תחילת
+ *  הקידום לתחילת המנוי, כלומר 60 יום של קידום בתשלום. ההקפאה מכאן רק למשלמים
+ *  ("בקידום מתנה לא לעשות את ההקפאה הזו"), ובתוך חלון ערבות הפניות לא מקפיאים. */
 export const FREEZE_MIN_TENURE_DAYS = 60;
 /** "לפחות 3 מהפונים הגיעו מהשאלון" (הבעלים, 20/10/26). הקפאה משפיעה רק על
  *  השאלון, ומי שהפניות שלו מגיעות מהמאגר או מהפרופיל לא יתחלק עם אחרים. */
@@ -340,21 +340,21 @@ export function analyzeConcentration(input: {
     // רשומת מרכז (ישות) מקודמת לפעמים כ-paid או ידנית, ואז pauseSourceBlock לא
     // תופס אותה - אבל חשיפה של מרכז לא מוקפאת (match-pause.ts).
     if (t.entity_type === "center") return blocked("רשומת מרכז: חשיפה של מרכז לא מוקפאת.");
+    // "בקידום מתנה לא לעשות את ההקפאה הזו. רק מטפל בתשלום" (הבעלים, 20/10/26).
+    // מקודמי מתנה (trial / manual) עדיין ניתנים להקפאה ידנית מעמוד המטפלים -
+    // רק ההצעה מכאן מוגבלת למשלמים.
+    if (t.promotion_source !== "paid") {
+      return blocked("קידום מתנה: ההקפאה מריכוז פניות רק למטפל/ת בתשלום.");
+    }
     if (isPaused(t, nowMs)) return blocked("כבר מוקפא/ת מההתאמות.");
-    const isPaid = t.promotion_source === "paid";
     const paidStart = input.paidSince?.get(t.id) ?? null;
-    if (isPaid && !paidStart) {
+    if (!paidStart) {
       return blocked("לא נמצא מנוי פעיל, ולכן אי אפשר לדעת כמה זמן הקידום בתשלום.");
     }
-    const tenureFrom = [t.promoted_since, isPaid ? paidStart : null]
-      .filter((d): d is string => Boolean(d))
-      .reduce<string | null>((latest, d) => (!latest || d > latest ? d : latest), null);
-    if (!tenureFrom || nowMs - Date.parse(tenureFrom) < FREEZE_MIN_TENURE_DAYS * 86_400_000) {
-      return blocked(
-        isPaid
-          ? `בקידום בתשלום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`
-          : `בקידום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`
-      );
+    // 60 יום של קידום בתשלום: מהמאוחר בין תחילת הקידום לתחילת המנוי.
+    const tenureFrom = t.promoted_since && t.promoted_since > paidStart ? t.promoted_since : paidStart;
+    if (nowMs - Date.parse(tenureFrom) < FREEZE_MIN_TENURE_DAYS * 86_400_000) {
+      return blocked(`בקידום בתשלום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`);
     }
     // צינון משני מקורות: יומן הביקורת והצעות שבוצעו (מתי הוקפא/ה), ותאריך הסיום
     // שנשאר על המטפל/ת אחרי שההקפאה פגה (שחרור ידני מאפס אותו, הקפאה שפגה - לא).
