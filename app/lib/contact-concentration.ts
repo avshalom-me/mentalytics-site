@@ -43,12 +43,16 @@ export const FREEZE_MIN_ALTERNATIVES = 4;
 export const FREEZE_DAYS = 7;
 /** לא מקפיאים שוב מי שהוקפא בחודש האחרון - אחרת שבוע בפנים ושבוע בחוץ. */
 export const FREEZE_COOLDOWN_DAYS = 28;
-/** בחודש הראשון של קידום לא מקפיאים: אלה הימים שבהם המטפל/ת מגבש/ת דעה
- *  אם זה עובד, וגם משלם/ת חדש/ה שכבר קיבל/ה פניות נמצא/ת שם. */
-export const FREEZE_MIN_TENURE_DAYS = 30;
-/** הקפאה משפיעה רק על השאלון. מי שרוב הפניות שלו מגיעות מהמאגר או
- *  מהפרופיל לא יתחלק עם אחרים בגלל הקפאה. */
-export const FREEZE_MIN_MATCH_PEOPLE = 2;
+/** "עברו לפחות 60 יום מקידום ממומן" (הבעלים, 20/10/26). נמדד מתחילת הקידום,
+ *  ולמשלם/ת - מהמאוחר בין תחילת הקידום לתחילת המנוי, כלומר 60 יום של קידום
+ *  בתשלום. אלה גם 60 ימי ערבות הפניות: בתוכם לא מקפיאים משלם/ת בכלל. */
+export const FREEZE_MIN_TENURE_DAYS = 60;
+/** "לפחות 3 מהפונים הגיעו מהשאלון" (הבעלים, 20/10/26). הקפאה משפיעה רק על
+ *  השאלון, ומי שהפניות שלו מגיעות מהמאגר או מהפרופיל לא יתחלק עם אחרים. */
+export const FREEZE_MIN_MATCH_PEOPLE = 3;
+/** בדיקת ההקפאה רצה פעם בשבועיים (הבעלים, 20/10/26), ומעלה הצעות לתור -
+ *  ההקפאה עצמה רק בלחיצה. */
+export const FREEZE_CHECK_EVERY_DAYS = 14;
 
 export const ONLINE_REGION = "online";
 
@@ -215,6 +219,8 @@ export function analyzeConcentration(input: {
   therapists: ConcTherapist[];
   /** מתי כל מטפל הוקפא לאחרונה (מיומן הביקורת), לצינון ההקפאה. */
   lastPausedAt?: Map<string, string>;
+  /** תחילת המנוי הפעיל של כל משלם/ת (subscriptions), לספירת ימי הקידום בתשלום. */
+  paidSince?: Map<string, string>;
   now?: Date;
 }): ConcentrationResult {
   const nowMs = (input.now ?? new Date()).getTime();
@@ -319,8 +325,20 @@ export function analyzeConcentration(input: {
     const sourceBlock = pauseSourceBlock(t);
     if (sourceBlock) return blocked(sourceBlock);
     if (isPaused(t, nowMs)) return blocked("כבר מוקפא/ת מההתאמות.");
-    if (!t.promoted_since || nowMs - Date.parse(t.promoted_since) < FREEZE_MIN_TENURE_DAYS * 86_400_000) {
-      return blocked(`בקידום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; בחודש הראשון לא מקפיאים.`);
+    const isPaid = t.promotion_source === "paid";
+    const paidStart = input.paidSince?.get(t.id) ?? null;
+    if (isPaid && !paidStart) {
+      return blocked("לא נמצא מנוי פעיל, ולכן אי אפשר לדעת כמה זמן הקידום בתשלום.");
+    }
+    const tenureFrom = [t.promoted_since, isPaid ? paidStart : null]
+      .filter((d): d is string => Boolean(d))
+      .reduce<string | null>((latest, d) => (!latest || d > latest ? d : latest), null);
+    if (!tenureFrom || nowMs - Date.parse(tenureFrom) < FREEZE_MIN_TENURE_DAYS * 86_400_000) {
+      return blocked(
+        isPaid
+          ? `בקידום בתשלום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`
+          : `בקידום פחות מ-${FREEZE_MIN_TENURE_DAYS} ימים; עד אז לא מקפיאים.`
+      );
     }
     const lastPaused = input.lastPausedAt?.get(t.id);
     if (lastPaused && nowMs - Date.parse(lastPaused) < FREEZE_COOLDOWN_DAYS * 86_400_000) {
@@ -329,7 +347,9 @@ export function analyzeConcentration(input: {
       );
     }
     if (base.matchPeople < FREEZE_MIN_MATCH_PEOPLE) {
-      return blocked("רוב הפניות מגיעות מהמאגר או ישר לפרופיל, והקפאה משפיעה רק על השאלון.");
+      return blocked(
+        `רק ${base.matchPeople} מהפונים הגיעו מהשאלון (צריך ${FREEZE_MIN_MATCH_PEOPLE}); הקפאה משפיעה רק על השאלון.`
+      );
     }
 
     const served = [...(servedSlices.get(t.id)?.values() ?? [])];

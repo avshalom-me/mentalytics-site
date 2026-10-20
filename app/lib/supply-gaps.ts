@@ -28,11 +28,14 @@ import {
   ONLINE_REGION,
   PAID_SOURCES,
   CONCENTRATION_WINDOW_DAYS,
+  FREEZE_CHECK_EVERY_DAYS,
+  FREEZE_DAYS,
   type ConcentrationSlice,
   type ConcentrationSummary,
   type FreezeCandidate,
 } from "./contact-concentration";
 import { loadConcentrationInput } from "./contact-concentration-data";
+import { serverFreezeChecks, FREEZE_ACTION_TYPE } from "./contact-concentration-freeze";
 
 // היה מוגדר כאן עד 20/10/26; נשאר מיוצא מכאן בשביל מי שכבר מייבא אותו.
 export { treatmentParts };
@@ -245,22 +248,14 @@ function giftOfferDraft(name: string, demandLine: string, fitLine: string, treat
   ].join("\n");
 }
 
-// טיוטת הצעת המתנה לחיתוך של ריכוז פניות (נוסף 20/10/26): אין כאן חוסר -
-// היו מטפלים להציע - אלא מעט מטפלים שמקבלים את רוב הפניות. הטיוטה אומרת
-// בדיוק את זה, בלי שמות, בלי מספרים של מטפלים אחרים, ובלי לטעון שלא היה
-// למטופלים מה לקבל.
-export function buildConcentrationDraft(
-  name: string,
-  regionKey: string,
-  rawTreatment: string,
-  people: number
-): string {
+// טיוטת הצעת המתנה לחיתוך של ריכוז פניות (נוסף 20/10/26). הנוסח של הבעלים,
+// מילה במילה (20/10/26): בלי "הפניות מתרכזות", בלי שמות ובלי מספרים. "מספר רב"
+// נכון תמיד כאן, כי חיתוך ריכוז דורש לפחות 3 פונים (MIN_SLICE_PEOPLE) - אותו
+// סף שבו הטיוטה של פער ההיצע עוברת ל"מספר רב".
+export function buildConcentrationDraft(name: string, regionKey: string, rawTreatment: string): string {
   const treatment = treatmentPhrase(rawTreatment);
   const where = regionPhrase(regionKey);
-  const who = people >= 3 ? "מספר רב של מטופלים" : "מספר מטופלים";
-  const demandLine =
-    `בשבועיים האחרונים ${who} שחיפשו ${treatment} ${where} דרך מערכת ההתאמות, שבה מוצגים רק מטפלים מקודמים, ` +
-    `פנו למטפלים שהוצגו להם. הפניות מתרכזות כרגע אצל מספר קטן של מטפלים בתחום ובאזור הזה, ואנחנו רוצים שלמטופלים יהיו יותר אפשרויות.`;
+  const demandLine = `בתקופה האחרונה מספר רב של מטופלים חיפשו ${treatment} ${where} דרך מערכת ההתאמות, שבה מוצגים רק מטפלים מקודמים.`;
   return giftOfferDraft(name, demandLine, "הפרופיל שלך מתאים לתחום ולאזור האלה", treatment, where);
 }
 
@@ -585,7 +580,12 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // לעוד מטפלים מאותו אזור ותחום, באותו מסלול שליחה ובאותם צינונים כמו
     // פער היצע. חיתוך שכבר עלה כפער לא מוצע פעמיים.
     const conc = concInput
-      ? analyzeConcentration({ contacts: concInput.contacts, therapists, lastPausedAt: concInput.lastPausedAt })
+      ? analyzeConcentration({
+          contacts: concInput.contacts,
+          therapists,
+          lastPausedAt: concInput.lastPausedAt,
+          paidSince: concInput.paidSince,
+        })
       : { hot: [], slices: [], freeze: [] };
     const gapKeys = new Set(gaps.map((g) => `${g.region}|${treatmentKey(g.treatment)}`));
     type ConcOffer = { slice: ConcentrationSlice; regionLabel: string; candidates: GapCandidate[]; key: string };
@@ -630,7 +630,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
           therapist_id: t.id,
           full_name: t.full_name ?? "",
           email: t.email ?? "",
-          draft: buildConcentrationDraft(t.full_name ?? "", s.region, label, s.slicePeople),
+          draft: buildConcentrationDraft(t.full_name ?? "", s.region, label),
         })),
       });
     }
@@ -722,7 +722,47 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         },
       };
     });
-    const actions = [...gapActions, ...concActions];
+    // ── הצעות להקפאה שקטה (20/10/26) ──────────────────────────────────────
+    // "חצי-אוטומטי": פעם בשבועיים עולה לתור הצעה לכל מקודם/ת עמוס/ה שעומד/ת
+    // בכל הכללים (contact-concentration.ts + חלון הערבות); ההקפאה רק בלחיצה,
+    // ושם הכול נבדק שוב. בריצה שבין שתי בדיקות לא עולות הצעות חדשות, אבל
+    // הצעה שעוד ממתינה ועדיין בטוחה נשמרת - אחרת הסנכרון היה סוגר אותה.
+    const freeze = concInput ? await serverFreezeChecks(conc.freeze) : [];
+    const lastBatchAt = await lastFreezeBatchAt();
+    const freezeDue =
+      concInput !== null &&
+      (!lastBatchAt || Date.now() - Date.parse(lastBatchAt) >= (FREEZE_CHECK_EVERY_DAYS - 1) * 86_400_000);
+    const pendingFreezeKeys = await pendingFreezeProposalKeys();
+    const freezeKey = (id: string) => `conc:freeze:${id}`;
+    const freezeActions = freeze
+      .filter((f) => f.safe && (freezeDue || pendingFreezeKeys.has(freezeKey(f.id))))
+      .map((f) => {
+        const w = f.weakest;
+        return {
+          actionType: FREEZE_ACTION_TYPE,
+          kind: "action" as const,
+          title: `הצעה להקפאה שקטה לשבוע: ${f.name}`,
+          body:
+            `${f.people} פונים ב-${CONCENTRATION_WINDOW_DAYS} הימים האחרונים, ${f.matchPeople} מהם מהשאלון.\n` +
+            (w
+              ? `גם בלי ${f.name} נשארות לפחות ${w.alternatives} חלופות פעילות (${treatmentLabel(w.treatment)} · ${w.region === ONLINE_REGION ? "אונליין" : w.region}).\n`
+              : "") +
+            `ההקפאה: ${FREEZE_DAYS} ימים מתוצאות השאלון בלבד. המאגר, עמודי הערים והחיוב לא משתנים, ולא נשלח שום מייל.\n` +
+            `בלחיצה כל הבדיקות רצות שוב על הנתונים של עכשיו.`,
+          entityType: "therapist",
+          entityId: f.id,
+          entityLabel: f.name,
+          dedupeKey: freezeKey(f.id),
+          payload: {
+            therapist_id: f.id,
+            people: f.people,
+            match_people: f.matchPeople,
+            weakest: f.weakest,
+          },
+        };
+      });
+
+    const actions = [...gapActions, ...concActions, ...freezeActions];
     const concSummary: ConcentrationSummary[] = concentrated.map((c) => ({
       region: c.region,
       treatment: treatmentLabel(c.treatment),
@@ -739,7 +779,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // המפתחות של הריצה הנוכחית, כפי שהיה קודם, שום הצעה לא הייתה נסגרת
     // לעולם - הרשימה זהה לרשימת הפעילים, וההחלמה הייתה קוד מת.)
     await syncAgentAlerts("supply_gaps", actions, {
-      recoveryNote: "הפער כבר לא עולה בניתוח (כיסוי משלם, או שכבר יצאה הצעה) - ההצעה נסגרה אוטומטית",
+      // משותף לכל סוגי ההצעות של הסוכן: פער, ריכוז פניות והקפאה.
+      recoveryNote: "המצב השתנה מאז ההצעה (כיסוי משלם, הצעה שכבר יצאה, או שהמטפל/ת כבר לא עומד/ת בכללים) - ההצעה נסגרה אוטומטית",
     });
 
     // רענון הצעות שכבר ממתינות בתור: createAgentAction לא דורס הצעה קיימת
@@ -777,7 +818,10 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
         skipped_unactionable: skippedUnactionable,
         // ריכוז פניות והקפאה - לתצוגה בעמוד הסוכנים גם בלי ריצה ידנית.
         concentration: concSummary,
-        freeze: conc.freeze,
+        freeze,
+        // מתי עלתה לאחרונה מנת הצעות הקפאה - קובע מתי הבאה (פעם בשבועיים).
+        freeze_batch_at: freezeDue ? new Date().toISOString() : lastBatchAt,
+        freeze_proposals: freezeActions.length,
       },
     });
 
@@ -789,7 +833,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       waitingGaps,
       concentration: concSummary,
       concentrationOffers: concOffers.length,
-      freeze: conc.freeze,
+      freeze,
     };
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
@@ -806,4 +850,39 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       error: msg,
     };
   }
+}
+
+/** מתי עלתה לאחרונה מנה של הצעות הקפאה (נשמר בפרטי הריצה). */
+async function lastFreezeBatchAt(): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from("agent_runs")
+    .select("details")
+    .eq("agent", "supply_gaps")
+    .not("details->>freeze_batch_at", "is", null)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    // לא יודעים מתי הייתה הבדיקה הקודמת: לא מעלים מנה חדשה (עדיף לאחר
+    // בשבוע מלהעלות הצעות כל שבוע).
+    console.error("supply_gaps: last freeze batch lookup failed:", error.message);
+    return new Date().toISOString();
+  }
+  const at = (data?.details as Record<string, unknown> | null)?.freeze_batch_at;
+  return typeof at === "string" ? at : null;
+}
+
+/** הצעות הקפאה שממתינות בתור - נשמרות גם בריצה שבין שתי בדיקות. */
+async function pendingFreezeProposalKeys(): Promise<Set<string>> {
+  const { data, error } = await supabaseAdmin
+    .from("agent_actions")
+    .select("dedupe_key")
+    .eq("agent", "supply_gaps")
+    .eq("action_type", FREEZE_ACTION_TYPE)
+    .eq("status", "pending");
+  if (error) {
+    console.error("supply_gaps: pending freeze proposals lookup failed:", error.message);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.dedupe_key as string).filter(Boolean));
 }

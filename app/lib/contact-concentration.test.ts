@@ -4,6 +4,8 @@ import {
   isConcentrated,
   workRegions,
   FREEZE_MIN_ALTERNATIVES,
+  FREEZE_MIN_MATCH_PEOPLE,
+  FREEZE_MIN_TENURE_DAYS,
   HOT_MIN_PEOPLE,
   ONLINE_REGION,
   type ConcContact,
@@ -161,7 +163,9 @@ describe("where the contacts actually came from", () => {
 });
 
 describe("whether a one-week freeze is safe", () => {
-  const base = { contacts: contacts("hot", 5), now: NOW };
+  // משלם/ת מאז יוני: הקידום בתשלום ארוך מ-60 יום.
+  const paidSince = new Map([["hot", LONG_AGO]]);
+  const base = { contacts: contacts("hot", 5), now: NOW, paidSince };
 
   it(`is safe when at least ${FREEZE_MIN_ALTERNATIVES} other active therapists cover the same area, treatment and age`, () => {
     const r = analyzeConcentration({ ...base, therapists: [therapist("hot"), ...quiet(FREEZE_MIN_ALTERNATIVES)] });
@@ -182,18 +186,21 @@ describe("whether a one-week freeze is safe", () => {
       therapist("kids", { age_groups: ["ילדים"] }),
       ...quiet(FREEZE_MIN_ALTERNATIVES - 1),
     ];
-    const r = analyzeConcentration({ contacts: [...base.contacts, ...contacts("busy2", 4)], therapists: [therapist("hot"), ...others], now: NOW });
+    const r = analyzeConcentration({
+      ...base,
+      contacts: [...base.contacts, ...contacts("busy2", 4)],
+      therapists: [therapist("hot"), ...others],
+    });
     const hot = r.freeze.find((f) => f.id === "hot")!;
     expect(hot.safe).toBe(false);
     expect(hot.weakest?.alternatives).toBe(FREEZE_MIN_ALTERNATIVES - 1);
   });
 
   it("checks alternatives for the ages that actually contacted: children are not covered by adults-only therapists", () => {
-    const kids = contacts("hot", 5, "CBT", "match", { ageBand: "child" });
     const r = analyzeConcentration({
-      contacts: kids,
+      ...base,
+      contacts: contacts("hot", 5, "CBT", "match", { ageBand: "child" }),
       therapists: [therapist("hot", { age_groups: ["ילדים", "מבוגרים"] }), ...quiet(5)],
-      now: NOW,
     });
     expect(r.freeze[0].safe).toBe(false);
     expect(r.freeze[0].blockedReason).toContain("ילדים ונוער");
@@ -206,13 +213,38 @@ describe("whether a one-week freeze is safe", () => {
     expect(gift.freeze[0].safe).toBe(false);
   });
 
-  it("does not freeze in the first month of promotion", () => {
+  // "עברו לפחות 60 יום מקידום ממומן" (הבעלים, 20/10/26).
+  it(`does not freeze before ${FREEZE_MIN_TENURE_DAYS} days of promotion`, () => {
     const r = analyzeConcentration({
       ...base,
-      therapists: [therapist("hot", { promoted_since: "2026-10-08T00:00:00Z" }), ...quiet(5)],
+      therapists: [therapist("hot", { promoted_since: "2026-09-01T00:00:00Z" }), ...quiet(5)],
     });
     expect(r.freeze[0].safe).toBe(false);
-    expect(r.freeze[0].blockedReason).toContain("30");
+    expect(r.freeze[0].blockedReason).toContain(String(FREEZE_MIN_TENURE_DAYS));
+  });
+
+  it("for a paying therapist, counts the 60 days from the start of paying, not from an earlier free promotion", () => {
+    const r = analyzeConcentration({
+      ...base,
+      paidSince: new Map([["hot", "2026-09-10T00:00:00Z"]]),
+      therapists: [therapist("hot"), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(false);
+    expect(r.freeze[0].blockedReason).toContain("בתשלום");
+  });
+
+  it("does not freeze a paying therapist whose subscription cannot be found", () => {
+    const r = analyzeConcentration({ ...base, paidSince: new Map(), therapists: [therapist("hot"), ...quiet(5)] });
+    expect(r.freeze[0].safe).toBe(false);
+  });
+
+  it("a gift promotion of more than 60 days needs no subscription", () => {
+    const r = analyzeConcentration({
+      ...base,
+      paidSince: new Map(),
+      therapists: [therapist("hot", { promotion_source: "trial" }), ...quiet(5)],
+    });
+    expect(r.freeze[0].safe).toBe(true);
   });
 
   it("does not freeze again within four weeks of the last freeze", () => {
@@ -224,13 +256,21 @@ describe("whether a one-week freeze is safe", () => {
     expect(r.freeze[0].safe).toBe(false);
   });
 
-  it("does not freeze someone whose contacts come mostly outside the matches - the freeze would not move them", () => {
-    const r = analyzeConcentration({
-      contacts: [...contacts("hot", 1), ...contacts("hot", 4, "CBT", "profile").map((c, i) => ({ ...c, sessionId: `p${i}` }))],
+  // "לפחות 3 מהפונים הגיעו מהשאלון" (הבעלים, 20/10/26).
+  it(`needs at least ${FREEZE_MIN_MATCH_PEOPLE} people from the quiz - the freeze moves only those`, () => {
+    const viaProfile = contacts("hot", 3, "CBT", "profile").map((c, i) => ({ ...c, sessionId: `p${i}` }));
+    const two = analyzeConcentration({
+      ...base,
+      contacts: [...contacts("hot", FREEZE_MIN_MATCH_PEOPLE - 1), ...viaProfile],
       therapists: [therapist("hot"), ...quiet(5)],
-      now: NOW,
     });
-    expect(r.freeze[0].safe).toBe(false);
-    expect(r.freeze[0].blockedReason).toContain("השאלון");
+    expect(two.freeze[0].safe).toBe(false);
+    expect(two.freeze[0].blockedReason).toContain("השאלון");
+    const three = analyzeConcentration({
+      ...base,
+      contacts: [...contacts("hot", FREEZE_MIN_MATCH_PEOPLE), ...viaProfile],
+      therapists: [therapist("hot"), ...quiet(5)],
+    });
+    expect(three.freeze[0].safe).toBe(true);
   });
 });

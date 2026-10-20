@@ -254,12 +254,15 @@ export async function POST(req: NextRequest) {
         error: result.error,
       });
     }
-    // הקפאה לשבוע מרשימת ריכוז הפניות. הבדיקה כולה רצה מחדש לפני ההקפאה,
-    // כי הרשימה בעמוד היא מהריצה האחרונה (contact-concentration-freeze.ts).
+    // הקפאה שקטה לשבוע מהצעה בתור (ריכוז פניות). רק מהצעה ממתינה של אותו
+    // מטפל/ת, והבדיקה כולה רצה מחדש לפני ההקפאה (contact-concentration-freeze.ts).
     if (body?.action === "concentration_freeze") {
       const therapistId = String(body?.therapist_id ?? "");
-      if (!therapistId) return NextResponse.json({ ok: false, error: "חסר מזהה מטפל/ת" }, { status: 400 });
-      const result = await freezeForConcentration(therapistId);
+      const actionId = String(body?.id ?? "");
+      if (!therapistId || !actionId) {
+        return NextResponse.json({ ok: false, error: "חסרים מזהה ההצעה ומזהה המטפל/ת" }, { status: 400 });
+      }
+      const result = await freezeForConcentration({ therapistId, actionId });
       if (!result.ok) return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
       return NextResponse.json({ ok: true, match_paused_until: result.until });
     }

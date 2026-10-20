@@ -3,7 +3,7 @@ import { PROSPECT_REGION_LABELS } from "@/app/lib/prospect-regions";
 import { repeatedClosingLine } from "@/app/lib/email-signature";
 import { splitQuoted } from "@/app/lib/email-quote";
 import GiftOfferHistory from "@/app/admin/components/GiftOfferHistory";
-import ConcentrationPanel from "@/app/admin/components/ConcentrationPanel";
+import ConcentrationPanel, { FreezeProposalCard } from "@/app/admin/components/ConcentrationPanel";
 import type { ConcentrationSummary, FreezeCandidate } from "@/app/lib/contact-concentration";
 
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -3415,6 +3415,21 @@ export default function AgentsPage() {
                 onToggle={() => setOpenNudge(openNudge === a.id ? null : a.id)}
                 dismissing={busyId === a.id}
                 onSent={(msg) => {
+                  setActionMsg(msg);
+                  setActionError("");
+                  load();
+                }}
+                onDismiss={() => resolveAction(a.id, "dismissed")}
+              />
+            ) : a.action_type === "concentration_freeze" && a.entity_id ? (
+              <FreezeProposalCard
+                key={a.id}
+                id={a.id}
+                therapistId={a.entity_id}
+                title={a.title}
+                body={a.body}
+                dismissing={busyId === a.id}
+                onDone={(msg) => {
                   setActionMsg(msg);
                   setActionError("");
                   load();

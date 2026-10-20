@@ -4,18 +4,19 @@ import { fetchAllRows } from "./fetch-all-rows";
 import { CONCENTRATION_WINDOW_DAYS, FREEZE_COOLDOWN_DAYS, type ConcContact } from "./contact-concentration";
 
 // הנתונים לניתוח ריכוז הפניות (contact-concentration.ts): מי פנה למי בחלון,
-// מה חיפש ואיפה, ומי הוקפא לאחרונה. קריאה בלבד.
+// מה חיפש ואיפה, מי הוקפא לאחרונה, ומתי התחיל כל מנוי פעיל. קריאה בלבד.
 
 type ViewContext = { treatment: string; regionGroup: string | null; ageBand: string | null; at: string };
 
 export async function loadConcentrationInput(now = new Date()): Promise<{
   contacts: ConcContact[];
   lastPausedAt: Map<string, string>;
+  paidSince: Map<string, string>;
 }> {
   const sinceIso = new Date(now.getTime() - CONCENTRATION_WINDOW_DAYS * 86_400_000).toISOString();
   const pauseSinceIso = new Date(now.getTime() - FREEZE_COOLDOWN_DAYS * 86_400_000).toISOString();
 
-  const [clicks, views, pauses] = await Promise.all([
+  const [clicks, views, pauses, subs] = await Promise.all([
     fetchAllRows<{ therapist_id: string; session_id: string | null; source: string | null; automated: boolean | null }>(
       () =>
         supabaseAdmin
@@ -45,8 +46,12 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
       .select("therapist_id, created_at, after_state")
       .eq("action", "set_match_pause")
       .gte("created_at", pauseSinceIso),
+    // תחילת המנוי הפעיל - "60 יום מקידום ממומן" נמדד ממנה למשלמים.
+    supabaseAdmin.from("subscriptions").select("therapist_id, created_at").eq("status", "active"),
   ]);
+  // בלי אחד מאלה אי אפשר לבדוק את כללי ההקפאה, ולכן לא ממשיכים בחצי מידע.
   if (pauses.error) throw new Error(`קריאת ההקפאות האחרונות נכשלה: ${pauses.error.message}`);
+  if (subs.error) throw new Error(`קריאת המנויים נכשלה: ${subs.error.message}`);
 
   const byPair = new Map<string, ViewContext>();
   const bySession = new Map<string, ViewContext>();
@@ -94,5 +99,12 @@ export async function loadConcentrationInput(now = new Date()): Promise<{
     if (!prev || p.created_at > prev) lastPausedAt.set(p.therapist_id, p.created_at);
   }
 
-  return { contacts, lastPausedAt };
+  // מנוי פעיל אחד לכל משלם/ת בפועל; אם יש יותר, המוקדם הוא תחילת התשלום.
+  const paidSince = new Map<string, string>();
+  for (const r of (subs.data ?? []) as { therapist_id: string; created_at: string }[]) {
+    const prev = paidSince.get(r.therapist_id);
+    if (!prev || r.created_at < prev) paidSince.set(r.therapist_id, r.created_at);
+  }
+
+  return { contacts, lastPausedAt, paidSince };
 }
