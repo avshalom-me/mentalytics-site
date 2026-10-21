@@ -4,7 +4,10 @@ import {
   DEFAULT_BRANCH_SETTINGS,
   DEAL_STAGES,
   SCHOOL_ENTITY_TYPES,
+  addMonthsIso,
   autoMatchable,
+  calendarQuarter,
+  ladderStatus,
   matchTransferCandidates,
   normalizeForMatch,
   type ExpectedPayment,
@@ -211,5 +214,47 @@ describe("matching a bank credit to an expected payment", () => {
   it("a short symbol inside a longer number does not match", () => {
     const short = [{ ...expected[0], school_symbol: "123" }];
     expect(matchTransferCandidates(credit(1180, "ref 4123456"), short)[0].reasons).toEqual(["amount"]);
+  });
+});
+
+describe("the ladder (section 9, appendix B)", () => {
+  const settings = { start_date: "2026-10-22", ladder: DEFAULT_BRANCH_SETTINGS.ladder };
+  it("adds calendar months, clamped to the month's last day", () => {
+    expect(addMonthsIso("2026-10-22", 2)).toBe("2026-12-22");
+    expect(addMonthsIso("2026-12-31", 2)).toBe("2027-02-28");
+    expect(addMonthsIso("2026-11-15", 14)).toBe("2028-01-15");
+  });
+  it("starts at the first stage on the start day, with nothing sold", () => {
+    const s = ladderStatus(settings, [], "2026-10-22");
+    expect(s.current).toEqual({ stage: 1, rate: 0.1, since: "2026-10-22" });
+    expect(s.next).toMatchObject({ stage: 2, not_before: "2026-12-22", gates_met_on: null, applies_from: null });
+  });
+  it("a stage whose date came but whose gates are not met waits, and the rate does not move", () => {
+    const events = [{ date: "2026-11-05", schools: 39, receipts: 30000 }];
+    expect(ladderStatus(settings, events, "2027-03-01").current.stage).toBe(1);
+  });
+  it("both gates met: the stage applies from the first of the next month, not before its date", () => {
+    const early = [{ date: "2026-11-05", schools: 40, receipts: 25000 }];
+    const s1 = ladderStatus(settings, early, "2026-12-01");
+    expect(s1.current.stage).toBe(1);
+    expect(s1.next?.gates_met_on).toBe("2026-11-05");
+    expect(s1.next?.applies_from).toBe("2026-12-22");
+    expect(ladderStatus(settings, early, "2026-12-22").current).toEqual({ stage: 2, rate: 0.2, since: "2026-12-22" });
+    const late = [{ date: "2027-01-10", schools: 40 }, { date: "2027-02-03", receipts: 25000 }];
+    const s2 = ladderStatus(settings, late, "2027-03-01");
+    expect(s2.current).toEqual({ stage: 2, rate: 0.2, since: "2027-03-01" });
+  });
+  it("when several stages' gates are met, the highest stage whose date came applies", () => {
+    const big = [{ date: "2026-11-01", schools: 130, receipts: 80000 }];
+    expect(ladderStatus(settings, big, "2027-01-15").current.stage).toBe(2);
+    expect(ladderStatus(settings, big, "2027-02-22").current.stage).toBe(3);
+  });
+  it("without a start date nothing advances", () => {
+    const s = ladderStatus({ ...settings, start_date: null }, [{ date: "2026-11-01", schools: 999, receipts: 1e7 }], "2027-12-01");
+    expect(s.current.stage).toBe(1);
+  });
+  it("names the calendar quarter of a date (the calculation period)", () => {
+    expect(calendarQuarter("2026-10-22")).toEqual({ label: "רבעון 4, 2026", start: "2026-10-01", end: "2026-12-31" });
+    expect(calendarQuarter("2027-02-28")).toEqual({ label: "רבעון 1, 2027", start: "2027-01-01", end: "2027-03-31" });
   });
 });

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
-import { Notice, btnGhost, cardCls, errText, getJson, hebDate, sendJson, todayIso } from "@/app/admin/schools/shared";
+import { Notice, btnGhost, cardCls, errText, getJson, hebDate, sendJson, todayIso, useSchoolsBase } from "../shared";
 
-// המשימות של ענף בתי הספר בפורטל השותפה. ברירת המחדל: המשימות שמשויכות
-// אליה; אפשר לראות את כל משימות הענף. משימה חדשה נפתחת מעמוד בית הספר.
+// המשימות של ענף בתי הספר, ב-CRM המשותף (לבעלים ב-/admin/schools/tasks ולשותפה
+// ב-/partner/schools/tasks). ברירת המחדל: המשימות שמשויכות למי שמחובר; אפשר
+// לראות את כל משימות הענף. משימה חדשה נפתחת מעמוד בית הספר.
 
 type Task = {
   id: string;
@@ -19,7 +20,8 @@ type Task = {
   status: string;
 };
 
-export default function PartnerTasksPage() {
+export default function SchoolTasksPage() {
+  const base = useSchoolsBase();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [mine, setMine] = useState(true);
   const [error, setError] = useState("");
@@ -28,7 +30,7 @@ export default function PartnerTasksPage() {
 
   const load = useCallback(async () => {
     try {
-      const j = await getJson<{ tasks: Task[] }>(`/api/admin-crm/tasks?status=active${mine ? "&mine=1" : ""}`);
+      const j = await getJson<{ tasks: Task[] }>(`/api/admin-schools/tasks?status=active${mine ? "&mine=1" : ""}`);
       setTasks(j.tasks);
       setError("");
     } catch (e) {
@@ -43,7 +45,7 @@ export default function PartnerTasksPage() {
 
   async function markDone(t: Task) {
     try {
-      await sendJson("/api/admin-crm/tasks", { id: t.id, status: "done" }, "PATCH");
+      await sendJson("/api/admin-schools/tasks", { id: t.id, status: "done" }, "PATCH");
       await load();
       setFlash("המשימה סומנה כבוצעה.");
       window.setTimeout(() => setFlash(""), 3000);
@@ -53,7 +55,7 @@ export default function PartnerTasksPage() {
   }
 
   const today = todayIso();
-  const href = (t: Task) => (t.entity_type === "school" && t.entity_id ? `/partner/schools/${t.entity_id}` : t.entity_type === "school_license" ? "/partner/schools/payments" : "/partner/schools/pipeline");
+  const href = (t: Task) => (t.entity_type === "school" && t.entity_id ? `${base}/${t.entity_id}` : t.entity_type === "school_license" ? `${base}/payments` : `${base}/pipeline`);
 
   return (
     <div className="p-4 sm:p-6">
@@ -72,7 +74,7 @@ export default function PartnerTasksPage() {
       {loading ? (
         <p className="text-sm text-stone-500">טוען...</p>
       ) : tasks.length === 0 ? (
-        <p className="text-sm text-stone-500">{mine ? "אין משימות פתוחות שמשויכות אלייך." : "אין משימות פתוחות בענף."} משימה חדשה פותחים מעמוד בית הספר.</p>
+        <p className="text-sm text-stone-500">{mine ? "אין משימות פתוחות שמשויכות אליך." : "אין משימות פתוחות בענף."} משימה חדשה פותחים מעמוד בית הספר.</p>
       ) : (
         <div className="space-y-2">
           {tasks.map((t) => {

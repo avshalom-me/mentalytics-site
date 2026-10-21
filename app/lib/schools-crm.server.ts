@@ -5,6 +5,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
   CLOSED_DEAL_STAGES,
   DEAL_STAGES,
+  BRANCH_OWNER_ASSIGNEE,
   DEFAULT_BRANCH_SETTINGS,
   LICENSE_KINDS,
   PAYMENT_METHODS,
@@ -32,8 +33,9 @@ import {
 /** מי פועל: הבעלים מהאדמין, או שותפה מהפורטל (/partner) עם המשתמש שלה. */
 export type Viewer = { role: "owner" | "partner"; name: string; user_id?: string };
 
-/** הבעלים מהאדמין (Basic Auth, בלי משתמשים): שם קבוע ביומן הפעילות. */
-export const OWNER_VIEWER: Viewer = { role: "owner", name: "בעלים" };
+/** הבעלים מהאדמין (Basic Auth, בלי משתמשים): השם שלו ברשימת האחראים, כך שגם
+ *  "המשימות שלי" וגם היומן מזהים אותו כמו את השותפה. */
+export const OWNER_VIEWER: Viewer = { role: "owner", name: BRANCH_OWNER_ASSIGNEE };
 /** דף התשלום הציבורי: פעולות מערכת שבית הספר גרם להן. */
 export const PAY_PAGE_VIEWER: Viewer = { role: "owner", name: "דף התשלום" };
 

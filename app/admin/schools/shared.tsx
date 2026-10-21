@@ -93,7 +93,7 @@ export function useSchoolsBase(): string {
 }
 
 const PARTNER_ROUTES: [RegExp, string][] = [
-  [/^\/api\/admin-schools\/(schools|deals|licenses|assignees)(?=\?|$)/, "/api/partner-schools/$1"],
+  [/^\/api\/admin-schools\/(schools|deals|licenses|assignees|overview|tasks)(?=\?|$)/, "/api/partner-schools/$1"],
   [/^\/api\/admin-crm\/(tasks|notes)(?=\?|$)/, "/api/partner-schools/$1"],
 ];
 

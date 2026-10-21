@@ -1,14 +1,14 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
+import SchoolsShell from "@/app/admin/schools/SchoolsShell";
 
 // המעטפת של פורטל השותפה: בודקת שיש סשן ושהמשתמשת רשומה כשותפה פעילה, ומציגה
-// תפריט עליון של מסכי הענף. המסכים עצמם הם המסכים של האדמין
-// (app/admin/schools/*), שמנתבים את הקריאות שלהם לנתיבי הפורטל כשהם רצים כאן.
-// עמוד הכניסה עובר בלי בדיקה.
+// את תפריט הצד של הענף, אותו תפריט שהבעלים רואה (SchoolsShell). המסכים עצמם הם
+// המסכים של האדמין (app/admin/schools/*), שמנתבים את הקריאות שלהם לנתיבי הפורטל
+// כשהם רצים כאן. עמוד הכניסה עובר בלי בדיקה.
 
 type Me = { name: string; email: string };
 type Check = { state: "ok"; me: Me } | { state: "denied" } | { state: "signed_out" };
@@ -26,14 +26,6 @@ async function checkPartner(): Promise<Check> {
     return { state: "denied" };
   }
 }
-
-const NAV = [
-  { href: "/partner/schools/pipeline", label: "צינור" },
-  { href: "/partner/schools", label: "בתי ספר" },
-  { href: "/partner/schools/owners", label: "בעלויות" },
-  { href: "/partner/schools/payments", label: "רישיונות ותשלומים" },
-  { href: "/partner/tasks", label: "משימות" },
-];
 
 export default function PartnerShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname() ?? "";
@@ -75,43 +67,14 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
     );
   }
 
-  const active = (href: string) =>
-    href === "/partner/schools"
-      ? pathname === href || (/^\/partner\/schools\/[^/]+$/.test(pathname) && !NAV.some((n) => n.href === pathname))
-      : pathname === href || pathname.startsWith(href + "/");
+  const signOut = async () => {
+    await supabase.auth.signOut().catch(() => {});
+    window.location.href = "/partner/login";
+  };
 
   return (
-    <div dir="rtl" className="min-h-screen bg-stone-50">
-      <header className="border-b border-stone-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
-          <div className="text-base font-black text-stone-900">בתי ספר | טיפול חכם</div>
-          <nav className="flex flex-wrap gap-1.5">
-            {NAV.map((n) => (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={`rounded-full px-3 py-1.5 text-sm font-bold ${active(n.href) ? "bg-[#3D8C8A] text-white" : "text-stone-600 hover:bg-stone-100"}`}
-              >
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="ms-auto flex items-center gap-3 text-sm text-stone-500">
-            <span>{check.me.name}</span>
-            <button
-              type="button"
-              onClick={async () => {
-                await supabase.auth.signOut().catch(() => {});
-                window.location.href = "/partner/login";
-              }}
-              className="font-bold text-[#2A6462] underline"
-            >
-              יציאה
-            </button>
-          </div>
-        </div>
-      </header>
-      <div className="mx-auto max-w-6xl">{children}</div>
-    </div>
+    <SchoolsShell mode="partner" userName={check.me.name} onSignOut={signOut}>
+      {children}
+    </SchoolsShell>
   );
 }

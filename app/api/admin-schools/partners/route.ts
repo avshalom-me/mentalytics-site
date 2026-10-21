@@ -8,6 +8,8 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 //       אותו מייל) + שורה ב-partner_users, וקישור חד-פעמי להגדרת סיסמה.
 //       {action: "link", user_id}: קישור חדש להגדרת סיסמה (איפוס).
 //       {action: "toggle", user_id, active}: השבתה או החזרה.
+//       {action: "email", user_id, email}: החלפת מייל הכניסה (למשל למייל
+//       הארגוני). הסיסמה, ההיסטוריה והשיוך נשארים.
 //
 // המערכת לא שולחת מייל: הקישור חוזר לאדמין, והבעלים מעביר אותו בעצמו. הקישור
 // הוא קישור שחזור של Supabase, ונפתח בעמוד האיפוס המשותף עם ctx=partner.
@@ -110,6 +112,22 @@ export async function POST(req: NextRequest) {
         if (!row) return fail("לא נמצא", 404);
         const { link } = await setPasswordLink(row.email as string, origin);
         return NextResponse.json({ ok: true, link });
+      }
+      case "email": {
+        if (!UUID_RE.test(String(b.user_id ?? ""))) return fail("חסר מזהה");
+        const email = String(b.email ?? "").trim().toLowerCase().slice(0, 200);
+        if (!EMAIL_RE.test(email)) return fail("כתובת המייל לא תקינה");
+        const { data: row } = await supabaseAdmin.from("partner_users").select("user_id").eq("user_id", b.user_id).maybeSingle();
+        if (!row) return fail("לא נמצא", 404);
+        // email_confirm: הבעלים מחליף את הכתובת בעצמו, ו-Supabase לא שולח מייל אישור.
+        const { error: uErr } = await supabaseAdmin.auth.admin.updateUserById(b.user_id, { email, email_confirm: true });
+        if (uErr) {
+          if (/already|exists|registered/i.test(uErr.message)) return fail("המייל הזה כבר שייך לחשבון אחר באתר", 409);
+          throw new Error(uErr.message);
+        }
+        const { error } = await supabaseAdmin.from("partner_users").update({ email }).eq("user_id", b.user_id);
+        if (error) throw new Error(error.message);
+        return NextResponse.json({ ok: true });
       }
       case "toggle": {
         if (!UUID_RE.test(String(b.user_id ?? ""))) return fail("חסר מזהה");

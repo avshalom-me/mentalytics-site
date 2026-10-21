@@ -504,3 +504,96 @@ export const MATCH_REASON_LABELS: Record<MatchReason, string> = {
   proforma: "מספר דרישת התשלום בתיאור",
   name: "שם בית הספר בתיאור",
 };
+
+// ── הסולם: השלב החל וההתקדמות לשלב הבא (סעיף 9 ונספח ב') ─────────────────────
+// שלב חל רק כשגם המועד שלו הגיע (חודשים מיום ההתחלה) וגם שני השערים שלו
+// הושגו: מספר בתי ספר משלמים ותקבולים נטו מצטברים (לפי gateReceiptValue). הוא
+// חל מהיום הראשון של החודש שאחרי החודש שבו הושגו שני השערים, ולא לפני המועד
+// שלו. אם הושגו שערי כמה שלבים, חל הגבוה שמועדו הגיע; השיעור אינו יורד. זה
+// מצב לפי הנתונים במערכת; העמידה בשערים מאושרת ברבעון בידי רואה החשבון (9.2).
+
+/** תאריך YYYY-MM-DD ועוד חודשים קלנדריים (22.10 + 2 = 22.12). */
+export function addMonthsIso(dateIso: string, months: number): string {
+  const [y, m, d] = dateIso.split("-").map(Number);
+  const total = y * 12 + (m - 1) + months;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(d, last)).padStart(2, "0")}`;
+}
+
+function firstOfNextMonth(dateIso: string): string {
+  return addMonthsIso(`${dateIso.slice(0, 7)}-01`, 1);
+}
+
+export type GateEvent = { date: string; schools?: number; receipts?: number };
+
+export type LadderStatus = {
+  start_date: string | null;
+  schools_now: number;
+  receipts_now: number;
+  current: { stage: number; rate: number; since: string | null };
+  next: null | {
+    stage: number;
+    rate: number;
+    not_before: string | null;
+    gate_schools: number | null;
+    gate_receipts: number | null;
+    gates_met_on: string | null;
+    applies_from: string | null;
+  };
+};
+
+/** events: תוספות לשערים לפי תאריך (בית ספר שנהיה "משלם", תקבול נטו לשער). */
+export function ladderStatus(settings: Pick<BranchSettings, "start_date" | "ladder">, events: GateEvent[], todayIso: string): LadderStatus {
+  const ladder = [...settings.ladder].sort((a, b) => a.stage - b.stage);
+  const sorted = [...events].sort((a, b) => a.date.localeCompare(b.date));
+  let schools = 0;
+  let receipts = 0;
+  const cumulative: { date: string; schools: number; receipts: number }[] = [];
+  for (const e of sorted) {
+    schools += e.schools ?? 0;
+    receipts += e.receipts ?? 0;
+    cumulative.push({ date: e.date, schools, receipts });
+  }
+  const start = settings.start_date;
+  const gatesMetOn = (gs: number | null, gr: number | null): string | null => {
+    if (gs == null && gr == null) return start;
+    const hit = cumulative.find((c) => c.schools >= (gs ?? 0) && c.receipts >= (gr ?? 0));
+    return hit ? hit.date : null;
+  };
+  const appliesFrom = (step: (typeof ladder)[number]): { notBefore: string | null; met: string | null; from: string | null } => {
+    const notBefore = start ? addMonthsIso(start, step.not_before_month) : null;
+    const met = gatesMetOn(step.gate_schools, step.gate_receipts);
+    if (!notBefore || !met) return { notBefore, met, from: null };
+    const byGates = step.gate_schools == null && step.gate_receipts == null ? met : firstOfNextMonth(met);
+    return { notBefore, met, from: byGates > notBefore ? byGates : notBefore };
+  };
+  let current = { stage: ladder[0]?.stage ?? 1, rate: ladder[0]?.rate ?? 0, since: start };
+  let nextIdx = 1;
+  ladder.forEach((step, i) => {
+    const a = appliesFrom(step);
+    if (a.from && a.from <= todayIso) {
+      current = { stage: step.stage, rate: step.rate, since: a.from };
+      nextIdx = i + 1;
+    }
+  });
+  const n = ladder[nextIdx];
+  let next: LadderStatus["next"] = null;
+  if (n) {
+    const a = appliesFrom(n);
+    next = { stage: n.stage, rate: n.rate, not_before: a.notBefore, gate_schools: n.gate_schools, gate_receipts: n.gate_receipts, gates_met_on: a.met, applies_from: a.from };
+  }
+  return { start_date: start, schools_now: schools, receipts_now: receipts, current, next };
+}
+
+/** הרבעון הקלנדרי של תאריך (תקופת החישוב, סעיף 9.3). */
+export function calendarQuarter(dateIso: string): { label: string; start: string; end: string } {
+  const [y, m] = dateIso.split("-").map(Number);
+  const q = Math.floor((m - 1) / 3);
+  const sm = q * 3 + 1;
+  const start = `${y}-${String(sm).padStart(2, "0")}-01`;
+  const end = addMonthsIso(start, 3);
+  const endDay = new Date(Date.parse(`${end}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  return { label: `רבעון ${q + 1}, ${y}`, start, end: endDay };
+}

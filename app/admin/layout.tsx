@@ -30,14 +30,9 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
     ],
   },
   {
+    // הכניסה ל-CRM המשותף עם השותפה. שם יש תפריט צד משלו (app/admin/schools/SchoolsShell.tsx).
     label: "בתי ספר",
-    items: [
-      { href: "/admin/schools", label: "בתי ספר", icon: "🏫" },
-      { href: "/admin/schools/pipeline", label: "צינור", icon: "📋" },
-      { href: "/admin/schools/owners", label: "בעלויות", icon: "🏛️" },
-      { href: "/admin/schools/payments", label: "רישיונות ותשלומים", icon: "💳" },
-      { href: "/admin/schools/partners", label: "שותפות הענף", icon: "🔑" },
-    ],
+    items: [{ href: "/admin/schools/overview", label: "CRM בתי ספר (משותף)", icon: "🏫" }],
   },
   {
     label: "כספים",
@@ -150,6 +145,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  // ה-CRM המשותף של ענף בתי הספר מביא תפריט צד משלו (app/admin/schools/layout.tsx).
+  if (pathname?.startsWith("/admin/schools")) return <>{children}</>;
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>

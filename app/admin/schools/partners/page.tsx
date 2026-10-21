@@ -61,7 +61,7 @@ export default function SchoolPartnersPage() {
     <div className="p-6" dir="rtl">
       <h1 className="text-2xl font-black text-stone-900">שותפות הענף</h1>
       <p className="mt-1 text-sm text-stone-500">
-        מי נכנסת לפורטל בתי הספר בכתובת /partner. היא רואה רק את ענף בתי הספר: בתי ספר, צינור, רישיונות ותשלומים, משימות והערות של הענף. לא את דף הבנק ולא את שאר ה-CRM.
+        מי נכנסת לפורטל בתי הספר בכתובת mentalytics.co.il/partner. היא רואה רק את ענף בתי הספר: מבט על, בתי ספר, צינור, רישיונות ותשלומים, משימות והערות של הענף. לא את דף הבנק ולא את שאר ה-CRM. מייל הכניסה אפשר להחליף בכל עת (&quot;שינוי מייל&quot;), בלי לאבד סיסמה או היסטוריה.
       </p>
       {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
@@ -124,6 +124,17 @@ export default function SchoolPartnersPage() {
               <div className="flex flex-wrap gap-2">
                 <button type="button" disabled={busy !== null} className={btnGhost} onClick={() => run(`link:${p.user_id}`, { action: "link", user_id: p.user_id }, p.name)}>
                   {busy === `link:${p.user_id}` ? "מפיק..." : "קישור חדש לסיסמה"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  className={btnGhost}
+                  onClick={() => {
+                    const next = window.prompt(`המייל החדש לכניסה של ${p.name} (הסיסמה נשארת). אם זה חשבון שמשמש אותה גם במקום אחר באתר, גם שם המייל יתחלף:`, p.email);
+                    if (next && next.trim() && next.trim().toLowerCase() !== p.email) void run(`email:${p.user_id}`, { action: "email", user_id: p.user_id, email: next.trim() }, p.name);
+                  }}
+                >
+                  {busy === `email:${p.user_id}` ? "מעדכן..." : "שינוי מייל"}
                 </button>
                 <button
                   type="button"

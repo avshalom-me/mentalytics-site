@@ -20,7 +20,7 @@ function LoginContent() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) window.location.href = "/partner/schools/pipeline";
+      if (session) window.location.href = "/partner/schools/overview";
     });
   }, []);
 
@@ -34,7 +34,7 @@ function LoginContent() {
       setLoading(false);
       return;
     }
-    window.location.href = "/partner/schools/pipeline";
+    window.location.href = "/partner/schools/overview";
   }
 
   return (

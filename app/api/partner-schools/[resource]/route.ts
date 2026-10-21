@@ -3,6 +3,7 @@ import { resolvePartner } from "@/app/lib/schools-auth.server";
 import { schoolsGet, schoolsPost } from "@/app/lib/schools-api/schools";
 import { dealsGet, dealsPost } from "@/app/lib/schools-api/deals";
 import { licensesGet, licensesPost } from "@/app/lib/schools-api/licenses";
+import { overviewGet } from "@/app/lib/schools-api/overview";
 import { branchAssignees, notesGet, notesPost, tasksDelete, tasksGet, tasksPatch, tasksPost } from "@/app/lib/schools-api/tasks";
 
 // פורטל השותפה (/partner): כל הנתיבים של ענף בתי הספר תחת כתובת אחת.
@@ -24,6 +25,8 @@ async function handle(method: "GET" | "POST" | "PATCH" | "DELETE", req: NextRequ
   switch (`${method} ${resource}`) {
     case "GET me":
       return NextResponse.json({ ok: true, name: v.name, email: v.email });
+    case "GET overview":
+      return overviewGet(v);
     case "GET schools":
       return schoolsGet(req, v);
     case "POST schools":
