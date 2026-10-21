@@ -60,6 +60,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { url: `${BASE}/research/how-matching-works`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/first-session`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/recommended-psychologist`, priority: 0.7, changeFrequency: "monthly" },
+    { url: `${BASE}/research/emotional-therapy`, priority: 0.7, changeFrequency: "monthly" },
     { url: `${BASE}/research/faq`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/assessments`, priority: 0.6, changeFrequency: "monthly" },
     { url: `${BASE}/research/psychodiagnostic`, priority: 0.6, changeFrequency: "monthly" },

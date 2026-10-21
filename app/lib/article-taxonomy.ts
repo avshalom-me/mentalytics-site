@@ -250,6 +250,13 @@ export const EDITORIAL_ARTICLES: EditorialArticle[] = [
     section: "בחירת-טיפול-ומטפל",
   },
   {
+    slug: "emotional-therapy",
+    title: "טיפול רגשי - מה זה ולמי זה מתאים",
+    desc: "במה טיפול רגשי שונה מטיפול פסיכולוגי, מי מוסמך לתת אותו בישראל, ואיך מגיעים לטיפול שמתאים לכם.",
+    img: "https://images.unsplash.com/photo-1573497491208-6b1acb260507?w=600&h=260&fit=crop&auto=format&q=75",
+    section: "בחירת-טיפול-ומטפל",
+  },
+  {
     slug: "therapy-types",
     title: "סוגי הטיפולים השונים",
     desc: "CBT, דינאמי, EMDR, DBT, ACT ועוד - הסבר נגיש על כל גישה טיפולית ומה מתאים למי.",
