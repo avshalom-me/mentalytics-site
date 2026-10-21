@@ -275,7 +275,7 @@ export async function getSchoolDetail(id: string) {
     supabaseAdmin.from("school_activities").select("*").eq("entity_type", "school").eq("entity_id", id).order("happened_at", { ascending: false }).limit(200),
   ]);
   for (const r of [school, contacts, deals, licenses, trainings, activities]) {
-    if (r.error) throw new SchoolsCrmError(r.error.message, r.error.code === "PGRST116" ? 404 : 500);
+    if (r.error) throw r.error.code === "PGRST116" ? new SchoolsCrmError("בית הספר לא נמצא", 404) : new SchoolsCrmError(r.error.message, 500);
   }
   return { school: school.data, contacts: contacts.data ?? [], deals: deals.data ?? [], licenses: licenses.data ?? [], trainings: trainings.data ?? [], activities: activities.data ?? [] };
 }
@@ -406,8 +406,17 @@ export async function markPaymentReceived(
     statement_line_id?: string;
     note?: string;
   },
+  opts: { fromCardCharge?: boolean } = {},
 ) {
   const receivedAt = details.received_at ?? new Date().toISOString();
+  // חיוב בכרטיס שנמצא באמצע (דף התשלום תפס את התשלום ל-method 'card') נרשם
+  // רק על ידי דף התשלום עצמו. סימון ידני באותו רגע היה רושם את הכסף פעמיים.
+  if (!opts.fromCardCharge) {
+    const { data: cur } = await supabaseAdmin.from("school_payments").select("method, status, updated_at").eq("id", paymentId).maybeSingle();
+    if (cur && cur.status === "expected" && cur.method === "card" && Date.now() - Date.parse(cur.updated_at as string) < CARD_CLAIM_MS) {
+      throw new SchoolsCrmError("חיוב בכרטיס על התשלום הזה נמצא בתהליך. אפשר לנסות שוב בעוד כמה דקות.", 409);
+    }
+  }
   const { data: payment, error } = await supabaseAdmin
     .from("school_payments")
     .update({
@@ -422,9 +431,13 @@ export async function markPaymentReceived(
       updated_at: new Date().toISOString(),
     })
     .eq("id", paymentId)
+    // רק תשלום שעוד צפוי: תשלום שכבר נרשם (עם שורת הבנק או מסמך ה-Sumit שלו),
+    // בוטל או הוחזר לא נדרס.
+    .eq("status", "expected")
     .select("id, seq, license_id, amount_gross")
-    .single();
+    .maybeSingle();
   if (error) throw new SchoolsCrmError(error.message, 500);
+  if (!payment) throw new SchoolsCrmError("התשלום הזה כבר נרשם, בוטל או הוחזר, ולכן לא סומן שוב.", 409);
 
   // התשלום הראשון מפעיל את הרישיון.
   if (payment.seq === 1) {
@@ -527,6 +540,9 @@ export async function getPayPage(licenseId: string) {
  * ל-'card' בעוד הסטטוס נשאר 'expected'. תפיסה שנשארה תלויה (קריסה באמצע)
  * משתחררת אחרי שתי דקות.
  */
+/** כמה זמן תפיסה של חיוב בכרטיס נחשבת "בתהליך". */
+const CARD_CLAIM_MS = 10 * 60 * 1000;
+
 export async function claimPaymentForCard(paymentId: string): Promise<boolean> {
   const stale = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const { data, error } = await supabaseAdmin
@@ -719,30 +735,55 @@ export async function autoMatchTransfers(v: Viewer): Promise<{ matched: number; 
 // נרשמת ביומן של בית הספר; ליומן אין מפתח זר, ולכן הרישום נשאר גם אחרי
 // שבית הספר עצמו נמחק.
 
-async function receivedPaymentsOf(licenseIds: string[]): Promise<number> {
-  if (licenseIds.length === 0) return 0;
-  const { count, error } = await supabaseAdmin
+/**
+ * האם בתשלומי הרישיונות האלה נגע כסף: התקבל או הוחזר, יש לו מסמך ב-Sumit, או
+ * שחיוב בכרטיס עליו נמצא עכשיו בתהליך (דף התשלום תפס אותו). כל אחד מאלה חוסם
+ * מחיקה. הבדיקה והמחיקה הן שתי קריאות; החלון ביניהן קצר, ושתיהן פעולות ידניות.
+ */
+async function moneyTouched(licenseIds: string[]): Promise<boolean> {
+  if (licenseIds.length === 0) return false;
+  const { data, error } = await supabaseAdmin
     .from("school_payments")
-    .select("id", { count: "exact", head: true })
-    .in("license_id", licenseIds)
-    .eq("status", "received");
+    .select("status, method, sumit_document_id, updated_at")
+    .in("license_id", licenseIds);
   if (error) throw new SchoolsCrmError(error.message, 500);
-  return count ?? 0;
+  return (data ?? []).some(
+    (p) =>
+      p.status === "received" ||
+      p.status === "refunded" ||
+      !!p.sumit_document_id ||
+      (p.status === "expected" && p.method === "card" && Date.now() - Date.parse(p.updated_at as string) < CARD_CLAIM_MS),
+  );
 }
 
+/**
+ * גיבוי לפני מחיקה (REVIEW.md, סעיף 5): השורות שנמחקות נשמרות כ-JSON ב-crm_notes
+ * עם entity_type 'school_backup'. אף מסך לא מציג אותן, והן לא נמחקות עם הישות;
+ * שחזור הוא ידני, מהמסד. כישלון בגיבוי עוצר את המחיקה.
+ */
+async function backupBeforeDelete(v: Viewer, kind: string, id: string, payload: unknown): Promise<void> {
+  const { error } = await supabaseAdmin.from("crm_notes").insert({
+    entity_type: "school_backup",
+    entity_id: id,
+    body: JSON.stringify({ kind, deleted_by: v.name, deleted_at: new Date().toISOString(), payload }),
+    author: v.name.slice(0, 60),
+  });
+  if (error) throw new SchoolsCrmError(`הגיבוי לפני המחיקה נכשל, ולכן לא נמחק דבר: ${error.message}`, 500);
+}
+
+/** משימות והערות של ישויות שנמחקו. אחרי שהמחיקה עצמה הצליחה, כישלון כאן רק נרשם. */
 async function dropTasksAndNotes(entityIds: string[]): Promise<void> {
   if (entityIds.length === 0) return;
   const [t, n] = await Promise.all([
     supabaseAdmin.from("crm_tasks").delete().in("entity_type", [...SCHOOL_ENTITY_TYPES_LIST]).in("entity_id", entityIds),
     supabaseAdmin.from("crm_notes").delete().in("entity_type", [...SCHOOL_ENTITY_TYPES_LIST]).in("entity_id", entityIds),
   ]);
-  if (t.error) throw new SchoolsCrmError(t.error.message, 500);
-  if (n.error) throw new SchoolsCrmError(n.error.message, 500);
+  if (t.error || n.error) console.error("schools delete: tasks/notes cleanup failed:", t.error?.message, n.error?.message);
 }
 
 const SCHOOL_ENTITY_TYPES_LIST = ["school", "school_owner", "school_deal", "school_license"];
 
-async function rowOrThrow<T>(table: string, id: string, cols: string): Promise<T> {
+async function rowOrThrow<T>(table: string, id: string, cols = "*"): Promise<T> {
   const { data, error } = await supabaseAdmin.from(table).select(cols).eq("id", id).maybeSingle();
   if (error) throw new SchoolsCrmError(error.message, 500);
   if (!data) throw new SchoolsCrmError("לא נמצא", 404);
@@ -750,21 +791,24 @@ async function rowOrThrow<T>(table: string, id: string, cols: string): Promise<T
 }
 
 export async function deleteContact(v: Viewer, id: string) {
-  const c = await rowOrThrow<{ school_id: string | null; name: string }>("school_contacts", id, "school_id, name");
+  const c = await rowOrThrow<{ school_id: string | null; name: string }>("school_contacts", id);
+  await backupBeforeDelete(v, "school_contact", id, c);
   const { error } = await supabaseAdmin.from("school_contacts").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
   if (c.school_id) await logActivity(v, "school", c.school_id, "system", `איש הקשר ${c.name} נמחק`);
 }
 
 export async function deleteTraining(v: Viewer, id: string) {
-  const t = await rowOrThrow<{ school_id: string; held_on: string; topic: string | null }>("school_trainings", id, "school_id, held_on, topic");
+  const t = await rowOrThrow<{ school_id: string; held_on: string; topic: string | null }>("school_trainings", id);
+  await backupBeforeDelete(v, "school_training", id, t);
   const { error } = await supabaseAdmin.from("school_trainings").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await logActivity(v, "school", t.school_id, "system", `הדרכה מ-${t.held_on}${t.topic ? ` (${t.topic})` : ""} נמחקה`);
 }
 
 export async function deleteDeal(v: Viewer, id: string) {
-  const d = await rowOrThrow<{ school_id: string | null; title: string | null; stage: string }>("school_deals", id, "school_id, title, stage");
+  const d = await rowOrThrow<{ school_id: string | null; title: string | null; stage: string }>("school_deals", id);
+  await backupBeforeDelete(v, "school_deal", id, d);
   const { error } = await supabaseAdmin.from("school_deals").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await dropTasksAndNotes([id]);
@@ -774,10 +818,12 @@ export async function deleteDeal(v: Viewer, id: string) {
 }
 
 export async function deleteLicense(v: Viewer, id: string) {
-  const l = await rowOrThrow<{ school_id: string; kind: string; school_year: string }>("school_licenses", id, "school_id, kind, school_year");
-  if ((await receivedPaymentsOf([id])) > 0) {
-    throw new SchoolsCrmError("לרישיון יש תשלום שהתקבל, ולכן הוא לא נמחק. מבטלים אותו במקום.", 409);
+  const l = await rowOrThrow<{ school_id: string; kind: string; school_year: string }>("school_licenses", id);
+  if (await moneyTouched([id])) {
+    throw new SchoolsCrmError("ברישיון הזה כבר נגע כסף (תשלום שהתקבל או הוחזר, מסמך ב-Sumit, או חיוב בכרטיס בתהליך), ולכן הוא לא נמחק. מבטלים אותו במקום.", 409);
   }
+  const { data: payments } = await supabaseAdmin.from("school_payments").select("*").eq("license_id", id);
+  await backupBeforeDelete(v, "school_license", id, { license: l, payments: payments ?? [] });
   const { error } = await supabaseAdmin.from("school_licenses").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await dropTasksAndNotes([id]);
@@ -785,32 +831,40 @@ export async function deleteLicense(v: Viewer, id: string) {
 }
 
 export async function deleteSchool(v: Viewer, id: string) {
-  const s = await rowOrThrow<{ name: string; is_demo: boolean }>("schools", id, "name, is_demo");
+  const s = await rowOrThrow<{ name: string; is_demo: boolean }>("schools", id);
   if (s.is_demo) throw new SchoolsCrmError("בית ספר ההדגמה משמש לבדיקות ולא נמחק", 409);
-  const [{ data: lic, error: lErr }, { data: deals, error: dErr }] = await Promise.all([
-    supabaseAdmin.from("school_licenses").select("id").eq("school_id", id),
-    supabaseAdmin.from("school_deals").select("id").eq("school_id", id),
+  const [lic, deals, contacts, trainings] = await Promise.all([
+    supabaseAdmin.from("school_licenses").select("*, school_payments(*)").eq("school_id", id),
+    supabaseAdmin.from("school_deals").select("*").eq("school_id", id),
+    supabaseAdmin.from("school_contacts").select("*").eq("school_id", id),
+    supabaseAdmin.from("school_trainings").select("*").eq("school_id", id),
   ]);
-  if (lErr) throw new SchoolsCrmError(lErr.message, 500);
-  if (dErr) throw new SchoolsCrmError(dErr.message, 500);
-  const licenseIds = (lic ?? []).map((r) => r.id as string);
-  if ((await receivedPaymentsOf(licenseIds)) > 0) {
-    throw new SchoolsCrmError("לבית הספר יש תשלום שהתקבל, ולכן הוא לא נמחק. אפשר לסמן אותו 'לא רלוונטי'.", 409);
+  for (const r of [lic, deals, contacts, trainings]) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
+  const licenseIds = (lic.data ?? []).map((r) => r.id as string);
+  if (await moneyTouched(licenseIds)) {
+    throw new SchoolsCrmError("בבית הספר הזה כבר נגע כסף (תשלום שהתקבל או הוחזר, מסמך ב-Sumit, או חיוב בכרטיס בתהליך), ולכן הוא לא נמחק. אפשר לסמן אותו 'לא רלוונטי'.", 409);
   }
+  await backupBeforeDelete(v, "school", id, { school: s, licenses: lic.data, deals: deals.data, contacts: contacts.data, trainings: trainings.data });
   const { error } = await supabaseAdmin.from("schools").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
-  await dropTasksAndNotes([id, ...licenseIds, ...(deals ?? []).map((r) => r.id as string)]);
+  await dropTasksAndNotes([id, ...licenseIds, ...(deals.data ?? []).map((r) => r.id as string)]);
   await logActivity(v, "school", id, "system", `בית הספר "${s.name}" נמחק`);
 }
 
 export async function deleteOwner(v: Viewer, id: string) {
-  const o = await rowOrThrow<{ name: string }>("school_owners", id, "name");
-  const [{ count: schools }, { count: deals }] = await Promise.all([
+  const o = await rowOrThrow<{ name: string }>("school_owners", id);
+  const [sc, dc, cc] = await Promise.all([
     supabaseAdmin.from("schools").select("id", { count: "exact", head: true }).eq("owner_id", id),
     supabaseAdmin.from("school_deals").select("id", { count: "exact", head: true }).eq("owner_id", id),
+    supabaseAdmin.from("school_contacts").select("*").eq("owner_id", id),
   ]);
+  // ספירה שנכשלה אינה "אפס": עסקאות וקשרים של הבעלות נמחקים איתה (cascade).
+  for (const r of [sc, dc, cc]) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
+  const schools = sc.count;
+  const deals = dc.count;
   if ((schools ?? 0) > 0) throw new SchoolsCrmError("יש בתי ספר בבעלות הזו. קודם משייכים אותם לבעלות אחרת או מנתקים.", 409);
   if ((deals ?? 0) > 0) throw new SchoolsCrmError("יש עסקאות על הבעלות הזו. קודם מוחקים אותן.", 409);
+  await backupBeforeDelete(v, "school_owner", id, { owner: o, contacts: cc.data ?? [] });
   const { error } = await supabaseAdmin.from("school_owners").delete().eq("id", id);
   if (error) throw new SchoolsCrmError(error.message, 500);
   await dropTasksAndNotes([id]);

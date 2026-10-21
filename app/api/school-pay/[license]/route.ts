@@ -104,7 +104,7 @@ export async function POST(req: NextRequest, ctx: Ctx) {
       sumit_document_id: documentId,
       sumit_document_number: documentNumber,
       note: `שולם בכרטיס בדף התשלום: ${payerName}, ${payerEmail}`,
-    });
+    }, { fromCardCharge: true });
   } catch (err) {
     console.error(
       `school-pay CRITICAL: Sumit charge succeeded (doc ${documentId ?? "?"}) but marking payment ${next.id} received failed:`,

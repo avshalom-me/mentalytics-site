@@ -28,6 +28,30 @@ async function setPasswordLink(email: string, origin: string): Promise<{ link: s
   return { link: data.properties.action_link, userId: data.user.id };
 }
 
+async function findAuthUserByEmail(email: string): Promise<string | null> {
+  for (let page = 1; page <= 50; page++) {
+    const { data, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 200 });
+    if (error) throw new Error(error.message);
+    const u = data.users.find((x) => (x.email ?? "").toLowerCase() === email);
+    if (u) return u.id;
+    if (data.users.length < 200) return null;
+  }
+  return null;
+}
+
+/** איזה חשבון זה, כדי שהבעלים יזהה טעות לפני שהוא מאשר. */
+async function describeAccount(userId: string): Promise<string> {
+  const [t, c, p] = await Promise.all([
+    supabaseAdmin.from("therapists").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    supabaseAdmin.from("center_members").select("center_id", { count: "exact", head: true }).eq("user_id", userId),
+    supabaseAdmin.from("partner_users").select("user_id", { count: "exact", head: true }).eq("user_id", userId),
+  ]);
+  if ((p.count ?? 0) > 0) return "שותפה קיימת";
+  if ((t.count ?? 0) > 0) return "חשבון מטפל/ת";
+  if ((c.count ?? 0) > 0) return "חשבון של מרכז טיפולי";
+  return "חשבון באתר בלי פרופיל";
+}
+
 export async function GET() {
   const { data, error } = await supabaseAdmin
     .from("partner_users")
@@ -51,16 +75,34 @@ export async function POST(req: NextRequest) {
         const email = String(b.email ?? "").trim().toLowerCase().slice(0, 200);
         if (name.length < 2) return fail("כותבים שם");
         if (!EMAIL_RE.test(email)) return fail("כתובת המייל לא תקינה");
-        // משתמשת חדשה בלי סיסמה, עם מייל מאושר (הבעלים מכיר אותה). אם כבר יש
-        // משתמש עם המייל הזה (למשל חשבון מטפלת), הוא מקבל גם גישה לפורטל.
+        // משתמשת חדשה בלי סיסמה, עם מייל מאושר (הבעלים מכיר אותה).
         const created = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true });
-        if (created.error && !/already|exists|registered/i.test(created.error.message)) throw new Error(created.error.message);
-        const { link, userId } = await setPasswordLink(email, origin);
+        if (!created.error && created.data.user) {
+          const { link } = await setPasswordLink(email, origin);
+          const { error } = await supabaseAdmin
+            .from("partner_users")
+            .upsert({ user_id: created.data.user.id, name, email, active: true, branch: "schools", role: "partner" }, { onConflict: "user_id" });
+          if (error) throw new Error(error.message);
+          return NextResponse.json({ ok: true, link });
+        }
+        if (!/already|exists|registered/i.test(created.error?.message ?? "")) throw new Error(created.error?.message ?? "createUser failed");
+        // כבר יש חשבון באתר עם המייל הזה. לא מצרפים אותו בשקט: מייל שהוקלד
+        // לא נכון היה פותח את הענף לחשבון של מישהו אחר, וקישור איפוס היה מחליף
+        // את הסיסמה שלו. הבעלים רואה איזה חשבון זה ומאשר במפורש; אז היא
+        // נכנסת עם הסיסמה שכבר יש לה, בלי קישור.
+        const existing = await findAuthUserByEmail(email);
+        if (!existing) throw new Error("existing user not found");
+        if (b.confirm_existing !== true) {
+          return NextResponse.json(
+            { ok: false, existing: true, account: await describeAccount(existing), error: "כבר קיים חשבון באתר עם המייל הזה" },
+            { status: 409 },
+          );
+        }
         const { error } = await supabaseAdmin
           .from("partner_users")
-          .upsert({ user_id: userId, name, email, active: true, branch: "schools", role: "partner" }, { onConflict: "user_id" });
+          .upsert({ user_id: existing, name, email, active: true, branch: "schools", role: "partner" }, { onConflict: "user_id" });
         if (error) throw new Error(error.message);
-        return NextResponse.json({ ok: true, link, existing: !!created.error });
+        return NextResponse.json({ ok: true, existing: true });
       }
       case "link": {
         if (!UUID_RE.test(String(b.user_id ?? ""))) return fail("חסר מזהה");
