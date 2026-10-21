@@ -141,10 +141,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [mobileOpen, setMobileOpen] = useState(false);
   const pathname = usePathname();
 
-  // Close the mobile drawer on navigation.
+  // The mobile drawer closes from its own links (NavLinks onNavigate), not from
+  // an effect on the path: setState inside an effect re-renders the whole admin.
+
+  // כותרת האתר דביקה (z-index 100) ובגובה משתנה, והתפריט הקבוע התחיל מאחוריה:
+  // הכותרת "טיפול חכם — אדמין" והפריט הראשון נבלעו. התפריט מתחיל מתחתיה.
+  const [headerH, setHeaderH] = useState(0);
   useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
+    const h = document.querySelector("header");
+    if (!h) return;
+    const ro = new ResizeObserver(() => setHeaderH(Math.round(h.getBoundingClientRect().height)));
+    ro.observe(h);
+    return () => ro.disconnect();
+  }, []);
 
   // ה-CRM המשותף של ענף בתי הספר מביא תפריט צד משלו (app/admin/schools/layout.tsx).
   if (pathname?.startsWith("/admin/schools")) return <>{children}</>;
@@ -153,7 +162,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     <div dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
 
       {/* Desktop sidebar — fixed at the inline-start (right in RTL). */}
-      <aside className="fixed inset-y-0 right-0 z-40 hidden w-52 flex-col overflow-y-auto border-e border-stone-200 bg-white px-3 py-4 lg:flex">
+      <aside style={{ top: headerH }} className="fixed bottom-0 right-0 z-40 hidden w-52 flex-col overflow-y-auto border-e border-stone-200 bg-white px-3 py-4 lg:flex">
         <Link href="/admin" className="mb-5 block px-3 text-sm font-black text-stone-800">
           טיפול חכם — אדמין
         </Link>
@@ -166,7 +175,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </aside>
 
       {/* Mobile top bar + slide-over. */}
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-2.5 lg:hidden">
+      <div style={{ top: headerH }} className="sticky z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-2.5 lg:hidden">
         <button
           type="button"
           onClick={() => setMobileOpen(true)}
@@ -180,7 +189,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </Link>
       </div>
       {mobileOpen && (
-        <div className="fixed inset-0 z-50 lg:hidden" dir="rtl">
+        <div className="fixed inset-0 z-[110] lg:hidden" dir="rtl">
           <div className="absolute inset-0 bg-black/30" onClick={() => setMobileOpen(false)} />
           <aside className="absolute inset-y-0 right-0 w-64 overflow-y-auto bg-white px-3 py-4 shadow-2xl">
             <div className="mb-4 flex items-center justify-between px-3">
@@ -196,7 +205,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <NavLinks onNavigate={() => setMobileOpen(false)} />
             <div className="mt-6">
-              <Link href="/" className="block px-3 text-xs text-stone-400">
+              <Link href="/" onClick={() => setMobileOpen(false)} className="block px-3 text-xs text-stone-400">
                 חזרה לאתר ←
               </Link>
             </div>
