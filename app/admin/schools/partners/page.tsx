@@ -1,0 +1,128 @@
+"use client";
+
+import { useCallback, useEffect, useState } from "react";
+import { btnGhost, btnPrimary, cardCls, errText, getJson, hebStamp, inputCls, sendJson } from "../shared";
+
+// שותפות הענף: מי נכנסת לפורטל /partner. יצירה מפיקה קישור חד-פעמי להגדרת
+// סיסמה, והבעלים שולח אותו בעצמו (וואטסאפ או מייל אישי). המערכת לא שולחת
+// מייל. אותו כפתור משמש לאיפוס סיסמה.
+
+type Partner = { user_id: string; name: string; email: string; active: boolean; created_at: string };
+
+export default function SchoolPartnersPage() {
+  const [rows, setRows] = useState<Partner[]>([]);
+  const [error, setError] = useState("");
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState<string | null>(null);
+  const [link, setLink] = useState<{ who: string; url: string } | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const j = await getJson<{ partners: Partner[] }>("/api/admin-schools/partners");
+      setRows(j.partners);
+      setError("");
+    } catch (e) {
+      setError(errText(e));
+    }
+  }, []);
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function run(key: string, body: Record<string, unknown>, who: string) {
+    setBusy(key);
+    setError("");
+    try {
+      const j = await sendJson<{ link?: string }>("/api/admin-schools/partners", body);
+      if (j.link) setLink({ who, url: j.link });
+      await load();
+      return true;
+    } catch (e) {
+      setError(errText(e));
+      return false;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="p-6" dir="rtl">
+      <h1 className="text-2xl font-black text-stone-900">שותפות הענף</h1>
+      <p className="mt-1 text-sm text-stone-500">
+        מי נכנסת לפורטל בתי הספר בכתובת /partner. היא רואה רק את ענף בתי הספר: בתי ספר, צינור, רישיונות ותשלומים, משימות והערות של הענף. לא את דף הבנק ולא את שאר ה-CRM.
+      </p>
+      {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
+
+      {link && (
+        <div className="mt-4 rounded-2xl border border-[#C2DFDE] bg-[#EAF4F3] p-4 text-sm">
+          <div className="font-bold text-[#2A6462]">קישור להגדרת סיסמה עבור {link.who}</div>
+          <p className="mt-1 text-stone-600">שולחים לה את הקישור בעצמך. הוא חד-פעמי ותקף לזמן מוגבל; אם פג, מפיקים חדש כאן.</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <code dir="ltr" className="max-w-full truncate rounded bg-white px-2 py-1 text-xs">{link.url}</code>
+            <button type="button" className={btnGhost} onClick={() => navigator.clipboard.writeText(link.url).catch(() => {})}>העתקה</button>
+            <button type="button" className={btnGhost} onClick={() => setLink(null)}>סגירה</button>
+          </div>
+        </div>
+      )}
+
+      <form
+        className={`${cardCls} mt-5 grid gap-3 sm:grid-cols-3`}
+        onSubmit={async (e) => {
+          e.preventDefault();
+          if (await run("create", { action: "create", name, email }, name)) {
+            setName("");
+            setEmail("");
+          }
+        }}
+      >
+        <label className="text-sm">
+          <span className="mb-1 block font-bold text-stone-700">שם (כפי שיופיע ביומן ובמשימות)</span>
+          <input value={name} onChange={(e) => setName(e.target.value)} className={inputCls} required />
+        </label>
+        <label className="text-sm">
+          <span className="mb-1 block font-bold text-stone-700">מייל לכניסה</span>
+          <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} required />
+        </label>
+        <div className="flex items-end">
+          <button type="submit" disabled={busy !== null} className={btnPrimary}>{busy === "create" ? "יוצר..." : "הוספה וקישור לסיסמה"}</button>
+        </div>
+      </form>
+
+      <div className="mt-5 space-y-2">
+        {rows.length === 0 ? (
+          <p className="text-sm text-stone-500">עדיין אין שותפות.</p>
+        ) : (
+          rows.map((p) => (
+            <div key={p.user_id} className={`${cardCls} flex flex-wrap items-center justify-between gap-3`}>
+              <div>
+                <div className="font-black text-stone-900">
+                  {p.name}
+                  {!p.active && <span className="ms-2 rounded-full bg-stone-100 px-2 py-0.5 text-xs font-bold text-stone-500">מושבתת</span>}
+                </div>
+                <div className="text-sm text-stone-500" dir="ltr">{p.email}</div>
+                <div className="text-xs text-stone-400">נוספה {hebStamp(p.created_at)}</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" disabled={busy !== null} className={btnGhost} onClick={() => run(`link:${p.user_id}`, { action: "link", user_id: p.user_id }, p.name)}>
+                  {busy === `link:${p.user_id}` ? "מפיק..." : "קישור חדש לסיסמה"}
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  className={btnGhost}
+                  onClick={() => {
+                    if (p.active && !window.confirm(`להשבית את הגישה של ${p.name} לפורטל?`)) return;
+                    void run(`toggle:${p.user_id}`, { action: "toggle", user_id: p.user_id, active: !p.active }, p.name);
+                  }}
+                >
+                  {p.active ? "השבתת גישה" : "החזרת גישה"}
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}

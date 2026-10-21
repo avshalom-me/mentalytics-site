@@ -13,6 +13,7 @@ import {
   btnPrimary,
   errText,
   getJson,
+  useSchoolsBase,
   hebStamp,
   inputCls,
   regionLabel,
@@ -43,6 +44,7 @@ type ListResponse = { schools: SchoolRow[]; counts: Record<string, number>; owne
 
 export default function SchoolsListPage() {
   const router = useRouter();
+  const base = useSchoolsBase();
   // בעלות שמגיעים אליה מעמוד הבעלויות (?owner=...). נקרא ישירות מהכתובת ולא
   // דרך useSearchParams, שדורש Suspense.
   const [ownerId, setOwnerId] = useState(() => (typeof window === "undefined" ? "" : (new URLSearchParams(window.location.search).get("owner") ?? "")));
@@ -117,7 +119,7 @@ export default function SchoolsListPage() {
       {showNew && (
         <NewSchoolForm
           owners={data?.owners ?? []}
-          onCreated={(id) => router.push(`/admin/schools/${id}`)}
+          onCreated={(id) => router.push(`${base}/${id}`)}
           onCancel={() => setShowNew(false)}
         />
       )}
@@ -174,7 +176,7 @@ export default function SchoolsListPage() {
                 {(data?.schools ?? []).map((s) => (
                   <tr key={s.id} className="border-t border-stone-100 hover:bg-stone-50">
                     <td className="px-3 py-2">
-                      <Link href={`/admin/schools/${s.id}`} className="font-bold text-stone-900 underline decoration-stone-300 hover:decoration-stone-700">
+                      <Link href={`${base}/${s.id}`} className="font-bold text-stone-900 underline decoration-stone-300 hover:decoration-stone-700">
                         {s.name}
                       </Link>
                       {s.symbol ? <span className="ms-2 text-xs text-stone-500">סמל {s.symbol}</span> : null}

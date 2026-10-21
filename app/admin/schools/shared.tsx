@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
+import { supabase } from "@/app/lib/supabaseClient";
 import {
   DEAL_LOST_REASONS,
   DEAL_PRODUCTS,
@@ -74,18 +76,94 @@ export const STATUS_PILL: Record<string, string> = {
 // ── קריאות לשרת ───────────────────────────────────────────────────────────────
 type Json = Record<string, unknown>;
 
+// ── אדמין או פורטל השותפה ──────────────────────────────────────────────────────
+// אותם מסכים משמשים את הבעלים (/admin/schools, Basic Auth) ואת השותפה
+// (/partner/schools, סשן Supabase). המסכים כותבים את נתיבי האדמין; בפורטל,
+// כל קריאה מנותבת ל-/api/partner-schools/* עם טוקן הסשן (טרי בכל קריאה), ונתיב
+// שאין לו מקביל בפורטל נחסם כאן ולא נשלח. ההרשאות עצמן נאכפות בשרת
+// (app/lib/schools-api/*, app/lib/schools-auth.server.ts).
+export function inPartnerPortal(): boolean {
+  return typeof window !== "undefined" && window.location.pathname.startsWith("/partner");
+}
+
+/** הבסיס לקישורים בין מסכי הענף: /admin/schools או /partner/schools. */
+export function useSchoolsBase(): string {
+  const pathname = usePathname();
+  return pathname?.startsWith("/partner") ? "/partner/schools" : "/admin/schools";
+}
+
+const PARTNER_ROUTES: [RegExp, string][] = [
+  [/^\/api\/admin-schools\/(schools|deals|licenses|assignees)(?=\?|$)/, "/api/partner-schools/$1"],
+  [/^\/api\/admin-crm\/(tasks|notes)(?=\?|$)/, "/api/partner-schools/$1"],
+];
+
+async function request(url: string, init: RequestInit): Promise<Response> {
+  if (!inPartnerPortal()) return fetch(url, init);
+  const route = PARTNER_ROUTES.find(([re]) => re.test(url));
+  if (!route) throw new Error("הפעולה הזו אינה זמינה בפורטל");
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) {
+    window.location.href = "/partner/login";
+    throw new Error("צריך להתחבר מחדש");
+  }
+  const r = await fetch(url.replace(route[0], route[1]), { ...init, headers: { ...(init.headers as Record<string, string>), Authorization: `Bearer ${token}` } });
+  if (r.status === 401) window.location.href = "/partner/login";
+  return r;
+}
+
 export async function getJson<T extends Json>(url: string, signal?: AbortSignal): Promise<T> {
-  const r = await fetch(url, { cache: "no-store", signal });
+  const r = await request(url, { cache: "no-store", signal });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.ok) throw new Error(j.error || "שגיאה בטעינה");
   return j as T;
 }
 
-export async function sendJson<T extends Json = Json>(url: string, body: Json, method: "POST" | "PATCH" = "POST"): Promise<T> {
-  const r = await fetch(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+export async function sendJson<T extends Json = Json>(url: string, body: Json, method: "POST" | "PATCH" | "DELETE" = "POST"): Promise<T> {
+  const r = await request(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
   const j = await r.json().catch(() => ({}));
   if (!r.ok || !j.ok) throw new Error(j.error || "שגיאה");
   return j as T;
+}
+
+/** כפתור מחיקה עם אישור. השרת מסרב למחוק מה שכבר נכנס בו כסף, וההודעה שלו מוצגת. */
+export function DeleteButton({
+  url,
+  body,
+  confirmText,
+  onDone,
+  onError,
+  label = "מחיקה",
+}: {
+  url: string;
+  body: Json;
+  confirmText: string;
+  onDone: () => void | Promise<void>;
+  onError: (msg: string) => void;
+  label?: string;
+}) {
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={async () => {
+        if (!window.confirm(confirmText)) return;
+        setBusy(true);
+        try {
+          await sendJson(url, body);
+          await onDone();
+        } catch (e) {
+          onError(errText(e));
+        } finally {
+          setBusy(false);
+        }
+      }}
+      className="rounded-full border border-red-200 px-3 py-1 text-xs font-bold text-red-700 hover:bg-red-50 disabled:opacity-50"
+    >
+      {busy ? "מוחק..." : label}
+    </button>
+  );
 }
 
 export const errText = (e: unknown) => (e instanceof Error ? e.message : "שגיאה");
@@ -377,7 +455,7 @@ export function DealForm({
   const set = (k: keyof DealFields) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
 
   useEffect(() => {
-    getJson<{ assignees: string[] }>("/api/admin-crm/assignees")
+    getJson<{ assignees: string[] }>("/api/admin-schools/assignees")
       .then((j) => setAssignees(j.assignees))
       .catch(() => setAssignees([]));
   }, []);

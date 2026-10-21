@@ -1,4 +1,5 @@
 import { ACTIVE_TASK_STATUSES } from "@/app/lib/crm";
+import { OWNER_QUEUE_TASKS_OR } from "@/app/lib/schools-crm";
 import "server-only";
 import { supabaseAdmin } from "./supabaseAdmin";
 import { computeGuarantee } from "./guarantee";
@@ -141,11 +142,13 @@ export async function buildDashboardData(): Promise<DashboardData> {
       .from("crm_tasks")
       .select("id, title, entity_type, entity_id, entity_label, due_date, priority, snoozed_until")
       .in("status", [...ACTIVE_TASK_STATUSES])
+      // משימות ענף בתי הספר: רק מה שמשויך לבעלים (schools-crm.ts).
+      .or(OWNER_QUEUE_TASKS_OR)
       .not("due_date", "is", null)
       .lte("due_date", todayIso)
       .order("due_date", { ascending: true })
       .limit(20),
-    supabaseAdmin.from("crm_tasks").select("id", { count: "exact", head: true }).in("status", [...ACTIVE_TASK_STATUSES]),
+    supabaseAdmin.from("crm_tasks").select("id", { count: "exact", head: true }).in("status", [...ACTIVE_TASK_STATUSES]).or(OWNER_QUEUE_TASKS_OR),
     supabaseAdmin
       .from("payments")
       .select("reference_id, amount, created_at")

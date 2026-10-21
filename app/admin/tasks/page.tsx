@@ -75,8 +75,8 @@ export default function TasksPage() {
       .then((j) => setAssignees(j.ok ? j.assignees : []))
       .catch(() => setAssignees([]));
     Promise.all([
-      fetch("/api/admin-crm/tasks?status=active").then((r) => r.json()),
-      fetch("/api/admin-crm/tasks?status=done").then((r) => r.json()),
+      fetch("/api/admin-crm/tasks?status=active&queue=1").then((r) => r.json()),
+      fetch("/api/admin-crm/tasks?status=done&queue=1").then((r) => r.json()),
       fetch("/api/admin-crm/task-suggestions").then((r) => r.json()),
     ])
       .then(([openJ, doneJ, sugJ]) => {

@@ -36,6 +36,7 @@ const NAV_GROUPS: { label: string; items: { href: string; label: string; icon: s
       { href: "/admin/schools/pipeline", label: "צינור", icon: "📋" },
       { href: "/admin/schools/owners", label: "בעלויות", icon: "🏛️" },
       { href: "/admin/schools/payments", label: "רישיונות ותשלומים", icon: "💳" },
+      { href: "/admin/schools/partners", label: "שותפות הענף", icon: "🔑" },
     ],
   },
   {

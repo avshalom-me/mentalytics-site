@@ -29,6 +29,8 @@ import {
   cardCls,
   errText,
   getJson,
+  useSchoolsBase,
+  DeleteButton,
   hebDate,
   hebStamp,
   inputCls,
@@ -108,6 +110,7 @@ function regionOptions(current: string): Opt[] {
 }
 
 export default function SchoolDetailPage() {
+  const base = useSchoolsBase();
   const params = useParams<{ id: string }>();
   const id = params?.id ? decodeURIComponent(params.id) : "";
   const [d, setD] = useState<Detail | null>(null);
@@ -149,7 +152,7 @@ export default function SchoolDetailPage() {
   if (!d) {
     return (
       <div className="p-6" dir="rtl">
-        <Link href="/admin/schools" className="text-sm font-bold text-[#2A6462] underline">
+        <Link href={base} className="text-sm font-bold text-[#2A6462] underline">
           כל בתי הספר
         </Link>
         <div className="mt-4">{error ? <Notice error={error} /> : <span className="text-sm text-stone-500">טוען...</span>}</div>
@@ -160,7 +163,7 @@ export default function SchoolDetailPage() {
   const { school } = d;
   return (
     <div className="mx-auto max-w-5xl p-6" dir="rtl">
-      <Link href="/admin/schools" className="text-sm font-bold text-[#2A6462] underline">
+      <Link href={base} className="text-sm font-bold text-[#2A6462] underline">
         כל בתי הספר
       </Link>
       <div className="mb-5 mt-2 flex flex-wrap items-center gap-3">
@@ -198,6 +201,7 @@ function SectionTitle({ children, action }: { children: React.ReactNode; action?
 
 // ── פרטים ─────────────────────────────────────────────────────────────────────
 function DetailsSection({ school, owners, reload, say }: { school: School; owners: Owner[]; reload: () => Promise<void>; say: (m: string) => void }) {
+  const listHref = useSchoolsBase();
   const [f, setF] = useState(() => ({
     name: school.name,
     symbol: school.symbol ?? "",
@@ -283,6 +287,20 @@ function DetailsSection({ school, owners, reload, say }: { school: School; owner
           </button>
           {regionLabel(school.region_key) ? <span className="text-xs text-stone-500">אזור: {regionLabel(school.region_key)}</span> : null}
           {school.is_demo ? <span className="text-xs text-stone-500">בית ספר הדגמה אינו נספר בשום סטטיסטיקה ובשערי ההסכם.</span> : null}
+          {!school.is_demo && (
+            <span className="ms-auto">
+              <DeleteButton
+                url="/api/admin-schools/schools"
+                body={{ action: "delete_school", id: school.id }}
+                label="מחיקת בית הספר"
+                confirmText={`למחוק את "${school.name}" עם אנשי הקשר, העסקאות, הרישיונות וההדרכות שלו? אי אפשר לבטל. בית ספר ששולם בו תשלום לא נמחק.`}
+                onDone={() => {
+                  window.location.href = listHref;
+                }}
+                onError={setError}
+              />
+            </span>
+          )}
         </div>
       </form>
     </section>
@@ -340,9 +358,18 @@ function ContactsSection({ schoolId, contacts, reload, say }: { schoolId: string
                 </div>
                 {c.notes ? <div className="mt-1 text-xs text-stone-500">{c.notes}</div> : null}
               </div>
-              <button type="button" onClick={() => setEditing(c.id)} className={btnGhost}>
-                עריכה
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditing(c.id)} className={btnGhost}>
+                  עריכה
+                </button>
+                <DeleteButton
+                  url="/api/admin-schools/schools"
+                  body={{ action: "delete_contact", id: c.id }}
+                  confirmText={`למחוק את ${c.name}? (מי שעזב/ה אפשר גם לסמן "לא בתפקיד" ולשמור לתיעוד.)`}
+                  onDone={() => done("איש הקשר נמחק.")}
+                  onError={say}
+                />
+              </div>
             </div>
           ),
         )}
@@ -488,6 +515,17 @@ function DealsSection({ school, deals, reload, say }: { school: School; deals: D
                 <button type="button" onClick={() => setForm({ deal: x })} className={btnGhost}>
                   עריכת עסקה
                 </button>
+                <DeleteButton
+                  url="/api/admin-schools/deals"
+                  body={{ action: "delete", id: x.id }}
+                  label="מחיקת עסקה"
+                  confirmText="למחוק את העסקה, עם המשימות וההערות שלה? אי אפשר לבטל."
+                  onDone={async () => {
+                    await reload();
+                    say("העסקה נמחקה.");
+                  }}
+                  onError={setError}
+                />
               </div>
             </div>
           );
@@ -513,11 +551,12 @@ function DealsSection({ school, deals, reload, say }: { school: School; deals: D
 
 // ── רישיונות (לקריאה) ────────────────────────────────────────────────────────
 function LicensesSection({ licenses }: { licenses: License[] }) {
+  const paymentsBase = useSchoolsBase();
   return (
     <section className={cardCls}>
       <SectionTitle
         action={
-          <Link href="/admin/schools/payments" className="text-xs font-bold text-[#2A6462] underline">
+          <Link href={`${paymentsBase}/payments`} className="text-xs font-bold text-[#2A6462] underline">
             ניהול רישיונות ותשלומים
           </Link>
         }
@@ -592,9 +631,18 @@ function TrainingsSection({ schoolId, trainings, reload, say }: { schoolId: stri
                 <div className="text-xs text-stone-500">{t.billable ? `בתשלום${t.amount_gross != null ? `: ${shekel(t.amount_gross)} כולל מע"מ` : ""}` : "רכיב ההדרכה ברישיון, ללא חיוב נפרד"}</div>
                 {t.notes ? <div className="text-xs text-stone-500">{t.notes}</div> : null}
               </div>
-              <button type="button" onClick={() => setEditing(t.id)} className={btnGhost}>
-                עריכה
-              </button>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => setEditing(t.id)} className={btnGhost}>
+                  עריכה
+                </button>
+                <DeleteButton
+                  url="/api/admin-schools/schools"
+                  body={{ action: "delete_training", id: t.id }}
+                  confirmText="למחוק את ההדרכה?"
+                  onDone={() => done("ההדרכה נמחקה.")}
+                  onError={say}
+                />
+              </div>
             </div>
           ),
         )}
@@ -703,7 +751,7 @@ function TasksSection({ schoolId, schoolName, say }: { schoolId: string; schoolN
   }, [schoolId]);
   useEffect(() => {
     void loadTasks();
-    getJson<{ assignees: string[] }>("/api/admin-crm/assignees")
+    getJson<{ assignees: string[] }>("/api/admin-schools/assignees")
       .then((j) => setAssignees(j.assignees))
       .catch(() => setAssignees([]));
   }, [loadTasks]);

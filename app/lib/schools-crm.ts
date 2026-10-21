@@ -174,6 +174,16 @@ export const EXPENSE_APPROVALS: Opt[] = [
 ];
 
 export const SCHOOL_ENTITY_TYPES = ["school", "school_owner", "school_deal", "school_license"] as const;
+
+/** שם הבעלים כפי שהוא ברשימת האחראים (staff_members.full_name). */
+export const BRANCH_OWNER_ASSIGNEE = "אבשלום";
+
+/**
+ * תור המשימות הראשי של הבעלים מציג משימה של ענף בתי הספר רק כשהיא משויכת
+ * אליו (החלטת הבעלים, 19/10/2026). כל משימה אחרת מוצגת כרגיל. מחרוזת or()
+ * של PostgREST.
+ */
+export const OWNER_QUEUE_TASKS_OR = `entity_type.is.null,entity_type.not.like.school*,assignee.eq.${BRANCH_OWNER_ASSIGNEE}`;
 export type SchoolEntityType = (typeof SCHOOL_ENTITY_TYPES)[number];
 
 export function labelOf(list: Opt[], value: string | null | undefined): string {

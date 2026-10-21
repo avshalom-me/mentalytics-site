@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CLOSED_DEAL_STAGES, DEAL_LOST_REASONS, DEAL_PRODUCTS, DEAL_SOURCES, DEAL_STAGES, labelOf } from "@/app/lib/schools-crm";
-import { DealForm, Notice, StageMover, btnPrimary, daysSince, errText, getJson, hebDate, inputCls, sendJson, shekel, todayIso, type DealRow } from "../shared";
+import { DealForm, Notice, StageMover, btnPrimary, daysSince, errText, getJson, hebDate, inputCls, sendJson, shekel, todayIso, useSchoolsBase, type DealRow } from "../shared";
 
 // צינור העסקאות של ענף בתי הספר: עמודה לכל שלב, ועל כל כרטיס דרופדאון שלב
 // שמעביר אותו בין העמודות (כמו בלוח עסקאות B2B). השלבים הסגורים ("שולם,
@@ -32,6 +32,7 @@ const COLUMN_CLS: Record<string, string> = {
 };
 
 export default function SchoolsPipelinePage() {
+  const base = useSchoolsBase();
   const [deals, setDeals] = useState<PipelineDeal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -133,7 +134,7 @@ export default function SchoolsPipelinePage() {
       <div key={d.id} className={`rounded-xl border border-stone-200 bg-white p-3 shadow-sm ${d.stage === "lost" ? "opacity-75" : ""}`}>
         <div className="flex items-start justify-between gap-2">
           {d.school_id ? (
-            <Link href={`/admin/schools/${d.school_id}`} className="text-sm font-black leading-snug text-stone-900 underline decoration-stone-300 hover:decoration-stone-700">
+            <Link href={`${base}/${d.school_id}`} className="text-sm font-black leading-snug text-stone-900 underline decoration-stone-300 hover:decoration-stone-700">
               {who}
             </Link>
           ) : (

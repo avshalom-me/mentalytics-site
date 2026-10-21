@@ -12,6 +12,8 @@ import {
   btnPrimary,
   errText,
   getJson,
+  useSchoolsBase,
+  DeleteButton,
   inputCls,
   regionLabel,
   sendJson,
@@ -41,6 +43,7 @@ const SUPPLIER_PILL: Record<string, string> = {
 };
 
 export default function SchoolOwnersPage() {
+  const base = useSchoolsBase();
   const [owners, setOwners] = useState<Owner[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -136,7 +139,7 @@ export default function SchoolOwnersPage() {
                     <td className="px-3 py-2 text-stone-600">{o.payment_terms_days != null ? `${o.payment_terms_days} ימים` : "עוד לא ידוע"}</td>
                     <td className="px-3 py-2">
                       {o.schools_count > 0 ? (
-                        <Link href={`/admin/schools?owner=${o.id}`} className="font-bold text-[#2A6462] underline">
+                        <Link href={`${base}?owner=${o.id}`} className="font-bold text-[#2A6462] underline">
                           {o.schools_count}
                         </Link>
                       ) : (
@@ -144,9 +147,18 @@ export default function SchoolOwnersPage() {
                       )}
                     </td>
                     <td className="px-3 py-2 text-end">
-                      <button type="button" onClick={() => setEditing(editing === o.id ? null : o.id)} className={btnGhost}>
-                        {editing === o.id ? "סגירה" : "עריכה"}
-                      </button>
+                      <span className="inline-flex gap-2">
+                        <button type="button" onClick={() => setEditing(editing === o.id ? null : o.id)} className={btnGhost}>
+                          {editing === o.id ? "סגירה" : "עריכה"}
+                        </button>
+                        <DeleteButton
+                          url="/api/admin-schools/schools"
+                          body={{ action: "delete_owner", id: o.id }}
+                          confirmText={`למחוק את "${o.name}"? בעלות עם בתי ספר או עסקאות לא נמחקת.`}
+                          onDone={load}
+                          onError={setError}
+                        />
+                      </span>
                     </td>
                   </tr>
                   {editing === o.id && (

@@ -15,9 +15,9 @@ export default function ResetPasswordPage() {
 
   // עמוד איפוס משותף למטפלים ולמרכזים. ctx=center מגיע מקישור האיפוס של
   // /centers/login ומנתב את היעד בסיום בחזרה לסביבת המרכזים.
-  const isCenter =
-    typeof window !== "undefined" && new URLSearchParams(window.location.search).get("ctx") === "center";
-  const loginPath = isCenter ? "/centers/login" : "/therapists/login";
+  // ctx=partner מגיע מקישור הגדרת הסיסמה של פורטל השותפה (/admin/schools/partners).
+  const ctx = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("ctx") : null;
+  const loginPath = ctx === "center" ? "/centers/login" : ctx === "partner" ? "/partner/login" : "/therapists/login";
 
   useEffect(() => {
     async function init() {

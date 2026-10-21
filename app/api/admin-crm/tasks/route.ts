@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { ACTIVE_TASK_STATUSES, TASK_STATUSES } from "@/app/lib/crm";
+import { OWNER_QUEUE_TASKS_OR } from "@/app/lib/schools-crm";
 
 // CRM follow-up tasks. Open tasks with a due date surface in the dashboard
 // work queue; entity_label is denormalized so lists render without joins.
@@ -24,6 +25,9 @@ export async function GET(req: NextRequest) {
   else if (status !== "all") q = q.eq("status", status);
   if (entityType) q = q.eq("entity_type", entityType);
   if (entityId) q = q.eq("entity_id", entityId);
+  // queue=1: תור המשימות הראשי. משימה של ענף בתי הספר מופיעה בו רק כשהיא
+  // משויכת לבעלים; משימות השותפה נשארות בפורטל שלה ובעמוד בית הספר.
+  if (params.get("queue")) q = q.or(OWNER_QUEUE_TASKS_OR);
 
   const { data, error } = await q;
   if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });

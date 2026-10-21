@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import HelpTip from "../../components/HelpTip";
 import TransfersPanel from "../TransfersPanel";
+import { DeleteButton, getJson, sendJson, useSchoolsBase } from "../shared";
 import {
   LICENSE_KINDS,
   LICENSE_STATUSES,
@@ -57,14 +58,12 @@ const hebDate = (iso: string | null) => (iso ? iso.slice(0, 10).split("-").rever
 const shekel = (n: number) => `${Number(n).toLocaleString("he-IL", { maximumFractionDigits: 2 })} ש"ח`;
 const payUrl = (licenseId: string) => `${typeof window !== "undefined" ? window.location.origin : ""}/school/pay/${licenseId}`;
 
-async function post(body: Record<string, unknown>) {
-  const r = await fetch("/api/admin-schools/licenses", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  const j = await r.json().catch(() => ({}));
-  if (!r.ok || !j.ok) throw new Error(j.error || "שגיאה");
-  return j;
-}
+// בפורטל השותפה הקריאה מנותבת ל-/api/partner-schools/licenses (shared.tsx).
+const post = (body: Record<string, unknown>) => sendJson<Record<string, unknown> & { license?: unknown }>("/api/admin-schools/licenses", body as never);
 
 export default function SchoolPaymentsPage() {
+  // דף הבנק של החברה וההתאמה אליו: רק באדמין, לא בפורטל השותפה.
+  const portal = useSchoolsBase().startsWith("/partner");
   const [licenses, setLicenses] = useState<License[]>([]);
   const [schools, setSchools] = useState<School[]>([]);
   const [loading, setLoading] = useState(true);
@@ -74,9 +73,7 @@ export default function SchoolPaymentsPage() {
 
   const load = useCallback(async () => {
     try {
-      const r = await fetch("/api/admin-schools/licenses", { cache: "no-store" });
-      const j = await r.json();
-      if (!j.ok) throw new Error(j.error);
+      const j = await getJson<{ licenses: License[]; schools: School[] }>("/api/admin-schools/licenses");
       setLicenses(j.licenses);
       setSchools(j.schools);
       setError("");
@@ -133,7 +130,7 @@ export default function SchoolPaymentsPage() {
       {error && <div className="mb-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       {flash && <div className="mb-4 rounded-xl border border-[#C2DFDE] bg-[#EAF4F3] p-3 text-sm text-[#2A6462]">{flash}</div>}
 
-      <TransfersPanel onMatched={load} say={say} />
+      {!portal && <TransfersPanel onMatched={load} say={say} />}
 
       {showNew && (
         <NewLicenseForm
@@ -301,10 +298,21 @@ function LicenseCard({ license: l, onChanged, say }: { license: License; onChang
             </button>
           </>
         )}
+        {!l.school_payments.some((p) => p.status === "received") && (
+          <DeleteButton
+            url="/api/admin-schools/licenses"
+            body={{ action: "delete", license_id: l.id }}
+            label="מחיקת רישיון"
+            confirmText="למחוק את הרישיון, עם קוד הגישה ולוח התשלומים שלו? אי אפשר לבטל."
+            onDone={onChanged}
+            onError={say}
+          />
+        )}
       </div>
 
       {l.school_payments.length > 0 && (
-        <table className="mt-3 w-full text-sm">
+        <div className="mt-3 overflow-x-auto">
+        <table className="w-full min-w-[560px] text-sm">
           <thead>
             <tr className="text-xs text-stone-500">
               <th className="py-1 text-start font-normal">תשלום</th>
@@ -341,6 +349,7 @@ function LicenseCard({ license: l, onChanged, say }: { license: License; onChang
             ))}
           </tbody>
         </table>
+        </div>
       )}
 
       {marking && (

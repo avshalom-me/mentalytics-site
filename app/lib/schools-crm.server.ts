@@ -29,7 +29,8 @@ import {
   type TransferCandidate,
 } from "./schools-crm";
 
-export type Viewer = { role: "owner" | "partner"; name: string };
+/** מי פועל: הבעלים מהאדמין, או שותפה מהפורטל (/partner) עם המשתמש שלה. */
+export type Viewer = { role: "owner" | "partner"; name: string; user_id?: string };
 
 /** הבעלים מהאדמין (Basic Auth, בלי משתמשים): שם קבוע ביומן הפעילות. */
 export const OWNER_VIEWER: Viewer = { role: "owner", name: "בעלים" };
@@ -451,8 +452,8 @@ export async function setLicenseCode(v: Viewer, licenseId: string, disabled: boo
   await logActivity(v, "school_license", licenseId, "system", disabled ? "קוד הגישה הושבת" : "קוד הגישה הופעל מחדש");
 }
 
+// ביטול רישיון פתוח גם לשותפה (החלטת הבעלים, 21/10/2026).
 export async function cancelLicense(v: Viewer, licenseId: string, reason: string) {
-  assertOwner(v, "ביטול רישיון");
   const { error } = await supabaseAdmin
     .from("school_licenses")
     .update({ status: "cancelled", cancelled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
@@ -709,4 +710,109 @@ export async function autoMatchTransfers(v: Viewer): Promise<{ matched: number; 
     }
   }
   return { matched, skipped };
+}
+
+// ── מחיקות ────────────────────────────────────────────────────────────────────
+// פתוחות לבעלים ולשותפה (החלטת הבעלים, 21/10/2026), עם גבול אחד לשניהם: מה
+// שכבר נכנס בו כסף לא נמחק, כי הוא חלק מהתקבולים שהדוח הרבעוני וחלקה של
+// השותפה מחושבים מהם. רישיון ששולם מבטלים (והחזר נרשם), לא מוחקים. כל מחיקה
+// נרשמת ביומן של בית הספר; ליומן אין מפתח זר, ולכן הרישום נשאר גם אחרי
+// שבית הספר עצמו נמחק.
+
+async function receivedPaymentsOf(licenseIds: string[]): Promise<number> {
+  if (licenseIds.length === 0) return 0;
+  const { count, error } = await supabaseAdmin
+    .from("school_payments")
+    .select("id", { count: "exact", head: true })
+    .in("license_id", licenseIds)
+    .eq("status", "received");
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  return count ?? 0;
+}
+
+async function dropTasksAndNotes(entityIds: string[]): Promise<void> {
+  if (entityIds.length === 0) return;
+  const [t, n] = await Promise.all([
+    supabaseAdmin.from("crm_tasks").delete().in("entity_type", [...SCHOOL_ENTITY_TYPES_LIST]).in("entity_id", entityIds),
+    supabaseAdmin.from("crm_notes").delete().in("entity_type", [...SCHOOL_ENTITY_TYPES_LIST]).in("entity_id", entityIds),
+  ]);
+  if (t.error) throw new SchoolsCrmError(t.error.message, 500);
+  if (n.error) throw new SchoolsCrmError(n.error.message, 500);
+}
+
+const SCHOOL_ENTITY_TYPES_LIST = ["school", "school_owner", "school_deal", "school_license"];
+
+async function rowOrThrow<T>(table: string, id: string, cols: string): Promise<T> {
+  const { data, error } = await supabaseAdmin.from(table).select(cols).eq("id", id).maybeSingle();
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  if (!data) throw new SchoolsCrmError("לא נמצא", 404);
+  return data as T;
+}
+
+export async function deleteContact(v: Viewer, id: string) {
+  const c = await rowOrThrow<{ school_id: string | null; name: string }>("school_contacts", id, "school_id, name");
+  const { error } = await supabaseAdmin.from("school_contacts").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  if (c.school_id) await logActivity(v, "school", c.school_id, "system", `איש הקשר ${c.name} נמחק`);
+}
+
+export async function deleteTraining(v: Viewer, id: string) {
+  const t = await rowOrThrow<{ school_id: string; held_on: string; topic: string | null }>("school_trainings", id, "school_id, held_on, topic");
+  const { error } = await supabaseAdmin.from("school_trainings").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  await logActivity(v, "school", t.school_id, "system", `הדרכה מ-${t.held_on}${t.topic ? ` (${t.topic})` : ""} נמחקה`);
+}
+
+export async function deleteDeal(v: Viewer, id: string) {
+  const d = await rowOrThrow<{ school_id: string | null; title: string | null; stage: string }>("school_deals", id, "school_id, title, stage");
+  const { error } = await supabaseAdmin.from("school_deals").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  await dropTasksAndNotes([id]);
+  if (d.school_id) {
+    await logActivity(v, "school", d.school_id, "system", `העסקה "${d.title ?? labelOf(DEAL_STAGES, d.stage)}" נמחקה`);
+  }
+}
+
+export async function deleteLicense(v: Viewer, id: string) {
+  const l = await rowOrThrow<{ school_id: string; kind: string; school_year: string }>("school_licenses", id, "school_id, kind, school_year");
+  if ((await receivedPaymentsOf([id])) > 0) {
+    throw new SchoolsCrmError("לרישיון יש תשלום שהתקבל, ולכן הוא לא נמחק. מבטלים אותו במקום.", 409);
+  }
+  const { error } = await supabaseAdmin.from("school_licenses").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  await dropTasksAndNotes([id]);
+  await logActivity(v, "school", l.school_id, "system", `רישיון ${labelOf(LICENSE_KINDS, l.kind)} לשנת ${l.school_year} נמחק`);
+}
+
+export async function deleteSchool(v: Viewer, id: string) {
+  const s = await rowOrThrow<{ name: string; is_demo: boolean }>("schools", id, "name, is_demo");
+  if (s.is_demo) throw new SchoolsCrmError("בית ספר ההדגמה משמש לבדיקות ולא נמחק", 409);
+  const [{ data: lic, error: lErr }, { data: deals, error: dErr }] = await Promise.all([
+    supabaseAdmin.from("school_licenses").select("id").eq("school_id", id),
+    supabaseAdmin.from("school_deals").select("id").eq("school_id", id),
+  ]);
+  if (lErr) throw new SchoolsCrmError(lErr.message, 500);
+  if (dErr) throw new SchoolsCrmError(dErr.message, 500);
+  const licenseIds = (lic ?? []).map((r) => r.id as string);
+  if ((await receivedPaymentsOf(licenseIds)) > 0) {
+    throw new SchoolsCrmError("לבית הספר יש תשלום שהתקבל, ולכן הוא לא נמחק. אפשר לסמן אותו 'לא רלוונטי'.", 409);
+  }
+  const { error } = await supabaseAdmin.from("schools").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  await dropTasksAndNotes([id, ...licenseIds, ...(deals ?? []).map((r) => r.id as string)]);
+  await logActivity(v, "school", id, "system", `בית הספר "${s.name}" נמחק`);
+}
+
+export async function deleteOwner(v: Viewer, id: string) {
+  const o = await rowOrThrow<{ name: string }>("school_owners", id, "name");
+  const [{ count: schools }, { count: deals }] = await Promise.all([
+    supabaseAdmin.from("schools").select("id", { count: "exact", head: true }).eq("owner_id", id),
+    supabaseAdmin.from("school_deals").select("id", { count: "exact", head: true }).eq("owner_id", id),
+  ]);
+  if ((schools ?? 0) > 0) throw new SchoolsCrmError("יש בתי ספר בבעלות הזו. קודם משייכים אותם לבעלות אחרת או מנתקים.", 409);
+  if ((deals ?? 0) > 0) throw new SchoolsCrmError("יש עסקאות על הבעלות הזו. קודם מוחקים אותן.", 409);
+  const { error } = await supabaseAdmin.from("school_owners").delete().eq("id", id);
+  if (error) throw new SchoolsCrmError(error.message, 500);
+  await dropTasksAndNotes([id]);
+  await logActivity(v, "school_owner", id, "system", `הבעלות "${o.name}" נמחקה`);
 }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { underDailyCap } from "@/app/lib/daily-cap";
 import { getIp } from "@/app/lib/usage";
-import { CONTACT_ROLES, labelOf, planLicense } from "@/app/lib/schools-crm";
+import { BRANCH_OWNER_ASSIGNEE, CONTACT_ROLES, labelOf, planLicense } from "@/app/lib/schools-crm";
 import { isUuid, logActivity, saveDeal, saveSchool, type Viewer } from "@/app/lib/schools-crm.server";
 
 // בקשת גישה של בית ספר לשאלון היועצות, מהטופס ב-/counselors#access.
@@ -30,7 +30,7 @@ export const dynamic = "force-dynamic";
 const FORM_VIEWER: Viewer = { role: "owner", name: "טופס הפנייה" };
 
 /** השם כפי שהוא בבחירת האחראים של המשימות (staff_members), והמטפל בעסקה. */
-const OWNER_ASSIGNEE = "אבשלום";
+const OWNER_ASSIGNEE = BRANCH_OWNER_ASSIGNEE;
 
 /** הפנייה הראשונה נכנסה (DEAL_STAGES: "פנייה ראשונה"). */
 const FIRST_CONTACT_STAGE = "contacted";
