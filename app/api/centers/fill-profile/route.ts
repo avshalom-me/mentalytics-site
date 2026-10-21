@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { writeAudit } from "@/app/lib/audit";
 import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
 import { normalizePriceField } from "@/app/lib/price-input";
+import { originalPhotoPath, parsePhotoFocus, prepareProfilePhoto } from "@/app/lib/profile-photo";
 
 // מילוי פרופיל מטפל לפי הזמנת מרכז (מסלול 1) - אימות בטוקן ההזמנה האישי,
 // בלי חשבון. JSON = יצירת הפרופיל (חד-פעמי); multipart = העלאת תמונה/תעודה
@@ -70,10 +70,14 @@ export async function POST(req: NextRequest) {
       }
 
       if (type === "photo") {
+        // ריבוע שנחתך במקום שהמטפל/ת מיקם/ה בטופס, והמקור נשמר לידו (profile-photo.ts).
         let out: Buffer;
+        let original: Buffer | null;
         try {
-          out = await sharp(Buffer.from(await file.arrayBuffer()))
-            .rotate().resize(600, 600, { fit: "cover", position: "center" }).webp({ quality: 80 }).toBuffer();
+          ({ square: out, original } = await prepareProfilePhoto(
+            Buffer.from(await file.arrayBuffer()),
+            parsePhotoFocus(fd.get("focus")),
+          ));
         } catch {
           return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
         }
@@ -81,6 +85,11 @@ export async function POST(req: NextRequest) {
         const { error } = await supabaseAdmin.storage.from("therapist-certificates")
           .upload(path, out, { contentType: "image/webp", upsert: true });
         if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 });
+        const originalPath = originalPhotoPath(path);
+        if (original && originalPath) {
+          await supabaseAdmin.storage.from("therapist-certificates")
+            .upload(originalPath, original, { contentType: "image/webp", upsert: true });
+        }
         await supabaseAdmin.from("therapists")
           .update({ profile_photo_path: path, profile_updated_at: new Date().toISOString() })
           .eq("id", invite.therapist_id);

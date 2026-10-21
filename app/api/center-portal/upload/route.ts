@@ -3,6 +3,7 @@ import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { resolveCenter } from "@/app/lib/center-auth";
 import { prepareCenterLogo } from "@/app/lib/center-logo-image";
+import { originalPhotoPath, parsePhotoFocus, prepareProfilePhoto } from "@/app/lib/profile-photo";
 
 // העלאת קבצים מפורטל המרכז - תמונת פרופיל / תעודה עבור מטפל של המרכז.
 // שיקוף של /api/therapist-upload (כיווץ תמונות, ולידציית תעודות), עם אימות
@@ -90,16 +91,16 @@ export async function POST(req: NextRequest) {
   let uploadBody: ArrayBuffer | Uint8Array;
   let uploadContentType: string;
   let uploadExt: string;
+  let originalBody: Buffer | null = null;
 
   if (type === "photo") {
-    // כיווץ אוטומטי - כמו בהעלאת מטפל: 600x600 WebP.
+    // כמו בהעלאת מטפל: ריבוע 600x600 שנחתך במקום שהמרכז מיקם בטופס (focus),
+    // והמקור נשמר לידו. ראו profile-photo.ts.
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     try {
-      uploadBody = await sharp(inputBuffer)
-        .rotate()
-        .resize(600, 600, { fit: "cover", position: "center" })
-        .webp({ quality: 80 })
-        .toBuffer();
+      const prepared = await prepareProfilePhoto(inputBuffer, parsePhotoFocus(formData.get("focus")));
+      uploadBody = prepared.square;
+      originalBody = prepared.original;
       uploadContentType = "image/webp";
       uploadExt = "webp";
     } catch {
@@ -125,6 +126,12 @@ export async function POST(req: NextRequest) {
     .from(bucket)
     .upload(path, uploadBody, { contentType: uploadContentType, upsert: true });
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
+  const originalPath = originalBody ? originalPhotoPath(path) : null;
+  if (originalBody && originalPath) {
+    await supabaseAdmin.storage
+      .from(bucket)
+      .upload(originalPath, originalBody, { contentType: "image/webp", upsert: true });
+  }
 
   if (type === "photo") {
     const { error: dbError } = await supabaseAdmin

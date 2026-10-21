@@ -10,6 +10,7 @@ import {
   COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
+import PhotoFramePicker from "@/app/components/PhotoFramePicker";
 import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
 import { parsePriceInput } from "@/app/lib/price-input";
 import { uploadCertificate, readFileBytes, PHOTO_UNREADABLE_MESSAGE, type JsonResponse } from "@/app/lib/cert-upload-client";
@@ -89,6 +90,7 @@ export default function TherapistProfileEditPage() {
   const [certFile, setCertFile] = useState<File | null>(null);
   const [existingCerts, setExistingCerts] = useState<Array<{ id: string; original_name: string; signed_url: string | null }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFocus, setPhotoFocus] = useState<number | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [showPlanChoice, setShowPlanChoice] = useState(false);
@@ -276,6 +278,7 @@ export default function TherapistProfileEditPage() {
       const fd = new FormData();
       fd.append("file", toSend);
       fd.append("type", type);
+      if (photoFocus !== null) fd.append("focus", String(photoFocus));
       const res = await fetch("/api/therapist-upload", {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -348,7 +351,7 @@ export default function TherapistProfileEditPage() {
       if (certFile) certErr = await uploadFile(certFile, "certificate", accessToken);
       setUploading(false);
     }
-    if (!photoErr) { setPhotoFile(null); setPhotoPreview(null); }
+    if (!photoErr) { setPhotoFile(null); setPhotoPreview(null); setPhotoFocus(null); }
     if (!certErr) setCertFile(null);
 
     // Refresh the stored photo URL + cert list from the server so the therapist
@@ -790,9 +793,11 @@ export default function TherapistProfileEditPage() {
               פרופילים עם תמונה מקבלים פניות רבות באופן משמעותי. מומלץ להוסיף תמונה.
             </div>
             <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל <span className="text-stone-400 font-normal">(רשות)</span></label>
-            {(photoPreview || profilePhotoUrl) && (
+            {photoPreview ? (
+              <PhotoFramePicker src={photoPreview} focus={photoFocus} onChange={setPhotoFocus} />
+            ) : profilePhotoUrl && (
               <img
-                src={photoPreview || profilePhotoUrl!}
+                src={profilePhotoUrl}
                 alt="תמונה"
                 className="mb-2 h-20 w-20 rounded-xl object-cover border border-stone-200" />
             )}
@@ -800,6 +805,7 @@ export default function TherapistProfileEditPage() {
               onChange={e => {
                 const f = e.target.files?.[0] ?? null;
                 setPhotoFile(f);
+                setPhotoFocus(null);
                 if (f) setPhotoPreview(URL.createObjectURL(f));
               }}
               className="w-full text-sm text-stone-600 file:mr-3 file:rounded-lg file:border-0 file:bg-stone-100 file:px-3 file:py-1.5 file:text-xs file:font-semibold hover:file:bg-stone-200" />

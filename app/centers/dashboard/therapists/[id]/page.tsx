@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import PhotoFramePicker from "@/app/components/PhotoFramePicker";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { supabase } from "@/app/lib/supabaseClient";
@@ -86,6 +87,7 @@ export default function CenterTherapistFormPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFocus, setPhotoFocus] = useState<number | null>(null);
   const [profilePhotoUrl, setProfilePhotoUrl] = useState<string | null>(null);
   const [existingCerts, setExistingCerts] = useState<Array<{ id: string; original_name: string; signed_url: string | null }>>([]);
   // מה ששמור בשרת (JSON של הטופס), כדי לדעת מתי יש שינוי שעוד לא נשמר -
@@ -205,6 +207,7 @@ export default function CenterTherapistFormPage() {
     fd.append("file", toSend);
     fd.append("type", type);
     fd.append("therapist_id", id);
+    if (type === "photo" && photoFocus !== null) fd.append("focus", String(photoFocus));
     try {
       const res = await fetch("/api/center-portal/upload", {
         method: "POST",
@@ -459,13 +462,16 @@ export default function CenterTherapistFormPage() {
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
                 <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
-                {(photoPreview || profilePhotoUrl) && (
+                {photoPreview ? (
+                  <PhotoFramePicker src={photoPreview} focus={photoFocus} onChange={setPhotoFocus} size={144} readOnly={!photoFile} />
+                ) : profilePhotoUrl && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={photoPreview ?? profilePhotoUrl ?? ""} alt="" className="mb-2 h-24 w-24 rounded-full object-cover border border-stone-200" />
+                  <img src={profilePhotoUrl} alt="" className="mb-2 h-24 w-24 rounded-full object-cover border border-stone-200" />
                 )}
                 <input type="file" accept="image/*" onChange={e => {
                   const f = e.target.files?.[0] ?? null;
                   setPhotoFile(f);
+                  setPhotoFocus(null);
                   setPhotoPreview(f ? URL.createObjectURL(f) : null);
                 }} className="block w-full text-xs" />
               </div>

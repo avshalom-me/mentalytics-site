@@ -1,6 +1,7 @@
 "use client";
 
 import { Fragment, useCallback, useEffect, useState } from "react";
+import PhotoFramePicker from "@/app/components/PhotoFramePicker";
 import { REGION_CITIES, ALL_REGIONS, CITY_TO_REGION } from "@/app/lib/regions";
 import { FREE_REGION_FALLBACK_ENABLED, regionsCovered, expertiseOf } from "@/app/lib/match-fallback";
 import {
@@ -368,6 +369,8 @@ export default function AdminTherapistsPage() {
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState("");
   const [photoBusy, setPhotoBusy] = useState(false);
+  // A chosen photo waits here until the admin positions it and saves (PhotoFramePicker).
+  const [pendingPhoto, setPendingPhoto] = useState<{ therapistId: string; file: File; url: string; focus: number | null } | null>(null);
   const [completionFor, setCompletionFor] = useState<AdminTherapist | null>(null);
   const [completionText, setCompletionText] = useState("");
   const [completionSending, setCompletionSending] = useState(false);
@@ -1136,7 +1139,7 @@ export default function AdminTherapistsPage() {
   }
 
   // Admin replaces a therapist's profile photo (compressed server-side).
-  async function uploadAdminPhoto(therapistId: string, file: File) {
+  async function uploadAdminPhoto(therapistId: string, file: File, focus: number | null) {
     try {
       setPhotoBusy(true);
       setEditError("");
@@ -1144,9 +1147,11 @@ export default function AdminTherapistsPage() {
       const fd = new FormData();
       fd.append("therapistId", therapistId);
       fd.append("file", toSend);
+      if (focus !== null) fd.append("focus", String(focus));
       const res = await fetch("/api/admin-therapist-photo", { method: "POST", body: fd });
-      const json = await res.json();
-      if (!res.ok || !json.ok) throw new Error(json.error || "העלאת התמונה נכשלה");
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) throw new Error(json?.error || `העלאת התמונה נכשלה (${res.status})`);
+      setPendingPhoto(null);
       setBrokenImages((prev) => { const n = { ...prev }; delete n[therapistId]; return n; });
       setTherapists((prev) =>
         prev.map((t) => (t.id === therapistId ? { ...t, profile_photo_url: json.photoUrl, profile_photo_path: json.path } : t))
@@ -2451,7 +2456,7 @@ export default function AdminTherapistsPage() {
                     disabled={photoBusy}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) uploadAdminPhoto(editingTherapist.id, f);
+                      if (f) setPendingPhoto({ therapistId: editingTherapist.id, file: f, url: URL.createObjectURL(f), focus: null });
                       e.target.value = "";
                     }}
                   />
@@ -2463,9 +2468,30 @@ export default function AdminTherapistsPage() {
                     מחק תמונה
                   </button>
                 )}
-                <span className="text-xs text-stone-400">התמונה נשמרת ומיושרת אוטומטית</span>
+                <span className="text-xs text-stone-400">אחרי הבחירה אפשר למקם את התמונה במסגרת ואז לשמור</span>
               </div>
             </div>
+            {pendingPhoto && pendingPhoto.therapistId === editingTherapist.id && (
+              <div className="mb-4 rounded-xl border border-[#2e7d8c]/40 bg-white p-3">
+                <PhotoFramePicker
+                  src={pendingPhoto.url}
+                  focus={pendingPhoto.focus}
+                  onChange={(focus) => setPendingPhoto((prev) => (prev ? { ...prev, focus } : prev))}
+                />
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" disabled={photoBusy}
+                    onClick={() => uploadAdminPhoto(pendingPhoto.therapistId, pendingPhoto.file, pendingPhoto.focus)}
+                    className="rounded-full bg-[#2e7d8c] px-4 py-1.5 text-xs font-semibold text-white hover:bg-[#256673] disabled:opacity-50">
+                    {photoBusy ? "שומר..." : "שמירת התמונה"}
+                  </button>
+                  <button type="button" disabled={photoBusy}
+                    onClick={() => setPendingPhoto(null)}
+                    className="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-xs font-semibold text-stone-700 hover:bg-stone-50 disabled:opacity-50">
+                    ביטול
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div className="space-y-3">
               {/* Basic fields */}

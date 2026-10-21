@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { operationalMailTarget } from "@/app/lib/therapist-recipient";
+import { photoFilesToRemove } from "@/app/lib/profile-photo";
 import { supabaseAdmin } from "../../lib/supabaseAdmin";
 import { fetchAllRows } from "@/app/lib/fetch-all-rows";
 import { CENTER_THERAPIST_EDIT_FIELDS, sanitizePublicationLinks } from "@/app/lib/therapist-fields";
@@ -857,7 +858,9 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
       }
       if (t.profile_photo_path) {
-        await supabaseAdmin.storage.from(PROFILE_PHOTOS_BUCKET).remove([t.profile_photo_path]);
+        // The square and the original kept next to it (profile-photo.ts).
+        const files = photoFilesToRemove(t.profile_photo_path);
+        await supabaseAdmin.storage.from(PROFILE_PHOTOS_BUCKET).remove(files.length ? files : [t.profile_photo_path]);
       }
       const { error: delErr } = await supabaseAdmin
         .from("therapists")

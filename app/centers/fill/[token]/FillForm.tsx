@@ -8,6 +8,8 @@ import {
   COGFUN_AGE_GROUPS, THERAPIST_TYPE_TO_TRAINING,
 } from "@/app/lib/therapist-options";
 import RegionCityPicker from "@/app/components/RegionCityPicker";
+import PhotoFramePicker from "@/app/components/PhotoFramePicker";
+import { downscaleImageForUpload } from "@/app/lib/center-image-upload";
 import { parsePriceInput } from "@/app/lib/price-input";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
@@ -69,6 +71,7 @@ export default function FillForm({ token, centerName, inviteEmail }: {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [certFile, setCertFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoFocus, setPhotoFocus] = useState<number | null>(null);
 
   const [form, setForm] = useState({
     full_name: "", email: inviteEmail, phone: "", bio: "", gender: "", online: false,
@@ -90,12 +93,15 @@ export default function FillForm({ token, centerName, inviteEmail }: {
   async function uploadFile(file: File, type: "photo" | "certificate"): Promise<string | null> {
     const fd = new FormData();
     fd.append("token", token);
-    fd.append("file", file);
+    // תמונה מהטלפון עוברת את מגבלת 4.5MB של Vercel - ראו center-image-upload.ts.
+    fd.append("file", type === "photo" ? await downscaleImageForUpload(file, 1200) : file);
     fd.append("type", type);
+    if (type === "photo" && photoFocus !== null) fd.append("focus", String(photoFocus));
     try {
       const res = await fetch("/api/centers/fill-profile", { method: "POST", body: fd });
-      const json = await res.json();
-      return json.ok ? null : (json.error ?? "העלאה נכשלה");
+      const json = await res.json().catch(() => null);
+      if (res.ok && json?.ok) return null;
+      return typeof json?.error === "string" ? json.error : `העלאה נכשלה (שגיאה ${res.status})`;
     } catch {
       return "העלאה נכשלה";
     }
@@ -236,12 +242,12 @@ export default function FillForm({ token, centerName, inviteEmail }: {
             <div>
               <label className="mb-1 block text-sm font-semibold text-stone-700">תמונת פרופיל</label>
               {photoPreview && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={photoPreview} alt="" className="mb-2 h-24 w-24 rounded-full object-cover border border-stone-200" />
+                <PhotoFramePicker src={photoPreview} focus={photoFocus} onChange={setPhotoFocus} size={144} />
               )}
               <input type="file" accept="image/*" onChange={e => {
                 const f = e.target.files?.[0] ?? null;
                 setPhotoFile(f);
+                setPhotoFocus(null);
                 setPhotoPreview(f ? URL.createObjectURL(f) : null);
               }} className="block w-full text-xs" />
               <p className="mt-1 text-[11px] text-stone-400">פרופילים עם תמונה מקבלים משמעותית יותר פניות.</p>

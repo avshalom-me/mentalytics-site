@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
-import { compressProfilePhoto } from "@/app/lib/profile-photo";
+import { originalPhotoPath, parsePhotoFocus, photoFilesToRemove, prepareProfilePhoto } from "@/app/lib/profile-photo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -33,11 +33,15 @@ export async function POST(req: NextRequest) {
     .single();
   if (!therapist) return NextResponse.json({ ok: false, error: "therapist not found" }, { status: 404 });
 
-  // Compress to a square WebP thumbnail, same as the therapist upload path
-  // (top-biased crop so a portrait headshot doesn't lose the top of the head).
+  // Compress to a square WebP thumbnail, same as the therapist upload path:
+  // cut where the admin positioned it (`focus`), original kept next to it.
   let body: Buffer;
+  let original: Buffer | null;
   try {
-    body = await compressProfilePhoto(Buffer.from(await file.arrayBuffer()));
+    ({ square: body, original } = await prepareProfilePhoto(
+      Buffer.from(await file.arrayBuffer()),
+      parsePhotoFocus(formData.get("focus")),
+    ));
   } catch {
     return NextResponse.json({ ok: false, error: "Invalid image" }, { status: 400 });
   }
@@ -47,6 +51,10 @@ export async function POST(req: NextRequest) {
     .from(BUCKET)
     .upload(path, body, { contentType: "image/webp", upsert: true });
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
+  const originalPath = originalPhotoPath(path);
+  if (original && originalPath) {
+    await supabaseAdmin.storage.from(BUCKET).upload(originalPath, original, { contentType: "image/webp", upsert: true });
+  }
 
   const { error: dbError } = await supabaseAdmin
     .from("therapists")
@@ -57,8 +65,9 @@ export async function POST(req: NextRequest) {
   // Best-effort cleanup of the replaced photo (photos/ only — never touch a
   // legacy path that might point at a certificate file).
   const oldPath = therapist.profile_photo_path as string | null;
-  if (oldPath && oldPath !== path && oldPath.startsWith("photos/")) {
-    await supabaseAdmin.storage.from(BUCKET).remove([oldPath]);
+  if (oldPath && oldPath !== path) {
+    const stale = photoFilesToRemove(oldPath);
+    if (stale.length) await supabaseAdmin.storage.from(BUCKET).remove(stale);
   }
 
   // Signed URL so the admin sees the new photo immediately.

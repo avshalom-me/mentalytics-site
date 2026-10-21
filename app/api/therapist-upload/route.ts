@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import sharp from "sharp";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import { findClaimableTherapistByEmail } from "@/app/lib/therapist-claim";
-import { compressProfilePhoto } from "@/app/lib/profile-photo";
+import { originalPhotoPath, parsePhotoFocus, photoFilesToRemove, prepareProfilePhoto } from "@/app/lib/profile-photo";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -36,6 +35,7 @@ export async function POST(req: NextRequest) {
   let uploadBody: ArrayBuffer | Uint8Array;
   let uploadContentType: string;
   let uploadExt: string;
+  let originalBody: Buffer | null = null;
 
   if (type === "photo") {
     // Auto-compress profile photos: resize + convert to WebP.
@@ -43,9 +43,12 @@ export async function POST(req: NextRequest) {
     // thumbnail (~40-80KB) without touching the UX on their end.
     const inputBuffer = Buffer.from(await file.arrayBuffer());
     try {
-      // Top-biased square crop — a plain center crop cut the top of the head
-      // off portrait headshots. See app/lib/profile-photo.ts.
-      uploadBody = await compressProfilePhoto(inputBuffer);
+      // The square is cut where the therapist positioned it in the form
+      // (`focus`); the uncropped original is kept next to it.
+      // See app/lib/profile-photo.ts.
+      const prepared = await prepareProfilePhoto(inputBuffer, parsePhotoFocus(formData.get("focus")));
+      uploadBody = prepared.square;
+      originalBody = prepared.original;
       uploadContentType = "image/webp";
       uploadExt = "webp";
     } catch {
@@ -74,6 +77,12 @@ export async function POST(req: NextRequest) {
     .upload(path, uploadBody, { contentType: uploadContentType, upsert: true });
 
   if (uploadError) return NextResponse.json({ ok: false, error: uploadError.message }, { status: 500 });
+  const originalPath = originalBody ? originalPhotoPath(path) : null;
+  if (originalBody && originalPath) {
+    await supabaseAdmin.storage
+      .from(bucket)
+      .upload(originalPath, originalBody, { contentType: "image/webp", upsert: true });
+  }
 
   // Find therapist by user_id, fallback to email
   let { data: therapist } = await supabaseAdmin
@@ -143,8 +152,9 @@ export async function POST(req: NextRequest) {
     // and left the previous one orphaned in the bucket. photos/ only — a legacy
     // path pointing elsewhere (e.g. a certificate) must never be deleted here.
     const oldPath = prev?.profile_photo_path;
-    if (oldPath && oldPath !== path && oldPath.startsWith("photos/")) {
-      await supabaseAdmin.storage.from(bucket).remove([oldPath]);
+    if (oldPath && oldPath !== path) {
+      const stale = photoFilesToRemove(oldPath);
+      if (stale.length) await supabaseAdmin.storage.from(bucket).remove(stale);
     }
   } else {
 
