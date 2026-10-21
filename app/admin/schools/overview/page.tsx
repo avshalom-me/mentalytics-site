@@ -5,13 +5,14 @@ import { useEffect, useState } from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Notice, cardCls, errText, getJson, hebDate, shekel, useSchoolsBase } from "../shared";
 
-// "מבט על": המסך הראשון של ה-CRM המשותף לבעלים ולשותפה.
-//
-// הסדר הוא לפי השאלות שנשאלות כל בוקר:
-// 1. איפה אנחנו מול ההסכם: השיעור החל, בתי ספר משלמים, תקבולי הרבעון, פתוח לגבייה.
-// 2. מה חסר לשלב הבא בסולם (שני השערים והמועד, סעיף 9), ומה דורש טיפול היום.
-// 3. המגמה: תקבולים לפי חודש, הצינור לפי שלב, השימוש בשאלון לפי שבוע.
-// 4. הלקוחות: תקבולים לפי בית ספר (סעיף 16.1).
+// "מבט על": המסך הראשון של ה-CRM המשותף לבעלים ולשותפה. העבודה עצמה, לא ההסכם:
+// 1. ארבעה מספרים: בתי ספר ברשימה, עסקאות פתוחות, תקבולי הרבעון, פתוח לגבייה.
+// 2. מה דורש טיפול היום, ולצידו הפעילות שנרשמה לפי שבוע.
+// 3. גרפים: תקבולים לפי חודש, הצינור לפי שלב, בתי ספר לפי סטטוס, שימוש בשאלון.
+// 4. תקבולים לפי בית ספר.
+// השיעור, שלבי הסולם והשערים אינם כאן, בהחלטת הבעלים (21/10/2026): הם במסך
+// "מצב לפי ההסכם" (agreement/page.tsx), בקישור הקטן בתחתית תפריט הצד.
+// גרף בלי נתונים מציג הסבר מתי יתמלא, כדי שגרף ריק לא ייראה כמו גרף חסר.
 // הסכומים נטו, בלי מע"מ, כמו בהסכם; "פתוח לגבייה" כולל מע"מ, כי זה מה שנגבה.
 // בית ספר הדגמה לא נספר. הנתונים: app/lib/schools-api/overview.ts.
 
@@ -19,18 +20,18 @@ type Overview = {
   today: string;
   school_year: string;
   quarter: { label: string; start: string; end: string; received_net: number };
-  ladder: {
-    start_date: string | null;
-    schools_now: number;
-    receipts_now: number;
-    current: { stage: number; rate: number; since: string | null };
-    next: null | { stage: number; rate: number; not_before: string | null; gate_schools: number | null; gate_receipts: number | null; gates_met_on: string | null; applies_from: string | null };
-  };
   money: { received_total_net: number; received_year_net: number; open_gross: number; overdue_gross: number; overdue_count: number; due_30_gross: number };
   months: { month: string; net: number }[];
-  customers: { paying: number; active_licenses: number; schools_by_status: Record<string, number>; top: { school_id: string; name: string; net: number }[] };
+  customers: {
+    paying: number;
+    active_licenses: number;
+    schools_by_status: Record<string, number>;
+    status_rows: { status: string; label: string; count: number }[];
+    top: { school_id: string; name: string; net: number }[];
+  };
   pipeline: { stages: { stage: string; label: string; count: number; value: number }[]; open_count: number; open_value: number; won_year: number; lost_year: number };
   usage: { weeks: { week: string; count: number }[]; last30: number; idle_active: number };
+  activity: { weeks: { week: string; count: number }[] };
   attention: {
     overdue_payments: number;
     overdue_tasks: number;
@@ -44,14 +45,15 @@ type Overview = {
 };
 
 const TEAL = "#3D8C8A";
-const pct = (r: number) => `${Math.round(r * 100)}%`;
 const num = (n: number) => Number(n).toLocaleString("he-IL", { maximumFractionDigits: 0 });
 /** "תשלום אחד באיחור" / "3 תשלומים באיחור". */
 const count = (n: number, one: string, many: string) => (n === 1 ? one : `${num(n)} ${many}`);
 const HE_MONTHS = ["ינו׳", "פבר׳", "מרץ", "אפר׳", "מאי", "יוני", "יולי", "אוג׳", "ספט׳", "אוק׳", "נוב׳", "דצמ׳"];
 const monthLabel = (ym: string) => `${HE_MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`;
+const weekLabel = (iso: string) => hebDate(iso).split(".").slice(0, 2).join(".");
 const tooltipStyle = { fontFamily: "Heebo", fontSize: 12, direction: "rtl" as const, borderRadius: 12, border: "1px solid #e7e5e4" };
 const axisTick = { fontSize: 11, fill: "#78716c" };
+const cursor = { fill: "rgba(61,140,138,0.08)" };
 
 export default function SchoolsOverviewPage() {
   const base = useSchoolsBase();
@@ -74,8 +76,9 @@ export default function SchoolsOverviewPage() {
 
   if (!d) return <div className="p-6">{error ? <Notice error={error} /> : <span className="text-sm text-stone-500">טוען...</span>}</div>;
 
-  const { ladder, money, attention } = d;
-  const next = ladder.next;
+  const { money, attention } = d;
+  const schoolsTotal = Object.values(d.customers.schools_by_status).reduce((a, b) => a + b, 0);
+  const activityTotal = d.activity.weeks.reduce((a, w) => a + w.count, 0);
 
   return (
     <div className="space-y-5 p-4 sm:p-6">
@@ -83,14 +86,13 @@ export default function SchoolsOverviewPage() {
         <h1 className="text-2xl font-black text-stone-900">מבט על</h1>
         <p className="mt-1 text-sm text-stone-500">
           ענף שאלון היועצות · שנת הלימודים {d.school_year} · {d.quarter.label} (עד {hebDate(d.quarter.end)})
-          {ladder.start_date ? ` · יום ההתחלה ${hebDate(ladder.start_date)}` : ""}
         </p>
       </div>
 
-      {/* 1. איפה אנחנו */}
+      {/* 1. המספרים */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Tile label="השיעור החל" value={pct(ladder.current.rate)} sub={`שלב ${ladder.current.stage} מתוך 5${ladder.current.since ? `, מ-${hebDate(ladder.current.since)}` : ""}`} />
-        <Tile label="בתי ספר משלמים" value={num(d.customers.paying)} sub={`${num(d.customers.active_licenses)} רישיונות פעילים`} />
+        <Tile label="בתי ספר ברשימה" value={num(schoolsTotal)} sub={`${num(d.customers.paying)} משלמים · ${num(d.customers.active_licenses)} רישיונות פעילים`} />
+        <Tile label="עסקאות פתוחות" value={num(d.pipeline.open_count)} sub={d.pipeline.open_value ? `בשווי ${shekel(d.pipeline.open_value)}` : "בלי סכום משוער"} />
         <Tile label={`תקבולים נטו, ${d.quarter.label}`} value={shekel(d.quarter.received_net)} sub={`בשנת הלימודים: ${shekel(money.received_year_net)}`} />
         <Tile
           label="פתוח לגבייה"
@@ -100,128 +102,128 @@ export default function SchoolsOverviewPage() {
         />
       </div>
 
-      {/* 2. השלב הבא ומה דורש טיפול */}
+      {/* 2. מה דורש טיפול, והפעילות */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <section className={cardCls}>
-          <h2 className="text-base font-black text-stone-900">{next ? `הדרך לשלב ${next.stage} (${pct(next.rate)})` : "השלב האחרון בסולם"}</h2>
-          {next ? (
-            <>
-              <p className="mt-1 text-xs text-stone-500">שלב חל רק כשגם המועד הגיע וגם שני השערים הושגו (סעיף 9). השיעור אינו יורד.</p>
-              <div className="mt-4 space-y-4">
-                {next.gate_schools != null && <Meter label="בתי ספר משלמים" now={ladder.schools_now} goal={next.gate_schools} fmt={num} />}
-                {next.gate_receipts != null && <Meter label="תקבולים נטו מצטברים" now={ladder.receipts_now} goal={next.gate_receipts} fmt={shekel} />}
-                <div className="flex items-center justify-between gap-3 text-sm">
-                  <span className="font-bold text-stone-700">המועד</span>
-                  <span className={next.not_before && next.not_before <= d.today ? "font-bold text-[#2A6462]" : "text-stone-600"}>
-                    {next.not_before ? (next.not_before <= d.today ? `הגיע (${hebDate(next.not_before)})` : `מ-${hebDate(next.not_before)}`) : "אחרי שנקבע יום ההתחלה"}
-                  </span>
-                </div>
-              </div>
-              {next.applies_from && <p className="mt-3 rounded-xl bg-[#EAF4F3] p-2.5 text-sm font-bold text-[#2A6462]">שני השערים הושגו. השלב חל מ-{hebDate(next.applies_from)}.</p>}
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-stone-600">השיעור נשאר {pct(ladder.current.rate)} כל עוד ההסכם בתוקף (סעיף 9.4).</p>
-          )}
-          <p className="mt-3 text-xs text-stone-400">לפי הנתונים במערכת. העמידה בשערים מאושרת בידי רואה החשבון בסוף כל רבעון (סעיף 9.2).</p>
-        </section>
-
         <section className={cardCls}>
           <h2 className="text-base font-black text-stone-900">מה דורש טיפול</h2>
           <AttentionList base={base} a={attention} overdueGross={money.overdue_gross} />
         </section>
+
+        <ChartCard
+          title="פעילות שנרשמה, לפי שבוע"
+          sub={activityTotal ? `${num(activityTotal)} שיחות, פגישות, הודעות והדרכות ב-12 השבועות האחרונים` : undefined}
+          empty={activityTotal === 0}
+          emptyText="עדיין לא נרשמה פעילות. כל שיחה, פגישה או הודעה שנרשמת בעמוד בית הספר ('רישום מהיר') נספרת כאן."
+          height="h-44"
+        >
+          <BarChart data={d.activity.weeks.map((w) => ({ ...w, label: weekLabel(w.week) }))} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
+            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} interval={1} />
+            <YAxis tick={axisTick} width={32} allowDecimals={false} tickLine={false} axisLine={false} orientation="right" />
+            <Tooltip cursor={cursor} formatter={(v) => [num(Number(v)), "פעולות"]} labelFormatter={(l) => `שבוע מ-${l}`} contentStyle={tooltipStyle} />
+            <Bar dataKey="count" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+          </BarChart>
+        </ChartCard>
       </div>
 
-      {/* 3. המגמה */}
+      {/* 3. הגרפים */}
       <div className="grid gap-5 lg:grid-cols-2">
-        <section className={cardCls}>
-          <h2 className="text-base font-black text-stone-900">תקבולים נטו לפי חודש</h2>
-          <p className="mt-0.5 text-xs text-stone-500">מצטבר מיום ההתחלה: {shekel(money.received_total_net)}</p>
-          <div className="mt-3 h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={d.months.map((m) => ({ ...m, label: monthLabel(m.month) }))} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} />
-                <YAxis tickFormatter={(v) => `₪${num(Number(v))}`} tick={axisTick} width={64} allowDecimals={false} tickLine={false} axisLine={false} orientation="right" />
-                <Tooltip cursor={{ fill: "rgba(61,140,138,0.08)" }} formatter={(v) => [shekel(Number(v)), "תקבולים נטו"]} contentStyle={tooltipStyle} />
-                <Bar dataKey="net" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        <ChartCard
+          title="תקבולים נטו לפי חודש"
+          sub={`מצטבר מיום ההתחלה: ${shekel(money.received_total_net)}`}
+          empty={money.received_total_net === 0}
+          emptyText="עדיין לא התקבל תשלום. הגרף יתמלא עם התשלום הראשון מבית ספר."
+        >
+          <BarChart data={d.months.map((m) => ({ ...m, label: monthLabel(m.month) }))} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
+            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} />
+            <YAxis tickFormatter={(v) => `₪${num(Number(v))}`} tick={axisTick} width={64} allowDecimals={false} tickLine={false} axisLine={false} orientation="right" />
+            <Tooltip cursor={cursor} formatter={(v) => [shekel(Number(v)), "תקבולים נטו"]} contentStyle={tooltipStyle} />
+            <Bar dataKey="net" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={36} isAnimationActive={false} />
+          </BarChart>
+        </ChartCard>
 
-        <section className={cardCls}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-black text-stone-900">הצינור: עסקאות פתוחות לפי שלב</h2>
-            <Link href={`${base}/pipeline`} className="text-xs font-bold text-[#2A6462] underline">ללוח הצינור</Link>
-          </div>
-          <p className="mt-0.5 text-xs text-stone-500">
-            {num(d.pipeline.open_count)} פתוחות בשווי {shekel(d.pipeline.open_value)} · בשנת הלימודים: {num(d.pipeline.won_year)} נסגרו, {num(d.pipeline.lost_year)} אבדו
-          </p>
-          <div className="mt-3 h-52">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={d.pipeline.stages} layout="vertical" margin={{ top: 4, right: 4, left: 8, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" horizontal={false} />
-                <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} reversed />
-                <YAxis type="category" dataKey="label" tick={axisTick} width={118} tickLine={false} axisLine={false} orientation="right" />
-                <Tooltip
-                  cursor={{ fill: "rgba(61,140,138,0.08)" }}
-                  formatter={(v, _n, item) => [`${num(Number(v))} עסקאות${item?.payload?.value ? `, ${shekel(item.payload.value)}` : ""}`, ""]}
-                  contentStyle={tooltipStyle}
-                />
-                <Bar dataKey="count" fill={TEAL} radius={[4, 0, 0, 4]} maxBarSize={18} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        <ChartCard
+          title="הצינור: עסקאות פתוחות לפי שלב"
+          sub={`בשנת הלימודים: ${num(d.pipeline.won_year)} נסגרו, ${num(d.pipeline.lost_year)} אבדו`}
+          link={{ href: `${base}/pipeline`, label: "ללוח הצינור" }}
+          empty={d.pipeline.stages.every((s) => s.count === 0)}
+          emptyText="עדיין אין עסקאות. כל פנייה מהטופס באתר, וכל עסקה שנפתחת בעמוד בית ספר, נכנסת לכאן."
+        >
+          <BarChart data={d.pipeline.stages} layout="vertical" margin={{ top: 4, right: 4, left: 8, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} reversed />
+            <YAxis type="category" dataKey="label" tick={axisTick} width={118} tickLine={false} axisLine={false} orientation="right" />
+            <Tooltip
+              cursor={cursor}
+              formatter={(v, _n, item) => [`${num(Number(v))} עסקאות${item?.payload?.value ? `, ${shekel(item.payload.value)}` : ""}`, ""]}
+              contentStyle={tooltipStyle}
+            />
+            <Bar dataKey="count" fill={TEAL} radius={[4, 0, 0, 4]} maxBarSize={18} isAnimationActive={false} />
+          </BarChart>
+        </ChartCard>
 
-        <section className={cardCls}>
-          <h2 className="text-base font-black text-stone-900">שימוש בשאלון: שאלונים שמולאו בבתי ספר ברישיון, לפי שבוע</h2>
-          <p className="mt-0.5 text-xs text-stone-500">
-            ב-30 הימים האחרונים: {num(d.usage.last30)}
-            {d.usage.idle_active ? ` · ${d.usage.idle_active === 1 ? "בית ספר אחד ברישיון לא השתמש" : `${num(d.usage.idle_active)} בתי ספר ברישיון לא השתמשו`} בחודש האחרון` : ""}
-          </p>
-          <div className="mt-3 h-44">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={d.usage.weeks.map((w) => ({ ...w, label: hebDate(w.week).split(".").slice(0, 2).join(".") }))} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
-                <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} interval={1} />
-                <YAxis tick={axisTick} width={36} allowDecimals={false} tickLine={false} axisLine={false} orientation="right" />
-                <Tooltip cursor={{ fill: "rgba(61,140,138,0.08)" }} formatter={(v) => [num(Number(v)), "שאלונים"]} labelFormatter={(l) => `שבוע מ-${l}`} contentStyle={tooltipStyle} />
-                <Bar dataKey="count" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </section>
+        <ChartCard
+          title="בתי ספר לפי סטטוס"
+          sub={schoolsTotal ? `${num(schoolsTotal)} בתי ספר ברשימה` : undefined}
+          link={{ href: base, label: "לרשימה" }}
+          empty={schoolsTotal === 0}
+          emptyText="עדיין אין בתי ספר ברשימה. בית ספר נוסף מהרשימה ('בית ספר חדש') או מטופס הפנייה באתר."
+          height="h-44"
+        >
+          <BarChart data={d.customers.status_rows} layout="vertical" margin={{ top: 4, right: 4, left: 8, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" horizontal={false} />
+            <XAxis type="number" allowDecimals={false} tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} reversed />
+            <YAxis type="category" dataKey="label" tick={axisTick} width={92} tickLine={false} axisLine={false} orientation="right" />
+            <Tooltip cursor={cursor} formatter={(v) => [num(Number(v)), "בתי ספר"]} contentStyle={tooltipStyle} />
+            <Bar dataKey="count" fill={TEAL} radius={[4, 0, 0, 4]} maxBarSize={16} isAnimationActive={false} />
+          </BarChart>
+        </ChartCard>
 
-        {/* 4. הלקוחות */}
-        <section className={cardCls}>
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-base font-black text-stone-900">תקבולים לפי בית ספר</h2>
-            <Link href={`${base}/payments`} className="text-xs font-bold text-[#2A6462] underline">לרישיונות ולתשלומים</Link>
-          </div>
-          <p className="mt-0.5 text-xs text-stone-500">
-            {Object.entries(d.customers.schools_by_status).length
-              ? `בתי ספר ברשימה: ${num(Object.values(d.customers.schools_by_status).reduce((a, b) => a + b, 0))}, מהם ${num(d.customers.schools_by_status.customer ?? 0)} לקוחות`
-              : "עדיין אין בתי ספר ברשימה."}
-          </p>
-          {d.customers.top.length === 0 ? (
-            <p className="mt-4 text-sm text-stone-500">עדיין לא התקבל תשלום מבית ספר.</p>
-          ) : (
-            <table className="mt-3 w-full text-sm">
-              <tbody>
-                {d.customers.top.map((c) => (
-                  <tr key={c.school_id} className="border-t border-stone-100">
-                    <td className="py-2">
-                      <Link href={`${base}/${c.school_id}`} className="font-bold text-stone-800 underline decoration-stone-300">{c.name}</Link>
-                    </td>
-                    <td className="py-2 text-end text-stone-700">{shekel(c.net)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </section>
+        <ChartCard
+          title="שימוש בשאלון: שאלונים שמולאו בבתי ספר ברישיון, לפי שבוע"
+          sub={
+            d.usage.last30 || d.usage.idle_active
+              ? `ב-30 הימים האחרונים: ${num(d.usage.last30)}${d.usage.idle_active ? ` · ${d.usage.idle_active === 1 ? "בית ספר אחד ברישיון לא השתמש" : `${num(d.usage.idle_active)} בתי ספר ברישיון לא השתמשו`} בחודש האחרון` : ""}`
+              : undefined
+          }
+          empty={d.usage.weeks.every((w) => w.count === 0)}
+          emptyText="עדיין אין בתי ספר ברישיון שמילאו שאלון. כל שאלון שיועצת ממלאת עם קוד הגישה של בית הספר נספר כאן, בלי תוכן."
+          height="h-44"
+        >
+          <BarChart data={d.usage.weeks.map((w) => ({ ...w, label: weekLabel(w.week) }))} margin={{ top: 8, right: 4, left: 4, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#eef2f1" vertical={false} />
+            <XAxis dataKey="label" tick={axisTick} tickLine={false} axisLine={{ stroke: "#e7e5e4" }} interval={1} />
+            <YAxis tick={axisTick} width={36} allowDecimals={false} tickLine={false} axisLine={false} orientation="right" />
+            <Tooltip cursor={cursor} formatter={(v) => [num(Number(v)), "שאלונים"]} labelFormatter={(l) => `שבוע מ-${l}`} contentStyle={tooltipStyle} />
+            <Bar dataKey="count" fill={TEAL} radius={[4, 4, 0, 0]} maxBarSize={28} isAnimationActive={false} />
+          </BarChart>
+        </ChartCard>
       </div>
+
+      {/* 4. הלקוחות */}
+      <section className={cardCls}>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-base font-black text-stone-900">תקבולים לפי בית ספר</h2>
+          <Link href={`${base}/payments`} className="text-xs font-bold text-[#2A6462] underline">לרישיונות ולתשלומים</Link>
+        </div>
+        {d.customers.top.length === 0 ? (
+          <p className="mt-3 text-sm text-stone-500">עדיין לא התקבל תשלום מבית ספר.</p>
+        ) : (
+          <table className="mt-3 w-full text-sm">
+            <tbody>
+              {d.customers.top.map((c) => (
+                <tr key={c.school_id} className="border-t border-stone-100">
+                  <td className="py-2">
+                    <Link href={`${base}/${c.school_id}`} className="font-bold text-stone-800 underline decoration-stone-300">{c.name}</Link>
+                  </td>
+                  <td className="py-2 text-end text-stone-700">{shekel(c.net)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
     </div>
   );
 }
@@ -236,21 +238,46 @@ function Tile({ label, value, sub, alert }: { label: string; value: string; sub?
   );
 }
 
-function Meter({ label, now, goal, fmt }: { label: string; now: number; goal: number; fmt: (n: number) => string }) {
-  const share = goal > 0 ? Math.min(1, now / goal) : 1;
-  const done = now >= goal;
+/** כרטיס גרף. בלי נתונים: הצירים נשארים, ומעליהם הסבר מתי הגרף יתמלא. */
+function ChartCard({
+  title,
+  sub,
+  link,
+  empty,
+  emptyText,
+  height = "h-52",
+  children,
+}: {
+  title: string;
+  sub?: string;
+  link?: { href: string; label: string };
+  empty: boolean;
+  emptyText: string;
+  height?: string;
+  children: React.ReactElement;
+}) {
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3 text-sm">
-        <span className="font-bold text-stone-700">{label}</span>
-        <span className={done ? "font-bold text-[#2A6462]" : "text-stone-600"}>
-          {fmt(now)} מתוך {fmt(goal)}{done ? " ✓" : ""}
-        </span>
+    <section className={cardCls}>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-base font-black text-stone-900">{title}</h2>
+        {link && (
+          <Link href={link.href} className="text-xs font-bold text-[#2A6462] underline">
+            {link.label}
+          </Link>
+        )}
       </div>
-      <div className="mt-1.5 h-2.5 overflow-hidden rounded-full bg-stone-100" role="meter" aria-valuemin={0} aria-valuemax={goal} aria-valuenow={now} aria-label={label}>
-        <div className="h-full rounded-full bg-[#3D8C8A]" style={{ width: `${Math.round(share * 100)}%` }} />
+      {sub && <p className="mt-0.5 text-xs text-stone-500">{sub}</p>}
+      <div className={`relative mt-3 ${height}`}>
+        <ResponsiveContainer width="100%" height="100%">
+          {children}
+        </ResponsiveContainer>
+        {empty && (
+          <div className="absolute inset-0 flex items-center justify-center p-4">
+            <p className="max-w-xs rounded-xl bg-white/90 px-4 py-3 text-center text-sm leading-6 text-stone-500 shadow-sm">{emptyText}</p>
+          </div>
+        )}
       </div>
-    </div>
+    </section>
   );
 }
 

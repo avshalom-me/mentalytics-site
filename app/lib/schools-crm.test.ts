@@ -228,6 +228,13 @@ describe("the ladder (section 9, appendix B)", () => {
     const s = ladderStatus(settings, [], "2026-10-22");
     expect(s.current).toEqual({ stage: 1, rate: 0.1, since: "2026-10-22" });
     expect(s.next).toMatchObject({ stage: 2, not_before: "2026-12-22", gates_met_on: null, applies_from: null });
+    expect(s.steps.map((x) => [x.stage, x.not_before, x.applies_from])).toEqual([
+      [1, "2026-10-22", "2026-10-22"],
+      [2, "2026-12-22", null],
+      [3, "2027-02-22", null],
+      [4, "2027-04-22", null],
+      [5, "2027-06-22", null],
+    ]);
   });
   it("a stage whose date came but whose gates are not met waits, and the rate does not move", () => {
     const events = [{ date: "2026-11-05", schools: 39, receipts: 30000 }];

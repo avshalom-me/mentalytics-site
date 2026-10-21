@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 import {
   CLOSED_DEAL_STAGES,
   DEAL_STAGES,
+  SCHOOL_STATUSES,
   SCHOOL_ENTITY_TYPES,
   addMonthsIso,
   calendarQuarter,
@@ -35,7 +36,7 @@ export async function overviewGet(v: Viewer) {
     const today = ilDay(new Date().toISOString());
     const settings = await getBranchSettings();
     const since90 = addMonthsIso(today, -3);
-    const [lic, schools, deals, usage, tasks] = await Promise.all([
+    const [lic, schools, deals, usage, tasks, acts, demo] = await Promise.all([
       supabaseAdmin
         .from("school_licenses")
         .select("id, school_id, kind, status, school_year, start_date, end_date, price_net, months, paid_at, refunded_at, code_disabled, schools!inner(name, is_demo), school_payments(id, seq, amount_gross, amount_net, due_date, status, received_at)")
@@ -44,8 +45,11 @@ export async function overviewGet(v: Viewer) {
       supabaseAdmin.from("school_deals").select("id, school_id, stage, value_gross, next_step_due, source, created_at, closed_at, schools(is_demo)"),
       supabaseAdmin.from("school_usage_daily").select("school_id, day, count, schools!inner(is_demo)").eq("schools.is_demo", false).gte("day", since90),
       supabaseAdmin.from("crm_tasks").select("id, due_date, assignee, status").in("entity_type", [...SCHOOL_ENTITY_TYPES]).in("status", ["open", "in_progress"]),
+      // פעולות שאנשים רשמו (שיחה, פגישה, וואטסאפ...), בלי רישומי המערכת.
+      supabaseAdmin.from("school_activities").select("entity_id, happened_at").neq("kind", "system").gte("happened_at", `${since90}T00:00:00+03:00`).limit(5000),
+      supabaseAdmin.from("schools").select("id, school_deals(id), school_licenses(id)").eq("is_demo", true),
     ]);
-    for (const r of [lic, schools, deals, usage, tasks]) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
+    for (const r of [lic, schools, deals, usage, tasks, acts, demo]) if (r.error) throw new SchoolsCrmError(r.error.message, 500);
 
     const licenses = (lic.data ?? []) as unknown as Lic[];
     const sy = schoolYearOf(today);
@@ -169,6 +173,21 @@ export async function overviewGet(v: Viewer) {
       }
     }
 
+    // פעילות שנרשמה לפי שבוע, בלי מה שנרשם על בית ספר ההדגמה.
+    type DemoRow = { id: string; school_deals: { id: string }[] | null; school_licenses: { id: string }[] | null };
+    const demoIds = new Set<string>();
+    for (const r of (demo.data ?? []) as DemoRow[]) {
+      demoIds.add(r.id);
+      for (const x of r.school_deals ?? []) demoIds.add(x.id);
+      for (const x of r.school_licenses ?? []) demoIds.add(x.id);
+    }
+    const activityWeeks = weeks.map((w) => ({ week: w.week, count: 0 }));
+    for (const a of (acts.data ?? []) as { entity_id: string; happened_at: string }[]) {
+      if (demoIds.has(a.entity_id)) continue;
+      const w = activityWeeks.find((x) => x.week === weekStart(ilDay(a.happened_at)));
+      if (w) w.count++;
+    }
+
     const statusCounts: Record<string, number> = {};
     for (const s of (schools.data ?? []) as { status: string }[]) statusCounts[s.status] = (statusCounts[s.status] ?? 0) + 1;
 
@@ -192,7 +211,14 @@ export async function overviewGet(v: Viewer) {
         due_30_gross: round(dueSoonGross),
       },
       months,
-      customers: { paying: payingSince.size, active_licenses: activeLicenses, schools_by_status: statusCounts, top: topCustomers },
+      customers: {
+        paying: payingSince.size,
+        active_licenses: activeLicenses,
+        schools_by_status: statusCounts,
+        status_rows: SCHOOL_STATUSES.map((s) => ({ status: s.value, label: s.label, count: statusCounts[s.value] ?? 0 })),
+        top: topCustomers,
+      },
+      activity: { weeks: activityWeeks },
       pipeline: { stages: pipeline, open_count: openDeals.length, open_value: round(openDeals.reduce((a, d) => a + Number(d.value_gross ?? 0), 0)), won_year: wonYear, lost_year: lostYear },
       usage: { weeks, last30: usage30, idle_active: idleActive },
       attention: {

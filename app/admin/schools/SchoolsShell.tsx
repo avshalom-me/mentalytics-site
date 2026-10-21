@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 // המעטפת של ה-CRM המשותף של ענף בתי הספר: תפריט צד עם מסכי הענף, זהה אצל
 // הבעלים (/admin/schools, נכנס מהאדמין הראשי) ואצל השותפה (/partner/schools).
@@ -35,9 +35,19 @@ export default function SchoolsShell({
   const base = mode === "admin" ? "/admin/schools" : "/partner/schools";
   // המגירה בטלפון נסגרת בלחיצה על קישור, לא מתוך effect על הנתיב.
   const [open, setOpen] = useState(false);
+  // הכותרת של האתר דביקה (z-index 100) ובגובה משתנה; התפריט מתחיל מתחתיה,
+  // אחרת הפריט הראשון ("מבט על") נבלע מאחוריה.
+  const [headerH, setHeaderH] = useState(0);
+  useEffect(() => {
+    const h = document.querySelector("header");
+    if (!h) return;
+    const ro = new ResizeObserver(() => setHeaderH(Math.round(h.getBoundingClientRect().height)));
+    ro.observe(h);
+    return () => ro.disconnect();
+  }, []);
 
   const items = mode === "admin" ? [...ITEMS, ...OWNER_ITEMS] : ITEMS;
-  const named = items.filter((i) => i.path).map((i) => base + i.path);
+  const named = [...items.filter((i) => i.path).map((i) => base + i.path), `${base}/agreement`];
   // "בתי ספר" דולק ברשימה ובעמוד של בית ספר, לא בשאר מסכי הענף.
   const active = (i: Item) => {
     const href = base + i.path;
@@ -68,8 +78,12 @@ export default function SchoolsShell({
     </div>
   );
 
+  // "מצב לפי ההסכם" (שלבי הסולם והשערים) בכוונה כאן, קטן, ולא בתפריט: "זה לא העיקר" (הבעלים, 21/10/2026).
   const footer = (
     <div className="space-y-2 px-3 text-xs">
+      <Link href={`${base}/agreement`} onClick={() => setOpen(false)} className={`block hover:underline ${pathname.startsWith(`${base}/agreement`) ? "font-bold text-stone-700" : "text-stone-400"}`}>
+        מצב לפי ההסכם
+      </Link>
       {mode === "admin" ? (
         <Link href="/admin" className="block font-bold text-[#2A6462] hover:underline">
           ← ל-CRM הראשי של טיפול חכם
@@ -87,20 +101,20 @@ export default function SchoolsShell({
 
   return (
     <div dir="rtl" style={{ fontFamily: "'Heebo', sans-serif" }}>
-      <aside className="fixed inset-y-0 right-0 z-40 hidden w-52 flex-col gap-5 overflow-y-auto border-e border-stone-200 bg-white py-4 ps-3 pe-3 lg:flex">
+      <aside style={{ top: headerH }} className="fixed bottom-0 right-0 z-40 hidden w-52 flex-col gap-5 overflow-y-auto border-e border-stone-200 bg-white py-4 ps-3 pe-3 lg:flex">
         {title}
         {nav}
         <div className="mt-auto">{footer}</div>
       </aside>
 
-      <div className="sticky top-0 z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-2.5 lg:hidden">
+      <div style={{ top: headerH }} className="sticky z-40 flex items-center justify-between border-b border-stone-200 bg-white px-4 py-2.5 lg:hidden">
         <button type="button" onClick={() => setOpen(true)} aria-label="תפריט" className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm font-bold text-stone-600">
           ☰ תפריט
         </button>
         <span className="text-sm font-black text-stone-800">CRM בתי ספר</span>
       </div>
       {open && (
-        <div className="fixed inset-0 z-50 lg:hidden">
+        <div className="fixed inset-0 z-[110] lg:hidden">
           <div className="absolute inset-0 bg-black/30" onClick={() => setOpen(false)} />
           <aside className="absolute inset-y-0 right-0 flex w-64 flex-col gap-5 overflow-y-auto bg-white px-3 py-4 shadow-2xl">
             <div className="flex items-start justify-between">

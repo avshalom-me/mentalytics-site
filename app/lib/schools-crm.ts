@@ -542,6 +542,8 @@ export type LadderStatus = {
     gates_met_on: string | null;
     applies_from: string | null;
   };
+  /** כל שלבי הסולם, לטבלה במסך "מצב לפי ההסכם". */
+  steps: { stage: number; rate: number; not_before: string | null; gate_schools: number | null; gate_receipts: number | null; gates_met_on: string | null; applies_from: string | null }[];
 };
 
 /** events: תוספות לשערים לפי תאריך (בית ספר שנהיה "משלם", תקבול נטו לשער). */
@@ -584,7 +586,11 @@ export function ladderStatus(settings: Pick<BranchSettings, "start_date" | "ladd
     const a = appliesFrom(n);
     next = { stage: n.stage, rate: n.rate, not_before: a.notBefore, gate_schools: n.gate_schools, gate_receipts: n.gate_receipts, gates_met_on: a.met, applies_from: a.from };
   }
-  return { start_date: start, schools_now: schools, receipts_now: receipts, current, next };
+  const steps = ladder.map((step) => {
+    const a = appliesFrom(step);
+    return { stage: step.stage, rate: step.rate, not_before: a.notBefore, gate_schools: step.gate_schools, gate_receipts: step.gate_receipts, gates_met_on: a.met, applies_from: a.from };
+  });
+  return { start_date: start, schools_now: schools, receipts_now: receipts, current, next, steps };
 }
 
 /** הרבעון הקלנדרי של תאריך (תקופת החישוב, סעיף 9.3). */
