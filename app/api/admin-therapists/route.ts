@@ -1380,9 +1380,14 @@ export async function PATCH(request: Request) {
       // (customer_cancellation) or a free gift (admin_demote). Skip if
       // they were never promoted in the first place (pending → approved
       // is a normal first-time approval and doesn't need a notification).
+      // מסלול מתנה עם כרטיס (gift_trial) מקבל את מייל ביטול המנוי: יש לו הוראת
+      // קבע, ומה שחשוב לו הוא שהיא הופסקה ולא ייגבה תשלום. "ההטבה של הקידום
+      // החינמי הסתיימה" לא אומר את זה (22/10/26).
       if (before.status === "paying") {
         endedEmailReason =
-          before.promotion_source === "paid" ? "customer_cancellation" : "admin_demote";
+          before.promotion_source === "paid" || before.promotion_source === "gift_trial"
+            ? "customer_cancellation"
+            : "admin_demote";
       }
     }
 

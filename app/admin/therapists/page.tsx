@@ -1810,7 +1810,10 @@ export default function AdminTherapistsPage() {
                   </button>
                 )
               )}
-              {therapist.status === "paying" && therapist.promotion_source === "paid" && (
+              {/* מסלול מתנה עם כרטיס (gift_trial) הוא הוראת קבע אמיתית שתחייב בסוף
+                  המתנה - עד 22/10/26 לא היה לו אף כפתור הורדה, ומטפלת שביקשה לחזור
+                  לחינמי לפני החיוב הראשון לא הייתה ניתנת להורדה מהאדמין. */}
+              {therapist.status === "paying" && (therapist.promotion_source === "paid" || therapist.promotion_source === "gift_trial") && (
                 <button type="button" disabled={isBusy}
                   className="rounded-xl bg-amber-600 px-4 py-2 text-sm text-white disabled:opacity-50"
                   onClick={() => {
@@ -2927,10 +2930,22 @@ export default function AdminTherapistsPage() {
             <h3 className="mb-1 text-lg font-bold text-stone-900">
               ביטול מנוי - {cancelPayingFor.full_name?.trim() || cancelPayingFor.email || "מטפל/ת"}
             </h3>
-            <p className="mb-4 text-sm text-stone-600">
-              הוראת הקבע ב-Sumit תבוטל, המטפל/ת ירד/תרד למסלול החינמי ויישלח מייל על סיום הקידום.
-            </p>
+            {cancelPayingFor.promotion_source === "gift_trial" ? (
+              <p className="mb-4 text-sm text-stone-600">
+                מסלול מתנה עם כרטיס - עוד לא נגבה תשלום
+                {cancelPayingFor.subscription?.current_period_end
+                  ? ` (החיוב הראשון מתוכנן ל-${new Date(cancelPayingFor.subscription.current_period_end).toLocaleDateString("he-IL")})`
+                  : ""}
+                . הוראת הקבע ב-Sumit תבוטל לפני החיוב, המטפל/ת ירד/תרד למסלול החינמי כבר עכשיו, ויישלח
+                המייל &quot;המנוי שלך באתר טיפול חכם בוטל&quot; (הוראת הקבע הופסקה ולא ייגבו תשלומים).
+              </p>
+            ) : (
+              <p className="mb-4 text-sm text-stone-600">
+                הוראת הקבע ב-Sumit תבוטל, המטפל/ת ירד/תרד למסלול החינמי ויישלח מייל על סיום הקידום.
+              </p>
+            )}
 
+            {cancelPayingFor.promotion_source === "paid" && (
             <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-800">
               <input
                 type="checkbox"
@@ -2947,6 +2962,7 @@ export default function AdminTherapistsPage() {
                 </span>
               </span>
             </label>
+            )}
 
             {refundChecked && (
               <div className="mt-3 space-y-3 rounded-xl border border-amber-200 bg-amber-50/60 px-4 py-4">
