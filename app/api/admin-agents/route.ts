@@ -15,7 +15,7 @@ import { runCenterHealth } from "@/app/lib/center-health-agent";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
-import { sendGiftOffer, recentGiftOffers, finishGiftOffer } from "@/app/lib/gift-offer";
+import { sendGiftOffer, recentGiftOffers, finishGiftOffer, recentlyPromotedIds } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect, addProspectsFromText, moveProspectToDeal, PROSPECT_STATUS_VALUES, type ProspectStatus } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
@@ -191,8 +191,13 @@ export async function GET() {
       // מי כבר קיבל הצעת מתנה בחלון הצינון. הכרטיס מסתיר אותם, אחרת הוא
       // מציג נמען שהשליחה אליו תיחסם ברגע הלחיצה - אותו מטפל עולה כמועמד
       // בכמה חיתוכים במקביל.
-      gift_offered_ids: await recentGiftOffers()
-        .then((rows) => Array.from(new Set(rows.map((r) => r.therapist_id))))
+      // וגם מי שהיה במסלול המקודם בשנה האחרונה - כרטיס שנוצר לפני הכלל
+      // (22/10/26) לא מציג אותם עד שהריצה הבאה תרענן אותו.
+      gift_offered_ids: await Promise.all([
+        recentGiftOffers().then((rows) => rows.map((r) => r.therapist_id)),
+        recentlyPromotedIds().then((ids) => Array.from(ids)),
+      ])
+        .then(([offered, promoted]) => Array.from(new Set([...offered, ...promoted])))
         .catch(() => [] as string[]),
       // הספירות האמיתיות מהמאגר, מופרדות לפי סוג התוצר.
       pending_action_total: actionCountRes.count ?? 0,

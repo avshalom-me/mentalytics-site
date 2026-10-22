@@ -8,6 +8,7 @@ import { startAgentRun, finishAgentRun, syncAgentAlerts } from "./agent-infra";
 import {
   giftEligibilityError,
   recentGiftOffers,
+  recentlyPromotedIds,
   GIFT_OFFER_MONTHS,
   GIFT_OFFER_WAIT_DAYS,
   GIFT_OFFER_COOLDOWN_DAYS,
@@ -291,7 +292,7 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // ההתאמה נושאת את האזור והטיפול שהמטופל ביקש - גם כשכן היו מטפלים
     // להציע. אירוע הפער (למטה) נרשם רק כשלא היה אף משלם, ולכן הוא לבדו
     // לא יכול לגלות חיתוך שיש בו מטפל אחד או שניים.
-    const [viewsRes, eventsRes, therapists, sentOffers, concInput] = await Promise.all([
+    const [viewsRes, eventsRes, therapists, sentOffers, pastPromoted, concInput] = await Promise.all([
       fetchAllRows<{ viewer_region: string | null; viewer_treatment: string | null; session_id: string | null }>(
         () =>
           supabaseAdmin
@@ -319,6 +320,8 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
       // הצעות מתנה שכבר יצאו: מוציאות את מי שקיבל אותן מבריכת המועמדים,
       // ומשתיקות את הפער שממנו יצאו כל עוד ההמתנה לתשובה נמשכת.
       recentGiftOffers(),
+      // מי שהיה במסלול המקודם בשנה האחרונה - לא מועמד/ת למתנה (הבעלים, 22/10/26).
+      recentlyPromotedIds(),
       // ריכוז פניות: מי פנה למי בשבועיים האחרונים (contact-concentration-data.ts).
       // כישלון כאן לא מפיל את פערי ההיצע - הם לא תלויים בנתונים האלה.
       loadConcentrationInput().catch((e) => {
@@ -402,7 +405,9 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     const offeredRecently = new Set(sentOffers.map((o) => o.therapist_id));
     // בלי כתובת מייל אין למי לשלוח - מועמד כזה רק היה יוצר הצעה שנחסמת
     // בשליחה, ולכן הוא לא נכנס לבריכה מלכתחילה.
-    const freePool = therapists.filter((t) => Boolean(t.email) && giftEligibilityError(t, nowIso) === null);
+    const freePool = therapists.filter(
+      (t) => Boolean(t.email) && giftEligibilityError(t, nowIso) === null && !pastPromoted.has(t.id)
+    );
 
     // הצעות פתוחות בחיתוך - טרם הגיעה עליהן תשובה. נספרות ולא רק
     // מסמנות "מחכים": כל הצעה סוגרת לכל היותר מטפל אחד מתוך הפער.

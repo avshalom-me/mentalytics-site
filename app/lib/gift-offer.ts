@@ -4,6 +4,7 @@ import { supabaseAdmin } from "./supabaseAdmin";
 import { sendGiftOfferEmail } from "./therapist-emails";
 import { writeAudit } from "./audit";
 import { issueGiftCheckoutToken, JOIN_LINK_PLACEHOLDER, GIFT_OFFER_TTL_DAYS } from "./gift-checkout";
+import { fetchAllRows } from "./fetch-all-rows";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://www.mentalytics.co.il";
 
@@ -49,6 +50,68 @@ export function giftEligibilityError(t: GiftEligibility, nowIso: string): string
   if (t.promotion_source) return "למטפל כבר יש קידום פעיל";
   if (t.promoted_until && t.promoted_until > nowIso) return "למטפל כבר יש חלון קידום פעיל";
   return null;
+}
+
+// מי שהיה במסלול המקודם (בתשלום, ניסיון, מתנה, ידני או דרך מרכז) ויצא ממנו -
+// לא מקבל הצעת מתנה שנה. הבעלים, 22/10/26: הסוכן הציע למטפל ששילם וקיבל
+// החזר, ולמטפל שקיבל מתנה על מאמר ויצא בלי להמשיך בתשלום.
+// השעון רץ מהכניסה או מהיציאה, המאוחר מביניהם - כלומר שנה מהיום שיצא.
+export const PAST_PROMOTION_EXCLUDE_DAYS = 365;
+
+/** פעולת יומן שהיא כניסה למסלול המקודם או יציאה ממנו ("status_change:approved->paying", "status_change:paying->approved"). */
+export function isPromotionStatusChange(action: string): boolean {
+  return action.startsWith("status_change:") && action.includes("paying");
+}
+
+/**
+ * ההחלטה הטהורה: לפי פעולות היומן של מטפל/ת - מתי לאחרונה נכנס/ה למסלול
+ * המקודם או יצא/ה ממנו בחלון, או null אם לא.
+ */
+export function lastPromotionChangeWithin(
+  rows: readonly { action: string; created_at: string }[],
+  nowMs: number,
+  days = PAST_PROMOTION_EXCLUDE_DAYS,
+): string | null {
+  const since = nowMs - days * 86_400_000;
+  let latest: string | null = null;
+  for (const r of rows) {
+    if (!isPromotionStatusChange(r.action)) continue;
+    if (Date.parse(r.created_at) < since) continue;
+    if (!latest || r.created_at > latest) latest = r.created_at;
+  }
+  return latest;
+}
+
+/** כל מי שנכנס/ה למסלול המקודם או יצא/ה ממנו בשנה האחרונה (מיומן המטפלים). */
+export async function recentlyPromotedIds(days = PAST_PROMOTION_EXCLUDE_DAYS): Promise<Set<string>> {
+  const sinceIso = new Date(Date.now() - days * 86_400_000).toISOString();
+  // כישלון כאן נזרק, כמו ב-recentGiftOffers: בריכת מועמדים שהורחבה בשקט
+  // היא בדיוק התקלה שהכלל הזה בא למנוע.
+  const rows = await fetchAllRows<{ therapist_id: string }>(() =>
+    supabaseAdmin
+      .from("therapist_audit_log")
+      .select("therapist_id")
+      .like("action", "status_change:%paying%")
+      .gte("created_at", sinceIso)
+      .order("created_at", { ascending: true })
+  );
+  return new Set(rows.map((r) => r.therapist_id));
+}
+
+/** אותה בדיקה למטפל/ת אחד/ת, ברגע השליחה. נימוק בעברית, או null. */
+export async function pastPromotionError(therapistId: string): Promise<string | null> {
+  const sinceIso = new Date(Date.now() - PAST_PROMOTION_EXCLUDE_DAYS * 86_400_000).toISOString();
+  const { data, error } = await supabaseAdmin
+    .from("therapist_audit_log")
+    .select("action, created_at")
+    .eq("therapist_id", therapistId)
+    .like("action", "status_change:%paying%")
+    .gte("created_at", sinceIso);
+  if (error) return `בדיקת היסטוריית הקידום נכשלה: ${error.message}`;
+  const latest = lastPromotionChangeWithin((data ?? []) as { action: string; created_at: string }[], Date.now());
+  if (!latest) return null;
+  const when = new Date(latest).toLocaleDateString("he-IL");
+  return `המטפל/ת היה/תה במסלול המקודם (שינוי אחרון ב-${when}). לא מציעים מתנה למי שהיה במסלול בשנה האחרונה.`;
 }
 
 export type SentGiftOffer = {
@@ -137,6 +200,8 @@ export async function sendGiftOffer(opts: {
   if (!t.email) return { ok: false, error: "למטפל אין כתובת מייל" };
   const ineligible = giftEligibilityError(t as GiftEligibility, new Date().toISOString());
   if (ineligible) return { ok: false, error: `לא נשלח: ${ineligible}` };
+  const pastPromotion = await pastPromotionError(opts.therapistId);
+  if (pastPromotion) return { ok: false, error: `לא נשלח: ${pastPromotion}` };
 
   // 3. צינון - הצעה אחת למטפל בחלון הצינון, גם אם עלה בכמה פערים שונים.
   const cooldownIso = new Date(Date.now() - GIFT_OFFER_COOLDOWN_DAYS * 86_400_000).toISOString();
