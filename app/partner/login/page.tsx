@@ -6,8 +6,8 @@ import { Loader2 } from "lucide-react";
 import { supabase } from "@/app/lib/supabaseClient";
 
 // כניסה לפורטל השותפה של ענף בתי הספר: מייל וסיסמה (Supabase Auth). אין כאן
-// הרשמה: משתמשת נוצרת רק מהאדמין, עם קישור חד-פעמי להגדרת סיסמה. גם איפוס
-// סיסמה עובר דרך הבעלים, שמפיק קישור חדש; המערכת לא שולחת מייל.
+// הרשמה: משתמשת נוצרת רק מהאדמין, עם סיסמה זמנית שהיא מחליפת בכניסה הראשונה.
+// גם איפוס סיסמה עובר דרך הבעלים, שמפיק סיסמה זמנית חדשה; המערכת לא שולחת מייל.
 
 function LoginContent() {
   const params = useSearchParams();
@@ -63,7 +63,7 @@ function LoginContent() {
         </form>
         <div className="mt-5 text-center text-sm">
           {forgot ? (
-            <p className="leading-6 text-stone-600">לקבלת קישור חדש להגדרת סיסמה פונים לאבשלום. הקישור מגיע ממנו ישירות.</p>
+            <p className="leading-6 text-stone-600">לקבלת סיסמה זמנית חדשה פונים לאבשלום. בכניסה איתה בוחרים סיסמה חדשה.</p>
           ) : (
             <button type="button" onClick={() => setForgot(true)} className="text-stone-400 hover:underline">
               שכחתי סיסמה

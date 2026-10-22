@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/app/lib/supabaseClient";
 import SchoolsShell from "@/app/admin/schools/SchoolsShell";
+import ChangePassword from "./ChangePassword";
 
 // המעטפת של פורטל השותפה: בודקת שיש סשן ושהמשתמשת רשומה כשותפה פעילה, ומציגה
 // את תפריט הצד של הענף, אותו תפריט שהבעלים רואה (SchoolsShell). המסכים עצמם הם
@@ -11,7 +12,8 @@ import SchoolsShell from "@/app/admin/schools/SchoolsShell";
 // כשהם רצים כאן. עמוד הכניסה עובר בלי בדיקה.
 
 type Me = { name: string; email: string };
-type Check = { state: "ok"; me: Me } | { state: "denied" } | { state: "signed_out" };
+// mustChange: נכנסה עם סיסמה זמנית מהבעלים, ועוד לא קבעה סיסמה משלה.
+type Check = { state: "ok"; me: Me; mustChange: boolean } | { state: "denied" } | { state: "signed_out" };
 
 async function checkPartner(): Promise<Check> {
   const { data } = await supabase.auth.getSession();
@@ -20,7 +22,7 @@ async function checkPartner(): Promise<Check> {
   try {
     const r = await fetch("/api/partner-schools/me", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
     const j = await r.json().catch(() => null);
-    if (r.ok && j?.ok) return { state: "ok", me: { name: j.name, email: j.email } };
+    if (r.ok && j?.ok) return { state: "ok", me: { name: j.name, email: j.email }, mustChange: data.session?.user?.user_metadata?.must_change_password === true };
     return { state: "denied" };
   } catch {
     return { state: "denied" };
@@ -66,6 +68,9 @@ export default function PartnerShell({ children }: { children: React.ReactNode }
       </main>
     );
   }
+
+  // סיסמה זמנית: קודם בוחרים סיסמה, ורק אז הפורטל.
+  if (check.mustChange) return <ChangePassword forced onDone={() => (window.location.href = "/partner/schools/overview")} />;
 
   const signOut = async () => {
     await supabase.auth.signOut().catch(() => {});

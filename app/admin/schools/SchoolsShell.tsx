@@ -91,6 +91,9 @@ export default function SchoolsShell({
       ) : (
         <>
           {userName ? <div className="text-stone-500">{userName}</div> : null}
+          <Link href="/partner/password" onClick={() => setOpen(false)} className="block text-stone-400 hover:underline">
+            שינוי סיסמה
+          </Link>
           <button type="button" onClick={onSignOut} className="font-bold text-[#2A6462] underline">
             יציאה
           </button>

@@ -1,3 +1,4 @@
+import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 
@@ -5,14 +6,17 @@ import { supabaseAdmin } from "@/app/lib/supabaseAdmin";
 //
 // GET   הרשימה.
 // POST  {action: "create", name, email}: משתמשת Supabase Auth (או הקיימת עם
-//       אותו מייל) + שורה ב-partner_users, וקישור חד-פעמי להגדרת סיסמה.
-//       {action: "link", user_id}: קישור חדש להגדרת סיסמה (איפוס).
+//       אותו מייל, באישור מפורש) + שורה ב-partner_users, וסיסמה זמנית.
+//       {action: "password", user_id}: סיסמה זמנית חדשה (שכחה או איפוס).
 //       {action: "toggle", user_id, active}: השבתה או החזרה.
 //       {action: "email", user_id, email}: החלפת מייל הכניסה (למשל למייל
 //       הארגוני). הסיסמה, ההיסטוריה והשיוך נשארים.
 //
-// המערכת לא שולחת מייל: הקישור חוזר לאדמין, והבעלים מעביר אותו בעצמו. הקישור
-// הוא קישור שחזור של Supabase, ונפתח בעמוד האיפוס המשותף עם ctx=partner.
+// סיסמה זמנית ולא קישור חד-פעמי (22/10/2026): קישור הגדרת סיסמה שהודבק
+// בוואטסאפ נוצל על ידי התצוגה המקדימה של וואטסאפ עוד לפני שהשותפה לחצה עליו,
+// וכשלחצה הוא כבר היה "לא בתוקף". סיסמה זמנית לא מתבזבזת כך ולא פגה. החשבון
+// מסומן must_change_password, והפורטל מבקש ממנה לקבוע סיסמה משלה בכניסה
+// הראשונה (app/partner/PartnerShell.tsx). המערכת לא שולחת מייל: הבעלים מעביר.
 
 export const dynamic = "force-dynamic";
 
@@ -20,14 +24,25 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const fail = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
 
-async function setPasswordLink(email: string, origin: string): Promise<{ link: string; userId: string }> {
-  const { data, error } = await supabaseAdmin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo: `${origin}/therapists/reset-password?ctx=partner` },
+// בלי תווים שמתבלבלים בהקלדה מהטלפון (0/O, 1/l/I).
+const PW_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789";
+function tempPassword(): string {
+  const bytes = randomBytes(12);
+  const chars = Array.from(bytes, (b) => PW_ALPHABET[b % PW_ALPHABET.length]).join("");
+  return `${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
+}
+
+/** סיסמה זמנית למשתמשת קיימת, והסימון שמחייב אותה לקבוע סיסמה משלה בכניסה. */
+async function setTempPassword(userId: string): Promise<string> {
+  const { data: cur, error: gErr } = await supabaseAdmin.auth.admin.getUserById(userId);
+  if (gErr || !cur?.user) throw new Error(gErr?.message ?? "user not found");
+  const password = tempPassword();
+  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
+    password,
+    user_metadata: { ...(cur.user.user_metadata ?? {}), must_change_password: true },
   });
-  if (error || !data?.properties?.action_link || !data.user) throw new Error(error?.message ?? "no link");
-  return { link: data.properties.action_link, userId: data.user.id };
+  if (error) throw new Error(error.message);
+  return password;
 }
 
 async function findAuthUserByEmail(email: string): Promise<string | null> {
@@ -66,10 +81,6 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => null);
   if (!b || typeof b !== "object") return fail("בקשה לא תקינה");
-  // הקישור חוזר לאתר הקנוני: Supabase מכבד רק כתובות ברשימת ההפניות שלו, וכתובת
-  // של פריסת preview הייתה מוחלפת בעמוד הבית (שם אין טופס סיסמה). בפיתוח מקומי
-  // הכתובת המקומית נשמרת לבדיקה.
-  const origin = process.env.NODE_ENV === "production" ? "https://www.mentalytics.co.il" : req.nextUrl.origin;
   try {
     switch (b.action) {
       case "create": {
@@ -77,21 +88,21 @@ export async function POST(req: NextRequest) {
         const email = String(b.email ?? "").trim().toLowerCase().slice(0, 200);
         if (name.length < 2) return fail("כותבים שם");
         if (!EMAIL_RE.test(email)) return fail("כתובת המייל לא תקינה");
-        // משתמשת חדשה בלי סיסמה, עם מייל מאושר (הבעלים מכיר אותה).
-        const created = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true });
+        // משתמשת חדשה עם מייל מאושר (הבעלים מכיר אותה) וסיסמה זמנית.
+        const password = tempPassword();
+        const created = await supabaseAdmin.auth.admin.createUser({ email, email_confirm: true, password, user_metadata: { must_change_password: true } });
         if (!created.error && created.data.user) {
-          const { link } = await setPasswordLink(email, origin);
           const { error } = await supabaseAdmin
             .from("partner_users")
             .upsert({ user_id: created.data.user.id, name, email, active: true, branch: "schools", role: "partner" }, { onConflict: "user_id" });
           if (error) throw new Error(error.message);
-          return NextResponse.json({ ok: true, link });
+          return NextResponse.json({ ok: true, password });
         }
         if (!/already|exists|registered/i.test(created.error?.message ?? "")) throw new Error(created.error?.message ?? "createUser failed");
         // כבר יש חשבון באתר עם המייל הזה. לא מצרפים אותו בשקט: מייל שהוקלד
         // לא נכון היה פותח את הענף לחשבון של מישהו אחר, וקישור איפוס היה מחליף
         // את הסיסמה שלו. הבעלים רואה איזה חשבון זה ומאשר במפורש; אז היא
-        // נכנסת עם הסיסמה שכבר יש לה, בלי קישור.
+        // נכנסת עם הסיסמה שכבר יש לה, בלי סיסמה זמנית.
         const existing = await findAuthUserByEmail(email);
         if (!existing) throw new Error("existing user not found");
         if (b.confirm_existing !== true) {
@@ -106,12 +117,11 @@ export async function POST(req: NextRequest) {
         if (error) throw new Error(error.message);
         return NextResponse.json({ ok: true, existing: true });
       }
-      case "link": {
+      case "password": {
         if (!UUID_RE.test(String(b.user_id ?? ""))) return fail("חסר מזהה");
-        const { data: row } = await supabaseAdmin.from("partner_users").select("email").eq("user_id", b.user_id).maybeSingle();
+        const { data: row } = await supabaseAdmin.from("partner_users").select("user_id").eq("user_id", b.user_id).maybeSingle();
         if (!row) return fail("לא נמצא", 404);
-        const { link } = await setPasswordLink(row.email as string, origin);
-        return NextResponse.json({ ok: true, link });
+        return NextResponse.json({ ok: true, password: await setTempPassword(b.user_id) });
       }
       case "email": {
         if (!UUID_RE.test(String(b.user_id ?? ""))) return fail("חסר מזהה");

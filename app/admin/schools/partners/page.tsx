@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { btnGhost, btnPrimary, cardCls, errText, getJson, hebStamp, inputCls } from "../shared";
 
-// שותפות הענף: מי נכנסת לפורטל /partner. יצירה מפיקה קישור חד-פעמי להגדרת
-// סיסמה, והבעלים שולח אותו בעצמו (וואטסאפ או מייל אישי). המערכת לא שולחת
-// מייל. אותו כפתור משמש לאיפוס סיסמה.
+// שותפות הענף: מי נכנסת לפורטל /partner. יצירה נותנת סיסמה זמנית, והבעלים
+// מעביר אותה בעצמו (וואטסאפ מתאים: אין כאן קישור שהתצוגה המקדימה של וואטסאפ
+// יכולה לנצל לפני הלחיצה, מה שקרה ב-22/10/2026). בכניסה הראשונה הפורטל מבקש
+// ממנה לקבוע סיסמה משלה. המערכת לא שולחת מייל. אותו כפתור משמש לאיפוס.
 
 type Partner = { user_id: string; name: string; email: string; active: boolean; created_at: string };
 
@@ -15,7 +16,8 @@ export default function SchoolPartnersPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
-  const [link, setLink] = useState<{ who: string; url: string } | null>(null);
+  // סיסמה זמנית שהופקה עכשיו (password ריק = נוספה עם חשבון קיים, בלי סיסמה זמנית).
+  const [issued, setIssued] = useState<{ who: string; email: string; password: string } | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -40,13 +42,13 @@ export default function SchoolPartnersPage() {
       if (r.status === 409 && j.existing && body.action === "create") {
         setBusy(null);
         const ok = window.confirm(
-          `כבר קיים באתר ${j.account ?? "חשבון"} עם המייל ${String(body.email)}.\n\nאם זה החשבון של ${who}, אשרו: היא תיכנס לפורטל עם הסיסמה שכבר יש לה, בלי קישור.\nאם זה לא החשבון שלה, בטלו ובדקו את המייל.`,
+          `כבר קיים באתר ${j.account ?? "חשבון"} עם המייל ${String(body.email)}.\n\nאם זה החשבון של ${who}, אשרו: היא תיכנס לפורטל עם הסיסמה שכבר יש לה.\nאם זה לא החשבון שלה, בטלו ובדקו את המייל.`,
         );
         return ok ? run(key, { ...body, confirm_existing: true }, who) : false;
       }
       if (!r.ok || !j.ok) throw new Error(j.error || "שגיאה");
-      if (j.link) setLink({ who, url: j.link });
-      else if (j.existing) setLink({ who, url: "" });
+      if (j.password) setIssued({ who, email: String(body.email ?? rows.find((x) => x.user_id === body.user_id)?.email ?? ""), password: j.password });
+      else if (j.existing) setIssued({ who, email: String(body.email ?? ""), password: "" });
       await load();
       return true;
     } catch (e) {
@@ -65,21 +67,35 @@ export default function SchoolPartnersPage() {
       </p>
       {error && <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
-      {link && !link.url && (
+      {issued && !issued.password && (
         <div className="mt-4 rounded-2xl border border-[#C2DFDE] bg-[#EAF4F3] p-4 text-sm">
-          <div className="font-bold text-[#2A6462]">{link.who} נוספה לפורטל עם החשבון הקיים שלה.</div>
-          <p className="mt-1 text-stone-600">היא נכנסת ב-/partner/login עם המייל והסיסמה שכבר יש לה באתר. אין קישור לשלוח.</p>
-          <button type="button" className={`${btnGhost} mt-2`} onClick={() => setLink(null)}>סגירה</button>
+          <div className="font-bold text-[#2A6462]">{issued.who} נוספה לפורטל עם החשבון הקיים שלה.</div>
+          <p className="mt-1 text-stone-600">היא נכנסת ב-mentalytics.co.il/partner עם המייל והסיסמה שכבר יש לה באתר.</p>
+          <button type="button" className={`${btnGhost} mt-2`} onClick={() => setIssued(null)}>סגירה</button>
         </div>
       )}
-      {link && link.url && (
+      {issued && issued.password && (
         <div className="mt-4 rounded-2xl border border-[#C2DFDE] bg-[#EAF4F3] p-4 text-sm">
-          <div className="font-bold text-[#2A6462]">קישור להגדרת סיסמה עבור {link.who}</div>
-          <p className="mt-1 text-stone-600">שולחים לה את הקישור בעצמך. הוא חד-פעמי ותקף לזמן מוגבל; אם פג, מפיקים חדש כאן.</p>
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <code dir="ltr" className="max-w-full truncate rounded bg-white px-2 py-1 text-xs">{link.url}</code>
-            <button type="button" className={btnGhost} onClick={() => navigator.clipboard.writeText(link.url).catch(() => {})}>העתקה</button>
-            <button type="button" className={btnGhost} onClick={() => setLink(null)}>סגירה</button>
+          <div className="font-bold text-[#2A6462]">סיסמה זמנית עבור {issued.who}</div>
+          <p className="mt-1 text-stone-600">
+            שולחים לה בעצמך את הכתובת, המייל והסיסמה. בכניסה הראשונה הפורטל יבקש ממנה לקבוע סיסמה משלה. הסיסמה מוצגת רק עכשיו; אם תאבד, מפיקים חדשה.
+          </p>
+          <div className="mt-2 grid gap-1 rounded-xl bg-white p-3 text-sm" dir="ltr">
+            <div>mentalytics.co.il/partner</div>
+            <div>{issued.email}</div>
+            <div className="font-mono text-base font-bold tracking-wider">{issued.password}</div>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              className={btnGhost}
+              onClick={() => navigator.clipboard.writeText(`כניסה לפורטל בתי הספר: mentalytics.co.il/partner
+מייל: ${issued.email}
+סיסמה זמנית: ${issued.password}`).catch(() => {})}
+            >
+              העתקת ההודעה
+            </button>
+            <button type="button" className={btnGhost} onClick={() => setIssued(null)}>סגירה</button>
           </div>
         </div>
       )}
@@ -103,7 +119,7 @@ export default function SchoolPartnersPage() {
           <input type="email" dir="ltr" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} required />
         </label>
         <div className="flex items-end">
-          <button type="submit" disabled={busy !== null} className={btnPrimary}>{busy === "create" ? "יוצר..." : "הוספה וקישור לסיסמה"}</button>
+          <button type="submit" disabled={busy !== null} className={btnPrimary}>{busy === "create" ? "יוצר..." : "הוספה וסיסמה זמנית"}</button>
         </div>
       </form>
 
@@ -122,8 +138,16 @@ export default function SchoolPartnersPage() {
                 <div className="text-xs text-stone-400">נוספה {hebStamp(p.created_at)}</div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <button type="button" disabled={busy !== null} className={btnGhost} onClick={() => run(`link:${p.user_id}`, { action: "link", user_id: p.user_id }, p.name)}>
-                  {busy === `link:${p.user_id}` ? "מפיק..." : "קישור חדש לסיסמה"}
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  className={btnGhost}
+                  onClick={() => {
+                    if (!window.confirm(`להפיק ל${p.name} סיסמה זמנית חדשה? הסיסמה הנוכחית שלה תפסיק לעבוד, ובכניסה הבאה היא תקבע סיסמה משלה.`)) return;
+                    void run(`pw:${p.user_id}`, { action: "password", user_id: p.user_id }, p.name);
+                  }}
+                >
+                  {busy === `pw:${p.user_id}` ? "מפיק..." : "סיסמה זמנית חדשה"}
                 </button>
                 <button
                   type="button"
