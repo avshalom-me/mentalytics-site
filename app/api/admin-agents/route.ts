@@ -15,7 +15,7 @@ import { runCenterHealth } from "@/app/lib/center-health-agent";
 import { runCenterNudgeAgent } from "@/app/lib/center-nudge-agent";
 import { loadCenterEmailHistory } from "@/app/lib/center-email-history";
 import { sendCenterNudge } from "@/app/lib/center-nudge-send";
-import { sendGiftOffer, recentGiftOffers } from "@/app/lib/gift-offer";
+import { sendGiftOffer, recentGiftOffers, finishGiftOffer } from "@/app/lib/gift-offer";
 import { runCenterProspects, listProspects, updateProspect, addProspectsFromText, moveProspectToDeal, PROSPECT_STATUS_VALUES, type ProspectStatus } from "@/app/lib/center-prospects";
 import { requestProspectDraft, sendProspectDraft } from "@/app/lib/prospect-draft";
 import { placesConfigured } from "@/app/lib/places-search";
@@ -292,6 +292,13 @@ export async function POST(req: NextRequest) {
         still_short: result.stillShort ?? 0,
         reoffer_after_days: result.reofferAfterDays ?? null,
       });
+    }
+    if (body?.action === "gift_offer_finish") {
+      const actionId = String(body?.id ?? "");
+      if (!actionId) return NextResponse.json({ ok: false, error: "חסר מזהה הצעה" }, { status: 400 });
+      const r = await finishGiftOffer(actionId);
+      if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: 400 });
+      return NextResponse.json({ ok: true, note: r.note });
     }
     if (body?.action === "deals_run") {
       const r = await syncDealReminders();

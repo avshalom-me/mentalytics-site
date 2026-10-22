@@ -792,11 +792,25 @@ export async function runSupplyGaps(): Promise<SupplyGapsResult> {
     // רענון הצעות שכבר ממתינות בתור: createAgentAction לא דורס הצעה קיימת
     // עם אותו מפתח, ולכן בלי זה טיוטה שהנוסח שלה השתנה (או ספירת ביקוש
     // שהתעדכנה) הייתה נשארת תקועה בגרסה שנוצרה ביום הראשון.
+    // כמה הצעות כבר יצאו מכרטיס ממתין (sent_count, נכתב במסלול השליחה) נשמר
+    // ברענון: לפיו הכרטיס מציג "סיום" במקום "דחה".
+    const { data: pendingRows } = await supabaseAdmin
+      .from("agent_actions")
+      .select("dedupe_key, payload")
+      .eq("agent", "supply_gaps")
+      .eq("status", "pending");
+    const sentCountByKey = new Map<string, number>();
+    for (const r of pendingRows ?? []) {
+      const n = Number((r.payload as { sent_count?: unknown } | null)?.sent_count ?? 0);
+      if (r.dedupe_key && n > 0) sentCountByKey.set(r.dedupe_key as string, n);
+    }
     for (const a of actions) {
       if (!a.dedupeKey) continue;
+      const sentCount = sentCountByKey.get(a.dedupeKey);
+      const payload = a.payload ? (sentCount ? { ...a.payload, sent_count: sentCount } : a.payload) : null;
       const { error } = await supabaseAdmin
         .from("agent_actions")
-        .update({ title: a.title, body: a.body ?? null, payload: a.payload ?? null })
+        .update({ title: a.title, body: a.body ?? null, payload })
         .eq("agent", "supply_gaps")
         .eq("dedupe_key", a.dedupeKey)
         .eq("status", "pending");

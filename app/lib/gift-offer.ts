@@ -274,7 +274,7 @@ export async function sendGiftOffer(opts: {
     }
   }
 
-  const stillOpen = stillShort > 0 && available.length > 0;
+  const { stillOpen } = giftOfferAfterSend({ stillShort, availableCount: available.length });
   const sentNote = `נשלחה הצעת מתנה ל${name || "מטפל"} (${t.email})`;
 
   const { error: updErr } = await supabaseAdmin
@@ -282,7 +282,8 @@ export async function sendGiftOffer(opts: {
     .update(
       stillOpen
         ? {
-            // נשארת פתוחה: רק המועמדים מתעדכנים, והגוף אומר כמה עוד חסר.
+            // נשארת פתוחה: רק המועמדים מתעדכנים, והגוף אומר כמה עוד חסר
+            // (או שהיעד כבר הושג, והשליחה לנותרים היא החלטה של האדמין).
             payload: { ...payload, candidates: available, sent_count: sentForGap },
             body: withProgressLine(String(action.body ?? ""), sentForGap, stillShort),
           }
@@ -293,9 +294,7 @@ export async function sendGiftOffer(opts: {
             resolution_note:
               sentNote +
               (sentForGap > 1 ? ` · ${sentForGap} הצעות בחיתוך הזה בסך הכל` : "") +
-              (available.length > 0
-                ? ` · החיתוך מלא; ${available.length} מועמדים נותרו ללא פנייה`
-                : ""),
+              " · לא נותרו מועמדים בכרטיס",
           }
     )
     .eq("id", opts.actionId);
@@ -312,13 +311,71 @@ export async function sendGiftOffer(opts: {
   };
 }
 
+/**
+ * מה קורה לכרטיס אחרי שליחה. עד 22/10/26 הכרטיס נסגר ברגע שהיעד בחיתוך
+ * הושג, גם כשנשארו בו מועמדים, ונעלם מהמסך באמצע סבב שליחות. ריצה חוזרת
+ * של הסוכן חישבה יעד חדש ופתחה אותו שוב, כך שהאדמין היה צריך להריץ את
+ * הסוכן בין שליחה לשליחה. עכשיו הכרטיס נשאר פתוח כל עוד יש למי לשלוח,
+ * והאדמין סוגר אותו ב"סיום" (finishGiftOffer); שורת ההתקדמות אומרת אם
+ * היעד כבר הושג.
+ */
+export function giftOfferAfterSend(p: { stillShort: number; availableCount: number }): {
+  stillOpen: boolean;
+  targetReached: boolean;
+} {
+  return { stillOpen: p.availableCount > 0, targetReached: p.stillShort <= 0 };
+}
+
 // שורת ההתקדמות בגוף ההצעה. מוחלפת בכל שליחה ולא נערמת.
-const PROGRESS_MARK = "\u25b8 נשלחו עד כה";
-function withProgressLine(body: string, sent: number, short: number): string {
+const PROGRESS_MARK = "▸ נשלחו עד כה";
+export function withProgressLine(body: string, sent: number, short: number): string {
   const clean = body
     .split("\n")
     .filter((l) => !l.startsWith(PROGRESS_MARK))
     .join("\n")
     .trimEnd();
-  return `${clean}\n${PROGRESS_MARK}: ${sent} הצעות בחיתוך הזה; חסרים עוד ${short} כדי לסגור אותו.`;
+  const tail =
+    short > 0
+      ? `חסרים עוד ${short} כדי לסגור אותו.`
+      : `היעד בחיתוך הושג. אפשר לשלוח גם לנותרים, או ללחוץ "סיום" כדי לסגור את ההצעה.`;
+  return `${clean}\n${PROGRESS_MARK}: ${sent} הצעות בחיתוך הזה; ${tail}`;
+}
+
+/**
+ * "סיום" על כרטיס שכבר יצאו ממנו הצעות: נסגר כ"בוצע" (לא "נדחה"), עם מספר
+ * ההצעות ששלח ומספר המועמדים שלא קיבלו פנייה. כרטיס שלא נשלח ממנו כלום
+ * נדחה כרגיל, ולכן כאן הוא נחסם.
+ */
+export async function finishGiftOffer(actionId: string): Promise<{ ok: boolean; error?: string; note?: string }> {
+  const { data: action, error } = await supabaseAdmin
+    .from("agent_actions")
+    .select("id, action_type, status, payload")
+    .eq("id", actionId)
+    .single();
+  if (error || !action) return { ok: false, error: "ההצעה לא נמצאה" };
+  if (action.action_type !== "gift_offer") return { ok: false, error: "ההצעה הזו אינה הצעת קידום מתנה" };
+  if (action.status !== "pending") return { ok: false, error: "ההצעה כבר טופלה - רענן/י את העמוד" };
+
+  const { count, error: cntErr } = await supabaseAdmin
+    .from("gift_offers")
+    .select("id", { count: "exact", head: true })
+    .eq("agent_action_id", actionId);
+  if (cntErr) return { ok: false, error: `בדיקת ההצעות שנשלחו נכשלה: ${cntErr.message}` };
+  const sent = count ?? 0;
+  if (sent === 0) return { ok: false, error: "לא נשלחה אף הצעה מהכרטיס הזה - אפשר לדחות אותו" };
+
+  const left = ((action.payload as { candidates?: unknown[] } | null)?.candidates ?? []).length;
+  const note = `הסתיים ידנית אחרי ${sent} הצעות מהכרטיס` + (left > 0 ? ` · ${left} מועמדים לא קיבלו פנייה` : "");
+  const { error: updErr } = await supabaseAdmin
+    .from("agent_actions")
+    .update({
+      status: "executed",
+      status_changed_at: new Date().toISOString(),
+      resolved_by: "admin",
+      resolution_note: note,
+    })
+    .eq("id", actionId)
+    .eq("status", "pending");
+  if (updErr) return { ok: false, error: updErr.message };
+  return { ok: true, note };
 }

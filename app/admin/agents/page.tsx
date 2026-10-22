@@ -153,6 +153,8 @@ type ActionPayload = {
   sent_count?: number;
   supply_target?: number;
   paying_covering?: number;
+  /** "concentration" = הצעה לפזר פניות שמתרכזות אצל מעט מטפלים (לא פער היצע). */
+  reason?: string;
   // טיוטת נדנוד למרכז
   center_id?: string;
   center_name?: string;
@@ -904,6 +906,7 @@ function GiftOfferCard({
   offeredIds,
   onSent,
   onDismiss,
+  onFinish,
   dismissing,
   open,
   onToggle,
@@ -913,6 +916,8 @@ function GiftOfferCard({
   offeredIds: string[];
   onSent: (msg: string) => void;
   onDismiss: () => void;
+  /** סגירת כרטיס שכבר יצאו ממנו הצעות - נרשם כ"בוצע", לא כ"נדחה". */
+  onFinish: () => void;
   dismissing: boolean;
   open: boolean;
   onToggle: () => void;
@@ -935,6 +940,13 @@ function GiftOfferCard({
   const selected = candidates.find((c) => c.therapist_id === selectedId) ?? null;
   // כמה הצעות כבר יצאו בחיתוך הזה - נכתב ע"י מסלול השליחה כשההצעה נשארת פתוחה.
   const sentCount = Number(action.payload?.sent_count ?? 0);
+  // הצעת פיזור (ריכוז פניות) נראתה כמו כל הצעת מתנה ולא בלטה בתור.
+  const isConcentration = action.payload?.reason === "concentration";
+  const concBadge = isConcentration ? (
+    <span className="shrink-0 rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800">
+      🔥 פיזור פניות
+    </span>
+  ) : null;
 
   function pickCandidate(c: GiftCandidate) {
     if (c.therapist_id === selectedId) return;
@@ -972,7 +984,9 @@ function GiftOfferCard({
       onSent(
         `ההצעה נשלחה אל ${selected.full_name} (${selected.email})` +
           (stillOpen
-            ? ` · החיתוך עדיין חסר ${short}, וההצעה נשארה פתוחה - אפשר לשלוח גם ל${left.join(", ")}`
+            ? short > 0
+              ? ` · החיתוך עדיין חסר ${short}, וההצעה נשארה פתוחה - אפשר לשלוח גם ל${left.join(", ")}`
+              : ` · היעד בחיתוך הושג. ההצעה נשארה פתוחה אם תרצה לשלוח גם ל${left.join(", ")}; אחרת "סיום"`
             : left.length > 0
               ? ` · ${left.join(", ")} נשמרו לגיבוי${
                   days ? ` ויוצעו מחדש בעוד ${days} יום אם לא תגיע תשובה` : ""
@@ -990,6 +1004,7 @@ function GiftOfferCard({
     return (
       <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-emerald-200 bg-white px-4 py-2.5">
         <span className="text-sm font-bold text-stone-800">🎁 {action.title}</span>
+        {concBadge}
         <span className="flex-1 truncate text-xs text-stone-400">
           {candidates.length
             ? `${sentCount > 0 ? `${sentCount} כבר נשלחו · ` : ""}${candidates.length} מועמדים · ${candidates[0].full_name}${candidates.length > 1 ? " ואחרים" : ""}`
@@ -1002,11 +1017,11 @@ function GiftOfferCard({
           פתח וערוך ▼
         </button>
         <button
-          onClick={onDismiss}
+          onClick={sentCount > 0 ? onFinish : onDismiss}
           disabled={dismissing}
           className="shrink-0 text-xs text-stone-400 underline hover:text-stone-600 disabled:opacity-50"
         >
-          דחה
+          {sentCount > 0 ? "סיום" : "דחה"}
         </button>
       </div>
     );
@@ -1015,7 +1030,7 @@ function GiftOfferCard({
   return (
     <div className="rounded-2xl border border-emerald-200 bg-white p-5">
       <div className="mb-1 flex items-start justify-between gap-3">
-        <h3 className="text-sm font-black text-stone-900">🎁 {action.title}</h3>
+        <h3 className="text-sm font-black text-stone-900">🎁 {action.title} {concBadge}</h3>
         <div className="flex shrink-0 items-center gap-2">
           <span className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-0.5 text-xs font-bold text-stone-500">
             {agentLabel(action.agent)}
@@ -1096,11 +1111,11 @@ function GiftOfferCard({
               {sending ? "שולח..." : "📤 שלח הצעה"}
             </button>
             <button
-              onClick={onDismiss}
+              onClick={sentCount > 0 ? onFinish : onDismiss}
               disabled={sending || dismissing}
               className="rounded-full border border-stone-300 px-4 py-1.5 text-sm font-bold text-stone-600 hover:bg-stone-50 disabled:opacity-50"
             >
-              ✕ דחה
+              {sentCount > 0 ? "✓ סיום" : "✕ דחה"}
             </button>
             <span className="text-xs text-stone-400">
               המייל יוצא רק מהלחיצה הזו. הקידום עצמו מוענק ידנית מעמוד המטפלים אחרי תשובה.
@@ -2914,6 +2929,21 @@ export default function AgentsPage() {
     }
   }
 
+  async function finishGiftOffer(id: string) {
+    setBusyId(id);
+    setActionError("");
+    setActionMsg("");
+    try {
+      const j = await postAgents("gift_offer_finish", { id });
+      setActionMsg(typeof j.note === "string" ? `ההצעה נסגרה · ${j.note}` : "ההצעה נסגרה");
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "הסגירה נכשלה");
+    } finally {
+      setBusyId(null);
+      load();
+    }
+  }
+
   async function dismissMany(items: PendingAction[], what: string) {
     if (items.length === 0) return;
     if (
@@ -3450,6 +3480,7 @@ export default function AgentsPage() {
                   load();
                 }}
                 onDismiss={() => resolveAction(a.id, "dismissed")}
+                onFinish={() => finishGiftOffer(a.id)}
               />
             ) : (
               <div
