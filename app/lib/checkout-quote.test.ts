@@ -59,6 +59,13 @@ describe("the page and the charge read the same decision", () => {
     expect(page).not.toMatch(/\.from\("therapists"\)/);
   });
 
+  it("the dashboard's join banner shows the same quote (a free therapist with an offer saw ₪140 there)", () => {
+    const dash = readFileSync("app/therapists/dashboard/page.tsx", "utf8");
+    expect(dash).toContain("const quote = checkoutQuote(profile.upgrade_offer_until ?? null);");
+    expect(dash).toContain("₪{quote.unitPrice}");
+    expect(dash).not.toMatch(/isPromoActive\(\)/);
+  });
+
   it("the info route answers from checkoutQuote for the signed-in user's own row", () => {
     const info = readFileSync("app/api/payments/checkout-info/route.ts", "utf8");
     expect(info).toContain('.eq("user_id", user.id)');

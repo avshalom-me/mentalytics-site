@@ -9,7 +9,7 @@ import ProfileLinkPromo from "./ProfileLinkPromo";
 import PendingLinkNotice from "@/app/therapists/PendingLinkNotice";
 import CenterOwnerNotice from "@/app/therapists/CenterOwnerNotice";
 import { UpgradeToPromotedButton } from "@/app/therapists/register/PromotedSignupButton";
-import { isPromoActive, SUBSCRIPTION_PROMO_PRICE, SUBSCRIPTION_PROMO_MONTHS, SUBSCRIPTION_REGULAR_PRICE } from "@/app/lib/promo";
+import { checkoutQuote } from "@/app/lib/promo";
 import { ATTRIBUTION_HEADER, getAttributionHeaderValue } from "@/app/lib/attribution";
 import { THERAPIST_ARCHIVED_STATUS } from "@/app/lib/center-gift";
 
@@ -41,6 +41,8 @@ type Profile = {
   education?: string;
   experience?: string;
   rejection_reason?: string | null;
+  /** הצעה אישית ממייל סיום הניסיון (₪60 לחודשיים) - פעילה עד התאריך הזה. */
+  upgrade_offer_until?: string | null;
 };
 
 type StatsBucket = { whatsapp: number; phone: number; email: number; site_message: number; total: number };
@@ -533,29 +535,45 @@ function TherapistDashboard() {
       {profile && profile.status !== "paying" && !profile.center_account_id && (
         <div className="mb-6 rounded-2xl overflow-hidden" style={{ background: "linear-gradient(135deg,#0F5468,#1A7A96)", boxShadow: "0 4px 20px rgba(15,84,104,.25)" }}>
           <div className="px-6 pt-6 pb-5">
+            {/* אותו מחיר שדף התשלום מציג והשרת גובה (checkoutQuote) - כולל הצעה
+                אישית ממייל סיום הניסיון. עד 23/10/26 כאן הופיע ₪140 גם למי שקיבל
+                במייל ₪60 לחודשיים. */}
+            {(() => {
+              const quote = checkoutQuote(profile.upgrade_offer_until ?? null);
+              const title =
+                quote.kind === "trial_upgrade"
+                  ? "ההצעה האישית שלך - הצטרפות למערכת ההתאמה החכמה"
+                  : quote.kind === "early_bird"
+                    ? "מבצע פתיחה - הצטרפות למערכת ההתאמה החכמה"
+                    : "הצטרפות למערכת ההתאמה החכמה";
+              return (
+                <>
             <div className="text-xs font-bold text-white/60 uppercase tracking-widest mb-2">
-              {isPromoActive() ? "מבצע פתיחה - הצטרפות למערכת ההתאמה החכמה" : "הצטרפות למערכת ההתאמה החכמה"}
+              {title}
             </div>
-            {isPromoActive() ? (
+            {quote.kind !== "regular" ? (
               <>
                 <div className="flex items-end gap-3 mb-1">
-                  <span className="text-4xl font-black text-white leading-none">₪{SUBSCRIPTION_PROMO_PRICE}</span>
+                  <span className="text-4xl font-black text-white leading-none">₪{quote.unitPrice}</span>
                   <span className="text-white/70 text-sm pb-1">+ מע&quot;מ / לחודש</span>
-                  <span className="text-white/40 text-lg pb-1 line-through">₪{SUBSCRIPTION_REGULAR_PRICE}</span>
+                  <span className="text-white/40 text-lg pb-1 line-through">₪{quote.regularPrice}</span>
                 </div>
                 <p className="text-white/70 text-xs mb-4">
-                  ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן ₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ. ניתן לבטל בכל עת.
+                  ל-{quote.discountMonths} החודשים הראשונים, ולאחר מכן ₪{quote.regularPrice} + מע&quot;מ. ניתן לבטל בכל עת.
                 </p>
               </>
             ) : (
               <>
                 <div className="flex items-end gap-3 mb-1">
-                  <span className="text-4xl font-black text-white leading-none">₪{SUBSCRIPTION_REGULAR_PRICE}</span>
+                  <span className="text-4xl font-black text-white leading-none">₪{quote.regularPrice}</span>
                   <span className="text-white/70 text-sm pb-1">+ מע&quot;מ / לחודש</span>
                 </div>
                 <p className="text-white/60 text-xs mb-4">ניתן לבטל בכל עת</p>
               </>
             )}
+                </>
+              );
+            })()}
             <div className="h-px bg-white/20 mb-4" />
             <div className="flex items-start gap-2.5">
               <span className="text-yellow-300 font-bold text-base mt-0.5 flex-shrink-0">✓</span>
