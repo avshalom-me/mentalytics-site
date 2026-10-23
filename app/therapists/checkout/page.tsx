@@ -5,14 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, ShieldCheck } from "lucide-react";
 import { getClickIds } from "@/app/lib/attribution";
-import {
-  isPromoActive,
-  SUBSCRIPTION_PROMO_PRICE,
-  SUBSCRIPTION_PROMO_TOTAL,
-  SUBSCRIPTION_PROMO_MONTHS,
-  SUBSCRIPTION_REGULAR_PRICE,
-  SUBSCRIPTION_REGULAR_TOTAL,
-} from "@/app/lib/promo";
+import { checkoutQuote, type CheckoutQuote } from "@/app/lib/promo";
 
 // Sumit's Vault API: card data goes from the browser directly to Sumit, never
 // through our server. PCI scope is effectively SAQ-A. The "json" variant of
@@ -41,7 +34,11 @@ function formatCardNumber(raw: string): string {
 function CheckoutForm() {
   const searchParams = useSearchParams();
   const isNewSignup = searchParams.get("mode") === "register";
-  const promo = isPromoActive();
+  // המחיר שיחויב בפועל. עד שהשרת עונה - ה-early-bird או המחיר הרגיל; מטפל/ת
+  // עם הצעה אישית (מייל סיום הניסיון) מקבל/ת אותה מהשרת, כמו בחיוב עצמו.
+  const [quote, setQuote] = useState<CheckoutQuote>(() => checkoutQuote(null));
+  const discounted = quote.kind !== "regular";
+  const offerLabel = quote.kind === "trial_upgrade" ? "ההצעה האישית שלך 🎁" : "מבצע פתיחה 🎉";
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -71,11 +68,14 @@ function CheckoutForm() {
         } = await sb.auth.getSession();
         if (!session) return;
 
-        const { data: therapist } = await sb
-          .from("therapists")
-          .select("full_name, email, phone")
-          .eq("user_id", session.user.id)
-          .single();
+        // הדפדפן לא קורא טבלאות (מ-20/10/26 אף טבלה לא פתוחה ל-authenticated),
+        // ולכן גם המילוי המוקדם וגם המחיר מגיעים מנתיב בשרת.
+        const res = await fetch("/api/payments/checkout-info", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        const info = res.ok ? await res.json().catch(() => null) : null;
+        if (info?.quote) setQuote(info.quote as CheckoutQuote);
+        const therapist = info?.therapist as { full_name?: string | null; email?: string | null; phone?: string | null } | null | undefined;
 
         if (therapist) {
           const parts = (therapist.full_name || "").split(" ");
@@ -217,20 +217,20 @@ function CheckoutForm() {
       <div className="mt-4 rounded-xl border border-[#E8E0D8] bg-white p-4">
         <div className="flex justify-between items-center">
           <span className="font-bold text-stone-800">מנוי חודשי - מסלול מקודם</span>
-          {promo ? (
+          {discounted ? (
             <span className="text-left">
-              <span className="font-black text-[#0F5468]">&#8362;{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ</span>
-              <span className="block text-[11px] font-normal text-stone-400 line-through">&#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ</span>
+              <span className="font-black text-[#0F5468]">&#8362;{quote.unitPrice} + מע&quot;מ</span>
+              <span className="block text-[11px] font-normal text-stone-400 line-through">&#8362;{quote.regularPrice} + מע&quot;מ</span>
             </span>
           ) : (
-            <span className="font-black text-[#0F5468]">&#8362;{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ</span>
+            <span className="font-black text-[#0F5468]">&#8362;{quote.regularPrice} + מע&quot;מ</span>
           )}
         </div>
-        {promo ? (
+        {discounted ? (
           <div className="mt-2 rounded-lg bg-[#FDF6EE] border border-[#E8DCC8] px-3 py-2">
-            <p className="text-xs font-bold text-[#8B5A0A]">מבצע פתיחה 🎉</p>
+            <p className="text-xs font-bold text-[#8B5A0A]">{offerLabel}</p>
             <p className="text-xs text-stone-600 mt-0.5 leading-5">
-              ₪{SUBSCRIPTION_PROMO_PRICE} + מע&quot;מ לחודש ל-{SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים, ולאחר מכן ₪{SUBSCRIPTION_REGULAR_PRICE} + מע&quot;מ לחודש. ניתן לבטל בכל עת.
+              ₪{quote.unitPrice} + מע&quot;מ לחודש ל-{quote.discountMonths} החודשים הראשונים, ולאחר מכן ₪{quote.regularPrice} + מע&quot;מ לחודש. ניתן לבטל בכל עת.
             </p>
           </div>
         ) : (
@@ -397,9 +397,9 @@ function CheckoutForm() {
             >
               תקנון הרכישה
             </Link>{" "}
-            {promo
-              ? `ואת החיוב החודשי המתחדש - ₪${SUBSCRIPTION_PROMO_PRICE} + מע"מ ל-${SUBSCRIPTION_PROMO_MONTHS} החודשים הראשונים ולאחר מכן ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ - עד לביטול.`
-              : `ואת החיוב החודשי המתחדש של ₪${SUBSCRIPTION_REGULAR_PRICE} + מע"מ עד לביטול.`}
+            {discounted
+              ? `ואת החיוב החודשי המתחדש - ₪${quote.unitPrice} + מע"מ ל-${quote.discountMonths} החודשים הראשונים ולאחר מכן ₪${quote.regularPrice} + מע"מ - עד לביטול.`
+              : `ואת החיוב החודשי המתחדש של ₪${quote.regularPrice} + מע"מ עד לביטול.`}
           </span>
         </label>
 
@@ -416,7 +416,7 @@ function CheckoutForm() {
             <Loader2 size={16} className="inline animate-spin" />
           ) : (
             <>
-              חיוב מאובטח - ₪{promo ? SUBSCRIPTION_PROMO_TOTAL : SUBSCRIPTION_REGULAR_TOTAL}
+              חיוב מאובטח - ₪{quote.unitTotal}
               <ArrowLeft size={16} className="inline mr-2" />
             </>
           )}

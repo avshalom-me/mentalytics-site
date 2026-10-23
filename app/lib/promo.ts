@@ -121,3 +121,35 @@ export function trialUpgradeRevertDate(signupAt: Date = new Date()): Date {
   d.setDate(d.getDate() - 3);
   return d;
 }
+
+// ── מה יחויב בפועל, ומה דף התשלום מציג ──────────────────────────────────
+// עד 23/10/26 דף התשלום הכיר רק את ה-early-bird ואת המחיר הרגיל, ואילו
+// השרת חייב לפי הצעת סוף הניסיון (₪60 לחודשיים). מטפלת שקיבלה את המייל
+// "החודשיים הראשונים ב-₪60" ראתה בדף ₪140, בתיבת ההסכמה ₪140 ובכפתור
+// ₪165.20 - ואף אחד מ-16 מקבלי ההצעה לא נרשם דרכה. ההחלטה יושבת כאן אחת,
+// ושני הצדדים קוראים לה.
+export type CheckoutQuoteKind = "trial_upgrade" | "early_bird" | "regular";
+
+export type CheckoutQuote = {
+  kind: CheckoutQuoteKind;
+  /** מחיר לחודש לפני מע"מ, כפי שנפתחת הוראת הקבע. */
+  unitPrice: number;
+  /** אותו מחיר כולל מע"מ - מה שנגבה בפועל בכל חודש מוזל. */
+  unitTotal: number;
+  /** כמה חודשים במחיר המוזל (0 = אין הנחה). */
+  discountMonths: number;
+  regularPrice: number;
+  regularTotal: number;
+};
+
+export function checkoutQuote(upgradeOfferUntil: string | null | undefined, at: Date = new Date()): CheckoutQuote {
+  const base = { regularPrice: SUBSCRIPTION_REGULAR_PRICE, regularTotal: SUBSCRIPTION_REGULAR_TOTAL };
+  // הצעת סוף הניסיון גוברת על ה-early-bird אם שניהם פעילים.
+  if (trialUpgradeActive(upgradeOfferUntil, at)) {
+    return { kind: "trial_upgrade", unitPrice: TRIAL_UPGRADE_PRICE, unitTotal: TRIAL_UPGRADE_TOTAL, discountMonths: TRIAL_UPGRADE_MONTHS, ...base };
+  }
+  if (isPromoActive(at)) {
+    return { kind: "early_bird", unitPrice: SUBSCRIPTION_PROMO_PRICE, unitTotal: SUBSCRIPTION_PROMO_TOTAL, discountMonths: SUBSCRIPTION_PROMO_MONTHS, ...base };
+  }
+  return { kind: "regular", unitPrice: SUBSCRIPTION_REGULAR_PRICE, unitTotal: SUBSCRIPTION_REGULAR_TOTAL, discountMonths: 0, ...base };
+}

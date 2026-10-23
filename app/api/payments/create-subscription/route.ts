@@ -3,12 +3,8 @@ import { createClient } from "@supabase/supabase-js";
 import {
   createSubscription,
   SumitPaymentDeclinedError,
-  SUBSCRIPTION_BASE_PRICE,
 } from "@/app/lib/sumit";
-import {
-  isPromoActive, SUBSCRIPTION_PROMO_PRICE, promoRevertDate,
-  TRIAL_UPGRADE_PRICE, trialUpgradeActive, trialUpgradeRevertDate,
-} from "@/app/lib/promo";
+import { checkoutQuote, promoRevertDate, trialUpgradeRevertDate } from "@/app/lib/promo";
 import { writeAudit } from "@/app/lib/audit";
 import { sendTherapistWelcomeEmail } from "@/app/lib/therapist-emails";
 import { sanitizeClickIds } from "@/app/lib/attribution";
@@ -153,13 +149,11 @@ export async function POST(req: NextRequest) {
     // הצעת שדרוג אישית לסיום תקופת מתנה (מייל "התקופה נגמרת"): מחיר מוזל
     // לחודשיים ואז המחיר המלא. נבדקת מול השדה שנשמר על המטפל/ת, כדי שההצעה
     // לא תדלוף למי שלא קיבל אותה. גוברת על ה-early-bird אם שניהם פעילים.
-    const upgradeOffer = trialUpgradeActive(therapist.upgrade_offer_until as string | null);
-    const promoActive = !upgradeOffer && isPromoActive();
-    const unitPrice = upgradeOffer
-      ? TRIAL_UPGRADE_PRICE
-      : promoActive
-        ? SUBSCRIPTION_PROMO_PRICE
-        : SUBSCRIPTION_BASE_PRICE;
+    // דף התשלום מציג את אותה החלטה (checkoutQuote דרך /api/payments/checkout-info).
+    const quote = checkoutQuote(therapist.upgrade_offer_until as string | null);
+    const upgradeOffer = quote.kind === "trial_upgrade";
+    const promoActive = quote.kind === "early_bird";
+    const unitPrice = quote.unitPrice;
 
     const { data: payment, error: paymentErr } = await supabase
       .from("payments")
